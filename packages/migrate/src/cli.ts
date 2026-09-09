@@ -102,12 +102,20 @@ program
       const { join } = await import('node:path');
       const outPath: string = opts.out ?? join(projectRoot, '.modeler', 'resolved-packages.json');
 
-      const artifact = await resolvePackages(projectRoot);
+      // A file the parser rejected contributes nothing to the artifact. Say which, always — not
+      // only under --verbose: a build that quietly ignores a model file is how a project ends up
+      // believing it declares something it does not.
+      const skipped: string[] = [];
+      const artifact = await resolvePackages(projectRoot, (path, errors) => {
+        skipped.push(path);
+        console.error(`resolve-packages: SKIPPED ${path} — it does not parse (${errors[0]?.message ?? 'parse error'})`);
+      });
       const serialized = serializeArtifact(artifact);
 
       if (opts.verbose) {
         console.error(
-          `resolve-packages: ${artifact.packages.length} package(s), ${artifact.entities.length} entit(y/ies), ${artifact.areas.length} area(s)`
+          `resolve-packages: ${artifact.packages.length} package(s), ${artifact.entities.length} entit(y/ies), ${artifact.areas.length} area(s)` +
+            (skipped.length ? `, ${skipped.length} file(s) skipped` : '')
         );
       }
 

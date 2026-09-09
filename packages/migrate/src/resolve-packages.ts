@@ -85,7 +85,13 @@ export function buildArtifactFromFiles(
   files: ModelFile[],
   projectRoot: string,
   cfg: PackagesConfig,
-  generatedFrom: string
+  generatedFrom: string,
+  /**
+   * Called once per file the parser rejected. Optional, and the artifact is identical with or
+   * without it — but a build that drops a file silently fails the same way the bug below did, so
+   * the CLI passes one and says so.
+   */
+  onSkip?: (path: string, errors: readonly { message: string }[]) => void
 ): ResolvedPackagesArtifact {
   const symbols = new ProjectSymbolTable();
   const areaEntries: AreaEntry[] = [];
@@ -95,8 +101,29 @@ export function buildArtifactFromFiles(
 
   for (const file of [...files].filter((f) => isModelExt(f.path)).sort((a, b) => a.path.localeCompare(b.path))) {
     const uri = file.path.startsWith('file://') ? file.path : `file://${file.path}`;
-    const ast = parseString(file.text, uri).ast;
+    const parsed = parseString(file.text, uri);
+    const ast = parsed.ast;
     if (!ast) continue;
+
+    // ⛔ A FILE THE PARSER REJECTED CONTRIBUTES NOTHING.
+    //
+    // The parser is deliberately error-TOLERANT: it recovers past a bad token and keeps whatever
+    // definitions it can still read, which is exactly what an editor wants from a file being typed
+    // into. A build artifact wants the opposite — it is a statement about what a project CONTAINS,
+    // and a definition salvaged from a syntax error is not something the project contains.
+    //
+    // This line used to read `parseString(...).ast` and never look at `.errors`, so a rejected file
+    // still contributed packages, entities and areas — under a GUESSED schema code, because its
+    // `model` directive was usually part of what failed (an empty modelCode reads as `er`). Found
+    // on kantheon's `investment` package: three files declare `model book`, a model code this
+    // grammar does not have, and were believed invisible. They were not — their `def entity`
+    // declarations reached the symbol table, so the artifact claimed er entities nobody had
+    // authored, and inside the table they competed for qnames with the real `er` layer, with
+    // alphabetical file order deciding the winner.
+    if (parsed.errors.length > 0) {
+      onSkip?.(file.path, parsed.errors);
+      continue;
+    }
 
     // v3.0: subject areas are now `def area` definitions (no `.ttrd` file kind).
     // They drive the `areas` artifact (recursive package closure). Collect them
@@ -186,7 +213,10 @@ export function basename(p: string): string {
  * project-root **basename** (not the absolute path) so the committed snapshot is
  * byte-identical across machines (a CI drift gate compares it to a local run).
  */
-export async function resolvePackages(projectRoot: string): Promise<ResolvedPackagesArtifact> {
+export async function resolvePackages(
+  projectRoot: string,
+  onSkip?: (path: string, errors: readonly { message: string }[]) => void
+): Promise<ResolvedPackagesArtifact> {
   const { readFile } = await import('node:fs/promises');
   const { join } = await import('node:path');
 
@@ -199,7 +229,7 @@ export async function resolvePackages(projectRoot: string): Promise<ResolvedPack
 
   const files: ModelFile[] = [];
   await walk(projectRoot, files);
-  return buildArtifactFromFiles(files, projectRoot, cfg, basename(projectRoot));
+  return buildArtifactFromFiles(files, projectRoot, cfg, basename(projectRoot), onSkip);
 }
 
 async function walk(dir: string, out: ModelFile[]): Promise<void> {

@@ -115,4 +115,64 @@ describe('PD4 — buildArtifactFromFiles', () => {
     const a = buildArtifactFromFiles(files, ROOT, flexible, 'proj');
     expect(a.areas).toEqual([]);
   });
+
+  // ── a file that does not parse contributes nothing ───────────────────────────────────────────
+  //
+  // The parser is deliberately error-TOLERANT: it recovers past a bad token and keeps the
+  // definitions it can still read, which is what an editor needs. A build artifact needs the
+  // opposite. `buildArtifactFromFiles` used to take `parseString(...).ast` and never look at
+  // `.errors`, so a file the parser had REJECTED still contributed packages, entities and areas —
+  // under a guessed schema code, since its `model` directive was part of what failed.
+  //
+  // Found on kantheon's `investment` package (IE-P2·S2.1), where three files declare `model book`
+  // — not a model code this grammar has — and were believed invisible. They were not: their
+  // `def entity` declarations reached the symbol table, and because the table takes the FIRST
+  // writer of a qname and `model/book.ttrm` sorts before `model/er/book.ttrm`, the artifact
+  // resolved `transaction` and `position` to the file that had failed to parse rather than to the
+  // authored `er` layer. Alphabetical order decided which model a consumer would be served.
+  //
+  // The artifact cannot express WHICH file won a qname, so that half is asserted in kantheon's
+  // own suite against the symbol table. What the artifact does show — and what these assert — is
+  // the entities and areas that only exist because a rejected file was read anyway.
+  const unparseable = (entity: string) =>
+    `package a\nmodel book schema entity\ndef entity ${entity} { attributes: [def attribute id { type: int }] }`;
+
+  it('a file with parse errors contributes NO entities', () => {
+    const files: ModelFile[] = [{ path: '/proj/a/broken.ttrm', text: unparseable('ghost') }];
+    const a = buildArtifactFromFiles(files, ROOT, flexible, 'proj');
+    expect(a.entities).toEqual([]);
+    expect(a.packages).toEqual([]);
+  });
+
+  it('a file with parse errors cannot add an entity beside the ones that parse', () => {
+    // The kantheon shape exactly: one authored `er` file, one file the parser rejected, both in
+    // the same package. Before the fix the artifact carried BOTH `client` and `consultant`, and
+    // nothing distinguished the one that had been authored from the one that had been recovered
+    // out of a syntax error.
+    const files: ModelFile[] = [
+      { path: '/proj/a/book.ttrm', text: unparseable('consultant') },
+      { path: '/proj/a/er/parties.ttrm', text: declared('a', 'client') },
+    ];
+    const a = buildArtifactFromFiles(files, ROOT, flexible, 'proj');
+    expect(a.entities.map((e) => e.qname)).toEqual(['a.er.entity.client']);
+  });
+
+  it('a file with parse errors contributes no AREA either', () => {
+    const files: ModelFile[] = [
+      { path: '/proj/a/er.ttrm', text: declared('a', 'ea') },
+      { path: '/proj/domains/broken.ttrd.ttrm', text: 'def area D { packages: [a] } }}}' },
+    ];
+    const a = buildArtifactFromFiles(files, ROOT, flexible, 'proj');
+    expect(a.areas).toEqual([]);
+  });
+
+  it('a file that parses is unaffected', () => {
+    // The guard must key on ERRORS, not on "looks odd" — every existing fixture still resolves.
+    const a = buildArtifactFromFiles(FIXTURE, ROOT, flexible, 'proj');
+    expect(a.entities.map((e) => e.qname)).toEqual([
+      'a.b.c.er.entity.ec',
+      'a.b.er.entity.eb',
+      'a.er.entity.ea',
+    ]);
+  });
 });
