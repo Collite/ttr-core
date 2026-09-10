@@ -120,8 +120,17 @@ export function buildArtifactFromFiles(
     // declarations reached the symbol table, so the artifact claimed er entities nobody had
     // authored, and inside the table they competed for qnames with the real `er` layer, with
     // alphabetical file order deciding the winner.
-    if (parsed.errors.length > 0) {
-      onSkip?.(file.path, parsed.errors);
+    //
+    // ⛔ REJECTED means an `error`-severity diagnostic, NOT a non-empty `.errors`. That list also
+    // carries the walker's LINT warnings (`UnknownLanguageTag`, `DeprecatedLanguageProperty`) and
+    // the recovery strategy's `info` events — the latter only ever accompany an `error` the ANTLR
+    // listener already reported. Keying on `.errors.length` dropped a well-formed query that kept
+    // the soft-deprecated `language: SQL` beside a tagged `"""sql` block, and the CLI then said the
+    // file "does not parse", which was false (review-089 ⒄). A warning is advice about a file the
+    // project DOES contain; only an error makes its definitions untrustworthy.
+    const rejections = parsed.errors.filter((e) => e.severity === 'error');
+    if (rejections.length > 0) {
+      onSkip?.(file.path, rejections);
       continue;
     }
 
