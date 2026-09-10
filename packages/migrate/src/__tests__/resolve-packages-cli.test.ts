@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -71,6 +71,28 @@ describe('modeler resolve-packages CLI', () => {
     // Regenerating brings it back in sync.
     runCli(['resolve-packages', root, '--out', out]);
     expect(runCli(['resolve-packages', root, '--out', out, '--check']).status).toBe(0);
+  });
+
+  it('the SKIPPED line names the file that does not parse — and not one that only carries a warning', () => {
+    // review-089 ⒄: a well-formed query keeping the soft-deprecated `language: SQL` beside a tagged
+    // """sql block used to be reported as "SKIPPED … it does not parse", which was false.
+    mkdirSync(join(root, 'q'), { recursive: true });
+    writeFileSync(
+      join(root, 'q', 'q.ttrm'),
+      'package q\nmodel query\ndef query x {\n  language: SQL\n  sourceText: """sql\nSELECT 1\n"""\n}\n'
+    );
+    mkdirSync(join(root, 'bad'), { recursive: true });
+    writeFileSync(join(root, 'bad', 'broken.ttrm'), 'package bad\nmodel book schema entity\ndef entity ghost { }\n');
+    const out = join(root, 'resolved-packages.json');
+    // execFileSync drops stderr on success; spawnSync keeps both streams.
+    const r = spawnSync('node', [CLI, 'resolve-packages', root, '--out', out], { encoding: 'utf-8' });
+    expect(r.status).toBe(0);
+    const skippedLines = r.stderr.split('\n').filter((l) => l.includes('SKIPPED'));
+    expect(skippedLines).toHaveLength(1);
+    expect(skippedLines[0]).toContain(join(root, 'bad', 'broken.ttrm'));
+    expect(r.stderr).not.toContain(join(root, 'q', 'q.ttrm'));
+    const artifact = JSON.parse(readFileSync(out, 'utf-8'));
+    expect(artifact.packages.map((p: { canonicalName: string }) => p.canonicalName)).toEqual(['a', 'q']);
   });
 
   it('--check exits non-zero when no artifact exists yet', () => {

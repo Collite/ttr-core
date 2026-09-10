@@ -175,4 +175,61 @@ describe('PD4 — buildArtifactFromFiles', () => {
       'a.er.entity.ea',
     ]);
   });
+
+  // ── a WARNING is not a rejection (review-089 ⒄) ────────────────────────────────────────────
+  //
+  // `parseString(...).errors` carries every diagnostic the parser has, not only errors: the
+  // walker's lint warnings (`UnknownLanguageTag`, `DeprecatedLanguageProperty`) ride the same list.
+  // The guard above first keyed on `errors.length`, so a well-formed query in the CURRENT tagged
+  // form that also kept the soft-deprecated `language: SQL` vanished from the artifact, and the CLI
+  // reported it as a file that "does not parse". No estate was exposed only because every
+  // `q_*.ttrm` so far uses an untagged `"""` block.
+  const query = (pkg: string, body: string) => `package ${pkg}\nmodel query\ndef query x {\n${body}\n}`;
+  const TAGGED_SQL = '  sourceText: """sql\nSELECT 1\n"""';
+
+  it('a query keeping `language: SQL` beside a tagged """sql block contributes its package', () => {
+    const skipped: string[] = [];
+    const a = buildArtifactFromFiles(
+      [
+        { path: '/proj/a/er.ttrm', text: declared('a', 'ea') },
+        { path: '/proj/q/q.ttrm', text: query('q', `  language: SQL\n${TAGGED_SQL}`) },
+      ],
+      ROOT,
+      flexible,
+      'proj',
+      (p) => skipped.push(p)
+    );
+    expect(a.packages.map((p) => p.canonicalName)).toEqual(['a', 'q']);
+    expect(skipped).toEqual([]);
+  });
+
+  it('an unknown embedded-language tag (a warning) does not drop the file either', () => {
+    const skipped: string[] = [];
+    const a = buildArtifactFromFiles(
+      [{ path: '/proj/q/q.ttrm', text: query('q', '  sourceText: """cobol\nMOVE 1 TO X\n"""') }],
+      ROOT,
+      flexible,
+      'proj',
+      (p) => skipped.push(p)
+    );
+    expect(a.packages.map((p) => p.canonicalName)).toEqual(['q']);
+    expect(skipped).toEqual([]);
+  });
+
+  it('a file with an error AND a warning is skipped, and onSkip hears only the error', () => {
+    // `language: PYTHON` against a `"""sql` tag is LanguageTagMismatch (error) AND
+    // DeprecatedLanguageProperty (warning) on the same property. The file is rejected — and the
+    // reason handed on must be the error, or the CLI's "it does not parse (<first message>)" line
+    // would quote a deprecation notice as the reason a file was dropped.
+    const heard: { path: string; severities: string[] }[] = [];
+    const a = buildArtifactFromFiles(
+      [{ path: '/proj/q/q.ttrm', text: query('q', `  language: PYTHON\n${TAGGED_SQL}`) }],
+      ROOT,
+      flexible,
+      'proj',
+      (p, errs) => heard.push({ path: p, severities: errs.map((e) => (e as { severity?: string }).severity ?? '') })
+    );
+    expect(a.packages).toEqual([]);
+    expect(heard).toEqual([{ path: '/proj/q/q.ttrm', severities: ['error'] }]);
+  });
 });
