@@ -293,8 +293,11 @@ object Expressions {
                 builder.setIntValue((lit.value2 as Number).toLong()).build()
             SqlTypeName.DECIMAL, SqlTypeName.DOUBLE, SqlTypeName.FLOAT, SqlTypeName.REAL ->
                 builder.setFloatValue((lit.value2 as Number).toDouble()).build()
+            // ISO-8601, as plan.proto defines `datetime_value`. `value2` is not that: for a TIMESTAMP
+            // it is epoch milliseconds, so the wire carried "1735689600000" — a value no caller writing
+            // the contract's own form produces, and one decode could not read back as a date.
             SqlTypeName.DATE, SqlTypeName.TIME, SqlTypeName.TIMESTAMP ->
-                builder.setDatetimeValue(lit.value2.toString()).build()
+                builder.setDatetimeValue(isoDatetimeOf(lit)).build()
             // CalciteExtParser (CEP-P1) — datepart SYMBOL operand. DATEADD/DATEDIFF/DATEPART carry
             // their time unit as a SYMBOL RexLiteral (e.g. `FLAG(DAY)`, an avatica TimeUnit enum).
             // The wire format has no symbol slot, so carry the enum constant's name as a string under
@@ -405,10 +408,94 @@ object Expressions {
             Literal.ValueCase.INT_VALUE -> builder.literal(lit.intValue)
             Literal.ValueCase.FLOAT_VALUE -> builder.literal(lit.floatValue)
             Literal.ValueCase.BOOL_VALUE -> builder.literal(lit.boolValue)
-            Literal.ValueCase.DATETIME_VALUE -> builder.literal(lit.datetimeValue)
+            // A TYPED temporal literal. `builder.literal(String)` built a CHARACTER literal, so a date
+            // bound came back typed `text` and was compared to a date column as a string.
+            Literal.ValueCase.DATETIME_VALUE ->
+                temporalLiteral(builder.rexBuilder, datetimeLiteralValue(lit.datetimeValue))
             else -> builder.literal(null)
         }
     }
+
+    private val ISO_DATE = Regex("""\d{4}-\d{2}-\d{2}""")
+    private val ISO_TIME = Regex("""\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?""")
+
+    /**
+     * `datetime_value` (ISO-8601) → the Calcite temporal value [RelBuilder.literal] types correctly:
+     * a date-only value becomes a DATE ([org.apache.calcite.util.DateString]), a time-only value a
+     * TIME ([org.apache.calcite.util.TimeString]), and a date with a time a TIMESTAMP
+     * ([org.apache.calcite.util.TimestampString]). An instant with an offset (`…Z`, `…+02:00`) is
+     * normalised to UTC — the zone [isoDatetimeOf] writes back, so encode → decode → encode is stable;
+     * a zone-less local date-time is taken as written.
+     *
+     * Anything else throws. The previous fallback, a string literal, is exactly how a malformed bound
+     * became a silent text comparison; a clear failure is the better outcome.
+     */
+    private fun datetimeLiteralValue(value: String): Any =
+        runCatching {
+            when {
+                ISO_DATE.matches(value) ->
+                    org.apache.calcite.util
+                        .DateString(value)
+                ISO_TIME.matches(value) ->
+                    org.apache.calcite.util
+                        .TimeString(value)
+                else -> {
+                    val millis =
+                        runCatching {
+                            java.time.OffsetDateTime
+                                .parse(value)
+                                .toInstant()
+                                .toEpochMilli()
+                        }.getOrElse {
+                            java.time.LocalDateTime
+                                .parse(value.replace(' ', 'T'))
+                                .toInstant(java.time.ZoneOffset.UTC)
+                                .toEpochMilli()
+                        }
+                    org.apache.calcite.util.TimestampString
+                        .fromMillisSinceEpoch(millis)
+                }
+            }
+        }.getOrElse { cause ->
+            throw UnsupportedOperationException(
+                "datetime_value '$value' is not ISO-8601 (plan.v1 Literal.datetime_value) — expected a " +
+                    "date (2025-01-01), a time (12:30:00) or a date-time (2025-01-01T00:00:00Z)",
+                cause,
+            )
+        }
+
+    /**
+     * The typed [RexLiteral] for a value [datetimeLiteralValue] produced. Built through the
+     * [org.apache.calcite.rex.RexBuilder] directly: `RelBuilder.literal(Object)` does not accept Calcite's
+     * temporal value types ("cannot convert … to a constant"). Precision is 0 unless the value carries
+     * milliseconds, so a whole-second bound unparses as `TIMESTAMP '2025-01-01 00:00:00'`.
+     */
+    private fun temporalLiteral(
+        rex: org.apache.calcite.rex.RexBuilder,
+        value: Any,
+    ): RexNode =
+        when (value) {
+            is org.apache.calcite.util.DateString -> rex.makeDateLiteral(value)
+            is org.apache.calcite.util.TimeString ->
+                rex.makeTimeLiteral(value, if (Math.floorMod(value.millisOfDay, 1000) == 0) 0 else 3)
+            is org.apache.calcite.util.TimestampString ->
+                rex.makeTimestampLiteral(value, if (Math.floorMod(value.millisSinceEpoch, 1000L) == 0L) 0 else 3)
+            else -> throw IllegalStateException("not a temporal value: ${value::class.java.name}")
+        }
+
+    /** A DATE / TIME / TIMESTAMP [RexLiteral] as the ISO-8601 text `datetime_value` carries — see [datetimeLiteralValue]. */
+    private fun isoDatetimeOf(lit: RexLiteral): String =
+        when (lit.type.sqlTypeName) {
+            SqlTypeName.DATE ->
+                lit.getValueAs(org.apache.calcite.util.DateString::class.java)!!.toString()
+            SqlTypeName.TIME ->
+                lit.getValueAs(org.apache.calcite.util.TimeString::class.java)!!.toString()
+            else ->
+                java.time.Instant
+                    .ofEpochMilli(
+                        lit.getValueAs(org.apache.calcite.util.TimestampString::class.java)!!.millisSinceEpoch,
+                    ).toString()
+        }
 
     private fun decodeColumnRef(
         builder: RelBuilder,
