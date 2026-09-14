@@ -6,6 +6,18 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-translator`** ⚑ **behaviour fix — `EXTRACT` lowers to `DATEPART` on SQL Server.**
+  `EXTRACT(<unit> FROM <datetime>)` reached the engine verbatim (Calcite's stock MSSQL
+  dialect has no unparse rule for it) and died with error 195 `'EXTRACT' is not a
+  recognized built-in function name`. Every date-part route lands on that node — the
+  validator rewrites `YEAR(x)`/`MONTH(x)` to `EXTRACT`, the MD dot-path viaCalc lowering
+  emits it, a free-SQL planner writes it as the portable form — so year/month grouping on
+  any MSSQL estate failed. `MssqlSqlDialectWithFloatCast` now renders
+  `DATEPART(<part>, <datetime>)` for both unit shapes (the validator's `TimeUnitRange`
+  flag and the wire's `TimeUnit` flag); `DOY`/`DOW` map to `DAYOFYEAR`/`WEEKDAY`; a unit
+  SQL Server cannot express (EPOCH, DECADE, …) fails at translate time with a clear
+  message. Postgres/DuckDB are untouched. `ExtractLoweringSpec` pins it.
+
 - **MH T1 + T3-data — the collision report, and the E-R reach in the archive
   (mention homonymy).** One word claimed by two refs (hartland's `prodejna`: the store
   *dimension*'s label and the Stores-*channel* alias pinned to the sales fact) is now
