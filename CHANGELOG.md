@@ -6,6 +6,30 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-translator`** ⚑ **behaviour fix — joins over renamed keys, and `datetime_value` read
+  and written as ISO-8601.** Three defects that meet on the first entity join to reach execution
+  on a model whose join keys are renamed between the ER and DB layers:
+  - **`JoinerPhysical` is alias-aware.** MAP_TO_PHYSICAL aliases each renamed column back to its
+    attribute name (DF-T05, alias-at-boundary), so above the scan only the alias exists — but the
+    FK-based join condition named the physical columns and failed at unparse with
+    `field [d_date_sk] not found; input fields are: [sk, …]`. Each operand now resolves through its
+    own side's scan: the alias when that scan aliases the column, the column name otherwise. Models
+    whose attribute names equal their column names produce the same plans as before.
+  - **`JoinerLogical` no longer throws on a relation with no join pairs** (one bound only to its FK,
+    with no `join:` list): it leaves the join for `JoinerPhysical` to condition from that FK and
+    records **`JoinerWarning.RelationWithoutJoinPairs`** (wire code `join_relation_without_pairs`).
+    ⚠ New member of a sealed interface — an exhaustive `when` over `JoinerWarning` needs a branch.
+  - **`Literal.datetime_value` honours plan.proto's ISO-8601 in both directions.** Encode wrote
+    Calcite's `value2` — epoch milliseconds for a TIMESTAMP (`"1735689600000"`); decode built a
+    CHARACTER literal, so a date bound was compared to a date column as a string. A TIMESTAMP now
+    encodes as an ISO instant (`2025-01-01T00:00:00Z`), a DATE as `2025-01-01`, a TIME as `12:30:00`;
+    decode builds a typed TIMESTAMP / DATE / TIME literal (an offset is normalised to UTC) and rejects
+    a value that is not ISO-8601 instead of degrading it to text. ⚠ Known gap, unchanged: a
+    `datetime_value` in a **VALUES row** still decodes as text — `RelBuilder.values` routes cells
+    through `RelBuilder.literal(Object)`, which does not accept Calcite's temporal types.
+  `JoinerPhysicalSpec`, `JoinerLogicalSpec`, `DatetimeLiteralSpec` and `RenamedKeyJoinSpec` (the
+  two-pass TransDSL → REL_NODE → SQL pipeline, asserting the unparsed join and bounds) pin them.
+
 - **`ttr-translator`** ⚑ **behaviour fix — `EXTRACT` lowers to `DATEPART` on SQL Server.**
   `EXTRACT(<unit> FROM <datetime>)` reached the engine verbatim (Calcite's stock MSSQL
   dialect has no unparse rule for it) and died with error 195 `'EXTRACT' is not a

@@ -139,6 +139,100 @@ class JoinerPhysicalSpec :
             result.warnings.shouldBeEmpty()
         }
 
+        // ---- alias-at-boundary ------------------------------------------------------------------
+        //
+        // MAP_TO_PHYSICAL rebuilds a scan's output columns as `name = DB column, alias = ER attribute`
+        // whenever the model renames an attribute, and above that scan only the ALIAS exists — its
+        // own contract says every upstream reference, `Join.condition` included, resolves by
+        // attribute name. A condition naming the physical column therefore failed at unparse with
+        // `field [d_date_sk] not found; input fields are: [sk, …]`: the first ER join to reach
+        // execution on an estate whose attribute names differ from its column names.
+
+        fun tableQname(name: String): QualifiedName =
+            QualifiedName
+                .newBuilder()
+                .setSchemaCode(SchemaCode.DB)
+                .setNamespace("dbo")
+                .setName(name)
+                .build()
+
+        /** A TableScan as MAP_TO_PHYSICAL leaves it: each output column `name` aliased to [columns]' second. */
+        fun aliasedScan(
+            table: QualifiedName,
+            vararg columns: Pair<String, String>,
+        ): PlanNode =
+            PlanNode
+                .newBuilder()
+                .setTableScan(
+                    TableScanNode
+                        .newBuilder()
+                        .setTable(table)
+                        .addAllOutputColumns(
+                            columns.map { (name, alias) ->
+                                org.tatrman.plan.v1.ColumnRef
+                                    .newBuilder()
+                                    .setName(name)
+                                    .setAlias(alias)
+                                    .build()
+                            },
+                        ),
+                ).build()
+
+        // FK: catalog_sales.cs_sold_date_sk → date_dim.d_date_sk — the attribute names are `sold_date` / `sk`.
+        val soldDateFk =
+            ModelForeignKey(
+                from = listOf(colQname("catalog_sales", "cs_sold_date_sk")),
+                to = listOf(colQname("date_dim", "d_date_sk")),
+            )
+
+        "an FK over renamed columns joins on the scans' ALIASES, not on the physical names" {
+            val model = InMemoryModelHandle(tables = emptyList(), foreignKeys = listOf(soldDateFk))
+            val input =
+                unconditionedJoin(
+                    aliasedScan(tableQname("date_dim"), "d_date_sk" to "sk", "d_moy" to "month"),
+                    aliasedScan(
+                        tableQname("catalog_sales"),
+                        "cs_sold_date_sk" to "sold_date",
+                        "cs_ext_sales_price" to "ext_sales_price",
+                    ),
+                )
+
+            val result = JoinerPhysical.apply(input, model)
+
+            result.warnings.shouldBeEmpty()
+            val cond = result.plan.join.condition
+            cond.function.operation shouldBe "eq"
+            cond.function.operandsList[0]
+                .columnRef.name shouldBe "sk"
+            cond.function.operandsList[0]
+                .columnRef.sourceAlias shouldBe Expressions.LEFT_INPUT_TAG
+            cond.function.operandsList[1]
+                .columnRef.name shouldBe "sold_date"
+            cond.function.operandsList[1]
+                .columnRef.sourceAlias shouldBe Expressions.RIGHT_INPUT_TAG
+        }
+
+        "a column with no alias keeps its physical name — the name = name path is unchanged per side" {
+            // One side renamed, the other not: each operand follows ITS OWN scan. An empty alias is
+            // how MAP_TO_PHYSICAL marks a column whose attribute name already equals the column name.
+            val model = InMemoryModelHandle(tables = emptyList(), foreignKeys = listOf(soldDateFk))
+            val input =
+                unconditionedJoin(
+                    aliasedScan(tableQname("date_dim"), "d_date_sk" to ""),
+                    aliasedScan(tableQname("catalog_sales"), "cs_sold_date_sk" to "sold_date"),
+                )
+
+            val cond =
+                JoinerPhysical
+                    .apply(input, model)
+                    .plan.join.condition
+
+            cond.function.operandsList[0]
+                .columnRef.name shouldBe "d_date_sk"
+            cond.function.operandsList[1]
+                .columnRef.name shouldBe "sold_date"
+        }
+
         "idempotent — running twice produces the same tree" {
             val model =
                 InMemoryModelHandle(

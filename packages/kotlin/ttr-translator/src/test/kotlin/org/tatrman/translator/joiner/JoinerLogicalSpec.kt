@@ -173,6 +173,27 @@ class JoinerLogicalSpec :
             result.plan.join.hasCondition() shouldBe false
         }
 
+        "a relation with NO join pairs → left unconditioned with a warning, never a crash" {
+            // A relation bound only to its FK (`binding: { fk: … }`, no `join:` list) carries no
+            // attribute pairs, and `buildEqualityCondition` called `.first()` on them. Unconditioned is
+            // the correct outcome here, not a Cartesian product: the physical Joiner fills the join from
+            // that same FK once MAP_TO_PHYSICAL has run. The warning records why this Joiner stepped aside.
+            val pairless = customerOrderRelation.copy(joinPairs = emptyList())
+            val model =
+                InMemoryModelHandle(
+                    tables = emptyList(),
+                    entities = listOf(customerEntity, orderEntity),
+                    relations = listOf(pairless),
+                )
+            val input = unconditionedJoin(erScan("customer"), erScan("order"))
+
+            val result = JoinerLogical.apply(input, model)
+
+            result.plan.join.hasCondition() shouldBe false
+            result.warnings shouldHaveSize 1
+            result.warnings.single()::class.simpleName shouldBe "RelationWithoutJoinPairs"
+        }
+
         "entity ↔ table → untouched (mixed-schema preservation)" {
             val model =
                 InMemoryModelHandle(

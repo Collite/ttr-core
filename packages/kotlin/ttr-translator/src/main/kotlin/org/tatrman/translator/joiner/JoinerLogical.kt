@@ -114,7 +114,15 @@ object JoinerLogical {
                 withChildren
             }
             1 -> {
-                val condition = buildEqualityCondition(candidates.single(), leftEntity)
+                val relation = candidates.single()
+                if (relation.joinPairs.isEmpty()) {
+                    // A relation bound only to its FK carries no attribute pairs to join on, and
+                    // `buildEqualityCondition` would call `.first()` on none. Step aside rather than
+                    // guess: JoinerPhysical fills this join from that FK after MAP_TO_PHYSICAL.
+                    warnings += JoinerWarning.RelationWithoutJoinPairs(leftEntity, rightEntity, relation)
+                    return withChildren
+                }
+                val condition = buildEqualityCondition(relation, leftEntity)
                 withConditionSet(withChildren, condition)
             }
             else -> {
@@ -137,7 +145,9 @@ object JoinerLogical {
         val (fromAttr, toAttr) = relation.joinPairs.first()
         // Attribute qnames carry `<entity>.<attribute>` in the `name` field — strip the entity
         // prefix to recover the bare attribute name that lives in the corresponding Scan's
-        // row type (and matches the column name post-MAP_TO_PHYSICAL under v1's 1:1 assumption).
+        // row type. It stays valid after MAP_TO_PHYSICAL even when the column is renamed: that
+        // stage aliases each renamed column back to its attribute name (DF-T05), so the condition
+        // resolves by attribute name on both sides of the ER/DB boundary.
         val fromAttrName = fromAttr.name.substringAfterLast('.')
         val toAttrName = toAttr.name.substringAfterLast('.')
         val (leftAttrName, rightAttrName) =
