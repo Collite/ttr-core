@@ -9,7 +9,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Collite/tatrman.git",
+    "url": "https://github.com/Collite/ttr-core.git",
     "directory": "packages/ttrp-vscode-ext"
   },
   "engines": {

@@ -19,7 +19,7 @@
 #      one of them is silently wrong, and the reader cannot tell which.
 #
 # If a site page genuinely needs to point at the engineering record, link OUTWARD
-# to a GitHub URL (https://github.com/Collite/tatrman/blob/master/docs/...): that
+# to a GitHub URL (https://github.com/Collite/ttr-core/blob/master/docs/...): that
 # is an explicit, durable handoff off the site rather than a hidden dependency.
 #
 # Run locally before opening a PR:  bash scripts/check-docs-site-boundary.sh
@@ -49,7 +49,7 @@ if [ -n "$offenders" ]; then
   echo "docs/ecosystem/ and docs/features/ are the engineering record, not site content."
   echo "These links break the moment the site is served standalone. If the page truly"
   echo "needs to point there, use an absolute GitHub URL instead:"
-  echo "  https://github.com/Collite/tatrman/blob/master/docs/features/<...>"
+  echo "  https://github.com/Collite/ttr-core/blob/master/docs/features/<...>"
   exit 1
 fi
 

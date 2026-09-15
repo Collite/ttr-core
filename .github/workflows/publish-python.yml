@@ -3,7 +3,7 @@ name: Publish Python (PyPI)
 # Tag-driven release of the repo's pure-Python wheels to public PyPI via PyPI
 # Trusted Publishing (OIDC). No PYPI_TOKEN: PyPI mints a short-lived token for
 # each `publish*` job in the `pypi` environment, registered as the trusted
-# publisher for this workflow (Collite/tatrman · publish-python.yml · env pypi).
+# publisher for this workflow (Collite/ttr-core · publish-python.yml · env pypi).
 #
 # Tag → wheel:
 #   python/v<x.y.z>-RELEASE       ttr-parser      (packages/python/ttr-parser)

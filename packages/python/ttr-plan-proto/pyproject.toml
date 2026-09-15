@@ -37,8 +37,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Collite/tatrman"
-Issues = "https://github.com/Collite/tatrman/issues"
+Homepage = "https://github.com/Collite/ttr-core"
+Issues = "https://github.com/Collite/ttr-core/issues"
 
 [tool.hatch.build.targets.wheel]
 # The wheel ships the generated `org.tatrman.*` message modules. The build hook

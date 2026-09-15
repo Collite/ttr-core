@@ -13,8 +13,8 @@ set shell := ["bash", "-uc"]
 
 # pnpm-aware repo paths
 vscode_ext   := "packages/vscode-ext"
-ghblob       := "https://github.com/Collite/tatrman/blob/master/packages/vscode-ext"
-ghraw        := "https://raw.githubusercontent.com/Collite/tatrman/master/packages/vscode-ext"
+ghblob       := "https://github.com/Collite/ttr-core/blob/master/packages/vscode-ext"
+ghraw        := "https://raw.githubusercontent.com/Collite/ttr-core/master/packages/vscode-ext"
 # IntelliJ plugin resource root (server bundle + grammars land here; gitignored)
 intellij_res := "intellij-plugin/src/main/resources"
 

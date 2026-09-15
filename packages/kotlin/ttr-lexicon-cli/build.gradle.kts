@@ -72,7 +72,7 @@ mavenPublishing {
         name.set("TTR Lexicon CLI")
         description.set("Builds an estate's deterministic `kind: \"lexicon\"` archive from a repo root")
         inceptionYear.set("2026")
-        url.set("https://github.com/Collite/tatrman")
+        url.set("https://github.com/Collite/ttr-core")
         licenses {
             license {
                 name.set("The Apache License, Version 2.0")
@@ -88,9 +88,9 @@ mavenPublishing {
             }
         }
         scm {
-            connection.set("scm:git:https://github.com/Collite/tatrman.git")
-            developerConnection.set("scm:git:git@github.com:Collite/tatrman.git")
-            url.set("https://github.com/Collite/tatrman")
+            connection.set("scm:git:https://github.com/Collite/ttr-core.git")
+            developerConnection.set("scm:git:git@github.com:Collite/ttr-core.git")
+            url.set("https://github.com/Collite/ttr-core")
         }
     }
 }
@@ -99,7 +99,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/Collite/tatrman")
+            url = uri("https://maven.pkg.github.com/Collite/ttr-core")
             credentials {
                 username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
                 password = providers.gradleProperty("gpr.token").orNull ?: System.getenv("GITHUB_TOKEN")

@@ -53,7 +53,7 @@ it.
 
 They are not the engineering record. Design decisions, architecture rationale,
 and phase plans live in the repositories themselves (`docs/features/` and
-`docs/ecosystem/` in [Collite/tatrman](https://github.com/Collite/tatrman)), and
+`docs/ecosystem/` in [Collite/ttr-core](https://github.com/Collite/ttr-core)), and
 they stay there. Pages here may *distill* that material into an explanation when
 it helps you, but they never mirror it — one concept, one home, and this site is
 the home for the concepts you need in order to run the product.
