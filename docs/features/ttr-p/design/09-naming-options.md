@@ -56,7 +56,7 @@ The canonical DSL needs a name that works in three positions: prose ("a ___ prog
 ## RESOLVED (2026-07-03/04 — Bora's direction, superseding the H-1 catalogue)
 
 - **H-1 · The FAMILY is "tatrman" (TTR = "table transformation manager"); modeling = TTR-M, processing = TTR-P.** The product = modeler (TTR-M + metadata) + TTR-P (+ compiler, later optimizer) under one name. Disambiguation convention in prose: **Tatrman** = the product/repo · **TTR** = the family · **TTR-M / TTR-P** = the languages · TTR-SQL / TTR-pandas = TTR-P's fragment dialects (unchanged). "PL" retires as scaffolding shorthand (docs keep it historically).
-- **H-1-bis · REPO FORK: modeler → `~/Dev/collite/tatrman` (`Collite/tatrman`), whole content, continue there.** Mechanics + consequence sweep below (§Fork consequences).
+- **H-1-bis · REPO FORK: modeler → `~/Dev/collite/tatrman` (`Collite/ttr-core`), whole content, continue there.** Mechanics + consequence sweep below (§Fork consequences).
 - **H-2a · Program extension = `.ttrp`** (free again — 07's `plan.ttrp` manifest placeholder was superseded by `manifest.json` in F-f). `.ttrm` (model) and `.ttrg` (designer graph/package) stand.
 - **H-2c · ONE layout/view-state scheme + ONE extension `.ttrl` for the whole family** (Bora's "try this" — taken): per-document sidecar `<doc>.ttrl` beside `.ttrp` programs, bare fragments, **and TTR-M documents** (`.ttrm`/`.ttrg`). This exercises exactly the branch C3-h left open ("same block grammar, different hosting; TTR may migrate later") — **TTR-M migrates to the sidecar**, i.e. the v1.1 in-file `layout` block moves out of `.ttrg` into the sibling `.ttrl`. Not a D4 revert (D4 killed the *project-global* aggregate; per-document pairing is preserved — `.ttrl` even reclaims the old extension with new, per-document semantics). One block grammar, one suffix, one pair-integrity toolset (orphan diagnostics + atomic renames) serving both languages — better ROI than two schemes. **Consequence: a TTR-M-side design amendment (v1.1 layout hosting), to be recorded in the modeler/TTR docs, not just here.**
 - **H-3a · Translation lib = `org.tatrman` + "translator"** (artifact-id form — `ttr-translator` vs bare `translator` — settled below; Kotlin root `org.tatrman.translator.*`).
@@ -65,8 +65,8 @@ The canonical DSL needs a name that works in three positions: prose ("a ___ prog
 
 ### Fork consequences (H-1-bis sweep — track these, they bite silently)
 
-1. **Kantheon consumption re-points.** GitHub Packages URLs are per-repo: kantheon's `settings.gradle.kts` (`ColliteModeler` repository → `Collite/tatrman`), the `gpr.*` PAT (fine-grained PATs are repo-scoped — needs re-granting), and kantheon's CLAUDE.md §7.3 text all reference `Collite/modeler`. Kantheon-side task, natural companion to the already-queued Proteus-extraction arc.
-2. **Publish workflow travels**: tag-driven `publish.yml` publishes to the *new* repo's package registry; first publish from `Collite/tatrman` must happen before kantheon re-points.
+1. **Kantheon consumption re-points.** GitHub Packages URLs are per-repo: kantheon's `settings.gradle.kts` (`ColliteModeler` repository → `Collite/ttr-core`), the `gpr.*` PAT (fine-grained PATs are repo-scoped — needs re-granting), and kantheon's CLAUDE.md §7.3 text all reference `Collite/modeler`. Kantheon-side task, natural companion to the already-queued Proteus-extraction arc.
+2. **Publish workflow travels**: tag-driven `publish.yml` publishes to the *new* repo's package registry; first publish from `Collite/ttr-core` must happen before kantheon re-points.
 3. **Old-modeler disposition**: the ai-platform→kantheon precedent says copy-not-move, old repo frozen/maintenance until consumers re-point, then archive.
 4. **Name shadowing**: `~/Dev/tatrman` (the historical PoC repo — JGraphT DAG prior art) already carries the name. Recommend renaming it (e.g. `tatrman-poc`) so "tatrman" unambiguously means the product.
 5. **`@modeler/*` npm scope**: the TS workspace packages are unpublished, so renaming to `@tatrman/*` is cheap churn — decide opportunistically, not blocking.
@@ -74,7 +74,7 @@ The canonical DSL needs a name that works in three positions: prose ("a ___ prog
 
 ## RESOLVED (round 2) — H converged 🟢
 
-- **H-1-bis mechanics = CLONE WITH FULL HISTORY** (git clone → push to `Collite/tatrman`; old `Collite/modeler` frozen/maintenance until kantheon re-points, then archived — the ai-platform→kantheon precedent).
+- **H-1-bis mechanics = CLONE WITH FULL HISTORY** (git clone → push to `Collite/ttr-core`; old `Collite/modeler` frozen/maintenance until kantheon re-points, then archived — the ai-platform→kantheon precedent).
 - **H-3a = `org.tatrman:ttr-translator`** (matches the `ttr-*` sibling row; Kotlin root `org.tatrman.translator.*`).
 - **H-2b = DOUBLE EXTENSIONS for fragments: `report.ttr.sql` / `prep.ttr.py`** — free foreign-editor highlighting; the `# pl:`-style comment override (C3-g-ii) still serves generic extensions.
 - **H-4a = TTR-B** (the strict NL surface joins the scheme; the B honors Byx; name formally lands with C4's grammar session).
@@ -83,7 +83,7 @@ The canonical DSL needs a name that works in three positions: prose ("a ___ prog
 
 | Thing | Name / extension |
 |---|---|
-| The product / repo | **Tatrman** (`Collite/tatrman`, `~/Dev/collite/tatrman`) |
+| The product / repo | **Tatrman** (`Collite/ttr-core`, `~/Dev/collite/tatrman`) |
 | The language family | **TTR** ("table transformation manager") |
 | Modeling language | **TTR-M** · `.ttrm` (docs, incl. `schema world`) · `.ttrg` (designer graph/package) |
 | Processing language | **TTR-P** · `.ttrp` |

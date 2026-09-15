@@ -114,7 +114,7 @@ publishing {
             pom {
                 name.set("TTR-P Compiler Front-Half")
                 description.set("parse to resolve to typecheck for TTR-P (.ttrp)")
-                url.set("https://github.com/Collite/tatrman")
+                url.set("https://github.com/Collite/ttr-core")
                 licenses {
                     license {
                         name.set("The Apache License, Version 2.0")
@@ -130,9 +130,9 @@ publishing {
                     }
                 }
                 scm {
-                    connection.set("scm:git:https://github.com/Collite/tatrman.git")
-                    developerConnection.set("scm:git:git@github.com:Collite/tatrman.git")
-                    url.set("https://github.com/Collite/tatrman")
+                    connection.set("scm:git:https://github.com/Collite/ttr-core.git")
+                    developerConnection.set("scm:git:git@github.com:Collite/ttr-core.git")
+                    url.set("https://github.com/Collite/ttr-core")
                 }
             }
         }
@@ -140,7 +140,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/Collite/tatrman")
+            url = uri("https://maven.pkg.github.com/Collite/ttr-core")
             credentials {
                 username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
                 password = providers.gradleProperty("gpr.token").orNull ?: System.getenv("GITHUB_TOKEN")

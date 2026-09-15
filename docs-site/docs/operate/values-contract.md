@@ -3,7 +3,7 @@
 
 *Reference. Every key the umbrella chart honours, what it does, and what happens if you leave it at
 its default. This page is the operator's projection of the chart's documented values contract; the
-[canonical contract](https://github.com/Collite/tatrman-server/blob/master/helm/tatrman-server/values-contract.md)
+[canonical contract](https://github.com/Collite/ttr-server/blob/master/helm/tatrman-server/values-contract.md)
 ships with the chart and is the source of truth — if a key is not in it, do not guess what it does.*
 
 The umbrella chart installs the whole product from one release. You configure it with values; this

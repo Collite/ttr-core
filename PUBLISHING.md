@@ -9,7 +9,7 @@ group to **two lanes** (SV-P1 S4, 2026-07-12; lane-gating polarity flipped
   and `ai-platform`/`kantheon` resolve. Signed + full POMs + sources/javadoc,
   via the `com.vanniktech.maven.publish` plugin. **Only a tag explicitly marked
   `-RELEASE` reaches here** — see [§ Release lanes](#release-lanes--internal-vs-release-2026-07-16).
-- **GitHub Packages** (`https://maven.pkg.github.com/Collite/tatrman`) — the
+- **GitHub Packages** (`https://maven.pkg.github.com/Collite/ttr-core`) — the
   **staging lane**. Every release lands here first (it needs auth even for
   public reads — Gotcha 1 — which is exactly why it can't be the public lane).
   **Every tag** lands here, `-RELEASE`-marked or not.
@@ -99,7 +99,7 @@ for every consumer, permanently, because registry versions cannot be deleted.
    while grammar sat at `0.10.1`. Nothing forced them together.
 2. **Partial failure.** On 07-29 the `0.10.4` pair went out as two tags:
    `metadata/v0.10.4-RELEASE` published, and `grammar/v0.10.4-RELEASE`'s workflow run
-   **failed** ([run 30438898653](https://github.com/Collite/tatrman/actions/runs/30438898653)).
+   **failed** ([run 30438898653](https://github.com/Collite/ttr-core/actions/runs/30438898653)).
    Half a version shipped.
 
 **Consequence:** `org.tatrman:ttr-metadata` **0.10.3 and 0.10.4 are permanently
@@ -296,7 +296,7 @@ dependencyResolutionManagement {
         mavenCentral()
         maven {
             name = "ColliteModeler"
-            url = uri("https://maven.pkg.github.com/Collite/tatrman")
+            url = uri("https://maven.pkg.github.com/Collite/ttr-core")
             credentials {
                 username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
                 password = providers.gradleProperty("gpr.token").orNull ?: System.getenv("GITHUB_TOKEN")
@@ -366,7 +366,7 @@ across the multi-module build.
 **Namespace.** `org.tatrman` is verified to Collite on the Portal via a DNS TXT
 record on `tatrman.org` (S0·T2).
 
-**CI secrets** (repo or org secrets on `Collite/tatrman` + `Collite/tatrman-server`;
+**CI secrets** (repo or org secrets on `Collite/ttr-core` + `Collite/ttr-server`;
 the names ARE the Gradle property names, so they pass straight through as
 `ORG_GRADLE_PROJECT_*` env):
 
@@ -507,7 +507,7 @@ just publish intellij release set 1.0.0  # set 1.0.0, then → JetBrains Marketp
 | `intellij/vX.Y.Z` | internal | `intellij-plugin-X.Y.Z.zip` | — |
 | `intellij/vX.Y.Z-RELEASE` | public | `intellij-plugin-X.Y.Z.zip` | ✅ JetBrains Marketplace |
 
-Each Release lands at `https://github.com/Collite/tatrman/releases` (or
+Each Release lands at `https://github.com/Collite/ttr-core/releases` (or
 `gh release download <kind>/vX.Y.Z[-RELEASE]`); its notes carry the install
 instructions and say whether it reached the Marketplace.
 

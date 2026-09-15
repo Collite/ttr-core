@@ -6,7 +6,7 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Collite/tatrman.git",
+    "url": "git+https://github.com/Collite/ttr-core.git",
     "directory": "packages/grammar"
   },
   "main": "./dist/index.js",

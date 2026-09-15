@@ -23,8 +23,8 @@ site_description: >-
   attached.
 copyright: Copyright &copy; 2026 Collite
 
-repo_url: https://github.com/Collite/tatrman
-repo_name: Collite/tatrman
+repo_url: https://github.com/Collite/ttr-core
+repo_name: Collite/ttr-core
 edit_uri: edit/master/docs-site/docs/
 
 theme:
@@ -96,7 +96,7 @@ extra:
     alias: true
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/Collite/tatrman
+      link: https://github.com/Collite/ttr-core
       name: Tatrman on GitHub
 
 # The four tracks (RO-27 ①). Order is the visitor's likely journey:
