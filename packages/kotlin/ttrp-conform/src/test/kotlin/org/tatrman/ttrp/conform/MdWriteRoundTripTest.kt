@@ -29,6 +29,7 @@ import org.tatrman.ttrp.emit.sql.MdPathLowering
 import org.tatrman.ttrp.emit.sql.MdWriteLowering
 import org.tatrman.ttrp.emit.sql.WriteTechnical
 import java.math.BigDecimal
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.sql.DriverManager
@@ -50,16 +51,22 @@ import java.sql.DriverManager
  * engine — computes the right stored state. Read-back is a plain verification SELECT replicating each
  * mode's read view (dot-path read lowering is covered by MdConformLiveTest on the same tables).
  *
- * Gated by `TTRP_CONFORM_PG=1` (needs the ttrp-pg container; connection via the same `spike.pg.*`
- * properties as [org.tatrman.ttrp.conform.spike.PgDivergenceSpike]). Skips visibly otherwise.
+ * Gated by `TTRP_CONFORM_PG=1`. The database comes from `TTR_CONN_ERP_PG` (`postgresql://user:pass@host:port/db`)
+ * when set — the same variable CI hands MdConformLiveTest and HeroConformLiveTest; without it, the local
+ * ttrp-pg container via the `spike.pg.*` properties of [org.tatrman.ttrp.conform.spike.PgDivergenceSpike].
+ * Skips visibly otherwise.
  */
 class MdWriteRoundTripTest :
     FunSpec({
         val enabled = System.getenv("TTRP_CONFORM_PG") == "1"
 
-        val url = System.getProperty("spike.pg.url", "jdbc:postgresql://localhost:55432/postgres")
-        val user = System.getProperty("spike.pg.user", "postgres")
-        val password = System.getProperty("spike.pg.password", "ttrp")
+        val erpPg = System.getenv("TTR_CONN_ERP_PG")?.let { URI(it) }
+        val erpUserInfo = erpPg?.userInfo?.split(":")
+        val url =
+            erpPg?.let { "jdbc:postgresql://${it.host}:${if (it.port > 0) it.port else 5432}${it.path}" }
+                ?: System.getProperty("spike.pg.url", "jdbc:postgresql://localhost:55432/postgres")
+        val user = erpUserInfo?.getOrNull(0) ?: System.getProperty("spike.pg.user", "postgres")
+        val password = erpUserInfo?.getOrNull(1) ?: System.getProperty("spike.pg.password", "ttrp")
 
         // sales (wide/overwrite) + plan (long/invalidate) from the shared fixture; budget (wide/diff) added
         // here — the seed has no diff table, so the third journaling mode gets a purpose-built cubelet.
