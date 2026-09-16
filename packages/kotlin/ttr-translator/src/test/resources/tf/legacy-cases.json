@@ -1,8 +1,7 @@
 {
   "summary": {
-    "parseOk": 95,
-    "unparseOk": 66,
-    "note": "Counts under the test JVM (-ea). translator-harness 0.10.1 without -ea: 96/67 — the difference is pt02_obchod/nevyfakturovane_zakazky_dm."
+    "parseOk": 96,
+    "unparseOk": 67
   },
   "cases": [
     {
@@ -766,8 +765,8 @@
       ],
       "parse": "ok",
       "unparse": "ok",
-      "status": "red:TF-P1.S1",
-      "note": "P0 finding (not in the gaps report): SearchExpander leaves AND(…, AND(<>, <>)) non-flat after expanding NOT IN (-2, 10); Calcite's Filter asserts RexUtil.isFlat, so this fails only with -ea (the harness ran without it). Proposed for TF-P1.S1 — flatten after expandSearch."
+      "status": "green",
+      "note": "TF-P1.S1 — SearchExpander flattens the AND after expanding NOT IN (-2, 10); it threw under -ea."
     },
     {
       "id": "pt02_obchod/vazby_podle_typu",

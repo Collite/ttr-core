@@ -108,7 +108,7 @@ SqlNode DateaddFunctionCall() :
 }
 {
     (   <DATEADD> { op = org.apache.calcite.sql.fun.SqlLibraryOperators.DATEADD; }
-    |   <DATEDIFF> { op = org.apache.calcite.sql.fun.SqlLibraryOperators.DATEDIFF; }
+    |   <DATEDIFF> { op = org.tatrman.translator.functions.DateOperators.INSTANCE.getDATEDIFF(); }
     |   <DATEPART>  { op = org.apache.calcite.sql.fun.SqlLibraryOperators.DATEPART; }
     )
     { s = span(); }

@@ -14,6 +14,7 @@ import org.tatrman.plan.v1.SubqueryExpression
 import org.tatrman.plan.v1.WindowFrame
 import org.apache.calcite.rel.RelFieldCollation
 import org.apache.calcite.rel.type.RelDataType
+import org.apache.calcite.rel.type.RelDataTypeFactory
 import org.apache.calcite.rex.RexCall
 import org.apache.calcite.rex.RexDynamicParam
 import org.apache.calcite.rex.RexFieldCollation
@@ -125,7 +126,7 @@ object Expressions {
                             .newBuilder()
                             .setOperation(operationCode(rex))
                             .addAllOperands(rex.operands.map { encode(it, ctx) }),
-                    ).setResultType(surfaceTypeOf(rex.type))
+                    ).setResultType(if (rex.kind == SqlKind.CAST) physicalCodeOf(rex.type) else surfaceTypeOf(rex.type))
                     .build()
             is RexDynamicParam -> {
                 // Phase 08 A2 — name restoration. When the orchestrator threaded the prepared
@@ -291,8 +292,12 @@ object Expressions {
                 builder.setBoolValue(lit.value2 as Boolean).build()
             SqlTypeName.INTEGER, SqlTypeName.BIGINT, SqlTypeName.SMALLINT, SqlTypeName.TINYINT ->
                 builder.setIntValue((lit.value2 as Number).toLong()).build()
+            // TF-P1.S1 (G A1) — the numeric value, not `value2`: for a DECIMAL literal `value2` is the
+            // *unscaled* long (`1.5` → 15, `100.0` → 1000), which silently multiplied every fractional
+            // constant by 10^scale. `getValueAs(BigDecimal)` is the scaled value for every exact and
+            // approximate numeric literal.
             SqlTypeName.DECIMAL, SqlTypeName.DOUBLE, SqlTypeName.FLOAT, SqlTypeName.REAL ->
-                builder.setFloatValue((lit.value2 as Number).toDouble()).build()
+                builder.setFloatValue(lit.getValueAs(java.math.BigDecimal::class.java)!!.toDouble()).build()
             // ISO-8601, as plan.proto defines `datetime_value`. `value2` is not that: for a TIMESTAMP
             // it is epoch milliseconds, so the wire carried "1735689600000" — a value no caller writing
             // the contract's own form produces, and one decode could not read back as a date.
@@ -406,7 +411,16 @@ object Expressions {
         return when (lit.valueCase) {
             Literal.ValueCase.STRING_VALUE -> builder.literal(lit.stringValue)
             Literal.ValueCase.INT_VALUE -> builder.literal(lit.intValue)
-            Literal.ValueCase.FLOAT_VALUE -> builder.literal(lit.floatValue)
+            // TF-P1.S1 (G A1) — an exact literal: `RelBuilder.literal(Double)` builds an approximate one,
+            // which MSSQL renders in E-notation (`2.5E-1`) — a T-SQL FLOAT constant, turning decimal
+            // arithmetic into float arithmetic. `BigDecimal.valueOf` keeps the written digits (`0.25`,
+            // `100.0`) and re-encodes to the same double.
+            Literal.ValueCase.FLOAT_VALUE ->
+                if (lit.floatValue.isFinite()) {
+                    builder.rexBuilder.makeExactLiteral(java.math.BigDecimal.valueOf(lit.floatValue))
+                } else {
+                    builder.literal(lit.floatValue)
+                }
             Literal.ValueCase.BOOL_VALUE -> builder.literal(lit.boolValue)
             // A TYPED temporal literal. `builder.literal(String)` built a CHARACTER literal, so a date
             // bound came back typed `text` and was compared to a date column as a string.
@@ -536,9 +550,10 @@ object Expressions {
 
     /**
      * Decode a CAST (encoded as `FunctionCall(operation="cast")` with the single value operand;
-     * the target type is the wrapping Expression's surface [resultType]). Rebuilt as a Calcite
-     * `RexCall(CAST)` via [org.apache.calcite.rex.RexBuilder.makeCast] so RelToSql renders the
-     * dialect-appropriate `CAST(... AS ...)`.
+     * the target type is the wrapping Expression's [resultType] — a physical type code, see
+     * [castTargetType]). Rebuilt as a Calcite `RexCall(CAST)` via
+     * [org.apache.calcite.rex.RexBuilder.makeCast] so RelToSql renders the dialect-appropriate
+     * `CAST(... AS ...)`.
      */
     private fun decodeCast(
         builder: RelBuilder,
@@ -547,9 +562,118 @@ object Expressions {
     ): RexNode {
         require(fn.operandsCount == 1) { "cast expects exactly 1 operand, got ${fn.operandsCount}" }
         val operand = decode(builder, fn.operandsList[0])
-        val targetType = builder.typeFactory.createSqlType(sqlTypeNameFor(resultType))
-        return builder.rexBuilder.makeCast(targetType, operand)
+        return builder.rexBuilder.makeCast(castTargetType(builder.typeFactory, resultType), operand)
     }
+
+    /**
+     * TF-P1.S1 (G A9, contracts §3.3) — the physical type code a CAST's target type rides as:
+     * `<kind>[:<precision>[,<scale>]]` (`varchar:20`, `decimal:18,2`, `int`, `date`, `datetime`,
+     * `datetime2:0`, `varchar:max`). The surface tags (`text`, `float`, …) lost length, precision and
+     * scale, and widened a `date` cast to a timestamp that the optimizer then folded away. A type
+     * outside the table falls back to its surface tag.
+     *
+     * Deliberate: `int` is INTEGER and `datetime` is TIMESTAMP(3) here, where the surface tags meant
+     * BIGINT / TIMESTAMP. Only casts read these codes ([castTargetType]); parameters keep the surface
+     * mapping ([sqlTypeNameFor]).
+     */
+    internal fun physicalCodeOf(t: RelDataType): String {
+        val precision = t.precision
+        return when (t.sqlTypeName) {
+            SqlTypeName.VARCHAR ->
+                when {
+                    precision == RelDataType.PRECISION_NOT_SPECIFIED -> "varchar"
+                    precision >= VARCHAR_MAX_PRECISION -> "varchar:max"
+                    else -> "varchar:$precision"
+                }
+            SqlTypeName.CHAR -> "char:$precision"
+            SqlTypeName.DECIMAL -> "decimal:$precision,${t.scale}"
+            SqlTypeName.INTEGER -> "int"
+            SqlTypeName.BIGINT -> "bigint"
+            SqlTypeName.SMALLINT -> "smallint"
+            SqlTypeName.TINYINT -> "tinyint"
+            SqlTypeName.BOOLEAN -> "bit"
+            SqlTypeName.DOUBLE, SqlTypeName.FLOAT -> "float"
+            SqlTypeName.REAL -> "real"
+            SqlTypeName.DATE -> "date"
+            SqlTypeName.TIME -> if (precision > 0) "time:$precision" else "time"
+            SqlTypeName.TIMESTAMP -> if (precision == DATETIME_PRECISION) "datetime" else "datetime2:$precision"
+            else -> surfaceTypeOf(t)
+        }
+    }
+
+    /**
+     * Inverse of [physicalCodeOf]. Also accepts the T-SQL-only kinds (contracts §3.3 — `nvarchar`,
+     * `money`, `uniqueidentifier`, …) and the pre-TF surface tags `text`, `float`, `bool`, `decimal`
+     * that older plans and the TTR-P lowerings still send. Anything else is refused rather than
+     * rebuilt as `ANY`.
+     */
+    private fun castTargetType(
+        typeFactory: RelDataTypeFactory,
+        code: String,
+    ): RelDataType {
+        val kind = code.substringBefore(':').lowercase()
+        val args =
+            code
+                .substringAfter(':', "")
+                .split(',')
+                .filter { it.isNotBlank() }
+                .map { it.trim() }
+
+        fun unsupported(): Nothing =
+            throw UnsupportedOperationException("Cast target type '$code' is not in the v1 wire format")
+
+        fun number(i: Int): Int? = args.getOrNull(i)?.let { it.toIntOrNull() ?: unsupported() }
+
+        fun sized(
+            name: SqlTypeName,
+            default: Int? = null,
+        ): RelDataType {
+            val p = if (args.firstOrNull()?.lowercase() == "max") VARCHAR_MAX_PRECISION else number(0) ?: default
+            return if (p == null) typeFactory.createSqlType(name) else typeFactory.createSqlType(name, p)
+        }
+
+        fun decimal(
+            p: Int?,
+            s: Int?,
+        ): RelDataType =
+            when {
+                p == null -> typeFactory.createSqlType(SqlTypeName.DECIMAL)
+                s == null -> typeFactory.createSqlType(SqlTypeName.DECIMAL, p)
+                else -> typeFactory.createSqlType(SqlTypeName.DECIMAL, p, s)
+            }
+        return when (kind) {
+            "varchar", "nvarchar", "text", "ntext" -> sized(SqlTypeName.VARCHAR)
+            "char", "nchar" -> sized(SqlTypeName.CHAR)
+            "decimal", "numeric" -> decimal(number(0), number(1))
+            "money" -> decimal(19, 4)
+            "smallmoney" -> decimal(10, 4)
+            "int", "integer" -> typeFactory.createSqlType(SqlTypeName.INTEGER)
+            "bigint" -> typeFactory.createSqlType(SqlTypeName.BIGINT)
+            "smallint" -> typeFactory.createSqlType(SqlTypeName.SMALLINT)
+            "tinyint" -> typeFactory.createSqlType(SqlTypeName.TINYINT)
+            "bit", "bool", "boolean" -> typeFactory.createSqlType(SqlTypeName.BOOLEAN)
+            "float", "double" -> typeFactory.createSqlType(SqlTypeName.DOUBLE)
+            "real" -> typeFactory.createSqlType(SqlTypeName.REAL)
+            "date" -> typeFactory.createSqlType(SqlTypeName.DATE)
+            "time" -> sized(SqlTypeName.TIME)
+            "datetime" -> typeFactory.createSqlType(SqlTypeName.TIMESTAMP, number(0) ?: DATETIME_PRECISION)
+            "smalldatetime" -> typeFactory.createSqlType(SqlTypeName.TIMESTAMP, 0)
+            "datetime2" -> sized(SqlTypeName.TIMESTAMP, default = DATETIME2_DEFAULT_PRECISION)
+            "uniqueidentifier" -> typeFactory.createSqlType(SqlTypeName.CHAR, 36)
+            else -> unsupported()
+        }
+    }
+
+    /** T-SQL `datetime` is millisecond-ish (3.33 ms) — the TIMESTAMP precision it maps to. */
+    private const val DATETIME_PRECISION = 3
+
+    /** T-SQL `datetime2` without a precision is `datetime2(7)`. */
+    private const val DATETIME2_DEFAULT_PRECISION = 7
+
+    /** `varchar(max)` — Calcite's default type-system ceiling for VARCHAR. */
+    private val VARCHAR_MAX_PRECISION: Int =
+        org.apache.calcite.rel.type.RelDataTypeSystem.DEFAULT
+            .getMaxPrecision(SqlTypeName.VARCHAR)
 
     /** Surface-type tag → the [SqlTypeName] the encoder used. Shared by parameter + cast decoding. */
     private fun sqlTypeNameFor(resultType: String): SqlTypeName =
@@ -702,7 +826,7 @@ object Expressions {
             // `operator.name` fallback. Their datepart operand rides as a SYMBOL literal (see the
             // SYMBOL_TYPE_TAG decode path above).
             "dateadd" -> org.apache.calcite.sql.`fun`.SqlLibraryOperators.DATEADD
-            "datediff" -> org.apache.calcite.sql.`fun`.SqlLibraryOperators.DATEDIFF
+            "datediff" -> org.tatrman.translator.functions.DateOperators.DATEDIFF
             "datepart" -> org.apache.calcite.sql.`fun`.SqlLibraryOperators.DATEPART
             "date_part" -> org.apache.calcite.sql.`fun`.SqlLibraryOperators.DATE_PART
             // Standard `EXTRACT(<unit> FROM <datetime>)` — the dialect-agnostic date-part extraction

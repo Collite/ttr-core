@@ -509,7 +509,7 @@
     "expect": {
       "sql": "SELECT ROUND([ID] * 1.5, 1) AS [R], ABS([ID]) AS [A], FLOOR([ID] / 2.0) AS [F], CEILING([ID] / 2.0) AS [C] FROM [dbo].[A]"
     },
-    "status": "red:TF-P1.S1"
+    "status": "green"
   },
   {
     "id": "r16_coalesce_nullif",
@@ -599,7 +599,7 @@
     "expect": {
       "sql": "SELECT CAST([ID] AS DECIMAL(18, 2)) AS [D], '2026-01-01' AS [DT], CAST([ID] AS VARCHAR) AS [V] FROM [dbo].[A]"
     },
-    "status": "red:TF-P1.S1"
+    "status": "green"
   },
   {
     "id": "r25_datepart_dw_alias",
@@ -753,8 +753,8 @@
     "expect": {
       "sql": "SELECT [ID] + 1 AS [X], CAST([NAME] AS INTEGER) + 1 AS [Y] FROM [dbo].[A]"
     },
-    "status": "red:TF-P1.S1",
-    "note": "P0 finding: CAST(x AS int) rides the wire as the surface tag 'int' and comes back as BIGINT."
+    "status": "green",
+    "note": "TF-P1.S1 — CAST(x AS int) rides as physical 'int' (INTEGER); it came back as BIGINT via the surface tag."
   },
   {
     "id": "r39_union_distinct_dup",
@@ -774,7 +774,7 @@
     "expect": {
       "sql": "SELECT [ID] * 0.25 AS [A], [ID] * 100.0 AS [B], [ID] * 1.5 AS [C], [ID] * 2 AS [D], [ID] / 3.333 AS [E], 0.5 AS [F], 12.75 AS [G] FROM [dbo].[A]"
     },
-    "status": "red:TF-P1.S1"
+    "status": "green"
   },
   {
     "id": "s2_where_decimal",
@@ -782,9 +782,10 @@
     "sql": "SELECT a.ID FROM A a WHERE a.ID > 10.5",
     "params": [],
     "expect": {
-      "sql": "SELECT [ID] FROM [dbo].[A] WHERE CAST([ID] AS FLOAT) > 10.5"
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE CAST([ID] AS DECIMAL(19, 1)) > 10.5"
     },
-    "status": "red:TF-P1.S1"
+    "status": "green",
+    "note": "TF-P1.S1 — Calcite coerces the INT column to DECIMAL(19, 1) for the comparison; the cast now carries its precision."
   },
   {
     "id": "s3_date_cast_cmp",
@@ -794,8 +795,8 @@
     "expect": {
       "sql": "SELECT [ID] FROM [dbo].[A] WHERE CAST(GETDATE() AS DATE) >= '2026-01-01'"
     },
-    "status": "red:TF-P1.S1",
-    "note": "P0 finding (not in the gaps report): CAST(GETDATE() AS date) is dropped today — the cast rides as surface 'datetime', decodes to TIMESTAMP and folds away. Harmless for >=, wrong for =."
+    "status": "green",
+    "note": "TF-P1.S1 — the DATE cast rides as 'date'; it used to decode to TIMESTAMP and fold away."
   },
   {
     "id": "s4_convert_date",
@@ -815,7 +816,7 @@
     "expect": {
       "sql": "SELECT CASE WHEN [B_ID] > 0 THEN ROUND([ID] * 100.0 / [B_ID], 1) ELSE NULL END AS [P] FROM [dbo].[A]"
     },
-    "status": "red:TF-P1.S1"
+    "status": "green"
   },
   {
     "id": "s6_str_pipes_param",

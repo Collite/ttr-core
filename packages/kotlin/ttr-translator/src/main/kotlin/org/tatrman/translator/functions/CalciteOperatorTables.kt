@@ -2,7 +2,12 @@
 package org.tatrman.translator.functions
 
 import java.util.EnumSet
+import org.apache.calcite.sql.SqlFunctionCategory
+import org.apache.calcite.sql.SqlIdentifier
+import org.apache.calcite.sql.SqlOperator
 import org.apache.calcite.sql.SqlOperatorTable
+import org.apache.calcite.sql.SqlSyntax
+import org.apache.calcite.sql.validate.SqlNameMatcher
 import org.apache.calcite.sql.`fun`.SqlLibrary
 import org.apache.calcite.sql.`fun`.SqlLibraryOperatorTableFactory
 import org.apache.calcite.sql.util.SqlOperatorTables
@@ -46,8 +51,41 @@ object CalciteOperatorTables {
         SqlOperatorTables.chain(
             CustomOperators.table,
             PlatformOperators.OPERATOR_TABLE,
-            libraryTableFor(EnumSet.of(SqlLibrary.STANDARD, SqlLibrary.MSSQL, SqlLibrary.POSTGRESQL)),
+            ShadowedOperatorTable(
+                libraryTableFor(EnumSet.of(SqlLibrary.STANDARD, SqlLibrary.MSSQL, SqlLibrary.POSTGRESQL)),
+                REPLACED_LIBRARY_OPERATORS,
+            ),
         )
+    }
+
+    /**
+     * Library operators a [CustomOperators] entry *replaces* with the same name, kind and arity. Chain
+     * order alone does not shadow those: with two same-kind candidates of equal arity Calcite's
+     * type-precedence pass eliminates both ("No match found for function signature …"). TF-P1.S1:
+     * `DATEDIFF` (see [DateOperators.DATEDIFF]).
+     */
+    private val REPLACED_LIBRARY_OPERATORS: Set<SqlOperator> =
+        setOf(org.apache.calcite.sql.`fun`.SqlLibraryOperators.DATEDIFF)
+
+    /** [delegate] with the [hidden] operator instances removed from every lookup and listing. */
+    private class ShadowedOperatorTable(
+        private val delegate: SqlOperatorTable,
+        private val hidden: Set<SqlOperator>,
+    ) : SqlOperatorTable {
+        override fun lookupOperatorOverloads(
+            opName: SqlIdentifier,
+            category: SqlFunctionCategory?,
+            syntax: SqlSyntax,
+            operatorList: MutableList<SqlOperator>,
+            nameMatcher: SqlNameMatcher,
+        ) {
+            val found = mutableListOf<SqlOperator>()
+            delegate.lookupOperatorOverloads(opName, category, syntax, found, nameMatcher)
+            found.filterTo(operatorList) { op -> hidden.none { it === op } }
+        }
+
+        override fun getOperatorList(): List<SqlOperator> =
+            delegate.operatorList.filter { op -> hidden.none { it === op } }
     }
 
     /**
