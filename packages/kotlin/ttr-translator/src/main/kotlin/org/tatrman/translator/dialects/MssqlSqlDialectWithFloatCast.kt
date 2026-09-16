@@ -17,6 +17,7 @@ import org.apache.calcite.sql.SqlNodeList
 import org.apache.calcite.sql.SqlWriter
 import org.apache.calcite.sql.dialect.MssqlSqlDialect
 import org.apache.calcite.sql.`fun`.SqlLibraryOperators
+import org.apache.calcite.sql.`fun`.SqlStdOperatorTable
 import org.apache.calcite.sql.parser.SqlParserPos
 import org.apache.calcite.sql.type.SqlTypeName
 
@@ -64,6 +65,8 @@ class MssqlSqlDialectWithFloatCast(
         if (rendered != null) {
             writer.print(rendered)
             writer.setNeedWhitespace(true)
+        } else if (call.operator === SqlStdOperatorTable.CONCAT) {
+            unparseConcat(writer, call)
         } else if (call.kind == SqlKind.EXTRACT) {
             unparseExtract(writer, call)
         } else if (call.kind == SqlKind.LISTAGG) {
@@ -103,6 +106,35 @@ class MssqlSqlDialectWithFloatCast(
         call.operandList[1].unparse(writer, 0, 0)
         writer.endFunCall(frame)
     }
+
+    /**
+     * TF-P2.S1 (G A4; contracts §3.5, ⚑TF-1 ruled `CONCAT`) — the ANSI `a || b` (and every T-SQL string
+     * `+`, which TsqlPlusLowering turns into `||`) → `CONCAT(a, b)`. SQL Server has no `||`. A chain
+     * `a || b || c` arrives as nested binary calls and is flattened left-to-right into one
+     * `CONCAT(a, b, c)`.
+     *
+     * NULL semantics differ from T-SQL `+`: `CONCAT` treats a NULL operand as `''`, `'a' + NULL` is
+     * NULL. Accepted deviation (⚑TF-1 records the rejected alternative, `a + b` with
+     * `CAST(… AS VARCHAR)` wrappers).
+     */
+    private fun unparseConcat(
+        writer: SqlWriter,
+        call: SqlCall,
+    ) {
+        val frame = writer.startFunCall("CONCAT")
+        concatOperands(call).forEach { operand ->
+            writer.sep(",")
+            operand.unparse(writer, 0, 0)
+        }
+        writer.endFunCall(frame)
+    }
+
+    private fun concatOperands(node: SqlNode): List<SqlNode> =
+        if (node is SqlCall && node.operator === SqlStdOperatorTable.CONCAT) {
+            node.operandList.flatMap { concatOperands(it) }
+        } else {
+            listOf(node)
+        }
 
     /**
      * TF-P1.S3 (G C6; contracts §5.4) — `LISTAGG(x, sep)` → T-SQL `STRING_AGG(x, sep)`. Only the name

@@ -15,6 +15,7 @@ import org.tatrman.translator.codec.sql.TableHintExtractor
 import org.tatrman.translator.codec.sql.TableHintSpec
 import org.tatrman.translator.codec.sql.TopClauseExtractor
 import org.tatrman.translator.codec.sql.ValidateResult
+import org.tatrman.translator.functions.TsqlPlusLowering
 import org.tatrman.translator.codec.transdsl.TransDslCodec
 import org.tatrman.translator.codec.transdsl.TransDslParseException
 import org.tatrman.translator.codec.transdsl.TransDslUnparseException
@@ -427,10 +428,15 @@ class Translator(
             // `SubqueryExpression` encoding and REL_NODE re-entry stays byte-stable.
             val decorrelated = SubqueryNormalizer.apply(rel, framework)
 
+            // TF-P2.S1 (contracts §3.4) — pass 2 of T-SQL `+`/`-`: with operand types known, lower each
+            // TsqlPlus/TsqlMinus call to `||` (CONCAT), `DATEADD(DAY, n, d)` or plain PLUS/MINUS. The wire
+            // carries none of the T-SQL operators, so this is a no-op on REL_NODE re-entry.
+            val lowered = TsqlPlusLowering.apply(decorrelated)
+
             // 1. RESOLVE on RelNode. When the SQL carried parameters, `preparedSql` lets RESOLVE
             //    pre-type each `?` (RexDynamicParam) from the declared parameter type via
             //    ParameterTyper; null (free-SQL / RelNode re-entry) is a no-op for typing.
-            val resolved = Resolve.apply(decorrelated, framework, preparedSql)
+            val resolved = Resolve.apply(lowered, framework, preparedSql)
 
             // 1b. EXPAND SEARCH → OR/AND of comparisons. `SqlToRelConverter` folds an `IN`-list of
             //     literals / comparison ranges into a `SEARCH($ref, Sarg[…])`, whose `Sarg` value

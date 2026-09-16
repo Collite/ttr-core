@@ -97,7 +97,7 @@
     "expect": {
       "sql": "SELECT CONCAT('Skladem (', CAST([ID] AS VARCHAR(20)), ' ks)') AS [X] FROM [dbo].[A]"
     },
-    "status": "red:TF-P2.S1"
+    "status": "green"
   },
   {
     "id": "q11_window",
@@ -489,7 +489,7 @@
     "expect": {
       "sql": "SELECT CONCAT('a', CAST([ID] AS VARCHAR(10))) AS [X] FROM [dbo].[A]"
     },
-    "status": "red:TF-P2.S1"
+    "status": "green"
   },
   {
     "id": "r14_try_cast",
@@ -831,7 +831,7 @@
     "expect": {
       "sql": "SELECT [ID] FROM [dbo].[A] WHERE [NAME] LIKE CONCAT('%', ?, '%')"
     },
-    "status": "red:TF-P2.S1"
+    "status": "green"
   },
   {
     "id": "s7_getdate_minus_int",
@@ -841,7 +841,7 @@
     "expect": {
       "sql": "SELECT [ID] FROM [dbo].[A] WHERE DATEADD(DAY, -30, GETDATE()) > GETDATE()"
     },
-    "status": "red:TF-P2.S1"
+    "status": "green"
   },
   {
     "id": "s8_int_div",

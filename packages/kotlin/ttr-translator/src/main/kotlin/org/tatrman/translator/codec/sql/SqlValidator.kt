@@ -47,7 +47,15 @@ object SqlValidator {
                     org.tatrman.translator.functions.StringAggRewriter
                         .rewriter(),
                 ) ?: rewritten
-            val validated = planner.validate(stringAggRewritten)
+            // TF-P2.S1 (contracts §3.4) — pass 1 of T-SQL `+`/`-`: swap binary PLUS/MINUS to the TsqlPlus/
+            // TsqlMinus operators so the validator neither coerces `'a' + CAST(x AS varchar)` to DECIMAL
+            // nor rejects `GETDATE() - 30`. Pass 2 (TsqlPlusLowering) runs on the RelNode, types known.
+            val arithmeticRewritten =
+                stringAggRewritten.accept(
+                    org.tatrman.translator.functions.TsqlArithmeticShuttle
+                        .rewriter(),
+                ) ?: stringAggRewritten
+            val validated = planner.validate(arithmeticRewritten)
             val rel = planner.rel(validated).rel
             ValidateResult.Success(rel)
         } catch (ex: SqlParseException) {
