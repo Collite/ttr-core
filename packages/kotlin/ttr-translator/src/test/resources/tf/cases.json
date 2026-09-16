@@ -852,5 +852,54 @@
       "sql": "SELECT [ID] / 2 AS [H] FROM [dbo].[A]"
     },
     "status": "green"
+  },
+  {
+    "id": "r40_like_quoted_param",
+    "group": "C2",
+    "sql": "SELECT a.ID FROM A a WHERE ({q} = '' OR a.NAME COLLATE Latin1_General_CI_AI LIKE '%{q}%')",
+    "params": [
+      {
+        "name": "q",
+        "type": "varchar"
+      }
+    ],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE LOWER(?) = '' OR [NAME] COLLATE Latin1_General_CI_AI LIKE CONCAT('%', ?, '%')"
+    },
+    "status": "green",
+    "note": "C2 — a quoted LIKE pattern placeholder becomes CONCAT('%', ?, '%') (TF-P4)."
+  },
+  {
+    "id": "r41_quoted_exact_param",
+    "group": "C2",
+    "sql": "SELECT a.ID FROM A a WHERE ('{id}' = '' OR a.ID = '{id}')",
+    "params": [
+      {
+        "name": "id",
+        "type": "int"
+      }
+    ],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE ? = '' OR [ID] = ?"
+    },
+    "status": "green",
+    "note": "C2 — an exactly-quoted placeholder loses its quotes (TF-P4)."
+  },
+  {
+    "id": "r42_param_in_literal",
+    "group": "C2",
+    "sql": "SELECT a.ID FROM A a WHERE a.NAME = 'prefix {q} suffix'",
+    "params": [
+      {
+        "name": "q",
+        "type": "varchar"
+      }
+    ],
+    "expect": {
+      "parseCode": "parameter_in_string_literal",
+      "messageContains": "Parameter '{q}' is inside a SQL string literal"
+    },
+    "status": "green",
+    "note": "C2 — a declared placeholder in a literal that is neither exact nor a pattern is refused (TF-P4)."
   }
 ]

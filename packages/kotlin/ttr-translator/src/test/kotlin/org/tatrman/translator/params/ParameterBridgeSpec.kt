@@ -81,6 +81,95 @@ class ParameterBridgeSpec :
             r.sql shouldBe "SELECT '{open' FROM customers"
         }
 
+        // ---- TF-P4 (G C2; contracts §3.7, §6): placeholders inside string literals ----
+
+        val q = SqlParam("q", "varchar", "x")
+        val id = SqlParam("id", "int", 1)
+
+        fun prepared(
+            sql: String,
+            vararg params: SqlParam,
+            typed: Boolean = false,
+        ) = ParameterBridge.prepareSqlForCalcite(sql, params.toList(), typed)
+
+        "an exactly-quoted placeholder '{id}' loses its quotes" {
+            val r = prepared("WHERE ('{id}' = '' OR s.IDSUBJEKT = '{id}')", id)
+            r.sql shouldBe "WHERE (? = '' OR s.IDSUBJEKT = ?)"
+            r.parameterOrder shouldBe listOf("id", "id")
+            r.distinctNames shouldBe listOf("id")
+        }
+
+        "'%{q}%' becomes CONCAT('%', ?, '%')" {
+            val r = prepared("WHERE s.SUBJ_NAZEV LIKE '%{q}%'", q)
+            r.sql shouldBe "WHERE s.SUBJ_NAZEV LIKE CONCAT('%', ?, '%')"
+            r.parameterOrder shouldBe listOf("q")
+        }
+
+        "a one-sided pattern keeps only its non-empty side" {
+            prepared("WHERE KOD LIKE '{q}%'", q).sql shouldBe "WHERE KOD LIKE CONCAT(?, '%')"
+            prepared("WHERE KOD LIKE '%{q}'", q).sql shouldBe "WHERE KOD LIKE CONCAT('%', ?)"
+        }
+
+        "two placeholders in one pattern literal become one CONCAT, in order" {
+            val r = prepared("WHERE x LIKE '%{q}-{id}%'", q, id)
+            r.sql shouldBe "WHERE x LIKE CONCAT('%', ?, '-', ?, '%')"
+            r.parameterOrder shouldBe listOf("q", "id")
+        }
+
+        "a pattern literal keeps its escaped quotes and its N prefix" {
+            prepared("WHERE x LIKE '%''{q}''%'", q).sql shouldBe "WHERE x LIKE CONCAT('%''', ?, '''%')"
+            prepared("WHERE x LIKE N'%{q}%'", q).sql shouldBe "WHERE x LIKE CONCAT(N'%', ?, N'%')"
+            prepared("WHERE x = N'{q}'", q).sql shouldBe "WHERE x = ?"
+        }
+
+        "Czech placeholder names are placeholders (the name grammar is Unicode)" {
+            ParameterBridge.PLACEHOLDER.matches("{číslo_dokladu}") shouldBe true
+            val cislo = SqlParam("číslo_dokladu", "varchar", "x")
+            val nazev = SqlParam("název", "varchar", "x")
+            val r = prepared("WHERE d = '{číslo_dokladu}' AND n LIKE '%{název}%'", cislo, nazev)
+            r.sql shouldBe "WHERE d = ? AND n LIKE CONCAT('%', ?, '%')"
+            r.parameterOrder shouldBe listOf("číslo_dokladu", "název")
+        }
+
+        "an undeclared {…} inside a literal is literal text (e.g. JSON)" {
+            prepared("WHERE x = 'literal {json} text' AND y = {q}", q).sql shouldBe
+                "WHERE x = 'literal {json} text' AND y = ?"
+            prepared("WHERE x LIKE '%{json}%'", q).sql shouldBe "WHERE x LIKE '%{json}%'"
+        }
+
+        "a declared placeholder in a literal that is neither exact nor a pattern fails loudly" {
+            val ex =
+                shouldThrow<ParameterInStringLiteralException> {
+                    prepared("WHERE x = 'prefix {q} suffix'", q)
+                }
+            ex.parameterName shouldBe "q"
+            ex.message shouldBe
+                "Parameter '{q}' is inside a SQL string literal; a parameter cannot be embedded in a quoted literal " +
+                "(it would become the literal text, never a bound value). Concatenate instead, e.g. " +
+                "LIKE CONCAT('%', {q}, '%')."
+        }
+
+        "two placeholders in a literal without % fail too (only exact or pattern literals are rewritten)" {
+            shouldThrow<ParameterInStringLiteralException> { prepared("WHERE x = '{q}-{id}'", q, id) }
+                .parameterName shouldBe "q"
+        }
+
+        "the in-literal guard is an IllegalArgumentException (existing catch blocks still hold)" {
+            shouldThrow<IllegalArgumentException> { prepared("WHERE x = 'a {q} b'", q) }
+        }
+
+        "a quote inside a comment or a quoted identifier does not open a literal" {
+            prepared("WHERE x = {q} -- don't\nAND y LIKE '%{q}%'", q).sql shouldBe
+                "WHERE x = ? -- don't\nAND y LIKE CONCAT('%', ?, '%')"
+            prepared("WHERE x = {q} /* it's */ AND \"o'k\" = '{q}'", q).sql shouldBe
+                "WHERE x = ? /* it's */ AND \"o'k\" = ?"
+        }
+
+        "typed mode wraps the placeholder inside the CONCAT" {
+            prepared("WHERE x LIKE '%{q}%'", q, typed = true).sql shouldBe
+                "WHERE x LIKE CONCAT('%', CAST(? AS VARCHAR), '%')"
+        }
+
         // ---- typed = true (CAST(? AS T)) mode ----
 
         "typed mode emits CAST(? AS VARCHAR) for a string parameter" {

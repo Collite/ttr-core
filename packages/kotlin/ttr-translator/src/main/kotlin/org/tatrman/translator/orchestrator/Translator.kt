@@ -28,6 +28,7 @@ import org.tatrman.translator.framework.TranslatorFramework
 import org.tatrman.translator.joiner.JoinerLogical
 import org.tatrman.translator.joiner.JoinerPhysical
 import org.tatrman.translator.params.ParameterBridge
+import org.tatrman.translator.params.ParameterInStringLiteralException
 import org.tatrman.translator.params.PositionalParameters
 import org.tatrman.translator.params.PreparedSql
 import org.tatrman.translator.params.SqlParam
@@ -261,6 +262,14 @@ class Translator(
             if (parameters.isNotEmpty()) {
                 try {
                     ParameterBridge.prepareSqlForCalcite(preSource, parameters)
+                } catch (ex: ParameterInStringLiteralException) {
+                    // TF-P4 (G C2) — a declared `{name}` in a literal the bridge cannot rewrite
+                    // (`'a {x} b'`): distinct code, so the author gets the CONCAT hint rather
+                    // than a misleading "unknown parameter".
+                    return ParseResult.Failure(
+                        code = "parameter_in_string_literal",
+                        message = ex.message ?: "Parameter placeholder inside a SQL string literal",
+                    )
                 } catch (ex: IllegalArgumentException) {
                     return ParseResult.Failure(
                         code = "parameter_unknown",

@@ -298,6 +298,52 @@ class TranslatorSpec :
             r.code shouldBe "parameter_unknown"
         }
 
+        "a quoted LIKE pattern placeholder binds positionally as [q, q] (TF-P4, G C2)" {
+            // The legacy search idiom written with the placeholder inside the pattern literal: the bridge
+            // rewrites `'%{q}%'` to `CONCAT('%', {q}, '%')`, so the `?` is a real marker, not pattern text.
+            val parsed =
+                translator.parseToRelNode(
+                    source =
+                        "SELECT id FROM customers WHERE ({q} = '' OR name COLLATE Latin1_General_CI_AI LIKE '%{q}%')",
+                    sourceLanguage = Language.SQL,
+                    parameters = listOf(SqlParam(name = "q", type = "varchar", value = "DF")),
+                )
+            parsed.shouldBeInstanceOf<ParseResult.Success>()
+            val binding =
+                org.tatrman.plan.v1.ParameterBinding
+                    .newBuilder()
+                    .setName("q")
+                    .setType("varchar")
+                    .setValue(
+                        org.tatrman.plan.v1.Value
+                            .newBuilder()
+                            .setStringValue("DF"),
+                    ).build()
+            val r =
+                translator.unparseFromRelNode(
+                    parsed.plan,
+                    Language.SQL,
+                    SqlDialectProto.MSSQL,
+                    parameters = listOf(binding),
+                )
+            r.shouldBeInstanceOf<UnparseResult.Success>()
+            r.output shouldBe
+                "SELECT [id]\nFROM [dbo].[customers]\n" +
+                "WHERE LOWER(?) = '' OR [name] COLLATE Latin1_General_CI_AI LIKE CONCAT('%', ?, '%')"
+            r.parameters.map { it.name } shouldBe listOf("q", "q")
+        }
+
+        "parseToRelNode fails with parameter_in_string_literal for a placeholder baked into a literal (TF-P4)" {
+            val r =
+                translator.parseToRelNode(
+                    source = "SELECT id FROM customers WHERE name = 'prefix {q} suffix'",
+                    sourceLanguage = Language.SQL,
+                    parameters = listOf(SqlParam(name = "q", type = "varchar", value = "x")),
+                )
+            r.shouldBeInstanceOf<ParseResult.Failure>()
+            r.code shouldBe "parameter_in_string_literal"
+        }
+
         "parseToRelNode leaves {…} verbatim when no parameters are supplied (free-SQL)" {
             // No bindings → the bridge is bypassed so JDBC escapes / literal `{` survive; here a
             // bare `{q}` is therefore handed to Calcite as-is and rejected (i.e. we did NOT
