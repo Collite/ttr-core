@@ -27,6 +27,7 @@ import org.apache.calcite.rex.RexWindowBound
 import org.apache.calcite.rex.RexWindowBounds
 import org.apache.calcite.sql.SqlAggFunction
 import org.apache.calcite.sql.SqlKind
+import org.apache.calcite.sql.parser.SqlParserPos
 import org.apache.calcite.sql.SqlOperator
 import org.apache.calcite.sql.`fun`.SqlStdOperatorTable
 import org.apache.calcite.sql.type.SqlTypeName
@@ -126,8 +127,13 @@ object Expressions {
                             .newBuilder()
                             .setOperation(operationCode(rex))
                             .addAllOperands(rex.operands.map { encode(it, ctx) }),
-                    ).setResultType(if (rex.kind == SqlKind.CAST) physicalCodeOf(rex.type) else surfaceTypeOf(rex.type))
-                    .build()
+                    ).setResultType(
+                        if (rex.kind == SqlKind.CAST || rex.kind == SqlKind.SAFE_CAST) {
+                            physicalCodeOf(rex.type)
+                        } else {
+                            surfaceTypeOf(rex.type)
+                        },
+                    ).build()
             is RexDynamicParam -> {
                 // Phase 08 A2 — name restoration. When the orchestrator threaded the prepared
                 // `parameterNames` map in, emit the original `{name}` here; otherwise fall back
@@ -344,6 +350,8 @@ object Expressions {
             // Phase 08 B4 / DF-S05 + DF-DSL04 — first-class set/pattern membership.
             SqlKind.IN -> "in"
             SqlKind.LIKE -> "like"
+            // TF-P1.S3 (G C8) — T-SQL TRY_CAST; Calcite builds it as SAFE_CAST (or TRY_CAST, same kind).
+            SqlKind.SAFE_CAST -> "safe_cast"
             else -> call.operator.name.lowercase()
         }
 
@@ -367,7 +375,9 @@ object Expressions {
                 // rides on the *Expression's* result_type, not on the call — so it can't
                 // go through the generic operator path (which has no type to cast to).
                 if (expr.function.operation.equals("cast", ignoreCase = true)) {
-                    decodeCast(builder, expr.function, expr.resultType)
+                    decodeCast(builder, expr.function, expr.resultType, safe = false)
+                } else if (expr.function.operation.equals("safe_cast", ignoreCase = true)) {
+                    decodeCast(builder, expr.function, expr.resultType, safe = true)
                 } else {
                     decodeFunctionCall(builder, expr.function)
                 }
@@ -598,10 +608,17 @@ object Expressions {
         builder: RelBuilder,
         fn: FunctionCall,
         resultType: String,
+        safe: Boolean,
     ): RexNode {
-        require(fn.operandsCount == 1) { "cast expects exactly 1 operand, got ${fn.operandsCount}" }
+        require(fn.operandsCount == 1) { "${fn.operation} expects exactly 1 operand, got ${fn.operandsCount}" }
         val operand = decode(builder, fn.operandsList[0])
-        return builder.rexBuilder.makeCast(castTargetType(builder.typeFactory, resultType), operand)
+        val targetType = castTargetType(builder.typeFactory, resultType)
+        // TF-P1.S3 (G C8) — `safe_cast` (T-SQL TRY_CAST): the same target-type code, a SAFE_CAST call.
+        return if (safe) {
+            builder.rexBuilder.makeAbstractCast(SqlParserPos.ZERO, targetType, operand, true)
+        } else {
+            builder.rexBuilder.makeCast(targetType, operand)
+        }
     }
 
     /**
@@ -875,6 +892,9 @@ object Expressions {
             // CEP-P2 — faithful CONVERT / TRY_CONVERT custom operators.
             "convert" -> org.tatrman.translator.functions.ConvertOperators.CONVERT
             "try_convert" -> org.tatrman.translator.functions.ConvertOperators.TRY_CONVERT
+            // TF-P1.S3 — decoded by [decodeCast] (the target type rides on result_type); mapped here so
+            // a name lookup agrees with the encoder's `operationCode`.
+            "safe_cast" -> org.apache.calcite.sql.`fun`.SqlLibraryOperators.SAFE_CAST
             // Catalog-driven decode: function-syntax operators (CONCAT, LEFT, IIF, ISNULL, LEN, …)
             // aren't hand-mapped above; resolve them from the FunctionCatalog, built by enumerating
             // the loaded custom + library operator tables (CalciteOperatorTables). The explicit

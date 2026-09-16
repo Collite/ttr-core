@@ -16,6 +16,7 @@ import org.apache.calcite.sql.SqlNode
 import org.apache.calcite.sql.SqlNodeList
 import org.apache.calcite.sql.SqlWriter
 import org.apache.calcite.sql.dialect.MssqlSqlDialect
+import org.apache.calcite.sql.`fun`.SqlLibraryOperators
 import org.apache.calcite.sql.parser.SqlParserPos
 import org.apache.calcite.sql.type.SqlTypeName
 
@@ -31,7 +32,7 @@ import org.apache.calcite.sql.type.SqlTypeName
  *
  * Also lowers the standard `EXTRACT(<unit> FROM <datetime>)` to T-SQL `DATEPART(<part>, <datetime>)`
  * — SQL Server has no `EXTRACT` (error 195 `'EXTRACT' is not a recognized built-in function name`),
- * and Calcite's stock [MssqlSqlDialect] has no unparse rule for it (FLOOR/MOD/SAFE_CAST only), so the
+ * and Calcite's stock [MssqlSqlDialect] has no unparse rule for it (FLOOR/MOD only), so the
  * call went out verbatim. Every date-part route lands on this node: `YEAR(x)`/`MONTH(x)` are rewritten
  * to `EXTRACT` by Calcite's validator (`SqlDatePartFunction.rewriteCall`), the MD dot-path viaCalc
  * lowering emits it directly, and a free-SQL planner writes it as the portable form.
@@ -65,6 +66,12 @@ class MssqlSqlDialectWithFloatCast(
             writer.setNeedWhitespace(true)
         } else if (call.kind == SqlKind.EXTRACT) {
             unparseExtract(writer, call)
+        } else if (call.kind == SqlKind.LISTAGG) {
+            unparseStringAgg(writer, call)
+        } else if (call.kind == SqlKind.SAFE_CAST) {
+            // TF-P1.S3 (G C8) — RelToSql builds the SAFE_CAST operator, which renders under its own
+            // name; T-SQL spells it TRY_CAST (same `expr AS type` operand shape).
+            SqlLibraryOperators.TRY_CAST.unparse(writer, call, leftPrec, rightPrec)
         } else {
             super.unparseCall(writer, call, leftPrec, rightPrec)
         }
@@ -94,6 +101,28 @@ class MssqlSqlDialectWithFloatCast(
         writer.keyword(part)
         writer.sep(",", true)
         call.operandList[1].unparse(writer, 0, 0)
+        writer.endFunCall(frame)
+    }
+
+    /**
+     * TF-P1.S3 (G C6; contracts §5.4) — `LISTAGG(x, sep)` → T-SQL `STRING_AGG(x, sep)`. Only the name
+     * changes: a `WITHIN GROUP (ORDER BY …)` is a separate `SqlWithinGroupOperator` call wrapping this
+     * one, which renders its clause itself after delegating the inner call here. SQL Server has no
+     * `STRING_AGG(DISTINCT …)`: that fails at translate time (as an unmapped EXTRACT unit does) rather
+     * than at the engine.
+     */
+    private fun unparseStringAgg(
+        writer: SqlWriter,
+        call: SqlCall,
+    ) {
+        if (call.functionQuantifier != null) {
+            throw IllegalArgumentException("STRING_AGG(${call.functionQuantifier}) has no SQL Server equivalent")
+        }
+        val frame = writer.startFunCall("STRING_AGG")
+        call.operandList.forEach { operand ->
+            writer.sep(",")
+            operand.unparse(writer, 0, 0)
+        }
         writer.endFunCall(frame)
     }
 

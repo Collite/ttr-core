@@ -255,13 +255,16 @@ message AggregateNode {
 
 // AggregateCall — a single aggregate column in an Aggregate node.
 // "function" is one of the aggregate operator names from the operator enum
-// in v1-architecture.md §3.2 (sum, count, count_distinct, avg, min, max).
+// in v1-architecture.md §3.2 (sum, count, count_distinct, avg, min, max), plus
+// listagg (TF — STRING_AGG; carries separator + within_group).
 message AggregateCall {
   string function = 1;
   repeated ColumnRef args = 2;
   bool distinct = 3;            // true when the canonical form uses _distinct
   string alias = 4;
   reserved 5 to 9;
+  Literal separator = 10;             // TF — listagg only: the separator literal (STRING_AGG(x, ', '))
+  repeated SortKey within_group = 11; // TF — listagg only: WITHIN GROUP (ORDER BY …), empty = none
 }
 
 // Sort — order rows. Multi-key sorting; nulls ordering explicit.

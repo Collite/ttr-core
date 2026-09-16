@@ -118,7 +118,7 @@
       "parseCode": "parse_pipeline_failed",
       "messageContains": "GROUP BY ROLLUP/CUBE/GROUPING SETS is not in the v1 wire format"
     },
-    "status": "red:TF-P1.S3"
+    "status": "green"
   },
   {
     "id": "q13_string_agg",
@@ -128,7 +128,7 @@
     "expect": {
       "sql": "SELECT [B_ID], STRING_AGG([NAME], ', ') AS [NAMES] FROM [dbo].[A] GROUP BY [B_ID]"
     },
-    "status": "red:TF-P1.S3"
+    "status": "green"
   },
   {
     "id": "q14_to_char_pg",
@@ -161,7 +161,7 @@
       "parseCode": "parse_pipeline_failed",
       "messageContains": "Aggregate FILTER (WHERE …) is not in the v1 wire format"
     },
-    "status": "red:TF-P1.S3"
+    "status": "green"
   },
   {
     "id": "q17_datepart_weekday",
@@ -499,7 +499,7 @@
     "expect": {
       "sql": "SELECT TRY_CAST([NAME] AS INTEGER) AS [X], TRY_CONVERT(INTEGER, [NAME]) AS [Y] FROM [dbo].[A]"
     },
-    "status": "red:TF-P1.S3"
+    "status": "green"
   },
   {
     "id": "r15_round_abs",

@@ -224,14 +224,43 @@ object PlanNodeDecoder {
                 "min" -> org.apache.calcite.sql.`fun`.SqlStdOperatorTable.MIN
                 "max" -> org.apache.calcite.sql.`fun`.SqlStdOperatorTable.MAX
                 "avg" -> org.apache.calcite.sql.`fun`.SqlStdOperatorTable.AVG
+                // TF-P1.S3 (contracts §5.4) — STRING_AGG; the MSSQL dialect renders the name back.
+                "listagg" -> org.apache.calcite.sql.`fun`.SqlStdOperatorTable.LISTAGG
                 else -> throw UnsupportedOperationException(
                     "Aggregate function '${call.function}' is not in the v1 wire format",
                 )
             }
-        val args: List<RexNode> = call.argsList.map { Expressions.fieldByName(builder, it.name) }
-        val agg = builder.aggregateCall(fn, args)
+        val columns: List<RexNode> = call.argsList.map { Expressions.fieldByName(builder, it.name) }
+        val args = if (call.hasSeparator()) columns + separatorArg(builder, call.separator.stringValue) else columns
+        val unordered = builder.aggregateCall(fn, args)
+        val agg =
+            if (call.withinGroupCount >
+                0
+            ) {
+                unordered.sort(call.withinGroupList.map { sortKeyToRex(builder, it) })
+            } else {
+                unordered
+            }
         val withDistinct = if (call.distinct) agg.distinct() else agg
         return if (call.alias.isNotEmpty()) withDistinct.`as`(call.alias) else withDistinct
+    }
+
+    /**
+     * TF-P1.S3 — the listagg separator operand. The encoder read it from the constant column Calcite
+     * projects below the aggregate, and that column is still on the wire in the input `Project`: reuse it
+     * rather than projecting a second copy (which `RelBuilder` would name `$f<n+1>`, so every round trip
+     * renamed it).
+     */
+    private fun separatorArg(
+        builder: RelBuilder,
+        separator: String,
+    ): RexNode {
+        val input = builder.peek() as? org.apache.calcite.rel.core.Project
+        val ordinal =
+            input?.projects?.indexOfFirst {
+                it is org.apache.calcite.rex.RexLiteral && it.getValueAs(String::class.java) == separator
+            } ?: -1
+        return if (ordinal >= 0) builder.field(ordinal) else builder.literal(separator)
     }
 
     private fun pushSort(

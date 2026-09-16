@@ -41,7 +41,13 @@ object SqlValidator {
                     org.tatrman.translator.functions.ConvertOperators
                         .rewriter(),
                 ) ?: parsed
-            val validated = planner.validate(rewritten)
+            // TF-P1.S3 — T-SQL `STRING_AGG(x, sep) WITHIN GROUP (ORDER BY …)` → `LISTAGG(x, sep) WITHIN GROUP (…)`.
+            val stringAggRewritten =
+                rewritten.accept(
+                    org.tatrman.translator.functions.StringAggRewriter
+                        .rewriter(),
+                ) ?: rewritten
+            val validated = planner.validate(stringAggRewritten)
             val rel = planner.rel(validated).rel
             ValidateResult.Success(rel)
         } catch (ex: SqlParseException) {
