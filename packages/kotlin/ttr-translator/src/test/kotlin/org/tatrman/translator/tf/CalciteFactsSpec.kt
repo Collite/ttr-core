@@ -6,7 +6,9 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.apache.calcite.config.NullCollation
+import org.apache.calcite.rel.RelFieldCollation
 import org.apache.calcite.rel.core.JoinRelType
+import org.apache.calcite.rel.core.Sort
 import org.apache.calcite.rex.RexBuilder
 import org.apache.calcite.rex.RexInputRef
 import org.apache.calcite.sql.SqlAggFunction
@@ -53,6 +55,16 @@ class CalciteFactsSpec :
             val validatorConfig = SqlValidator.Config.DEFAULT.withDefaultNullCollation(NullCollation.LOW)
             val config = Frameworks.newConfigBuilder().sqlValidatorConfig(validatorConfig).build()
             config.sqlValidatorConfig.defaultNullCollation() shouldBe NullCollation.LOW
+        }
+
+        "(c2) …but PlannerImpl takes it from the context connection config — TranslatorFramework sets both (TF-P2.S2)" {
+            val planner = TranslatorFramework(FixtureModel.tfHandle()).newPlanner()
+            val validated = planner.validate(planner.parse("SELECT a.ID FROM A a ORDER BY a.ID"))
+            val sort = planner.rel(validated).rel
+            sort.shouldBeInstanceOf<Sort>()
+            sort.collation.fieldCollations
+                .single()
+                .nullDirection shouldBe RelFieldCollation.NullDirection.FIRST
         }
 
         "(d) the ranking window functions are SqlAggFunctions" {

@@ -5,6 +5,7 @@ import org.apache.calcite.sql.SqlCall
 import org.apache.calcite.sql.SqlDialect
 import org.apache.calcite.sql.SqlWriter
 import org.apache.calcite.sql.dialect.PostgresqlSqlDialect
+import org.apache.calcite.sql.validate.SqlConformance
 
 /**
  * PostgreSQL dialect that lowers the platform grounding catalog functions (feature-grounding A6):
@@ -18,6 +19,9 @@ import org.apache.calcite.sql.dialect.PostgresqlSqlDialect
 class PostgresqlSqlDialectWithGrounding(
     context: SqlDialect.Context,
 ) : PostgresqlSqlDialect(context) {
+    /** TF-P2.S2 — ORDER BY keys as expressions, so an order-only key does not leak a result column; see [SortByExpressionConformance]. */
+    override fun getConformance(): SqlConformance = SortByExpressionConformance(super.getConformance())
+
     override fun unparseCall(
         writer: SqlWriter,
         call: SqlCall,

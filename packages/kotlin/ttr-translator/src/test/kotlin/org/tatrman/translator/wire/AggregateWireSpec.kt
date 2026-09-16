@@ -112,12 +112,10 @@ class AggregateWireSpec :
             agg.function shouldBe "listagg"
             agg.separator.stringValue shouldBe ", "
             agg.withinGroupList.map { Triple(it.column.name, it.descending, it.nullsFirst) } shouldBe
-                listOf(Triple("NAME", false, false))
-            // The CASE prefix is the null-collation emulation every sort key gets today; TF-P2.S2
-            // (T-SQL null collation on validation) removes it here too — re-freeze then.
+                listOf(Triple("NAME", false, true))
+            // TF-P2.S2 — T-SQL null order (ascending = NULLS FIRST) needs no emulation prefix.
             mssql(sql) shouldBe
-                "SELECT [B_ID], STRING_AGG([NAME], ', ') WITHIN GROUP " +
-                "(ORDER BY CASE WHEN [NAME] IS NULL THEN 1 ELSE 0 END, [NAME]) AS [NAMES] FROM [dbo].[A] GROUP BY [B_ID]"
+                "SELECT [B_ID], STRING_AGG([NAME], ', ') WITHIN GROUP (ORDER BY [NAME]) AS [NAMES] FROM [dbo].[A] GROUP BY [B_ID]"
         }
 
         "STRING_AGG … WITHIN GROUP (ORDER BY … DESC) keeps the direction" {
@@ -126,11 +124,18 @@ class AggregateWireSpec :
             val agg = aggregates(plan(sql)).single()
             agg.separator.stringValue shouldBe "|"
             agg.withinGroupList.map { Triple(it.column.name, it.descending, it.nullsFirst) } shouldBe
-                listOf(Triple("ID", true, true))
-            // CASE prefix: see above (TF-P2.S2 re-freeze).
+                listOf(Triple("ID", true, false))
             mssql(sql) shouldBe
-                "SELECT [B_ID], STRING_AGG([NAME], '|') WITHIN GROUP " +
-                "(ORDER BY CASE WHEN [ID] IS NULL THEN 0 ELSE 1 END, [ID] DESC) AS [NAMES] FROM [dbo].[A] GROUP BY [B_ID]"
+                "SELECT [B_ID], STRING_AGG([NAME], '|') WITHIN GROUP (ORDER BY [ID] DESC) AS [NAMES] FROM [dbo].[A] GROUP BY [B_ID]"
+        }
+
+        "STRING_AGG … WITHIN GROUP (ORDER BY … NULLS LAST) keeps the explicit direction (emulated on MSSQL)" {
+            val sql =
+                "SELECT a.B_ID, STRING_AGG(a.NAME, ', ') WITHIN GROUP (ORDER BY a.NAME NULLS LAST) AS NAMES FROM A a GROUP BY a.B_ID"
+            aggregates(plan(sql)).single().withinGroupList.map { it.nullsFirst } shouldBe listOf(false)
+            mssql(sql) shouldBe
+                "SELECT [B_ID], STRING_AGG([NAME], ', ') WITHIN GROUP " +
+                "(ORDER BY CASE WHEN [NAME] IS NULL THEN 1 ELSE 0 END, [NAME]) AS [NAMES] FROM [dbo].[A] GROUP BY [B_ID]"
         }
 
         "STRING_AGG(DISTINCT …) rides the wire but is refused at MSSQL unparse (SQL Server has no DISTINCT there)" {

@@ -20,6 +20,7 @@ import org.apache.calcite.sql.`fun`.SqlLibraryOperators
 import org.apache.calcite.sql.`fun`.SqlStdOperatorTable
 import org.apache.calcite.sql.parser.SqlParserPos
 import org.apache.calcite.sql.type.SqlTypeName
+import org.apache.calcite.sql.validate.SqlConformance
 
 /**
  * MS SQL Server dialect that fixes CAST target type names Calcite renders with
@@ -52,6 +53,9 @@ class MssqlSqlDialectWithFloatCast(
                 )
             else -> super.getCastSpec(type)
         }
+
+    /** TF-P2.S2 — ORDER BY keys as expressions, so an order-only key does not leak a result column; see [SortByExpressionConformance]. */
+    override fun getConformance(): SqlConformance = SortByExpressionConformance(super.getConformance())
 
     // RG-P3 — lower the platform grounding functions to MSSQL-native SQL (DATEFROMPARTS/DATEADD,
     // geography::Point.STDistance); everything else defers to the stock dialect.

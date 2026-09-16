@@ -298,7 +298,7 @@
     "expect": {
       "sql": "SELECT TOP (5) [ID] FROM [dbo].[A] WITH (NOLOCK) ORDER BY [ID]"
     },
-    "status": "red:TF-P2.S2"
+    "status": "green"
   },
   {
     "id": "q30_cte",
@@ -429,7 +429,7 @@
     "expect": {
       "sql": "SELECT [ID] FROM [dbo].[A] ORDER BY [ID] OFFSET 10 ROWS FETCH NEXT 5 ROWS ONLY"
     },
-    "status": "red:TF-P2.S2"
+    "status": "green"
   },
   {
     "id": "r8_distinct_top",
@@ -439,7 +439,7 @@
     "expect": {
       "sql": "SELECT TOP (3) [B_ID] FROM [dbo].[A] GROUP BY [B_ID] ORDER BY [B_ID]"
     },
-    "status": "red:TF-P2.S2"
+    "status": "green"
   },
   {
     "id": "r9_order_by_case",
@@ -449,7 +449,7 @@
     "expect": {
       "sql": "SELECT [ID] FROM [dbo].[A] ORDER BY CASE WHEN [NAME] = 'x' THEN 0 ELSE 1 END, [ID]"
     },
-    "status": "red:TF-P2.S2"
+    "status": "green"
   },
   {
     "id": "r10_year_month",

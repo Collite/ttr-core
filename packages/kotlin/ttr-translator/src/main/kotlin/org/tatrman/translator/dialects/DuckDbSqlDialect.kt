@@ -3,6 +3,7 @@ package org.tatrman.translator.dialects
 
 import org.apache.calcite.sql.SqlDialect
 import org.apache.calcite.sql.dialect.PostgresqlSqlDialect
+import org.apache.calcite.sql.validate.SqlConformance
 
 /**
  * DuckDB Calcite [SqlDialect]. DuckDB's SQL surface for the constructs the unparser emits
@@ -25,6 +26,9 @@ import org.apache.calcite.sql.dialect.PostgresqlSqlDialect
 class DuckDbSqlDialect(
     context: Context,
 ) : PostgresqlSqlDialect(context) {
+    /** TF-P2.S2 — ORDER BY keys as expressions, so an order-only key does not leak a result column; see [SortByExpressionConformance]. */
+    override fun getConformance(): SqlConformance = SortByExpressionConformance(super.getConformance())
+
     companion object {
         @JvmField
         val DEFAULT_CONTEXT: Context =

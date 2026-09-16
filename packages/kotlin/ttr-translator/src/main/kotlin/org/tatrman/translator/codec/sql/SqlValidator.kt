@@ -56,7 +56,11 @@ object SqlValidator {
                         .rewriter(),
                 ) ?: stringAggRewritten
             val validated = planner.validate(arithmeticRewritten)
-            val rel = planner.rel(validated).rel
+            // TF-P2.S2 (G A8) — `RelRoot.project()`, not `.rel`: an ORDER BY key outside the select list is
+            // projected below the Sort, and only the root's field mapping trims it back off. `.rel` dropped
+            // that mapping, so `SELECT a.ID … ORDER BY LEN(a.NAME)` returned two columns. A no-op (the same
+            // node) whenever the mapping is the identity — every query without such a key.
+            val rel = planner.rel(validated).project()
             ValidateResult.Success(rel)
         } catch (ex: SqlParseException) {
             ValidateResult.Failure(toError("parse_failed", ex))

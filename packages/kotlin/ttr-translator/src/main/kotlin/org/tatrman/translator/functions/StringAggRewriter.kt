@@ -4,6 +4,7 @@ package org.tatrman.translator.functions
 import org.apache.calcite.sql.SqlCall
 import org.apache.calcite.sql.SqlKind
 import org.apache.calcite.sql.SqlNode
+import org.apache.calcite.sql.SqlNodeList
 import org.apache.calcite.sql.`fun`.SqlStdOperatorTable
 import org.apache.calcite.sql.util.SqlShuttle
 
@@ -18,18 +19,36 @@ import org.apache.calcite.sql.util.SqlShuttle
  * `LISTAGG`, which allows `WITHIN GROUP` — the node `AggConverter` lowers every `STRING_AGG` to
  * anyway, so the RelNode is the same. No-op for queries without it. Runs on the parsed SqlNode
  * before validation, next to [ConvertRewriter].
+ *
+ * TF-P2.S2 (G A8) — every `WITHIN GROUP` order key without an explicit `NULLS FIRST/LAST` gets T-SQL's
+ * default spelled out (ascending → `NULLS FIRST`, descending → `NULLS LAST`). Calcite's `AggConverter`
+ * resolves an unspecified null direction with `Direction.defaultNullDirection()` (the HIGH collation),
+ * ignoring the validator's `NullCollation.LOW` that ORDER BY honours, and after conversion an explicit
+ * `NULLS LAST` is indistinguishable from none — so the default has to be made explicit here.
  */
 class StringAggRewriter : SqlShuttle() {
     override fun visit(call: SqlCall): SqlNode? {
-        val inner = call.operandList.getOrNull(0)
-        if (call.kind != SqlKind.WITHIN_GROUP || inner !is SqlCall || inner.kind != SqlKind.STRING_AGG) {
-            return super.visit(call)
-        }
-        val operands = inner.operandList.map { it.accept(this) ?: it }
-        val listagg = SqlStdOperatorTable.LISTAGG.createCall(inner.functionQuantifier, inner.parserPosition, operands)
-        val orderList = call.operandList[1].accept(this) ?: call.operandList[1]
-        return call.operator.createCall(call.functionQuantifier, call.parserPosition, listagg, orderList)
+        if (call.kind != SqlKind.WITHIN_GROUP) return super.visit(call)
+        val inner = call.operandList[0]
+        val aggregate =
+            if (inner is SqlCall && inner.kind == SqlKind.STRING_AGG) {
+                val operands = inner.operandList.map { it.accept(this) ?: it }
+                SqlStdOperatorTable.LISTAGG.createCall(inner.functionQuantifier, inner.parserPosition, operands)
+            } else {
+                inner.accept(this) ?: inner
+            }
+        val orderList = call.operandList[1] as SqlNodeList
+        val tsqlOrder =
+            SqlNodeList(orderList.map { withTsqlNullDirection(it.accept(this) ?: it) }, orderList.parserPosition)
+        return call.operator.createCall(call.functionQuantifier, call.parserPosition, aggregate, tsqlOrder)
     }
+
+    private fun withTsqlNullDirection(item: SqlNode): SqlNode =
+        when (item.kind) {
+            SqlKind.NULLS_FIRST, SqlKind.NULLS_LAST -> item
+            SqlKind.DESCENDING -> SqlStdOperatorTable.NULLS_LAST.createCall(item.parserPosition, item)
+            else -> SqlStdOperatorTable.NULLS_FIRST.createCall(item.parserPosition, item)
+        }
 
     companion object {
         /** Fresh rewriter per call (SqlShuttle is cheap and not thread-safe to share). */
