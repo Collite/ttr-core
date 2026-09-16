@@ -208,7 +208,7 @@ object PlanNodeDecoder {
     ) {
         push(builder, aggregate.input)
         val keyFields = aggregate.groupKeysList.map { it.name }
-        val groupKey = builder.groupKey(keyFields.map { builder.field(it) })
+        val groupKey = builder.groupKey(keyFields.map { Expressions.fieldByName(builder, it) })
         val aggCalls = aggregate.aggregatesList.map { decodeAggCall(builder, it) }
         builder.aggregate(groupKey, aggCalls)
     }
@@ -228,7 +228,7 @@ object PlanNodeDecoder {
                     "Aggregate function '${call.function}' is not in the v1 wire format",
                 )
             }
-        val args: List<RexNode> = call.argsList.map { builder.field(it.name) }
+        val args: List<RexNode> = call.argsList.map { Expressions.fieldByName(builder, it.name) }
         val agg = builder.aggregateCall(fn, args)
         val withDistinct = if (call.distinct) agg.distinct() else agg
         return if (call.alias.isNotEmpty()) withDistinct.`as`(call.alias) else withDistinct
@@ -247,7 +247,7 @@ object PlanNodeDecoder {
         builder: RelBuilder,
         key: SortKey,
     ): RexNode {
-        val field = builder.field(key.column.name)
+        val field = Expressions.fieldByName(builder, key.column.name)
         val descending = if (key.descending) builder.desc(field) else field
         return when {
             key.nullsFirst -> builder.nullsFirst(descending)

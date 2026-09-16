@@ -522,8 +522,8 @@ object Expressions {
         // the bare `field(name)` only sees the top-of-stack rel and a join's right-side reference
         // mis-resolves into the right input by index, going out of range.
         when (ref.sourceAlias) {
-            LEFT_INPUT_TAG -> return builder.field(2, 0, name)
-            RIGHT_INPUT_TAG -> return builder.field(2, 1, name)
+            LEFT_INPUT_TAG -> return fieldByName(builder, 2, 0, name)
+            RIGHT_INPUT_TAG -> return fieldByName(builder, 2, 1, name)
         }
         // A `$`-prefix means a positional ref ONLY when the remainder is an integer — the encoder's
         // sole positional fallback shape is `$<index>` (see [encodeInputRef]). Calcite also mints
@@ -536,8 +536,47 @@ object Expressions {
             val idx = name.drop(1).toIntOrNull()
             if (idx != null) return builder.field(idx)
         }
-        return builder.field(name)
+        return fieldByName(builder, name)
     }
+
+    /**
+     * TF-P1.S2 (G A3, contracts §3.2) — resolve [name] against the top of the builder stack, falling back
+     * to the row type's ordinal.
+     *
+     * Above a join whose inputs share a column name, the encoder names a ref from the `LogicalJoin` row
+     * type, which Calcite uniquifies (`[ID, NAME, B_ID, ID0, NAME0]`). `RelBuilder.join` keeps the
+     * per-input names in its *frame* (`[ID, NAME, B_ID, ID, NAME]`), and `field(String)` looks there, so
+     * `field("NAME0")` threw `field [NAME0] not found`. Frame and row type share positions, so the row
+     * type's ordinal is the exact field: `field(ordinal)` is a plain `RexInputRef`, so the decoded plan —
+     * and its re-encoding — is unchanged. When neither lookup matches, the original error is rethrown.
+     */
+    internal fun fieldByName(
+        builder: RelBuilder,
+        name: String,
+    ): RexNode = fieldByName(builder, 1, 0, name)
+
+    /**
+     * [fieldByName] for input [inputOrdinal] of [inputCount] — a join condition's `$L`/`$R` lookup. The
+     * same frame-vs-row-type gap applies when that input is itself a join: in `A JOIN B … JOIN C ON c.x =
+     * b.ID` the second condition names `ID0` from the first join's row type (legacy
+     * `podprodukty_pro_firmu`).
+     */
+    internal fun fieldByName(
+        builder: RelBuilder,
+        inputCount: Int,
+        inputOrdinal: Int,
+        name: String,
+    ): RexNode =
+        try {
+            builder.field(inputCount, inputOrdinal, name)
+        } catch (e: IllegalArgumentException) {
+            val ordinal =
+                builder
+                    .peek(inputCount, inputOrdinal)
+                    .rowType.fieldNames
+                    .indexOf(name)
+            if (ordinal >= 0) builder.field(inputCount, inputOrdinal, ordinal) else throw e
+        }
 
     private fun decodeFunctionCall(
         builder: RelBuilder,

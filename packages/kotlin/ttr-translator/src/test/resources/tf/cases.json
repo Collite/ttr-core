@@ -7,7 +7,7 @@
     "expect": {
       "sql": "SELECT [A].[ID], [B].[ID] AS [ID0] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID]"
     },
-    "status": "red:TF-P1.S2"
+    "status": "green"
   },
   {
     "id": "q2_right_dup_in_where",
@@ -17,7 +17,7 @@
     "expect": {
       "sql": "SELECT [A].[NAME] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID] WHERE [B].[ID] = 5"
     },
-    "status": "red:TF-P1.S2"
+    "status": "green"
   },
   {
     "id": "q3_right_nondup",
@@ -27,7 +27,7 @@
     "expect": {
       "sql": "SELECT [A].[ID], [B].[NAME] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID] WHERE [A].[ID] = 5"
     },
-    "status": "red:TF-P1.S2"
+    "status": "green"
   },
   {
     "id": "q4_left_dup_only",
@@ -47,7 +47,7 @@
     "expect": {
       "sql": "SELECT [A].[B_ID] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID] WHERE [B].[NAME] = 'x'"
     },
-    "status": "red:TF-P1.S2"
+    "status": "green"
   },
   {
     "id": "q6_right_dup_name_select",
@@ -57,7 +57,7 @@
     "expect": {
       "sql": "SELECT [B].[NAME] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID]"
     },
-    "status": "red:TF-P1.S2"
+    "status": "green"
   },
   {
     "id": "q7_union",
@@ -369,7 +369,7 @@
     "expect": {
       "sql": "SELECT [A].[ID], [B].[NAME] FROM [dbo].[A] LEFT JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID]"
     },
-    "status": "red:TF-P1.S2"
+    "status": "green"
   },
   {
     "id": "r2_dup_aliased_select",
@@ -379,7 +379,7 @@
     "expect": {
       "sql": "SELECT [A].[ID] AS [A_ID], [B].[ID] AS [B_ID2] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID]"
     },
-    "status": "red:TF-P1.S2"
+    "status": "green"
   },
   {
     "id": "r3_three_tables",
@@ -389,7 +389,7 @@
     "expect": {
       "sql": "SELECT [A].[ID], [B].[NAME], [B0].[NAME] AS [CN] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID] INNER JOIN [dbo].[B] AS [B0] ON [A].[ID] = [B0].[ID]"
     },
-    "status": "red:TF-P1.S2"
+    "status": "green"
   },
   {
     "id": "r4_anti_join",
@@ -399,7 +399,7 @@
     "expect": {
       "sql": "SELECT [A].[ID] FROM [dbo].[A] LEFT JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID] WHERE [B].[ID] IS NULL"
     },
-    "status": "red:TF-P1.S2"
+    "status": "green"
   },
   {
     "id": "r5_lag",
@@ -764,7 +764,7 @@
     "expect": {
       "sql": "SELECT [A].[ID] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID] WHERE [B].[NAME] = 'x' UNION SELECT [ID] FROM [dbo].[B]"
     },
-    "status": "red:TF-P1.S2"
+    "status": "green"
   },
   {
     "id": "s1_literals",
