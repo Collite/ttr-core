@@ -74,6 +74,46 @@ class InMemoryModelHandle(
             SchemaCode.OBJ -> savedQueries.mapTo(mutableSetOf()) { it.qname.namespace }
             else -> emptySet()
         }
+
+    companion object {
+        /**
+         * TF-P0 — builds a handle from the translator-harness model shape
+         * `{"tables": {"<TABLE>": {"<COLUMN>": "INT|TEXT|FLOAT|DATETIME|BOOL"}}}`: every table under
+         * `db.dbo`, every column nullable, no keys (exactly what `Harness2.java` builds).
+         */
+        fun fromJson(
+            json: String,
+            version: String = "legacy-v0",
+        ): InMemoryModelHandle {
+            val root =
+                com.fasterxml.jackson.databind
+                    .ObjectMapper()
+                    .readTree(json)
+            val tablesNode =
+                requireNotNull(root.get("tables")) { "model JSON has no 'tables' object" }
+            val tables =
+                tablesNode.properties().map { (tableName, columnsNode) ->
+                    ModelTable(
+                        qname =
+                            QualifiedName
+                                .newBuilder()
+                                .setSchemaCode(SchemaCode.DB)
+                                .setNamespace("dbo")
+                                .setName(tableName)
+                                .build(),
+                        columns =
+                            columnsNode.properties().map { (columnName, typeNode) ->
+                                val type =
+                                    requireNotNull(SurfaceType.fromTag(typeNode.asText())) {
+                                        "unknown surface type '${typeNode.asText()}' for $tableName.$columnName"
+                                    }
+                                ModelColumn(columnName, type, nullable = true)
+                            },
+                    )
+                }
+            return InMemoryModelHandle(tables, version = version)
+        }
+    }
 }
 
 /**
@@ -150,5 +190,35 @@ object FixtureModel {
         InMemoryModelHandle(
             tables = listOf(customers, orders),
             entities = listOf(customerEntity),
+        )
+
+    private fun dboTable(
+        name: String,
+        vararg columns: Pair<String, SurfaceType>,
+    ): ModelTable =
+        ModelTable(
+            qname =
+                QualifiedName
+                    .newBuilder()
+                    .setSchemaCode(SchemaCode.DB)
+                    .setNamespace("dbo")
+                    .setName(name)
+                    .build(),
+            columns = columns.map { (n, t) -> ModelColumn(n, t, nullable = true) },
+        )
+
+    /**
+     * TF-P0 — the translator-fidelity probe model (`translator-harness/mini-model.json`):
+     * `A(ID INT, NAME TEXT, B_ID INT)` and `B(ID INT, NAME TEXT)` under `db.dbo`, all nullable, no
+     * keys. The two tables deliberately share `ID` and `NAME` (G A3).
+     */
+    fun tfHandle(): InMemoryModelHandle =
+        InMemoryModelHandle(
+            tables =
+                listOf(
+                    dboTable("A", "ID" to SurfaceType.INT, "NAME" to SurfaceType.TEXT, "B_ID" to SurfaceType.INT),
+                    dboTable("B", "ID" to SurfaceType.INT, "NAME" to SurfaceType.TEXT),
+                ),
+            version = "legacy-v0",
         )
 }

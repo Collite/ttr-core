@@ -1,0 +1,1528 @@
+{
+  "summary": {
+    "parseOk": 95,
+    "unparseOk": 66,
+    "note": "Counts under the test JVM (-ea). translator-harness 0.10.1 without -ea: 96/67 — the difference is pt02_obchod/nevyfakturovane_zakazky_dm."
+  },
+  "cases": [
+    {
+      "id": "pt01_ciselniky/role",
+      "sql": "SELECT\n       IDSKUPUZIV,\n       KOD_SKUP_UZIV,\n       NAZEV_SKUP_UZIV\nFROM QSKUPUZIV\nWHERE ({nazev_role} = '' OR NAZEV_SKUP_UZIV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_role}, '%')\n       OR KOD_SKUP_UZIV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_role}, '%'))\nORDER BY KOD_SKUP_UZIV;\n",
+      "params": [
+        {
+          "name": "nazev_role",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/organizacni_struktura",
+      "sql": "SELECT\n       P.IDSKUPUZIV IDSKUPUZIV_P,\n       P.KOD_SKUP_UZIV KOD_SKUP_UZIV_P,\n       P.NAZEV_SKUP_UZIV NAZEV_SKUP_UZIV_P,\n       R.IDSKUPUZIV IDSKUPUZIV_R,\n       R.KOD_SKUP_UZIV KOD_SKUP_UZIV_R,\n       R.NAZEV_SKUP_UZIV NAZEV_SKUP_UZIV_R\nFROM QSKUPUZIV P\nJOIN QSKUPUZIV R ON R.IDSKUPUZIV = P.IDSKUPUZIV_R\nORDER BY P.KOD_SKUP_UZIV, R.KOD_SKUP_UZIV;\n",
+      "params": [],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSKUPUZIV0] not found"
+    },
+    {
+      "id": "pt01_ciselniky/uzivatele",
+      "sql": "SELECT\n       IDUZIVATEL,\n       KOD_UZIV,\n       JMENO_UZIV,\n       UZIV_EMAIL\nFROM QUZIVATEL_DF\nWHERE VLZAKAZPRISTUP = 0\n  AND ({jmeno} = '' OR JMENO_UZIV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {jmeno}, '%')\n       OR KOD_UZIV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {jmeno}, '%'))\nORDER BY KOD_UZIV;\n",
+      "params": [
+        {
+          "name": "jmeno",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/uzivatel_v_rolich",
+      "sql": "SELECT\n       u.IDUZIVATEL,\n       u.KOD_UZIV,\n       u.JMENO_UZIV,\n       su.IDSKUPUZIV,\n       su.KOD_SKUP_UZIV,\n       su.NAZEV_SKUP_UZIV\nFROM QUZIVATEL_DF u\nJOIN QUZVESKUP su ON su.IDUZIVATEL = u.IDUZIVATEL\nWHERE ({kod_uzivatele} = '' OR u.KOD_UZIV = {kod_uzivatele})\n  AND ({nazev_role} = '' OR su.NAZEV_SKUP_UZIV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_role}, '%')\n       OR su.KOD_SKUP_UZIV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_role}, '%'))\nORDER BY u.JMENO_UZIV;\n",
+      "params": [
+        {
+          "name": "kod_uzivatele",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_role",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/produkty",
+      "sql": "SELECT\n       IDSKUPZBOZI,\n       KOD_SKUP_ZBOZI,\n       NAZEV_SKUP_ZBOZI\nFROM QSKUPZBOZI_DF\nWHERE NAZEV_SKUP_ZBOZI not LIKE 'Z%'\n  AND ({nazev_produktu} = '' OR NAZEV_SKUP_ZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_produktu}, '%')\n       OR KOD_SKUP_ZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_produktu}, '%'))\nORDER BY NAZEV_SKUP_ZBOZI;\n",
+      "params": [
+        {
+          "name": "nazev_produktu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/trzni_skupiny",
+      "sql": "SELECT\n       IDSKUPZNACZBOZI,\n       KOD_SKUPZNACZBOZI,\n       NAZEV_SKUPZNACZBOZI\nFROM QSKUPZNACZBOZI_DF\nWHERE NAZEV_SKUPZNACZBOZI not LIKE 'Z%'\n  AND ({nazev_trzni_skupiny} = '' OR NAZEV_SKUPZNACZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_trzni_skupiny}, '%')\n       OR KOD_SKUPZNACZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_trzni_skupiny}, '%'))\nORDER BY NAZEV_SKUPZNACZBOZI;\n",
+      "params": [
+        {
+          "name": "nazev_trzni_skupiny",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/podprodukty",
+      "sql": "SELECT\n  pp.IDXXPODSKUPZBOZI,\n  pp.KOD_PODSKUPZBOZI,\n  pp.NAZEV_PODSKUPZBOZI,\n  p.NAZEV_SKUP_ZBOZI\nFROM QXXPODSKUPZBOZI pp\nJOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = pp.IDSKUPZBOZI\nWHERE ({id_produktu} = '' OR pp.IDSKUPZBOZI = {id_produktu})\n  AND ({nazev_produktu} = '' OR p.NAZEV_SKUP_ZBOZI LIKE CONCAT('%', {nazev_produktu}, '%'))\n  AND ({nazev_podproduktu} = '' OR pp.NAZEV_PODSKUPZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_podproduktu}, '%')\n       OR pp.KOD_PODSKUPZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_podproduktu}, '%'))\n  AND pp.NAZEV_PODSKUPZBOZI not LIKE 'Z%'\nORDER BY p.NAZEV_SKUP_ZBOZI, pp.NAZEV_PODSKUPZBOZI;\n",
+      "params": [
+        {
+          "name": "id_produktu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_produktu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_podproduktu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/sklady",
+      "sql": "SELECT\n       IDSKLAD,\n       CIS_SKLAD,\n       NAZEV_SKLAD\nFROM QSKLAD_DF\nWHERE ({nazev_skladu} = '' OR CIS_SKLAD COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_skladu}, '%')\n       OR NAZEV_SKLAD COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_skladu}, '%'))\nORDER BY CIS_SKLAD;\n",
+      "params": [
+        {
+          "name": "nazev_skladu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/cenove_skupiny_artiklu",
+      "sql": "SELECT\n       IDCENSKZB,\n       KOD_CENSKZB,\n       NAZEV_CENSKZB\nFROM QCENSKZB_DF\nWHERE ({nazev_cenove_skupiny} = '' OR KOD_CENSKZB COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_cenove_skupiny}, '%')\n       OR NAZEV_CENSKZB COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_cenove_skupiny}, '%'))\nORDER BY KOD_CENSKZB;\n",
+      "params": [
+        {
+          "name": "nazev_cenove_skupiny",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/hledani_artiklu",
+      "sql": "SELECT\n       z.IDZBOZI,\n       z.CIS_ZBOZI,\n       z.NAZEV_ZBOZI\nFROM QZBOZI_DF z\nWHERE z.VLTYP_SLOZ = 1\n  AND z.NAZEV_ZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_artiklu}, '%')\nORDER BY z.NAZEV_ZBOZI;\n",
+      "params": [
+        {
+          "name": "nazev_artiklu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/artikly_produktu",
+      "sql": "SELECT\n       z.IDZBOZI,\n       z.CIS_ZBOZI,\n       z.NAZEV_ZBOZI\nFROM QZBOZI_DF z\nJOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = z.IDSKUPZBOZI\nWHERE z.VLTYP_SLOZ = 1\n  AND p.NAZEV_SKUP_ZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_produktu}, '%')\nORDER BY z.NAZEV_ZBOZI;\n",
+      "params": [
+        {
+          "name": "nazev_produktu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/aktivni_artikly",
+      "sql": "SELECT\n  IDZBOZI,\n  CIS_ZBOZI,\n  NAZEV_ZBOZI,\n  VLPODTYP_SLOZ\nFROM QZBOZI_DF\nWHERE VLTYP_SLOZ = 1\n  AND VLSTAVZBOZI = 0\nORDER BY NAZEV_ZBOZI;\n",
+      "params": [],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/zasoby_artiklu",
+      "sql": "SELECT\n  za.IDXXVYPADKYZASOB,\n  a.CIS_ZBOZI,\n  a.NAZEV_ZBOZI,\n  za.MNZASOBA,\n  za.DTDOPLNENI,\n  za.MNDOPLNENI\nFROM XXVYPADKYZASOB za\nJOIN QZBOZI_DF a ON a.IDZBOZI = za.IDZBOZI AND a.VLTYP_SLOZ = 1\nWHERE ({id_artiklu} = '' OR za.IDZBOZI = {id_artiklu})\n  AND ({kod_artiklu} = '' OR a.CIS_ZBOZI LIKE CONCAT('%', {kod_artiklu}, '%'))\n  AND ({nazev_artiklu} = '' OR a.NAZEV_ZBOZI LIKE CONCAT('%', {nazev_artiklu}, '%'))\nORDER BY a.NAZEV_ZBOZI;\n",
+      "params": [
+        {
+          "name": "id_artiklu",
+          "type": "varchar"
+        },
+        {
+          "name": "kod_artiklu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_artiklu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/termin_obnoveni_zasoby",
+      "sql": "SELECT\n       z.IDXXVYPADKYZASOB,\n       a.CIS_ZBOZI,\n       a.NAZEV_ZBOZI,\n       z.DTDOPLNENI,\n       z.MNDOPLNENI\nFROM XXVYPADKYZASOB z\nJOIN QZBOZI_DF a ON a.IDZBOZI = z.IDZBOZI AND a.VLTYP_SLOZ = 1\nWHERE a.NAZEV_ZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_artiklu}, '%')\n  AND z.DTDOPLNENI IS NOT NULL\nORDER BY z.DTDOPLNENI;\n",
+      "params": [
+        {
+          "name": "nazev_artiklu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/obchodni_zastupce",
+      "sql": "SELECT\n  u.IDUZIVATEL,\n  u.KOD_UZIV,\n  u.JMENO_UZIV\nFROM QUZIVATEL_DF u\nWHERE u.IDUZIVATEL IN (SELECT IDUZIVATEL FROM QUZVESKUP WHERE KOD_SKUP_UZIV = 'OZ')\n  AND NOT u.IDUZIVATEL IN (SELECT IDUZIVATEL FROM QUZVESKUP WHERE KOD_SKUP_UZIV = '00')\n  AND (u.JMENO_UZIV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {jmeno_uzivatele}, '%')\n       OR u.KOD_UZIV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {jmeno_uzivatele}, '%'))\nORDER BY u.JMENO_UZIV;\n",
+      "params": [
+        {
+          "name": "jmeno_uzivatele",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/prodejni_akce",
+      "sql": "SELECT\n  IDXXPRODAKCE,\n  KOD_PRODAKCE\nFROM QXXPRODAKCE\nWHERE DTPLATI_OD <= GETDATE()\n  AND (DTPLATI_DO IS NULL OR DTPLATI_DO >= GETDATE())\nORDER BY KOD_PRODAKCE;\n",
+      "params": [],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/obchodni_kanaly",
+      "sql": "SELECT\n       IDCENSKUP,\n       CEN_SKUP\nFROM QCENSKUP_DF\nWHERE CEN_SKUP NOT LIKE '0%'\n  AND VLNEAKTIVNI = 0\n  AND ({kod_kanalu} = '' OR CEN_SKUP COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_kanalu}, '%'))\nORDER BY CEN_SKUP;\n",
+      "params": [
+        {
+          "name": "kod_kanalu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/obchodni_kanaly_trzni_skupiny",
+      "sql": "SELECT\n  ok.IDCENSKUP,\n  ok.CEN_SKUP,\n  ts.NAZEV_SKUPZNACZBOZI\nFROM QCENSKUP_DF ok\nLEFT JOIN QSKUPZNACZBOZI_DF ts ON ts.IDSKUPZNACZBOZI = ok.IDSKUPZNACZBOZI\nWHERE ({id_trzni_skupiny} = '' OR ok.IDSKUPZNACZBOZI = {id_trzni_skupiny})\n  AND ({nazev_trzni_skupiny} = '' OR ts.NAZEV_SKUPZNACZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_trzni_skupiny}, '%'))\n  AND ok.CEN_SKUP NOT LIKE 'Z%'\nORDER BY ts.NAZEV_SKUPZNACZBOZI, ok.CEN_SKUP;\n",
+      "params": [
+        {
+          "name": "id_trzni_skupiny",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_trzni_skupiny",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/typy_dodacich_mist",
+      "sql": "SELECT\n  tdm.IDXXTYPDODMIST,\n  tdm.KOD_TYPDODMIST,\n  ok.CEN_SKUP\nFROM QXXTYPDODMIST tdm\nJOIN QCENSKUP_DF ok ON ok.IDCENSKUP = tdm.IDCENSKUP\nWHERE ({id_obchodniho_kanalu} = '' OR ok.IDCENSKUP = {id_obchodniho_kanalu})\n  AND ({kod_kanalu} = '' OR ok.CEN_SKUP COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_kanalu}, '%'))\nORDER BY ok.CEN_SKUP, tdm.KOD_TYPDODMIST;\n",
+      "params": [
+        {
+          "name": "id_obchodniho_kanalu",
+          "type": "varchar"
+        },
+        {
+          "name": "kod_kanalu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDCENSKUP0] not found"
+    },
+    {
+      "id": "pt01_ciselniky/produkty_pro_firmu",
+      "sql": "SELECT\n  p.IDSKUPZBOZI,\n  p.KOD_SKUP_ZBOZI,\n  p.NAZEV_SKUP_ZBOZI,\n  pf.PORADI_F,\n  pf.VLVYZNAM_F,\n  pf.HDNORMATIV_TRZBY_F\nFROM QSKUPZBOZI_DF p\nJOIN QXXMEZABC pf ON p.IDSKUPZBOZI = pf.IDSKUPZBOZI\nWHERE pf.VLTYP_NASTAVENI = 1\nORDER BY pf.PORADI_F;\n",
+      "params": [],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/produkty_pro_trzni_skupinu",
+      "sql": "SELECT\n  p.IDSKUPZBOZI,\n  p.KOD_SKUP_ZBOZI,\n  p.NAZEV_SKUP_ZBOZI,\n  ts.NAZEV_SKUPZNACZBOZI,\n  pts.PORADI_F,\n  pts.VLVYZNAM_F,\n  pts.HDNORMATIV_TRZBY_F\nFROM QSKUPZBOZI_DF p\nJOIN  QXXMEZABC pts ON p.IDSKUPZBOZI = pts.IDSKUPZBOZI\nJOIN QSKUPZNACZBOZI_DF ts ON ts.IDSKUPZNACZBOZI = pts.IDSKUPZNACZBOZI\nWHERE pts.VLTYP_NASTAVENI = 11\n  AND ({id_trzni_skupiny} = '' OR pts.IDSKUPZNACZBOZI = {id_trzni_skupiny})\n  AND ts.KOD_SKUPZNACZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_trzni_skupiny}, '%')\nORDER BY pts.PORADI_F;\n",
+      "params": [
+        {
+          "name": "id_trzni_skupiny",
+          "type": "varchar"
+        },
+        {
+          "name": "kod_trzni_skupiny",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/produkty_pro_obchodni_kanal",
+      "sql": "SELECT\n  p.IDSKUPZBOZI,\n  p.KOD_SKUP_ZBOZI,\n  p.NAZEV_SKUP_ZBOZI,\n  ok.CEN_SKUP,\n  pok.PORADI_F,\n  pok.VLVYZNAM_F,\n  pok.HDNORMATIV_TRZBY_F\nFROM QSKUPZBOZI_DF p \nJOIN QXXMEZABC pok ON p.IDSKUPZBOZI = pok.IDSKUPZBOZI\nJOIN QCENSKUP_DF ok ON ok.IDCENSKUP = pok.IDCENSKUP\nWHERE pok.VLTYP_NASTAVENI = 21\n  AND ({id_obchodniho_kanalu} = '' OR pok.IDCENSKUP = {id_obchodniho_kanalu})\n  AND ok.CEN_SKUP COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_kanalu}, '%')\nORDER BY pok.PORADI_F;\n",
+      "params": [
+        {
+          "name": "id_obchodniho_kanalu",
+          "type": "varchar"
+        },
+        {
+          "name": "kod_kanalu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/artikly_pro_trzni_skupinu",
+      "sql": "SELECT\n  a.IDZBOZI,\n  a.CIS_ZBOZI,\n  a.NAZEV_ZBOZI,\n  ts.NAZEV_SKUPZNACZBOZI,\n  ats.VLVYZNAM_Z\nFROM QZBOZI_DF a\nJOIN QXXTRSKUPZBOZI ats ON a.IDZBOZI = ats.IDZBOZI AND a.VLTYP_SLOZ = 1\nJOIN QSKUPZNACZBOZI_DF ts ON ts.IDSKUPZNACZBOZI = ats.IDSKUPZNACZBOZI\nWHERE ({id_trzni_skupiny} = '' OR ats.IDSKUPZNACZBOZI = {id_trzni_skupiny})\n  AND ts.KOD_SKUPZNACZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_trzni_skupiny}, '%')\nORDER BY a.NAZEV_ZBOZI;\n",
+      "params": [
+        {
+          "name": "id_trzni_skupiny",
+          "type": "varchar"
+        },
+        {
+          "name": "kod_trzni_skupiny",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/artikly_pro_obchodni_kanal",
+      "sql": "SELECT\n  a.IDZBOZI,\n  a.CIS_ZBOZI,\n  a.NAZEV_ZBOZI,\n  ok.CEN_SKUP,\n  aok.VLVYZNAM_Z\nFROM QZBOZI_DF a\nJOIN QXXLISTING aok ON a.IDZBOZI = aok.IDZBOZI AND a.VLTYP_SLOZ = 1\nJOIN QCENSKUP_DF ok ON ok.IDCENSKUP = aok.IDCENSKUP\nWHERE ({id_obchodniho_kanalu} = '' OR aok.IDCENSKUP = {id_obchodniho_kanalu})\n  AND ok.CEN_SKUP COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_kanalu}, '%')\nORDER BY a.NAZEV_ZBOZI;\n",
+      "params": [
+        {
+          "name": "id_obchodniho_kanalu",
+          "type": "varchar"
+        },
+        {
+          "name": "kod_kanalu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/podprodukty_pro_firmu",
+      "sql": "SELECT\n  pp.IDXXPODSKUPZBOZI,\n  pp.KOD_PODSKUPZBOZI,\n  pp.NAZEV_PODSKUPZBOZI,\n  sz.NAZEV_SKUP_ZBOZI,\n  ppf.PORADI_F,\n  ppf.VLVYZNAM_F,\n  ppf.HDNORMATIV_TRZBY_F\nFROM QXXPODSKUPZBOZI pp\nJOIN QXXMEZABC ppf ON pp.IDXXPODSKUPZBOZI = ppf.IDXXPODSKUPZBOZI\nJOIN QSKUPZBOZI_DF sz ON sz.IDSKUPZBOZI = ppf.IDSKUPZBOZI\nWHERE ppf.VLTYP_NASTAVENI = 2\nORDER BY ppf.PORADI_F;\n",
+      "params": [],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSKUPZBOZI0] not found"
+    },
+    {
+      "id": "pt01_ciselniky/podprodukty_pro_trzni_skupinu",
+      "sql": "SELECT\n  pp.IDXXPODSKUPZBOZI,\n  pp.KOD_PODSKUPZBOZI,\n  pp.NAZEV_PODSKUPZBOZI,\n  ts.NAZEV_SKUPZNACZBOZI,\n  ppts.PORADI_F,\n  ppts.VLVYZNAM_F,\n  ppts.HDNORMATIV_TRZBY_F\nFROM QXXPODSKUPZBOZI pp\nJOIN QXXMEZABC ppts ON pp.IDXXPODSKUPZBOZI = ppts.IDXXPODSKUPZBOZI\nJOIN QSKUPZNACZBOZI_DF ts ON ts.IDSKUPZNACZBOZI = ppts.IDSKUPZNACZBOZI\nWHERE ppts.VLTYP_NASTAVENI = 12\n  AND ({id_trzni_skupiny} = '' OR ppts.IDSKUPZNACZBOZI = {id_trzni_skupiny})\n  AND ts.KOD_SKUPZNACZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_trzni_skupiny}, '%')\nORDER BY ppts.PORADI_F;\n",
+      "params": [
+        {
+          "name": "id_trzni_skupiny",
+          "type": "varchar"
+        },
+        {
+          "name": "kod_trzni_skupiny",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt01_ciselniky/podprodukty_pro_obchodni_kanal",
+      "sql": "SELECT\n  pp.IDXXPODSKUPZBOZI,\n  pp.KOD_PODSKUPZBOZI,\n  pp.NAZEV_PODSKUPZBOZI,\n  ok.CEN_SKUP,\n  ppok.PORADI_F,\n  ppok.VLVYZNAM_F,\n  ppok.HDNORMATIV_TRZBY_F\nFROM QXXPODSKUPZBOZI pp\nJOIN QXXMEZABC ppok ON pp.IDXXPODSKUPZBOZI = ppok.IDXXPODSKUPZBOZI\nJOIN QCENSKUP_DF ok ON ok.IDCENSKUP = ppok.IDCENSKUP\nWHERE ppok.VLTYP_NASTAVENI = 22\n  AND ({id_obchodniho_kanalu} = '' OR ppok.IDCENSKUP = {id_obchodniho_kanalu})\n  AND ok.CEN_SKUP COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_kanalu}, '%')\nORDER BY ppok.PORADI_F;\n",
+      "params": [
+        {
+          "name": "id_obchodniho_kanalu",
+          "type": "varchar"
+        },
+        {
+          "name": "kod_kanalu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt02_obchod/subjekty_obchodniho_kanalu",
+      "sql": "SELECT\n  s.IDSUBJEKT,\n  s.KOD_SUBJEKTU,\n  s.SUBJ_NAZEV,\n  ok.CEN_SKUP\nFROM QSUBJEKT s\nJOIN QSUBJVTSUBJ_DF ov ON ov.IDSUBJEKT = s.IDSUBJEKT AND ov.TYP_SUBJ = 'ODB'\nJOIN QCENSKUP_DF ok ON ok.IDCENSKUP = ov.IDCENSKUP\nWHERE ({id_obchodniho_kanalu} = '' OR ok.IDCENSKUP = {id_obchodniho_kanalu})\n  AND ok.CEN_SKUP LIKE CONCAT('%', {kod_kanalu}, '%')\nORDER BY s.SUBJ_NAZEV;\n",
+      "params": [
+        {
+          "name": "id_obchodniho_kanalu",
+          "type": "varchar"
+        },
+        {
+          "name": "kod_kanalu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDCENSKUP0] not found"
+    },
+    {
+      "id": "pt02_obchod/najdi_zakaznika",
+      "sql": "SELECT\n  s.IDSUBJEKT,\n  s.KOD_SUBJEKTU,\n  s.SUBJ_NAZEV\nFROM QSUBJEKT s\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nORDER BY s.SUBJ_NAZEV;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt02_obchod/dodaci_mista_zakaznika",
+      "sql": "SELECT\n      dm.IDSUBJADR,\n       dm.SUBJADR_POZNAMKA,\n       dm.ULICE,\n       dm.MESTO\nFROM QSUBJADR_DF dm\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND dm.VLSUBJADR_TYP = 2\n  AND dm.KOD_STATU = 'CZ'\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nORDER BY dm.SUBJADR_POZNAMKA;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt02_obchod/osoby_dodaciho_mista",
+      "sql": "SELECT\n  o.IDSUBJOSOBA,\n  o.IDSUBJADR,\n  o.JMENO,\n  o.FUNKCE,\n  o.TEL,\n  o.EMAIL\nFROM QSUBJOSOBA_DF o\nWHERE ({id_dodaciho_mista} = '' OR o.IDSUBJADR = {id_dodaciho_mista})\nORDER BY o.JMENO;\n",
+      "params": [
+        {
+          "name": "id_dodaciho_mista",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt02_obchod/info_o_zakaznikovi",
+      "sql": "-- Zakázky zákazníka\nSELECT 'zakázka' AS typ_zaznamu,\n       z.CIS_DOK AS cislo_dokladu,\n       z.DTVYSTAVENO AS datum,\n       z.DTZDANITPLN AS termin,\n       'datum dodání' AS typ_datumu,\n       CAST(z.VLSTAVHDOK AS VARCHAR) AS stav\nFROM QHDOK_ZAK_DF z\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = z.IDSUBJADRP\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND z.TYP_DOK = 'POB' \n  AND z.HDKUHRADEVAL >= 0\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nUNION ALL\n-- Faktury zákazníka\nSELECT 'faktura' AS typ_zaznamu,\n       f.CIS_DOK AS cislo_dokladu,\n       f.DTVYSTAVENO AS datum,\n       f.DTSPLATNO AS termin,\n       'datum splatnosti' AS typ_datumu,\n       CAST(f.VLSTAVHDOK AS VARCHAR) AS stav\nFROM QHDOK_FAV_DF f\nJOIN QSUBJEKT s ON s.IDSUBJEKT = f.IDSUBJEKT\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND f.TYP_DOK = 'FVU' \n  AND f.HDKUHRADEVAL >= 0\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nUNION ALL\n-- Vratky zákazníka\nSELECT 'vratka' AS typ_zaznamu,\n       v.CIS_DOK AS cislo_dokladu,\n       v.DTVYSTAVENO AS datum,\n       v.DTZDANITPLN AS termin,\n       'datum stažení' AS typ_datumu,\n       CAST(v.VLSTAVHDOK AS VARCHAR) AS stav\nFROM QHDOK_ZAK_DF v\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = v.IDSUBJADRP\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND v.TYP_DOK = 'POB' \n  AND v.HDKUHRADEVAL < 0\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nUNION ALL\n-- Dobropisy zákazníka\nSELECT 'dobropis' AS typ_zaznamu,\n       d.CIS_DOK AS cislo_dokladu,\n       d.DTVYSTAVENO AS datum,\n       d.DTSPLATNO AS termin,\n       'datum splatnosti' AS typ_datumu,\n       CAST(d.VLSTAVHDOK AS VARCHAR) AS stav\nFROM QHDOK_FAV_DF d\nJOIN QSUBJEKT s ON s.IDSUBJEKT = d.IDSUBJEKT\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND d.TYP_DOK = 'FVU' \n  AND d.HDKUHRADEVAL < 0\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nORDER BY datum DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt02_obchod/faktury_zakaznika",
+      "sql": "SELECT\n       f.IDHDOK,\n       f.CIS_DOK,\n       s.SUBJ_NAZEV,\n       f.DTVYSTAVENO,\n       f.DTSPLATNO,\n       f.HDKUHRADEVAL,\n       f.VLSTAVHDOK\nFROM QHDOK_FAV_DF f\nJOIN QSUBJEKT s ON s.IDSUBJEKT = f.IDSUBJEKT\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND f.TYP_DOK = 'FVU'\n  AND f.HDKUHRADEVAL >= 0\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nORDER BY f.DTVYSTAVENO DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt02_obchod/nesplacene_faktury",
+      "sql": "SELECT\n        f.IDHDOK,\n       f.CIS_DOK,\n       s.SUBJ_NAZEV,\n       f.DTVYSTAVENO,\n       f.DTSPLATNO,\n       f.HDKUHRADEVAL,\n       f.VLSTAVHDOK\nFROM QHDOK_FAV_DF f\nJOIN QSUBJEKT s ON s.IDSUBJEKT = f.IDSUBJEKT\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND f.TYP_DOK = 'FVU'\n  AND f.HDKUHRADEVAL >=0\n  AND  f.HDKUHRADEVAL > f.HDUHRAZENOVAL\n  AND f.DTSPLATNO < GETDATE()\n  AND f.VLSTAVHDOK NOT IN (20) -- 20 = Storno\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nORDER BY f.DTSPLATNO ASC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt02_obchod/zakázky_dodacího_místa",
+      "sql": "SELECT\n  z.IDHDOK,\n  z.CIS_DOK,\n  s.SUBJ_NAZEV,\n  dm.SUBJADR_POZNAMKA,\n  z.DTZDANITPLN,\n  z.HDKUHRADEVAL,\n  z.VLSTAVHDOK\nFROM QHDOK_ZAK_DF z\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = z.IDSUBJADRP\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nWHERE \n  z.TYP_DOK = 'POB'\n  AND z.HDKUHRADEVAL >= 0\n  AND dm.SUBJADR_POZNAMKA = {zkratka_dodacího_místa}\n  AND @time_grounding(z.DTZDANITPLN)\nORDER BY z.DTZDANITPLN DESC;\n",
+      "params": [
+        {
+          "name": "zkratka_dodacího_místa",
+          "type": "varchar"
+        }
+      ],
+      "parse": "fail",
+      "unparse": "fail",
+      "status": "out-of-scope",
+      "note": "C4 — @time_grounding(...) sketch, not SQL."
+    },
+    {
+      "id": "pt02_obchod/zakázky_zákazníka",
+      "sql": "SELECT\n        z.IDHDOK,\n       z.CIS_DOK,\n       s.SUBJ_NAZEV,\n       dm.SUBJADR_POZNAMKA,\n       z.DTZDANITPLN,\n       z.HDKUHRADEVAL,\n       z.VLSTAVHDOK\nFROM QHDOK_ZAK_DF z\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = z.IDSUBJADRP\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nWHERE \n  z.TYP_DOK = 'POB'\n  AND z.HDKUHRADEVAL >= 0\n  AND s.IDSUBJEKT = {id_subjektu}\n  AND @time_grounding(z.DTZDANITPLN)\nORDER BY z.DTZDANITPLN DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "fail",
+      "unparse": "fail",
+      "status": "out-of-scope",
+      "note": "C4 — @time_grounding(...) sketch, not SQL."
+    },
+    {
+      "id": "pt02_obchod/hodnota_zakazky",
+      "sql": "SELECT\n        z.IDHDOK,\n       z.CIS_DOK,\n       s.SUBJ_NAZEV,\n       dm.SUBJADR_POZNAMKA,\n       z.DTZDANITPLN,\n       z.HDKUHRADEVAL,\n       z.VLSTAVHDOK\nFROM QHDOK_ZAK_DF z\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = z.IDSUBJADRP\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND ({id_dodaciho_mista} = '' OR dm.IDSUBJADR = {id_dodaciho_mista})\n  AND z.TYP_DOK = 'POB'\n  AND z.HDKUHRADEVAL >= 0\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nORDER BY z.HDKUHRADEVAL DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "id_dodaciho_mista",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt02_obchod/prodeje_dodacího_místa",
+      "sql": "SELECT\n  p.IDXXPLANPRODEJU,\n  p.SUBJ_NAZEV,\n  p.SUBJADR_POZNAMKA,\n  p.CIS_ZBOZI,\n  p.NAZEV_ZBOZI,\n  p.DTTERMIN,\n  p.MNMNOZSTVI,\n  p.HDCCENAKC\nFROM QXXPLANPRODEJU p\nWHERE\n  p.VLTYPPLANUPR = 0\n  AND p.SUBJADR_POZNAMKA = {zkratka_dodacího_místa}\n  AND @time_grounding(p.DTTERMIN)\nORDER BY p.DTTERMIN DESC;\n",
+      "params": [
+        {
+          "name": "zkratka_dodacího_místa",
+          "type": "varchar"
+        }
+      ],
+      "parse": "fail",
+      "unparse": "fail",
+      "status": "out-of-scope",
+      "note": "C4 — @time_grounding(...) sketch, not SQL."
+    },
+    {
+      "id": "pt02_obchod/prodeje_zákazníka",
+      "sql": "SELECT\n  p.IDXXPLANPRODEJU,\n  p.SUBJ_NAZEV,\n  p.SUBJADR_POZNAMKA,\n  p.CIS_ZBOZI,\n  p.NAZEV_ZBOZI,\n  p.DTTERMIN,\n  p.MNMNOZSTVI,\n  p.HDCCENAKC\nFROM QXXPLANPRODEJU p\nWHERE\n  p.VLTYPPLANUPR = 0\n  AND p.IDSUBJEKT = {id_subjektu}\n  AND @time_grounding(p.DTTERMIN)\nORDER BY p.DTTERMIN DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "fail",
+      "unparse": "fail",
+      "status": "out-of-scope",
+      "note": "C4 — @time_grounding(...) sketch, not SQL."
+    },
+    {
+      "id": "pt02_obchod/termin_stazeni_vratky",
+      "sql": "SELECT\n       v.IDHDOK,\n       v.CIS_DOK,\n       s.KOD_SUBJEKTU,\n       s.SUBJ_NAZEV,\n       v.DTZDANITPLN,\n       v.VLSTAVHDOK\nFROM QHDOK_ZAK_DF v\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = v.IDSUBJADRP\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND v.TYP_DOK = 'POB' \n  AND v.HDKUHRADEVAL < 0\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nORDER BY v.DTZDANITPLN DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt02_obchod/vratky_zakaznika",
+      "sql": "SELECT\n       v.IDHDOK,\n       v.CIS_DOK,\n       s.SUBJ_NAZEV,\n       v.DTZDANITPLN,\n       v.VLSTAVHDOK\nFROM QHDOK_ZAK_DF v\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = v.IDSUBJADRP\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND v.TYP_DOK = 'POB' \n  AND v.HDKUHRADEVAL < 0\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nORDER BY v.DTZDANITPLN DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt02_obchod/reklamace_zakaznika",
+      "sql": "SELECT\n       r.IDHDOK,\n       r.CIS_DOK,\n       r.JEJICH_CISDOK,\n       s.SUBJ_NAZEV,\n       r.DTZDANITPLN,\n       r.DTVYSTAVENO,\n       r.VLSTAVHDOK\nFROM QHDOK_ZAK_DF r\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = r.IDSUBJADRP\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND r.TYP_DOK = 'PDO'\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nORDER BY r.DTZDANITPLN DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt02_obchod/polozky_reklamace",
+      "sql": "SELECT\n       rs.IDSDOK,\n       rs.IDZBOZI,\n       a.CIS_ZBOZI,\n       a.NAZEV_ZBOZI,\n       rs.MNCELKEMPOCET,\n       rs.HDJCENAVAL,\n       rs.HDCCENAVAL\nFROM QSDOK_PDO_DF rs\nJOIN QHDOK_ZAK_DF r ON r.IDHDOK = rs.IDHDOK AND r.TYP_DOK = 'PDO'\nJOIN QZBOZI_DF a ON a.IDZBOZI = rs.IDZBOZI\nWHERE r.CIS_DOK LIKE CONCAT('%', {cislo_reklamace}, '%')\nORDER BY a.NAZEV_ZBOZI;\n",
+      "params": [
+        {
+          "name": "cislo_reklamace",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt02_obchod/termin_uhrady_dobropisu",
+      "sql": "SELECT\n       d.IDHDOK,\n       d.CIS_DOK,\n       s.KOD_SUBJEKTU,\n       s.SUBJ_NAZEV,\n       d.ZAK_HDOK,\n       d.DTVYSTAVENO,\n       d.DTSPLATNO,\n       d.VLSTAVHDOK\nFROM QHDOK_FAV_DF d\nJOIN QSUBJEKT s ON s.IDSUBJEKT = d.IDSUBJEKT\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND d.TYP_DOK = 'FVU' \n  AND d.HDKUHRADEVAL < 0\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nORDER BY d.DTSPLATNO DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt02_obchod/dobropisy_zakaznika",
+      "sql": "SELECT\n       d.IDHDOK,\n       d.CIS_DOK,\n       s.SUBJ_NAZEV,\n       d.DTVYSTAVENO,\n       d.DTSPLATNO,\n       d.VLSTAVHDOK\nFROM QHDOK_FAV_DF d\nJOIN QSUBJEKT s ON s.IDSUBJEKT = d.IDSUBJEKT\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND d.TYP_DOK = 'FVU' \n  AND d.HDKUHRADEVAL < 0\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nORDER BY d.DTVYSTAVENO DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt02_obchod/polozky_dokladu",
+      "sql": "SELECT\n       zs.IDSDOK,\n       zs.IDZBOZI,\n       a.CIS_ZBOZI,\n       a.NAZEV_ZBOZI,\n       zs.MNCELKEMPOCET,\n       zs.HDJCENAVAL,\n       zs.HDCCENAVAL\nFROM QZBOZSDOK zs\nJOIN QZBOZI_DF a ON a.IDZBOZI = zs.IDZBOZI AND a.VLTYP_SLOZ = 1\nWHERE zs.IDHDOK = {id_dokladu}\nORDER BY a.NAZEV_ZBOZI;\n",
+      "params": [
+        {
+          "name": "id_dokladu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt02_obchod/naslednici_dokladu",
+      "sql": "SELECT\n  td.IDHISHDOK,\n  td.CIS_DOKN,\n  td.NAZEV_TYPDOKN,\n  td.DTZDANITPLNN,\n  td.STAVN\nFROM QHISHDOK_DF td\nWHERE ({id_dokladu} = '' OR td.IDHDOKP = {id_dokladu})\n  AND ({číslo_dokladu} = '' OR td.CIS_DOKP LIKE CONCAT('%', {číslo_dokladu}, '%'))\nORDER BY td.DTZDANITPLNN DESC;\n",
+      "params": [
+        {
+          "name": "id_dokladu",
+          "type": "varchar"
+        },
+        {
+          "name": "číslo_dokladu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt02_obchod/predchudci_dokladu",
+      "sql": "SELECT\n  td.IDHISHDOK,\n  td.CIS_DOKP,\n  td.NAZEV_TYPDOKP,\n  td.DTZDANITPLNP,\n  td.STAVP\nFROM QHISHDOK_DF td\nWHERE ({id_dokladu} = '' OR td.IDHDOKN = {id_dokladu})\n  AND ({číslo_dokladu} = '' OR td.CIS_DOKN LIKE CONCAT('%', {číslo_dokladu}, '%'))\nORDER BY td.DTZDANITPLNP DESC;\n",
+      "params": [
+        {
+          "name": "id_dokladu",
+          "type": "varchar"
+        },
+        {
+          "name": "číslo_dokladu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt02_obchod/tok_dokladu",
+      "sql": "SELECT\n  td.IDHISHDOK,\n  td.CIS_DOKP,\n  td.NAZEV_TYPDOKP,\n  td.DTZDANITPLNP,\n  td.STAVP,\n  td.CIS_DOKN,\n  td.NAZEV_TYPDOKN,\n  td.DTZDANITPLNN,\n  td.STAVN\nFROM QHISHDOK_DF td\nWHERE ({id_dokladu} = '' OR td.IDHDOKP = {id_dokladu} OR td.IDHDOKN = {id_dokladu})\n  AND ({číslo_dokladu} = '' OR td.CIS_DOKP LIKE CONCAT('%', {číslo_dokladu}, '%') OR td.CIS_DOKN LIKE CONCAT('%', {číslo_dokladu}, '%'))\nORDER BY td.DTZDANITPLNP, td.DTZDANITPLNN;\n",
+      "params": [
+        {
+          "name": "id_dokladu",
+          "type": "varchar"
+        },
+        {
+          "name": "číslo_dokladu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt02_obchod/nevyfakturovane_zakazky_dm",
+      "sql": "SELECT\n  z.IDHDOK,\n  z.CIS_DOK,\n  z.DTZDANITPLN,       \n  z.VLSTAVHDOK\nFROM QHDOK_ZAK_DF z\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = z.IDSUBJADRP\nWHERE z.TYP_DOK = 'POB'\n  AND z.HDKUHRADEVAL >= 0\n  AND z.VLSTAVHDOK NOT IN (-2, 10)\n  AND ({id_dodaciho_mista} = '' OR dm.IDSUBJADR = {id_dodaciho_mista})\n  AND dm.SUBJADR_POZNAMKA COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {zkratka_dodaciho_mista}, '%')\n  AND NOT EXISTS (\n    SELECT 1 FROM QHISHDOK_DF td\n    WHERE td.IDHDOKP = z.IDHDOK\n      AND td.NAZEV_TYPDOKN LIKE '%aktur%'\n  )\nORDER BY z.DTZDANITPLN DESC;\n",
+      "params": [
+        {
+          "name": "id_dodaciho_mista",
+          "type": "varchar"
+        },
+        {
+          "name": "zkratka_dodaciho_mista",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S1",
+      "note": "P0 finding (not in the gaps report): SearchExpander leaves AND(…, AND(<>, <>)) non-flat after expanding NOT IN (-2, 10); Calcite's Filter asserts RexUtil.isFlat, so this fails only with -ea (the harness ran without it). Proposed for TF-P1.S1 — flatten after expandSearch."
+    },
+    {
+      "id": "pt02_obchod/vazby_podle_typu",
+      "sql": "SELECT\n  td.IDHISHDOK,\n  td.CIS_DOKP,\n  td.NAZEV_TYPDOKP,\n  td.DTZDANITPLNP,\n  td.STAVP,\n  td.CIS_DOKN,\n  td.NAZEV_TYPDOKN,\n  td.DTZDANITPLNN,\n  td.STAVN\nFROM QHISHDOK_DF td\nWHERE td.NAZEV_TYPDOKP COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {typ_předchůdce}, '%')\n  AND td.NAZEV_TYPDOKN COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {typ_následníka}, '%')\nORDER BY td.DTZDANITPLNP DESC;\n",
+      "params": [
+        {
+          "name": "typ_předchůdce",
+          "type": "varchar"
+        },
+        {
+          "name": "typ_následníka",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt03_potencial/rezerva_trzby_dodaciho_mista",
+      "sql": "SELECT\n  rt.SUBJADR_POZNAMKA,\n  rt.IDCENSKUP,\n  rt.IDXXPODSKUPZBOZI,\n  rt.DM_NEUPLNA_DATA,\n  rt.DM_KONKURENCE_ZAEVIDOVANA,\n  rt.HDNORMATIV_TRZBY,\n  rt.HDTRZBA_POTENCIAL_PODPROD,\n  rt.HDTRZBA_CILOVYNORMATIV_PODPROD,\n  rt.HDTRZBA_VYTEZNOST_PODPROD\nFROM XXREZERVA_TRZBY rt\nWHERE rt.SUBJADR_POZNAMKA COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {zkratka_dm}, '%')\nORDER BY rt.HDTRZBA_POTENCIAL_PODPROD DESC;\n",
+      "params": [
+        {
+          "name": "zkratka_dm",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt03_potencial/top_rezervy_trzeb",
+      "sql": "SELECT TOP 10\n  dm.IDSUBJADR,\n  rt.SUBJADR_POZNAMKA,\n  MAX(rt.DM_NEUPLNA_DATA) AS DM_NEUPLNA_DATA,\n  MAX(rt.DM_KONKURENCE_ZAEVIDOVANA) AS DM_KONKURENCE_ZAEVIDOVANA,\n  MAX(rt.HDTRZBA_12M_DM) AS HDTRZBA_12M_DM,\n  MAX(rt.HDTRZBA_POTENCIAL_DM) AS HDTRZBA_POTENCIAL_DM,\n  MAX(rt.HDTRZBA_POTENCIAL_DM) - MAX(rt.HDTRZBA_12M_DM) AS HDTRZBA_POTENCIAL_PODPROD\nFROM XXREZERVA_TRZBY rt\n-- JOIN přes SUBJADR_POZNAMKA je záměrný (XXREZERVA_TRZBY neobsahuje IDSUBJADR)\nLEFT JOIN QSUBJADR_DF dm ON dm.SUBJADR_POZNAMKA = rt.SUBJADR_POZNAMKA and dm.VLSUBJADR_TYP = 2 and dm.KOD_STATU = 'CZ'\nGROUP BY dm.IDSUBJADR, rt.SUBJADR_POZNAMKA\nORDER BY HDTRZBA_POTENCIAL_PODPROD DESC;\n",
+      "params": [],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt03_potencial/nevytezena_dodaci_mista",
+      "sql": "SELECT TOP 10\n  dm.IDSUBJADR,\n  rt.SUBJADR_POZNAMKA,\n  MAX(rt.DM_NEUPLNA_DATA) AS DM_NEUPLNA_DATA,\n  MAX(rt.DM_KONKURENCE_ZAEVIDOVANA) AS DM_KONKURENCE_ZAEVIDOVANA,\n  MAX(rt.HDTRZBA_12M_DM) AS HDTRZBA_12M_DM,\n  MAX(rt.HDTRZBA_POTENCIAL_DM) AS HDTRZBA_POTENCIAL_DM,\n  CAST(ROUND(MAX(rt.HDTRZBA_12M_DM) * 100.0\n    / NULLIF(MAX(rt.HDTRZBA_POTENCIAL_DM), 0), 1) AS DECIMAL(18,1)) AS VYTEZNOST\nFROM XXREZERVA_TRZBY rt\n-- JOIN přes SUBJADR_POZNAMKA je záměrný (XXREZERVA_TRZBY neobsahuje IDSUBJADR)\nLEFT JOIN QSUBJADR_DF dm ON dm.SUBJADR_POZNAMKA = rt.SUBJADR_POZNAMKA and dm.VLSUBJADR_TYP = 2 and dm.KOD_STATU = 'CZ'\nGROUP BY dm.IDSUBJADR, rt.SUBJADR_POZNAMKA\nHAVING CAST(ROUND(MAX(rt.HDTRZBA_12M_DM) * 100.0\n           / NULLIF(MAX(rt.HDTRZBA_POTENCIAL_DM), 0), 1) AS DECIMAL(18,1)) < 50\nORDER BY VYTEZNOST ASC;\n",
+      "params": [],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt03_potencial/rezerva_trzby_podle_produktu",
+      "sql": "SELECT \n  pp.IDSKUPZBOZI,\n  p.NAZEV_SKUP_ZBOZI,\n  SUM(rt.HDTRZBA_POTENCIAL_PODPROD) AS HDTRZBA_POTENCIAL_PODPROD,\n  CASE WHEN SUM(rt.HDTRZBA_CILOVYNORMATIV_PODPROD) > 0\n       THEN ROUND(SUM(rt.HDTRZBA_12M_PODPROD) * 100.0 / SUM(rt.HDTRZBA_CILOVYNORMATIV_PODPROD), 1)\n  END AS HDTRZBA_VYTEZNOST_PODPROD\nFROM XXREZERVA_TRZBY rt\nJOIN QXXPODSKUPZBOZI pp ON pp.IDXXPODSKUPZBOZI = rt.IDXXPODSKUPZBOZI\nJOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = pp.IDSKUPZBOZI\nGROUP BY pp.IDSKUPZBOZI, p.NAZEV_SKUP_ZBOZI\nORDER BY HDTRZBA_POTENCIAL_PODPROD DESC;\n",
+      "params": [],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt03_potencial/nadnormativni_podprodukty",
+      "sql": "SELECT\n  rt.SUBJADR_POZNAMKA,\n  rt.IDXXPODSKUPZBOZI,\n  pp.NAZEV_PODSKUPZBOZI,\n  rt.HDTRZBA_NORMATIV,\n  rt.VLPODPROD_NADNORMATIV,\n  rt.HDTRZBA_NORMATIV_UPRAV\nFROM XXREZERVA_TRZBY rt\nJOIN QXXPODSKUPZBOZI pp ON pp.IDXXPODSKUPZBOZI = rt.IDXXPODSKUPZBOZI\nWHERE rt.VLPODPROD_NADNORMATIV = 1\n  AND ({zkratka_dm} = '' OR rt.SUBJADR_POZNAMKA COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {zkratka_dm}, '%'))\nORDER BY rt.HDTRZBA_NORMATIV DESC;\n",
+      "params": [
+        {
+          "name": "zkratka_dm",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt03_potencial/trzba_na_cm_dm",
+      "sql": "SELECT\n       vr.SUBJADR_POZNAMKA,\n       a.CIS_ZBOZI,\n       a.NAZEV_ZBOZI,\n       p.NAZEV_SKUP_ZBOZI,\n       vr.MNFACING,\n       vr.MNDELKA_REG_ART,\n       vr.HDTRZBA_12M_PREP,\n       vr.HDVYTEZNOST_REGALU\nFROM QDF_VYTEZNOST_REGALU vr\nJOIN QZBOZI_DF a ON a.IDZBOZI = vr.IDZBOZI AND a.VLTYP_SLOZ = 1\nJOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = vr.IDSKUPZBOZI\nWHERE vr.SUBJADR_POZNAMKA COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {zkratka_dodaciho_mista}, '%')\nORDER BY vr.HDVYTEZNOST_REGALU DESC;\n",
+      "params": [
+        {
+          "name": "zkratka_dodaciho_mista",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt03_potencial/trzba_na_cm_kanal",
+      "sql": "SELECT\n       ok.CEN_SKUP,\n       a.CIS_ZBOZI,\n       a.NAZEV_ZBOZI,\n       vr.ODEBIRA_POCET_DM_KANAL,\n       vr.CELKEM_POCET_DM_KANAL,\n       vr.MNDELKA_REG_ART_KANAL,\n       vr.HDTRZBA_12M_PREP_KANAL,\n       vr.HDVYTEZNOST_REGALU_KANAL\nFROM QDF_VYTEZNOST_REGALU_KANAL vr\nJOIN QZBOZI_DF a ON a.IDZBOZI = vr.IDZBOZI AND a.VLTYP_SLOZ = 1\nJOIN QCENSKUP_DF ok ON ok.IDCENSKUP = vr.IDCENSKUP\nWHERE ({kod_kanalu} = '' OR ok.CEN_SKUP LIKE CONCAT('%', {kod_kanalu}, '%'))\nORDER BY vr.HDVYTEZNOST_REGALU_KANAL DESC;\n",
+      "params": [
+        {
+          "name": "kod_kanalu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt03_potencial/kumulované_prodeje_zakaznika",
+      "sql": "SELECT \n  s.IDSUBJEKT,\n  s.SUBJ_NAZEV,\n  COUNT(DISTINCT dm.IDSUBJADR) AS POCET_DM,\n  SUM(p.HDTRZBA_12M) AS HDTRZBA_12M,\n  SUM(p.HDTRZBA_24M) AS HDTRZBA_24M\nFROM QSUBJEKT s\nJOIN QSUBJADR_DF dm ON dm.IDSUBJEKT = s.IDSUBJEKT AND dm.VLSUBJADR_TYP = 2 AND dm.KOD_STATU = 'CZ'\nJOIN XXPRODEJE p ON p.IDSUBJADR = dm.IDSUBJADR\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nGROUP BY s.IDSUBJEKT, s.SUBJ_NAZEV\nORDER BY HDTRZBA_12M DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt03_potencial/kumulované_prodeje_zakazníka_pro_produkty",
+      "sql": "SELECT \n  pr.IDSKUPZBOZI,\n  s.SUBJ_NAZEV,\n  pr.NAZEV_SKUP_ZBOZI,\n  SUM(p.HDTRZBA_12M) AS HDTRZBA_12M\nFROM QSKUPZBOZI_DF pr \nJOIN XXPRODEJE p ON pr.IDSKUPZBOZI = p.IDSKUPZBOZI\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = p.IDSUBJADR AND dm.VLSUBJADR_TYP = 2 AND dm.KOD_STATU = 'CZ'\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nGROUP BY pr.IDSKUPZBOZI, s.SUBJ_NAZEV, pr.NAZEV_SKUP_ZBOZI\nORDER BY HDTRZBA_12M DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt03_potencial/posledni_dodavka_zakaznika",
+      "sql": "SELECT\n       s.SUBJ_NAZEV,\n       a.NAZEV_ZBOZI,\n       p.DTPOSLEDNI_DOD,\n       p.MNPOSLEDNI_DOD\nFROM XXPRODEJE p\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = p.IDSUBJADR AND dm.VLSUBJADR_TYP = 2 AND dm.KOD_STATU = 'CZ'\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nJOIN QZBOZI_DF a ON a.IDZBOZI = p.IDZBOZI AND a.VLTYP_SLOZ = 1\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\n  AND p.DTPOSLEDNI_DOD IS NOT NULL\nORDER BY p.DTPOSLEDNI_DOD DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt03_potencial/trzba_zakaznika_24m",
+      "sql": "SELECT s.SUBJ_NAZEV,\n       SUM(p.HDTRZBA_24M) AS HDTRZBA_24M\nFROM XXPRODEJE p\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = p.IDSUBJADR AND dm.VLSUBJADR_TYP = 2 AND dm.KOD_STATU = 'CZ'\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nGROUP BY s.SUBJ_NAZEV\nORDER BY HDTRZBA_24M DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt03_potencial/top_artikly_zakaznika",
+      "sql": "SELECT TOP 10\n       s.SUBJ_NAZEV,\n       a.NAZEV_ZBOZI,\n       SUM(p.HDTRZBA_12M) AS HDTRZBA_12M\nFROM XXPRODEJE p\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = p.IDSUBJADR AND dm.VLSUBJADR_TYP = 2 AND dm.KOD_STATU = 'CZ'\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nJOIN QZBOZI_DF a ON a.IDZBOZI = p.IDZBOZI AND a.VLTYP_SLOZ = 1\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\nGROUP BY s.SUBJ_NAZEV, a.NAZEV_ZBOZI\nORDER BY HDTRZBA_12M DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt03_potencial/prvni_nakup_artiklu",
+      "sql": "SELECT\n       s.SUBJ_NAZEV,\n       a.NAZEV_ZBOZI,\n       p.DTPRVNI_DOD\nFROM XXPRODEJE p\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = p.IDSUBJADR AND dm.VLSUBJADR_TYP = 2 AND dm.KOD_STATU = 'CZ'\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nJOIN QZBOZI_DF a ON a.IDZBOZI = p.IDZBOZI AND a.VLTYP_SLOZ = 1\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\n  AND a.NAZEV_ZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_artiklu}, '%')\n  AND p.DTPRVNI_DOD IS NOT NULL\nORDER BY p.DTPRVNI_DOD;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_artiklu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt03_potencial/porovnání_kumulovaných_tržeb_zakazniků",
+      "sql": "SELECT s.SUBJ_NAZEV,\n       SUM(p.HDTRZBA_12M) AS HDTRZBA_12M,\n       SUM(p.HDTRZBA_24M) AS HDTRZBA_24M\nFROM XXPRODEJE p\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = p.IDSUBJADR AND dm.VLSUBJADR_TYP = 2 AND dm.KOD_STATU = 'CZ'\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nWHERE (s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika_a}, '%')\n   OR s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika_b}, '%'))\nGROUP BY s.SUBJ_NAZEV\nORDER BY HDTRZBA_12M DESC;\n",
+      "params": [
+        {
+          "name": "nazev_zakaznika_a",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika_b",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt03_potencial/kumulované_prodeje_produktu_u_zakazníka",
+      "sql": "SELECT\n       dm.SUBJADR_POZNAMKA,\n       a.CIS_ZBOZI,\n       a.NAZEV_ZBOZI,\n       p.HDTRZBA_12M,\n       p.HDTRZBA_24M,\n       p.DTPOSLEDNI_DOD\nFROM XXPRODEJE p\nJOIN QSUBJADR_DF dm ON dm.IDSUBJADR = p.IDSUBJADR AND dm.VLSUBJADR_TYP = 2 AND dm.KOD_STATU = 'CZ'\nJOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT\nJOIN QSKUPZBOZI_DF pr ON pr.IDSKUPZBOZI = p.IDSKUPZBOZI\nJOIN QZBOZI_DF a ON a.IDZBOZI = p.IDZBOZI AND a.VLTYP_SLOZ = 1\nWHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})\n  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\n  AND pr.NAZEV_SKUP_ZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_produktu}, '%')\nORDER BY p.HDTRZBA_12M DESC;\n",
+      "params": [
+        {
+          "name": "id_subjektu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_produktu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSUBJEKT0] not found"
+    },
+    {
+      "id": "pt03_potencial/kumulované_prodeje_na_dodacím_místě",
+      "sql": "SELECT\n  pr.SUBJADR_POZNAMKA,\n  ok.CEN_SKUP,\n  p.NAZEV_SKUP_ZBOZI,\n  pp.NAZEV_PODSKUPZBOZI,\n  a.CIS_ZBOZI,\n  a.NAZEV_ZBOZI,\n  pr.DTPRVNI_DOD,\n  pr.DTPOSLEDNI_DOD,\n  pr.HDTRZBA_24M,\n  pr.HDTRZBA_12M\nFROM XXPRODEJE pr\nLEFT JOIN QCENSKUP_DF ok ON ok.IDCENSKUP = pr.IDCENSKUP\nLEFT JOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = pr.IDSKUPZBOZI\nLEFT JOIN QXXPODSKUPZBOZI pp ON pp.IDXXPODSKUPZBOZI = pr.IDXXPODSKUPZBOZI\nLEFT JOIN QZBOZI_DF a ON a.IDZBOZI = pr.IDZBOZI AND a.VLTYP_SLOZ = 1\nWHERE ({id_dodaciho_mista} = '' OR pr.IDSUBJADR = {id_dodaciho_mista})\n  AND pr.SUBJADR_POZNAMKA COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {zkratka_dodaciho_mista}, '%')\nORDER BY p.NAZEV_SKUP_ZBOZI, a.NAZEV_ZBOZI;\n",
+      "params": [
+        {
+          "name": "id_dodaciho_mista",
+          "type": "varchar"
+        },
+        {
+          "name": "zkratka_dodaciho_mista",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt03_potencial/kumulované_tržby_podle_produktu",
+      "sql": "SELECT \n  p.IDSKUPZBOZI,\n  p.KOD_SKUP_ZBOZI,\n  p.NAZEV_SKUP_ZBOZI,\n  SUM(pr.HDTRZBA_24M) AS HDTRZBA_24M,\n  SUM(pr.HDTRZBA_12M) AS HDTRZBA_12M\nFROM XXPRODEJE pr\nJOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = pr.IDSKUPZBOZI\nWHERE ({id_produktu} = '' OR pr.IDSKUPZBOZI = {id_produktu})\n  AND ({nazev_produktu} = '' OR p.NAZEV_SKUP_ZBOZI LIKE CONCAT('%', {nazev_produktu}, '%'))\nGROUP BY p.IDSKUPZBOZI, p.KOD_SKUP_ZBOZI, p.NAZEV_SKUP_ZBOZI\nORDER BY HDTRZBA_12M DESC;\n",
+      "params": [
+        {
+          "name": "id_produktu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_produktu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSKUPZBOZI0] not found"
+    },
+    {
+      "id": "pt03_potencial/kumulované_tržby_podle_kanalu",
+      "sql": "SELECT \n    ok.CEN_SKUP,\n    SUM(pr.HDTRZBA_24M) AS HDTRZBA_24M,\n    SUM(pr.HDTRZBA_12M) AS HDTRZBA_12M\nFROM XXPRODEJE pr\nJOIN QCENSKUP_DF ok ON ok.IDCENSKUP = pr.IDCENSKUP\nWHERE ({id_obchodniho_kanalu} = '' OR ok.IDCENSKUP = {id_obchodniho_kanalu})\n  AND ({kod_kanalu} = '' OR ok.CEN_SKUP LIKE CONCAT('%', {kod_kanalu}, '%'))\nGROUP BY ok.CEN_SKUP\nORDER BY HDTRZBA_12M DESC;\n",
+      "params": [
+        {
+          "name": "id_obchodniho_kanalu",
+          "type": "varchar"
+        },
+        {
+          "name": "kod_kanalu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDCENSKUP0] not found"
+    },
+    {
+      "id": "pt04_navstevy/platnosti_dm_v_tdm",
+      "sql": "SELECT\n  pt.IDXXTDMSUBJADR,\n  pt.IDSUBJADR,\n  tdm.KOD_TYPDODMIST,\n  pt.DTPLATI_OD,\n  pt.DTPLATI_DO\nFROM QXXTDMSUBJADR pt\nJOIN QXXTYPDODMIST tdm ON tdm.IDXXTYPDODMIST = pt.IDXXTYPDODMIST\nWHERE ({id_dodaciho_mista} = '' OR pt.IDSUBJADR = {id_dodaciho_mista})\nORDER BY pt.DTPLATI_OD DESC;\n",
+      "params": [
+        {
+          "name": "id_dodaciho_mista",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt04_navstevy/konkurencni_dodavatele",
+      "sql": "SELECT\n       IDXXKONKURENT,\n       NAZEV_KONKURENTA\nFROM QXXKONKURENT\nWHERE VLTYP_KONK = 1\n  AND ({nazev_dodavatele} = '' OR NAZEV_KONKURENTA COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_dodavatele}, '%'))\nORDER BY NAZEV_KONKURENTA;\n",
+      "params": [
+        {
+          "name": "nazev_dodavatele",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt04_navstevy/konkurencni_znacky",
+      "sql": "SELECT\n       IDXXKONKURENT,\n       NAZEV_KONKURENTA\nFROM QXXKONKURENT\nWHERE VLTYP_KONK = 0\n  AND ({nazev_znacky} = '' OR NAZEV_KONKURENTA COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_znacky}, '%'))\nORDER BY NAZEV_KONKURENTA;\n",
+      "params": [
+        {
+          "name": "nazev_znacky",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt04_navstevy/typy_informaci_o_konkurenci",
+      "sql": "SELECT\n       IDXXKONKINFOTYP,\n       VLTYP_INFO,\n       VLVLASTNOST_INFO,\n       VLOBLAST_INFO,\n       VLTRZNI_SKUPINA,\n       VLKANAL,\n       VLPRODUKT,\n       VLDODAVATEL,\n       VLZNACKA\nFROM XXKONKINFOTYP\nORDER BY VLTYP_INFO, VLVLASTNOST_INFO;\n",
+      "params": [],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt04_navstevy/denni_vykazy_oz",
+      "sql": "SELECT\n       dv.IDXXDENNIPLANOZ,\n       dv.IDUZIVATEL_DE,\n       u.JMENO_UZIV,\n       dv.DTDEN\nFROM QXXDENNIPLANOZ dv\nJOIN QUZIVATEL_DF u ON u.IDUZIVATEL = dv.IDUZIVATEL_DE\nWHERE ({id_obchodniho_zastupce} = '' OR dv.IDUZIVATEL_DE = {id_obchodniho_zastupce})\n  AND ({jmeno_oz} = '' OR u.JMENO_UZIV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {jmeno_oz}, '%'))\nORDER BY dv.DTDEN DESC;\n",
+      "params": [
+        {
+          "name": "id_obchodniho_zastupce",
+          "type": "varchar"
+        },
+        {
+          "name": "jmeno_oz",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt04_navstevy/navstevy_zakaznika",
+      "sql": "SELECT\n  nz.IDXXNAVSTEVAOZ,\n  nz.IDXXDENNIPLANOZ,\n  nz.IDUZIVATEL_DE,\n  nz.IDSUBJADR,\n  nz.DTUSKUTECNENO,\n  nz.SUBJADR_POZNAMKA,\n  nz.JMENO_UZIV_DE,\n  nz.VLTYP_NAVSTEVY,\n  nz.VLSTAV_XXNAVSTEVAOZ\nFROM QXXNAVSTEVAOZ nz\nWHERE ({id_dodaciho_mista} = '' OR nz.IDSUBJADR = {id_dodaciho_mista})\n  AND ({zkratka_dodaciho_mista} = '' OR nz.SUBJADR_POZNAMKA COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {zkratka_dodaciho_mista}, '%'))\nORDER BY nz.DTUSKUTECNENO DESC;\n",
+      "params": [
+        {
+          "name": "id_dodaciho_mista",
+          "type": "varchar"
+        },
+        {
+          "name": "zkratka_dodaciho_mista",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt04_navstevy/navstevy_pro_denni_vykaz_oz",
+      "sql": "SELECT\n  nz.IDXXNAVSTEVAOZ,\n  nz.IDXXDENNIPLANOZ,\n  nz.IDUZIVATEL_DE,\n  nz.IDSUBJADR,\n  nz.DTUSKUTECNENO,\n  nz.SUBJADR_POZNAMKA,\n  nz.JMENO_UZIV_DE,\n  nz.VLTYP_NAVSTEVY,\n  nz.VLSTAV_XXNAVSTEVAOZ\nFROM QXXNAVSTEVAOZ nz\nWHERE ({id_denního_výkazu_oz} = '' OR nz.IDXXDENNIPLANOZ = {id_denního_výkazu_oz})\nORDER BY nz.DTUSKUTECNENO DESC;\n",
+      "params": [
+        {
+          "name": "id_denního_výkazu_oz",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt04_navstevy/artikly_navstevy",
+      "sql": "SELECT\n  anz.IDXXPLNPOLDISTR,\n  anz.IDXXNAVSTEVAOZ,\n  a.CIS_ZBOZI,\n  a.NAZEV_ZBOZI,\n  anz.DTPOSLDODANI,\n  anz.MNPOSLDODANI,\n  anz.MNFACING,\n  anz.MNARTIKL_SIRKA,\n  anz.MNDELKA_REG_ART\nFROM QXXPLNPOLDISTR_AT anz\nJOIN QZBOZI_DF a ON a.IDZBOZI = anz.IDZBOZI AND a.VLTYP_SLOZ = 1\nWHERE ({id_navstevy} = '' OR anz.IDXXNAVSTEVAOZ = {id_navstevy})\nORDER BY a.NAZEV_ZBOZI;\n",
+      "params": [
+        {
+          "name": "id_navstevy",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt04_navstevy/ukoly_navstevy",
+      "sql": "SELECT\n  u.IDXXPLNUKOLOZ,\n  u.IDXXNAVSTEVAOZ,\n  u.SPEC_ZADANIUKOLOZ\nFROM QXXPLNUKOLOZ u\nWHERE ({id_navstevy} = '' OR u.IDXXNAVSTEVAOZ = {id_navstevy})\nORDER BY u.IDXXPLNUKOLOZ;\n",
+      "params": [
+        {
+          "name": "id_navstevy",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt04_navstevy/podnety_navstevy",
+      "sql": "SELECT\n  pn.IDXXPODNET,\n  pn.IDXXNAVSTEVAOZ,\n  p.NAZEV_SKUP_ZBOZI,\n  pn.PODNET\nFROM QXXPODNET pn\nLEFT JOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = pn.IDSKUPZBOZI\nWHERE ({id_navstevy} = '' OR pn.IDXXNAVSTEVAOZ = {id_navstevy})\nORDER BY p.NAZEV_SKUP_ZBOZI;\n",
+      "params": [
+        {
+          "name": "id_navstevy",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt04_navstevy/produkty_navstevy_zakaznika",
+      "sql": "SELECT\n  pdm.IDXXNOZPRIPRAVA,\n  pdm.IDXXNAVSTEVAOZ,\n  p.NAZEV_SKUP_ZBOZI,\n  pdm.PORADI_PR,\n  pdm.VYHRAZENO,\n  pdm.HDVYTEZNOST_REGALU_PROD\nFROM QXXNOZPRIPRAVA pdm\nJOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = pdm.IDSKUPZBOZI\nWHERE ({id_navstevy} = '' OR pdm.IDXXNAVSTEVAOZ = {id_navstevy})\nORDER BY pdm.PORADI_PR;\n",
+      "params": [
+        {
+          "name": "id_navstevy",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [NAZEV_SKUP_ZBOZI0] not found"
+    },
+    {
+      "id": "pt04_navstevy/konkurence_navstevy_zakaznika",
+      "sql": "SELECT\n  knd.IDXXKONKNADM,\n  knd.IDXXNAVSTEVAOZ,\n  p.NAZEV_SKUP_ZBOZI,\n  kd.NAZEV_KONKURENTA AS NAZEV_KONKURENTA_D,\n  kz.NAZEV_KONKURENTA AS NAZEV_KONKURENTA_Z,\n  knd.OBSAZENO,\n  knd.OBSAZENO_PROC\nFROM QXXKONKNADM knd\nLEFT JOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = knd.IDSKUPZBOZI\nLEFT JOIN QXXKONKURENT kd ON kd.IDXXKONKURENT = knd.IDXXKONKURENT_D AND kd.VLTYP_KONK = 1\nLEFT JOIN QXXKONKURENT kz ON kz.IDXXKONKURENT = knd.IDXXKONKURENT_Z AND kz.VLTYP_KONK = 0\nWHERE ({id_navstevy} = '' OR knd.IDXXNAVSTEVAOZ = {id_navstevy})\nORDER BY p.NAZEV_SKUP_ZBOZI;\n",
+      "params": [
+        {
+          "name": "id_navstevy",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [NAZEV_KONKURENTA0] not found"
+    },
+    {
+      "id": "pt04_navstevy/podprodukty_navstevy_zakaznika",
+      "sql": "SELECT\n  ppd.IDXXNOZPODPROD,\n  ppd.IDXXNOZPRIPRAVA,\n  pp.KOD_PODSKUPZBOZI,\n  pp.NAZEV_PODSKUPZBOZI,\n  ppd.PORADI_PODPROD,\n  ppd.VLVYZNAM_PODPROD,\n  ppd.HDNORMATIV_TRZBY_PODPROD,\n  ppd.HDTRZBA_12M_PODPROD,\n  ppd.HDTRZBA_POTENCIAL_PODPROD,\n  ppd.HDTRZBA_VYTEZNOST_PODPROD,\n  ppd.POCET_ART_PODPROD,\n  ppd.DI_PODPRODUKT\nFROM QXXNOZPODPROD ppd\nJOIN QXXPODSKUPZBOZI pp ON pp.IDXXPODSKUPZBOZI = ppd.IDXXPODSKUPZBOZI\nWHERE ({id_navstevy} = '' OR ppd.IDXXNAVSTEVAOZ = {id_navstevy})\nORDER BY ppd.PORADI_PODPROD;\n",
+      "params": [
+        {
+          "name": "id_navstevy",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [KOD_PODSKUPZBOZI0] not found"
+    },
+    {
+      "id": "pt04_navstevy/informace_o_konkurenci",
+      "sql": "SELECT\n  ik.IDXXKONKINFO,\n  kd.NAZEV_KONKURENTA AS NAZEV_KONKURENTA_D,\n  kz.NAZEV_KONKURENTA AS NAZEV_KONKURENTA_Z,\n  ts.NAZEV_SKUPZNACZBOZI,\n  ok.CEN_SKUP,\n  p.NAZEV_SKUP_ZBOZI,\n  ik.VLTYP_INFO,\n  ik.VLVLASTNOST_INFO,\n  ik.VLOBLAST_INFO,\n  ik.DTPLATI_OD,\n  ik.DTPLATI_DO\nFROM QXXKONKINFO ik\nLEFT JOIN QXXKONKURENT kd ON kd.IDXXKONKURENT = ik.IDXXKONKURENT_D AND kd.VLTYP_KONK = 1\nLEFT JOIN QXXKONKURENT kz ON kz.IDXXKONKURENT = ik.IDXXKONKURENT_Z AND kz.VLTYP_KONK = 0\nLEFT JOIN QSKUPZNACZBOZI_DF ts ON ts.IDSKUPZNACZBOZI = ik.IDSKUPZNACZBOZI\nLEFT JOIN QCENSKUP_DF ok ON ok.IDCENSKUP = ik.IDCENSKUP\nLEFT JOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = ik.IDSKUPZBOZI\nWHERE ({id_konkurencniho_dodavatele} = '' OR ik.IDXXKONKURENT_D = {id_konkurencniho_dodavatele})\n  AND ({id_konkurencni_znacky} = '' OR ik.IDXXKONKURENT_Z = {id_konkurencni_znacky})\nORDER BY ik.DTPLATI_OD DESC;\n",
+      "params": [
+        {
+          "name": "id_konkurencniho_dodavatele",
+          "type": "varchar"
+        },
+        {
+          "name": "id_konkurencni_znacky",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [NAZEV_KONKURENTA0] not found"
+    },
+    {
+      "id": "pt05_dostupnost/identifikace_artiklu",
+      "sql": "SELECT\n       Z.IDZBOZI,\n       Z.CIS_ZBOZI,\n       Z.NAZEV_ZBOZI,\n       Z.VLPODTYP_SLOZ,\n       case Z.VLPODTYP_SLOZ\n           when 1 then 'Výrobek'\n           when 2 then 'Zboží'\n           when 3 then 'Materiál'\n           when 4 then 'Polotovar'\n           else 'Neznámý'\n       end                             AS TYP_ARTIKLU,\n       case\n           when Z.VLPODTYP_SLOZ in (1,4) then 'Vyráběný'\n           when Z.VLPODTYP_SLOZ in (2,3) then 'Nakupovaný'\n           else 'Neurčeno'\n       end                             AS ZPUSOB_PORIZENI,\n       Z.VLSTAVZBOZI,\n       case Z.VLSTAVZBOZI\n           when 0 then 'Aktivní'\n           when 1 then 'Neaktivní'\n           else 'Neznámý'\n       end                             AS STAV_ARTIKLU,\n       SZ.NAZEV_SKUP_ZBOZI            AS PRODUKT,\n       PSZ.NAZEV_PODSKUPZBOZI          AS PODPRODUKT,\n       case\n           when Z.CIS_ZBOZI = {hledany_vyraz} then 'Kód artiklu'\n           when Z.CARKOVY_KOD = {hledany_vyraz} then 'Čárový kód'\n           when VMJ.CARKOVY_KODMJ = {hledany_vyraz} then 'Čárový kód obalu'\n           when Z.NAZEV_ZBOZI LIKE CONCAT('%', {hledany_vyraz}, '%') then 'Název (fulltext)'\n           else 'Jiné'\n       end                             AS NALEZENO_PODLE\nFROM QZBOZI_DF Z WITH(NOLOCK)\nLEFT JOIN QSKUPZBOZI_DF SZ WITH(NOLOCK) ON SZ.IDSKUPZBOZI = Z.IDSKUPZBOZI\nLEFT JOIN QXXPODSKUPZBOZI PSZ WITH(NOLOCK) ON PSZ.IDXXPODSKUPZBOZI = Z.IDXXPODSKUPZBOZI\nLEFT JOIN QZBOZIVMJ_DF VMJ WITH(NOLOCK) ON VMJ.IDZBOZI = Z.IDZBOZI\n                                         AND VMJ.CARKOVY_KODMJ = {hledany_vyraz}\nWHERE ISNULL(Z.VLSTAVZBOZI, 0) = 0\n  AND Z.VLTYP_SLOZ = 1\n  AND (\n        Z.CIS_ZBOZI = {hledany_vyraz}\n     OR Z.CARKOVY_KOD = {hledany_vyraz}\n     OR VMJ.CARKOVY_KODMJ = {hledany_vyraz}\n     OR Z.NAZEV_ZBOZI LIKE CONCAT('%', {hledany_vyraz}, '%')\n      )\nORDER BY\n    case\n        when Z.CIS_ZBOZI = {hledany_vyraz} then 1\n        when Z.CARKOVY_KOD = {hledany_vyraz} then 2\n        when VMJ.CARKOVY_KODMJ = {hledany_vyraz} then 3\n        else 4\n    end,\n    Z.CIS_ZBOZI;\n",
+      "params": [
+        {
+          "name": "hledany_vyraz",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt05_dostupnost/skladova_dostupnost_artiklu",
+      "sql": "SELECT\n       ZS.CIS_SKLAD                    AS SKLAD,\n       ZS.NAZEV_SKLAD                  AS NAZEV_SKLADU,\n       ZS.CIS_ZBOZI,\n       ZS.NAZEV_ZBOZI,\n       ZS.MNFYZICKYSTAV                AS FYZICKY_STAV,\n       ZS.MNBLOKOVANO                  AS BLOKOVANO,\n       ZS.MNFYZVOLNYSTAV               AS VOLNE,\n       ZS.DISPONIBILNI                 AS DISPONIBILNI_PRO_OVERENI,\n       ZS.DISPONIBILNI_WMS             AS DISPONIBILNI_STAV,\n       ZS.MNFYZICKYSTAV_PAL            AS FYZICKY_STAV_PAL,\n       ZS.DISPONIBILNI_PAL             AS DISPONIBILNI_PAL,\n       -- Pro Materiál na skladu surovin (04) se bere VOLNE místo DISPONIBILNI\n       case\n           when Z.VLPODTYP_SLOZ = 3 AND ZS.CIS_SKLAD = '04' then\n               case\n                   when ZS.MNFYZVOLNYSTAV > 0\n                       then 'Skladem (' + CAST(CAST(ZS.MNFYZVOLNYSTAV as int) as varchar(20)) + ' ks volné)'\n                   when ZS.MNFYZVOLNYSTAV = 0\n                       then 'Nedostupný (0 ks volné)'\n                   when ZS.MNFYZVOLNYSTAV < 0\n                       then 'Nedostatek (přečerpáno o '\n                            + CAST(CAST(ABS(ZS.MNFYZVOLNYSTAV) as int) as varchar(20)) + ' ks)'\n                   else 'Stav neznámý'\n               end\n           else\n               case\n                   when ZS.DISPONIBILNI > 0\n                       then 'Skladem (' + CAST(CAST(ZS.DISPONIBILNI as int) as varchar(20)) + ' ks disp.)'\n                   when ZS.DISPONIBILNI = 0\n                       then 'Nedostupný (0 ks disp.)'\n                   when ZS.DISPONIBILNI < 0\n                       then 'Nedostatek (přečerpáno o '\n                            + CAST(CAST(ABS(ZS.DISPONIBILNI) as int) as varchar(20)) + ' ks)'\n                   else 'Stav neznámý'\n               end\n       end                             AS STAV_DOSTUPNOSTI,\n       case\n           when ZS.DISPONIBILNI_WMS > 0 then 'OK'\n           when ZS.DISPONIBILNI_WMS <= 0 then 'KRITICKÝ'\n           else '?'\n       end                             AS DISP_STAV_SIGNAL\nFROM QZBOZSKL_DF ZS WITH(NOLOCK)\nLEFT JOIN QZBOZI_DF Z WITH(NOLOCK) ON Z.IDZBOZI = ZS.IDZBOZI\nWHERE ({id_artiklu} = '' OR ZS.IDZBOZI = {id_artiklu})\n  AND ({kod_artiklu} = '' OR ZS.CIS_ZBOZI = {kod_artiklu})\n  AND ({nazev_artiklu} = '' OR ZS.NAZEV_ZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_artiklu}, '%'))\n /* AND ZS.MNFYZICKYSTAV <> 0 */\nORDER BY ZS.CIS_SKLAD;\n",
+      "params": [
+        {
+          "name": "id_artiklu",
+          "type": "varchar"
+        },
+        {
+          "name": "kod_artiklu",
+          "type": "varchar"
+        },
+        {
+          "name": "nazev_artiklu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt05_dostupnost/celkova_dostupnost_artiklu",
+      "sql": "SELECT\n       ZS.CIS_ZBOZI,\n       MAX(ZS.NAZEV_ZBOZI)             AS NAZEV_ZBOZI,\n       SUM(ZS.MNFYZICKYSTAV)           AS FYZICKY_STAV_CELKEM,\n       SUM(ZS.MNBLOKOVANO)             AS BLOKOVANO_CELKEM,\n       SUM(ZS.MNFYZVOLNYSTAV)          AS VOLNE_CELKEM,\n       SUM(ZS.DISPONIBILNI)            AS DISPONIBILNI_CELKEM,\n       SUM(ZS.DISPONIBILNI_WMS)        AS DISPONIBILNI_WMS_CELKEM,\n       SUM(ZS.DISPONIBILNI_PAL)        AS DISPONIBILNI_PAL_CELKEM,\n       case\n           when SUM(ZS.DISPONIBILNI) > 0 then 'Skladem'\n           when SUM(ZS.DISPONIBILNI) = 0 then 'Na hranici'\n           else 'Nedostatek'\n       end                             AS STAV_DOSTUPNOSTI\nFROM QZBOZSKL_DF ZS WITH(NOLOCK)\nWHERE ZS.CIS_ZBOZI = {kod_artiklu}\n  AND ZS.MNFYZICKYSTAV <> 0\nGROUP BY ZS.CIS_ZBOZI;\n",
+      "params": [
+        {
+          "name": "kod_artiklu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt05_dostupnost/planovane_doplneni_artiklu",
+      "sql": "SELECT\n       PMT.CIS_ZBOZI,\n       PMT.NAZEV_ZBOZI,\n       case PMT.VLPODTYP_SLOZ\n           when 1 then 'Výrobek'\n           when 2 then 'Zboží'\n           when 3 then 'Materiál'\n           when 4 then 'Polotovar'\n       end                             AS TYP_ARTIKLU,\n       case\n           when PMT.VLPODTYP_SLOZ in (1,4) then 'Vyráběný'\n           when PMT.VLPODTYP_SLOZ in (2,3) then 'Nakupovaný'\n           else 'Neurčeno'\n       end                             AS ZPUSOB_PORIZENI,\n       PMT.CIS_SKLAD                   AS SKLAD,\n       PMT.NAZEV_SKLAD,\n       PMT.DTDATPOHYBU                 AS TERMIN_DOPLNENI,\n       PMT.MNPRIJEMMT                  AS POTVRZENY_PRIJEM,\n       PMT.MNNAVRHDOPLN                AS NAVRH_DOPLNENI,\n       PMT.MNBUDNAVDOPLN               AS BUDOUCI_NAVRH_DOPLNENI,\n       PMT.MNCELKPLANDOPLN             AS CELKOVY_PLAN_DOPLNENI,\n       PMT.CIS_SARZE                   AS SARZE,\n       PMT.KOD_MJ                      AS MJ,\n       PMT.VLSTAVPRIKAZU               AS STAV_PRIKAZU,\n       PMT.DTTERMINPRIKAZU             AS TERMIN_PRIKAZU,\n       PMT.SUBJ_NAZEV_DOD              AS DODAVATEL,\n       PMT.DTDATUMDODANI               AS DATUM_DODANI,\n       case\n           when PMT.DTDATPOHYBU < GETDATE() then 'Termín prošlý'\n           when PMT.DTDATPOHYBU = CAST(GETDATE() as date) then 'Dnes'\n           else 'Očekáváno: ' + CONVERT(varchar(10), PMT.DTDATPOHYBU, 104)\n       end                             AS INFO_TERMIN\nFROM QXXPLANMATTOKU PMT WITH(NOLOCK)\nWHERE PMT.DTDATPOHYBU >= GETDATE()\n  AND PMT.MNPRIJEMMT > 0\n  AND PMT.VLTYPPLANUMT IN (2, 4, 6)\n  AND PMT.CIS_ZBOZI = {kod_artiklu}\nORDER BY PMT.DTDATPOHYBU ASC, PMT.CIS_SKLAD;\n",
+      "params": [
+        {
+          "name": "kod_artiklu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt05_dostupnost/zalozni_doplneni_vyroba",
+      "sql": "SELECT\n       Z.CIS_ZBOZI,\n       Z.NAZEV_ZBOZI,\n       'Vyráběný'                      AS ZPUSOB_PORIZENI,\n       TD.TYP_DOK                      AS TYP_DOKLADU,\n       case TD.TYP_DOK\n           when 'PVY' then 'Příkaz k výrobě'\n           when 'PVP' then 'Příkaz k výrobě polotovarů'\n           when 'PLV' then 'Plán výroby'\n       end                             AS NAZEV_TYPU,\n       H.CIS_DOK                       AS CISLO_DOKLADU,\n       H.DTVYSTAVENO                   AS DATUM_VYSTAVENI,\n       H.DTZDANITPLN                   AS PLAN_DATUM_DOKONCENI,\n       H.VLSTAVHDOK                    AS STAV_DOKLADU,\n       case H.VLSTAVHDOK\n           when -2 then 'Koncept'\n           when 0  then 'Rozpracováno'\n           when 1  then 'Otevřený'\n           when 3  then 'Blokovaný'\n           else 'Stav ' + CAST(H.VLSTAVHDOK as varchar(5))\n       end                             AS STAV_POPIS,\n       SD.MNCELKEMPOCET                AS MNOZSTVI,\n       MJ.KOD_MJ                       AS MERNA_JEDNOTKA,\n       case\n           when H.DTZDANITPLN IS NULL then 'Termín neurčen'\n           when H.DTZDANITPLN < GETDATE() then 'Termín prošlý'\n           else 'Očekáváno: ' + CONVERT(varchar(10), H.DTZDANITPLN, 104)\n       end                             AS INFO_TERMIN\nFROM HDOK H WITH(NOLOCK)\nLEFT JOIN TYPDOK TD WITH(NOLOCK) ON TD.IDTYPDOK = H.IDTYPDOK\nLEFT JOIN SDOK SD WITH(NOLOCK) ON SD.IDHDOK = H.IDHDOK\n                                AND SD.VLTYP_SLOZ IN (1,2)\nLEFT JOIN QZBOZI_DF Z WITH(NOLOCK) ON Z.IDZBOZI = SD.IDZBOZI\nLEFT JOIN QMJ MJ WITH(NOLOCK) ON MJ.IDMJ = SD.IDMJ\nWHERE TD.TYP_DOK IN ('PVY','PVP','PLV')\n  AND H.VLSTAVHDOK IN (-2, 0, 1)\n  AND Z.CIS_ZBOZI = {kod_artiklu}\nORDER BY H.DTZDANITPLN ASC;\n",
+      "params": [
+        {
+          "name": "kod_artiklu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [KOD_MJ0] not found"
+    },
+    {
+      "id": "pt05_dostupnost/zalozni_doplneni_nakup",
+      "sql": "SELECT\n       Z.CIS_ZBOZI,\n       Z.NAZEV_ZBOZI,\n       'Nakupovaný'                    AS ZPUSOB_PORIZENI,\n       'NOB'                           AS TYP_DOKLADU,\n       'Nákupní objednávka'            AS NAZEV_TYPU,\n       H.CIS_DOK                       AS CISLO_DOKLADU,\n       H.DTVYSTAVENO                   AS DATUM_VYSTAVENI,\n       H.DTZDANITPLN                   AS OCEKAVANY_TERMIN_DODANI,\n       H.VLSTAVHDOK                    AS STAV_DOKLADU,\n       case H.VLSTAVHDOK\n           when -2 then 'Koncept'\n           when 0  then 'Rozpracováno'\n           when 1  then 'Otevřený'\n           when 3  then 'Blokovaný'\n           when 6  then 'Předfakturováno'\n           else 'Stav ' + CAST(H.VLSTAVHDOK as varchar(5))\n       end                             AS STAV_POPIS,\n       SUBJ.SUBJ_NAZEV                 AS DODAVATEL,\n       SD.MNCELKEMPOCET                AS MNOZSTVI,\n       MJ.KOD_MJ                       AS MERNA_JEDNOTKA,\n       H.JEJICH_CISDOK                 AS CISLO_DODAVATELE,\n       case\n           when H.DTZDANITPLN IS NULL then 'Termín dodání neurčen'\n           when CAST(H.DTZDANITPLN AS date) = CAST(GETDATE() AS date) then 'Dodání v plánu dnes'\n           when H.DTZDANITPLN < CAST(GETDATE() AS date) then 'Termín prošlý – zpožděná dodávka'\n           else 'Očekáváno: ' + CONVERT(varchar(10), H.DTZDANITPLN, 104)\n       end                             AS INFO_TERMIN\nFROM HDOK H WITH(NOLOCK)\nLEFT JOIN TYPDOK TD WITH(NOLOCK) ON TD.IDTYPDOK = H.IDTYPDOK\nLEFT JOIN SDOK SD WITH(NOLOCK) ON SD.IDHDOK = H.IDHDOK\n                                AND SD.VLTYP_SLOZ IN (1,2)\nLEFT JOIN QZBOZI_DF Z WITH(NOLOCK) ON Z.IDZBOZI = SD.IDZBOZI\nLEFT JOIN QSUBJEKT SUBJ WITH(NOLOCK) ON SUBJ.IDSUBJEKT = H.IDSUBJEKT\nLEFT JOIN QMJ MJ WITH(NOLOCK) ON MJ.IDMJ = SD.IDMJ\nWHERE TD.TYP_DOK = 'NOB'\n  AND H.VLSTAVHDOK IN (-2, 0, 1, 3, 6)\n  AND Z.CIS_ZBOZI = {kod_artiklu}\nORDER BY H.DTZDANITPLN ASC;\n",
+      "params": [
+        {
+          "name": "kod_artiklu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [KOD_MJ0] not found"
+    },
+    {
+      "id": "pt20_ucetnictvi/ucetni_zapisy_agregace_ukazatele",
+      "sql": "SELECT MIN(z.IDUCETZAP) AS IDUCETZAP,\n       o.UCET_OBD,\n       mu.KOD_UKAZMU,\n       mu.NAZEV_UKAZMU,\n       u.KOD_UCTU,\n       u.NAZEV_UCTU,\n       SUM(z.HDKON_STAV) AS HDKON_STAV,\n       -SUM(z.HDKON_STAV) AS HDSKUT\nFROM QUCETZAP z\nJOIN QSTRED_DF s ON s.IDSTRED = z.IDSTRED\nJOIN QXXUKAZMU mu ON mu.IDXXUKAZMU = s.IDXXUKAZMU\nJOIN QUCTOBD o ON o.IDUCTOBD = z.IDUCTOBD\nJOIN QUCTOSN_DF u ON u.IDUCTOSN = z.IDUCTOSN\nWHERE (mu.KOD_UKAZMU COLLATE Latin1_General_CI_AI LIKE CONCAT({nazev_ukazatele}, '%')\n   OR mu.NAZEV_UKAZMU COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_ukazatele}, '%'))\n  AND o.UCET_OBD LIKE CONCAT('%', {obdobi}, '%')\n  AND substring(u.KOD_UCTU,1,1) in ('5','6','8','9')\nGROUP BY z.IDUCTOBD, z.IDUCTOSN, z.IDSTRED,\n         o.UCET_OBD, mu.KOD_UKAZMU, mu.NAZEV_UKAZMU,\n         u.KOD_UCTU, u.NAZEV_UCTU\nORDER BY SUM(z.HDKON_STAV) DESC;\n",
+      "params": [
+        {
+          "name": "nazev_ukazatele",
+          "type": "varchar"
+        },
+        {
+          "name": "obdobi",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt20_ucetnictvi/ucetni_zapisy_agregace_strediska",
+      "sql": "SELECT MIN(z.IDUCETZAP) AS IDUCETZAP,\n       o.UCET_OBD,\n       s.KOD_STR,\n       s.NAZEV_STR,\n       u.KOD_UCTU,\n       u.NAZEV_UCTU,\n       SUM(z.HDKON_STAV) AS HDKON_STAV,\n       -SUM(z.HDKON_STAV) AS HDSKUT\nFROM QUCETZAP z\nJOIN QSTRED_DF s ON s.IDSTRED = z.IDSTRED\nJOIN QUCTOBD o ON o.IDUCTOBD = z.IDUCTOBD\nJOIN QUCTOSN_DF u ON u.IDUCTOSN = z.IDUCTOSN\nWHERE s.IDSTRED = {id_střediska}\n  AND o.IDUCTOBD = {id_účetního_období}\n  AND substring(u.KOD_UCTU,1,1) in ('5','6','8','9')\nGROUP BY z.IDUCTOBD, z.IDUCTOSN, z.IDSTRED,\n         o.UCET_OBD, s.KOD_STR, s.NAZEV_STR,\n         u.KOD_UCTU, u.NAZEV_UCTU\nORDER BY SUM(z.HDKON_STAV) DESC;\n",
+      "params": [
+        {
+          "name": "id_střediska",
+          "type": "varchar"
+        },
+        {
+          "name": "id_účetního_období",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P1.S2",
+      "note": "A3 — field [IDSTRED0] not found"
+    },
+    {
+      "id": "pt20_ucetnictvi/ucetni_zapisy_agregace_uctu",
+      "sql": "SELECT MIN(z.IDUCETZAP) AS IDUCETZAP,\n       o.UCET_OBD,\n       u.KOD_UCTU,\n       u.NAZEV_UCTU,\n       s.KOD_STR,\n       s.NAZEV_STR,\n       SUM(z.HDKON_STAV) AS HDKON_STAV,\n       -SUM(z.HDKON_STAV) AS HDSKUT\nFROM QUCETZAP z\nJOIN QUCTOSN_DF u ON u.IDUCTOSN = z.IDUCTOSN\nJOIN QUCTOBD o ON o.IDUCTOBD = z.IDUCTOBD\nJOIN QSTRED_DF s ON s.IDSTRED = z.IDSTRED\nWHERE (u.KOD_UCTU COLLATE Latin1_General_CI_AI LIKE CONCAT({nazev_uctu}, '%')\n   OR u.NAZEV_UCTU COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_uctu}, '%'))\n  AND o.UCET_OBD LIKE CONCAT('%', {obdobi}, '%')\n  AND substring(u.KOD_UCTU,1,1) in ('5','6','8','9')\nGROUP BY z.IDUCTOBD, z.IDUCTOSN, z.IDSTRED,\n         o.UCET_OBD, u.KOD_UCTU, u.NAZEV_UCTU,\n         s.KOD_STR, s.NAZEV_STR\nORDER BY SUM(z.HDKON_STAV) DESC;\n",
+      "params": [
+        {
+          "name": "nazev_uctu",
+          "type": "varchar"
+        },
+        {
+          "name": "obdobi",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt20_ucetnictvi/ucetni_zapisy_detail_agregace",
+      "sql": "SELECT z.IDUCETZAP,\n       o.UCET_OBD,\n       u.KOD_UCTU,\n       u.NAZEV_UCTU,\n       s.KOD_STR,\n       s.NAZEV_STR,\n       z.HDKON_STAV AS HDKON_STAV,\n       -z.HDKON_STAV AS HDSKUT,\n       d.CIS_DOK,\n       z.UZTEXT,\n       d.SLOZKA_IDENT\nFROM QUCETZAP z\nJOIN QUCTOBD o ON o.IDUCTOBD = z.IDUCTOBD\nJOIN QUCTOSN_DF u ON u.IDUCTOSN = z.IDUCTOSN\nJOIN QSTRED_DF s ON s.IDSTRED = z.IDSTRED\nLEFT JOIN QSDOK d ON d.IDSDOK = z.IDSDOK\nWHERE z.IDUCTOBD = (SELECT TOP 1 r.IDUCTOBD FROM QUCETZAP r WHERE r.IDUCETZAP = {id_ucetniho_zapisu})\n  AND z.IDUCTOSN = (SELECT TOP 1 r.IDUCTOSN FROM QUCETZAP r WHERE r.IDUCETZAP = {id_ucetniho_zapisu})\n  AND z.IDSTRED = (SELECT TOP 1 r.IDSTRED FROM QUCETZAP r WHERE r.IDUCETZAP = {id_ucetniho_zapisu})\nORDER BY z.HDKON_STAV DESC;\n",
+      "params": [
+        {
+          "name": "id_ucetniho_zapisu",
+          "type": "int"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt20_ucetnictvi/ucetni_doklad_detail",
+      "sql": "WITH z AS\n  (SELECT r.IDHDOK, r.IDSDOK FROM QUCETZAP r WHERE r.IDUCETZAP = {id_ucetniho_zapisu})\nSELECT s.IDSDOK,\n       t.NAZEV_TYPDOK,\n       d.CIS_DOK,\n       d.DTZDANITPLN,\n       d.IDSUBJEKT,\n       s.ZAK_SDOK,\n       d.TEXTPOZN,\n       s.PORADI_DOK,\n       s.VLTYP_SLOZ,\n       s.KOD_POHYB,\n       s.SLOZKA_IDENT,\n       s.NAZEV_ZBOZI,\n       s.TEXT_SLOZ,\n       s.MNPOCETMJ,\n       s.HDJCENAKC,\n       s.HDCCENAKC\nFROM QHDOK d\nLEFT JOIN QTYPDOK t ON t.IDTYPDOK = d.IDTYPDOK\nLEFT JOIN QSDOK s ON s.IDSDOK = (SELECT IDSDOK FROM z)\nWHERE d.IDHDOK = (SELECT IDHDOK FROM z)\nORDER BY s.PORADI_DOK;\n",
+      "params": [
+        {
+          "name": "id_ucetniho_zapisu",
+          "type": "int"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt20_ucetnictvi/ucetni_ucty",
+      "sql": "SELECT\n       IDUCTOSN,\n       KOD_UCTU,\n       NAZEV_UCTU\nFROM QUCTOSN_DF\nWHERE substring(KOD_UCTU,1,1) in ('5','6','8','9')\n  AND len(KOD_UCTU) = 6\n  AND ({nazev_uctu} = '' OR KOD_UCTU COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_uctu}, '%')\n       OR NAZEV_UCTU COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_uctu}, '%'))\nORDER BY KOD_UCTU;\n",
+      "params": [
+        {
+          "name": "nazev_uctu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt20_ucetnictvi/ucetni_strediska",
+      "sql": "SELECT\n       IDSTRED,\n       KOD_STR,\n       NAZEV_STR\nFROM QSTRED_DF\nWHERE ({nazev_strediska} = '' OR KOD_STR COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_strediska}, '%')\n       OR NAZEV_STR COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_strediska}, '%'))\nORDER BY KOD_STR;\n",
+      "params": [
+        {
+          "name": "nazev_strediska",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt20_ucetnictvi/ukazatele_mu",
+      "sql": "SELECT\n       IDXXUKAZMU,\n       KOD_UKAZMU,\n       NAZEV_UKAZMU\nFROM QXXUKAZMU\nWHERE ({nazev_ukazatele} = '' OR KOD_UKAZMU COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_ukazatele}, '%')\n       OR NAZEV_UKAZMU COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_ukazatele}, '%'))\nORDER BY KOD_UKAZMU;\n",
+      "params": [
+        {
+          "name": "nazev_ukazatele",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt30_cenova_politika/cena_subjekt_artikl_aktualni",
+      "sql": "SELECT\n       QSUBJEKT.IDSUBJEKT,\n       QSUBJEKT.KOD_SUBJEKTU,\n       QSUBJEKT.SUBJ_NAZEV,\n       QZBOZI_DF.IDZBOZI,\n       QZBOZI_DF.CIS_ZBOZI,\n       QZBOZI_DF.NAZEV_ZBOZI,\n       QCENSKUP_DF.CEN_SKUP,\n       CONVERT(decimal(18,4), dbo.fnXXOZ_JCenaNaObjednavceSubjekt(QZBOZI_DF.IDZBOZI, QSUBJEKT.IDSUBJEKT, CONVERT(date, GETDATE()))) AS CENA_SUBJEKT,\n       CONVERT(decimal(18,4), dbo.fnXXOZ_JCenaNaObjednavce(QZBOZI_DF.IDZBOZI, QSUBJVTSUBJ_DF.IDCENSKUP, CONVERT(date, GETDATE()))) AS CENA_KANAL,\n       CONVERT(decimal(18,4), ISNULL(dbo.fnXXOZ_JCenaNaObjednavceSubjekt(QZBOZI_DF.IDZBOZI, QSUBJEKT.IDSUBJEKT, CONVERT(date, GETDATE())),\n                                     dbo.fnXXOZ_JCenaNaObjednavce(QZBOZI_DF.IDZBOZI, QSUBJVTSUBJ_DF.IDCENSKUP, CONVERT(date, GETDATE())))) AS CENA_VYSLEDNA\nFROM QSUBJEKT\nJOIN QSUBJVTSUBJ_DF ON QSUBJVTSUBJ_DF.IDSUBJEKT = QSUBJEKT.IDSUBJEKT AND QSUBJVTSUBJ_DF.TYP_SUBJ = 'ODB'\nJOIN QCENSKUP_DF ON QCENSKUP_DF.IDCENSKUP = QSUBJVTSUBJ_DF.IDCENSKUP\nJOIN QZBOZI_DF ON QZBOZI_DF.VLTYP_SLOZ = 1 AND QZBOZI_DF.VLSTAVZBOZI = 0\nWHERE (QSUBJEKT.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\n       OR QSUBJEKT.KOD_SUBJEKTU COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%'))\n  AND (QZBOZI_DF.CIS_ZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_artiklu}, '%')\n       OR QZBOZI_DF.NAZEV_ZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_artiklu}, '%'))\nORDER BY QSUBJEKT.SUBJ_NAZEV, QZBOZI_DF.NAZEV_ZBOZI;\n",
+      "params": [
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        },
+        {
+          "name": "kod_artiklu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "red:TF-P5.S1",
+      "note": "C1 — calls dbo.fnXXOZ_* (model-declared functions)."
+    },
+    {
+      "id": "pt30_cenova_politika/aktivni_slevy_subjektu",
+      "sql": "SELECT\n       QCESKZBPA_DF.IDCESKZBPA,\n       QSUBJEKT.KOD_SUBJEKTU,\n       QSUBJEKT.SUBJ_NAZEV,\n       QZBOZI_DF.CIS_ZBOZI,\n       QZBOZI_DF.NAZEV_ZBOZI,\n       QCENSKZB_DF.KOD_CENSKZB,\n       QSKUPZBOZI_DF.NAZEV_SKUP_ZBOZI,\n       QXXPODSKUPZBOZI.NAZEV_PODSKUPZBOZI,\n       QCESKZBPA_DF.PREDPIS_CENA,\n       CASE\n            WHEN QCESKZBPA_DF.IDZBOZI IS NOT NULL AND QCESKZBPA_DF.PREDPIS_CENA NOT LIKE '%@%' THEN 'P1'\n            WHEN QCESKZBPA_DF.IDZBOZI IS NOT NULL THEN 'P2'\n            WHEN QCESKZBPA_DF.IDXXPODSKUPZBOZI IS NOT NULL THEN 'P3'\n            WHEN QCESKZBPA_DF.IDSKUPZBOZI IS NOT NULL THEN 'P4'\n            WHEN QCENSKZB_DF.KOD_CENSKZB = 'Sortiment DF' THEN 'P6'\n            ELSE 'P5'\n       END AS PRIORITA,\n       QCESKZBPA_DF.DTPLATI_OD,\n       QCESKZBPA_DF.DTPLATI_DO\nFROM QCESKZBPA_DF\nJOIN QSUBJEKT ON QSUBJEKT.IDSUBJEKT = QCESKZBPA_DF.IDSUBJEKT\nLEFT JOIN QZBOZI_DF ON QZBOZI_DF.IDZBOZI = QCESKZBPA_DF.IDZBOZI\nLEFT JOIN QCENSKZB_DF ON QCENSKZB_DF.IDCENSKZB = QCESKZBPA_DF.IDCENSKZB\nLEFT JOIN QSKUPZBOZI_DF ON QSKUPZBOZI_DF.IDSKUPZBOZI = QCESKZBPA_DF.IDSKUPZBOZI\nLEFT JOIN QXXPODSKUPZBOZI ON QXXPODSKUPZBOZI.IDXXPODSKUPZBOZI = QCESKZBPA_DF.IDXXPODSKUPZBOZI\nWHERE QCESKZBPA_DF.VLPROCENU = 2\n  AND CONVERT(date, GETDATE()) BETWEEN QCESKZBPA_DF.DTPLATI_OD AND ISNULL(QCESKZBPA_DF.DTPLATI_DO, CONVERT(date, GETDATE()))\n  AND (QSUBJEKT.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')\n       OR QSUBJEKT.KOD_SUBJEKTU COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%'))\nORDER BY QSUBJEKT.SUBJ_NAZEV, PRIORITA, QCENSKZB_DF.KOD_CENSKZB;\n",
+      "params": [
+        {
+          "name": "nazev_zakaznika",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt30_cenova_politika/cenove_predpisy_kanalu",
+      "sql": "SELECT\n       QCESKZBPA_DF.IDCESKZBPA,\n       QCENSKUP_DF.CEN_SKUP,\n       QZBOZI_DF.CIS_ZBOZI,\n       QZBOZI_DF.NAZEV_ZBOZI,\n       QCESKZBPA_DF.PREDPIS_CENA,\n       QCESKZBPA_DF.DTPLATI_OD,\n       QCESKZBPA_DF.DTPLATI_DO\nFROM QCESKZBPA_DF\nJOIN QCENSKUP_DF ON QCENSKUP_DF.IDCENSKUP = QCESKZBPA_DF.IDCENSKUP\nLEFT JOIN QZBOZI_DF ON QZBOZI_DF.IDZBOZI = QCESKZBPA_DF.IDZBOZI\nWHERE QCESKZBPA_DF.VLPROCENU = 2\n  AND QCESKZBPA_DF.IDSUBJEKT IS NULL\n  AND CONVERT(date, GETDATE()) BETWEEN QCESKZBPA_DF.DTPLATI_OD AND ISNULL(QCESKZBPA_DF.DTPLATI_DO, CONVERT(date, GETDATE()))\n  AND QCENSKUP_DF.CEN_SKUP LIKE CONCAT('%', {kod_kanalu}, '%')\nORDER BY QCENSKUP_DF.CEN_SKUP, QZBOZI_DF.NAZEV_ZBOZI;\n",
+      "params": [
+        {
+          "name": "kod_kanalu",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    },
+    {
+      "id": "pt30_cenova_politika/slevova_pasma_kanalu",
+      "sql": "SELECT\n       XXSLEVPAS.IDXXSLEVPAS,\n       QCENSKUP_DF.CEN_SKUP,\n       QCENSKZB_DF.KOD_CENSKZB,\n       QCENSKZB_DF.NAZEV_CENSKZB,\n       XXSLEVPAS.HDDOLMEZ,\n       XXSLEVPAS.HDHORMEZ,\n       XXSLEVPAS.HDMINSLEVA,\n       XXSLEVPAS.HDMAXSLEVA\nFROM XXSLEVPAS\nJOIN QCENSKUP_DF ON QCENSKUP_DF.IDCENSKUP = XXSLEVPAS.IDCENSKUP\nJOIN QCENSKZB_DF ON QCENSKZB_DF.IDCENSKZB = XXSLEVPAS.IDCENSKZB\nWHERE XXSLEVPAS.VLPRIRAZENI = 0\n  AND ({kod_kanalu} = '' OR QCENSKUP_DF.CEN_SKUP COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_kanalu}, '%'))\n  AND ({kod_znacky} = '' OR QCENSKZB_DF.KOD_CENSKZB COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_znacky}, '%'))\nORDER BY QCENSKUP_DF.CEN_SKUP, QCENSKZB_DF.KOD_CENSKZB, XXSLEVPAS.HDDOLMEZ;\n",
+      "params": [
+        {
+          "name": "kod_kanalu",
+          "type": "varchar"
+        },
+        {
+          "name": "kod_znacky",
+          "type": "varchar"
+        }
+      ],
+      "parse": "ok",
+      "unparse": "ok",
+      "status": "green"
+    }
+  ]
+}

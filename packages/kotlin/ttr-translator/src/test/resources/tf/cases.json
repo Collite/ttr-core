@@ -1,0 +1,855 @@
+[
+  {
+    "id": "q1_right_dup_in_select",
+    "group": "A3",
+    "sql": "SELECT a.ID, b.ID FROM A a JOIN B b ON b.ID = a.B_ID",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [A].[ID], [B].[ID] AS [ID0] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID]"
+    },
+    "status": "red:TF-P1.S2"
+  },
+  {
+    "id": "q2_right_dup_in_where",
+    "group": "A3",
+    "sql": "SELECT a.NAME FROM A a JOIN B b ON b.ID = a.B_ID WHERE b.ID = 5",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [A].[NAME] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID] WHERE [B].[ID] = 5"
+    },
+    "status": "red:TF-P1.S2"
+  },
+  {
+    "id": "q3_right_nondup",
+    "group": "A3",
+    "sql": "SELECT a.ID, b.NAME FROM A a JOIN B b ON b.ID = a.B_ID WHERE a.ID = 5",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [A].[ID], [B].[NAME] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID] WHERE [A].[ID] = 5"
+    },
+    "status": "red:TF-P1.S2"
+  },
+  {
+    "id": "q4_left_dup_only",
+    "group": "D",
+    "sql": "SELECT a.ID FROM A a JOIN B b ON b.ID = a.B_ID WHERE a.ID = 5",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [A].[ID] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID] WHERE [A].[ID] = 5"
+    },
+    "status": "green"
+  },
+  {
+    "id": "q5_right_dup_where_only",
+    "group": "A3",
+    "sql": "SELECT a.B_ID FROM A a JOIN B b ON b.ID = a.B_ID WHERE b.NAME = 'x'",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [A].[B_ID] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID] WHERE [B].[NAME] = 'x'"
+    },
+    "status": "red:TF-P1.S2"
+  },
+  {
+    "id": "q6_right_dup_name_select",
+    "group": "A3",
+    "sql": "SELECT b.NAME FROM A a JOIN B b ON b.ID = a.B_ID",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [B].[NAME] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID]"
+    },
+    "status": "red:TF-P1.S2"
+  },
+  {
+    "id": "q7_union",
+    "group": "B",
+    "sql": "SELECT a.ID FROM A a WHERE a.ID = 1 UNION ALL SELECT b.ID FROM B b WHERE b.ID = 2",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE [ID] = 1 UNION ALL SELECT [ID] FROM [dbo].[B] WHERE [ID] = 2"
+    },
+    "status": "green"
+  },
+  {
+    "id": "q8_corr_not_exists",
+    "group": "B",
+    "sql": "SELECT a.ID FROM A a WHERE NOT EXISTS (SELECT 1 FROM B b WHERE b.ID = a.B_ID)",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [A].[ID] FROM [dbo].[A] LEFT JOIN (SELECT [ID], (1 = 1) AS [$f1] FROM [dbo].[B] WHERE [ID] IS NOT NULL GROUP BY [ID]) AS [t2] ON [A].[B_ID] = [t2].[ID] WHERE [t2].[$f1] IS NULL"
+    },
+    "status": "green"
+  },
+  {
+    "id": "q9_corr_exists",
+    "group": "B",
+    "sql": "SELECT a.ID FROM A a WHERE EXISTS (SELECT 1 FROM B b WHERE b.ID = a.B_ID AND b.NAME = 'x')",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [A].[ID] FROM [dbo].[A] INNER JOIN (SELECT [ID], (1 = 1) AS [$f1] FROM [dbo].[B] WHERE [NAME] = 'x' AND [ID] IS NOT NULL GROUP BY [ID]) AS [t2] ON [A].[B_ID] = [t2].[ID]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "q10_str_plus",
+    "group": "A2",
+    "sql": "SELECT 'Skladem (' + CAST(a.ID AS varchar(20)) + ' ks)' AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT CONCAT('Skladem (', CAST([ID] AS VARCHAR(20)), ' ks)') AS [X] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P2.S1"
+  },
+  {
+    "id": "q11_window",
+    "group": "C5",
+    "sql": "SELECT a.ID, ROW_NUMBER() OVER (PARTITION BY a.B_ID ORDER BY a.ID DESC) AS RN FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID], ROW_NUMBER() OVER (PARTITION BY [B_ID] ORDER BY [ID] DESC) AS [RN] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P3.S3"
+  },
+  {
+    "id": "q12_rollup",
+    "group": "A6",
+    "sql": "SELECT a.B_ID, COUNT(*) AS N FROM A a GROUP BY ROLLUP(a.B_ID)",
+    "params": [],
+    "expect": {
+      "parseCode": "parse_pipeline_failed",
+      "messageContains": "GROUP BY ROLLUP/CUBE/GROUPING SETS is not in the v1 wire format"
+    },
+    "status": "red:TF-P1.S3"
+  },
+  {
+    "id": "q13_string_agg",
+    "group": "C6",
+    "sql": "SELECT a.B_ID, STRING_AGG(a.NAME, ', ') AS NAMES FROM A a GROUP BY a.B_ID",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [B_ID], STRING_AGG([NAME], ', ') AS [NAMES] FROM [dbo].[A] GROUP BY [B_ID]"
+    },
+    "status": "red:TF-P1.S3"
+  },
+  {
+    "id": "q14_to_char_pg",
+    "group": "C12",
+    "sql": "SELECT TO_CHAR(a.ID, '999') AS X FROM A a",
+    "params": [],
+    "expect": {
+      "parseCode": "validation_failed"
+    },
+    "status": "out-of-scope",
+    "note": "C12 — Postgres function against the MSSQL target; dialect-scoped operator tables are ⚑TF-3 (recorded, not in TF)."
+  },
+  {
+    "id": "q15_greatest",
+    "group": "C12",
+    "sql": "SELECT GREATEST(a.ID, a.B_ID) AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT CASE WHEN [ID] IS NOT NULL AND ([B_ID] IS NULL OR [ID] > [B_ID]) THEN [ID] WHEN [B_ID] IS NOT NULL THEN [B_ID] ELSE NULL END AS [X] FROM [dbo].[A]"
+    },
+    "status": "green",
+    "note": "C12 — GREATEST validates via the Postgres library and renders as a harmless CASE."
+  },
+  {
+    "id": "q16_filter_agg",
+    "group": "C7",
+    "sql": "SELECT COUNT(*) FILTER (WHERE a.ID > 1) AS N FROM A a",
+    "params": [],
+    "expect": {
+      "parseCode": "parse_pipeline_failed",
+      "messageContains": "Aggregate FILTER (WHERE …) is not in the v1 wire format"
+    },
+    "status": "red:TF-P1.S3"
+  },
+  {
+    "id": "q17_datepart_weekday",
+    "group": "C10",
+    "sql": "SELECT DATEPART(weekday, GETDATE()) AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT DATEPART(WEEKDAY, GETDATE()) AS [X] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P3.S2"
+  },
+  {
+    "id": "q18_nvarchar_cast",
+    "group": "C9",
+    "sql": "SELECT CAST(a.ID AS nvarchar(30)) AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT CAST([ID] AS VARCHAR(30)) AS [X] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P3.S1"
+  },
+  {
+    "id": "q19_eomonth",
+    "group": "C11",
+    "sql": "SELECT EOMONTH(GETDATE()) AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT EOMONTH(GETDATE()) AS [X] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P3.S2"
+  },
+  {
+    "id": "q20_format",
+    "group": "C11",
+    "sql": "SELECT FORMAT(a.ID, 'N0') AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT FORMAT([ID], 'N0') AS [X] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P3.S2"
+  },
+  {
+    "id": "q21_like_concat_param",
+    "group": "D",
+    "sql": "SELECT a.ID FROM A a WHERE a.NAME LIKE CONCAT('%', {q}, '%')",
+    "params": [
+      {
+        "name": "q",
+        "type": "varchar"
+      }
+    ],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE [NAME] LIKE CONCAT('%', ?, '%')"
+    },
+    "status": "green"
+  },
+  {
+    "id": "q22_top_percent",
+    "group": "C13",
+    "sql": "SELECT TOP 10 PERCENT a.ID FROM A a ORDER BY a.ID",
+    "params": [],
+    "expect": {
+      "parseCode": "parse_failed"
+    },
+    "status": "out-of-scope",
+    "note": "C13 — TOP n PERCENT: prompt rule, not planned (architecture §7)."
+  },
+  {
+    "id": "q23_cross_apply",
+    "group": "C13",
+    "sql": "SELECT a.ID, x.N FROM A a CROSS APPLY (SELECT COUNT(*) AS N FROM B b WHERE b.ID = a.B_ID) x",
+    "params": [],
+    "expect": {
+      "parseCode": "parse_failed"
+    },
+    "status": "out-of-scope",
+    "note": "C13 — CROSS APPLY: prompt rule, not planned (architecture §7)."
+  },
+  {
+    "id": "q24_datename",
+    "group": "C11",
+    "sql": "SELECT DATENAME(month, GETDATE()) AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT DATENAME(MONTH, GETDATE()) AS [X] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P3.S2"
+  },
+  {
+    "id": "q25_iif_isnull",
+    "group": "D",
+    "sql": "SELECT IIF(a.ID > 1, 'y', 'n') AS X, ISNULL(a.NAME, '-') AS Y FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT IIF([ID] > 1, 'y', 'n') AS [X], ISNULL([NAME], '-') AS [Y] FROM [dbo].[A]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "q26_dateadd_dd",
+    "group": "D",
+    "sql": "SELECT a.ID FROM A a WHERE GETDATE() > DATEADD(dd, -30, GETDATE())",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE GETDATE() > DATEADD(DAY, -30, GETDATE())"
+    },
+    "status": "green"
+  },
+  {
+    "id": "q27_convert_style",
+    "group": "D",
+    "sql": "SELECT CONVERT(varchar(10), GETDATE(), 104) AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT CONVERT(VARCHAR(10), GETDATE(), 104) AS [X] FROM [dbo].[A]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "q28_collate",
+    "group": "D",
+    "sql": "SELECT a.ID FROM A a WHERE a.NAME COLLATE Latin1_General_CI_AI LIKE 'x%'",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE [NAME] COLLATE Latin1_General_CI_AI LIKE 'x%'"
+    },
+    "status": "green"
+  },
+  {
+    "id": "q29_nolock_top",
+    "group": "A8",
+    "sql": "SELECT TOP 5 a.ID FROM A a WITH (NOLOCK) ORDER BY a.ID",
+    "params": [],
+    "expect": {
+      "sql": "SELECT TOP (5) [ID] FROM [dbo].[A] WITH (NOLOCK) ORDER BY [ID]"
+    },
+    "status": "red:TF-P2.S2"
+  },
+  {
+    "id": "q30_cte",
+    "group": "D",
+    "sql": "WITH t AS (SELECT a.B_ID, COUNT(*) AS N FROM A a GROUP BY a.B_ID) SELECT t.B_ID, t.N FROM t WHERE t.N > 1",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [B_ID], COUNT(*) AS [N] FROM [dbo].[A] GROUP BY [B_ID] HAVING COUNT(*) > 1"
+    },
+    "status": "green"
+  },
+  {
+    "id": "q31_money_cast",
+    "group": "C9",
+    "sql": "SELECT CAST(a.ID AS money) AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT CAST([ID] AS DECIMAL(19, 4)) AS [X] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P3.S1"
+  },
+  {
+    "id": "q32_datetime_cast",
+    "group": "C9",
+    "sql": "SELECT CAST('2026-01-01' AS datetime) AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT '2026-01-01 00:00:00' AS [X] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P3.S1"
+  },
+  {
+    "id": "q33_uncorr_in",
+    "group": "D",
+    "sql": "SELECT a.ID FROM A a WHERE a.B_ID IN (SELECT b.ID FROM B b WHERE b.NAME = 'x')",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE [B_ID] IN (SELECT [ID] FROM [dbo].[B] WHERE [NAME] = 'x')"
+    },
+    "status": "green"
+  },
+  {
+    "id": "q34_corr_scalar",
+    "group": "B",
+    "sql": "SELECT a.ID, (SELECT MAX(b.ID) FROM B b WHERE b.ID = a.B_ID) AS M FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [A].[ID], [t1].[EXPR$0] AS [M] FROM [dbo].[A] LEFT JOIN (SELECT [ID] AS [ID1], MAX([ID]) AS [EXPR$0] FROM [dbo].[B] WHERE [ID] IS NOT NULL GROUP BY [ID]) AS [t1] ON [A].[B_ID] = [t1].[ID1]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "q35_sum_over",
+    "group": "A5",
+    "sql": "SELECT a.ID, SUM(a.ID) OVER (PARTITION BY a.B_ID) AS S FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID], CASE WHEN (COUNT([ID]) OVER (PARTITION BY [B_ID] RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)) > 0 THEN SUM([ID]) OVER (PARTITION BY [B_ID] RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) ELSE NULL END AS [S] FROM [dbo].[A]"
+    },
+    "status": "green",
+    "note": "A5 — org keeps OVER (Calcite's null-guard CASE); cz stripped it."
+  },
+  {
+    "id": "r1_left_join_dup",
+    "group": "A3",
+    "sql": "SELECT a.ID, b.NAME FROM A a LEFT JOIN B b ON b.ID = a.B_ID",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [A].[ID], [B].[NAME] FROM [dbo].[A] LEFT JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID]"
+    },
+    "status": "red:TF-P1.S2"
+  },
+  {
+    "id": "r2_dup_aliased_select",
+    "group": "A3",
+    "sql": "SELECT a.ID AS A_ID, b.ID AS B_ID2 FROM A a JOIN B b ON b.ID = a.B_ID",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [A].[ID] AS [A_ID], [B].[ID] AS [B_ID2] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID]"
+    },
+    "status": "red:TF-P1.S2"
+  },
+  {
+    "id": "r3_three_tables",
+    "group": "A3",
+    "sql": "SELECT a.ID, b.NAME, c.NAME AS CN FROM A a JOIN B b ON b.ID = a.B_ID JOIN B c ON c.ID = a.ID",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [A].[ID], [B].[NAME], [B0].[NAME] AS [CN] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID] INNER JOIN [dbo].[B] AS [B0] ON [A].[ID] = [B0].[ID]"
+    },
+    "status": "red:TF-P1.S2"
+  },
+  {
+    "id": "r4_anti_join",
+    "group": "A3",
+    "sql": "SELECT a.ID FROM A a LEFT JOIN B b ON b.ID = a.B_ID WHERE b.ID IS NULL",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [A].[ID] FROM [dbo].[A] LEFT JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID] WHERE [B].[ID] IS NULL"
+    },
+    "status": "red:TF-P1.S2"
+  },
+  {
+    "id": "r5_lag",
+    "group": "C5",
+    "sql": "SELECT a.ID, LAG(a.ID) OVER (ORDER BY a.ID) AS P FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID], LAG([ID]) OVER (ORDER BY [ID]) AS [P] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P3.S3"
+  },
+  {
+    "id": "r6_count_distinct",
+    "group": "D",
+    "sql": "SELECT COUNT(DISTINCT a.B_ID) AS N FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT COUNT(DISTINCT [B_ID]) AS [N] FROM [dbo].[A]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r7_offset_fetch",
+    "group": "A8",
+    "sql": "SELECT a.ID FROM A a ORDER BY a.ID OFFSET 10 ROWS FETCH NEXT 5 ROWS ONLY",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] ORDER BY [ID] OFFSET 10 ROWS FETCH NEXT 5 ROWS ONLY"
+    },
+    "status": "red:TF-P2.S2"
+  },
+  {
+    "id": "r8_distinct_top",
+    "group": "A8",
+    "sql": "SELECT DISTINCT TOP 3 a.B_ID FROM A a ORDER BY a.B_ID",
+    "params": [],
+    "expect": {
+      "sql": "SELECT TOP (3) [B_ID] FROM [dbo].[A] GROUP BY [B_ID] ORDER BY [B_ID]"
+    },
+    "status": "red:TF-P2.S2"
+  },
+  {
+    "id": "r9_order_by_case",
+    "group": "A8",
+    "sql": "SELECT a.ID FROM A a ORDER BY CASE WHEN a.NAME = 'x' THEN 0 ELSE 1 END, a.ID",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] ORDER BY CASE WHEN [NAME] = 'x' THEN 0 ELSE 1 END, [ID]"
+    },
+    "status": "red:TF-P2.S2"
+  },
+  {
+    "id": "r10_year_month",
+    "group": "A10",
+    "sql": "SELECT YEAR(GETDATE()) AS Y, MONTH(GETDATE()) AS M, DATEDIFF(day, GETDATE(), GETDATE()) AS D FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT DATEPART(YEAR, GETDATE()) AS [Y], DATEPART(MONTH, GETDATE()) AS [M], DATEDIFF(DAY, GETDATE(), GETDATE()) AS [D] FROM [dbo].[A]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r11_string_fns",
+    "group": "D",
+    "sql": "SELECT LEFT(a.NAME, 3) AS L, LEN(a.NAME) AS N, CHARINDEX('x', a.NAME) AS C, REPLACE(a.NAME, 'a', 'b') AS R, LTRIM(RTRIM(a.NAME)) AS T, UPPER(a.NAME) AS U FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT LEFT([NAME], 3) AS [L], LEN([NAME]) AS [N], CHARINDEX('x', [NAME]) AS [C], REPLACE([NAME], 'a', 'b') AS [R], LTRIM(RTRIM([NAME])) AS [T], UPPER([NAME]) AS [U] FROM [dbo].[A]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r12_concat_fn",
+    "group": "D",
+    "sql": "SELECT CONCAT('Skladem (', a.ID, ' ks)') AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT CONCAT('Skladem (', CAST([ID] AS VARCHAR), ' ks)') AS [X] FROM [dbo].[A]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r13_pipes",
+    "group": "A4",
+    "sql": "SELECT 'a' || CAST(a.ID AS varchar(10)) AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT CONCAT('a', CAST([ID] AS VARCHAR(10))) AS [X] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P2.S1"
+  },
+  {
+    "id": "r14_try_cast",
+    "group": "C8",
+    "sql": "SELECT TRY_CAST(a.NAME AS int) AS X, TRY_CONVERT(int, a.NAME) AS Y FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT TRY_CAST([NAME] AS INTEGER) AS [X], TRY_CONVERT(INTEGER, [NAME]) AS [Y] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P1.S3"
+  },
+  {
+    "id": "r15_round_abs",
+    "group": "A1",
+    "sql": "SELECT ROUND(a.ID * 1.5, 1) AS R, ABS(a.ID) AS A, FLOOR(a.ID / 2.0) AS F, CEILING(a.ID / 2.0) AS C FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT ROUND([ID] * 1.5, 1) AS [R], ABS([ID]) AS [A], FLOOR([ID] / 2.0) AS [F], CEILING([ID] / 2.0) AS [C] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P1.S1"
+  },
+  {
+    "id": "r16_coalesce_nullif",
+    "group": "D",
+    "sql": "SELECT COALESCE(a.NAME, 'n/a') AS X, NULLIF(a.ID, 0) AS Y FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT CASE WHEN [NAME] IS NOT NULL THEN CAST([NAME] AS VARCHAR) ELSE 'n/a' END AS [X], CASE WHEN [ID] = 0 THEN NULL ELSE [ID] END AS [Y] FROM [dbo].[A]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r17_having",
+    "group": "D",
+    "sql": "SELECT a.B_ID, SUM(a.ID) AS S FROM A a GROUP BY a.B_ID HAVING SUM(a.ID) > 10",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [B_ID], SUM([ID]) AS [S] FROM [dbo].[A] GROUP BY [B_ID] HAVING SUM([ID]) > 10"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r18_derived_table",
+    "group": "D",
+    "sql": "SELECT t.B_ID, t.N FROM (SELECT a.B_ID, COUNT(*) AS N FROM A a GROUP BY a.B_ID) t WHERE t.N > 1",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [B_ID], COUNT(*) AS [N] FROM [dbo].[A] GROUP BY [B_ID] HAVING COUNT(*) > 1"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r19_exists_uncorr",
+    "group": "D",
+    "sql": "SELECT a.ID FROM A a WHERE EXISTS (SELECT 1 FROM B b WHERE b.NAME = 'x')",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE EXISTS (SELECT * FROM [dbo].[B] WHERE [NAME] = 'x')"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r20_not_in_uncorr",
+    "group": "D",
+    "sql": "SELECT a.ID FROM A a WHERE a.B_ID NOT IN (SELECT b.ID FROM B b WHERE b.NAME = 'x')",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE [B_ID] NOT IN (SELECT [ID] FROM [dbo].[B] WHERE [NAME] = 'x')"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r21_dateadd_month_getdate",
+    "group": "D",
+    "sql": "SELECT a.ID FROM A a WHERE DATEADD(month, -12, GETDATE()) < GETDATE() AND DATEPART(quarter, GETDATE()) = 1",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE DATEADD(MONTH, -12, GETDATE()) < GETDATE() AND DATEPART(QUARTER, GETDATE()) = 1"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r22_between_in_like",
+    "group": "D",
+    "sql": "SELECT a.ID FROM A a WHERE a.ID BETWEEN 1 AND 5 AND a.NAME IN ('a','b') AND a.NAME LIKE 'x%' AND a.NAME IS NOT NULL",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE [ID] >= 1 AND [ID] <= 5 AND [NAME] IN ('a', 'b') AND [NAME] LIKE 'x%'"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r23_percentile",
+    "group": "D",
+    "sql": "SELECT a.B_ID, AVG(a.ID) AS AV, MIN(a.ID) AS MI, MAX(a.ID) AS MA FROM A a GROUP BY a.B_ID",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [B_ID], AVG([ID]) AS [AV], MIN([ID]) AS [MI], MAX([ID]) AS [MA] FROM [dbo].[A] GROUP BY [B_ID]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r24_cast_decimal_date",
+    "group": "A9",
+    "sql": "SELECT CAST(a.ID AS decimal(18,2)) AS D, CAST('2026-01-01' AS date) AS DT, CAST(a.ID AS varchar) AS V FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT CAST([ID] AS DECIMAL(18, 2)) AS [D], '2026-01-01' AS [DT], CAST([ID] AS VARCHAR) AS [V] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P1.S1"
+  },
+  {
+    "id": "r25_datepart_dw_alias",
+    "group": "C10",
+    "sql": "SELECT DATEPART(dw, GETDATE()) AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT DATEPART(WEEKDAY, GETDATE()) AS [X] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P3.S2"
+  },
+  {
+    "id": "r26_sysdatetime",
+    "group": "C11",
+    "sql": "SELECT SYSDATETIME() AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT SYSDATETIME() AS [X] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P3.S2"
+  },
+  {
+    "id": "r27_datefromparts",
+    "group": "C11",
+    "sql": "SELECT DATEFROMPARTS(2026, 1, 1) AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT DATEFROMPARTS(2026, 1, 1) AS [X] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P3.S2"
+  },
+  {
+    "id": "r28_isnumeric",
+    "group": "C11",
+    "sql": "SELECT ISNUMERIC(a.NAME) AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT ISNUMERIC([NAME]) AS [X] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P3.S2"
+  },
+  {
+    "id": "r29_date_trunc_pg",
+    "group": "C12",
+    "sql": "SELECT DATE_TRUNC('month', GETDATE()) AS X FROM A a",
+    "params": [],
+    "expect": {
+      "parseCode": "validation_failed"
+    },
+    "status": "out-of-scope",
+    "note": "C12 — Postgres function; ⚑TF-3."
+  },
+  {
+    "id": "r30_now_pg",
+    "group": "C12",
+    "sql": "SELECT NOW() AS X FROM A a",
+    "params": [],
+    "expect": {
+      "parseCode": "validation_failed"
+    },
+    "status": "out-of-scope",
+    "note": "C12 — Postgres function; ⚑TF-3."
+  },
+  {
+    "id": "r31_datetrunc",
+    "group": "C11",
+    "sql": "SELECT DATETRUNC(month, GETDATE()) AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT DATETRUNC(MONTH, GETDATE()) AS [X] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P3.S2"
+  },
+  {
+    "id": "r32_with_ties",
+    "group": "C13",
+    "sql": "SELECT TOP 3 WITH TIES a.ID FROM A a ORDER BY a.B_ID",
+    "params": [],
+    "expect": {
+      "parseCode": "parse_failed"
+    },
+    "status": "out-of-scope",
+    "note": "C13 — TOP … WITH TIES: prompt rule, not planned (architecture §7)."
+  },
+  {
+    "id": "r33_stuff_replicate",
+    "group": "D",
+    "sql": "SELECT STUFF(a.NAME, 1, 1, 'X') AS S, REPLICATE('0', 3) AS R, REVERSE(a.NAME) AS V FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT STUFF([NAME], 1, 1, 'X') AS [S], REPLICATE('0', 3) AS [R], REVERSE([NAME]) AS [V] FROM [dbo].[A]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r34_choose",
+    "group": "D",
+    "sql": "SELECT CHOOSE(a.ID, 'one', 'two') AS X FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT CHOOSE([ID], 'one', 'two') AS [X] FROM [dbo].[A]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r35_date_literal_cmp",
+    "group": "D",
+    "sql": "SELECT a.ID FROM A a WHERE GETDATE() >= '2026-01-01'",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE GETDATE() >= '2026-01-01 00:00:00'"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r36_param_typed_int",
+    "group": "D",
+    "sql": "SELECT a.ID FROM A a WHERE ({id} = 0 OR a.ID = {id})",
+    "params": [
+      {
+        "name": "id",
+        "type": "int"
+      }
+    ],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE ? = 0 OR [ID] = ?"
+    },
+    "status": "green"
+  },
+  {
+    "id": "r37_param_empty_guard",
+    "group": "A11",
+    "sql": "SELECT a.ID FROM A a WHERE ({q} = '' OR a.NAME = {q})",
+    "params": [
+      {
+        "name": "q",
+        "type": "varchar"
+      }
+    ],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE LOWER(?) = '' OR LOWER([NAME]) = LOWER(?)"
+    },
+    "status": "green",
+    "note": "A11 — the LOWER() search rail is kept as is (⚑TF-5)."
+  },
+  {
+    "id": "r38_cast_int_in_plus",
+    "group": "A2",
+    "sql": "SELECT a.ID + 1 AS X, CAST(a.NAME AS int) + 1 AS Y FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] + 1 AS [X], CAST([NAME] AS INTEGER) + 1 AS [Y] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P1.S1",
+    "note": "P0 finding: CAST(x AS int) rides the wire as the surface tag 'int' and comes back as BIGINT."
+  },
+  {
+    "id": "r39_union_distinct_dup",
+    "group": "A3",
+    "sql": "SELECT a.ID FROM A a JOIN B b ON b.ID = a.B_ID WHERE b.NAME = 'x' UNION SELECT b.ID FROM B b",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [A].[ID] FROM [dbo].[A] INNER JOIN [dbo].[B] ON [A].[B_ID] = [B].[ID] WHERE [B].[NAME] = 'x' UNION SELECT [ID] FROM [dbo].[B]"
+    },
+    "status": "red:TF-P1.S2"
+  },
+  {
+    "id": "s1_literals",
+    "group": "A1",
+    "sql": "SELECT a.ID * 0.25 AS A, a.ID * 100.0 AS B, a.ID * 1.5 AS C, a.ID * 2 AS D, a.ID / 3.333 AS E, 0.5 AS F, 12.75 AS G FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] * 0.25 AS [A], [ID] * 100.0 AS [B], [ID] * 1.5 AS [C], [ID] * 2 AS [D], [ID] / 3.333 AS [E], 0.5 AS [F], 12.75 AS [G] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P1.S1"
+  },
+  {
+    "id": "s2_where_decimal",
+    "group": "A1",
+    "sql": "SELECT a.ID FROM A a WHERE a.ID > 10.5",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE CAST([ID] AS FLOAT) > 10.5"
+    },
+    "status": "red:TF-P1.S1"
+  },
+  {
+    "id": "s3_date_cast_cmp",
+    "group": "A7",
+    "sql": "SELECT a.ID FROM A a WHERE CAST(GETDATE() AS date) >= CAST('2026-01-01' AS date)",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE CAST(GETDATE() AS DATE) >= '2026-01-01'"
+    },
+    "status": "red:TF-P1.S1",
+    "note": "P0 finding (not in the gaps report): CAST(GETDATE() AS date) is dropped today — the cast rides as surface 'datetime', decodes to TIMESTAMP and folds away. Harmless for >=, wrong for =."
+  },
+  {
+    "id": "s4_convert_date",
+    "group": "A7",
+    "sql": "SELECT a.ID FROM A a WHERE CONVERT(date, GETDATE()) = CONVERT(date, '2026-01-01')",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE CONVERT(DATE, GETDATE()) = CONVERT(DATE, '2026-01-01')"
+    },
+    "status": "green"
+  },
+  {
+    "id": "s5_round_pct",
+    "group": "A1",
+    "sql": "SELECT CASE WHEN a.B_ID > 0 THEN ROUND(a.ID * 100.0 / a.B_ID, 1) END AS P FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT CASE WHEN [B_ID] > 0 THEN ROUND([ID] * 100.0 / [B_ID], 1) ELSE NULL END AS [P] FROM [dbo].[A]"
+    },
+    "status": "red:TF-P1.S1"
+  },
+  {
+    "id": "s6_str_pipes_param",
+    "group": "A4",
+    "sql": "SELECT a.ID FROM A a WHERE a.NAME LIKE '%' || {q} || '%'",
+    "params": [
+      {
+        "name": "q",
+        "type": "varchar"
+      }
+    ],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE [NAME] LIKE CONCAT('%', ?, '%')"
+    },
+    "status": "red:TF-P2.S1"
+  },
+  {
+    "id": "s7_getdate_minus_int",
+    "group": "C11",
+    "sql": "SELECT a.ID FROM A a WHERE GETDATE() - 30 > GETDATE()",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] FROM [dbo].[A] WHERE DATEADD(DAY, -30, GETDATE()) > GETDATE()"
+    },
+    "status": "red:TF-P2.S1"
+  },
+  {
+    "id": "s8_int_div",
+    "group": "D",
+    "sql": "SELECT a.ID / 2 AS H FROM A a",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [ID] / 2 AS [H] FROM [dbo].[A]"
+    },
+    "status": "green"
+  }
+]
