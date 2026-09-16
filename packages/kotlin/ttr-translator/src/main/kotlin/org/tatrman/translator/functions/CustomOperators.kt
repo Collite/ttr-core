@@ -13,7 +13,10 @@ import org.apache.calcite.sql.util.SqlOperatorTables
  *    `SPACE`, `REVERSE`, `REPLICATE`, `CHARINDEX`, `STUFF`, `PATINDEX`, `QUOTENAME`, `STR`);
  *  - the Phase 3 numeric/conditional operators ([ConditionalOperators] — `SQUARE`, `IIF`, `CHOOSE`,
  *    `ISNULL`) and the faithful conversion operators ([ConvertOperators] — `CONVERT`/`TRY_CONVERT`);
- *  - the faithful date/time operators ([DateOperators] — `GETDATE`).
+ *  - the faithful date/time operators ([DateOperators] — `GETDATE`, `DATEDIFF`);
+ *  - the TF-P3.S2 T-SQL function tail ([TsqlTailOperators] — `FORMAT`, `EOMONTH`, `DATENAME`,
+ *    `DATETRUNC`, `SYSDATETIME`, `SYSUTCDATETIME`, `GETUTCDATE`, `DATEFROMPARTS`, `ISNUMERIC`, `NEWID`),
+ *    chained last so it shadows nothing.
  *
  * Later phases add DuckDB-only functions (`list_*`, `strftime`, …) and other special-syntax
  * operators here. Chained into the framework operator table alongside the standard + library tables
@@ -27,5 +30,6 @@ object CustomOperators {
             ConditionalOperators.table,
             ConvertOperators.table,
             DateOperators.table,
+            TsqlTailOperators.table,
         )
 }

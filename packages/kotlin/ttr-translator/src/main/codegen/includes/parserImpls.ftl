@@ -40,6 +40,8 @@ void Collate(List<Object> list, ExprContext exprContext, Span s) :
 |   < DATEDIFF: "DATEDIFF" >
 |   < DATEPART: "DATEPART" >
 |   < TRY_CONVERT: "TRY_CONVERT" >
+|   < DATENAME: "DATENAME" >
+|   < DATETRUNC: "DATETRUNC" >
 }
 
 /**
@@ -113,13 +115,46 @@ SqlNode DateaddFunctionCall() :
     )
     { s = span(); }
     <LPAREN> unit = TimeUnitOrName() {
-        args = startList(NormalizeDatepart(unit));
+        // TF-P3.S2 — weekday/dayofyear mean day in DATEADD/DATEDIFF (Dateparts.forArithmetic).
+        args = startList(op == org.apache.calcite.sql.fun.SqlLibraryOperators.DATEPART
+            ? NormalizeDatepart(unit)
+            : org.tatrman.translator.functions.Dateparts.forArithmetic(NormalizeDatepart(unit)));
     }
     (
         <COMMA> e = Expression(ExprContext.ACCEPT_SUB_QUERY) {
             args.add(e);
         }
     )*
+    <RPAREN> {
+        return op.createCall(s.end(this), args);
+    }
+}
+
+/**
+ * TF-P3.S2 (G C11; contracts §4.2) — T-SQL "DATENAME(datepart, date)" / "DATETRUNC(datepart, date)".
+ * The datepart is read like DATEADD's (TimeUnitOrName + NormalizeDatepart, so `mm`/`dw`/`weekday` all
+ * work) and handed to the operator as a SYMBOL TimeUnit literal (Dateparts.symbol), the shape the
+ * wire carries for DATEPART.
+ */
+SqlNode DateNameFunctionCall() :
+{
+    final Span s;
+    final SqlOperator op;
+    final SqlIntervalQualifier unit;
+    final List<SqlNode> args;
+    final SqlNode e;
+}
+{
+    (   <DATENAME> { op = org.tatrman.translator.functions.TsqlTailOperators.DATENAME; }
+    |   <DATETRUNC> { op = org.tatrman.translator.functions.TsqlTailOperators.DATETRUNC; }
+    )
+    { s = span(); }
+    <LPAREN> unit = TimeUnitOrName() {
+        args = startList(org.tatrman.translator.functions.Dateparts.symbol(NormalizeDatepart(unit)));
+    }
+    <COMMA> e = Expression(ExprContext.ACCEPT_SUB_QUERY) {
+        args.add(e);
+    }
     <RPAREN> {
         return op.createCall(s.end(this), args);
     }

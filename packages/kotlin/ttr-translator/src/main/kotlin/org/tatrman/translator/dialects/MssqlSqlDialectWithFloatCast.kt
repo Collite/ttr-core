@@ -84,6 +84,8 @@ class MssqlSqlDialectWithFloatCast(
             writer.setNeedWhitespace(true)
         } else if (call.operator === SqlStdOperatorTable.CONCAT) {
             unparseConcat(writer, call)
+        } else if (call.operator in DATEPART_FUNCTIONS && datepartUnit(call) != null) {
+            unparseDatepartCall(writer, call, datepartUnit(call)!!)
         } else if (call.kind == SqlKind.EXTRACT) {
             unparseExtract(writer, call)
         } else if (call.kind == SqlKind.LISTAGG) {
@@ -175,6 +177,29 @@ class MssqlSqlDialectWithFloatCast(
         writer.endFunCall(frame)
     }
 
+    /** The datepart of a DATE* call, or null when operand 0 is not a plain time unit (left to the stock unparse). */
+    private fun datepartUnit(call: SqlCall): TimeUnit? =
+        call.operandList.firstOrNull()?.let { runCatching { extractUnit(it) }.getOrNull() }
+
+    /**
+     * TF-P3.S2 (G C11; contracts §3.5, §5.1) — `DATEPART`/`DATEADD`/`DATEDIFF`/`DATENAME`/`DATETRUNC` with the
+     * datepart spelled in T-SQL: Calcite's unit names `DOW`/`DOY` are not T-SQL dateparts, so they print as
+     * `WEEKDAY`/`DAYOFYEAR`; every other unit prints under its name, as before.
+     */
+    private fun unparseDatepartCall(
+        writer: SqlWriter,
+        call: SqlCall,
+        unit: TimeUnit,
+    ) {
+        val frame = writer.startFunCall(call.operator.name)
+        writer.keyword(DATEPART_OF[unit] ?: unit.name)
+        call.operandList.drop(1).forEach {
+            writer.sep(",", true)
+            it.unparse(writer, 0, 0)
+        }
+        writer.endFunCall(frame)
+    }
+
     private fun extractUnit(node: SqlNode): TimeUnit =
         when (node) {
             is SqlIntervalQualifier -> node.timeUnitRange.startUnit
@@ -188,6 +213,16 @@ class MssqlSqlDialectWithFloatCast(
         }
 
     private companion object {
+        /** The T-SQL functions whose first operand is a datepart ([unparseDatepartCall]). */
+        val DATEPART_FUNCTIONS: Set<org.apache.calcite.sql.SqlOperator> =
+            setOf(
+                SqlLibraryOperators.DATEPART,
+                SqlLibraryOperators.DATEADD,
+                org.tatrman.translator.functions.DateOperators.DATEDIFF,
+                org.tatrman.translator.functions.TsqlTailOperators.DATENAME,
+                org.tatrman.translator.functions.TsqlTailOperators.DATETRUNC,
+            )
+
         /** T-SQL `datetime` is TIMESTAMP(3); every other TIMESTAMP precision is a `datetime2(p)`. */
         const val DATETIME_PRECISION = 3
 

@@ -34,7 +34,9 @@ data: {
     builtinFunctionCallMethods: [
       "DatePartFunctionCall()",
       "DateaddFunctionCall()",
-      "TryConvertFunctionCall()"
+      "TryConvertFunctionCall()",
+      # TF-P3.S2 — DATENAME / DATETRUNC (datepart as a SYMBOL TimeUnit operand).
+      "DateNameFunctionCall()"
     ]
 
     # TF-P3.S1 — T-SQL type names (NVARCHAR, MONEY, DATETIME2, BIT, VARCHAR(MAX), …) in CAST/CONVERT.

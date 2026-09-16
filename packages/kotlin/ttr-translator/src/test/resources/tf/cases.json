@@ -171,7 +171,7 @@
     "expect": {
       "sql": "SELECT DATEPART(WEEKDAY, GETDATE()) AS [X] FROM [dbo].[A]"
     },
-    "status": "red:TF-P3.S2"
+    "status": "green"
   },
   {
     "id": "q18_nvarchar_cast",
@@ -191,7 +191,7 @@
     "expect": {
       "sql": "SELECT EOMONTH(GETDATE()) AS [X] FROM [dbo].[A]"
     },
-    "status": "red:TF-P3.S2"
+    "status": "green"
   },
   {
     "id": "q20_format",
@@ -201,7 +201,7 @@
     "expect": {
       "sql": "SELECT FORMAT([ID], 'N0') AS [X] FROM [dbo].[A]"
     },
-    "status": "red:TF-P3.S2"
+    "status": "green"
   },
   {
     "id": "q21_like_concat_param",
@@ -248,7 +248,7 @@
     "expect": {
       "sql": "SELECT DATENAME(MONTH, GETDATE()) AS [X] FROM [dbo].[A]"
     },
-    "status": "red:TF-P3.S2"
+    "status": "green"
   },
   {
     "id": "q25_iif_isnull",
@@ -609,7 +609,7 @@
     "expect": {
       "sql": "SELECT DATEPART(WEEKDAY, GETDATE()) AS [X] FROM [dbo].[A]"
     },
-    "status": "red:TF-P3.S2"
+    "status": "green"
   },
   {
     "id": "r26_sysdatetime",
@@ -619,7 +619,7 @@
     "expect": {
       "sql": "SELECT SYSDATETIME() AS [X] FROM [dbo].[A]"
     },
-    "status": "red:TF-P3.S2"
+    "status": "green"
   },
   {
     "id": "r27_datefromparts",
@@ -629,7 +629,7 @@
     "expect": {
       "sql": "SELECT DATEFROMPARTS(2026, 1, 1) AS [X] FROM [dbo].[A]"
     },
-    "status": "red:TF-P3.S2"
+    "status": "green"
   },
   {
     "id": "r28_isnumeric",
@@ -639,7 +639,7 @@
     "expect": {
       "sql": "SELECT ISNUMERIC([NAME]) AS [X] FROM [dbo].[A]"
     },
-    "status": "red:TF-P3.S2"
+    "status": "green"
   },
   {
     "id": "r29_date_trunc_pg",
@@ -671,7 +671,7 @@
     "expect": {
       "sql": "SELECT DATETRUNC(MONTH, GETDATE()) AS [X] FROM [dbo].[A]"
     },
-    "status": "red:TF-P3.S2"
+    "status": "green"
   },
   {
     "id": "r32_with_ties",
