@@ -36,6 +36,12 @@ data: {
       "DateaddFunctionCall()",
       "TryConvertFunctionCall()"
     ]
+
+    # TF-P3.S1 — T-SQL type names (NVARCHAR, MONEY, DATETIME2, BIT, VARCHAR(MAX), …) in CAST/CONVERT.
+    # TypeName() tries these ahead of the core types (contracts §4.1).
+    dataTypeParserMethods: [
+      "TsqlDataType()"
+    ]
   }
 }
 

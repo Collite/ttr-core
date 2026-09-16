@@ -29,8 +29,9 @@ import org.apache.calcite.sql.validate.SqlConformance
  * Calcite's [MssqlSqlDialect] emits `CAST(... AS DOUBLE)` for [SqlTypeName.DOUBLE],
  * but SQL Server has no `DOUBLE` type — its 8-byte double-precision type is
  * `FLOAT`. The bad cast produced `Incorrect syntax near ')'` at the database.
- * We override [getCastSpec] to render `DOUBLE` as `FLOAT`; every other type
- * defers to the stock dialect.
+ * We override [getCastSpec] to render `DOUBLE` as `FLOAT`, and (TF-P3.S1) `BOOLEAN` as `BIT`,
+ * `TIMESTAMP(3)` as `DATETIME`, any other `TIMESTAMP(p)` as `DATETIME2(p)` and the VARCHAR ceiling as
+ * `VARCHAR(MAX)`; every other type defers to the stock dialect.
  *
  * Also lowers the standard `EXTRACT(<unit> FROM <datetime>)` to T-SQL `DATEPART(<part>, <datetime>)`
  * — SQL Server has no `EXTRACT` (error 195 `'EXTRACT' is not a recognized built-in function name`),
@@ -46,13 +47,25 @@ class MssqlSqlDialectWithFloatCast(
 ) : MssqlSqlDialect(context) {
     override fun getCastSpec(type: RelDataType): SqlNode? =
         when (type.sqlTypeName) {
-            SqlTypeName.DOUBLE ->
-                SqlDataTypeSpec(
-                    SqlAlienSystemTypeNameSpec("FLOAT", type.sqlTypeName, SqlParserPos.ZERO),
-                    SqlParserPos.ZERO,
-                )
+            SqlTypeName.DOUBLE -> alien("FLOAT", type)
+            // TF-P3.S1 (G C9; contracts §3.5) — re-spell from the Calcite type alone; the authored T-SQL
+            // name (nvarchar, money, uniqueidentifier, …) does not survive validation (⚑TF-6).
+            SqlTypeName.BOOLEAN -> alien("BIT", type)
+            SqlTypeName.TIMESTAMP ->
+                when (type.precision) {
+                    DATETIME_PRECISION -> alien("DATETIME", type)
+                    else -> alien("DATETIME2(${type.precision})", type)
+                }
+            SqlTypeName.VARCHAR ->
+                if (type.precision >= VARCHAR_MAX_PRECISION) alien("VARCHAR(MAX)", type) else super.getCastSpec(type)
             else -> super.getCastSpec(type)
         }
+
+    private fun alien(
+        spelling: String,
+        type: RelDataType,
+    ): SqlNode =
+        SqlDataTypeSpec(SqlAlienSystemTypeNameSpec(spelling, type.sqlTypeName, SqlParserPos.ZERO), SqlParserPos.ZERO)
 
     /** TF-P2.S2 — ORDER BY keys as expressions, so an order-only key does not leak a result column; see [SortByExpressionConformance]. */
     override fun getConformance(): SqlConformance = SortByExpressionConformance(super.getConformance())
@@ -175,6 +188,14 @@ class MssqlSqlDialectWithFloatCast(
         }
 
     private companion object {
+        /** T-SQL `datetime` is TIMESTAMP(3); every other TIMESTAMP precision is a `datetime2(p)`. */
+        const val DATETIME_PRECISION = 3
+
+        /** `varchar(max)` — Calcite's VARCHAR ceiling, which the wire spells `varchar:max` (contracts §3.3). */
+        val VARCHAR_MAX_PRECISION: Int =
+            org.apache.calcite.rel.type.RelDataTypeSystem.DEFAULT
+                .getMaxPrecision(SqlTypeName.VARCHAR)
+
         /** Calcite [TimeUnit] → T-SQL `DATEPART` part name (a keyword, not a string literal). */
         val DATEPART_OF: Map<TimeUnit, String> =
             mapOf(

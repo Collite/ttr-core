@@ -65,6 +65,8 @@ class TranslatorFramework(
             // [CalciteOperatorTables.permissiveUnion] for the ordering + the "don't double-chain
             // SqlStdOperatorTable" rationale.
             .operatorTable(CalciteOperatorTables.permissiveUnion)
+            // TF-P3.S1 — TIMESTAMP/TIME precision up to 7 (T-SQL datetime2/time); see [TsqlTypeSystem].
+            .typeSystem(TsqlTypeSystem)
             // TF-P2.S2 (G A8; contracts §3.6) — source SQL is T-SQL, which sorts NULLs FIRST ascending
             // and LAST descending (`NullCollation.LOW`). Calcite's default (`HIGH`) gave every sort key
             // the opposite direction, so the MSSQL dialect (also LOW) "corrected" it with a

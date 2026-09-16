@@ -181,7 +181,7 @@
     "expect": {
       "sql": "SELECT CAST([ID] AS VARCHAR(30)) AS [X] FROM [dbo].[A]"
     },
-    "status": "red:TF-P3.S1"
+    "status": "green"
   },
   {
     "id": "q19_eomonth",
@@ -318,7 +318,7 @@
     "expect": {
       "sql": "SELECT CAST([ID] AS DECIMAL(19, 4)) AS [X] FROM [dbo].[A]"
     },
-    "status": "red:TF-P3.S1"
+    "status": "green"
   },
   {
     "id": "q32_datetime_cast",
@@ -328,7 +328,7 @@
     "expect": {
       "sql": "SELECT '2026-01-01 00:00:00' AS [X] FROM [dbo].[A]"
     },
-    "status": "red:TF-P3.S1"
+    "status": "green"
   },
   {
     "id": "q33_uncorr_in",

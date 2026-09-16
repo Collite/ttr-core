@@ -161,3 +161,54 @@ SqlNode TryConvertFunctionCall() :
         return org.tatrman.translator.functions.ConvertOperators.TRY_CONVERT.createCall(s.end(this), args);
     }
 }
+
+/**
+ * TF-P3.S1 (G C9; contracts §4.1) — T-SQL type names in CAST / CONVERT / TRY_CONVERT, registered
+ * ahead of the core types via the `dataTypeParserMethods` hook (TypeName() tries it with LOOKAHEAD(2)):
+ * `NVARCHAR[(n|MAX)]`, `VARCHAR(MAX)`, `NCHAR[(n)]`, `TEXT`, `NTEXT`, `MONEY`, `SMALLMONEY`, `DATETIME`,
+ * `DATETIME2[(p)]`, `SMALLDATETIME`, `BIT`, `UNIQUEIDENTIFIER`.
+ *
+ * No keyword tokens are added: `BIT`, `DATETIME`, `NCHAR` and `MAX` already are Calcite tokens, and the
+ * rest are matched as identifiers by image (TsqlDataTypes.isIdentifierTypeName), so a column or alias
+ * named `text` or `money` still parses. `VARCHAR` is claimed only when `( MAX` follows; every other
+ * VARCHAR spelling stays with the core CharacterTypeName(). The semantic lookaheads read tokens from the
+ * start of this production, which is also where TypeName()'s syntactic lookahead starts.
+ */
+SqlTypeNameSpec TsqlDataType() :
+{
+    final Span s;
+    final String name;
+    int precision = -1;
+    int scale = -1;
+    boolean max = false;
+}
+{
+    (
+        LOOKAHEAD({ getToken(1).kind == VARCHAR && getToken(2).kind == LPAREN && getToken(3).kind == MAX })
+        <VARCHAR> { name = "VARCHAR"; }
+    |
+        <NCHAR> { name = "NCHAR"; }
+    |
+        <DATETIME> { name = "DATETIME"; }
+    |
+        <BIT> { name = "BIT"; }
+    |
+        LOOKAHEAD({ getToken(1).kind == IDENTIFIER
+            && org.tatrman.translator.functions.TsqlDataTypes.isIdentifierTypeName(getToken(1).image) })
+        <IDENTIFIER> { name = token.image.toUpperCase(Locale.ROOT); }
+    )
+    { s = span(); }
+    [
+        <LPAREN>
+        (
+            precision = UnsignedIntLiteral()
+            [ <COMMA> scale = UnsignedIntLiteral() ]
+        |
+            <MAX> { max = true; }
+        )
+        <RPAREN>
+    ]
+    {
+        return org.tatrman.translator.functions.TsqlDataTypes.spec(name, precision, scale, max, s.end(this));
+    }
+}
