@@ -175,12 +175,16 @@ object Expressions {
                     .setNullsFirst(fc.nullDirection == RelFieldCollation.NullDirection.FIRST),
             )
         }
+        val (lower, lowerOffset) = frameBoundCode(w.lowerBound)
+        val (upper, upperOffset) = frameBoundCode(w.upperBound)
         over.setFrame(
             WindowFrame
                 .newBuilder()
                 .setIsRows(w.isRows)
-                .setLower(frameBoundCode(w.lowerBound))
-                .setUpper(frameBoundCode(w.upperBound)),
+                .setLower(lower)
+                .setLowerOffset(lowerOffset)
+                .setUpper(upper)
+                .setUpperOffset(upperOffset),
         )
         return Expression
             .newBuilder()
@@ -196,20 +200,42 @@ object Expressions {
             SqlKind.AVG -> "avg"
             SqlKind.MIN -> "min"
             SqlKind.MAX -> "max"
+            SqlKind.ROW_NUMBER -> "row_number"
+            SqlKind.RANK -> "rank"
+            SqlKind.DENSE_RANK -> "dense_rank"
+            SqlKind.NTILE -> "ntile"
+            SqlKind.LAG -> "lag"
+            SqlKind.LEAD -> "lead"
+            SqlKind.FIRST_VALUE -> "first_value"
+            SqlKind.LAST_VALUE -> "last_value"
             else -> throw UnsupportedOperationException(
                 "Window aggregate '${op.name}' is not in the v1 wire format",
             )
         }
 
-    private fun frameBoundCode(b: RexWindowBound): FrameBound =
+    /** The wire bound and its offset (`0` unless the bound is `n PRECEDING` / `n FOLLOWING`). */
+    private fun frameBoundCode(b: RexWindowBound): Pair<FrameBound, Long> =
         when {
-            b.isUnbounded && b.isPreceding -> FrameBound.UNBOUNDED_PRECEDING
-            b.isCurrentRow -> FrameBound.CURRENT_ROW
-            b.isUnbounded && b.isFollowing -> FrameBound.UNBOUNDED_FOLLOWING
+            b.isUnbounded && b.isPreceding -> FrameBound.UNBOUNDED_PRECEDING to 0L
+            b.isCurrentRow -> FrameBound.CURRENT_ROW to 0L
+            b.isUnbounded && b.isFollowing -> FrameBound.UNBOUNDED_FOLLOWING to 0L
+            b.isPreceding -> FrameBound.PRECEDING to frameOffset(b)
+            b.isFollowing -> FrameBound.FOLLOWING to frameOffset(b)
             else -> throw UnsupportedOperationException(
-                "Window frame bound '$b' is not in the v1 wire format (offset bounds unsupported)",
+                "Window frame bound '$b' is not in the v1 wire format",
             )
         }
+
+    private fun frameOffset(b: RexWindowBound): Long {
+        val offset = b.offset
+        if (offset is RexLiteral && SqlTypeName.EXACT_TYPES.contains(offset.type.sqlTypeName)) {
+            val exact = offset.getValueAs(java.math.BigDecimal::class.java)
+            runCatching { exact?.longValueExact() }.getOrNull()?.let { return it }
+        }
+        throw UnsupportedOperationException(
+            "Window frame bound '$b' is not in the v1 wire format (offset must be an integer literal)",
+        )
+    }
 
     private fun encodeInputRef(
         rex: RexInputRef,
@@ -796,8 +822,8 @@ object Expressions {
             exprs,
             partitionKeys,
             ImmutableList.copyOf(orderKeys),
-            frameBoundFor(over.frame.lower),
-            frameBoundFor(over.frame.upper),
+            frameBoundFor(builder, over.frame.lower, over.frame.lowerOffset),
+            frameBoundFor(builder, over.frame.upper, over.frame.upperOffset),
             over.frame.isRows,
             true, // allowPartial
             false, // nullWhenCountZero — the CASE null-on-empty wrapper is explicit in the plan
@@ -813,16 +839,32 @@ object Expressions {
             "avg" -> SqlStdOperatorTable.AVG
             "min" -> SqlStdOperatorTable.MIN
             "max" -> SqlStdOperatorTable.MAX
+            "row_number" -> SqlStdOperatorTable.ROW_NUMBER
+            "rank" -> SqlStdOperatorTable.RANK
+            "dense_rank" -> SqlStdOperatorTable.DENSE_RANK
+            "ntile" -> SqlStdOperatorTable.NTILE
+            "lag" -> SqlStdOperatorTable.LAG
+            "lead" -> SqlStdOperatorTable.LEAD
+            "first_value" -> SqlStdOperatorTable.FIRST_VALUE
+            "last_value" -> SqlStdOperatorTable.LAST_VALUE
             else -> throw UnsupportedOperationException(
                 "Window aggregate '$code' is not in the v1 wire format",
             )
         }
 
-    private fun frameBoundFor(fb: FrameBound): RexWindowBound =
+    private fun frameBoundFor(
+        builder: RelBuilder,
+        fb: FrameBound,
+        offset: Long,
+    ): RexWindowBound =
         when (fb) {
             FrameBound.UNBOUNDED_PRECEDING -> RexWindowBounds.UNBOUNDED_PRECEDING
             FrameBound.CURRENT_ROW -> RexWindowBounds.CURRENT_ROW
             FrameBound.UNBOUNDED_FOLLOWING -> RexWindowBounds.UNBOUNDED_FOLLOWING
+            FrameBound.PRECEDING ->
+                RexWindowBounds.preceding(builder.rexBuilder.makeExactLiteral(java.math.BigDecimal.valueOf(offset)))
+            FrameBound.FOLLOWING ->
+                RexWindowBounds.following(builder.rexBuilder.makeExactLiteral(java.math.BigDecimal.valueOf(offset)))
             else -> throw UnsupportedOperationException(
                 "Window frame bound '$fb' is not in the v1 wire format",
             )

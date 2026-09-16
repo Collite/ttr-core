@@ -14,6 +14,7 @@ import org.apache.calcite.sql.SqlKind
 import org.apache.calcite.sql.SqlLiteral
 import org.apache.calcite.sql.SqlNode
 import org.apache.calcite.sql.SqlNodeList
+import org.apache.calcite.sql.SqlWindow
 import org.apache.calcite.sql.SqlWriter
 import org.apache.calcite.sql.dialect.MssqlSqlDialect
 import org.apache.calcite.sql.`fun`.SqlLibraryOperators
@@ -90,6 +91,8 @@ class MssqlSqlDialectWithFloatCast(
             unparseExtract(writer, call)
         } else if (call.kind == SqlKind.LISTAGG) {
             unparseStringAgg(writer, call)
+        } else if (call.kind == SqlKind.OVER) {
+            unparseOver(writer, call, leftPrec, rightPrec)
         } else if (call.kind == SqlKind.SAFE_CAST) {
             // TF-P1.S3 (G C8) — RelToSql builds the SAFE_CAST operator, which renders under its own
             // name; T-SQL spells it TRY_CAST (same `expr AS type` operand shape).
@@ -154,6 +157,62 @@ class MssqlSqlDialectWithFloatCast(
         } else {
             listOf(node)
         }
+
+    /**
+     * TF-P3.S3 (G C5) — `agg OVER (…)` in the frames SQL Server takes.
+     *
+     * * `NTILE(n) OVER (…)` prints without a frame. SQL Server refuses `ROWS`/`RANGE` on a ranking
+     *   function, but Calcite's NTILE (unlike ROW_NUMBER/RANK/LAG/LEAD) allows framing, so the default
+     *   frame the validator gave it (`RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`) would print.
+     *   The frame changes nothing for NTILE, so dropping it is exact.
+     * * A `RANGE` frame with an offset bound (`RANGE BETWEEN 5 PRECEDING AND CURRENT ROW`) has no SQL
+     *   Server equivalent (it takes only `UNBOUNDED` and `CURRENT ROW` there): it fails at translate
+     *   time rather than at the engine, as `STRING_AGG(DISTINCT …)` does.
+     */
+    private fun unparseOver(
+        writer: SqlWriter,
+        call: SqlCall,
+        leftPrec: Int,
+        rightPrec: Int,
+    ) {
+        val window = call.operand<SqlNode>(1) as? SqlWindow
+        if (window == null || window.lowerBound == null) {
+            super.unparseCall(writer, call, leftPrec, rightPrec)
+            return
+        }
+        val offsetBound = listOfNotNull(window.lowerBound, window.upperBound).firstOrNull(::isOffsetBound)
+        if (!window.isRows && offsetBound != null) {
+            throw IllegalArgumentException("RANGE frame bound '$offsetBound' has no SQL Server equivalent (use ROWS)")
+        }
+        if (call.operand<SqlNode>(0).kind != SqlKind.NTILE) {
+            super.unparseCall(writer, call, leftPrec, rightPrec)
+            return
+        }
+        val unframed =
+            SqlWindow.create(
+                null,
+                window.refName,
+                window.partitionList,
+                window.orderList,
+                SqlLiteral.createBoolean(window.isRows, window.parserPosition),
+                null,
+                null,
+                null,
+                window.exclude,
+                window.parserPosition,
+            )
+        super.unparseCall(
+            writer,
+            SqlStdOperatorTable.OVER.createCall(call.parserPosition, call.operand(0), unframed),
+            leftPrec,
+            rightPrec,
+        )
+    }
+
+    private fun isOffsetBound(bound: SqlNode): Boolean =
+        !SqlWindow.isUnboundedPreceding(bound) &&
+            !SqlWindow.isUnboundedFollowing(bound) &&
+            !SqlWindow.isCurrentRow(bound)
 
     /**
      * TF-P1.S3 (G C6; contracts §5.4) — `LISTAGG(x, sep)` → T-SQL `STRING_AGG(x, sep)`. Only the name

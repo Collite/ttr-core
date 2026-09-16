@@ -348,7 +348,9 @@ message FunctionCall {
 // ELSE NULL END` (the null-on-empty-window wrapper) — that CASE rides the generic FunctionCall
 // (operation "case"), and each windowed aggregate inside it is one of these.
 message OverExpression {
-  string aggregate = 1;                    // "sum" | "count" | "avg" | "min" | "max"
+  // "sum" | "count" | "avg" | "min" | "max" | "row_number" | "rank" | "dense_rank" | "ntile"
+  // | "lag" | "lead" | "first_value" | "last_value"
+  string aggregate = 1;
   repeated Expression operands = 2;        // the aggregate's arguments
   repeated Expression partition_keys = 3;
   repeated OverOrderKey order_keys = 4;
@@ -362,13 +364,14 @@ message OverOrderKey {
   bool nulls_first = 3;
 }
 
-// A window frame. v1 supports the unbounded/current-row bounds that cover the default
-// frame (`RANGE UNBOUNDED PRECEDING TO CURRENT ROW`) and the common explicit frames;
-// offset bounds (`n PRECEDING`) are not yet in the wire format.
+// A window frame: unbounded, current-row and integer-offset bounds (`3 PRECEDING`,
+// `1 FOLLOWING`). A non-literal offset is not in the wire format.
 message WindowFrame {
   bool is_rows = 1;                        // true = ROWS, false = RANGE
   FrameBound lower = 2;
   FrameBound upper = 3;
+  int64 lower_offset = 4;                  // only meaningful when lower is PRECEDING/FOLLOWING
+  int64 upper_offset = 5;                  // only meaningful when upper is PRECEDING/FOLLOWING
 }
 
 enum FrameBound {
@@ -376,6 +379,8 @@ enum FrameBound {
   UNBOUNDED_PRECEDING = 1;
   CURRENT_ROW = 2;
   UNBOUNDED_FOLLOWING = 3;
+  PRECEDING = 4;                           // `n PRECEDING`, n in WindowFrame.lower_offset / upper_offset
+  FOLLOWING = 5;                           // `n FOLLOWING`
 }
 
 // CastExpression — explicit type coercion.

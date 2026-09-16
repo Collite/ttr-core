@@ -107,7 +107,7 @@
     "expect": {
       "sql": "SELECT [ID], ROW_NUMBER() OVER (PARTITION BY [B_ID] ORDER BY [ID] DESC) AS [RN] FROM [dbo].[A]"
     },
-    "status": "red:TF-P3.S3"
+    "status": "green"
   },
   {
     "id": "q12_rollup",
@@ -409,7 +409,7 @@
     "expect": {
       "sql": "SELECT [ID], LAG([ID]) OVER (ORDER BY [ID]) AS [P] FROM [dbo].[A]"
     },
-    "status": "red:TF-P3.S3"
+    "status": "green"
   },
   {
     "id": "r6_count_distinct",
