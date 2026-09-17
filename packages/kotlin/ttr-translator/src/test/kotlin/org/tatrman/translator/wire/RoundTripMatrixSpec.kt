@@ -69,6 +69,7 @@ import org.tatrman.plan.v1.parseSchemaCode
  * | Q5  ORDER + LIMIT     |  ✅  |    ❌    |   ✅  |  (TransDSL Query has no orderby/limit slots)
  * | Q6  WHERE + ORDER BY  |  ✅  |    ❌    |   ✅  |  (same as Q5)
  * | Q7  LIMIT only        |  ✅  |    ❌    |   ✅  |  (same as Q5)
+ * | W1…W9 window (TF-P3.S3) | ✅ |  _   |   _   |  (no window slot in TransDSL / DFDSL)
  *
  * Each enabled cell is one Kotest test (so failures map directly to a single matrix coordinate).
  */
@@ -428,6 +429,27 @@ class RoundTripMatrixSpec :
 
         val erShapes = listOf(q8, q9)
 
+        // ---------- Window shapes (W1…W9, TF-P3.S3) ------------------------------------
+        // One `OverExpression` per aggregate code added in TF-P3.S3, plus an offset frame. SQL input
+        // only: neither TransDSL nor DFDSL has a window slot.
+
+        val windowShapes =
+            listOf(
+                "W1 ROW_NUMBER" to
+                    "SELECT customer_id, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY total DESC) FROM orders",
+                "W2 RANK" to "SELECT customer_id, RANK() OVER (ORDER BY total) FROM orders",
+                "W3 DENSE_RANK" to "SELECT customer_id, DENSE_RANK() OVER (ORDER BY total) FROM orders",
+                "W4 NTILE" to "SELECT customer_id, NTILE(4) OVER (ORDER BY total) FROM orders",
+                "W5 LAG" to "SELECT customer_id, LAG(total, 1, 0) OVER (ORDER BY total) FROM orders",
+                "W6 LEAD" to "SELECT customer_id, LEAD(total) OVER (ORDER BY total) FROM orders",
+                "W7 FIRST_VALUE" to
+                    "SELECT customer_id, FIRST_VALUE(total) OVER (PARTITION BY customer_id ORDER BY total) FROM orders",
+                "W8 LAST_VALUE" to
+                    "SELECT customer_id, LAST_VALUE(total) OVER (PARTITION BY customer_id ORDER BY total) FROM orders",
+                "W9 offset frame" to
+                    "SELECT customer_id, MIN(total) OVER (ORDER BY total ROWS BETWEEN 2 PRECEDING AND 1 FOLLOWING) FROM orders",
+            )
+
         // ---------- Cell registration ----------------------------------------------------
         // SQL input — every shape, every dialect.
 
@@ -453,6 +475,20 @@ class RoundTripMatrixSpec :
                     val out = erSqlRoundTrip(sqlText, dialect)
                     out.shouldContainIgnoringCase("select")
                     shape.expectedKeywords.forEach { out.shouldContainIgnoringCase(it) }
+                }
+            }
+        }
+
+        // Window SQL — W1…W9, every dialect.
+
+        for ((name, sqlText) in windowShapes) {
+            val function = name.substringAfter(' ').substringBefore(' ')
+            val keyword = if (function == "offset") "2 preceding" else function
+            for ((dialectName, dialect) in dialects) {
+                "$name · SQL → $dialectName" {
+                    val out = sqlRoundTrip(sqlText, dialect)
+                    out.shouldContainIgnoringCase("over")
+                    out.shouldContainIgnoringCase(keyword)
                 }
             }
         }

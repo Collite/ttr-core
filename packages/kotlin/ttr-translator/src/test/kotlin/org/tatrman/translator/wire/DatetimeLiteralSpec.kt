@@ -78,6 +78,41 @@ class DatetimeLiteralSpec :
             datetimeValues(PlanNodeEncoder.encode(rel)) shouldBe datetimeValues(once)
         }
 
+        // TF-P1.S1 (G A7) — Calcite folds CAST('…' AS date) in a select list to a DATE literal; the wire once
+        // carried its value2 (epoch days), so MSSQL got '20454'. Regression guard for the ISO encoding.
+        "a folded DATE cast in the select list unparses as the date, not as epoch days (G A7)" {
+            val translator =
+                org.tatrman.translator.orchestrator
+                    .Translator(FixtureModel.tfHandle())
+            val parsed =
+                translator.parseToRelNode(
+                    "SELECT CAST('2026-01-01' AS date) AS DT FROM A a",
+                    org.tatrman.translate.v1.Language.SQL,
+                )
+            parsed.shouldBeInstanceOf<org.tatrman.translator.orchestrator.ParseResult.Success>()
+            val u =
+                translator.unparseFromRelNode(parsed.plan, org.tatrman.translate.v1.Language.SQL, SqlDialectProto.MSSQL)
+            u.shouldBeInstanceOf<org.tatrman.translator.orchestrator.UnparseResult.Success>()
+            u.output shouldContain "2026-01-01"
+            u.output shouldNotContain "20454"
+        }
+
+        "a date literal compared to GETDATE() is widened to a datetime string (G A7, unchanged)" {
+            val translator =
+                org.tatrman.translator.orchestrator
+                    .Translator(FixtureModel.tfHandle())
+            val parsed =
+                translator.parseToRelNode(
+                    "SELECT a.ID FROM A a WHERE GETDATE() >= '2026-01-01'",
+                    org.tatrman.translate.v1.Language.SQL,
+                )
+            parsed.shouldBeInstanceOf<org.tatrman.translator.orchestrator.ParseResult.Success>()
+            val u =
+                translator.unparseFromRelNode(parsed.plan, org.tatrman.translate.v1.Language.SQL, SqlDialectProto.MSSQL)
+            u.shouldBeInstanceOf<org.tatrman.translator.orchestrator.UnparseResult.Success>()
+            u.output shouldContain "'2026-01-01 00:00:00'"
+        }
+
         "a datetime_value that is not ISO-8601 fails loudly instead of quietly becoming a string" {
             shouldThrowAny { unparsePostgres(withDatetimeValue(encode(timestampFilter), "next tuesday")) }
                 .message!! shouldContain "ISO-8601"

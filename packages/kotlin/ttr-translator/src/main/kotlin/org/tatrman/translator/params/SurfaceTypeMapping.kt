@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.translator.params
 
+import org.apache.calcite.sql.type.SqlTypeFamily
 import org.apache.calcite.sql.type.SqlTypeName
+import org.tatrman.translator.framework.SurfaceType
 
 /**
  * Single source of truth for the surface parameter-type → Calcite [SqlTypeName] mapping, shared by
@@ -78,4 +80,17 @@ object SurfaceTypeMapping {
 
     /** Resolve [surfaceType] to a [SqlTypeName], or null when unknown (caller picks a fallback). */
     fun sqlTypeNameOrNull(surfaceType: String): SqlTypeName? = TABLE[surfaceType.lowercase()]
+
+    /**
+     * TF-P5 (contracts §3.1) — the operand family a model-declared function parameter of [surfaceType]
+     * accepts: both numeric surfaces are [SqlTypeFamily.NUMERIC], so an `INT` parameter takes a decimal
+     * column and a `FLOAT` one an integer literal, as SQL Server converts them implicitly.
+     */
+    fun familyOf(surfaceType: SurfaceType): SqlTypeFamily =
+        when (surfaceType) {
+            SurfaceType.INT, SurfaceType.FLOAT -> SqlTypeFamily.NUMERIC
+            SurfaceType.TEXT -> SqlTypeFamily.CHARACTER
+            SurfaceType.DATETIME -> SqlTypeFamily.DATETIME
+            SurfaceType.BOOL -> SqlTypeFamily.BOOLEAN
+        }
 }

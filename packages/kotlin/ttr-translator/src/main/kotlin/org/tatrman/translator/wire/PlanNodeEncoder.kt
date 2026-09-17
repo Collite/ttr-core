@@ -22,6 +22,7 @@ import org.tatrman.plan.v1.parseSchemaCode
 import org.tatrman.translator.codec.sql.TableHintSpec
 import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.core.Aggregate
+import org.apache.calcite.rel.core.AggregateCall
 import org.apache.calcite.rel.core.Filter
 import org.apache.calcite.rel.core.Join
 import org.apache.calcite.rel.core.JoinRelType
@@ -31,6 +32,7 @@ import org.apache.calcite.rel.core.TableScan
 import org.apache.calcite.rel.core.Union
 import org.apache.calcite.rel.core.Values
 import org.apache.calcite.rex.RexLiteral
+import org.apache.calcite.sql.SqlKind
 
 /**
  * Encode a Calcite [RelNode] into the v1 proto [PlanNode] wire format.
@@ -358,6 +360,15 @@ object PlanNodeEncoder {
         rel: Aggregate,
         parameterNames: Map<Int, String>,
     ): PlanNode {
+        // TF-P1.S3 (G A6, C7; contracts §2) — the v1 AggregateNode has one flat group-key list and no
+        // per-call filter, so ROLLUP/CUBE/GROUPING SETS and FILTER (WHERE …) used to be dropped
+        // silently: the query still ran, with a different meaning. Refuse them instead
+        // (`parse_pipeline_failed` through `runFrontHalfStages`).
+        if (rel.groupSets.size > 1) {
+            throw UnsupportedOperationException(
+                "GROUP BY ROLLUP/CUBE/GROUPING SETS is not in the v1 wire format (aggregate has ${rel.groupSets.size} group sets)",
+            )
+        }
         val builder = AggregateNode.newBuilder().setInput(encode(rel.input, parameterNames))
         // Group keys are represented as positional column refs into the input.
         rel.groupSet.forEach { idx ->
@@ -370,6 +381,9 @@ object PlanNodeEncoder {
             )
         }
         rel.aggCallList.forEachIndexed { idx, call ->
+            if (call.filterArg >= 0) {
+                throw UnsupportedOperationException("Aggregate FILTER (WHERE …) is not in the v1 wire format")
+            }
             val outName = rel.rowType.fieldList[rel.groupSet.cardinality() + idx].name
             val agg =
                 org.tatrman.plan.v1.AggregateCall
@@ -377,18 +391,56 @@ object PlanNodeEncoder {
                     .setFunction(call.aggregation.name.lowercase())
                     .setDistinct(call.isDistinct)
                     .setAlias(outName)
-            call.argList.forEach { argIdx ->
-                val argField = rel.input.rowType.fieldList[argIdx]
-                agg.addArgs(
-                    org.tatrman.plan.v1.ColumnRef
-                        .newBuilder()
-                        .setName(argField.name)
-                        .setType(Expressions.surfaceTypeOf(argField.type)),
-                )
+            if (call.aggregation.kind == SqlKind.LISTAGG) {
+                encodeListagg(rel, call, agg)
+            } else {
+                call.argList.forEach { argIdx -> agg.addArgs(inputColumnRef(rel, argIdx)) }
             }
             builder.addAggregates(agg)
         }
         return PlanNode.newBuilder().setAggregate(builder).build()
+    }
+
+    /**
+     * TF-P1.S3 (G C6; contracts §5.4) — `LISTAGG(value, sep) WITHIN GROUP (ORDER BY …)`, which is what
+     * Calcite makes of T-SQL `STRING_AGG`. `args` carries only the value column; the separator rides
+     * as a literal on `separator` (Calcite projects it into the aggregate's input as a constant
+     * column, so it is read back from that `Project`), and the order on `within_group`, encoded like
+     * a [SortNode] key.
+     */
+    private fun encodeListagg(
+        rel: Aggregate,
+        call: AggregateCall,
+        agg: org.tatrman.plan.v1.AggregateCall.Builder,
+    ) {
+        agg.addArgs(inputColumnRef(rel, call.argList[0]))
+        if (call.argList.size > 1) {
+            val separator =
+                (rel.input as? Project)?.projects?.get(call.argList[1]) as? RexLiteral
+                    ?: throw UnsupportedOperationException("LISTAGG separator must be a literal")
+            agg.setSeparator(Expressions.encode(separator).literal)
+        }
+        call.collation.fieldCollations.forEach { fc ->
+            agg.addWithinGroup(
+                SortKey
+                    .newBuilder()
+                    .setColumn(inputColumnRef(rel, fc.fieldIndex))
+                    .setDescending(fc.direction.isDescending)
+                    .setNullsFirst(fc.nullDirection == org.apache.calcite.rel.RelFieldCollation.NullDirection.FIRST),
+            )
+        }
+    }
+
+    private fun inputColumnRef(
+        rel: Aggregate,
+        index: Int,
+    ): org.tatrman.plan.v1.ColumnRef {
+        val field = rel.input.rowType.fieldList[index]
+        return org.tatrman.plan.v1.ColumnRef
+            .newBuilder()
+            .setName(field.name)
+            .setType(Expressions.surfaceTypeOf(field.type))
+            .build()
     }
 
     private fun encodeSort(

@@ -37,10 +37,17 @@ object SearchExpander {
                     // itself a SEARCH — so a SEARCH under NOT/AND/OR is reached too. expandSearch's
                     // output is SEARCH-free, so no further recursion into it is needed.
                     val visited = super.visitCall(call)
-                    return if (visited is RexCall && visited.kind == SqlKind.SEARCH) {
-                        RexUtil.expandSearch(rexBuilder, null, visited)
-                    } else {
-                        visited
+                    return when {
+                        visited is RexCall && visited.kind == SqlKind.SEARCH ->
+                            RexUtil.expandSearch(rexBuilder, null, visited)
+                        // TF-P1.S1 — an expanded `NOT IN (-2, 10)` is `AND(<>, <>)`; left nested inside the
+                        // enclosing AND it makes the condition non-flat, and Calcite's Filter asserts
+                        // `RexUtil.isFlat` (a parse that threw only under -ea). Re-flatten AND/OR parents.
+                        visited !== call &&
+                            visited is RexCall &&
+                            (visited.kind == SqlKind.AND || visited.kind == SqlKind.OR) ->
+                            RexUtil.flatten(rexBuilder, visited)
+                        else -> visited
                     }
                 }
             }

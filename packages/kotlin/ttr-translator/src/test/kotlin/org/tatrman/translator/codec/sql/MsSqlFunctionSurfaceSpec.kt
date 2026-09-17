@@ -66,6 +66,25 @@ class MsSqlFunctionSurfaceSpec :
             validates("ROUND(id, 2)")
         }
 
+        // TF-P3.S2 (contracts §5.2) — the T-SQL function tail (TsqlTailOperators) and the weekday /
+        // dayofyear dateparts.
+        "the TF-P3.S2 T-SQL function tail validates" {
+            validates("FORMAT(id, 'N0')")
+            validates("FORMAT(signup, 'yyyy-MM', 'cs-CZ')")
+            validates("EOMONTH(signup)")
+            validates("EOMONTH(signup, -1)")
+            validates("DATENAME(month, signup)")
+            validates("DATETRUNC(month, signup)")
+            validates("SYSDATETIME()")
+            validates("SYSUTCDATETIME()")
+            validates("GETUTCDATE()")
+            validates("DATEFROMPARTS(2026, 1, 1)")
+            validates("ISNUMERIC(name)")
+            validates("NEWID()")
+            validates("DATEPART(weekday, signup)")
+            validates("DATEPART(dy, signup)")
+        }
+
         // End-to-end: the motivating pattern query — CONCAT building a LIKE pattern — now translates.
         "the RG-audit CONCAT LIKE-pattern query translates end-to-end to MSSQL" {
             val r =

@@ -40,6 +40,8 @@ void Collate(List<Object> list, ExprContext exprContext, Span s) :
 |   < DATEDIFF: "DATEDIFF" >
 |   < DATEPART: "DATEPART" >
 |   < TRY_CONVERT: "TRY_CONVERT" >
+|   < DATENAME: "DATENAME" >
+|   < DATETRUNC: "DATETRUNC" >
 }
 
 /**
@@ -108,18 +110,51 @@ SqlNode DateaddFunctionCall() :
 }
 {
     (   <DATEADD> { op = org.apache.calcite.sql.fun.SqlLibraryOperators.DATEADD; }
-    |   <DATEDIFF> { op = org.apache.calcite.sql.fun.SqlLibraryOperators.DATEDIFF; }
+    |   <DATEDIFF> { op = org.tatrman.translator.functions.DateOperators.INSTANCE.getDATEDIFF(); }
     |   <DATEPART>  { op = org.apache.calcite.sql.fun.SqlLibraryOperators.DATEPART; }
     )
     { s = span(); }
     <LPAREN> unit = TimeUnitOrName() {
-        args = startList(NormalizeDatepart(unit));
+        // TF-P3.S2 — weekday/dayofyear mean day in DATEADD/DATEDIFF (Dateparts.forArithmetic).
+        args = startList(op == org.apache.calcite.sql.fun.SqlLibraryOperators.DATEPART
+            ? NormalizeDatepart(unit)
+            : org.tatrman.translator.functions.Dateparts.forArithmetic(NormalizeDatepart(unit)));
     }
     (
         <COMMA> e = Expression(ExprContext.ACCEPT_SUB_QUERY) {
             args.add(e);
         }
     )*
+    <RPAREN> {
+        return op.createCall(s.end(this), args);
+    }
+}
+
+/**
+ * TF-P3.S2 (G C11; contracts §4.2) — T-SQL "DATENAME(datepart, date)" / "DATETRUNC(datepart, date)".
+ * The datepart is read like DATEADD's (TimeUnitOrName + NormalizeDatepart, so `mm`/`dw`/`weekday` all
+ * work) and handed to the operator as a SYMBOL TimeUnit literal (Dateparts.symbol), the shape the
+ * wire carries for DATEPART.
+ */
+SqlNode DateNameFunctionCall() :
+{
+    final Span s;
+    final SqlOperator op;
+    final SqlIntervalQualifier unit;
+    final List<SqlNode> args;
+    final SqlNode e;
+}
+{
+    (   <DATENAME> { op = org.tatrman.translator.functions.TsqlTailOperators.DATENAME; }
+    |   <DATETRUNC> { op = org.tatrman.translator.functions.TsqlTailOperators.DATETRUNC; }
+    )
+    { s = span(); }
+    <LPAREN> unit = TimeUnitOrName() {
+        args = startList(org.tatrman.translator.functions.Dateparts.symbol(NormalizeDatepart(unit)));
+    }
+    <COMMA> e = Expression(ExprContext.ACCEPT_SUB_QUERY) {
+        args.add(e);
+    }
     <RPAREN> {
         return op.createCall(s.end(this), args);
     }
@@ -159,5 +194,56 @@ SqlNode TryConvertFunctionCall() :
     ]
     <RPAREN> {
         return org.tatrman.translator.functions.ConvertOperators.TRY_CONVERT.createCall(s.end(this), args);
+    }
+}
+
+/**
+ * TF-P3.S1 (G C9; contracts §4.1) — T-SQL type names in CAST / CONVERT / TRY_CONVERT, registered
+ * ahead of the core types via the `dataTypeParserMethods` hook (TypeName() tries it with LOOKAHEAD(2)):
+ * `NVARCHAR[(n|MAX)]`, `VARCHAR(MAX)`, `NCHAR[(n)]`, `TEXT`, `NTEXT`, `MONEY`, `SMALLMONEY`, `DATETIME`,
+ * `DATETIME2[(p)]`, `SMALLDATETIME`, `BIT`, `UNIQUEIDENTIFIER`.
+ *
+ * No keyword tokens are added: `BIT`, `DATETIME`, `NCHAR` and `MAX` already are Calcite tokens, and the
+ * rest are matched as identifiers by image (TsqlDataTypes.isIdentifierTypeName), so a column or alias
+ * named `text` or `money` still parses. `VARCHAR` is claimed only when `( MAX` follows; every other
+ * VARCHAR spelling stays with the core CharacterTypeName(). The semantic lookaheads read tokens from the
+ * start of this production, which is also where TypeName()'s syntactic lookahead starts.
+ */
+SqlTypeNameSpec TsqlDataType() :
+{
+    final Span s;
+    final String name;
+    int precision = -1;
+    int scale = -1;
+    boolean max = false;
+}
+{
+    (
+        LOOKAHEAD({ getToken(1).kind == VARCHAR && getToken(2).kind == LPAREN && getToken(3).kind == MAX })
+        <VARCHAR> { name = "VARCHAR"; }
+    |
+        <NCHAR> { name = "NCHAR"; }
+    |
+        <DATETIME> { name = "DATETIME"; }
+    |
+        <BIT> { name = "BIT"; }
+    |
+        LOOKAHEAD({ getToken(1).kind == IDENTIFIER
+            && org.tatrman.translator.functions.TsqlDataTypes.isIdentifierTypeName(getToken(1).image) })
+        <IDENTIFIER> { name = token.image.toUpperCase(Locale.ROOT); }
+    )
+    { s = span(); }
+    [
+        <LPAREN>
+        (
+            precision = UnsignedIntLiteral()
+            [ <COMMA> scale = UnsignedIntLiteral() ]
+        |
+            <MAX> { max = true; }
+        )
+        <RPAREN>
+    ]
+    {
+        return org.tatrman.translator.functions.TsqlDataTypes.spec(name, precision, scale, max, s.end(this));
     }
 }

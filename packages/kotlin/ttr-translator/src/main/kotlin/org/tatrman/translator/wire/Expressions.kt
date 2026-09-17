@@ -14,6 +14,7 @@ import org.tatrman.plan.v1.SubqueryExpression
 import org.tatrman.plan.v1.WindowFrame
 import org.apache.calcite.rel.RelFieldCollation
 import org.apache.calcite.rel.type.RelDataType
+import org.apache.calcite.rel.type.RelDataTypeFactory
 import org.apache.calcite.rex.RexCall
 import org.apache.calcite.rex.RexDynamicParam
 import org.apache.calcite.rex.RexFieldCollation
@@ -26,10 +27,12 @@ import org.apache.calcite.rex.RexWindowBound
 import org.apache.calcite.rex.RexWindowBounds
 import org.apache.calcite.sql.SqlAggFunction
 import org.apache.calcite.sql.SqlKind
+import org.apache.calcite.sql.parser.SqlParserPos
 import org.apache.calcite.sql.SqlOperator
 import org.apache.calcite.sql.`fun`.SqlStdOperatorTable
 import org.apache.calcite.sql.type.SqlTypeName
 import org.apache.calcite.tools.RelBuilder
+import org.tatrman.translator.functions.FunctionCatalog
 
 /**
  * RexNode ↔ Expression encoders / decoders for the v1 wire format.
@@ -125,8 +128,13 @@ object Expressions {
                             .newBuilder()
                             .setOperation(operationCode(rex))
                             .addAllOperands(rex.operands.map { encode(it, ctx) }),
-                    ).setResultType(surfaceTypeOf(rex.type))
-                    .build()
+                    ).setResultType(
+                        if (rex.kind == SqlKind.CAST || rex.kind == SqlKind.SAFE_CAST) {
+                            physicalCodeOf(rex.type)
+                        } else {
+                            surfaceTypeOf(rex.type)
+                        },
+                    ).build()
             is RexDynamicParam -> {
                 // Phase 08 A2 — name restoration. When the orchestrator threaded the prepared
                 // `parameterNames` map in, emit the original `{name}` here; otherwise fall back
@@ -168,12 +176,16 @@ object Expressions {
                     .setNullsFirst(fc.nullDirection == RelFieldCollation.NullDirection.FIRST),
             )
         }
+        val (lower, lowerOffset) = frameBoundCode(w.lowerBound)
+        val (upper, upperOffset) = frameBoundCode(w.upperBound)
         over.setFrame(
             WindowFrame
                 .newBuilder()
                 .setIsRows(w.isRows)
-                .setLower(frameBoundCode(w.lowerBound))
-                .setUpper(frameBoundCode(w.upperBound)),
+                .setLower(lower)
+                .setLowerOffset(lowerOffset)
+                .setUpper(upper)
+                .setUpperOffset(upperOffset),
         )
         return Expression
             .newBuilder()
@@ -189,20 +201,42 @@ object Expressions {
             SqlKind.AVG -> "avg"
             SqlKind.MIN -> "min"
             SqlKind.MAX -> "max"
+            SqlKind.ROW_NUMBER -> "row_number"
+            SqlKind.RANK -> "rank"
+            SqlKind.DENSE_RANK -> "dense_rank"
+            SqlKind.NTILE -> "ntile"
+            SqlKind.LAG -> "lag"
+            SqlKind.LEAD -> "lead"
+            SqlKind.FIRST_VALUE -> "first_value"
+            SqlKind.LAST_VALUE -> "last_value"
             else -> throw UnsupportedOperationException(
                 "Window aggregate '${op.name}' is not in the v1 wire format",
             )
         }
 
-    private fun frameBoundCode(b: RexWindowBound): FrameBound =
+    /** The wire bound and its offset (`0` unless the bound is `n PRECEDING` / `n FOLLOWING`). */
+    private fun frameBoundCode(b: RexWindowBound): Pair<FrameBound, Long> =
         when {
-            b.isUnbounded && b.isPreceding -> FrameBound.UNBOUNDED_PRECEDING
-            b.isCurrentRow -> FrameBound.CURRENT_ROW
-            b.isUnbounded && b.isFollowing -> FrameBound.UNBOUNDED_FOLLOWING
+            b.isUnbounded && b.isPreceding -> FrameBound.UNBOUNDED_PRECEDING to 0L
+            b.isCurrentRow -> FrameBound.CURRENT_ROW to 0L
+            b.isUnbounded && b.isFollowing -> FrameBound.UNBOUNDED_FOLLOWING to 0L
+            b.isPreceding -> FrameBound.PRECEDING to frameOffset(b)
+            b.isFollowing -> FrameBound.FOLLOWING to frameOffset(b)
             else -> throw UnsupportedOperationException(
-                "Window frame bound '$b' is not in the v1 wire format (offset bounds unsupported)",
+                "Window frame bound '$b' is not in the v1 wire format",
             )
         }
+
+    private fun frameOffset(b: RexWindowBound): Long {
+        val offset = b.offset
+        if (offset is RexLiteral && SqlTypeName.EXACT_TYPES.contains(offset.type.sqlTypeName)) {
+            val exact = offset.getValueAs(java.math.BigDecimal::class.java)
+            runCatching { exact?.longValueExact() }.getOrNull()?.let { return it }
+        }
+        throw UnsupportedOperationException(
+            "Window frame bound '$b' is not in the v1 wire format (offset must be an integer literal)",
+        )
+    }
 
     private fun encodeInputRef(
         rex: RexInputRef,
@@ -291,8 +325,12 @@ object Expressions {
                 builder.setBoolValue(lit.value2 as Boolean).build()
             SqlTypeName.INTEGER, SqlTypeName.BIGINT, SqlTypeName.SMALLINT, SqlTypeName.TINYINT ->
                 builder.setIntValue((lit.value2 as Number).toLong()).build()
+            // TF-P1.S1 (G A1) — the numeric value, not `value2`: for a DECIMAL literal `value2` is the
+            // *unscaled* long (`1.5` → 15, `100.0` → 1000), which silently multiplied every fractional
+            // constant by 10^scale. `getValueAs(BigDecimal)` is the scaled value for every exact and
+            // approximate numeric literal.
             SqlTypeName.DECIMAL, SqlTypeName.DOUBLE, SqlTypeName.FLOAT, SqlTypeName.REAL ->
-                builder.setFloatValue((lit.value2 as Number).toDouble()).build()
+                builder.setFloatValue(lit.getValueAs(java.math.BigDecimal::class.java)!!.toDouble()).build()
             // ISO-8601, as plan.proto defines `datetime_value`. `value2` is not that: for a TIMESTAMP
             // it is epoch milliseconds, so the wire carried "1735689600000" — a value no caller writing
             // the contract's own form produces, and one decode could not read back as a date.
@@ -339,7 +377,10 @@ object Expressions {
             // Phase 08 B4 / DF-S05 + DF-DSL04 — first-class set/pattern membership.
             SqlKind.IN -> "in"
             SqlKind.LIKE -> "like"
-            else -> call.operator.name.lowercase()
+            // TF-P1.S3 (G C8) — T-SQL TRY_CAST; Calcite builds it as SAFE_CAST (or TRY_CAST, same kind).
+            SqlKind.SAFE_CAST -> "safe_cast"
+            // TF-P5 — a model-declared function rides under its qualified name (`dbo.fn_price`).
+            else -> FunctionCatalog.wireName(call.operator)
         }
 
     /**
@@ -349,10 +390,15 @@ object Expressions {
      * Column references are resolved against the builder's current peek's
      * row type (so `decode` MUST be called after the input has been pushed
      * onto the builder's stack).
+     *
+     * [catalog] resolves function-syntax operators by wire name; TF-P5 — pass the framework's
+     * [org.tatrman.translator.framework.TranslatorFramework.functionCatalog] so model-declared functions
+     * decode.
      */
     fun decode(
         builder: RelBuilder,
         expr: Expression,
+        catalog: FunctionCatalog = FunctionCatalog.DEFAULT,
     ): RexNode =
         when (expr.exprCase) {
             Expression.ExprCase.LITERAL -> decodeLiteral(builder, expr.literal)
@@ -362,16 +408,18 @@ object Expressions {
                 // rides on the *Expression's* result_type, not on the call — so it can't
                 // go through the generic operator path (which has no type to cast to).
                 if (expr.function.operation.equals("cast", ignoreCase = true)) {
-                    decodeCast(builder, expr.function, expr.resultType)
+                    decodeCast(builder, expr.function, expr.resultType, safe = false, catalog)
+                } else if (expr.function.operation.equals("safe_cast", ignoreCase = true)) {
+                    decodeCast(builder, expr.function, expr.resultType, safe = true, catalog)
                 } else {
-                    decodeFunctionCall(builder, expr.function)
+                    decodeFunctionCall(builder, expr.function, catalog)
                 }
             Expression.ExprCase.PARAMETER ->
                 decodeParameter(builder, expr.parameter, expr.resultType)
             Expression.ExprCase.SUBQUERY ->
-                decodeSubquery(builder, expr.subquery)
+                decodeSubquery(builder, expr.subquery, catalog)
             Expression.ExprCase.OVER ->
-                decodeOver(builder, expr.over, expr.resultType)
+                decodeOver(builder, expr.over, expr.resultType, catalog)
             Expression.ExprCase.CAST ->
                 throw UnsupportedOperationException(
                     "CastExpression decoding is TODO; v1 codecs preserve casts via Expression.cast",
@@ -406,7 +454,16 @@ object Expressions {
         return when (lit.valueCase) {
             Literal.ValueCase.STRING_VALUE -> builder.literal(lit.stringValue)
             Literal.ValueCase.INT_VALUE -> builder.literal(lit.intValue)
-            Literal.ValueCase.FLOAT_VALUE -> builder.literal(lit.floatValue)
+            // TF-P1.S1 (G A1) — an exact literal: `RelBuilder.literal(Double)` builds an approximate one,
+            // which MSSQL renders in E-notation (`2.5E-1`) — a T-SQL FLOAT constant, turning decimal
+            // arithmetic into float arithmetic. `BigDecimal.valueOf` keeps the written digits (`0.25`,
+            // `100.0`) and re-encodes to the same double.
+            Literal.ValueCase.FLOAT_VALUE ->
+                if (lit.floatValue.isFinite()) {
+                    builder.rexBuilder.makeExactLiteral(java.math.BigDecimal.valueOf(lit.floatValue))
+                } else {
+                    builder.literal(lit.floatValue)
+                }
             Literal.ValueCase.BOOL_VALUE -> builder.literal(lit.boolValue)
             // A TYPED temporal literal. `builder.literal(String)` built a CHARACTER literal, so a date
             // bound came back typed `text` and was compared to a date column as a string.
@@ -508,8 +565,8 @@ object Expressions {
         // the bare `field(name)` only sees the top-of-stack rel and a join's right-side reference
         // mis-resolves into the right input by index, going out of range.
         when (ref.sourceAlias) {
-            LEFT_INPUT_TAG -> return builder.field(2, 0, name)
-            RIGHT_INPUT_TAG -> return builder.field(2, 1, name)
+            LEFT_INPUT_TAG -> return fieldByName(builder, 2, 0, name)
+            RIGHT_INPUT_TAG -> return fieldByName(builder, 2, 1, name)
         }
         // A `$`-prefix means a positional ref ONLY when the remainder is an integer — the encoder's
         // sole positional fallback shape is `$<index>` (see [encodeInputRef]). Calcite also mints
@@ -522,34 +579,192 @@ object Expressions {
             val idx = name.drop(1).toIntOrNull()
             if (idx != null) return builder.field(idx)
         }
-        return builder.field(name)
+        return fieldByName(builder, name)
     }
+
+    /**
+     * TF-P1.S2 (G A3, contracts §3.2) — resolve [name] against the top of the builder stack, falling back
+     * to the row type's ordinal.
+     *
+     * Above a join whose inputs share a column name, the encoder names a ref from the `LogicalJoin` row
+     * type, which Calcite uniquifies (`[ID, NAME, B_ID, ID0, NAME0]`). `RelBuilder.join` keeps the
+     * per-input names in its *frame* (`[ID, NAME, B_ID, ID, NAME]`), and `field(String)` looks there, so
+     * `field("NAME0")` threw `field [NAME0] not found`. Frame and row type share positions, so the row
+     * type's ordinal is the exact field: `field(ordinal)` is a plain `RexInputRef`, so the decoded plan —
+     * and its re-encoding — is unchanged. When neither lookup matches, the original error is rethrown.
+     */
+    internal fun fieldByName(
+        builder: RelBuilder,
+        name: String,
+    ): RexNode = fieldByName(builder, 1, 0, name)
+
+    /**
+     * [fieldByName] for input [inputOrdinal] of [inputCount] — a join condition's `$L`/`$R` lookup. The
+     * same frame-vs-row-type gap applies when that input is itself a join: in `A JOIN B … JOIN C ON c.x =
+     * b.ID` the second condition names `ID0` from the first join's row type (legacy
+     * `podprodukty_pro_firmu`).
+     */
+    internal fun fieldByName(
+        builder: RelBuilder,
+        inputCount: Int,
+        inputOrdinal: Int,
+        name: String,
+    ): RexNode =
+        try {
+            builder.field(inputCount, inputOrdinal, name)
+        } catch (e: IllegalArgumentException) {
+            val ordinal =
+                builder
+                    .peek(inputCount, inputOrdinal)
+                    .rowType.fieldNames
+                    .indexOf(name)
+            if (ordinal >= 0) builder.field(inputCount, inputOrdinal, ordinal) else throw e
+        }
 
     private fun decodeFunctionCall(
         builder: RelBuilder,
         fn: FunctionCall,
+        catalog: FunctionCatalog,
     ): RexNode {
-        val operator = operatorFor(fn.operation)
-        val operands = fn.operandsList.map { decode(builder, it) }
+        val operator = operatorFor(fn.operation, catalog)
+        val operands = fn.operandsList.map { decode(builder, it, catalog) }
         return builder.call(operator, operands)
     }
 
     /**
      * Decode a CAST (encoded as `FunctionCall(operation="cast")` with the single value operand;
-     * the target type is the wrapping Expression's surface [resultType]). Rebuilt as a Calcite
-     * `RexCall(CAST)` via [org.apache.calcite.rex.RexBuilder.makeCast] so RelToSql renders the
-     * dialect-appropriate `CAST(... AS ...)`.
+     * the target type is the wrapping Expression's [resultType] — a physical type code, see
+     * [castTargetType]). Rebuilt as a Calcite `RexCall(CAST)` via
+     * [org.apache.calcite.rex.RexBuilder.makeCast] so RelToSql renders the dialect-appropriate
+     * `CAST(... AS ...)`.
      */
     private fun decodeCast(
         builder: RelBuilder,
         fn: FunctionCall,
         resultType: String,
+        safe: Boolean,
+        catalog: FunctionCatalog,
     ): RexNode {
-        require(fn.operandsCount == 1) { "cast expects exactly 1 operand, got ${fn.operandsCount}" }
-        val operand = decode(builder, fn.operandsList[0])
-        val targetType = builder.typeFactory.createSqlType(sqlTypeNameFor(resultType))
-        return builder.rexBuilder.makeCast(targetType, operand)
+        require(fn.operandsCount == 1) { "${fn.operation} expects exactly 1 operand, got ${fn.operandsCount}" }
+        val operand = decode(builder, fn.operandsList[0], catalog)
+        val targetType = castTargetType(builder.typeFactory, resultType)
+        // TF-P1.S3 (G C8) — `safe_cast` (T-SQL TRY_CAST): the same target-type code, a SAFE_CAST call.
+        return if (safe) {
+            builder.rexBuilder.makeAbstractCast(SqlParserPos.ZERO, targetType, operand, true)
+        } else {
+            builder.rexBuilder.makeCast(targetType, operand)
+        }
     }
+
+    /**
+     * TF-P1.S1 (G A9, contracts §3.3) — the physical type code a CAST's target type rides as:
+     * `<kind>[:<precision>[,<scale>]]` (`varchar:20`, `decimal:18,2`, `int`, `date`, `datetime`,
+     * `datetime2:0`, `varchar:max`). The surface tags (`text`, `float`, …) lost length, precision and
+     * scale, and widened a `date` cast to a timestamp that the optimizer then folded away. A type
+     * outside the table falls back to its surface tag.
+     *
+     * Deliberate: `int` is INTEGER and `datetime` is TIMESTAMP(3) here, where the surface tags meant
+     * BIGINT / TIMESTAMP. Only casts read these codes ([castTargetType]); parameters keep the surface
+     * mapping ([sqlTypeNameFor]).
+     */
+    internal fun physicalCodeOf(t: RelDataType): String {
+        val precision = t.precision
+        return when (t.sqlTypeName) {
+            SqlTypeName.VARCHAR ->
+                when {
+                    precision == RelDataType.PRECISION_NOT_SPECIFIED -> "varchar"
+                    precision >= VARCHAR_MAX_PRECISION -> "varchar:max"
+                    else -> "varchar:$precision"
+                }
+            SqlTypeName.CHAR -> "char:$precision"
+            SqlTypeName.DECIMAL -> "decimal:$precision,${t.scale}"
+            SqlTypeName.INTEGER -> "int"
+            SqlTypeName.BIGINT -> "bigint"
+            SqlTypeName.SMALLINT -> "smallint"
+            SqlTypeName.TINYINT -> "tinyint"
+            SqlTypeName.BOOLEAN -> "bit"
+            SqlTypeName.DOUBLE, SqlTypeName.FLOAT -> "float"
+            SqlTypeName.REAL -> "real"
+            SqlTypeName.DATE -> "date"
+            SqlTypeName.TIME -> if (precision > 0) "time:$precision" else "time"
+            SqlTypeName.TIMESTAMP -> if (precision == DATETIME_PRECISION) "datetime" else "datetime2:$precision"
+            else -> surfaceTypeOf(t)
+        }
+    }
+
+    /**
+     * Inverse of [physicalCodeOf]. Also accepts the T-SQL-only kinds (contracts §3.3 — `nvarchar`,
+     * `money`, `uniqueidentifier`, …) and the pre-TF surface tags `text`, `float`, `bool`, `decimal`
+     * that older plans and the TTR-P lowerings still send. Anything else is refused rather than
+     * rebuilt as `ANY`.
+     */
+    private fun castTargetType(
+        typeFactory: RelDataTypeFactory,
+        code: String,
+    ): RelDataType {
+        val kind = code.substringBefore(':').lowercase()
+        val args =
+            code
+                .substringAfter(':', "")
+                .split(',')
+                .filter { it.isNotBlank() }
+                .map { it.trim() }
+
+        fun unsupported(): Nothing =
+            throw UnsupportedOperationException("Cast target type '$code' is not in the v1 wire format")
+
+        fun number(i: Int): Int? = args.getOrNull(i)?.let { it.toIntOrNull() ?: unsupported() }
+
+        fun sized(
+            name: SqlTypeName,
+            default: Int? = null,
+        ): RelDataType {
+            val p = if (args.firstOrNull()?.lowercase() == "max") VARCHAR_MAX_PRECISION else number(0) ?: default
+            return if (p == null) typeFactory.createSqlType(name) else typeFactory.createSqlType(name, p)
+        }
+
+        fun decimal(
+            p: Int?,
+            s: Int?,
+        ): RelDataType =
+            when {
+                p == null -> typeFactory.createSqlType(SqlTypeName.DECIMAL)
+                s == null -> typeFactory.createSqlType(SqlTypeName.DECIMAL, p)
+                else -> typeFactory.createSqlType(SqlTypeName.DECIMAL, p, s)
+            }
+        return when (kind) {
+            "varchar", "nvarchar", "text", "ntext" -> sized(SqlTypeName.VARCHAR)
+            "char", "nchar" -> sized(SqlTypeName.CHAR)
+            "decimal", "numeric" -> decimal(number(0), number(1))
+            "money" -> decimal(19, 4)
+            "smallmoney" -> decimal(10, 4)
+            "int", "integer" -> typeFactory.createSqlType(SqlTypeName.INTEGER)
+            "bigint" -> typeFactory.createSqlType(SqlTypeName.BIGINT)
+            "smallint" -> typeFactory.createSqlType(SqlTypeName.SMALLINT)
+            "tinyint" -> typeFactory.createSqlType(SqlTypeName.TINYINT)
+            "bit", "bool", "boolean" -> typeFactory.createSqlType(SqlTypeName.BOOLEAN)
+            "float", "double" -> typeFactory.createSqlType(SqlTypeName.DOUBLE)
+            "real" -> typeFactory.createSqlType(SqlTypeName.REAL)
+            "date" -> typeFactory.createSqlType(SqlTypeName.DATE)
+            "time" -> sized(SqlTypeName.TIME)
+            "datetime" -> typeFactory.createSqlType(SqlTypeName.TIMESTAMP, number(0) ?: DATETIME_PRECISION)
+            "smalldatetime" -> typeFactory.createSqlType(SqlTypeName.TIMESTAMP, 0)
+            "datetime2" -> sized(SqlTypeName.TIMESTAMP, default = DATETIME2_DEFAULT_PRECISION)
+            "uniqueidentifier" -> typeFactory.createSqlType(SqlTypeName.CHAR, 36)
+            else -> unsupported()
+        }
+    }
+
+    /** T-SQL `datetime` is millisecond-ish (3.33 ms) — the TIMESTAMP precision it maps to. */
+    private const val DATETIME_PRECISION = 3
+
+    /** T-SQL `datetime2` without a precision is `datetime2(7)`. */
+    private const val DATETIME2_DEFAULT_PRECISION = 7
+
+    /** `varchar(max)` — Calcite's default type-system ceiling for VARCHAR. */
+    private val VARCHAR_MAX_PRECISION: Int =
+        org.apache.calcite.rel.type.RelDataTypeSystem.DEFAULT
+            .getMaxPrecision(SqlTypeName.VARCHAR)
 
     /** Surface-type tag → the [SqlTypeName] the encoder used. Shared by parameter + cast decoding. */
     private fun sqlTypeNameFor(resultType: String): SqlTypeName =
@@ -574,8 +789,9 @@ object Expressions {
     private fun decodeSubquery(
         builder: RelBuilder,
         sub: SubqueryExpression,
+        catalog: FunctionCatalog,
     ): RexNode {
-        val subRel = PlanNodeDecoder.decodeSubrel(builder, sub.subquery)
+        val subRel = PlanNodeDecoder.decodeSubrel(builder, sub.subquery, catalog)
         return when (sub.kind.lowercase()) {
             "scalar" -> RexSubQuery.scalar(subRel)
             "exists" -> RexSubQuery.exists(subRel)
@@ -583,7 +799,7 @@ object Expressions {
                 RexSubQuery.`in`(
                     subRel,
                     com.google.common.collect.ImmutableList
-                        .copyOf(sub.operandsList.map { decode(builder, it) }),
+                        .copyOf(sub.operandsList.map { decode(builder, it, catalog) }),
                 )
             else -> throw UnsupportedOperationException(
                 "Subquery kind '${sub.kind}' is not in the v1 wire format",
@@ -595,20 +811,21 @@ object Expressions {
         builder: RelBuilder,
         over: OverExpression,
         resultType: String,
+        catalog: FunctionCatalog,
     ): RexNode {
         val type =
             builder.typeFactory.createTypeWithNullability(
                 builder.typeFactory.createSqlType(sqlTypeNameFor(resultType)),
                 true,
             )
-        val exprs = over.operandsList.map { decode(builder, it) }
-        val partitionKeys = over.partitionKeysList.map { decode(builder, it) }
+        val exprs = over.operandsList.map { decode(builder, it, catalog) }
+        val partitionKeys = over.partitionKeysList.map { decode(builder, it, catalog) }
         val orderKeys =
             over.orderKeysList.map { ok ->
                 val dirs = mutableSetOf<SqlKind>()
                 if (ok.descending) dirs.add(SqlKind.DESCENDING)
                 dirs.add(if (ok.nullsFirst) SqlKind.NULLS_FIRST else SqlKind.NULLS_LAST)
-                RexFieldCollation(decode(builder, ok.expr), dirs)
+                RexFieldCollation(decode(builder, ok.expr, catalog), dirs)
             }
         return builder.rexBuilder.makeOver(
             type,
@@ -616,8 +833,8 @@ object Expressions {
             exprs,
             partitionKeys,
             ImmutableList.copyOf(orderKeys),
-            frameBoundFor(over.frame.lower),
-            frameBoundFor(over.frame.upper),
+            frameBoundFor(builder, over.frame.lower, over.frame.lowerOffset),
+            frameBoundFor(builder, over.frame.upper, over.frame.upperOffset),
             over.frame.isRows,
             true, // allowPartial
             false, // nullWhenCountZero — the CASE null-on-empty wrapper is explicit in the plan
@@ -633,16 +850,32 @@ object Expressions {
             "avg" -> SqlStdOperatorTable.AVG
             "min" -> SqlStdOperatorTable.MIN
             "max" -> SqlStdOperatorTable.MAX
+            "row_number" -> SqlStdOperatorTable.ROW_NUMBER
+            "rank" -> SqlStdOperatorTable.RANK
+            "dense_rank" -> SqlStdOperatorTable.DENSE_RANK
+            "ntile" -> SqlStdOperatorTable.NTILE
+            "lag" -> SqlStdOperatorTable.LAG
+            "lead" -> SqlStdOperatorTable.LEAD
+            "first_value" -> SqlStdOperatorTable.FIRST_VALUE
+            "last_value" -> SqlStdOperatorTable.LAST_VALUE
             else -> throw UnsupportedOperationException(
                 "Window aggregate '$code' is not in the v1 wire format",
             )
         }
 
-    private fun frameBoundFor(fb: FrameBound): RexWindowBound =
+    private fun frameBoundFor(
+        builder: RelBuilder,
+        fb: FrameBound,
+        offset: Long,
+    ): RexWindowBound =
         when (fb) {
             FrameBound.UNBOUNDED_PRECEDING -> RexWindowBounds.UNBOUNDED_PRECEDING
             FrameBound.CURRENT_ROW -> RexWindowBounds.CURRENT_ROW
             FrameBound.UNBOUNDED_FOLLOWING -> RexWindowBounds.UNBOUNDED_FOLLOWING
+            FrameBound.PRECEDING ->
+                RexWindowBounds.preceding(builder.rexBuilder.makeExactLiteral(java.math.BigDecimal.valueOf(offset)))
+            FrameBound.FOLLOWING ->
+                RexWindowBounds.following(builder.rexBuilder.makeExactLiteral(java.math.BigDecimal.valueOf(offset)))
             else -> throw UnsupportedOperationException(
                 "Window frame bound '$fb' is not in the v1 wire format",
             )
@@ -659,7 +892,10 @@ object Expressions {
         return builder.rexBuilder.makeDynamicParam(type, param.positionalIndex)
     }
 
-    private fun operatorFor(opName: String): SqlOperator =
+    private fun operatorFor(
+        opName: String,
+        catalog: FunctionCatalog,
+    ): SqlOperator =
         when (opName.lowercase()) {
             "and" -> org.apache.calcite.sql.`fun`.SqlStdOperatorTable.AND
             "or" -> org.apache.calcite.sql.`fun`.SqlStdOperatorTable.OR
@@ -702,7 +938,7 @@ object Expressions {
             // `operator.name` fallback. Their datepart operand rides as a SYMBOL literal (see the
             // SYMBOL_TYPE_TAG decode path above).
             "dateadd" -> org.apache.calcite.sql.`fun`.SqlLibraryOperators.DATEADD
-            "datediff" -> org.apache.calcite.sql.`fun`.SqlLibraryOperators.DATEDIFF
+            "datediff" -> org.tatrman.translator.functions.DateOperators.DATEDIFF
             "datepart" -> org.apache.calcite.sql.`fun`.SqlLibraryOperators.DATEPART
             "date_part" -> org.apache.calcite.sql.`fun`.SqlLibraryOperators.DATE_PART
             // Standard `EXTRACT(<unit> FROM <datetime>)` — the dialect-agnostic date-part extraction
@@ -712,13 +948,16 @@ object Expressions {
             // CEP-P2 — faithful CONVERT / TRY_CONVERT custom operators.
             "convert" -> org.tatrman.translator.functions.ConvertOperators.CONVERT
             "try_convert" -> org.tatrman.translator.functions.ConvertOperators.TRY_CONVERT
+            // TF-P1.S3 — decoded by [decodeCast] (the target type rides on result_type); mapped here so
+            // a name lookup agrees with the encoder's `operationCode`.
+            "safe_cast" -> org.apache.calcite.sql.`fun`.SqlLibraryOperators.SAFE_CAST
             // Catalog-driven decode: function-syntax operators (CONCAT, LEFT, IIF, ISNULL, LEN, …)
             // aren't hand-mapped above; resolve them from the FunctionCatalog, built by enumerating
             // the loaded custom + library operator tables (CalciteOperatorTables). The explicit
             // structural/contract entries above stay the authority — the catalog is only the
             // fallback, so e.g. the binary `||` is never conflated with the function-syntax "concat".
             else ->
-                org.tatrman.translator.functions.FunctionCatalog.DEFAULT
+                catalog
                     .lookup(opName)
                     ?: throw UnsupportedOperationException(
                         "Operator '$opName' is not in the v1 wire format",

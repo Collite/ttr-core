@@ -3,14 +3,20 @@ package org.tatrman.translator.framework
 
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.plan.v1.schemaCodeToToken
+import org.apache.calcite.config.CalciteConnectionConfig
+import org.apache.calcite.config.CalciteConnectionProperty
 import org.apache.calcite.config.Lex
+import org.apache.calcite.config.NullCollation
+import org.apache.calcite.plan.Contexts
 import org.apache.calcite.schema.SchemaPlus
 import org.apache.calcite.sql.parser.SqlParser
+import org.apache.calcite.sql.validate.SqlValidator
 import org.apache.calcite.tools.FrameworkConfig
 import org.apache.calcite.tools.Frameworks
 import org.apache.calcite.tools.Planner
 import org.apache.calcite.tools.RelBuilder
 import org.tatrman.translator.functions.CalciteOperatorTables
+import org.tatrman.translator.functions.FunctionCatalog
 import org.tatrman.translator.parser.impl.CalciteExtParserImpl
 import org.tatrman.translator.schema.SchemaPlusAdapter
 
@@ -40,6 +46,14 @@ class TranslatorFramework(
             if (model.namespaces(SchemaCode.OBJ).isNotEmpty()) it.add("obj", schemaPlusAdapter.obj)
         }
 
+    private val operatorTable = CalciteOperatorTables.forModel(model, schemaCode, namespace)
+
+    /**
+     * TF-P5 — the wire-name catalog matching this framework's operator table: a plan decoded here
+     * resolves the model-declared functions the parse resolved.
+     */
+    val functionCatalog: FunctionCatalog by lazy { FunctionCatalog.forTable(operatorTable) }
+
     private val frameworkConfig: FrameworkConfig =
         Frameworks
             .newConfigBuilder()
@@ -59,8 +73,29 @@ class TranslatorFramework(
             // validates, while our custom operators win any name collision. See
             // [CalciteOperatorTables.permissiveUnion] for the ordering + the "don't double-chain
             // SqlStdOperatorTable" rationale.
-            .operatorTable(CalciteOperatorTables.permissiveUnion)
-            .defaultSchema(
+            // TF-P5 (G C1) — the functions the model declares chain first ([CalciteOperatorTables.forModel]).
+            .operatorTable(operatorTable)
+            // TF-P3.S1 — TIMESTAMP/TIME precision up to 7 (T-SQL datetime2/time); see [TsqlTypeSystem].
+            .typeSystem(TsqlTypeSystem)
+            // TF-P2.S2 (G A8; contracts §3.6) — source SQL is T-SQL, which sorts NULLs FIRST ascending
+            // and LAST descending (`NullCollation.LOW`). Calcite's default (`HIGH`) gave every sort key
+            // the opposite direction, so the MSSQL dialect (also LOW) "corrected" it with a
+            // `CASE WHEN x IS NULL THEN 1 ELSE 0 END, x` prefix — changing the query's order from what
+            // its author wrote. The emulation now fires only for an explicit NULLS FIRST/LAST that
+            // disagrees with the target dialect.
+            // `PlannerImpl` builds its validator from `sqlValidatorConfig` but then OVERWRITES the null
+            // collation with the connection config it unwraps from the context (1.41
+            // `PlannerImpl.createSqlValidator`) — so the context carries it; the validator config is
+            // set too for any path that reads it directly.
+            .sqlValidatorConfig(SqlValidator.Config.DEFAULT.withDefaultNullCollation(NullCollation.LOW))
+            .context(
+                Contexts.of(
+                    CalciteConnectionConfig.DEFAULT.set(
+                        CalciteConnectionProperty.DEFAULT_NULL_COLLATION,
+                        NullCollation.LOW.name,
+                    ),
+                ),
+            ).defaultSchema(
                 rootSchema
                     .subSchemas()
                     .get(schemaCodeToToken(schemaCode))

@@ -15,6 +15,7 @@ import org.tatrman.translator.codec.sql.TableHintExtractor
 import org.tatrman.translator.codec.sql.TableHintSpec
 import org.tatrman.translator.codec.sql.TopClauseExtractor
 import org.tatrman.translator.codec.sql.ValidateResult
+import org.tatrman.translator.functions.TsqlPlusLowering
 import org.tatrman.translator.codec.transdsl.TransDslCodec
 import org.tatrman.translator.codec.transdsl.TransDslParseException
 import org.tatrman.translator.codec.transdsl.TransDslUnparseException
@@ -27,6 +28,7 @@ import org.tatrman.translator.framework.TranslatorFramework
 import org.tatrman.translator.joiner.JoinerLogical
 import org.tatrman.translator.joiner.JoinerPhysical
 import org.tatrman.translator.params.ParameterBridge
+import org.tatrman.translator.params.ParameterInStringLiteralException
 import org.tatrman.translator.params.PositionalParameters
 import org.tatrman.translator.params.PreparedSql
 import org.tatrman.translator.params.SqlParam
@@ -260,6 +262,14 @@ class Translator(
             if (parameters.isNotEmpty()) {
                 try {
                     ParameterBridge.prepareSqlForCalcite(preSource, parameters)
+                } catch (ex: ParameterInStringLiteralException) {
+                    // TF-P4 (G C2) — a declared `{name}` in a literal the bridge cannot rewrite
+                    // (`'a {x} b'`): distinct code, so the author gets the CONCAT hint rather
+                    // than a misleading "unknown parameter".
+                    return ParseResult.Failure(
+                        code = "parameter_in_string_literal",
+                        message = ex.message ?: "Parameter placeholder inside a SQL string literal",
+                    )
                 } catch (ex: IllegalArgumentException) {
                     return ParseResult.Failure(
                         code = "parameter_unknown",
@@ -427,10 +437,15 @@ class Translator(
             // `SubqueryExpression` encoding and REL_NODE re-entry stays byte-stable.
             val decorrelated = SubqueryNormalizer.apply(rel, framework)
 
+            // TF-P2.S1 (contracts §3.4) — pass 2 of T-SQL `+`/`-`: with operand types known, lower each
+            // TsqlPlus/TsqlMinus call to `||` (CONCAT), `DATEADD(DAY, n, d)` or plain PLUS/MINUS. The wire
+            // carries none of the T-SQL operators, so this is a no-op on REL_NODE re-entry.
+            val lowered = TsqlPlusLowering.apply(decorrelated)
+
             // 1. RESOLVE on RelNode. When the SQL carried parameters, `preparedSql` lets RESOLVE
             //    pre-type each `?` (RexDynamicParam) from the declared parameter type via
             //    ParameterTyper; null (free-SQL / RelNode re-entry) is a no-op for typing.
-            val resolved = Resolve.apply(decorrelated, framework, preparedSql)
+            val resolved = Resolve.apply(lowered, framework, preparedSql)
 
             // 1b. EXPAND SEARCH → OR/AND of comparisons. `SqlToRelConverter` folds an `IN`-list of
             //     literals / comparison ranges into a `SEARCH($ref, Sarg[…])`, whose `Sarg` value

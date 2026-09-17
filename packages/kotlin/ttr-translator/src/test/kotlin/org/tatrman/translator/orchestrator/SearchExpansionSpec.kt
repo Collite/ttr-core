@@ -23,6 +23,21 @@ class SearchExpansionSpec :
     StringSpec({
         val translator = Translator(FixtureModel.handle())
 
+        // TF-P1.S1 (P0 finding, legacy `nevyfakturovane_zakazky_dm`) — `NOT IN (-2, 10)` expands to
+        // `AND(<>, <>)`; nested inside the WHERE's own AND it left the condition non-flat, and Calcite's
+        // Filter asserts `RexUtil.isFlat` — a parse that threw only with assertions on (-ea). The correlated
+        // NOT EXISTS matters: the decorrelated plan carries a Filter that SearchExpander then copies.
+        "NOT IN inside an AND chain leaves the condition flat (throws under -ea otherwise)" {
+            val r =
+                Translator(FixtureModel.tfHandle()).parseToRelNode(
+                    source =
+                        "SELECT a.ID FROM A a WHERE a.NAME = 'x' AND a.ID >= 0 AND a.B_ID NOT IN (-2, 10) " +
+                            "AND NOT EXISTS (SELECT 1 FROM B b WHERE b.ID = a.ID)",
+                    sourceLanguage = Language.SQL,
+                )
+            r.shouldBeInstanceOf<ParseResult.Success>()
+        }
+
         "IN-list in WHERE parses (was Sarg-cast parse_pipeline_failed)" {
             val r =
                 translator.parseToRelNode(

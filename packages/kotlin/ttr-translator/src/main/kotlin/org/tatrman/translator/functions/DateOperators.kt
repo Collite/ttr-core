@@ -43,6 +43,14 @@ object SqlGetDateFunction : SqlFunction(
 }
 
 object DateOperators {
+    /**
+     * TF-P1.S1 — T-SQL `DATEDIFF(unit, startdate, enddate)` with **datetime** operands. Calcite's
+     * `SqlLibraryOperators.DATEDIFF` types them as DATE, so the validator inserted `CAST(… AS DATE)` and
+     * `DATEDIFF(HOUR, …)` counted whole days once casts rode the wire faithfully. The parser production
+     * (`DateaddFunctionCall`) and the wire decoder (`"datediff"`) both bind this instance.
+     */
+    val DATEDIFF: SqlFunction = org.apache.calcite.sql.`fun`.TsqlDateDiffFunctions.DATEDIFF
+
     /** Operator table exposed to the parser/validator (chained into [CustomOperators.table]). */
-    val table: SqlOperatorTable = SqlOperatorTables.of(SqlGetDateFunction)
+    val table: SqlOperatorTable = SqlOperatorTables.of(SqlGetDateFunction, DATEDIFF)
 }
