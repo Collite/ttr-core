@@ -1,7 +1,7 @@
 {
   "summary": {
-    "parseOk": 96,
-    "unparseOk": 96
+    "parseOk": 97,
+    "unparseOk": 97
   },
   "cases": [
     {
@@ -1477,8 +1477,8 @@
       ],
       "parse": "ok",
       "unparse": "ok",
-      "status": "red:TF-P5.S1",
-      "note": "C1 — calls dbo.fnXXOZ_* (model-declared functions)."
+      "status": "green",
+      "note": "TF-P5.S1 (C1) — calls dbo.fnXXOZ_* (model-declared functions, legacy-model.json `functions`)"
     },
     {
       "id": "pt30_cenova_politika/aktivni_slevy_subjektu",

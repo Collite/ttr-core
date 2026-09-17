@@ -19,6 +19,7 @@ import org.apache.calcite.rex.RexNode
 import org.apache.calcite.sql.SqlAggFunction
 import org.apache.calcite.tools.RelBuilder
 import org.tatrman.translator.framework.TranslatorFramework
+import org.tatrman.translator.functions.FunctionCatalog
 import org.tatrman.plan.v1.schemaCodeToToken
 
 /**
@@ -37,7 +38,7 @@ object PlanNodeDecoder {
         framework: TranslatorFramework,
     ): RelNode {
         val builder = framework.newRelBuilder()
-        push(builder, plan)
+        push(builder, plan, framework.functionCatalog)
         return builder.build()
     }
 
@@ -54,14 +55,16 @@ object PlanNodeDecoder {
     internal fun decodeSubrel(
         builder: RelBuilder,
         plan: PlanNode,
+        catalog: FunctionCatalog,
     ): RelNode {
-        push(builder, plan)
+        push(builder, plan, catalog)
         return builder.build()
     }
 
     private fun push(
         builder: RelBuilder,
         plan: PlanNode,
+        catalog: FunctionCatalog,
     ) {
         when (plan.nodeCase) {
             PlanNode.NodeCase.TABLE_SCAN ->
@@ -70,14 +73,14 @@ object PlanNodeDecoder {
             PlanNode.NodeCase.SCAN ->
                 pushTableScan(builder, plan.scan.getObject(), plan.scan.outputColumnsList, plan.scan.hintsList)
 
-            PlanNode.NodeCase.PROJECT -> pushProject(builder, plan.project)
-            PlanNode.NodeCase.FILTER -> pushFilter(builder, plan.filter)
-            PlanNode.NodeCase.JOIN -> pushJoin(builder, plan.join)
-            PlanNode.NodeCase.AGGREGATE -> pushAggregate(builder, plan.aggregate)
-            PlanNode.NodeCase.SORT -> pushSort(builder, plan.sort)
-            PlanNode.NodeCase.LIMIT_OFFSET -> pushLimitOffset(builder, plan.limitOffset)
+            PlanNode.NodeCase.PROJECT -> pushProject(builder, plan.project, catalog)
+            PlanNode.NodeCase.FILTER -> pushFilter(builder, plan.filter, catalog)
+            PlanNode.NodeCase.JOIN -> pushJoin(builder, plan.join, catalog)
+            PlanNode.NodeCase.AGGREGATE -> pushAggregate(builder, plan.aggregate, catalog)
+            PlanNode.NodeCase.SORT -> pushSort(builder, plan.sort, catalog)
+            PlanNode.NodeCase.LIMIT_OFFSET -> pushLimitOffset(builder, plan.limitOffset, catalog)
             PlanNode.NodeCase.VALUES -> pushValues(builder, plan.values)
-            PlanNode.NodeCase.UNION -> pushUnion(builder, plan.union)
+            PlanNode.NodeCase.UNION -> pushUnion(builder, plan.union, catalog)
             // A StoreNode is a write root with no query-RelNode form; it is intercepted by the DML
             // unparse path (StoreDmlUnparser) before reaching the generic decoder. Its `input` is
             // decoded there, never inline here (that would break RelBuilder stack discipline).
@@ -144,9 +147,10 @@ object PlanNodeDecoder {
     private fun pushProject(
         builder: RelBuilder,
         project: ProjectNode,
+        catalog: FunctionCatalog,
     ) {
-        push(builder, project.input)
-        val nodes = project.expressionsList.map { Expressions.decode(builder, it.expression) }
+        push(builder, project.input, catalog)
+        val nodes = project.expressionsList.map { Expressions.decode(builder, it.expression, catalog) }
         val aliases = project.expressionsList.map { it.alias.ifEmpty { null } }
         // `force = true` — preserve identity Projects. A `ProjectNode` in the wire form must
         // round-trip to a Calcite `Project`; without `force`, RelBuilder silently elides projects
@@ -159,18 +163,20 @@ object PlanNodeDecoder {
     private fun pushFilter(
         builder: RelBuilder,
         filter: FilterNode,
+        catalog: FunctionCatalog,
     ) {
-        push(builder, filter.input)
-        val cond = Expressions.decode(builder, filter.condition)
+        push(builder, filter.input, catalog)
+        val cond = Expressions.decode(builder, filter.condition, catalog)
         builder.filter(cond)
     }
 
     private fun pushJoin(
         builder: RelBuilder,
         join: JoinNode,
+        catalog: FunctionCatalog,
     ) {
-        push(builder, join.left)
-        push(builder, join.right)
+        push(builder, join.left, catalog)
+        push(builder, join.right, catalog)
         val type =
             when (join.joinType) {
                 JoinType.INNER -> JoinRelType.INNER
@@ -185,7 +191,7 @@ object PlanNodeDecoder {
                 )
             }
         if (join.hasCondition()) {
-            val cond = Expressions.decode(builder, join.condition)
+            val cond = Expressions.decode(builder, join.condition, catalog)
             builder.join(type, cond)
         } else {
             builder.join(type, builder.literal(true))
@@ -195,18 +201,20 @@ object PlanNodeDecoder {
     private fun pushUnion(
         builder: RelBuilder,
         union: UnionNode,
+        catalog: FunctionCatalog,
     ) {
         // Push each input in order, then collapse the top `n` stack entries into a
         // single set-op node (RelBuilder.union pops n rels and pushes the Union).
-        union.inputsList.forEach { push(builder, it) }
+        union.inputsList.forEach { push(builder, it, catalog) }
         builder.union(union.all, union.inputsList.size)
     }
 
     private fun pushAggregate(
         builder: RelBuilder,
         aggregate: AggregateNode,
+        catalog: FunctionCatalog,
     ) {
-        push(builder, aggregate.input)
+        push(builder, aggregate.input, catalog)
         val keyFields = aggregate.groupKeysList.map { it.name }
         val groupKey = builder.groupKey(keyFields.map { Expressions.fieldByName(builder, it) })
         val aggCalls = aggregate.aggregatesList.map { decodeAggCall(builder, it) }
@@ -266,8 +274,9 @@ object PlanNodeDecoder {
     private fun pushSort(
         builder: RelBuilder,
         sort: SortNode,
+        catalog: FunctionCatalog,
     ) {
-        push(builder, sort.input)
+        push(builder, sort.input, catalog)
         val sortNodes = sort.sortKeysList.map { sortKeyToRex(builder, it) }
         builder.sort(sortNodes)
     }
@@ -287,8 +296,9 @@ object PlanNodeDecoder {
     private fun pushLimitOffset(
         builder: RelBuilder,
         lo: LimitOffsetNode,
+        catalog: FunctionCatalog,
     ) {
-        push(builder, lo.input)
+        push(builder, lo.input, catalog)
         val limit = if (lo.hasLimit()) lo.limit.toInt() else -1
         val offset = if (lo.hasOffset()) lo.offset.toInt() else 0
         builder.limit(offset, limit)

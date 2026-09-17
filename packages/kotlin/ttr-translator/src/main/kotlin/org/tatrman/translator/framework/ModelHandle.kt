@@ -95,7 +95,30 @@ interface ModelHandle {
      * Returns an empty set if no objects of this schema kind are loaded.
      */
     fun namespaces(schemaCode: SchemaCode): Set<String>
+
+    /**
+     * TF-P5 (G C1) — scalar functions the database exposes and the model declares (db* `functions:`),
+     * callable in SQL against [schemaCode]/[namespace] (`("db", "dbo")` → `dbo.fn_price`). Default
+     * empty, so existing handles keep compiling and see no functions.
+     */
+    fun functions(
+        schemaCode: SchemaCode,
+        namespace: String,
+    ): List<ModelFunction> = emptyList()
 }
+
+/**
+ * TF-P5 (G C1) — a scalar function the database exposes and the model declares. [qname] is
+ * `(DB, <SQL schema>, <function name>)`; lookup is case-insensitive. [parameters] are positional and
+ * validated by their surface family ([org.tatrman.translator.params.SurfaceTypeMapping.familyOf]);
+ * [physicalReturn] carries precision/scale when the model gave them (`decimal(18,4)`).
+ */
+data class ModelFunction(
+    val qname: QualifiedName,
+    val parameters: List<SurfaceType>,
+    val returns: SurfaceType,
+    val physicalReturn: PhysicalType? = null,
+)
 
 /** A table or view in the model. */
 data class ModelTable(

@@ -11,6 +11,8 @@ import org.apache.calcite.sql.validate.SqlNameMatcher
 import org.apache.calcite.sql.`fun`.SqlLibrary
 import org.apache.calcite.sql.`fun`.SqlLibraryOperatorTableFactory
 import org.apache.calcite.sql.util.SqlOperatorTables
+import org.tatrman.plan.v1.SchemaCode
+import org.tatrman.translator.framework.ModelHandle
 
 /**
  * The Calcite [SqlOperatorTable]s the translator loads for validation.
@@ -56,6 +58,21 @@ object CalciteOperatorTables {
                 REPLACED_LIBRARY_OPERATORS,
             ),
         )
+    }
+
+    /**
+     * TF-P5 (contracts §3.6) — the operator set for a framework over [model]: the functions the model
+     * declares ([ModelFunctions.tableFor]) chained before [permissiveUnion]. A model without functions
+     * resolves exactly as [permissiveUnion].
+     */
+    fun forModel(
+        model: ModelHandle,
+        schemaCode: SchemaCode,
+        namespace: String,
+    ): SqlOperatorTable {
+        val declared = ModelFunctions.tableFor(model, schemaCode, namespace, permissiveUnion)
+        if (declared.operatorList.isEmpty()) return permissiveUnion
+        return SqlOperatorTables.chain(declared, permissiveUnion)
     }
 
     /**

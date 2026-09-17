@@ -4,6 +4,9 @@ package org.tatrman.translator.functions
 import org.apache.calcite.sql.SqlOperator
 import org.apache.calcite.sql.SqlOperatorTable
 import org.apache.calcite.sql.SqlSyntax
+import org.apache.calcite.sql.validate.SqlUserDefinedFunction
+import org.tatrman.plan.v1.SchemaCode
+import org.tatrman.translator.framework.ModelHandle
 
 /**
  * Single source of wire identity for function-syntax operators (master-plan §5.2, decision D4).
@@ -53,10 +56,35 @@ class FunctionCatalog private constructor(
             val byName: Map<String, SqlOperator> =
                 table.operatorList
                     .filter { it.syntax in FUNCTION_SYNTAXES }
-                    .groupBy { it.name.lowercase() }
+                    .groupBy(::wireName)
                     .mapValues { (_, ops) -> ops.first() }
             return FunctionCatalog(byName)
         }
+
+        /**
+         * The wire `operation` of a function-syntax [operator]: its lower-cased name, or for a
+         * model-declared function (TF-P5) its lower-cased qualified identifier (`dbo.fn_price`), so a
+         * decoded call finds the function of the right schema.
+         */
+        fun wireName(operator: SqlOperator): String =
+            if (operator is SqlUserDefinedFunction) {
+                operator.nameAsId.names
+                    .joinToString(".")
+                    .lowercase()
+            } else {
+                operator.name.lowercase()
+            }
+
+        /** TF-P5 (contracts §3.6) — the catalog of [CalciteOperatorTables.forModel]. */
+        fun forModel(
+            model: ModelHandle,
+            schemaCode: SchemaCode,
+            namespace: String,
+        ): FunctionCatalog = forTable(CalciteOperatorTables.forModel(model, schemaCode, namespace))
+
+        /** The catalog of a framework operator [table]: the shared [DEFAULT] for the permissive union. */
+        fun forTable(table: SqlOperatorTable): FunctionCatalog =
+            if (table === CalciteOperatorTables.permissiveUnion) DEFAULT else fromOperatorTable(table)
 
         /**
          * The default catalog for the Phase 0 interim permissive union (STANDARD + MSSQL +

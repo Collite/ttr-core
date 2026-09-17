@@ -117,4 +117,29 @@ class ModelHandleSpec :
             result.planNode shouldBe body
             result.parameters shouldBe listOf(ParamSpec("p1", SurfaceType.TEXT))
         }
+
+        // ---- TF-P5 (contracts §3.1): model-declared functions ----
+
+        "functions() defaults to empty for a handle that does not declare any" {
+            FixtureModel.handle().functions(SchemaCode.DB, "dbo") shouldBe emptyList()
+        }
+
+        "InMemoryModelHandle returns the functions of the asked schema and namespace only" {
+            val h = FixtureModel.handleWithFunctions()
+            h.functions(SchemaCode.DB, "dbo").map { it.qname.name } shouldContainExactly listOf("fn_price", "fn_today")
+            h.functions(SchemaCode.DB, "xx") shouldBe emptyList()
+            h.functions(SchemaCode.ER, "dbo") shouldBe emptyList()
+        }
+
+        "fromJson reads the functions section (schema-qualified name, surface parameter and return types)" {
+            val h =
+                InMemoryModelHandle.fromJson(
+                    """{"tables": {"T": {"ID": "INT"}}, "functions": {"xx.fn_a": {"parameters": ["INT", "DATETIME"], "returns": "FLOAT"}}}""",
+                )
+            val f = h.functions(SchemaCode.DB, "xx").single()
+            f.qname.name shouldBe "fn_a"
+            f.parameters shouldBe listOf(SurfaceType.INT, SurfaceType.DATETIME)
+            f.returns shouldBe SurfaceType.FLOAT
+            h.namespaces(SchemaCode.DB) shouldBe setOf("dbo", "xx")
+        }
     })

@@ -32,6 +32,7 @@ import org.apache.calcite.sql.SqlOperator
 import org.apache.calcite.sql.`fun`.SqlStdOperatorTable
 import org.apache.calcite.sql.type.SqlTypeName
 import org.apache.calcite.tools.RelBuilder
+import org.tatrman.translator.functions.FunctionCatalog
 
 /**
  * RexNode ↔ Expression encoders / decoders for the v1 wire format.
@@ -378,7 +379,8 @@ object Expressions {
             SqlKind.LIKE -> "like"
             // TF-P1.S3 (G C8) — T-SQL TRY_CAST; Calcite builds it as SAFE_CAST (or TRY_CAST, same kind).
             SqlKind.SAFE_CAST -> "safe_cast"
-            else -> call.operator.name.lowercase()
+            // TF-P5 — a model-declared function rides under its qualified name (`dbo.fn_price`).
+            else -> FunctionCatalog.wireName(call.operator)
         }
 
     /**
@@ -388,10 +390,15 @@ object Expressions {
      * Column references are resolved against the builder's current peek's
      * row type (so `decode` MUST be called after the input has been pushed
      * onto the builder's stack).
+     *
+     * [catalog] resolves function-syntax operators by wire name; TF-P5 — pass the framework's
+     * [org.tatrman.translator.framework.TranslatorFramework.functionCatalog] so model-declared functions
+     * decode.
      */
     fun decode(
         builder: RelBuilder,
         expr: Expression,
+        catalog: FunctionCatalog = FunctionCatalog.DEFAULT,
     ): RexNode =
         when (expr.exprCase) {
             Expression.ExprCase.LITERAL -> decodeLiteral(builder, expr.literal)
@@ -401,18 +408,18 @@ object Expressions {
                 // rides on the *Expression's* result_type, not on the call — so it can't
                 // go through the generic operator path (which has no type to cast to).
                 if (expr.function.operation.equals("cast", ignoreCase = true)) {
-                    decodeCast(builder, expr.function, expr.resultType, safe = false)
+                    decodeCast(builder, expr.function, expr.resultType, safe = false, catalog)
                 } else if (expr.function.operation.equals("safe_cast", ignoreCase = true)) {
-                    decodeCast(builder, expr.function, expr.resultType, safe = true)
+                    decodeCast(builder, expr.function, expr.resultType, safe = true, catalog)
                 } else {
-                    decodeFunctionCall(builder, expr.function)
+                    decodeFunctionCall(builder, expr.function, catalog)
                 }
             Expression.ExprCase.PARAMETER ->
                 decodeParameter(builder, expr.parameter, expr.resultType)
             Expression.ExprCase.SUBQUERY ->
-                decodeSubquery(builder, expr.subquery)
+                decodeSubquery(builder, expr.subquery, catalog)
             Expression.ExprCase.OVER ->
-                decodeOver(builder, expr.over, expr.resultType)
+                decodeOver(builder, expr.over, expr.resultType, catalog)
             Expression.ExprCase.CAST ->
                 throw UnsupportedOperationException(
                     "CastExpression decoding is TODO; v1 codecs preserve casts via Expression.cast",
@@ -617,9 +624,10 @@ object Expressions {
     private fun decodeFunctionCall(
         builder: RelBuilder,
         fn: FunctionCall,
+        catalog: FunctionCatalog,
     ): RexNode {
-        val operator = operatorFor(fn.operation)
-        val operands = fn.operandsList.map { decode(builder, it) }
+        val operator = operatorFor(fn.operation, catalog)
+        val operands = fn.operandsList.map { decode(builder, it, catalog) }
         return builder.call(operator, operands)
     }
 
@@ -635,9 +643,10 @@ object Expressions {
         fn: FunctionCall,
         resultType: String,
         safe: Boolean,
+        catalog: FunctionCatalog,
     ): RexNode {
         require(fn.operandsCount == 1) { "${fn.operation} expects exactly 1 operand, got ${fn.operandsCount}" }
-        val operand = decode(builder, fn.operandsList[0])
+        val operand = decode(builder, fn.operandsList[0], catalog)
         val targetType = castTargetType(builder.typeFactory, resultType)
         // TF-P1.S3 (G C8) — `safe_cast` (T-SQL TRY_CAST): the same target-type code, a SAFE_CAST call.
         return if (safe) {
@@ -780,8 +789,9 @@ object Expressions {
     private fun decodeSubquery(
         builder: RelBuilder,
         sub: SubqueryExpression,
+        catalog: FunctionCatalog,
     ): RexNode {
-        val subRel = PlanNodeDecoder.decodeSubrel(builder, sub.subquery)
+        val subRel = PlanNodeDecoder.decodeSubrel(builder, sub.subquery, catalog)
         return when (sub.kind.lowercase()) {
             "scalar" -> RexSubQuery.scalar(subRel)
             "exists" -> RexSubQuery.exists(subRel)
@@ -789,7 +799,7 @@ object Expressions {
                 RexSubQuery.`in`(
                     subRel,
                     com.google.common.collect.ImmutableList
-                        .copyOf(sub.operandsList.map { decode(builder, it) }),
+                        .copyOf(sub.operandsList.map { decode(builder, it, catalog) }),
                 )
             else -> throw UnsupportedOperationException(
                 "Subquery kind '${sub.kind}' is not in the v1 wire format",
@@ -801,20 +811,21 @@ object Expressions {
         builder: RelBuilder,
         over: OverExpression,
         resultType: String,
+        catalog: FunctionCatalog,
     ): RexNode {
         val type =
             builder.typeFactory.createTypeWithNullability(
                 builder.typeFactory.createSqlType(sqlTypeNameFor(resultType)),
                 true,
             )
-        val exprs = over.operandsList.map { decode(builder, it) }
-        val partitionKeys = over.partitionKeysList.map { decode(builder, it) }
+        val exprs = over.operandsList.map { decode(builder, it, catalog) }
+        val partitionKeys = over.partitionKeysList.map { decode(builder, it, catalog) }
         val orderKeys =
             over.orderKeysList.map { ok ->
                 val dirs = mutableSetOf<SqlKind>()
                 if (ok.descending) dirs.add(SqlKind.DESCENDING)
                 dirs.add(if (ok.nullsFirst) SqlKind.NULLS_FIRST else SqlKind.NULLS_LAST)
-                RexFieldCollation(decode(builder, ok.expr), dirs)
+                RexFieldCollation(decode(builder, ok.expr, catalog), dirs)
             }
         return builder.rexBuilder.makeOver(
             type,
@@ -881,7 +892,10 @@ object Expressions {
         return builder.rexBuilder.makeDynamicParam(type, param.positionalIndex)
     }
 
-    private fun operatorFor(opName: String): SqlOperator =
+    private fun operatorFor(
+        opName: String,
+        catalog: FunctionCatalog,
+    ): SqlOperator =
         when (opName.lowercase()) {
             "and" -> org.apache.calcite.sql.`fun`.SqlStdOperatorTable.AND
             "or" -> org.apache.calcite.sql.`fun`.SqlStdOperatorTable.OR
@@ -943,7 +957,7 @@ object Expressions {
             // structural/contract entries above stay the authority — the catalog is only the
             // fallback, so e.g. the binary `||` is never conflated with the function-syntax "concat".
             else ->
-                org.tatrman.translator.functions.FunctionCatalog.DEFAULT
+                catalog
                     .lookup(opName)
                     ?: throw UnsupportedOperationException(
                         "Operator '$opName' is not in the v1 wire format",

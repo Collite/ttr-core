@@ -20,6 +20,7 @@ class InMemoryModelHandle(
     private val savedQueries: List<ModelSavedQuery> = emptyList(),
     private val savedQueryBodies: Map<QualifiedName, SavedQueryBody> = emptyMap(),
     private val attributeRenames: Map<QualifiedName, Map<String, String>> = emptyMap(),
+    private val functions: List<ModelFunction> = emptyList(),
 ) : ModelHandle {
     override fun tables(
         schemaCode: SchemaCode,
@@ -67,9 +68,16 @@ class InMemoryModelHandle(
     override fun savedQueryBody(queryQname: QualifiedName): SavedQueryBody =
         savedQueryBodies[queryQname] ?: error("Unknown query $queryQname")
 
+    override fun functions(
+        schemaCode: SchemaCode,
+        namespace: String,
+    ): List<ModelFunction> = functions.filter { it.qname.schemaCode == schemaCode && it.qname.namespace == namespace }
+
     override fun namespaces(schemaCode: SchemaCode): Set<String> =
         when (schemaCode) {
-            SchemaCode.DB -> tables.mapTo(mutableSetOf()) { it.qname.namespace }
+            SchemaCode.DB ->
+                tables.mapTo(mutableSetOf()) { it.qname.namespace } +
+                    functions.filter { it.qname.schemaCode == SchemaCode.DB }.map { it.qname.namespace }
             SchemaCode.ER -> entities.mapTo(mutableSetOf()) { it.qname.namespace }
             SchemaCode.OBJ -> savedQueries.mapTo(mutableSetOf()) { it.qname.namespace }
             else -> emptySet()
@@ -111,7 +119,24 @@ class InMemoryModelHandle(
                             },
                     )
                 }
-            return InMemoryModelHandle(tables, version = version)
+            // TF-P5 — optional `{"functions": {"<schema>.<name>": {"parameters": ["INT", …], "returns": "FLOAT"}}}`.
+            val functions =
+                root.get("functions")?.properties()?.map { (qualified, fnNode) ->
+                    fun surface(tag: String) =
+                        SurfaceType.fromTag(tag) ?: error("unknown surface type '$tag' for function $qualified")
+                    ModelFunction(
+                        qname =
+                            QualifiedName
+                                .newBuilder()
+                                .setSchemaCode(SchemaCode.DB)
+                                .setNamespace(qualified.substringBefore('.', "dbo"))
+                                .setName(qualified.substringAfter('.'))
+                                .build(),
+                        parameters = fnNode.get("parameters")?.map { surface(it.asText()) } ?: emptyList(),
+                        returns = surface(fnNode.get("returns").asText()),
+                    )
+                } ?: emptyList()
+            return InMemoryModelHandle(tables, version = version, functions = functions)
         }
     }
 }
@@ -205,6 +230,50 @@ object FixtureModel {
                     .setName(name)
                     .build(),
             columns = columns.map { (n, t) -> ModelColumn(n, t, nullable = true) },
+        )
+
+    private fun dboFunction(
+        name: String,
+        parameters: List<SurfaceType>,
+        returns: SurfaceType,
+        physicalReturn: PhysicalType? = null,
+    ): ModelFunction =
+        ModelFunction(
+            qname =
+                QualifiedName
+                    .newBuilder()
+                    .setSchemaCode(SchemaCode.DB)
+                    .setNamespace("dbo")
+                    .setName(name)
+                    .build(),
+            parameters = parameters,
+            returns = returns,
+            physicalReturn = physicalReturn,
+        )
+
+    /** TF-P5 (G C1) — the model-declared scalar functions of [handleWithFunctions]. */
+    val tfFunctions: List<ModelFunction> =
+        listOf(
+            dboFunction(
+                "fn_price",
+                listOf(SurfaceType.INT, SurfaceType.INT, SurfaceType.DATETIME),
+                SurfaceType.FLOAT,
+                PhysicalType(PhysicalType.Kind.DECIMAL, precision = 18, scale = 4),
+            ),
+            dboFunction("fn_today", emptyList(), SurfaceType.DATETIME),
+        )
+
+    /** TF-P5 — [tfHandle] plus `dbo.fn_price(INT, INT, DATETIME) → DECIMAL(18,4)` and `dbo.fn_today()`. */
+    fun handleWithFunctions(): InMemoryModelHandle =
+        InMemoryModelHandle(tables = tfHandle().tables(SchemaCode.DB, "dbo").values.toList(), functions = tfFunctions)
+
+    /** TF-P5 — [handleWithEntities] with `customer → customers` mapped, plus [tfFunctions]. */
+    fun handleWithEntitiesAndFunctions(): InMemoryModelHandle =
+        InMemoryModelHandle(
+            tables = listOf(customers, orders),
+            entities = listOf(customerEntity),
+            entityMappings = mapOf(customerEntityQname to EntityMapping.ToTable(customersQname)),
+            functions = tfFunctions,
         )
 
     /**

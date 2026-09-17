@@ -16,6 +16,7 @@ import org.apache.calcite.tools.Frameworks
 import org.apache.calcite.tools.Planner
 import org.apache.calcite.tools.RelBuilder
 import org.tatrman.translator.functions.CalciteOperatorTables
+import org.tatrman.translator.functions.FunctionCatalog
 import org.tatrman.translator.parser.impl.CalciteExtParserImpl
 import org.tatrman.translator.schema.SchemaPlusAdapter
 
@@ -45,6 +46,14 @@ class TranslatorFramework(
             if (model.namespaces(SchemaCode.OBJ).isNotEmpty()) it.add("obj", schemaPlusAdapter.obj)
         }
 
+    private val operatorTable = CalciteOperatorTables.forModel(model, schemaCode, namespace)
+
+    /**
+     * TF-P5 — the wire-name catalog matching this framework's operator table: a plan decoded here
+     * resolves the model-declared functions the parse resolved.
+     */
+    val functionCatalog: FunctionCatalog by lazy { FunctionCatalog.forTable(operatorTable) }
+
     private val frameworkConfig: FrameworkConfig =
         Frameworks
             .newConfigBuilder()
@@ -64,7 +73,8 @@ class TranslatorFramework(
             // validates, while our custom operators win any name collision. See
             // [CalciteOperatorTables.permissiveUnion] for the ordering + the "don't double-chain
             // SqlStdOperatorTable" rationale.
-            .operatorTable(CalciteOperatorTables.permissiveUnion)
+            // TF-P5 (G C1) — the functions the model declares chain first ([CalciteOperatorTables.forModel]).
+            .operatorTable(operatorTable)
             // TF-P3.S1 — TIMESTAMP/TIME precision up to 7 (T-SQL datetime2/time); see [TsqlTypeSystem].
             .typeSystem(TsqlTypeSystem)
             // TF-P2.S2 (G A8; contracts §3.6) — source SQL is T-SQL, which sorts NULLs FIRST ascending
