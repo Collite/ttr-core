@@ -50,15 +50,16 @@ let the engine fill in the `ON`s. The join is decided by `joiner.JoinPolicy` —
 | Form | Result |
 |---|---|
 | `a JOIN b` · `a INNER JOIN b` · `a LEFT JOIN b` · `a RIGHT JOIN b` · `a FULL JOIN b` (no `ON`/`USING`) | conditioned from the model in SQL; join type preserved |
-| `a, b` · `a CROSS JOIN b` | conditioned from the model on the wire (`JoinerLogical`), as `INNER` |
+| `a, b` · `a CROSS JOIN b` | conditioned from the model on the wire (`JoinerLogical`), as `INNER` — the key-name collision guard applies |
 | `a JOIN b ON …` · `USING (…)` · `NATURAL JOIN` | untouched |
 | `a JOIN b JOIN c …` (chain, any length, parentheses allowed) | each join decided against the full entity set of its other side |
 | `a JOIN (SELECT …) s` · `a JOIN db_table` | the non-entity side contributes no entity → `ON TRUE` + `JOIN_NO_RELATION` |
 | aliases `FROM zákazník z JOIN dodací_místo dm` | the conditions use the aliases |
 
 Warnings: `JOIN_NO_RELATION`, `JOIN_AMBIGUOUS_RELATIONS` (two relations, or an entity repeated across
-the join — write the `ON`), `JOIN_RELATION_WITHOUT_PAIRS` (INFO; filled from the FK after
-MAP_TO_PHYSICAL), `JOIN_KEY_NAME_COLLISION` (wire carrier only). `explain` exposes the rewritten
+the join — write the `ON`), `JOIN_RELATION_WITHOUT_PAIRS` (INFO; left to the FK after
+MAP_TO_PHYSICAL), `JOIN_KEY_NAME_COLLISION` (wire carrier only). An entity that already has its `ON`
+(the OZ + VOT double) does not block a later bare join. `explain` exposes the rewritten
 statement as stage `model_joins`. Design, contracts and the acceptance corpus:
 `project/tatrman/features/ttr-translator/model-joins/`.
 

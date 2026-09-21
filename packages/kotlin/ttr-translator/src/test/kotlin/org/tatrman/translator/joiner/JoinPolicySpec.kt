@@ -91,6 +91,40 @@ class JoinPolicySpec :
             v.repeated shouldBe setOf(er("dodací_místo"))
         }
 
+        "C-1: a repeated entity no candidate names does not block the join (review-097 R1)" {
+            // (dm, uživatel oz, uživatel vot) × kp — the two uživatel aliases got their ONs; kp ↔ dm is unique.
+            val v =
+                JoinPolicy
+                    .resolve(model, side("dodací_místo", "uživatel", "uživatel"), side("kumulovaný_prodej"))
+                    .shouldBeInstanceOf<Verdict.Resolved<String>>()
+            v.left.entity shouldBe er("dodací_místo")
+            v.right.entity shouldBe er("kumulovaný_prodej")
+            v.pairs shouldContainExactly listOf("id_dodacího_místa" to "id_dodacího_místa")
+        }
+
+        "C-1: a repeated entity that IS party to a candidate still steps aside" {
+            // (dm, uživatel, uživatel) × obchodní_kanál — dm ↔ ok is the only candidate and uživatel names none,
+            // so it resolves; (uživatel, uživatel) × dm — every candidate names uživatel → ambiguous, repeated.
+            JoinPolicy
+                .resolve(model, side("dodací_místo", "uživatel", "uživatel"), side("obchodní_kanál"))
+                .shouldBeInstanceOf<Verdict.Resolved<String>>()
+            val v =
+                JoinPolicy
+                    .resolve(model, side("uživatel", "uživatel"), side("dodací_místo"))
+                    .shouldBeInstanceOf<Verdict.Ambiguous<String>>()
+            v.repeated shouldBe setOf(er("uživatel"))
+        }
+
+        "C-1: a repeat within one side and no candidate → NoRelation; across the join → still a self-join" {
+            JoinPolicy
+                .resolve(model, side("uživatel", "uživatel"), side("produkt"))
+                .shouldBeInstanceOf<Verdict.NoRelation<String>>()
+            JoinPolicy
+                .resolve(model, side("produkt"), side("produkt"))
+                .shouldBeInstanceOf<Verdict.Ambiguous<String>>()
+                .repeated shouldBe setOf(er("produkt"))
+        }
+
         "composite relation: dodatek × smlouva carries both pairs, oriented (⚑MJ-7)" {
             val v =
                 JoinPolicy

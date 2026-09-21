@@ -21,8 +21,9 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
     the stage `model_joins` (the rewritten statement, or `(no bare joins)`).
   - **`joiner/JoinPolicy`** (new) — the single decision: candidates `(l, r, rel)` over both sides; exactly
     one → resolved; none → `NoRelation`; two or more → `AmbiguousRelations` (no proximity tie-break); an
-    entity occurring twice across the join (self-join, two aliases) → ambiguous with `repeated`; all pairs
-    oriented to the sides. Path inference through bridge entities is deliberately *not* built (gated v2).
+    entity occurring twice across the join (a self-join, or two aliases a candidate names) → ambiguous with
+    `repeated` — a repeated alias that already has its `ON` does not block the *next* join (contracts §2
+    C-1, review-097 R1); all pairs oriented to the sides. Path inference through bridge entities is deliberately *not* built (gated v2).
   - **`JoinerLogical` / `JoinerPhysical`** on the same rule: whole-side matching (the comma-form chain
     `FROM a, b, c` now resolves too), `and(eq, eq)` for composite relations / multi-column FKs, and a
     **key-name collision guard** — a bare `$L`/`$R` ref resolves to the *first* holder of a name, so a join
@@ -30,7 +31,8 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
     `JoinerWarning.KeyNameCollision` instead of silently mis-joining. ⚠ **Behaviour changes:** (1) a side's
     entity/table set descends `Join` and `Filter` only — a `Project`/`Aggregate`/`Subquery` under a join side
     is no longer looked into (it could produce a bare-name ref to a column a derived table does not expose
-    and fail at decode); such a join is passed through untouched. (2) `JoinerLogical` used only the FIRST
+    and fail at decode); such a join stays unconditioned and is reported as `JOIN_NO_RELATION` naming
+    "a derived table" for that side (review-097 R2) — never a silent Cartesian product. (2) `JoinerLogical` used only the FIRST
     pair of a composite relation. (3) `JoinerPhysical` skipped multi-column FKs (`NoRelation`); they are now
     ANDed.
   - **Warnings ride on the result:** `ParseResult.Success.warnings` / `TranslateResult.Success.warnings`

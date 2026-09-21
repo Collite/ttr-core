@@ -6,6 +6,7 @@ import org.tatrman.plan.v1.Expression
 import org.tatrman.plan.v1.FunctionCall
 import org.tatrman.plan.v1.JoinNode
 import org.tatrman.plan.v1.PlanNode
+import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.translator.framework.ModelHandle
 import org.tatrman.translator.joiner.JoinPolicy.SideRef
@@ -32,8 +33,10 @@ import org.tatrman.translator.wire.Expressions
  * - A side's entity set = the `Scan(ER)` leaves reachable through `Join` and `Filter` nodes only
  *   ([collectEntityScans]). Narrower than the v1.0 first-scan search, which descended `Project` /
  *   `Aggregate` / `Subquery` and could emit a bare-name ref to a column a derived table no longer exposes
- *   (a hard `field not found` at decode instead of a warning). A side with no visible entity → the join is
- *   passed through (mixed-schema preservation per §96; `JoinerPhysical` may still condition table ↔ table).
+ *   (a hard `field not found` at decode instead of a warning). A side that exposes a table instead → the join
+ *   is passed through (mixed-schema preservation per §96; `JoinerPhysical` may still condition table ↔ table).
+ *   A side that exposes nothing at all (a derived table) → [JoinerWarning.NoRelation] with that side empty
+ *   (review-097 R2): the Cartesian product is reported, never silent.
  * - The join is decided against the **whole** set of each side (⚑MJ-2): `((kp ⋈ dm) ⋈ z)` matches `z`
  *   against `{kp, dm}`, so a chain resolves through `dodací_místo → zákazník`; v1.0 matched the first scan
  *   only and warned `NoRelation` for every chain past two entities.
@@ -96,9 +99,23 @@ object JoinerLogical {
 
         val left = collectEntityScans(join.left)
         val right = collectEntityScans(join.right)
+        if (left.isEmpty() && right.isEmpty()) return withChildren
         if (left.isEmpty() || right.isEmpty()) {
             // Mixed-schema preservation: only act on entity ↔ entity pairs. Section E handles
             // table ↔ table; entity ↔ table is left for the user to express explicitly.
+            val opaque = if (left.isEmpty()) join.left else join.right
+            if (hasScan(opaque)) return withChildren
+            // review-097 R2 (contracts §1 row 5): entity ↔ derived table (a Project / Aggregate / Subquery
+            // the narrowed descent does not look into) is a Cartesian product nobody declared — say so;
+            // the empty side is rendered as "a derived table" and carries no QualifiedName.
+            val entities = left.ifEmpty { right }.map { it.entity }
+            warnings +=
+                JoinerWarning.NoRelation(
+                    sideA = if (left.isEmpty()) QualifiedName.getDefaultInstance() else entities.first(),
+                    sideB = if (right.isEmpty()) QualifiedName.getDefaultInstance() else entities.first(),
+                    leftEntities = left.map { it.entity },
+                    rightEntities = right.map { it.entity },
+                )
             return withChildren
         }
 
@@ -156,6 +173,15 @@ object JoinerLogical {
             PlanNode.NodeCase.JOIN -> collectEntityScans(plan.join.left) + collectEntityScans(plan.join.right)
             PlanNode.NodeCase.FILTER -> collectEntityScans(plan.filter.input)
             else -> emptyList()
+        }
+
+    /** Is any scan (entity or table) reachable through `Join` / `Filter`? False for an opaque (derived) side. */
+    private fun hasScan(plan: PlanNode): Boolean =
+        when (plan.nodeCase) {
+            PlanNode.NodeCase.SCAN, PlanNode.NodeCase.TABLE_SCAN -> true
+            PlanNode.NodeCase.JOIN -> hasScan(plan.join.left) || hasScan(plan.join.right)
+            PlanNode.NodeCase.FILTER -> hasScan(plan.filter.input)
+            else -> false
         }
 
     /**

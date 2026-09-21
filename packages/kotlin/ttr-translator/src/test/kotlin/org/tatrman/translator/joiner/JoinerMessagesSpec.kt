@@ -32,6 +32,19 @@ class JoinerMessagesSpec :
                 "Cartesian product preserved"
         }
 
+        "JOIN_NO_RELATION — an empty side is a derived table (review-097 R2)" {
+            val w =
+                JoinerWarning.NoRelation(
+                    er("kumulovaný_prodej"),
+                    org.tatrman.plan.v1.QualifiedName
+                        .getDefaultInstance(),
+                    leftEntities = listOf(er("kumulovaný_prodej")),
+                    rightEntities = emptyList(),
+                )
+            JoinerMessages.text(w) shouldBe
+                "no declared relation between entity.kumulovaný_prodej and a derived table; Cartesian product preserved"
+        }
+
         "JOIN_AMBIGUOUS_RELATIONS — lists the candidates as from → to (pairs); write the ON" {
             val w = JoinerWarning.AmbiguousRelations(er("dodací_místo"), er("uživatel"), oz)
             JoinerMessages.code(w) shouldBe "JOIN_AMBIGUOUS_RELATIONS"
@@ -63,7 +76,7 @@ class JoinerMessagesSpec :
             val w = JoinerWarning.RelationWithoutJoinPairs(er("a"), er("b"), rel)
             JoinerMessages.code(w) shouldBe "JOIN_RELATION_WITHOUT_PAIRS"
             JoinerMessages.severity(w) shouldBe JoinerMessages.Severity.INFO
-            JoinerMessages.text(w) shouldBe "relation a → b declares no join pairs; joined from its foreign key"
+            JoinerMessages.text(w) shouldBe "relation a → b declares no join pairs; left to its foreign key"
         }
 
         "JOIN_KEY_NAME_COLLISION — wire carrier only, names the key and the side" {
@@ -105,7 +118,7 @@ class JoinerMessagesSpec :
             JoinerWarnings.merge(logical, physical) shouldBe emptyList()
         }
 
-        "merge: RelationWithoutJoinPairs stays when the FK filled the join, and lets a physical NoRelation through" {
+        "merge: RelationWithoutJoinPairs stays when the FK filled the join, else only the physical NoRelation (R3)" {
             val logical = JoinerResult(plan, listOf(withoutPairs), listOf(JoinOutcome(listOf(0), withoutPairs)))
             JoinerWarnings.merge(
                 logical,
@@ -116,7 +129,7 @@ class JoinerMessagesSpec :
                 logical,
                 JoinerResult(plan, listOf(noFk), listOf(JoinOutcome(listOf(0), noFk))),
             ) shouldBe
-                listOf(withoutPairs, noFk)
+                listOf(noFk)
         }
 
         "merge: joins only one carrier saw are reported as they are, logical first" {

@@ -240,6 +240,32 @@ class ModelJoinSpec :
             dbHalf.warnings.map { JoinerMessages.code(it) } shouldBe listOf("JOIN_AMBIGUOUS_RELATIONS")
         }
 
+        "H11 — a derived table on one side: ON TRUE + JOIN_NO_RELATION naming 'a derived table' (review-097 R2)" {
+            val r =
+                mssql(
+                    "SELECT 1 FROM kumulovaný_prodej JOIN " +
+                        "(SELECT id_produktu FROM produkt WHERE název_produktu LIKE '%Oleje%') p",
+                ).shouldBeInstanceOf<TranslateResult.Success>()
+            r.output shouldNotContain "="
+            val w = r.warnings.single()
+            JoinerMessages.code(w) shouldBe "JOIN_NO_RELATION"
+            JoinerMessages.text(w) shouldBe
+                "no declared relation between entity.kumulovaný_prodej and a derived table; Cartesian product preserved"
+        }
+
+        "H13 — OZ + VOT with explicit ONs, then a bare JOIN kumulovaný_prodej resolves kp ↔ dm (C-1, review-097 R1)" {
+            val r =
+                mssql(
+                    "SELECT 1 FROM dodací_místo dm " +
+                        "JOIN uživatel oz ON dm.obchodní_zástupce = oz.id_uživatele " +
+                        "JOIN uživatel vot ON dm.vedoucí_obchodního_týmu = vot.id_uživatele " +
+                        "JOIN kumulovaný_prodej",
+                ).shouldBeInstanceOf<TranslateResult.Success>()
+            r.output shouldContain "[QDODMISTO].[id_dodacího_místa] = [QKUMPRODEJ].[id_dodacího_místa]"
+            r.output shouldNotContain "CROSS JOIN"
+            r.warnings shouldBe emptyList()
+        }
+
         "a pure-DB comma join with no FK still reports JOIN_NO_RELATION naming the tables" {
             val r =
                 translator

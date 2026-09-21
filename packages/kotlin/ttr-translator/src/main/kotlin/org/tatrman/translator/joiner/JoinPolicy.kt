@@ -14,10 +14,12 @@ import org.tatrman.translator.framework.ModelRelation
  * Contract (project `model-joins/contracts.md §2`, ⚑MJ-2/6/7/8 ruled 2026-09-21):
  *  1. candidates = every `(l, r, rel)` with `l ∈ left`, `r ∈ right`, `rel` connecting them in either direction;
  *  2. an entity qname occurring more than once in `left ∪ right` (both sides counted together) drops every
- *     candidate naming it and is reported in [Verdict.Ambiguous.repeated] (self-joins / OZ+VOT-style
- *     doubles: the author writes the ON);
- *  3. exactly one candidate → [Verdict.Resolved]; none → [Verdict.NoRelation]; two or more, or any repeated
- *     entity → [Verdict.Ambiguous]. No proximity tie-break — deterministic on (statement, model) only;
+ *     candidate naming it; if anything was dropped the join is [Verdict.Ambiguous] with the entity in
+ *     [Verdict.Ambiguous.repeated]; an entity on both sides of the join (self-join) always is. A repeated
+ *     entity within one side that no candidate names does not block the join — `(dm ⋈ oz ON … ⋈ vot ON …)
+ *     ⋈ kp` still resolves `kp ↔ dm` (contracts §2 amendment C-1, review-097 R1);
+ *  3. exactly one remaining candidate → [Verdict.Resolved]; none → [Verdict.NoRelation]; two or more →
+ *     [Verdict.Ambiguous]. No proximity tie-break — deterministic on (statement, model) only;
  *  4. a resolved relation with no `joinPairs` → [Verdict.WithoutPairs] (FK-bound; JoinerPhysical may fill it);
  *  5. [Verdict.Resolved.pairs] carries ALL pairs (composite relations AND them), each already oriented
  *     left/right and reduced to the bare attribute name.
@@ -90,9 +92,14 @@ object JoinPolicy {
                         .map { rel -> Candidate(l, r, rel) }
                 }
             }
-        val candidates = all.filter { it.left.entity !in repeated && it.right.entity !in repeated }
+        val (dropped, candidates) = all.partition { it.left.entity in repeated || it.right.entity in repeated }
+        // C-1: a repeated entity blocks the join only when it is party to a candidate, or when it sits on BOTH
+        // sides of this join (a self-join always needs its ON, related or not — H8).
+        val partyToCandidate = dropped.flatMap { listOf(it.left.entity, it.right.entity) }.filter { it in repeated }
+        val onBothSides = leftNames.filter { it in rightNames }
+        val blocking = (partyToCandidate + onBothSides).toSet()
         return when {
-            repeated.isNotEmpty() -> Verdict.Ambiguous(leftNames, rightNames, all, repeated)
+            blocking.isNotEmpty() -> Verdict.Ambiguous(leftNames, rightNames, all, blocking)
             candidates.isEmpty() -> Verdict.NoRelation(leftNames, rightNames)
             candidates.size > 1 -> Verdict.Ambiguous(leftNames, rightNames, candidates, emptySet())
             else -> {

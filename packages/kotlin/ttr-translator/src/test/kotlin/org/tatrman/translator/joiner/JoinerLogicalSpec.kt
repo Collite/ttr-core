@@ -381,7 +381,7 @@ class JoinerLogicalSpec :
             warn.relation.fromEntity shouldBe erQname("b")
         }
 
-        "narrowed descent: a Subquery/Aggregate/Project under a join side is NOT looked into" {
+        "narrowed descent: a Subquery/Aggregate/Project side → NoRelation with that side empty (review-097 R2)" {
             fun wrapAggregate(input: PlanNode): PlanNode =
                 PlanNode
                     .newBuilder()
@@ -412,8 +412,15 @@ class JoinerLogicalSpec :
                 val input = unconditionedJoin(erScan("kumulovaný_prodej"), wrap(erScan("produkt")))
                 val result = JoinerLogical.apply(input, dfp)
                 result.plan.join.hasCondition() shouldBe false
-                // No entity visible on the right → mixed-schema preservation, no warning from this carrier.
-                result.warnings.shouldBeEmpty()
+                // Nothing visible on the right at all (a derived table) → the Cartesian product is reported,
+                // the empty side carries no QualifiedName (contracts §1 row 5).
+                val warn = result.warnings.single().shouldBeInstanceOf<JoinerWarning.NoRelation>()
+                warn.leftEntities shouldBe listOf(erQname("kumulovaný_prodej"))
+                warn.rightEntities.shouldBeEmpty()
+                warn.sideA shouldBe erQname("kumulovaný_prodej")
+                warn.sideB shouldBe QualifiedName.getDefaultInstance()
+                JoinerMessages.text(warn) shouldBe
+                    "no declared relation between entity.kumulovaný_prodej and a derived table; Cartesian product preserved"
             }
         }
 

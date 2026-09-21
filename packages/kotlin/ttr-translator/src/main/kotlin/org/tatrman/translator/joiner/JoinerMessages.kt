@@ -56,7 +56,7 @@ object JoinerMessages {
                             "write the ON"
                 }
             is JoinerWarning.RelationWithoutJoinPairs ->
-                "relation ${relation(warning.relation)} declares no join pairs; joined from its foreign key"
+                "relation ${relation(warning.relation)} declares no join pairs; left to its foreign key"
             is JoinerWarning.KeyNameCollision ->
                 "join key ${warning.attribute} exists on more than one entity of the " +
                     "${warning.side.name.lowercase()} side; Cartesian product preserved — write the ON"
@@ -64,7 +64,9 @@ object JoinerMessages {
 
     private fun name(q: QualifiedName): String = if (q.namespace.isEmpty()) q.name else "${q.namespace}.${q.name}"
 
-    private fun names(qs: List<QualifiedName>): String = qs.joinToString { name(it) }
+    /** An empty side is a derived table the wire carrier does not look into (review-097 R2). */
+    private fun names(qs: List<QualifiedName>): String =
+        if (qs.isEmpty()) "a derived table" else qs.joinToString { name(it) }
 
     /** `from → to (a = b, c = d)` — a relation has no name of its own on the model handle. */
     private fun relation(r: ModelRelation): String {
@@ -81,10 +83,11 @@ object JoinerMessages {
  *
  *  - the physical carrier **conditioned** a join the logical one warned on → the logical warning is
  *    stale and dropped, except [JoinerWarning.RelationWithoutJoinPairs], whose text says exactly that
- *    ("joined from its foreign key");
+ *    ("left to its foreign key");
  *  - both **warned** on the same join → keep the logical (entity-level) warning, which names what the
  *    author wrote; the physical duplicate is dropped — unless the logical one was
- *    `RelationWithoutJoinPairs` (INFO), in which case the physical `NoRelation` is the real news;
+ *    `RelationWithoutJoinPairs` (INFO), in which case the physical `NoRelation` is the real news and the
+ *    INFO is dropped (review-097 R3: no FK joined it);
  *  - a join only one carrier saw (a mixed entity/table side, a pure-DB statement) → reported as is.
  *
  * Order: logical first, then physical — the order the stages ran.
@@ -99,10 +102,19 @@ object JoinerWarnings {
                 .filter { it.warning == null }
                 .map { it.joinPath }
                 .toSet()
+        val warnedByPhysical =
+            physical.outcomes
+                .filter { it.warning != null }
+                .map { it.joinPath }
+                .toSet()
         val keptLogical =
             logical.outcomes.mapNotNull { o ->
                 val w = o.warning ?: return@mapNotNull null
-                if (o.joinPath in conditionedByPhysical && w !is JoinerWarning.RelationWithoutJoinPairs) null else w
+                when {
+                    w is JoinerWarning.RelationWithoutJoinPairs -> w.takeIf { o.joinPath !in warnedByPhysical }
+                    o.joinPath in conditionedByPhysical -> null
+                    else -> w
+                }
             }
         val decidedByLogical =
             logical.outcomes

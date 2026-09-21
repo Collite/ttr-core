@@ -37,7 +37,8 @@ data class JoinOutcome(
  * MJ (⚑MJ-2): a join is decided against the **whole** entity set of each side, so [NoRelation] and
  * [AmbiguousRelations] carry those sets (`leftEntities` / `rightEntities`, tree order). `sideA` / `sideB`
  * are the sets' first members — the two `QualifiedName` slots the proto message keeps; the text renders the
- * lists (contracts §4).
+ * lists (contracts §4). A side the wire carrier cannot see into (a derived table, review-097 R2) is an empty
+ * list, and its slot is `QualifiedName.getDefaultInstance()`.
  */
 sealed interface JoinerWarning {
     /** Which input of the join a [KeyNameCollision] is on. */
