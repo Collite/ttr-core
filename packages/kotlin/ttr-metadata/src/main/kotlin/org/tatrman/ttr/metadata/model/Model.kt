@@ -689,6 +689,14 @@ data class QueryParameterDef(
     val name: String,
     val type: String,
     val label: String = "",
+    /**
+     * ai-platform PB — the model attributes (`entity.attribute`) whose resolved value fills this
+     * parameter. Carrier for a host dialect, exactly like [Query.skipSecurity]: declared in
+     * ai-platform's YAML pattern files, never in TTR-M — the grammar is untouched, so a query
+     * loaded from (or written back to) `.ttr` always leaves this at its default. Appended last
+     * with a default so positional construction stays source-compatible.
+     */
+    val binds: List<String> = emptyList(),
 )
 
 sealed interface ParseStatus {
