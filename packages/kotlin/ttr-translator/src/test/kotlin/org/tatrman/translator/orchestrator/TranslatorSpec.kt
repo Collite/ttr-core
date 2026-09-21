@@ -130,7 +130,8 @@ class TranslatorSpec :
 
         "explain captures stage artefacts" {
             val r = translator.explain("SELECT id FROM customers", Language.SQL)
-            r.stages.size shouldBe 2
+            // parse_and_to_rel, model_joins (MJ), optimize_and_unparse
+            r.stages.size shouldBe 3
             r.finalOutput!!.shouldContainIgnoringCase("customers")
         }
 

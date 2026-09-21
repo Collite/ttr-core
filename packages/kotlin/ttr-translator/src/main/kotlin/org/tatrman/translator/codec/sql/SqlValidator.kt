@@ -3,6 +3,7 @@ package org.tatrman.translator.codec.sql
 
 import org.apache.calcite.rel.RelNode
 import org.apache.calcite.sql.parser.SqlParseException
+import org.apache.calcite.sql.util.SqlShuttle
 import org.apache.calcite.sql.validate.SqlValidatorException
 import org.apache.calcite.tools.Planner
 import org.apache.calcite.tools.RelConversionException
@@ -25,9 +26,15 @@ import org.apache.calcite.tools.ValidationException
  * planner is in scope.
  */
 object SqlValidator {
+    /**
+     * [preValidation] — extra `SqlShuttle`s applied to the parsed statement after the built-in rewrites and
+     * before `planner.validate`, in order. MJ: `Translator.parseSql` passes a fresh
+     * [ModelJoinRewriter] here for ER-catalog validations (contracts §1); existing callers pass nothing.
+     */
     fun validateAndConvert(
         planner: Planner,
         sqlText: String,
+        preValidation: List<SqlShuttle> = emptyList(),
     ): ValidateResult =
         try {
             val parsed = planner.parse(sqlText)
@@ -55,7 +62,8 @@ object SqlValidator {
                     org.tatrman.translator.functions.TsqlArithmeticShuttle
                         .rewriter(),
                 ) ?: stringAggRewritten
-            val validated = planner.validate(arithmeticRewritten)
+            val preValidated = preValidation.fold(arithmeticRewritten) { node, shuttle -> node.accept(shuttle) ?: node }
+            val validated = planner.validate(preValidated)
             // TF-P2.S2 (G A8) — `RelRoot.project()`, not `.rel`: an ORDER BY key outside the select list is
             // projected below the Sort, and only the root's field mapping trims it back off. `.rel` dropped
             // that mapping, so `SELECT a.ID … ORDER BY LEN(a.NAME)` returned two columns. A no-op (the same

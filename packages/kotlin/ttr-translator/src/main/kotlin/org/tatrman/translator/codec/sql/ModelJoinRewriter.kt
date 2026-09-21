@@ -10,6 +10,7 @@ import org.apache.calcite.sql.SqlJoin
 import org.apache.calcite.sql.SqlKind
 import org.apache.calcite.sql.SqlLiteral
 import org.apache.calcite.sql.SqlNode
+import org.apache.calcite.sql.dialect.CalciteSqlDialect
 import org.apache.calcite.sql.`fun`.SqlStdOperatorTable
 import org.apache.calcite.sql.parser.SqlParserPos
 import org.apache.calcite.sql.util.SqlShuttle
@@ -60,6 +61,17 @@ class ModelJoinRewriter(
     var rewrittenJoins: Int = 0
         private set
 
+    /**
+     * The whole statement after the last top-level `accept`, rendered as one line of SQL, when at least one
+     * join was touched; null otherwise. "What the engine actually joined" — the `explain` stage `model_joins`
+     * and the DEBUG log read it; available whether or not validation succeeds afterwards.
+     */
+    var lastRewrittenSql: String? = null
+        private set
+
+    /** Depth of nested `visit(SqlCall)` frames — the outermost one is the statement root. */
+    private var depth: Int = 0
+
     /** Case-insensitive (`Lex.MYSQL_ANSI`) lookup of the ER entities in [namespace] by bare name. */
     private val entitiesByName: Map<String, QualifiedName> by lazy {
         model
@@ -69,6 +81,17 @@ class ModelJoinRewriter(
     }
 
     override fun visit(call: SqlCall): SqlNode? {
+        depth++
+        try {
+            val result = visitCall(call)
+            if (depth == 1 && rewrittenJoins > 0 && result != null) lastRewrittenSql = render(result)
+            return result
+        } finally {
+            depth--
+        }
+    }
+
+    private fun visitCall(call: SqlCall): SqlNode? {
         // Children first — SqlShuttle rebuilds the call through its operator (SqlJoin.OPERATOR.createCall
         // keeps the parser position) only when an operand changed.
         val visited = super.visit(call) ?: return null
@@ -148,7 +171,16 @@ class ModelJoinRewriter(
         return if (equalities.size == 1) equalities.single() else SqlStdOperatorTable.AND.createCall(pos, equalities)
     }
 
+    private fun render(node: SqlNode): String =
+        node
+            .toSqlString(CalciteSqlDialect.DEFAULT)
+            .sql
+            .replace(WHITESPACE, " ")
+            .trim()
+
     companion object {
+        private val WHITESPACE = Regex("\\s+")
+
         /** Calcite's catalog token for the ER schema (`TranslatorFramework.schemaCodeToToken(ER)`). */
         private const val ER_CATALOG = "er"
 
