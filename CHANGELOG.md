@@ -6,6 +6,19 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-translator`** ⚑ **regression fix (MJ follow-up, df-test 2026-09-21) — `JoinerPhysical` sees the
+  `TableScan` under MAP_TO_PHYSICAL's alias-at-boundary `Project` again.** 0.11.1 narrowed a join side's
+  scan search to `Join`/`Filter` (so a derived table's hidden column could not become a bare-name ref that
+  dies at decode) — but MAP_TO_PHYSICAL itself wraps a **query-backed** entity's body in a `Project`
+  (`id_obchodního_kanálu := IDCENSKUP`), and every `*__filter` entity on the DF estate is query-backed.
+  The FK fallback that had conditioned `FROM prodej JOIN obchodní_kanál` since v1.0 silently stopped and the
+  join ran as a Cartesian product. A `Project` is now descended as a **name map** on the scan (`ScanRef`):
+  only its bare column-ref expressions expose a name, the FK column is mapped through every projection up
+  to the join, and an FK whose column no projection exposes is dropped from the candidates (a
+  `JOIN_NO_RELATION` warning, never a decode-time `field not found`). `JoinerPhysicalSpec` (nested alias
+  projects, unexposed column, computed expression) and `ModelJoinSpec` on `DfpJoinModel.handleQueryBacked()`
+  — the df-test shape: query-backed entity, FKs derived from the relations, and no relations served — pin it.
+
 - **`ttr-translator`** ⚑ **model joins (MJ, → `translator/v0.12.0`) — bare and chained `JOIN`s in the ER
   lane are conditioned from the model's declared relations.** `FROM kumulovaný_prodej JOIN dodací_místo
   JOIN zákazník JOIN produkt` — the way the LLM lane writes it — used to die at Calcite validation with

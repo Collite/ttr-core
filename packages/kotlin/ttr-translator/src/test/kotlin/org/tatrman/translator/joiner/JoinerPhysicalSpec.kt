@@ -358,4 +358,102 @@ class JoinerPhysicalSpec :
             result.plan.join.hasCondition() shouldBe false
             result.warnings.last().shouldBeInstanceOf<JoinerWarning.AmbiguousRelations>()
         }
+
+        // -- MJ-P4·S2.6: the TableScan under MAP_TO_PHYSICAL's alias Project (query-backed entity) --------
+
+        fun aliasProject(
+            input: PlanNode,
+            vararg columns: Pair<String, String>,
+        ): PlanNode {
+            val p =
+                org.tatrman.plan.v1.ProjectNode
+                    .newBuilder()
+                    .setInput(input)
+            columns.forEach { (name, alias) ->
+                p.addExpressions(
+                    org.tatrman.plan.v1.NamedExpression
+                        .newBuilder()
+                        .setExpression(
+                            Expression.newBuilder().setColumnRef(
+                                org.tatrman.plan.v1.ColumnRef
+                                    .newBuilder()
+                                    .setName(name),
+                            ),
+                        ).setAlias(alias),
+                )
+            }
+            return PlanNode.newBuilder().setProject(p).build()
+        }
+
+        "a scan under an alias Project is found and the FK column is mapped THROUGH the projection" {
+            // Project(id_obchodního_kanálu := IDCENSKUP) over the body's Project(IDCENSKUP := IDCENSKUP) over the scan
+            // — the shape MAP_TO_PHYSICAL builds for a query-backed entity. The condition must name the outermost
+            // visible name on each side.
+            val fk =
+                ModelForeignKey(
+                    listOf(colQname("QXXPLANPRODEJU", "IDCENSKUP")),
+                    listOf(colQname("QCENSKUP_DF", "IDCENSKUP")),
+                )
+            val model = InMemoryModelHandle(tables = emptyList(), foreignKeys = listOf(fk))
+            val left =
+                aliasProject(
+                    aliasProject(
+                        dbScan(tableQname("QXXPLANPRODEJU")),
+                        "IDCENSKUP" to "IDCENSKUP",
+                        "HDCCENAKC" to "HDCCENAKC",
+                    ),
+                    "IDCENSKUP" to "id_obchodního_kanálu",
+                    "HDCCENAKC" to "tržba",
+                )
+            val right =
+                aliasProject(
+                    dbScan(tableQname("QCENSKUP_DF")),
+                    "IDCENSKUP" to "id_obchodního_kanálu",
+                    "CEN_SKUP" to "kód",
+                )
+            val result = JoinerPhysical.apply(unconditionedJoin(left, right), model)
+            result.warnings.shouldBeEmpty()
+            eqNames(result.plan.join.condition) shouldBe ("id_obchodního_kanálu" to "id_obchodního_kanálu")
+        }
+
+        "a projection that does NOT expose the FK column drops that FK: NoRelation, not a decode-time failure" {
+            val fk = ModelForeignKey(listOf(colQname("a", "b_id")), listOf(colQname("b", "id")))
+            val model = InMemoryModelHandle(tables = emptyList(), foreignKeys = listOf(fk))
+            val left = aliasProject(dbScan(tableQname("a")), "x" to "x") // b_id not projected
+            val result = JoinerPhysical.apply(unconditionedJoin(left, dbScan(tableQname("b"))), model)
+            result.plan.join.hasCondition() shouldBe false
+            result.warnings.single().shouldBeInstanceOf<JoinerWarning.NoRelation>()
+        }
+
+        "a Project with a computed expression over the FK column does not expose it" {
+            val fk = ModelForeignKey(listOf(colQname("a", "b_id")), listOf(colQname("b", "id")))
+            val model = InMemoryModelHandle(tables = emptyList(), foreignKeys = listOf(fk))
+            val p =
+                org.tatrman.plan.v1.ProjectNode
+                    .newBuilder()
+                    .setInput(dbScan(tableQname("a")))
+            p.addExpressions(
+                org.tatrman.plan.v1.NamedExpression
+                    .newBuilder()
+                    .setExpression(
+                        Expression
+                            .newBuilder()
+                            .setFunction(
+                                org.tatrman.plan.v1.FunctionCall
+                                    .newBuilder()
+                                    .setOperation("abs")
+                                    .addOperands(
+                                        Expression.newBuilder().setColumnRef(
+                                            org.tatrman.plan.v1.ColumnRef
+                                                .newBuilder()
+                                                .setName("b_id"),
+                                        ),
+                                    ),
+                            ),
+                    ).setAlias("b_id"),
+            )
+            val left = PlanNode.newBuilder().setProject(p).build()
+            val result = JoinerPhysical.apply(unconditionedJoin(left, dbScan(tableQname("b"))), model)
+            result.plan.join.hasCondition() shouldBe false
+        }
     })

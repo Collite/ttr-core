@@ -280,4 +280,55 @@ class ModelJoinSpec :
             JoinerMessages.text(r.warnings.single()) shouldBe
                 "no declared relation between dbo.QKUMPRODEJ and dbo.QPRODUKT; Cartesian product preserved"
         }
+
+        // ---- MJ-P4·S2.6 (df-test trace 108b292c…): query-backed entities, FK fallback through MAP_TO_PHYSICAL's Project ----
+
+        fun mssqlOn(
+            model: org.tatrman.translator.framework.ModelHandle,
+            sql: String,
+        ): TranslateResult =
+            Translator(model).translate(
+                source = sql,
+                sourceLanguage = Language.SQL,
+                targetLanguage = Language.SQL,
+                targetSchema = SchemaCode.DB,
+                targetDialect = SqlDialect.MSSQL,
+                sourceSchema = SchemaCode.ER,
+            )
+
+        "query-backed entity, no relations served: the FK still conditions a bare JOIN through the alias Project" {
+            // On df-test `relations()` was empty (metadata served descriptors only) and `produkt`-like entities are
+            // `*__filter` queries: MAP_TO_PHYSICAL wraps the body in a Project, which the narrowed descent (P2) no
+            // longer looked through — the FK fallback silently stopped and the join stayed a Cartesian product.
+            val r =
+                mssqlOn(
+                    DfpJoinModel.handleQueryBacked(),
+                    "SELECT produkt.název_produktu FROM kumulovaný_prodej JOIN produkt",
+                ).shouldBeInstanceOf<TranslateResult.Success>()
+            r.output shouldContain "[id_produktu] = "
+            r.output.count { it == '=' } shouldBe 1
+            r.output shouldNotContain "CROSS"
+            // physical conditioned it → the logical carrier's NoRelation is stale and dropped (one verdict per join)
+            r.warnings shouldBe emptyList()
+        }
+
+        "query-backed entity, no relations served: the comma form too" {
+            val r =
+                mssqlOn(
+                    DfpJoinModel.handleQueryBacked(),
+                    "SELECT produkt.název_produktu FROM kumulovaný_prodej, produkt",
+                ).shouldBeInstanceOf<TranslateResult.Success>()
+            r.output.count { it == '=' } shouldBe 1
+            r.warnings shouldBe emptyList()
+        }
+
+        "query-backed entity WITH relations served: the SQL carrier resolves it, the physical carrier passes through" {
+            val r =
+                mssqlOn(
+                    DfpJoinModel.handleQueryBacked(relations = DfpJoinModel.relations),
+                    "SELECT produkt.název_produktu FROM kumulovaný_prodej JOIN produkt",
+                ).shouldBeInstanceOf<TranslateResult.Success>()
+            r.output.count { it == '=' } shouldBe 1
+            r.warnings shouldBe emptyList()
+        }
     })

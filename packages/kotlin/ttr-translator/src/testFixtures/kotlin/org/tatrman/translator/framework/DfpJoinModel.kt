@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.translator.framework
 
+import org.tatrman.plan.v1.PlanNode
 import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.plan.v1.SchemaCode
 
@@ -215,6 +216,111 @@ object DfpJoinModel {
             entities = entities,
             relations = relations,
             entityMappings = entityMappings,
+            attributeRenames = renames,
+        )
+
+    // ---- the df-test shape (MJ-P4·S2.6): query-backed entities + FKs derived from the relations ----
+
+    /** FK `QKUMPRODEJ.id_produktu → QPRODUKT.id_produktu`, the way the metadata service derives it from the relation. */
+    val kumulovanyProdejProduktFk =
+        ModelForeignKey(
+            from = listOf(db("QKUMPRODEJ.id_produktu")),
+            to = listOf(db("QPRODUKT.id_produktu")),
+        )
+
+    private val produktFilterQuery: QualifiedName =
+        QualifiedName
+            .newBuilder()
+            .setNamespace("query")
+            .setName("produkt__filter")
+            .build()
+
+    /**
+     * `produkt` backed by a saved query `SELECT id_produktu, název_produktu FROM QPRODUKT WHERE id_produktu > 0`
+     * — MAP_TO_PHYSICAL substitutes the body and wraps it in the alias-at-boundary Project, exactly as on
+     * df-test where `prodej` / `obchodní_kanál` are `*__filter` queries.
+     */
+    private fun produktFilterBody(): PlanNode {
+        fun col(name: String) =
+            org.tatrman.plan.v1.ColumnRef
+                .newBuilder()
+                .setName(name)
+                .build()
+
+        fun colExpr(name: String) =
+            org.tatrman.plan.v1.Expression
+                .newBuilder()
+                .setColumnRef(col(name))
+                .build()
+        val scan =
+            PlanNode
+                .newBuilder()
+                .setTableScan(
+                    org.tatrman.plan.v1.TableScanNode
+                        .newBuilder()
+                        .setTable(db("QPRODUKT"))
+                        .addOutputColumns(col("id_produktu"))
+                        .addOutputColumns(col("název_produktu")),
+                ).build()
+        val zero =
+            org.tatrman.plan.v1.Expression
+                .newBuilder()
+                .setLiteral(
+                    org.tatrman.plan.v1.Literal
+                        .newBuilder()
+                        .setIntValue(0),
+                ).build()
+        val filter =
+            PlanNode
+                .newBuilder()
+                .setFilter(
+                    org.tatrman.plan.v1.FilterNode
+                        .newBuilder()
+                        .setInput(scan)
+                        .setCondition(
+                            org.tatrman.plan.v1.Expression
+                                .newBuilder()
+                                .setFunction(
+                                    org.tatrman.plan.v1.FunctionCall
+                                        .newBuilder()
+                                        .setOperation("gt")
+                                        .addOperands(colExpr("id_produktu"))
+                                        .addOperands(zero),
+                                ),
+                        ),
+                ).build()
+        val project =
+            org.tatrman.plan.v1.ProjectNode
+                .newBuilder()
+                .setInput(filter)
+        listOf("id_produktu", "název_produktu").forEach { c ->
+            project.addExpressions(
+                org.tatrman.plan.v1.NamedExpression
+                    .newBuilder()
+                    .setExpression(colExpr(c))
+                    .setAlias(c),
+            )
+        }
+        return PlanNode.newBuilder().setProject(project).build()
+    }
+
+    /**
+     * The estate as df-test serves it: `produkt` query-backed, FKs derived from the relations, and —
+     * [relations] defaulted to none — a snapshot whose relation detail never reached the translator
+     * (the metadata gap fixed in ai-platform MJ-P4·S2.5), so every entity join must be filled from the FK.
+     */
+    fun handleQueryBacked(relations: List<ModelRelation> = emptyList()): InMemoryModelHandle =
+        InMemoryModelHandle(
+            tables = tables,
+            foreignKeys = listOf(kumulovanyProdejProduktFk),
+            entities = entities,
+            relations = relations,
+            entityMappings = entityMappings + (er("produkt") to EntityMapping.ToQuery(produktFilterQuery)),
+            savedQueries = listOf(ModelSavedQuery(produktFilterQuery)),
+            savedQueryBodies =
+                mapOf(
+                    produktFilterQuery to SavedQueryBody(produktFilterBody(), emptyList(), emptyList()),
+                ),
             attributeRenames = renames,
         )
 

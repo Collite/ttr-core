@@ -69,10 +69,22 @@ object JoinerPhysical {
         return JoinerResult(plan = rewritten, warnings = outcomes.mapNotNull { it.warning }, outcomes = outcomes)
     }
 
+    /**
+     * A `TableScan(DB)` on a join side together with the alias-only projections between it and the join
+     * ([projections], innermost first): MAP_TO_PHYSICAL wraps a query-backed entity's body in an
+     * alias-at-boundary `Project` (`id_obchodního_kanálu := IDCENSKUP`), and the body itself usually
+     * carries one. A column is visible above the join only under the name the outermost projection
+     * gives it — [visibleName] maps it through; a column no projection exposes is not usable.
+     */
+    data class ScanRef(
+        val scan: TableScanNode,
+        val projections: List<Map<String, String>>,
+    )
+
     /** One FK that could join a left scan to a right scan. */
     private data class Candidate(
-        val left: SideRef<TableScanNode>,
-        val right: SideRef<TableScanNode>,
+        val left: SideRef<ScanRef>,
+        val right: SideRef<ScanRef>,
         val fk: ModelForeignKey,
     )
 
@@ -124,7 +136,12 @@ object JoinerPhysical {
                     fks.filter { fk -> connects(fk, l.entity, r.entity) }.map { fk -> Candidate(l, r, fk) }
                 }
             }
-        val candidates = all.filter { it.left.entity !in repeated && it.right.entity !in repeated }
+        // MJ-P4·S2.6 — an FK whose column a projection does not expose cannot be used: drop it here so the
+        // verdict is a warning, not a `field not found` at decode.
+        val candidates =
+            all
+                .filter { it.left.entity !in repeated && it.right.entity !in repeated }
+                .filter { c -> orientedVisiblePairs(c) != null }
         return when {
             repeated.isNotEmpty() || candidates.size > 1 -> {
                 // FK ambiguity is rare but possible (two FKs between the same two tables — think
@@ -147,7 +164,7 @@ object JoinerPhysical {
             }
             else -> {
                 val c = candidates.single()
-                val pairs = orientedVisiblePairs(c)
+                val pairs = checkNotNull(orientedVisiblePairs(c))
                 val collision = keyNameCollision(c, pairs, left, right, model)
                 if (collision != null) {
                     warnings += collision
@@ -160,22 +177,45 @@ object JoinerPhysical {
     }
 
     /**
-     * The `TableScan(DB)` leaves of a join side, in tree order, reachable through `Join` and `Filter` only
-     * (the [JoinerLogical.collectEntityScans] rule). The handle is the scan node, whose aliases the
-     * condition must use.
+     * The `TableScan(DB)` leaves of a join side, in tree order, reachable through `Join`, `Filter` and
+     * `Project` (MJ-P4·S2.6 — the [JoinerLogical.collectEntityScans] rule plus the projections
+     * MAP_TO_PHYSICAL itself puts above a query-backed entity's body; the df-test `*__filter` entities).
+     * A `Project` is recorded as a name map on the [ScanRef] — only its bare column-ref expressions expose
+     * a name; a computed expression, an aggregate or a subquery hide the column, as the narrowed descent
+     * intends. The handle is the scan node plus that map chain, which the condition resolves through.
      */
-    internal fun collectTableScans(plan: PlanNode): List<SideRef<TableScanNode>> =
+    internal fun collectTableScans(
+        plan: PlanNode,
+        projections: List<Map<String, String>> = emptyList(),
+    ): List<SideRef<ScanRef>> =
         when (plan.nodeCase) {
             PlanNode.NodeCase.TABLE_SCAN ->
                 if (plan.tableScan.table.schemaCode == SchemaCode.DB) {
-                    listOf(SideRef(plan.tableScan.table, plan.tableScan))
+                    listOf(SideRef(plan.tableScan.table, ScanRef(plan.tableScan, projections)))
                 } else {
                     emptyList()
                 }
-            PlanNode.NodeCase.JOIN -> collectTableScans(plan.join.left) + collectTableScans(plan.join.right)
-            PlanNode.NodeCase.FILTER -> collectTableScans(plan.filter.input)
+            PlanNode.NodeCase.JOIN ->
+                collectTableScans(plan.join.left, projections) + collectTableScans(plan.join.right, projections)
+            PlanNode.NodeCase.FILTER -> collectTableScans(plan.filter.input, projections)
+            PlanNode.NodeCase.PROJECT ->
+                collectTableScans(
+                    plan.project.input,
+                    listOf(aliasMap(plan.project)) + projections,
+                )
             else -> emptyList()
         }
+
+    /** `input name → exposed name` for every bare column-ref expression of a Project; other expressions expose nothing. */
+    private fun aliasMap(project: org.tatrman.plan.v1.ProjectNode): Map<String, String> =
+        project.expressionsList
+            .filter {
+                it.expression.exprCase == Expression.ExprCase.COLUMN_REF &&
+                    it.expression.columnRef.sourceAlias
+                        .isEmpty()
+            }.associate { ne ->
+                ne.expression.columnRef.name to ne.alias.ifEmpty { ne.expression.columnRef.name }
+            }
 
     /** Does [fk] connect tables [a] and [b] (either direction)? Every column of an FK belongs to one table. */
     private fun connects(
@@ -203,9 +243,10 @@ object JoinerPhysical {
 
     /**
      * The FK's column pairs as `(leftVisible, rightVisible)`: oriented to the join's sides (which side
-     * holds the FK's source table) and mapped through each side's own scan ([visibleName]).
+     * holds the FK's source table) and mapped through each side's own scan and projections
+     * ([visibleName]); null when a column is not exposed above the join.
      */
-    private fun orientedVisiblePairs(c: Candidate): List<Pair<String, String>> {
+    private fun orientedVisiblePairs(c: Candidate): List<Pair<String, String>>? {
         val fromOnLeft =
             c.fk.from
                 .first()
@@ -214,46 +255,66 @@ object JoinerPhysical {
             val fromName = fromCol.name.substringAfterLast('.')
             val toName = toCol.name.substringAfterLast('.')
             val (leftCol, rightCol) = if (fromOnLeft) fromName to toName else toName to fromName
-            visibleName(c.left.handle, leftCol) to visibleName(c.right.handle, rightCol)
+            val l = visibleName(c.left.handle, leftCol) ?: return null
+            val r = visibleName(c.right.handle, rightCol) ?: return null
+            l to r
         }
     }
 
     /**
-     * The name [column] is reachable by above [scan]: its alias when the scan aliases it, the column
-     * name otherwise. A column the scan does not declare keeps its physical name — the join then fails
-     * at unparse naming that column, which is the honest outcome; guessing another column would not be.
+     * The name [column] is reachable by above the join: the scan's alias when it aliases the column (the
+     * column name otherwise — a column the scan does not declare keeps its physical name, the honest
+     * outcome; guessing another column would not be), then mapped through every projection on the way up.
+     * Null when a projection does not expose it.
      */
     private fun visibleName(
-        scan: TableScanNode,
+        ref: ScanRef,
         column: String,
-    ): String =
-        scan.outputColumnsList
-            .firstOrNull { it.name == column }
-            ?.alias
-            ?.takeIf { it.isNotEmpty() }
-            ?: column
+    ): String? {
+        val atScan =
+            ref.scan.outputColumnsList
+                .firstOrNull { it.name == column }
+                ?.alias
+                ?.takeIf { it.isNotEmpty() }
+                ?: column
+        return ref.projections.fold(atScan, ::exposedAs)
+    }
 
-    /** Every name a scan exposes above itself: its `output_columns` (alias, else name), or the model's columns. */
+    /** The name [name] has above one projection ([map]: input name → exposed name), or null once it is hidden. */
+    private fun exposedAs(
+        name: String?,
+        map: Map<String, String>,
+    ): String? = name?.let { map[it] }
+
+    /**
+     * Every name a scan exposes above the join: its `output_columns` (alias, else name) or the model's
+     * columns, mapped through the projections.
+     */
     private fun visibleNames(
-        scan: TableScanNode,
+        ref: ScanRef,
         model: ModelHandle,
-    ): Set<String> =
-        if (scan.outputColumnsCount > 0) {
-            scan.outputColumnsList.map { it.alias.ifEmpty { it.name } }.toSet()
-        } else {
-            model.columns(scan.table).map { it.name }.toSet()
-        }
+    ): Set<String> {
+        val atScan =
+            if (ref.scan.outputColumnsCount > 0) {
+                ref.scan.outputColumnsList.map { it.alias.ifEmpty { it.name } }
+            } else {
+                model.columns(ref.scan.table).map { it.name }
+            }
+        return atScan
+            .mapNotNull { name -> ref.projections.fold(name, ::exposedAs) }
+            .toSet()
+    }
 
     /** F3b on the physical side — see [JoinerLogical]: a bare `$L`/`$R` name must be unique on its side. */
     private fun keyNameCollision(
         c: Candidate,
         pairs: List<Pair<String, String>>,
-        left: List<SideRef<TableScanNode>>,
-        right: List<SideRef<TableScanNode>>,
+        left: List<SideRef<ScanRef>>,
+        right: List<SideRef<ScanRef>>,
         model: ModelHandle,
     ): JoinerWarning.KeyNameCollision? {
         fun holders(
-            side: List<SideRef<TableScanNode>>,
+            side: List<SideRef<ScanRef>>,
             name: String,
         ): Int = side.count { name in visibleNames(it.handle, model) }
         for ((leftName, rightName) in pairs) {
