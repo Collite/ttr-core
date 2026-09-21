@@ -204,7 +204,8 @@ class Translator(
                 // binding expansion is needed here (the gRPC unparse path passes bindings).
                 when (val unparse = unparseFromRelNode(parse.plan, targetLanguage, targetDialect, optimize)) {
                     is UnparseResult.Failure -> TranslateResult.Failure(unparse.code, unparse.message)
-                    is UnparseResult.Success -> TranslateResult.Success(output = unparse.output, plan = parse.plan)
+                    is UnparseResult.Success ->
+                        TranslateResult.Success(output = unparse.output, plan = parse.plan, warnings = parse.warnings)
                 }
         }
 
@@ -416,10 +417,8 @@ class Translator(
      *
      * Every stage is **semantically idempotent**, so REL_NODE re-entry re-runs the chain safely.
      *
-     * Warnings from JoinerLogical / JoinerPhysical are currently dropped on the floor — the
-     * `ParseResult` shape doesn't carry a `messages` slot. Surfacing them through the Translator
-     * service's `ResponseMessage messages = 99` is a service-side follow-up; the data is
-     * available, just not plumbed.
+     * Warnings from JoinerLogical / JoinerPhysical ride on [ParseResult.Success.warnings] (MJ, contracts §4);
+     * the service maps them to `ResponseMessage` via `JoinerMessages`.
      */
     private fun runFrontHalfStages(
         rel: RelNode,
@@ -473,8 +472,11 @@ class Translator(
                     is UnfoldResult.Error -> return ParseResult.Failure(unfolded.code, unfolded.message)
                 }
 
-            // 4. EXPAND_JOINS-logical — always. Warnings collected but not surfaced (see KDoc).
-            plan = JoinerLogical.apply(plan, model).plan
+            // 4. EXPAND_JOINS-logical — always. MJ: warnings ride on the result (contracts §4).
+            val warnings = mutableListOf<org.tatrman.translator.joiner.JoinerWarning>()
+            val logical = JoinerLogical.apply(plan, model)
+            plan = logical.plan
+            warnings += logical.warnings
 
             // 5 + 6. Physical stages — gated on targetSchema.
             if (targetSchema == SchemaCode.DB || targetSchema == SchemaCode.SCHEMA_CODE_UNSPECIFIED) {
@@ -483,10 +485,12 @@ class Translator(
                         is MapToPhysicalResult.Success -> mapped.plan
                         is MapToPhysicalResult.Failure -> return ParseResult.Failure(mapped.code, mapped.message)
                     }
-                plan = JoinerPhysical.apply(plan, model).plan
+                val physical = JoinerPhysical.apply(plan, model)
+                plan = physical.plan
+                warnings += physical.warnings
             }
 
-            ParseResult.Success(plan = plan)
+            ParseResult.Success(plan = plan, warnings = warnings)
         } catch (ex: Exception) {
             // The front-half stage chain (RESOLVE → encode → UNFOLD → EXPAND_JOINS-logical →
             // MAP_TO_PHYSICAL → EXPAND_JOINS-physical) previously let any unexpected exception
@@ -643,6 +647,12 @@ class Translator(
 sealed interface ParseResult {
     data class Success(
         val plan: PlanNode,
+        /**
+         * MJ (model joins) — what EXPAND_JOINS could not condition and why. Empty when every join between
+         * entities resolved (or the plan has none). Mapped to `ResponseMessage(WARNING/INFO, code, text)`
+         * by the caller via [org.tatrman.translator.joiner.JoinerMessages].
+         */
+        val warnings: List<org.tatrman.translator.joiner.JoinerWarning> = emptyList(),
     ) : ParseResult
 
     data class Failure(
@@ -673,6 +683,8 @@ sealed interface TranslateResult {
     data class Success(
         val output: String,
         val plan: PlanNode,
+        /** MJ — the parse half's joiner warnings, carried through unchanged. See [ParseResult.Success.warnings]. */
+        val warnings: List<org.tatrman.translator.joiner.JoinerWarning> = emptyList(),
     ) : TranslateResult
 
     data class Failure(

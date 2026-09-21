@@ -1,0 +1,133 @@
+# MJ-P0·S1.3 — H10 golden: the plan bytes for DfpJoinModel.H10_COMMA (SQL→MSSQL, targetSchema=DB) as of
+# translator/v0.11.0 (pre-MJ). ModelJoinSpec parses this text proto and compares toByteArray() — the comma form
+# must stay byte-identical through MJ (task-management rule 6). Regenerate by hand only.
+project {
+  input {
+    filter {
+      input {
+        join {
+          left {
+            table_scan {
+              table {
+                schema_code: DB
+                namespace: "dbo"
+                name: "QKUMPRODEJ"
+              }
+              output_columns {
+                name: "id_dodac\303\255ho_m\303\255sta"
+                type: "int"
+              }
+              output_columns {
+                name: "id_obchodn\303\255ho_kan\303\241lu"
+                type: "int"
+              }
+              output_columns {
+                name: "id_tr\305\276n\303\255_skupiny"
+                type: "int"
+              }
+              output_columns {
+                name: "id_produktu"
+                type: "int"
+              }
+              output_columns {
+                name: "id_podproduktu"
+                type: "int"
+              }
+              output_columns {
+                name: "id_artiklu"
+                type: "int"
+              }
+              output_columns {
+                name: "obdob\303\255"
+                type: "text"
+              }
+              output_columns {
+                name: "tr\305\276ba_12_m\304\233s\303\255c\305\257"
+                type: "float"
+              }
+              output_columns {
+                name: "mno\305\276stv\303\255_12_m\304\233s\303\255c\305\257"
+                type: "float"
+              }
+            }
+          }
+          right {
+            table_scan {
+              table {
+                schema_code: DB
+                namespace: "dbo"
+                name: "QPRODUKT"
+              }
+              output_columns {
+                name: "id_produktu"
+                type: "int"
+              }
+              output_columns {
+                name: "n\303\241zev_produktu"
+                type: "text"
+              }
+            }
+          }
+          join_type: INNER
+          condition {
+            function {
+              operation: "eq"
+              operands {
+                column_ref {
+                  source_alias: "$L"
+                  name: "id_produktu"
+                }
+              }
+              operands {
+                column_ref {
+                  source_alias: "$R"
+                  name: "id_produktu"
+                }
+              }
+            }
+          }
+        }
+      }
+      condition {
+        function {
+          operation: "like"
+          operands {
+            column_ref {
+              name: "n\303\241zev_produktu"
+              type: "text"
+            }
+            result_type: "text"
+          }
+          operands {
+            literal {
+              string_value: "%Oleje%"
+              type: "text"
+            }
+            result_type: "text"
+          }
+        }
+        result_type: "bool"
+      }
+    }
+  }
+  expressions {
+    expression {
+      column_ref {
+        name: "obdob\303\255"
+        type: "text"
+      }
+      result_type: "text"
+    }
+    alias: "obdob\303\255"
+  }
+  expressions {
+    expression {
+      column_ref {
+        name: "n\303\241zev_produktu"
+        type: "text"
+      }
+      result_type: "text"
+    }
+    alias: "n\303\241zev_produktu"
+  }
+}
