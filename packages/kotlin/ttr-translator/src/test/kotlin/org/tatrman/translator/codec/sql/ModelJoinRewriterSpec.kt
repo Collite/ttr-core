@@ -110,4 +110,102 @@ class ModelJoinRewriterSpec :
         "an unknown table on one side contributes no entity → ON TRUE" {
             rewrite("SELECT 1 FROM kumulovaný_prodej JOIN not_an_entity") shouldContain "ON TRUE"
         }
+
+        // ---- S2: chains, aliases, nesting, non-entity sides ----
+
+        "H1 — the hero chain: each join decided against the whole other side (⚑MJ-2)" {
+            val out = rewrite(DfpJoinModel.H1_HERO)
+            out shouldContain
+                "FROM kumulovaný_prodej INNER JOIN dodací_místo " +
+                "ON kumulovaný_prodej.id_dodacího_místa = dodací_místo.id_dodacího_místa " +
+                "INNER JOIN zákazník ON dodací_místo.id_subjektu = zákazník.id_zákazníka " +
+                "INNER JOIN produkt ON kumulovaný_prodej.id_produktu = produkt.id_produktu"
+            out shouldNotContain "TRUE"
+        }
+
+        "H2 — aliases are used in the conditions" {
+            rewrite(DfpJoinModel.H2_ALIASES) shouldContain
+                "FROM kumulovaný_prodej AS kp INNER JOIN dodací_místo AS dm " +
+                "ON kp.id_dodacího_místa = dm.id_dodacího_místa " +
+                "INNER JOIN zákazník AS z ON dm.id_subjektu = z.id_zákazníka"
+        }
+
+        "a parenthesised right side: the inner join resolves first, the outer sees {dm, z}" {
+            val out = rewrite("SELECT 1 FROM kumulovaný_prodej JOIN (dodací_místo JOIN zákazník)")
+            out shouldContain "dodací_místo INNER JOIN zákazník ON dodací_místo.id_subjektu = zákazník.id_zákazníka"
+            out shouldContain "ON kumulovaný_prodej.id_dodacího_místa = dodací_místo.id_dodacího_místa"
+            out shouldNotContain "TRUE"
+        }
+
+        "H6 — both kp→ok and dm→ok exist: ambiguous, ON TRUE, no proximity tie-break (⚑MJ-8)" {
+            val out = rewrite("SELECT 1 FROM kumulovaný_prodej JOIN dodací_místo JOIN obchodní_kanál")
+            out shouldContain "ON kumulovaný_prodej.id_dodacího_místa = dodací_místo.id_dodacího_místa"
+            out shouldContain "INNER JOIN obchodní_kanál ON TRUE"
+        }
+
+        "H8 — the same entity twice steps aside (⚑MJ-6)" {
+            rewrite("SELECT 1 FROM zákazník z1 JOIN zákazník z2") shouldContain "INNER JOIN zákazník AS z2 ON TRUE"
+        }
+
+        "H9 — a composite relation ANDs every pair (⚑MJ-7)" {
+            rewrite("SELECT 1 FROM smlouva JOIN dodatek") shouldContain
+                "ON smlouva.číslo_smlouvy = dodatek.číslo_smlouvy AND smlouva.rok = dodatek.rok"
+        }
+
+        "H11 — a derived table on one side contributes no entity → ON TRUE" {
+            val out =
+                rewrite(
+                    "SELECT 1 FROM kumulovaný_prodej JOIN (SELECT id_produktu FROM produkt WHERE id_produktu > 1) p",
+                )
+            out shouldContain ") AS p ON TRUE"
+        }
+
+        "a DB table on one side in an ER-catalog statement → ON TRUE" {
+            rewrite("SELECT 1 FROM kumulovaný_prodej JOIN db.dbo.QPRODUKT") shouldContain "ON TRUE"
+            rewrite("SELECT 1 FROM kumulovaný_prodej JOIN dbo.QPRODUKT") shouldContain "ON TRUE"
+        }
+
+        "a bare join inside a WHERE subquery is rewritten too" {
+            val out =
+                rewrite(
+                    "SELECT 1 FROM produkt WHERE id_produktu IN " +
+                        "(SELECT kumulovaný_prodej.id_produktu FROM kumulovaný_prodej JOIN dodací_místo)",
+                )
+            out shouldContain "ON kumulovaný_prodej.id_dodacího_místa = dodací_místo.id_dodacího_místa"
+        }
+
+        "bare joins inside a CTE body and both UNION branches are rewritten" {
+            val out =
+                rewrite(
+                    "WITH x AS (SELECT 1 AS a FROM kumulovaný_prodej JOIN produkt) " +
+                        "SELECT a FROM x UNION ALL SELECT 2 FROM dodací_místo JOIN zákazník",
+                )
+            out shouldContain "ON kumulovaný_prodej.id_produktu = produkt.id_produktu"
+            out shouldContain "ON dodací_místo.id_subjektu = zákazník.id_zákazníka"
+        }
+
+        "qualified entity names (entity.x, er.entity.x) resolve; another namespace does not" {
+            rewrite("SELECT 1 FROM entity.kumulovaný_prodej JOIN er.entity.produkt") shouldContain
+                "ON kumulovaný_prodej.id_produktu = produkt.id_produktu"
+            rewrite("SELECT 1 FROM other.kumulovaný_prodej JOIN produkt") shouldContain "ON TRUE"
+        }
+
+        "quoted identifiers resolve like bare ones (Lex.MYSQL_ANSI: double quotes; backticks are a lexical error)" {
+            rewrite("SELECT 1 FROM \"kumulovaný_prodej\" JOIN \"produkt\"") shouldContain
+                "ON kumulovaný_prodej.id_produktu = produkt.id_produktu"
+            rewrite("SELECT 1 FROM KUMULOVANÝ_PRODEJ JOIN Produkt") shouldContain
+                "ON KUMULOVANÝ_PRODEJ.id_produktu = Produkt.id_produktu"
+        }
+
+        "collectEntityRefs keeps FROM order (the ambiguity text lists entities in source order)" {
+            val rewriter = ModelJoinRewriter(model, "entity")
+            val from =
+                (
+                    parse(
+                        "SELECT 1 FROM produkt p JOIN kumulovaný_prodej ON TRUE JOIN dodací_místo dm ON TRUE",
+                    ) as org.apache.calcite.sql.SqlSelect
+                ).from
+            rewriter.collectEntityRefs(from).map { it.entity.name to it.handle } shouldBe
+                listOf("produkt" to "p", "kumulovaný_prodej" to "kumulovaný_prodej", "dodací_místo" to "dm")
+        }
     })
