@@ -506,11 +506,11 @@ class Translator(
                     is UnfoldResult.Error -> return ParseResult.Failure(unfolded.code, unfolded.message)
                 }
 
-            // 4. EXPAND_JOINS-logical — always. MJ: warnings ride on the result (contracts §4).
-            val warnings = mutableListOf<org.tatrman.translator.joiner.JoinerWarning>()
+            // 4. EXPAND_JOINS-logical — always. MJ: warnings ride on the result (contracts §4); the two
+            // carriers' verdicts on the same join are reconciled by JoinerWarnings.merge.
             val logical = JoinerLogical.apply(plan, model)
             plan = logical.plan
-            warnings += logical.warnings
+            var warnings: List<org.tatrman.translator.joiner.JoinerWarning> = logical.warnings
 
             // 5 + 6. Physical stages — gated on targetSchema.
             if (targetSchema == SchemaCode.DB || targetSchema == SchemaCode.SCHEMA_CODE_UNSPECIFIED) {
@@ -521,7 +521,9 @@ class Translator(
                     }
                 val physical = JoinerPhysical.apply(plan, model)
                 plan = physical.plan
-                warnings += physical.warnings
+                warnings =
+                    org.tatrman.translator.joiner.JoinerWarnings
+                        .merge(logical, physical)
             }
 
             ParseResult.Success(plan = plan, warnings = warnings)

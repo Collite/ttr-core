@@ -12,6 +12,8 @@ import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.translate.v1.Language
 import org.tatrman.translate.v1.SqlDialect
 import org.tatrman.translator.framework.DfpJoinModel
+import org.tatrman.translator.joiner.JoinerMessages
+import org.tatrman.translator.joiner.JoinerWarning
 
 /**
  * MJ (model joins) — end-to-end acceptance of the corpus in project `model-joins/plan/plan.md §4`.
@@ -182,5 +184,74 @@ class ModelJoinSpec :
                     ).shouldBeInstanceOf<TranslateResult.Success>()
             r.output shouldContain "[kumulovaný_prodej].[id_produktu] = [produkt].[id_produktu]"
             r.warnings shouldBe emptyList()
+        }
+
+        // ---- P3·S1: warnings on the result, one verdict per join ----
+
+        "H4 — OZ + VOT: one JOIN_AMBIGUOUS_RELATIONS on parseToRelNode, translate carries the same list" {
+            val sql = "SELECT dodací_místo.město, uživatel.jméno FROM dodací_místo JOIN uživatel"
+            val parsed =
+                translator
+                    .parseToRelNode(sql, Language.SQL, SchemaCode.DB, sourceSchema = SchemaCode.ER)
+                    .shouldBeInstanceOf<ParseResult.Success>()
+            val w = parsed.warnings.single()
+            JoinerMessages.code(w) shouldBe "JOIN_AMBIGUOUS_RELATIONS"
+            JoinerMessages.text(w) shouldBe
+                "2 relations could join entity.dodací_místo and entity.uživatel: " +
+                "dodací_místo → uživatel (obchodní_zástupce = id_uživatele), " +
+                "dodací_místo → uživatel (vedoucí_obchodního_týmu = id_uživatele); write the ON"
+            val translated = mssql(sql).shouldBeInstanceOf<TranslateResult.Success>()
+            translated.warnings shouldBe parsed.warnings
+            translated.output shouldNotContain "="
+        }
+
+        "H7 — no direct relation: one JOIN_NO_RELATION, cz wording verbatim, no physical duplicate" {
+            val r = mssql("SELECT 1 FROM kumulovaný_prodej JOIN zákazník").shouldBeInstanceOf<TranslateResult.Success>()
+            val w = r.warnings.single()
+            JoinerMessages.code(w) shouldBe "JOIN_NO_RELATION"
+            JoinerMessages.severity(w) shouldBe JoinerMessages.Severity.WARNING
+            JoinerMessages.text(w) shouldBe
+                "no declared relation between entity.kumulovaný_prodej and entity.zákazník; Cartesian product preserved"
+        }
+
+        "H6 — chain with an ambiguous last hop: resolved hops silent, the ambiguous one names the whole side" {
+            val r =
+                mssql("SELECT 1 FROM kumulovaný_prodej JOIN dodací_místo JOIN obchodní_kanál")
+                    .shouldBeInstanceOf<TranslateResult.Success>()
+            val w = r.warnings.single().shouldBeInstanceOf<JoinerWarning.AmbiguousRelations>()
+            JoinerMessages.text(w) shouldContain
+                "entity.kumulovaný_prodej, entity.dodací_místo and entity.obchodní_kanál"
+        }
+
+        "REL_NODE re-entry of an H4 target=ER plan reports the warning again, once" {
+            val sql = "SELECT dodací_místo.město FROM dodací_místo JOIN uživatel"
+            val erHalf =
+                translator
+                    .parseToRelNode(sql, Language.SQL, SchemaCode.ER, sourceSchema = SchemaCode.ER)
+                    .shouldBeInstanceOf<ParseResult.Success>()
+            erHalf.warnings.map { JoinerMessages.code(it) } shouldBe listOf("JOIN_AMBIGUOUS_RELATIONS")
+            val dbHalf =
+                translator
+                    .parseToRelNode(
+                        String(erHalf.plan.toByteArray(), Charsets.ISO_8859_1),
+                        Language.REL_NODE,
+                        SchemaCode.DB,
+                    ).shouldBeInstanceOf<ParseResult.Success>()
+            dbHalf.warnings.map { JoinerMessages.code(it) } shouldBe listOf("JOIN_AMBIGUOUS_RELATIONS")
+        }
+
+        "a pure-DB comma join with no FK still reports JOIN_NO_RELATION naming the tables" {
+            val r =
+                translator
+                    .translate(
+                        source = "SELECT 1 FROM QKUMPRODEJ, QPRODUKT",
+                        sourceLanguage = Language.SQL,
+                        targetLanguage = Language.SQL,
+                        targetSchema = SchemaCode.DB,
+                        targetDialect = SqlDialect.MSSQL,
+                        sourceSchema = SchemaCode.DB,
+                    ).shouldBeInstanceOf<TranslateResult.Success>()
+            JoinerMessages.text(r.warnings.single()) shouldBe
+                "no declared relation between dbo.QKUMPRODEJ and dbo.QPRODUKT; Cartesian product preserved"
         }
     })

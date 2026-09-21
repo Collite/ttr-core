@@ -60,19 +60,36 @@ object JoinerLogical {
         plan: PlanNode,
         model: ModelHandle,
     ): JoinerResult {
-        val warnings = mutableListOf<JoinerWarning>()
-        val rewritten = walk(plan, model, warnings)
-        return JoinerResult(plan = rewritten, warnings = warnings)
+        val outcomes = mutableListOf<JoinOutcome>()
+        val rewritten = walk(plan, emptyList(), model, outcomes)
+        return JoinerResult(plan = rewritten, warnings = outcomes.mapNotNull { it.warning }, outcomes = outcomes)
     }
 
     private fun walk(
         plan: PlanNode,
+        path: List<Int>,
+        model: ModelHandle,
+        outcomes: MutableList<JoinOutcome>,
+    ): PlanNode {
+        var child = 0
+        val withChildren = JoinerPlanWalker.rewriteChildren(plan) { walk(it, path + child++, model, outcomes) }
+        if (withChildren.nodeCase != PlanNode.NodeCase.JOIN) return withChildren
+        val warnings = mutableListOf<JoinerWarning>()
+        val decided = decide(withChildren, model, warnings)
+        if (decided !== withChildren) {
+            outcomes += JoinOutcome(path, null)
+        } else {
+            warnings.forEach { outcomes += JoinOutcome(path, it) }
+        }
+        return decided
+    }
+
+    /** Decide one join node whose children are already rewritten; records at most one warning. */
+    private fun decide(
+        withChildren: PlanNode,
         model: ModelHandle,
         warnings: MutableList<JoinerWarning>,
     ): PlanNode {
-        val withChildren = JoinerPlanWalker.rewriteChildren(plan) { walk(it, model, warnings) }
-        if (withChildren.nodeCase != PlanNode.NodeCase.JOIN) return withChildren
-
         val join = withChildren.join
         // Idempotency: a Join already carrying a condition is left alone.
         if (join.hasCondition()) return withChildren

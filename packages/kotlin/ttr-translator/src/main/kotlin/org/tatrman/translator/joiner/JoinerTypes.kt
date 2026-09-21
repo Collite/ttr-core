@@ -13,6 +13,20 @@ import org.tatrman.translator.framework.ModelRelation
 data class JoinerResult(
     val plan: PlanNode,
     val warnings: List<JoinerWarning> = emptyList(),
+    /** MJ — one entry per unconditioned join this stage decided (conditioned or warned), by tree path. */
+    val outcomes: List<JoinOutcome> = emptyList(),
+)
+
+/**
+ * MJ — what a carrier did with one unconditioned join, keyed by the join's position in the tree so the
+ * orchestrator can reconcile the two stages ([JoinerWarnings.merge]): [joinPath] is the sequence of
+ * child ordinals from the plan root in [JoinerPlanWalker.rewriteChildren]'s visiting order. MAP_TO_PHYSICAL
+ * only rewrites *below* scan leaves (a table, a filtered table, a query body), so a join's path is the
+ * same before and after it. [warning] is null when the stage conditioned the join.
+ */
+data class JoinOutcome(
+    val joinPath: List<Int>,
+    val warning: JoinerWarning?,
 )
 
 /**
