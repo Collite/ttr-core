@@ -87,8 +87,13 @@ class TranslatorFramework(
             // collation with the connection config it unwraps from the context (1.41
             // `PlannerImpl.createSqlValidator`) — so the context carries it; the validator config is
             // set too for any path that reads it directly.
-            .sqlValidatorConfig(SqlValidator.Config.DEFAULT.withDefaultNullCollation(NullCollation.LOW))
-            .context(
+            // T-SQL string→datetime operand coercion (`DATEDIFF(day, '19000101', …)`), see
+            // [TsqlTypeCoercion]. PlannerImpl keeps the factory when it re-derives the config.
+            .sqlValidatorConfig(
+                SqlValidator.Config.DEFAULT
+                    .withDefaultNullCollation(NullCollation.LOW)
+                    .withTypeCoercionFactory(TsqlTypeCoercion.FACTORY),
+            ).context(
                 Contexts.of(
                     CalciteConnectionConfig.DEFAULT.set(
                         CalciteConnectionProperty.DEFAULT_NULL_COLLATION,

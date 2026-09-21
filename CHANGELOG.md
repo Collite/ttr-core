@@ -6,6 +6,21 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-translator`** ⚑ **T-SQL string→datetime operand coercion (df-test 2026-09-21) — `DATEDIFF(day,
+  '19000101', …)` / `DATEADD(day, 7, '2026-09-14')` validate.** The LLM lane's canonical "previous calendar
+  week" idiom (`DATEADD(day, -7, DATEADD(day, (DATEDIFF(day, '19000101', CAST(GETDATE() AS date)) / 7) * 7,
+  '19000101'))`) died at `ParseToRelNode` with `Cannot apply 'DATEDIFF' to arguments of type 'DATEDIFF(<INTERVAL
+  DAY>, <CHAR(8)>, <DATE>)'`: our `DATEDIFF` (TF-P1.S1) and Calcite's `DATEADD` declare their operands as the
+  `DATETIME` family, and Calcite's `TypeCoercionImpl` coerces a character operand only into `DATE`/`TIME`/
+  `TIMESTAMP` — for `DATETIME` it inserted no cast at all, so an ISO literal failed just the same. New
+  `framework/TsqlTypeCoercion` (bound through `SqlValidator.Config.withTypeCoercionFactory`): a character
+  operand expected as `DATETIME` is cast to `TIMESTAMP` (what SQL Server's implicit conversion yields too),
+  and T-SQL's unseparated `'YYYYMMDD'` literal is rewritten to `'YYYY-MM-DD'` first — Calcite's date parser
+  reads only the dashed form, and the decode-side constant fold turns the cast into a typed TIMESTAMP
+  literal (`'1900-01-01 00:00:00'` on the MSSQL unparse). A `datetime` column operand still gets no implicit
+  cast; an integer anchor (`DATEDIFF(wk, 0, …)`) is still rejected; binary comparisons are untouched.
+  `TsqlTypeCoercionSpec` runs the service path (parse → wire → decode → unparse).
+
 - **`ttr-translator`** ⚑ **regression fix (MJ follow-up, df-test 2026-09-21) — `JoinerPhysical` sees the
   `TableScan` under MAP_TO_PHYSICAL's alias-at-boundary `Project` again.** 0.11.1 narrowed a join side's
   scan search to `Join`/`Filter` (so a derived table's hidden column could not become a bare-name ref that
