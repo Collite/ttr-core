@@ -37,5 +37,30 @@ via `java-test-fixtures` so consumers can test against the SPI without a real mo
 - The test JVM pins the Calcite default charset to UTF-8 (see `build.gradle.kts`) — carried
   from the source lib to keep Unicode-literal coverage deterministic.
 
+## Model joins
+
+MJ (`translator/v0.12.0`) — in the ER catalog, a join between entities written without a condition is
+conditioned from the model's declared relations, so the LLM lane can write `FROM a JOIN b JOIN c` and
+let the engine fill in the `ON`s. The join is decided by `joiner.JoinPolicy` — the new entity against
+**every** entity already on the other side; exactly one relation must resolve; all of its pairs are
+`AND`-ed — and carried by `codec.sql.ModelJoinRewriter` (SQL, pre-validation) and `joiner.JoinerLogical`
+/ `JoinerPhysical` (wire). What cannot be resolved stays a Cartesian product with a warning on
+`ParseResult.Success.warnings` (`joiner.JoinerMessages` renders code / severity / text).
+
+| Form | Result |
+|---|---|
+| `a JOIN b` · `a INNER JOIN b` · `a LEFT JOIN b` · `a RIGHT JOIN b` · `a FULL JOIN b` (no `ON`/`USING`) | conditioned from the model in SQL; join type preserved |
+| `a, b` · `a CROSS JOIN b` | conditioned from the model on the wire (`JoinerLogical`), as `INNER` |
+| `a JOIN b ON …` · `USING (…)` · `NATURAL JOIN` | untouched |
+| `a JOIN b JOIN c …` (chain, any length, parentheses allowed) | each join decided against the full entity set of its other side |
+| `a JOIN (SELECT …) s` · `a JOIN db_table` | the non-entity side contributes no entity → `ON TRUE` + `JOIN_NO_RELATION` |
+| aliases `FROM zákazník z JOIN dodací_místo dm` | the conditions use the aliases |
+
+Warnings: `JOIN_NO_RELATION`, `JOIN_AMBIGUOUS_RELATIONS` (two relations, or an entity repeated across
+the join — write the `ON`), `JOIN_RELATION_WITHOUT_PAIRS` (INFO; filled from the FK after
+MAP_TO_PHYSICAL), `JOIN_KEY_NAME_COLLISION` (wire carrier only). `explain` exposes the rewritten
+statement as stage `model_joins`. Design, contracts and the acceptance corpus:
+`project/tatrman/features/ttr-translator/model-joins/`.
+
 Published as `org.tatrman:ttr-translator`, lockstep with `ttr-plan-proto` under the
 `kotlin-translator/v*` tag. See `docs/ttr-translator/` for the full arc.
