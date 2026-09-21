@@ -10,6 +10,8 @@ import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.plan.v1.TableScanNode
 import org.tatrman.translator.framework.ModelForeignKey
 import org.tatrman.translator.framework.ModelHandle
+import org.tatrman.translator.framework.ModelRelation
+import org.tatrman.translator.joiner.JoinPolicy.SideRef
 import org.tatrman.translator.wire.Expressions
 
 /**
@@ -36,6 +38,17 @@ import org.tatrman.translator.wire.Expressions
  * Emitting the FK's physical names unmapped failed at unparse with `field [d_date_sk] not found;
  * input fields are: [sk, …]` — on the first estate whose join keys were renamed.
  *
+ * ## Sides (MJ-P2·S2)
+ *
+ * The same rule as [JoinerLogical]: a side's table set = the `TableScan(DB)` leaves reachable through
+ * `Join` and `Filter` only, and the join is decided against the **whole** set of each side — a comma chain
+ * `FROM a, b, c` with FKs `a→b`, `b→c` conditions the second join on `b ↔ c` (v1.0 matched the first scan
+ * of the left side and warned). Exactly one matching FK over all `(l, r)` pairs → condition; zero →
+ * [JoinerWarning.NoRelation]; two or more, or a table repeated across the join → [JoinerWarning.AmbiguousRelations]
+ * (`candidateRelations` empty — FKs are not relations). A multi-column FK ANDs its columns (v1.0 skipped it
+ * as "not the single-column shape" and warned NoRelation). The F3b collision guard applies here too, on the
+ * names each scan EXPOSES (`output_columns` aliases, else the model's column list).
+ *
  * ## Don't-double-join
  *
  * Per master plan §138, JoinerPhysical must not re-insert a condition that JoinerLogical
@@ -56,6 +69,13 @@ object JoinerPhysical {
         return JoinerResult(plan = rewritten, warnings = warnings)
     }
 
+    /** One FK that could join a left scan to a right scan. */
+    private data class Candidate(
+        val left: SideRef<TableScanNode>,
+        val right: SideRef<TableScanNode>,
+        val fk: ModelForeignKey,
+    )
+
     private fun walk(
         plan: PlanNode,
         model: ModelHandle,
@@ -68,51 +88,88 @@ object JoinerPhysical {
         // Don't-double-join.
         if (join.hasCondition()) return withChildren
 
-        val leftTable = JoinerLogical.findFirstScanPublic(join.left, SchemaCode.DB)
-        val rightTable = JoinerLogical.findFirstScanPublic(join.right, SchemaCode.DB)
-        if (leftTable == null || rightTable == null) return withChildren
+        val left = collectTableScans(join.left)
+        val right = collectTableScans(join.right)
+        if (left.isEmpty() || right.isEmpty()) return withChildren
+        val leftTables = left.map { it.entity }
+        val rightTables = right.map { it.entity }
 
-        val candidates = matchingForeignKeys(model.foreignKeys(), leftTable, rightTable)
-        return when (candidates.size) {
-            0 -> {
-                warnings += JoinerWarning.NoRelation(leftTable, rightTable)
+        val repeated =
+            (leftTables + rightTables)
+                .groupingBy { it }
+                .eachCount()
+                .filterValues { it > 1 }
+                .keys
+        val fks = model.foreignKeys().filter { it.from.isNotEmpty() && it.from.size == it.to.size }
+        val all =
+            left.flatMap { l ->
+                right.flatMap { r ->
+                    fks.filter { fk -> connects(fk, l.entity, r.entity) }.map { fk -> Candidate(l, r, fk) }
+                }
+            }
+        val candidates = all.filter { it.left.entity !in repeated && it.right.entity !in repeated }
+        return when {
+            repeated.isNotEmpty() || candidates.size > 1 -> {
+                // FK ambiguity is rare but possible (two FKs between the same two tables — think
+                // `customer_id` + `billing_customer_id`), or the same table on both sides. Same Cartesian
+                // fallback as JoinerLogical's ambiguous case.
+                warnings +=
+                    JoinerWarning.AmbiguousRelations(
+                        sideA = leftTables.first(),
+                        sideB = rightTables.first(),
+                        candidateRelations = emptyList(),
+                        repeated = repeated,
+                        leftEntities = leftTables,
+                        rightEntities = rightTables,
+                    )
                 withChildren
             }
-            1 -> {
-                val condition =
-                    buildEqualityCondition(
-                        fk = candidates.single(),
-                        leftTable = leftTable,
-                        leftScan = findFirstTableScan(join.left),
-                        rightScan = findFirstTableScan(join.right),
-                    )
-                withConditionSet(withChildren, condition)
+            candidates.isEmpty() -> {
+                warnings += JoinerWarning.NoRelation(leftTables.first(), rightTables.first(), leftTables, rightTables)
+                withChildren
             }
             else -> {
-                // FK ambiguity is rare but possible (e.g. two FKs between the same two tables —
-                // think `customer_id` + `billing_customer_id`). Same Cartesian fallback as
-                // JoinerLogical's ambiguous case.
-                warnings += JoinerWarning.AmbiguousRelations(leftTable, rightTable, emptyList())
-                withChildren
+                val c = candidates.single()
+                val pairs = orientedVisiblePairs(c)
+                val collision = keyNameCollision(c, pairs, left, right, model)
+                if (collision != null) {
+                    warnings += collision
+                    withChildren
+                } else {
+                    withConditionSet(withChildren, buildCondition(pairs))
+                }
             }
         }
     }
 
     /**
-     * Return every FK whose `(from-table, to-table)` connects [a] and [b] (in either direction),
-     * limited to v1.0's single-column FK shape.
+     * The `TableScan(DB)` leaves of a join side, in tree order, reachable through `Join` and `Filter` only
+     * (the [JoinerLogical.collectEntityScans] rule). The handle is the scan node, whose aliases the
+     * condition must use.
      */
-    private fun matchingForeignKeys(
-        fks: List<ModelForeignKey>,
+    internal fun collectTableScans(plan: PlanNode): List<SideRef<TableScanNode>> =
+        when (plan.nodeCase) {
+            PlanNode.NodeCase.TABLE_SCAN ->
+                if (plan.tableScan.table.schemaCode == SchemaCode.DB) {
+                    listOf(SideRef(plan.tableScan.table, plan.tableScan))
+                } else {
+                    emptyList()
+                }
+            PlanNode.NodeCase.JOIN -> collectTableScans(plan.join.left) + collectTableScans(plan.join.right)
+            PlanNode.NodeCase.FILTER -> collectTableScans(plan.filter.input)
+            else -> emptyList()
+        }
+
+    /** Does [fk] connect tables [a] and [b] (either direction)? Every column of an FK belongs to one table. */
+    private fun connects(
+        fk: ModelForeignKey,
         a: QualifiedName,
         b: QualifiedName,
-    ): List<ModelForeignKey> =
-        fks.filter { fk ->
-            if (fk.from.size != 1 || fk.to.size != 1) return@filter false
-            val fromTable = fk.from.first().tableQname()
-            val toTable = fk.to.first().tableQname()
-            (fromTable == a && toTable == b) || (fromTable == b && toTable == a)
-        }
+    ): Boolean {
+        val fromTable = fk.from.first().tableQname()
+        val toTable = fk.to.first().tableQname()
+        return (fromTable == a && toTable == b) || (fromTable == b && toTable == a)
+    }
 
     /**
      * v1 convention: column qnames are stored table-qualified as `<schema>.<namespace>.<table.column>`
@@ -127,51 +184,21 @@ object JoinerPhysical {
             .setName(name.substringBeforeLast('.'))
             .build()
 
-    private fun buildEqualityCondition(
-        fk: ModelForeignKey,
-        leftTable: QualifiedName,
-        leftScan: TableScanNode?,
-        rightScan: TableScanNode?,
-    ): Expression {
-        val fromCol = fk.from.first()
-        val toCol = fk.to.first()
-        val fromColName = fromCol.name.substringAfterLast('.')
-        val toColName = toCol.name.substringAfterLast('.')
-        // Orient: which column is on the left vs right input depends on which side of the join
-        // the FK's source table happens to be on.
-        val (leftColName, rightColName) =
-            if (fromCol.tableQname() == leftTable) {
-                fromColName to toColName
-            } else {
-                toColName to fromColName
-            }
-        val leftRef =
-            Expression
-                .newBuilder()
-                .setColumnRef(
-                    ColumnRef
-                        .newBuilder()
-                        .setName(visibleName(leftScan, leftColName))
-                        .setSourceAlias(Expressions.LEFT_INPUT_TAG),
-                ).build()
-        val rightRef =
-            Expression
-                .newBuilder()
-                .setColumnRef(
-                    ColumnRef
-                        .newBuilder()
-                        .setName(visibleName(rightScan, rightColName))
-                        .setSourceAlias(Expressions.RIGHT_INPUT_TAG),
-                ).build()
-        return Expression
-            .newBuilder()
-            .setFunction(
-                FunctionCall
-                    .newBuilder()
-                    .setOperation("eq")
-                    .addOperands(leftRef)
-                    .addOperands(rightRef),
-            ).build()
+    /**
+     * The FK's column pairs as `(leftVisible, rightVisible)`: oriented to the join's sides (which side
+     * holds the FK's source table) and mapped through each side's own scan ([visibleName]).
+     */
+    private fun orientedVisiblePairs(c: Candidate): List<Pair<String, String>> {
+        val fromOnLeft =
+            c.fk.from
+                .first()
+                .tableQname() == c.left.entity
+        return c.fk.from.zip(c.fk.to).map { (fromCol, toCol) ->
+            val fromName = fromCol.name.substringAfterLast('.')
+            val toName = toCol.name.substringAfterLast('.')
+            val (leftCol, rightCol) = if (fromOnLeft) fromName to toName else toName to fromName
+            visibleName(c.left.handle, leftCol) to visibleName(c.right.handle, rightCol)
+        }
     }
 
     /**
@@ -180,36 +207,97 @@ object JoinerPhysical {
      * at unparse naming that column, which is the honest outcome; guessing another column would not be.
      */
     private fun visibleName(
-        scan: TableScanNode?,
+        scan: TableScanNode,
         column: String,
     ): String =
-        scan
-            ?.outputColumnsList
-            ?.firstOrNull { it.name == column }
+        scan.outputColumnsList
+            .firstOrNull { it.name == column }
             ?.alias
             ?.takeIf { it.isNotEmpty() }
             ?: column
 
-    /**
-     * The first `TableScan(DB, …)` NODE under [plan], found along the same path
-     * [JoinerLogical.findFirstScanPublic] takes to find its table — so the scan whose aliases are read
-     * is the one whose table the FK was matched against.
-     */
-    private fun findFirstTableScan(plan: PlanNode): TableScanNode? {
-        if (plan.nodeCase == PlanNode.NodeCase.TABLE_SCAN && plan.tableScan.table.schemaCode == SchemaCode.DB) {
-            return plan.tableScan
+    /** Every name a scan exposes above itself: its `output_columns` (alias, else name), or the model's columns. */
+    private fun visibleNames(
+        scan: TableScanNode,
+        model: ModelHandle,
+    ): Set<String> =
+        if (scan.outputColumnsCount > 0) {
+            scan.outputColumnsList.map { it.alias.ifEmpty { it.name } }.toSet()
+        } else {
+            model.columns(scan.table).map { it.name }.toSet()
         }
-        return when (plan.nodeCase) {
-            PlanNode.NodeCase.PROJECT -> findFirstTableScan(plan.project.input)
-            PlanNode.NodeCase.FILTER -> findFirstTableScan(plan.filter.input)
-            PlanNode.NodeCase.JOIN -> findFirstTableScan(plan.join.left) ?: findFirstTableScan(plan.join.right)
-            PlanNode.NodeCase.AGGREGATE -> findFirstTableScan(plan.aggregate.input)
-            PlanNode.NodeCase.SORT -> findFirstTableScan(plan.sort.input)
-            PlanNode.NodeCase.LIMIT_OFFSET -> findFirstTableScan(plan.limitOffset.input)
-            PlanNode.NodeCase.SUBQUERY -> findFirstTableScan(plan.subquery.subquery)
-            else -> null
+
+    /** F3b on the physical side — see [JoinerLogical]: a bare `$L`/`$R` name must be unique on its side. */
+    private fun keyNameCollision(
+        c: Candidate,
+        pairs: List<Pair<String, String>>,
+        left: List<SideRef<TableScanNode>>,
+        right: List<SideRef<TableScanNode>>,
+        model: ModelHandle,
+    ): JoinerWarning.KeyNameCollision? {
+        fun holders(
+            side: List<SideRef<TableScanNode>>,
+            name: String,
+        ): Int = side.count { name in visibleNames(it.handle, model) }
+        for ((leftName, rightName) in pairs) {
+            val side =
+                when {
+                    holders(left, leftName) > 1 -> JoinerWarning.Side.LEFT
+                    holders(right, rightName) > 1 -> JoinerWarning.Side.RIGHT
+                    else -> continue
+                }
+            return JoinerWarning.KeyNameCollision(
+                sideA = c.left.entity,
+                sideB = c.right.entity,
+                relation =
+                    ModelRelation(
+                        c.fk.from
+                            .first()
+                            .tableQname(),
+                        c.fk.to
+                            .first()
+                            .tableQname(),
+                        emptyList(),
+                    ),
+                attribute = if (side == JoinerWarning.Side.LEFT) leftName else rightName,
+                side = side,
+            )
+        }
+        return null
+    }
+
+    /** `eq($L.l, $R.r)` per pair, `and(…)` for a multi-column FK; a single column stays a bare `eq`. */
+    private fun buildCondition(pairs: List<Pair<String, String>>): Expression {
+        val equalities =
+            pairs.map { (leftName, rightName) ->
+                Expression
+                    .newBuilder()
+                    .setFunction(
+                        FunctionCall
+                            .newBuilder()
+                            .setOperation("eq")
+                            .addOperands(ref(leftName, Expressions.LEFT_INPUT_TAG))
+                            .addOperands(ref(rightName, Expressions.RIGHT_INPUT_TAG)),
+                    ).build()
+            }
+        return if (equalities.size == 1) {
+            equalities.single()
+        } else {
+            Expression
+                .newBuilder()
+                .setFunction(FunctionCall.newBuilder().setOperation("and").addAllOperands(equalities))
+                .build()
         }
     }
+
+    private fun ref(
+        name: String,
+        sourceAlias: String,
+    ): Expression =
+        Expression
+            .newBuilder()
+            .setColumnRef(ColumnRef.newBuilder().setName(name).setSourceAlias(sourceAlias))
+            .build()
 
     private fun withConditionSet(
         plan: PlanNode,

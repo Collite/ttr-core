@@ -6,7 +6,6 @@ import org.tatrman.plan.v1.Expression
 import org.tatrman.plan.v1.FunctionCall
 import org.tatrman.plan.v1.JoinNode
 import org.tatrman.plan.v1.PlanNode
-import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.translator.framework.ModelHandle
 import org.tatrman.translator.joiner.JoinPolicy.SideRef
@@ -222,38 +221,4 @@ object JoinerLogical {
             .toBuilder()
             .setJoin(plan.join.toBuilder().setCondition(condition))
             .build()
-
-    /**
-     * Walk the subtree under [plan] and return the qname of the first `Scan` whose schema_code
-     * matches [schemaCode], or `null` if none found. v1.0 side search, kept for [JoinerPhysical] until
-     * MJ-P2·S2 moves it onto the narrowed [collectEntityScans] rule.
-     */
-    private fun findFirstScan(
-        plan: PlanNode,
-        schemaCode: SchemaCode,
-    ): QualifiedName? {
-        if (plan.nodeCase == PlanNode.NodeCase.SCAN && plan.scan.getObject().schemaCode == schemaCode) {
-            return plan.scan.getObject()
-        }
-        if (plan.nodeCase == PlanNode.NodeCase.TABLE_SCAN && plan.tableScan.table.schemaCode == schemaCode) {
-            return plan.tableScan.table
-        }
-        return when (plan.nodeCase) {
-            PlanNode.NodeCase.PROJECT -> findFirstScan(plan.project.input, schemaCode)
-            PlanNode.NodeCase.FILTER -> findFirstScan(plan.filter.input, schemaCode)
-            PlanNode.NodeCase.JOIN ->
-                findFirstScan(plan.join.left, schemaCode) ?: findFirstScan(plan.join.right, schemaCode)
-            PlanNode.NodeCase.AGGREGATE -> findFirstScan(plan.aggregate.input, schemaCode)
-            PlanNode.NodeCase.SORT -> findFirstScan(plan.sort.input, schemaCode)
-            PlanNode.NodeCase.LIMIT_OFFSET -> findFirstScan(plan.limitOffset.input, schemaCode)
-            PlanNode.NodeCase.SUBQUERY -> findFirstScan(plan.subquery.subquery, schemaCode)
-            else -> null
-        }
-    }
-
-    /** Sibling accessor for [JoinerPhysical] — same logic, exposed by package contract. */
-    internal fun findFirstScanPublic(
-        plan: PlanNode,
-        schemaCode: SchemaCode,
-    ): QualifiedName? = findFirstScan(plan, schemaCode)
 }
