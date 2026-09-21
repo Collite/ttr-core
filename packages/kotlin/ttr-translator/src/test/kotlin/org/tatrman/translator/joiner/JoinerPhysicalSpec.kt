@@ -250,4 +250,112 @@ class JoinerPhysicalSpec :
 
             second shouldBe first
         }
+
+        // -- MJ-P2·S2: the same side rule as JoinerLogical (whole side, Join/Filter descent) ----------
+
+        fun eqNames(cond: Expression): Pair<String, String> {
+            cond.function.operation shouldBe "eq"
+            cond.function.operandsList[0]
+                .columnRef.sourceAlias shouldBe Expressions.LEFT_INPUT_TAG
+            cond.function.operandsList[1]
+                .columnRef.sourceAlias shouldBe Expressions.RIGHT_INPUT_TAG
+            return cond.function.operandsList[0]
+                .columnRef.name to
+                cond.function.operandsList[1]
+                    .columnRef.name
+        }
+
+        "chain ((a ⋈ b) ⋈ c) with FKs a→b, b→c: the second join is matched against the WHOLE left side" {
+            val model =
+                InMemoryModelHandle(
+                    tables = emptyList(),
+                    foreignKeys =
+                        listOf(
+                            ModelForeignKey(listOf(colQname("a", "b_id")), listOf(colQname("b", "id"))),
+                            ModelForeignKey(listOf(colQname("b", "c_id")), listOf(colQname("c", "id"))),
+                        ),
+                )
+            val input =
+                unconditionedJoin(
+                    unconditionedJoin(dbScan(tableQname("a")), dbScan(tableQname("b"))),
+                    dbScan(tableQname("c")),
+                )
+            val result = JoinerPhysical.apply(input, model)
+            result.warnings.shouldBeEmpty()
+            eqNames(result.plan.join.left.join.condition) shouldBe ("b_id" to "id")
+            eqNames(result.plan.join.condition) shouldBe ("c_id" to "id")
+        }
+
+        "a multi-column FK ANDs its columns (was: silently skipped as 'not v1.0 shape')" {
+            val model =
+                InMemoryModelHandle(
+                    tables = emptyList(),
+                    foreignKeys =
+                        listOf(
+                            ModelForeignKey(
+                                listOf(colQname("dodatek", "cislo_smlouvy"), colQname("dodatek", "rok")),
+                                listOf(colQname("smlouva", "cislo_smlouvy"), colQname("smlouva", "rok")),
+                            ),
+                        ),
+                )
+            val result =
+                JoinerPhysical.apply(
+                    unconditionedJoin(dbScan(tableQname("smlouva")), dbScan(tableQname("dodatek"))),
+                    model,
+                )
+            result.warnings.shouldBeEmpty()
+            val cond = result.plan.join.condition
+            cond.function.operation shouldBe "and"
+            eqNames(cond.function.operandsList[0]) shouldBe ("cislo_smlouvy" to "cislo_smlouvy")
+            eqNames(cond.function.operandsList[1]) shouldBe ("rok" to "rok")
+        }
+
+        "narrowed descent: an Aggregate under a join side is not looked into — untouched, no warning" {
+            val model = InMemoryModelHandle(tables = emptyList(), foreignKeys = listOf(customerToOrdersFk))
+            val aggregated =
+                PlanNode
+                    .newBuilder()
+                    .setAggregate(
+                        org.tatrman.plan.v1.AggregateNode
+                            .newBuilder()
+                            .setInput(dbScan(tableQname("orders"))),
+                    ).build()
+            val result = JoinerPhysical.apply(unconditionedJoin(dbScan(tableQname("customers")), aggregated), model)
+            result.plan.join.hasCondition() shouldBe false
+            result.warnings.shouldBeEmpty()
+        }
+
+        "no FK: the warning carries the full side lists" {
+            val model = InMemoryModelHandle(tables = emptyList(), foreignKeys = emptyList())
+            val input =
+                unconditionedJoin(
+                    unconditionedJoin(dbScan(tableQname("a")), dbScan(tableQname("b"))),
+                    dbScan(tableQname("c")),
+                )
+            val result = JoinerPhysical.apply(input, model)
+            result.warnings shouldHaveSize 2
+            val outer = result.warnings.last().shouldBeInstanceOf<JoinerWarning.NoRelation>()
+            outer.leftEntities.map { it.name } shouldBe listOf("a", "b")
+            outer.rightEntities.map { it.name } shouldBe listOf("c")
+        }
+
+        "two FKs between the same tables on a chain side → AmbiguousRelations, unconditioned" {
+            val model =
+                InMemoryModelHandle(
+                    tables = emptyList(),
+                    foreignKeys =
+                        listOf(
+                            ModelForeignKey(listOf(colQname("a", "c_id")), listOf(colQname("c", "id"))),
+                            ModelForeignKey(listOf(colQname("b", "c_id")), listOf(colQname("c", "id"))),
+                        ),
+                )
+            val input =
+                unconditionedJoin(
+                    unconditionedJoin(dbScan(tableQname("a")), dbScan(tableQname("b"))),
+                    dbScan(tableQname("c")),
+                )
+            val result = JoinerPhysical.apply(input, model)
+            result.plan.join.hasCondition() shouldBe false
+            result.warnings.last().shouldBeInstanceOf<JoinerWarning.AmbiguousRelations>()
+        }
     })

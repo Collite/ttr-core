@@ -6,6 +6,51 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-translator`** ⚑ **model joins (MJ, → `translator/v0.12.0`) — bare and chained `JOIN`s in the ER
+  lane are conditioned from the model's declared relations.** `FROM kumulovaný_prodej JOIN dodací_místo
+  JOIN zákazník JOIN produkt` — the way the LLM lane writes it — used to die at Calcite validation with
+  `INNER, LEFT, RIGHT, FULL, or ASOF join requires a condition`; it now translates with the three `ON`s the
+  E-R model implies (`kp ↔ dm`, `dm ↔ z`, `kp ↔ p`) and zero warnings. Two carriers on one policy:
+  - **`codec/sql/ModelJoinRewriter`** (new, pre-validation `SqlShuttle`, ER catalog only): every
+    `INNER`/`LEFT`/`RIGHT`/`FULL` join without `ON`/`USING` (not `NATURAL`) gets
+    `<alias>.<attr> = <alias>.<attr>` from the model — join type preserved, SQL aliases used, `AND` over
+    every pair of a composite relation. Each join in a chain is decided against the **whole** entity set
+    of its other side, so `dodací_místo → zákazník` is found for the third entity, not `kumulovaný_prodej
+    → zákazník`. Anything unresolvable gets `ON TRUE` and falls through to the wire carrier, which reports
+    it. Explicit `ON`/`USING`, `NATURAL`, the comma list and `CROSS JOIN` are untouched. `explain` gains
+    the stage `model_joins` (the rewritten statement, or `(no bare joins)`).
+  - **`joiner/JoinPolicy`** (new) — the single decision: candidates `(l, r, rel)` over both sides; exactly
+    one → resolved; none → `NoRelation`; two or more → `AmbiguousRelations` (no proximity tie-break); an
+    entity occurring twice across the join (a self-join, or two aliases a candidate names) → ambiguous with
+    `repeated` — a repeated alias that already has its `ON` does not block the *next* join (contracts §2
+    C-1, review-097 R1); all pairs oriented to the sides. Path inference through bridge entities is deliberately *not* built (gated v2).
+  - **`JoinerLogical` / `JoinerPhysical`** on the same rule: whole-side matching (the comma-form chain
+    `FROM a, b, c` now resolves too), `and(eq, eq)` for composite relations / multi-column FKs, and a
+    **key-name collision guard** — a bare `$L`/`$R` ref resolves to the *first* holder of a name, so a join
+    whose key exists on two entities of one side stays unconditioned with the new
+    `JoinerWarning.KeyNameCollision` instead of silently mis-joining. ⚠ **Behaviour changes:** (1) a side's
+    entity/table set descends `Join` and `Filter` only — a `Project`/`Aggregate`/`Subquery` under a join side
+    is no longer looked into (it could produce a bare-name ref to a column a derived table does not expose
+    and fail at decode); such a join stays unconditioned and is reported as `JOIN_NO_RELATION` naming
+    "a derived table" for that side (review-097 R2) — never a silent Cartesian product. (2) `JoinerLogical` used only the FIRST
+    pair of a composite relation. (3) `JoinerPhysical` skipped multi-column FKs (`NoRelation`); they are now
+    ANDed.
+  - **Warnings ride on the result:** `ParseResult.Success.warnings` / `TranslateResult.Success.warnings`
+    (`List<JoinerWarning>`, defaulted — source-compatible), reconciled to **one verdict per join** across
+    the two stages (`JoinerWarnings.merge`: a join the physical carrier conditioned drops the logical
+    carrier's stale warning; a join both warned on keeps the entity-level one). New
+    **`joiner/JoinerMessages`** renders `code` / `severity` / `text`: `JOIN_NO_RELATION`,
+    `JOIN_AMBIGUOUS_RELATIONS`, `JOIN_RELATION_WITHOUT_PAIRS` (INFO), `JOIN_KEY_NAME_COLLISION` — the names
+    Golem already demotes on; the KDoc names `join_unresolved_cartesian` / `join_ambiguous_multiple_relations`
+    / `join_relation_without_pairs` are gone. ⚠ `JoinerWarning` gained `KeyNameCollision` (exhaustive `when`s
+    need a branch); `NoRelation` / `AmbiguousRelations` carry `leftEntities` / `rightEntities` (`sideA` /
+    `sideB` are their first members); `AmbiguousRelations.repeated`. `JoinerLogical.RelationMatcher` and
+    `findFirstScanPublic` are removed. `ParseResult.{Success,Failure}.modelJoinsSql` (debug, defaulted).
+  Fixture `DfpJoinModel` (test-fixtures) + `ModelJoinSpec` (H1–H12 of the MJ plan), `ModelJoinRewriterSpec`,
+  `JoinPolicySpec`, `JoinerMessagesSpec`, and the extended `JoinerLogicalSpec` / `JoinerPhysicalSpec` pin it;
+  every pre-MJ golden (incl. the comma-form plan bytes) is unchanged. Design and decisions:
+  `project/tatrman/features/ttr-translator/model-joins/`.
+
 - **`ttr-translator`** ⚑ **behaviour fix — joins over renamed keys, and `datetime_value` read
   and written as ISO-8601.** Three defects that meet on the first entity join to reach execution
   on a model whose join keys are renamed between the ER and DB layers:

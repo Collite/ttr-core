@@ -9,6 +9,7 @@ import org.tatrman.translator.codec.dfdsl.DfDslCodec
 import org.tatrman.translator.codec.dfdsl.DfDslParseException
 import org.tatrman.translator.codec.dfdsl.DfDslUnparseException
 import org.tatrman.translator.codec.sql.RelToSqlUnparser
+import org.tatrman.translator.codec.sql.ModelJoinRewriter
 import org.tatrman.translator.codec.sql.SqlValidator
 import org.tatrman.translator.codec.sql.StoreDmlUnparser
 import org.tatrman.translator.codec.sql.TableHintExtractor
@@ -204,7 +205,8 @@ class Translator(
                 // binding expansion is needed here (the gRPC unparse path passes bindings).
                 when (val unparse = unparseFromRelNode(parse.plan, targetLanguage, targetDialect, optimize)) {
                     is UnparseResult.Failure -> TranslateResult.Failure(unparse.code, unparse.message)
-                    is UnparseResult.Success -> TranslateResult.Success(output = unparse.output, plan = parse.plan)
+                    is UnparseResult.Success ->
+                        TranslateResult.Success(output = unparse.output, plan = parse.plan, warnings = parse.warnings)
                 }
         }
 
@@ -217,6 +219,9 @@ class Translator(
         val stages = mutableListOf<StageArtifact>()
         val parse = parseToRelNode(source, sourceLanguage)
         stages += stage("parse_and_to_rel", parse.toString())
+        // MJ — what the engine actually joined (contracts §4): the statement after ModelJoinRewriter, or a
+        // marker when no bare join was there to condition (also for non-SQL sources and REL_NODE re-entry).
+        stages += stage("model_joins", parse.modelJoinsSql ?: "(no bare joins)")
         if (parse is ParseResult.Failure) {
             return ExplainResult(stages = stages, finalOutput = null, finalError = parse.message)
         }
@@ -324,25 +329,41 @@ class Translator(
         // post-validation so the executed SQL stays cast-free. Only attempt when typed parameters
         // were supplied, and keep the ORIGINAL error if the typed retry also fails — it diagnoses
         // the author's SQL, not the crutch.
-        fun validateAgainst(schema: SchemaCode): Pair<ValidateResult, TranslatorFramework> {
+        // MJ (model joins, contracts §1) — the SQL carrier runs only for ER-catalog validations; the DB
+        // catalog has no relations to draw on (FK-conditioned bare joins are gated v2). One fresh
+        // rewriter per attempt (a SqlShuttle is single-use); `lastRewrittenSql` feeds the DEBUG log and the
+        // `explain` stage whether the validation then succeeds or not.
+        fun preValidation(schema: SchemaCode): List<ModelJoinRewriter> =
+            if (schema == SchemaCode.ER) listOf(ModelJoinRewriter(model, "entity")) else emptyList()
+
+        fun attempt(
+            schema: SchemaCode,
+            sql: String,
+        ): Attempt {
             val framework = newFramework(schema)
-            return when (val r = SqlValidator.validateAndConvert(framework.newPlanner(), effectiveSql)) {
-                is ValidateResult.Success -> r to framework
+            val rewriters = preValidation(schema)
+            val result = SqlValidator.validateAndConvert(framework.newPlanner(), sql, rewriters)
+            val modelJoinsSql = rewriters.firstNotNullOfOrNull { it.lastRewrittenSql }
+            if (modelJoinsSql != null) log.debug("Model joins rewrote SQL: $modelJoinsSql")
+            return Attempt(result, framework, modelJoinsSql)
+        }
+
+        fun validateAgainst(schema: SchemaCode): Attempt {
+            val first = attempt(schema, effectiveSql)
+            return when (first.result) {
+                is ValidateResult.Success -> first
                 is ValidateResult.Failure ->
                     if (prepared != null && prepared.parameterOrder.isNotEmpty()) {
                         val typedSql = ParameterBridge.prepareSqlForCalcite(preSource, parameters, typed = true).sql
-                        val retryFramework = newFramework(schema)
-                        when (val retry = SqlValidator.validateAndConvert(retryFramework.newPlanner(), typedSql)) {
-                            is ValidateResult.Success -> retry to retryFramework
-                            is ValidateResult.Failure -> r to framework
-                        }
+                        val retry = attempt(schema, typedSql)
+                        if (retry.result is ValidateResult.Success) retry else first
                     } else {
-                        r to framework
+                        first
                     }
             }
         }
 
-        var (validated, validatedFramework) = validateAgainst(catalogSchema)
+        var (validated, validatedFramework, modelJoinsSql) = validateAgainst(catalogSchema)
         // Schema auto-correction. When the caller left `source_schema` UNSPECIFIED and content
         // detection was inconclusive, we validated against the `targetSchema` guess; a failure there
         // may just mean the source's tables live in the OTHER catalog (e.g. query-runner's pass-1
@@ -352,7 +373,7 @@ class Translator(
         // the author's SQL rather than reporting a misleading wrong-catalog "object not found".
         if (validated is ValidateResult.Failure && autoCorrectEligible) {
             for (alt in SchemaDetector.CONSIDERED.filter { it != catalogSchema }) {
-                val (altResult, altFramework) = validateAgainst(alt)
+                val (altResult, altFramework, altModelJoinsSql) = validateAgainst(alt)
                 if (altResult is ValidateResult.Success) {
                     log.info(
                         "source_schema was inconclusive; auto-corrected catalog to {} after {} validation failed",
@@ -361,17 +382,31 @@ class Translator(
                     )
                     validated = altResult
                     validatedFramework = altFramework
+                    modelJoinsSql = altModelJoinsSql
                     break
                 }
             }
         }
         log.debug("Detected framework schema: $validatedFramework for source: $effectiveSql")
         return when (val v = validated) {
-            is ValidateResult.Failure -> ParseResult.Failure(v.error.code, v.error.message)
-            is ValidateResult.Success ->
-                runFrontHalfStages(v.rel, validatedFramework, targetSchema, prepared, hintsByTable = hintsByTable)
+            is ValidateResult.Failure -> ParseResult.Failure(v.error.code, v.error.message, modelJoinsSql)
+            is ValidateResult.Success -> {
+                val r =
+                    runFrontHalfStages(v.rel, validatedFramework, targetSchema, prepared, hintsByTable = hintsByTable)
+                when (r) {
+                    is ParseResult.Success -> r.copy(modelJoinsSql = modelJoinsSql)
+                    is ParseResult.Failure -> r.copy(modelJoinsSql = modelJoinsSql)
+                }
+            }
         }
     }
+
+    /** One validation attempt of [parseSql]: the outcome, its (single-use) framework, and the MJ artefact. */
+    private data class Attempt(
+        val result: ValidateResult,
+        val framework: TranslatorFramework,
+        val modelJoinsSql: String?,
+    )
 
     /**
      * Derive the catalog schema for [source] from the schemas its own table identifiers belong
@@ -416,10 +451,8 @@ class Translator(
      *
      * Every stage is **semantically idempotent**, so REL_NODE re-entry re-runs the chain safely.
      *
-     * Warnings from JoinerLogical / JoinerPhysical are currently dropped on the floor — the
-     * `ParseResult` shape doesn't carry a `messages` slot. Surfacing them through the Translator
-     * service's `ResponseMessage messages = 99` is a service-side follow-up; the data is
-     * available, just not plumbed.
+     * Warnings from JoinerLogical / JoinerPhysical ride on [ParseResult.Success.warnings] (MJ, contracts §4);
+     * the service maps them to `ResponseMessage` via `JoinerMessages`.
      */
     private fun runFrontHalfStages(
         rel: RelNode,
@@ -473,8 +506,11 @@ class Translator(
                     is UnfoldResult.Error -> return ParseResult.Failure(unfolded.code, unfolded.message)
                 }
 
-            // 4. EXPAND_JOINS-logical — always. Warnings collected but not surfaced (see KDoc).
-            plan = JoinerLogical.apply(plan, model).plan
+            // 4. EXPAND_JOINS-logical — always. MJ: warnings ride on the result (contracts §4); the two
+            // carriers' verdicts on the same join are reconciled by JoinerWarnings.merge.
+            val logical = JoinerLogical.apply(plan, model)
+            plan = logical.plan
+            var warnings: List<org.tatrman.translator.joiner.JoinerWarning> = logical.warnings
 
             // 5 + 6. Physical stages — gated on targetSchema.
             if (targetSchema == SchemaCode.DB || targetSchema == SchemaCode.SCHEMA_CODE_UNSPECIFIED) {
@@ -483,10 +519,14 @@ class Translator(
                         is MapToPhysicalResult.Success -> mapped.plan
                         is MapToPhysicalResult.Failure -> return ParseResult.Failure(mapped.code, mapped.message)
                     }
-                plan = JoinerPhysical.apply(plan, model).plan
+                val physical = JoinerPhysical.apply(plan, model)
+                plan = physical.plan
+                warnings =
+                    org.tatrman.translator.joiner.JoinerWarnings
+                        .merge(logical, physical)
             }
 
-            ParseResult.Success(plan = plan)
+            ParseResult.Success(plan = plan, warnings = warnings)
         } catch (ex: Exception) {
             // The front-half stage chain (RESOLVE → encode → UNFOLD → EXPAND_JOINS-logical →
             // MAP_TO_PHYSICAL → EXPAND_JOINS-physical) previously let any unexpected exception
@@ -641,13 +681,29 @@ class Translator(
 }
 
 sealed interface ParseResult {
+    /**
+     * MJ — debug artefact: the SQL statement after `ModelJoinRewriter` conditioned at least one bare join
+     * (one line, Calcite dialect), else null. Not part of the wire contract; `explain` exposes it as stage
+     * `model_joins`. Present on a failure too, so a validation error after the rewrite can be read against
+     * the SQL the validator actually saw.
+     */
+    val modelJoinsSql: String?
+
     data class Success(
         val plan: PlanNode,
+        /**
+         * MJ (model joins) — what EXPAND_JOINS could not condition and why. Empty when every join between
+         * entities resolved (or the plan has none). Mapped to `ResponseMessage(WARNING/INFO, code, text)`
+         * by the caller via [org.tatrman.translator.joiner.JoinerMessages].
+         */
+        val warnings: List<org.tatrman.translator.joiner.JoinerWarning> = emptyList(),
+        override val modelJoinsSql: String? = null,
     ) : ParseResult
 
     data class Failure(
         val code: String,
         val message: String,
+        override val modelJoinsSql: String? = null,
     ) : ParseResult
 }
 
@@ -673,6 +729,8 @@ sealed interface TranslateResult {
     data class Success(
         val output: String,
         val plan: PlanNode,
+        /** MJ — the parse half's joiner warnings, carried through unchanged. See [ParseResult.Success.warnings]. */
+        val warnings: List<org.tatrman.translator.joiner.JoinerWarning> = emptyList(),
     ) : TranslateResult
 
     data class Failure(
