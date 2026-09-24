@@ -1,0 +1,38 @@
+# English function words — the RG-LEX-031 guard (LP contracts §3.1).
+#
+# See `stop-words-cs.txt` for what this list is for and why it is a deliberate twin
+# of `ttr-metadata`'s `/search/stop-words-en.txt` (`StopWordParitySpec` holds them
+# equal). One token per line, UTF-8; `#` comments; compared after fold + lowercase.
+a
+an
+the
+and
+or
+is
+are
+was
+were
+be
+been
+being
+this
+that
+these
+those
+for
+on
+in
+to
+from
+with
+by
+at
+of
+which
+what
+how
+where
+when
+me
+my
+it

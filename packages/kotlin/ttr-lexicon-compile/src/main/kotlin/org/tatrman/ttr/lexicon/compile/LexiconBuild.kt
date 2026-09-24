@@ -131,7 +131,14 @@ object LexiconBuild {
         // own `ground:` files second, so an estate extends the kernels' trigger words instead of
         // having to restate them.
         val groundingStdlib = if (includeStdlib) LexiconStdlib.groundingSlices() else emptyList()
-        val area = authored.copy(skills = stdlib + authored.skills, dataFiles = groundingStdlib + authored.dataFiles)
+        // And the same again for LP's `pred:` slice — shipped words first, the estate's own
+        // `pred:` files second.
+        val predicateStdlib = if (includeStdlib) LexiconStdlib.predicateSlices() else emptyList()
+        val area =
+            authored.copy(
+                skills = stdlib + authored.skills,
+                dataFiles = groundingStdlib + predicateStdlib + authored.dataFiles,
+            )
 
         // ONE walk, every `.ttrm` under `model/`. Each consumer takes what it owns by the unit's
         // `model` directive: the sugar extractor keeps `lexicon` units, the md tier keeps `md`

@@ -100,6 +100,18 @@ object LexiconValidator {
      */
     val GROUNDING_KINDS: Set<String> = setOf("chrono", "money", "geo")
 
+    /** LP contracts §3.1 — the `pred:` ref prefix and its CLOSED kind vocabulary. */
+    const val PRED_PREFIX: String = "pred:"
+
+    /**
+     * The five string predicates (LP contracts §3.1). Closed for the same reason [GROUNDING_KINDS]
+     * is: the ref names a behaviour a *consumer* lowers — `starts_with` becomes a parameterised
+     * `LIKE 'x%'` at the translator — so an unknown kind is not an extension point but an entry no
+     * stage would ever act on.
+     */
+    val PREDICATE_KINDS: Set<String> =
+        setOf("starts_with", "ends_with", "contains", "equals", "not_contains")
+
     /** Parses a `.lex.yaml` data file. [file] is used for provenance only. */
     fun loadDataFile(
         yaml: String,
@@ -148,6 +160,27 @@ object LexiconValidator {
                     return@mapNotNull null
                 }
 
+                // LP §3.1: a `pred:` target names one of the five string predicates, and its forms
+                // must be able to carry a trigger. Both checks live here rather than in the
+                // compiler because both reject the FILE: an author can fix either by editing a
+                // line, which is the boundary between this object and RV-20's dropped rows.
+                if (targetRef.startsWith(PRED_PREFIX)) {
+                    if (targetRef.removePrefix(PRED_PREFIX) !in PREDICATE_KINDS) {
+                        ctx += LexiconErrors.unknownPredicateKind(targetRef, PREDICATE_KINDS, ctx.at(target))
+                        return@mapNotNull null
+                    }
+                    // Every weak form is reported, not the first — a slice is authored in bulk.
+                    var weak = false
+                    for (term in terms) {
+                        val why = weakPredicateForm(term)
+                        if (why != null) {
+                            ctx += LexiconErrors.weakPredicateForm(term.text, targetRef, why, term.provenance)
+                            weak = true
+                        }
+                    }
+                    if (weak) return@mapNotNull null
+                }
+
                 LexiconEntryDef(terms, targetRef, ctx.at(target))
             }
 
@@ -156,6 +189,30 @@ object LexiconValidator {
             LexiconLoad.Ok(LexiconDataFile(entries, Provenance(file, 1)), ctx.warnings())
         } else {
             ctx.rejected()
+        }
+    }
+
+    /**
+     * LP contracts §3.1 — why [term] cannot be a `pred:` trigger, or null when it can.
+     *
+     * **Single-token forms only.** A multi-word form matches as a phrase, so `s textem` is safe
+     * even though `s` alone is not: the two words must both be there, in one span, which is
+     * already the evidence a predicate needs. Refusing it would leave the cs slice with no natural
+     * way to say *contains* at all.
+     *
+     * The token test is [TermNormalizer.normalize]'s whitespace, not a tokenizer: the authored
+     * form is the unit here, and the only question is whether an author wrote one word or several.
+     */
+    private fun weakPredicateForm(term: TermDef): String? {
+        val normalized = TermNormalizer.normalize(term.text)
+        if (normalized.contains(' ')) return null
+        val folded = TermNormalizer.fold(normalized)
+        return when {
+            folded.length <= 1 -> "a single character matches inside half the words in a question"
+            LexiconStopWords.isStop(folded, term.lang) ->
+                "it is a function word in ${term.lang.wire}"
+
+            else -> null
         }
     }
 

@@ -393,6 +393,11 @@ class MatchProfileSpec :
                         // It shipped in the catalogue without this list being updated; the spec is a
                         // completeness check, so the list follows the catalogue.
                         "RG-LEX-017",
+                        // LP (P2a T1/T2) — the `pred:` slice. The 03x band, not 018: the RV bands
+                        // are grouped by the arc that opened them, and a reader who meets
+                        // `RG-LEX-030` in a log should be able to tell which feature to read about.
+                        "RG-LEX-030",
+                        "RG-LEX-031",
                     ),
                 )
             }

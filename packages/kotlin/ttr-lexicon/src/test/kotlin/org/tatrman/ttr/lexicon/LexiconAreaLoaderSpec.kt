@@ -90,6 +90,31 @@ class LexiconAreaLoaderSpec :
             trend.triggers[1].provenance shouldBe Provenance("skills/trend.md", 6)
         }
 
+        test("LP §3.3 — `predicates/` is a data directory, and a `pred:` row loads like any other") {
+            val root = kotlin.io.path.createTempDirectory("lexicon-area-pred")
+            root.resolve("predicates").createDirectories()
+            root.resolve("predicates/string.lex.yaml").writeText(
+                """
+                schema: ttr-lexicon/v1
+                entries:
+                  - terms: [ { text: "v popisu", lang: cs, method: TOKENS } ]
+                    target: pred:contains
+                """.trimIndent(),
+            )
+
+            val area = LexiconAreaLoader.load(root).shouldBeInstanceOf<LexiconLoad.Ok<LexiconArea>>().value
+
+            // The directory is layout, never meaning — the CLASS comes from the `pred:` prefix at
+            // compile time. What this asserts is only that the folder is walked at all: without it
+            // an estate could not extend the shipped slice in the place the docs send it to.
+            area.entries.single().target shouldBe "pred:contains"
+            area.entries
+                .single()
+                .terms
+                .single()
+                .provenance shouldBe Provenance("predicates/string.lex.yaml", 3)
+        }
+
         test("every bad file is reported, not just the first") {
             val broken = tempTree()
 

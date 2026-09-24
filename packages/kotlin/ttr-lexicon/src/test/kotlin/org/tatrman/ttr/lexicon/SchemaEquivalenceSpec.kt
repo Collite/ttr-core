@@ -57,6 +57,9 @@ class SchemaEquivalenceSpec :
                 // RV-44 (RV-P3.0): declared matching profiles. Additive to `ttr-lexicon/v1`, so
                 // this fixture and the three above are validated by the SAME schema id.
                 "match-profiles.lex.yaml",
+                // LP (P2a T3): the `pred:` slice. Same schema id again — a new target PREFIX is
+                // not a new file shape, which is the whole reason `ground:` needed no bump either.
+                "predicate-triggers.lex.yaml",
             ).forEach { name ->
                 test(name) {
                     schemaAccepts(lexiconSchema, fixture("valid/$name")) shouldBe true
@@ -103,6 +106,9 @@ class SchemaEquivalenceSpec :
                 "profile-typos-without-exact.lex.yaml",
                 "profile-method-and-match.lex.yaml",
                 "profile-score-out-of-range.lex.yaml",
+                // LP (P2a T1): the closed `pred:` kind set, expressible as a conditional pattern
+                // exactly as `ground:`'s is — so both sides enforce it.
+                "pred-unknown-kind.lex.yaml",
             ).forEach { name ->
                 test(name) {
                     schemaAccepts(lexiconSchema, fixture("invalid/$name")) shouldBe false
@@ -139,6 +145,20 @@ class SchemaEquivalenceSpec :
                 .loadDataFile(yaml, "profile-typos-exhausts-score.lex.yaml")
                 .shouldBeInstanceOf<LexiconLoad.Rejected>()
                 .codes shouldBe listOf(LexiconErrors.TYPOS_BUDGET_EXHAUSTS_SCORE)
+        }
+
+        test("the pred: FORM rule is Kotlin-only, and the schema knowingly passes it") {
+            // RG-LEX-031 asks a per-language word list ("is `with` a function word in en?").
+            // JSON Schema cannot carry one, and inlining 70 words as a pattern would be a second
+            // copy of the list — so this joins duplicate-term and the typos budget on the
+            // Kotlin-only side. Both weak forms are reported: a slice is authored in bulk.
+            val yaml = fixture("invalid/pred-weak-form.lex.yaml")
+
+            schemaAccepts(lexiconSchema, yaml) shouldBe true
+            LexiconValidator
+                .loadDataFile(yaml, "pred-weak-form.lex.yaml")
+                .shouldBeInstanceOf<LexiconLoad.Rejected>()
+                .codes shouldBe listOf(LexiconErrors.WEAK_PREDICATE_FORM, LexiconErrors.WEAK_PREDICATE_FORM)
         }
 
         test("the duplicate-term rule is Kotlin-only, and the schema knowingly passes it") {

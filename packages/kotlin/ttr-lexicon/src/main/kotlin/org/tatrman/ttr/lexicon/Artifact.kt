@@ -30,6 +30,21 @@ enum class TargetClass {
 
     /** A `ground:` ref — a grounding trigger slice (RV-42). */
     GROUNDING_TRIGGER,
+
+    /**
+     * A `pred:` ref — a string-predicate trigger slice (LP contracts §3).
+     *
+     * The words that say *how* a quoted literal restricts its attribute — *začínající na*,
+     * *obsahující*, *ends with*. Like [GROUNDING_TRIGGER] it names a behaviour rather than a model
+     * object, so it never reaches the model snapshot and never gates a span's values.
+     *
+     * ⚠ Adding a member to this enum is the one change in this file that an OLD reader cannot
+     * absorb. `targetClass` has no default, and kotlinx rejects an enum value it does not know, so
+     * a pre-LP reader meeting a `STRING_PREDICATE` row fails to decode the WHOLE archive and
+     * degrades to an empty vocabulary — see [CompiledLexiconHeader.SCHEMA_VERSION]'s
+     * readers-before-producers rule, which exists for exactly this.
+     */
+    STRING_PREDICATE,
 }
 
 /**
@@ -110,7 +125,11 @@ data class CompiledLexiconHeader(
 ) {
     companion object {
         /**
-         * v2 (MS) adds [CompiledLexicon.targets]; v3 (MH) adds [TargetFacts.reachedFrom].
+         * v2 (MS) adds [CompiledLexicon.targets]; v3 (MH) adds [TargetFacts.reachedFrom];
+         * v4 (LP) adds [TargetFacts.nameRef]/[TargetFacts.codeRef]/[TargetFacts.codeFormat] —
+         * and the [TargetClass.STRING_PREDICATE] member, which is why v4 is the first bump where
+         * the ordering rule below is not merely prudent but load-bearing: the three fields are
+         * defaulted and harmless, the enum member is not.
          *
          * Each field is defaulted, so an older archive decodes here (v1 → v2 → v3). That is the
          * only direction a
@@ -130,7 +149,7 @@ data class CompiledLexiconHeader(
          * and a mismatch should log a WARN that NAMES the versions — an old reader's only signal
          * today is a generic "undecodable", which is the hardest thing to diagnose in a cluster.
          */
-        const val SCHEMA_VERSION: String = "ttr-lexicon-compiled/v3"
+        const val SCHEMA_VERSION: String = "ttr-lexicon-compiled/v4"
     }
 }
 
@@ -176,6 +195,30 @@ data class TargetFacts(
      * reader ignores the field and simply leaves T3 inert.
      */
     val reachedFrom: List<Reach> = emptyList(),
+    /**
+     * LP (contracts §2.1) — the MENTION facet: which attribute carries this object under the
+     * aspect a quoted literal is about. `semantics { name: · code: }`, as FULL attribute refs
+     * (`er.entity.store.name`), because the resolver compares them to `Attribution.attribute_ref`
+     * and a local name would make every consumer re-join.
+     *
+     * Null when the model declares none — or when it names a member this object does not have,
+     * which is a model mistake and not a fact to invent. Empty for members: a member has no name
+     * column, it IS one.
+     *
+     * ⛔ Copied from the same `mentionSemantics` read that fills [objectKind], never derived from
+     * the ref string. "The entity's name column" is a DECLARED fact (the rule this whole file
+     * lives by), and the resolver already refuses to guess it — LP-P1's `Verbatim` leaves a
+     * literal HEADLESS rather than pick a column.
+     */
+    val nameRef: String? = null,
+    val codeRef: String? = null,
+    /**
+     * `code_format:` as declared on the CODE attribute, so the resolver's code-shape test uses the
+     * model's own pattern instead of the fallback regex it would otherwise invent
+     * (`VerbatimAttribution.attributeRefOf`). Null when [codeRef] is null, or when the code
+     * attribute declares no format.
+     */
+    val codeFormat: String? = null,
 )
 
 /**

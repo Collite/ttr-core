@@ -1,0 +1,10 @@
+# expected: RG-LEX-031 — a `pred:` form that is a single character (`s`) or a function
+# word of its language (`with`). Kotlin-only: the rule needs a per-language word list,
+# and JSON Schema cannot carry one — so the schema knowingly ACCEPTS this file.
+#
+# Both forms are reported, not just the first: a slice is authored in bulk.
+schema: ttr-lexicon/v1
+defaults: { method: EXACT }
+entries:
+  - terms: [ { text: "s", lang: cs }, { text: "with", lang: en } ]
+    target: pred:starts_with
