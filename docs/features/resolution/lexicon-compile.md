@@ -296,6 +296,51 @@ undo that.
 is the precedence statement the compiler reads: an estate redefining `op:trend` wins, and the
 build note names both files.
 
+### 7.1 The string-predicate slice (LP §3.3)
+
+Beside `skills/` and `grounding/` the stdlib ships one more area,
+`lexicon-stdlib/predicates/`, loaded by `LexiconStdlib.predicateSlices()` on exactly the path the
+grounding slices take. It is an ordinary `ttr-lexicon/v1` data file; the only thing that makes it a
+predicate slice is the `pred:` target prefix, from which the compiler derives `STRING_PREDICATE`.
+
+These are the words that say **how** a quoted literal restricts its attribute. They do not
+interpret the literal and they do not name it: `"Pelex"` is the value, this file is the operator
+between the value and the column. The lowering — `starts_with` to a parameterised `LIKE ? || '%'`
+— stays consumer-side, so nothing here knows SQL.
+
+| Ref | cs triggers | en triggers |
+|---|---|---|
+| `pred:starts_with` | začínající na · začíná na · začínají na · s prefixem | starts with · beginning with · prefix |
+| `pred:ends_with` | končící na · končí na · končící · s příponou | ends with · ending with · suffix |
+| `pred:contains` | obsahující · obsahuje · obsahují · s textem · v názvu | contains · containing · including |
+| `pred:equals` | přesně · s názvem přesně · rovná se | exactly · named exactly · equal to |
+| `pred:not_contains` | neobsahující · neobsahuje · neobsahují | not containing · without · excluding |
+
+**One file for all five**, unlike grounding's file-per-kernel. A `ground:` file is a kernel's
+vocabulary and a kernel owns its own words; the five predicates are one closed family read by one
+consumer, and splitting them would only let *starts_with* and *ends_with* drift apart in style.
+
+Three rules the forms follow, and each is a decision rather than a style:
+
+1. **Inflected forms are listed explicitly** — no lemma reliance. The slice has to work on the
+   `LLM_EMULATED` NLP backend, which has no morphology, and Czech puts one predicate in half a
+   dozen shapes (`začínající` / `začíná` / `začínají`).
+2. **Multi-word forms are `TOKENS`, single words `EXACT`.** A phrase can be separated in a real
+   question (*začínající přesně na "Pelex"*) and its order is not fixed. A single word gets no
+   typo budget on purpose: these compete with entity names for the same span, and a one-edit
+   neighbourhood around `obsahuje` reaches real words.
+3. **No single-character or function-word forms** — `RG-LEX-031` refuses them. A predicate form is
+   matched against running text, so a bare `s` would declare a filter in questions nobody meant
+   one in. That is why the natural Czech forms for *contains* are the phrases `s textem` and
+   `v názvu`, never the bare preposition.
+
+Layered like the other two areas — stdlib first, estate second — so an estate that adds
+*v popisu* for `pred:contains` **extends** the shipped vocabulary rather than replacing it.
+
+⚑ The set is closed at these five. `RG-LEX-030` rejects any other `pred:` ref, in the stdlib and in
+an estate's own files alike: a consumer that meets `pred:sounds_like` has nothing to lower it to,
+and a trigger that resolves to nothing is worse than a word that resolves to nothing at all.
+
 ## 8. Running it
 
 ```kotlin
