@@ -6,6 +6,33 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-metadata` · `ttr-lexicon` · `ttr-lexicon-compile`** ⚑ **member vocabularies (MV-T0) —
+  `SearchHints.indexed` + `matchMethod` are two facts, and the compiled archive (`ttr-lexicon-compiled/v5`)
+  knows every indexed attribute.** Before this, one bit — `SearchHints.fuzzy` — answered "is this carrier
+  indexed?" under the name of "is it matched partially?", so `search { searchable method: EXACT }` had no
+  member vocabulary at all.
+  - **`SearchHints.indexed`** (new, in the constructor position `fuzzy` held): an authored `method:` of any
+    kind — `EXACT` included — or the deprecated `fuzzy: true`. A bare `searchable` stays a hint. Derived at
+    the one boundary (`toSearchHints`); `matchMethod` carries the method verbatim, and the deprecated
+    `fuzzy: true` as the `TYPOS(1)` grammar 0.12 maps it to.
+  - ⚠ **Source break, deliberate:** `SearchHints.fuzzy` is now a `@Deprecated` computed property
+    `= MatchMethods.isPartial(matchMethod)`, not a constructor parameter, so `SearchHints(fuzzy = …)` /
+    `.copy(fuzzy = …)` no longer compile — a producer must say which fact it means (`indexed`, `matchMethod`).
+    Readers of `.fuzzy` compile with a warning and read the pre-MV value for every carrier that does not
+    author both a method and `fuzzy`. `SearchHints.methodIsFuzzy` → `MatchMethods.isPartial` (deprecated
+    forwarder kept).
+  - `ModelToDefinitions` writes the method whenever there is one (`method: EXACT` for an indexed carrier
+    with none) and never writes `fuzzy: true` back; an authored `fuzzy: false` is kept (it has no lossless
+    replacement).
+  - `MetadataQuery.ObjectFilter.indexedOnly` (new); `fuzzyOnly` is its alias. ⚠ `method: EXACT` carriers
+    are now listed.
+  - `Model.memberVocabularyCarriers()` (new) — the one definition of "has a member vocabulary": indexed
+    attributes, plus indexed columns that do not back an indexed attribute.
+  - **Archive v5:** `TargetFacts.memberVocabulary` (defaulted; additive in both directions — a v4 reader
+    ignores it, a v4 archive decodes with `false`), and `targets` gains an entry for every member-vocabulary
+    carrier whether or not it has lexicon terms (`objectKind = attribute`, `ownerRef` = its entity/table, no
+    reach of its own). `entries` — and so `contentHash` — are unchanged.
+
 - **`ttr-translator`** ⚑ **T-SQL string→datetime operand coercion (df-test 2026-09-21) — `DATEDIFF(day,
   '19000101', …)` / `DATEADD(day, 7, '2026-09-14')` validate.** The LLM lane's canonical "previous calendar
   week" idiom (`DATEADD(day, -7, DATEADD(day, (DATEDIFF(day, '19000101', CAST(GETDATE() AS date)) / 7) * 7,

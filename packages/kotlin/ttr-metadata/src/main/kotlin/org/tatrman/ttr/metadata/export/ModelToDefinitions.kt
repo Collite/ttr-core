@@ -18,6 +18,7 @@ import org.tatrman.ttr.metadata.model.Er2DbEntityMapping
 import org.tatrman.ttr.metadata.model.Er2DbRelationMapping
 import org.tatrman.ttr.metadata.model.ErSchema
 import org.tatrman.ttr.metadata.model.LocalizedText
+import org.tatrman.ttr.metadata.model.MatchMethods
 import org.tatrman.ttr.metadata.model.Mapping
 import org.tatrman.ttr.metadata.model.MappingTarget
 import org.tatrman.ttr.metadata.model.Model
@@ -643,17 +644,21 @@ object ModelToDefinitions {
         LocalizedStringValue(byLanguage = byLanguage)
 
     /**
-     * Grammar 0.12 (RV-32): [SearchHints.fuzzy] is the DERIVED "indexed for fuzzy matching" flag,
-     * so a carrier that authored `searchable method: TYPOS(1)` has it set. Re-emitting `fuzzy: true`
-     * for that carrier would invent a deprecated property the author never wrote — so the authored
-     * method wins and the boolean is only restored when there is no method to restore it from.
+     * MV (member-vocabulary contracts §2.1) — write what the model MEANS, in the 0.12 spelling.
+     *
+     * The method is written whenever there is one; an [SearchHints.indexed] carrier with none is
+     * written `method: EXACT`, because an authored method is what indexes a carrier on the way back
+     * in. The deprecated `fuzzy: true` is never written: the loader folded it into `TYPOS(1)`, and
+     * `method: TYPOS(1)` is its exact replacement. An authored `fuzzy: false` IS written back — it
+     * is the one deprecated spelling with no lossless replacement (the lexicon reads it as EXACT, and
+     * its 0.12 replacement `method: EXACT` would now also index the carrier).
      */
     private fun SearchHints.toSearchHintsValue(): SearchHintsValue {
-        val method = matchMethod?.let { MatchMethodValue.ofSurfaceText(it) }
-        val authoredFuzzy = fuzzy && method == null
+        val methodText = matchMethod ?: MatchMethods.DEFAULT.takeIf { indexed }
+        val method = methodText?.let { MatchMethodValue.ofSurfaceText(it) }
         return SearchHintsValue(
             searchable = searchable,
-            fuzzy = authoredFuzzy,
+            fuzzy = false,
             fuzzyAuthored = fuzzyAuthored && method == null,
             keywords = keywords.toLocalizedStringListValue(),
             patterns = patterns,

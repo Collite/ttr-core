@@ -420,30 +420,36 @@ data class LocalizedTextList(
 }
 
 data class SearchHints(
+    /**
+     * The legacy inclusion hint (`search { searchable }`). Since MV it decides nothing about
+     * indexing: a bare `searchable` is not a member vocabulary.
+     */
     val searchable: Boolean = false,
     /**
-     * "Is this carrier indexed for fuzzy matching?" — the question every consumer of this model
-     * asks (`meta.v1.SearchHints.fuzzy`, `ListObjects(fuzzy_only=true)`, lex-matcher's index
-     * loader), and NOT simply the authored `fuzzy` keyword.
+     * MV (member-vocabulary contracts §2.1) — "does this carrier have a member vocabulary?": the
+     * values it takes are indexed for matching. The question every consumer of this model asks
+     * (`meta.v1.SearchHints.indexed`, `ListObjects(indexed_only=true)`, Veles'
+     * `ListMemberVocabularies`, the compiled lexicon's `memberVocabulary` facet).
      *
-     * From grammar 0.12 (RV-32) an author states the same thing with `searchable method:`, so the
-     * TTR→model boundary folds an authored non-EXACT method in here (`Source.kt`'s `toSearchHints`).
-     * Keeping the derivation at that one boundary is what makes the documented `fuzzy` → `method`
-     * migration behaviour-preserving for every downstream reader without a wire change.
+     * Derived at ONE boundary (`Source.kt`'s `toSearchHints`): an authored `method:` of any kind —
+     * `EXACT` included — or the deprecated `fuzzy: true`. A bare `searchable` stays a hint.
      *
-     * The DEFAULT method is deliberately not folded in: a bare `searchable` carries no authored
-     * method, so it stays out of the fuzzy index exactly as it did under 0.11.
+     * Takes the constructor position the pre-MV `fuzzy` held, because that bit always meant
+     * "indexed": a positional caller keeps its meaning, a named `fuzzy =` caller fails to compile
+     * and has to say which of the two facts it meant.
      */
-    val fuzzy: Boolean = false,
+    val indexed: Boolean = false,
     val keywords: LocalizedTextList = LocalizedTextList.EMPTY,
     val patterns: List<String> = emptyList(),
     val descriptions: LocalizedTextList = LocalizedTextList.EMPTY,
     val examples: List<String> = emptyList(),
     val aliases: List<String> = emptyList(),
     /**
-     * Grammar 0.12 (RV-32) — the match method exactly as authored (`EXACT`, `TYPOS(2)`, `TOKENS`),
-     * or null when the carrier declared none. Kept verbatim rather than parsed: this model is a
-     * carrier, and the RV-32 vocabulary is `ttr-semantics`' to own.
+     * How this carrier's values are matched — `EXACT`, `TYPOS(n)`, `TOKENS` — verbatim as authored
+     * (grammar 0.12, RV-32), or the deprecated `fuzzy: true` spelled as the `TYPOS(1)` grammar 0.12
+     * maps it to. Null when the carrier declared none; an [indexed] carrier with no method is
+     * matched `EXACT` (contracts §2.1). Kept as text rather than parsed: this model is a carrier,
+     * and the RV-32 vocabulary is `ttr-semantics`' to own.
      *
      * Appended, so positional construction stays source-compatible for published-artifact consumers.
      */
@@ -455,10 +461,22 @@ data class SearchHints(
      */
     val fuzzyAuthored: Boolean = false,
 ) {
+    /**
+     * The pre-MV name of a bit that meant "indexed" — now what its name says: the match method is
+     * partial (TYPOS/TOKENS). Kept one bundle release so readers compile; for every carrier that
+     * does not author both a method and the deprecated boolean it reads exactly as it did before.
+     */
+    @Deprecated(
+        "MV: ask the question you mean — `indexed` (has a member vocabulary) or " +
+            "`MatchMethods.isPartial(matchMethod)` (matched partially)",
+        ReplaceWith("MatchMethods.isPartial(matchMethod)"),
+    )
+    val fuzzy: Boolean get() = MatchMethods.isPartial(matchMethod)
+
     val isEmpty: Boolean
         get() =
             !searchable &&
-                !fuzzy &&
+                !indexed &&
                 keywords.isEmpty &&
                 patterns.isEmpty() &&
                 descriptions.isEmpty &&
@@ -469,17 +487,25 @@ data class SearchHints(
     companion object {
         val EMPTY: SearchHints = SearchHints()
 
-        /**
-         * Does an AUTHORED match method mean "index this for fuzzy matching"? Everything except
-         * `EXACT` does — `TYPOS(n)` by definition, `TOKENS` because it matches words the carrier's
-         * value does not contain in that order. An unrecognized method is not fuzzy: it is a
-         * diagnostic (`ttr/unknown-match-method`), and widening the index on a typo would be the
-         * wrong way to find out.
-         */
-        fun methodIsFuzzy(method: String?): Boolean {
-            val name = method?.substringBefore('(')?.trim()?.uppercase() ?: return false
-            return name == "TYPOS" || name == "TOKENS"
-        }
+        @Deprecated("MV: renamed — it no longer decides indexing", ReplaceWith("MatchMethods.isPartial(method)"))
+        fun methodIsFuzzy(method: String?): Boolean = MatchMethods.isPartial(method)
+    }
+}
+
+/** RV-32 match-method questions over the verbatim [SearchHints.matchMethod] text. */
+object MatchMethods {
+    /** What an [SearchHints.indexed] carrier with no authored method is matched with. */
+    const val DEFAULT: String = "EXACT"
+
+    /**
+     * Is this method PARTIAL — does it admit values that are not the query verbatim? `TYPOS(n)` by
+     * definition, `TOKENS` because it matches words the value does not carry in that order. `EXACT`
+     * is not, and neither is an unrecognized method: it is a diagnostic (`ttr/unknown-match-method`),
+     * and widening a match on a typo would be the wrong way to find out.
+     */
+    fun isPartial(method: String?): Boolean {
+        val name = method?.substringBefore('(')?.trim()?.uppercase() ?: return false
+        return name == "TYPOS" || name == "TOKENS"
     }
 }
 

@@ -46,8 +46,13 @@ class MetadataQuery(
         val tags: List<String> = emptyList(),
         val sourceFilePrefix: String? = null,
         val pkg: String? = null,
+        /** Deprecated alias of [indexedOnly] (MV contracts §2.2): the bit it filtered on meant "indexed". */
         val fuzzyOnly: Boolean = false,
-    )
+        /** MV — only carriers with a member vocabulary: indexed columns/attributes, and the columns backing an indexed attribute. */
+        val indexedOnly: Boolean = false,
+    ) {
+        internal val onlyIndexed: Boolean get() = indexedOnly || fuzzyOnly
+    }
 
     /** afterKey-based page window; `PageTokenCodec` (base64 wire token) stays kantheon. */
     data class PageRequest(
@@ -132,7 +137,7 @@ class MetadataQuery(
         filter: ObjectFilter,
         page: PageRequest,
     ): Page<ModelObject> {
-        val attrBackedFuzzy = if (filter.fuzzyOnly) attributeBackedFuzzyColumns else emptySet()
+        val backingIndexed = if (filter.onlyIndexed) indexedColumns else emptySet()
         val all =
             snapshot.model
                 .objectByQname()
@@ -143,9 +148,9 @@ class MetadataQuery(
                 .filter { filter.tags.isEmpty() || filter.tags.any(it.tags::contains) }
                 .filter { filter.sourceFilePrefix.isNullOrEmpty() || it.sourceFile.startsWith(filter.sourceFilePrefix) }
                 .filter { obj ->
-                    !filter.fuzzyOnly ||
-                        obj.searchHintsOrNull()?.fuzzy == true ||
-                        (obj is DbColumn && obj.qname in attrBackedFuzzy)
+                    !filter.onlyIndexed ||
+                        obj.searchHintsOrNull()?.indexed == true ||
+                        (obj is DbColumn && obj.qname in backingIndexed)
                 }.filter { obj -> filter.pkg.isNullOrEmpty() || obj.sourceFile.contains("/${filter.pkg}/") }
                 .sortedBy { sortKey(it) }
                 .toList()
@@ -274,17 +279,17 @@ class MetadataQuery(
         return postProcess(raw, query)
     }
 
-    // Fuzzy attribute → backing db column set (MetadataServiceImpl lines 171–209).
-    // Memoised for the life of this query (constructed per snapshot). Attributes
-    // mapped to an Expression or with no mapping are skipped (no physical column).
-    private val attributeBackedFuzzyColumns: Set<QualifiedName> by lazy {
-        val fuzzyAttrs =
+    // Indexed attribute → backing db column set (MetadataServiceImpl lines 171–209; MV renamed it
+    // from `attributeBackedFuzzyColumns`). Memoised for the life of this query (constructed per
+    // snapshot). Attributes mapped to an Expression or with no mapping are skipped (no physical column).
+    private val indexedColumns: Set<QualifiedName> by lazy {
+        val indexedAttrs =
             snapshot.model
                 .objectByQname()
                 .values
                 .asSequence()
                 .filterIsInstance<Attribute>()
-                .filter { it.search.fuzzy }
+                .filter { it.search.indexed }
                 .map { it.qname }
                 .toSet()
         val mappingByAttr =
@@ -293,7 +298,7 @@ class MetadataQuery(
                 .filterIsInstance<Er2DbAttributeMapping>()
                 .associateBy { it.attribute }
         buildSet {
-            for (attr in fuzzyAttrs) {
+            for (attr in indexedAttrs) {
                 (mappingByAttr[attr]?.target as? AttributeMappingTarget.Column)?.let { add(it.qname) }
             }
         }

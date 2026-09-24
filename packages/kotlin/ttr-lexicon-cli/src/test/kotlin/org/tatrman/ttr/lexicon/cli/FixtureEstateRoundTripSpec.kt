@@ -97,13 +97,13 @@ class FixtureEstateRoundTripSpec :
                 .operators.operators.keys shouldContain "op:trend"
         }
 
-        test("MH — the archive carries the E-R reach, at schema v4, through the real CLI path") {
+        test("MH — the archive carries the E-R reach, at schema v5, through the real CLI path") {
             val out = Files.createTempDirectory("fixture-reach").resolve("lexicon.tar.zst")
             LexiconBuildCli.run(repoRoot = estate, out = out).exitCode shouldBe LexiconBuildCli.EXIT_OK
 
             val lexicon = LexiconBuildCli.readBack(out).lexicon
 
-            lexicon.header.schemaVersion shouldBe "ttr-lexicon-compiled/v4"
+            lexicon.header.schemaVersion shouldBe "ttr-lexicon-compiled/v5"
             // `model/er/relations.ttrm` declares both, and only the mandatory one may claim to be
             // mandatory — the flag is `cardinality.to`'s lower bound, read off the estate.
             lexicon.targets.getValue("er.entity.store").reachedFrom shouldBe

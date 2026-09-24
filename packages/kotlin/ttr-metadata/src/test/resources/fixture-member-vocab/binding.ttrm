@@ -1,0 +1,21 @@
+model binding
+
+def er2db_entity E {
+    entity: er.entity.E
+    target: { table: db.dbo.T }
+}
+
+def er2db_attribute E.id {
+    attribute: er.entity.E.id
+    target: { column: db.dbo.T.id }
+}
+
+def er2db_attribute E.a {
+    attribute: er.entity.E.a
+    target: { column: db.dbo.T.a_col }
+}
+
+def er2db_attribute E.b {
+    attribute: er.entity.E.b
+    target: { column: db.dbo.T.b_col }
+}

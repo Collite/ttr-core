@@ -1,0 +1,26 @@
+model db schema dbo
+// MV-T0 (member-vocabulary contracts §2.1): one column per `search { … }` shape, so the ONE
+// boundary that derives `SearchHints.indexed` + `matchMethod` is pinned shape by shape.
+// "indexed" = the column has a member vocabulary; the method says how its values are matched.
+def table shapes {
+    description: "SearchHints.indexed derivation fixture"
+    primaryKey: ["id"]
+    columns: [
+        def column id { type: int, isKey: true },
+        // an authored method of ANY kind indexes — EXACT included (it did not before MV)
+        def column exact_code { type: text, search { searchable method: EXACT } },
+        def column typo_name { type: text, search { searchable method: TYPOS(1) } },
+        def column token_title { type: text, search { searchable method: TOKENS } },
+        // the bare inclusion marker is a hint, not a vocabulary
+        def column bare_label { type: text, search { searchable } },
+        // deprecated spellings: `fuzzy: true` ≡ `method: TYPOS(1)` (grammar 0.12);
+        // `fuzzy: false` authored says "no fuzzy" and indexes nothing
+        def column legacy_fuzzy { type: text, search { searchable: true, fuzzy: true } },
+        def column legacy_not_fuzzy { type: text, search { searchable: true, fuzzy: false } },
+        // an authored method wins over the deprecated boolean
+        def column method_wins { type: text, search { searchable method: EXACT, fuzzy: true } },
+        // an unknown method is still an authored method: indexed, kept verbatim, not partial
+        def column unknown_method { type: text, search { searchable method: SOUNDEX } },
+        def column plain { type: text }
+    ]
+}

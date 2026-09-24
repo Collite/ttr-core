@@ -5,6 +5,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
@@ -83,8 +84,8 @@ class ArtifactSpec :
             decoded.header.schemaVersion shouldBe "ttr-lexicon-compiled/v2"
         }
 
-        "the schema label moved to v4" {
-            CompiledLexiconHeader.SCHEMA_VERSION shouldBe "ttr-lexicon-compiled/v4"
+        "the schema label moved to v5" {
+            CompiledLexiconHeader.SCHEMA_VERSION shouldBe "ttr-lexicon-compiled/v5"
         }
 
         "contentHash covers the entry table only, so reach does not move the id" {
@@ -215,6 +216,61 @@ class ArtifactSpec :
             // A member it does NOT know behaves exactly as STRING_PREDICATE does to a v3 reader:
             // the whole document is refused, which is the shape of the break.
             shouldThrow<SerializationException> { CompiledLexicon.fromJson(archive("SOMETHING_LATER")) }
+        }
+
+        // ---- MV (T0 T4): the v4 → v5 seam --------------------------------------------------
+
+        "a v4-shaped targets object decodes with no member facet" {
+            // Verbatim v4 bytes (the six keys `TargetFacts` had at v4) — an added case, per the rule
+            // above: the older pins stay as they shipped.
+            val v4 =
+                """
+                {
+                  "header": {
+                    "schemaVersion": "ttr-lexicon-compiled/v4",
+                    "modelSnapshotHash": "sha256:${"ab".repeat(32)}",
+                    "sourceHashes": { "declared": "d", "metadata": "m" },
+                    "builtAt": "2026-09-24T00:00:00Z"
+                  },
+                  "entries": [],
+                  "targets": {
+                    "er.entity.store": {
+                      "objectKind": "entity",
+                      "ownerRef": null,
+                      "reachedFrom": [],
+                      "nameRef": "er.entity.store.store_name",
+                      "codeRef": null,
+                      "codeFormat": null
+                    },
+                    "er.entity.store.state": {
+                      "objectKind": "attribute",
+                      "ownerRef": "er.entity.store",
+                      "reachedFrom": [],
+                      "nameRef": null,
+                      "codeRef": null,
+                      "codeFormat": null
+                    }
+                  }
+                }
+                """.trimIndent()
+
+            val targets = CompiledLexicon.fromJson(v4).targets
+            targets.values.map { it.memberVocabulary } shouldBe listOf(false, false)
+            targets.getValue("er.entity.store").nameRef shouldBe "er.entity.store.store_name"
+        }
+
+        "the member facet round-trips, is written on every target, and does not move contentHash" {
+            val member = TargetFacts(objectKind = "attribute", ownerRef = "er.entity.store", memberVocabulary = true)
+            val before = lexicon(mapOf("er.entity.store.state" to member))
+
+            CompiledLexicon.fromJson(before.toJson()) shouldBe before
+            before.toJson() shouldContain "\"memberVocabulary\": true"
+            // encodeDefaults: the `false` is written too, so a reader can tell "not indexed" from "v4".
+            lexicon(mapOf("er.entity.store" to TargetFacts("entity"))).toJson() shouldContain
+                "\"memberVocabulary\": false"
+            // The id answers "did the VOCABULARY change?" — a header-level fact is not vocabulary.
+            before.contentHash shouldBe
+                lexicon(mapOf("er.entity.store.state" to member.copy(memberVocabulary = false))).contentHash
         }
 
         "Reach is a plain serializable pair — factRef and the to-side lower bound" {

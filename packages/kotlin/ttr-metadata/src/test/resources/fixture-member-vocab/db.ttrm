@@ -1,0 +1,15 @@
+model db schema dbo
+
+def table T {
+    primaryKey: ["id"]
+    columns: [
+        def column id { type: int, isKey: true },
+        // backs the indexed E.a: the attribute's storage, not a second vocabulary
+        def column a_col { type: text, search { searchable method: EXACT } },
+        // backs E.b, which is NOT indexed: the column's own vocabulary stands
+        def column b_col { type: text, search { searchable method: EXACT } },
+        // no attribute backs it: the db-only estate's shape
+        def column own { type: text, search { searchable method: TOKENS } },
+        def column plain { type: text }
+    ]
+}

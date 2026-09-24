@@ -129,7 +129,10 @@ data class CompiledLexiconHeader(
          * v4 (LP) adds [TargetFacts.nameRef]/[TargetFacts.codeRef]/[TargetFacts.codeFormat] —
          * and the [TargetClass.STRING_PREDICATE] member, which is why v4 is the first bump where
          * the ordering rule below is not merely prudent but load-bearing: the three fields are
-         * defaulted and harmless, the enum member is not.
+         * defaulted and harmless, the enum member is not. v5 (MV) adds
+         * [TargetFacts.memberVocabulary] and a `targets` entry for every indexed attribute —
+         * defaulted, no enum member, so a v4 reader reads a v5 archive (it simply sees no member
+         * facet) and v5 is additive in both directions.
          *
          * Each field is defaulted, so an older archive decodes here (v1 → v2 → v3). That is the
          * only direction a
@@ -149,7 +152,7 @@ data class CompiledLexiconHeader(
          * and a mismatch should log a WARN that NAMES the versions — an old reader's only signal
          * today is a generic "undecodable", which is the hardest thing to diagnose in a cluster.
          */
-        const val SCHEMA_VERSION: String = "ttr-lexicon-compiled/v4"
+        const val SCHEMA_VERSION: String = "ttr-lexicon-compiled/v5"
     }
 }
 
@@ -219,6 +222,16 @@ data class TargetFacts(
      * attribute declares no format.
      */
     val codeFormat: String? = null,
+    /**
+     * MV (member-vocabulary contracts §5.1) — this ref is an INDEXED attribute/column: it has a
+     * member vocabulary, registered and queried under this very ref as its category. True for every
+     * indexed attribute whether or not it has lexicon terms — which is why, from v5, `targets` holds
+     * refs that no entry row points at. Its owner is [ownerRef], and that is the only way a consumer
+     * reaches an entity's member vocabularies (✅MV-3): the entity's own entry lists none.
+     *
+     * Defaulted: a v4 archive decodes with `false` everywhere, and a v4 reader ignores the field.
+     */
+    val memberVocabulary: Boolean = false,
 )
 
 /**

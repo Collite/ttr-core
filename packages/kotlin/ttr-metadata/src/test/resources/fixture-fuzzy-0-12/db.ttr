@@ -1,7 +1,7 @@
 model db schema dbo
 // The 0.12 (RV-P1.5, RV-32) spelling of `fixture-fuzzy`, migrated exactly as the grammar
 // CHANGELOG's table instructs. Every column here asserts one row of that table:
-// the migration must not change which columns are indexed for fuzzy matching.
+// the migration must not change which columns are indexed. (MV: an authored EXACT indexes too.)
 def table products {
     description: "Product catalog (0.12 match-method fixture)"
     primaryKey: ["id"]
@@ -12,7 +12,8 @@ def table products {
         def column name { type: text, search { searchable method: TYPOS(1) } },
         // TOKENS is fuzzy matching too — it matches words the value does not carry in order
         def column title { type: text, search { searchable method: TOKENS } },
-        // was `searchable: true, fuzzy: false` — exact matching, NOT fuzzy-indexed
+        // was `searchable: true, fuzzy: false` — exact matching; since MV an indexed member
+        // vocabulary like any other authored method (it was NOT indexed before MV)
         def column code { type: text, search { searchable method: EXACT } },
         // the inclusion marker alone: no authored method, so it stays out of the fuzzy
         // index exactly as a bare `searchable: true` did under 0.11
