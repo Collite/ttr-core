@@ -5,14 +5,18 @@ group to **two lanes** (SV-P1 S4, 2026-07-12; lane-gating polarity flipped
 2026-07-16 — justfile sync):
 
 - **Maven Central** (Central Portal, `central.sonatype.com`) — the **public
-  lane** (RO-17). Anonymous, no auth to consume; this is what external readers
-  and `ai-platform`/`kantheon` resolve. Signed + full POMs + sources/javadoc,
-  via the `com.vanniktech.maven.publish` plugin. **Only a tag explicitly marked
+  lane** (RO-17). Anonymous, no auth to consume; this is what **external**
+  readers resolve. Signed + full POMs + sources/javadoc, via the
+  `com.vanniktech.maven.publish` plugin. **Only a tag explicitly marked
   `-RELEASE` reaches here** — see [§ Release lanes](#release-lanes--internal-vs-release-2026-07-16).
 - **GitHub Packages** (`https://maven.pkg.github.com/Collite/ttr-core`) — the
-  **staging lane**. Every release lands here first (it needs auth even for
-  public reads — Gotcha 1 — which is exactly why it can't be the public lane).
-  **Every tag** lands here, `-RELEASE`-marked or not.
+  **internal lane**. **Every tag** lands here, `-RELEASE`-marked or not, which is
+  why it is what every internal consumer reads: `tatrman-server`, `kantheon`,
+  `tatrman-platform` and `ai-platform` all resolve `org.tatrman:*` from here and
+  **exclude the group from Central** (2026-09-24 — see
+  [§ Consumer setup](#consumer-setup-ai-platform-and-other-repos)). It needs auth
+  even for public reads (Gotcha 1), which is exactly why it can't be the *public*
+  lane — and why every consumer needs a `read:packages` token.
 
 See [§ Maven Central — the public lane](#maven-central--the-public-lane-sv-p1-s4) below.
 
@@ -166,9 +170,12 @@ away from burning Central quota.
 
 - **Iterating?** Cut bare patches as fast as you like:
   `just publish ttr-parser` (or `just publish ttr-parser set 0.9.5`). Internal
-  consumers (ai-platform, kantheon) pin whichever internal version they need —
-  they already resolve the GH Packages repo (see
-  [§ Consumer setup](#consumer-setup-ai-platform-and-other-repos)).
+  consumers pin whichever internal version they need — they resolve the GH
+  Packages repo and *only* that one for this group (see
+  [§ Consumer setup](#consumer-setup-ai-platform-and-other-repos)), so a bare cut
+  is consumable everywhere in the ecosystem minutes after `publish.yml` finishes.
+  **A `-RELEASE` is never needed to unblock internal work**; if one looks
+  necessary, the consumer is reading the wrong lane.
 - **Going public?** `just publish ttr-parser release` (or `release minor` /
   `release set X.Y.Z`) — mints a **brand-new** version number (never reuses one
   already spent by a prior internal tag, so the stripped Central/GH-Packages
@@ -288,27 +295,67 @@ version for anything that leaves your machine.
 
 ## Consumer setup (ai-platform and other repos)
 
+**The rule (2026-09-24): an internal consumer resolves `org.tatrman:*` from
+GitHub Packages and excludes the group from Maven Central.** Central takes only
+`-RELEASE`-marked tags, and that marker is reserved for genuinely public
+releases — so a build that can also see Central is a build that can silently
+come to depend on one, and then wait for one. Leaving both lanes open is worse
+than either alone: whichever registry happens to hold the pinned version wins,
+which is not a decision anyone makes on purpose.
+
+This is not theoretical. Between 2026-07-12 and 2026-09-24 kantheon consumed the
+group from Central, and for the last two of those weeks could not move its
+`server-libs` pin at all: the version it wanted dragged in
+`org.tatrman:ttr-plan-proto:0.10.3`, cut on a bare `translator/v0.10.3` tag and
+therefore living only in GitHub Packages. Nothing on the consumer side could fix
+that, and the "fix" on this side would have been a public release of a
+transitive — the same treadmill, one level down.
+
 In the consuming repo's `settings.gradle.kts`:
 
 ```kotlin
 dependencyResolutionManagement {
     repositories {
-        mavenCentral()
+        // Central serves everything EXCEPT org.tatrman.
+        mavenCentral {
+            content { excludeGroup("org.tatrman") }
+        }
+        // The TTR toolchain — every `grammar/v*`, `translator/v*`, `validator/v*` tag.
         maven {
-            name = "ColliteModeler"
+            name = "ColliteTatrman"
             url = uri("https://maven.pkg.github.com/Collite/ttr-core")
             credentials {
                 username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
                 password = providers.gradleProperty("gpr.token").orNull ?: System.getenv("GITHUB_TOKEN")
             }
+            content { includeGroup("org.tatrman") }
         }
+        // The open read spine's libs + proto stubs — every `server-libs/v*` tag. A SECOND block
+        // because GitHub Packages is per-repository; one credential serves both. Omit it if the
+        // repo consumes no tatrman-server artifact.
+        maven {
+            name = "ColliteTatrmanServer"
+            url = uri("https://maven.pkg.github.com/Collite/ttr-server")
+            credentials {
+                username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
+                password = providers.gradleProperty("gpr.token").orNull ?: System.getenv("GITHUB_TOKEN")
+            }
+            content { includeGroup("org.tatrman") }
+        }
+        // If a repo keeps mavenLocal() for cross-repo iteration, put it LAST. Ahead of the
+        // registries, a stale ~/.m2 jar shadows a real cut under the same coordinate.
     }
 }
 ```
 
 Then add a `gradle/libs.versions.toml` entry + `implementation(...)` line, e.g.
-`implementation("org.tatrman:ttr-parser:0.1.0")`. The same `gpr.user`/`gpr.token`
-keys already used for ai-platform's own `AiPlatformPackages` repo work here.
+`implementation("org.tatrman:ttr-parser:0.13.5")`.
+
+Live examples, all on this shape: `tatrman-server`, `kantheon`,
+`tatrman-platform`, `ai-platform`. The one deliberate exception is
+tatrman-server's `scripts/verify-public-resolution`, whose only repository is
+`mavenCentral()` — its entire job is to prove the public lane really is
+anonymously resolvable.
 
 ### Local-developer authentication
 
@@ -321,7 +368,17 @@ gpr.user=<github-username>
 gpr.token=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-CI does not need this — `GITHUB_TOKEN` is auto-provisioned in Actions.
+In Actions, `GITHUB_ACTOR` + `GITHUB_TOKEN` stand in for the pair — but the
+workflow must declare `permissions: packages: read`, and the env must reach the
+Gradle step (it is not exported automatically). A workflow in ANOTHER
+organisation (ai-platform lives under `DFPartner`) cannot use its own
+`GITHUB_TOKEN` for this and needs a real PAT in a secret; ai-platform's
+`_reusable-build-gradle.yml` shows the shape, including a preflight that fails
+with a rotate-the-token message rather than an opaque 401 mid-resolution.
+
+Note that **GitHub Packages serves nothing anonymously** — not even a public
+repository's packages (Gotcha 1). Public-ness buys you a token with no scopes
+beyond `read:packages`; it does not buy you no token.
 
 ### Consumer setup — TypeScript / npm (`@tatrman/grammar`)
 
