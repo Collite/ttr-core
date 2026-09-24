@@ -6,6 +6,7 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import org.tatrman.ttr.lexicon.Reach
+import org.tatrman.ttr.lexicon.LexiconValidator
 import org.tatrman.ttr.lexicon.SourceTag
 import org.tatrman.ttr.lexicon.TargetClass
 import java.nio.file.Files
@@ -71,6 +72,20 @@ class FixtureEstateRoundTripSpec :
             triggers.map { it.targetRef }.toSet() shouldContain "ground:geo"
         }
 
+        test("LP §3.3 — the predicate slice is present as STRING_PREDICATE rows") {
+            val out = Files.createTempDirectory("fixture-pred").resolve("lexicon.tar.zst")
+            LexiconBuildCli.run(repoRoot = estate, out = out).exitCode shouldBe LexiconBuildCli.EXIT_OK
+
+            val lexicon = LexiconBuildCli.readBack(out).lexicon
+            val predicates = lexicon.entries.filter { it.targetClass == TargetClass.STRING_PREDICATE }
+
+            predicates.map { it.targetRef }.toSet() shouldBe
+                LexiconValidator.PREDICATE_KINDS.map { "pred:$it" }.toSet()
+            // The whole point of P2a, through the real CLI: `pred:` rows ride an ordinary estate
+            // build with nothing authored, exactly as the grounding slices do.
+            predicates.map { it.termNormalized } shouldContain "obsahuje"
+        }
+
         test("the operator stdlib reaches the artifact's second document") {
             val out = Files.createTempDirectory("fixture-ops").resolve("lexicon.tar.zst")
             LexiconBuildCli.run(repoRoot = estate, out = out).exitCode shouldBe LexiconBuildCli.EXIT_OK
@@ -82,13 +97,13 @@ class FixtureEstateRoundTripSpec :
                 .operators.operators.keys shouldContain "op:trend"
         }
 
-        test("MH — the archive carries the E-R reach, at schema v3, through the real CLI path") {
+        test("MH — the archive carries the E-R reach, at schema v4, through the real CLI path") {
             val out = Files.createTempDirectory("fixture-reach").resolve("lexicon.tar.zst")
             LexiconBuildCli.run(repoRoot = estate, out = out).exitCode shouldBe LexiconBuildCli.EXIT_OK
 
             val lexicon = LexiconBuildCli.readBack(out).lexicon
 
-            lexicon.header.schemaVersion shouldBe "ttr-lexicon-compiled/v3"
+            lexicon.header.schemaVersion shouldBe "ttr-lexicon-compiled/v4"
             // `model/er/relations.ttrm` declares both, and only the mandatory one may claim to be
             // mandatory — the flag is `cardinality.to`'s lower bound, read off the estate.
             lexicon.targets.getValue("er.entity.store").reachedFrom shouldBe

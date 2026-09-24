@@ -1,0 +1,53 @@
+# Czech function words — the RG-LEX-031 guard (LP contracts §3.1).
+#
+# What this list is FOR: refusing a `pred:` trigger form that is a function word.
+# A predicate form is matched against running text to decide that the words around
+# a quoted literal mean "starts with", so `s` or `na` as a trigger would declare a
+# filter in questions nobody meant one in.
+#
+# ⚠ This file is a DELIBERATE TWIN of
+# `ttr-metadata`'s `/search/stop-words-cs.txt`, and `StopWordParitySpec`
+# (ttr-lexicon-compile, the one module that sees both) fails the build if they
+# diverge. Two files rather than one because `ttr-lexicon` is the lean artifact the
+# SERVING side reads — it must not drag `ttr-metadata` in for a word list — and one
+# list rather than two vocabularies because a word that is noise to keyword search
+# is a word nobody should trigger a filter on either. Add a word to BOTH, or split
+# them on purpose and delete the spec.
+#
+# One token per line, UTF-8. Lines starting with # are comments. Blank lines ignored.
+# Tokens are compared AFTER NFD diacritic-fold + lowercase (`TermNormalizer.fold`),
+# so list the folded form (e.g. `ze` not `že`).
+a
+i
+nebo
+ten
+ta
+to
+ti
+ty
+je
+jsou
+byl
+byla
+bylo
+byly
+neni
+tento
+tato
+toto
+ktery
+ktera
+ktere
+pro
+na
+v
+do
+od
+s
+se
+o
+ze
+co
+jak
+kde
+kdy

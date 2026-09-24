@@ -107,11 +107,19 @@
           "items": { "$ref": "#/$defs/term" }
         },
         "target": {
-          "description": "Any model-graph ref (`er.*`, `md.*`, member refs), an `op:` ref, or a `ground:` class ref (RV-42). Existence of a MODEL ref is checked at compile time against the model snapshot, not here — but the `ground:` kind vocabulary IS closed (chrono | money | geo), because it names a kernel that must load the slice.",
+          "description": "Any model-graph ref (`er.*`, `md.*`, member refs), an `op:` ref, a `ground:` class ref (RV-42), or a `pred:` string-predicate ref (LP contracts §3). Existence of a MODEL ref is checked at compile time against the model snapshot, not here — but the `ground:` and `pred:` vocabularies ARE closed, because each names a consumer that must implement the behaviour: a kernel that loads the slice, a translator that lowers the predicate. Note the `pred:` FORM rule (RG-LEX-031, no single-character or function-word triggers) is Kotlin-only — it needs a per-language word list, which JSON Schema cannot carry.",
           "type": "string",
           "minLength": 1,
-          "if": { "pattern": "^ground:" },
-          "then": { "pattern": "^ground:(chrono|money|geo)$" }
+          "allOf": [
+            {
+              "if": { "pattern": "^ground:" },
+              "then": { "pattern": "^ground:(chrono|money|geo)$" }
+            },
+            {
+              "if": { "pattern": "^pred:" },
+              "then": { "pattern": "^pred:(starts_with|ends_with|contains|equals|not_contains)$" }
+            }
+          ]
         }
       }
     }

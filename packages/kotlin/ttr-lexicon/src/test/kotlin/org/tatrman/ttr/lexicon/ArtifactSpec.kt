@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.lexicon
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 /**
@@ -81,8 +83,8 @@ class ArtifactSpec :
             decoded.header.schemaVersion shouldBe "ttr-lexicon-compiled/v2"
         }
 
-        "the schema label moved to v3" {
-            CompiledLexiconHeader.SCHEMA_VERSION shouldBe "ttr-lexicon-compiled/v3"
+        "the schema label moved to v4" {
+            CompiledLexiconHeader.SCHEMA_VERSION shouldBe "ttr-lexicon-compiled/v4"
         }
 
         "contentHash covers the entry table only, so reach does not move the id" {
@@ -116,6 +118,103 @@ class ArtifactSpec :
                 .targets
                 .getValue("er.entity.store")
                 .reachedFrom shouldBe listOf(Reach("er.entity.store_sales", mandatory = true))
+        }
+
+        // ---- LP (P2a T9/T4): the v3 → v4 seam ------------------------------------------------
+
+        "a v3-shaped targets object decodes with no mention facet" {
+            // Verbatim v3 bytes: `TargetFacts` had exactly these three keys. The v2 case above is
+            // left untouched — a compatibility pin is evidence about a version that has shipped,
+            // so the way to cover a new one is to ADD a case, never to edit an old one.
+            val v3 =
+                """
+                {
+                  "header": {
+                    "schemaVersion": "ttr-lexicon-compiled/v3",
+                    "modelSnapshotHash": "sha256:${"ab".repeat(32)}",
+                    "sourceHashes": { "declared": "d", "metadata": "m" },
+                    "builtAt": "2026-09-02T00:00:00Z"
+                  },
+                  "entries": [],
+                  "targets": {
+                    "er.entity.store": {
+                      "objectKind": "entity",
+                      "ownerRef": null,
+                      "reachedFrom": [ { "factRef": "er.entity.store_sales", "mandatory": true } ]
+                    }
+                  }
+                }
+                """.trimIndent()
+
+            val facts = CompiledLexicon.fromJson(v3).targets.getValue("er.entity.store")
+
+            facts.reachedFrom shouldBe listOf(Reach("er.entity.store_sales", mandatory = true))
+            // Null, not "" — the model said nothing, which is what leaves a literal headless (G3)
+            // rather than attributed to a column nobody declared.
+            facts.nameRef shouldBe null
+            facts.codeRef shouldBe null
+            facts.codeFormat shouldBe null
+        }
+
+        "the mention facet round-trips, and does not move contentHash" {
+            val facet =
+                TargetFacts(
+                    objectKind = "entity",
+                    nameRef = "er.entity.store.name",
+                    codeRef = "er.entity.store.code",
+                    codeFormat = "^S[0-9]{4}$",
+                )
+            val before = lexicon(mapOf("er.entity.store" to facet))
+
+            CompiledLexicon.fromJson(before.toJson()) shouldBe before
+            // Same rule as `reachedFrom`: the id answers "did the VOCABULARY change?", and three
+            // header-level facts are not vocabulary.
+            before.contentHash shouldBe lexicon(mapOf("er.entity.store" to TargetFacts("entity"))).contentHash
+        }
+
+        "⚠ the v4 BREAK is the enum member, not the three fields" {
+            // The finding P2a T4 was asked to record, pinned as a test rather than a sentence.
+            //
+            // `targetClass` has no default and kotlinx refuses an enum value it does not know, so
+            // a reader built before `STRING_PREDICATE` existed fails on the WHOLE archive — not on
+            // the row — and both serving readers degrade an undecodable archive to an EMPTY
+            // vocabulary. Since the stdlib slice ships `pred:` rows, every archive built by this
+            // compiler carries them. Hence contracts §8's ordering rule for the v3→v4 release:
+            // READERS BEFORE PRODUCERS. Nothing on this side can soften it.
+            fun archive(targetClass: String) =
+                """
+                {
+                  "header": {
+                    "schemaVersion": "ttr-lexicon-compiled/v4",
+                    "modelSnapshotHash": "sha256:${"ab".repeat(32)}",
+                    "sourceHashes": { "declared": "d", "metadata": "m" },
+                    "builtAt": "2026-09-02T00:00:00Z"
+                  },
+                  "entries": [
+                    {
+                      "termNormalized": "obsahující",
+                      "lang": "cs",
+                      "targetRef": "pred:contains",
+                      "targetClass": "$targetClass",
+                      "method": "EXACT",
+                      "sourceTag": "DECLARED",
+                      "provenance": { "file": "stdlib/predicates/string.lex.yaml", "line": 1 }
+                    }
+                  ],
+                  "targets": {}
+                }
+                """.trimIndent()
+
+            // This reader knows the member, so it reads.
+            CompiledLexicon
+                .fromJson(archive("STRING_PREDICATE"))
+                .entries
+                .single()
+                .targetClass shouldBe TargetClass.STRING_PREDICATE
+
+            // A member it does NOT know behaves exactly as STRING_PREDICATE does to a v3 reader:
+            // the whole document is refused, which is the shape of the break.
+            shouldThrow<SerializationException> { CompiledLexicon.fromJson(archive("SOMETHING_LATER")) }
         }
 
         "Reach is a plain serializable pair — factRef and the to-side lower bound" {

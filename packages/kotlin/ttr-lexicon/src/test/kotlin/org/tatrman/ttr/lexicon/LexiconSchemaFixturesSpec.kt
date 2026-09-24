@@ -86,6 +86,28 @@ class LexiconSchemaFixturesSpec :
                 file.entries[1].terms[0].method shouldBe MatchMethod.Exact // "Kč"
             }
 
+            test("predicate trigger file — `pred:` targets load like any other entry (LP §3.3)") {
+                val load =
+                    LexiconValidator.loadDataFile(
+                        fixture("valid/predicate-triggers.lex.yaml"),
+                        "predicate-triggers.lex.yaml",
+                    )
+
+                val file = load.shouldBeInstanceOf<LexiconLoad.Ok<LexiconDataFile>>().value
+                file.entries.map { it.target } shouldBe
+                    listOf("pred:starts_with", "pred:contains", "pred:not_contains")
+                // Nothing about a predicate file is special-cased either: defaults and per-term
+                // overrides work exactly as they do for aliases, values and grounding.
+                val startsWith = file.entries[0].terms
+                startsWith[0].method shouldBe MatchMethod.Tokens // "začínající na" is multi-word
+                startsWith[2].lang shouldBe Lang.EN
+                // `s textem` OPENS with a function word and is legal: the RG-LEX-031 guard is
+                // about single-token forms, and a phrase must appear whole to match.
+                file.entries[1]
+                    .terms[1]
+                    .text shouldBe "s textem"
+            }
+
             test("skill file — frontmatter typed, body kept verbatim") {
                 val load = LexiconValidator.loadSkillFile(fixture("valid/skill-trend.md"), "skill-trend.md")
 
@@ -114,6 +136,10 @@ class LexiconSchemaFixturesSpec :
                     "bad-lang.lex.yaml" to "RG-LEX-010",
                     // RV-P1.6 T1 (RV-42) — the `ground:` kind vocabulary is closed.
                     "ground-unknown-kind.lex.yaml" to "RG-LEX-012",
+                    // LP (P2a T1/T2) — the `pred:` kind vocabulary is closed, and a `pred:` form
+                    // must be able to carry a trigger.
+                    "pred-unknown-kind.lex.yaml" to "RG-LEX-030",
+                    "pred-weak-form.lex.yaml" to "RG-LEX-031",
                 )
 
             dataFiles.forEach { (name, code) ->

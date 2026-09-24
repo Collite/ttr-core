@@ -24,10 +24,11 @@
     ├── aliases/*.lex.yaml       # ttr-lexicon/v1 — terms → model refs
     ├── values/*.lex.yaml        # ttr-lexicon/v1 — terms → member refs
     ├── grounding/*.lex.yaml     # ttr-lexicon/v1 — terms → `ground:` classes (RV-42)
+    ├── predicates/*.lex.yaml    # ttr-lexicon/v1 — terms → `pred:` classes (LP §3)
     └── skills/*.md              # ttr-skill/v1 frontmatter + a Golem-side behavior body
 ```
 
-Files outside those four directories are ignored, not rejected — notes may live beside a
+Files outside those five directories are ignored, not rejected — notes may live beside a
 lexicon. **Entry kind is never authored**: alias vs value is derived from the target class
 (RV-38), so a file cannot disagree with the model graph about what it declares.
 
@@ -51,7 +52,7 @@ entries:
 | `entries[].terms[].lang` | no | `cs` · `en` · `cs\|en` |
 | `entries[].terms[].method` | no | `EXACT` · `TOKENS` · `TYPOS(1)`…`TYPOS(3)` |
 | `defaults.match` / `entries[].terms[].match` | no | a **matching profile** — see §2.1. Mutually exclusive with `method` on the same node |
-| `entries[].target` | yes | any model-graph ref, member ref, or `ground:` class |
+| `entries[].target` | yes | any model-graph ref, member ref, `ground:` class, or `pred:` class |
 
 Both schemas are **closed** (`additionalProperties: false`): an unknown key is an error, so a
 typo fails the build instead of silently contributing nothing.
@@ -162,6 +163,9 @@ an undocumented member. Messages quote the authored value and the line it was wr
 | `RG-LEX-014` | `typos` with no sibling `exact` on the same norm | `[{ norm: folded, typos: { distance: 1, penalty: 0.05 } }]` |
 | `RG-LEX-015` | `method` and `match` on one node | `{ text: "DC", method: EXACT, match: [ … ] }` |
 | `RG-LEX-016` | Score / distance / penalty out of range | `exact: 1.4`, `distance: 0`, `penalty: 0` |
+| `RG-LEX-017` | `typos` budget reaches or passes its `exact` anchor | `exact: 0.9` with `typos: { distance: 3, penalty: 0.3 }` — scores 0 at the widest edit |
+| `RG-LEX-030` | Unknown string predicate (LP §3.1) | `target: pred:like` — the set is closed: `pred:starts_with` \| `pred:ends_with` \| `pred:contains` \| `pred:equals` \| `pred:not_contains` |
+| `RG-LEX-031` | A `pred:` form is a single character or a function word | `{ text: "s" }` (cs) or `{ text: "with" }` (en) under a `pred:` target — write `s textem`, `starts with` |
 
 ### 4.1 Warning catalogue (`RG-LEX-1xx`)
 

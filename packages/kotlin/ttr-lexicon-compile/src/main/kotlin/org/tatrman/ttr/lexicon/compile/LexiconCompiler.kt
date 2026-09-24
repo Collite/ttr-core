@@ -42,9 +42,10 @@ data class CompileResult(
  * see [CompiledLexiconHeader.builtAt].
  */
 object LexiconCompiler {
-    /** `op:` / `ground:` refs are classified by their prefix; nothing else is. */
+    /** `op:` / `ground:` / `pred:` refs are classified by their prefix; nothing else is. */
     private const val OP_PREFIX = "op:"
     private const val GROUND_PREFIX = "ground:"
+    private const val PRED_PREFIX = "pred:"
 
     fun compile(
         sources: LexiconSources,
@@ -175,7 +176,16 @@ object LexiconCompiler {
             // Reach is a fact about whole OBJECTS: an attribute is reached through its owner, and
             // saying otherwise would let the resolver join to a column.
             val reachOf = if (facts.isAttribute) emptyList() else reach[ref].orEmpty()
-            out[ref] = TargetFacts(MentionKinds.of(facts), facts.ownerRef, reachOf)
+            val mention = if (facts.isAttribute) Mention.NONE else mentionFacet(objects.getValue(ref))
+            out[ref] =
+                TargetFacts(
+                    objectKind = MentionKinds.of(facts),
+                    ownerRef = facts.ownerRef,
+                    reachedFrom = reachOf,
+                    nameRef = mention.nameRef,
+                    codeRef = mention.codeRef,
+                    codeFormat = mention.codeFormat,
+                )
         }
         return out
     }
@@ -226,6 +236,55 @@ object LexiconCompiler {
         )
     }
 
+    /**
+     * LP (contracts §2.1) — `semantics { name: · code: }` as FULL attribute refs, plus the code
+     * attribute's `code_format:`.
+     *
+     * Members carry none of this: a member has no name column, it IS one ([Mention.NONE]).
+     *
+     * ⛔ The local name the block declares is RESOLVED against the owner's own member list, never
+     * concatenated onto the owner's ref. The two differ exactly where it matters: a model that
+     * names an attribute it does not have would otherwise ship a ref pointing at nothing, and the
+     * resolver would attribute a literal to a column the plan cannot select. Absent here means
+     * "the model does not say", which LP-P1's `Verbatim` already handles by leaving the literal
+     * headless — the one degradation that cannot produce a wrong answer.
+     */
+    private data class Mention(
+        val nameRef: String? = null,
+        val codeRef: String? = null,
+        val codeFormat: String? = null,
+    ) {
+        companion object {
+            val NONE = Mention()
+        }
+    }
+
+    private fun mentionFacet(obj: ModelObject): Mention {
+        val (semantics, members) =
+            when (obj) {
+                is Entity -> obj.mentionSemantics to obj.attributes
+                is DbTable -> obj.mentionSemantics to obj.columns
+                else -> return Mention.NONE
+            }
+        val sem = semantics ?: return Mention.NONE
+        val byLocal = members.associateBy { it.qname.name.substringAfterLast('.') }
+        val name = sem.name?.path?.let { byLocal[it] }
+        val code = sem.code?.path?.let { byLocal[it] }
+        return Mention(
+            nameRef = name?.qname?.dotted(),
+            codeRef = code?.qname?.dotted(),
+            codeFormat = code?.let { codeFormatOf(it) },
+        )
+    }
+
+    /** The CODE member's declared `code_format:`, or null — never a shape this compiler invents. */
+    private fun codeFormatOf(member: ModelObject): String? =
+        when (member) {
+            is Attribute -> member.semantics?.codeFormat
+            is DbColumn -> member.semantics?.codeFormat
+            else -> null
+        }?.takeIf { it.isNotBlank() }
+
     private fun ownerFacts(mention: ResolvedEntitySemantics?): MentionKinds.ObjectFacts =
         MentionKinds.ObjectFacts(
             isAttribute = false,
@@ -240,9 +299,10 @@ object LexiconCompiler {
         }
 
     /**
-     * RV-38/RV-42 — the target's class. `op:`/`ground:` refs resolve by prefix and never touch the
-     * index: they are not model objects, so consulting a model snapshot for them would make every
-     * operator and every grounding trigger dangle against a snapshot that will never contain it.
+     * RV-38/RV-42, LP §3.2 — the target's class. `op:`/`ground:`/`pred:` refs resolve by prefix and
+     * never touch the index: they are not model objects, so consulting a model snapshot for them
+     * would make every operator, grounding trigger and string predicate dangle against a snapshot
+     * that will never contain it.
      *
      * Anything else must be in the snapshot. Absent ⇒ RV-20: drop the row, warn with the line.
      */
@@ -255,6 +315,7 @@ object LexiconCompiler {
             when {
                 row.targetRef.startsWith(OP_PREFIX) -> TargetClass.OPERATOR
                 row.targetRef.startsWith(GROUND_PREFIX) -> TargetClass.GROUNDING_TRIGGER
+                row.targetRef.startsWith(PRED_PREFIX) -> TargetClass.STRING_PREDICATE
                 else -> refs.classify(row.targetRef)
             }
         if (cls == null) {

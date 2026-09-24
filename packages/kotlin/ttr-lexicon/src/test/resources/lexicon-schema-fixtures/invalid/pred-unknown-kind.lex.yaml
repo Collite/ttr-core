@@ -1,0 +1,8 @@
+# expected: RG-LEX-030 — `pred:like` is not a string predicate. The set is closed:
+# starts_with | ends_with | contains | equals | not_contains (LP contracts §3.1). An
+# unknown kind compiles into an entry class no translator lowers, so it is a rejection,
+# not a warning — exactly the RV-42 reasoning for `ground:`.
+schema: ttr-lexicon/v1
+entries:
+  - terms: [ { text: "podobný", lang: cs } ]
+    target: pred:like

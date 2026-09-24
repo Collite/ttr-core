@@ -1,0 +1,78 @@
+# LP §3.3 — the string-predicate TRIGGER slice.
+#
+# These are the words that say *how* a quoted literal restricts its attribute. They do
+# not interpret the literal and they do not name it: `"Shell"` is the value, this file
+# is the operator between the value and the column. The lowering — `starts_with` to a
+# parameterised `LIKE ? + '%'` — stays translator-side, so nothing here knows SQL.
+#
+# Three rules the forms follow, all from §3.3:
+#
+#  1. **Inflected forms are listed explicitly.** No lemma reliance: the slice must work
+#     on the LLM_EMULATED backend, which has no morphology, and Czech puts the same
+#     predicate in half a dozen shapes (`začínající` / `začíná` / `začínají`).
+#  2. **Multi-word forms are TOKENS, single words EXACT.** A phrase may be separated in
+#     a real question (*začínající přesně na "Shell"*), and order is not fixed. A single
+#     word gets no typo budget on purpose: these compete with entity names for the same
+#     span, and a one-edit neighbourhood around `obsahuje` reaches real words.
+#  3. **No single-character or function-word forms** — RG-LEX-031 refuses them, because a
+#     predicate form is matched against running text and `s` alone would declare a filter
+#     in questions nobody meant one in. That is why the natural cs forms for *contains*
+#     are `s textem` and `v názvu`, as PHRASES, and never the bare preposition.
+schema: ttr-lexicon/v1
+defaults: { lang: cs, method: EXACT }
+entries:
+  # --- starts_with
+  - terms:
+      - { text: "začínající na", method: TOKENS }
+      - { text: "začíná na", method: TOKENS }
+      - { text: "začínají na", method: TOKENS }
+      - { text: "s prefixem", method: TOKENS }
+      - { text: "starts with", lang: en, method: TOKENS }
+      - { text: "beginning with", lang: en, method: TOKENS }
+      - { text: "prefix", lang: en }
+    target: pred:starts_with
+
+  # --- ends_with
+  - terms:
+      - { text: "končící na", method: TOKENS }
+      - { text: "končí na", method: TOKENS }
+      - { text: "končící" }
+      - { text: "s příponou", method: TOKENS }
+      - { text: "ends with", lang: en, method: TOKENS }
+      - { text: "ending with", lang: en, method: TOKENS }
+      - { text: "suffix", lang: en }
+    target: pred:ends_with
+
+  # --- contains. The default predicate for a name attribute (§2.2), so these are the
+  #     forms a user is LEAST likely to write — the ones that matter are the others.
+  - terms:
+      - { text: "obsahující" }
+      - { text: "obsahuje" }
+      - { text: "obsahují" }
+      - { text: "s textem", method: TOKENS }
+      - { text: "v názvu", method: TOKENS }
+      - { text: "contains", lang: en }
+      - { text: "containing", lang: en }
+      - { text: "including", lang: en }
+    target: pred:contains
+
+  # --- equals. The default for a CODE attribute (§2.2); written out because a user who
+  #     says it about a NAME means it, and the default there is `contains`.
+  - terms:
+      - { text: "přesně" }
+      - { text: "s názvem přesně", method: TOKENS }
+      - { text: "rovná se", method: TOKENS }
+      - { text: "exactly", lang: en }
+      - { text: "named exactly", lang: en, method: TOKENS }
+      - { text: "equal to", lang: en, method: TOKENS }
+    target: pred:equals
+
+  # --- not_contains
+  - terms:
+      - { text: "neobsahující" }
+      - { text: "neobsahuje" }
+      - { text: "neobsahují" }
+      - { text: "not containing", lang: en, method: TOKENS }
+      - { text: "without", lang: en }
+      - { text: "excluding", lang: en }
+    target: pred:not_contains

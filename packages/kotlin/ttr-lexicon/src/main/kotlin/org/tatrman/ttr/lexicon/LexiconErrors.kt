@@ -30,6 +30,10 @@ object LexiconErrors {
     const val SCORE_OUT_OF_RANGE = "RG-LEX-016"
     const val TYPOS_BUDGET_EXHAUSTS_SCORE = "RG-LEX-017"
 
+    // LP (contracts §3.1/§7) — the `pred:` string-predicate slice.
+    const val UNKNOWN_PREDICATE_KIND = "RG-LEX-030"
+    const val WEAK_PREDICATE_FORM = "RG-LEX-031"
+
     /** Every code this library can emit — the catalogue's own index. */
     val ALL: List<String> =
         listOf(
@@ -50,6 +54,8 @@ object LexiconErrors {
             METHOD_AND_MATCH,
             SCORE_OUT_OF_RANGE,
             TYPOS_BUDGET_EXHAUSTS_SCORE,
+            UNKNOWN_PREDICATE_KIND,
+            WEAK_PREDICATE_FORM,
         )
 
     fun unknownMethod(
@@ -98,6 +104,45 @@ object LexiconErrors {
     ) = LexiconViolation(
         UNKNOWN_GROUNDING_KIND,
         "`$ref` is not a grounding kind — the set is closed: ${known.sorted().joinToString(" | ") { "ground:$it" }}.",
+        at,
+    )
+
+    /**
+     * LP contracts §3.1 — the `pred:` kind vocabulary is CLOSED, and closed for the same reason
+     * `ground:` is: the ref names a *behaviour a consumer implements*, not an extension point. The
+     * resolver turns `pred:starts_with` into a `LIKE 'x%'`; `pred:like` is a kind nothing lowers,
+     * so the entry would never fire and never say why.
+     */
+    fun unknownPredicateKind(
+        ref: String,
+        known: Collection<String>,
+        at: Provenance,
+    ) = LexiconViolation(
+        UNKNOWN_PREDICATE_KIND,
+        "`$ref` is not a string predicate — the set is closed: ${known.sorted().joinToString(" | ") { "pred:$it" }}.",
+        at,
+    )
+
+    /**
+     * LP contracts §3.1 — a `pred:` form that is one character, or a function word of its language.
+     *
+     * Every other target class is anchored by something: a model object has a ref in the snapshot,
+     * an operator needs its whole trigger phrase. A predicate form is matched against RUNNING TEXT
+     * to decide that the words around a quoted literal mean "starts with" — so a form like cs `s`
+     * or en `with` fires on most questions ever asked, and turns a filter the user did not write
+     * into one the plan executes. Multi-word forms are unaffected: `s textem` is two tokens and
+     * only the whole phrase matches.
+     */
+    fun weakPredicateForm(
+        text: String,
+        ref: String,
+        why: String,
+        at: Provenance,
+    ) = LexiconViolation(
+        WEAK_PREDICATE_FORM,
+        "\"$text\" cannot be a `$ref` trigger — $why. A predicate form is matched against running " +
+            "text, so a word this common would declare a filter in questions nobody meant one in. " +
+            "Use a longer form, or a multi-word one (`s textem`).",
         at,
     )
 

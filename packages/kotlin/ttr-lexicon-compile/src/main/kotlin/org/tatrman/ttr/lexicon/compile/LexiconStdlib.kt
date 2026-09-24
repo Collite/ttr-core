@@ -27,6 +27,17 @@ object LexiconStdlib {
     /** RV-P1.6 (RV-42) — the grounding trigger slices, beside the operator skills. */
     const val GROUNDING_ROOT: String = "/lexicon-stdlib/grounding"
 
+    /** LP §3.3 — the string-predicate trigger slice, beside the grounding ones. */
+    const val PREDICATES_ROOT: String = "/lexicon-stdlib/predicates"
+
+    /**
+     * The predicate slice files. ONE file for all five refs, unlike grounding's file-per-kernel:
+     * a `ground:` file is a kernel's vocabulary and a kernel owns its own words, whereas the five
+     * predicates are one closed family read by one consumer, and splitting them would only let
+     * *starts_with* and *ends_with* drift apart in style.
+     */
+    val PREDICATE_SLICES: List<String> = listOf("string")
+
     /** The ruled set (⚑RV-2). Listed explicitly: a stdlib that quietly loses a file is worse than one that fails. */
     val OPERATORS: List<String> =
         listOf("show", "trend", "compare", "drilldown", "top-n", "share-of")
@@ -73,6 +84,28 @@ object LexiconStdlib {
             when (val load = LexiconValidator.loadDataFile(text, "stdlib/grounding/$kind.lex.yaml")) {
                 is LexiconLoad.Ok -> load.value
                 is LexiconLoad.Rejected -> error("grounding stdlib file $path is invalid: ${render(load.violations)}")
+            }
+        }
+
+    /**
+     * LP §3.3 T3 — the string-predicate trigger slice, loaded exactly as [groundingSlices] is.
+     *
+     * Ordinary `ttr-lexicon/v1` data files; the only thing that makes them a predicate slice is
+     * the `pred:` target class the compiler derives from the prefix. Layered the same way too —
+     * stdlib first, estate second — so an estate that adds *v popisu* for `pred:contains` extends
+     * the shipped vocabulary instead of replacing it.
+     */
+    fun predicateSlices(): List<LexiconDataFile> =
+        PREDICATE_SLICES.map { name ->
+            val path = "$PREDICATES_ROOT/$name.lex.yaml"
+            val text =
+                requireNotNull(LexiconStdlib::class.java.getResourceAsStream(path)) {
+                    "predicate stdlib is missing $path"
+                }.reader().readText()
+
+            when (val load = LexiconValidator.loadDataFile(text, "stdlib/predicates/$name.lex.yaml")) {
+                is LexiconLoad.Ok -> load.value
+                is LexiconLoad.Rejected -> error("predicate stdlib file $path is invalid: ${render(load.violations)}")
             }
         }
 
