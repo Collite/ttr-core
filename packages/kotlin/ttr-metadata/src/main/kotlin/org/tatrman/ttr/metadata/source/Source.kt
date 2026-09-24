@@ -1443,28 +1443,35 @@ internal fun org.tatrman.ttr.parser.model.LocalizedStringListValue?.toLocalizedT
         ?: org.tatrman.ttr.metadata.model.LocalizedTextList.EMPTY
 
 /**
- * Grammar 0.12 (RV-P1.5, RV-32) — an authored `searchable method:` reaches the model here.
+ * Grammar 0.12 (RV-P1.5, RV-32) + MV (member-vocabulary contracts §2.1) — the ONE boundary where a
+ * `search { … }` block becomes [SearchHints.indexed] and [SearchHints.matchMethod].
  *
- * [SearchHints.fuzzy] is the *derived* "indexed for fuzzy matching" flag, so a non-EXACT authored
- * method folds into it: `searchable method: TYPOS(1)` indexes exactly like the `fuzzy: true` it
- * replaces, which is what makes the 0.12 migration note safe for a live estate. The method itself
- * rides along verbatim in [SearchHints.matchMethod] so nothing is lost on the way back out.
+ * - An authored `method:` — ANY method, `EXACT` included — indexes the carrier, and rides along
+ *   verbatim. Before MV only a partial method did, so `method: EXACT` had no member vocabulary.
+ * - The deprecated `fuzzy: true` indexes too, as the `TYPOS(1)` grammar 0.12 maps it to (the parser
+ *   model's own reading, `SearchHintsValue.fuzzy`, and `ttr-semantics`' `effectiveMatchMethod`), so
+ *   the documented `fuzzy: true` → `method: TYPOS(1)` migration changes nothing downstream.
+ * - An authored method wins over the deprecated boolean; `fuzzy: false` and a bare `searchable`
+ *   index nothing.
  */
 internal fun org.tatrman.ttr.parser.model.SearchHintsValue?.toSearchHints(): SearchHints {
     if (this == null) return org.tatrman.ttr.metadata.model.SearchHints.EMPTY
-    val authoredMethod = method?.toSurfaceText()
+    val matchMethod = method?.toSurfaceText() ?: LEGACY_FUZZY_METHOD.takeIf { fuzzy }
     return org.tatrman.ttr.metadata.model.SearchHints(
         searchable = searchable,
-        fuzzy = fuzzy || SearchHints.methodIsFuzzy(authoredMethod),
+        indexed = matchMethod != null,
         keywords = keywords.toLocalizedTextList(),
         patterns = patterns,
         descriptions = descriptions.toLocalizedTextList(),
         examples = examples,
         aliases = aliases,
-        matchMethod = authoredMethod,
+        matchMethod = matchMethod,
         fuzzyAuthored = fuzzyAuthored,
     )
 }
+
+/** Grammar 0.12's reading of the deprecated `fuzzy: true` (`SearchHintsValue.fuzzy`'s own doc). */
+private const val LEGACY_FUZZY_METHOD = "TYPOS(1)"
 
 /** Resolve a parser-side dotted Reference to a [QualifiedName]. */
 internal fun TtrReference.toQualifiedName(

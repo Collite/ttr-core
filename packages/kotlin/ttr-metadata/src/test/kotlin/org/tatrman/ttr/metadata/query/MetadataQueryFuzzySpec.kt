@@ -4,24 +4,32 @@ package org.tatrman.ttr.metadata.query
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.shouldBe
 import java.nio.file.Path
 
 /**
- * MD2 pull-down: fuzzyOnly filter + fuzzy-attribute→backing-column mapping,
+ * MD2 pull-down: the indexed-only filter + indexed-attribute→backing-column mapping,
  * memoised per snapshot (MetadataServiceImpl lines 171–209, filter 366–368).
  * Kantheon twins: `ListObjectsFuzzyOnlyFilterSpec`, `ListObjectsFuzzyOnlyFixtureSpec`,
  * `ListObjectsFuzzyAttributeMappingSpec`.
+ *
+ * MV (member-vocabulary contracts §2.2): the filter asks `SearchHints.indexed`; `fuzzyOnly` is its
+ * deprecated alias, because the bit it used to read always meant "indexed".
  */
 class MetadataQueryFuzzySpec :
     StringSpec({
 
         // Column qnames are parent-qualified (e.g. `name` of the fuzzy fixture table),
         // so assert on the simple leaf via substringAfterLast('.').
-        fun MetadataQuery.fuzzyLeaves() =
-            listObjects(MetadataQuery.ObjectFilter(fuzzyOnly = true), MetadataQuery.PageRequest(pageSize = 1000))
+        fun MetadataQuery.leaves(filter: MetadataQuery.ObjectFilter) =
+            listObjects(filter, MetadataQuery.PageRequest(pageSize = 1000))
                 .items
                 .map { it.qname.name.substringAfterLast('.') }
                 .toSet()
+
+        fun MetadataQuery.fuzzyLeaves() = leaves(MetadataQuery.ObjectFilter(fuzzyOnly = true))
+
+        fun MetadataQuery.indexedLeaves() = leaves(MetadataQuery.ObjectFilter(indexedOnly = true))
 
         "fuzzyOnly=true keeps only fuzzy-flagged columns (fixture-fuzzy)" {
             val q = queryFor(Path.of("src/test/resources/fixture-fuzzy"))
@@ -49,13 +57,21 @@ class MetadataQueryFuzzySpec :
             leaves shouldContain "title" // searchable method: TOKENS
         }
 
-        "EXACT and the bare inclusion marker stay OUT of the fuzzy index" {
+        // MV reverses the EXACT half of the pre-MV rule: an exact-matched code is still a member
+        // vocabulary (`stores in TN` needs `state` indexed), it is just matched without slack.
+        "EXACT is indexed; the bare inclusion marker stays OUT" {
             val q = queryFor(Path.of("src/test/resources/fixture-fuzzy-0-12"))
-            val leaves = q.fuzzyLeaves()
-            leaves shouldNotContain "code" // searchable method: EXACT  ← was fuzzy: false
-            // The RV-32 default is NOT folded in: a bare `searchable` behaves as it did under
-            // 0.11, which is what keeps the documented behaviour delta latent.
+            val leaves = q.indexedLeaves()
+            leaves shouldContain "code" // searchable method: EXACT
+            // The RV-32 default is NOT folded in: a bare `searchable` is a hint, not a vocabulary.
             leaves shouldNotContain "label"
             leaves shouldNotContain "sku"
+        }
+
+        "fuzzyOnly is an alias of indexedOnly" {
+            for (fixture in listOf("fixture-fuzzy-0-12", "fixture-fuzzy", "fixture-indexed", "fuzzy-attr/shop")) {
+                val q = queryFor(Path.of("src/test/resources/$fixture"))
+                q.fuzzyLeaves() shouldBe q.indexedLeaves()
+            }
         }
     })

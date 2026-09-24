@@ -1,0 +1,9 @@
+model er
+// MV: which carriers have a member vocabulary (MemberVocabulariesSpec).
+def entity E {
+    attributes: [
+        def attribute id { type: int, isKey: true },
+        def attribute a { type: text, search { searchable method: TYPOS(1) } },
+        def attribute b { type: text }
+    ]
+}

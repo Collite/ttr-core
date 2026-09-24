@@ -23,6 +23,7 @@ import org.tatrman.ttr.metadata.model.Entity
 import org.tatrman.ttr.metadata.model.ErSchema
 import org.tatrman.ttr.metadata.model.Model
 import org.tatrman.ttr.metadata.model.ModelObject
+import org.tatrman.ttr.metadata.model.memberVocabularyCarriers
 import org.tatrman.ttr.semantics.semanticsblock.MentionKinds
 import org.tatrman.ttr.semantics.semanticsblock.ResolvedEntitySemantics
 
@@ -153,6 +154,13 @@ object LexiconCompiler {
      * Saying `entity` about a role would be a wrong claim, and the map's contract is that a
      * missing key means "nothing declared", which every consumer already has to handle.
      *
+     * MV (member-vocabulary contracts §5.1, archive v5) — the map ALSO carries every carrier with a
+     * member vocabulary ([memberVocabularyCarriers]), terms or not, flagged `memberVocabulary`. Before
+     * MV an indexed attribute nobody had written a term for was absent here, so the resolver's
+     * registry never learned its vocabulary existed and a governed value could not reach it.
+     * Members carry no reach of their own: they are reached through their owner (`ownerRef`), the
+     * same rule the terms-derived attribute entries have always followed.
+     *
      * Sorted by key: iteration order is byte order in the archive, and two builds over the same
      * inputs must produce the same bytes (contracts §2 determinism).
      */
@@ -163,8 +171,10 @@ object LexiconCompiler {
         if (model == null) return emptyMap()
         val objects = model.objectByQname().entries.associate { (qname, obj) -> qname.dotted() to obj }
         val reach = reachedFrom(model, objects.keys)
+        val members = model.memberVocabularyCarriers().map { it.qname.dotted() }.toSet()
+        val termRefs = entries.filter { it.targetClass == TargetClass.MODEL_OBJECT }.map { it.targetRef }
         val out = sortedMapOf<String, TargetFacts>()
-        for (ref in entries.filter { it.targetClass == TargetClass.MODEL_OBJECT }.map { it.targetRef }.distinct()) {
+        for (ref in (termRefs + members).distinct()) {
             val facts =
                 when (val obj = objects[ref]) {
                     is Attribute -> memberFacts(obj.qname.name, objects[obj.entity.dotted()], obj.entity.dotted())
@@ -185,6 +195,7 @@ object LexiconCompiler {
                     nameRef = mention.nameRef,
                     codeRef = mention.codeRef,
                     codeFormat = mention.codeFormat,
+                    memberVocabulary = ref in members,
                 )
         }
         return out
