@@ -6,6 +6,46 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-lexicon` · `ttr-lexicon-compile`** ⚑ **`pred:` forms are EXACT, whole and negatable (LP
+  review-103 F1/F12/F17/N5, ruling 1).** A `pred:` form authored `TOKENS` was scored over the QUERY's tokens,
+  so the one-word window `názvem` matched *s názvem přesně* on its own and fired `pred:equals` — *customers
+  named "Valmy"* became `name = ?`.
+  - The stdlib slice (`lexicon-stdlib/predicates/string.lex.yaml`) authors **every** form `EXACT`, and grows:
+    en *starting with · start with · begin(s) with · end with · ends/ending/end in · contain · equals*; cs the
+    oblique participle cases (`-ícího · -ícímu · -ícím · -ících · -ícími`) of *obsahující / začínající na /
+    končící na*; *se rovná · rovnající se*; and a negated counterpart for each where natural.
+  - ⚠ **The closed `pred:` set grows by three** (D1): `pred:not_starts_with`, `pred:not_ends_with`,
+    `pred:not_equals` (RG-LEX-030, the JSON schema). A consumer that does not render them refuses them, as
+    for any unknown ref — kantheon and ttr-server must ship their half before an estate rebuilds its archive
+    with this toolchain.
+  - **`RG-LEX-032`** (new, error): a `pred:` form wider than `LexiconValidator.MAX_PREDICATE_FORM_TOKENS`
+    (= 3, public — the resolver sizes its trigger windows from it). **`RG-LEX-031`** also refuses a phrase
+    made of function words only (`with the`, `s na`); `not` (en) and `ne` (cs) join both stop-word twins
+    (the lexicon guard and `ttr-metadata`'s keyword search).
+  - The stories about who lowers a predicate now agree: the consumer (kantheon's fast-path renderer,
+    `LIKE ? || '%'`), not the translator or the resolver.
+
+- **`ttr-semantics` · `ttr-parser` · `ttr-writer` · `ttr-lexicon-compile`** ⚑ **`semantics { code_pattern: }`,
+  and `TargetFacts.codeFormat` is always a regex (LP review-103 F6/F7, ruling 3, D4).** The compiler copied
+  the code attribute's period `code_format:` — a date MASK such as `yyyyMM` — into a field the resolver
+  compiles as a regex, so no period code was ever recognised, and letter-only codes (TPC-DS business keys)
+  could not be declared at all.
+  - The entity/table mention facet gains `code_pattern: "<Java regex>"`, legal only beside `code:`, compiled
+    at analysis time. New **`TTR-SEM-219` `SemBadCodePattern`** (error): does not compile, empty, or no
+    `code:`. `ResolvedEntitySemantics.codePattern` (defaulted, last); `Vocabulary.ALL_ENTITY_KEYS` gains
+    `code_pattern` (no vocabulary-version bump — no proto enum moves); the TS twin, the lint rule
+    `semantics-bad-code-pattern` and the writer follow. Grammar, parsers and conformance goldens unchanged.
+  - `TargetFacts.codeFormat` = the declared `code_pattern`, else the period mask translated (`yyyyMM` →
+    `^\d{6}$`), else null — never a raw mask. No archive-schema change: every reader already treated the
+    field as a regex.
+
+- **`ttr-lexicon-compile` · `ttr-semantics`** **legacy `nameAttribute:` / `codeAttribute:` reach the
+  quoted-literal facet (LP review-103 F16).** An entity still on the legacy properties compiled to
+  `nameRef = null`, so every quoted literal on it was refused as headless. The compiler now falls back to
+  them where the semantics block names no `name:` / `code:` (a path qualified to another entity is not
+  taken), and `TTR-SEM-218` says that quoting reads the column from the semantics block and the legacy
+  property only as a fallback.
+
 - **`ttr-metadata` · `ttr-lexicon` · `ttr-lexicon-compile`** ⚑ **member vocabularies (MV-T0) —
   `SearchHints.indexed` + `matchMethod` are two facts, and the compiled archive (`ttr-lexicon-compiled/v5`)
   knows every indexed attribute.** Before this, one bit — `SearchHints.fuzzy` — answered "is this carrier
