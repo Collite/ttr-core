@@ -2,90 +2,90 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://docs.tatrman.org/dev/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/connect/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/connect/compat/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/connect/conformance-harness/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/connect/doors-and-tools/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/connect/first-agent/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/connect/identity/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/get-running/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/get-running/import-schema/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/get-running/quickstart/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/get-running/review-checklist/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/model/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/model/first-three-tables/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/model/language-reference/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/model/layers/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/model/why-model-is-the-artifact/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/operate/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/operate/component-renames/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/operate/identity-and-oidc/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/operate/policy-in-git/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/operate/upgrade-and-versioning/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
     <url>
          <loc>https://docs.tatrman.org/dev/operate/values-contract/</loc>
-         <lastmod>2026-09-24</lastmod>
+         <lastmod>2026-09-25</lastmod>
     </url>
 </urlset>
