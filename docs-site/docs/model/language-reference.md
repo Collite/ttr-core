@@ -66,11 +66,15 @@ Entities and attributes carry the vocabulary the understanding layer resolves ag
   `measures:` is ordered and its first item is the entity's default measure.
 
 !!! note "`nameAttribute:` / `codeAttribute:` are deprecated"
-    The entity properties `nameAttribute:` and `codeAttribute:` still parse and still work, but
+    The entity properties `nameAttribute:` and `codeAttribute:` still parse, but
     `semantics { name: … , code: … }` is the source of truth from vocabulary v3 on. Declaring only
     the legacy property, or declaring both in agreement, raises a deprecation **warning**;
     declaring both so they *disagree* is an **error** — a disagreement is always a bug, not a
-    preference. Prefer the semantics block in new models.
+    preference. For [quoting a literal](#quoting-a-literal), the column a quoted value filters is
+    read from the semantics block; where the block names no `name:` (or no `code:`), the legacy
+    property is used as a **fallback**, so an existing model keeps working. Only the semantics block
+    can say more than that — a `code_pattern:` needs `code:` beside it. Prefer the semantics block
+    in new models.
 
 ## Quoting a literal _(hand-written)_
 

@@ -498,6 +498,15 @@ class SemanticsValidationSpec :
             c shouldNotContain DiagnosticCode.SemLegacyMentionMismatch
         }
 
+        "legacy only — the deprecation says what the property still feeds (review-103 F16)" {
+            val hit =
+                diagsFor(ent("nameAttribute: customer_name, " + members))
+                    .single { it.code == DiagnosticCode.SemLegacyMentionDeprecated }
+            hit.message shouldBe
+                "'nameAttribute:' is superseded by 'semantics { name: customer_name }' — quoting a value " +
+                "(\"…\") filters the column the semantics block names, and reads 'nameAttribute:' only as a fallback"
+        }
+
         "semantics only — clean" {
             diagsFor(ent("semantics { name: customer_name }, " + members)) shouldBe emptyList()
         }

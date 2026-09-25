@@ -77,5 +77,5 @@ export const SEMANTICS_RULES: Rule[] = [
   // LP review-103 (D4) — the code attribute's value pattern.
   semRule('semantics-bad-code-pattern', DiagnosticCode.SemBadCodePattern, '`code_pattern:` is not a valid (Java) regular expression, is empty, or sits in a block with no `code:`.'),
   // The one warning: a deprecation is advice about style, not a defect in the model.
-  semRule('semantics-legacy-mention-deprecated', DiagnosticCode.SemLegacyMentionDeprecated, 'Legacy `nameAttribute:`/`codeAttribute:` is superseded by `semantics { name: · code: }`.', 'warning'),
+  semRule('semantics-legacy-mention-deprecated', DiagnosticCode.SemLegacyMentionDeprecated, 'Legacy `nameAttribute:`/`codeAttribute:` is superseded by `semantics { name: · code: }` — quoting a value reads the column from the semantics block, and the legacy property only as a fallback.', 'warning'),
 ];

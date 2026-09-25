@@ -466,7 +466,14 @@ export function analyzeSemantics(ast: Document, symbols?: ProjectSymbolTable): S
       if (!legacy) continue;
       const key = prop === 'nameAttribute' ? 'name' : 'code';
       if (!declared) {
-        emit(DiagnosticCode.SemLegacyMentionDeprecated, legacy.source, `'${prop}:' is superseded by 'semantics { ${key}: ${lastSeg(legacy.path)} }'`);
+        // Review-103 F16 — say what the property is still FOR: the mention facet a quoted
+        // literal is attributed through reads the semantics block, and this only as a
+        // fallback. "Superseded" alone read as "harmless", and the facet is not.
+        emit(
+          DiagnosticCode.SemLegacyMentionDeprecated,
+          legacy.source,
+          `'${prop}:' is superseded by 'semantics { ${key}: ${lastSeg(legacy.path)} }' — quoting a value ("…") filters the column the semantics block names, and reads '${prop}:' only as a fallback`,
+        );
         continue;
       }
       if (namesTheSameAttribute(legacy.path, declared.path, owner.name)) {

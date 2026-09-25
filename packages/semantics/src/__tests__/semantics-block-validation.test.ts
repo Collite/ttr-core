@@ -372,6 +372,13 @@ describe('MS — the three aggregation surfaces stay apart', () => {
 
 // contracts §1.2 / MS-D2 — the legacy `nameAttribute:` / `codeAttribute:` matrix.
 describe('MS — the D2 legacy mention matrix', () => {
+  it('legacy only — the deprecation says what the property still feeds (review-103 F16)', () => {
+    const hit = diagsFor(ent('nameAttribute: customer_name, ' + MEMBERS)).find((d) => d.code === DiagnosticCode.SemLegacyMentionDeprecated);
+    expect(hit?.message).toBe(
+      "'nameAttribute:' is superseded by 'semantics { name: customer_name }' — quoting a value (\"…\") filters the column the semantics block names, and reads 'nameAttribute:' only as a fallback",
+    );
+  });
+
   it('legacy only — the deprecation warning, and no mismatch', () => {
     // The "works as today" half of contracts §1.2 row 1 is `EntityDef.nameAttribute`
     // continuing to feed the metadata merge — that is MS-P1·S2's `Source.kt`, not

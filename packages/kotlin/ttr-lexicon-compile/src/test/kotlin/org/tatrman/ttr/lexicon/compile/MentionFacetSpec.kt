@@ -297,6 +297,63 @@ class MentionFacetSpec :
             facts.codeFormat shouldBe null
         }
 
+        val legacy =
+            "model/er/legacy.ttrm" to
+                """
+                model er
+
+                // Only the legacy properties — the estate shape the docs said "still works" (F16).
+                def entity shop { displayLabel: { cs: "Obchod" },
+                    nameAttribute: shop_name,
+                    codeAttribute: shop.shop_code,
+                    attributes: [
+                        def attribute shop_name { type: text },
+                        def attribute shop_code { type: text },
+                    ]
+                }
+
+                // Mixed: the block names the name, the legacy property the code.
+                def entity depot { displayLabel: { cs: "Sklad" },
+                    semantics { name: depot_name },
+                    codeAttribute: depot_code,
+                    attributes: [
+                        def attribute depot_name { type: text },
+                        def attribute depot_code { type: text },
+                    ]
+                }
+
+                // A legacy ref qualified to ANOTHER entity names that entity's attribute, not ours.
+                def entity kiosk { displayLabel: { cs: "Stánek" },
+                    nameAttribute: shop.shop_name,
+                    attributes: [ def attribute shop_name { type: text } ]
+                }
+                """.trimIndent()
+
+        test("F16 — legacy nameAttribute:/codeAttribute: reach the facet when the block names nothing") {
+            val result = load(legacy)
+            // Deprecated, and said so — a warning, never an error that would stop the build.
+            result.warnings.count { "TTR-SEM-218" in it.message } shouldBe 4
+            val facts = targets(result.model.shouldNotBeNull())
+
+            // Was nameRef = null: every quoted literal on a legacy estate went headless.
+            val shop = facts.getValue("er.entity.shop")
+            shop.nameRef shouldBe "er.entity.shop.shop_name"
+            // Qualified to the owner itself — the same line the analyzer draws.
+            shop.codeRef shouldBe "er.entity.shop.shop_code"
+            shop.codeFormat shouldBe null
+        }
+
+        test("F16 — the semantics block and the legacy property compose, the block winning where it speaks") {
+            val depot = targets(modelOf(legacy)).getValue("er.entity.depot")
+
+            depot.nameRef shouldBe "er.entity.depot.depot_name"
+            depot.codeRef shouldBe "er.entity.depot.depot_code"
+        }
+
+        test("F16 — a legacy ref qualified to another entity is not taken as ours") {
+            targets(modelOf(legacy)).getValue("er.entity.kiosk").nameRef shouldBe null
+        }
+
         test("a block the analyzer refuses reaches the compiler as NO facet, and the load says why") {
             // What the first version of this spec asserted with a hand-built `code:` naming a member
             // the entity does not have: the real producer never gets that far. The analyzer reports

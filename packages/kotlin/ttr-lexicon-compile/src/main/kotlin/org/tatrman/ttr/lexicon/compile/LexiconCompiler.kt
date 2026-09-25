@@ -249,7 +249,10 @@ object LexiconCompiler {
 
     /**
      * LP (contracts §2.1) — `semantics { name: · code: }` as FULL attribute refs, plus the regex a
-     * code matches (review-103 D4, see [codeFormatOf]).
+     * code matches (review-103 D4, see [codeFormatOf]). An entity with no `name:`/`code:` in its
+     * block falls back to its legacy `nameAttribute:`/`codeAttribute:` (review-103 F16): before
+     * the fallback, an estate still on the legacy properties compiled to `nameRef = null` and
+     * every quoted literal on it was refused as headless, while the docs said they "still work".
      *
      * Members carry none of this: a member has no name column, it IS one ([Mention.NONE]).
      *
@@ -271,21 +274,60 @@ object LexiconCompiler {
     }
 
     private fun mentionFacet(obj: ModelObject): Mention {
-        val (semantics, members) =
-            when (obj) {
-                is Entity -> obj.mentionSemantics to obj.attributes
-                is DbTable -> obj.mentionSemantics to obj.columns
-                else -> return Mention.NONE
+        val sem: ResolvedEntitySemantics?
+        val members: List<ModelObject>
+        // Review-103 F16 — the legacy `nameAttribute:` / `codeAttribute:`, as the loader merged them
+        // (`Entity.nameAttribute` is the semantics block's `name:` when there is one, else the
+        // legacy property). Tables never had them.
+        val legacyName: String?
+        val legacyCode: String?
+        when (obj) {
+            is Entity -> {
+                sem = obj.mentionSemantics
+                members = obj.attributes
+                legacyName = legacyLocal(obj.nameAttribute, obj.qname.name)
+                legacyCode = legacyLocal(obj.codeAttribute, obj.qname.name)
             }
-        val sem = semantics ?: return Mention.NONE
+
+            is DbTable -> {
+                sem = obj.mentionSemantics
+                members = obj.columns
+                legacyName = null
+                legacyCode = null
+            }
+
+            else -> return Mention.NONE
+        }
         val byLocal = members.associateBy { it.qname.name.substringAfterLast('.') }
-        val name = sem.name?.path?.let { byLocal[it] }
-        val code = sem.code?.path?.let { byLocal[it] }
+        // The semantics block wins; the legacy property is the fallback, so an estate still
+        // writing `nameAttribute:` gets a facet instead of every quoted literal going headless.
+        val name = (sem?.name?.path ?: legacyName)?.let { byLocal[it] }
+        val code = (sem?.code?.path ?: legacyCode)?.let { byLocal[it] }
         return Mention(
             nameRef = name?.qname?.dotted(),
             codeRef = code?.qname?.dotted(),
-            codeFormat = code?.let { codeFormatOf(sem.codePattern, it) },
+            codeFormat = code?.let { codeFormatOf(sem?.codePattern, it) },
         )
+    }
+
+    /**
+     * Review-103 F16 — a legacy `nameAttribute:` / `codeAttribute:` path as a LOCAL member name, or
+     * null when it names nothing of this owner's.
+     *
+     * The legacy side is a reference and may be written qualified (`store.store_name`). Its last
+     * segment is the member — but only when the qualifier is empty or the owner ITSELF: the analyzer
+     * draws the same line (`namesTheSameAttribute`), because `nameAttribute: Other.customer_name`
+     * names a different entity's attribute, and a facet pointing there would filter a column the
+     * plan cannot select. The result is then resolved against the member list like any other name.
+     */
+    private fun legacyLocal(
+        path: String,
+        ownerName: String,
+    ): String? {
+        if (path.isBlank()) return null
+        val local = path.substringAfterLast('.')
+        val qualifier = path.dropLast(local.length).removeSuffix(".")
+        return local.takeIf { qualifier.isEmpty() || qualifier.substringAfterLast('.') == ownerName }
     }
 
     /**

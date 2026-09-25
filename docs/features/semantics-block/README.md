@@ -202,7 +202,7 @@ entity sales {
 
 | declared | outcome |
 |---|---|
-| legacy only | works as today + **WARN** `SemLegacyMentionDeprecated` (suggests the semantics key) |
+| legacy only | works as today + **WARN** `SemLegacyMentionDeprecated` (suggests the semantics key, and says quoting reads it only as a fallback) — the lexicon compiler falls back to it for the quoted-literal facet (`TargetFacts.nameRef`/`codeRef`, review-103 F16) |
 | semantics only | the new source of truth |
 | both, agreeing | **WARN** `SemLegacyMentionDeprecated` (redundant) |
 | both, disagreeing | **ERROR** `SemLegacyMentionMismatch` — a disagreement is always a bug |
