@@ -79,7 +79,7 @@ A `semantics { }` block carries **two orthogonal facets**:
 | facet | declared on | answers | keys |
 |---|---|---|---|
 | **grounding** | attribute / column (`role:`), entity / table (`kind:`) | *what computation grounds on this column* — a date to filter on, a coordinate to measure from, an amount to convert | `role:` + its extra keys, `kind:` |
-| **mention** (v3, MS) | entity / table only | *how humans refer to this entity* — by name, by code, or as a value to aggregate | `name:`, `code:`, `measures:` |
+| **mention** (v3, MS) | entity / table only | *how humans refer to this entity* — by name, by code, or as a value to aggregate | `name:`, `code:`, `code_pattern:`, `measures:` |
 
 They are orthogonal by construction. The mention facet is **not** a second `role:` table:
 `role:` is single-valued and one column is routinely both an amount to convert (grounding)
@@ -144,9 +144,11 @@ when the target is missing, or lacks the required kind/role.
 
 ### Mention facet — entity/table keys (v3, MS)
 
-`ALL_ENTITY_KEYS` = `['kind', 'name', 'code', 'measures']` (was `['kind']`). All three new
-keys are **optional and independent**; each names an attribute of **that same** entity (a
-column of that same table — the block serves er attributes and db columns uniformly).
+`ALL_ENTITY_KEYS` = `['kind', 'name', 'code', 'code_pattern', 'measures']` (was `['kind']`).
+`name:`, `code:` and `measures:` are **optional and independent**; each names an attribute of
+**that same** entity (a column of that same table — the block serves er attributes and db
+columns uniformly). `code_pattern:` (LP review-103, D4) is optional too, but only **with**
+`code:` — it describes the code attribute's values.
 
 ```ttrm
 entity sales {
@@ -155,6 +157,7 @@ entity sales {
     kind: …                          // existing, unchanged (period_table | calendar | poi | fx_rate)
     name: customer_name              // NEW — id ref to an attribute of THIS entity
     code: doc_no                     // NEW — id ref to an attribute of THIS entity
+    code_pattern: "^[0-9]{4}-[0-9]{6}$"   // NEW (LP) — a Java regex every code matches; needs `code:`
     measures: [                      // NEW — ordered list; FIRST item = the default measure
       amount_czk,                    //   bare id ⇒ aggregation `sum`
       { attribute: quantity, aggregation: avg },   // item object: attribute + aggregation
@@ -173,6 +176,20 @@ entity sales {
   an ERROR, and an empty list is not a defect.
 - An entity block may carry the mention facet and no `kind:` at all — `kind` is optional
   in the resolved model since v3.
+- **`code_pattern:`** (LP review-103, D4) is a quoted **Java** regular expression that every
+  value of the `code:` attribute matches. It is what lets a quoted literal be recognised as a
+  *code* rather than a name — in particular a code with no digit in it (TPC-DS business keys
+  such as `AAAAAAAABAAAAAAA`), which the resolver's fallback shape test (`^[A-Z0-9][A-Z0-9\-/.]*$`
+  with at least one digit) accepts only on a head that declares a `code:` and no `name:`. It is
+  compiled at analysis time with `java.util.regex.Pattern` (the JVM is where the resolver
+  matches it); a pattern that does not compile, an empty one, or one in a block with no
+  `code:` is `TTR-SEM-219`. Prefer character classes to backslash escapes (`[0-9]`, not
+  `\d`): a backslash inside a TTR string is an escape character to the parsers, so `\d` must
+  be written `\\d`. The lexicon compiler carries it to the resolver as the archive's
+  `TargetFacts.codeFormat` — which, when no `code_pattern:` is declared, holds the code
+  attribute's period `code_format:` mask translated to a regex (`yyyyMM` → `^\d{6}$`).
+  No vocabulary-version bump: the version moves with the closed proto enums, and a free-text
+  key adds no enum member.
 
 > ⚠ **Three different `aggregation:` surfaces, deliberately kept apart.** The one above is
 > the aggregation *of a measure*, declared where the measure is declared. It is NOT the
@@ -219,13 +236,15 @@ role on entity, 205 type-constraint violation, 206 completeness violation, 207 m
 210 geo pair violation, 211 valid pair violation. Mention facet (v3): 212
 `SemMentionRefUnresolved` (a `name:`/`code:`/measure `attribute:` that is not an attribute of
 THIS owner), 213 `SemMeasureNotNumeric`, 214 `SemMeasureDuplicate`, 215 `SemBadAggregation`,
-216 `SemMentionShape`, 217 `SemLegacyMentionMismatch`, 218 `SemLegacyMentionDeprecated`. Each
-carries a suggested alternative where meaningful (closed-vocabulary nearest match).
+216 `SemMentionShape`, 217 `SemLegacyMentionMismatch`, 218 `SemLegacyMentionDeprecated`, 219
+`SemBadCodePattern` (LP review-103: a `code_pattern:` that is not a Java regex, is empty, or has
+no `code:` beside it). Each carries a suggested alternative where meaningful
+(closed-vocabulary nearest match).
 
 216 `SemMentionShape` is the shape code for the **whole block**, not just the three mention
 keys: shape is decided before vocabulary, at every key. A list or nested object on a key the
 vocabulary reads as a single value (`kind:`, `role:`, `period:`, `currency:`, `code_format:`,
-a measures item's `aggregation:`) is a shape error — *"'<key>:' takes a single value, not a
+`code_pattern:`, a measures item's `aggregation:`) is a shape error — *"'<key>:' takes a single value, not a
 list"* — rather than a bogus "unknown kind 'period_table'". Everything except 218 is an
 ERROR, and an entity block with any semantics ERROR degrades: the whole block becomes a load
 issue and is served without semantics. Veles never guesses.

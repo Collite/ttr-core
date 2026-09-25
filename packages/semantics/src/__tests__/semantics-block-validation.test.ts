@@ -285,6 +285,65 @@ describe('MS — mention semantics on an entity block', () => {
   });
 });
 
+// LP review-103 (D4) — `code_pattern:`, the code attribute's value regex. Twins of the
+// Kotlin suite's `LP D4 — …` cases.
+describe('LP D4 — code_pattern on the mention facet', () => {
+  it('LP D4 — code_pattern beside code: resolves, as written', () => {
+    const { diagnostics, resolved } = resolvedEntity(
+      ent('semantics { name: customer_name, code: doc_no, code_pattern: "^[A-P]{16}$" }, ' + MEMBERS),
+    );
+    expect(diagnostics).toEqual([]);
+    const e = resolved as ResolvedEntitySemantics;
+    expect(e.code?.path).toBe('doc_no');
+    expect(e.codePattern).toBe('^[A-P]{16}$');
+  });
+
+  it('LP D4 — a doubled backslash reaches the analyzer as ONE (the parsers\' escape rule)', () => {
+    const { diagnostics, resolved } = resolvedEntity(ent('semantics { code: doc_no, code_pattern: "^\\\\d{6}$" }, ' + MEMBERS));
+    expect(diagnostics).toEqual([]);
+    expect((resolved as ResolvedEntitySemantics).codePattern).toBe('^\\d{6}$');
+  });
+
+  it('LP D4 — a Java-only construct is judged by the JVM, and not flagged here', () => {
+    // JS has no `(?i)` inline flag; the Kotlin twin compiles it with java.util.regex and
+    // accepts it. Flagging it here would be an error that is not one.
+    expect(diagsFor(ent('semantics { code: doc_no, code_pattern: "(?i)^[a-z]{2}[0-9]+$" }, ' + MEMBERS))).toEqual([]);
+  });
+
+  it('219 — a code_pattern that does not compile, and the block degrades', () => {
+    const { diagnostics, all } = resolvedEntity(ent('semantics { code: doc_no, code_pattern: "^[A-P{16}$" }, ' + MEMBERS));
+    expect(diagnostics.map((d) => d.code)).toEqual([DiagnosticCode.SemBadCodePattern]);
+    expect(diagnostics[0].message).toContain('is not a valid regular expression');
+    expect(all.size).toBe(0);
+  });
+
+  it('219 — an empty code_pattern', () => {
+    expect(codesFor(ent('semantics { code: doc_no, code_pattern: "" }, ' + MEMBERS))).toEqual([DiagnosticCode.SemBadCodePattern]);
+  });
+
+  it('219 — a code_pattern with no code: beside it', () => {
+    expect(codesFor(ent('semantics { name: customer_name, code_pattern: "^X[0-9]+$" }, ' + MEMBERS))).toEqual([
+      DiagnosticCode.SemBadCodePattern,
+    ]);
+  });
+
+  it('219 does not pile onto a code: that failed to resolve — 212 alone says what is wrong', () => {
+    expect(codesFor(ent('semantics { code: nonexistent, code_pattern: "^X[0-9]+$" }, ' + MEMBERS))).toEqual([
+      DiagnosticCode.SemMentionRefUnresolved,
+    ]);
+  });
+
+  it('216 — a code_pattern that is not a single value', () => {
+    expect(codesFor(ent('semantics { code: doc_no, code_pattern: [a, b] }, ' + MEMBERS))).toEqual([DiagnosticCode.SemMentionShape]);
+  });
+
+  it('code_pattern is an ENTITY key — on an attribute block it is unknown', () => {
+    expect(
+      codesFor(ent('attributes: [ def attribute p { type: text, semantics { role: period_code, code_pattern: "^[0-9]{6}$" } } ]')),
+    ).toContain(DiagnosticCode.SemUnknownKey);
+  });
+});
+
 // The aggregation-surface firewall (plan risk 4, contracts §1.1 ⚠). Three different
 // `aggregation:` surfaces exist — the def-level attribute property (EN-P1.2 derived
 // attributes), md's measure property, and the measures-item key. They must not read
@@ -489,12 +548,12 @@ describe('MS — a duplicate key inside a measures item is reported like one on 
 // F4. contracts §4 names the SemMisplacedKeyword rewrite as a requirement, and MS-P1·S1
 // has to mirror this exact string in the Kotlin analyzer. Pin the text, not just the code.
 describe('MS — the misplaced-keyword message names all four entity keys', () => {
-  it('204 lists kind, name, code and measures', () => {
+  it('204 lists kind, name, code, code_pattern and measures', () => {
     const hit = diagsFor(ent('semantics { code_format: "x" }')).find(
       (x) => x.code === DiagnosticCode.SemMisplacedKeyword,
     );
     expect(hit?.message).toBe(
-      "'code_format' is an attribute/column key; entity/table blocks carry 'kind', 'name', 'code', 'measures'",
+      "'code_format' is an attribute/column key; entity/table blocks carry 'kind', 'name', 'code', 'code_pattern', 'measures'",
     );
   });
 });

@@ -122,6 +122,29 @@ class RoundTripSpec :
                         ]
                     }
                     """.trimIndent(),
+                // LP review-103 (D4) — `code_pattern:`, a quoted regex beside `code:`. It is not an
+                // id, so the writer must QUOTE it; a backslash must come back doubled so the
+                // re-parse unescapes it to the one the model meant.
+                "entity+semantics+code_pattern" to
+                    """
+                    def entity promotion {
+                        semantics { name: promo_name, code: promo_id, code_pattern: "^[A-P]{16}$", measures: [cost] }
+                        attributes: [
+                            def attribute promo_name { type: text },
+                            def attribute promo_id { type: text },
+                            def attribute cost { type: decimal }
+                        ]
+                    }
+                    """.trimIndent(),
+                "entity+semantics+code_pattern+backslash" to
+                    """
+                    def entity period {
+                        semantics { code: code, code_pattern: "^\\d{6}$" }
+                        attributes: [
+                            def attribute code { type: text }
+                        ]
+                    }
+                    """.trimIndent(),
                 "table+column+semantics" to
                     """
                     def table poi {

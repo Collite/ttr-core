@@ -67,6 +67,8 @@ export enum DiagnosticCode {
   SemMentionShape = 'TTR-SEM-216',           // a mention value is not the shape the key takes
   SemLegacyMentionMismatch = 'TTR-SEM-217',  // legacy and semantics disagree — always a bug (MS-D2)
   SemLegacyMentionDeprecated = 'TTR-SEM-218',
+  // LP review-103 (D4) — `code_pattern:` on the mention facet: not a regex, empty, or no `code:`.
+  SemBadCodePattern = 'TTR-SEM-219',
   DuplicateBinding = 'ttr/duplicate-binding',
   // qname-redesign (contracts §5): manifest schema config + slot discipline.
   SchemaNameCollision = 'ttr/schema-name-collision',

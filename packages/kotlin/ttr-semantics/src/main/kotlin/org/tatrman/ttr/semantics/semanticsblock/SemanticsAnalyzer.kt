@@ -11,6 +11,8 @@ import org.tatrman.ttr.parser.model.SemanticsBlock
 import org.tatrman.ttr.parser.model.SemanticsValue
 import org.tatrman.ttr.parser.model.SourceLocation
 import org.tatrman.ttr.parser.model.TableDef
+import java.util.regex.Pattern
+import java.util.regex.PatternSyntaxException
 
 /** One `semantics { … }` validation diagnostic (mirrors TS `SemanticsDiagnostic`). */
 data class SemanticsDiagnostic(
@@ -293,6 +295,56 @@ object SemanticsAnalyzer {
             return measures.toList() to clean
         }
 
+        /**
+         * LP review-103 (D4) — a `code_pattern:` value: a quoted Java regex the code attribute's
+         * values match. Null (after emitting) when it is not a single string, is blank, or does not
+         * compile.
+         *
+         * Compiled HERE, with the JVM's own engine, because the JVM is where it runs: the lexicon
+         * compiler copies it into the archive's `TargetFacts.codeFormat`, and the resolver matches
+         * a quoted literal against it with `Regex(...)`. A pattern that fails there fails silently
+         * (the literal is simply not code-shaped), so this is the one place an author can hear
+         * about it.
+         */
+        fun codePatternOf(
+            value: SemanticsValue,
+            source: SourceLocation,
+        ): String? {
+            val pattern = strOf(value)
+            if (pattern == null) {
+                emit(
+                    DiagnosticCode.SemMentionShape,
+                    source,
+                    "'code_pattern:' takes a regular expression in quotes, not ${describeValue(value)}",
+                )
+                return null
+            }
+            if (pattern.isBlank()) {
+                emit(
+                    DiagnosticCode.SemBadCodePattern,
+                    source,
+                    "'code_pattern:' is empty — an empty pattern matches no code anyone can quote",
+                )
+                return null
+            }
+            val error =
+                try {
+                    Pattern.compile(pattern)
+                    null
+                } catch (e: PatternSyntaxException) {
+                    e.description
+                }
+            if (error != null) {
+                emit(
+                    DiagnosticCode.SemBadCodePattern,
+                    source,
+                    "'code_pattern: \"$pattern\"' is not a valid regular expression: $error",
+                )
+                return null
+            }
+            return pattern
+        }
+
         fun validateEntityBlock(
             block: SemanticsBlock,
             rawMembers: List<Definition>,
@@ -305,6 +357,7 @@ object SemanticsAnalyzer {
             var kind: String? = null
             var name: SymbolRef? = null
             var code: SymbolRef? = null
+            var codePattern: String? = null
             var measures: List<MeasureRef> = emptyList()
             for ((key, value) in block.entries) {
                 if (key == "kind") {
@@ -336,6 +389,11 @@ object SemanticsAnalyzer {
                     } else {
                         code = ref
                     }
+                } else if (key == "code_pattern") {
+                    // Matched before the misplaced-keyword branch for the same reason `name`/`code`
+                    // are: that branch tests the VALUE against the role roster.
+                    codePattern = codePatternOf(value, block.source)
+                    if (codePattern == null) clean = false
                 } else if (key == "measures") {
                     val (parsed, ok) = parseMeasures(value, rawMembers, block.source)
                     measures = parsed
@@ -356,7 +414,21 @@ object SemanticsAnalyzer {
                     clean = false
                 }
             }
-            return EntityBlockResult(kind, name, code, measures, clean)
+            // A pattern describes the CODE attribute's values, so a block that names no code has
+            // nothing for it to describe. Keyed on the `code` KEY, not on the resolved ref: a `code:`
+            // that failed to resolve has already been reported, and a second error blaming the
+            // pattern for it would send the author to the wrong line of the block.
+            if (block.entries.containsKey("code_pattern") && !block.entries.containsKey("code")) {
+                emit(
+                    DiagnosticCode.SemBadCodePattern,
+                    block.source,
+                    "'code_pattern:' needs 'code:' in the same block — it describes the values of the " +
+                        "code attribute, and this block names none",
+                )
+                clean = false
+                codePattern = null
+            }
+            return EntityBlockResult(kind, name, code, measures, clean, codePattern)
         }
 
         /**
@@ -667,7 +739,8 @@ object SemanticsAnalyzer {
                 // Resolve when the block declared SOMETHING. An empty `semantics { }` carries no
                 // facts, and a block that only errored is degraded by the `clean` gate above.
                 if (ownerClean && (r.kind != null || r.name != null || r.code != null || r.measures.isNotEmpty())) {
-                    resolved[ownerBlock.source] = ResolvedEntitySemantics(r.kind, r.name, r.code, r.measures)
+                    resolved[ownerBlock.source] =
+                        ResolvedEntitySemantics(r.kind, r.name, r.code, r.measures, r.codePattern)
                 }
             } else {
                 legacyMentionOk(owner, null)
@@ -723,6 +796,7 @@ object SemanticsAnalyzer {
         val code: SymbolRef? = null,
         val measures: List<MeasureRef> = emptyList(),
         val clean: Boolean = true,
+        val codePattern: String? = null,
     )
 
     /**

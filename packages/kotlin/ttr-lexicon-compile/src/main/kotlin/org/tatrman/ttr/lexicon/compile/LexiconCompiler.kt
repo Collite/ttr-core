@@ -248,8 +248,8 @@ object LexiconCompiler {
     }
 
     /**
-     * LP (contracts §2.1) — `semantics { name: · code: }` as FULL attribute refs, plus the code
-     * attribute's `code_format:`.
+     * LP (contracts §2.1) — `semantics { name: · code: }` as FULL attribute refs, plus the regex a
+     * code matches (review-103 D4, see [codeFormatOf]).
      *
      * Members carry none of this: a member has no name column, it IS one ([Mention.NONE]).
      *
@@ -284,17 +284,89 @@ object LexiconCompiler {
         return Mention(
             nameRef = name?.qname?.dotted(),
             codeRef = code?.qname?.dotted(),
-            codeFormat = code?.let { codeFormatOf(it) },
+            codeFormat = code?.let { codeFormatOf(sem.codePattern, it) },
         )
     }
 
-    /** The CODE member's declared `code_format:`, or null — never a shape this compiler invents. */
-    private fun codeFormatOf(member: ModelObject): String? =
-        when (member) {
-            is Attribute -> member.semantics?.codeFormat
-            is DbColumn -> member.semantics?.codeFormat
-            else -> null
-        }?.takeIf { it.isNotBlank() }
+    /**
+     * Review-103 D4 — the REGEX a quoted code matches, for `TargetFacts.codeFormat`. Always a regex
+     * or null, never anything else: the resolver compiles this field with `Regex(...)`, and before
+     * this fix the compiler copied a period `code_format:` MASK into it (`yyyyMM`), which as a
+     * regex matches the literal letters `yyyyMM` and nothing a user would ever quote (F6).
+     *
+     * In order: the owner's declared `code_pattern:` (already compiled by the analyzer, which
+     * refuses the block otherwise); else the code member's period `code_format:` mask, translated
+     * ([maskToRegex]); else null — never a shape this compiler invents.
+     */
+    private fun codeFormatOf(
+        declaredPattern: String?,
+        member: ModelObject,
+    ): String? {
+        if (!declaredPattern.isNullOrBlank()) return declaredPattern
+        val mask =
+            when (member) {
+                is Attribute -> member.semantics?.codeFormat
+                is DbColumn -> member.semantics?.codeFormat
+                else -> null
+            }
+        return mask?.takeIf { it.isNotBlank() }?.let(::maskToRegex)
+    }
+
+    /** The date-mask letters [maskToRegex] reads as digits: year, month, day, hour, minute, second, quarter, week. */
+    private const val MASK_DIGIT_LETTERS = "yMdHmsQW"
+
+    /** Mask letters that stop being digits at three in a row: `MMM` is a month name, `QQQ` a quarter label. */
+    private const val MASK_TEXT_WHEN_3 = "MQ"
+
+    /**
+     * Review-103 D4 — a period `code_format:` mask as an anchored regex: `yyyyMM` → `^\d{6}$`,
+     * `yyyy-MM` → `^\d{4}\-\d{2}$`.
+     *
+     * Each RUN of mask letters (`y M d H m s Q W`, in any mix) becomes `\d{n}`, n being the run's
+     * length — every one of those fields is written as digits, so `yyyyMM` is six digits. Any other
+     * letter means the mask says something this translation does not understand (an era, a day
+     * name), and the answer is null rather than a regex that is confidently wrong. So does three or
+     * more of `M` or `Q` in a row: in the date-pattern convention the masks follow, `MMM`/`MMMM` is
+     * a month NAME and `QQQ` a quarter label (`Q1`), not digits. Every other
+     * character is literal: a non-alphanumeric one is backslash-escaped (always legal in a Java
+     * regex, and required for `.` `+` `(`…), and a digit is appended as it is (`\2` would be a
+     * back-reference).
+     */
+    internal fun maskToRegex(mask: String): String? {
+        if (mask.isEmpty()) return null
+        val out = StringBuilder("^")
+        var i = 0
+        while (i < mask.length) {
+            val c = mask[i]
+            when {
+                c in MASK_DIGIT_LETTERS -> {
+                    var j = i
+                    while (j < mask.length && mask[j] in MASK_DIGIT_LETTERS) {
+                        // A textual field (`MMM`, `QQQ`) inside the run makes the whole mask unreadable.
+                        var k = j
+                        while (k < mask.length && mask[k] == mask[j]) k++
+                        if (mask[j] in MASK_TEXT_WHEN_3 && k - j >= 3) return null
+                        j = k
+                    }
+                    out.append("\\d{").append(j - i).append('}')
+                    i = j
+                }
+
+                c.isLetter() -> return null
+
+                c.isDigit() -> {
+                    out.append(c)
+                    i++
+                }
+
+                else -> {
+                    out.append('\\').append(c)
+                    i++
+                }
+            }
+        }
+        return out.append('$').toString()
+    }
 
     private fun ownerFacts(mention: ResolvedEntitySemantics?): MentionKinds.ObjectFacts =
         MentionKinds.ObjectFacts(

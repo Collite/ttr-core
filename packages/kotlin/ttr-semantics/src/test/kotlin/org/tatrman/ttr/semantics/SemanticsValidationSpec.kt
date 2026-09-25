@@ -6,6 +6,7 @@ import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.tatrman.ttr.parser.diagnostics.DiagnosticCode
 import org.tatrman.ttr.parser.loader.TtrLoader
 import org.tatrman.ttr.semantics.semanticsblock.ResolvedEntitySemantics
@@ -322,6 +323,69 @@ class SemanticsValidationSpec :
             diagsFor(src) shouldBe emptyList()
         }
 
+        // -------------------------------------------------------------------
+        // LP review-103 (D4) — `code_pattern:`, the code attribute's value regex. Twins of the TS
+        // suite's `LP D4 — …` cases.
+        // -------------------------------------------------------------------
+
+        "LP D4 — code_pattern beside code: resolves, as written" {
+            val src =
+                ent("""semantics { name: customer_name, code: doc_no, code_pattern: "^[A-P]{16}$" }, """ + members)
+            diagsFor(src) shouldBe emptyList()
+            val e = firstResolved(src) as ResolvedEntitySemantics
+            e.code?.path shouldBe "doc_no"
+            e.codePattern shouldBe "^[A-P]{16}$"
+        }
+
+        "LP D4 — a doubled backslash reaches the analyzer as ONE (the parsers' escape rule)" {
+            // `\d` must be written `\\d` inside a TTR string; this pins what the analyzer then sees.
+            val src = ent("""semantics { code: doc_no, code_pattern: "^\\d{6}$" }, """ + members)
+            diagsFor(src) shouldBe emptyList()
+            (firstResolved(src) as ResolvedEntitySemantics).codePattern shouldBe """^\d{6}$"""
+        }
+
+        "LP D4 — a Java-only construct is judged by the JVM, and the JVM accepts it" {
+            val src = ent("""semantics { code: doc_no, code_pattern: "(?i)^[a-z]{2}[0-9]+$" }, """ + members)
+            diagsFor(src) shouldBe emptyList()
+        }
+
+        "219 — a code_pattern that does not compile, and the block degrades" {
+            val a = analysisFor(ent("""semantics { code: doc_no, code_pattern: "^[A-P{16}$" }, """ + members))
+            val hit = a.diagnostics.single()
+            hit.code shouldBe DiagnosticCode.SemBadCodePattern
+            hit.message shouldContain "is not a valid regular expression"
+            a.resolved.size shouldBe 0
+        }
+
+        "219 — an empty code_pattern" {
+            codesFor(ent("""semantics { code: doc_no, code_pattern: "" }, """ + members)) shouldBe
+                listOf(DiagnosticCode.SemBadCodePattern)
+        }
+
+        "219 — a code_pattern with no code: beside it" {
+            codesFor(ent("""semantics { name: customer_name, code_pattern: "^X[0-9]+$" }, """ + members)) shouldBe
+                listOf(DiagnosticCode.SemBadCodePattern)
+        }
+
+        "219 does not pile onto a code: that failed to resolve — 212 alone says what is wrong" {
+            codesFor(ent("""semantics { code: nonexistent, code_pattern: "^X[0-9]+$" }, """ + members)) shouldBe
+                listOf(DiagnosticCode.SemMentionRefUnresolved)
+        }
+
+        "216 — a code_pattern that is not a single value" {
+            codesFor(ent("""semantics { code: doc_no, code_pattern: [a, b] }, """ + members)) shouldBe
+                listOf(DiagnosticCode.SemMentionShape)
+        }
+
+        "code_pattern is an ENTITY key — on an attribute block it is unknown" {
+            codesFor(
+                ent(
+                    "attributes: [ def attribute p { type: text, " +
+                        "semantics { role: period_code, code_pattern: \"^[0-9]{6}$\" } } ]",
+                ),
+            ) shouldContain DiagnosticCode.SemUnknownKey
+        }
+
         "212 — a name: that is not an attribute of THIS entity" {
             codesFor(ent("semantics { name: nonexistent }, " + members)) shouldContain
                 DiagnosticCode.SemMentionRefUnresolved
@@ -509,13 +573,13 @@ class SemanticsValidationSpec :
 
         // review-081 F4 (TS) — contracts §4 names the SemMisplacedKeyword rewrite as a
         // requirement, and this is the string the TS twin pins. Text, not just code.
-        "204 lists kind, name, code and measures" {
+        "204 lists kind, name, code, code_pattern and measures" {
             val hit =
                 diagsFor(ent("semantics { code_format: \"x\" }"))
                     .firstOrNull { it.code == DiagnosticCode.SemMisplacedKeyword }
             hit?.message shouldBe
                 "'code_format' is an attribute/column key; entity/table blocks carry " +
-                "'kind', 'name', 'code', 'measures'"
+                "'kind', 'name', 'code', 'code_pattern', 'measures'"
         }
     })
 

@@ -50,6 +50,14 @@ data class ResolvedEntitySemantics(
      * distinguish empty from absent.
      */
     val measures: List<MeasureRef> = emptyList(),
+    /**
+     * LP review-103 (D4) — `code_pattern:` → a Java regex every value of the [code] attribute
+     * matches (`"^[A-P]{16}$"`), so a quoted literal can be recognised as a code even when it has
+     * no digit in it. Only ever set together with [code], and only once it has compiled — the
+     * analyzer refuses the block otherwise (TTR-SEM-219). Last, and defaulted, so every positional
+     * construction written before it still means what it did.
+     */
+    val codePattern: String? = null,
 ) : ResolvedSemantics
 
 /** The resolved `semantics` block on an attribute or db column. */

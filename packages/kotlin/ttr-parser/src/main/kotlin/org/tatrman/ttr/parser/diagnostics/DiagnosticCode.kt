@@ -82,6 +82,10 @@ enum class DiagnosticCode(
     SemLegacyMentionMismatch("TTR-SEM-217"), // legacy and semantics disagree — always a bug (MS-D2)
     SemLegacyMentionDeprecated("TTR-SEM-218"),
 
+    // LP review-103 (D4) — `code_pattern:` on the entity/table mention facet: a pattern the JVM
+    // cannot compile as a regex, an empty one, or one declared on a block that names no `code:`.
+    SemBadCodePattern("TTR-SEM-219"),
+
     // EN-P1 (grammar 0.10) — TTR-M entry declarations (`management` / `changeSemantics`, FO §9/§11).
     // Deliberately in the `ttr/entry-*` slug family, NOT the ai-platform-synced TTR-SEM-2xx grounding
     // vocabulary. `EntryMissingRole` (scd2 without valid-from/valid-to, ledger without reversal-link)
