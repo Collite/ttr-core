@@ -1,17 +1,20 @@
 # LP §3.3 — a string-predicate trigger file. Same `ttr-lexicon/v1` schema as any other
 # data file; the only thing that makes it a predicate slice is the `pred:` target class.
 #
-# Note `s textem` and `v názvu`: both OPEN with a function word, and both are legal,
-# because the RG-LEX-031 guard is about single-token forms — a phrase must appear whole,
-# which is already the evidence a predicate needs.
+# Every form is EXACT (review-103 ruling 1): a `pred:` form only ever fires whole. Note
+# `s textem` and `not starting with`: both OPEN with a function word, and both are legal,
+# because RG-LEX-031 refuses a phrase only when EVERY word in it is a function word — a
+# form that fires whole always brings its content word with it.
 schema: ttr-lexicon/v1
 defaults: { lang: cs, method: EXACT }
 entries:
-  - terms: [ { text: "začínající na", method: TOKENS }, { text: "s prefixem", method: TOKENS },
-             { text: "starts with", lang: en, method: TOKENS } ]
+  - terms: [ { text: "začínající na" }, { text: "s prefixem" },
+             { text: "starts with", lang: en } ]
     target: pred:starts_with
-  - terms: [ { text: "obsahující" }, { text: "s textem", method: TOKENS },
+  - terms: [ { text: "obsahující" }, { text: "s textem" },
              { text: "contains", lang: en } ]
     target: pred:contains
   - terms: [ { text: "neobsahující" }, { text: "without", lang: en } ]
     target: pred:not_contains
+  - terms: [ { text: "nezačínající na" }, { text: "not starting with", lang: en } ]
+    target: pred:not_starts_with

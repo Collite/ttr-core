@@ -1,0 +1,11 @@
+# expected: RG-LEX-031 — a MULTI-word `pred:` form whose every word is a function word
+# (review-103 N5). `with the` and `s na` occur around any literal at all, so no
+# whole-form rule can make them evidence of a predicate.
+#
+# Kotlin-only for the same reason as `pred-weak-form`: it needs the per-language word
+# list. Both forms are reported.
+schema: ttr-lexicon/v1
+defaults: { method: EXACT }
+entries:
+  - terms: [ { text: "with the", lang: en }, { text: "s na", lang: cs } ]
+    target: pred:contains

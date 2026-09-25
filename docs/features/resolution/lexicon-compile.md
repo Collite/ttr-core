@@ -305,39 +305,59 @@ predicate slice is the `pred:` target prefix, from which the compiler derives `S
 
 These are the words that say **how** a quoted literal restricts its attribute. They do not
 interpret the literal and they do not name it: `"Pelex"` is the value, this file is the operator
-between the value and the column. The lowering — `starts_with` to a parameterised `LIKE ? || '%'`
-— stays consumer-side, so nothing here knows SQL.
+between the value and the column. Nothing here knows SQL: the resolver only carries the `pred:` ref
+on the lattice, and the **consumer** lowers it — kantheon's fast-path renderer turns
+`pred:starts_with` into a parameterised `col LIKE ? || '%' ESCAPE …`, a negation into its
+`NOT (…)` (`not_equals` into `col <> ?`), and refuses a ref it does not know rather than defaulting.
 
 | Ref | cs triggers | en triggers |
 |---|---|---|
-| `pred:starts_with` | začínající na · začíná na · začínají na · s prefixem | starts with · beginning with · prefix |
-| `pred:ends_with` | končící na · končí na · končící · s příponou | ends with · ending with · suffix |
-| `pred:contains` | obsahující · obsahuje · obsahují · s textem · v názvu | contains · containing · including |
-| `pred:equals` | přesně · s názvem přesně · rovná se | exactly · named exactly · equal to |
-| `pred:not_contains` | neobsahující · neobsahuje · neobsahují | not containing · without · excluding |
+| `pred:starts_with` | začínající na (+ -ícího · -ícímu · -ícím · -ících · -ícími na) · začíná na · začínají na · s prefixem | starts with · starting with · start with · begins with · beginning with · begin with · prefix |
+| `pred:not_starts_with` | nezačínající na (+ every case) · nezačíná na · nezačínají na | not starting with · not start with · not beginning with · not begin with |
+| `pred:ends_with` | končící na (+ every case) · končí na · končící · s příponou | ends with · ending with · end with · ends in · ending in · end in · suffix |
+| `pred:not_ends_with` | nekončící na (+ every case) · nekončí na · nekončící | not ending with · not end with · not ending in · not end in |
+| `pred:contains` | obsahující (+ every case) · obsahuje · obsahují · s textem · v názvu | contains · containing · contain · including |
+| `pred:not_contains` | neobsahující (+ every case) · neobsahuje · neobsahují | not containing · not contain · not including · without · excluding |
+| `pred:equals` | přesně · s názvem přesně · rovná se · se rovná · rovnající se | exactly · named exactly · equal to · equals |
+| `pred:not_equals` | nerovná se · se nerovná · nerovnající se | not equal to · not equal · not equals |
 
-**One file for all five**, unlike grounding's file-per-kernel. A `ground:` file is a kernel's
-vocabulary and a kernel owns its own words; the five predicates are one closed family read by one
+**One file for all eight**, unlike grounding's file-per-kernel. A `ground:` file is a kernel's
+vocabulary and a kernel owns its own words; the predicates are one closed family read by one
 consumer, and splitting them would only let *starts_with* and *ends_with* drift apart in style.
 
-Three rules the forms follow, and each is a decision rather than a style:
+Four rules the forms follow, and each is a decision rather than a style:
 
 1. **Inflected forms are listed explicitly** — no lemma reliance. The slice has to work on the
    `LLM_EMULATED` NLP backend, which has no morphology, and Czech puts one predicate in half a
-   dozen shapes (`začínající` / `začíná` / `začínají`).
-2. **Multi-word forms are `TOKENS`, single words `EXACT`.** A phrase can be separated in a real
-   question (*začínající přesně na "Pelex"*) and its order is not fixed. A single word gets no
-   typo budget on purpose: these compete with entity names for the same span, and a one-edit
-   neighbourhood around `obsahuje` reaches real words.
-3. **No single-character or function-word forms** — `RG-LEX-031` refuses them. A predicate form is
-   matched against running text, so a bare `s` would declare a filter in questions nobody meant
-   one in. That is why the natural Czech forms for *contains* are the phrases `s textem` and
-   `v názvu`, never the bare preposition.
+   dozen shapes. A participle declines with the noun it qualifies (*firem začínajících na*), so
+   every participle is listed in every case: `-ící · -ícího · -ícímu · -ícím · -ících · -ícími`.
+2. **Every form is `EXACT`** (review-103 ruling 1, amending contracts §3.3's "multi-word forms
+   `TOKENS`"). A `TOKENS` row is scored over the *query's* tokens, so the one-word window `názvem`
+   matched the three-word form *s názvem přesně* on its own and fired `pred:equals` on *zákazníky
+   s názvem "Valmy"*. The resolver looks at contiguous windows of at most three words beside the
+   literal, so `TOKENS` bought no word-order freedom it could use — only fragments. Word order is
+   therefore part of a form, and both orders are listed where Czech uses both (`rovná se` ·
+   `se rovná`). The resolver also accepts a predicate row only when its window covers the whole
+   form, so an estate file that still says `TOKENS` cannot fire on a fragment either.
+3. **No weak and no wide forms.** `RG-LEX-031` refuses a single character, a function word, and a
+   phrase of function words only (*with the*, *s na*): a predicate form is matched against running
+   text, so a bare `s` would declare a filter in questions nobody meant one in. That is why the
+   natural Czech forms for *contains* are the phrases `s textem` and `v názvu`, never the bare
+   preposition. `RG-LEX-032` refuses a form wider than `LexiconValidator.MAX_PREDICATE_FORM_TOKENS`
+   (3) words — no window is wider, and the resolver sizes its windows from that constant. The bare
+   *s názvem* / *named* are deliberately **not** forms: a user who quotes a name after them has
+   not said "exactly", and the name default (`contains`) is what they mean.
+4. **A negation is its own kind** (review-103 D1). A negated phrase is listed under its `not_*`
+   ref, never left to match its positive tail — *not starting with "Vex"* used to become
+   `starts_with`. The resolver additionally negates a positive trigger that follows a free
+   negator (en `not` · `never` · `no` · `n't`, cs `ne` · `nikoli` · `nikoliv`); Czech negates
+   verbs and participles morphologically (*nezačínající*), which is why those forms are listed
+   one by one. The free negators themselves (`not`, `ne`) are stop words, so neither can be a form.
 
 Layered like the other two areas — stdlib first, estate second — so an estate that adds
 *v popisu* for `pred:contains` **extends** the shipped vocabulary rather than replacing it.
 
-⚑ The set is closed at these five. `RG-LEX-030` rejects any other `pred:` ref, in the stdlib and in
+⚑ The set is closed at these eight. `RG-LEX-030` rejects any other `pred:` ref, in the stdlib and in
 an estate's own files alike: a consumer that meets `pred:sounds_like` has nothing to lower it to,
 and a trigger that resolves to nothing is worse than a word that resolves to nothing at all.
 

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tatrman.org/schemas/ttr-lexicon.v1.schema.json",
-  "title": "ttr-lexicon/v1 — alias / value / grounding-trigger data file",
-  "description": "A lexicon data file in the defining repo's sibling data area (`lexicon/aliases/*.lex.yaml`, `lexicon/values/*.lex.yaml`, `lexicon/grounding/*.lex.yaml`). RV-36..38, RV-42; contracts §2. Entry KIND is not declared here — it is derived from the target class (RV-38).",
+  "title": "ttr-lexicon/v1 — alias / value / grounding-trigger / string-predicate data file",
+  "description": "A lexicon data file in the defining repo's sibling data area (`lexicon/aliases/*.lex.yaml`, `lexicon/values/*.lex.yaml`, `lexicon/grounding/*.lex.yaml`, `lexicon/predicates/*.lex.yaml`). RV-36..38, RV-42, LP §3; contracts §2. Entry KIND is not declared here — it is derived from the target class (RV-38).",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "entries"],
@@ -107,7 +107,7 @@
           "items": { "$ref": "#/$defs/term" }
         },
         "target": {
-          "description": "Any model-graph ref (`er.*`, `md.*`, member refs), an `op:` ref, a `ground:` class ref (RV-42), or a `pred:` string-predicate ref (LP contracts §3). Existence of a MODEL ref is checked at compile time against the model snapshot, not here — but the `ground:` and `pred:` vocabularies ARE closed, because each names a consumer that must implement the behaviour: a kernel that loads the slice, a translator that lowers the predicate. Note the `pred:` FORM rule (RG-LEX-031, no single-character or function-word triggers) is Kotlin-only — it needs a per-language word list, which JSON Schema cannot carry.",
+          "description": "Any model-graph ref (`er.*`, `md.*`, member refs), an `op:` ref, a `ground:` class ref (RV-42), or a `pred:` string-predicate ref (LP contracts §3). Existence of a MODEL ref is checked at compile time against the model snapshot, not here — but the `ground:` and `pred:` vocabularies ARE closed, because each names a consumer that must implement the behaviour: a kernel that loads the slice, a consumer that lowers the predicate (kantheon's fast-path renderer, e.g. `pred:starts_with` ⇒ `col LIKE ? || '%' ESCAPE …`). The `pred:` FORM rules are Kotlin-only: RG-LEX-031 (no single-character or function-word trigger, and no phrase of function words only) needs a per-language word list, which JSON Schema cannot carry; RG-LEX-032 (at most `LexiconValidator.MAX_PREDICATE_FORM_TOKENS` = 3 words) counts tokens on the Kotlin normalizer's whitespace, and a second definition of a token here would be one more thing to drift.",
           "type": "string",
           "minLength": 1,
           "allOf": [
@@ -117,7 +117,7 @@
             },
             {
               "if": { "pattern": "^pred:" },
-              "then": { "pattern": "^pred:(starts_with|ends_with|contains|equals|not_contains)$" }
+              "then": { "pattern": "^pred:(starts_with|ends_with|contains|equals|not_starts_with|not_ends_with|not_contains|not_equals)$" }
             }
           ]
         }

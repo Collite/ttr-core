@@ -97,7 +97,7 @@ class LexiconAreaLoaderSpec :
                 """
                 schema: ttr-lexicon/v1
                 entries:
-                  - terms: [ { text: "v popisu", lang: cs, method: TOKENS } ]
+                  - terms: [ { text: "v popisu", lang: cs, method: EXACT } ]
                     target: pred:contains
                 """.trimIndent(),
             )

@@ -33,6 +33,7 @@ object LexiconErrors {
     // LP (contracts §3.1/§7) — the `pred:` string-predicate slice.
     const val UNKNOWN_PREDICATE_KIND = "RG-LEX-030"
     const val WEAK_PREDICATE_FORM = "RG-LEX-031"
+    const val WIDE_PREDICATE_FORM = "RG-LEX-032"
 
     /** Every code this library can emit — the catalogue's own index. */
     val ALL: List<String> =
@@ -56,6 +57,7 @@ object LexiconErrors {
             TYPOS_BUDGET_EXHAUSTS_SCORE,
             UNKNOWN_PREDICATE_KIND,
             WEAK_PREDICATE_FORM,
+            WIDE_PREDICATE_FORM,
         )
 
     fun unknownMethod(
@@ -110,8 +112,10 @@ object LexiconErrors {
     /**
      * LP contracts §3.1 — the `pred:` kind vocabulary is CLOSED, and closed for the same reason
      * `ground:` is: the ref names a *behaviour a consumer implements*, not an extension point. The
-     * resolver turns `pred:starts_with` into a `LIKE 'x%'`; `pred:like` is a kind nothing lowers,
-     * so the entry would never fire and never say why.
+     * resolver only carries the ref on the lattice; the consumer — kantheon's fast-path renderer —
+     * lowers `pred:starts_with` to a parameterised `col LIKE ? || '%' ESCAPE …`, and refuses a ref
+     * it does not know rather than defaulting. `pred:like` is a kind nothing lowers, so the entry
+     * would never fire and never say why.
      */
     fun unknownPredicateKind(
         ref: String,
@@ -124,14 +128,16 @@ object LexiconErrors {
     )
 
     /**
-     * LP contracts §3.1 — a `pred:` form that is one character, or a function word of its language.
+     * LP contracts §3.1 — a `pred:` form that is one character or a function word of its
+     * language, or a phrase made of function words only (*with the*, *s na*).
      *
      * Every other target class is anchored by something: a model object has a ref in the snapshot,
      * an operator needs its whole trigger phrase. A predicate form is matched against RUNNING TEXT
      * to decide that the words around a quoted literal mean "starts with" — so a form like cs `s`
      * or en `with` fires on most questions ever asked, and turns a filter the user did not write
-     * into one the plan executes. Multi-word forms are unaffected: `s textem` is two tokens and
-     * only the whole phrase matches.
+     * into one the plan executes. A phrase with a content word in it (`s textem`) is legal: `pred:`
+     * forms are authored `EXACT` and the resolver accepts one only when its window covers the whole
+     * form, so the content word is always part of the evidence.
      */
     fun weakPredicateForm(
         text: String,
@@ -141,8 +147,30 @@ object LexiconErrors {
     ) = LexiconViolation(
         WEAK_PREDICATE_FORM,
         "\"$text\" cannot be a `$ref` trigger — $why. A predicate form is matched against running " +
-            "text, so a word this common would declare a filter in questions nobody meant one in. " +
-            "Use a longer form, or a multi-word one (`s textem`).",
+            "text, so words this common would declare a filter in questions nobody meant one in. " +
+            "Use a longer form, or a phrase with a content word in it (`s textem`).",
+        at,
+    )
+
+    /**
+     * Review-103 F1 — a `pred:` form wider than [LexiconValidator.MAX_PREDICATE_FORM_TOKENS].
+     *
+     * The resolver looks for predicate forms in the windows immediately left of a quoted literal,
+     * and those windows are at most [LexiconValidator.MAX_PREDICATE_FORM_TOKENS] tokens wide. A
+     * wider form can never be seen whole, so the only thing it could ever contribute is a fragment
+     * — and a fragment firing a predicate is the defect this rule exists to make unauthorable.
+     */
+    fun widePredicateForm(
+        text: String,
+        ref: String,
+        width: Int,
+        max: Int,
+        at: Provenance,
+    ) = LexiconViolation(
+        WIDE_PREDICATE_FORM,
+        "\"$text\" cannot be a `$ref` trigger — it is $width words, and a predicate form may be at " +
+            "most $max: the resolver only looks $max words to the left of a quoted literal, so a " +
+            "wider form could never match whole. Shorten it.",
         at,
     )
 

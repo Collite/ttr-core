@@ -1,78 +1,175 @@
 # LP §3.3 — the string-predicate TRIGGER slice.
 #
 # These are the words that say *how* a quoted literal restricts its attribute. They do
-# not interpret the literal and they do not name it: `"Shell"` is the value, this file
-# is the operator between the value and the column. The lowering — `starts_with` to a
-# parameterised `LIKE ? + '%'` — stays translator-side, so nothing here knows SQL.
+# not interpret the literal and they do not name it: `"Pelex"` is the value, this file
+# is the operator between the value and the column. Nothing here knows SQL: the resolver
+# only carries the `pred:` ref on the lattice, and the CONSUMER lowers it — kantheon's
+# fast-path renderer turns `starts_with` into a parameterised `col LIKE ? || '%' ESCAPE …`,
+# `not_starts_with` into `NOT (col LIKE ? || '%' ESCAPE …)`, `equals` into `col = ?` and
+# `not_equals` into `col <> ?`.
 #
-# Three rules the forms follow, all from §3.3:
+# Four rules the forms follow:
 #
 #  1. **Inflected forms are listed explicitly.** No lemma reliance: the slice must work
 #     on the LLM_EMULATED backend, which has no morphology, and Czech puts the same
-#     predicate in half a dozen shapes (`začínající` / `začíná` / `začínají`).
-#  2. **Multi-word forms are TOKENS, single words EXACT.** A phrase may be separated in
-#     a real question (*začínající přesně na "Shell"*), and order is not fixed. A single
-#     word gets no typo budget on purpose: these compete with entity names for the same
-#     span, and a one-edit neighbourhood around `obsahuje` reaches real words.
-#  3. **No single-character or function-word forms** — RG-LEX-031 refuses them, because a
-#     predicate form is matched against running text and `s` alone would declare a filter
-#     in questions nobody meant one in. That is why the natural cs forms for *contains*
-#     are `s textem` and `v názvu`, as PHRASES, and never the bare preposition.
+#     predicate in half a dozen shapes. A participle declines with the noun it qualifies
+#     (*firmy začínající na*, *firem začínajících na*, *s firmami začínajícími na*), so
+#     every participle is listed in every case form: -ící · -ícího · -ícímu · -ícím ·
+#     -ících · -ícími.
+#  2. **Every form is EXACT** (review-103 ruling 1, amending §3.3's "multi-word forms
+#     TOKENS"). A TOKENS row is scored over the QUERY's tokens, so the one-word window
+#     `názvem` matched the three-word form *s názvem přesně* on its own and fired
+#     `pred:equals` on *zákazníky s názvem "Valmy"*. The resolver looks at contiguous
+#     windows of at most three words beside the literal, so TOKENS bought no word-order
+#     freedom it could use — only fragments. Word order is therefore part of a form, and
+#     both orders are listed where Czech uses both (`rovná se` · `se rovná`).
+#  3. **No weak and no wide forms.** RG-LEX-031 refuses a single character, a function
+#     word, and a phrase made of function words only: a predicate form is matched against
+#     running text, and `s` alone would declare a filter in questions nobody meant one in.
+#     That is why the natural cs forms for *contains* are the PHRASES `s textem` and
+#     `v názvu`. RG-LEX-032 refuses a form wider than three words
+#     (`LexiconValidator.MAX_PREDICATE_FORM_TOKENS`): no window is wider, so such a form
+#     could only ever match as a fragment. The bare *s názvem* / *named* are deliberately
+#     NOT forms — a user who quotes a name after them has not said "exactly", and the name
+#     default (`contains`) is what they mean; *s názvem přesně* / *named exactly* are.
+#  4. **A negation is its own kind** (review-103 D1). A negated phrase is listed under
+#     `not_starts_with` / `not_ends_with` / `not_contains` / `not_equals`, never left to
+#     match its positive tail — *not starting with "Vex"* used to become `starts_with`.
+#     The resolver also negates a positive trigger that follows a free negator (`not`,
+#     `never`, `n't`, `ne`, …), so *does not start with* is covered by the window it ends
+#     in; Czech negates verbs and participles morphologically (*nezačínající*), which is
+#     why the `ne-` forms are listed one by one.
 schema: ttr-lexicon/v1
 defaults: { lang: cs, method: EXACT }
 entries:
   # --- starts_with
   - terms:
-      - { text: "začínající na", method: TOKENS }
-      - { text: "začíná na", method: TOKENS }
-      - { text: "začínají na", method: TOKENS }
-      - { text: "s prefixem", method: TOKENS }
-      - { text: "starts with", lang: en, method: TOKENS }
-      - { text: "beginning with", lang: en, method: TOKENS }
+      - { text: "začínající na" }
+      - { text: "začínajícího na" }
+      - { text: "začínajícímu na" }
+      - { text: "začínajícím na" }
+      - { text: "začínajících na" }
+      - { text: "začínajícími na" }
+      - { text: "začíná na" }
+      - { text: "začínají na" }
+      - { text: "s prefixem" }
+      - { text: "starts with", lang: en }
+      - { text: "starting with", lang: en }
+      - { text: "start with", lang: en }
+      - { text: "begins with", lang: en }
+      - { text: "beginning with", lang: en }
+      - { text: "begin with", lang: en }
       - { text: "prefix", lang: en }
     target: pred:starts_with
 
+  # --- not_starts_with
+  - terms:
+      - { text: "nezačínající na" }
+      - { text: "nezačínajícího na" }
+      - { text: "nezačínajícímu na" }
+      - { text: "nezačínajícím na" }
+      - { text: "nezačínajících na" }
+      - { text: "nezačínajícími na" }
+      - { text: "nezačíná na" }
+      - { text: "nezačínají na" }
+      - { text: "not starting with", lang: en }
+      - { text: "not start with", lang: en }
+      - { text: "not beginning with", lang: en }
+      - { text: "not begin with", lang: en }
+    target: pred:not_starts_with
+
   # --- ends_with
   - terms:
-      - { text: "končící na", method: TOKENS }
-      - { text: "končí na", method: TOKENS }
+      - { text: "končící na" }
+      - { text: "končícího na" }
+      - { text: "končícímu na" }
+      - { text: "končícím na" }
+      - { text: "končících na" }
+      - { text: "končícími na" }
+      - { text: "končí na" }
       - { text: "končící" }
-      - { text: "s příponou", method: TOKENS }
-      - { text: "ends with", lang: en, method: TOKENS }
-      - { text: "ending with", lang: en, method: TOKENS }
+      - { text: "s příponou" }
+      - { text: "ends with", lang: en }
+      - { text: "ending with", lang: en }
+      - { text: "end with", lang: en }
+      - { text: "ends in", lang: en }
+      - { text: "ending in", lang: en }
+      - { text: "end in", lang: en }
       - { text: "suffix", lang: en }
     target: pred:ends_with
 
+  # --- not_ends_with
+  - terms:
+      - { text: "nekončící na" }
+      - { text: "nekončícího na" }
+      - { text: "nekončícímu na" }
+      - { text: "nekončícím na" }
+      - { text: "nekončících na" }
+      - { text: "nekončícími na" }
+      - { text: "nekončí na" }
+      - { text: "nekončící" }
+      - { text: "not ending with", lang: en }
+      - { text: "not end with", lang: en }
+      - { text: "not ending in", lang: en }
+      - { text: "not end in", lang: en }
+    target: pred:not_ends_with
+
   # --- contains. The default predicate for a name attribute (§2.2), so these are the
-  #     forms a user is LEAST likely to write — the ones that matter are the others.
+  #     forms a user is LEAST likely to need — the ones that matter are the others.
   - terms:
       - { text: "obsahující" }
+      - { text: "obsahujícího" }
+      - { text: "obsahujícímu" }
+      - { text: "obsahujícím" }
+      - { text: "obsahujících" }
+      - { text: "obsahujícími" }
       - { text: "obsahuje" }
       - { text: "obsahují" }
-      - { text: "s textem", method: TOKENS }
-      - { text: "v názvu", method: TOKENS }
+      - { text: "s textem" }
+      - { text: "v názvu" }
       - { text: "contains", lang: en }
       - { text: "containing", lang: en }
+      - { text: "contain", lang: en }
       - { text: "including", lang: en }
     target: pred:contains
+
+  # --- not_contains
+  - terms:
+      - { text: "neobsahující" }
+      - { text: "neobsahujícího" }
+      - { text: "neobsahujícímu" }
+      - { text: "neobsahujícím" }
+      - { text: "neobsahujících" }
+      - { text: "neobsahujícími" }
+      - { text: "neobsahuje" }
+      - { text: "neobsahují" }
+      - { text: "not containing", lang: en }
+      - { text: "not contain", lang: en }
+      - { text: "not including", lang: en }
+      - { text: "without", lang: en }
+      - { text: "excluding", lang: en }
+    target: pred:not_contains
 
   # --- equals. The default for a CODE attribute (§2.2); written out because a user who
   #     says it about a NAME means it, and the default there is `contains`.
   - terms:
       - { text: "přesně" }
-      - { text: "s názvem přesně", method: TOKENS }
-      - { text: "rovná se", method: TOKENS }
+      - { text: "s názvem přesně" }
+      - { text: "rovná se" }
+      - { text: "se rovná" }
+      - { text: "rovnající se" }
       - { text: "exactly", lang: en }
-      - { text: "named exactly", lang: en, method: TOKENS }
-      - { text: "equal to", lang: en, method: TOKENS }
+      - { text: "named exactly", lang: en }
+      - { text: "equal to", lang: en }
+      - { text: "equals", lang: en }
     target: pred:equals
 
-  # --- not_contains
+  # --- not_equals
   - terms:
-      - { text: "neobsahující" }
-      - { text: "neobsahuje" }
-      - { text: "neobsahují" }
-      - { text: "not containing", lang: en, method: TOKENS }
-      - { text: "without", lang: en }
-      - { text: "excluding", lang: en }
-    target: pred:not_contains
+      - { text: "nerovná se" }
+      - { text: "se nerovná" }
+      - { text: "nerovnající se" }
+      - { text: "not equal to", lang: en }
+      - { text: "not equal", lang: en }
+      - { text: "not equals", lang: en }
+    target: pred:not_equals

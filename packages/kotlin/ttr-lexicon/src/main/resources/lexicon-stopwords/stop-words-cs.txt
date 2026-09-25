@@ -51,3 +51,7 @@ co
 jak
 kde
 kdy
+# review-103 N5 — the bare negator (`ne`). Czech negates verbs and participles
+# morphologically (`nezačínající`), so the slice lists those forms explicitly; the free
+# particle is never a predicate form on its own.
+ne

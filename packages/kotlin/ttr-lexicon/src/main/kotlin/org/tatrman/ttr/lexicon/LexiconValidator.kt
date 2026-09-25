@@ -104,13 +104,40 @@ object LexiconValidator {
     const val PRED_PREFIX: String = "pred:"
 
     /**
-     * The five string predicates (LP contracts §3.1). Closed for the same reason [GROUNDING_KINDS]
-     * is: the ref names a behaviour a *consumer* lowers — `starts_with` becomes a parameterised
-     * `LIKE 'x%'` at the translator — so an unknown kind is not an extension point but an entry no
-     * stage would ever act on.
+     * The eight string predicates (LP contracts §3.1, grown by the three negations in the
+     * review-103 fix, D1). Closed for the same reason [GROUNDING_KINDS] is: the ref names a
+     * behaviour a *consumer* implements — kantheon's fast-path renderer lowers `pred:starts_with`
+     * to a parameterised `col LIKE ? || '%' ESCAPE …` and `pred:not_starts_with` to its `NOT (…)`
+     * — so an unknown kind is not an extension point but an entry no stage would ever act on.
+     *
+     * The negations are kinds of their own rather than a flag on the positive ones because a
+     * negated FORM (*not starting with*, *nezačínající na*) must never be able to fire the positive
+     * predicate: before they existed, the only thing a negated phrase could match was its own
+     * positive tail (review-103 F12).
      */
     val PREDICATE_KINDS: Set<String> =
-        setOf("starts_with", "ends_with", "contains", "equals", "not_contains")
+        setOf(
+            "starts_with",
+            "ends_with",
+            "contains",
+            "equals",
+            "not_starts_with",
+            "not_ends_with",
+            "not_contains",
+            "not_equals",
+        )
+
+    /**
+     * RG-LEX-032 — the widest a `pred:` form may be, in whitespace-separated tokens.
+     *
+     * Pinned HERE, as a public constant, because the resolver's trigger windows are sized from it:
+     * `PredicateTriggers` asks the 1…N-token windows to the left of a quoted literal, and a form
+     * wider than the widest window can never match whole — only a fragment of it can, which is
+     * exactly how *s názvem přesně* (three words, against a two-word window) fired `pred:equals`
+     * on the bare *s názvem* (review-103 F1). The resolver cites this constant rather than
+     * hard-coding its own number; raising it is a change to both sides at once.
+     */
+    const val MAX_PREDICATE_FORM_TOKENS: Int = 3
 
     /** Parses a `.lex.yaml` data file. [file] is used for provenance only. */
     fun loadDataFile(
@@ -160,25 +187,37 @@ object LexiconValidator {
                     return@mapNotNull null
                 }
 
-                // LP §3.1: a `pred:` target names one of the five string predicates, and its forms
-                // must be able to carry a trigger. Both checks live here rather than in the
-                // compiler because both reject the FILE: an author can fix either by editing a
-                // line, which is the boundary between this object and RV-20's dropped rows.
+                // LP §3.1: a `pred:` target names one of the closed string predicates, and its
+                // forms must be able to carry a trigger. All three checks live here rather than in
+                // the compiler because all three reject the FILE: an author can fix any of them by
+                // editing a line, which is the boundary between this object and RV-20's dropped rows.
                 if (targetRef.startsWith(PRED_PREFIX)) {
                     if (targetRef.removePrefix(PRED_PREFIX) !in PREDICATE_KINDS) {
                         ctx += LexiconErrors.unknownPredicateKind(targetRef, PREDICATE_KINDS, ctx.at(target))
                         return@mapNotNull null
                     }
-                    // Every weak form is reported, not the first — a slice is authored in bulk.
-                    var weak = false
+                    // Every bad form is reported, not the first — a slice is authored in bulk.
+                    var bad = false
                     for (term in terms) {
                         val why = weakPredicateForm(term)
                         if (why != null) {
                             ctx += LexiconErrors.weakPredicateForm(term.text, targetRef, why, term.provenance)
-                            weak = true
+                            bad = true
+                        }
+                        val width = predicateFormWidth(term)
+                        if (width > MAX_PREDICATE_FORM_TOKENS) {
+                            ctx +=
+                                LexiconErrors.widePredicateForm(
+                                    term.text,
+                                    targetRef,
+                                    width,
+                                    MAX_PREDICATE_FORM_TOKENS,
+                                    term.provenance,
+                                )
+                            bad = true
                         }
                     }
-                    if (weak) return@mapNotNull null
+                    if (bad) return@mapNotNull null
                 }
 
                 LexiconEntryDef(terms, targetRef, ctx.at(target))
@@ -193,20 +232,33 @@ object LexiconValidator {
     }
 
     /**
-     * LP contracts §3.1 — why [term] cannot be a `pred:` trigger, or null when it can.
+     * LP contracts §3.1 — why [term] cannot be a `pred:` trigger (RG-LEX-031), or null when it can.
      *
-     * **Single-token forms only.** A multi-word form matches as a phrase, so `s textem` is safe
-     * even though `s` alone is not: the two words must both be there, in one span, which is
-     * already the evidence a predicate needs. Refusing it would leave the cs slice with no natural
-     * way to say *contains* at all.
+     * **One word:** refused when it is a single character or a function word of its language.
+     *
+     * **Several words:** refused only when EVERY word is a function word (*with the*, *s na*). A
+     * phrase with one content word in it — `s textem`, `v názvu`, `not containing` — is legal even
+     * though it opens with a function word, because a `pred:` form only ever fires WHOLE: the stdlib
+     * authors every form `EXACT` (review-103 ruling 1), and the resolver accepts a predicate row
+     * only when its window covers the whole form. ⚠ Before that ruling this KDoc said "only the
+     * whole phrase matches" of forms authored `TOKENS`, which was false — a `TOKENS` row scores the
+     * QUERY's tokens, so the one-word window `názvem` matched *s názvem přesně* on its own and fired
+     * `pred:equals` (review-103 F1). A phrase of function words alone is refused because there is no
+     * whole-form rule that can make it evidence: every one of its words occurs around any literal.
      *
      * The token test is [TermNormalizer.normalize]'s whitespace, not a tokenizer: the authored
      * form is the unit here, and the only question is whether an author wrote one word or several.
      */
     private fun weakPredicateForm(term: TermDef): String? {
-        val normalized = TermNormalizer.normalize(term.text)
-        if (normalized.contains(' ')) return null
-        val folded = TermNormalizer.fold(normalized)
+        val tokens = TermNormalizer.normalize(term.text).split(' ')
+        if (tokens.size > 1) {
+            return if (tokens.all { LexiconStopWords.isStop(it, term.lang) }) {
+                "every word in it is a function word in ${term.lang.wire}"
+            } else {
+                null
+            }
+        }
+        val folded = TermNormalizer.fold(tokens.single())
         return when {
             folded.length <= 1 -> "a single character matches inside half the words in a question"
             LexiconStopWords.isStop(folded, term.lang) ->
@@ -215,6 +267,9 @@ object LexiconValidator {
             else -> null
         }
     }
+
+    /** RG-LEX-032 — how many whitespace-separated tokens [term] is, on the same split as RG-LEX-031. */
+    private fun predicateFormWidth(term: TermDef): Int = TermNormalizer.normalize(term.text).split(' ').size
 
     /** Parses a skill file (`skills` dir, `.md`): frontmatter → [SkillDef], body kept verbatim. */
     fun loadSkillFile(

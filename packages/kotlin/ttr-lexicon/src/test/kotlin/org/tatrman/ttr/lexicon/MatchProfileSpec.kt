@@ -398,6 +398,8 @@ class MatchProfileSpec :
                         // `RG-LEX-030` in a log should be able to tell which feature to read about.
                         "RG-LEX-030",
                         "RG-LEX-031",
+                        // Review-103 F1 — a `pred:` form wider than the resolver's trigger window.
+                        "RG-LEX-032",
                     ),
                 )
             }

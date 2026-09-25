@@ -161,6 +161,29 @@ class SchemaEquivalenceSpec :
                 .codes shouldBe listOf(LexiconErrors.WEAK_PREDICATE_FORM, LexiconErrors.WEAK_PREDICATE_FORM)
         }
 
+        test("the pred: all-function-words PHRASE rule is Kotlin-only too (review-103 N5)") {
+            val yaml = fixture("invalid/pred-stopword-phrase.lex.yaml")
+
+            schemaAccepts(lexiconSchema, yaml) shouldBe true
+            LexiconValidator
+                .loadDataFile(yaml, "pred-stopword-phrase.lex.yaml")
+                .shouldBeInstanceOf<LexiconLoad.Rejected>()
+                .codes shouldBe listOf(LexiconErrors.WEAK_PREDICATE_FORM, LexiconErrors.WEAK_PREDICATE_FORM)
+        }
+
+        test("the pred: WIDTH rule is Kotlin-only, and the schema knowingly passes it (review-103 F1)") {
+            // RG-LEX-032 counts tokens on `TermNormalizer`'s whitespace. A JSON-Schema pattern
+            // could approximate that, but it would be a second definition of "a token", and the
+            // one the resolver's windows are sized against lives in Kotlin.
+            val yaml = fixture("invalid/pred-wide-form.lex.yaml")
+
+            schemaAccepts(lexiconSchema, yaml) shouldBe true
+            LexiconValidator
+                .loadDataFile(yaml, "pred-wide-form.lex.yaml")
+                .shouldBeInstanceOf<LexiconLoad.Rejected>()
+                .codes shouldBe listOf(LexiconErrors.WIDE_PREDICATE_FORM, LexiconErrors.WIDE_PREDICATE_FORM)
+        }
+
         test("the duplicate-term rule is Kotlin-only, and the schema knowingly passes it") {
             val yaml = fixture("invalid/duplicate-term.lex.yaml")
 
