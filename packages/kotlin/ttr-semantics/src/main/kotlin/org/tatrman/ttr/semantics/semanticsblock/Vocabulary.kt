@@ -34,6 +34,11 @@ object Vocabulary {
      * Kept in lock-step with the TS twin (`packages/semantics/src/semantics-block/vocabulary.ts`), which
      * `VocabularyParitySpec` asserts mechanically; the `meta.v1` proto follows in MS-P2 (additive:
      * `EntitySemantics.measures`, `AttributeSemantics.aggregation`).
+     *
+     * LP review-103 (D4) adds one more MENTION key, `code_pattern:` — a regex the code attribute's
+     * values match — WITHOUT a version bump: the number moves with the closed proto ENUMS, and a
+     * free-text key adds no enum member. The lexicon archive's `TargetFacts.codeFormat` is its only
+     * channel downstream; `meta.v1` does not carry it.
      */
     const val SEMANTICS_VOCABULARY_VERSION: Int = 3
 
@@ -188,11 +193,12 @@ object Vocabulary {
     /**
      * The keys legal on an entity/table `semantics` block.
      *
-     * `kind` is the grounding facet (what this table IS); `name`/`code`/`measures` are the mention facet
-     * (which attribute carries the entity when a human refers to it by name, by code, or as a value).
-     * Order is the order the README table and the `SemMisplacedKeyword` message use.
+     * `kind` is the grounding facet (what this table IS); `name`/`code`/`code_pattern`/`measures` are the
+     * mention facet (which attribute carries the entity when a human refers to it by name, by code, or as
+     * a value — and, for the code, what a code looks like). Order is the order the README table and the
+     * `SemMisplacedKeyword` message use.
      */
-    val ALL_ENTITY_KEYS: List<String> = listOf("kind", "name", "code", "measures")
+    val ALL_ENTITY_KEYS: List<String> = listOf("kind", "name", "code", "code_pattern", "measures")
 
     /**
      * The closed aggregation vocabulary for a `measures:` item.

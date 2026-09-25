@@ -90,6 +90,24 @@ const lastSeg = (path: string): string => path.split('.').pop() ?? path;
 /** The entity/table key roster, for the misplaced-keyword message. */
 const entityKeyList = (): string => ALL_ENTITY_KEYS.map((k) => `'${k}'`).join(', ');
 
+/**
+ * LP review-103 (D4) — Java regex constructs JavaScript's engine rejects: inline flags
+ * (`(?i)`, `(?i:…)`), atomic groups (`(?>…)`) and possessive quantifiers (`a*+`). A
+ * `code_pattern:` that fails in JS but uses one of these is left to the JVM analyzer.
+ */
+const JAVA_ONLY_REGEX = /\(\?[a-zA-Z-]+[):]|\(\?>|[*+?}]\+/;
+
+/** Why `pattern` does not compile, or undefined when it does (or is Java-only; see above). */
+function regexError(pattern: string): string | undefined {
+  try {
+    new RegExp(pattern);
+    return undefined;
+  } catch (e) {
+    if (JAVA_ONLY_REGEX.test(pattern)) return undefined;
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+
 /** How to name a wrong-shaped value in a diagnostic, without dumping its contents. */
 function describeValue(v: SemanticsValue): string {
   if (Array.isArray(v)) return 'a list';
@@ -170,6 +188,7 @@ export function analyzeSemantics(ast: Document, symbols?: ProjectSymbolTable): S
           name: r.name,
           code: r.code,
           measures: r.measures,
+          ...(r.codePattern !== undefined ? { codePattern: r.codePattern } : {}),
         } satisfies ResolvedEntitySemantics);
       }
     } else {
@@ -208,6 +227,7 @@ export function analyzeSemantics(ast: Document, symbols?: ProjectSymbolTable): S
     kind?: EntityKind;
     name?: SymbolRef;
     code?: SymbolRef;
+    codePattern?: string;
     measures: MeasureRef[];
     clean: boolean;
   }
@@ -224,6 +244,7 @@ export function analyzeSemantics(ast: Document, symbols?: ProjectSymbolTable): S
     let kind: EntityKind | undefined;
     let name: SymbolRef | undefined;
     let code: SymbolRef | undefined;
+    let codePattern: string | undefined;
     let measures: MeasureRef[] = [];
     for (const [key, value] of Object.entries(block.entries)) {
       if (key === 'kind') {
@@ -245,6 +266,11 @@ export function analyzeSemantics(ast: Document, symbols?: ProjectSymbolTable): S
         if (!ref) clean = false;
         else if (key === 'name') name = ref;
         else code = ref;
+      } else if (key === 'code_pattern') {
+        // Matched before the misplaced-keyword branch for the same reason `name`/`code`
+        // are: that branch tests the VALUE against the role roster.
+        codePattern = codePatternOf(value, block.source);
+        if (codePattern === undefined) clean = false;
       } else if (key === 'measures') {
         const parsed = parseMeasures(value, rawMembers, block.source);
         measures = parsed.measures;
@@ -262,7 +288,45 @@ export function analyzeSemantics(ast: Document, symbols?: ProjectSymbolTable): S
         clean = false;
       }
     }
-    return { kind, name, code, measures, clean };
+    // A pattern describes the CODE attribute's values, so a block that names no code has
+    // nothing for it to describe. Keyed on the `code` KEY, not on the resolved ref: a
+    // `code:` that failed to resolve has already been reported, and a second error blaming
+    // the pattern for it would send the author to the wrong line of the block.
+    if ('code_pattern' in block.entries && !('code' in block.entries)) {
+      emit(DiagnosticCode.SemBadCodePattern, block.source, `'code_pattern:' needs 'code:' in the same block — it describes the values of the code attribute, and this block names none`);
+      clean = false;
+      codePattern = undefined;
+    }
+    return { kind, name, code, codePattern, measures, clean };
+  }
+
+  /**
+   * LP review-103 (D4) — a `code_pattern:` value: a quoted regex the code attribute's values
+   * match. Undefined (after emitting) when it is not a single string, is blank, or does not
+   * compile.
+   *
+   * ⚠ The dialect is JAVA's: the lexicon compiler copies the pattern into the archive and
+   * the resolver matches literals against it on the JVM, and the Kotlin analyzer compiles
+   * it with `java.util.regex.Pattern` — that twin is the authority. JavaScript's engine can
+   * only stand in for it, so a pattern JS rejects is reported only when it uses nothing
+   * Java-specific (`JAVA_ONLY_REGEX`); a Java-only construct is left for the JVM to judge
+   * rather than flagged here as an error it is not.
+   */
+  function codePatternOf(value: SemanticsValue, source: SourceLocation): string | undefined {
+    if (typeof value !== 'string') {
+      emit(DiagnosticCode.SemMentionShape, source, `'code_pattern:' takes a regular expression in quotes, not ${describeValue(value)}`);
+      return undefined;
+    }
+    if (value.trim() === '') {
+      emit(DiagnosticCode.SemBadCodePattern, source, `'code_pattern:' is empty — an empty pattern matches no code anyone can quote`);
+      return undefined;
+    }
+    const error = regexError(value);
+    if (error !== undefined) {
+      emit(DiagnosticCode.SemBadCodePattern, source, `'code_pattern: "${value}"' is not a valid regular expression: ${error}`);
+      return undefined;
+    }
+    return value;
   }
 
   /**
@@ -402,7 +466,14 @@ export function analyzeSemantics(ast: Document, symbols?: ProjectSymbolTable): S
       if (!legacy) continue;
       const key = prop === 'nameAttribute' ? 'name' : 'code';
       if (!declared) {
-        emit(DiagnosticCode.SemLegacyMentionDeprecated, legacy.source, `'${prop}:' is superseded by 'semantics { ${key}: ${lastSeg(legacy.path)} }'`);
+        // Review-103 F16 — say what the property is still FOR: the mention facet a quoted
+        // literal is attributed through reads the semantics block, and this only as a
+        // fallback. "Superseded" alone read as "harmless", and the facet is not.
+        emit(
+          DiagnosticCode.SemLegacyMentionDeprecated,
+          legacy.source,
+          `'${prop}:' is superseded by 'semantics { ${key}: ${lastSeg(legacy.path)} }' — quoting a value ("…") filters the column the semantics block names, and reads '${prop}:' only as a fallback`,
+        );
         continue;
       }
       if (namesTheSameAttribute(legacy.path, declared.path, owner.name)) {

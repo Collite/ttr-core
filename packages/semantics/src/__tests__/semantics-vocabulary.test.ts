@@ -89,9 +89,9 @@ describe('semantics vocabulary v3 (MS — mention facet)', () => {
     expect(SEMANTICS_VOCABULARY_VERSION).toBe(3);
   });
 
-  it('carries the four entity/table keys, in declaration order', () => {
+  it('carries the five entity/table keys (LP D4 added code_pattern), in declaration order', () => {
     // Order is meaningful in the message of SemMisplacedKeyword and in the README table.
-    expect([...ALL_ENTITY_KEYS]).toEqual(['kind', 'name', 'code', 'measures']);
+    expect([...ALL_ENTITY_KEYS]).toEqual(['kind', 'name', 'code', 'code_pattern', 'measures']);
   });
 
   it('closes the aggregation vocabulary, defaulting to sum', () => {

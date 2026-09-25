@@ -164,8 +164,9 @@ an undocumented member. Messages quote the authored value and the line it was wr
 | `RG-LEX-015` | `method` and `match` on one node | `{ text: "DC", method: EXACT, match: [ … ] }` |
 | `RG-LEX-016` | Score / distance / penalty out of range | `exact: 1.4`, `distance: 0`, `penalty: 0` |
 | `RG-LEX-017` | `typos` budget reaches or passes its `exact` anchor | `exact: 0.9` with `typos: { distance: 3, penalty: 0.3 }` — scores 0 at the widest edit |
-| `RG-LEX-030` | Unknown string predicate (LP §3.1) | `target: pred:like` — the set is closed: `pred:starts_with` \| `pred:ends_with` \| `pred:contains` \| `pred:equals` \| `pred:not_contains` |
-| `RG-LEX-031` | A `pred:` form is a single character or a function word | `{ text: "s" }` (cs) or `{ text: "with" }` (en) under a `pred:` target — write `s textem`, `starts with` |
+| `RG-LEX-030` | Unknown string predicate (LP §3.1) | `target: pred:like` — the set is closed: `pred:starts_with` \| `pred:ends_with` \| `pred:contains` \| `pred:equals` \| `pred:not_starts_with` \| `pred:not_ends_with` \| `pred:not_contains` \| `pred:not_equals` |
+| `RG-LEX-031` | A `pred:` form is a single character, a function word, or a phrase of function words only | `{ text: "s" }` (cs), `{ text: "with" }` or `{ text: "with the" }` (en) under a `pred:` target — write `s textem`, `starts with` |
+| `RG-LEX-032` | A `pred:` form is wider than `LexiconValidator.MAX_PREDICATE_FORM_TOKENS` (3) words | `{ text: "does not start with" }` — the resolver looks at most three words left of a quoted literal, so a wider form could only ever match as a fragment |
 
 ### 4.1 Warning catalogue (`RG-LEX-1xx`)
 

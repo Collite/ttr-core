@@ -6,6 +6,7 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
+import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.tatrman.ttr.lexicon.Lang
@@ -13,9 +14,15 @@ import org.tatrman.ttr.lexicon.LexiconArea
 import org.tatrman.ttr.lexicon.LexiconDataFile
 import org.tatrman.ttr.lexicon.LexiconLoad
 import org.tatrman.ttr.lexicon.LexiconValidator
+import org.tatrman.ttr.lexicon.LexiconStopWords
 import org.tatrman.ttr.lexicon.MatchMethod
 import org.tatrman.ttr.lexicon.TargetClass
 import org.tatrman.ttr.lexicon.TermNormalizer
+import org.tatrman.ttr.metadata.model.Model
+import org.tatrman.ttr.metadata.model.ModelDescriptor
+import org.tatrman.ttr.metadata.model.ModelVersion
+import java.nio.file.Files
+import java.time.Instant
 
 /**
  * LP-P2a T3 (contracts §3.3) — the string-predicate slice, at build level.
@@ -50,7 +57,24 @@ class PredicateStdlibSpec :
                 .shouldBeInstanceOf<LexiconLoad.Ok<LexiconDataFile>>()
                 .value
 
-        test("the slice covers all five predicates — no kind ships without vocabulary") {
+        /** Every shipped form with its target, in file order. */
+        fun shipped() =
+            LexiconStdlib
+                .predicateSlices()
+                .flatMap { file -> file.entries.flatMap { entry -> entry.terms.map { entry.target to it } } }
+
+        /** The target each (normalized form, lang) compiles to. */
+        fun targetOf(
+            form: String,
+            lang: Lang,
+        ): String? =
+            shipped()
+                .filter { (_, term) -> TermNormalizer.normalize(term.text) == TermNormalizer.normalize(form) }
+                .filter { (_, term) -> term.lang == lang }
+                .map { it.first }
+                .singleOrNull()
+
+        test("the slice covers every predicate, the three negations included — no kind ships without vocabulary") {
             LexiconStdlib
                 .predicateSlices()
                 .flatMap { file -> file.entries.map { it.target } }
@@ -94,40 +118,102 @@ class PredicateStdlibSpec :
             result.lexicon.targets shouldBe emptyMap()
         }
 
-        test("multi-word forms are TOKENS, single words EXACT (§3.3)") {
-            val byTerm = compileStdlib().lexicon.entries.associateBy { it.termNormalized }
+        test("EVERY form is EXACT, single- and multi-word alike (review-103 ruling 1)") {
+            // Was: "multi-word forms are TOKENS" (§3.3). A TOKENS row is scored over the QUERY's
+            // tokens, so the one-word window `názvem` matched *s názvem přesně* and fired
+            // `pred:equals` on its own (F1). The windows are contiguous and at most three words
+            // wide, so TOKENS bought no word-order freedom the resolver could use — only fragments.
+            val rows = compileStdlib().lexicon.entries
 
-            // A phrase may be separated in a real question and its order is not fixed.
-            listOf("začínající na", "s prefixem", "starts with", "not containing").forEach { form ->
-                withClue(form) {
-                    byTerm.getValue(TermNormalizer.normalize(form)).method shouldBe MatchMethod.Tokens.wire
-                }
-            }
-            // A single word gets no typo budget: these compete with entity names for the same span.
-            listOf("obsahuje", "neobsahující", "prefix", "exactly").forEach { form ->
+            rows.size shouldBeGreaterThanOrEqual 1
+            rows.filter { it.method != MatchMethod.Exact.wire }.map { it.termNormalized } shouldBe emptyList()
+            // Pinned on the phrases that used to be TOKENS, so the assertion above cannot pass
+            // vacuously on a slice that lost them.
+            val byTerm = rows.associateBy { it.termNormalized }
+            listOf("začínající na", "s prefixem", "starts with", "not containing", "s názvem přesně").forEach { form ->
                 withClue(form) {
                     byTerm.getValue(TermNormalizer.normalize(form)).method shouldBe MatchMethod.Exact.wire
                 }
             }
         }
 
-        test("no shipped form is one the RG-LEX-031 guard would refuse") {
-            // `predicateSlices()` throws on a rejection, so the slice already passed the guard on
+        test("no shipped form is one RG-LEX-031 or RG-LEX-032 would refuse") {
+            // `predicateSlices()` throws on a rejection, so the slice already passed both guards on
             // the way in. This says the same thing from the other side, where a reviewer can see
-            // it: the shipped file cannot quietly become the counter-example to its own rule.
-            val singles =
-                LexiconStdlib
-                    .predicateSlices()
-                    .flatMap { file -> file.entries.flatMap { it.terms } }
-                    .filter { !TermNormalizer.normalize(it.text).contains(' ') }
-
-            singles.forEach { term ->
+            // it: the shipped file cannot quietly become the counter-example to its own rules.
+            shipped().forEach { (_, term) ->
+                val tokens = TermNormalizer.normalize(term.text).split(' ')
                 withClue(term.text) {
-                    TermNormalizer.fold(term.text).length shouldBeGreaterThanOrEqual 2
-                    org.tatrman.ttr.lexicon.LexiconStopWords
-                        .isStop(term.text, term.lang) shouldBe false
+                    tokens.size shouldBeLessThanOrEqual LexiconValidator.MAX_PREDICATE_FORM_TOKENS
+                    if (tokens.size == 1) {
+                        TermNormalizer.fold(term.text).length shouldBeGreaterThanOrEqual 2
+                        LexiconStopWords.isStop(term.text, term.lang) shouldBe false
+                    } else {
+                        tokens.all { LexiconStopWords.isStop(it, term.lang) } shouldBe false
+                    }
                 }
             }
+        }
+
+        test("F17 — the natural English phrasings ship, including the docs' own example") {
+            // `language-reference.md` leads with *Show stores starting with "Abl"*, and the slice
+            // used to ship only *starts with* / *beginning with*: `starting` is three edits from
+            // `starts`, and the bare `with` ties starts_with with ends_with, so the example ran
+            // as `contains`.
+            listOf("starting with", "start with", "begin with", "begins with", "starts with", "beginning with")
+                .forEach { form -> withClue(form) { targetOf(form, Lang.EN) shouldBe "pred:starts_with" } }
+            listOf("end with", "ending with", "ends with", "ending in")
+                .forEach { form -> withClue(form) { targetOf(form, Lang.EN) shouldBe "pred:ends_with" } }
+        }
+
+        test("F12 — a negated phrase is its negation's form, never its positive's (D1)") {
+            mapOf(
+                "not starting with" to "pred:not_starts_with",
+                "not beginning with" to "pred:not_starts_with",
+                "not ending with" to "pred:not_ends_with",
+                "not containing" to "pred:not_contains",
+                "not equal to" to "pred:not_equals",
+            ).forEach { (form, target) -> withClue(form) { targetOf(form, Lang.EN) shouldBe target } }
+            // Czech negates morphologically, so the `ne-` forms are listed one by one.
+            mapOf(
+                "nezačínající na" to "pred:not_starts_with",
+                "nezačíná na" to "pred:not_starts_with",
+                "nezačínají na" to "pred:not_starts_with",
+                "nekončící na" to "pred:not_ends_with",
+                "nekončí na" to "pred:not_ends_with",
+                "neobsahující" to "pred:not_contains",
+                "nerovná se" to "pred:not_equals",
+            ).forEach { (form, target) -> withClue(form) { targetOf(form, Lang.CS) shouldBe target } }
+        }
+
+        test("F12 — the Czech participles ship in every case §3.3 promised, positive and negated") {
+            // *firem neobsahujících "s.r.o."* used to find no trigger at all and fall to the name
+            // default, `contains` — the OPPOSITE filter.
+            val endings = listOf("ící", "ícího", "ícímu", "ícím", "ících", "ícími")
+            mapOf(
+                "obsahuj" to ("" to "pred:contains"),
+                "neobsahuj" to ("" to "pred:not_contains"),
+                "začínaj" to (" na" to "pred:starts_with"),
+                "nezačínaj" to (" na" to "pred:not_starts_with"),
+                "konč" to (" na" to "pred:ends_with"),
+                "nekonč" to (" na" to "pred:not_ends_with"),
+            ).forEach { (stem, tailAndTarget) ->
+                val (tail, target) = tailAndTarget
+                endings.forEach { ending ->
+                    val form = "$stem$ending$tail"
+                    withClue(form) { targetOf(form, Lang.CS) shouldBe target }
+                }
+            }
+        }
+
+        test("the bare *s názvem* / *named* are NOT forms — only the `exactly` phrasings mean equals") {
+            // §3.3 put *přesně*/*exactly* into the equals forms precisely so that a name quoted
+            // after *named* keeps the name default. A form for the bare phrase would undo that.
+            targetOf("s názvem", Lang.CS) shouldBe null
+            targetOf("názvem", Lang.CS) shouldBe null
+            targetOf("named", Lang.EN) shouldBe null
+            targetOf("s názvem přesně", Lang.CS) shouldBe "pred:equals"
+            targetOf("named exactly", Lang.EN) shouldBe "pred:equals"
         }
 
         test("an estate EXTENDS the shipped slice rather than replacing it") {
@@ -137,7 +223,7 @@ class PredicateStdlibSpec :
                     """
                     schema: ttr-lexicon/v1
                     entries:
-                      - terms: [ { text: "v popisu", lang: cs, method: TOKENS } ]
+                      - terms: [ { text: "v popisu", lang: cs, method: EXACT } ]
                         target: pred:contains
                     """.trimIndent(),
                 )
@@ -206,24 +292,30 @@ class PredicateStdlibSpec :
 
         test("the whole build layers the slice in, beside grounding and the operator stdlib") {
             // The slice is only worth shipping if `LexiconBuild` actually reaches for it; a loader
-            // nothing calls would pass every test above.
-            val result =
-                LexiconCompiler.compile(
-                    LexiconSources(
-                        area =
-                            LexiconArea(
-                                LexiconStdlib.groundingSlices() + LexiconStdlib.predicateSlices(),
-                                LexiconStdlib.skills(),
-                            ),
-                    ),
-                    ModelRefIndex.EMPTY,
-                    snapshotHash,
-                    builtAt,
+            // nothing calls would pass every test above. So this goes through `LexiconBuild.run`
+            // itself (review-103 N4) — hand-assembling the three stdlib parts and calling the
+            // compiler would pass even if the build stopped layering one of them in.
+            val empty =
+                Model(
+                    descriptor = ModelDescriptor(id = "t", name = "t"),
+                    version = ModelVersion("v1", Instant.EPOCH),
+                    schemas = emptyMap(),
+                    mappings = emptyList(),
+                    queries = emptyMap(),
                 )
+            val repo = Files.createTempDirectory("pred-build") // no lexicon/, no model/: stdlib only
 
-            result.lexicon.entries
+            val outcome = LexiconBuild.run(repo, empty, snapshotHash, builtAt, "ttr-lexicon-compile/test")
+
+            outcome.ok shouldBe true
+            val entries = outcome.result.lexicon.entries
+            entries
                 .map { it.targetClass }
                 .toSet() shouldContainExactly
                 setOf(TargetClass.GROUNDING_TRIGGER, TargetClass.STRING_PREDICATE, TargetClass.OPERATOR)
+            outcome.result.operators.operators.keys shouldContainExactlyInAnyOrder
+                LexiconStdlib.OPERATORS.map { "op:$it" }
+            entries.filter { it.targetClass == TargetClass.STRING_PREDICATE }.map { it.targetRef }.toSet() shouldBe
+                LexiconValidator.PREDICATE_KINDS.map { "pred:$it" }.toSet()
         }
     })

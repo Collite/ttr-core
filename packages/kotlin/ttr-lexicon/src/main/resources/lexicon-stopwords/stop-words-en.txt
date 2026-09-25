@@ -36,3 +36,7 @@ when
 me
 my
 it
+# review-103 N5 — the bare negator. Never a predicate form on its own (`not` next to a
+# literal negates the trigger beside it, it is not one), and `not` + a function word
+# (`not with`) is a phrase of function words only, which RG-LEX-031 refuses.
+not

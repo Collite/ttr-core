@@ -47,6 +47,14 @@ export interface ResolvedEntitySemantics {
    * never have to distinguish empty from absent.
    */
   readonly measures: ReadonlyArray<MeasureRef>;
+  /**
+   * LP review-103 (D4) — `code_pattern:` → a regex every value of the `code` attribute
+   * matches (`"^[A-P]{16}$"`), so a quoted literal can be recognised as a code even with
+   * no digit in it. Only ever set together with `code`. Java-dialect: the JVM compiles it
+   * (the lexicon compiler and the resolver), so the JVM analyzer is the authority on
+   * whether it is valid.
+   */
+  readonly codePattern?: string;
 }
 
 /** The resolved `semantics` block on an attribute or db column. */

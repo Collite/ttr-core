@@ -819,7 +819,7 @@ object TtrRenderer {
      * table does rather than alphabetically.
      */
     private val SEM_KEY_ORDER =
-        listOf("kind", "name", "code", "measures", "role", "period", "currency", "code_format")
+        listOf("kind", "name", "code", "code_pattern", "measures", "role", "period", "currency", "code_format")
 
     private val SEM_IDENT = Regex("^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$")
 

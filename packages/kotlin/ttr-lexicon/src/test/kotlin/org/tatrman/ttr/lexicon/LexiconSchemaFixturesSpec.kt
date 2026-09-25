@@ -95,14 +95,15 @@ class LexiconSchemaFixturesSpec :
 
                 val file = load.shouldBeInstanceOf<LexiconLoad.Ok<LexiconDataFile>>().value
                 file.entries.map { it.target } shouldBe
-                    listOf("pred:starts_with", "pred:contains", "pred:not_contains")
+                    listOf("pred:starts_with", "pred:contains", "pred:not_contains", "pred:not_starts_with")
                 // Nothing about a predicate file is special-cased either: defaults and per-term
                 // overrides work exactly as they do for aliases, values and grounding.
                 val startsWith = file.entries[0].terms
-                startsWith[0].method shouldBe MatchMethod.Tokens // "začínající na" is multi-word
+                // Review-103 ruling 1: every `pred:` form is EXACT, the multi-word ones included.
+                startsWith[0].method shouldBe MatchMethod.Exact // "začínající na", from defaults
                 startsWith[2].lang shouldBe Lang.EN
-                // `s textem` OPENS with a function word and is legal: the RG-LEX-031 guard is
-                // about single-token forms, and a phrase must appear whole to match.
+                // `s textem` OPENS with a function word and is legal: RG-LEX-031 refuses a phrase
+                // only when EVERY word in it is a function word.
                 file.entries[1]
                     .terms[1]
                     .text shouldBe "s textem"
@@ -140,6 +141,10 @@ class LexiconSchemaFixturesSpec :
                     // must be able to carry a trigger.
                     "pred-unknown-kind.lex.yaml" to "RG-LEX-030",
                     "pred-weak-form.lex.yaml" to "RG-LEX-031",
+                    // Review-103 N5 / F1 — a phrase of function words only, and a form wider than
+                    // any window the resolver looks at.
+                    "pred-stopword-phrase.lex.yaml" to "RG-LEX-031",
+                    "pred-wide-form.lex.yaml" to "RG-LEX-032",
                 )
 
             dataFiles.forEach { (name, code) ->

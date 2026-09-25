@@ -1,0 +1,13 @@
+# expected: RG-LEX-032 — a `pred:` form wider than three words
+# (`LexiconValidator.MAX_PREDICATE_FORM_TOKENS`). The resolver only looks three words to
+# the left of a quoted literal, so a four-word form could never match whole — only a
+# fragment of it could, and a fragment firing a predicate is review-103 F1.
+#
+# Kotlin-only: the token count is taken on the Kotlin normalizer's whitespace, and a
+# second definition of "a token" in JSON Schema would be one more thing to drift — so the
+# schema knowingly ACCEPTS this file.
+schema: ttr-lexicon/v1
+defaults: { method: EXACT }
+entries:
+  - terms: [ { text: "does not start with", lang: en }, { text: "s názvem, který začíná na", lang: cs } ]
+    target: pred:not_starts_with

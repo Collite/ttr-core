@@ -66,23 +66,33 @@ Entities and attributes carry the vocabulary the understanding layer resolves ag
   `measures:` is ordered and its first item is the entity's default measure.
 
 !!! note "`nameAttribute:` / `codeAttribute:` are deprecated"
-    The entity properties `nameAttribute:` and `codeAttribute:` still parse and still work, but
+    The entity properties `nameAttribute:` and `codeAttribute:` still parse, but
     `semantics { name: … , code: … }` is the source of truth from vocabulary v3 on. Declaring only
     the legacy property, or declaring both in agreement, raises a deprecation **warning**;
     declaring both so they *disagree* is an **error** — a disagreement is always a bug, not a
-    preference. Prefer the semantics block in new models.
+    preference. For [quoting a literal](#quoting-a-literal-hand-written), the column a quoted value filters is
+    read from the semantics block; where the block names no `name:` (or no `code:`), the legacy
+    property is used as a **fallback**, so an existing model keeps working. Only the semantics block
+    can say more than that — a `code_pattern:` needs `code:` beside it. Prefer the semantics block
+    in new models.
 
 ## Quoting a literal _(hand-written)_
 
 TTR-M has one escape hatch on the *asking* side, and it belongs here because what it needs from a
 model is declared in the section above. Putting a span of a question in quotes means **take this
-exactly as typed**: it is a value, not language. Nothing looks it up, nothing corrects it, nothing
-proposes alternatives for it, and no language model is asked what it might have meant.
+exactly as typed**: it is a value, not language. Nothing rewrites it, nothing corrects its
+spelling, nothing proposes alternatives for it, and no language model is asked what it might have
+meant. The one thing that can happen to it besides becoming a filter is a lookup among the values
+the model already knows for that column — and only when the question gives no predicate word and
+the model has such a vocabulary ([below](#what-the-literal-filters-and-how)).
 
 ```
 Show stores starting with "Abl"
 Zobraz prodejny začínající na „Abl"
 ```
+
+Both lines filter the store name with *starts with* `Abl`: *starting with* and *začínající na* are
+predicate words from the standard library (below), and `"Abl"` is the value they apply to.
 
 ### The delimiter family
 
@@ -121,31 +131,79 @@ is the nearest model object that governs it, and that head's **mention facet** d
 That last row is the one to design for. A head with no mention facet cannot carry a quoted literal
 at all, and refusing is deliberate: guessing a column for a value the user was explicit about is
 the one failure mode that produces a confident wrong answer. If quoting a name does not work on
-some entity, the fix is `semantics { name: … }` on that entity, not a rephrasing.
+some entity, the fix is `semantics { name: … }` on that entity, not a rephrasing. (An entity that
+still uses the legacy `nameAttribute:` / `codeAttribute:` gets them as a fallback.)
+
+**Code-shaped** means the literal matches the head's `code_pattern:` — a Java regular expression
+every code of that entity matches — or, failing that, the generic code shape: capital letters,
+digits and `- / .`, starting with a letter or digit, and containing **at least one digit**. The
+digit is not required when the head declares a `code:` and no `name:` (there is nothing else the
+literal could be). A period table's code with a `code_format:` mask (`yyyyMM`) is recognised by
+that mask. Declare `code_pattern:` whenever your codes are not caught by the generic shape — codes
+made only of letters, for instance:
+
+```
+def entity promotion {
+    semantics { name: promo_name, code: promo_id, code_pattern: "^[A-P]{16}$" }
+    attributes: [
+        def attribute promo_name { type: text },
+        def attribute promo_id   { type: text }    // AAAAAAAABAAAAAAA …
+    ]
+}
+```
+
+`code_pattern:` needs `code:` in the same block, and a pattern that does not compile is an error
+(`TTR-SEM-219`). Prefer character classes to backslashes (`[0-9]`, not `\d`): inside a TTR string
+a backslash escapes the next character, so `\d` has to be written `\\d`.
 
 **How** it filters comes from the predicate words beside the literal — ordinary lexicon vocabulary
 shipped in the standard library, matched in Czech and English:
 
 | Predicate | Some of the words | Filter |
 |---|---|---|
-| `starts_with` | začínající na · začíná na · s prefixem · starts with · beginning with | `col LIKE ? \|\| '%'` |
-| `ends_with` | končící na · končí na · s příponou · ends with · suffix | `col LIKE '%' \|\| ?` |
-| `contains` | obsahující · obsahuje · s textem · v názvu · contains · including | `col LIKE '%' \|\| ? \|\| '%'` |
-| `equals` | přesně · rovná se · exactly · named exactly · equal to | `col = ?` |
-| `not_contains` | neobsahující · neobsahuje · not containing · without · excluding | `NOT (…)` |
+| `starts_with` | začínající na · začíná na · s prefixem · starts with · starting with · begins with | `col LIKE ? \|\| '%'` |
+| `not_starts_with` | nezačínající na · nezačíná na · not starting with · not beginning with | `NOT (col LIKE ? \|\| '%')` |
+| `ends_with` | končící na · končí na · s příponou · ends with · ending with · ending in | `col LIKE '%' \|\| ?` |
+| `not_ends_with` | nekončící na · nekončí na · not ending with · not ending in | `NOT (col LIKE '%' \|\| ?)` |
+| `contains` | obsahující · obsahuje · s textem · v názvu · contains · containing · including | `col LIKE '%' \|\| ? \|\| '%'` |
+| `not_contains` | neobsahující · neobsahuje · not containing · without · excluding | `NOT (col LIKE '%' \|\| ? \|\| '%')` |
+| `equals` | přesně · s názvem přesně · rovná se · exactly · named exactly · equal to | `col = ?` |
+| `not_equals` | nerovná se · se nerovná · not equal to · not equals | `col <> ?` |
 
-With no predicate word at all, the default follows the facet the literal landed on: a **name** is
-`contains`, a **code** is `equals`. Someone asking about a name usually means "has this in it";
-someone quoting a code means that code.
+Every predicate word matches **whole and exactly as listed** — *starting with* fires, a bare *with*
+never does — so the forms are spelled out one by one rather than left to a lemmatiser: Czech
+participles in every case (*firmy obsahující*, *firem obsahujících*, *s firmami obsahujícími*),
+both word orders where Czech uses both (*rovná se* · *se rovná*). A form may be at most three
+words. Negation is part of the vocabulary: *not starting with* and *nezačínající na* are the
+`not_starts_with` predicate, never *starts_with*, and a predicate word right after a negator
+(*does **not** start with*, *never*, *ne*) is negated too. The bare *named* / *s názvem* are
+deliberately not predicate words: quoting a name after them keeps the name default below; say
+*named exactly* / *s názvem přesně* to mean equals.
+
+With **no** predicate word, what happens depends on where the literal landed:
+
+- **On a name attribute whose values the model indexes** (a member vocabulary), the literal is
+  first **looked up among those values**. One match: the question is about that value. Several:
+  you are asked which one you meant. None — or no vocabulary to look in, or the lookup service
+  unavailable — falls through to the default below. The literal itself is never altered; a
+  lookup can only pick one of the column's existing values for it.
+- **Otherwise, the default follows the facet it was attributed to**: a **name** (or an attribute
+  that is itself the head, as in *customers with the name "Valmy"*) is `contains`, a **code** is
+  `equals`. Someone asking about a name usually means "has this in it"; someone quoting a code
+  means that code. The resolver decides this from the attribution and sends the predicate to the
+  query stage **explicitly** — the filter never depends on a later stage re-guessing it from the
+  literal's shape.
 
 An estate can add its own wording — a `pred:` entry in the estate's `lexicon/` area *extends* the
-shipped list rather than replacing it — but the five predicates themselves are a closed set.
+shipped list rather than replacing it — but the eight predicates themselves are a closed set.
 
 !!! note "The literal is a bound parameter, always"
-    The quoted text never becomes SQL text. It is bound as a parameter, and `%` and `_` inside it
-    are escaped with an explicit `ESCAPE` clause, so a value containing a wildcard filters for that
-    character rather than acting as one. A user who asks for names containing `"50%"` gets rows
-    with `50%` in them.
+    The quoted text never becomes SQL text. It is bound as a parameter, and the query stage
+    escapes the wildcard characters `%`, `_` and `[` inside it, with an explicit `ESCAPE` clause,
+    so a value containing one filters for that character rather than acting as a wildcard — `[`
+    included, which SQL Server would otherwise read as the start of a character set. A user who
+    asks for names containing `"50%"` gets rows with `50%` in them, and `"[DE] Pelex"` finds
+    exactly that text.
 
 ## Queries _(from grammar)_
 

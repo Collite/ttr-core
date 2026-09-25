@@ -37,3 +37,4 @@ co
 jak
 kde
 kdy
+ne

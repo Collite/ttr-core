@@ -39,9 +39,9 @@ class SemanticsVocabularySpec :
             Vocabulary.SEMANTICS_VOCABULARY_VERSION shouldBe 3
         }
 
-        "carries the four entity/table keys, in declaration order" {
+        "carries the five entity/table keys (LP D4 added code_pattern), in declaration order" {
             // Order is meaningful in the message of SemMisplacedKeyword and in the README table.
-            Vocabulary.ALL_ENTITY_KEYS shouldBe listOf("kind", "name", "code", "measures")
+            Vocabulary.ALL_ENTITY_KEYS shouldBe listOf("kind", "name", "code", "code_pattern", "measures")
         }
 
         "closes the aggregation vocabulary, defaulting to sum" {

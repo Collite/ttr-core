@@ -216,10 +216,17 @@ data class TargetFacts(
     val nameRef: String? = null,
     val codeRef: String? = null,
     /**
-     * `code_format:` as declared on the CODE attribute, so the resolver's code-shape test uses the
-     * model's own pattern instead of the fallback regex it would otherwise invent
-     * (`VerbatimAttribution.attributeRefOf`). Null when [codeRef] is null, or when the code
-     * attribute declares no format.
+     * A **Java regex** every value of the [codeRef] attribute matches, so the resolver can tell a
+     * code-shaped quoted literal by the model's own pattern — in addition to (never instead of) its
+     * fallback shape test (`VerbatimAttribution.attributeRefOf`). Always a regex, never a mask
+     * (review-103 D4 / F6): the owner's declared `semantics { code_pattern: "…" }` when there is
+     * one; otherwise the code attribute's period `code_format:` MASK translated to a regex
+     * (`yyyyMM` → `^\d{6}$`); otherwise null. Null too when [codeRef] is null.
+     *
+     * ⚠ The name is historical and kept on purpose: before D4 the compiler copied the raw
+     * `code_format:` mask here, which the resolver then compiled as a regex that matched nothing a
+     * user would type. Renaming the field would have been an archive-schema change for a fix that
+     * only had to correct what the PRODUCER writes — every reader already treats it as a regex.
      */
     val codeFormat: String? = null,
     /**
