@@ -72,7 +72,7 @@ object JoinerPhysical {
     /**
      * A `TableScan(DB)` on a join side together with the alias-only projections between it and the join
      * ([projections], innermost first): MAP_TO_PHYSICAL wraps a query-backed entity's body in an
-     * alias-at-boundary `Project` (`id_obchodního_kanálu := IDCENSKUP`), and the body itself usually
+     * alias-at-boundary `Project` (`call_center := cs_call_center_sk`), and the body itself usually
      * carries one. A column is visible above the join only under the name the outermost projection
      * gives it — [visibleName] maps it through; a column no projection exposes is not usable.
      */

@@ -92,8 +92,8 @@ object Expressions {
         val joinSplit: Int? = null,
         val parameterNames: Map<Int, String> = emptyMap(),
         // Per-input field names for a Join condition. Calcite uniquifies duplicate
-        // names in the COMBINED join row type (a right-side `IDSTRED` colliding with
-        // a left-side `IDSTRED` becomes `IDSTRED0`), but on decode a `$L`/`$R` ref is
+        // names in the COMBINED join row type (a right-side `i_item_sk` colliding with
+        // a left-side `i_item_sk` becomes `i_item_sk0`), but on decode a `$L`/`$R` ref is
         // resolved against the individual input — where the name is still the
         // original. So join-condition refs must be encoded with the per-input name,
         // not the combined one. Empty → fall back to `fieldNames` (no per-input info).

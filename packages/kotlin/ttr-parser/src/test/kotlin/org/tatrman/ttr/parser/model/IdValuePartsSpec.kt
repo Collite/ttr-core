@@ -17,7 +17,7 @@ class IdValuePartsSpec :
                 TtrLoader.parseString(
                     """
                     def relation R {
-                        from: db.dbo.fk_artikl_produkt
+                        from: db.dbo.fk_item_category
                         to: db.dbo.Y
                     }
                     """.trimIndent(),
@@ -26,7 +26,7 @@ class IdValuePartsSpec :
             val rel = r.definitions[0] as RelationDef
             val id = rel.from as PropertyValue.IdValue
 
-            id.ref.path shouldBe "db.dbo.fk_artikl_produkt"
-            id.parts shouldBe listOf("db", "dbo", "fk_artikl_produkt")
+            id.ref.path shouldBe "db.dbo.fk_item_category"
+            id.parts shouldBe listOf("db", "dbo", "fk_item_category")
         }
     })

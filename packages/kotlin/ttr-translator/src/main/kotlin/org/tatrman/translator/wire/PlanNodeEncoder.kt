@@ -332,7 +332,7 @@ object PlanNodeEncoder {
                     joinSplit = rel.left.rowType.fieldCount,
                     parameterNames = parameterNames,
                     // Original per-input names so a `$R` ref to a name Calcite
-                    // uniquified in `combined` (e.g. IDSTRED→IDSTRED0) still decodes
+                    // uniquified in `combined` (e.g. i_item_sk→i_item_sk0) still decodes
                     // against the right input, where it's the un-suffixed name.
                     leftFieldNames =
                         rel.left.rowType.fieldList

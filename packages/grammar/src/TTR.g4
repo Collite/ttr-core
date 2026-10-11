@@ -891,8 +891,8 @@ listOfIds
 
 // `primaryKey` accepts three forms — a quoted-string list (legacy), a bare-id
 // list, or a single bare id. Column names are always valid identifiers, so the
-// bare forms are the cleaner authoring style (`primaryKey: IDSTRED` /
-// `primaryKey: [IDSTRED, KOD_STR]`); the quoted `["IDSTRED"]` form stays valid.
+// bare forms are the cleaner authoring style (`primaryKey: i_item_sk` /
+// `primaryKey: [ss_item_sk, ss_ticket_number]`); the quoted `["i_item_sk"]` form stays valid.
 // A list must be all-strings or all-ids (no mixing) — the per-element rules
 // keep the two unambiguous.
 primaryKeyValue

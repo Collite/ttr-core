@@ -1019,7 +1019,7 @@ object TtrRenderer {
 
     /**
      * v3.0 inline `binding:` value (was v2.1 `mapping:`). Two surface forms:
-     *  - bare-id: `binding: IDSKUPZBOZI` / `binding: db.dbo.fk_artikl_produkt`.
+     *  - bare-id: `binding: i_category_id` / `binding: db.dbo.fk_item_category`.
      *  - block:   `binding: { target: …, columns: { … } }` (entity) /
      *             `{ target: … }` (attribute) / `{ fk: … }` (relation).
      * Single-line by design so it appends inline like the surrounding properties

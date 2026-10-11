@@ -1105,7 +1105,7 @@ data class TaggedBlockValue(
  * v3.0 — inline `binding:` property on entity / attribute / relation defs and
  * on explicit `def er2db_*` declarations' `target:` slot. Two surface forms:
  *
- * - [BindingPropertyBareId] — `binding: db.dbo.fk_artikl_produkt` (relation FK
+ * - [BindingPropertyBareId] — `binding: db.dbo.fk_item_category` (relation FK
  *   shorthand) or attribute-level `binding: COLUMN_NAME`.
  * - [BindingPropertyBlock]  — `binding: { target: ..., columns: { ... } }`.
  */

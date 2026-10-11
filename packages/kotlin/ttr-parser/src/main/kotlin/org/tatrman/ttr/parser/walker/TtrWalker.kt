@@ -2062,7 +2062,7 @@ class TtrWalker(
                         )
                     v.bindingTargetValue() != null -> {
                         // Form (b) — `kód_artiklu: { target: KOD_ZBOZI }` or
-                        // `název_artiklu: { target: { column: NAZEV_ZBOZI } }`. Mirror the
+                        // `product_name: { target: { column: i_product_name } }`. Mirror the
                         // modeler-side shape: wrap in a synthetic { target: <inner> } object
                         // so downstream consumers see the same structure as form (c).
                         val mtv = v.bindingTargetValue()
@@ -2262,7 +2262,7 @@ class TtrWalker(
 
     /**
      * `primaryKey` value — a quoted-string list, a bare-id list, or a single bare
-     * id (`primaryKey: IDSTRED`). All three collapse to the column-name list,
+     * id (`primaryKey: i_item_sk`). All three collapse to the column-name list,
      * mirroring the TS walker's `walkPrimaryKeyValue`.
      */
     private fun primaryKeyList(ctx: TTRParser.PrimaryKeyValueContext?): List<String> {

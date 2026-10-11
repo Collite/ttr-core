@@ -337,7 +337,7 @@ class Translator(
 
         // Validate `effectiveSql` against one candidate [schema]'s catalog, with the typed-parameter
         // fallback: a bare `?` is untypeable in contexts Calcite can't infer — chiefly inside `||` /
-        // `CONCAT`, whose operand-type inference is null, so `KOD_STR LIKE {x} || '%'` fails with
+        // `CONCAT`, whose operand-type inference is null, so `s_store_id LIKE {x} || '%'` fails with
         // "Illegal use of dynamic parameter". Retry once with each placeholder wrapped as
         // `CAST(? AS <type>)` from its declared type; ParameterTyper unwraps the synthetic cast
         // post-validation so the executed SQL stays cast-free. Only attempt when typed parameters

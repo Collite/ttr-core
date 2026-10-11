@@ -1106,7 +1106,7 @@ class FileBasedSource(
         mappings: MutableList<org.tatrman.ttr.metadata.model.Mapping>,
     ) {
         // Resolve the entity's physical table once so bare column refs
-        // (`mapping: KOD_STR`) can be canonicalised to the table-embedded qname.
+        // (`mapping: s_store_id`) can be canonicalised to the table-embedded qname.
         val entityTable = entityTargetTable(def)
         for (attr in def.attributes) {
             val attrMapping = attr.binding ?: continue

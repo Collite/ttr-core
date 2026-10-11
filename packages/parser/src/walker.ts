@@ -1567,7 +1567,7 @@ function walkListOfIds(ctx: ListOfIdsContext, _file: string): string[] {
 
 /**
  * `primaryKey` accepts a quoted-string list (legacy), a bare-id list, or a
- * single bare id (`primaryKey: IDSTRED`). All three collapse to the column-name
+ * single bare id (`primaryKey: i_item_sk`). All three collapse to the column-name
  * `string[]` — the AST doesn't distinguish the surface form (the formatter
  * re-emits the bare form when each name is a valid identifier).
  */

@@ -18,7 +18,7 @@ import { enclosingQnameOf } from './reference-index.js';
  *
  * Inline-mapping column references can't go through the generic
  * `collectReferences` + `resolveReference` path: the bare id (`binding:
- * IDXXUKAZMU`) names a *db column*, but it's written in `er`-entity scope, so it
+ * p_promo_sk`) names a *db column*, but it's written in `er`-entity scope, so it
  * only resolves once you know the table the enclosing entity maps to. This
  * module computes that bridge.
  *
@@ -41,7 +41,7 @@ import { enclosingQnameOf } from './reference-index.js';
 export interface BindingReference {
   /** The column-name token (its source span drives highlight / hover / definition). */
   ref: Reference;
-  /** Resolved db column symbol qname, e.g. `<pkg>.db.dbo.QXXUKAZMUHOD.IDXXUKAZMU`. */
+  /** Resolved db column symbol qname, e.g. `<pkg>.db.dbo.promotion.p_promo_sk`. */
   targetQname: string;
   /** The enclosing entity's qname (the referrer), or null if it can't be derived. */
   referrerQname: string | null;
