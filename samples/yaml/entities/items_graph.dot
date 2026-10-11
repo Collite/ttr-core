@@ -1,0 +1,22 @@
+digraph Items {
+  rankdir=LR;
+  node [shape=box, style="rounded,filled", fillcolor="#f4f4f4", fontname="Segoe UI"];
+
+  category [label="category"];
+  item_class [label="item_class"];
+  item [label="item"];
+  warehouse [label="warehouse"];
+  inventory [label="inventory"];
+  stockout [label="stockout"];
+  // External entities (from other files)
+  date_dim [label="date_dim\n(orders)", style="rounded,filled,dashed", fillcolor="#e0e0e0"];
+
+  item_class -> category;
+  item -> category;
+  item -> item_class;
+  inventory -> item;
+  inventory -> warehouse;
+  inventory -> date_dim;
+  stockout -> item [label="inv_quantity_on_hand = 0"];
+  stockout -> warehouse [label="inv_quantity_on_hand = 0"];
+}

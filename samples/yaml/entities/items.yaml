@@ -1,0 +1,278 @@
+# Sample of the YAML entity format over the Hartland demo database (TPC-DS), hartland_us world.
+# The item catalog (category -> item_class -> item), distribution centers and weekly inventory.
+# item_category and item_class are derived (normalised) lookup tables — TPC-DS denormalises
+# both the category and the class straight onto the item table.
+entities:
+
+  category:
+    table: "item_category"
+    entity_type: structural
+    aliases: ["product category", "department"]
+    name_column: "category_name"
+    code_column: "category_code"
+    label_plural: "Categories"
+    description: |
+      Lookup of item categories (the top level of the catalog).
+      ⚠ The category name is a stable English string (e.g. Electronics, Sports).
+    columns:
+      - name: "sk"
+        column: "i_category_id"
+        type: "int"
+        primary_key: true
+        description: "Category key"
+
+      - name: "category_code"
+        column: "i_category_code"
+        type: "varchar(20)"
+        description: "Unique category code"
+
+      - name: "category_name"
+        label: "Category"
+        column: "i_category"
+        type: "char(50)"
+        description: "Category name"
+        searchable: true
+        search_hint: "Look a category up by name. Example: WHERE i_category COLLATE Latin1_General_CI_AI LIKE '%electro%'"
+
+  item_class:
+    table: "item_class"
+    entity_type: structural
+    name_column: "class_name"
+    code_column: "class_code"
+    description: "Item classes within a category (the second level of the catalog)."
+    columns:
+      - name: "sk"
+        column: "i_class_id"
+        type: "int"
+        primary_key: true
+        description: "Class key"
+
+      - name: "class_code"
+        column: "i_class_code"
+        type: "varchar(20)"
+        description: "Unique class code"
+
+      - name: "class_name"
+        label: "Class"
+        column: "i_class"
+        type: "char(50)"
+        description: "Class name"
+
+      - name: "category_id"
+        column: "i_category_id"
+        type: "int"
+        description: "Parent category"
+
+  item:
+    table: "item"
+    entity_type: master
+    aliases: ["product", "SKU", "article"]
+    label_plural: "Products"
+    name_column: "product_name"
+    code_column: "item_id"
+    description: |
+      Products (TPC-DS item) and their properties.
+      ⚠ An item belongs to a category through i_category_id and to a class through i_class_id.
+      One item code (i_item_id) can have several rows — historical versions of the same SKU.
+    columns:
+      - name: "sk"
+        column: "i_item_sk"
+        type: "int"
+        primary_key: true
+        description: "Sequence key. Internal primary key only."
+
+      - name: "item_id"
+        column: "i_item_id"
+        type: "char(16)"
+        description: "Item code — 16 capital letters A-P"
+        searchable: true
+        search_hint: "Item codes are matched exactly. Example: WHERE i_item_id = 'AAAAAAAABAAAAAAA'"
+
+      - name: "product_name"
+        label: "Product"
+        column: "i_product_name"
+        type: "char(50)"
+        description: "Product name, the human-readable label"
+        searchable: true
+        search_hint: "A product name has several words and users type one of them. Example: WHERE i_product_name COLLATE Latin1_General_CI_AI LIKE '%word%'"
+
+      - name: "brand"
+        column: "i_brand"
+        type: "char(50)"
+        description: "Product brand of this item"
+
+      - name: "size"
+        column: "i_size"
+        type: "char(20)"
+        description: |
+          The size of this item's SKU. Typical values:
+          small, medium, large, petite, compact, deluxe, standard
+
+      - name: "category_id"
+        column: "i_category_id"
+        type: "int"
+        description: "Parent category"
+
+      - name: "class_id"
+        column: "i_class_id"
+        type: "int"
+        description: "Parent class"
+
+  warehouse:
+    table: "warehouse"
+    entity_type: master
+    aliases: ["distribution center", "DC", "distribution centers"]
+    label_plural: "Distribution Centers"
+    name_column: "warehouse_name"
+    code_column: "warehouse_id"
+    description: |
+      Distribution centers that fulfil marketplace and web orders.
+      In the US world of the demo data: Memphis DC, Columbus DC, Dallas DC, Reno DC, Allentown DC.
+    columns:
+      - name: "sk"
+        column: "w_warehouse_sk"
+        type: "int"
+        primary_key: true
+        description: "Warehouse primary key. Internal sequence key only."
+
+      - name: "warehouse_id"
+        column: "w_warehouse_id"
+        type: "char(16)"
+        description: "Warehouse ID (unique code)"
+
+      - name: "warehouse_name"
+        label: "DC"
+        column: "w_warehouse_name"
+        type: "varchar(20)"
+        description: "Warehouse name, the human-readable label"
+        searchable: true
+        search_hint: "One word of the name is enough. Example: WHERE w_warehouse_name COLLATE Latin1_General_CI_AI LIKE '%Memphis%'"
+
+      - name: "city"
+        column: "w_city"
+        type: "varchar(60)"
+        description: "The city the warehouse is located in"
+
+      - name: "state"
+        column: "w_state"
+        type: "char(2)"
+        description: "Two-letter US state code of the warehouse (e.g. TN, TX, OH)"
+
+  inventory:
+    table: "inventory"
+    entity_type: transaction
+    composite_primary_key: ["as_of_date", "item", "warehouse"]
+    aliases: ["stock", "on hand", "stock level"]
+    description: |
+      Weekly warehouse-level on-hand snapshots per warehouse and item.
+      ⚠ This entity is only semi-additive: stock levels MUST NOT be added across snapshots — for a period take the latest one.
+    columns:
+      - name: "as_of_date"
+        column: "inv_date_sk"
+        type: "int"
+        primary_key: true
+        description: "Weekly snapshot date — FK to the calendar"
+
+      - name: "item"
+        column: "inv_item_sk"
+        type: "int"
+        primary_key: true
+        description: "Item primary key (the 'sk' attribute of the item entity)"
+
+      - name: "warehouse"
+        column: "inv_warehouse_sk"
+        type: "int"
+        primary_key: true
+        description: "Warehouse primary key (the 'sk' attribute of the warehouse entity)"
+
+      - name: "quantity_on_hand"
+        column: "inv_quantity_on_hand"
+        type: "int"
+        description: "Quantity on hand of the given item at the time of the snapshot"
+
+  stockout:
+    table: "inventory WHERE inv_quantity_on_hand = 0"
+    entity_type: transaction
+    composite_primary_key: ["as_of_date", "item", "warehouse"]
+    aliases: ["out of stock", "sold out", "zero stock"]
+    description: |
+      Snapshots in which an item was out of stock at a distribution center (zero on hand).
+      Use this entity when the user asks what is missing or where an item is sold out;
+      the actual quantity on hand lives in the inventory entity.
+    columns:
+      - name: "as_of_date"
+        column: "inv_date_sk"
+        type: "int"
+        primary_key: true
+        description: "Weekly snapshot date — FK to the calendar"
+
+      - name: "item"
+        column: "inv_item_sk"
+        type: "int"
+        primary_key: true
+        description: "The item that was out of stock"
+
+      - name: "warehouse"
+        column: "inv_warehouse_sk"
+        type: "int"
+        primary_key: true
+        description: "The distribution center where the item was missing"
+
+relationships:
+
+  class_in_category:
+    from: "item_class"
+    to: "category"
+    type: "many-to-one"
+    join: "item_class.i_category_id = item_category.i_category_id"
+    description: "A class belongs to its parent category"
+
+  item_in_category:
+    from: "item"
+    to: "category"
+    type: "many-to-one"
+    join: "item.i_category_id = item_category.i_category_id"
+    description: "An item belongs to its parent category"
+
+  item_in_class:
+    from: "item"
+    to: "item_class"
+    type: "many-to-one"
+    join: "item.i_class_id = item_class.i_class_id"
+    description: "An item belongs to its parent class"
+
+  inventory_item:
+    from: "inventory"
+    to: "item"
+    type: "many-to-one"
+    join: "inventory.inv_item_sk = item.i_item_sk"
+    description: "An inventory snapshot is about one item"
+
+  inventory_warehouse:
+    from: "inventory"
+    to: "warehouse"
+    type: "many-to-one"
+    join: "inventory.inv_warehouse_sk = warehouse.w_warehouse_sk"
+    description: "An inventory snapshot is taken at one distribution center"
+
+  inventory_date:
+    from: "inventory"
+    to: "date_dim"  # orders.yaml
+    type: "many-to-one"
+    join: "inventory.inv_date_sk = date_dim.d_date_sk"
+    description: "An inventory snapshot belongs to its weekly snapshot date"
+
+  stockout_item:
+    from: "stockout"
+    to: "item"
+    type: "many-to-one"
+    join: "inventory.inv_item_sk = item.i_item_sk"
+    description: "A stockout is about one item. Disambiguation: the source table is filtered WHERE inv_quantity_on_hand = 0."
+
+  stockout_warehouse:
+    from: "stockout"
+    to: "warehouse"
+    type: "many-to-one"
+    join: "inventory.inv_warehouse_sk = warehouse.w_warehouse_sk"
+    description: "The item is out of stock at one distribution center"
+    note: "The same physical join as inventory_warehouse — the two entities differ only in the filter over the inventory table."
