@@ -30,7 +30,7 @@ import type {
 } from './model-data-source.js';
 import type { TtrmSearchHit } from './ttrm-types.js';
 import type { GetGraphResponse } from '@tatrman/lsp';
-import { ttrmToGetGraphResponse } from './structural-graph.js';
+import { StructuralGraphCache, describeTtrmNode, ttrmToGetGraphResponse, type ObjectDescription } from './structural-graph.js';
 
 export interface VelesDataSourceOptions {
   /** Injected for tests; defaults to global `fetch`. */
@@ -40,6 +40,8 @@ export interface VelesDataSourceOptions {
   /** Injected timer for tests; defaults to window.setInterval/clearInterval. */
   setIntervalImpl?: (cb: () => void, ms: number) => ReturnType<typeof setInterval>;
   clearIntervalImpl?: (h: ReturnType<typeof setInterval>) => void;
+  /** The language model labels and descriptions are shown in (ttr-core#170); default `en`. */
+  lang?: string;
 }
 
 export class VelesReadError extends Error {
@@ -69,6 +71,7 @@ export class VelesReadApiDataSource implements ModelDataSource {
   private readonly pollIntervalMs: number;
   private readonly setIntervalImpl: (cb: () => void, ms: number) => ReturnType<typeof setInterval>;
   private readonly clearIntervalImpl: (h: ReturnType<typeof setInterval>) => void;
+  private readonly served: StructuralGraphCache;
 
   /** @param base a same-origin path prefix (e.g. `/veles`, or `` for the origin root)
    *  or a full http(s) origin (e.g. `http://localhost:7260`). Endpoint paths are
@@ -80,6 +83,7 @@ export class VelesReadApiDataSource implements ModelDataSource {
     this.setIntervalImpl =
       opts.setIntervalImpl ?? ((cb, ms) => setInterval(cb, ms));
     this.clearIntervalImpl = opts.clearIntervalImpl ?? ((h) => clearInterval(h));
+    this.served = new StructuralGraphCache(opts.lang);
   }
 
   private async getJson<T>(path: string): Promise<T> {
@@ -137,7 +141,25 @@ export class VelesReadApiDataSource implements ModelDataSource {
    */
   async getGraph(ref: string): Promise<GetGraphResponse | null> {
     const g = await this.getModelGraph({ schema: ref });
-    return ttrmToGetGraphResponse(ref, g.nodes, g.edges);
+    this.served.remember(ref, g.nodes, g.edges);
+    return ttrmToGetGraphResponse(ref, g.nodes, g.edges, [], { lang: this.served.lang });
+  }
+
+  /**
+   * The inspector read on this backend (ttr-core#170): the object's label, identifier, plural and
+   * description in the viewer's language, with its attributes / columns — from the graph already
+   * served when it holds the object, else from `/model/object`.
+   */
+  async describe(qname: string): Promise<ObjectDescription | null> {
+    const cached = this.served.describe(qname);
+    if (cached) return cached;
+    const detail = await this.getObject(qname);
+    return describeTtrmNode(detail.object, [], this.served.lang);
+  }
+
+  /** The languages the served graphs' labels and descriptions carry (the language picker's options). */
+  knownLanguages(): string[] {
+    return this.served.languages();
   }
 
   async search(q: SearchParams): Promise<SearchHit[]> {

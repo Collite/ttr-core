@@ -80,6 +80,18 @@ index tree, graph, and read-only search come straight over the socket, and a
 `ttrm/modelChanged` notification (file-watch → 200 ms debounce → reload) live-updates
 the canvas. `capabilities.edit === false` hides every edit affordance.
 
+## Labels and language (catalog mode)
+
+Against Veles (`?veles=` or the runtime config), the graph is labelled the way the model's authors
+labelled it (ttr-core#170): a card reads `displayLabel[lang]`, falling back to the identifier;
+attributes / columns are rows of their card (`src/data/structural-graph.ts` folds them via their
+DEFINES edges); relations and foreign keys are the edges between cards. The inspector shows the label,
+the identifier and qname, the plural, the description (Veles' D7 chain: language → plain form → `en` →
+first) and each member with its description. The language (`src/i18n/labels.ts`): `?lang=` → the
+header picker's saved choice → the runtime config's `lang` → the browser → `en`; a change remounts the
+catalog view in place. The fields come from Veles' JSON read API (ttr-server#185); an older Veles yields
+identifiers and relation cards, never an error. The UI chrome itself stays English.
+
 ## Loading a project (worker mode)
 
 Two entry points, depending on the browser:

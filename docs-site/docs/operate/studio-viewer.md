@@ -58,6 +58,35 @@ For local use, `?veles=<catalog>` still selects a catalog explicitly and wins ov
 e.g. `http://localhost:5173/?veles=http://localhost:7260` against the dev server. The address bar keeps
 it on every rewrite, so reloads keep the catalog.
 
+## Labels and language
+
+The viewer shows the model the way its authors labelled it, not by identifier. An entity's card reads
+its `displayLabel` in the viewer's language, *Product* for the Hartland model's `item`, and falls back
+to the identifier when no label exists in that language. Attributes become rows of their entity's card
+(choose **With types** under *Detail* to see them), and relations become the edges between cards, with
+their cardinality.
+
+Select a card to open the inspector. It shows the label, the identifier and qualified name
+(`item`, `er.entity.item`), the plural label (*Products*), the description, and every attribute with
+its own description. A description in the viewer's language wins; failing that, the plain-form
+description, then English, then the first one the model has.
+
+The language is chosen when the page loads, first match wins:
+
+1. `?lang=cs` in the URL, which the address bar keeps;
+2. the user's own choice from the **Language** picker in the header (remembered in that browser);
+3. `VIEWER_DEFAULT_LANG`;
+4. the browser's language;
+5. `en`.
+
+The picker offers the languages the model's labels carry, plus `VIEWER_LANGUAGES`. The viewer's own
+buttons and headings stay English.
+
+!!! note "Needs a Veles that serves the labels"
+    The labels, descriptions and relation endpoints are fields of Veles' JSON read API from the
+    release after `0.11.7` (Collite/ttr-server#185). Against an older Veles the viewer still works,
+    but it shows identifiers, and relations appear as cards of their own instead of edges.
+
 ## The catalog proxy: read routes only
 
 The viewer's catalog calls are same-origin `fetch`es to `<base>veles/…`. With
@@ -210,8 +239,13 @@ docker run -d --name viewer --network ttr-viewer-demo -p 8080:8080 \
   ghcr.io/collite/ttr-viewer:<version>
 ```
 
-Open <http://localhost:8080/> and choose **er** in the catalog: the Hartland ER graph opens. Add
-`-e VIEWER_BASE_PATH=/models/` to the viewer to serve it under <http://localhost:8080/models/> instead.
+Open <http://localhost:8080/> and choose **er** in the catalog: the Hartland ER graph opens, with cards
+that read *Product*, *Store*, *Customer Address*, and so on. Open <http://localhost:8080/?lang=cs> and the
+same cards read *Produkt*, *Prodejna*, *Adresa zákazníka*. Add `-e VIEWER_BASE_PATH=/models/` to the
+viewer to serve it under <http://localhost:8080/models/> instead.
+
+Use a Veles that serves the labels (see [Labels and language](#labels-and-language)). With `0.11.7`
+the graph shows identifiers.
 
 ## Verify
 

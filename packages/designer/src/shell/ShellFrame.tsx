@@ -299,6 +299,17 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
 
   async function onSelectNode(qname: string | null) {
     if (!qname) { setSelected(null); return; }
+    // A structural catalog (Veles) has no getSymbolDetail: it describes the object itself — the
+    // label in the viewer's language beside the identifier, plural, description, members (#170).
+    if (!dataSource.getSymbolDetail && dataSource.describe) {
+      const d = await dataSource.describe(qname).catch(() => null);
+      setSelected({
+        qname, kind: d?.kind ?? 'object', label: d?.label ?? qname.split('.').pop() ?? qname,
+        identifier: d?.identifier, labelPlural: d?.labelPlural, description: d?.description, members: d?.members,
+      });
+      setDrawerOpen(true);
+      return;
+    }
     const detail = await dataSource.getSymbolDetail?.(qname).catch(() => null);
     const src = detail?.sourceUri ? getSourceText?.(detail.sourceUri) : undefined;
     setSelected({

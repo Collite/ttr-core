@@ -29,9 +29,26 @@ export type TtrmEdgeType = 'DEFINES' | 'REFERENCES' | 'MAPS_TO' | 'USES';
 export interface TtrmNode {
   qname: string;
   kind: string;
+  /** the leaf identifier (`item`) — the localized name is `displayLabel`. */
   label: string;
   schema: string;
   pkg: string;
+  // ---- optional, each omitted when empty (Veles JSON read API, ttr-server#185; ttr-core#170) ----
+  /** entity / attribute: the localized name, every authored language — `{ en: "Product", cs: "Produkt" }`. */
+  displayLabel?: Record<string, string>;
+  /** entity: the plural name — `"Products"`. */
+  labelPlural?: string;
+  /** the plain-form description. */
+  description?: string;
+  /** the localized description — `{ en: …, cs: … }`. At most one of the two forms is authored. */
+  descriptionLocalized?: Record<string, string>;
+  /** relation: the entity qnames it joins, and its cardinality in the authored form (`0..*`, `1`). */
+  from?: string;
+  to?: string;
+  cardinality?: { from?: string; to?: string };
+  /** foreign key: the column qnames it joins. */
+  fromColumns?: string[];
+  toColumns?: string[];
 }
 
 export interface TtrmEdge {

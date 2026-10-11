@@ -1,0 +1,76 @@
+{
+  "nodes": [
+    {
+      "qname": "db.dbo.item",
+      "kind": "table",
+      "label": "item",
+      "schema": "db",
+      "pkg": "hartland",
+      "description": "Products (D-5: Products — category/brand drills; the bilingual catalog, Phase 1)."
+    },
+    {
+      "qname": "db.dbo.item.i_item_sk",
+      "kind": "column",
+      "label": "i_item_sk",
+      "schema": "db",
+      "pkg": "hartland"
+    },
+    {
+      "qname": "db.dbo.item.i_category",
+      "kind": "column",
+      "label": "i_category",
+      "schema": "db",
+      "pkg": "hartland"
+    },
+    {
+      "qname": "db.dbo.store_sales",
+      "kind": "table",
+      "label": "store_sales",
+      "schema": "db",
+      "pkg": "hartland",
+      "description": "Stores-channel sales lines (D-5: Store Sales — beats 1-2)."
+    },
+    {
+      "qname": "db.dbo.store_sales.ss_item_sk",
+      "kind": "column",
+      "label": "ss_item_sk",
+      "schema": "db",
+      "pkg": "hartland"
+    },
+    {
+      "qname": "db.dbo.fk_ss_item",
+      "kind": "foreign_key",
+      "label": "fk_ss_item",
+      "schema": "db",
+      "pkg": "hartland",
+      "fromColumns": [
+        "db.dbo.store_sales.ss_item_sk"
+      ],
+      "toColumns": [
+        "db.dbo.item.i_item_sk"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "db.dbo.item.i_item_sk",
+      "to": "db.dbo.item",
+      "type": "DEFINES"
+    },
+    {
+      "from": "db.dbo.item.i_category",
+      "to": "db.dbo.item",
+      "type": "DEFINES"
+    },
+    {
+      "from": "db.dbo.store_sales.ss_item_sk",
+      "to": "db.dbo.store_sales",
+      "type": "DEFINES"
+    },
+    {
+      "from": "db.dbo.fk_ss_item",
+      "to": "db.dbo.item.i_item_sk",
+      "type": "REFERENCES"
+    }
+  ]
+}

@@ -108,4 +108,44 @@ describe('VelesReadApiDataSource', () => {
 
     sub.dispose();
   });
+
+  // ttr-core#170 — labels in the viewer's language; the inspector read without another round trip.
+  describe('labels and the inspector (ttr-core#170)', () => {
+    const ITEM = {
+      qname: 'er.entity.item', kind: 'entity', label: 'item', schema: 'er', pkg: 'hartland',
+      displayLabel: { cs: 'Produkt', en: 'Product' }, labelPlural: 'Products',
+      descriptionLocalized: { cs: 'Produkty', en: 'Products' },
+    };
+    const CATEGORY = {
+      qname: 'er.entity.item.category', kind: 'attribute', label: 'category', schema: 'er', pkg: 'hartland',
+      descriptionLocalized: { cs: 'Kategorie tohoto produktu', en: 'Product category of this item' },
+    };
+    const GRAPH = { nodes: [ITEM, CATEGORY], edges: [{ from: CATEGORY.qname, to: ITEM.qname, type: 'DEFINES' }] };
+
+    it('labels the graph in the configured language', async () => {
+      const { impl } = fakeFetch({ '/model/graph?schema=er': { body: GRAPH } });
+      const cs = new VelesReadApiDataSource('/veles', { fetchImpl: impl, lang: 'cs' });
+      expect((await cs.getGraph('er'))!.nodes[0]).toMatchObject({ label: 'Produkt', name: 'item' });
+      const en = new VelesReadApiDataSource('/veles', { fetchImpl: impl });
+      expect((await en.getGraph('er'))!.nodes[0].label).toBe('Product');
+    });
+
+    it('describes a served object from the cached graph — no extra request', async () => {
+      const { impl, calls } = fakeFetch({ '/model/graph?schema=er': { body: GRAPH } });
+      const src = new VelesReadApiDataSource('/veles', { fetchImpl: impl, lang: 'en' });
+      await src.getGraph('er');
+      const d = await src.describe('er.entity.item');
+      expect(d).toMatchObject({ label: 'Product', identifier: 'item', labelPlural: 'Products', description: 'Products' });
+      expect(d!.members).toEqual([expect.objectContaining({ identifier: 'category', description: 'Product category of this item' })]);
+      expect(calls).toHaveLength(1);
+      expect(src.knownLanguages()).toEqual(['cs', 'en']);
+    });
+
+    it('describes an object it has not served through /model/object', async () => {
+      const { impl, calls } = fakeFetch({ '/model/object?qname=er.entity.item': { body: { object: ITEM, sourceLocation: 'er/catalog.ttrm', references: [] } } });
+      const src = new VelesReadApiDataSource('/veles', { fetchImpl: impl, lang: 'cs' });
+      expect(await src.describe('er.entity.item')).toMatchObject({ label: 'Produkt', identifier: 'item', members: [] });
+      expect(calls[0]).toBe('/veles/model/object?qname=er.entity.item');
+    });
+  });
 });
