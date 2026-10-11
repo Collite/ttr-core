@@ -50,9 +50,9 @@ class DbErCncSplitSpec :
                 name = name,
             )
 
-        // One source file ⇒ one package "navsteva"; covers every bucket-relevant kind.
+        // One source file ⇒ one package "returns"; covers every bucket-relevant kind.
         fun model(): Model {
-            val src = "bt09_navsteva.yaml"
+            val src = "hl05_returns.yaml"
             val entityQn = qn("er", "entity", "customer")
             val attrQn = qn("er", "entity", "customer.id")
             val relQn = qn("er", "relation", "customer_self")
@@ -127,7 +127,7 @@ class DbErCncSplitSpec :
 
         "3.1 per package the bundle has exactly db.ttr, er.ttr, cnc.ttr" {
             val bundle = ModelToDefinitions.convert(model())
-            val pkgFiles = bundle.files.filter { it.packageName == "navsteva" }.map { it.filename }
+            val pkgFiles = bundle.files.filter { it.packageName == "returns" }.map { it.filename }
             pkgFiles shouldContainExactlyInAnyOrder listOf("db.ttr", "er.ttr", "cnc.ttr")
             pkgFiles shouldNotContain "map.ttr"
             pkgFiles shouldNotContain "relation.ttr"
@@ -138,7 +138,7 @@ class DbErCncSplitSpec :
             val bundle = ModelToDefinitions.convert(model())
 
             fun render(name: String): String {
-                val f = bundle.files.first { it.filename == name && it.packageName == "navsteva" }
+                val f = bundle.files.first { it.filename == name && it.packageName == "returns" }
                 return TtrRenderer.renderFile(f.schemaCode, f.namespace, f.definitions, f.packageName, f.imports)
             }
 
@@ -163,7 +163,7 @@ class DbErCncSplitSpec :
         "3.3 db/er/cnc files carry no schema/namespace directive and parse cleanly" {
             val bundle = ModelToDefinitions.convert(model())
             for (name in listOf("db.ttr", "er.ttr", "cnc.ttr")) {
-                val f = bundle.files.first { it.filename == name && it.packageName == "navsteva" }
+                val f = bundle.files.first { it.filename == name && it.packageName == "returns" }
                 f.schemaCode shouldBe null
                 f.namespace shouldBe null
                 val content = TtrRenderer.renderFile(f.schemaCode, f.namespace, f.definitions, f.packageName, f.imports)

@@ -18,10 +18,10 @@ class MetadataQueryResolveAreaSpec :
         val q = queryFor(Path.of("src/test/resources/model-ttr-areas"))
 
         "resolveArea returns packages/description/tags verbatim for a known area" {
-            val area = q.resolveArea("accounting")
+            val area = q.resolveArea("hartland")
             area.shouldNotBeNull()
-            area.packages shouldContainAll listOf("obchodni_doklady", "ucetnictvi")
-            area.tags shouldContainAll listOf("finance")
+            area.packages shouldContainAll listOf("sales", "returns")
+            area.tags shouldContainAll listOf("reporting")
             (area.description.isNotEmpty()) shouldBe true
         }
 

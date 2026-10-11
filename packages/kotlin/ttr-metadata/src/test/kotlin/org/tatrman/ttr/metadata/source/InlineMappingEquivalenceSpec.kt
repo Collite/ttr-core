@@ -79,25 +79,25 @@ class InlineMappingEquivalenceSpec :
 
         "inline export and standalone er2db export synthesise the same mapping qnames" {
             // ----- shared model: entity (table mapping + 2 column mappings) + relation (fk) -----
-            val artiklQn = qn("er", "entity", "artikl")
+            val itemQn = qn("er", "entity", "item")
             val bQn = qn("er", "entity", "b")
-            val idAttrQn = qn("er", "entity", "artikl.id_artiklu")
-            val kodAttrQn = qn("er", "entity", "artikl.kód_artiklu")
-            val relQn = qn("er", "relation", "artikl_b")
-            val tableQn = qn("db", "dbo", "QZBOZI_DF")
-            val idColQn = qn("db", "dbo", "QZBOZI_DF.IDZBOZI")
-            val kodColQn = qn("db", "dbo", "QZBOZI_DF.KOD_ZBOZI")
-            val fkQn = qn("db", "dbo", "fk_artikl_b")
+            val idAttrQn = qn("er", "entity", "item.sk")
+            val kodAttrQn = qn("er", "entity", "item.item_id")
+            val relQn = qn("er", "relation", "item_b")
+            val tableQn = qn("db", "dbo", "item")
+            val idColQn = qn("db", "dbo", "item.i_item_sk")
+            val kodColQn = qn("db", "dbo", "item.i_item_id")
+            val fkQn = qn("db", "dbo", "fk_item_b")
 
-            val idAttr = Attribute(internalId = "a1", qname = idAttrQn, entity = artiklQn, type = "int", isKey = true)
-            val kodAttr = Attribute(internalId = "a2", qname = kodAttrQn, entity = artiklQn, type = "text")
-            val artikl = Entity(internalId = "e1", qname = artiklQn, attributes = listOf(idAttr, kodAttr))
+            val idAttr = Attribute(internalId = "a1", qname = idAttrQn, entity = itemQn, type = "int", isKey = true)
+            val kodAttr = Attribute(internalId = "a2", qname = kodAttrQn, entity = itemQn, type = "text")
+            val item = Entity(internalId = "e1", qname = itemQn, attributes = listOf(idAttr, kodAttr))
             val bEntity = Entity(internalId = "e2", qname = bQn)
             val rel =
                 Relation(
                     internalId = "r1",
                     qname = relQn,
-                    fromEntity = artiklQn,
+                    fromEntity = itemQn,
                     toEntity = bQn,
                     cardinality = Cardinality(0, -1, 0, 1),
                 )
@@ -105,28 +105,28 @@ class InlineMappingEquivalenceSpec :
             val entityMapping =
                 Er2DbEntityMapping(
                     internalId = "m1",
-                    qname = qn("map", "er2db_entity", "artikl"),
-                    entity = artiklQn,
+                    qname = qn("map", "er2db_entity", "item"),
+                    entity = itemQn,
                     target = MappingTarget.Table(tableQn),
                 )
             val idAttrMapping =
                 Er2DbAttributeMapping(
                     internalId = "m2",
-                    qname = qn("map", "er2db_attribute", "artikl.id_artiklu"),
+                    qname = qn("map", "er2db_attribute", "item.sk"),
                     attribute = idAttrQn,
                     target = AttributeMappingTarget.Column(idColQn),
                 )
             val kodAttrMapping =
                 Er2DbAttributeMapping(
                     internalId = "m3",
-                    qname = qn("map", "er2db_attribute", "artikl.kód_artiklu"),
+                    qname = qn("map", "er2db_attribute", "item.item_id"),
                     attribute = kodAttrQn,
                     target = AttributeMappingTarget.Column(kodColQn),
                 )
             val relMapping =
                 Er2DbRelationMapping(
                     internalId = "m4",
-                    qname = qn("map", "er2db_relation", "artikl_b"),
+                    qname = qn("map", "er2db_relation", "item_b"),
                     relation = relQn,
                     foreignKey = fkQn,
                 )
@@ -139,7 +139,7 @@ class InlineMappingEquivalenceSpec :
                         mapOf(
                             "er" to
                                 ErSchema(
-                                    entities = mapOf(artiklQn to artikl, bQn to bEntity),
+                                    entities = mapOf(itemQn to item, bQn to bEntity),
                                     relations = mapOf(relQn to rel),
                                 ),
                         ),
@@ -169,10 +169,10 @@ class InlineMappingEquivalenceSpec :
             // sanity: the expected four mapping identities are present
             newIds shouldBe
                 setOf(
-                    "er2db_entity_mapping:artikl",
-                    "er2db_attribute_mapping:artikl.id_artiklu",
-                    "er2db_attribute_mapping:artikl.kód_artiklu",
-                    "er2db_relation_mapping:artikl_b",
+                    "er2db_entity_mapping:item",
+                    "er2db_attribute_mapping:item.sk",
+                    "er2db_attribute_mapping:item.item_id",
+                    "er2db_relation_mapping:item_b",
                 )
         }
     })

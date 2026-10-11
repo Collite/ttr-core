@@ -1069,7 +1069,7 @@ class FileBasedSource(
                 )
         }
 
-        // Each `columns: { id_artiklu: IDZBOZI, ... }` entry → one Er2DbAttributeMapping.
+        // Each `columns: { sk: i_item_sk, ... }` entry → one Er2DbAttributeMapping.
         // Bare column refs are canonicalised to the table-embedded qname (see
         // [canonicaliseColumnTarget]); the entity target table is the one resolved above.
         val entityTable = entityTargetTable(def)
@@ -1216,10 +1216,10 @@ class FileBasedSource(
      * owning-table segment, matching how DbColumn qnames are keyed
      * (`qname(schema, ns, "<TABLE>.<COLUMN>")`, see [ttrColumnToDbColumn] callers).
      *
-     * A *bare* column ref — `mapping: KOD_STR`, which [Reference.toQname] resolves
-     * table-less to `db.dbo.KOD_STR` (qname name `"KOD_STR"`, no dot) — is rewritten
-     * to `db.dbo.QSTRED_DF.KOD_STR` under [entityTable]. Refs that already embed the
-     * table (`db.dbo.QSTRED_DF.KOD_STR` → name `"QSTRED_DF.KOD_STR"`) and Expression
+     * A *bare* column ref — `mapping: s_store_id`, which [Reference.toQname] resolves
+     * table-less to `db.dbo.s_store_id` (qname name `"s_store_id"`, no dot) — is rewritten
+     * to `db.dbo.store.s_store_id` under [entityTable]. Refs that already embed the
+     * table (`db.dbo.store.s_store_id` → name `"store.s_store_id"`) and Expression
      * targets pass through unchanged; with no resolvable table the target is left as-is.
      *
      * Without this, a bare-ref column mapping points at a column qname that no
@@ -1440,8 +1440,8 @@ object Reference {
      *  - **package.schema.namespace.name** — stock vocabulary, e.g. `cnc.cnc.role.master`
      *    (`parts[1] == "cnc"` is a schema token).
      *  - **schema.namespace.name** where `name` itself contains dots — e.g. the entity-attribute
-     *    references `er.entity.účetní_středisko.kód_střediska` and column targets
-     *    `db.dbo.QSTRED_DF.KOD_STR` (`parts[1]` is `entity`/`dbo`, not a schema token). The name is
+     *    references `er.entity.store.store_id` and column targets
+     *    `db.dbo.store.s_store_id` (`parts[1]` is `entity`/`dbo`, not a schema token). The name is
      *    everything after the namespace, so the qname matches the attribute's/column's canonical
      *    `qname(schema, namespace, "<owner>.<member>")` — see GH #53 (these previously misparsed to
      *    `package=schema-token, schemaCode=UNSPECIFIED`, so fuzzy attributes silently lost their

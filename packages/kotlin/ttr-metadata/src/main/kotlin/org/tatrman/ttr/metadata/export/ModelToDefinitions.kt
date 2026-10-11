@@ -120,7 +120,7 @@ object ModelToDefinitions {
     /**
      * Converts the full [Model] into an [ExportBundle] partitioned **per source file**:
      * one package directory per originating YAML file (package name = file name minus its
-     * `NNnn_` code prefix, e.g. `bt09_navsteva` → `navsteva`). Inside each package the
+     * `NNnn_` code prefix, e.g. `hl05_returns` → `returns`). Inside each package the
      * content collapses to at most three **directive-less** files (v2.1 / yaml-converter
      * split): `db.ttr` (tables, views, foreign keys, procedures, **and queries**),
      * `er.ttr` (entities **and** relations, with inline `mapping:`), and `cnc.ttr` (roles
