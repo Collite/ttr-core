@@ -4,7 +4,7 @@ package org.tatrman.ttr.metadata.export
 import org.tatrman.ttr.metadata.graph.ModelGraph
 
 /**
- * Phase 09 B4 / DF-M15 — Graphviz DOT export of a [ModelGraph].
+ * Phase 09 B4 — Graphviz DOT export of a [ModelGraph].
  *
  * Output shape:
  * ```

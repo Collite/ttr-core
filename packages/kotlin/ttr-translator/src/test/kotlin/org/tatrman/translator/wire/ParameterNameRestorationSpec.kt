@@ -14,7 +14,7 @@ import org.tatrman.translator.params.ParameterTyper
 import org.tatrman.translator.params.SqlParam
 
 /**
- * Phase 08 A2 / DF-T02 — verifies that [PlanNodeEncoder] restores the original `{name}` on
+ * Phase 08 A2 — verifies that [PlanNodeEncoder] restores the original `{name}` on
  * `RexDynamicParam` nodes when the orchestrator threads in the prepared `parameterNames` map,
  * and that the round-trip through encode → decode preserves both the type and the name.
  */

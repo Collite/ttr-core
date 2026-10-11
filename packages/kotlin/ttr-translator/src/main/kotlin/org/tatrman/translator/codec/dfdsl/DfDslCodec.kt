@@ -39,7 +39,7 @@ import org.tatrman.plan.v1.TableScanNode
  * enforces both rules; misordered chains raise
  * `dfdsl_chain_misordered`.
  *
- * Phase 08 B1 / DF-DSL01 — Joins are supported as a single optional `join` op positioned
+ * Phase 08 B1 — Joins are supported as a single optional `join` op positioned
  * between `from` and `select`. The pipeline's running DataFrame is the LEFT side; the JoinOp
  * carries the RIGHT source + an `on` condition. B0 chose option (b) (no Joiner service): the
  * codec refuses a JoinOp without an `on` (`join_condition_required`). v1 allows at most one
@@ -153,7 +153,7 @@ object DfDslCodec {
                             .setAlias(from.alias.ifEmpty { from.queryRef }),
                     ).build()
             FromOp.SourceCase.WORKSPACE_REF ->
-                // Phase 08 B2 / DF-DSL02 — `workspace_ref: "q1"` reads from a session-scoped
+                // Phase 08 B2 — `workspace_ref: "q1"` reads from a session-scoped
                 // workspace materialised by a prior query. The session_id travels in the
                 // PipelineContext, not in the codec output; the codec carries only the name.
                 PlanNode
@@ -174,7 +174,7 @@ object DfDslCodec {
         join: JoinOp,
         input: PlanNode,
     ): PlanNode {
-        // Phase 08 B1 / DF-DSL01 — JoinOp requires an explicit `on` (B0 option (b)). v1 only
+        // Phase 08 B1 — JoinOp requires an explicit `on` (B0 option (b)). v1 only
         // accepts a single JoinOp per pipeline; chained joins are blocked by the chain-order
         // rule (JOIN is a single position in `expectedOrder`).
         if (!join.hasOn()) {

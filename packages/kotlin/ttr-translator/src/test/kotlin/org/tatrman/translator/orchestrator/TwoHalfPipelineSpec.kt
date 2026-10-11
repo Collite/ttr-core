@@ -20,7 +20,7 @@ import org.tatrman.translator.framework.ModelEntity
 import org.tatrman.translator.framework.SurfaceType
 
 /**
- * Phase 08 B6 / DF-T08 — orchestrator-level integration of the C/D/E stages.
+ * Phase 08 B6 — orchestrator-level integration of the C/D/E stages.
  *
  *   - `target=ER` keeps `Scan(ER, ...)` nodes in the output plan (no MAP_TO_PHYSICAL).
  *   - `target=DB` rewrites them to `TableScan(DB, ...)`.

@@ -21,7 +21,7 @@ import org.tatrman.translator.framework.TranslatorFramework
 import org.tatrman.translator.wire.PlanNodeEncoder
 
 /**
- * Phase 08 B1 / DF-T03 — UNFOLD_QUERY_REFS tests.
+ * Phase 08 B1 — UNFOLD_QUERY_REFS tests.
  *
  * The tests build their input [RelNode] via [TranslatorFramework]'s `RelBuilder` rather than
  * through `PlanNodeDecoder.decode` of a hand-built proto, so the `obj.query.X` symbol resolves

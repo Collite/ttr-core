@@ -10,7 +10,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * DF-M09 / Phase 07 C1 — `ModelStorage` backed by a git repository. On first load (when the
+ * Phase 07 C1 — `ModelStorage` backed by a git repository. On first load (when the
  * local checkout doesn't exist or is empty) we **clone** the configured `remoteUri` into
  * `localCheckoutDir`; on subsequent loads we **fetch + hard-reset** to the latest commit of
  * `branch` so the metadata service tracks remote changes the same way a CI deploy would.

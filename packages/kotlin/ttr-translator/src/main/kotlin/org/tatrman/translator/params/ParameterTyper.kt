@@ -13,7 +13,7 @@ import org.apache.calcite.sql.type.SqlTypeName
 import org.tatrman.translator.framework.RelTreeRexShuttle
 
 /**
- * Phase 08 A2 / DF-T02 — parameter type pre-supply via [RelTreeRexShuttle].
+ * Phase 08 A2 — parameter type pre-supply via [RelTreeRexShuttle].
  *
  * Calcite's validator infers `RexDynamicParam` types from surrounding context. When the context
  * is ambiguous (`? > ?`, `WHERE id = ?` where `id` is itself ANY-typed, or a bare select-list

@@ -60,7 +60,7 @@ class RoundTripSpec :
         }
 
         "Q3 - JOIN round-trips (encoder produces a structurally valid PlanNode)" {
-            // Phase 08 A1 / DF-T01 — RESOLVE stage. `RexInputRef`s inside a Join condition now
+            // Phase 08 A1 — RESOLVE stage. `RexInputRef`s inside a Join condition now
             // encode the real field name plus a `$L`/`$R` source-alias hint; the decoder routes
             // through `RelBuilder.field(inputCount, ord, name)` so the lookup hits the correct
             // join input. The pre-RESOLVE failure was: positional `$idx` indexed into the right

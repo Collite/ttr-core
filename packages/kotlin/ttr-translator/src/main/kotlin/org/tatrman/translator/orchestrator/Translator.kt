@@ -479,7 +479,7 @@ class Translator(
         try {
             // NX-A: decorrelate correlated `[NOT] EXISTS` / `IN` sub-queries before encode. A
             // correlated sub-query reaches this seam as a `RexSubQuery` bearing a `RexFieldAccess`
-            // over a `RexCorrelVariable`, which has no `plan.v1` form (ai-models#27). No-op unless a
+            // over a `RexCorrelVariable`, which has no `plan.v1` form. No-op unless a
             // correlated sub-query is present, so uncorrelated sub-queries keep their
             // `SubqueryExpression` encoding and REL_NODE re-entry stays byte-stable.
             val decorrelated = SubqueryNormalizer.apply(rel, framework)

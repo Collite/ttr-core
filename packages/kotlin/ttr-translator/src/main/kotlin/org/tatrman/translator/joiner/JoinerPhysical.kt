@@ -29,7 +29,7 @@ import org.tatrman.translator.wire.Expressions
  * ## The condition names what each scan EXPOSES, not what the table stores
  *
  * Wherever the model renames an attribute, MAP_TO_PHYSICAL rebuilds the scan's output columns as
- * `name = DB column, alias = ER attribute` (DF-T05, alias-at-boundary), and the decoder wraps that
+ * `name = DB column, alias = ER attribute` (alias-at-boundary), and the decoder wraps that
  * scan in a Project producing the aliases — so above the scan only the alias exists. An FK names
  * physical columns. Each operand is therefore mapped through ITS OWN side's scan: the alias when
  * that scan aliases the column, the column name otherwise (a bare TableScan, or a column whose
