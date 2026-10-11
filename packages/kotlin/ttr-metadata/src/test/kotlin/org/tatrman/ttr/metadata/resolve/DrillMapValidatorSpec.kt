@@ -37,7 +37,9 @@ class DrillMapValidatorSpec :
                             patternQuery(
                                 "returns_by_reason",
                                 params = emptyList(),
-                                sql = "SELECT r.r_reason_desc, SUM(cr.cr_return_amount) AS returned_amount, cr.cr_order_number FROM catalog_returns cr",
+                                sql =
+                                    "SELECT r.r_reason_desc, SUM(cr.cr_return_amount) AS returned_amount, " +
+                                        "cr.cr_order_number FROM catalog_returns cr",
                             ),
                             patternQuery(
                                 "return_detail",

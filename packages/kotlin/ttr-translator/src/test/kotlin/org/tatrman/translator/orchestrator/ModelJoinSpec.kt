@@ -94,13 +94,14 @@ class ModelJoinSpec :
         }
 
         "H12 — target=ER → REL_NODE → target=DB gives the same bytes as single-call target=DB" {
+            val hero = HartlandJoinModel.H1_HERO
             val singleCall =
                 translator
-                    .parseToRelNode(HartlandJoinModel.H1_HERO, Language.SQL, SchemaCode.DB, sourceSchema = SchemaCode.ER)
+                    .parseToRelNode(hero, Language.SQL, SchemaCode.DB, sourceSchema = SchemaCode.ER)
                     .shouldBeInstanceOf<ParseResult.Success>()
             val erHalf =
                 translator
-                    .parseToRelNode(HartlandJoinModel.H1_HERO, Language.SQL, SchemaCode.ER, sourceSchema = SchemaCode.ER)
+                    .parseToRelNode(hero, Language.SQL, SchemaCode.ER, sourceSchema = SchemaCode.ER)
                     .shouldBeInstanceOf<ParseResult.Success>()
             val twoHalf =
                 translator
@@ -192,7 +193,7 @@ class ModelJoinSpec :
 
         // ---- P3·S1: warnings on the result, one verdict per join ----
 
-        "H4 — first purchase + first shipment: one JOIN_AMBIGUOUS_RELATIONS on parseToRelNode, translate carries the same list" {
+        "H4 — first purchase + first shipment: one JOIN_AMBIGUOUS_RELATIONS, translate carries the same list" {
             val sql = "SELECT shopper.birth_country, calendar.day_name FROM shopper JOIN calendar"
             val parsed =
                 translator

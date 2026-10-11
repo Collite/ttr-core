@@ -33,7 +33,8 @@ class SqlTextRenderSpec :
                     "_ttrp_inline",
                     mapOf("catalog_order__filter" to "SELECT * FROM T WHERE KIND='EXPRESS'"),
                 )
-            out shouldBe "SELECT [x] FROM (\n    SELECT * FROM T WHERE KIND='EXPRESS'\n) AS [catalog_order__filter] WHERE [x] = 1"
+            out shouldBe
+                "SELECT [x] FROM (\n    SELECT * FROM T WHERE KIND='EXPRESS'\n) AS [catalog_order__filter] WHERE [x] = 1"
         }
 
         "door dialect: tables lose the sentinel qualifier; brackets become double quotes outside literals" {
