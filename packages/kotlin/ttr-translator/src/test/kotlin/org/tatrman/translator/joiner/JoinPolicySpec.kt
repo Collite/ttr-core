@@ -7,130 +7,130 @@ import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
-import org.tatrman.translator.framework.DfpJoinModel
-import org.tatrman.translator.framework.DfpJoinModel.er
+import org.tatrman.translator.framework.HartlandJoinModel
+import org.tatrman.translator.framework.HartlandJoinModel.er
 import org.tatrman.translator.framework.ModelRelation
 import org.tatrman.translator.joiner.JoinPolicy.SideRef
 import org.tatrman.translator.joiner.JoinPolicy.Verdict
 
-/** MJ-P0·S2 — the shared join policy over the DFP-shaped fixture (contracts §2–§3). */
+/** MJ-P0·S2 — the shared join policy over the Hartland join fixture (contracts §2–§3). */
 class JoinPolicySpec :
     StringSpec({
-        val model = DfpJoinModel.handle()
+        val model = HartlandJoinModel.handle()
 
         fun side(vararg names: String): List<SideRef<String>> = names.map { SideRef(er(it), it) }
 
-        "chain: (kp, dm) × z resolves through dodací_místo → zákazník, not kumulovaný_prodej" {
+        "chain: (s, sh) × h resolves through shopper → household, not sale" {
             val v =
                 JoinPolicy
-                    .resolve(model, side("kumulovaný_prodej", "dodací_místo"), side("zákazník"))
+                    .resolve(model, side("sale", "shopper"), side("household"))
                     .shouldBeInstanceOf<Verdict.Resolved<String>>()
-            v.left.entity shouldBe er("dodací_místo")
-            v.right.entity shouldBe er("zákazník")
-            v.pairs shouldContainExactly listOf("id_subjektu" to "id_zákazníka")
+            v.left.entity shouldBe er("shopper")
+            v.right.entity shouldBe er("household")
+            v.pairs shouldContainExactly listOf("current_household" to "household_id")
         }
 
-        "chain: (kp, dm, z) × produkt resolves through kumulovaný_prodej → produkt" {
+        "chain: (s, sh, h) × product resolves through sale → product" {
             val v =
                 JoinPolicy
-                    .resolve(model, side("kumulovaný_prodej", "dodací_místo", "zákazník"), side("produkt"))
+                    .resolve(model, side("sale", "shopper", "household"), side("product"))
                     .shouldBeInstanceOf<Verdict.Resolved<String>>()
-            v.left.entity shouldBe er("kumulovaný_prodej")
-            v.pairs shouldContainExactly listOf("id_produktu" to "id_produktu")
+            v.left.entity shouldBe er("sale")
+            v.pairs shouldContainExactly listOf("product_id" to "product_id")
         }
 
         "orientation: the `from` entity on the RIGHT swaps the pair" {
             val v =
                 JoinPolicy
-                    .resolve(model, side("zákazník"), side("dodací_místo"))
+                    .resolve(model, side("household"), side("shopper"))
                     .shouldBeInstanceOf<Verdict.Resolved<String>>()
-            v.pairs shouldContainExactly listOf("id_zákazníka" to "id_subjektu")
+            v.pairs shouldContainExactly listOf("household_id" to "current_household")
         }
 
-        "no relation: kp × zákazník (no path inference in v1)" {
+        "no relation: s × household (no path inference in v1)" {
             val v =
                 JoinPolicy
-                    .resolve(model, side("kumulovaný_prodej"), side("zákazník"))
+                    .resolve(model, side("sale"), side("household"))
                     .shouldBeInstanceOf<Verdict.NoRelation<String>>()
-            v.left shouldContainExactly listOf(er("kumulovaný_prodej"))
-            v.right shouldContainExactly listOf(er("zákazník"))
+            v.left shouldContainExactly listOf(er("sale"))
+            v.right shouldContainExactly listOf(er("household"))
         }
 
-        "ambiguous: dm × uživatel has two relations (OZ + VOT), nothing repeated" {
+        "ambiguous: sh × calendar has two relations (first purchase + first shipment), nothing repeated" {
             val v =
                 JoinPolicy
-                    .resolve(model, side("dodací_místo"), side("uživatel"))
+                    .resolve(model, side("shopper"), side("calendar"))
                     .shouldBeInstanceOf<Verdict.Ambiguous<String>>()
             v.candidates shouldHaveSize 2
             v.repeated.shouldBeEmpty()
         }
 
-        "ambiguous: (kp, dm) × obchodní_kanál — both sides relate, no proximity tie-break (⚑MJ-8)" {
+        "ambiguous: (s, sh) × address — both sides relate, no proximity tie-break (⚑MJ-8)" {
             val v =
                 JoinPolicy
-                    .resolve(model, side("kumulovaný_prodej", "dodací_místo"), side("obchodní_kanál"))
+                    .resolve(model, side("sale", "shopper"), side("address"))
                     .shouldBeInstanceOf<Verdict.Ambiguous<String>>()
-            v.candidates.map { it.left.entity.name }.toSet() shouldBe setOf("kumulovaný_prodej", "dodací_místo")
+            v.candidates.map { it.left.entity.name }.toSet() shouldBe setOf("sale", "shopper")
             v.repeated.shouldBeEmpty()
         }
 
-        "repeated entity: zákazník × zákazník steps aside (⚑MJ-6)" {
+        "repeated entity: shopper × shopper steps aside (⚑MJ-6)" {
             val v =
                 JoinPolicy
-                    .resolve(model, side("zákazník"), side("zákazník"))
+                    .resolve(model, side("shopper"), side("shopper"))
                     .shouldBeInstanceOf<Verdict.Ambiguous<String>>()
-            v.repeated shouldBe setOf(er("zákazník"))
+            v.repeated shouldBe setOf(er("shopper"))
         }
 
         "repeated entity on one side drops only its candidates" {
-            // (dm, dm) × zákazník — the two dm aliases could each join z; refuse to guess.
+            // (sh, sh) × household — the two sh aliases could each join h; refuse to guess.
             val v =
                 JoinPolicy
-                    .resolve(model, side("dodací_místo", "dodací_místo"), side("zákazník"))
+                    .resolve(model, side("shopper", "shopper"), side("household"))
                     .shouldBeInstanceOf<Verdict.Ambiguous<String>>()
-            v.repeated shouldBe setOf(er("dodací_místo"))
+            v.repeated shouldBe setOf(er("shopper"))
         }
 
         "C-1: a repeated entity no candidate names does not block the join (review-097 R1)" {
-            // (dm, uživatel oz, uživatel vot) × kp — the two uživatel aliases got their ONs; kp ↔ dm is unique.
+            // (sh, calendar c1, calendar c2) × s — the two calendar aliases got their ONs; s ↔ sh is unique.
             val v =
                 JoinPolicy
-                    .resolve(model, side("dodací_místo", "uživatel", "uživatel"), side("kumulovaný_prodej"))
+                    .resolve(model, side("shopper", "calendar", "calendar"), side("sale"))
                     .shouldBeInstanceOf<Verdict.Resolved<String>>()
-            v.left.entity shouldBe er("dodací_místo")
-            v.right.entity shouldBe er("kumulovaný_prodej")
-            v.pairs shouldContainExactly listOf("id_dodacího_místa" to "id_dodacího_místa")
+            v.left.entity shouldBe er("shopper")
+            v.right.entity shouldBe er("sale")
+            v.pairs shouldContainExactly listOf("shopper_id" to "shopper_id")
         }
 
         "C-1: a repeated entity that IS party to a candidate still steps aside" {
-            // (dm, uživatel, uživatel) × obchodní_kanál — dm ↔ ok is the only candidate and uživatel names none,
-            // so it resolves; (uživatel, uživatel) × dm — every candidate names uživatel → ambiguous, repeated.
+            // (sh, calendar, calendar) × address — sh ↔ address is the only candidate and calendar names none,
+            // so it resolves; (calendar, calendar) × sh — every candidate names calendar → ambiguous, repeated.
             JoinPolicy
-                .resolve(model, side("dodací_místo", "uživatel", "uživatel"), side("obchodní_kanál"))
+                .resolve(model, side("shopper", "calendar", "calendar"), side("address"))
                 .shouldBeInstanceOf<Verdict.Resolved<String>>()
             val v =
                 JoinPolicy
-                    .resolve(model, side("uživatel", "uživatel"), side("dodací_místo"))
+                    .resolve(model, side("calendar", "calendar"), side("shopper"))
                     .shouldBeInstanceOf<Verdict.Ambiguous<String>>()
-            v.repeated shouldBe setOf(er("uživatel"))
+            v.repeated shouldBe setOf(er("calendar"))
         }
 
         "C-1: a repeat within one side and no candidate → NoRelation; across the join → still a self-join" {
             JoinPolicy
-                .resolve(model, side("uživatel", "uživatel"), side("produkt"))
+                .resolve(model, side("calendar", "calendar"), side("product"))
                 .shouldBeInstanceOf<Verdict.NoRelation<String>>()
             JoinPolicy
-                .resolve(model, side("produkt"), side("produkt"))
+                .resolve(model, side("product"), side("product"))
                 .shouldBeInstanceOf<Verdict.Ambiguous<String>>()
-                .repeated shouldBe setOf(er("produkt"))
+                .repeated shouldBe setOf(er("product"))
         }
 
-        "composite relation: dodatek × smlouva carries both pairs, oriented (⚑MJ-7)" {
+        "composite relation: order_return × order_line carries both pairs, oriented (⚑MJ-7)" {
             val v =
                 JoinPolicy
-                    .resolve(model, side("smlouva"), side("dodatek"))
+                    .resolve(model, side("order_line"), side("order_return"))
                     .shouldBeInstanceOf<Verdict.Resolved<String>>()
-            v.pairs shouldContainExactly listOf("číslo_smlouvy" to "číslo_smlouvy", "rok" to "rok")
+            v.pairs shouldContainExactly listOf("order_number" to "order_number", "product_id" to "product_id")
         }
 
         "relation without join pairs → WithoutPairs, never a crash" {
@@ -149,9 +149,9 @@ class JoinPolicySpec :
         "handles ride through untouched (the carrier's alias / scan)" {
             val v =
                 JoinPolicy
-                    .resolve(model, listOf(SideRef(er("kumulovaný_prodej"), "kp")), listOf(SideRef(er("produkt"), "p")))
+                    .resolve(model, listOf(SideRef(er("sale"), "s")), listOf(SideRef(er("product"), "p")))
                     .shouldBeInstanceOf<Verdict.Resolved<String>>()
-            v.left.handle shouldBe "kp"
+            v.left.handle shouldBe "s"
             v.right.handle shouldBe "p"
         }
     })

@@ -10,7 +10,7 @@ import org.tatrman.plan.v1.PlanNode
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.translate.v1.Language
 import org.tatrman.translate.v1.SqlDialect
-import org.tatrman.translator.framework.DfpJoinModel
+import org.tatrman.translator.framework.HartlandJoinModel
 import org.tatrman.translator.framework.EntityMapping
 import org.tatrman.translator.framework.FixtureModel
 import org.tatrman.translator.framework.InMemoryModelHandle
@@ -113,10 +113,10 @@ class SearchExpansionSpec :
         // to Number` parse_pipeline_failed for an INTEGER column — or, for a VARCHAR column, no error at
         // all: the Sarg's digest rode as a string literal under a `search` operator, and the plan failed
         // only on its next decode.
-        val place = DfpJoinModel.er("place")
-        val visit = DfpJoinModel.er("visit")
-        val placeTable = DfpJoinModel.db("place")
-        val visitTable = DfpJoinModel.db("visit")
+        val place = HartlandJoinModel.er("place")
+        val visit = HartlandJoinModel.er("visit")
+        val placeTable = HartlandJoinModel.db("place")
+        val visitTable = HartlandJoinModel.db("visit")
         val visitAttributes =
             listOf(
                 ModelAttribute("id", SurfaceType.INT, nullable = false, isKey = true),

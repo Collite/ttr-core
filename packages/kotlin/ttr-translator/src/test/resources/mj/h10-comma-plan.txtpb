@@ -1,6 +1,8 @@
-# MJ-P0·S1.3 — H10 golden: the plan bytes for DfpJoinModel.H10_COMMA (SQL→MSSQL, targetSchema=DB) as of
-# translator/v0.11.0 (pre-MJ). ModelJoinSpec parses this text proto and compares toByteArray() — the comma form
-# must stay byte-identical through MJ (task-management rule 6). Regenerate by hand only.
+# MJ-P0·S1.3 — H10 golden: the plan bytes for HartlandJoinModel.H10_COMMA (SQL→MSSQL, targetSchema=DB). First
+# recorded at translator/v0.11.0 (pre-MJ); re-recorded with `MJ_DUMP=<file>` when the fixture moved to the
+# Hartland names — the plan was identical to the pre-MJ recording apart from the names. ModelJoinSpec parses this
+# text proto and compares toByteArray() — the comma form must stay byte-identical through MJ (task-management
+# rule 6). Never edit by hand: re-record with MJ_DUMP and review the diff.
 project {
   input {
     filter {
@@ -11,42 +13,42 @@ project {
               table {
                 schema_code: DB
                 namespace: "dbo"
-                name: "QKUMPRODEJ"
+                name: "store_sales"
               }
               output_columns {
-                name: "id_dodac\303\255ho_m\303\255sta"
+                name: "shopper_id"
                 type: "int"
               }
               output_columns {
-                name: "id_obchodn\303\255ho_kan\303\241lu"
+                name: "address_id"
                 type: "int"
               }
               output_columns {
-                name: "id_tr\305\276n\303\255_skupiny"
+                name: "store_id"
                 type: "int"
               }
               output_columns {
-                name: "id_produktu"
+                name: "product_id"
                 type: "int"
               }
               output_columns {
-                name: "id_podproduktu"
+                name: "ticket_number"
                 type: "int"
               }
               output_columns {
-                name: "id_artiklu"
+                name: "promo_id"
                 type: "int"
               }
               output_columns {
-                name: "obdob\303\255"
+                name: "sale_month"
                 type: "text"
               }
               output_columns {
-                name: "tr\305\276ba_12_m\304\233s\303\255c\305\257"
+                name: "revenue"
                 type: "float"
               }
               output_columns {
-                name: "mno\305\276stv\303\255_12_m\304\233s\303\255c\305\257"
+                name: "quantity"
                 type: "float"
               }
             }
@@ -56,14 +58,14 @@ project {
               table {
                 schema_code: DB
                 namespace: "dbo"
-                name: "QPRODUKT"
+                name: "item"
               }
               output_columns {
-                name: "id_produktu"
+                name: "product_id"
                 type: "int"
               }
               output_columns {
-                name: "n\303\241zev_produktu"
+                name: "product_name"
                 type: "text"
               }
             }
@@ -75,13 +77,13 @@ project {
               operands {
                 column_ref {
                   source_alias: "$L"
-                  name: "id_produktu"
+                  name: "product_id"
                 }
               }
               operands {
                 column_ref {
                   source_alias: "$R"
-                  name: "id_produktu"
+                  name: "product_id"
                 }
               }
             }
@@ -93,14 +95,14 @@ project {
           operation: "like"
           operands {
             column_ref {
-              name: "n\303\241zev_produktu"
+              name: "product_name"
               type: "text"
             }
             result_type: "text"
           }
           operands {
             literal {
-              string_value: "%Oleje%"
+              string_value: "%able%"
               type: "text"
             }
             result_type: "text"
@@ -113,21 +115,21 @@ project {
   expressions {
     expression {
       column_ref {
-        name: "obdob\303\255"
+        name: "sale_month"
         type: "text"
       }
       result_type: "text"
     }
-    alias: "obdob\303\255"
+    alias: "sale_month"
   }
   expressions {
     expression {
       column_ref {
-        name: "n\303\241zev_produktu"
+        name: "product_name"
         type: "text"
       }
       result_type: "text"
     }
-    alias: "n\303\241zev_produktu"
+    alias: "product_name"
   }
 }
