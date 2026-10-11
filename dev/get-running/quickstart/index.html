@@ -1543,11 +1543,14 @@ auditable, and visible rather than asserted.</p>
 <p class="admonition-title">Where the transcripts on this page come from</p>
 <p>Every command below was run for real; the outputs are pasted, not
 reconstructed. Steps 1–3 (install and import) run on any cluster with the
-published chart and CLI. Steps 4–6 show real transcripts from a deployed
-Tatrman catalog — your model and data differ, but the <em>shapes</em> are exactly
-what you get. The end-to-end governed-execution acceptance run (real result
-rows through a live query worker) is exercised in full at
-<a href="../import-schema/">import a database</a> and the reference deployment.</p>
+published chart and CLI. Steps 4–6 are real transcripts from running this
+page on a local single-node cluster against the Hartland demo model — the
+public <a href="https://github.com/Collite/ttr-demo"><code>Collite/ttr-demo</code></a> repository,
+a retail schema built on TPC-DS — so your model and data differ, but the
+<em>shapes</em> are exactly what you get. The end-to-end governed-execution
+acceptance run (real result rows through a live query worker) is exercised
+in full at <a href="../import-schema/">import a database</a> and the reference
+deployment.</p>
 </div>
 <hr />
 <h2 id="1-prereqs">1. Prereqs<a class="headerlink" href="#1-prereqs" title="Permanent link">&para;</a></h2>
@@ -1590,6 +1593,23 @@ explicit version so you get exactly the product this page documents.</p>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="go">Pulled: ghcr.io/collite/charts/tatrman-server:0.9.0</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="go">Digest: sha256:6872f69eb33124795a533983fd3837ec9b59bff4049d0e3a2dc4690bea13b61e</span>
 </code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Chart 0.9.0 pins service images older than the current grammar</p>
+<p>The 0.9.0 chart pins the 0.9.x service images, and they predate the current
+TTR-M grammar: Veles 0.9.0 cannot load a model that uses it (on the
+Hartland demo model it reports hundreds of parse and package errors and
+serves no entity-to-table bindings, so step 6 fails). Until the next chart
+release, run the current public builds of the spine and the MCP doors —
+save this as <code>current-images.yaml</code> and add <code>-f current-images.yaml</code> to the
+install command above:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">veles</span><span class="p">:</span><span class="w">     </span><span class="p p-Indicator">{</span><span class="nt"> image</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> repository</span><span class="p">:</span><span class="w"> </span><span class="nv">ghcr.io/collite/veles</span><span class="p p-Indicator">,</span><span class="nt">     tag</span><span class="p">:</span><span class="w"> </span><span class="s">"0.11.7"</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">query</span><span class="p">:</span><span class="w">     </span><span class="p p-Indicator">{</span><span class="nt"> image</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> repository</span><span class="p">:</span><span class="w"> </span><span class="nv">ghcr.io/collite/query</span><span class="p p-Indicator">,</span><span class="nt">     tag</span><span class="p">:</span><span class="w"> </span><span class="s">"0.11.3"</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">translate</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> image</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> repository</span><span class="p">:</span><span class="w"> </span><span class="nv">ghcr.io/collite/translate</span><span class="p p-Indicator">,</span><span class="nt"> tag</span><span class="p">:</span><span class="w"> </span><span class="s">"0.11.6"</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nt">validate</span><span class="p">:</span><span class="w">  </span><span class="p p-Indicator">{</span><span class="nt"> image</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> repository</span><span class="p">:</span><span class="w"> </span><span class="nv">ghcr.io/collite/validate</span><span class="p p-Indicator">,</span><span class="nt">  tag</span><span class="p">:</span><span class="w"> </span><span class="s">"0.11.5"</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nt">query-mcp</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> image</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> repository</span><span class="p">:</span><span class="w"> </span><span class="nv">ghcr.io/collite/query-mcp</span><span class="p p-Indicator">,</span><span class="nt"> tag</span><span class="p">:</span><span class="w"> </span><span class="s">"0.11.4"</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nt">veles-mcp</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> image</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> repository</span><span class="p">:</span><span class="w"> </span><span class="nv">ghcr.io/collite/meta-mcp</span><span class="p p-Indicator">,</span><span class="nt">  tag</span><span class="p">:</span><span class="w"> </span><span class="s">"0.9.0"</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</code></pre></div>
+</div>
 <p><code>devIdp.enabled=true</code> brings up a bundled dev Keycloak (realm <code>tatrman</code>, a
 <code>demo</code>/<code>demo</code> user) so you can complete the quickstart with no external IdP.
 <strong>It is not for production</strong> — wire your own IdP for anything real
@@ -1599,8 +1619,10 @@ explicit version so you get exactly the product this page documents.</p>
 <p>The spine coming up — <code>veles</code>, <code>query</code>, <code>translate</code>, <code>validate</code>, the
 identity (<code>whois</code>) and <code>health</code> services, and the dev Keycloak — each pod
 reaching <code>Ready</code>, and <code>/ready</code> green on the front door. On a capacity-bound
-node, lower the request floor with the documented deploy overlay; the
-workers and MCP doors that need databases and an IdP come up once you wire
+node, lower the request floor with the documented deploy overlay
+(<code>deploy/values-bp-dsk-smoke.yaml</code> in the chart) — it also switches the MCP
+doors off, so add <code>--set veles-mcp.enabled=true --set query-mcp.enabled=true</code>
+(steps 4–6 use them); the workers that need databases come up once you wire
 steps 3–5.</p>
 </div>
 <h2 id="3-import-your-schema">3. Import your schema<a class="headerlink" href="#3-import-your-schema" title="Permanent link">&para;</a></h2>
@@ -1610,52 +1632,52 @@ faithful, deterministic reflection of what is actually there), an <code>er</code
 checklist</strong> naming every judgement call it made.</p>
 <p>The checklist is the point. The importer never silently decides what your data
 means — it shows its work, grades its evidence, and asks.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">DB_PW</span><span class="o">=</span>…<span class="w">                 </span><span class="c1"># never pass the password on the command line</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>ttr<span class="w"> </span>import-schema<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--jdbc-url<span class="w"> </span><span class="s2">"jdbc:postgresql://your-host:5432/erp"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--user<span class="w"> </span>analyst<span class="w"> </span>--password-env<span class="w"> </span>DB_PW<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span>--dialect<span class="w"> </span>postgresql<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span>--package<span class="w"> </span>erp<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span>--profile<span class="w"> </span>czech-erp<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span>--out<span class="w"> </span>./erp-model
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">DB_PW</span><span class="o">=</span>…<span class="w">                 </span><span class="c1"># never pass the password on the command line</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>ttr<span class="w"> </span>import-schema<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--jdbc-url<span class="w"> </span><span class="s2">"jdbc:postgresql://your-host:5432/erp"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>--user<span class="w"> </span>analyst<span class="w"> </span>--password-env<span class="w"> </span>DB_PW<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>--dialect<span class="w"> </span>postgresql<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span>--package<span class="w"> </span>erp<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span>--profile<span class="w"> </span>czech-erp<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span>--out<span class="w"> </span>./erp-model
 </code></pre></div>
 <p>Against a real, imperfect schema — here a seven-table Czech ERP with missing
 foreign keys, a code column named <code>Sleva %</code> (a space and a percent sign, illegal
 as an identifier), and junction tables — the run takes well under a second:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="go">conventions: profile: czech-erp</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="go">materialised conventions.yaml from profile: czech-erp</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="go">wrote 5 file(s) to ./erp-model</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="go">1 identifier(s) mangled (see the review checklist):</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="go">  public.Faktura.Sleva % → Sleva_</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="go">conventions: profile: czech-erp</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="go">materialised conventions.yaml from profile: czech-erp</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="go">wrote 5 file(s) to ./erp-model</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="go">1 identifier(s) mangled (see the review checklist):</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="go">  public.Faktura.Sleva % → Sleva_</span>
 </code></pre></div>
 <p>Open <code>import-review.md</code>. This is the confidence carrier — the model text stays
 clean canonical form, and every judgement lands here graded by evidence:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="gu">## Relations (evidence grades)</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">-</span><span class="w"> </span><span class="sb">`Faktura_Ciselnik_StavFaktury`</span> Faktura → Ciselnik_StavFaktury — VERIFIED_FULL (pk-name-match) · FULL · orphans=0
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="k">-</span><span class="w"> </span><span class="sb">`Faktura_Odberatel`</span> Faktura → Odberatel — DECLARED (declared:Faktura_IDOdberatel_fkey) · FULL · orphans=0
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="k">-</span><span class="w"> </span><span class="sb">`PolozkaFaktury_Faktura`</span> PolozkaFaktury → Faktura — DECLARED (declared:PolozkaFaktury_IDFaktura_fkey) · FULL · orphans=0
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="gu">## Junctions collapsed (silent M:N)</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="k">-</span><span class="w"> </span>public.Artikl_Odberatel — pure M:N junction collapsed into relation Artikl ↔ Odberatel
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="gu">## Folds PROPOSED (not applied — accept in review)</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="k">-</span><span class="w"> </span>PolozkaFaktury/Faktura — possible header/detail fold (PolozkaFaktury is detail of Faktura) — PROPOSED only
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="gu">## Codebooks proposed (enum-like)</span>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="k">-</span><span class="w"> </span>public.Ciselnik_Stat — codebook table — proposed as an enum-like entity
-<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="k">-</span><span class="w"> </span>public.Ciselnik_StavFaktury — codebook table — proposed as an enum-like entity
-<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>
-<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="gu">## Unmatched columns (look like FKs, resolve to no table)</span>
-<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>
-<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="k">-</span><span class="w"> </span>public.Artikl(IDKategorie) — looks like a foreign key but resolves to no table — left as a plain attribute
-<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>
-<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="gu">## Renamed identifiers (original ← TTR name)</span>
-<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>
-<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a><span class="k">-</span><span class="w"> </span><span class="sb">`Sleva_`</span> ← <span class="sb">`Sleva %`</span> (COLUMN public.Faktura)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="gu">## Relations (evidence grades)</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="k">-</span><span class="w"> </span><span class="sb">`Faktura_Ciselnik_StavFaktury`</span> Faktura → Ciselnik_StavFaktury — VERIFIED_FULL (pk-name-match) · FULL · orphans=0
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">-</span><span class="w"> </span><span class="sb">`Faktura_Odberatel`</span> Faktura → Odberatel — DECLARED (declared:Faktura_IDOdberatel_fkey) · FULL · orphans=0
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="k">-</span><span class="w"> </span><span class="sb">`PolozkaFaktury_Faktura`</span> PolozkaFaktury → Faktura — DECLARED (declared:PolozkaFaktury_IDFaktura_fkey) · FULL · orphans=0
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="gu">## Junctions collapsed (silent M:N)</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="k">-</span><span class="w"> </span>public.Artikl_Odberatel — pure M:N junction collapsed into relation Artikl ↔ Odberatel
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="gu">## Folds PROPOSED (not applied — accept in review)</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="k">-</span><span class="w"> </span>PolozkaFaktury/Faktura — possible header/detail fold (PolozkaFaktury is detail of Faktura) — PROPOSED only
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="gu">## Codebooks proposed (enum-like)</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="k">-</span><span class="w"> </span>public.Ciselnik_Stat — codebook table — proposed as an enum-like entity
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="k">-</span><span class="w"> </span>public.Ciselnik_StavFaktury — codebook table — proposed as an enum-like entity
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="gu">## Unmatched columns (look like FKs, resolve to no table)</span>
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a><span class="k">-</span><span class="w"> </span>public.Artikl(IDKategorie) — looks like a foreign key but resolves to no table — left as a plain attribute
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a><span class="gu">## Renamed identifiers (original ← TTR name)</span>
+<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>
+<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a><span class="k">-</span><span class="w"> </span><span class="sb">`Sleva_`</span> ← <span class="sb">`Sleva %`</span> (COLUMN public.Faktura)
 </code></pre></div>
 <p>Note what happened: a relation <code>Faktura → Ciselnik_StavFaktury</code> was proposed
 <strong>even though the database declared no foreign key for it</strong> — the importer saw
@@ -1674,27 +1696,50 @@ first cut into meaning.</p>
 <h2 id="4-serve-the-model">4. Serve the model<a class="headerlink" href="#4-serve-the-model" title="Permanent link">&para;</a></h2>
 <p>Point Veles at your model repository — it reads the model from git, so shipping
 a new model is a <code>git push</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Veles reads METADATA_GIT_REMOTE_URI; set it via the chart's values</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1"># (or the model-repo field in the Designer viewer).</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>helm<span class="w"> </span>upgrade<span class="w"> </span>ttr<span class="w"> </span>oci://ghcr.io/collite/charts/tatrman-server<span class="w"> </span>--version<span class="w"> </span><span class="m">0</span>.9.0<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>--reuse-values<span class="w"> </span>--set<span class="w"> </span>veles.metadataGitRemoteUri<span class="o">=</span><span class="s2">"https://github.com/you/erp-model.git"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Veles reads METADATA_GIT_REMOTE_URI; set it via the chart's values</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="c1"># (or the model-repo field in the Designer viewer).</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>helm<span class="w"> </span>upgrade<span class="w"> </span>ttr<span class="w"> </span>oci://ghcr.io/collite/charts/tatrman-server<span class="w"> </span>--version<span class="w"> </span><span class="m">0</span>.9.0<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span>-n<span class="w"> </span>ttr<span class="w"> </span>--reuse-values<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>--set<span class="w"> </span>veles.metadata.gitRemoteUri<span class="o">=</span><span class="s2">"https://github.com/you/erp-model.git"</span>
+</code></pre></div>
+<p>Veles clones the <code>main</code> branch and reads the model from the repository root. A
+model on another branch or in a subdirectory names both in <code>veles.extraEnv</code> —
+the run on this page served the Hartland model from <code>master</code>, under <code>model/</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">veles</span><span class="p">:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">metadata</span><span class="p">:</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">gitRemoteUri</span><span class="p">:</span><span class="w"> </span><span class="s">"https://github.com/Collite/ttr-demo.git"</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">extraEnv</span><span class="p">:</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> name</span><span class="p">:</span><span class="w"> </span><span class="nv">METADATA_GIT_BRANCH</span><span class="p p-Indicator">,</span><span class="nt"> value</span><span class="p">:</span><span class="w"> </span><span class="s">"master"</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> name</span><span class="p">:</span><span class="w"> </span><span class="nv">METADATA_GIT_SUBDIR</span><span class="p p-Indicator">,</span><span class="nt"> value</span><span class="p">:</span><span class="w"> </span><span class="s">"model"</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<p><code>translate</code> re-reads the model from Veles every ten minutes (<code>validate</code> every
+minute); restart it to pick up a new model source now:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>ttr<span class="w"> </span>rollout<span class="w"> </span>restart<span class="w"> </span>deploy/translate
 </code></pre></div>
 <p>The catalog is now answering. Any MCP client can read it through the
 <code>veles-mcp</code> door; here is the tool surface a real deployment exposes:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="gp">$ </span><span class="c1"># tools/list on the veles-mcp door</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="go">get_tables            get_table_details</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="go">get_entities          get_entity_details</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="go">get_relationships     get_pattern_queries</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="go">get_model             list_roles           resolve_area</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="gp">$ </span><span class="c1"># tools/list on the veles-mcp door</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="go">get_tables                  get_table_details</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="go">get_entities                get_entity_details</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="go">get_relationships           get_pattern_queries</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="go">get_pattern_query_details   get_sql_queries</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="go">get_sql_query_details       get_stored_procedures</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="go">get_stored_procedure_details</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="go">get_model                   list_roles</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="go">get_roles_for_entity        resolve_area</span>
 </code></pre></div>
-<p>Calling <code>get_entities</code> returns your logical model — real transcript from a
-deployed Czech field-sales catalog:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">[</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"er.entity.faktura"</span><span class="p">,</span><span class="w">              </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"faktura"</span><span class="w"> </span><span class="p">},</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"er.entity.prodeje"</span><span class="p">,</span><span class="w">              </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"prodeje"</span><span class="w"> </span><span class="p">},</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"er.entity.návštěva_zákazníka"</span><span class="p">,</span><span class="w">   </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"návštěva_zákazníka"</span><span class="w"> </span><span class="p">},</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"er.entity.organizační_struktura"</span><span class="p">,</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"organizační_struktura"</span><span class="w"> </span><span class="p">}</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="p">]</span>
+<p>Calling <code>get_entities</code> returns your logical model — real transcript over the
+Hartland model, <code>get_entities {"package": "hartland"}</code> (20 entities; the first
+six shown, each trimmed to <code>id</code> and <code>name</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="p">[</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"er.entity.call_center"</span><span class="p">,</span><span class="w">     </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"call_center"</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"er.entity.catalog_returns"</span><span class="p">,</span><span class="w"> </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"catalog_returns"</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"er.entity.catalog_sales"</span><span class="p">,</span><span class="w">   </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"catalog_sales"</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"er.entity.channel_sales"</span><span class="p">,</span><span class="w">   </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"channel_sales"</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"er.entity.customer"</span><span class="p">,</span><span class="w">        </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"customer"</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"er.entity.customer_address"</span><span class="p">,</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"customer_address"</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">  </span><span class="err">…</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="p">]</span>
 </code></pre></div>
 <div class="admonition success">
 <p class="admonition-title">You should now see…</p>
@@ -1708,17 +1753,27 @@ speak MCP — and <strong>forward your user's identity</strong> per the identity
 is what makes the governance in step 6 real rather than decorative. Add the door
 to your client (Claude Desktop's <code>mcpServers</code>, or <code>claude mcp add</code>), pointing at
 the door's URL and forwarding an <code>Authorization: Bearer &lt;token&gt;</code> from your IdP.</p>
+<p>With the bundled dev IdP, a bearer for the <code>demo</code> user comes from the realm's
+public <code>tatrman-agent</code> client:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>ttr<span class="w"> </span>port-forward<span class="w"> </span>svc/ttr-keycloak<span class="w"> </span><span class="m">8080</span>:8080<span class="w"> </span><span class="p">&amp;</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8080/realms/tatrman/protocol/openid-connect/token<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="nv">grant_type</span><span class="o">=</span>password<span class="w"> </span>-d<span class="w"> </span><span class="nv">client_id</span><span class="o">=</span>tatrman-agent<span class="w"> </span>-d<span class="w"> </span><span class="nv">username</span><span class="o">=</span>demo<span class="w"> </span>-d<span class="w"> </span><span class="nv">password</span><span class="o">=</span>demo
+</code></pre></div>
+<p>On chart 0.9.0 that call first answers <code>"Account is not fully set up"</code>: Keycloak
+26 requires an email, first and last name on every user, and the dev realm's
+<code>demo</code> user has none. Fill them in once in the admin console (<code>admin</code>/<code>admin</code>,
+realm <code>tatrman</code> → Users → <code>demo</code>) and the call returns the token.</p>
 <p>The doors are <strong>fail-closed</strong>. Call one without an identity and it refuses,
 naming exactly what it needs — real transcript from the <code>query</code> door:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">{</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">"tool"</span><span class="p">:</span><span class="w"> </span><span class="s2">"compile"</span><span class="p">,</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="nt">"messages"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nt">"severity"</span><span class="p">:</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span><span class="w"> </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"missing_user_identity"</span><span class="p">,</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">      </span><span class="nt">"text"</span><span class="p">:</span><span class="w"> </span><span class="s2">"No user identity supplied (Authorization Bearer / X-User-Id / user_id arg)."</span><span class="w"> </span><span class="p">}</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span><span class="p">],</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="nt">"pipelineWarnings"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="nt">"tool"</span><span class="p">:</span><span class="w"> </span><span class="s2">"compile"</span><span class="p">,</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span><span class="nt">"messages"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nt">"severity"</span><span class="p">:</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span><span class="w"> </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"missing_user_identity"</span><span class="p">,</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">      </span><span class="nt">"text"</span><span class="p">:</span><span class="w"> </span><span class="s2">"No user identity supplied (Authorization Bearer / X-User-Id / user_id arg)."</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">  </span><span class="nt">"pipelineWarnings"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="p">}</span>
 </code></pre></div>
 <p>That refusal <em>is</em> the contract: no identity, no answer — never a guess about who
 is asking. Forward the bearer and the same call proceeds as your user. See
@@ -1736,19 +1791,19 @@ your model, compiles it to SQL over your real tables, applies your governance,
 and returns the answer <strong>with a record of what it did</strong>.</p>
 <p>You can watch this without touching a row of data: <code>compile</code> runs the whole
 translation and governance pipeline and hands back the SQL it <em>would</em> execute.
-Here a question over the logical entity <code>prodeje</code> (Czech: <em>sales</em>) compiles to
-physical SQL over the real table — real transcript:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="gp">$ </span><span class="c1"># compile "SELECT * FROM prodeje" as your user</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="go">SELECT "IDSUBJADR"    AS "id_dodacího_místa",</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="go">       "IDSKUPZNACZBOZI" AS "id_tržní_skupiny",</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="go">       "DTPOSLEDNI_DOD"  AS "poslední_dodávka",</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="go">       "HDTRZBA_24M"     AS "tržba_24_měsíců",</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="go">       "HDTRZBA_12M"     AS "tržba_12_měsíců"</span>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="go">FROM "XXPRODEJE"</span>
+Here a question over the logical entity <code>store_sales</code> (Hartland's store sales
+lines) compiles to physical SQL over the real table — real transcript. Hartland
+names its entities after their tables, so the call says <code>source_schema: "er"</code> to
+resolve the name against the entity model:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="gp">$ </span><span class="c1"># compile "SELECT * FROM store_sales" as your user</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="gp">$ </span><span class="c1">#   (source_schema: "er", target_dialect: "postgresql")</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="go">SELECT "ss_item_sk" AS "item", "ss_ticket_number" AS "ticket_number", "ss_sold_date_sk" AS "sold_date", "ss_customer_sk" AS "customer", "ss_addr_sk" AS "addr", "ss_store_sk" AS "store", "ss_promo_sk" AS "promo", "ss_quantity" AS "quantity", "ss_ext_sales_price" AS "ext_sales_price"</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="go">FROM "store_sales"</span>
 </code></pre></div>
-<p>The logical model you curated (<code>prodeje</code>, <code>poslední_dodávka</code>, <code>tržba_24_měsíců</code>)
-became physical SQL over the actual columns (<code>XXPRODEJE</code>, <code>DTPOSLEDNI_DOD</code>,
-<code>HDTRZBA_24M</code>) — the agent never sees, and never needs, the raw column soup.</p>
+<p>The logical model you curated (<code>item</code>, <code>sold_date</code>, <code>ext_sales_price</code>) became
+physical SQL over the actual columns (<code>ss_item_sk</code>, <code>ss_sold_date_sk</code>,
+<code>ss_ext_sales_price</code>) — the agent never sees, and never needs, the raw column
+soup.</p>
 <p>Run the same query with <code>query</code> instead of <code>compile</code> and you get the rows <strong>plus
 the envelope</strong>: <code>pipelineWarnings</code> naming every row-level filter, masked column,
 value-label substitution and cap the platform applied on the way out. Compiling
