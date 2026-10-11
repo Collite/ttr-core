@@ -1,0 +1,14 @@
+package billing.products
+
+model er
+
+def entity item_class { description: """Product classes within a category.
+""",
+    nameAttribute: class_name,
+    attributes: [
+        def attribute sk { type: int, isKey: true, description: "Unique class identifier" },
+        def attribute class_code { type: text, optional: true, description: "Unique class code" },
+        def attribute class_name { type: text, optional: true, description: "Class name" },
+        def attribute category_id { type: int, optional: true, description: "Link to the parent category" }
+    ]
+}

@@ -11,7 +11,7 @@ import org.tatrman.plan.v1.PlanNode
  * in the unparsed SQL.
  *
  * Why this exists: [ParameterBridge] emits one positional `?` per *occurrence* of a `{name}`, so a
- * name referenced twice — e.g. `KOD_STR LIKE {x} || '%' OR NAZEV_STR LIKE '%' || {x} || '%'` —
+ * name referenced twice — e.g. `s_store_id LIKE {x} || '%' OR s_store_name LIKE '%' || {x} || '%'` —
  * produces **two** `?` but only **one** binding. Binding the distinct named values 1:1 (as the
  * worker does) leaves the trailing positions unset (`The value is not set for the parameter
  * number N`). This object replays each `?` to its name's value, so repeats are bound at every

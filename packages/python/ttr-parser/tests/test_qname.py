@@ -16,15 +16,15 @@ from ttr_parser.semantics import Qname
 
 
 def test_segments_multi() -> None:
-    assert Qname("er.entity.artikl").segments == ("er", "entity", "artikl")
+    assert Qname("er.entity.item").segments == ("er", "entity", "item")
 
 
 def test_segments_with_sub_part() -> None:
-    assert Qname("er.entity.artikl.id_artiklu").segments == (
+    assert Qname("er.entity.item.sk").segments == (
         "er",
         "entity",
-        "artikl",
-        "id_artiklu",
+        "item",
+        "sk",
     )
 
 
@@ -33,7 +33,7 @@ def test_segments_single() -> None:
 
 
 def test_last_multi() -> None:
-    assert Qname("er.entity.artikl").last == "artikl"
+    assert Qname("er.entity.item").last == "item"
 
 
 def test_last_single() -> None:
@@ -41,7 +41,7 @@ def test_last_single() -> None:
 
 
 def test_parent_multi() -> None:
-    assert Qname("er.entity.artikl").parent == Qname("er.entity")
+    assert Qname("er.entity.item").parent == Qname("er.entity")
 
 
 def test_parent_chain() -> None:
@@ -60,8 +60,8 @@ def test_parent_of_single_is_none() -> None:
 
 
 def test_str_round_trips() -> None:
-    assert str(Qname("er.entity.artikl")) == "er.entity.artikl"
-    assert str(Qname("db.dbo.QZBOZI_DF")) == "db.dbo.QZBOZI_DF"
+    assert str(Qname("er.entity.item")) == "er.entity.item"
+    assert str(Qname("db.dbo.CATALOG_SALES")) == "db.dbo.CATALOG_SALES"
 
 
 def test_value_field() -> None:

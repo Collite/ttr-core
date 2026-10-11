@@ -1,0 +1,10 @@
+package billing.invoicing
+
+model er
+
+def entity store_return { description: """Store returns.
+""",
+    attributes: [
+        def attribute sk { type: int, isKey: true, description: "Unique store return identifier" }
+    ]
+}

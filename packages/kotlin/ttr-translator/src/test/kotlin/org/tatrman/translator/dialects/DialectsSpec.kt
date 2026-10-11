@@ -38,7 +38,7 @@ class DialectsSpec :
             Dialects.MYSQL.javaClass shouldBe MysqlSqlDialect::class.java
         }
 
-        // Phase 08 A3 / DF-T04 — DuckDB.
+        // Phase 08 A3 — DuckDB.
         "DUCKDB extends Postgres dialect (Postgres-compatible for the constructs we emit)" {
             (Dialects.DUCKDB is DuckDbSqlDialect) shouldBe true
             (Dialects.DUCKDB is PostgresqlSqlDialect) shouldBe true

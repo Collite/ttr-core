@@ -2,34 +2,58 @@
 package org.tatrman.ttrp.dialect.b
 
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldNotBeBlank
+import org.tatrman.ttrp.diagnostics.TtrpDiagnosticId
 
 /**
- * T7.1.2: the reject table is a complete, versioned fixture — every TTRP-B-00N id (001..008)
- * plus the shared TTRP-EQ-001 has an entry with a non-blank message + suggestion (the assist
- * repair vocabulary guarantee, C4-b-iii; consumed untouched by Stage 7.2).
+ * B6 — the reject tables are complete, versioned fixtures PER SKIN (`rejects.en.yaml`,
+ * `rejects.cs.yaml`): the same ids in both, every TTRP-B diagnostic id plus the shared TTRP-EQ-001
+ * has a row with a message in that language and a suggested correct sentence (the assist repair
+ * vocabulary, C4-b-iii).
  */
 class TtrbRejectTableSpec :
     StringSpec({
-        val table = TtrB.rejectTable
+        val bIds = TtrpDiagnosticId.entries.map { it.id }.filter { it.startsWith("TTRP-B-") }
 
-        "every TTRP-B id 001..008 has a table entry with message + suggestion" {
-            (1..8).forEach { n ->
-                val id = "TTRP-B-%03d".format(n)
-                val entry = table.entry(id)
-                entry.message.shouldNotBeBlank()
-                entry.suggest.shouldNotBeBlank()
+        for (skin in TtrbSkin.all) {
+            "rejects.${skin.lang}.yaml: every TTRP-B id + TTRP-EQ-001 has a row with a message and a suggestion" {
+                val table = TtrB.rejects(skin)
+                table.lang shouldBe skin.lang
+                for (id in bIds + "TTRP-EQ-001") {
+                    val row = table.entry(id)
+                    row.message.shouldNotBeBlank()
+                    row.suggest.shouldNotBeBlank()
+                }
+            }
+
+            "rejects.${skin.lang}.yaml: no row names an id the diagnostics catalogue lacks" {
+                (TtrB.rejects(skin).ids() - (bIds + "TTRP-EQ-001").toSet()).shouldBeEmpty()
             }
         }
 
-        "the shared TTRP-EQ-001 entry is present (S9 repair vocabulary)" {
-            val eq = table.entry("TTRP-EQ-001")
-            eq.suggest shouldBe "use ="
+        "both skins carry the same ids, with their own wording" {
+            TtrB.rejects(TtrbSkin.CS).ids() shouldBe TtrB.rejects(TtrbSkin.EN).ids()
+            (
+                TtrB.rejects(TtrbSkin.CS).entry("TTRP-B-104").suggest ==
+                    TtrB.rejects(TtrbSkin.EN).entry("TTRP-B-104").suggest
+            ) shouldBe
+                false
         }
 
-        "the table loads without error and is non-empty" {
-            table.ids() shouldNotBe emptySet<String>()
+        "the shared TTRP-EQ-001 entry keeps its English suggestion (S9 repair vocabulary)" {
+            TtrB.rejectTable.entry("TTRP-EQ-001").suggest shouldBe "use ="
+        }
+
+        "a trigger word belongs to one row of its table" {
+            for (skin in TtrbSkin.all) {
+                val triggers = TtrB.rejects(skin).rows.flatMap { r -> r.triggers.map { it to r.id } }
+                triggers
+                    .groupBy { it.first }
+                    .filterValues { it.size > 1 }
+                    .keys
+                    .shouldBeEmpty()
+            }
         }
     })

@@ -38,6 +38,8 @@ object KeywordTable {
             "of",
             "retries",
             "absorbs",
+            // AG B5: `from "<file>"` — a file-backed container body; soft (also in `identifier`).
+            "from",
         )
 
     /** Words that appear only inside expressions (S9/B-T5). `null` is a literal-keyword; see [booleanLiterals]. */

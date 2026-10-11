@@ -128,6 +128,8 @@ const allKinds = [
   'query',
   'role',
   'er2cncRole',
+  // 0.14 — named row schema (`def schema`): description / tags / columns.
+  'schema',
 ];
 
 const searchSubProperties = extractProps('searchSubProperty');

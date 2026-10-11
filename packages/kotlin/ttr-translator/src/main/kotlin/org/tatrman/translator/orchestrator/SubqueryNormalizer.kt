@@ -21,8 +21,7 @@ import org.tatrman.translator.framework.TranslatorFramework
  * (see `Expressions.encodeSubquery`). That is fine for an **uncorrelated** sub-query. A
  * **correlated** one — the inner query references the outer row, e.g. `td.customer_id = z.id` —
  * instead carries a `RexFieldAccess` over a `RexCorrelVariable`, which has no `plan.v1`
- * representation: the encoder throws `RexNode kind 'RexFieldAccess' is not in the v1 wire format`
- * (ai-models#27).
+ * representation: the encoder throws `RexNode kind 'RexFieldAccess' is not in the v1 wire format`.
  *
  * This stage decorrelates **only when a correlated sub-query is present**, so uncorrelated
  * sub-queries keep their `SubqueryExpression` encoding and the two-half pipeline's REL_NODE

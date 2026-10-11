@@ -1,44 +1,48 @@
-// AG-P0 aip-hero: a two-check order program over a host-GENERATED model (query-bound + table-bound
-// entities) against the `aip` (sql-text) world. Exercises every sql-text seam: logical rename over
-// physical columns, an inline (`__filter` query) source, runtime params, a relation join in its
-// logical spelling, select/calc, and semi / anti / cross joins.
-uses world "dfp.worlds.platform"
-import dfp.obchod.*
+// AG-P0 aip-hero: a two-check order-release program over a host-GENERATED model (query-bound + table-bound
+// entities) against the `aip` (sql-text) world. The model is a slice of the Hartland demo database
+// (TPC-DS): a marketplace order (`catalog_orders`, query-bound through its row filter) with its lines
+// (`catalog_sales`), checked against the weekly stock of one distribution centre (`inventory`).
+// Exercises every sql-text seam: logical rename over physical columns, an inline (`__filter` query)
+// source, runtime params, a relation join in its logical spelling, select/calc, and semi / anti /
+// cross joins.
+uses world "hartland.worlds.platform"
+import hartland.obchod.*
 
-param zakázka_id: int
-param sklad:      string = "20"
+param objednávka_id: int
+param centrum:       int = 1
+param stav_k:        int
 
-container zakázka(out hlavička, out řádky) target erp {
-    z = load(zakázka) -> filter(id_zakázky = zakázka_id and stav_zakázky = 1)
-    hlavička = z -> select(id_zakázky, číslo_zakázky, id_subjektu)
-    r = load(řádek_zakázky)
-    rz = join(left: r, right: z, type: inner, on: relation řádek_zakázka)
-    řádky = rz -> select(id_řádku_zakázky, id_zakázky, id_artiklu, množství)
+container objednávka(out hlavička, out řádky) target erp {
+    o = load(objednávka) -> filter(číslo_objednávky = objednávka_id and centrum_podpory = 1)
+    hlavička = o -> select(číslo_objednávky, id_zákazníka, datum_prodeje)
+    r = load(řádek_objednávky)
+    ro = join(left: r, right: o, type: inner, on: relation řádek_objednávka)
+    řádky = ro -> select(číslo_objednávky, id_produktu, množství, cena)
 }
 
 container sklad(in řádky, out výpadky) target erp {
-    zásoba = load(zásoba_na_skladě) -> filter(kód_skladu = sklad)
-    j = join(left: řádky, right: zásoba, type: left, on: left.id_artiklu = right.id_artiklu)
-    d = j -> calc { disponibilní = coalesce(disponibilní_pro_ověření, 0) }
-    výpadky = d -> filter(disponibilní < množství) -> select(id_zakázky, id_artiklu, množství, disponibilní)
+    zásoba = load(stav_zásoby) -> filter(id_centra = centrum and datum_stavu = stav_k)
+    j = join(left: řádky, right: zásoba, type: left, on: left.id_produktu = right.id_produktu)
+    d = j -> calc { disponibilní = coalesce(na_skladě, 0) }
+    výpadky = d -> filter(disponibilní < množství) -> select(číslo_objednávky, id_produktu, množství, disponibilní)
 }
 
 container skladem(in řádky, out vedené, out nevedené) target erp {
-    z = load(zásoba_na_skladě)
-    vedené   = join(left: řádky, right: z, type: semi, on: left.id_artiklu = right.id_artiklu)
-    nevedené = join(left: řádky, right: z, type: anti, on: left.id_artiklu = right.id_artiklu)
+    z = load(stav_zásoby)
+    vedené   = join(left: řádky, right: z, type: semi, on: left.id_produktu = right.id_produktu)
+    nevedené = join(left: řádky, right: z, type: anti, on: left.id_produktu = right.id_produktu)
 }
 
 container verdikt(in hlavička, in výpadky, out uvolnit) target erp {
-    n = výpadky -> aggregate { n_výpadky = count(id_artiklu) }
+    n = výpadky -> aggregate { n_výpadků = count(id_produktu) }
     v = join(left: hlavička, right: n, type: cross)
-    uvolnit = filter(v, n_výpadky = 0)
+    uvolnit = filter(v, n_výpadků = 0)
 }
 
-zakázka.řádky    -> sklad.řádky
-zakázka.řádky    -> skladem.řádky
-zakázka.hlavička -> verdikt.hlavička
-sklad.výpadky    -> verdikt.výpadky
+objednávka.řádky    -> sklad.řádky
+objednávka.řádky    -> skladem.řádky
+objednávka.hlavička -> verdikt.hlavička
+sklad.výpadky       -> verdikt.výpadky
 
 verdikt.uvolnit  -> display(uvolnit)
 sklad.výpadky    -> display(výpadky)

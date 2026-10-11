@@ -1,0 +1,3 @@
+# The root .gitignore drops every `generated/` directory (build output). Here `generated/` is the fixture's
+# extra model root (`extra-model-roots`, mirroring a host-generated .ttrm tree), so keep it.
+!generated/

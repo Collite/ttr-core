@@ -1,0 +1,11 @@
+// A conditional value, written by hand: case when … then … else … end (one or more arms).
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container priorita(out serazene) target erp {
+  serazene = load(objednávky)
+    -> calc { pásmo = case when částka > 1000 then "A" when částka > 100 then "B" else "C" end }
+    -> calc { kontakt = case when email_zástupce is null then "chybí" else email_zástupce end }
+}
+
+priorita.serazene -> display(serazene)

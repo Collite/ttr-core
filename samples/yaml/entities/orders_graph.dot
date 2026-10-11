@@ -1,0 +1,32 @@
+digraph Orders {
+  rankdir=LR;
+  node [shape=box, style="rounded,filled", fillcolor="#f4f4f4", fontname="Segoe UI"];
+
+  date_dim [label="date_dim"];
+  catalog_order [label="catalog_order"];
+  catalog_sales [label="catalog_sales"];
+  catalog_returns [label="catalog_returns"];
+  reason [label="reason"];
+
+  // External entities (from other files)
+  customer [label="customer", fillcolor="#e0e0e0", style="rounded,filled,dashed"];
+  customer_address [label="customer_address", fillcolor="#e0e0e0", style="rounded,filled,dashed"];
+  item [label="item", fillcolor="#e0e0e0", style="rounded,filled,dashed"];
+  warehouse [label="warehouse", fillcolor="#e0e0e0", style="rounded,filled,dashed"];
+
+  date_dim -> date_dim [label="same day last year"];
+
+  catalog_order -> date_dim;
+  catalog_order -> customer [label="bill-to"];
+  catalog_order -> customer [label="ship-to"];
+  catalog_order -> customer_address;
+  catalog_order -> warehouse;
+
+  catalog_sales -> catalog_order;
+  catalog_sales -> item;
+
+  catalog_returns -> catalog_sales [label="item + order number"];
+  catalog_returns -> reason;
+  catalog_returns -> date_dim;
+  catalog_returns -> warehouse;
+}

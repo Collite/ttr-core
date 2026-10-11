@@ -70,6 +70,13 @@
         "icon": { "light": "./icons/ttrp.svg", "dark": "./icons/ttrp.svg" }
       },
       {
+        "id": "ttrb-cs",
+        "extensions": [".ttrb-cs"],
+        "aliases": ["TTR-B (česky)", "TTR-B Czech"],
+        "configuration": "./language-configuration/ttrb.json",
+        "icon": { "light": "./icons/ttrp.svg", "dark": "./icons/ttrp.svg" }
+      },
+      {
         "id": "ttrl",
         "extensions": [".ttrl"],
         "aliases": ["TTR view-state"],
@@ -149,6 +156,7 @@
     "onLanguage:ttrp",
     "onLanguage:ttr-sql",
     "onLanguage:ttr-pandas",
-    "onLanguage:ttrb"
+    "onLanguage:ttrb",
+    "onLanguage:ttrb-cs"
   ]
 }

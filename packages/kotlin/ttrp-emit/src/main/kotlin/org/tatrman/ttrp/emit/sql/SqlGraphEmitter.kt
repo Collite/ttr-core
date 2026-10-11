@@ -248,6 +248,11 @@ class SqlGraphEmitter(
                     detail = "island '${container.label}' IN port '$port' has no feeding edge",
                     location = container.location,
                 )
+        // A program-level model `load(…)` wired into the port (a bare program's derived in-port): the host
+        // statement reads the model object itself, as a member load would.
+        (graph.nodes[feed.from.nodeId] as? Load)?.let { load ->
+            graph.loadSources[load.id]?.let { return modelInput(load.id, it) }
+        }
         val producer =
             graph.containers[feed.from.nodeId]
                 ?: throw TtrpEmitException(
@@ -258,7 +263,7 @@ class SqlGraphEmitter(
                     location = container.location,
                 )
         val columns =
-            if (producer.fragment != null) {
+            if (producer.verbatimFragment != null) {
                 stagingSchema(port, container)
             } else {
                 SqlGraphEmitter(graph, world, sqlText = true)

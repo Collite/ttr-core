@@ -1,0 +1,172 @@
+# TTR-B reject table — English skin (`"""ttrb`, `*.ttrb`). Versioned fixture (contracts §8): every
+# row has a corpus fixture (ttrp-frontend src/test/resources/ttrb/rejects/en/<id>.ttrb) that triggers
+# exactly it, and the table doubles as the assist repair vocabulary (C4-b-iii, C4-d). The Czech skin
+# has the same ids in rejects.cs.yaml — same detection, its own language.
+#
+# Detection is deterministic (P2 — no NLP): `triggers` are sentence-initial words (matched case- and
+# diacritic-insensitively) that name a row; the other rows are detected by token shape (comment
+# lexis, a stray character, `is <word> <operand>`, block layout) or, after a syntax error, by the
+# sentence's first word. `{word}` in a message is the offending word.
+lang: en
+version: 2
+
+rejects:
+  - id: TTRP-B-001
+    form: sentence-initial UPDATE
+    triggers: [update]
+    example: "Update orders set status to 'closed'."
+    message: "TTR-B does not change rows in place — `{word}` is not a sentence verb."
+    suggest: "To ask the host for a change: Set <attribute> of <entity> with key <key> to <value> with reason \"<reason>\". To write a table: Store that to <model-ref>."
+    decision: C4-b, AG-B6
+
+  - id: TTRP-B-002
+    form: sentence-initial INSERT
+    triggers: [insert]
+    example: "Insert into orders values (1)."
+    message: "TTR-B has no insert — rows are added with Combine, tables are written with Store."
+    suggest: "Combine that with <name>. / Store that to <model-ref>."
+    decision: C4-b
+
+  - id: TTRP-B-003
+    form: sentence-initial DROP | TRUNCATE | ALTER
+    triggers: [drop, truncate, alter]
+    example: "Drop the orders table."
+    message: "TTR-B has no DDL."
+    suggest: "Model changes belong in TTR-M; data writes are Store: Store that to <model-ref>."
+    decision: C4-b
+
+  - id: TTRP-B-004
+    form: sentence-initial word not in the verb roster (catch-all; also an unrecognised sentence)
+    example: "Frobnicate the orders."
+    message: "Not a TTR-B sentence (`{word}`). The roster: Load, Keep/Take/Select, Filter, Remove/Delete, Rename, Convert/Retype, Create/Compute, Summarize, Join, Sort, Combine/Append, Store, Show/Display, If, Count, Attach, Send, Set, Create a manual task, Call/Name."
+    suggest: "Start the sentence with a roster verb, e.g. Keep only the rows where <condition>."
+    decision: C4-b
+
+  - id: TTRP-B-005
+    form: "'//' or '/*' comment lexis"
+    example: "// a C-style comment"
+    message: "TTR-B comments start with #."
+    suggest: "# a comment"
+    decision: S19
+
+  - id: TTRP-B-006
+    form: a sentence in another skin's language
+    example: "Načti objednávky."
+    message: "`{word}` starts a sentence in another language — this fragment reads English sentences (`\"\"\"ttrb`)."
+    suggest: "Mark the fragment \"\"\"ttrb-cs (a file: .ttrb-cs, or a first line `# ttr: dialect=b lang=cs`) to write Czech sentences."
+    decision: AG-B2 (supersedes S20)
+
+  - id: TTRP-B-007
+    form: comparison phrase not in the verbose synonym table
+    example: "Keep rows where amount is roughly 100."
+    message: "`is {word}` is not a TTR-B comparison (closed table, never fuzzy)."
+    suggest: "Use a listed form — is more than, is less than, is not more than, is not less than, is, is not, is empty, is one of (…), is between … and … — or an operator: > < >= <= = <>."
+    decision: C4-c
+
+  - id: TTRP-B-008
+    form: sentence-initial PIVOT
+    triggers: [pivot]
+    example: "Pivot the orders by region."
+    message: "Pivot is written in canonical TTR-P only."
+    suggest: "Author the pivot in a canonical container: pivot(…)."
+    decision: C2-b
+
+  - id: TTRP-B-101
+    form: a character no TTR-B sentence admits
+    example: "Keep rows where amount > 100 €."
+    message: "`{word}` is not part of a TTR-B sentence."
+    suggest: "Remove the character, or put the text in quotes: \"100 €\"."
+    decision: AG-B6
+
+  - id: TTRP-B-102
+    form: "a malformed block header (`If …` without `:` at the line end, or no indented sentence after it)"
+    example: "If amount is more than 100"
+    message: "A block is `If <condition>:` ending its line, followed by its sentences on the next lines, indented."
+    suggest: "If amount is more than 1000:   — then, on the next line, indented: Send an e-mail to … ."
+    decision: AG-B3
+
+  - id: TTRP-B-103
+    form: a sentence whose indentation matches no open block
+    example: "  Show the result as big."
+    message: "This sentence's indentation matches no block — indent it like the sentences of its block, or like the `If` line to leave the block."
+    suggest: "Indent every sentence of a block by the same amount."
+    decision: AG-B3
+
+  - id: TTRP-B-104
+    form: a malformed e-mail sentence
+    example: "Send an e-mail to rep with subject \"Hi\", key id."
+    message: "An e-mail sentence names a recipient, a subject, a template and a key — in this order."
+    suggest: "Send an e-mail to <column> | department \"<name>\" | <column>, otherwise department \"<name>\" with subject \"<subject>\", template \"<template>\", key <key> [and attachments <a>, <b>]."
+    decision: AG-B4
+
+  - id: TTRP-B-105
+    form: a malformed set-field sentence
+    example: "Set status of orders to \"x\" with reason \"r\"."
+    message: "A set sentence names an attribute, an entity, a key, a value and a reason — in this order."
+    suggest: "Set <attribute> of <entity> with key <key> to <value> with reason \"<reason>\"."
+    decision: AG-B4
+
+  - id: TTRP-B-106
+    form: a malformed manual-task sentence
+    example: "Create a manual task for lead with description \"Check it.\"."
+    message: "A manual task names a solver, a title and a description — in this order."
+    suggest: "Create a manual task for <column> | department \"<name>\" \"<title>\" with description \"<description>\" [and attachment <a>]."
+    decision: AG-B4
+
+  - id: TTRP-B-107
+    form: a malformed count sentence
+    example: "Count the rows as n."
+    message: "A count sentence names the table whose rows it counts and the name of the count."
+    suggest: "Count the rows of <table> as <name>."
+    decision: AG-B4
+
+  - id: TTRP-B-108
+    form: a malformed attach sentence
+    example: "Attach to the result."
+    message: "An attach sentence names the (one-row) table it attaches."
+    suggest: "Attach <table> to the result."
+    decision: AG-B4
+
+  - id: TTRP-B-109
+    form: a keyword where a name belongs
+    example: "Load orders as where."
+    message: "`{word}` is a keyword of this language, not a name."
+    suggest: "Choose another name — a keyword cannot name a column, a table or a result."
+    decision: AG-B6
+
+  - id: TTRP-B-110
+    form: "an `If …:` block inside a block"
+    example: "If region is \"N\":  If status is \"open\":"
+    message: "Blocks do not nest — an `If …:` block cannot hold another block."
+    suggest: "Join the conditions with `and` in one block: If <a> and <b>:"
+    decision: AG-B3
+
+  - id: TTRP-B-111
+    form: a malformed output sentence
+    example: "Send that to big."
+    message: "An output sentence names the container OUT port that carries the current value."
+    suggest: "Send that to output <port>."
+    decision: AG-B7
+
+  - id: TTRP-B-112
+    form: an output to a port the container does not declare
+    example: "Send that to output elsewhere."
+    message: "`{word}` is not an OUT port of this container."
+    suggest: "Declare it in the container header — container <name>(…, out <port>) … — or send to a declared port."
+    decision: AG-B7
+
+  - id: TTRP-B-113
+    form: a value a sentence produces that nothing reads (no later sentence, port or display)
+    example: "Keep the rows where store is \"S1\".   — then the next sentence starts from another value"
+    message: "The result of this `{word}` sentence is never used — no later sentence, output or display reads it, so it does not take effect."
+    suggest: "Name it and use the name — Call that <name>. — continue from it with `that`, or send it out: Send that to output <port>."
+    decision: AG-B8
+
+  # Shared canonical diagnostic (S9) surfaced by the TTR-B scanner too — `==` is rejected everywhere
+  # except TTR-pandas. Kept here so the reject spec reads its suggestion from one source.
+  - id: TTRP-EQ-001
+    form: "== used as equality"
+    example: "Keep the rows where status == 'open'."
+    message: "`==` is not equality in TTR-B."
+    suggest: "use ="
+    decision: S9

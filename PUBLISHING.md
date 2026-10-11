@@ -370,11 +370,10 @@ gpr.token=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 In Actions, `GITHUB_ACTOR` + `GITHUB_TOKEN` stand in for the pair — but the
 workflow must declare `permissions: packages: read`, and the env must reach the
-Gradle step (it is not exported automatically). A workflow in ANOTHER
-organisation (ai-platform lives under `DFPartner`) cannot use its own
-`GITHUB_TOKEN` for this and needs a real PAT in a secret; ai-platform's
-`_reusable-build-gradle.yml` shows the shape, including a preflight that fails
-with a rotate-the-token message rather than an opaque 401 mid-resolution.
+Gradle step (it is not exported automatically). A consumer workflow in ANOTHER
+organisation cannot use its own `GITHUB_TOKEN` for this and needs a real PAT in
+a secret — ideally behind a preflight step that fails with a rotate-the-token
+message rather than an opaque 401 mid-resolution.
 
 Note that **GitHub Packages serves nothing anonymously** — not even a public
 repository's packages (Gotcha 1). Public-ness buys you a token with no scopes

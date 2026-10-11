@@ -1,73 +1,60 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttrp.dialect.b
 
-import org.antlr.v4.runtime.BaseErrorListener
-import org.antlr.v4.runtime.CharStreams
-import org.antlr.v4.runtime.CommonTokenStream
-import org.antlr.v4.runtime.RecognitionException
-import org.antlr.v4.runtime.Recognizer
-import org.antlr.v4.runtime.Token
 import org.tatrman.ttrp.ast.FragmentDecomposition
 import org.tatrman.ttrp.ast.SourceLocation
-import org.tatrman.ttrp.diagnostics.TtrpDiagnostic
-import org.tatrman.ttrp.dialect.RejectTable
 import org.tatrman.ttrp.dialect.sql.TtrSqlLoc
 import org.tatrman.ttrp.parser.TtrpParser
-import org.tatrman.ttrp.parser.generated.TTRBLexer
-import org.tatrman.ttrp.parser.generated.TTRBParser
 
 /**
- * The TTR-B fragment front door (T7.1.3/T7.1.7). Peeled `"""ttrb` interior + host offset →
- * canonical AST + host-mapped diagnostics. A curated reject (T7.1.2 table) is named BEFORE
- * any bare syntax error (C2-g); a clean parse decomposes sentence-wise (C2-a-β). The
- * interior is never rewritten (C2-f) — this parse is derived from the verbatim `sourceText`.
+ * The TTR-B fragment front door (T7.1.3/T7.1.7). Peeled `"""ttrb` / `"""ttrb-cs` interior +
+ * host offset → canonical AST + host-mapped diagnostics. The [TtrbSkin] picks the keyword table
+ * (AG B2) and the reject table (AG B6). A curated reject is named BEFORE any bare syntax error
+ * (C2-g); a failed parse gets the most specific help the scanner can give; a clean parse decomposes
+ * sentence-wise (C2-a-β). The interior is never rewritten (C2-f) — this parse is derived from the
+ * verbatim `sourceText`.
  */
 object TtrB {
-    val rejectTable: RejectTable = RejectTable.load("/rejects/ttr-b.rejects.toml")
+    private val tables = HashMap<String, TtrbRejectTable>()
+
+    /** The reject table of [skin] (`rejects.<lang>.yaml`). */
+    fun rejects(skin: TtrbSkin): TtrbRejectTable =
+        synchronized(tables) { tables.getOrPut(skin.lang) { TtrbRejectTable.load(skin.lang) } }
+
+    /** The English reject table (the default skin's). */
+    val rejectTable: TtrbRejectTable get() = rejects(TtrbSkin.EN)
 
     fun decompose(
         sourceText: String,
         interior: SourceLocation,
         outPort: String?,
+        skin: TtrbSkin = TtrbSkin.EN,
+        /** The container's IN ports — names in every sentence, never loaded (B7). */
+        inPorts: Set<String> = emptySet(),
+        /** The container's declared OUT ports; null when unknown (bare / corpus — no check). */
+        outPorts: Set<String>? = null,
     ): FragmentDecomposition {
         val loc = TtrSqlLoc(interior)
-        val diags = mutableListOf<TtrpDiagnostic>()
-
-        val lexer = TTRBLexer(CharStreams.fromString(sourceText))
-        lexer.removeErrorListeners()
-        val tokenStream = CommonTokenStream(lexer)
-        tokenStream.fill()
-        val defaultTokens = tokenStream.tokens.filter { it.channel == Token.DEFAULT_CHANNEL }
+        val parsed = TtrbSyntax.parse(sourceText, skin)
+        val scanner = TtrbRejectScanner(rejects(skin), loc, skin)
 
         // 1) Curated reject scan — one primary diagnostic, wins over syntax noise.
-        val reject = TtrbRejectScanner(rejectTable, loc).scan(defaultTokens)
+        val reject = scanner.scan(parsed.tokens, parsed.indentProblems)
         if (reject != null) return FragmentDecomposition(emptyList(), listOf(reject), emptyList())
 
-        // 2) Parse.
-        val parser = TTRBParser(tokenStream)
-        parser.removeErrorListeners()
-        var syntaxError: SourceLocation? = null
-        parser.addErrorListener(
-            object : BaseErrorListener() {
-                override fun syntaxError(
-                    r: Recognizer<*, *>?,
-                    sym: Any?,
-                    line: Int,
-                    col: Int,
-                    msg: String,
-                    e: RecognitionException?,
-                ) {
-                    if (syntaxError == null) syntaxError = (sym as? Token)?.let { loc.of(it) } ?: interior
-                }
-            },
-        )
-        val tree = parser.fragmentProgram()
-        if (syntaxError != null) {
-            return FragmentDecomposition(emptyList(), listOf(TtrbRejectScanner.generic(syntaxError!!)), emptyList())
+        // 2) Parse — a failed one gets the shape-specific help (B-102 / B-104…B-109) or B-004.
+        parsed.syntaxErrors.firstOrNull()?.let {
+            return FragmentDecomposition(emptyList(), listOf(scanner.syntax(it, parsed.tokens)), emptyList())
         }
 
         // 3) Decompose.
-        val result = TtrbDecomposer(loc, TtrpParser.catalog).decompose(tree, outPort)
-        return FragmentDecomposition(result.statements, diags, result.derivedInPorts)
+        val result = TtrbDecomposer(loc, TtrpParser.catalog, skin, inPorts, outPorts).decompose(parsed.tree, outPort)
+        return FragmentDecomposition(
+            result.statements,
+            result.diagnostics,
+            result.derivedInPorts,
+            result.actionOutputs,
+            result.outputPorts,
+        )
     }
 }

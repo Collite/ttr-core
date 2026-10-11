@@ -294,6 +294,33 @@
               "type": "string"
             }
           }
+        },
+        "schema": {
+          "description": "Grammar 0.14: an action display's package-qualified `def schema` (omitted for an ordinary display).",
+          "type": "string"
+        },
+        "columns": {
+          "description": "Grammar 0.14: the action display's declared columns, in schema order.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "type"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "optional": {
+                "type": "boolean"
+              }
+            }
+          }
         }
       }
     },

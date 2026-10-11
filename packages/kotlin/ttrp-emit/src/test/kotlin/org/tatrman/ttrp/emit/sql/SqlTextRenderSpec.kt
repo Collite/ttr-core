@@ -29,16 +29,17 @@ class SqlTextRenderSpec :
         "an inline source placeholder becomes its SQL as a derived table named after the source" {
             val out =
                 SqlTextRender.inlineSources(
-                    "SELECT [x] FROM [_ttrp_inline].[zakázka__filter] WHERE [x] = 1",
+                    "SELECT [x] FROM [_ttrp_inline].[catalog_order__filter] WHERE [x] = 1",
                     "_ttrp_inline",
-                    mapOf("zakázka__filter" to "SELECT * FROM T WHERE TYP='POB'"),
+                    mapOf("catalog_order__filter" to "SELECT * FROM T WHERE KIND='EXPRESS'"),
                 )
-            out shouldBe "SELECT [x] FROM (\n    SELECT * FROM T WHERE TYP='POB'\n) AS [zakázka__filter] WHERE [x] = 1"
+            out shouldBe
+                "SELECT [x] FROM (\n    SELECT * FROM T WHERE KIND='EXPRESS'\n) AS [catalog_order__filter] WHERE [x] = 1"
         }
 
         "door dialect: tables lose the sentinel qualifier; brackets become double quotes outside literals" {
-            SqlTextRender.unqualify("FROM [_ttrp_table].[QSDOK] AS [t] JOIN [x].[y]", "_ttrp_table") shouldBe
-                "FROM [QSDOK] AS [t] JOIN [x].[y]"
+            SqlTextRender.unqualify("FROM [_ttrp_table].[catalog_sales] AS [t] JOIN [x].[y]", "_ttrp_table") shouldBe
+                "FROM [catalog_sales] AS [t] JOIN [x].[y]"
             SqlTextRender.doubleQuoted("SELECT [a] AS [b c], 'it''s [x]', [q\"r], [s]]t] FROM [T]") shouldBe
                 "SELECT \"a\" AS \"b c\", 'it''s [x]', \"q\"\"r\", \"s]t\" FROM \"T\""
         }

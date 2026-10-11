@@ -28,9 +28,9 @@ import org.tatrman.translator.orchestrator.UnparseResult
  *
  * The encoder names such a ref from the `LogicalJoin` row type, which Calcite uniquifies (`ID0`,
  * `NAME0`); the decoder rebuilds the join with `RelBuilder.join`, whose frame keeps the duplicates
- * (`[ID, NAME, B_ID, ID, NAME]`), so `field("NAME0")` failed: `field [NAME0] not found`. That was 29 of
- * the 101 legacy templates (every `QHDOK JOIN QSUBJEKT` reading `s.IDSUBJEKT`), and most free-SQL
- * joins over the DF schema.
+ * (`[ID, NAME, B_ID, ID, NAME]`), so `field("NAME0")` failed: `field [NAME0] not found`. That hit a large
+ * share of the legacy-pattern corpus (every join of a document header to its customer that reads the
+ * customer key) and most free-SQL joins over a production schema.
  */
 class DuplicateNameJoinSpec :
     StringSpec({

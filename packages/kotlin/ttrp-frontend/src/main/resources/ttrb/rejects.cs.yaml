@@ -1,0 +1,166 @@
+# Tabulka odmítnutí TTR-B — česká slupka (`"""ttrb-cs`, `*.ttrb-cs`). Stejná id a stejná detekce jako
+# rejects.en.yaml, zprávy a navržené věty česky. Každý řádek má fixture
+# (ttrp-frontend src/test/resources/ttrb/rejects/cs/<id>.ttrb-cs), která spustí právě jeho.
+# `triggers` = slova na začátku věty (bez ohledu na velikost písmen a diakritiku); `{word}` ve zprávě
+# je problematické slovo.
+lang: cs
+version: 2
+
+rejects:
+  - id: TTRP-B-001
+    form: sentence-initial UPDATE
+    triggers: [aktualizuj, uprav]
+    example: "Aktualizuj objednávky."
+    message: "TTR-B nemění řádky na místě — `{word}` není sloveso věty."
+    suggest: "Žádost o změnu: Nastav <atribut> <entita> s klíčem <klíč> na <hodnota> s důvodem \"<důvod>\". Zápis tabulky: Ulož to do <model>."
+    decision: C4-b, AG-B6
+
+  - id: TTRP-B-002
+    form: sentence-initial INSERT
+    triggers: [vlož]
+    example: "Vlož do objednávky řádek."
+    message: "TTR-B nemá vkládání — řádky se přidávají větou Sluč, tabulky se zapisují větou Ulož."
+    suggest: "Sluč to s <tabulka>. / Ulož to do <model>."
+    decision: C4-b
+
+  - id: TTRP-B-003
+    form: sentence-initial DROP | TRUNCATE | ALTER
+    triggers: [zahoď, vyprázdni]
+    example: "Zahoď tabulku objednávky."
+    message: "TTR-B nemění strukturu tabulek."
+    suggest: "Změny modelu patří do TTR-M; data se zapisují větou Ulož: Ulož to do <model>."
+    decision: C4-b
+
+  - id: TTRP-B-004
+    form: sentence-initial word not in the verb roster (catch-all; also an unrecognised sentence)
+    example: "Zprohýbej objednávky."
+    message: "Tohle není věta TTR-B (`{word}`). Slovesa: Načti, Ponech/Vezmi/Vyber, Filtruj, Odstraň/Smaž, Přejmenuj, Převeď/Přetypuj, Vytvoř/Spočti, Shrň, Spoj, Seřaď, Sluč/Přidej, Ulož, Ukaž/Zobraz, Když, Spočítej, Připoj, Pošli, Nastav, Vytvoř ruční úkol, Pojmenuj/Nazvi."
+    suggest: "Začněte větu slovesem ze seznamu, např. Ponech jen řádky, kde <podmínka>."
+    decision: C4-b
+
+  - id: TTRP-B-005
+    form: "'//' or '/*' comment lexis"
+    example: "// komentář ve stylu C"
+    message: "Komentáře v TTR-B začínají znakem #."
+    suggest: "# komentář"
+    decision: S19
+
+  - id: TTRP-B-006
+    form: a sentence in another skin's language
+    example: "Load orders."
+    message: "`{word}` začíná větu v jiném jazyce — tento fragment čte české věty (`\"\"\"ttrb-cs`)."
+    suggest: "Pro anglické věty označte fragment \"\"\"ttrb (soubor .ttrb, nebo první řádek `# ttr: dialect=b lang=en`), jinak větu napište česky: Načti …"
+    decision: AG-B2 (supersedes S20)
+
+  - id: TTRP-B-007
+    form: comparison phrase not in the verbose synonym table
+    example: "Ponech řádky, kde částka je zhruba 100."
+    message: "`je {word}` není porovnání TTR-B (uzavřená tabulka, žádné odhadování)."
+    suggest: "Použijte některý tvar ze seznamu — je větší než, je menší než, je více než, je méně než, není větší než, není menší než, je, není, je prázdný, je jedno z (…), je mezi … a … — nebo operátor: > < >= <= = <>."
+    decision: C4-c
+
+  - id: TTRP-B-008
+    form: sentence-initial PIVOT
+    triggers: [pivotuj, překlop]
+    example: "Pivotuj objednávky podle oblast."
+    message: "Pivot se píše jen v kanonickém TTR-P."
+    suggest: "Pivot zapište v kanonickém kontejneru: pivot(…)."
+    decision: C2-b
+
+  - id: TTRP-B-101
+    form: a character no TTR-B sentence admits
+    example: "Ponech řádky, kde částka > 100 €."
+    message: "`{word}` do věty TTR-B nepatří."
+    suggest: "Znak odstraňte, nebo text dejte do uvozovek: \"100 €\"."
+    decision: AG-B6
+
+  - id: TTRP-B-102
+    form: "a malformed block header (`Když …` without `:` at the line end, or no indented sentence after it)"
+    example: "Když částka je větší než 100"
+    message: "Blok je `Když <podmínka>:` na konci řádku a pod ním odsazené věty bloku."
+    suggest: "Když částka je větší než 1000:   — a na dalším řádku, odsazeně: Pošli e-mail … ."
+    decision: AG-B3
+
+  - id: TTRP-B-103
+    form: a sentence whose indentation matches no open block
+    example: "  Ukaž výsledek jako velke."
+    message: "Odsazení této věty neodpovídá žádnému bloku — odsaďte ji jako ostatní věty jejího bloku, nebo jako řádek `Když` pro konec bloku."
+    suggest: "Všechny věty jednoho bloku odsaďte stejně."
+    decision: AG-B3
+
+  - id: TTRP-B-104
+    form: a malformed e-mail sentence
+    example: "Pošli e-mail zástupce s předmětem \"Ahoj\", klíčem číslo."
+    message: "Věta s e-mailem uvádí příjemce, předmět, šablonu a klíč — v tomto pořadí."
+    suggest: "Pošli e-mail <sloupec> | oddělení \"<název>\" | <sloupec>, jinak oddělení \"<název>\" s předmětem \"<předmět>\", šablonou \"<šablona>\", klíčem <klíč> [a přílohami <a>, <b>]."
+    decision: AG-B4
+
+  - id: TTRP-B-105
+    form: a malformed set-field sentence
+    example: "Nastav stav objednávky na \"x\" s důvodem \"r\"."
+    message: "Věta Nastav uvádí atribut, entitu, klíč, hodnotu a důvod — v tomto pořadí."
+    suggest: "Nastav <atribut> <entita> s klíčem <klíč> na <hodnota> s důvodem \"<důvod>\"."
+    decision: AG-B4
+
+  - id: TTRP-B-106
+    form: a malformed manual-task sentence
+    example: "Vytvoř ruční úkol pro vedoucí s popisem \"Zkontrolovat.\"."
+    message: "Ruční úkol uvádí řešitele, název a popis — v tomto pořadí."
+    suggest: "Vytvoř ruční úkol pro <sloupec> | oddělení \"<název>\" \"<název úkolu>\" s popisem \"<popis>\" [a přílohou <a>]."
+    decision: AG-B4
+
+  - id: TTRP-B-107
+    form: a malformed count sentence
+    example: "Spočítej n jako počet řádků."
+    message: "Věta Spočítej uvádí jméno výsledku a tabulku, jejíž řádky počítá."
+    suggest: "Spočítej <jméno> jako počet řádků <tabulka>."
+    decision: AG-B4
+
+  - id: TTRP-B-108
+    form: a malformed attach sentence
+    example: "Připoj k výsledku."
+    message: "Věta Připoj uvádí (jednořádkovou) tabulku, kterou připojuje."
+    suggest: "Připoj <tabulka> k výsledku."
+    decision: AG-B4
+
+  - id: TTRP-B-109
+    form: a keyword where a name belongs
+    example: "Načti objednávky jako a."
+    message: "`{word}` je v tomto jazyce klíčové slovo, ne jméno."
+    suggest: "Zvolte jiné jméno — klíčové slovo (např. a, s, z, k, na, je, to) nemůže pojmenovat sloupec, tabulku ani výsledek."
+    decision: AG-B6
+
+  - id: TTRP-B-110
+    form: "an `If …:` block inside a block"
+    example: "Když oblast je \"S\":  Když stav je \"otevřená\":"
+    message: "Bloky se nevnořují — blok `Když …:` nemůže obsahovat další blok."
+    suggest: "Spojte podmínky slovem `a` v jednom bloku: Když <a> a <b>:"
+    decision: AG-B3
+
+  - id: TTRP-B-111
+    form: a malformed output sentence
+    example: "Pošli to na velke."
+    message: "Věta s výstupem uvádí výstupní port kontejneru, který ponese aktuální hodnotu."
+    suggest: "Pošli to na výstup <port>."
+    decision: AG-B7
+
+  - id: TTRP-B-112
+    form: an output to a port the container does not declare
+    example: "Pošli to na výstup jinam."
+    message: "`{word}` není výstupní port tohoto kontejneru."
+    suggest: "Deklarujte ho v hlavičce kontejneru — container <jméno>(…, out <port>) … — nebo pošlete hodnotu na deklarovaný port."
+    decision: AG-B7
+
+  - id: TTRP-B-113
+    form: a value a sentence produces that nothing reads (no later sentence, port or display)
+    example: "Ponech řádky, kde store je \"S1\".   — a další věta začne od jiné hodnoty"
+    message: "Výsledek věty `{word}` se nikde nepoužije — nečte ho žádná další věta, výstup ani zobrazení, takže se neprojeví."
+    suggest: "Pojmenujte ho a jméno použijte — Pojmenuj to jako <jméno>. — navažte na něj slovem `to`, nebo ho pošlete ven: Pošli to na výstup <port>."
+    decision: AG-B8
+
+  - id: TTRP-EQ-001
+    form: "== used as equality"
+    example: "Ponech řádky, kde stav == 'otevřená'."
+    message: "`==` v TTR-B neznamená rovnost."
+    suggest: "použijte ="
+    decision: S9

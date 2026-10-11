@@ -3,6 +3,14 @@
 All notable changes to `ttr-parser` (Python) are documented here. While
 `< 1.0.0`, minor bumps may introduce breaking changes (see each entry).
 
+## 0.14.0 — unreleased
+
+- **Grammar 0.14 (additive) — named row schemas (`def schema`).** A new top-level def kind
+  `def schema <name> { description?, tags?, columns: [...] }` parses to `SchemaDef`
+  (`kind = "schema"`, `columns: tuple[ColumnDef, ...]`); each column is written exactly like a
+  table column (`type`, `optional`, …). Tier-neutral — `model_for_kind("schema")` is `db`. The
+  conformance dump gains the `schema` kind (fixture 69), byte-identical to the TS golden.
+
 ## 0.13.0 — 2026-08-13
 
 - **Grammar 0.13 (additive) — localised `description:` (NLS-P10, ⚑GXP-D7).** The

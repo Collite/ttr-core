@@ -1,0 +1,7 @@
+# ttr: dialect=b lang=en
+Load orders as o.
+Compute priority as 1 when amount is bigger than 1000, otherwise 2.
+Compute band as "A" when amount is bigger than 1000, "B" when amount is bigger than 100, otherwise "C".
+Compute contact as "missing" when email is empty, otherwise email.
+Compute flagged as true when note is not empty.
+Compute amount * 2 as total.

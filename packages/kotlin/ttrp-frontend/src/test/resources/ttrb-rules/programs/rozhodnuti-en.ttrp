@@ -1,0 +1,13 @@
+// The same decision in English sentences (identifiers and data stay as the model declares them).
+uses world "shop.worlds.host"
+import shop.prodej.*
+import shop.akce.*
+
+container rozhodnuti target erp """ttrb
+Load objednávky.
+Count the rows of reklamace as počet_reklamací.
+If částka is bigger than 1000:
+    Send an e-mail to email_zástupce, otherwise department "obchod" with subject "Velká objednávka", template "velka_objednavka", key číslo and attachments faktura, dodací_list.
+If stav is "zaplacená" and počet_reklamací is 0:
+    Set stav of objednávky with key číslo to "uvolněná" with reason "zaplaceno, bez reklamací".
+"""

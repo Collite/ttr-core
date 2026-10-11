@@ -1,0 +1,5 @@
+# Action-display fixture project: the hand-written world lives in models/, the host-GENERATED model
+# (entities + `def schema` action row schemas) in a second root, joined by `extra-model-roots`.
+[ttrp]
+world             = "shop.worlds.host"
+extra-model-roots = ["generated"]

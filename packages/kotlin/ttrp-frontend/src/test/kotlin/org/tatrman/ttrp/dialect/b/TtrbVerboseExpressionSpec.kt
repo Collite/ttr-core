@@ -26,7 +26,11 @@ class TtrbVerboseExpressionSpec :
         fun pred(cond: String): Expression {
             val parsed = TtrbCorpus.parse("Keep rows where $cond.")
             parsed.syntaxErrors shouldBe emptyList()
-            val filter = parsed.tree.sentence(0).statement() as TTRBParser.FilterSentenceContext
+            val filter =
+                parsed.tree
+                    .item(0)
+                    .sentence()
+                    .statement() as TTRBParser.FilterSentenceContext
             val bool = (filter.filterStmt() as TTRBParser.KeepFilterContext).boolExpr()
             return folder.foldBool(bool)
         }

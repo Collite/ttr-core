@@ -1,0 +1,157 @@
+# TTR-B keyword skin — English. Serves `"""ttrb` fragments and `*.ttrb` files.
+#
+# ONE grammar (packages/grammar/src/TTRB.g4), one keyword table per language: the grammar
+# declares the keyword token types, a skin spells them. A spelling is one or more words; a
+# word may be hyphenated (`e-mail`). Matching is case- and diacritic-insensitive (`LOAD` =
+# `load`), whole-word, longest phrase first, and only against THIS table — anything it does
+# not spell is an identifier, matched exactly. Closed, never fuzzy (P2).
+#
+#   keywords:  TOKEN: [spelling, …]        a spelling that stands for that one token
+#   sequences: "spelling": [TOKEN, …]      a spelling that stands for several tokens in a row
+#   absent:    [TOKEN, …]                  tokens this language has no word for (always optional
+#                                          noise in the grammar — e.g. articles)
+#   functions: name: catalogue-name        function / aggregate names this language spells
+#                                          differently from the catalogue (`součet` → sum)
+lang: en
+
+keywords:
+  # ---- verbs (C4-b roster) ----
+  LOAD: [load]
+  KEEP: [keep]
+  TAKE: [take]
+  SELECT: [select]
+  FILTER: [filter]
+  REMOVE: [remove]
+  DELETE: [delete]
+  RENAME: [rename]
+  CONVERT: [convert]
+  RETYPE: [retype]
+  CREATE: [create]
+  COMPUTE: [compute]
+  CALCULATE: [calculate]
+  SUMMARIZE: [summarize]
+  JOIN: [join]
+  SORT: [sort]
+  COMBINE: [combine]
+  APPEND: [append]
+  UNION: [union]
+  STORE: [store]
+  SHOW: [show]
+  DISPLAY: [display]
+
+  # ---- helper / noise words ----
+  COLUMN: [column]
+  COLUMNS: [columns]
+  COL: [col]
+  COLS: [cols]
+  FIELD: [field]
+  FIELDS: [fields]
+  ROW: [row]
+  ROWS: [rows]
+  RECORD: [record]
+  RECORDS: [records]
+  LINE: [line]
+  LINES: [lines]
+  ONLY: [only]
+  ALL: [all]
+  THE: [the]
+  ME: [me]
+  NEW: [new]
+  FROM: [from]
+  WITH: [with]
+  "ON": ["on"]
+  BY: [by]
+  OF: [of]
+  TO: [to]
+  AS: [as]
+  FOR: [for]
+  WHERE: [where]
+  WHICH: [which]
+  THAT: [that]
+  THIS: [this]
+  IT: [it]
+  EXCEPT: [except]
+  BUT: [but]
+  EXCLUDING: [excluding]
+  EXCLUDE: [exclude]
+  GROUP: [group]
+  GROUPED: [grouped]
+  FIRST: [first]
+  RESULT: [result]
+  RESULTS: [results]
+  W_TYPE: [type]
+  FILE: [file]
+  SCHEMA: [schema]
+  ASC: [asc]
+  ASCENDING: [ascending]
+  DESC: [desc]
+  DESCENDING: [descending]
+
+  # ---- verbose comparison words (C4-c, ttr-b.synonyms.toml) ----
+  IS: [is]
+  NOT: [not]
+  AND: [and]
+  OR: [or]
+  W_MORE: [more]
+  LESS: [less]
+  THAN: [than]
+  BIGGER: [bigger]
+  LARGER: [larger]
+  HIGHER: [higher]
+  LOWER: [lower]
+  SMALLER: [smaller]
+  FEWER: [fewer]
+  BEFORE: [before]
+  AFTER: [after]
+  COMES: [comes]
+  EQUAL: [equal]
+  EQUALS: [equals]
+  SAME: [same]
+  DOES: [does]
+  EMPTY: [empty]
+  ONE: [one]
+  BETWEEN: [between]
+
+  # ---- literals-as-keywords ----
+  "TRUE": ["true"]
+  "FALSE": ["false"]
+
+  # ---- blocks (B3) ----
+  IF: [if, when]
+
+  # ---- count / attach (B4) ----
+  COUNT: [count]
+  COUNT_NOUN: ["number of"]
+  ATTACH: [attach]
+
+  # ---- actions + recipients (B4) — the action kinds are fixed: send_email, update_field, manual_task ----
+  SEND: [send]
+  EMAIL: ["an e-mail", "an email", e-mail, email]
+  SUBJECT: [subject]
+  TEMPLATE: [template]
+  KEY: [key]
+  ATTACHMENT: [attachment, attachments]
+  SET: [set]
+  REASON: [reason]
+  MANUAL_TASK: ["a manual task", "manual task"]
+  DESCRIPTION: [description]
+  DEPARTMENT: [department]
+  OTHERWISE: [otherwise]
+
+  # ---- container ports (B7) ----
+  OUTPUT: [output]
+
+  # ---- joins (B7) ----
+  OPTIONALLY: [optionally]
+  MATCH_IN: ["have a match in", "has a match in", "with a match in"]
+  NO_MATCH_IN: ["have no match in", "has no match in", "without a match in"]
+  RELATION: [relation]
+
+  # ---- naming the current value (B8) ----
+  NAME_VERB: [call, name]
+
+sequences: {}
+
+absent: []
+
+functions: {}

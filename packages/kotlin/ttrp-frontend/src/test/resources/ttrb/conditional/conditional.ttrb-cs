@@ -1,0 +1,7 @@
+# ttr: dialect=b lang=cs
+Načti orders jako o.
+Spočti priority jako 1, když amount je větší než 1000, jinak 2.
+Spočti band jako "A", když amount je větší než 1000, "B", když amount je větší než 100, jinak "C".
+Spočti contact jako "missing", když email je prázdný, jinak email.
+Spočti flagged jako pravda, když note není prázdná.
+Spočti amount * 2 jako total.

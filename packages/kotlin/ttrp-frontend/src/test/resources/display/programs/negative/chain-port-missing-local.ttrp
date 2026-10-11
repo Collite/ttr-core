@@ -1,0 +1,10 @@
+// TTRP-DSP-001 through chain-to-port in the bash world (a Polars island; retarget it to `pg` for Postgres).
+uses world "shop.worlds.local"
+import shop.actions.*
+
+container review(out late) target pl {
+    o = load(files.orders, schema: orders_csv) -> calc { recipient = email }
+    o -> filter(status = 1) -> select(recipient, order_id) -> late
+}
+
+review.late -> display(notify)

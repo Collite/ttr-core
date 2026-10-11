@@ -23,7 +23,7 @@ TransDSL Query ┘                         └─► PlanNode (canonical)
 | `queryRefsIn(query)` | — | `Set<String>` of `query_ref` source qnames |
 | `queryRefsInJson(json)` | — | same, from JSON form |
 
-### `query_ref` resolution (DF-T03 / Phase 03 B1)
+### `query_ref` resolution (Phase 03 B1)
 
 `Source.QUERY_REF` lets a TransDSL query embed a reference to another stored query by qname.
 The codec defers resolution to the caller: pass a `queryRefs: Map<String, PlanNode>` containing
@@ -47,8 +47,8 @@ Supported node shapes (see `TransDslCodec.kt` for the full set):
 
 Currently rejected / unsupported (Phase 08 follow-ups):
 
-- Multi-core TransDSL Cartesian joins without conditions — DF-DSL03 / B3.
-- The full expression operator catalog — DF-DSL04 + `IN` operator DF-S05 / B4.
+- Multi-core TransDSL Cartesian joins without conditions — B3.
+- The full expression operator catalog and the `IN` operator — B4.
 
 ## Extending the codec
 
@@ -56,4 +56,4 @@ Currently rejected / unsupported (Phase 08 follow-ups):
 2. Add a `case` in `parseInto` / `unparseInto` (in `TransDslCodec.kt`).
 3. Add a round-trip case to `RoundTripSpec` (`src/test/kotlin/org/tatrman/translator/wire/`).
 4. If the new shape requires resolution against the model (column qualification etc.),
-   coordinate with the RESOLVE stage (DF-T01, Phase 08 A1).
+   coordinate with the RESOLVE stage (Phase 08 A1).

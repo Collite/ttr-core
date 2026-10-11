@@ -17,6 +17,12 @@ tasks.test {
     useJUnitPlatform()
     // `ttrp explain` goldens: run with `-DupdateGolden=true` to (re)write, then review the diff.
     systemProperty("updateGolden", System.getProperty("updateGolden") ?: "false")
+    // DisplayLeavesSpec reads the shared action-display fixture project in ttrp-frontend's test resources (found by
+    // walking up the tree): declare it, so editing a fixture re-runs this task instead of leaving it UP-TO-DATE.
+    inputs
+        .dir(rootProject.file("packages/kotlin/ttrp-frontend/src/test/resources/display"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("displayFixture")
 }
 
 dependencies {

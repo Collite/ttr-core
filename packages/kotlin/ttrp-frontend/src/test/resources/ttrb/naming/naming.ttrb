@@ -1,0 +1,11 @@
+# ttr: dialect=b lang=en
+Load items as pol.
+Load stock as z2.
+Keep the rows where shop_code is "S1".
+Call that z2.
+Join pol optionally with z2 on code is z2.code as j.
+Keep the rows where qty is not empty.
+Name the result candidates.
+Load pol.
+Keep only the rows that have a match in candidates on code is candidates.code.
+Show the result as matched.

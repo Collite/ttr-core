@@ -1,0 +1,33 @@
+package hartland.obchod
+def table catalog_orders { description: "Marketplace order header (a view over catalog_sales: one row per order number)", primaryKey: ["order_number"],
+    columns: [
+        def column order_number { type: int, isKey: true, },
+        def column bill_customer_sk { type: int, optional: true, },
+        def column call_center_sk { type: int, optional: true, },
+        def column sold_date_sk { type: int, optional: true, },
+        def column ship_mode_type { type: text, optional: true, },
+    ]
+}
+
+def table catalog_sales { description: "Marketplace order line", primaryKey: ["cs_order_number", "cs_item_sk"],
+    columns: [
+        def column cs_order_number { type: int, isKey: true, },
+        def column cs_item_sk { type: int, isKey: true, },
+        def column cs_warehouse_sk { type: int, optional: true, },
+        def column cs_quantity { type: int, optional: true, },
+        def column cs_sales_price { type: decimal, optional: true, },
+    ]
+}
+
+def table inventory { description: "Weekly on-hand stock per distribution centre and item", primaryKey: ["inv_date_sk", "inv_item_sk", "inv_warehouse_sk"],
+    columns: [
+        def column inv_date_sk { type: int, isKey: true, },
+        def column inv_item_sk { type: int, isKey: true, },
+        def column inv_warehouse_sk { type: int, isKey: true, },
+        def column inv_quantity_on_hand { type: int, optional: true, },
+    ]
+}
+
+def query objednávka__filter { description: "Synthetic query materialising the row-filter declared on YAML entity objednávka.", sourceText: """sql
+SELECT * FROM catalog_orders WHERE ship_mode_type='EXPRESS'
+""", tags: ["synthetic", "where-filter"],}

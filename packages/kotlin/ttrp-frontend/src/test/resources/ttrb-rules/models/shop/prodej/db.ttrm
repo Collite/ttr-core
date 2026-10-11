@@ -1,0 +1,29 @@
+package shop.prodej
+def table OBJ_HEAD { description: "Objednávky", primaryKey: ["CISLO"],
+    columns: [
+        def column CISLO { type: int, isKey: true, },
+        def column CASTKA { type: decimal, optional: true, },
+        def column STAV { type: text, optional: true, },
+        def column EMAIL_ZAST { type: text, optional: true, },
+        def column POZNAMKA { type: text, optional: true, },
+        def column KOD_ZBOZI { type: text, optional: true, },
+    ]
+}
+def table REKL { description: "Reklamace", primaryKey: ["REKL_ID"],
+    columns: [
+        def column REKL_ID { type: int, isKey: true, },
+        def column CISLO_OBJ { type: int, optional: true, },
+    ]
+}
+def table SKL_ZAS { description: "Zásoby", primaryKey: ["KOD"],
+    columns: [
+        def column KOD { type: text, isKey: true, },
+        def column MNOZSTVI { type: int, optional: true, },
+        def column VEDOUCI { type: text, optional: true, },
+    ]
+}
+def table LIM_ZAS { description: "Limity (jeden řádek)",
+    columns: [
+        def column MIN_ZASOBA { type: int, optional: true, },
+    ]
+}

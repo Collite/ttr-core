@@ -1,0 +1,34 @@
+package shop.akce
+
+// The three action row schemas a rules program hands to the host (one per action kind).
+def schema send_email {
+    description: "Odeslat e-mail",
+    columns: [
+        def column komu    { type: text },
+        def column předmět { type: text },
+        def column šablona { type: text },
+        def column klíč    { type: text },
+        def column příloha { type: text, optional: true },
+    ]
+}
+
+def schema update_field {
+    description: "Nastavit atribut entity",
+    columns: [
+        def column entita  { type: text },
+        def column klíč    { type: text },
+        def column atribut { type: text },
+        def column hodnota { type: text },
+        def column důvod   { type: text },
+    ]
+}
+
+def schema manual_task {
+    description: "Ruční úkol",
+    columns: [
+        def column řešitel { type: text },
+        def column název   { type: text },
+        def column popis   { type: text },
+        def column příloha { type: text, optional: true },
+    ]
+}

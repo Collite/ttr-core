@@ -6,7 +6,7 @@ import org.tatrman.plan.v1.schemaCodeToToken
 import org.tatrman.translator.framework.ModelHandle
 
 /**
- * DF-V07 / Phase 08 C2 — best-effort enrichment of a Calcite validation-error message with
+ * Phase 08 C2 — best-effort enrichment of a Calcite validation-error message with
  * "did you mean…?" suggestions. Calcite's `SqlValidatorException` messages typically embed the
  * offending identifier in single quotes (`Column 'custmer_name' not found in any table`,
  * `Object 'CUSTOMRES' not found`); this helper extracts the first such token, looks it up in

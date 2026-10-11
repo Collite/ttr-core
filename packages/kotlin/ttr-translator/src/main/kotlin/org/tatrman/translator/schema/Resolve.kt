@@ -10,7 +10,7 @@ import org.tatrman.translator.params.ParameterTyper
 import org.tatrman.translator.params.PreparedSql
 
 /**
- * Phase 08 A1 / DF-T01 — RESOLVE stage.
+ * Phase 08 A1 — RESOLVE stage.
  *
  * Calcite's `SqlToRelConverter` can emit `RexInputRef` nodes where the `name` field
  * is a SQL type name (e.g. "BIGINT") rather than the actual field name (e.g. "id").

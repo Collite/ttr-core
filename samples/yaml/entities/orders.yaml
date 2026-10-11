@@ -1,0 +1,309 @@
+# Sample of the YAML entity format over the Hartland demo database (TPC-DS), hartland_us world.
+# Marketplace orders (header + lines), returns, return reasons and the calendar.
+# catalog_order is a derived view (one row per cs_order_number) — TPC-DS denormalises
+# the order header onto the catalog_sales lines.
+entities:
+
+  date_dim:
+    table: "date_dim"
+    entity_type: structural
+    aliases: ["calendar", "date", "day"]
+    label_plural: "Calendar Days"
+    name_column: "cal_date"
+    code_column: "sk"
+    description: |
+      Calendar — one row per day. Facts reference it through their *_date_sk columns.
+      It also points to the same day of the previous year for year-over-year comparisons.
+    columns:
+      - name: "sk"
+        column: "d_date_sk"
+        type: "int"
+        primary_key: true
+        description: "Sequence key; the primary key for this entity, not bearing any meaning"
+
+      - name: "cal_date"
+        label: "Date"
+        column: "d_date"
+        type: "date"
+        description: "Calendar date. The primary grain of the calendar."
+
+      - name: "year"
+        column: "d_year"
+        type: "int"
+        description: "Year of the calendar date"
+
+      - name: "month"
+        column: "d_moy"
+        type: "int"
+        description: "Month of the calendar date (1-12)"
+
+      - name: "quarter"
+        column: "d_qoy"
+        type: "int"
+        description: "Quarter of the calendar date (1-4)"
+
+      - name: "week_seq"
+        column: "d_week_seq"
+        type: "int"
+        description: "Absolute week number from the beginning of this calendar (weekly inventory snapshots line up on it)"
+
+      - name: "holiday"
+        column: "d_holiday"
+        type: "char(1)"
+        description: |
+          Is this a holiday?
+          Y = holiday
+          N = regular day
+
+      - name: "same_day_last_year"
+        column: "d_same_day_ly"
+        type: "int"
+        description: "The same day of the previous year — FK back to the calendar"
+
+  catalog_order:
+    table: "catalog_order"
+    entity_type: transaction
+    aliases: ["marketplace order", "orders", "purchase"]
+    label_plural: "Marketplace Orders"
+    code_column: "order_number"
+    description: |
+      Marketplace order header — one row per order number.
+      ⚠ The bill-to customer (cs_bill_customer_sk) and the ship-to customer (cs_ship_customer_sk) can be two different customers.
+    columns:
+      - name: "order_number"
+        label: "Order"
+        column: "cs_order_number"
+        type: "int"
+        primary_key: true
+        description: "Marketplace order number"
+
+      - name: "sold_date"
+        column: "cs_sold_date_sk"
+        type: "int"
+        description: "Sale date — FK to the calendar"
+
+      - name: "bill_customer"
+        column: "cs_bill_customer_sk"
+        type: "int"
+        description: "The customer who pays for the order"
+
+      - name: "ship_customer"
+        column: "cs_ship_customer_sk"
+        type: "int"
+        description: "The customer the order is shipped to"
+
+      - name: "bill_addr"
+        column: "cs_bill_addr_sk"
+        type: "int"
+        description: "Billing address at sale time"
+
+      - name: "warehouse"
+        column: "cs_warehouse_sk"
+        type: "int"
+        description: "Fulfilling distribution center"
+
+  catalog_sales:
+    table: "catalog_sales"
+    entity_type: transaction
+    composite_primary_key: ["item", "order_number"]
+    aliases: ["order line", "marketplace sales", "marketplace revenue"]
+    label_plural: "Marketplace Order Lines"
+    description: |
+      Marketplace sales lines — one row per item in an order.
+      Revenue = SUM(cs_ext_sales_price), units sold = SUM(cs_quantity), dated by cs_sold_date_sk.
+    columns:
+      - name: "item"
+        column: "cs_item_sk"
+        type: "int"
+        primary_key: true
+        description: "Sold product — FK to the 'sk' attribute of the item entity"
+
+      - name: "order_number"
+        column: "cs_order_number"
+        type: "int"
+        primary_key: true
+        description: "Marketplace order number — FK to the order header"
+
+      - name: "sold_date"
+        column: "cs_sold_date_sk"
+        type: "int"
+        description: "Sale date — FK to the calendar"
+
+      - name: "quantity"
+        column: "cs_quantity"
+        type: "int"
+        description: "Units sold on this line"
+
+      - name: "ext_sales_price"
+        label: "Revenue"
+        column: "cs_ext_sales_price"
+        type: "decimal(10,2)"
+        description: "Extended sales price of the line (unit price x quantity) — the revenue amount; SUM this for revenue."
+
+  catalog_returns:
+    table: "catalog_returns"
+    entity_type: transaction
+    composite_primary_key: ["item", "order_number"]
+    aliases: ["marketplace returns", "returned items", "returns",
+              "refunds"]
+    label_plural: "Marketplace Returns"
+    description: |
+      Marketplace-channel returns.
+      ⚠ The amount column is cr_return_amount (not cr_return_amt as on the other channels).
+    columns:
+      - name: "item"
+        column: "cr_item_sk"
+        type: "int"
+        primary_key: true
+        description: "Returned product — FK to the 'sk' attribute of the item entity"
+
+      - name: "order_number"
+        column: "cr_order_number"
+        type: "int"
+        primary_key: true
+        description: "Original marketplace order number — pairs this return with its sale"
+
+      - name: "returned_date"
+        column: "cr_returned_date_sk"
+        type: "int"
+        description: "Return date — FK to the calendar"
+
+      - name: "reason"
+        column: "cr_reason_sk"
+        type: "int"
+        description: "Return reason — FK to the 'sk' attribute of the reason entity"
+
+      - name: "warehouse"
+        column: "cr_warehouse_sk"
+        type: "int"
+        description: "Distribution center processing the return"
+
+      - name: "return_quantity"
+        column: "cr_return_quantity"
+        type: "int"
+        description: "Units returned on this line"
+
+      - name: "return_amt"
+        column: "cr_return_amount"
+        type: "decimal(10,2)"
+        description: "Refunded amount of the line — SUM this for the return value"
+
+  reason:
+    table: "reason"
+    entity_type: config
+    aliases: ["return reason", "why returned"]
+    label_plural: "Return Reasons"
+    name_column: "reason_desc"
+    code_column: "reason_id"
+    description: |
+      Return reasons — why a customer returned a sales line.
+      ⚠ The reason text is stored in the language of the loaded data (e.g. "Did not get it on time") — filter on the reason exactly as the question names it.
+    columns:
+      - name: "sk"
+        column: "r_reason_sk"
+        type: "int"
+        primary_key: true
+        description: "Sequence key. Internal primary key only."
+
+      - name: "reason_id"
+        column: "r_reason_id"
+        type: "char(16)"
+        description: "Return reason identifier (code)"
+
+      - name: "reason_desc"
+        label: "Reason"
+        column: "r_reason_desc"
+        type: "char(100)"
+        description: "Return reason text, the human-readable label"
+        searchable: true
+        search_hint: "Part of the text is enough. Example: WHERE r_reason_desc COLLATE Latin1_General_CI_AI LIKE '%on time%'"
+
+relationships:
+
+  date_same_day_last_year:
+    from: "date_dim"
+    to: "date_dim"
+    type: "many-to-one"
+    join: "date_dim.d_same_day_ly = date_dim.d_date_sk"
+    description: "A day points to the same day of the previous year"
+
+  catalog_order_date:
+    from: "catalog_order"
+    to: "date_dim"
+    type: "many-to-one"
+    join: "catalog_order.cs_sold_date_sk = date_dim.d_date_sk"
+    description: "An order belongs to its sale date"
+
+  catalog_order_bill_customer:
+    from: "catalog_order"
+    to: "customer"  # customers.yaml
+    type: "many-to-one"
+    join: "catalog_order.cs_bill_customer_sk = customer.c_customer_sk"
+    description: "An order is paid for by a customer (bill-to). Disambiguation: the default meaning of 'orders of a customer'."
+
+  catalog_order_ship_customer:
+    from: "catalog_order"
+    to: "customer"  # customers.yaml
+    type: "many-to-one"
+    join: "catalog_order.cs_ship_customer_sk = customer.c_customer_sk"
+    description: "An order is shipped to a customer (ship-to)"
+    note: "A second relationship between the same two entities — use it only for questions about the recipient or the delivery."
+
+  catalog_order_bill_address:
+    from: "catalog_order"
+    to: "customer_address"  # customers.yaml
+    type: "many-to-one"
+    join: "catalog_order.cs_bill_addr_sk = customer_address.ca_address_sk"
+    description: "An order carries the billing address valid at sale time"
+
+  catalog_order_warehouse:
+    from: "catalog_order"
+    to: "warehouse"  # items.yaml
+    type: "many-to-one"
+    join: "catalog_order.cs_warehouse_sk = warehouse.w_warehouse_sk"
+    description: "An order is fulfilled by a distribution center"
+
+  catalog_sales_order:
+    from: "catalog_sales"
+    to: "catalog_order"
+    type: "many-to-one"
+    join: "catalog_sales.cs_order_number = catalog_order.cs_order_number"
+    description: "A sales line belongs to an order"
+
+  catalog_sales_item:
+    from: "catalog_sales"
+    to: "item"  # items.yaml
+    type: "many-to-one"
+    join: "catalog_sales.cs_item_sk = item.i_item_sk"
+    description: "A sales line refers to the sold item"
+
+  catalog_returns_sale:
+    from: "catalog_returns"
+    to: "catalog_sales"
+    type: "many-to-one"
+    join: |
+      catalog_returns.cr_item_sk = catalog_sales.cs_item_sk AND
+      catalog_returns.cr_order_number = catalog_sales.cs_order_number
+    note: "A return has no foreign key of its own to the sales line — it pairs on the natural key (item + order number)."
+    description: "A return refers to the line of the original order"
+
+  catalog_returns_reason:
+    from: "catalog_returns"
+    to: "reason"
+    type: "many-to-one"
+    join: "catalog_returns.cr_reason_sk = reason.r_reason_sk"
+    description: "A return states a return reason"
+
+  catalog_returns_date:
+    from: "catalog_returns"
+    to: "date_dim"
+    type: "many-to-one"
+    join: "catalog_returns.cr_returned_date_sk = date_dim.d_date_sk"
+    description: "A return belongs to its return date"
+
+  catalog_returns_warehouse:
+    from: "catalog_returns"
+    to: "warehouse"  # items.yaml
+    type: "many-to-one"
+    join: "catalog_returns.cr_warehouse_sk = warehouse.w_warehouse_sk"
+    description: "A return is processed by a distribution center"

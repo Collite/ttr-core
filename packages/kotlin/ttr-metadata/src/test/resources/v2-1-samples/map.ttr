@@ -1,38 +1,38 @@
 package samples.v2_1
 
 model binding
-// podprodukt: no inline mapping — covered explicitly
-def er2db_entity podprodukt { entity: er.entity.podprodukt, target: { table: db.dbo.QXXPODSKUPZBOZI } }
+// item_class: no inline mapping — covered explicitly
+def er2db_entity item_class { entity: er.entity.item_class, target: { table: db.dbo.item_class } }
 
-// obchodní_kanál: no inline mapping
-def er2db_entity obchodní_kanál { entity: er.entity.obchodní_kanál, target: { table: db.dbo.QCENSKUP_DF } }
+// market: no inline mapping
+def er2db_entity market { entity: er.entity.market, target: { table: db.dbo.store_market } }
 
-// tržní_skupina: no inline mapping
-def er2db_entity tržní_skupina { entity: er.entity.tržní_skupina, target: { table: db.dbo.QSKUPZNACZBOZI_DF } }
+// division: no inline mapping
+def er2db_entity division { entity: er.entity.division, target: { table: db.dbo.store_division } }
 
-// subjekt: no inline mapping
-def er2db_entity subjekt { entity: er.entity.subjekt, target: { table: db.dbo.QSUBJEKT } }
+// store: no inline mapping
+def er2db_entity store { entity: er.entity.store, target: { table: db.dbo.store } }
 
-// podprodukt attributes
-def er2db_attribute podprodukt.id_podproduktu { attribute: er.entity.podprodukt.id_podproduktu, target: { column: db.dbo.QXXPODSKUPZBOZI.IDXXPODSKUPZBOZI } }
-def er2db_attribute podprodukt.id_produktu { attribute: er.entity.podprodukt.id_produktu, target: { column: db.dbo.QXXPODSKUPZBOZI.IDSKUPZBOZI } }
+// item_class attributes
+def er2db_attribute item_class.sk { attribute: er.entity.item_class.sk, target: { column: db.dbo.item_class.i_class_id } }
+def er2db_attribute item_class.category_id { attribute: er.entity.item_class.category_id, target: { column: db.dbo.item_class.i_category_id } }
 
-// obchodní_kanál attributes
-def er2db_attribute obchodní_kanál.id_kanálu { attribute: er.entity.obchodní_kanál.id_kanálu, target: { column: db.dbo.QCENSKUP_DF.IDCENSKUP } }
-def er2db_attribute obchodní_kanál.id_tržní_skupiny { attribute: er.entity.obchodní_kanál.id_tržní_skupiny, target: { column: db.dbo.QCENSKUP_DF.IDSKUPZNACZBOZI } }
+// market attributes
+def er2db_attribute market.sk { attribute: er.entity.market.sk, target: { column: db.dbo.store_market.s_market_id } }
+def er2db_attribute market.division_id { attribute: er.entity.market.division_id, target: { column: db.dbo.store_market.s_division_id } }
 
-// tržní_skupina attributes
-def er2db_attribute tržní_skupina.id_tržní_skupiny { attribute: er.entity.tržní_skupina.id_tržní_skupiny, target: { column: db.dbo.QSKUPZNACZBOZI_DF.IDSKUPZNACZBOZI } }
+// division attributes
+def er2db_attribute division.sk { attribute: er.entity.division.sk, target: { column: db.dbo.store_division.s_division_id } }
 
-// subjekt attributes
-def er2db_attribute subjekt.id_subjektu { attribute: er.entity.subjekt.id_subjektu, target: { column: db.dbo.QSUBJEKT.IDSUBJEKT } }
-def er2db_attribute subjekt.id_kanálu { attribute: er.entity.subjekt.id_kanálu, target: { column: db.dbo.QSUBJEKT.IDCENSKUP } }
+// store attributes
+def er2db_attribute store.sk { attribute: er.entity.store.sk, target: { column: db.dbo.store.s_store_sk } }
+def er2db_attribute store.market_id { attribute: er.entity.store.market_id, target: { column: db.dbo.store.s_market_id } }
 
-// podprodukt -> produkt relation (no inline mapping — explicit here)
-def er2db_relation podprodukt_produkt { relation: er.entity.podprodukt_produkt, fk: db.dbo.fk_podprodukt_produkt }
+// item_class -> category relation (no inline mapping — explicit here)
+def er2db_relation class_in_category { relation: er.entity.class_in_category, fk: db.dbo.fk_class_category }
 
-// obchodní kanál -> tržní skupina (no inline mapping)
-def er2db_relation obchodní_kanál_tržní_skupina { relation: er.entity.obchodní_kanál_tržní_skupina, fk: db.dbo.fk_kanál_tržní_skupina }
+// market -> division (no inline mapping)
+def er2db_relation market_in_division { relation: er.entity.market_in_division, fk: db.dbo.fk_market_division }
 
-// subjekt -> obchodní kanál (no inline mapping)
-def er2db_relation subjekt_obchodní_kanál { relation: er.entity.subjekt_obchodní_kanál, fk: db.dbo.fk_subjekt_kanál }
+// store -> market (no inline mapping)
+def er2db_relation store_in_market { relation: er.entity.store_in_market, fk: db.dbo.fk_store_market }

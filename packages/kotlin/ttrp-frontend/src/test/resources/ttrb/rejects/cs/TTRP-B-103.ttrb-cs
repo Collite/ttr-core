@@ -1,0 +1,4 @@
+Načti objednávky.
+Když částka je větší než 100:
+    Ponech jen sloupce číslo, částka.
+  Ukaž výsledek jako velke.

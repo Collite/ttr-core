@@ -1,0 +1,24 @@
+package shop.worlds
+model world
+
+// Action-display fixture world: one SQL Server engine under the host-executed `aip` executor.
+def world host {
+    description: "display fixture: mssql-2019 engine under the aip executor"
+    def engine erp { type: mssql, version: "2019" }
+    def executor aip { type: aip }
+    def storage erp_db { type: mssql, via: erp, hosts: [shop] }
+}
+
+// A bash-launched world with file-writing executors (Polars / Postgres islands write `out/<display>.arrow`):
+// same-named action displays must land in distinct files.
+def world local {
+    description: "display fixture: Polars + Postgres islands under the bash executor"
+    def engine pl { type: polars }
+    def engine pg { type: postgres, version: "16" }
+    def executor sh { type: bash }
+    def storage files {
+        type: local_dir, path: "/data/files",
+        def schema orders_csv { order_id: int, email: string, amount: decimal, status: int }
+    }
+    def storage stage { type: local_dir, path: "/data/stage", staging: true }
+}

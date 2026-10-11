@@ -3,6 +3,7 @@ package org.tatrman.ttrp.emit.polars
 
 import org.tatrman.ttrp.emit.EmitDiagnosticId
 import org.tatrman.ttrp.emit.TtrpEmitException
+import org.tatrman.ttrp.emit.core.DisplayTypes
 import org.tatrman.ttrp.expr.Cast
 import org.tatrman.ttrp.expr.ColumnRef
 import org.tatrman.ttrp.expr.Expression
@@ -23,6 +24,7 @@ import org.tatrman.ttrp.graph.model.Select
 import org.tatrman.ttrp.graph.model.Sort
 import org.tatrman.ttrp.graph.model.Store
 import org.tatrman.ttrp.graph.model.Union
+import org.tatrman.ttrp.resolve.ColumnType
 
 /** How a Load node reads its input: a staged Arrow file, or a declared-schema CSV (D-c). */
 sealed interface PolarsSource {
@@ -339,7 +341,39 @@ class PolarsIslandEmitter(
         sinkPath: String?,
     ): String {
         val path = sinkPath ?: "out/${n.name}.arrow"
-        return "$input.write_ipc(${quote(path)}$IPC_COMPAT)\nprint(f\"display ${n.name}: $path\")"
+        val write = ".write_ipc(${quote(path)}$IPC_COMPAT)\nprint(f\"display ${n.name}: $path\")"
+        val schema = n.schema ?: return input + write
+        // An action display (grammar 0.14) writes exactly its row schema's columns, in schema order, each cast to
+        // the schema column's type (DisplayTypes — so every source of one display writes the same Arrow schema): a
+        // column the frame carries is cast, an absent `optional` one is a null of that type. A Polars frame has no
+        // static columns at emit time, so a REQUIRED column the frame lacks (a row type the checker could not see
+        // — TTRP-DSP-001 is reported at check time whenever it can) stops the island before it writes the file;
+        // it is never NULL-filled.
+        val required = schema.columns.filterNot { it.optional }.map { quote(it.name) }
+        val guard =
+            if (required.isEmpty()) {
+                ""
+            } else {
+                val message =
+                    quote(
+                        "TTRP-DSP-001: display ${n.name} (schema ${schema.qualifiedName}) is missing required " +
+                            "column(s): ",
+                    )
+                "_ttrp_missing = [_c for _c in [${required.joinToString(", ")}] if _c not in $input.columns]\n" +
+                    "if _ttrp_missing:\n" +
+                    "    raise SystemExit($message + \", \".join(_ttrp_missing))\n"
+            }
+        val columns =
+            schema.columns.joinToString(", ") { c ->
+                val q = quote(c.name)
+                val dtype = DisplayTypes.polars(DisplayTypes.of(c))
+                if (c.optional) {
+                    "(pl.col($q).cast($dtype) if $q in $input.columns else pl.lit(None, dtype=$dtype).alias($q))"
+                } else {
+                    "pl.col($q).cast($dtype)"
+                }
+            }
+        return "$guard$input.select([$columns])$write"
     }
 
     private fun requirePred(
@@ -352,16 +386,25 @@ class PolarsIslandEmitter(
             location = n.location,
         )
 
-    private fun csvDtype(spelling: String): String =
-        when (spelling.substringBefore('(').trim().lowercase()) {
+    /**
+     * The `read_csv` dtype of a world-schema field. A decimal carries its declared precision/scale
+     * (`{ type: decimal, length: 19, precision: 2 }` → `pl.Decimal(19, 2)`), else the toolchain default
+     * ([ColumnType.DEFAULT_DECIMAL_PRECISION], [ColumnType.DEFAULT_DECIMAL_SCALE]) — Polars ≥ 1.42 rejects a
+     * bare `pl.Decimal` ("Decimal without precision/scale set is not a valid Polars datatype").
+     */
+    private fun csvDtype(spelling: String): String {
+        ColumnType.parse(spelling)?.takeIf { it.kind == ColumnType.Kind.DECIMAL }?.let {
+            return "pl.Decimal(${it.precision}, ${it.scale})"
+        }
+        return when (spelling.substringBefore('(').trim().lowercase()) {
             "int", "integer", "bigint", "long" -> "pl.Int64"
             "float", "double", "real" -> "pl.Float64"
-            "decimal", "numeric", "number", "money" -> "pl.Decimal"
             "bool", "boolean" -> "pl.Boolean"
             "date" -> "pl.Date"
             "timestamp", "datetime" -> "pl.Datetime(\"us\", \"UTC\")"
             else -> "pl.String"
         }
+    }
 
     private fun quote(s: String): String = "\"${s.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 }

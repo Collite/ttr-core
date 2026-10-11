@@ -21,14 +21,12 @@ import java.nio.file.Path
  * Cross-package references are fully-qualified and resolve via the resolver's exact `byFull`
  * step (no imports needed).
  *
- * **Scope: `ucetnictvi`.** The full committed tree is *not* asserted error-free because some
- * packages in the converted snapshot are incomplete — their relations reference entity
- * definitions (`er.entity.artikl`, `produkt`, …) that are missing from the seed (e.g. the
- * `artikl` package ships `db.ttr` + `er.ttr` relations but no `def entity`). That is a real
- * seed-completeness gap tracked for fixup (kantheon-v1.1 §8 / fork Stage 2.1 T2 — complete the
- * `model-ttr` seed). `ucetnictvi` is self-contained (every `er.entity.*` it references is
- * defined within it), so it is the stable guard for the loader/reconciler path until the seed
- * is completed; widen [SEED_PACKAGES] as packages are made whole.
+ * **Scope: `returns`.** Only complete packages are asserted error-free: a converted snapshot can
+ * carry packages whose relations reference entity definitions that live in another, not yet
+ * converted package (kantheon-v1.1 §8 / fork Stage 2.1 T2). `returns` — a marketplace-returns slice
+ * of the Hartland demo database (TPC-DS) in the converter's output shape — is self-contained (every
+ * `er.entity.*` it references is defined within it), so it is the stable guard for the
+ * loader/reconciler path; widen [SEED_PACKAGES] as more complete packages are added.
  *
  * Package derivation relativises each file against the storage root, so the storage root stays
  * the `model-ttr` tree (pointing it straight at a package subdir would compute an empty package
@@ -38,7 +36,7 @@ import java.nio.file.Path
 class ModelTtrLoadSpec :
     StringSpec({
 
-        "a complete package (ucetnictvi) reconciles with no errors via LocalFsStorage" {
+        "a complete package (returns) reconciles with no errors via LocalFsStorage" {
             // Test working dir is the module dir.
             val root = Path.of("src/test/resources/model-ttr-seed")
             val storage = ScopedStorage(LocalFsStorage(id = "model-ttr", rootPath = root), SEED_PACKAGES)
@@ -53,7 +51,7 @@ class ModelTtrLoadSpec :
             result.model.objectByQname().size shouldBeGreaterThan 100
         }
 
-        "a complete package (ucetnictvi) loads cleanly via the service path (ClasspathStorage resources + ttr)" {
+        "a complete package (returns) loads cleanly via the service path (ClasspathStorage resources + ttr)" {
             // Mirrors application.conf: type=resources kind=ttr path=model-ttr (+ builtin stock),
             // scoped to the complete package via ScopedStorage.
             val storage =
@@ -70,10 +68,9 @@ class ModelTtrLoadSpec :
 
 /**
  * Package(s) of the committed `model-ttr` seed that are complete (every referenced entity is
- * defined). Widen as the incomplete packages (artikl, produkt, …) gain their missing
- * `def entity` files — see the spec KDoc / kantheon-v1.1 §8.
+ * defined). Widen as complete packages are added — see the spec KDoc / kantheon-v1.1 §8.
  */
-private val SEED_PACKAGES = setOf("ucetnictvi")
+private val SEED_PACKAGES = setOf("returns")
 
 /**
  * [ModelStorage] decorator that delegates to a real storage rooted at the whole `model-ttr`

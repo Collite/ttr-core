@@ -29,7 +29,7 @@ import org.tatrman.translator.wire.Expressions
  * ## The condition names what each scan EXPOSES, not what the table stores
  *
  * Wherever the model renames an attribute, MAP_TO_PHYSICAL rebuilds the scan's output columns as
- * `name = DB column, alias = ER attribute` (DF-T05, alias-at-boundary), and the decoder wraps that
+ * `name = DB column, alias = ER attribute` (alias-at-boundary), and the decoder wraps that
  * scan in a Project producing the aliases — so above the scan only the alias exists. An FK names
  * physical columns. Each operand is therefore mapped through ITS OWN side's scan: the alias when
  * that scan aliases the column, the column name otherwise (a bare TableScan, or a column whose
@@ -72,7 +72,7 @@ object JoinerPhysical {
     /**
      * A `TableScan(DB)` on a join side together with the alias-only projections between it and the join
      * ([projections], innermost first): MAP_TO_PHYSICAL wraps a query-backed entity's body in an
-     * alias-at-boundary `Project` (`id_obchodního_kanálu := IDCENSKUP`), and the body itself usually
+     * alias-at-boundary `Project` (`call_center := cs_call_center_sk`), and the body itself usually
      * carries one. A column is visible above the join only under the name the outermost projection
      * gives it — [visibleName] maps it through; a column no projection exposes is not usable.
      */
@@ -179,7 +179,7 @@ object JoinerPhysical {
     /**
      * The `TableScan(DB)` leaves of a join side, in tree order, reachable through `Join`, `Filter` and
      * `Project` (MJ-P4·S2.6 — the [JoinerLogical.collectEntityScans] rule plus the projections
-     * MAP_TO_PHYSICAL itself puts above a query-backed entity's body; the df-test `*__filter` entities).
+     * MAP_TO_PHYSICAL itself puts above a query-backed entity's body; a served estate's `*__filter` entities).
      * A `Project` is recorded as a name map on the [ScanRef] — only its bare column-ref expressions expose
      * a name; a computed expression, an aggregate or a subquery hide the column, as the narrowed descent
      * intends. The handle is the scan node plus that map chain, which the condition resolves through.

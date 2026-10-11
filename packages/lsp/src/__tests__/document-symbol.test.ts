@@ -149,15 +149,15 @@ def entity artikl {
     // VS Code rejects with "selectionRange must be contained in fullRange".
     const content = `model er schema entity
 
-def entity hodnoty {
+def entity promotion {
     attributes: [
-        def attribute id_ukazatele { type: int,
-description: "FK (QXXUKAZMU.IDXXUKAZMU)",
-binding: IDXXUKAZMU,
+        def attribute sk { type: int,
+description: "FK (promotion.p_promo_sk)",
+binding: p_promo_sk,
 }
     ]
 }`;
-    const uri = 'file:///proj/hodnoty.ttrm';
+    const uri = 'file:///proj/promotion.ttrm';
     clientConnection.sendNotification('textDocument/didOpen', {
       textDocument: { uri, languageId: 'ttr', version: 1, text: content },
     });

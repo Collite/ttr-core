@@ -14,7 +14,8 @@ import org.tatrman.ttrp.dialect.sql.TtrSql
  * Runs after the canonical walk (C2-a-β): for every `"""sql`/`"""pandas` container it
  * lowers the fragment interior to canonical AST and attaches it to the [FragmentBody]
  * ([FragmentBody.decomposition]), so `TtrpChecker` and `GraphBuilder` reuse their
- * FlowBody paths. `ttrb` stays opaque (P7). The interior `sourceText` is untouched (C2-f).
+ * FlowBody paths; `ttrb` / `ttrb-cs` go through [TtrB] with the tag's keyword skin. The interior
+ * `sourceText` is untouched (C2-f).
  */
 object FragmentDecomposer {
     data class Result(
@@ -50,8 +51,27 @@ object FragmentDecomposer {
         return when (body.tag) {
             "sql" -> TtrSql.decompose(body.sourceText, body.interiorLocation, outPort)
             "pandas" -> TtrPandas.decompose(body.sourceText, body.interiorLocation, outPort)
-            "ttrb" -> TtrB.decompose(body.sourceText, body.interiorLocation, outPort)
-            else -> null // unknown tag (FRG-001 handled upstream)
+            else ->
+                // `ttrb` (English) / `ttrb-cs` (Czech): the tag picks the keyword skin (AG B2).
+                org.tatrman.ttrp.dialect.b.TtrbSkin.forTag(body.tag)?.let { skin ->
+                    TtrB.decompose(
+                        body.sourceText,
+                        body.interiorLocation,
+                        outPort,
+                        skin,
+                        // The container's ports (B7): IN ports are names; OUT ports bound by output sentences.
+                        inPorts =
+                            decl.ports
+                                .filter { it.kind == PortKind.IN }
+                                .map { it.name }
+                                .toSet(),
+                        outPorts =
+                            decl.ports
+                                .filter { it.kind == PortKind.OUT }
+                                .map { it.name }
+                                .toSet(),
+                    )
+                } // unknown tag → null (FRG-001 handled upstream)
         }
     }
 }

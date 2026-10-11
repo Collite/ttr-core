@@ -17,27 +17,27 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const dbUri = 'file:///proj/db.ttrm';
 const DB = `model db schema dbo
-def table QXXUKAZMUHOD {
+def table promotion {
   columns: [
-    def column IDXXUKAZMU { type: int },
-    def column NAZEV_UKAZ { type: text }
+    def column p_promo_sk { type: int },
+    def column p_promo_name { type: text }
   ]
 }
-def fk fk_hodnoty_self { description: "self fk" }
+def fk fk_promotion_self { description: "self fk" }
 `;
 
 const erUri = 'file:///proj/er.ttrm';
-// hodnoty maps to QXXUKAZMUHOD; three attribute-mapping forms exercised, plus a
+// The promotion entity maps to the promotion table; three attribute-mapping forms exercised, plus a
 // relation with an inline fk mapping (Increment B).
 const ER = `model er schema entity
-def entity hodnoty {
-  binding: { target: { table: db.dbo.QXXUKAZMUHOD } },
+def entity promotion {
+  binding: { target: { table: db.dbo.promotion } },
   attributes: [
-    def attribute id_ukazatele { type: int, binding: IDXXUKAZMU },
-    def attribute nazev { type: text, binding: { target: { column: NAZEV_UKAZ } } }
+    def attribute sk { type: int, binding: p_promo_sk },
+    def attribute promo_name { type: text, binding: { target: { column: p_promo_name } } }
   ]
 }
-def relation hodnoty_self { from: er.entity.hodnoty, to: er.entity.hodnoty, binding: db.dbo.fk_hodnoty_self }
+def relation promotion_self { from: er.entity.promotion, to: er.entity.promotion, binding: db.dbo.fk_promotion_self }
 `;
 
 /** 0-indexed line + character of the first occurrence of `needle` in `text`. */
@@ -68,52 +68,52 @@ describe('inline-mapping column reference navigation (Increment A)', () => {
   });
   afterAll(() => { client.dispose(); server.dispose(); });
 
-  it('go-to-definition on a bare-id mapping (`binding: IDXXUKAZMU`) jumps to the db column', async () => {
-    const pos = posOf(ER, 'IDXXUKAZMU');
+  it('go-to-definition on a bare-id mapping (`binding: p_promo_sk`) jumps to the db column', async () => {
+    const pos = posOf(ER, 'p_promo_sk');
     const res = (await client.sendRequest('textDocument/definition', {
       textDocument: { uri: erUri }, position: { line: pos.line, character: pos.character + 2 },
     })) as lsp.Location | null;
     expect(res).not.toBeNull();
     expect(res!.uri).toBe(dbUri);
-    // IDXXUKAZMU is declared on line 3 (0-indexed) of db.ttrm.
-    expect(res!.range.start.line).toBe(posOf(DB, 'def column IDXXUKAZMU').line);
+    // p_promo_sk is declared on line 3 (0-indexed) of db.ttrm.
+    expect(res!.range.start.line).toBe(posOf(DB, 'def column p_promo_sk').line);
   });
 
   it('hover on a bare-id mapping shows the resolved db column symbol', async () => {
-    const pos = posOf(ER, 'IDXXUKAZMU');
+    const pos = posOf(ER, 'p_promo_sk');
     const res = (await client.sendRequest('textDocument/hover', {
       textDocument: { uri: erUri }, position: { line: pos.line, character: pos.character + 2 },
     })) as lsp.Hover | null;
     expect(res).not.toBeNull();
     const value = (res!.contents as { value: string }).value;
-    expect(value).toContain('db.dbo.table.QXXUKAZMUHOD.IDXXUKAZMU');
+    expect(value).toContain('db.dbo.table.promotion.p_promo_sk');
     expect(value).toContain('(column)');
   });
 
   it('go-to-definition on a `{ target: { column: … } }` mapping jumps to the db column', async () => {
-    const direct = posOf(ER, 'column: NAZEV_UKAZ');
+    const direct = posOf(ER, 'column: p_promo_name');
     const colPos = { line: direct.line, character: direct.character + 'column: '.length + 1 };
     const res = (await client.sendRequest('textDocument/definition', {
       textDocument: { uri: erUri }, position: colPos,
     })) as lsp.Location | null;
     expect(res).not.toBeNull();
     expect(res!.uri).toBe(dbUri);
-    expect(res!.range.start.line).toBe(posOf(DB, 'def column NAZEV_UKAZ').line);
+    expect(res!.range.start.line).toBe(posOf(DB, 'def column p_promo_name').line);
   });
 
   it('go-to-definition on a relation fk mapping jumps to the db `def fk` (Increment B)', async () => {
-    const direct = posOf(ER, 'binding: db.dbo.fk_hodnoty_self');
+    const direct = posOf(ER, 'binding: db.dbo.fk_promotion_self');
     const pos = { line: direct.line, character: direct.character + 'binding: db.dbo.'.length + 1 };
     const res = (await client.sendRequest('textDocument/definition', {
       textDocument: { uri: erUri }, position: pos,
     })) as lsp.Location | null;
     expect(res).not.toBeNull();
     expect(res!.uri).toBe(dbUri);
-    expect(res!.range.start.line).toBe(posOf(DB, 'def fk fk_hodnoty_self').line);
+    expect(res!.range.start.line).toBe(posOf(DB, 'def fk fk_promotion_self').line);
   });
 
   it('find-references on the db column includes the inline mapping use', async () => {
-    const dbPos = posOf(DB, 'IDXXUKAZMU'); // the column-name token in `def column IDXXUKAZMU`
+    const dbPos = posOf(DB, 'p_promo_sk'); // the column-name token in `def column p_promo_sk`
     const res = (await client.sendRequest('textDocument/references', {
       textDocument: { uri: dbUri },
       position: { line: dbPos.line, character: dbPos.character + 2 },
@@ -142,14 +142,14 @@ describe('inline-mapping nav via explicit er2db_entity target (Increment B2)', (
   const mapU = 'file:///p2/map.ttrm';
   const erU = 'file:///p2/er.ttrm';
   const DB2 = `model db schema dbo
-def table QXXUKAZMUHOD { columns: [ def column IDXXUKAZMU { type: int } ] }
+def table promotion { columns: [ def column p_promo_sk { type: int } ] }
 `;
   const MAP2 = `model binding
-def er2db_entity hodnoty { entity: er.entity.hodnoty, target: { table: db.dbo.QXXUKAZMUHOD } }
+def er2db_entity promotion { entity: er.entity.promotion, target: { table: db.dbo.promotion } }
 `;
   const ER2 = `model er schema entity
-def entity hodnoty {
-  attributes: [ def attribute id_uk { type: int, binding: IDXXUKAZMU } ]
+def entity promotion {
+  attributes: [ def attribute sk { type: int, binding: p_promo_sk } ]
 }
 `;
 
@@ -169,12 +169,12 @@ def entity hodnoty {
   afterAll(() => { client.dispose(); server.dispose(); });
 
   it('go-to-definition on the attribute mapping resolves through the explicit er2db_entity', async () => {
-    const pos = posOf(ER2, 'IDXXUKAZMU');
+    const pos = posOf(ER2, 'p_promo_sk');
     const res = (await client.sendRequest('textDocument/definition', {
       textDocument: { uri: erU }, position: { line: pos.line, character: pos.character + 2 },
     })) as lsp.Location | null;
     expect(res).not.toBeNull();
     expect(res!.uri).toBe(dbU);
-    expect(res!.range.start.line).toBe(posOf(DB2, 'def column IDXXUKAZMU').line);
+    expect(res!.range.start.line).toBe(posOf(DB2, 'def column p_promo_sk').line);
   });
 });

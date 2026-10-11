@@ -1,0 +1,12 @@
+// TTRP-DSP-001 through chain-to-port: `… -> late` gives the OUT port `late` the chain's row type, which lacks
+// the `notify` schema's required `subject` (it used to stay untyped — no diagnostic, and the build NULL-filled it).
+uses world "shop.worlds.host"
+import shop.orders.*
+import shop.actions.*
+
+container review(out late) target erp {
+    o = load(orders) -> calc { recipient = cast(order_id as string) }
+    o -> filter(status = 1) -> select(recipient, order_id) -> late
+}
+
+review.late -> display(notify)

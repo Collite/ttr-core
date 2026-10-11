@@ -1,0 +1,7 @@
+// The decision kept in a file: the container's interior is rules/rozhodnuti.ttrb-cs (relative to this
+// program), byte-preserved, its dialect read from the file's extension / first-line marker.
+uses world "shop.worlds.host"
+import shop.prodej.*
+import shop.akce.*
+
+container rozhodnuti target erp from "rules/rozhodnuti.ttrb-cs"

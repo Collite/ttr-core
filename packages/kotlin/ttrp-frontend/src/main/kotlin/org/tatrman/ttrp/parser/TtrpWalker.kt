@@ -201,6 +201,7 @@ internal class TtrpWalker(
         val body: ContainerBody =
             when {
                 ctx.TAGGED_BLOCK() != null -> fragmentBody(ctx.TAGGED_BLOCK().symbol)
+                ctx.FROM() != null && ctx.STRING() != null -> fileFragmentBody(ctx.FROM().symbol, ctx.STRING().symbol)
                 ctx.LBRACE() != null && ctx.RBRACE() != null ->
                     FlowBody(
                         statements = ctx.statement().mapNotNull { statement(it) },
@@ -285,6 +286,79 @@ internal class TtrpWalker(
         )
     }
 
+    /**
+     * AG B5 — `from "<path>"`: the fragment file's whole content is the interior, byte-preserved (C2-f),
+     * resolved relative to the program; its dialect from the file's extension / first-line marker. The
+     * body's [FragmentBody.location] is the `from "<path>"` clause; its interior location names the FILE,
+     * so diagnostics inside the fragment carry the file's own lines. A missing / unreadable file is
+     * TTRP-FRG-004, an unmarked one TTRP-FRG-005 (the body then has no dialect and is not decomposed).
+     */
+    private fun fileFragmentBody(
+        from: Token,
+        path: Token,
+    ): FragmentBody {
+        val rel = unquote(path.text)
+        val clause =
+            loc(from).copy(
+                endLine = loc(path).endLine,
+                endColumn = loc(path).endColumn,
+                offsetEnd =
+                    path.stopIndex + 1,
+            )
+
+        fun failed(
+            id: TtrpDiagnosticId,
+            message: String,
+        ): FragmentBody {
+            diagnostics += TtrpDiagnostic(id, Severity.ERROR, message, clause, id.suggestedAlternative)
+            return FragmentBody(
+                tag = "",
+                sourceText = "",
+                interiorLocation = clause,
+                location = clause,
+                sourceFile = rel,
+            )
+        }
+        val file =
+            org.tatrman.ttrp.dialect.FragmentFiles
+                .resolve(fileName, rel)
+        val text =
+            file?.let {
+                runCatching {
+                    java.nio.file.Files
+                        .readString(it)
+                }.getOrNull()
+            }
+                ?: return failed(
+                    TtrpDiagnosticId.FRG_004,
+                    "fragment file `$rel` not found (relative to the program file)",
+                )
+        val dialect =
+            org.tatrman.ttrp.dialect.bare.DialectMarker
+                .resolve(file.fileName.toString(), text)
+                ?: return failed(TtrpDiagnosticId.FRG_005, "fragment file `$rel` has no dialect marker")
+        val lines = text.split('\n')
+        val interior =
+            SourceLocation(
+                file =
+                    org.tatrman.ttrp.dialect.FragmentFiles
+                        .idOf(fileName, file),
+                line = 1,
+                column = 0,
+                endLine = lines.size,
+                endColumn = lines.last().length,
+                offsetStart = 0,
+                offsetEnd = text.length,
+            )
+        return FragmentBody(
+            tag = dialect,
+            sourceText = text,
+            interiorLocation = interior,
+            location = clause,
+            sourceFile = rel,
+        )
+    }
+
     private fun chain(ctx: TTRPParser.ChainContext): Chain =
         Chain(elements = ctx.chainElem().map { chainElem(it) }, location = loc(ctx))
 
@@ -315,13 +389,22 @@ internal class TtrpWalker(
         SchemaLiteralArg(columns = ctx.schemaField().map { schemaField(it) }, location = loc(ctx))
 
     private fun configBlock(ctx: TTRPParser.ConfigBlockContext): ConfigBlock =
-        ConfigBlock(entries = ctx.configEntry().map { configEntry(it) }, location = loc(ctx))
+        ConfigBlock(entries = ctx.configEntry().mapNotNull { configEntry(it) }, location = loc(ctx))
 
-    private fun configEntry(ctx: TTRPParser.ConfigEntryContext): ConfigEntry =
+    /** A config entry; null for one the parser only half-recovered (its syntax error is already reported). */
+    private fun configEntry(ctx: TTRPParser.ConfigEntryContext): ConfigEntry? =
         if (ctx.GROUP() != null) {
             GroupByEntry(keys = ctx.identifier().map { it.text }, location = loc(ctx))
         } else {
-            AssignEntry(name = ctx.identifier(0).text, value = expr(ctx.expr()), location = loc(ctx))
+            val name = ctx.identifier(0)
+            val value = ctx.expr()
+            if (name == null ||
+                value == null
+            ) {
+                null
+            } else {
+                AssignEntry(name = name.text, value = expr(value), location = loc(ctx))
+            }
         }
 
     private fun qname(ctx: TTRPParser.QnameContext): Qname =
@@ -467,8 +550,28 @@ internal class TtrpWalker(
             else -> MdPathAtom.StrLit(unquote(ctx.STRING().text), loc(ctx))
         }
 
-    private fun castExpr(ctx: TTRPParser.CastExprContext): Cast =
-        Cast(expr = expr(ctx.expr()), target = typeName(ctx.typeName()), location = loc(ctx))
+    /**
+     * `cast(x as <type>)`. A malformed cast the parser recovered from — `cast(x, string)` (a comma for `as`),
+     * `cast(x)` — has no type: report it (the syntax error itself is already a PRS-001) and fold to the inner
+     * expression, so the rest of the pipeline sees no half-built node (it used to NPE here).
+     */
+    private fun castExpr(ctx: TTRPParser.CastExprContext): Expression {
+        val type = ctx.typeName()?.takeIf { it.identifier() != null }
+        val inner = ctx.expr()?.let { expr(it) }
+        if (type == null || inner == null) {
+            diagnostics +=
+                TtrpDiagnostic(
+                    id = TtrpDiagnosticId.PRS_001,
+                    severity = Severity.ERROR,
+                    message = "malformed cast `${ctx.text}` — a cast is written `cast(<expr> as <type>)`",
+                    location = loc(ctx),
+                    suggestedAlternative =
+                        "write `cast(x as string)` — `as` separates the value and the type, not a comma (B-T5)",
+                )
+            return inner ?: Literal(LiteralValue.Null, loc(ctx))
+        }
+        return Cast(expr = inner, target = typeName(type), location = loc(ctx))
+    }
 
     private fun typeName(ctx: TTRPParser.TypeNameContext): TtrpType {
         val nums = ctx.INT()

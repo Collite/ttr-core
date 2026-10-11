@@ -1,0 +1,10 @@
+uses world "acme.worlds.dev"
+container blocks(out result) target erp_pg """ttrb-cs
+Načti erp.accounts jako t.
+Když region je "N":
+    Ponech jen sloupce account_id, region.
+    Ukaž výsledek jako north_accounts.
+Když status je "open" nebo region je "N":
+    Spočti account_id * 2 jako twice.
+    Ukaž výsledek jako open_accounts.
+"""

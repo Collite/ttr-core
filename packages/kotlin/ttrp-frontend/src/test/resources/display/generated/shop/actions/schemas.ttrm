@@ -1,0 +1,44 @@
+package shop.actions
+
+// Action row schemas (one per action kind) — the shape the host hands on.
+def schema notify {
+    description: "Send a notification to a recipient",
+    columns: [
+        def column recipient { type: text },
+        def column subject   { type: text },
+        def column order_id  { type: int },
+        def column amount    { type: decimal, optional: true },
+        def column note      { type: text, optional: true },
+    ]
+}
+
+def schema flag_order {
+    description: "Flag an order for review",
+    columns: [
+        def column order_id { type: int },
+        def column reason   { type: text },
+        def column due      { type: date, optional: true },
+    ]
+}
+
+// Optional columns typed with the SQL spellings a host-generated model carries as type ids (bigint, numeric,
+// money, time) and a structured decimal: an absent one is a NULL of the declared type on every engine.
+def schema audit {
+    description: "Audit an order",
+    columns: [
+        def column order_id  { type: int },
+        def column batch_no  { type: bigint, optional: true },
+        def column ratio     { type: numeric, optional: true },
+        def column fee       { type: money, optional: true },
+        def column logged_at { type: time, optional: true },
+        def column total     { type: { type: decimal, length: 12, precision: 4 }, optional: true },
+    ]
+}
+
+// A column no engine can produce (an object): TTRP-DSP-005.
+def schema raw_payload {
+    columns: [
+        def column order_id { type: int },
+        def column payload  { type: object },
+    ]
+}

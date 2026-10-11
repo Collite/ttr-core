@@ -61,17 +61,17 @@ class InlineMappingSynthesisSpec :
             val erTtr =
                 """
                 model er schema entity
-                def entity artikl {
+                def entity item {
                     binding: {
-                        target: { table: db.dbo.QZBOZI_DF },
+                        target: { table: db.dbo.item },
                         columns: {
-                            id_artiklu: IDZBOZI,
-                            kód_artiklu: { target: KOD_ZBOZI }
+                            sk: i_item_sk,
+                            item_id: { target: i_item_id }
                         }
                     },
                     attributes: [
-                        def attribute id_artiklu { type: int, isKey: true },
-                        def attribute kód_artiklu { type: text }
+                        def attribute sk { type: int, isKey: true },
+                        def attribute item_id { type: text }
                     ]
                 }
                 """.trimIndent()
@@ -81,24 +81,24 @@ class InlineMappingSynthesisSpec :
 
             val entityMapping = mappings.filterIsInstance<Er2DbEntityMapping>().single()
             entityMapping.mappingSource shouldBe MappingSource.Inline("entity")
-            entityMapping.qname.name shouldBe "artikl"
+            entityMapping.qname.name shouldBe "item"
             entityMapping.target.shouldBeInstanceOf<MappingTarget.Table>()
 
             val attrMappings = mappings.filterIsInstance<Er2DbAttributeMapping>()
             attrMappings shouldHaveSize 2
             attrMappings.all { it.mappingSource == MappingSource.Inline("entity") } shouldBe true
             attrMappings.map { it.qname.name }.toSet() shouldBe
-                setOf("artikl.id_artiklu", "artikl.kód_artiklu")
+                setOf("item.sk", "item.item_id")
         }
 
         "attribute-level inline mapping synthesises Er2DbAttributeMapping tagged Inline(\"attribute\")" {
             val erTtr =
                 """
                 model er schema entity
-                def entity produkt {
+                def entity category {
                     attributes: [
-                        def attribute id_produktu { type: int, isKey: true, binding: IDSKUPZBOZI },
-                        def attribute kód_produktu { type: text, binding: { target: { column: KOD_SKUPZBOZI } } }
+                        def attribute sk { type: int, isKey: true, binding: i_category_id },
+                        def attribute category_code { type: text, binding: { target: { column: i_category_code } } }
                     ]
                 }
                 """.trimIndent()
@@ -108,8 +108,8 @@ class InlineMappingSynthesisSpec :
             attrMappings shouldHaveSize 2
             attrMappings.all { it.mappingSource == MappingSource.Inline("attribute") } shouldBe true
             val byName = attrMappings.associateBy { it.qname.name }
-            byName["produkt.id_produktu"].shouldNotBeNull()
-            byName["produkt.kód_produktu"].shouldNotBeNull()
+            byName["category.sk"].shouldNotBeNull()
+            byName["category.category_code"].shouldNotBeNull()
         }
 
         "relation-level inline mapping (bare-fk) synthesises Er2DbRelationMapping tagged Inline" {
@@ -118,7 +118,7 @@ class InlineMappingSynthesisSpec :
                 model er schema entity
                 def entity a {}
                 def entity b {}
-                def relation artikl_produkt {
+                def relation item_in_category {
                     from: er.entity.a, to: er.entity.b,
                     cardinality: { from: "0..*", to: "0..1" },
                     join: [{ from: er.entity.a.x, to: er.entity.b.x }],
@@ -132,7 +132,7 @@ class InlineMappingSynthesisSpec :
                     .filterIsInstance<Er2DbRelationMapping>()
                     .single()
             relMapping.mappingSource shouldBe MappingSource.Inline("relation")
-            relMapping.qname.name shouldBe "artikl_produkt"
+            relMapping.qname.name shouldBe "item_in_category"
             relMapping.foreignKey.name shouldBe "fk_a_b"
         }
 
@@ -174,21 +174,21 @@ class InlineMappingSynthesisSpec :
             val erTtr =
                 """
                 model er schema entity
-                def entity artikl {
-                    binding: { target: { table: db.dbo.QZBOZI_DF } },
+                def entity item {
+                    binding: { target: { table: db.dbo.item } },
                     attributes: [ def attribute id { type: int, isKey: true } ]
                 }
                 """.trimIndent()
             val mapTtr =
                 """
                 model binding
-                def er2db_entity artikl { entity: er.entity.artikl, target: { table: db.dbo.OTHER } }
+                def er2db_entity item { entity: er.entity.item, target: { table: db.dbo.OTHER } }
                 """.trimIndent()
 
             val result = loadInline(mapOf("/er.ttr" to erTtr, "/map.ttr" to mapTtr))
             val dup = result.errors.filter { it.message.contains("ttr/duplicate-mapping") }
             dup shouldHaveSize 2 // one per offending location
-            dup[0].message shouldContain "artikl"
+            dup[0].message shouldContain "item"
             dup[0].message shouldContain "inline on entity"
             dup[0].message shouldContain "explicit def er2db_*"
         }
@@ -197,25 +197,25 @@ class InlineMappingSynthesisSpec :
             val erTtr =
                 """
                 model er schema entity
-                def entity produkt {
+                def entity category {
                     attributes: [
-                        def attribute id_produktu { type: int, isKey: true, binding: IDSKUPZBOZI }
+                        def attribute sk { type: int, isKey: true, binding: i_category_id }
                     ]
                 }
                 """.trimIndent()
             val mapTtr =
                 """
                 model binding
-                def er2db_attribute produkt.id_produktu {
-                    attribute: er.entity.produkt.id_produktu,
-                    target: { column: db.dbo.OTHER.IDSKUPZBOZI }
+                def er2db_attribute category.sk {
+                    attribute: er.entity.category.sk,
+                    target: { column: db.dbo.OTHER.i_category_id }
                 }
                 """.trimIndent()
 
             val result = loadInline(mapOf("/er.ttr" to erTtr, "/map.ttr" to mapTtr))
             val dup = result.errors.filter { it.message.contains("ttr/duplicate-mapping") }
             dup shouldHaveSize 2
-            dup[0].message shouldContain "produkt.id_produktu"
+            dup[0].message shouldContain "category.sk"
         }
 
         "ttr/duplicate-mapping fires when inline relation mapping collides with explicit def er2db_relation" {
@@ -224,7 +224,7 @@ class InlineMappingSynthesisSpec :
                 model er schema entity
                 def entity a {}
                 def entity b {}
-                def relation artikl_produkt {
+                def relation item_in_category {
                     from: er.entity.a, to: er.entity.b,
                     cardinality: { from: "0..*", to: "1" },
                     join: [{ from: er.entity.a.x, to: er.entity.b.x }],
@@ -234,8 +234,8 @@ class InlineMappingSynthesisSpec :
             val mapTtr =
                 """
                 model binding
-                def er2db_relation artikl_produkt {
-                    relation: er.entity.artikl_produkt,
+                def er2db_relation item_in_category {
+                    relation: er.entity.item_in_category,
                     fk: db.dbo.fk_two
                 }
                 """.trimIndent()
@@ -243,7 +243,7 @@ class InlineMappingSynthesisSpec :
             val result = loadInline(mapOf("/er.ttr" to erTtr, "/map.ttr" to mapTtr))
             val dup = result.errors.filter { it.message.contains("ttr/duplicate-mapping") }
             dup shouldHaveSize 2
-            dup[0].message shouldContain "artikl_produkt"
+            dup[0].message shouldContain "item_in_category"
             dup[0].message shouldContain "inline on relation"
             dup[0].message shouldContain "explicit def er2db_*"
         }
@@ -276,7 +276,7 @@ class InlineMappingSynthesisSpec :
             val mapTtr =
                 """
                 model binding
-                def er2db_entity artikl { entity: er.entity.artikl, target: { table: db.dbo.QZBOZI_DF } }
+                def er2db_entity item { entity: er.entity.item, target: { table: db.dbo.item } }
                 """.trimIndent()
             val result = loadInline(mapOf("/map.ttr" to mapTtr))
             result.errors.filter { it.message.contains("ttr/duplicate-mapping") } shouldHaveSize 0

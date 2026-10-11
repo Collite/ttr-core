@@ -127,7 +127,7 @@ object PlanNodeDecoder {
             )
         }
 
-        // DF-T05 v1.x — alias-at-boundary. When MapToPhysical emitted a TableScan whose
+        // v1.x — alias-at-boundary. When MapToPhysical emitted a TableScan whose
         // output_columns carry aliases (name=DB column, alias=ER attribute), we need to
         // wrap the raw Calcite scan with a Project that aliases the columns. Downstream
         // operators (Filter, Project, …) reference columns by ER attribute name; those

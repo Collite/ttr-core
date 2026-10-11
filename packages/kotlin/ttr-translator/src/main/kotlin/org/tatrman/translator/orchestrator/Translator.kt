@@ -337,7 +337,7 @@ class Translator(
 
         // Validate `effectiveSql` against one candidate [schema]'s catalog, with the typed-parameter
         // fallback: a bare `?` is untypeable in contexts Calcite can't infer — chiefly inside `||` /
-        // `CONCAT`, whose operand-type inference is null, so `KOD_STR LIKE {x} || '%'` fails with
+        // `CONCAT`, whose operand-type inference is null, so `s_store_id LIKE {x} || '%'` fails with
         // "Illegal use of dynamic parameter". Retry once with each placeholder wrapped as
         // `CAST(? AS <type>)` from its declared type; ParameterTyper unwraps the synthetic cast
         // post-validation so the executed SQL stays cast-free. Only attempt when typed parameters
@@ -479,7 +479,7 @@ class Translator(
         try {
             // NX-A: decorrelate correlated `[NOT] EXISTS` / `IN` sub-queries before encode. A
             // correlated sub-query reaches this seam as a `RexSubQuery` bearing a `RexFieldAccess`
-            // over a `RexCorrelVariable`, which has no `plan.v1` form (ai-models#27). No-op unless a
+            // over a `RexCorrelVariable`, which has no `plan.v1` form. No-op unless a
             // correlated sub-query is present, so uncorrelated sub-queries keep their
             // `SubqueryExpression` encoding and REL_NODE re-entry stays byte-stable.
             val decorrelated = SubqueryNormalizer.apply(rel, framework)

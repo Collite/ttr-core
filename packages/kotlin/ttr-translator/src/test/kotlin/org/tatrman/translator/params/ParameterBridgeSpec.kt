@@ -93,8 +93,8 @@ class ParameterBridgeSpec :
         ) = ParameterBridge.prepareSqlForCalcite(sql, params.toList(), typed)
 
         "an exactly-quoted placeholder '{id}' loses its quotes" {
-            val r = prepared("WHERE ('{id}' = '' OR s.IDSUBJEKT = '{id}')", id)
-            r.sql shouldBe "WHERE (? = '' OR s.IDSUBJEKT = ?)"
+            val r = prepared("WHERE ('{id}' = '' OR s.c_customer_sk = '{id}')", id)
+            r.sql shouldBe "WHERE (? = '' OR s.c_customer_sk = ?)"
             r.parameterOrder shouldBe listOf("id", "id")
             r.distinctNames shouldBe listOf("id")
         }

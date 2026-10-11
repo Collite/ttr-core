@@ -1,0 +1,23 @@
+// 0.14 — named row schemas (`def schema`): an ordered column list, each column written
+// exactly like a table column. TTR-P holds `display(<name>)` rows to them.
+package shop.actions
+
+def schema notify {
+    description: "Send a notification to a recipient",
+    columns: [
+        def column recipient { type: text },
+        def column subject   { type: text, description: "one line" },
+        def column order_id  { type: int },
+        def column amount    { type: decimal, optional: true },
+        def column note      { type: text, optional: true },
+    ]
+}
+
+def schema flag_order {
+    tags: ["action"],
+    columns: [
+        def column order_id { type: int },
+        def column reason   { type: text },
+        def column due      { type: date, optional: true },
+    ]
+}

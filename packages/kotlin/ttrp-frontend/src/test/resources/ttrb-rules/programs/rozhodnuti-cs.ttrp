@@ -1,0 +1,15 @@
+// A decision written in Czech sentences: two overlapping blocks, a count, an e-mail with a department
+// fallback recipient and a release. The action sentences route their rows to display(send_email) /
+// display(update_field) — no TTR-P wiring needed.
+uses world "shop.worlds.host"
+import shop.prodej.*
+import shop.akce.*
+
+container rozhodnuti target erp """ttrb-cs
+Načti objednávky.
+Spočítej počet_reklamací jako počet řádků reklamace.
+Když částka je větší než 1000:
+    Pošli e-mail email_zástupce, jinak oddělení "obchod" s předmětem "Velká objednávka", šablonou "velka_objednavka", klíčem číslo a přílohami faktura, dodací_list.
+Když stav je "zaplacená" a počet_reklamací je 0:
+    Nastav stav objednávky s klíčem číslo na "uvolněná" s důvodem "zaplaceno, bez reklamací".
+"""

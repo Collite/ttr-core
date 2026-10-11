@@ -1,0 +1,2 @@
+uses world "shop.worlds.host"
+container rozhodnuti target erp from "rules/neexistuje.ttrb-cs"

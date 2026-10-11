@@ -1,0 +1,22 @@
+// The same decision written by hand in canonical TTR-P: one filter per block, each action a
+// calc/select feeding display(<kind>) through a container OUT port.
+uses world "shop.worlds.host"
+import shop.prodej.*
+import shop.akce.*
+
+container rozhodnuti(out send_email, out update_field) target erp {
+  objednávky = load(objednávky)
+  reklamace_celkem = load(reklamace) -> calc { počet_reklamací = 1 } -> aggregate { počet_reklamací = count(počet_reklamací) }
+  s_reklamacemi = join(left: objednávky, right: reklamace_celkem, type: cross)
+  velke = s_reklamacemi -> filter(částka > 1000)
+  send_email = velke
+    -> calc { komu = coalesce(email_zástupce, "oddělení:obchod")  předmět = "Velká objednávka"  šablona = "velka_objednavka"  klíč = číslo  příloha = "faktura;dodací_list" }
+    -> select(komu, předmět, šablona, klíč, příloha)
+  uvolnit = s_reklamacemi -> filter(stav = "zaplacená" and počet_reklamací = 0)
+  update_field = uvolnit
+    -> calc { entita = "objednávky"  klíč = číslo  atribut = "stav"  hodnota = "uvolněná"  důvod = "zaplaceno, bez reklamací" }
+    -> select(entita, klíč, atribut, hodnota, důvod)
+}
+
+rozhodnuti.send_email -> display(send_email)
+rozhodnuti.update_field -> display(update_field)

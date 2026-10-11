@@ -29,6 +29,10 @@ class TtrbGraphIdentitySpec :
             norm("hero-embedded.ttrp") shouldBe norm("hero-canonical.ttrp")
         }
 
+        "embedded \"\"\"ttrb-cs (the Czech skin) ≡ canonical — the same hero, byte-identical normalized graphs" {
+            norm("hero-embedded-cs.ttrp") shouldBe norm("hero-canonical.ttrp")
+        }
+
         "the normalized graph is non-vacuous (the real hero roster is present)" {
             val n = norm("hero-canonical.ttrp")
             listOf(

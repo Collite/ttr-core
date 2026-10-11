@@ -51,7 +51,7 @@ message Operation {
     GroupByOp  groupby  = 5;
     OrderByOp  orderby  = 6;
     LimitOp    limit    = 7;
-    // Phase 08 B1 / DF-DSL01 — join with a second source. v1 allows at most one join per
+    // Phase 08 B1 — join with a second source. v1 allows at most one join per
     // pipeline (hub-and-spoke), positioned between `from` and `select`. Refused at parse
     // time when `on` is absent (B0 option (b)).
     JoinOp     join     = 8;
@@ -68,7 +68,7 @@ message FromOp {
   oneof source {
     org.tatrman.plan.v1.QualifiedName table = 1;
     string query_ref = 2;       // stackable-query reference (per Round 5)
-    // Phase 08 B2 / DF-DSL02 — workspace reference. The named workspace was materialised by
+    // Phase 08 B2 — workspace reference. The named workspace was materialised by
     // a prior query in the same session; the executing worker resolves it from the
     // session-scoped workspace store. Maps to PlanNode.WorkspaceRef. The session_id travels
     // separately (PipelineContext); the codec carries only the workspace name here.
@@ -137,7 +137,7 @@ message LimitOp {
   reserved 3 to 7;
 }
 
-// Phase 08 B1 / DF-DSL01 — JoinOp.
+// Phase 08 B1 — JoinOp.
 //
 // The pipeline's running DataFrame is the LEFT side; this op attaches a RIGHT side and an
 // `on` condition. Maps to plan.JoinNode. The right side accepts the same source kinds as

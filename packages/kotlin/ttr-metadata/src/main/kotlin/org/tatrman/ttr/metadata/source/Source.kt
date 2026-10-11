@@ -99,6 +99,8 @@ data class SourceSnapshot(
     val drillMaps: Map<QualifiedName, org.tatrman.ttr.metadata.model.DrillMap> = emptyMap(),
     /** Golem P4 S4.2 — `def area` blocks from `.ttrm` files, keyed by bare area name. */
     val areas: Map<String, AreaRecord> = emptyMap(),
+    /** Grammar 0.14 — `def schema` row schemas, keyed by package-qualified name. */
+    val rowSchemas: Map<String, org.tatrman.ttr.metadata.model.RowSchemaRecord> = emptyMap(),
     /** v4.1 world model (M2) — `def world` objects, keyed by world qname. */
     val worlds: Map<QualifiedName, org.tatrman.ttr.metadata.model.World> = emptyMap(),
     val warnings: List<LoadWarning> = emptyList(),
@@ -253,6 +255,7 @@ class FileBasedSource(
         val roles = mutableMapOf<QualifiedName, Role>()
         val drillMaps = mutableMapOf<QualifiedName, org.tatrman.ttr.metadata.model.DrillMap>()
         val areas = mutableMapOf<String, AreaRecord>()
+        val rowSchemas = mutableMapOf<String, org.tatrman.ttr.metadata.model.RowSchemaRecord>()
         val worlds = mutableMapOf<QualifiedName, org.tatrman.ttr.metadata.model.World>()
 
         for (file in files) {
@@ -329,6 +332,9 @@ class FileBasedSource(
                         "cnc" to setOf("role"),
                     )
                 for (def in pr.definitions) {
+                    // Grammar 0.14 — a `def schema` row schema is tier-neutral (the `area` precedent):
+                    // legal beside any directive, so it is never a wrong-file-kind.
+                    if (def is org.tatrman.ttr.parser.model.SchemaDef) continue
                     val defKind = definitionKind(def)
                     val allowedKinds = schemaKindAllowlist[schemaCode.lowercase()]
                     if (allowedKinds != null && defKind !in allowedKinds) {
@@ -357,6 +363,44 @@ class FileBasedSource(
                             def.tags,
                             def.packages,
                         )
+                    continue
+                }
+                // Grammar 0.14 — `def schema` row schemas are not model objects either (no tier /
+                // qname): stash them by package-qualified name for TTR-P's action displays.
+                if (def is org.tatrman.ttr.parser.model.SchemaDef) {
+                    val record =
+                        org.tatrman.ttr.metadata.model.RowSchemaRecord(
+                            name = def.name,
+                            pkg = declaredPackage ?: computedPackage,
+                            sourceFile = file.path,
+                            columns =
+                                def.columns.map { c ->
+                                    org.tatrman.ttr.metadata.model.RowSchemaColumn(
+                                        name = c.name,
+                                        type = c.type?.name ?: "",
+                                        optional = c.optional,
+                                        description = c.description ?: "",
+                                        length = c.type?.length,
+                                        precision = c.type?.precision,
+                                    )
+                                },
+                            description = def.description ?: "",
+                            descriptionLocalized = def.descriptionLocalized.toLocalizedText(),
+                            tags = def.tags,
+                        )
+                    if (rowSchemas.containsKey(record.qualifiedName)) {
+                        errors +=
+                            LoadWarning(
+                                sourceId = sourceId,
+                                file = file.path,
+                                line = def.source.line,
+                                column = def.source.column,
+                                message =
+                                    "ttr/duplicate-schema: schema '${record.qualifiedName}' is declared more than once",
+                            )
+                    } else {
+                        rowSchemas[record.qualifiedName] = record
+                    }
                     continue
                 }
                 // v4.1 world model (M2) — `def world` becomes typed world objects.
@@ -415,6 +459,7 @@ class FileBasedSource(
             roles = roles,
             drillMaps = drillMaps,
             areas = areas,
+            rowSchemas = rowSchemas,
             worlds = worlds,
             warnings = warnings,
             errors = errors,
@@ -1024,7 +1069,7 @@ class FileBasedSource(
                 )
         }
 
-        // Each `columns: { id_artiklu: IDZBOZI, ... }` entry → one Er2DbAttributeMapping.
+        // Each `columns: { sk: i_item_sk, ... }` entry → one Er2DbAttributeMapping.
         // Bare column refs are canonicalised to the table-embedded qname (see
         // [canonicaliseColumnTarget]); the entity target table is the one resolved above.
         val entityTable = entityTargetTable(def)
@@ -1061,7 +1106,7 @@ class FileBasedSource(
         mappings: MutableList<org.tatrman.ttr.metadata.model.Mapping>,
     ) {
         // Resolve the entity's physical table once so bare column refs
-        // (`mapping: KOD_STR`) can be canonicalised to the table-embedded qname.
+        // (`mapping: s_store_id`) can be canonicalised to the table-embedded qname.
         val entityTable = entityTargetTable(def)
         for (attr in def.attributes) {
             val attrMapping = attr.binding ?: continue
@@ -1171,10 +1216,10 @@ class FileBasedSource(
      * owning-table segment, matching how DbColumn qnames are keyed
      * (`qname(schema, ns, "<TABLE>.<COLUMN>")`, see [ttrColumnToDbColumn] callers).
      *
-     * A *bare* column ref — `mapping: KOD_STR`, which [Reference.toQname] resolves
-     * table-less to `db.dbo.KOD_STR` (qname name `"KOD_STR"`, no dot) — is rewritten
-     * to `db.dbo.QSTRED_DF.KOD_STR` under [entityTable]. Refs that already embed the
-     * table (`db.dbo.QSTRED_DF.KOD_STR` → name `"QSTRED_DF.KOD_STR"`) and Expression
+     * A *bare* column ref — `mapping: s_store_id`, which [Reference.toQname] resolves
+     * table-less to `db.dbo.s_store_id` (qname name `"s_store_id"`, no dot) — is rewritten
+     * to `db.dbo.store.s_store_id` under [entityTable]. Refs that already embed the
+     * table (`db.dbo.store.s_store_id` → name `"store.s_store_id"`) and Expression
      * targets pass through unchanged; with no resolvable table the target is left as-is.
      *
      * Without this, a bare-ref column mapping points at a column qname that no
@@ -1395,8 +1440,8 @@ object Reference {
      *  - **package.schema.namespace.name** — stock vocabulary, e.g. `cnc.cnc.role.master`
      *    (`parts[1] == "cnc"` is a schema token).
      *  - **schema.namespace.name** where `name` itself contains dots — e.g. the entity-attribute
-     *    references `er.entity.účetní_středisko.kód_střediska` and column targets
-     *    `db.dbo.QSTRED_DF.KOD_STR` (`parts[1]` is `entity`/`dbo`, not a schema token). The name is
+     *    references `er.entity.store.store_id` and column targets
+     *    `db.dbo.store.s_store_id` (`parts[1]` is `entity`/`dbo`, not a schema token). The name is
      *    everything after the namespace, so the qname matches the attribute's/column's canonical
      *    `qname(schema, namespace, "<owner>.<member>")` — see GH #53 (these previously misparsed to
      *    `package=schema-token, schemaCode=UNSPECIFIED`, so fuzzy attributes silently lost their

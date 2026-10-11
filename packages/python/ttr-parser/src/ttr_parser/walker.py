@@ -84,6 +84,7 @@ from .model import (
     Reference,
     RelationDef,
     RoleDef,
+    SchemaDef,
     SearchHintsValue,
     SecurityBlock,
     SecurityStatement,
@@ -439,6 +440,8 @@ def _visit_definition(ctx: Any, file: str, warnings: list[ParseWarning], errors:
         return _visit_drill_map(od, name, src, file, warnings)
     if od.AREA() is not None:
         return _visit_area(od, name, src, file, warnings)
+    if od.SCHEMA() is not None:
+        return _visit_schema(od, name, src, file, warnings, errors)
     if od.WORLD() is not None:
         return _visit_world(od, name, src, file, warnings)
     # v4.4 lexicon kinds (model lexicon) — one shared body, kind tag distinguishes.
@@ -607,6 +610,28 @@ def _visit_view(od: Any, name: str, source: SourceLocation, file: str, warnings:
     return ViewDef(
         name=name, source=source, description=description, description_localized=description_localized, tags=tags,
         columns=columns, definition_sql=definition_sql, search=search,
+    )
+
+
+def _visit_schema(od: Any, name: str, source: SourceLocation, file: str, warnings: list[ParseWarning], errors: list[ParseError]) -> SchemaDef:
+    """Grammar 0.14 — `def schema <id> { description?, tags?, columns: [...] }` (a named row schema)."""
+    description: str | None = None
+    description_localized: LocalizedStringValue | None = None
+    tags: tuple[str, ...] = ()
+    columns: tuple[ColumnDef, ...] = ()
+    for p in od.schemaDef().schemaProperty():
+        d = p.descriptionProperty()
+        if d is not None and description is None and description_localized is None:
+            description, description_localized = _visit_description(d, file)
+        t = p.tagsProperty()
+        if t is not None:
+            tags = _visit_list_of_strings(t.listOfStrings(), file)
+        c = p.columnsProperty()
+        if c is not None:
+            columns = tuple(_visit_column_def_list(c.columnDefList(), file, warnings, errors))
+    return SchemaDef(
+        name=name, source=source, description=description, description_localized=description_localized, tags=tags,
+        columns=columns,
     )
 
 

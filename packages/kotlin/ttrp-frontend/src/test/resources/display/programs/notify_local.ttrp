@@ -1,0 +1,13 @@
+// The `notify` action display fed twice in a bash-launched world: each source writes its own
+// Arrow file (out/notify.arrow, out/notify~2.arrow), projected to the schema's columns.
+uses world "shop.worlds.local"
+import shop.actions.*
+
+container review(out late, out large) target pl {
+    o = load(files.orders, schema: orders_csv) -> calc { recipient = email  subject = email }
+    late  = o -> filter(status = 1) -> select(recipient, subject, order_id, amount)
+    large = o -> filter(amount > 1000) -> select(recipient, subject, order_id)
+}
+
+review.late  -> display(notify)
+review.large -> display(notify)

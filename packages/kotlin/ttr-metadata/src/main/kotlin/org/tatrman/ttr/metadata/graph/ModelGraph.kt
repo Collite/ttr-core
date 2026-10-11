@@ -103,7 +103,7 @@ class ModelGraph private constructor(
     fun connectedComponents(): List<Set<String>> = ConnectivityInspector(graph).connectedSets()
 
     /**
-     * Phase 09 B4 / DF-M15 — read-only walk over every edge (export use case). The visitor
+     * Phase 09 B4 — read-only walk over every edge (export use case). The visitor
      * pattern keeps JGraphT off the public surface; callers don't need to touch it directly.
      */
     fun forEachEdge(action: (Edge) -> Unit) {

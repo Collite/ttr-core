@@ -3,17 +3,17 @@ ttrl 1
 canvas all_er {
     mode: manual
     nodes: {
-        "billing.invoicing.er.entity.artikl": { x: 320, y: 180 }
-        "billing.invoicing.er.entity.dobropis": { x: 580, y: 180 }
-        "billing.invoicing.er.entity.obchodní_kanál": { x: 320, y: 400 }
-        "billing.invoicing.er.entity.subjekt": { x: 580, y: 400 }
-        "billing.invoicing.er.entity.tržní_skupina": { x: 850, y: 400 }
-        "billing.invoicing.er.relation.artikl_podprodukt": { x: 320, y: 480 }
-        "billing.invoicing.er.relation.artikl_produkt": { x: 320, y: 300 }
-        "billing.invoicing.er.relation.obchodní_kanál_tržní_skupina": { x: 320, y: 580 }
-        "billing.invoicing.er.relation.subjekt_obchodní_kanál": { x: 580, y: 480 }
-        "billing.products.er.entity.podprodukt": { x: 580, y: 50 }
-        "billing.products.er.entity.produkt": { x: 850, y: 180 }
-        "billing.products.er.relation.podprodukt_produkt": { x: 580, y: 200 }
+        "billing.invoicing.er.entity.division": { x: 850, y: 400 }
+        "billing.invoicing.er.entity.item": { x: 320, y: 180 }
+        "billing.invoicing.er.entity.market": { x: 320, y: 400 }
+        "billing.invoicing.er.entity.store": { x: 580, y: 400 }
+        "billing.invoicing.er.entity.store_return": { x: 580, y: 180 }
+        "billing.invoicing.er.relation.item_in_category": { x: 320, y: 300 }
+        "billing.invoicing.er.relation.item_in_class": { x: 320, y: 480 }
+        "billing.invoicing.er.relation.market_in_division": { x: 320, y: 580 }
+        "billing.invoicing.er.relation.store_in_market": { x: 580, y: 480 }
+        "billing.products.er.entity.category": { x: 850, y: 180 }
+        "billing.products.er.entity.item_class": { x: 580, y: 50 }
+        "billing.products.er.relation.class_in_category": { x: 580, y: 200 }
     }
 }

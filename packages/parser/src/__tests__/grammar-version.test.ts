@@ -6,8 +6,13 @@ import { TTR_GRAMMAR_VERSION, PROPERTY_MAP } from '@tatrman/grammar';
 // the grammar prebuild) is what moves this constant; the assertion is the
 // reminder that the CHANGELOG entry + downstream proto/version sync move with it.
 describe('grammar version', () => {
-  it('is 0.13 (NLS-P10 / ⚑GXP-D7 — `description:` accepts the localized map form)', () => {
-    expect(TTR_GRAMMAR_VERSION).toBe('0.13');
+  it('is 0.14 (named row schemas — top-level `def schema <name> { columns: [...] }`)', () => {
+    expect(TTR_GRAMMAR_VERSION).toBe('0.14');
+  });
+
+  it('advertises the `def schema` properties: description, tags, columns', () => {
+    expect(PROPERTY_MAP.schema.map((p) => p.name)).toEqual(['description', 'tags', 'columns']);
+    expect(PROPERTY_MAP.schema.find((p) => p.name === 'columns')!.type).toBe('list of column definitions');
   });
 
   it('advertises description as accepting both forms on every kind that has it', () => {

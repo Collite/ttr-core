@@ -1,0 +1,19 @@
+package shop.orders
+def entity orders { description: "Order", binding: { target: { table: db.dbo.ORD_HEAD } },
+    attributes: [
+        def attribute order_id { type: int, isKey: true, binding: ORDER_ID, },
+        def attribute customer_id { type: int, optional: true, binding: CUSTOMER_ID, },
+        def attribute amount { type: decimal, optional: true, binding: AMOUNT, },
+        def attribute due_date { type: date, optional: true, binding: DUE_DATE, },
+        def attribute status { type: int, optional: true, binding: STATUS, },
+    ]
+}
+def entity customer { description: "Customer", binding: { target: { table: db.dbo.CUST } },
+    attributes: [
+        def attribute customer_id { type: int, isKey: true, binding: CUSTOMER_ID, },
+        def attribute email { type: text, optional: true, binding: EMAIL, },
+        def attribute full_name { type: text, optional: true, binding: FULL_NAME, },
+    ]
+}
+def relation order_customer { description: "An order belongs to a customer", from: er.entity.orders, to: er.entity.customer, cardinality: { from: "0..*", to: "1" }, join: [{ from: er.entity.orders.customer_id, to: er.entity.customer.customer_id }],
+}

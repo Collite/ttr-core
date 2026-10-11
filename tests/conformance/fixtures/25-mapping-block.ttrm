@@ -1,6 +1,6 @@
 model er
 
-def attribute nazev_artiklu {
+def attribute product_name {
     type: text,
-    binding: { target: { column: NAZEV_ZBOZI } }
+    binding: { target: { column: i_product_name } }
 }

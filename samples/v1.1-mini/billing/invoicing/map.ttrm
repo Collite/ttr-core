@@ -2,30 +2,30 @@ package billing.invoicing
 
 model binding
 
-def er2db_entity artikl { entity: er.entity.artikl, target: { table: db.dbo.QZBOZI_DF } }
-def er2db_entity produkt { entity: er.entity.produkt, target: { table: db.dbo.QSKUPZBOZI_DF } }
-def er2db_entity podprodukt { entity: er.entity.podprodukt, target: { table: db.dbo.QXXPODSKUPZBOZI } }
-def er2db_entity obchodní_kanál { entity: er.entity.obchodní_kanál, target: { table: db.dbo.QCENSKUP_DF } }
-def er2db_entity tržní_skupina { entity: er.entity.tržní_skupina, target: { table: db.dbo.QSKUPZNACZBOZI_DF } }
-def er2db_entity subjekt { entity: er.entity.subjekt, target: { table: db.dbo.QSUBJEKT } }
+def er2db_entity item_map { entity: er.entity.item, target: { table: db.dbo.item } }
+def er2db_entity category_map { entity: er.entity.category, target: { table: db.dbo.item_category } }
+def er2db_entity item_class_map { entity: er.entity.item_class, target: { table: db.dbo.item_class } }
+def er2db_entity market_map { entity: er.entity.market, target: { table: db.dbo.store_market } }
+def er2db_entity division_map { entity: er.entity.division, target: { table: db.dbo.store_division } }
+def er2db_entity store_map { entity: er.entity.store, target: { table: db.dbo.store } }
 
-def er2db_attribute artikl.id_artiklu { attribute: er.entity.artikl.id_artiklu, target: { column: db.dbo.QZBOZI_DF.IDZBOZI } }
-def er2db_attribute artikl.kód_artiklu { attribute: er.entity.artikl.kód_artiklu, target: { column: db.dbo.QZBOZI_DF.KOD_ZBOZI } }
-def er2db_attribute artikl.název_artiklu { attribute: er.entity.artikl.název_artiklu, target: { column: db.dbo.QZBOZI_DF.NAZEV_ZBOZI } }
-def er2db_attribute artikl.id_produktu { attribute: er.entity.artikl.id_produktu, target: { column: db.dbo.QZBOZI_DF.IDSKUPZBOZI } }
-def er2db_attribute artikl.id_podproduktu { attribute: er.entity.artikl.id_podproduktu, target: { column: db.dbo.QZBOZI_DF.IDXXPODSKUPZBOZI } }
+def er2db_attribute item.sk { attribute: er.entity.item.sk, target: { column: db.dbo.item.i_item_sk } }
+def er2db_attribute item.item_id { attribute: er.entity.item.item_id, target: { column: db.dbo.item.i_item_id } }
+def er2db_attribute item.product_name { attribute: er.entity.item.product_name, target: { column: db.dbo.item.i_product_name } }
+def er2db_attribute item.category_id { attribute: er.entity.item.category_id, target: { column: db.dbo.item.i_category_id } }
+def er2db_attribute item.class_id { attribute: er.entity.item.class_id, target: { column: db.dbo.item.i_class_id } }
 
-def er2db_attribute produkt.id_produktu { attribute: er.entity.produkt.id_produktu, target: { column: db.dbo.QSKUPZBOZI_DF.IDSKUPZBOZI } }
-def er2db_attribute produkt.kód_produktu { attribute: er.entity.produkt.kód_produktu, target: { column: db.dbo.QSKUPZBOZI_DF.KOD_SKUPZBOZI } }
-def er2db_attribute produkt.název_produktu { attribute: er.entity.produkt.název_produktu, target: { column: db.dbo.QSKUPZBOZI_DF.NAZEV_SKUPZBOZI } }
+def er2db_attribute category.sk { attribute: er.entity.category.sk, target: { column: db.dbo.item_category.i_category_id } }
+def er2db_attribute category.category_code { attribute: er.entity.category.category_code, target: { column: db.dbo.item_category.i_category_code } }
+def er2db_attribute category.category_name { attribute: er.entity.category.category_name, target: { column: db.dbo.item_category.i_category } }
 
-def er2db_attribute podprodukt.id_podproduktu { attribute: er.entity.podprodukt.id_podproduktu, target: { column: db.dbo.QXXPODSKUPZBOZI.IDXXPODSKUPZBOZI } }
-def er2db_attribute podprodukt.id_produktu { attribute: er.entity.podprodukt.id_produktu, target: { column: db.dbo.QXXPODSKUPZBOZI.IDSKUPZBOZI } }
+def er2db_attribute item_class.sk { attribute: er.entity.item_class.sk, target: { column: db.dbo.item_class.i_class_id } }
+def er2db_attribute item_class.category_id { attribute: er.entity.item_class.category_id, target: { column: db.dbo.item_class.i_category_id } }
 
-def er2db_attribute obchodní_kanál.id_kanálu { attribute: er.entity.obchodní_kanál.id_kanálu, target: { column: db.dbo.QCENSKUP_DF.IDCENSKUP } }
-def er2db_attribute obchodní_kanál.id_tržní_skupiny { attribute: er.entity.obchodní_kanál.id_tržní_skupiny, target: { column: db.dbo.QCENSKUP_DF.IDSKUPZNACZBOZI } }
+def er2db_attribute market.sk { attribute: er.entity.market.sk, target: { column: db.dbo.store_market.s_market_id } }
+def er2db_attribute market.division_id { attribute: er.entity.market.division_id, target: { column: db.dbo.store_market.s_division_id } }
 
-def er2db_attribute tržní_skupina.id_tržní_skupiny { attribute: er.entity.tržní_skupina.id_tržní_skupiny, target: { column: db.dbo.QSKUPZNACZBOZI_DF.IDSKUPZNACZBOZI } }
+def er2db_attribute division.sk { attribute: er.entity.division.sk, target: { column: db.dbo.store_division.s_division_id } }
 
-def er2db_attribute subjekt.id_subjektu { attribute: er.entity.subjekt.id_subjektu, target: { column: db.dbo.QSUBJEKT.IDSUBJEKT } }
-def er2db_attribute subjekt.id_kanálu { attribute: er.entity.subjekt.id_kanálu, target: { column: db.dbo.QSUBJEKT.IDCENSKUP } }
+def er2db_attribute store.sk { attribute: er.entity.store.sk, target: { column: db.dbo.store.s_store_sk } }
+def er2db_attribute store.market_id { attribute: er.entity.store.market_id, target: { column: db.dbo.store.s_market_id } }

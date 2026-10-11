@@ -1,7 +1,9 @@
 // TTR-P canonical grammar — the C3-converged canonical surface (P1 Stage 1.1).
-// @grammar-version: 0.2  (TTR-P spec version is an integer cut via docs/grammar-master/ — S6)
+// @grammar-version: 0.3  (TTR-P spec version is an integer cut via docs/grammar-master/ — S6)
 //   0.1 → 0.2 (PL-P2.S1, additive minor): runtime params (F-4-i) + on-failure
 //   islands / retries (F-4-iv/F-4-ii) — see docs/features/grammar-master/pl-grammar-work-items.md.
+//   0.2 → 0.3 (AG B5, additive minor): a container body may live in a file —
+//   `container x(…) target e from "rules/x.ttrb-cs"` (`from` is a SOFT keyword, still a name).
 //
 // Kotlin-only generation (G-b): this .g4 is read directly by the ANTLR Gradle
 // plugin in ttrp-frontend; there is no antlr-ng/TS target and no TextMate grammar.
@@ -105,7 +107,10 @@ mdObjectEntry   : identifier COLON mdObjectValue ;
 mdObjectValue   : qname | STRING | numericLiteral | TRUE | FALSE ;
 
 containerDecl   : CONTAINER identifier portSig? TARGET qname containerAttr*
-                  ( LBRACE statement* RBRACE | TAGGED_BLOCK ) ;   // closed containers (C3-d-iii)
+                  ( LBRACE statement* RBRACE | TAGGED_BLOCK | FROM STRING ) ;   // closed containers (C3-d-iii)
+// `from "<path>"` (AG B5): a FILE-BACKED fragment — the file's whole content is the interior
+// (byte-preserved, like a TAGGED_BLOCK's), the path relative to the program, the dialect read from
+// the file's extension / first-line marker (`.ttrb`, `.ttrb-cs`, `.ttr.sql`, `.ttr.py`).
 
 // PL-P2.S1 island execution attributes (F-4-iv on-failure, F-4-ii retries). An
 // `on failure of <island>` container runs IFF the named source island failed
@@ -201,7 +206,8 @@ pathAtom        : identifier | INT | STRING ;
 // name). Like `by`/`schema`, it is promoted back into `identifier`; the `on failure of`
 // clause is unambiguous by position (it only follows `target <qname>` on a container).
 // `param`/`failure`/`of`/`retries`/`absorbs` are hard keywords (no corpus collision).
-identifier      : IDENT | IN | OUT | ERR | BY | SCHEMA | DISTINCT | ON ;
+// `from` (AG B5) is soft too: it only opens a file-backed container body after `target <qname>`.
+identifier      : IDENT | IN | OUT | ERR | BY | SCHEMA | DISTINCT | ON | FROM ;
 idPart          : identifier | TRUE | FALSE | NULL ;
 
 // =============================================================================
@@ -238,6 +244,7 @@ FAILURE     : 'failure' ;
 OF          : 'of' ;
 RETRIES     : 'retries' ;
 ABSORBS     : 'absorbs' ;
+FROM        : 'from' ;
 
 // Expression keywords.
 AND         : 'and' ;

@@ -30,6 +30,7 @@ import org.tatrman.ttr.parser.model.ProcedureDef
 import org.tatrman.ttr.parser.model.QueryDef
 import org.tatrman.ttr.parser.model.RelationDef
 import org.tatrman.ttr.parser.model.RoleDef
+import org.tatrman.ttr.parser.model.SchemaDef
 import org.tatrman.ttr.parser.model.TableDef
 import org.tatrman.ttr.parser.model.ViewDef
 import org.tatrman.ttr.parser.model.WorldDef
@@ -61,6 +62,8 @@ fun kindOf(def: Definition): String =
         is Er2CncRoleDef -> "er2cncRole"
         is DrillMapDef -> "drillMap"
         is AreaDef -> "area"
+        // 0.14 — a named row schema (tier-neutral; `modelForKind` maps it to `db`, the `area` precedent).
+        is SchemaDef -> "schema"
         // v3.1 MD logical defs — kind strings mirror the TS `def.kind` discriminator (AST-NAMING).
         is MdDomainDef -> "mdDomain"
         is DimensionDef -> "dimension"

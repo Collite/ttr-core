@@ -1,0 +1,9 @@
+// TTRP-DSP-001: a stricter imported send_email schema requires `kopie`, which no e-mail sentence produces.
+uses world "shop.worlds.host"
+import shop.prodej.*
+import shop.akce_prisne.*
+
+container rozhodnuti target erp """ttrb-cs
+Načti objednávky.
+Pošli e-mail oddělení "obchod" s předmětem "Kontrola", šablonou "kontrola" a klíčem číslo.
+"""

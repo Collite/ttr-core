@@ -62,7 +62,7 @@ class RelToSqlUnparserSpec :
             out.shouldContainIgnoringCase("select")
         }
 
-        // Phase 08 A3 / DF-T04 — DuckDB dialect (Postgres-compatible for our constructs).
+        // Phase 08 A3 — DuckDB dialect (Postgres-compatible for our constructs).
         "DUCKDB dialect emits a SELECT (Postgres-shaped, no MSSQL brackets / no MySQL backticks)" {
             val rel = parseToRel("SELECT id, name FROM customers")
             val out = RelToSqlUnparser.unparse(rel, SqlDialectProto.DUCKDB)

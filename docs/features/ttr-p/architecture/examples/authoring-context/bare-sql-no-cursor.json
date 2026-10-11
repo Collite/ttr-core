@@ -154,7 +154,7 @@
     },
     {
       "id": "TTRP-FRG-001",
-      "suggestedAlternative": "supported fragment dialects: sql, pandas, ttrb (C3-g/C4-f)"
+      "suggestedAlternative": "supported fragment dialects: sql, pandas, ttrb, ttrb-cs (C3-g/C4-f)"
     },
     {
       "id": "TTRP-FN-001",

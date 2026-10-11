@@ -10,7 +10,7 @@ import org.tatrman.plan.v1.PlanNode
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.translate.v1.Language
 import org.tatrman.translate.v1.SqlDialect
-import org.tatrman.translator.framework.DfpJoinModel
+import org.tatrman.translator.framework.HartlandJoinModel
 import org.tatrman.translator.framework.EntityMapping
 import org.tatrman.translator.framework.FixtureModel
 import org.tatrman.translator.framework.InMemoryModelHandle
@@ -34,7 +34,7 @@ class SearchExpansionSpec :
     StringSpec({
         val translator = Translator(FixtureModel.handle())
 
-        // TF-P1.S1 (P0 finding, legacy `nevyfakturovane_zakazky_dm`) — `NOT IN (-2, 10)` expands to
+        // TF-P1.S1 (P0 finding, a legacy uninvoiced-orders template) — `NOT IN (-2, 10)` expands to
         // `AND(<>, <>)`; nested inside the WHERE's own AND it left the condition non-flat, and Calcite's
         // Filter asserts `RexUtil.isFlat` — a parse that threw only with assertions on (-ea). The correlated
         // NOT EXISTS matters: the decorrelated plan carries a Filter that the old rel-level pass then copied.
@@ -113,10 +113,10 @@ class SearchExpansionSpec :
         // to Number` parse_pipeline_failed for an INTEGER column — or, for a VARCHAR column, no error at
         // all: the Sarg's digest rode as a string literal under a `search` operator, and the plan failed
         // only on its next decode.
-        val place = DfpJoinModel.er("place")
-        val visit = DfpJoinModel.er("visit")
-        val placeTable = DfpJoinModel.db("place")
-        val visitTable = DfpJoinModel.db("visit")
+        val place = HartlandJoinModel.er("place")
+        val visit = HartlandJoinModel.er("visit")
+        val placeTable = HartlandJoinModel.db("place")
+        val visitTable = HartlandJoinModel.db("visit")
         val visitAttributes =
             listOf(
                 ModelAttribute("id", SurfaceType.INT, nullable = false, isKey = true),

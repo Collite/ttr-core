@@ -545,6 +545,23 @@ export interface ViewDef {
   search?: SearchBlock;
 }
 
+/**
+ * Grammar 0.14 — a named row schema (`def schema <name> { columns: [...] }`): an ordered column list,
+ * each column written exactly like a table column. Tier-neutral; consumed by TTR-P (`display(<name>)`
+ * rows are held to it). Not a loadable object.
+ */
+export interface SchemaDef {
+  kind: 'schema';
+  name: string;
+  source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
+  description?: StringValue | TripleStringValue;
+  descriptionLocalized?: LocalizedString;
+  tags?: string[];
+  columns?: ColumnDef[];
+}
+
 export interface ColumnDef {
   kind: 'column';
   name: string;
@@ -1107,6 +1124,7 @@ export type Definition =
   | Er2cncRoleDef
   | DrillMapDef
   | AreaDef
+  | SchemaDef
   | MdDomainDef
   | DimensionDef
   | MdMapDef

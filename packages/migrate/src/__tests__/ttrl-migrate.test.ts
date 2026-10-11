@@ -99,34 +99,34 @@ describe('planTtrlExtraction', () => {
     const text = `graph all_er {
   model: er,
   objects: [
-    billing.invoicing.er.entity.artikl,
-    billing.invoicing.er.entity.dobropis,
-    billing.invoicing.er.entity.obchodní_kanál,
-    billing.invoicing.er.entity.subjekt,
-    billing.invoicing.er.entity.tržní_skupina,
-    billing.products.er.entity.produkt,
-    billing.products.er.entity.podprodukt,
-    billing.invoicing.er.relation.artikl_produkt,
-    billing.invoicing.er.relation.artikl_podprodukt,
-    billing.products.er.relation.podprodukt_produkt,
-    billing.invoicing.er.relation.obchodní_kanál_tržní_skupina,
-    billing.invoicing.er.relation.subjekt_obchodní_kanál
+    billing.invoicing.er.entity.item,
+    billing.invoicing.er.entity.store_return,
+    billing.invoicing.er.entity.market,
+    billing.invoicing.er.entity.store,
+    billing.invoicing.er.entity.division,
+    billing.products.er.entity.category,
+    billing.products.er.entity.item_class,
+    billing.invoicing.er.relation.item_in_category,
+    billing.invoicing.er.relation.item_in_class,
+    billing.products.er.relation.class_in_category,
+    billing.invoicing.er.relation.market_in_division,
+    billing.invoicing.er.relation.store_in_market
   ],
   layout: {
     viewport: { zoom: 1.0, panX: 0, panY: 0, displayMode: "with-types" },
     nodes: {
-      billing.invoicing.er.entity.artikl: { x: 320, y: 180 },
-      billing.invoicing.er.entity.dobropis: { x: 580, y: 180 },
-      billing.invoicing.er.entity.obchodní_kanál: { x: 320, y: 400 },
-      billing.invoicing.er.entity.subjekt: { x: 580, y: 400 },
-      billing.invoicing.er.entity.tržní_skupina: { x: 850, y: 400 },
-      billing.products.er.entity.produkt: { x: 850, y: 180 },
-      billing.products.er.entity.podprodukt: { x: 580, y: 50 },
-      billing.invoicing.er.relation.artikl_produkt: { x: 320, y: 300 },
-      billing.invoicing.er.relation.artikl_podprodukt: { x: 320, y: 480 },
-      billing.products.er.relation.podprodukt_produkt: { x: 580, y: 200 },
-      billing.invoicing.er.relation.obchodní_kanál_tržní_skupina: { x: 320, y: 580 },
-      billing.invoicing.er.relation.subjekt_obchodní_kanál: { x: 580, y: 480 }
+      billing.invoicing.er.entity.item: { x: 320, y: 180 },
+      billing.invoicing.er.entity.store_return: { x: 580, y: 180 },
+      billing.invoicing.er.entity.market: { x: 320, y: 400 },
+      billing.invoicing.er.entity.store: { x: 580, y: 400 },
+      billing.invoicing.er.entity.division: { x: 850, y: 400 },
+      billing.products.er.entity.category: { x: 850, y: 180 },
+      billing.products.er.entity.item_class: { x: 580, y: 50 },
+      billing.invoicing.er.relation.item_in_category: { x: 320, y: 300 },
+      billing.invoicing.er.relation.item_in_class: { x: 320, y: 480 },
+      billing.products.er.relation.class_in_category: { x: 580, y: 200 },
+      billing.invoicing.er.relation.market_in_division: { x: 320, y: 580 },
+      billing.invoicing.er.relation.store_in_market: { x: 580, y: 480 }
     }
   }
 }
@@ -137,8 +137,8 @@ describe('planTtrlExtraction', () => {
     expect(r.nodeCount).toBe(12);
     expect(r.viewportDropped).toBe(true); // the sample has a viewport block
     expect(r.ttrl).toContain('canvas all_er {');
-    expect(r.ttrl).toContain('"billing.invoicing.er.entity.artikl": { x: 320, y: 180 }');
-    expect(r.ttrgAfter).toContain('billing.invoicing.er.entity.artikl'); // still in objects:
+    expect(r.ttrl).toContain('"billing.invoicing.er.entity.item": { x: 320, y: 180 }');
+    expect(r.ttrgAfter).toContain('billing.invoicing.er.entity.item'); // still in objects:
     expect(r.ttrgAfter).not.toContain('layout');
   });
 
@@ -152,7 +152,7 @@ describe('planTtrlExtraction', () => {
 
     const ttrlText = await readFile(sidecarPathFor(ttrgPath), 'utf-8');
     expect(ttrlText).toContain('canvas all_er {');
-    expect(ttrlText).toContain('"billing.invoicing.er.entity.artikl": { x: 320, y: 180 }');
+    expect(ttrlText).toContain('"billing.invoicing.er.entity.item": { x: 320, y: 180 }');
   });
 });
 

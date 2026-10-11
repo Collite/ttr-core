@@ -102,7 +102,8 @@ function buildGrammar(g4) {
             // Fences first: an embedded block must win over ordinary string/keyword scopes.
             fencePattern('sql', 'source.sql'),
             fencePattern('pandas', 'source.python'),
-            { begin: '(""")(ttrb)\\s*$', end: '(""")', name: 'string.quoted.fenced.ttrb.ttrp' },
+            // TTR-B in either skin: `"""ttrb` (English) and `"""ttrb-cs` (Czech) — one fence scope.
+            { begin: '(""")(ttrb(?:-cs)?)\\s*$', end: '(""")', name: 'string.quoted.fenced.ttrb.ttrp' },
             { include: '#strings' },
             { include: '#reserved-ports' },
             ...keywordPatterns,

@@ -1,0 +1,21 @@
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container priprava(out otevrene, out reklam) target erp {
+  otevrene = load(objednávky) -> filter(stav = "otevřená")
+  reklam = load(reklamace) -> select(id, číslo_objednávky)
+}
+
+container predani(in otevrene, in reklam, out velke, out ostatni) target erp """ttrb
+Load otevrene.
+Count the rows of reklam as počet_reklamací.
+If částka is bigger than 1000:
+    Send that to output velke.
+If částka is not bigger than 1000:
+    Send that to output ostatni.
+"""
+
+priprava.otevrene -> predani.otevrene
+priprava.reklam -> predani.reklam
+predani.velke -> display(velke)
+predani.ostatni -> display(ostatni)

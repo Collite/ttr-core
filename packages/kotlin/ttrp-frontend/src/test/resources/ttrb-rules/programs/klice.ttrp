@@ -1,0 +1,16 @@
+// Join conditions on the sql-text path: an unqualified column is the LEFT input's when the left has it
+// (`kód_zboží` exists on both sides), else the right's; `right.` / `left.` qualify explicitly.
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container klice(out oboji, out jen_vlevo, out jen_vpravo) target erp {
+  o = load(objednávky)
+  z = load(zásoby)
+  oboji = join(left: o, right: z, on: kód_zboží = right.kód_zboží, type: inner)
+  jen_vlevo = join(left: o, right: z, on: stav = right.vedoucí_skladu, type: inner)
+  jen_vpravo = join(left: o, right: z, on: poznámka = vedoucí_skladu, type: inner)
+}
+
+klice.oboji -> display(oboji)
+klice.jen_vlevo -> display(jen_vlevo)
+klice.jen_vpravo -> display(jen_vpravo)

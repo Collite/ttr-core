@@ -1,0 +1,7 @@
+# ttr: dialect=b lang=cs
+Načti otevrene.
+Spočítej počet_reklamací jako počet řádků reklam.
+Když částka je větší než 1000:
+    Pošli to na výstup velke.
+Když částka není větší než 1000:
+    Pošli to na výstup ostatni.

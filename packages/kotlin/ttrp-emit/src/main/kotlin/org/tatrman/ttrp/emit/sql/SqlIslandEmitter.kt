@@ -90,7 +90,11 @@ class SqlIslandEmitter(
         graph: TtrpGraph,
     ): Map<String, SqlEmitResult> {
         val container = graph.containers[island.id]
-        container?.fragment?.let { return mapOf(island.name to SqlEmitResult(it.sourceText.trim(), emptyMap())) }
+        container?.verbatimFragment?.let {
+            return mapOf(
+                island.name to SqlEmitResult(it.sourceText.trim(), emptyMap()),
+            )
+        }
         requireNotNull(container) { "SQL island '${island.name}' has no container" }
         val dialect = dialect(island)
         val rejects = world.engines[island.engine]?.manifest?.rejectsSupport() ?: RejectsSupport.NONE
@@ -119,7 +123,7 @@ class SqlIslandEmitter(
         graph: TtrpGraph,
     ): List<SiteCountQueries> {
         val container = graph.containers[island.id] ?: return emptyList()
-        if (container.fragment != null) return emptyList()
+        if (container.verbatimFragment != null) return emptyList()
         val dialect = dialect(island)
         val rejects = world.engines[island.engine]?.manifest?.rejectsSupport() ?: RejectsSupport.NONE
         val planner =

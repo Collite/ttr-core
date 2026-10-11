@@ -19,12 +19,12 @@ class ModelHandleSpec :
                 .setName("customer")
                 .build()
 
-        val qsubjektQname =
+        val customerTableQname =
             QualifiedName
                 .newBuilder()
                 .setSchemaCode(SchemaCode.DB)
                 .setNamespace("dbo")
-                .setName("QSUBJEKT")
+                .setName("CUSTOMER")
                 .build()
 
         val customerEntity =
@@ -37,7 +37,7 @@ class ModelHandleSpec :
                     ),
             )
 
-        val mapping = EntityMapping.ToTable(table = qsubjektQname, whereFilter = null)
+        val mapping = EntityMapping.ToTable(table = customerTableQname, whereFilter = null)
 
         val handle =
             InMemoryModelHandle(

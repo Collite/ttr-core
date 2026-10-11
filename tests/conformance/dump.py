@@ -39,6 +39,7 @@ from typing import Any
 import ttr_parser
 from ttr_parser.model import (
     AreaDef,
+    SchemaDef,
     AttributeDef,
     SecurityBlock,
     SecurityStatement,
@@ -125,6 +126,7 @@ KIND_KEYWORD: dict[str, str] = {
     "er2cnc_role": "er2cnc_role",
     "drill_map": "drill_map",
     "area": "area",
+    "schema": "schema",
     "world": "world",
     "term": "term",
     "pattern": "pattern",
@@ -294,6 +296,8 @@ def _properties(d: Definition) -> dict[str, Any]:
         return _drill_map_props(d)
     if isinstance(d, AreaDef):
         return _area_props(d)
+    if isinstance(d, SchemaDef):
+        return _schema_props(d)
     if isinstance(d, WorldDef):
         return _world_props(d)
     if isinstance(d, (TermDef, PatternDef, ExampleDef)):
@@ -534,6 +538,14 @@ def _area_props(d: AreaDef) -> dict[str, Any]:
         p["packages"] = list(d.packages)
     if d.entities:
         p["entities"] = list(d.entities)
+    return p
+
+
+def _schema_props(d: SchemaDef) -> dict[str, Any]:
+    """0.14 — a named row schema: its column list, dumped exactly like a view's."""
+    p: dict[str, Any] = {}
+    if d.columns:
+        p["columns"] = [_definition(c) for c in d.columns]
     return p
 
 

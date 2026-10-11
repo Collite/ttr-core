@@ -1,10 +1,10 @@
-package ucetnictvi
+package returns
 model query schema drill
 
 def drill_map agg_to_detail {
     from: query.query.agg,
     to: query.query.detail,
-    args: { id_zapisu: "IDZAP" },
+    args: { order_number: "cr_order_number" },
     display: { cs: "Detail", en: "Detail" },
     override: true,
 }

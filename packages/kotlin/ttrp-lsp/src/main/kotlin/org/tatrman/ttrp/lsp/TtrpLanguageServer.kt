@@ -87,6 +87,8 @@ class TtrpLanguageServer(
             org.eclipse.lsp4j.jsonrpc.messages.Either
                 .forRight(RenameOptions(true))
         capabilities.setDocumentFormattingProvider(true)
+        // AG B5: `container … from "<file>"` — the clause links to the fragment file.
+        capabilities.documentLinkProvider = org.eclipse.lsp4j.DocumentLinkOptions(false)
         return CompletableFuture.completedFuture(InitializeResult(capabilities))
     }
 

@@ -7,8 +7,8 @@ package org.tatrman.ttr.importschema.naming
  *
  * TTR.g4's `IDENT` rule is `[a-zA-ZÀ-ɏ_][a-zA-Z0-9_À-ɏ]*` — Latin-1 /
  * Latin-Extended letters (every Czech diacritic: č ě ř š ž ů …) are valid identifier chars.
- * So the hero's Czech identifiers are legal TTR-M names *verbatim* (the curated
- * `samples/v1.1-metadata/billing/db.ttrm` keeps them). §12 rule 1's `[^a-z0-9_]→_` + lowercase
+ * So Czech identifiers are legal TTR-M names *verbatim* (the ttrp-cli `aip-project` test fixture
+ * carries them end to end). §12 rule 1's `[^a-z0-9_]→_` + lowercase
  * mangling predates confirmed unicode-identifier support and would needlessly destroy them.
  *
  * The reconciled policy (findings, tasks-sv-p4-s3):

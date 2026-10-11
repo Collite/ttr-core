@@ -1,0 +1,151 @@
+# Sample of the YAML query-pattern format over the Hartland demo database (TPC-DS), hartland_us world.
+# Patterns: catalog and inventory
+# Categories, items, stock levels at distribution centers, out-of-stock items
+
+query_patterns:
+
+  # ===========================================================================
+  # CATEGORIES AND ITEMS
+  # ===========================================================================
+
+  categories:
+    pattern: "(list |show |)(all |)(categories|product categories)"
+    description: "List of all item categories"
+    entities: ["category"]
+    tested: true
+    example:
+      question: "List all categories"
+    sql_template: |
+      SELECT
+             i_category_id,
+             i_category_code,
+             i_category
+      FROM item_category
+      ORDER BY i_category;
+
+  find_item:
+    pattern: "(find|search for|look up) (item|product) {search_term}"
+    pattern_alt: "(what is|tell me about) (item|product|the product) {search_term}"
+    description: "Finds an item by its exact code or by part of its name"
+    entities: ["item", "category", "item_class"]
+    tested: true
+    param_labels:
+      search_term: "Item code or product name"
+    test_values:
+      search_term: "AAAAAAAABAAAAAAA"
+    example:
+      question: "Find item AAAAAAAABAAAAAAA"
+      explanation: "The item code is matched exactly (=), the name with a case-insensitive LIKE. Returns at most 50 rows."
+    sql_template: |
+      SELECT TOP 50
+             i.i_item_sk,
+             i.i_item_id,
+             i.i_product_name,
+             i.i_brand,
+             c.i_category,
+             k.i_class
+      FROM item i
+      LEFT JOIN item_category c ON c.i_category_id = i.i_category_id
+      LEFT JOIN item_class k ON k.i_class_id = i.i_class_id
+      WHERE i.i_item_id = '{search_term}'
+         OR i.i_product_name COLLATE Latin1_General_CI_AI LIKE '%{search_term}%'
+      ORDER BY i.i_product_name;
+
+  items_in_category:
+    pattern: "(items|products) (in |)(the |)(category |){category_name}( category|)"
+    pattern_alt: "(which|what) (items|products) (belong to|are in) (the |)(category |){category_name}( category|)"
+    description: "Items of a category, ordered by class and name"
+    entities: ["item", "category", "item_class"]
+    tested: true
+    param_labels:
+      category_name: "Category name"
+    example:
+      question: "Items in category Electronics"
+      question_alt: "Which products belong to the Sports category?"
+    sql_template: |
+      SELECT
+             k.i_class,
+             i.i_item_id,
+             i.i_product_name,
+             i.i_brand
+      FROM item i
+      JOIN item_category c ON c.i_category_id = i.i_category_id
+      LEFT JOIN item_class k ON k.i_class_id = i.i_class_id
+      WHERE c.i_category COLLATE Latin1_General_CI_AI LIKE '%{category_name}%'
+      ORDER BY k.i_class, i.i_product_name;
+
+  # ===========================================================================
+  # INVENTORY
+  # ===========================================================================
+
+  item_stock:
+    pattern: "(stock|stock level|inventory|how many are on hand) (of |for |)(item |){item_code}"
+    description: "Quantity on hand of an item per distribution center in the latest weekly snapshot"
+    entities: ["inventory", "item", "warehouse", "date_dim"]
+    tested: true
+    param_labels:
+      item_code: "Item code"
+    test_values:
+      warehouse_id: ""
+    sql_template: |
+      SELECT
+             w.w_warehouse_name,
+             d.d_date AS snapshot_date,
+             SUM(inv.inv_quantity_on_hand) AS on_hand_qty
+      FROM inventory inv
+      JOIN item i ON i.i_item_sk = inv.inv_item_sk
+      JOIN warehouse w ON w.w_warehouse_sk = inv.inv_warehouse_sk
+      JOIN date_dim d ON d.d_date_sk = inv.inv_date_sk
+      WHERE i.i_item_id = '{item_code}'
+        AND ('{warehouse_id}' = '' OR w.w_warehouse_sk = '{warehouse_id}')
+        AND inv.inv_date_sk = (SELECT MAX(inv_date_sk) FROM inventory)
+      GROUP BY w.w_warehouse_name, d.d_date
+      ORDER BY w.w_warehouse_name;
+
+  out_of_stock_items:
+    pattern: "(out of stock|sold out|missing) (items|products) (at |in |)(warehouse |DC |){warehouse_name}"
+    description: "Items that were out of stock at a distribution center in any of the latest 4 weekly snapshots"
+    entities: ["stockout", "item", "warehouse"]
+    tested: false
+    param_labels:
+      warehouse_name: "Distribution center name"
+    example:
+      question: "Which items are out of stock at Memphis DC?"
+    sql_template: |
+      WITH latest_snapshots AS (
+          SELECT DISTINCT TOP 4 inv_date_sk
+          FROM inventory
+          ORDER BY inv_date_sk DESC
+      )
+      SELECT
+             i.i_item_id,
+             i.i_product_name,
+             COUNT(*) AS weeks_out_of_stock
+      FROM inventory inv
+      JOIN latest_snapshots s ON s.inv_date_sk = inv.inv_date_sk
+      JOIN item i ON i.i_item_sk = inv.inv_item_sk
+      JOIN warehouse w ON w.w_warehouse_sk = inv.inv_warehouse_sk
+      WHERE inv.inv_quantity_on_hand = 0
+        AND w.w_warehouse_name COLLATE Latin1_General_CI_AI LIKE '%{warehouse_name}%'
+      GROUP BY i.i_item_id, i.i_product_name
+      ORDER BY weeks_out_of_stock DESC, i.i_item_id;
+
+  full_item_availability:
+    pattern: "(full|complete) availability (of |for |)(item |){search_term}"
+    description: |
+      Complete availability overview of an item in one step:
+        STEP 1: Identify the item by code or name (find_item)
+        STEP 2: Quantity on hand per distribution center (item_stock)
+    entities: ["item", "category", "item_class", "inventory", "warehouse"]
+    tested: false
+    param_labels:
+      search_term: "Item code or product name"
+    example:
+      question: "Full availability of item AAAAAAAABAAAAAAA"
+      explanation: |
+        Returns 2 result sets:
+          1. Item identification + category and class
+          2. Quantity on hand per distribution center in the latest snapshot
+    note: |
+      An orchestration pattern without its own sql_template — it combines find_item
+      and item_stock; the code of the item found is passed on as {item_code}.

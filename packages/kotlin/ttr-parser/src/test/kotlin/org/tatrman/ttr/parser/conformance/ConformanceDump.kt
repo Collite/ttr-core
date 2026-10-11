@@ -51,6 +51,7 @@ import org.tatrman.ttr.parser.model.PropertyValue
 import org.tatrman.ttr.parser.model.QueryDef
 import org.tatrman.ttr.parser.model.RelationDef
 import org.tatrman.ttr.parser.model.RoleDef
+import org.tatrman.ttr.parser.model.SchemaDef
 import org.tatrman.ttr.parser.model.SearchHintsValue
 import org.tatrman.ttr.parser.model.SemanticsBlock
 import org.tatrman.ttr.parser.model.SemanticsValue
@@ -185,6 +186,7 @@ object ConformanceDump {
             is Er2CncRoleDef -> "er2cnc_role"
             is DrillMapDef -> "drill_map"
             is AreaDef -> "area"
+            is SchemaDef -> "schema"
             is MdDomainDef -> "domain"
             is DimensionDef -> "dimension"
             is MdMapDef -> "map"
@@ -315,6 +317,10 @@ object ConformanceDump {
             is AreaDef -> {
                 if (d.packages.isNotEmpty()) p["packages"] = strList(d.packages)
                 if (d.entities.isNotEmpty()) p["entities"] = strList(d.entities)
+            }
+            // 0.14 — named row schema: its column list, dumped exactly like a view's.
+            is SchemaDef -> {
+                if (d.columns.isNotEmpty()) p["columns"] = JsonArray(d.columns.map { defTree(it) })
             }
             // MD (v3.1) logical + md2db binding defs are not in the cross-target conformance corpus
             // yet (S8) — their parser-port coverage lives in MdDefParseSpec / Md2dbDefParseSpec.

@@ -28,7 +28,7 @@ enum Language {
 }
 
 // SQL dialects. v1 emits MS SQL by default; POSTGRESQL / MYSQL_MARIADB / DUCKDB are wired
-// through `Dialects.byCode` and the unparser (Phase 08 A3 / DF-T04 in the ai-platform history).
+// through `Dialects.byCode` and the unparser (Phase 08 A3).
 enum SqlDialect {
     SQL_DIALECT_UNSPECIFIED = 0;
     MSSQL                   = 1;

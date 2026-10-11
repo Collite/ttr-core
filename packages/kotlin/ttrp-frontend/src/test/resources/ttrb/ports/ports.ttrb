@@ -1,0 +1,11 @@
+# ttr: dialect=b lang=en
+# In-ports `orders` and `shortages`, out-ports `big` and `rest`.
+Load orders.
+Count the rows of shortages as missing.
+Attach limits to the result.
+Join that with shortages on item is shortages.item as matched.
+Keep only the rows where amount is more than 1000.
+Send that to output big.
+Load orders as o.
+Combine that with shortages.
+Send the result to output rest.

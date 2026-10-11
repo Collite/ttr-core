@@ -1,0 +1,149 @@
+# TTR-B keyword skin — Czech. Serves `"""ttrb-cs` fragments and `*.ttrb-cs` files
+# (first line `# ttr: dialect=b lang=cs`).
+#
+# The same grammar as roster.en.yaml spells (see the format notes there). Keywords match
+# case- and diacritic-insensitively (`Pošli` = `posli` = `POSLI`); identifiers are matched
+# exactly and are never declined or folded — a sentence names a column / table in the form
+# the model declares it (`Načti objednávky.` reads the entity `objednávky`).
+#
+# Czech has no articles and no `of` before a genitive, so THE / OF are absent: the grammar
+# keeps them optional wherever they occur. `není` stands for IS NOT, `jedno z` for ONE OF.
+lang: cs
+
+keywords:
+  # ---- verbs (C4-b roster) ----
+  LOAD: [načti, nahraj]
+  KEEP: [ponech, zachovej, nech]
+  TAKE: [vezmi]
+  SELECT: [vyber]
+  FILTER: [filtruj]
+  REMOVE: [odstraň, odeber]
+  DELETE: [smaž, vymaž]
+  RENAME: [přejmenuj]
+  CONVERT: [převeď]
+  RETYPE: [přetypuj]
+  CREATE: [vytvoř]
+  COMPUTE: [spočti, vypočti]
+  CALCULATE: [vypočítej]
+  SUMMARIZE: [shrň, sumarizuj]
+  JOIN: [spoj, propoj]
+  SORT: [seřaď, setřiď]
+  COMBINE: [sluč, zkombinuj]
+  APPEND: [přidej]
+  UNION: [sjednoť]
+  STORE: [ulož]
+  SHOW: [ukaž, zobraz]
+  DISPLAY: [vypiš]
+
+  # ---- helper / noise words ----
+  COLUMN: [sloupec]
+  COLUMNS: [sloupce, sloupců, sloupcích]
+  FIELD: [pole]
+  ROW: [řádek]
+  ROWS: [řádky, řádků, řádcích]
+  RECORD: [záznam]
+  RECORDS: [záznamy, záznamů]
+  ONLY: [jen, jenom, pouze]
+  ALL: [všechny, všechna, všech]
+  ME: [mi]
+  NEW: [nový, nová, nové, novou]
+  FROM: [z, ze]
+  WITH: [s, se]
+  "ON": [přes]
+  BY: [podle, dle]
+  TO: [na, do, k, ke]
+  AS: [jako]
+  FOR: [pro]
+  WHERE: [kde]
+  WHICH: [který, která, které, jež, jenž]
+  THAT: [to]
+  THIS: [toto, tohle]
+  IT: [ono]
+  EXCEPT: [kromě]
+  BUT: [mimo]
+  GROUPED: [seskupeno, seskupené, seskupená]
+  FIRST: [první, prvních]
+  RESULT: [výsledek, výsledku, výsledkem]
+  RESULTS: [výsledky]
+  FILE: [soubor, souboru]
+  SCHEMA: [schéma, schématem, schématu]
+  ASCENDING: [vzestupně]
+  DESCENDING: [sestupně]
+
+  # ---- verbose comparison words ----
+  IS: [je, jsou]
+  NOT: [ne]
+  AND: [a]
+  OR: [nebo]
+  W_MORE: [více, víc]
+  LESS: [méně, míň]
+  THAN: [než]
+  BIGGER: [větší]
+  HIGHER: [vyšší]
+  LOWER: [nižší]
+  SMALLER: [menší]
+  BEFORE: [před]
+  AFTER: [po]
+  COMES: [přichází, následuje]
+  EQUAL: [rovno, rovna, rovný, rovné, rovná]
+  EQUALS: ["se rovná", "rovná se"]
+  SAME: [stejný, stejná, stejné]
+  EMPTY: [prázdný, prázdná, prázdné, prázdnou]
+  BETWEEN: [mezi]
+
+  # ---- literals-as-keywords ----
+  "TRUE": [pravda]
+  "FALSE": [nepravda]
+
+  # ---- blocks (B3) ----
+  IF: [když, pokud, jestliže]
+
+  # ---- count / attach (B4) ----
+  COUNT: [spočítej]
+  COUNT_NOUN: [počet]
+  ATTACH: [připoj]
+
+  # ---- actions + recipients (B4) — the action kinds are fixed: send_email, update_field, manual_task ----
+  SEND: [pošli, odešli]
+  EMAIL: [e-mail, email]
+  SUBJECT: [předmětem]
+  TEMPLATE: [šablonou]
+  KEY: [klíčem]
+  ATTACHMENT: [přílohou, přílohami]
+  SET: [nastav]
+  REASON: [důvodem]
+  MANUAL_TASK: ["ruční úkol"]
+  DESCRIPTION: [popisem]
+  DEPARTMENT: [oddělení]
+  OTHERWISE: [jinak]
+
+  # ---- container ports (B7) ----
+  OUTPUT: [výstup]
+
+  # ---- joins (B7) ----
+  OPTIONALLY: [volitelně]
+  MATCH_IN: ["mají protějšek v", "mají protějšek ve", "má protějšek v", "má protějšek ve"]
+  NO_MATCH_IN: ["nemají protějšek v", "nemají protějšek ve", "nemá protějšek v", "nemá protějšek ve"]
+  RELATION: [vazbu, vazby, vazba, vazbou]
+
+  # ---- naming the current value (B8) ----
+  NAME_VERB: [pojmenuj, nazvi]
+
+sequences:
+  "není": [IS, NOT]
+  "nejsou": [IS, NOT]
+  "jedno z": [ONE, OF]
+  "jeden z": [ONE, OF]
+  "jednou z": [ONE, OF]
+  "se nerovná": [DOES, NOT, EQUAL]
+
+# No Czech word: articles and `of`; English-only synonyms; `typ` stays a column name.
+absent: [THE, OF, COL, COLS, FIELDS, LINE, LINES, EXCLUDING, EXCLUDE, GROUP, W_TYPE, ASC, DESC,
+         LARGER, FEWER, DOES, ONE]
+
+functions:
+  součet: sum
+  průměr: avg
+  počet: count
+  minimum: min
+  maximum: max

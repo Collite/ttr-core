@@ -24,14 +24,14 @@ class DrillMapParserSpec :
             val r =
                 TtrLoader.parseString(
                     """
-                    package ucetnictvi
+                    package returns
                     model query schema drill
 
-                    def drill_map agg_strediska_na_doklad {
-                        from: query.query.ucetni_zapisy_agregace_strediska,
-                        to:   query.query.ucetni_doklad_detail,
-                        args: { id_ucetniho_zapisu: "IDUCETZAP" },
-                        display: { cs: "Detail dokladu" },
+                    def drill_map reason_to_return_detail {
+                        from: query.query.returns_by_reason,
+                        to:   query.query.return_detail,
+                        args: { order_number: "cr_order_number" },
+                        display: { en: "Return detail" },
                         override: true,
                     }
                     """.trimIndent(),
@@ -41,11 +41,11 @@ class DrillMapParserSpec :
             r.definitions shouldHaveSize 1
             val def = r.definitions[0]
             def.shouldBeInstanceOf<DrillMapDef>()
-            def.name shouldBe "agg_strediska_na_doklad"
-            def.from?.path shouldBe "query.query.ucetni_zapisy_agregace_strediska"
-            def.to?.path shouldBe "query.query.ucetni_doklad_detail"
-            def.args["id_ucetniho_zapisu"] shouldBe "IDUCETZAP"
-            def.display?.byLanguage?.get("cs") shouldBe "Detail dokladu"
+            def.name shouldBe "reason_to_return_detail"
+            def.from?.path shouldBe "query.query.returns_by_reason"
+            def.to?.path shouldBe "query.query.return_detail"
+            def.args["order_number"] shouldBe "cr_order_number"
+            def.display?.byLanguage?.get("en") shouldBe "Return detail"
             def.overrideAuto shouldBe true
         }
 
@@ -53,13 +53,13 @@ class DrillMapParserSpec :
             val r =
                 TtrLoader.parseString(
                     """
-                    package ucetnictvi
+                    package returns
                     model query schema drill
 
-                    def drill_map agg_uctu_na_doklad {
-                        from: query.query.ucetni_zapisy_agregace_uctu,
-                        to:   query.query.ucetni_doklad_detail,
-                        args: { id_ucetniho_zapisu: "IDUCETZAP" },
+                    def drill_map warehouse_to_return_detail {
+                        from: query.query.returns_by_warehouse,
+                        to:   query.query.return_detail,
+                        args: { order_number: "cr_order_number" },
                     }
                     """.trimIndent(),
                 )
@@ -75,7 +75,7 @@ class DrillMapParserSpec :
             val r =
                 TtrLoader.parseString(
                     """
-                    package ucetnictvi
+                    package returns
                     model query schema drill
 
                     def drill_map x {
@@ -94,7 +94,7 @@ class DrillMapParserSpec :
             val r =
                 TtrLoader.parseString(
                     """
-                    package ucetnictvi
+                    package returns
                     model query schema drill
 
                     def drill_map x {

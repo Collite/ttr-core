@@ -47,6 +47,7 @@ The two are mutually exclusive per file; mixing them is a `wrong-file-kind` erro
 | `role` | `cnc` | `label` (localized), `description` |
 | `er2cnc_role` | `binding`/`cnc` | `entity`, `role` |
 | `drill_map` | `db` | `from`, `to`, `args`, `display`, `override` |
+| `schema` | (any — tier-neutral) | `columns` (each a `def column` with `type`, `optional`) — a named row shape (grammar 0.14); TTR-P holds `display(<name>)` rows to it |
 
 Every kind also accepts `description` and `tags`. Many `er`/`db` kinds also accept a `search { … }` block.
 
@@ -165,6 +166,8 @@ graph       : 'graph' id '{' graphProperty* '}'        // .ttrg only; body: mode
 // 'area' is one of the def kinds — a plain def in any .ttrm file:
 //   def area <id> { (description | tags | packages | entities)* }
 areaProp    : ('packages'|'entities') ':' '[' path* ']' | description | tags
+// 'schema' (0.14) — a named row shape, columns written exactly like a table's:
+//   def schema <id> { (description | tags | columns: [ def column <id> { type: t, optional: true } ... ])* }
 
 property    : key (':' | '=') value
 value       : string | number | boolean | null | id | list | object

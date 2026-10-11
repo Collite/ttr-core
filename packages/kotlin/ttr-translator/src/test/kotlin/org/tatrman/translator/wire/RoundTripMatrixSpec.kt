@@ -41,7 +41,7 @@ import org.tatrman.translator.framework.TranslatorFramework
 import org.tatrman.plan.v1.parseSchemaCode
 
 /**
- * Phase 08 A5 / DF-T07 — cross-language `RoundTripSpec` matrix.
+ * Phase 08 A5 — cross-language `RoundTripSpec` matrix.
  *
  * Three input languages × four output dialects × seven query shapes. Cells that aren't
  * expressible in a given input language are explicitly disabled with a reason — never silently

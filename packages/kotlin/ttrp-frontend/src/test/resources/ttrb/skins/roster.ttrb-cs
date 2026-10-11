@@ -1,0 +1,11 @@
+# ttr: dialect=b lang=cs
+Načti raw jako base.
+Ponech jen sloupce region, total.
+Ponech všechny sloupce kromě internal_id.
+Vezmi jen řádky, kde region je jedno z ('N', 'S').
+Odstraň řádky, kde region je prázdný.
+Přejmenuj total na region_total.
+Převeď region na string.
+Spočti amount * 0.21 jako vat.
+Sluč to s archive_sales.
+Ulož to do souboru "out/totals.csv".

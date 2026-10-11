@@ -1,0 +1,5 @@
+order_id,email,amount,status
+1,ann@example.com,120.50,1
+2,bob@example.com,2500.00,2
+3,cid@example.com,1500.25,1
+4,dee@example.com,,3

@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttrp.emit.sql
 
+import org.tatrman.ttrp.emit.EmitDiagnosticId
+import org.tatrman.ttrp.emit.TtrpEmitException
 import org.tatrman.ttrp.expr.Cast
 import org.tatrman.ttrp.expr.ColumnRef
 import org.tatrman.ttrp.expr.Expression
 import org.tatrman.ttrp.expr.FunctionCall
 import org.tatrman.ttrp.expr.Literal
 import org.tatrman.ttrp.expr.LiteralValue
+import org.tatrman.ttrp.expr.TtrpType
 import org.tatrman.ttrp.expr.catalog.ValidityCatalog
 import org.tatrman.ttrp.expr.catalog.ValiditySpec
 import org.tatrman.ttrp.graph.capability.RejectDomain
 import org.tatrman.ttrp.graph.capability.RejectsSupport
+import org.tatrman.ttrp.resolve.ColumnType
 
 /**
  * Renders the `internal.*` validity calls a reject guard carries directly to Postgres SQL
@@ -202,10 +206,60 @@ object RejectGuardSql {
                     is LiteralValue.Bool -> v.value.toString()
                     LiteralValue.Null -> "NULL"
                 }
-            is Cast -> "CAST(${renderArg(e.expr)} AS ${e.target.canonical})"
+            is Cast -> "CAST(${renderArg(e.expr)} AS ${pgCastType(e.target)})"
             is FunctionCall -> renderCall(e)
             else -> throw IllegalArgumentException("reject guard operand not renderable to PG SQL: $e")
         }
+
+    /**
+     * The Postgres type a raw-rendered `cast(x as <t>)` names. The TTR-P canonical spellings are not all Postgres
+     * types (`string`, `double`, `number`, `datetime` are not), so a cast calc on a Postgres island rendered
+     * `CAST("order_id" AS string)` — invalid SQL. `integer` and an unsized `decimal` keep their spelling (the
+     * fail-fast twin's casts stay byte-identical, R-P3); a decimal keeps its precision/scale; a custom type id that
+     * is a SQL spelling ([ColumnType]) maps to its Postgres type; object / list have no cast.
+     */
+    fun pgCastType(t: TtrpType): String =
+        when (t) {
+            TtrpType.Integer -> "integer"
+            TtrpType.Float -> "float"
+            TtrpType.Double -> "double precision"
+            TtrpType.Number -> "numeric"
+            is TtrpType.Decimal ->
+                when {
+                    t.precision == null -> "decimal"
+                    t.scale == null -> "decimal(${t.precision})"
+                    else -> "decimal(${t.precision},${t.scale})"
+                }
+            TtrpType.Bool -> "boolean"
+            TtrpType.Str -> "text"
+            TtrpType.Date -> "date"
+            TtrpType.Timestamp, TtrpType.Datetime -> "timestamp"
+            is TtrpType.Named -> ColumnType.parse(t.name)?.let { pgType(it) } ?: noPgCast(t.canonical)
+            TtrpType.Obj, TtrpType.Lst -> noPgCast(t.canonical)
+        }
+
+    private fun pgType(t: ColumnType): String =
+        when (t.kind) {
+            ColumnType.Kind.TEXT -> t.length?.let { "varchar($it)" } ?: "text"
+            ColumnType.Kind.INT -> "integer"
+            ColumnType.Kind.BIGINT -> "bigint"
+            ColumnType.Kind.SMALLINT, ColumnType.Kind.TINYINT -> "smallint"
+            ColumnType.Kind.DECIMAL -> "numeric(${t.precision},${t.scale})"
+            ColumnType.Kind.FLOAT -> "double precision"
+            ColumnType.Kind.REAL -> "real"
+            ColumnType.Kind.BOOL -> "boolean"
+            ColumnType.Kind.DATE -> "date"
+            ColumnType.Kind.TIME -> "time"
+            ColumnType.Kind.DATETIME, ColumnType.Kind.TIMESTAMP -> "timestamp"
+        }
+
+    private fun noPgCast(type: String): Nothing =
+        throw TtrpEmitException(
+            EmitDiagnosticId.UNSUPPORTED_NODE,
+            detail =
+                "no Postgres cast to `$type` — cast to a scalar type " +
+                    "(text, int, decimal, float, bool, date, datetime)",
+        )
 
     /** `op.*` operators render infix (`div` is `/`, true division — never a function call); `fn.*` prefix. */
     private fun renderCall(e: FunctionCall): String {

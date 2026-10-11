@@ -1,0 +1,10 @@
+# ttr: dialect=b lang=cs
+Načti stock jako sk.
+Načti orders jako o.
+Ponech řádky, kde (aa je menší než bb nebo cc je prázdné) a (dd = ee nebo ff je prázdné).
+Ponech řádky, kde aa je menší než bb nebo cc je prázdné a dd = ee.
+Ponech řádky, kde (amount + fee) * 2 je větší než 100.
+Spočti prio jako 1, když (amount je větší než 5000 a note není prázdná) nebo state = "urgent", jinak 2.
+Spoj to se sk přes kk = sk.kk2 a (aa je menší než sk.bb nebo cc je větší než sk.dd) jako y.
+Když (prio = 1 nebo amount je větší než 10000) a state = "open":
+    Ukaž výsledek jako urgent.

@@ -1,0 +1,10 @@
+uses world "acme.worlds.dev"
+container blocks(out result) target erp_pg """ttrb
+Load erp.accounts as t.
+If region is "N":
+    Keep only the columns account_id, region.
+    Show the result as north_accounts.
+If status is "open" or region is "N":
+    Compute account_id * 2 as twice.
+    Show the result as open_accounts.
+"""

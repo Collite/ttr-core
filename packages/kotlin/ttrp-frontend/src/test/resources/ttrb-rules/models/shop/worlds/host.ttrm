@@ -1,0 +1,11 @@
+package shop.worlds
+model world
+
+// One SQL Server engine under the host-executed `aip` executor: every OUT port is one statement the
+// host runs, and action displays are read from those ports.
+def world host {
+    description: "ttrb-rules fixture: mssql-2019 engine under the aip executor"
+    def engine erp { type: mssql, version: "2019" }
+    def executor aip { type: aip }
+    def storage erp_db { type: mssql, via: erp, hosts: [shop] }
+}

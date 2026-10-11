@@ -357,7 +357,7 @@ class MapToPhysicalSpec :
         }
 
         "attribute renames → TableScan output_columns: name=DB col, alias=ER attr, type from DB column" {
-            // DF-T05 v1.x — alias-at-boundary: TableScan owns the rename, upstream tree untouched.
+            // v1.x — alias-at-boundary: TableScan owns the rename, upstream tree untouched.
             // Use a custom DB table whose columns are actually named like the renames so the
             // type lookup against ModelHandle.columns hits.
             val tableQn =

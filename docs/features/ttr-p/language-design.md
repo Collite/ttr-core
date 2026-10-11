@@ -91,7 +91,7 @@ bundle; it produces tables.
 
 Crucially, the text file is only the *canonical* surface. The very same graph can be drawn on a **canvas** (the
 graphical surface), and pieces of it can be written in **embedded dialects** that look like SQL, like a pandas
-method-chain, or like controlled English sentences. All of them compile to the identical graph. This is what "one
+method-chain, or like controlled sentences (English or Czech). All of them compile to the identical graph. This is what "one
 graph, many surfaces" means in practice, and it is the organizing idea of the whole language.
 
 ### 1.2 Who it is for
@@ -659,6 +659,47 @@ program may have several, each named (`display(name)`; a single unnamed `display
 program's final result flows to a display by default**. At run time a display lands as an Arrow file in the bundle's
 `out/` directory, which the graphical Designer watches and renders (section 10).
 
+**Action displays (grammar 0.14).** Some display names are *actions* a host hands on to another system, each with a
+fixed row shape. The shape is a TTR-M **`def schema`** in a model package (e.g. generated from the host's action
+catalogue into an `extra-model-roots` root):
+
+```ttrm
+package shop.actions
+
+def schema notify {
+    description: "Send a notification to a recipient",
+    columns: [
+        def column recipient { type: text },
+        def column subject   { type: text },
+        def column order_id  { type: int },
+        def column amount    { type: decimal, optional: true },
+        def column note      { type: text,    optional: true },
+    ]
+}
+```
+
+A program that imports the package (`import shop.actions.*`, scoped like entities) and wires rows into
+`display(notify)` has those rows held to the schema: a missing non-optional column is `TTRP-DSP-001`, a column whose
+type is not assignable is `TTRP-DSP-002` (assignable = the same type; an integer → any integer, decimal or float;
+`datetime` ⇄ `timestamp`; any scalar → text, since the host renders action fields as text), and a column the schema
+does not name is dropped with the warning `TTRP-DSP-003`. A schema column must be a scalar an engine can produce — the
+TTR-M type keywords (not `object` / `list`) and the SQL spellings a generated model carries (`bigint`, `smallint`,
+`numeric`, `money`, `real`, `bit`, `time`, `datetime2`, …); anything else is `TTRP-DSP-005`. The display then carries
+exactly the schema's columns, in schema order, each cast to the type the schema declares — so every source of the
+display has one row type and the host can concatenate them; an absent optional column is a NULL of that type. Unlike
+an ordinary display, an action display may take **several sources** (e.g. two branches that
+each produce `notify` rows); the bundle lists one `displays[]` entry per source, in wiring order, each with its own
+source and its own file — the host concatenates their rows in that order. An ordinary display name with several
+sources is ambiguous: `TTRP-DSP-004`.
+
+```ttrp
+import shop.actions.*
+
+review.late  -> display(notify)     // both feed the one `notify` action
+review.large -> display(notify)
+review.late  -> display(late_orders) // an ordinary (evidence) display — any shape
+```
+
 ---
 
 ## 5. The expression sublanguage
@@ -806,6 +847,9 @@ schema returns_raw {
 
 load("returns.csv", schema: returns_raw)
 ```
+
+(Separately, a TTR-M **`def schema`** in an imported package declares the row shape of an *action display*, section
+4.9 — a sink-side shape, not a load schema.)
 
 The `returned_qty_raw` column is declared `text` on purpose — the file is messy, so the program reads the raw string
 and does the `cast` itself, routing failures to `rejects` (section 4.8). That is the P2-clean way to handle dirty
@@ -963,7 +1007,7 @@ pandas subset is structural (T5-e): pandas boolean masks and `notna` cannot lift
 `NaN`-vs-`NULL` would silently diverge — the dialect would *lie*. Python control flow, lambdas, `.apply`, and any IO
 beyond `load()` are parse-time rejects.
 
-### 7.3 TTR-B — controlled English
+### 7.3 TTR-B — controlled sentences (English and Czech)
 
 TTR-B is the strict controlled-grammar dialect, the evolution of the historical Byx (C4-a). It is **deterministic
 and LLM-free** — bypassing language models for a simple instruction set has real value — and it is the third fragment
@@ -972,22 +1016,69 @@ default-out, untouchable interior, its own grammar.
 
 ```ttrp
 container returns_polars(out clean) target polars """ttrb
-    Load the file "returns.csv" as returns_raw.
-    Compute returned_qty as returned_qty_raw converted to a whole number.
-    Keep only rows where returned_qty is more than 0.
+Load the file "returns.csv" as returns_raw.
+Keep only the rows where returned_qty is more than 0.
 """
 ```
 
 The statement set is the Byx roster evolved to full breadth (C4-b): verb synonymy is kept (`Keep`/`Take`/`Select`);
-anaphora is grammar-resolved (`that`, `this`, `it`, and an implicit subject = the previous result); `as <name>` or
-`call it <name>` is SSA variable binding; Sort/Limit/Combine are added. Out-of-roster sentences are named-diagnostic
-rejects, and that reject table doubles as the assist layer's repair vocabulary (section 12).
+anaphora is grammar-resolved (`that`, `this`, `it`, and an implicit subject = the previous result); `as <name>` is SSA
+variable binding; Sort/Limit/Combine are added. Out-of-roster sentences are named-diagnostic rejects, and that reject
+table doubles as the assist layer's repair vocabulary (section 12).
 
 Its expressions are a **verbose skin over the one expression grammar** (C4-c), a *closed, documented synonym table* —
 `is more than` → `>`, `is empty` → `IS NULL`, `is one of` → `IN` — producing the same trees, precedence, catalogue
 ids, and 3VL as any other surface. Canonical spellings are also accepted, and you may mix them. It is **never NLP and
 never fuzzy** — it is grammar with a lookup table. TTR-B is engine-agnostic: a sentence-island is legal in any
 container, and the container carries the target.
+
+**Skins (AG B2).** There is ONE TTR-B grammar and one keyword table per language: English (`"""ttrb`, `*.ttrb`) and
+Czech (`"""ttrb-cs`, `*.ttrb-cs` with the first line `# ttr: dialect=b lang=cs`). A keyword matches case- and
+diacritic-insensitively against the active skin (`Pošli` = `posli` = `POSLI`); identifiers are matched exactly — Latin
+letters incl. Czech, never folded, never declined — so a sentence names a model object as the model declares it.
+Czech fragments lower to exactly the tree their English twins do.
+
+**Blocks (B3).** `If <condition>:` / `Když <podmínka>:` followed by indented sentences is ONE output — a `filter` of the
+current value, the block's sentences running on it. Blocks over the same value overlap (they are not else-if), which
+is the graph a canonical program with one `filter` per output has. Blocks do not nest (`TTRP-B-110`).
+
+**Rules and actions (B4).** Count (`Spočítej x jako počet řádků T.` / `Count the rows of T as x.`) and attach
+(`Připoj T k výsledku.` / `Attach T to the result.`) cross-join a one-row table into the current row. Three action
+sentences are sinks routed to **action displays** (§4.9): `Pošli e-mail … / Send an e-mail …` → `send_email`,
+`Nastav … / Set …` → `update_field`, `Vytvoř ruční úkol … / Create a manual task …` → `manual_task`. Each lowers to
+`calc { <the schema's columns> } -> select(<them>)`; the checker gives the container an OUT port per action and wires
+it to `display(<kind>)` at program level, so the imported `def schema <kind>` holds the rows (`TTRP-DSP-*`). Recipients
+are a column, a department (`oddělení "x"` → the text `"oddělení:x"`) or a column with a department fallback
+(`coalesce`). A whole business rule — checks plus a decision requesting actions — can thus be written entirely in
+Czech or English sentences and compiles to the same graph as its canonical program:
+
+```ttrp
+container rozhodnuti target erp """ttrb-cs
+Načti objednávky.
+Spočítej počet_reklamací jako počet řádků reklamace.
+Když částka je větší než 1000:
+    Pošli e-mail email_zástupce, jinak oddělení "obchod" s předmětem "Velká objednávka", šablonou "velka_objednavka", klíčem číslo a přílohami faktura, dodací_list.
+Když stav je "zaplacená" a počet_reklamací je 0:
+    Nastav stav objednávky s klíčem číslo na "uvolněná" s důvodem "zaplaceno, bez reklamací".
+"""
+```
+
+**Ports, joins and conditional values (B7).** A container's IN ports are names in every sentence that names a
+table (never `load(<port>)`); `Pošli to na výstup <port>.` / `Send that to output <port>.` binds a declared OUT
+port. Joins may be optional (`volitelně` / `optionally` → `type: left`), on a modelled relation (`přes vazbu r` /
+`on relation r`), or keep the rows that have / have no match in another table (`mají protějšek` / `have a match` →
+semi join, `nemají protějšek` / `have no match` → anti join). `Spočti x jako 1, když <p>, jinak 2.` / `Compute x as 1
+when <p>, otherwise 2.` is a `case when … end` value.
+
+**Grouping, names, no silent sentences (B8).** Parentheses group any sub-condition (`and` binds tighter than `or`
+without them). `Pojmenuj to jako <jméno>.` / `Call that <name>.` names the current value; `Načti <jméno>.` /
+`Load <name>.` makes a named value current again. A value a sentence produces that nothing reads — no later sentence,
+port or display — is the error `TTRP-B-113`: in a rule a sentence that does not take effect is always a mistake.
+
+**File-backed fragments (B5).** `container x(…) target <engine> from "rules/x.ttrb-cs"` takes its interior from a file
+(byte-preserved, relative to the program, dialect from the file's extension / first line) — the same graph as the
+embedded fragment; the editor opens the file from the clause. The full sentence reference, both skins side by side,
+is [`ttrb/ROSTER.md`](ttrb/ROSTER.md).
 
 ### 7.4 Bare-fragment programs
 
@@ -996,8 +1087,9 @@ A pure SQL, pandas, or TTR-B file is a **valid TTR-P program on its own** (C0). 
 (`bare-target`, `bare-shell`, `display-default`, `default-imports`). The dialect is declared by a cheap, explicit
 marker, never sniffed (P2): the **file extension** is the normal marker (`report.ttr.sql`, `prep.ttr.py`, a `.ttrb`
 file), and a **first-line comment** overrides it for generic extensions (`-- ttr: dialect=sql`,
-`# ttr: dialect=pandas`, `# ttr: dialect=b`). The double extensions (`.ttr.sql`, `.ttr.py`) exist so foreign editors
-still highlight the file (H-2).
+`# ttr: dialect=pandas`, `# ttr: dialect=b`, `# ttr: dialect=b lang=cs` for a Czech TTR-B file — `*.ttrb-cs`). The
+double extensions (`.ttr.sql`, `.ttr.py`) exist so foreign editors still highlight the file (H-2). A bare TTR-B file
+whose action sentences route to their own displays needs no synthesized final-result display.
 
 The source text of a bare fragment is **never rewritten** — the wrapper is desugaring, not a rewrite (C0). This is
 also why layout for such programs lives in a sidecar (section 8): there is nowhere in an untouched SQL file to put
@@ -1302,6 +1394,13 @@ Diagnostics are a designed, user-facing surface, not an afterthought. Every one 
 - TTR-pandas abbreviations — `agg` → "use `aggregate`".
 - capability misses — "node lowered to X for engine E" (info); "no rewrite; whole node re-placed to engine F"
   (warning, or error under `split-policy = error`); "cannot stage between E1 and E2" (error).
+- action displays (section 4.9, area `DSP`) — `TTRP-DSP-001` a schema column is missing, `TTRP-DSP-002` a column's
+  type is not assignable, `TTRP-DSP-003` (warning) a column the schema does not name is dropped, `TTRP-DSP-004` an
+  ordinary display name with several sources, `TTRP-DSP-005` a schema column no engine can produce.
+- TTR-B (area `B`) — one reject table per skin (`rejects.en.yaml`, `rejects.cs.yaml`): the same ids, a message in the
+  skin's language and a suggested correct sentence — e.g. `TTRP-B-104` a malformed e-mail sentence suggests the full
+  `Pošli e-mail …` / `Send an e-mail …` shape, `TTRP-B-109` a keyword used as a name (`jako a`), `TTRP-B-006` a
+  sentence in the other skin's language. Table: [`ttrb/ROSTER.md` §5](ttrb/ROSTER.md#5-diagnostics-ttrp-b-reject-tables-per-skin).
 
 The per-dialect reject tables are **versioned test fixtures** — they are simultaneously the compiler's conformance
 tests *and* the assist layer's repair vocabulary (section 12). One table, two consumers.
@@ -1554,13 +1653,14 @@ is canonical SQL 3VL everywhere.
 | Canonical program | `.ttrp` | — (identity = filename) |
 | Bare TTR-SQL program | `.ttr.sql` | double extension; `-- ttr: dialect=sql` override |
 | Bare TTR-pandas program | `.ttr.py` | double extension; `# ttr: dialect=pandas` override |
-| Bare TTR-B program | `.ttrb` | extension; `# ttr: dialect=b` override |
+| Bare TTR-B program (English) | `.ttrb` | extension; `# ttr: dialect=b [lang=en]` override |
+| Bare TTR-B program (Czech) | `.ttrb-cs` | extension; `# ttr: dialect=b lang=cs` override |
 | View-state sidecar | `.ttrl` | pairs by filename |
 | World / models | `.ttrm` | `schema world` doc, in the model repo |
 | Bundle | `<program>.bundle/` | — |
 
-Embedded fragment fences: `"""sql`, `"""pandas`, `"""ttrb` (the tag is the dialect marker). Interiors are
-byte-preserved.
+Embedded fragment fences: `"""sql`, `"""pandas`, `"""ttrb`, `"""ttrb-cs` (the tag is the dialect marker). Interiors are
+byte-preserved. A container body may also live in a file: `container x(…) target e from "rules/x.ttrb-cs"`.
 
 ### 15.4 CLI and LSP
 

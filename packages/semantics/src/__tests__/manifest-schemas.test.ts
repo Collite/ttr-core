@@ -4,7 +4,7 @@ import { parseManifest, resolveManifest, validateManifest } from '../manifest.js
 
 const TOML = `
 [project]
-name = "df-erp-metadata"
+name = "hartland-metadata"
 version = "0.1.0"
 
 [schemas.dbo]

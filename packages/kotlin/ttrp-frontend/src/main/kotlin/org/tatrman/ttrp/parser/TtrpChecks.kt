@@ -164,7 +164,12 @@ internal object TtrpChecks {
                 is ContainerDecl -> {
                     when (val body = stmt.body) {
                         is FragmentBody ->
-                            if (body.tag !in setOf("sql", "pandas", "ttrb")) {
+                            // An empty tag is a file-backed body that failed to load (FRG-004/005, already reported).
+                            if (body.tag.isNotEmpty() &&
+                                body.tag !in setOf("sql", "pandas") &&
+                                org.tatrman.ttrp.dialect.b.TtrbSkin
+                                    .forTag(body.tag) == null
+                            ) {
                                 out +=
                                     diag(
                                         TtrpDiagnosticId.FRG_001,

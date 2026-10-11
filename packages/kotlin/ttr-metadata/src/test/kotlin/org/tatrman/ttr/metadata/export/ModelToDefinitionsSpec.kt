@@ -411,7 +411,7 @@ class ModelToDefinitionsSpec :
         }
 
         "convert packages files by source file (NNnn_ prefix stripped) and emits no imports" {
-            val src = "bt01_zakaznik.yaml" // package = "zakaznik"
+            val src = "hl02_customers.yaml" // package = "customers"
             val entityQn = qn("er", "entity", "customer")
             val tableQn = qn("db", "dbo", "customers")
             val attrQn = qn("er", "entity", "customer.name")
@@ -487,8 +487,8 @@ class ModelToDefinitionsSpec :
             val erFile = bundle.files.first { it.filename == "er.ttr" }
             val dbFile = bundle.files.first { it.filename == "db.ttr" }
             // Package name comes from the source file (NNnn_ prefix stripped), not the schema.
-            erFile.packageName shouldBe "zakaznik"
-            dbFile.packageName shouldBe "zakaznik"
+            erFile.packageName shouldBe "customers"
+            dbFile.packageName shouldBe "customers"
             // v2.1: er2db mappings are inline ⇒ no standalone map.ttr for this fixture.
             bundle.files.none { it.filename == "map.ttr" } shouldBe true
             // References are fully-qualified, so no imports are emitted.

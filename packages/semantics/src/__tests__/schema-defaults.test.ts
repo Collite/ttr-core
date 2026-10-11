@@ -135,14 +135,14 @@ describe('db schema without explicit schema resolves db.dbo.* references', () =>
     // resolve (regression: previously they registered under db.table.* and the
     // reference was flagged "Unresolved reference").
     const ast = parseString(`model db
-def table QXXNAVSTEVAOZ { columns: [ def column IDXXNAVSTEVAOZ { type: int } ] }
-def fk fk_x { from: [db.dbo.QXXNAVSTEVAOZ.IDXXNAVSTEVAOZ], to: [db.dbo.QXXNAVSTEVAOZ.IDXXNAVSTEVAOZ] }
+def table web_page { columns: [ def column wp_web_page_sk { type: int } ] }
+def fk fk_x { from: [db.dbo.web_page.wp_web_page_sk], to: [db.dbo.web_page.wp_web_page_sk] }
 `).ast!;
     const symbols = new ProjectSymbolTable();
     symbols.upsertDocument('file:///db.ttrm', ast, 'db', '');
 
     // The column is addressable at the dbo-namespaced qname...
-    expect(symbols.get('db.dbo.table.QXXNAVSTEVAOZ.IDXXNAVSTEVAOZ')).toBeDefined();
+    expect(symbols.get('db.dbo.table.web_page.wp_web_page_sk')).toBeDefined();
 
     // ...and the fk's fully-qualified references resolve to it.
     const resolver = new Resolver(symbols);

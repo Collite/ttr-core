@@ -1,0 +1,13 @@
+// One OUT port feeds an ordinary display AND an action display: the port's own statement stays
+// whole (the evidence), and the action display reads a projected `overdue~flag_order` output.
+uses world "shop.worlds.host"
+import shop.orders.*
+import shop.actions.*
+
+container review(out overdue) target erp {
+    o = load(orders)
+    overdue = o -> filter(status = 2) -> calc { reason = cast(status as string)  due = due_date } -> select(order_id, reason, due, amount)
+}
+
+review.overdue -> display(overdue)
+review.overdue -> display(flag_order)

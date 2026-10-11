@@ -395,6 +395,22 @@ data class AreaDef(
     val entitySources: List<SourceLocation> = emptyList(),
 ) : Definition
 
+/**
+ * Grammar 0.14 — a named row schema (`def schema <name> { columns: [...] }`): an ordered column
+ * list, each column written exactly like a table column (`type`, `optional`, `description`, …).
+ * Tier-neutral (maps to `db` by default, the `area` precedent); consumed by TTR-P, which holds
+ * `display(<name>)` rows to it. Not a loadable object.
+ */
+data class SchemaDef(
+    override val name: String,
+    override val source: SourceLocation,
+    override val description: String? = null,
+    override val descriptionLocalized: LocalizedStringValue = LocalizedStringValue(),
+    override val tags: List<String> = emptyList(),
+    /** The row's columns, in declared order. */
+    val columns: List<ColumnDef> = emptyList(),
+) : Definition
+
 // ============================ MD (multidimensional) model defs ============================
 // v3.1 MD Layer A — the subset the dot-path resolver needs (MDS2): domains, dimensions +
 // attributes, maps, measures, cubelets, hierarchies. The `md2db_*` binding defs (S4 lowering)
@@ -1089,7 +1105,7 @@ data class TaggedBlockValue(
  * v3.0 — inline `binding:` property on entity / attribute / relation defs and
  * on explicit `def er2db_*` declarations' `target:` slot. Two surface forms:
  *
- * - [BindingPropertyBareId] — `binding: db.dbo.fk_artikl_produkt` (relation FK
+ * - [BindingPropertyBareId] — `binding: db.dbo.fk_item_category` (relation FK
  *   shorthand) or attribute-level `binding: COLUMN_NAME`.
  * - [BindingPropertyBlock]  — `binding: { target: ..., columns: { ... } }`.
  */
@@ -1128,7 +1144,7 @@ data class TargetReferenceValue(
     override val source: SourceLocation,
 ) : TargetValue
 
-/** v3.0 — one entry in a `binding: { columns: { id_artiklu: IDZBOZI, ... } }` map. */
+/** v3.0 — one entry in a `binding: { columns: { sk: i_item_sk, ... } }` map. */
 data class BindingColumnEntry(
     val name: String,
     val value: BindingColumnValue,
@@ -1137,7 +1153,7 @@ data class BindingColumnEntry(
 
 /**
  * v3.0 — one value in the inline `columns:` map. Two surface forms:
- *  - [BindingColumnBareId] — `id_artiklu: IDZBOZI`
+ *  - [BindingColumnBareId] — `sk: i_item_sk`
  *  - [BindingColumnObject] — `kód_artiklu: { target: KOD_ZBOZI }` etc.
  */
 sealed interface BindingColumnValue {

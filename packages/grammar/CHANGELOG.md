@@ -12,6 +12,48 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
+## 0.14 — 2026-10-10
+
+**Additive (named row schemas — TTR-P action displays).** Every previously-valid `0.13`
+file still parses unchanged; no token is added and nothing is newly reserved.
+
+1. **New top-level def kind `def schema <name> { … }`**: a named, ordered row shape.
+   `objectDefinition` gains one alternative `SCHEMA id schemaDef`;
+   `schemaProperty : descriptionProperty | tagsProperty | columnsProperty`.
+2. **No new sub-production.** The column list REUSES `columnsProperty` /
+   `columnDefList` / `columnProperty`, so a column is written exactly like a table
+   column — `def column note { type: text, optional: true }` (an optional column is
+   `optional: true`, as everywhere in TTR-M).
+3. **The world-storage `def schema` is unchanged** — a separate production inside
+   `def storage { … }`; the two never meet.
+4. **Tier-neutral**: the kind maps to the `db` model by default (the `area` /
+   `query` precedent) and is legal beside any `model` directive. It is not a
+   loadable object. `ttr-metadata` surfaces it as `Model.rowSchemas`
+   (`RowSchemaRecord`, keyed `<package>.<name>`); a re-declaration of one qualified
+   name is `ttr/duplicate-schema`.
+5. **Consumer: TTR-P.** A program brings a schema into scope with `import <pkg>.*`
+   (like entities) and holds `display(<name>)` rows to it (`TTRP-DSP-001..004`).
+6. **All three targets** (TS / Kotlin / Python) parse it to `SchemaDef` (`kind:
+   "schema"`, `columns`); the conformance dump gains the `schema` kind (fixture 69),
+   every pre-existing golden is byte-unchanged. `ttr-writer` renders it; the TS
+   formatter prints it; the property map advertises `schema: description, tags,
+   columns`.
+
+```ttrm
+package shop.actions
+
+def schema notify {
+    description: "Send a notification to a recipient",
+    columns: [
+        def column recipient { type: text },
+        def column order_id  { type: int },
+        def column amount    { type: decimal, optional: true },
+    ]
+}
+```
+
+Consumers re-cut at `0.14.0` per the unified version policy.
+
 ## 0.13 — 2026-08-13
 
 **Additive (NLS-P10 — localised `description:`; ⚑GXP-D7).** Every previously-valid

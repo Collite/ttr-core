@@ -3,10 +3,10 @@
         {
             "description": null,
             "kind": "attribute",
-            "name": "id_produktu",
+            "name": "category_id",
             "properties": {
                 "binding": {
-                    "id": "IDSKUPZBOZI",
+                    "id": "i_category_id",
                     "kind": "bareId"
                 },
                 "type": {

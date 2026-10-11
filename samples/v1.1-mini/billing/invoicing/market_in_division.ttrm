@@ -1,0 +1,9 @@
+package billing.invoicing
+
+model er
+
+def relation market_in_division { description: "A market belongs to a division",
+    from: er.entity.market, to: er.entity.division,
+    cardinality: { from: "1..*", to: "1" },
+    join: [{ from: er.entity.market.division_id, to: er.entity.division.sk }]
+}

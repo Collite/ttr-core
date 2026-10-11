@@ -1,0 +1,4 @@
+Load orders.
+If region is "N":
+    If status is "open":
+        Show the result as north_open.

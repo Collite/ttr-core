@@ -1,0 +1,13 @@
+// TTRP-B-113: the stock filter's result is never read — the join names `z2`, the LOAD.
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container nepouzito(out seznam) target erp """ttrb-cs
+Načti objednávky jako pol.
+Načti zásoby jako z2.
+Ponech řádky, kde množství je 0.
+Spoj pol volitelně se z2 přes kód_zboží je z2.kód_zboží jako j.
+Pošli to na výstup seznam.
+"""
+
+nepouzito.seznam -> display(seznam)

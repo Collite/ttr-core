@@ -168,6 +168,7 @@ existing ai-platform `Definition.kt` plus the v2.0.0/v2.2 corrections below):
 | `RoleDef` | `label`, `search` |
 | `Er2CncRoleDef` | `entity`, `role` |
 | `DrillMapDef` | `from`, `to`, `args`, `display`, `overrideAuto` (v2.2 grammar) |
+| `SchemaDef` | **grammar 0.14:** `columns: List<ColumnDef>` — a named row schema (`def schema <name> { description?, tags?, columns: [...] }`), each column a full `ColumnDef` (`type`, `optional`, …). Tier-neutral (`modelForKind` → `db`, the `area` precedent). Conformance kind `schema`; `properties.columns` dumped exactly like a view's. `ttr-metadata` surfaces it as `Model.rowSchemas` (keyed `<pkg>.<name>`, a `RowSchemaRecord` — not a `ModelObject`); TTR-P holds `display(<name>)` rows to it. |
 
 Full field signatures live in `AST-NAMING.md` — see that doc for the TS↔Kotlin
 type/field rename map.

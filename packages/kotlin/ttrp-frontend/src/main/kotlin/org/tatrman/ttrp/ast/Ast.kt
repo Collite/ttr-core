@@ -109,6 +109,12 @@ data class ChainStmt(
     override val location: SourceLocation,
     override val leadingTrivia: List<Trivia> = emptyList(),
     override val trailingTrivia: List<Trivia> = emptyList(),
+    /**
+     * Not authored: the program-level `<container>.<port> -> display(<kind>)` the checker adds for a
+     * TTR-B action sentence (AG B4); its spans point into the fragment. Text-rewriting editor features
+     * skip it.
+     */
+    val synthesized: Boolean = false,
 ) : Statement
 
 /** MD cubelet-statement operator (contracts §1.2, D20–D24): `=` · `:=` · `+=` · `-=`. */
@@ -204,6 +210,11 @@ data class PortDecl(
     val kind: PortKind,
     val name: String,
     override val location: SourceLocation,
+    /**
+     * Not authored: added by the checker for a TTR-B action sentence (AG B4) — the OUT port its rows
+     * leave the container by. Editor features that rewrite text (rename, edits) skip it.
+     */
+    val synthesized: Boolean = false,
 ) : TtrpNode
 
 sealed interface ContainerBody : TtrpNode
@@ -231,6 +242,12 @@ data class FragmentBody(
     val interiorLocation: SourceLocation,
     override val location: SourceLocation,
     val decomposition: FragmentDecomposition? = null,
+    /**
+     * AG B5: the path as written in `from "<path>"` for a FILE-BACKED fragment (null when the interior
+     * is inline). [sourceText] is then the file's whole content, [interiorLocation] names the file, and
+     * [location] is the `from "<path>"` clause in the program.
+     */
+    val sourceFile: String? = null,
 ) : ContainerBody
 
 /**
@@ -244,6 +261,23 @@ data class FragmentDecomposition(
     val statements: List<Statement>,
     val diagnostics: List<org.tatrman.ttrp.diagnostics.TtrpDiagnostic>,
     val derivedInPorts: List<String>,
+    /**
+     * TTR-B action sentences (AG B4), in sentence order: each assigns its rows to [ActionOutput.port]
+     * inside the fragment and asks to be shown as `display(<[ActionOutput.display]>)` at program level.
+     * The checker turns each into a container OUT port + that wiring (`FragmentActionWiring`).
+     */
+    val actionOutputs: List<ActionOutput> = emptyList(),
+    /** TTR-B output sentences (B7): the OUT ports `Send that to output <port>` wrote, in order. */
+    val outputPorts: List<String> = emptyList(),
+)
+
+/** One TTR-B action's output: the container OUT [port] and the action display [display] it feeds. */
+data class ActionOutput(
+    val port: String,
+    val display: String,
+    val location: SourceLocation,
+    /** The verb's own span — where the synthesized wiring reference points. */
+    val verbLocation: SourceLocation = location,
 )
 
 data class Chain(

@@ -221,7 +221,7 @@ object JoinerLogical {
      * decoder routes each ref into the correct join input via [Expressions.LEFT_INPUT_TAG] /
      * [Expressions.RIGHT_INPUT_TAG] — wrapped in `and(…)` when the relation has more than one pair. The
      * bare attribute name stays valid after MAP_TO_PHYSICAL even when the column is renamed: that stage
-     * aliases each renamed column back to its attribute name (DF-T05), so the condition resolves by
+     * aliases each renamed column back to its attribute name (alias-at-boundary), so the condition resolves by
      * attribute name on both sides of the ER/DB boundary.
      */
     private fun buildCondition(verdict: Verdict.Resolved<PlanNode>): Expression {

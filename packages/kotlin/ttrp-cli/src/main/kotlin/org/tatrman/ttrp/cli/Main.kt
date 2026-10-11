@@ -12,6 +12,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
+import com.github.ajalt.clikt.parameters.options.versionOption
 import org.tatrman.ttrp.bundle.BundleAssembler
 import org.tatrman.ttrp.bundle.EmitPluginLoader
 import org.tatrman.ttrp.member.ConnectedMemberCatalog
@@ -46,6 +47,11 @@ fun main(args: Array<String>) {
 }
 
 class TtrpCommand : CliktCommand(name = "ttrp") {
+    init {
+        // `ttrp --version` — the toolchain version every bundle this build writes records.
+        versionOption(ToolchainVersion.current, message = { "ttrp $it" })
+    }
+
     override fun help(context: com.github.ajalt.clikt.core.Context) =
         "TTR-P toolchain: compile, bundle, run, and conform .ttrp programs."
 
@@ -105,7 +111,7 @@ class BuildCommand : CliktCommand(name = "build") {
         }
         val result =
             try {
-                BundleAssembler().build(
+                BundleAssembler(ToolchainVersion.current).build(
                     source = Files.readString(abs),
                     fileName = abs.toString(),
                     pipelineManifest = manifestResult.manifest,
@@ -123,6 +129,12 @@ class BuildCommand : CliktCommand(name = "build") {
             } catch (e: IllegalArgumentException) {
                 echo(e.message ?: "build failed", err = true)
                 throw ProgramResult(1)
+            } catch (e: org.tatrman.ttrp.emit.TtrpEmitException) {
+                // An emit-time failure (a node an engine cannot run, a translator refusal) is a diagnostic,
+                // not a crash: print the TTRP-EMT line (+ its suggestion) and exit 1.
+                echo(e.message ?: "build failed", err = true)
+                e.suggestedAlternative?.let { echo("  ↳ suggested: $it", err = true) }
+                throw ProgramResult(1)
             }
         echo(result.dir.toString())
     }
@@ -139,7 +151,7 @@ class RunCommand : CliktCommand(name = "run") {
                 Files.isDirectory(p) && Files.exists(p.resolve("run.sh")) -> p
                 Files.isRegularFile(p) && p.toString().endsWith(".ttrp") -> {
                     val manifestResult = TtrpManifestReader.resolve(p.parent ?: p)
-                    BundleAssembler()
+                    BundleAssembler(ToolchainVersion.current)
                         .build(
                             Files.readString(p),
                             p.toString(),
@@ -200,6 +212,7 @@ class ConformCommand : CliktCommand(name = "conform") {
                 manifestResult.manifest,
                 manifestResult.manifest.modelsRoot(),
                 outDir,
+                toolchainVersion = ToolchainVersion.current,
             )
         val tolerances =
             tolerance
@@ -249,7 +262,7 @@ class EmitDeterminismCommand : CliktCommand(name = "emit-determinism") {
                     throw ProgramResult(2)
                 }
                 val manifest = TtrpManifestReader.resolve(abs.parent ?: abs)
-                BundleAssembler(emitPlugin = emitPlugin)
+                BundleAssembler(ToolchainVersion.current, emitPlugin)
                     .build(
                         source = Files.readString(abs),
                         fileName = abs.toString(),

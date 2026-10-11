@@ -91,6 +91,14 @@ class ModelReconciler(
             }
         }
 
+        // Grammar 0.14 — merge `def schema` row schemas by package-qualified name (same precedence).
+        val rowSchemas = mutableMapOf<String, org.tatrman.ttr.metadata.model.RowSchemaRecord>()
+        for (s in sorted) {
+            for ((name, record) in s.rowSchemas) {
+                if (name !in rowSchemas) rowSchemas[name] = record
+            }
+        }
+
         val dbSchema =
             DbSchema(
                 namespace = "dbo",
@@ -120,6 +128,7 @@ class ModelReconciler(
                 queries = queries,
                 drillMaps = drillMaps,
                 areas = areas,
+                rowSchemas = rowSchemas,
             )
 
         // v2.2 — post-reconcile validation. Needs the assembled Model so it can

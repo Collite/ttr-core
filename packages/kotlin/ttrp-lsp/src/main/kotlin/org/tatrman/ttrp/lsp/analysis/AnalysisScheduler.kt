@@ -54,7 +54,17 @@ class AnalysisScheduler(
         // Latest-version-wins: if the document advanced while we analyzed, drop this set.
         val now = docs.get(uri) ?: return
         if (now.version != doc.version) return
-        val diagnostics = analysis.report.diagnostics.map { DiagnosticMapping.toLsp(it) }
+        // A finding inside a file-backed fragment (AG B5) is shown on the `from "<path>"` clause.
+        val links =
+            org.tatrman.ttrp.lsp.nav.FragmentLinks
+                .of(uri, analysis.report.document)
+        val diagnostics =
+            analysis.report.diagnostics.map {
+                DiagnosticMapping.toLsp(
+                    org.tatrman.ttrp.lsp.nav.FragmentLinks
+                        .anchor(it, uri, links),
+                )
+            }
         client()?.publishDiagnostics(PublishDiagnosticsParams(uri, diagnostics, doc.version))
     }
 

@@ -387,7 +387,7 @@ class TargetReferenceValue(TargetValue):
 
 @dataclass(frozen=True, slots=True)
 class BindingColumnEntry:
-    """One entry in a `binding: { columns: { id_artiklu: IDZBOZI, … } }` map."""
+    """One entry in a `binding: { columns: { sk: i_item_sk, … } }` map."""
 
     name: str = ""
     value: BindingColumnValue | None = None
@@ -404,7 +404,7 @@ class BindingColumnValue:
 
 @dataclass(frozen=True, slots=True)
 class BindingColumnBareId(BindingColumnValue):
-    """`id_artiklu: IDZBOZI` (bare-id form)."""
+    """`sk: i_item_sk` (bare-id form)."""
 
     id: Reference | None = None
     kind: ClassVar[str] = "bareId"
@@ -794,6 +794,20 @@ class DrillMapDef(Definition):
     display: LocalizedStringValue | None = None
     override_auto: bool = False
     kind: ClassVar[str] = "drill_map"
+
+
+@dataclass(frozen=True, slots=True)
+class SchemaDef(Definition):
+    """Grammar 0.14 — `def schema <id> { description?, tags?, columns: [...] }`.
+
+    A named row schema: an ordered column list, each column written exactly like a
+    table column (`type`, `optional`, `description`, …). Tier-neutral (maps to `db`
+    by default, the `area` precedent); consumed by TTR-P, which holds
+    `display(<name>)` rows to it. Not a loadable object.
+    """
+
+    columns: tuple[ColumnDef, ...] = ()
+    kind: ClassVar[str] = "schema"
 
 
 @dataclass(frozen=True, slots=True)

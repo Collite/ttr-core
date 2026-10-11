@@ -1,0 +1,9 @@
+// TTRP-PRS-001: `cast` takes `cast(<expr> as <type>)` — a comma is a syntax error, not a crash.
+uses world "shop.worlds.host"
+import shop.orders.*
+
+container review(out late) target erp {
+    late = load(orders) -> calc { k = cast(order_id, string) } -> select(order_id, k)
+}
+
+review.late -> display(late)

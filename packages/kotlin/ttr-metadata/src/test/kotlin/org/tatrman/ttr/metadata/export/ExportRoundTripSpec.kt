@@ -33,7 +33,7 @@ import java.time.Instant
 
 /**
  * End-to-end round-trip for the per-source-file packaging: a model whose objects all
- * come from one source file (`bt01_obchod.yaml` → package `obchod`) AND that contains a
+ * come from one source file (`hl01_sales.yaml` → package `sales`) AND that contains a
  * deliberate entity/table name collision (`order` entity vs `order` table) is converted,
  * written to its package-named subdirectory, and reloaded through `FileBasedSource` +
  * `ModelReconciler` (+ `BuiltinStockSource` for stock roles). Proves the package layout
@@ -55,10 +55,10 @@ class ExportRoundTripSpec :
                 name = name,
             )
 
-        // Everything comes from one source file → package "obchod"; entity `order` (er) and
+        // Everything comes from one source file → package "sales"; entity `order` (er) and
         // table `order` (db) deliberately share a bare name.
         fun collidingModel(): Model {
-            val src = "bt01_obchod.yaml"
+            val src = "hl01_sales.yaml"
             val entityQn = qn("er", "entity", "order")
             val attrQn = qn("er", "entity", "order.id")
             val tableQn = qn("db", "dbo", "order")
@@ -156,9 +156,9 @@ class ExportRoundTripSpec :
                 Files.writeString(dir.resolve(file.filename), content)
             }
 
-            // Everything landed under the package-named directory and declares `package obchod`.
-            Files.readString(root.resolve("obchod").resolve("er.ttr")) shouldContain "package obchod"
-            Files.readString(root.resolve("obchod").resolve("cnc.ttr")) shouldContain "package obchod"
+            // Everything landed under the package-named directory and declares `package sales`.
+            Files.readString(root.resolve("sales").resolve("er.ttr")) shouldContain "package sales"
+            Files.readString(root.resolve("sales").resolve("cnc.ttr")) shouldContain "package sales"
 
             val source =
                 FileBasedSource(

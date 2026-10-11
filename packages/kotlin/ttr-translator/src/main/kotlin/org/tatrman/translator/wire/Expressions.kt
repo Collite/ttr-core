@@ -47,7 +47,7 @@ import org.tatrman.translator.functions.FunctionCatalog
  * those cases earlier; this encoder is the last-line check that the wire
  * format stays clean.
  *
- * Phase 08 A1 / DF-T01 — RESOLVE stage. `RexInputRef`s are encoded as named
+ * Phase 08 A1 — RESOLVE stage. `RexInputRef`s are encoded as named
  * `ColumnRef`s (instead of positional `$idx`) so the wire shape survives
  * round-trips, including across joins. For join conditions the encoder also
  * sets `source_alias = "$L"`/`"$R"` so the decoder can route the lookup
@@ -92,8 +92,8 @@ object Expressions {
         val joinSplit: Int? = null,
         val parameterNames: Map<Int, String> = emptyMap(),
         // Per-input field names for a Join condition. Calcite uniquifies duplicate
-        // names in the COMBINED join row type (a right-side `IDSTRED` colliding with
-        // a left-side `IDSTRED` becomes `IDSTRED0`), but on decode a `$L`/`$R` ref is
+        // names in the COMBINED join row type (a right-side `i_item_sk` colliding with
+        // a left-side `i_item_sk` becomes `i_item_sk0`), but on decode a `$L`/`$R` ref is
         // resolved against the individual input — where the name is still the
         // original. So join-condition refs must be encoded with the per-input name,
         // not the combined one. Empty → fall back to `fieldNames` (no per-input info).
@@ -409,7 +409,7 @@ object Expressions {
             SqlKind.DIVIDE -> "div"
             SqlKind.IS_NULL -> "is_null"
             SqlKind.IS_NOT_NULL -> "is_not_null"
-            // Phase 08 B4 / DF-S05 + DF-DSL04 — first-class set/pattern membership.
+            // Phase 08 B4 — first-class set/pattern membership.
             SqlKind.IN -> "in"
             SqlKind.LIKE -> "like"
             // TF-P1.S3 (G C8) — T-SQL TRY_CAST; Calcite builds it as SAFE_CAST (or TRY_CAST, same kind).
@@ -947,7 +947,7 @@ object Expressions {
             "div" -> org.apache.calcite.sql.`fun`.SqlStdOperatorTable.DIVIDE
             "is_null" -> org.apache.calcite.sql.`fun`.SqlStdOperatorTable.IS_NULL
             "is_not_null" -> org.apache.calcite.sql.`fun`.SqlStdOperatorTable.IS_NOT_NULL
-            // Phase 08 B4 / DF-S05 + DF-DSL04 — first-class set/pattern membership.
+            // Phase 08 B4 — first-class set/pattern membership.
             "in" -> org.apache.calcite.sql.`fun`.SqlStdOperatorTable.IN
             "like" -> org.apache.calcite.sql.`fun`.SqlStdOperatorTable.LIKE
             // COALESCE — the 3VL-correct FALSE-port complement `not(coalesce(pred, false))` the

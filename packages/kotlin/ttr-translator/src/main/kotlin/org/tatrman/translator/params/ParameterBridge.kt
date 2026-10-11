@@ -42,7 +42,7 @@ import org.apache.calcite.sql.type.SqlTypeName
  *      context can't infer a type. The worst offender is `||` / `CONCAT`:
  *      its operand-type inference is `null` (unlike `LIKE`/`BETWEEN`, which
  *      use `FIRST_KNOWN`), so a bare `?` ANYWHERE in a `||` chain is
- *      untypeable — e.g. `KOD_STR LIKE {x} || '%'` or
+ *      untypeable — e.g. `s_store_id LIKE {x} || '%'` or
  *      `NAZEV LIKE '%' || {x} || '%'` both fail. The [typed] mode emits
  *      each placeholder as `CAST(? AS <type>)` using the declared parameter
  *      type, which is the canonical Calcite idiom for typing a `?`. The

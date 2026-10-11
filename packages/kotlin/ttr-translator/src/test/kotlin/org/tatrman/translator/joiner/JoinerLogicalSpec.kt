@@ -259,8 +259,8 @@ class JoinerLogicalSpec :
 
         // -- MJ-P2·S1: the wire carrier on JoinPolicy (contracts §2–§4, architecture §2.3) -------
 
-        val dfp =
-            org.tatrman.translator.framework.DfpJoinModel
+        val hartland =
+            org.tatrman.translator.framework.HartlandJoinModel
                 .handle()
 
         fun eqOperands(cond: Expression): Pair<String, String> {
@@ -272,76 +272,77 @@ class JoinerLogicalSpec :
             return l.name to r.name
         }
 
-        "chain ((kp ⋈ dm) ⋈ z): the second join is matched against the WHOLE left side (⚑MJ-2)" {
+        "chain ((s ⋈ sh) ⋈ h): the second join is matched against the WHOLE left side (⚑MJ-2)" {
             val input =
                 unconditionedJoin(
-                    unconditionedJoin(erScan("kumulovaný_prodej"), erScan("dodací_místo")),
-                    erScan("zákazník"),
+                    unconditionedJoin(erScan("sale"), erScan("shopper")),
+                    erScan("household"),
                 )
-            val result = JoinerLogical.apply(input, dfp)
+            val result = JoinerLogical.apply(input, hartland)
             result.warnings.shouldBeEmpty()
-            eqOperands(result.plan.join.left.join.condition) shouldBe ("id_dodacího_místa" to "id_dodacího_místa")
-            // dm ↔ z, not kp ↔ z (which has no relation)
-            eqOperands(result.plan.join.condition) shouldBe ("id_subjektu" to "id_zákazníka")
+            eqOperands(result.plan.join.left.join.condition) shouldBe ("shopper_id" to "shopper_id")
+            // sh ↔ h, not s ↔ h (which has no relation)
+            eqOperands(result.plan.join.condition) shouldBe ("current_household" to "household_id")
         }
 
         "the hero chain on the wire (comma form of H1): three conditions, zero warnings" {
             val input =
                 unconditionedJoin(
                     unconditionedJoin(
-                        unconditionedJoin(erScan("kumulovaný_prodej"), erScan("dodací_místo")),
-                        erScan("zákazník"),
+                        unconditionedJoin(erScan("sale"), erScan("shopper")),
+                        erScan("household"),
                     ),
-                    erScan("produkt"),
+                    erScan("product"),
                 )
-            val result = JoinerLogical.apply(input, dfp)
+            val result = JoinerLogical.apply(input, hartland)
             result.warnings.shouldBeEmpty()
-            eqOperands(result.plan.join.condition) shouldBe ("id_produktu" to "id_produktu")
+            eqOperands(result.plan.join.condition) shouldBe ("product_id" to "product_id")
         }
 
         "a composite relation ANDs all pairs; a single pair stays a bare eq (⚑MJ-7, bytes as before)" {
-            val composite = JoinerLogical.apply(unconditionedJoin(erScan("smlouva"), erScan("dodatek")), dfp)
+            val composite =
+                JoinerLogical.apply(unconditionedJoin(erScan("order_line"), erScan("order_return")), hartland)
             composite.warnings.shouldBeEmpty()
             val cond = composite.plan.join.condition
             cond.function.operation shouldBe "and"
             cond.function.operandsList shouldHaveSize 2
-            eqOperands(cond.function.operandsList[0]) shouldBe ("číslo_smlouvy" to "číslo_smlouvy")
-            eqOperands(cond.function.operandsList[1]) shouldBe ("rok" to "rok")
+            eqOperands(cond.function.operandsList[0]) shouldBe ("order_number" to "order_number")
+            eqOperands(cond.function.operandsList[1]) shouldBe ("product_id" to "product_id")
 
-            val single = JoinerLogical.apply(unconditionedJoin(erScan("kumulovaný_prodej"), erScan("produkt")), dfp)
+            val single = JoinerLogical.apply(unconditionedJoin(erScan("sale"), erScan("product")), hartland)
             single.plan.join.condition.function.operation shouldBe "eq"
             single.plan.join.condition.resultType shouldBe ""
         }
 
-        "H6 on the wire: (kp ⋈ dm) ⋈ obchodní_kanál is ambiguous, sides carry the full entity lists (⚑MJ-8)" {
+        "H6 on the wire: (s ⋈ sh) ⋈ address is ambiguous, sides carry the full entity lists (⚑MJ-8)" {
             val input =
                 unconditionedJoin(
-                    unconditionedJoin(erScan("kumulovaný_prodej"), erScan("dodací_místo")),
-                    erScan("obchodní_kanál"),
+                    unconditionedJoin(erScan("sale"), erScan("shopper")),
+                    erScan("address"),
                 )
-            val result = JoinerLogical.apply(input, dfp)
+            val result = JoinerLogical.apply(input, hartland)
             result.plan.join.hasCondition() shouldBe false
             val warn = result.warnings.single().shouldBeInstanceOf<JoinerWarning.AmbiguousRelations>()
             warn.candidateRelations shouldHaveSize 2
             warn.repeated.shouldBeEmpty()
-            warn.leftEntities.map { it.name } shouldBe listOf("kumulovaný_prodej", "dodací_místo")
-            warn.rightEntities.map { it.name } shouldBe listOf("obchodní_kanál")
-            warn.sideA.name shouldBe "kumulovaný_prodej"
-            warn.sideB.name shouldBe "obchodní_kanál"
+            warn.leftEntities.map { it.name } shouldBe listOf("sale", "shopper")
+            warn.rightEntities.map { it.name } shouldBe listOf("address")
+            warn.sideA.name shouldBe "sale"
+            warn.sideB.name shouldBe "address"
         }
 
         "H7 on the wire: no relation reports the full sides too" {
-            val result = JoinerLogical.apply(unconditionedJoin(erScan("kumulovaný_prodej"), erScan("zákazník")), dfp)
+            val result = JoinerLogical.apply(unconditionedJoin(erScan("sale"), erScan("household")), hartland)
             val warn = result.warnings.single().shouldBeInstanceOf<JoinerWarning.NoRelation>()
-            warn.leftEntities.map { it.name } shouldBe listOf("kumulovaný_prodej")
-            warn.rightEntities.map { it.name } shouldBe listOf("zákazník")
+            warn.leftEntities.map { it.name } shouldBe listOf("sale")
+            warn.rightEntities.map { it.name } shouldBe listOf("household")
         }
 
         "H8 on the wire: the same entity on both sides steps aside with `repeated` (⚑MJ-6)" {
-            val result = JoinerLogical.apply(unconditionedJoin(erScan("zákazník"), erScan("zákazník")), dfp)
+            val result = JoinerLogical.apply(unconditionedJoin(erScan("shopper"), erScan("shopper")), hartland)
             result.plan.join.hasCondition() shouldBe false
             val warn = result.warnings.single().shouldBeInstanceOf<JoinerWarning.AmbiguousRelations>()
-            warn.repeated shouldBe setOf(erQname("zákazník"))
+            warn.repeated shouldBe setOf(erQname("shopper"))
         }
 
         "key-name collision: the chosen attribute also lives on another entity of that side → KeyNameCollision (F3b)" {
@@ -409,18 +410,18 @@ class JoinerLogicalSpec :
                             .setInput(input),
                     ).build()
             for (wrap in listOf(::wrapAggregate, ::wrapSubquery, ::wrapProject)) {
-                val input = unconditionedJoin(erScan("kumulovaný_prodej"), wrap(erScan("produkt")))
-                val result = JoinerLogical.apply(input, dfp)
+                val input = unconditionedJoin(erScan("sale"), wrap(erScan("product")))
+                val result = JoinerLogical.apply(input, hartland)
                 result.plan.join.hasCondition() shouldBe false
                 // Nothing visible on the right at all (a derived table) → the Cartesian product is reported,
                 // the empty side carries no QualifiedName (contracts §1 row 5).
                 val warn = result.warnings.single().shouldBeInstanceOf<JoinerWarning.NoRelation>()
-                warn.leftEntities shouldBe listOf(erQname("kumulovaný_prodej"))
+                warn.leftEntities shouldBe listOf(erQname("sale"))
                 warn.rightEntities.shouldBeEmpty()
-                warn.sideA shouldBe erQname("kumulovaný_prodej")
+                warn.sideA shouldBe erQname("sale")
                 warn.sideB shouldBe QualifiedName.getDefaultInstance()
                 JoinerMessages.text(warn) shouldBe
-                    "no declared relation between entity.kumulovaný_prodej and a derived table; Cartesian product preserved"
+                    "no declared relation between entity.sale and a derived table; Cartesian product preserved"
             }
         }
 
@@ -431,9 +432,9 @@ class JoinerLogicalSpec :
                     .setFilter(
                         org.tatrman.plan.v1.FilterNode
                             .newBuilder()
-                            .setInput(erScan("produkt")),
+                            .setInput(erScan("product")),
                     ).build()
-            val result = JoinerLogical.apply(unconditionedJoin(erScan("kumulovaný_prodej"), filtered), dfp)
+            val result = JoinerLogical.apply(unconditionedJoin(erScan("sale"), filtered), hartland)
             result.warnings.shouldBeEmpty()
             result.plan.join.hasCondition() shouldBe true
         }

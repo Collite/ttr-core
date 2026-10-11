@@ -36,7 +36,7 @@ export interface SymbolEntry {
   domainRange?: { lo: number; hi: number };
   /**
    * For explicit `def er2db_entity` symbols only: the dotted reference path of
-   * the db table (or view) it targets (e.g. `db.dbo.QXXUKAZMUHOD`), taken from
+   * the db table (or view) it targets (e.g. `db.dbo.promotion`), taken from
    * `target: { table: … }` or `target: { view: … }`. Lets inline
    * attribute/column mappings on an entity with no inline mapping block resolve
    * their columns against this table/view.

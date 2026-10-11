@@ -1,0 +1,14 @@
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container priprava(out otevrene, out reklam) target erp {
+  otevrene = load(objednávky) -> filter(stav = "otevřená")
+  reklam = load(reklamace) -> select(id, číslo_objednávky)
+}
+
+container predani(in otevrene, in reklam, out velke, out ostatni) target erp from "rules/predani.ttrb-cs"
+
+priprava.otevrene -> predani.otevrene
+priprava.reklam -> predani.reklam
+predani.velke -> display(velke)
+predani.ostatni -> display(ostatni)

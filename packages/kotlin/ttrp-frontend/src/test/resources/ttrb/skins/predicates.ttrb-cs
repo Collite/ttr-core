@@ -1,0 +1,14 @@
+# ttr: dialect=b lang=cs
+Načti objednávky jako o.
+Ponech řádky, kde částka je více než 10 a částka je méně než 500.
+Ponech řádky, kde částka není více než 400 nebo částka není méně než 20.
+Ponech řádky, kde stav je "otevřená" a stav není "zrušená".
+Ponech řádky, kde poznámka není prázdná.
+Odstraň řádky, kde oblast je prázdná.
+Ponech řádky, kde oblast je jedno z ('S', 'J').
+Ponech řádky, kde částka je mezi 1 a 9.
+Ponech řádky, kde částka je větší než 1 a částka je menší než 900.
+Ponech řádky, kde částka není větší než 800 a částka není menší než 2.
+Ponech řádky, kde stav je rovno "otevřená" nebo stav není rovno "x".
+Ponech řádky, kde příznak je pravda nebo příznak je nepravda.
+Shrň součet částka jako celkem, počet číslo jako počet_kusů podle oblast.

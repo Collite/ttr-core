@@ -229,7 +229,8 @@ class TtrpMethods(
         val outDir =
             filePath?.parent?.takeIf { Files.isWritable(it) }
                 ?: Files.createTempDirectory("ttrp-bundle")
-        return BundleAssembler().build(doc.text, fileNameOf(doc.uri), ctx.manifest, ctx.modelsRoot, outDir)
+        return BundleAssembler(org.tatrman.ttrp.cli.ToolchainVersion.current)
+            .build(doc.text, fileNameOf(doc.uri), ctx.manifest, ctx.modelsRoot, outDir)
     }
 
     private fun requireVersion(

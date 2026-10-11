@@ -1,0 +1,2 @@
+Load orders.
+Keep the rows where status == 'open'.

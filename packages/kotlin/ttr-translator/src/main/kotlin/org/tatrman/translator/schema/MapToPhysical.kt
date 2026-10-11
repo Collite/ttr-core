@@ -17,7 +17,7 @@ import org.tatrman.translator.framework.ModelHandle
 import org.tatrman.translator.joiner.JoinerPlanWalker
 
 /**
- * Phase 08 B3 / DF-T05 — MAP_TO_PHYSICAL — Section D.
+ * Phase 08 B3 — MAP_TO_PHYSICAL — Section D.
  *
  * Walks the wire-form `PlanNode` and rewrites every `ScanNode(ER, ...)` to its physical
  * equivalent via [ModelHandle.entityMapping]. After this stage runs, no `ScanNode(ER, ...)`
@@ -44,7 +44,7 @@ import org.tatrman.translator.joiner.JoinerPlanWalker
  *     synthetic-filter queries the YAML importer emits today.
  *   - No mapping registered — [MapToPhysicalResult.Failure] with code `entity_unmapped`.
  *
- * ## Attribute → column rename (v1.x — DF-T05, alias-at-boundary)
+ * ## Attribute → column rename (v1.x — alias-at-boundary)
  *
  * The Scan's `output_columns` start out carrying ER attribute names. When the model declares
  * per-attribute renames via [ModelHandle.attributeColumnRenames] (sourced from

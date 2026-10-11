@@ -8,7 +8,7 @@ import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.apache.calcite.sql.SqlNode
 import org.apache.calcite.sql.dialect.CalciteSqlDialect
-import org.tatrman.translator.framework.DfpJoinModel
+import org.tatrman.translator.framework.HartlandJoinModel
 
 /**
  * MJ-P1 — the SQL carrier: `ModelJoinRewriter` conditions bare joins between ER entities from the model's
@@ -20,7 +20,7 @@ import org.tatrman.translator.framework.DfpJoinModel
  */
 class ModelJoinRewriterSpec :
     StringSpec({
-        val model = DfpJoinModel.handle()
+        val model = HartlandJoinModel.handle()
 
         fun parse(sql: String): SqlNode = SqlParser.parseQuery(sql).shouldBeInstanceOf<ParseResult.Success>().sqlNode
 
@@ -41,60 +41,60 @@ class ModelJoinRewriterSpec :
         // ---- S1: one bare join ----
 
         "a bare JOIN between two related entities gets the model's ON, as INNER JOIN" {
-            rewrite("SELECT kumulovaný_prodej.období FROM kumulovaný_prodej JOIN produkt") shouldContain
-                "FROM kumulovaný_prodej INNER JOIN produkt ON kumulovaný_prodej.id_produktu = produkt.id_produktu"
+            rewrite("SELECT sale.sale_month FROM sale JOIN product") shouldContain
+                "FROM sale INNER JOIN product ON sale.product_id = product.product_id"
         }
 
         "the pair is oriented to the sides: the `from` entity on the RIGHT swaps the attributes" {
-            rewrite("SELECT 1 FROM produkt JOIN kumulovaný_prodej") shouldContain
-                "FROM produkt INNER JOIN kumulovaný_prodej ON produkt.id_produktu = kumulovaný_prodej.id_produktu"
+            rewrite("SELECT 1 FROM product JOIN sale") shouldContain
+                "FROM product INNER JOIN sale ON product.product_id = sale.product_id"
         }
 
         "H3 — a bare LEFT JOIN keeps its join type" {
-            rewrite(DfpJoinModel.H3_LEFT) shouldContain
-                "FROM kumulovaný_prodej LEFT JOIN produkt ON kumulovaný_prodej.id_produktu = produkt.id_produktu"
+            rewrite(HartlandJoinModel.H3_LEFT) shouldContain
+                "FROM sale LEFT JOIN product ON sale.product_id = product.product_id"
         }
 
         "RIGHT and FULL are preserved too" {
-            rewrite("SELECT 1 FROM kumulovaný_prodej RIGHT JOIN produkt") shouldContain "RIGHT JOIN produkt ON"
-            rewrite("SELECT 1 FROM kumulovaný_prodej FULL JOIN produkt") shouldContain "FULL JOIN produkt ON"
+            rewrite("SELECT 1 FROM sale RIGHT JOIN product") shouldContain "RIGHT JOIN product ON"
+            rewrite("SELECT 1 FROM sale FULL JOIN product") shouldContain "FULL JOIN product ON"
         }
 
         "H5 — an explicit ON is untouched" {
             val text =
-                "SELECT 1 FROM dodací_místo dm JOIN uživatel u ON dm.obchodní_zástupce = u.id_uživatele"
+                "SELECT 1 FROM shopper sh JOIN calendar c ON sh.first_purchase_date = c.date_id"
             rewrite(text) shouldBe sql(parse(text))
         }
 
         "USING is untouched" {
-            val text = "SELECT 1 FROM kumulovaný_prodej JOIN produkt USING (id_produktu)"
+            val text = "SELECT 1 FROM sale JOIN product USING (product_id)"
             rewrite(text) shouldBe sql(parse(text))
         }
 
         "NATURAL JOIN is untouched" {
-            val text = "SELECT 1 FROM kumulovaný_prodej NATURAL JOIN produkt"
+            val text = "SELECT 1 FROM sale NATURAL JOIN product"
             rewrite(text) shouldBe sql(parse(text))
         }
 
         "the comma form and CROSS JOIN are left to the wire carrier (H10 bytes)" {
-            val comma = DfpJoinModel.H10_COMMA
+            val comma = HartlandJoinModel.H10_COMMA
             rewrite(comma) shouldBe sql(parse(comma))
-            val cross = "SELECT 1 FROM kumulovaný_prodej CROSS JOIN produkt"
+            val cross = "SELECT 1 FROM sale CROSS JOIN product"
             rewrite(cross) shouldBe sql(parse(cross))
         }
 
         "H7 — no relation → ON TRUE, never an error" {
-            val out = rewrite("SELECT 1 FROM kumulovaný_prodej JOIN zákazník")
-            out shouldContain "INNER JOIN zákazník ON TRUE"
+            val out = rewrite("SELECT 1 FROM sale JOIN household")
+            out shouldContain "INNER JOIN household ON TRUE"
             out shouldNotContain "="
         }
 
-        "H4 — two relations (OZ + VOT) → ON TRUE" {
-            rewrite("SELECT 1 FROM dodací_místo JOIN uživatel") shouldContain "INNER JOIN uživatel ON TRUE"
+        "H4 — two relations (first purchase + first shipment) → ON TRUE" {
+            rewrite("SELECT 1 FROM shopper JOIN calendar") shouldContain "INNER JOIN calendar ON TRUE"
         }
 
         "the join keyword's position survives the rebuild (validation errors still point into the source)" {
-            val original = parse("SELECT 1 FROM kumulovaný_prodej JOIN produkt")
+            val original = parse("SELECT 1 FROM sale JOIN product")
             val rewritten = original.accept(ModelJoinRewriter(model, "entity"))!!
             val originalJoin = (original as org.apache.calcite.sql.SqlSelect).from as org.apache.calcite.sql.SqlJoin
             val rewrittenJoin = (rewritten as org.apache.calcite.sql.SqlSelect).from as org.apache.calcite.sql.SqlJoin
@@ -103,98 +103,98 @@ class ModelJoinRewriterSpec :
         }
 
         "a statement without joins comes back unchanged" {
-            val text = "SELECT název_produktu FROM produkt WHERE id_produktu > 5"
+            val text = "SELECT product_name FROM product WHERE product_id > 5"
             rewrite(text) shouldBe sql(parse(text))
         }
 
         "an unknown table on one side contributes no entity → ON TRUE" {
-            rewrite("SELECT 1 FROM kumulovaný_prodej JOIN not_an_entity") shouldContain "ON TRUE"
+            rewrite("SELECT 1 FROM sale JOIN not_an_entity") shouldContain "ON TRUE"
         }
 
         // ---- S2: chains, aliases, nesting, non-entity sides ----
 
         "H1 — the hero chain: each join decided against the whole other side (⚑MJ-2)" {
-            val out = rewrite(DfpJoinModel.H1_HERO)
+            val out = rewrite(HartlandJoinModel.H1_HERO)
             out shouldContain
-                "FROM kumulovaný_prodej INNER JOIN dodací_místo " +
-                "ON kumulovaný_prodej.id_dodacího_místa = dodací_místo.id_dodacího_místa " +
-                "INNER JOIN zákazník ON dodací_místo.id_subjektu = zákazník.id_zákazníka " +
-                "INNER JOIN produkt ON kumulovaný_prodej.id_produktu = produkt.id_produktu"
+                "FROM sale INNER JOIN shopper " +
+                "ON sale.shopper_id = shopper.shopper_id " +
+                "INNER JOIN household ON shopper.current_household = household.household_id " +
+                "INNER JOIN product ON sale.product_id = product.product_id"
             out shouldNotContain "TRUE"
         }
 
         "H2 — aliases are used in the conditions" {
-            rewrite(DfpJoinModel.H2_ALIASES) shouldContain
-                "FROM kumulovaný_prodej AS kp INNER JOIN dodací_místo AS dm " +
-                "ON kp.id_dodacího_místa = dm.id_dodacího_místa " +
-                "INNER JOIN zákazník AS z ON dm.id_subjektu = z.id_zákazníka"
+            rewrite(HartlandJoinModel.H2_ALIASES) shouldContain
+                "FROM sale AS s INNER JOIN shopper AS sh " +
+                "ON s.shopper_id = sh.shopper_id " +
+                "INNER JOIN household AS h ON sh.current_household = h.household_id"
         }
 
-        "a parenthesised right side: the inner join resolves first, the outer sees {dm, z}" {
-            val out = rewrite("SELECT 1 FROM kumulovaný_prodej JOIN (dodací_místo JOIN zákazník)")
-            out shouldContain "dodací_místo INNER JOIN zákazník ON dodací_místo.id_subjektu = zákazník.id_zákazníka"
-            out shouldContain "ON kumulovaný_prodej.id_dodacího_místa = dodací_místo.id_dodacího_místa"
+        "a parenthesised right side: the inner join resolves first, the outer sees {sh, h}" {
+            val out = rewrite("SELECT 1 FROM sale JOIN (shopper JOIN household)")
+            out shouldContain "shopper INNER JOIN household ON shopper.current_household = household.household_id"
+            out shouldContain "ON sale.shopper_id = shopper.shopper_id"
             out shouldNotContain "TRUE"
         }
 
-        "H6 — both kp→ok and dm→ok exist: ambiguous, ON TRUE, no proximity tie-break (⚑MJ-8)" {
-            val out = rewrite("SELECT 1 FROM kumulovaný_prodej JOIN dodací_místo JOIN obchodní_kanál")
-            out shouldContain "ON kumulovaný_prodej.id_dodacího_místa = dodací_místo.id_dodacího_místa"
-            out shouldContain "INNER JOIN obchodní_kanál ON TRUE"
+        "H6 — both s→address and sh→address exist: ambiguous, ON TRUE, no proximity tie-break (⚑MJ-8)" {
+            val out = rewrite("SELECT 1 FROM sale JOIN shopper JOIN address")
+            out shouldContain "ON sale.shopper_id = shopper.shopper_id"
+            out shouldContain "INNER JOIN address ON TRUE"
         }
 
         "H8 — the same entity twice steps aside (⚑MJ-6)" {
-            rewrite("SELECT 1 FROM zákazník z1 JOIN zákazník z2") shouldContain "INNER JOIN zákazník AS z2 ON TRUE"
+            rewrite("SELECT 1 FROM shopper z1 JOIN shopper z2") shouldContain "INNER JOIN shopper AS z2 ON TRUE"
         }
 
         "H9 — a composite relation ANDs every pair (⚑MJ-7)" {
-            rewrite("SELECT 1 FROM smlouva JOIN dodatek") shouldContain
-                "ON smlouva.číslo_smlouvy = dodatek.číslo_smlouvy AND smlouva.rok = dodatek.rok"
+            rewrite("SELECT 1 FROM order_line JOIN order_return") shouldContain
+                "ON order_line.order_number = order_return.order_number AND order_line.product_id = order_return.product_id"
         }
 
         "H11 — a derived table on one side contributes no entity → ON TRUE" {
             val out =
                 rewrite(
-                    "SELECT 1 FROM kumulovaný_prodej JOIN (SELECT id_produktu FROM produkt WHERE id_produktu > 1) p",
+                    "SELECT 1 FROM sale JOIN (SELECT product_id FROM product WHERE product_id > 1) p",
                 )
             out shouldContain ") AS p ON TRUE"
         }
 
         "a DB table on one side in an ER-catalog statement → ON TRUE" {
-            rewrite("SELECT 1 FROM kumulovaný_prodej JOIN db.dbo.QPRODUKT") shouldContain "ON TRUE"
-            rewrite("SELECT 1 FROM kumulovaný_prodej JOIN dbo.QPRODUKT") shouldContain "ON TRUE"
+            rewrite("SELECT 1 FROM sale JOIN db.dbo.item") shouldContain "ON TRUE"
+            rewrite("SELECT 1 FROM sale JOIN dbo.item") shouldContain "ON TRUE"
         }
 
         "a bare join inside a WHERE subquery is rewritten too" {
             val out =
                 rewrite(
-                    "SELECT 1 FROM produkt WHERE id_produktu IN " +
-                        "(SELECT kumulovaný_prodej.id_produktu FROM kumulovaný_prodej JOIN dodací_místo)",
+                    "SELECT 1 FROM product WHERE product_id IN " +
+                        "(SELECT sale.product_id FROM sale JOIN shopper)",
                 )
-            out shouldContain "ON kumulovaný_prodej.id_dodacího_místa = dodací_místo.id_dodacího_místa"
+            out shouldContain "ON sale.shopper_id = shopper.shopper_id"
         }
 
         "bare joins inside a CTE body and both UNION branches are rewritten" {
             val out =
                 rewrite(
-                    "WITH x AS (SELECT 1 AS a FROM kumulovaný_prodej JOIN produkt) " +
-                        "SELECT a FROM x UNION ALL SELECT 2 FROM dodací_místo JOIN zákazník",
+                    "WITH x AS (SELECT 1 AS a FROM sale JOIN product) " +
+                        "SELECT a FROM x UNION ALL SELECT 2 FROM shopper JOIN household",
                 )
-            out shouldContain "ON kumulovaný_prodej.id_produktu = produkt.id_produktu"
-            out shouldContain "ON dodací_místo.id_subjektu = zákazník.id_zákazníka"
+            out shouldContain "ON sale.product_id = product.product_id"
+            out shouldContain "ON shopper.current_household = household.household_id"
         }
 
         "qualified entity names (entity.x, er.entity.x) resolve; another namespace does not" {
-            rewrite("SELECT 1 FROM entity.kumulovaný_prodej JOIN er.entity.produkt") shouldContain
-                "ON kumulovaný_prodej.id_produktu = produkt.id_produktu"
-            rewrite("SELECT 1 FROM other.kumulovaný_prodej JOIN produkt") shouldContain "ON TRUE"
+            rewrite("SELECT 1 FROM entity.sale JOIN er.entity.product") shouldContain
+                "ON sale.product_id = product.product_id"
+            rewrite("SELECT 1 FROM other.sale JOIN product") shouldContain "ON TRUE"
         }
 
         "quoted identifiers resolve like bare ones (Lex.MYSQL_ANSI: double quotes; backticks are a lexical error)" {
-            rewrite("SELECT 1 FROM \"kumulovaný_prodej\" JOIN \"produkt\"") shouldContain
-                "ON kumulovaný_prodej.id_produktu = produkt.id_produktu"
-            rewrite("SELECT 1 FROM KUMULOVANÝ_PRODEJ JOIN Produkt") shouldContain
-                "ON KUMULOVANÝ_PRODEJ.id_produktu = Produkt.id_produktu"
+            rewrite("SELECT 1 FROM \"sale\" JOIN \"product\"") shouldContain
+                "ON sale.product_id = product.product_id"
+            rewrite("SELECT 1 FROM SHOPPER JOIN Household") shouldContain
+                "ON SHOPPER.current_household = Household.household_id"
         }
 
         "collectEntityRefs keeps FROM order (the ambiguity text lists entities in source order)" {
@@ -202,10 +202,10 @@ class ModelJoinRewriterSpec :
             val from =
                 (
                     parse(
-                        "SELECT 1 FROM produkt p JOIN kumulovaný_prodej ON TRUE JOIN dodací_místo dm ON TRUE",
+                        "SELECT 1 FROM product p JOIN sale ON TRUE JOIN shopper sh ON TRUE",
                     ) as org.apache.calcite.sql.SqlSelect
                 ).from
             rewriter.collectEntityRefs(from).map { it.entity.name to it.handle } shouldBe
-                listOf("produkt" to "p", "kumulovaný_prodej" to "kumulovaný_prodej", "dodací_místo" to "dm")
+                listOf("product" to "p", "sale" to "sale", "shopper" to "sh")
         }
     })

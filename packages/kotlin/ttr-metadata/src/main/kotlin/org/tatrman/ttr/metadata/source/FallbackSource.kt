@@ -8,9 +8,9 @@ import org.slf4j.LoggerFactory
  * back to [fallback]. The two are **mutually exclusive** — never merged — so a stale bundled
  * fallback can't resurrect definitions the primary (live repo) has since deleted.
  *
- * Used to make the `Tatrman/ai-models` GitHub repo the live model source (via [GitArchiveStorage])
- * while keeping the bundled `resources/model-ttr` copy as a pure fallback for when the repo is
- * unreachable or unconfigured.
+ * Typical use: a git repository is the live model source (via [GitArchiveStorage]) and a local copy
+ * of the model is a pure fallback for when the repository is unreachable or unconfigured. Whether a
+ * consumer configures a fallback at all is its own choice; this type only defines what one means.
  *
  * "Primary failed" means either [ModelSource.load] threw (clone / auth / network failure) or it
  * returned an **unusable** snapshot (empty across every object map — e.g. a misconfigured remote or

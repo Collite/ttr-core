@@ -47,7 +47,7 @@ import org.tatrman.ttrp.parser.TtrpParser
  *    a rewrite, out of the formatter's remit).
  *  - **Fragments (C2-f):** tagged-block interiors are copied byte-for-byte; the fence
  *    and header normalize, the interior never changes. Bare-fragment files
- *    (`.ttr.sql`/`.ttr.py`/`.ttrb`) are returned unchanged (never formatted).
+ *    (`.ttr.sql`/`.ttr.py`/`.ttrb`/`.ttrb-cs`) are returned unchanged (never formatted).
  */
 class TtrpFormatter {
     companion object {
@@ -55,7 +55,7 @@ class TtrpFormatter {
         private const val INDENT = "  "
 
         fun isBareFragmentFile(uri: String): Boolean =
-            uri.endsWith(".ttr.sql") || uri.endsWith(".ttr.py") || uri.endsWith(".ttrb")
+            uri.endsWith(".ttr.sql") || uri.endsWith(".ttr.py") || uri.endsWith(".ttrb") || uri.endsWith(".ttrb-cs")
     }
 
     /** Returns the formatted document text, or [source] unchanged when it must not be formatted. */
@@ -152,11 +152,16 @@ class TtrpFormatter {
         }
     }
 
-    /** Fence + header normalize; the interior bytes (`sourceText`) are copied verbatim (C2-f). */
+    /**
+     * Fence + header normalize; the interior bytes (`sourceText`) are copied verbatim (C2-f). A
+     * file-backed body (AG B5) keeps its `from "<path>"` clause — the interior lives in the file.
+     */
     private fun renderFragment(
         header: String,
         b: FragmentBody,
-    ): String = "$header \"\"\"${b.tag}\n${b.sourceText}\"\"\""
+    ): String =
+        b.sourceFile?.let { "$header from \"$it\"" }
+            ?: "$header \"\"\"${b.tag}\n${b.sourceText}\"\"\""
 
     private fun port(p: PortDecl): String {
         val kind =

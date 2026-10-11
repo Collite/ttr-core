@@ -1,0 +1,20 @@
+uses world "shop.worlds.host"
+import shop.prodej.*
+import shop.akce.*
+
+container sklad(out manual_task, out send_email) target erp {
+  zásoby = load(zásoby)
+  lim = load(limity)
+  s_limity = join(left: zásoby, right: lim, type: cross)
+  pod_minimem = s_limity -> filter(množství < minimum_zásoby)
+  manual_task = pod_minimem
+    -> calc { řešitel = coalesce(vedoucí_skladu, "oddělení:sklad")  název = "Doplnit zásobu"  popis = "Zásoba je pod minimem."  příloha = "skladová_karta" }
+    -> select(řešitel, název, popis, příloha)
+  vyprodano = s_limity -> filter(množství = 0)
+  send_email = vyprodano
+    -> calc { komu = "oddělení:nákup"  předmět = "Vyprodáno"  šablona = "vyprodano"  klíč = kód_zboží }
+    -> select(komu, předmět, šablona, klíč)
+}
+
+sklad.manual_task -> display(manual_task)
+sklad.send_email -> display(send_email)

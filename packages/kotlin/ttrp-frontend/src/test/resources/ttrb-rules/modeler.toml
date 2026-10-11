@@ -1,0 +1,8 @@
+# TTR-B rules fixture project (AG B4/B5/B7): a neutral shop model with Czech names (orders, complaints,
+# stock), the three action row schemas a rules program imports, and one host-executed world. The bare
+# defaults let a rules file (programs/rules/*.ttrb-cs) also run as a bare program.
+[ttrp]
+world = "shop.worlds.host"
+bare-target = "erp"
+bare-shell = "aip"
+default-imports = ["shop.prodej.*", "shop.akce.*"]

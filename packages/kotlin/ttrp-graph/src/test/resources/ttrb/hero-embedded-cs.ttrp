@@ -1,0 +1,16 @@
+uses world "acme.worlds.dev"
+acc = load(erp.accounts)
+sal = load(files.sales_2026, schema: sales_csv)
+container region_totals(in accounts, in sales, out result) target erp_pg """ttrb-cs
+Načti accounts jako accounts.
+Načti ze souboru "data/sales.csv" se schématem erp.sales_schema jako sales.
+Spoj accounts se sales přes account_id je sales.account_id jako joined.
+Ponech jen řádky, kde amount je více než 0 a customer není prázdný.
+Shrň součet amount jako total podle region.
+Seřaď to podle total sestupně.
+Ponech jen prvních 10 řádků.
+Ukaž výsledek jako region_totals.
+"""
+acc -> region_totals.accounts
+sal -> region_totals.sales
+region_totals.result -> display(main_result)

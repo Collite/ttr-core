@@ -6,6 +6,130 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttrp-frontend` · `ttrp-graph` · `ttrp-emit` · `ttrp-cli` · `ttrp-lsp`** ⚑ **TTR-B rules in Czech and English
+  sentences (AG B1–B6).** A business rule — checks plus a decision that requests actions — can be written entirely
+  in TTR-B sentences, in either language, and compiles to the same graph as its canonical TTR-P program.
+  - **Keyword skins:** ONE `TTRB.g4` whose keyword token types are spelled by data — `ttrb/roster.en.yaml`
+    (`"""ttrb`, `*.ttrb`) and `ttrb/roster.cs.yaml` (`"""ttrb-cs`, `*.ttrb-cs`, first line
+    `# ttr: dialect=b lang=cs`). Keywords match case- and diacritic-insensitively against the active skin;
+    identifiers are exact and take the Latin-extended range (Czech names). Czech fragments lower to exactly the
+    tree their English twins do.
+  - **Blocks:** `If <condition>:` / `Když <podmínka>:` + indented sentences = one `filter` output each; blocks
+    overlap (not else-if); a nested block is `TTRP-B-110`.
+  - **Count / attach / actions:** `Count the rows of T as x.` / `Spočítej x jako počet řádků T.` and
+    `Attach T to the result.` / `Připoj T k výsledku.` cross-join a one-row table into the current row; the action
+    sentences `Send an e-mail …` / `Pošli e-mail …`, `Set … of …` / `Nastav …`, `Create a manual task …` /
+    `Vytvoř ruční úkol …` lower to `calc { <schema columns> } -> select(…)` and are routed — through a container
+    OUT port the checker adds plus program-level `display(<kind>)` wiring — to the action displays `send_email`,
+    `update_field`, `manual_task` (held to the imported `def schema`, `TTRP-DSP-*`). Recipients: a column, a
+    department (`"oddělení:x"`), or a column with a department fallback (`coalesce`).
+  - **File-backed fragments:** `container x(…) target <engine> from "rules/x.ttrb-cs"` (`TTRP.g4` 0.3, soft
+    keyword `from`; `TTRP-FRG-004` file not found, `TTRP-FRG-005` no dialect marker). The LSP opens the file from
+    the clause (definition + document link) and shows the fragment's findings on it.
+  - **Diagnostics as help:** reject tables per skin (`ttrb/rejects.en.yaml`, `ttrb/rejects.cs.yaml`, replacing
+    `rejects/ttr-b.rejects.toml`) — a message in the skin's language and a suggested correct sentence per row; new
+    `TTRP-B-101…109` (stray character, block header, indentation, malformed e-mail / set / task / count / attach
+    sentence, a keyword used as a name). The LSP checks bare `ttrb` / `ttrb-cs` documents; the VS Code extension
+    registers `.ttrb-cs`.
+  - **Fixed:** a TTR-B container's interior (sentences) was handed to the SQL engines as if it were SQL; it now
+    emits from its decomposed members on every path (only `sql` / `pandas` fragments emit verbatim). A TTR-B
+    `Join that …` after a transform no longer drops the transform.
+  - **Ports, joins, conditional values (B7):** a container's IN ports are names in every sentence that names a
+    table (`Načti orders.` reads the port — it was `load(orders)`, `TTRP-RES-001`); `Pošli to na výstup <port>.` /
+    `Send that to output <port>.` binds a declared OUT port (`TTRP-B-111`, `TTRP-B-112`); `Spoj a volitelně s b …` /
+    `Join a optionally with b …` (left join); `… přes vazbu r` / `… on relation r`; `Ponech jen řádky, které
+    [ne]mají protějšek v b přes …` / `Keep only the rows that have [no] match in b on …` (semi / anti join);
+    `Spočti x jako 1, když <p>, jinak 2.` / `Compute x as 1 when <p>, otherwise 2.` (`case when`).
+  - **Grouping, naming, no silent sentences (B8):** `( … )` groups any sub-condition (`and` binds tighter than
+    `or`); `Pojmenuj to jako <jméno>.` / `Call that <name>.` names the current value, `Načti <jméno>.` /
+    `Load <name>.` makes a named value current again; **`TTRP-B-113` (error)** — a value a sentence produces that
+    nothing reads (no later sentence, port or display): such a sentence used to vanish silently from the SQL.
+  - **Fixed (`ttrp-emit`, plan.v1 / `sql-text`):** an unqualified column in a join condition bound to the wrong
+    input — `on: kód = right.kód` compared the left's FIRST column, a left-only `on: stav = right.x` failed with
+    `field [stav] not found`. It now binds to the left input when the left has the column, else the right. An
+    island IN port fed by a program-level model `load(…)` (a bare program's derived in-port) reads the model
+    object in a host statement instead of failing.
+
+- **`ttr-parser` · `ttr-writer` · `ttr-semantics` · `ttr-metadata`** ⚑ **Grammar 0.14 — named row schemas,
+  `def schema <name> { columns: [...] }`.** A new top-level, tier-neutral def kind (additive; every 0.13 file
+  parses unchanged): an ordered column list, each column written exactly like a table column (`type`,
+  `optional: true`, `description`). Kotlin `SchemaDef` (+ TS / Python twins, conformance fixture 69); the
+  writer renders it. `ttr-metadata` surfaces it as **`Model.rowSchemas`** (`RowSchemaRecord`, keyed
+  `<package>.<name>` — not a `ModelObject`, the `areas` precedent; defaulted, so constructors stay
+  source-compatible); a re-declaration is `ttr/duplicate-schema`; never a `ttr/wrong-file-kind`. ⚠ The
+  bundle re-cuts at **0.14.0** (the grammar minor moved).
+
+- **`ttrp-frontend` · `ttrp-graph` · `ttrp-emit` · `ttrp-cli`** ⚑ **Action displays: `display(<name>)` held
+  to an imported `def schema`.** When a row schema named exactly `<name>` is in scope (`import <pkg>.*`), the
+  rows flowing into `display(<name>)` are checked: **`TTRP-DSP-001`** missing non-optional column (error),
+  **`TTRP-DSP-002`** non-assignable type (error; assignable = same type, int → decimal/float, any scalar →
+  text), **`TTRP-DSP-003`** a column the schema does not name — dropped from the display (warning). A display
+  name with several sources that is NOT a declared schema is **`TTRP-DSP-004`** (error); two imports declaring
+  the name is `TTRP-RES-002`. Row types cross program-level wiring (`a.p -> b.q`) for the check, and `select`
+  narrows. The emitted display is the schema's columns in schema order (an absent optional column a typed
+  NULL) on every path (`sql-text`, Polars, Postgres).
+  - **Fixed:** several sources into one display name — `manifest.json` listed one `displays[]` entry per
+    source but every entry carried the FIRST one's `source {island, port}`. Each entry now keeps its own
+    source; same-named entries sit in wiring order; files are unique (`out/<name>.arrow`, then
+    `out/<name>~2.arrow`, …), and Polars / Postgres islands write every sink of a port, not only the first.
+  - Manifest v2 (additive): `displays[].schema` (the qualified schema) + `displays[].columns` (name / type /
+    optional) on an action display; a port feeding both an ordinary and an action display keeps its own
+    `sql-text` statement and gains a projected `<port>~<schema>` output the action display names.
+  - **Fixed:** `cast(x as <type>)` on the SQL emit paths lowered to the `Expression.cast` oneof the translator
+    does not decode (`TTRP-EMT-004 … CastExpression decoding is TODO`); it now lowers to the translator's
+    function form with a physical cast code (`varchar:max`, `int`, `decimal:p,s`, …) wherever the translator
+    renders it (`sql-text`, translator-rendered CTE nodes). The comma form `cast(x, string)` is a
+    `TTRP-PRS-001` diagnostic instead of a `NullPointerException`, and `ttrp build` prints an emit failure as a
+    diagnostic line (exit 1) instead of a stack trace.
+  - **Fixed (`ttrp-emit`, Postgres):** a cast calc on a Postgres island is rendered raw by the CTE planner and
+    named the TTR-P spelling — `calc { s = cast(order_id as string) }` emitted `CAST("order_id" AS string)`,
+    invalid PostgreSQL (also `double`, `number`, `datetime`; a decimal lost its precision). It now names the
+    Postgres type (`text`, `double precision`, `numeric`, `decimal(p,s)`, `boolean`, `timestamp`; `integer` and
+    an unsized `decimal` are unchanged, byte-identical).
+  - **Fixed (`ttrp-emit`, Polars):** a CSV load of a `decimal` field emitted a bare `pl.Decimal`, which
+    Polars ≥ 1.42 rejects (`Decimal without precision/scale set is not a valid Polars datatype`) — every Polars
+    island reading a decimal CSV column failed at run time. It now reads at the field's declared precision/scale
+    (`{ type: decimal, length: 19, precision: 2 }` → `pl.Decimal(19, 2)`), else at **`DECIMAL(19, 2)`**, the
+    toolchain default for an unsized decimal (the type the Postgres CSV ingest already used, which now also
+    honours a declared precision/scale).
+  - **Fixed (`ttrp-graph`, every engine — pre-existing):** a chain ending in a container OUT port
+    (`o -> filter(status = 1) -> select(a, b) -> late`) built its nodes but left them dangling, and the port fell
+    back to the body's last *assigned* value — the island wrote the chain's unfiltered head (Polars wrote
+    `o_1`, the SQL paths emitted the unfiltered statement), even for an ordinary display. Chain-to-port now
+    means exactly `late = o -> filter(…) -> select(a, b)` (`ChainToPort`, shared by the checker and the graph).
+  - **Fixed:** a REQUIRED action-display column the rows lack was silently NULL-filled on Polars and Postgres
+    (only `sql-text` refused it), and `ttrp check` missed it whenever the rows reached the OUT port through a
+    chain (`… -> late`) — the display pass bound a port only from `late = …`. The checker now gives a
+    chain-tail OUT port its row type (`TTRP-DSP-001/002/003` are reported), the Postgres emitter refuses an
+    absent required column at build time (`TTRP-EMT-006 … (TTRP-DSP-001)`, as `sql-text` does), and a Polars
+    island — whose frames have no static columns — stops with `TTRP-DSP-001` before it writes the display file.
+    Only an absent `optional` column is NULL-filled.
+  - **Fixed:** an omitted optional action-display column typed with a SQL spelling a generated model carries as a
+    TTR-M type id (`bigint`, `smallint`, `numeric`, `money`, `time`, …) broke every `sql-text` build with
+    `TTRP-EMT-006 … no SQL cast to 'bigint'` though `ttrp check` was clean (DSP-002 waved every unknown type
+    through). Every scalar spelling now has a cast code (`SqlCastTypes`, from `ColumnType`); DSP-002 judges the
+    real column types (`date` → `bigint` is an error now); **`TTRP-DSP-005` (new, error)** — a schema column no
+    engine can produce (`object`, `list`, an unknown type id). An unsized `decimal` NULL fill is now
+    `DECIMAL(19, 2)` (it was `DECIMAL(19, 0)`).
+  - **Fixed:** the per-source files of one action display had different Arrow schemas, so a host could not
+    concatenate them (`pa.concat_tables` → `ArrowInvalid`): a carried column kept its source type while a NULL
+    fill took a per-engine default (Polars filled a decimal as `Float64`; a carried int stayed int under a text
+    column). **Every projected column — carried or NULL-filled — is now cast to the type the schema column
+    declares**, on every engine (`DisplayTypes`): text → `large_string`, integers → `int64`, `decimal(p,s)` →
+    `decimal128(p, s)` (unsized: 19, 2), float → `double`, bool, `date32`, `time64[ns]`, datetime/timestamp →
+    `timestamp[us, tz=UTC]` — the Postgres island casts the fetched Arrow table to that schema (ADBC returns
+    `NUMERIC` as an opaque extension), so Polars and Postgres sources write identical files; a `sql-text`
+    statement casts every column (`CAST("c" AS …)`). `ttr-metadata`'s `RowSchemaColumn` carries the structured
+    type's `length` / `precision`; manifest `displays[].columns[].type` and a projected
+    `islands[].outputs[].columns[].type` report the schema's own spelling (`decimal(12,4)`), no longer the source
+    column's (`late.note: text` vs `large.note: string`).
+
+- **`ttrp-cli` · `ttrp-lsp`** — **Fixed:** every bundle recorded `toolchain: org.tatrman:ttrp:0.0.0-dev` in
+  `manifest.json` and `<prog>.compile-record.json` — the CLI (`build`, `run`, `conform`, `emit-determinism`,
+  `deploy`) and the LSP built bundles with `BundleAssembler`'s default version. The Gradle project version is now
+  stamped at build time (a generated `toolchain-version.properties` resource + the jar's `Implementation-Version`)
+  and passed to every bundle build; **`ttrp --version`** prints it.
+
 - **`ttr-lexicon` · `ttr-lexicon-compile`** ⚑ **`pred:` forms are EXACT, whole and negatable (LP
   review-103 F1/F12/F17/N5, ruling 1).** A `pred:` form authored `TOKENS` was scored over the QUERY's tokens,
   so the one-word window `názvem` matched *s názvem přesně* on its own and fired `pred:equals` — *customers
@@ -73,7 +197,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
     carrier whether or not it has lexicon terms (`objectKind = attribute`, `ownerRef` = its entity/table, no
     reach of its own). `entries` — and so `contentHash` — are unchanged.
 
-- **`ttr-translator`** ⚑ **T-SQL string→datetime operand coercion (df-test 2026-09-21) — `DATEDIFF(day,
+- **`ttr-translator`** ⚑ **T-SQL string→datetime operand coercion (hosted test estate, 2026-09-21) — `DATEDIFF(day,
   '19000101', …)` / `DATEADD(day, 7, '2026-09-14')` validate.** The LLM lane's canonical "previous calendar
   week" idiom (`DATEADD(day, -7, DATEADD(day, (DATEDIFF(day, '19000101', CAST(GETDATE() AS date)) / 7) * 7,
   '19000101'))`) died at `ParseToRelNode` with `Cannot apply 'DATEDIFF' to arguments of type 'DATEDIFF(<INTERVAL
@@ -88,30 +212,30 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   cast; an integer anchor (`DATEDIFF(wk, 0, …)`) is still rejected; binary comparisons are untouched.
   `TsqlTypeCoercionSpec` runs the service path (parse → wire → decode → unparse).
 
-- **`ttr-translator`** ⚑ **regression fix (MJ follow-up, df-test 2026-09-21) — `JoinerPhysical` sees the
+- **`ttr-translator`** ⚑ **regression fix (MJ follow-up, hosted test estate, 2026-09-21) — `JoinerPhysical` sees the
   `TableScan` under MAP_TO_PHYSICAL's alias-at-boundary `Project` again.** 0.11.1 narrowed a join side's
   scan search to `Join`/`Filter` (so a derived table's hidden column could not become a bare-name ref that
   dies at decode) — but MAP_TO_PHYSICAL itself wraps a **query-backed** entity's body in a `Project`
-  (`id_obchodního_kanálu := IDCENSKUP`), and every `*__filter` entity on the DF estate is query-backed.
-  The FK fallback that had conditioned `FROM prodej JOIN obchodní_kanál` since v1.0 silently stopped and the
+  (`call_center := cs_call_center_sk`), and every `*__filter` entity on that estate is query-backed.
+  The FK fallback that had conditioned a bare entity `JOIN` since v1.0 silently stopped and the
   join ran as a Cartesian product. A `Project` is now descended as a **name map** on the scan (`ScanRef`):
   only its bare column-ref expressions expose a name, the FK column is mapped through every projection up
   to the join, and an FK whose column no projection exposes is dropped from the candidates (a
   `JOIN_NO_RELATION` warning, never a decode-time `field not found`). `JoinerPhysicalSpec` (nested alias
-  projects, unexposed column, computed expression) and `ModelJoinSpec` on `DfpJoinModel.handleQueryBacked()`
-  — the df-test shape: query-backed entity, FKs derived from the relations, and no relations served — pin it.
+  projects, unexposed column, computed expression) and `ModelJoinSpec` on `HartlandJoinModel.handleQueryBacked()`
+  — the served-estate shape: query-backed entity, FKs derived from the relations, and no relations served — pin it.
 
 - **`ttr-translator`** ⚑ **model joins (MJ, → `translator/v0.12.0`) — bare and chained `JOIN`s in the ER
-  lane are conditioned from the model's declared relations.** `FROM kumulovaný_prodej JOIN dodací_místo
-  JOIN zákazník JOIN produkt` — the way the LLM lane writes it — used to die at Calcite validation with
+  lane are conditioned from the model's declared relations.** `FROM sale JOIN shopper JOIN household
+  JOIN product` — the way the LLM lane writes it — used to die at Calcite validation with
   `INNER, LEFT, RIGHT, FULL, or ASOF join requires a condition`; it now translates with the three `ON`s the
-  E-R model implies (`kp ↔ dm`, `dm ↔ z`, `kp ↔ p`) and zero warnings. Two carriers on one policy:
+  E-R model implies (`s ↔ sh`, `sh ↔ h`, `s ↔ p`) and zero warnings. Two carriers on one policy:
   - **`codec/sql/ModelJoinRewriter`** (new, pre-validation `SqlShuttle`, ER catalog only): every
     `INNER`/`LEFT`/`RIGHT`/`FULL` join without `ON`/`USING` (not `NATURAL`) gets
     `<alias>.<attr> = <alias>.<attr>` from the model — join type preserved, SQL aliases used, `AND` over
     every pair of a composite relation. Each join in a chain is decided against the **whole** entity set
-    of its other side, so `dodací_místo → zákazník` is found for the third entity, not `kumulovaný_prodej
-    → zákazník`. Anything unresolvable gets `ON TRUE` and falls through to the wire carrier, which reports
+    of its other side, so `shopper → household` is found for the third entity, not `sale
+    → household`. Anything unresolvable gets `ON TRUE` and falls through to the wire carrier, which reports
     it. Explicit `ON`/`USING`, `NATURAL`, the comma list and `CROSS JOIN` are untouched. `explain` gains
     the stage `model_joins` (the rewritten statement, or `(no bare joins)`).
   - **`joiner/JoinPolicy`** (new) — the single decision: candidates `(l, r, rel)` over both sides; exactly
@@ -141,7 +265,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
     need a branch); `NoRelation` / `AmbiguousRelations` carry `leftEntities` / `rightEntities` (`sideA` /
     `sideB` are their first members); `AmbiguousRelations.repeated`. `JoinerLogical.RelationMatcher` and
     `findFirstScanPublic` are removed. `ParseResult.{Success,Failure}.modelJoinsSql` (debug, defaulted).
-  Fixture `DfpJoinModel` (test-fixtures) + `ModelJoinSpec` (H1–H12 of the MJ plan), `ModelJoinRewriterSpec`,
+  Fixture `HartlandJoinModel` (test-fixtures) + `ModelJoinSpec` (H1–H12 of the MJ plan), `ModelJoinRewriterSpec`,
   `JoinPolicySpec`, `JoinerMessagesSpec`, and the extended `JoinerLogicalSpec` / `JoinerPhysicalSpec` pin it;
   every pre-MJ golden (incl. the comma-form plan bytes) is unchanged. Design and decisions:
   `project/tatrman/features/ttr-translator/model-joins/`.
@@ -150,7 +274,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   and written as ISO-8601.** Three defects that meet on the first entity join to reach execution
   on a model whose join keys are renamed between the ER and DB layers:
   - **`JoinerPhysical` is alias-aware.** MAP_TO_PHYSICAL aliases each renamed column back to its
-    attribute name (DF-T05, alias-at-boundary), so above the scan only the alias exists — but the
+    attribute name (alias-at-boundary), so above the scan only the alias exists — but the
     FK-based join condition named the physical columns and failed at unparse with
     `field [d_date_sk] not found; input fields are: [sk, …]`. Each operand now resolves through its
     own side's scan: the alias when that scan aliases the column, the column name otherwise. Models
@@ -357,8 +481,8 @@ The next published bundle. Minor (additive) per `PUBLISHING.md`.
 - **`org.tatrman:ttr-writer:0.4.0`** — `TtrRenderer` now renders the v2.1 inline
   `mapping:` property on entity / attribute / relation defs (additive — the
   parser model + walker already populated these fields; only rendering was
-  missing). Both surface forms emit: bare-id (`mapping: IDSKUPZBOZI`,
-  `mapping: db.dbo.fk_artikl_produkt`) and block (`mapping: { target: …,
+  missing). Both surface forms emit: bare-id (`mapping: i_category_id`,
+  `mapping: db.dbo.fk_item_category`) and block (`mapping: { target: …,
   columns: { … } }` on entities, `{ target: … }` on attributes, `{ fk: … }` on
   relations). Each `columns:` entry is a short bare-id (`attr: COL`) when the
   target is a plain column, else the object form. Round-trip is a fixed point on

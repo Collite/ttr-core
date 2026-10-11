@@ -5,11 +5,11 @@
         "db.dbo.table.t_bare_list",
         "db.dbo.table.t_bare_list.ID",
         "db.dbo.table.t_bare_multi",
+        "db.dbo.table.t_bare_multi.CODE",
         "db.dbo.table.t_bare_multi.ID",
-        "db.dbo.table.t_bare_multi.KOD",
         "db.dbo.table.t_quoted_legacy",
         "db.dbo.table.t_quoted_legacy.ID",
         "db.dbo.table.t_single_bare",
-        "db.dbo.table.t_single_bare.IDSTRED"
+        "db.dbo.table.t_single_bare.S_STORE_SK"
     ]
 }

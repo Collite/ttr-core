@@ -1,0 +1,8 @@
+# ttr: dialect=b lang=cs
+# Pravidlo pro velké a zaplacené objednávky — the same sentences as rozhodnuti-cs.ttrp, kept in a file.
+Načti objednávky.
+Spočítej počet_reklamací jako počet řádků reklamace.
+Když částka je větší než 1000:
+    Pošli e-mail email_zástupce, jinak oddělení "obchod" s předmětem "Velká objednávka", šablonou "velka_objednavka", klíčem číslo a přílohami faktura, dodací_list.
+Když stav je "zaplacená" a počet_reklamací je 0:
+    Nastav stav objednávky s klíčem číslo na "uvolněná" s důvodem "zaplaceno, bez reklamací".

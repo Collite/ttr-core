@@ -1,0 +1,2 @@
+Load orders.
+Update orders set status to 'closed'.

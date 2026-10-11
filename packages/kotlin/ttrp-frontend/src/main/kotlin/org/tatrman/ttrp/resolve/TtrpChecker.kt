@@ -102,6 +102,13 @@ class TtrpChecker(
          * without re-resolving the model. Empty when no model repo loaded.
          */
         val loadSources: Map<org.tatrman.ttrp.ast.SourceLocation, LoadSource> = emptyMap(),
+        /**
+         * Action displays (grammar 0.14): every `display(<name>)` op whose name is a row schema declared in an
+         * imported package, keyed by the display **op**'s location (= the graph's Display node location) →
+         * that schema. A display absent here is an ordinary (evidence) display. The graph carries it onto the
+         * Display node; the emitters project the display's rows to it.
+         */
+        val displaySchemas: Map<org.tatrman.ttrp.ast.SourceLocation, DisplaySchema> = emptyMap(),
     ) {
         val errors: List<TtrpDiagnostic> get() = diagnostics.filter { it.severity == Severity.ERROR }
     }
@@ -123,7 +130,10 @@ class TtrpChecker(
         diags += manifestDiagnostics
         synth?.let { diags += it.diagnostics }
         diags += parsed.diagnostics
-        val doc = parsed.document
+        // TTR-B action sentences become container OUT ports + program-level display wiring (AG B4).
+        val doc =
+            org.tatrman.ttrp.dialect.b.FragmentActionWiring
+                .apply(parsed.document)
 
         // ---- world selection + resolution (WLD) ----
         val pin = doc.statements.filterIsInstance<UsesWorld>().firstOrNull()
@@ -169,6 +179,9 @@ class TtrpChecker(
             }
         }
 
+        // ---- action displays (DSP, grammar 0.14): display(<name>) held to an imported row schema ----
+        val displaySchemas = checkDisplays(doc, world, imports, programSchemas, diags)
+
         // ---- expression typing via the resolved schema source (EXP/FN/AGG/TYP) + MD dot-paths ----
         // `asof` is the compile-time parameter (D17): the manifest's declared value, else defaulted
         // from the injectable compile-pass clock; threaded verbatim to the resolver. The MdModel /
@@ -212,6 +225,7 @@ class TtrpChecker(
             mdAsof = if (mdModel != null) asof else null,
             memberFingerprint = snapshot?.fingerprint,
             loadSources = ctx.loadSources.toMap(),
+            displaySchemas = displaySchemas,
         )
     }
 
@@ -227,6 +241,18 @@ class TtrpChecker(
         val varEntity: MutableMap<String, Entity> = mutableMapOf(),
         /** The er entity a chain just loaded (set by `load`, consumed by the enclosing assignment). */
         var pendingEntity: Entity? = null,
+        /**
+         * The display pass ([checkDisplays]) re-evaluates the program in a throwaway context with sharper row
+         * types than the main pass keeps: `select` narrows, a program-level `c.port` ref reads the container's
+         * port schema, and an IN port is seeded from the OUT port wired into it. Off for the main pass, whose
+         * schemas feed expression typing (unchanged).
+         */
+        val shadow: Boolean = false,
+        val containerNames: Set<String> = emptySet(),
+        /** Display pass: (container, IN port) → the (container, OUT port) wired into it at program level. */
+        val inPortFeeds: Map<Pair<String, String>, Pair<String, String>> = emptyMap(),
+        /** Display pass: every `display(...)` op met, with the row type flowing into it (null = unknown). */
+        val displaySites: MutableList<DisplaySite>? = null,
     ) {
         /** AG-P0: load-op location → the model object's physical source (see [Report.loadSources]). */
         val loadSources = LinkedHashMap<org.tatrman.ttrp.ast.SourceLocation, LoadSource>()
@@ -261,13 +287,44 @@ class TtrpChecker(
                 else -> null
             }
         if (statements != null) {
-            // in-ports start unknown (fragment/wiring-fed; interior schema deferred to Stage 2).
-            for (p in c.ports) if (p.kind == PortKind.IN) ctx.bindSchema(c.name, p.name, null)
-            for (stmt in statements) {
+            // in-ports start unknown (fragment/wiring-fed; interior schema deferred to Stage 2) — except in the
+            // display pass, which seeds each from the OUT port wired into it (resolved earlier, topo order).
+            for (p in c.ports) {
+                if (p.kind != PortKind.IN) continue
+                val feed = ctx.inPortFeeds[c.name to p.name]
+                ctx.bindSchema(c.name, p.name, feed?.let { ctx.schemasByScope[it.first]?.get(it.second) })
+            }
+            var last: List<Column>? = null
+            // `… -> <out port>` is `<out port> = …` (ChainToPort) — the port carries the chain's row type.
+            val outPorts =
+                c.ports
+                    .filter { it.kind == PortKind.OUT }
+                    .map { it.name }
+                    .toSet()
+            for (authored in statements) {
+                val stmt =
+                    (authored as? ChainStmt)?.let {
+                        org.tatrman.ttrp.ast.ChainToPort
+                            .asAssignment(it, outPorts)
+                    }
+                        ?: authored
                 when (stmt) {
-                    is Assignment -> assign(stmt.target, stmt.chain.elements, ctx, scope = c.name)
-                    is ChainStmt -> evalChain(stmt.chain.elements, ctx, ctx.varSchema)
+                    is Assignment -> {
+                        assign(stmt.target, stmt.chain.elements, ctx, scope = c.name)
+                        last = ctx.schemasByScope[c.name]?.get(stmt.target)
+                    }
+                    is ChainStmt -> last = evalChain(stmt.chain.elements, ctx, ctx.varSchema)
                     else -> Unit
+                }
+            }
+            // The single default DATA out maps to the body's final value when no `<out> = …` bound it (the
+            // graph builder's rule) — the display pass needs that port's row type too.
+            if (ctx.shadow) {
+                val out = c.ports.firstOrNull { it.kind == PortKind.OUT }?.name
+                if (out != null &&
+                    ctx.schemasByScope[c.name]?.containsKey(out) != true
+                ) {
+                    ctx.bindSchema(c.name, out, last)
                 }
             }
         }
@@ -318,10 +375,27 @@ class TtrpChecker(
             prevOut =
                 when (elem) {
                     is OpCall -> resolveOp(elem, prevOut, ctx, scope)
-                    is DottedRef -> scope[elem.parts.first()] // var/port ref; wiring node.port → null
+                    is DottedRef -> refSchema(elem, ctx, scope)
                 }
         }
         return prevOut
+    }
+
+    /**
+     * A chain-element ref's row type: a variable / in-scope port by its head (`x`, `b.true` → `b`). In the
+     * display pass a program-level `container.port` ref reads that container's port schema; the main pass
+     * leaves it unknown (wiring `node.port` → null), as before.
+     */
+    private fun refSchema(
+        ref: DottedRef,
+        ctx: Ctx,
+        scope: MutableMap<String, List<Column>?>,
+    ): List<Column>? {
+        val head = ref.parts.first()
+        if (ctx.shadow && ref.parts.size >= 2 && head in ctx.containerNames && !scope.containsKey(head)) {
+            return ctx.schemasByScope[head]?.get(ref.parts[1])
+        }
+        return scope[head]
     }
 
     private fun resolveOp(
@@ -336,7 +410,13 @@ class TtrpChecker(
                 resolveStore(op, ctx)
                 null
             }
-            "display" -> null
+            // A display is a sink: its argument is the display NAME, never a source. The display pass records
+            // the row type flowing into it (the chain predecessor).
+            "display" -> {
+                ctx.displaySites?.add(DisplaySite(op, prevOut))
+                null
+            }
+            "select" -> if (ctx.shadow) selectOutput(op, prevOut, scope) else inputOf(op, prevOut, scope)
             "join" -> resolveJoin(op, ctx, scope)
             "aggregate" -> aggregateOutput(op, inputOf(op, prevOut, scope), ctx)
             "calc" -> calcOutput(op, inputOf(op, prevOut, scope))
@@ -798,6 +878,223 @@ class TtrpChecker(
         return out
     }
 
+    /**
+     * `select(a, b, …)` keeps exactly the listed columns, in that order (display pass only — the main pass keeps
+     * the input row type, as it always has). A bare first arg naming an in-scope variable is the source when the
+     * chain supplies none (`select(v, a, b)`); a listed column the input lacks comes out untyped.
+     */
+    private fun selectOutput(
+        op: OpCall,
+        prevOut: List<Column>?,
+        scope: MutableMap<String, List<Column>?>,
+    ): List<Column>? {
+        var refs = op.args.mapNotNull { (it.value as? ExprArg)?.expr as? ColumnRef }.filter { it.port == null }
+        var input = prevOut
+        if (input == null) {
+            val first = refs.firstOrNull()
+            if (first != null && op.args.firstOrNull()?.name == null && scope.containsKey(first.column)) {
+                input = scope[first.column]
+                refs = refs.drop(1)
+            }
+        }
+        if (input == null) return null
+        val byName = input.associateBy { it.name }
+        return refs.map { byName[it.column] ?: Column(it.column, TtrpType.Named("")) }
+    }
+
+    // ----- action displays (DSP, grammar 0.14) -----
+
+    /**
+     * The display pass. Re-evaluates the program in a throwaway context ([Ctx.shadow]: sharper row types, its
+     * diagnostics/rewrites discarded) — containers in wiring order so each IN port sees the OUT port feeding
+     * it — collecting every `display(...)` site with the row type flowing into it. Then, per site whose name is
+     * a row schema an import brings into scope, holds the rows to it (DSP-001/002/003); a name with several
+     * sources that is NOT such a schema is DSP-004; a name two imports declare is RES-002. An unknown input
+     * row type is deferred (no diagnostic here); the emitted display still never NULL-fills a required column:
+     * the `sql-text` and Postgres emitters refuse the build (TTRP-DSP-001, from the port's static columns) and a
+     * Polars island, whose frames carry no static columns, stops before it writes the display file.
+     */
+    private fun checkDisplays(
+        doc: TtrpDocument,
+        world: ResolvedWorld?,
+        imports: List<ImportScope>,
+        programSchemas: Map<String, List<Column>>,
+        diags: MutableList<TtrpDiagnostic>,
+    ): Map<SourceLocation, DisplaySchema> {
+        val containers = doc.statements.filterIsInstance<ContainerDecl>()
+        val names = containers.map { it.name }.toSet()
+        // Program-level wiring `a.p -> b.q`: (b, q) is fed by (a, p).
+        val feeds = LinkedHashMap<Pair<String, String>, Pair<String, String>>()
+        for (stmt in doc.statements) {
+            val elems = (stmt as? ChainStmt)?.chain?.elements ?: continue
+            for ((x, y) in elems.zipWithNext()) {
+                val from = x as? DottedRef ?: continue
+                val to = y as? DottedRef ?: continue
+                if (from.parts.size == 2 && to.parts.size == 2 && from.parts[0] in names && to.parts[0] in names) {
+                    feeds.putIfAbsent(to.parts[0] to to.parts[1], from.parts[0] to from.parts[1])
+                }
+            }
+        }
+        val ctx =
+            Ctx(
+                world,
+                imports,
+                programSchemas,
+                mutableMapOf(),
+                mutableMapOf(),
+                mutableListOf(),
+                mutableListOf(),
+                shadow = true,
+                containerNames = names,
+                inPortFeeds = feeds,
+                displaySites = mutableListOf(),
+            )
+        for (c in wiringOrder(containers, feeds)) resolveContainer(c, ctx)
+        for (stmt in doc.statements) {
+            when (stmt) {
+                is Assignment -> assign(stmt.target, stmt.chain.elements, ctx, scope = "")
+                is ChainStmt -> evalChain(stmt.chain.elements, ctx, ctx.varSchema)
+                else -> Unit
+            }
+        }
+        val sites = ctx.displaySites!!.sortedWith(compareBy({ it.op.location.line }, { it.op.location.column }))
+
+        val out = LinkedHashMap<SourceLocation, DisplaySchema>()
+        for ((name, group) in sites.groupBy { displayName(it.op) }) {
+            val candidates = modelIndex?.findRowSchemas(name, imports) ?: emptyList()
+            if (candidates.size > 1) {
+                val all = candidates.joinToString(", ") { it.qualifiedName }
+                diags +=
+                    diag(
+                        TtrpDiagnosticId.RES_002,
+                        "display `$name` is ambiguous — schemas $all are all imported; import only one",
+                        group.first().op.location,
+                    )
+                continue
+            }
+            val record = candidates.singleOrNull()
+            if (record == null) {
+                // An ordinary (evidence) display: unchanged — but one name, several sources, is ambiguous.
+                group.drop(1).forEach { site ->
+                    diags +=
+                        diag(
+                            TtrpDiagnosticId.DSP_004,
+                            "display `$name` has ${group.size} sources but `$name` is not a declared row schema — " +
+                                "an ordinary display takes one source (first at line ${group.first().op.location.line})",
+                            site.op.location,
+                        )
+                }
+                continue
+            }
+            val schema =
+                DisplaySchema(
+                    name = record.name,
+                    qualifiedName = record.qualifiedName,
+                    columns =
+                        record.columns.map {
+                            DisplaySchemaColumn(it.name, it.type, it.optional, it.length, it.precision)
+                        },
+                )
+            // A column no engine can produce (object / list / an unknown type id) — every build of this display
+            // would fail at emit, pointing at a cast the author never wrote. Reported once, at the first source.
+            for (col in schema.columns.filter { it.columnType == null }) {
+                diags +=
+                    diag(
+                        TtrpDiagnosticId.DSP_005,
+                        "display `$name`: column `${col.name}` of schema `${schema.qualifiedName}` is " +
+                            "`${col.spelling}`, not a scalar column type",
+                        group.first().op.location,
+                    )
+            }
+            for (site in group) {
+                out[site.op.location] = schema
+                checkDisplayRows(name, schema, site, diags)
+            }
+        }
+        return out
+    }
+
+    /** DSP-001/002/003 for one action-display site; an unknown input row type is deferred. */
+    private fun checkDisplayRows(
+        name: String,
+        schema: DisplaySchema,
+        site: DisplaySite,
+        diags: MutableList<TtrpDiagnostic>,
+    ) {
+        val input = site.input ?: return
+        val loc = site.op.location
+        val byName = input.associateBy { it.name }
+        for (col in schema.columns) {
+            val src = byName[col.name]
+            if (src == null) {
+                if (!col.optional) {
+                    diags +=
+                        diag(
+                            TtrpDiagnosticId.DSP_001,
+                            "display `$name` is missing column `${col.name}` (${col.spelling}) required by schema " +
+                                "`${schema.qualifiedName}`",
+                            loc,
+                        )
+                }
+                continue
+            }
+            val target = col.columnType ?: continue // DSP-005, reported once for the schema
+            if (DisplaySchema.assignable(src.type, target) == false) {
+                diags +=
+                    diag(
+                        TtrpDiagnosticId.DSP_002,
+                        "display `$name` column `${col.name}` is `${src.type}`, not assignable to `${col.spelling}` " +
+                            "declared by schema `${schema.qualifiedName}`",
+                        loc,
+                    )
+            }
+        }
+        val declared = schema.columns.map { it.name }.toSet()
+        val extra = input.map { it.name }.filter { it !in declared }.distinct()
+        if (extra.isNotEmpty()) {
+            diags +=
+                TtrpDiagnostic(
+                    TtrpDiagnosticId.DSP_003,
+                    Severity.WARNING,
+                    "display `$name`: ${extra.joinToString(", ") { "`$it`" }} " +
+                        (if (extra.size == 1) "is" else "are") + " not in schema `${schema.qualifiedName}` — " +
+                        "dropped from the display's output",
+                    loc,
+                )
+        }
+    }
+
+    /** Containers ordered so a container comes after every container wired into it (cycles: source order). */
+    private fun wiringOrder(
+        containers: List<ContainerDecl>,
+        feeds: Map<Pair<String, String>, Pair<String, String>>,
+    ): List<ContainerDecl> {
+        val deps =
+            containers.associate { c ->
+                c.name to
+                    feeds
+                        .filterKeys { it.first == c.name }
+                        .values
+                        .map { it.first }
+                        .toSet()
+            }
+        val done = LinkedHashSet<String>()
+        val byName = containers.associateBy { it.name }
+        var progress = true
+        while (progress && done.size < containers.size) {
+            progress = false
+            for (c in containers) {
+                if (c.name in done) continue
+                if (deps.getValue(c.name).all { it in done || it == c.name || it !in byName }) {
+                    done += c.name
+                    progress = true
+                }
+            }
+        }
+        containers.forEach { done += it.name } // a wiring cycle (TTRP-CTL-002 downstream): fall back to source order
+        return done.mapNotNull { byName[it] }
+    }
+
     // ----- helpers -----
 
     private fun merge(
@@ -868,6 +1165,81 @@ class TtrpChecker(
         loc: SourceLocation,
         suggestion: String? = id.suggestedAlternative,
     ) = TtrpDiagnostic(id, Severity.ERROR, message, loc, suggestion)
+}
+
+/** One `display(...)` op met by the display pass, with the row type flowing into it (null = unknown). */
+internal data class DisplaySite(
+    val op: OpCall,
+    val input: List<Column>?,
+)
+
+/** The display name of a `display(<name>)` op — its first bare argument's text (`""` for `display()`). */
+fun displayName(op: OpCall): String {
+    val expr = (op.args.firstOrNull { it.name == null }?.value as? ExprArg)?.expr ?: return ""
+    return when (expr) {
+        is ColumnRef -> (expr.port?.let { "$it." } ?: "") + expr.column
+        is org.tatrman.ttrp.expr.Literal ->
+            when (val v = expr.value) {
+                is org.tatrman.ttrp.expr.LiteralValue.Str -> v.value
+                is org.tatrman.ttrp.expr.LiteralValue.Num -> v.raw
+                is org.tatrman.ttrp.expr.LiteralValue.Bool -> v.value.toString()
+                org.tatrman.ttrp.expr.LiteralValue.Null -> "null"
+            }
+        else -> ""
+    }
+}
+
+/**
+ * An action display's declared row schema (grammar 0.14 `def schema`, resolved through the program's imports):
+ * the shape `display(<name>)` rows are held to — and the one shape every source of the display is written in: each
+ * engine casts every column to the type [DisplaySchemaColumn.columnType] maps it to.
+ */
+data class DisplaySchema(
+    val name: String,
+    val qualifiedName: String,
+    val columns: List<DisplaySchemaColumn>,
+) {
+    companion object {
+        /**
+         * Is a [source] column assignable to a [target] schema column? Judged on the column vocabulary
+         * ([ColumnType.accepts]): the same type (decimal precision/scale ignored); an integer → any integer,
+         * decimal or float; any scalar → text (the host renders action fields as text); `datetime` ⇄ `timestamp`.
+         * An object / list source is never assignable. Null when the source's type is unknown (an untyped calc /
+         * aggregate value, a custom type id) — not judged here.
+         */
+        fun assignable(
+            source: TtrpType,
+            target: ColumnType,
+        ): Boolean? {
+            if (source is TtrpType.Obj || source is TtrpType.Lst) return false
+            val from = ColumnType.of(source) ?: return null
+            return target.accepts(from)
+        }
+    }
+}
+
+/**
+ * One column of a [DisplaySchema]: its TTR-M [type] name, [optional], and — from the structured form
+ * `{ type: decimal, length: 19, precision: 2 }` — [length] / [precision] (for a decimal: precision and scale).
+ */
+data class DisplaySchemaColumn(
+    val name: String,
+    val type: String,
+    val optional: Boolean,
+    val length: Int? = null,
+    val precision: Int? = null,
+) {
+    /** The schema's own spelling of the type: the name, with `(length[,precision])` when the schema declares them. */
+    val spelling: String
+        get() =
+            when {
+                length != null && precision != null -> "$type($length,$precision)"
+                length != null -> "$type($length)"
+                else -> type
+            }
+
+    /** The scalar type every engine casts this column to; null when it is not one (TTRP-DSP-005). */
+    val columnType: ColumnType? get() = ColumnType.of(type, length, precision)
 }
 
 /**

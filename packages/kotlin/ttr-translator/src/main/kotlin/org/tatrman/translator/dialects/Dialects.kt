@@ -31,7 +31,7 @@ object Dialects {
 
     val MYSQL: SqlDialect = MysqlSqlDialect.DEFAULT
 
-    /** Phase 08 A3 / DF-T04 — DuckDB dialect (Postgres-compatible for the constructs we emit). */
+    /** Phase 08 A3 — DuckDB dialect (Postgres-compatible for the constructs we emit). */
     val DUCKDB: SqlDialect = DuckDbSqlDialect.DEFAULT
 
     /**

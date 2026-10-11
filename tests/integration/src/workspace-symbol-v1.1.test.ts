@@ -54,10 +54,10 @@ describe('workspace-symbol-v1.1', () => {
     client.sendNotification('initialized', {});
 
     const files = [
-      'billing/invoicing/artikl_podprodukt.ttrm',
+      'billing/invoicing/item_in_class.ttrm',
       'billing/invoicing/er.ttrm',
       'billing/invoicing/db.ttrm',
-      'billing/products/produkt.ttrm',
+      'billing/products/category.ttrm',
     ];
 
     for (const relPath of files) {
@@ -75,12 +75,12 @@ describe('workspace-symbol-v1.1', () => {
     server.dispose();
   });
 
-  it('workspace/symbol query=artikl returns hits with full package-prefixed qnames', async () => {
-    const res = await client.sendRequest('workspace/symbol', { query: 'artikl' }) as lsp.SymbolInformation[];
-    expect(res.length, `Expected at least 1 symbol for query "artikl", got ${res.length}`).toBeGreaterThanOrEqual(1);
+  it('workspace/symbol query=item returns hits with full package-prefixed qnames', async () => {
+    const res = await client.sendRequest('workspace/symbol', { query: 'item' }) as lsp.SymbolInformation[];
+    expect(res.length, `Expected at least 1 symbol for query "item", got ${res.length}`).toBeGreaterThanOrEqual(1);
 
     const hasPackagePrefix = res.some((sym) => sym.name.includes('.'));
-    expect(hasPackagePrefix, `Expected package-prefixed qnames like "billing.invoicing.er.entity.artikl", got: ${res.map((s) => s.name).join(', ')}`).toBe(true);
+    expect(hasPackagePrefix, `Expected package-prefixed qnames like "billing.invoicing.er.entity.item", got: ${res.map((s) => s.name).join(', ')}`).toBe(true);
   });
 
   it('workspace/symbol query=billing. returns every symbol in billing package and sub-packages', async () => {

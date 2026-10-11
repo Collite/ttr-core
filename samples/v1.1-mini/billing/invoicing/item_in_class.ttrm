@@ -1,0 +1,9 @@
+package billing.invoicing
+
+model er
+
+def relation item_in_class { description: "An item belongs to its parent class",
+    from: er.entity.item, to: billing.products.er.entity.item_class,
+    cardinality: { from: "0..*", to: "1" },
+    join: [{ from: er.entity.item.class_id, to: billing.products.er.entity.item_class.sk }]
+}
