@@ -6,7 +6,7 @@ In SQL, there is only one description of your data: the physical schema. Tables 
 
 TTR separates those two things on purpose. There is the **physical** view — your real tables, with their real (often cryptic) names — and there is the **conceptual** view — clean business entities like `customer` and `order`, named the way the business talks about them. TTR lets you write both and then **declare how they line up**.
 
-Why bother? Because the two drift apart in every real system. The table is `QZBOZI_DF` but the business calls it a "product." One entity is assembled from three tables; one table backs two entities. A column is named `IDSKUPZBOZI` but it means "category." In SQL you carry that translation in your head. In TTR you write it down once, and the tooling checks it forever.
+Why bother? Because the two drift apart in every real system. The table is `item` but the business calls it a "product." One entity is assembled from three tables; one table backs two entities. A column is named `ss_ext_sales_price` but it means "revenue." In SQL you carry that translation in your head. In TTR you write it down once, and the tooling checks it forever.
 
 ## The same model, both ways
 
