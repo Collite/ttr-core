@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
+import { getRuntimeConfig } from '../runtime-config.js';
+
 export interface DemoFiles {
   rootName: string;
   files: Map<string, string>;
 }
 
 export async function loadDemoFiles(demoName: string): Promise<DemoFiles> {
-  const base = `/samples/${demoName}/`;
+  // under the base path the viewer is served from (ttr-core#171) — `/samples/…` at the root.
+  const base = `${getRuntimeConfig().basePath}samples/${demoName}/`;
   const indexRes = await fetch(`${base}index.json`);
   if (!indexRes.ok) throw new Error(`Demo manifest not found: ${base}index.json`);
   const filePaths: string[] = await indexRes.json();

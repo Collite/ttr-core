@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# No VIEWER_CATALOG_UPSTREAM: this nginx proxies nothing. A deployment whose edge routes
+# @@BASE@@veles/ to Veles itself never reaches this location; one that forgot to gets a JSON error the
+# viewer shows verbatim — not index.html where JSON was expected.
+
+location ^~ @@BASE@@veles/ {
+    default_type application/json;
+    add_header Cache-Control "no-store" always;
+    add_header X-Content-Type-Options nosniff always;
+    return 503 '{"error":"this viewer has no catalog upstream: set VIEWER_CATALOG_UPSTREAM, or route @@BASE@@veles/ to Veles at the edge"}';
+}

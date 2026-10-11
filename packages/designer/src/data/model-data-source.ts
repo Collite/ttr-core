@@ -18,6 +18,7 @@
 
 import type { TtrmIndex, TtrmGraph, TtrmObjectDetail, TtrmSearchHit, TtrmLayoutPayload } from './ttrm-types.js';
 import type { RenderableSchemaCode, BindingMapData, SymbolDetail, GetGraphResponse } from '@tatrman/lsp';
+import type { ObjectDescription } from './structural-graph.js';
 
 export type ModelIndex = TtrmIndex;
 export type ModelGraphPayload = TtrmGraph;
@@ -130,4 +131,12 @@ export interface ModelDataSource {
    * (deployed, no source access) → the shell reads `getObject` for structural detail there.
    */
   getSymbolDetail?(qname: string): Promise<SymbolDetail | null>;
+  /**
+   * The inspector read on a structural catalog (ttr-core#170) — label, identifier, plural and
+   * description in the viewer's language, with the object's attributes / columns. Present on the
+   * Veles backends, which have no `getSymbolDetail`; the shell prefers `getSymbolDetail` when both exist.
+   */
+  describe?(qname: string): Promise<ObjectDescription | null>;
+  /** The languages the model's labels carry, as far as this backend has served them (the language picker). */
+  knownLanguages?(): string[];
 }

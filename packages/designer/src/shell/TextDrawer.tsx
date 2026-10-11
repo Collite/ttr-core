@@ -10,8 +10,15 @@ import type { LineageRootRef } from '@tatrman/lsp';
 export interface DrawerNode {
   qname: string;
   kind: string;
+  /** the display label — on a catalog, `displayLabel` in the viewer's language (ttr-core#170). */
   label: string;
+  /** the model identifier (`item`), shown beside a label that differs from it. */
+  identifier?: string;
+  /** the plural label (`Products`), when the model authors one. */
+  labelPlural?: string;
   description?: string;
+  /** a card's attributes / columns, labelled and described (catalog backends). */
+  members?: Array<{ qname: string; kind: string; identifier: string; label: string; description?: string }>;
   sourceText?: string;
   sourceUri?: string;
   sourceLine?: number;
@@ -75,6 +82,26 @@ export function TextDrawer({
         <span data-testid="drawer-label" style={{ fontSize: 15, fontWeight: 'bold', color: '#16283F' }}>{node.label}</span>
         <button data-testid="drawer-close" aria-label="Close details" onClick={onClose} style={{ marginLeft: 'auto', border: 'none', background: 'transparent', cursor: 'pointer', color: '#96989B' }}>×</button>
       </div>
+      {/* The model's own names stay visible under a localized label (ttr-core#170): the identifier
+          and the qname it is reached by, and the plural label when the model has one. */}
+      {(node.identifier !== undefined || node.labelPlural) && (
+        <div data-testid="drawer-names" style={{ padding: '6px 14px', borderBottom: '1px solid #EDF2F9', fontSize: 11.5, color: '#4A4B4D', display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 8, rowGap: 2 }}>
+          {node.identifier !== undefined && (
+            <>
+              <span style={{ color: '#96989B' }}>Identifier</span>
+              <code data-testid="drawer-identifier" title={node.qname} style={{ fontFamily: 'Consolas, monospace', overflowWrap: 'anywhere' }}>{node.identifier}</code>
+              <span style={{ color: '#96989B' }}>Qualified name</span>
+              <code data-testid="drawer-qname" style={{ fontFamily: 'Consolas, monospace', overflowWrap: 'anywhere' }}>{node.qname}</code>
+            </>
+          )}
+          {node.labelPlural && (
+            <>
+              <span style={{ color: '#96989B' }}>Plural</span>
+              <span data-testid="drawer-plural">{node.labelPlural}</span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* property panel (textual, C1-d) */}
       <div data-testid="property-panel" style={{ padding: '10px 14px', fontSize: 12.5, borderBottom: '1px solid #EDF2F9' }}>
@@ -110,6 +137,22 @@ export function TextDrawer({
           )
         )}
       </div>
+
+      {/* a card's members (catalog backends): label · identifier, and the description under it */}
+      {node.members && node.members.length > 0 && (
+        <div data-testid="drawer-members" style={{ padding: '8px 14px', borderBottom: '1px solid #EDF2F9', fontSize: 12, overflow: 'auto', maxHeight: '45%' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: '#96989B', marginBottom: 4 }}>
+            {node.members.every((m) => m.kind === 'column') ? 'Columns' : 'Attributes'}
+          </div>
+          {node.members.map((m) => (
+            <div key={m.qname} data-testid="drawer-member" data-qname={m.qname} style={{ padding: '3px 0' }}>
+              <span style={{ color: '#16283F', fontWeight: 600 }}>{m.label}</span>
+              {m.label !== m.identifier && <code style={{ marginLeft: 6, fontFamily: 'Consolas, monospace', fontSize: 11, color: '#96989B' }}>{m.identifier}</code>}
+              {m.description && <div data-testid="drawer-member-description" style={{ color: '#4A4B4D', fontSize: 11.5 }}>{m.description}</div>}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* escalation → read-only peek of the source text */}
       {!peeking ? (

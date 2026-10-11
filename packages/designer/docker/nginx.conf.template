@@ -1,0 +1,90 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The Studio Viewer's nginx config (ttr-core#169). ttr-viewer-entrypoint renders it into
+# /tmp/ttr-viewer/nginx.conf: every @@NAME@@ placeholder is replaced from the validated environment;
+# nginx's own $variables are left alone. Runs unprivileged — every path it writes is under /tmp.
+
+worker_processes auto;
+pid /tmp/ttr-viewer/nginx.pid;
+error_log /dev/stderr warn;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    access_log /dev/stdout;
+    server_tokens off;
+    sendfile on;
+    keepalive_timeout 65;
+
+    client_body_temp_path /tmp/ttr-viewer/client_temp;
+    proxy_temp_path       /tmp/ttr-viewer/proxy_temp;
+    fastcgi_temp_path     /tmp/ttr-viewer/fastcgi_temp;
+    uwsgi_temp_path       /tmp/ttr-viewer/uwsgi_temp;
+    scgi_temp_path        /tmp/ttr-viewer/scgi_temp;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+
+    server {
+        listen @@PORT@@;
+        # Redirects stay relative (`Location: /models/`), so they are right behind any proxy or
+        # port mapping.
+        absolute_redirect off;
+
+        # Inherited by every location that sets no header of its own (the ones that do repeat it).
+        add_header X-Content-Type-Options nosniff always;
+        add_header Referrer-Policy same-origin always;
+
+        # Liveness / readiness. Outside the base path, never proxied, not logged.
+        location = /healthz {
+            access_log off;
+            default_type text/plain;
+            return 200 "ok\n";
+        }
+
+        # Base path ≠ `/`: the bare prefix redirects to its slash form, and nothing outside the prefix
+        # is served. Empty when the base path is `/`.
+        include /tmp/ttr-viewer/outside-base.conf;
+
+        # The runtime config the app reads before its first render.
+        location = @@BASE@@config.json {
+            alias /tmp/ttr-viewer/config.json;
+            default_type application/json;
+            add_header Cache-Control "no-store" always;
+            add_header X-Content-Type-Options nosniff always;
+        }
+
+        # Fingerprinted build output: cached for a year. A miss is a 404, never the SPA document —
+        # a stale tab asking for an old chunk must not get HTML back as JavaScript.
+        location ^~ @@BASE@@assets/ {
+            alias /usr/share/ttr-viewer/html/assets/;
+            add_header Cache-Control "public, max-age=31536000, immutable" always;
+            add_header X-Content-Type-Options nosniff always;
+        }
+
+        # The catalog under @@BASE@@veles/: a reverse proxy to Veles' READ routes only
+        # (VIEWER_CATALOG_UPSTREAM set), or a 503 that says no upstream is configured.
+        include /tmp/ttr-viewer/catalog.conf;
+
+        # Everything else under the base path: a file from the bundle (the demo sample, …), else the
+        # SPA document — so a /w/<workspace>/s/<subject> deep link reloads into the app.
+        location ^~ @@BASE@@ {
+            rewrite ^@@BASE_RE@@(.*)$ /$1 break;
+            root /usr/share/ttr-viewer/html;
+            try_files $uri @app;
+        }
+
+        # The SPA document, rendered at startup with `<base href="@@BASE@@">`. Revalidated on every
+        # load, so a new image's asset names are picked up at once.
+        location @app {
+            root /tmp/ttr-viewer;
+            try_files /index.html =500;
+            add_header Cache-Control "no-cache" always;
+            add_header X-Content-Type-Options nosniff always;
+        }
+    }
+}

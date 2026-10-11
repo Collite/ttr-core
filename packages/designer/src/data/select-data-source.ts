@@ -63,20 +63,20 @@ function isLoopbackWsOrigin(value: string): boolean {
  *     (e.g. `http://localhost:7260`). Trailing slash stripped.
  * Anything else throws.
  */
-function normalizeVelesBase(value: string): string {
+function normalizeVelesBase(value: string, what = '`?veles=` value'): string {
   if (value.startsWith('/')) {
     // A `//host`-style value is a PROTOCOL-RELATIVE URL, not a same-origin path — the browser would
     // resolve it against the attacker-chosen host. The doc promises the path branch stays same-origin,
     // so reject it here (a full cross-origin backend must use the explicit `http(s)://` form below).
     if (value.startsWith('//')) {
       throw new BackendSelectionError(
-        `Invalid \`?veles=\` value: ${JSON.stringify(value)}. ` +
+        `Invalid ${what}: ${JSON.stringify(value)}. ` +
           'A leading `//` is a protocol-relative URL (cross-origin); use an explicit http(s):// origin instead.',
       );
     }
     if (/[?#]/.test(value)) {
       throw new BackendSelectionError(
-        `Invalid \`?veles=\` value: ${JSON.stringify(value)}. ` +
+        `Invalid ${what}: ${JSON.stringify(value)}. ` +
           'A same-origin path prefix must carry no query or fragment (e.g. /veles).',
       );
     }
@@ -87,18 +87,18 @@ function normalizeVelesBase(value: string): string {
     url = new URL(value);
   } catch {
     throw new BackendSelectionError(
-      `Invalid \`?veles=\` value: ${JSON.stringify(value)}. ` +
+      `Invalid ${what}: ${JSON.stringify(value)}. ` +
         'Expected a same-origin path prefix (e.g. /veles) or an http(s) origin (e.g. http://localhost:7260).',
     );
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     throw new BackendSelectionError(
-      `Invalid \`?veles=\` value: ${JSON.stringify(value)}. Expected an http(s) origin.`,
+      `Invalid ${what}: ${JSON.stringify(value)}. Expected an http(s) origin.`,
     );
   }
   if ((url.pathname !== '/' && url.pathname !== '') || url.search || url.hash) {
     throw new BackendSelectionError(
-      `Invalid \`?veles=\` value: ${JSON.stringify(value)}. ` +
+      `Invalid ${what}: ${JSON.stringify(value)}. ` +
         'Expected an ORIGIN only (no path/query/fragment), e.g. http://localhost:7260.',
     );
   }
@@ -110,30 +110,44 @@ function normalizeVelesBase(value: string): string {
  * Origin only — scheme + host [+ port], no path/query/fragment; trailing slash stripped. A non-loopback
  * origin is allowed (the platform Veles is the *deployed*, inherently-remote service). Anything else throws.
  */
-function normalizeVelesWsOrigin(value: string): string {
+function normalizeVelesWsOrigin(value: string, what = '`?veles=` value'): string {
   let url: URL;
   try {
     url = new URL(value);
   } catch {
     throw new BackendSelectionError(
-      `Invalid \`?veles=\` value: ${JSON.stringify(value)}. Expected a ws(s) origin, e.g. wss://veles.example.`,
+      `Invalid ${what}: ${JSON.stringify(value)}. Expected a ws(s) origin, e.g. wss://veles.example.`,
     );
   }
   if (url.protocol !== 'ws:' && url.protocol !== 'wss:') {
     throw new BackendSelectionError(
-      `Invalid \`?veles=\` value: ${JSON.stringify(value)}. Expected a ws(s) origin.`,
+      `Invalid ${what}: ${JSON.stringify(value)}. Expected a ws(s) origin.`,
     );
   }
   if ((url.pathname !== '/' && url.pathname !== '') || url.search || url.hash) {
     throw new BackendSelectionError(
-      `Invalid \`?veles=\` value: ${JSON.stringify(value)}. ` +
+      `Invalid ${what}: ${JSON.stringify(value)}. ` +
         'Expected an ORIGIN only (no path/query/fragment) — the client owns /v1/ttrm.',
     );
   }
   return value.replace(/\/$/, '');
 }
 
-export function selectBackend(search: string | URLSearchParams): BackendSelection {
+/** The part of the runtime config backend selection reads (see `runtime-config.ts`). */
+export interface BackendDefaults {
+  /** the deployment's catalog — the same values `?veles=` accepts; null = none. */
+  veles: string | null;
+}
+
+/** Dispatch a Veles value on its scheme (VS-3): ws(s) → the platform ttrm transport, else the read API. */
+function velesSelection(value: string, token: string | null, what: string): BackendSelection {
+  if (/^wss?:\/\//i.test(value)) {
+    return { kind: 'veles', transport: 'ttrm', origin: normalizeVelesWsOrigin(value, what), token };
+  }
+  return { kind: 'veles', transport: 'read-api', base: normalizeVelesBase(value, what) };
+}
+
+export function selectBackend(search: string | URLSearchParams, defaults?: BackendDefaults): BackendSelection {
   const params = typeof search === 'string' ? new URLSearchParams(search) : search;
   const server = params.get('server');
   const veles = params.get('veles');
@@ -149,10 +163,7 @@ export function selectBackend(search: string | URLSearchParams): BackendSelectio
   if (veles !== null) {
     // VS-3 scheme dispatch. A ws(s) value → the platform Veles (ttrm + bearer); anything else → the
     // SV read API (unchanged). The bearer is an explicit dev param, never guessed.
-    if (/^wss?:\/\//i.test(veles)) {
-      return { kind: 'veles', transport: 'ttrm', origin: normalizeVelesWsOrigin(veles), token: params.get('velesToken') };
-    }
-    return { kind: 'veles', transport: 'read-api', base: normalizeVelesBase(veles) };
+    return velesSelection(veles, params.get('velesToken'), '`?veles=` value');
   }
 
   if (server !== null) {
@@ -165,5 +176,28 @@ export function selectBackend(search: string | URLSearchParams): BackendSelectio
     return { kind: 'ws', origin: server.replace(/\/$/, '') };
   }
 
+  // The deployment default (runtime config) — only when the URL chose nothing, `?demo=` included.
+  if (demo === null && defaults?.veles) {
+    return velesSelection(defaults.veles, params.get('velesToken'), 'catalog URL in config.json (VIEWER_CATALOG_URL)');
+  }
+
   return { kind: 'worker', demo };
+}
+
+/**
+ * The workspace segment of a server backend's URLs (`/w/<workspace>/s/…`): a short, stable name —
+ * the host of an origin, the last segment of a same-origin path (`/models/veles` → `veles`) — rather
+ * than the raw backend value, which percent-encodes into an unreadable path segment (ttr-core#171).
+ * The backend itself rides the URL as `?veles=` / `?server=`, or comes from the runtime config.
+ */
+export function serverWorkspaceName(props: Extract<BackendSelection, { kind: 'ws' | 'veles' }>): string {
+  const raw = props.kind === 'ws' || props.transport === 'ttrm' ? props.origin : props.base;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) {
+    try {
+      return new URL(raw).host;
+    } catch {
+      /* fall through to the path form */
+    }
+  }
+  return raw.split('/').filter((seg) => seg.length > 0).pop() ?? 'catalog';
 }
