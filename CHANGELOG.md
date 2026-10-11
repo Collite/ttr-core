@@ -197,7 +197,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
     carrier whether or not it has lexicon terms (`objectKind = attribute`, `ownerRef` = its entity/table, no
     reach of its own). `entries` — and so `contentHash` — are unchanged.
 
-- **`ttr-translator`** ⚑ **T-SQL string→datetime operand coercion (df-test 2026-09-21) — `DATEDIFF(day,
+- **`ttr-translator`** ⚑ **T-SQL string→datetime operand coercion (hosted test estate, 2026-09-21) — `DATEDIFF(day,
   '19000101', …)` / `DATEADD(day, 7, '2026-09-14')` validate.** The LLM lane's canonical "previous calendar
   week" idiom (`DATEADD(day, -7, DATEADD(day, (DATEDIFF(day, '19000101', CAST(GETDATE() AS date)) / 7) * 7,
   '19000101'))`) died at `ParseToRelNode` with `Cannot apply 'DATEDIFF' to arguments of type 'DATEDIFF(<INTERVAL
@@ -212,30 +212,30 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   cast; an integer anchor (`DATEDIFF(wk, 0, …)`) is still rejected; binary comparisons are untouched.
   `TsqlTypeCoercionSpec` runs the service path (parse → wire → decode → unparse).
 
-- **`ttr-translator`** ⚑ **regression fix (MJ follow-up, df-test 2026-09-21) — `JoinerPhysical` sees the
+- **`ttr-translator`** ⚑ **regression fix (MJ follow-up, hosted test estate, 2026-09-21) — `JoinerPhysical` sees the
   `TableScan` under MAP_TO_PHYSICAL's alias-at-boundary `Project` again.** 0.11.1 narrowed a join side's
   scan search to `Join`/`Filter` (so a derived table's hidden column could not become a bare-name ref that
   dies at decode) — but MAP_TO_PHYSICAL itself wraps a **query-backed** entity's body in a `Project`
-  (`id_obchodního_kanálu := IDCENSKUP`), and every `*__filter` entity on the DF estate is query-backed.
-  The FK fallback that had conditioned `FROM prodej JOIN obchodní_kanál` since v1.0 silently stopped and the
+  (`call_center := cs_call_center_sk`), and every `*__filter` entity on that estate is query-backed.
+  The FK fallback that had conditioned a bare entity `JOIN` since v1.0 silently stopped and the
   join ran as a Cartesian product. A `Project` is now descended as a **name map** on the scan (`ScanRef`):
   only its bare column-ref expressions expose a name, the FK column is mapped through every projection up
   to the join, and an FK whose column no projection exposes is dropped from the candidates (a
   `JOIN_NO_RELATION` warning, never a decode-time `field not found`). `JoinerPhysicalSpec` (nested alias
-  projects, unexposed column, computed expression) and `ModelJoinSpec` on `DfpJoinModel.handleQueryBacked()`
-  — the df-test shape: query-backed entity, FKs derived from the relations, and no relations served — pin it.
+  projects, unexposed column, computed expression) and `ModelJoinSpec` on `HartlandJoinModel.handleQueryBacked()`
+  — the served-estate shape: query-backed entity, FKs derived from the relations, and no relations served — pin it.
 
 - **`ttr-translator`** ⚑ **model joins (MJ, → `translator/v0.12.0`) — bare and chained `JOIN`s in the ER
-  lane are conditioned from the model's declared relations.** `FROM kumulovaný_prodej JOIN dodací_místo
-  JOIN zákazník JOIN produkt` — the way the LLM lane writes it — used to die at Calcite validation with
+  lane are conditioned from the model's declared relations.** `FROM sale JOIN shopper JOIN household
+  JOIN product` — the way the LLM lane writes it — used to die at Calcite validation with
   `INNER, LEFT, RIGHT, FULL, or ASOF join requires a condition`; it now translates with the three `ON`s the
-  E-R model implies (`kp ↔ dm`, `dm ↔ z`, `kp ↔ p`) and zero warnings. Two carriers on one policy:
+  E-R model implies (`s ↔ sh`, `sh ↔ h`, `s ↔ p`) and zero warnings. Two carriers on one policy:
   - **`codec/sql/ModelJoinRewriter`** (new, pre-validation `SqlShuttle`, ER catalog only): every
     `INNER`/`LEFT`/`RIGHT`/`FULL` join without `ON`/`USING` (not `NATURAL`) gets
     `<alias>.<attr> = <alias>.<attr>` from the model — join type preserved, SQL aliases used, `AND` over
     every pair of a composite relation. Each join in a chain is decided against the **whole** entity set
-    of its other side, so `dodací_místo → zákazník` is found for the third entity, not `kumulovaný_prodej
-    → zákazník`. Anything unresolvable gets `ON TRUE` and falls through to the wire carrier, which reports
+    of its other side, so `shopper → household` is found for the third entity, not `sale
+    → household`. Anything unresolvable gets `ON TRUE` and falls through to the wire carrier, which reports
     it. Explicit `ON`/`USING`, `NATURAL`, the comma list and `CROSS JOIN` are untouched. `explain` gains
     the stage `model_joins` (the rewritten statement, or `(no bare joins)`).
   - **`joiner/JoinPolicy`** (new) — the single decision: candidates `(l, r, rel)` over both sides; exactly
@@ -265,7 +265,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
     need a branch); `NoRelation` / `AmbiguousRelations` carry `leftEntities` / `rightEntities` (`sideA` /
     `sideB` are their first members); `AmbiguousRelations.repeated`. `JoinerLogical.RelationMatcher` and
     `findFirstScanPublic` are removed. `ParseResult.{Success,Failure}.modelJoinsSql` (debug, defaulted).
-  Fixture `DfpJoinModel` (test-fixtures) + `ModelJoinSpec` (H1–H12 of the MJ plan), `ModelJoinRewriterSpec`,
+  Fixture `HartlandJoinModel` (test-fixtures) + `ModelJoinSpec` (H1–H12 of the MJ plan), `ModelJoinRewriterSpec`,
   `JoinPolicySpec`, `JoinerMessagesSpec`, and the extended `JoinerLogicalSpec` / `JoinerPhysicalSpec` pin it;
   every pre-MJ golden (incl. the comma-form plan bytes) is unchanged. Design and decisions:
   `project/tatrman/features/ttr-translator/model-joins/`.
@@ -274,7 +274,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   and written as ISO-8601.** Three defects that meet on the first entity join to reach execution
   on a model whose join keys are renamed between the ER and DB layers:
   - **`JoinerPhysical` is alias-aware.** MAP_TO_PHYSICAL aliases each renamed column back to its
-    attribute name (DF-T05, alias-at-boundary), so above the scan only the alias exists — but the
+    attribute name (alias-at-boundary), so above the scan only the alias exists — but the
     FK-based join condition named the physical columns and failed at unparse with
     `field [d_date_sk] not found; input fields are: [sk, …]`. Each operand now resolves through its
     own side's scan: the alias when that scan aliases the column, the column name otherwise. Models
@@ -481,8 +481,8 @@ The next published bundle. Minor (additive) per `PUBLISHING.md`.
 - **`org.tatrman:ttr-writer:0.4.0`** — `TtrRenderer` now renders the v2.1 inline
   `mapping:` property on entity / attribute / relation defs (additive — the
   parser model + walker already populated these fields; only rendering was
-  missing). Both surface forms emit: bare-id (`mapping: IDSKUPZBOZI`,
-  `mapping: db.dbo.fk_artikl_produkt`) and block (`mapping: { target: …,
+  missing). Both surface forms emit: bare-id (`mapping: i_category_id`,
+  `mapping: db.dbo.fk_item_category`) and block (`mapping: { target: …,
   columns: { … } }` on entities, `{ target: … }` on attributes, `{ fk: … }` on
   relations). Each `columns:` entry is a short bare-id (`attr: COL`) when the
   target is a plain column, else the object form. Round-trip is a fixed point on
