@@ -1,0 +1,12 @@
+// TTRP-DSP-001: the `notify` action display requires `subject`, which `late` does not produce.
+uses world "shop.worlds.host"
+import shop.orders.*
+import shop.actions.*
+
+container review(out late) target erp {
+    o    = load(orders)
+    c    = load(customer)
+    late = join(left: o, right: c, type: inner, on: relation order_customer) -> calc { recipient = email } -> select(recipient, order_id)
+}
+
+review.late -> display(notify)

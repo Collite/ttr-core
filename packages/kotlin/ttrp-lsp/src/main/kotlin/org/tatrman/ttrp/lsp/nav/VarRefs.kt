@@ -65,7 +65,8 @@ object VarRefs {
                     }
                     out += chainOccurrences(s.chain.elements, varNames)
                 }
-                is ChainStmt -> out += chainOccurrences(s.chain.elements, varNames)
+                // A synthesized TTR-B action wiring (AG B4) is not authored text — never an edit target.
+                is ChainStmt -> if (!s.synthesized) out += chainOccurrences(s.chain.elements, varNames)
                 else -> Unit
             }
         }
@@ -81,7 +82,7 @@ object VarRefs {
         for (s in statements) {
             when (s) {
                 is Assignment -> out += chainOccurrences(s.chain.elements, containerNames)
-                is ChainStmt -> out += chainOccurrences(s.chain.elements, containerNames)
+                is ChainStmt -> if (!s.synthesized) out += chainOccurrences(s.chain.elements, containerNames)
                 is ContainerDecl ->
                     if (s.name in
                         containerNames

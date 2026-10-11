@@ -1,0 +1,25 @@
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container priprava(out otevrene, out chybi) target erp {
+  otevrene = load(objednávky) -> filter(stav = "otevřená")
+  chybi = load(zásoby) -> filter(množství = 0)
+}
+
+container odklad(in otevrene, in chybi, out odlozit, out vyridit, out bez_skladu) target erp """ttrb-cs
+Načti otevrene.
+Ponech jen řádky, které mají protějšek v chybi přes kód_zboží je chybi.kód_zboží.
+Pošli to na výstup odlozit.
+Načti otevrene.
+Ponech jen řádky, které nemají protějšek v chybi přes kód_zboží je chybi.kód_zboží.
+Pošli to na výstup vyridit.
+Spoj otevrene volitelně s chybi přes kód_zboží je chybi.kód_zboží a chybi.množství není prázdné jako prehled_vse.
+Ponech jen řádky, kde množství je prázdné.
+Pošli to na výstup bez_skladu.
+"""
+
+priprava.otevrene -> odklad.otevrene
+priprava.chybi -> odklad.chybi
+odklad.odlozit -> display(odlozit)
+odklad.vyridit -> display(vyridit)
+odklad.bez_skladu -> display(bez_skladu)

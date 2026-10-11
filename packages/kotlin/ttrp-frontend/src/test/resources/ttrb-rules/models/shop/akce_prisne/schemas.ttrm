@@ -1,0 +1,12 @@
+package shop.akce_prisne
+
+// A stricter e-mail schema (negative fixture): it requires a `kopie` column no e-mail sentence produces.
+def schema send_email {
+    columns: [
+        def column komu    { type: text },
+        def column předmět { type: text },
+        def column šablona { type: text },
+        def column klíč    { type: text },
+        def column kopie   { type: text },
+    ]
+}

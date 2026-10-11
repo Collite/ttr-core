@@ -23,9 +23,12 @@ import java.io.PipedOutputStream
  * side, fully in-process — no sockets, no child process. The server binds the shared
  * erp-project world via [FixtureProjectResolver] and records ζ remaps via [renameParticipant].
  */
-class TtrpLspHarness : AutoCloseable {
+class TtrpLspHarness(
+    /** Project resolution; default the shared erp-project fixture world, or e.g. a real walk-up resolver. */
+    projects: org.tatrman.ttrp.lsp.project.ProjectResolver = FixtureProjectResolver(),
+) : AutoCloseable {
     val renameParticipant = RecordingRenameParticipant()
-    val server = TtrpLanguageServer(FixtureProjectResolver(), listOf(renameParticipant))
+    val server = TtrpLanguageServer(projects, listOf(renameParticipant))
     val client = RecordingLanguageClient()
     val remote: TtrpLanguageServerApi
 

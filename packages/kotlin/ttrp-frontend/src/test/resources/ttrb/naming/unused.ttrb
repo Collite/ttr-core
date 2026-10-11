@@ -1,0 +1,6 @@
+# ttr: dialect=b lang=en
+Load items as pol.
+Load stock as z2.
+Keep the rows where shop_code is "S1".
+Join pol optionally with z2 on code is z2.code as j.
+Send that to output seznam.

@@ -70,6 +70,15 @@ class PgAdbcIslandEmitterTest :
             GoldenSupport.assertMatchesGolden(script, "pg_adbc/hero_crunch.py")
         }
 
+        test("a CSV decimal column reads at its declared precision/scale, a bare one at decimal128(19, 2)") {
+            PgAdbcIslandEmitter.pgColumn("a", "decimal").arrowType shouldBe "_pa.decimal128(19, 2)"
+            PgAdbcIslandEmitter.pgColumn("a", "{type:decimal,length:12,precision:4}").arrowType shouldBe
+                "_pa.decimal128(12, 4)"
+            PgAdbcIslandEmitter.pgColumn("a", "numeric").arrowType shouldBe "_pa.decimal128(19, 2)"
+            PgAdbcIslandEmitter.pgColumn("a", "number").arrowType shouldBe "_pa.float64()"
+            PgAdbcIslandEmitter.pgColumn("a", "string").arrowType shouldBe "_pa.string()"
+        }
+
         test("crunch ADBC script compiles (py_compile)") {
             val python3 = which("python3")
             if (python3 == null) {

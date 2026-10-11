@@ -1,0 +1,4 @@
+# ttr: dialect=b lang=cs
+Načti accounts jako base.
+Ponech řádky, kde region není prázdný.
+Ukaž výsledek jako out.

@@ -21,9 +21,12 @@ import org.tatrman.ttrp.graph.TtrpPipeline
 import org.tatrman.ttrp.graph.capability.BoundWorld
 import org.tatrman.ttrp.graph.collapse.ExecutionGraph
 import org.tatrman.ttrp.graph.collapse.Island
+import org.tatrman.ttrp.graph.model.Display
+import org.tatrman.ttrp.graph.model.DisplayLeaves
 import org.tatrman.ttrp.graph.model.Load
 import org.tatrman.ttrp.graph.model.PortDirection
 import org.tatrman.ttrp.graph.model.PortKind
+import org.tatrman.ttrp.graph.model.PortRef
 import org.tatrman.ttrp.graph.model.TtrpGraph
 import org.tatrman.ttrp.project.CompileRecord
 import org.tatrman.ttrp.project.RecordStaleness
@@ -184,6 +187,10 @@ class BundleAssembler(
                 ?.qname
                 ?.name
 
+        // Grammar 0.14 action displays: Display node id → the island output its rows come from (sql-text only;
+        // filled while the sql-text islands are planned — an action display may name a derived output).
+        val displaySources = LinkedHashMap<String, DisplaySource>()
+
         // --- islands ---
         val islandEntries =
             exec.islands.map { island ->
@@ -196,10 +203,11 @@ class BundleAssembler(
                         sqlTextExecutor ?: "host",
                         bundleDir,
                         files,
+                        displaySources,
                     )
                 }
                 val type = bound.engines[island.engine]?.manifest?.type
-                val isFragment = graph.containers[island.id]?.fragment != null
+                val isFragment = graph.containers[island.id]?.verbatimFragment != null
                 // A SQL engine hosts two island shapes: an authored `"""sql` FRAGMENT emits its
                 // interior verbatim and is run by `psql`; a DECOMPOSED relational container (e.g.
                 // the hero `crunch` retargeted to PG) emits a `python3` + adbc script — Arrow export
@@ -307,9 +315,27 @@ class BundleAssembler(
         val connectionByIsland =
             exec.islands.filter { (it.invocation ?: "") == "psql" }.associate { it.name to connEnv(it.engine) }
         val hostExecuted = exec.islands.isNotEmpty() && exec.islands.all { it.invocation == SQL_TEXT }
+        // One entry per display leaf (several may share an action display's name): by name, then wiring order —
+        // the order the host concatenates an action display's rows in — each with its own source and file.
         val displays =
-            exec.displays.sorted().map { name ->
-                DisplayEntry(name, "out/$name.arrow", source = if (hostExecuted) displaySource(graph, name) else null)
+            DisplayLeaves.of(graph).map { leaf ->
+                val d = leaf.display
+                DisplayEntry(
+                    name = d.name,
+                    file = "out/${leaf.stem}.arrow",
+                    source = if (hostExecuted) displaySources[d.id] ?: displaySource(graph, d) else null,
+                    schema = d.schema?.qualifiedName,
+                    columns =
+                        // the schema's own type spelling (`decimal(12,4)` for a structured type) — the same one
+                        // its `sql-text` outputs report, whatever type the source column had
+                        d.schema?.columns?.map {
+                            DisplayColumn(
+                                it.name,
+                                it.spelling,
+                                if (it.optional) true else null,
+                            )
+                        },
+                )
             }
         val rejectSites = rejectSites(graph)
         // MD compile parameters for bind-time staleness (S4-B5, decision 13). Recorded only for an MD
@@ -521,6 +547,7 @@ class BundleAssembler(
         executor: String,
         bundleDir: Path,
         files: MutableMap<String, String>,
+        displaySources: MutableMap<String, DisplaySource>,
     ): IslandEntry {
         val container = graph.containers.getValue(island.id)
         val planner =
@@ -530,18 +557,44 @@ class BundleAssembler(
             container.declaredPorts
                 .filter { it.direction == PortDirection.OUT && it.kind == PortKind.DATA && it.name != "rejects" }
                 .map { it.name }
+
+        fun output(
+            port: String,
+            out: org.tatrman.ttrp.emit.sql.SqlTextOutput,
+        ): IslandOutput {
+            val rel = "islands/${island.name}.$port.sql"
+            write(bundleDir, rel, out.sql + "\n", files)
+            return IslandOutput(
+                port = port,
+                file = rel,
+                sha256 = files.getValue(rel),
+                columns = out.columns.map { OutputColumn(it.name, it.type) },
+                params = out.params.ifEmpty { null },
+            )
+        }
+        // Grammar 0.14 action displays: the statement the host runs for an action display is projected to its
+        // row schema. A port whose every display is the same action display is projected in place; a port that
+        // also feeds a differently-shaped display keeps its own statement and gains one projected output per
+        // action schema, `<port>~<schema>`, which those action displays name as their source.
         val outputs =
-            ports.map { port ->
-                val out = planner.emit(container, port)
-                val rel = "islands/${island.name}.$port.sql"
-                write(bundleDir, rel, out.sql + "\n", files)
-                IslandOutput(
-                    port = port,
-                    file = rel,
-                    sha256 = files.getValue(rel),
-                    columns = out.columns.map { OutputColumn(it.name, it.type) },
-                    params = out.params.ifEmpty { null },
-                )
+            ports.flatMap { port ->
+                val fed =
+                    graph.edges
+                        .filter { it.from == PortRef(container.id, port) }
+                        .mapNotNull { graph.nodes[it.to.nodeId] as? Display }
+                val schemas = fed.mapNotNull { it.schema }.distinctBy { it.qualifiedName }
+                val inPlace = schemas.size == 1 && fed.all { it.schema != null }
+                fed.forEach { displaySources[it.id] = DisplaySource(island.name, port) }
+                val own = output(port, planner.emit(container, port, if (inPlace) schemas.single() else null))
+                if (inPlace) return@flatMap listOf(own)
+                listOf(own) +
+                    schemas.map { schema ->
+                        val derived = "$port~${schema.name}"
+                        fed.filter { it.schema?.qualifiedName == schema.qualifiedName }.forEach {
+                            displaySources[it.id] = DisplaySource(island.name, derived)
+                        }
+                        output(derived, planner.emit(container, port, schema))
+                    }
             }
         val first = outputs.firstOrNull() ?: error("sql-text island '${island.name}' has no OUT port")
         return IslandEntry(
@@ -559,14 +612,11 @@ class BundleAssembler(
         )
     }
 
-    /** The island OUT port a display leaf is fed by (AG-P0 host-executed bundles). */
+    /** The island OUT port a display leaf is fed by (AG-P0 host-executed bundles) — each leaf its own. */
     private fun displaySource(
         graph: TtrpGraph,
-        name: String,
+        leaf: Display,
     ): DisplaySource? {
-        val leaf =
-            graph.nodes.values.firstOrNull { it is org.tatrman.ttrp.graph.model.Display && it.name == name }
-                ?: return null
         val feed = graph.edges.firstOrNull { it.to.nodeId == leaf.id } ?: return null
         val container = graph.containers[feed.from.nodeId] ?: return null
         return DisplaySource(container.label, feed.from.port)

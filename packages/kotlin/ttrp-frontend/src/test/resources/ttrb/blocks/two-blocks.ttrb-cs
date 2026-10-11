@@ -1,0 +1,10 @@
+# ttr: dialect=b lang=cs
+# Dva překrývající se bloky nad stejnými řádky.
+Načti accounts jako t.
+Když region je "N":
+    Ponech jen sloupce account_id, region.
+    Ukaž výsledek jako north_accounts.
+Když status je "open" nebo region je "N":
+    Spočti account_id * 2 jako twice.
+    Ukaž výsledek jako open_accounts.
+Seřaď to podle account_id.

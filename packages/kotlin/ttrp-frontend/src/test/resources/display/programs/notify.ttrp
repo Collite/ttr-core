@@ -1,0 +1,20 @@
+// Two branches each produce rows for the `notify` action (a `def schema` in shop.actions); an
+// ordinary (evidence) display sits beside them. `late` has no `note`, `large` has no `amount` —
+// both optional in the schema, so each statement fills the absent one with a typed NULL.
+uses world "shop.worlds.host"
+import shop.orders.*
+import shop.actions.*
+
+container review(out late, out large, out overdue) target erp {
+    o  = load(orders)
+    c  = load(customer)
+    oc = join(left: o, right: c, type: inner, on: relation order_customer)
+    n  = oc -> calc { recipient = email  subject = full_name }
+    late    = n -> filter(status = 1) -> select(recipient, subject, order_id, amount)
+    large   = n -> filter(amount > 1000) -> calc { note = cast(order_id as string) } -> select(recipient, subject, order_id, note)
+    overdue = n -> filter(status = 2) -> select(order_id, due_date, amount)
+}
+
+review.late    -> display(notify)
+review.large   -> display(notify)
+review.overdue -> display(overdue)

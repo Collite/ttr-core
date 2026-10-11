@@ -5,7 +5,7 @@ import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.translator.framework.ModelHandle
 
 /**
- * DF-V07 / Phase 08 C2 — extracts a flat identifier corpus from a [ModelHandle] for the
+ * Phase 08 C2 — extracts a flat identifier corpus from a [ModelHandle] for the
  * [IdentifierSuggester]. Covers:
  *   - **table local names** in `db.dbo` (the v1 default DB namespace)
  *   - **column local names** for every table in `db.dbo`

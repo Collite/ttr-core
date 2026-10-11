@@ -3,7 +3,6 @@ package org.tatrman.ttrp.emit.sql
 
 import org.tatrman.plan.v1.AggregateCall as PbAggregateCall
 import org.tatrman.plan.v1.AggregateNode
-import org.tatrman.plan.v1.CastExpression
 import org.tatrman.plan.v1.ColumnRef as PbColumnRef
 import org.tatrman.plan.v1.Expression as PbExpression
 import org.tatrman.plan.v1.FilterNode
@@ -321,7 +320,7 @@ class PlanNodeBuilder(
         // `left`/`right` become the `$L`/`$R` input tags the decoder routes on.
         val on = node.on
         when {
-            on != null -> b.condition = expr(on, inJoin = true)
+            on != null -> b.condition = withJoinSides(inputs) { expr(on, inJoin = true) }
             node.type == JoinType.CROSS -> b.condition = trueLiteralExpr()
         }
         val joinNode = PlanNode.newBuilder().setJoin(b).build()
@@ -397,7 +396,7 @@ class PlanNodeBuilder(
                 .setLeft(inputs[0])
                 .setRight(right)
                 .setJoinType(if (anti) PbJoinType.LEFT else PbJoinType.INNER)
-                .setCondition(expr(on, inJoin = true))
+                .setCondition(withJoinSides(listOf(inputs[0], inputs[1])) { expr(on, inJoin = true) })
         var plan = PlanNode.newBuilder().setJoin(joined).build()
         if (anti) {
             val isNull =
@@ -469,7 +468,7 @@ class PlanNodeBuilder(
                         .build()
                 } else {
                     val ref = PbColumnRef.newBuilder().setName(e.column)
-                    val alias = if (inJoin) joinInputTag(e.port) else e.port
+                    val alias = if (inJoin) joinInputTag(e.port) ?: unqualifiedSide(e) else e.port
                     alias?.let { ref.sourceAlias = it }
                     PbExpression.newBuilder().setColumnRef(ref).build()
                 }
@@ -495,15 +494,19 @@ class PlanNodeBuilder(
                     ).build()
             is InList -> inList(e, inJoin)
             is CaseWhen -> caseWhen(e, inJoin)
+            // The translator decodes a cast in its FUNCTION form only (`operation = "cast"`, the target as the
+            // expression's result type — a physical code, [SqlCastTypes]); its `Expression.cast` oneof is a
+            // decode TODO there (the sql-text `CastExpression decoding is TODO` failure).
             is Cast ->
                 PbExpression
                     .newBuilder()
-                    .setCast(
-                        CastExpression
+                    .setFunction(
+                        PbFunctionCall
                             .newBuilder()
-                            .setValue(expr(e.expr, inJoin))
-                            .setTargetType(e.target.canonical),
-                    ).build()
+                            .setOperation("cast")
+                            .addOperands(expr(e.expr, inJoin)),
+                    ).setResultType(SqlCastTypes.codeOf(e.target))
+                    .build()
             is AggregateCall ->
                 throw TtrpEmitException(
                     EmitDiagnosticId.UNSUPPORTED_NODE,
@@ -577,6 +580,37 @@ class PlanNodeBuilder(
         }
         call.addOperands(e.elseExpr?.let { expr(it, inJoin) } ?: nullLiteralExpr())
         return PbExpression.newBuilder().setFunction(call).build()
+    }
+
+    /** The two inputs' column names while a join condition is being encoded (null outside one, or unknown). */
+    private var joinSides: Pair<List<String>?, List<String>?>? = null
+
+    private fun <T> withJoinSides(
+        inputs: List<PlanNode>,
+        block: () -> T,
+    ): T {
+        val saved = joinSides
+        joinSides = columnsOf(inputs[0], 0) to columnsOf(inputs[1], 1)
+        try {
+            return block()
+        } finally {
+            joinSides = saved
+        }
+    }
+
+    /**
+     * An UNQUALIFIED column in a join condition (`on: x = right.y`): the left input's when the left has
+     * a column of that name (the TTR-P convention — unqualified is the left), else the right input's;
+     * no tag when neither side's row type is known (the bare combined-row lookup, as before).
+     */
+    private fun unqualifiedSide(e: ColumnRef): String? {
+        if (e.port != null) return null
+        val (left, right) = joinSides ?: return null
+        return when {
+            left?.contains(e.column) == true -> LEFT_INPUT_TAG
+            right?.contains(e.column) == true -> RIGHT_INPUT_TAG
+            else -> null
+        }
     }
 
     /**

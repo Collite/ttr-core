@@ -8,6 +8,7 @@ import org.tatrman.ttr.metadata.model.Entity
 import org.tatrman.ttr.metadata.model.ModelObject
 import org.tatrman.ttr.metadata.model.QualifiedName
 import org.tatrman.ttr.metadata.model.Relation
+import org.tatrman.ttr.metadata.model.RowSchemaRecord
 import org.tatrman.ttr.metadata.model.SchemaCode
 import org.tatrman.ttr.metadata.model.parseSchemaCode
 import org.tatrman.ttr.metadata.query.ErBindingResult
@@ -50,13 +51,43 @@ class ModelIndex(
      * D-b decision for Stage 2.1; the precise fix also needs an UPSTREAM ttr-metadata change to
      * populate `qname.package` for db/er objects. Flagged in tasks-overview.md §Blockers.
      */
-    fun packageExists(pkg: String): Boolean = objects.any { pathInPackage(it, pkg) }
+    fun packageExists(pkg: String): Boolean =
+        objects.any { pathInPackage(it, pkg) } || rowSchemas.any { fileInPackage(it.sourceFile, pkg) }
 
     /** Segment-boundary path match: object's source file lies under the `/<pkg>/` directory. */
     private fun pathInPackage(
         obj: ModelObject,
         pkg: String,
-    ): Boolean = obj.sourceFile.contains("/" + pkg.replace('.', '/') + "/")
+    ): Boolean = fileInPackage(obj.sourceFile, pkg)
+
+    private fun fileInPackage(
+        sourceFile: String,
+        pkg: String,
+    ): Boolean = sourceFile.contains("/" + pkg.replace('.', '/') + "/")
+
+    /** Grammar 0.14 `def schema` row schemas (not model objects — carried on the model beside them). */
+    private val rowSchemas: List<RowSchemaRecord> =
+        snapshot.model.rowSchemas.values
+            .toList()
+
+    /**
+     * Row schemas named [name] that an import brings into scope (action displays, grammar 0.14). Scoped the
+     * way loadable objects are — the declaring file lies under an imported package's directory (so a
+     * wildcard reaches sub-packages, the entity rule) — and tier-neutral: a bare `import <pkg>.*` or a
+     * `db`-tier one reaches them. More than one hit is an ambiguity the caller reports (no first-wins).
+     */
+    fun findRowSchemas(
+        name: String,
+        imports: List<ImportScope>,
+    ): List<RowSchemaRecord> =
+        rowSchemas
+            .filter { rs ->
+                rs.name == name &&
+                    imports.any { imp ->
+                        (imp.tier == null || imp.tier == SchemaCode.DB) &&
+                            (fileInPackage(rs.sourceFile, imp.pkg) || rs.pkg == imp.pkg)
+                    }
+            }.sortedBy { it.qualifiedName }
 
     private fun inScope(
         obj: ModelObject,

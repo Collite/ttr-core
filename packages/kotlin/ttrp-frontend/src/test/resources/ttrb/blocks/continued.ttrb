@@ -1,0 +1,6 @@
+    Load accounts as t.
+    If region is "N"
+       or region is "S":
+        Keep only the columns account_id,
+            region.
+        Show the result as north_south.

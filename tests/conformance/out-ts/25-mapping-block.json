@@ -3,7 +3,7 @@
         {
             "description": null,
             "kind": "attribute",
-            "name": "nazev_artiklu",
+            "name": "product_name",
             "properties": {
                 "binding": {
                     "kind": "block",
@@ -12,9 +12,9 @@
                             "column": {
                                 "kind": "id",
                                 "parts": [
-                                    "NAZEV_ZBOZI"
+                                    "i_product_name"
                                 ],
-                                "path": "NAZEV_ZBOZI"
+                                "path": "i_product_name"
                             }
                         },
                         "kind": "object"

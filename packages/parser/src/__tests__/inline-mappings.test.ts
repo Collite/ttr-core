@@ -18,19 +18,19 @@ describe('inline mappings — entity level', () => {
   it('parses entity with full inline mapping + columns map', () => {
     const result = parseString(`
       model er
-      def entity artikl {
+      def entity item {
         binding: {
-          target: { table: db.dbo.QZBOZI_DF },
+          target: { table: db.dbo.item },
           columns: {
-            id_artiklu: IDZBOZI,
-            kód_artiklu: { target: KOD_ZBOZI },
-            název_artiklu: { target: { column: NAZEV_ZBOZI } }
+            sk: i_item_sk,
+            item_id: { target: i_item_id },
+            product_name: { target: { column: i_product_name } }
           }
         },
         attributes: [
-          def attribute id_artiklu { type: int, isKey: true },
-          def attribute kód_artiklu { type: text },
-          def attribute název_artiklu { type: text }
+          def attribute sk { type: int, isKey: true },
+          def attribute item_id { type: text },
+          def attribute product_name { type: text }
         ]
       }
     `);
@@ -43,18 +43,18 @@ describe('inline mappings — entity level', () => {
     expect(mapping.target).toBeDefined();
     expect(mapping.columns).toHaveLength(3);
     const columns = mapping.columns!;
-    expect(columns[0].name).toBe('id_artiklu');
+    expect(columns[0].name).toBe('sk');
     expect(columns[0].value.kind).toBe('bareId');
 
-    // form (b): { target: KOD_ZBOZI } — target wrapper preserved
-    expect(columns[1].name).toBe('kód_artiklu');
+    // form (b): { target: i_item_id } — target wrapper preserved
+    expect(columns[1].name).toBe('item_id');
     const col1 = assertKind<BindingColumnValue, 'object'>(columns[1].value, 'object');
     expect(col1.object.entries[0].key).toBe('target');
     const col1Inner = assertKind(col1.object.entries[0].value, 'id');
-    expect(col1Inner.path).toBe('KOD_ZBOZI');
+    expect(col1Inner.path).toBe('i_item_id');
 
-    // form (c): { target: { column: NAZEV_ZBOZI } } — target wrapper preserved, inner is an object
-    expect(columns[2].name).toBe('název_artiklu');
+    // form (c): { target: { column: i_product_name } } — target wrapper preserved, inner is an object
+    expect(columns[2].name).toBe('product_name');
     const col2 = assertKind<BindingColumnValue, 'object'>(columns[2].value, 'object');
     expect(col2.object.entries[0].key).toBe('target');
     expect(col2.object.entries[0].value.kind).toBe('object');
@@ -65,22 +65,22 @@ describe('inline mappings — attribute level', () => {
   it('parses attribute with bare-id mapping', () => {
     const result = parseString(`
       model er
-      def attribute id_produktu { type: int, binding: IDSKUPZBOZI }
+      def attribute category_id { type: int, binding: i_category_id }
     `);
     expect(result.errors, `parse errors: ${result.errors.map(e => e.message).join(', ')}`).toEqual([]);
     const attr = assertKind<Definition, 'attribute'>(result.ast!.definitions[0], 'attribute');
     expect(attr.binding).toBeDefined();
     const mapping = assertKind(attr.binding, 'bareId');
     expect(mapping.kind).toBe('bareId');
-    expect(mapping.id.path).toBe('IDSKUPZBOZI');
+    expect(mapping.id.path).toBe('i_category_id');
   });
 
   it('parses attribute with full mapping block', () => {
     const result = parseString(`
       model er
-      def attribute název_artiklu {
+      def attribute product_name {
         type: text,
-        binding: { target: { column: NAZEV_ZBOZI } }
+        binding: { target: { column: i_product_name } }
       }
     `);
     expect(result.errors, `parse errors: ${result.errors.map(e => e.message).join(', ')}`).toEqual([]);

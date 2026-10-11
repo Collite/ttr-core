@@ -41,6 +41,7 @@ import org.tatrman.ttr.parser.model.PropertyValue
 import org.tatrman.ttr.parser.model.QueryDef
 import org.tatrman.ttr.parser.model.RelationDef
 import org.tatrman.ttr.parser.model.RoleDef
+import org.tatrman.ttr.parser.model.SchemaDef
 import org.tatrman.ttr.parser.model.ModelDirective
 import org.tatrman.ttr.parser.model.SearchHintsValue
 import org.tatrman.ttr.parser.model.ChangeSemanticsDecl
@@ -163,6 +164,7 @@ object TtrRenderer {
             is EntityDef -> renderEntity(def)
             is TableDef -> renderTable(def)
             is ViewDef -> renderView(def)
+            is SchemaDef -> renderSchema(def)
             is ColumnDef -> renderColumn(def)
             is RelationDef -> renderRelation(def)
             is Er2DbEntityDef -> renderEr2DbEntity(def)
@@ -486,6 +488,28 @@ object TtrRenderer {
             sb.append("    ]")
         }
         renderSearchHintsIfAny(def.search)?.let { sb.append(it) }
+        sb.appendLine()
+        sb.appendLine("}")
+        return sb.toString()
+    }
+
+    /** Grammar 0.14 — a named row schema: `def schema <name> { description?, tags?, columns: [...] }`. */
+    private fun renderSchema(def: SchemaDef): String {
+        val sb = StringBuilder()
+        sb.append("def schema ${def.name}")
+        sb.append(" {")
+        renderDescriptionIfAny(def.description, def.descriptionLocalized)?.let { sb.append(it) }
+        renderTagsIfAny(def.tags)?.let { sb.append(" $it") }
+        if (def.columns.isNotEmpty()) {
+            sb.appendLine()
+            sb.appendLine("    columns: [")
+            for (col in def.columns) {
+                sb.append("        ")
+                sb.append(renderColumn(col))
+                sb.appendLine(",")
+            }
+            sb.append("    ]")
+        }
         sb.appendLine()
         sb.appendLine("}")
         return sb.toString()
@@ -995,7 +1019,7 @@ object TtrRenderer {
 
     /**
      * v3.0 inline `binding:` value (was v2.1 `mapping:`). Two surface forms:
-     *  - bare-id: `binding: IDSKUPZBOZI` / `binding: db.dbo.fk_artikl_produkt`.
+     *  - bare-id: `binding: i_category_id` / `binding: db.dbo.fk_item_category`.
      *  - block:   `binding: { target: …, columns: { … } }` (entity) /
      *             `{ target: … }` (attribute) / `{ fk: … }` (relation).
      * Single-line by design so it appends inline like the surrounding properties

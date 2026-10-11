@@ -4,6 +4,7 @@ import org.tatrman.ttrp.ast.Arg
 import org.tatrman.ttrp.ast.Assignment
 import org.tatrman.ttrp.ast.Chain
 import org.tatrman.ttrp.ast.ChainStmt
+import org.tatrman.ttrp.ast.ChainToPort
 import org.tatrman.ttrp.ast.ContainerDecl
 import org.tatrman.ttrp.ast.ControlBlock
 import org.tatrman.ttrp.ast.ControlDep
@@ -76,7 +77,7 @@ class GraphBuilder {
     )
 
     fun build(report: TtrpChecker.Report): BuildResult {
-        val ctx = Ctx(report.rewrites)
+        val ctx = Ctx(report.rewrites, report.displaySchemas)
         val doc = report.document
 
         // Pass 1: build containers (so cross-container refs resolve in pass 2).
@@ -132,6 +133,8 @@ class GraphBuilder {
     /** Per-build mutable state (insertion-ordered — determinism groundwork for 2.3). */
     private class Ctx(
         val rewrites: List<ErRewrite>,
+        /** Action displays: display op location → its resolved row schema (the frontend's DSP pass). */
+        val displaySchemas: Map<SourceLocation, org.tatrman.ttrp.resolve.DisplaySchema> = emptyMap(),
     ) {
         val nodes = LinkedHashMap<String, Node>()
         val edges = mutableListOf<Edge>()
@@ -206,7 +209,14 @@ class GraphBuilder {
             val memberIds = mutableListOf<String>()
             val portMapping = LinkedHashMap<String, PortRef>()
             var lastOut: PortRef? = null
-            for (stmt in flowStatements.orEmpty()) {
+            // `… -> <out port>` writes the chain's value to the port, exactly as `<out port> = …` does.
+            val outPorts =
+                ports
+                    .filter { it.direction == PortDirection.OUT && it.kind == PortKind.DATA }
+                    .map { it.name }
+                    .toSet()
+            for (authored in flowStatements.orEmpty()) {
+                val stmt = (authored as? ChainStmt)?.let { ChainToPort.asAssignment(it, outPorts) } ?: authored
                 when (stmt) {
                     is Assignment -> {
                         val out = evalChain(stmt.chain, scope, target = stmt.target, memberIds = memberIds)
@@ -329,7 +339,7 @@ class GraphBuilder {
                             provenance = prov,
                         )
                     "store" -> Store(id, label, loc, target = refText(firstUnnamed(op)))
-                    "display" -> Display(id, label, loc, name = refText(firstUnnamed(op)))
+                    "display" -> Display(id, label, loc, name = refText(firstUnnamed(op)), schema = displaySchemas[loc])
                     "filter" -> Filter(id, label, loc, predicate = predicateOf(op, prev), provenance = prov)
                     "branch" -> Branch(id, label, loc, predicate = predicateOf(op, prev), provenance = prov)
                     "switch" -> Switch(id, label, loc, cases = switchCases(op), hasElse = hasElse(op))
@@ -500,6 +510,8 @@ class GraphBuilder {
             rewrites
                 .firstOrNull {
                     it.joinCondition == null &&
+                        // offsets only compare within ONE file (a file-backed fragment has its own, AG B5)
+                        it.location.file == op.location.file &&
                         it.location.offsetStart >= op.location.offsetStart &&
                         it.location.offsetEnd <= op.location.offsetEnd
                 }?.provenance

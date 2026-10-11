@@ -56,6 +56,7 @@ const KIND_KEYWORD: Record<string, string> = {
   er2cncRole: 'er2cnc_role',
   drillMap: 'drill_map',
   world: 'world',
+  schema: 'schema',
 };
 
 export function dump(result: ParseResult): string {
@@ -254,6 +255,10 @@ function propsOf(d: Definition): { [k: string]: Json } {
     case 'area':
       if (d.packages.length) p.packages = d.packages;
       if (d.entities.length) p.entities = d.entities;
+      break;
+    // 0.14 — a named row schema: its column list, dumped exactly like a view's.
+    case 'schema':
+      if (d.columns?.length) p.columns = d.columns.map(defTree);
       break;
     case 'world':
       if (d.extends) p.extends = d.extends;

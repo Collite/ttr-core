@@ -1,0 +1,30 @@
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container priprava(out otevrene, out chybi) target erp {
+  otevrene = load(objednávky) -> filter(stav = "otevřená")
+  chybi = load(zásoby) -> filter(množství = 0)
+}
+
+container nazvy(in otevrene, in chybi, out nalehave, out kontrola, out souhrn) target erp """ttrb
+Load otevrene.
+Keep the rows where (částka is bigger than 1000 or poznámka is empty) and (stav = "otevřená" or kód_zboží is empty).
+Compute priorita as 1 when (částka is bigger than 5000 and poznámka is not empty) or stav = "naléhavá", otherwise 2.
+Call that kandidati.
+If (priorita = 1 or částka is bigger than 10000) and stav = "otevřená":
+    Send that to output nalehave.
+Load chybi.
+Keep the rows where množství = 0 and (vedoucí_skladu is empty or vedoucí_skladu = "nikdo").
+Call that bez_zasob.
+Load kandidati.
+Keep only the rows that have a match in bez_zasob on kód_zboží is bez_zasob.kód_zboží.
+Send that to output kontrola.
+Join kandidati optionally with bez_zasob on kód_zboží is bez_zasob.kód_zboží and (bez_zasob.množství = 0 or bez_zasob.vedoucí_skladu is empty) as prehled.
+Send that to output souhrn.
+"""
+
+priprava.otevrene -> nazvy.otevrene
+priprava.chybi -> nazvy.chybi
+nazvy.nalehave -> display(nalehave)
+nazvy.kontrola -> display(kontrola)
+nazvy.souhrn -> display(souhrn)

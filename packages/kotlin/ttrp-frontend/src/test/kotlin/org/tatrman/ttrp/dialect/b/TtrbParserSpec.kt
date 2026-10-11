@@ -61,7 +61,7 @@ class TtrbParserSpec :
             "roster row parses clean: $name" {
                 val parsed = TtrbCorpus.parse(sentence)
                 parsed.syntaxErrors.shouldBeEmpty()
-                parsed.tree.sentence().size shouldBe 1
+                parsed.tree.item().size shouldBe 1
             }
         }
 
@@ -71,9 +71,9 @@ class TtrbParserSpec :
                 p.syntaxErrors.shouldBeEmpty()
                 (
                     p.tree
-                        .sentence(
-                            0,
-                        ).statement() is org.tatrman.ttrp.parser.generated.TTRBParser.FilterSentenceContext
+                        .item(0)
+                        .sentence()
+                        .statement() is org.tatrman.ttrp.parser.generated.TTRBParser.FilterSentenceContext
                 ) shouldBe
                     true
             }

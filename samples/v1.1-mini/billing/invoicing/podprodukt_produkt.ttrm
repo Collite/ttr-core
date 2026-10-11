@@ -1,9 +1,0 @@
-package billing.invoicing
-
-model er
-
-def relation podprodukt_produkt { description: "Podprodukt patří pod nadřazený produkt",
-    from: billing.products.er.entity.podprodukt, to: billing.products.er.entity.produkt,
-    cardinality: { from: "0..*", to: "1" },
-    join: [{ from: billing.products.er.entity.podprodukt.id_produktu, to: billing.products.er.entity.produkt.id_produktu }]
-}

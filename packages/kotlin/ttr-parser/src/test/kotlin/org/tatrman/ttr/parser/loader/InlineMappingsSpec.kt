@@ -38,19 +38,19 @@ class InlineMappingsSpec :
                 TtrLoader.parseString(
                     """
                     model er
-                    def entity artikl {
+                    def entity item {
                         binding: {
-                            target: { table: db.dbo.QZBOZI_DF },
+                            target: { table: db.dbo.item },
                             columns: {
-                                id_artiklu: IDZBOZI,
-                                kód_artiklu: { target: KOD_ZBOZI },
-                                název_artiklu: { target: { column: NAZEV_ZBOZI } }
+                                sk: i_item_sk,
+                                item_id: { target: i_item_id },
+                                product_name: { target: { column: i_product_name } }
                             }
                         },
                         attributes: [
-                            def attribute id_artiklu { type: int, isKey: true },
-                            def attribute kód_artiklu { type: text },
-                            def attribute název_artiklu { type: text }
+                            def attribute sk { type: int, isKey: true },
+                            def attribute item_id { type: text },
+                            def attribute product_name { type: text }
                         ]
                     }
                     """.trimIndent(),
@@ -66,22 +66,22 @@ class InlineMappingsSpec :
             binding.columns shouldHaveSize 3
 
             // form (a): bare id
-            binding.columns[0].name shouldBe "id_artiklu"
+            binding.columns[0].name shouldBe "sk"
             val c0 = binding.columns[0].value
             c0.shouldBeInstanceOf<BindingColumnBareId>()
-            c0.id.path shouldBe "IDZBOZI"
+            c0.id.path shouldBe "i_item_sk"
 
             // form (b): { target: bareId } — wrapped in synthetic { target: ... } object
-            binding.columns[1].name shouldBe "kód_artiklu"
+            binding.columns[1].name shouldBe "item_id"
             val c1 = binding.columns[1].value
             c1.shouldBeInstanceOf<BindingColumnObject>()
             c1.obj.entries.keys shouldBe setOf("target")
             val inner1 = c1.obj.entries["target"]
             inner1.shouldBeInstanceOf<PropertyValue.IdValue>()
-            inner1.ref.path shouldBe "KOD_ZBOZI"
+            inner1.ref.path shouldBe "i_item_id"
 
             // form (c): { target: { column: bareId } }
-            binding.columns[2].name shouldBe "název_artiklu"
+            binding.columns[2].name shouldBe "product_name"
             val c2 = binding.columns[2].value
             c2.shouldBeInstanceOf<BindingColumnObject>()
             c2.obj.entries.keys shouldBe setOf("target")
@@ -95,7 +95,7 @@ class InlineMappingsSpec :
                 TtrLoader.parseString(
                     """
                     model er
-                    def attribute id_produktu { type: int, binding: IDSKUPZBOZI }
+                    def attribute category_id { type: int, binding: i_category_id }
                     """.trimIndent(),
                 )
             r.ok shouldBe true
@@ -103,7 +103,7 @@ class InlineMappingsSpec :
             attr.shouldBeInstanceOf<AttributeDef>()
             val binding = attr.binding
             binding.shouldBeInstanceOf<BindingPropertyBareId>()
-            binding.id.path shouldBe "IDSKUPZBOZI"
+            binding.id.path shouldBe "i_category_id"
         }
 
         "parses attribute with full mapping block" {
@@ -111,9 +111,9 @@ class InlineMappingsSpec :
                 TtrLoader.parseString(
                     """
                     model er
-                    def attribute název_artiklu {
+                    def attribute product_name {
                         type: text,
-                        binding: { target: { column: NAZEV_ZBOZI } }
+                        binding: { target: { column: i_product_name } }
                     }
                     """.trimIndent(),
                 )

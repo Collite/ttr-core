@@ -1,1147 +1,958 @@
 model db schema dbo
 
-def table QCENSKUP_DF { description: """Evidence obchodních kanálů a jejich vlastností.
-""", primaryKey: ["id_obchodního_kanálu"],
+// A TPC-DS slice of the Hartland demo database (its US world): the sales, returns and
+// inventory facts with their dimensions, the item / store hierarchies normalised out of their
+// denormalised TPC-DS columns, and a few TPC-DS-style derived tables (channel_sales, plans,
+// summaries, assortment). Physical names are TPC-DS.
+
+def table call_center { description: """Seller support centers handling marketplace orders (TPC-DS call_center).
+""", primaryKey: ["cc_call_center_sk"],
+    columns: [
+        def column cc_call_center_sk { type: int, isKey: true, description: "Unique seller support center identifier", },
+        def column cc_call_center_id { type: text, optional: true, description: "Seller support center code", },
+        def column cc_name { type: text, optional: true, description: "Seller support center name, the human-readable label", search { searchable: true }, },
+        def column cc_rec_start_date { type: date, optional: true, description: "Start of validity of this record version", },
+        def column cc_rec_end_date { type: date, optional: true, description: "End of validity of this record version (NULL = current)", },
+        def column cc_open_date_sk { type: int, optional: true, description: "Date the center opened", },
+        def column cc_closed_date_sk { type: int, optional: true, description: "Date the center closed", },
+        def column cc_class { type: text, optional: true, description: "Size class of the center", },
+        def column cc_employees { type: int, optional: true, description: "Number of employees", },
+        def column cc_hours { type: text, optional: true, description: "Operating hours", },
+        def column cc_manager { type: text, optional: true, description: "Center manager", },
+        def column cc_mkt_id { type: int, optional: true, description: "Identifier of the market served", },
+        def column cc_division_name { type: text, optional: true, description: "Division of the center", },
+        def column cc_city { type: text, optional: true, description: "City", },
+        def column cc_state { type: text, optional: true, description: "State", },
+        def column cc_country { type: text, optional: true, description: "Country", },
+    ]
+}
+
+def table catalog_page { description: """Pages of the marketplace catalogs (TPC-DS catalog_page).
+""", primaryKey: ["cp_catalog_page_sk"],
+    columns: [
+        def column cp_catalog_page_sk { type: int, isKey: true, description: "Unique catalog page identifier", },
+        def column cp_catalog_page_id { type: text, optional: true, description: "Catalog page code", },
+        def column cp_start_date_sk { type: int, optional: true, description: "Start of validity of the catalog", },
+        def column cp_end_date_sk { type: int, optional: true, description: "End of validity of the catalog", },
+        def column cp_department { type: text, optional: true, description: "Department", },
+        def column cp_catalog_number { type: int, optional: true, description: "Catalog number", },
+        def column cp_catalog_page_number { type: int, optional: true, description: "Page number within the catalog", },
+        def column cp_description { type: text, optional: true, description: "Page description", },
+        def column cp_type { type: text, optional: true, description: "Catalog periodicity", },
+    ]
+}
+
+def table catalog_returns { description: """Marketplace-channel returns (TPC-DS catalog_returns).
+Note: the amount column is cr_return_amount, not cr_return_amt like its siblings.
+""", primaryKey: ["cr_item_sk", "cr_order_number"],
+    columns: [
+        def column cr_returned_date_sk { type: int, optional: true, description: "Return date — FK to the calendar", },
+        def column cr_item_sk { type: int, isKey: true, description: "Returned product", },
+        def column cr_refunded_customer_sk { type: int, optional: true, description: "Customer the amount was refunded to", },
+        def column cr_returning_customer_sk { type: int, optional: true, description: "Returning customer", },
+        def column cr_returning_addr_sk { type: int, optional: true, description: "Address the goods were returned from", },
+        def column cr_call_center_sk { type: int, optional: true, description: "Seller support center that handled the return", },
+        def column cr_catalog_page_sk { type: int, optional: true, description: "Catalog page of the original order", },
+        def column cr_ship_mode_sk { type: int, optional: true, description: "Return ship mode", },
+        def column cr_warehouse_sk { type: int, optional: true, description: "Distribution center processing the return", },
+        def column cr_reason_sk { type: int, optional: true, description: "Return reason", },
+        def column cr_order_number { type: int, isKey: true, description: "Original marketplace order number — pairs this return with its sale", },
+        def column cr_return_quantity { type: int, optional: true, description: "Units returned on this line", },
+        def column cr_return_amount { type: decimal, optional: true, description: "Refunded amount of the line, excluding tax", },
+        def column cr_return_ship_cost { type: decimal, optional: true, description: "Return shipping cost", },
+        def column cr_refunded_cash { type: decimal, optional: true, description: "Amount refunded in cash", },
+        def column cr_net_loss { type: decimal, optional: true, description: "Net loss of the return", },
+    ]
+}
+
+def table catalog_sales { description: """Marketplace-channel sales lines (TPC-DS catalog_sales).
+An order is handled by a seller support center and shipped by a distribution center.
+""", primaryKey: ["cs_item_sk", "cs_order_number"],
+    columns: [
+        def column cs_sold_date_sk { type: int, optional: true, description: "Order date — FK to the calendar", },
+        def column cs_sold_time_sk { type: int, optional: true, description: "Order time of day — FK to the time dimension", },
+        def column cs_ship_date_sk { type: int, optional: true, description: "Ship date — FK to the calendar", },
+        def column cs_bill_customer_sk { type: int, optional: true, description: "Billed customer", },
+        def column cs_bill_cdemo_sk { type: int, optional: true, description: "Demographics of the billed customer", },
+        def column cs_bill_addr_sk { type: int, optional: true, description: "Billing address", },
+        def column cs_ship_customer_sk { type: int, optional: true, description: "Customer the order is shipped to", },
+        def column cs_ship_addr_sk { type: int, optional: true, description: "Shipping address", },
+        def column cs_call_center_sk { type: int, optional: true, description: "Seller support center handling the order", },
+        def column cs_catalog_page_sk { type: int, optional: true, description: "Catalog page the order came from", },
+        def column cs_ship_mode_sk { type: int, optional: true, description: "Ship mode", },
+        def column cs_warehouse_sk { type: int, optional: true, description: "Fulfilling distribution center", },
+        def column cs_item_sk { type: int, isKey: true, description: "Ordered product", },
+        def column cs_promo_sk { type: int, optional: true, description: "Promotion applied to this line, if any", },
+        def column cs_order_number { type: int, isKey: true, description: "Marketplace order number; one order = one basket", },
+        def column cs_quantity { type: int, optional: true, description: "Units ordered on this line", },
+        def column cs_list_price { type: decimal, optional: true, description: "List price per unit", },
+        def column cs_sales_price { type: decimal, optional: true, description: "Sales price per unit after discount", },
+        def column cs_ext_sales_price { type: decimal, optional: true, description: "Extended sales price of the line — the revenue amount", },
+        def column cs_ext_ship_cost { type: decimal, optional: true, description: "Shipping cost of the line", },
+        def column cs_net_paid { type: decimal, optional: true, description: "Net amount paid, excluding tax", },
+        def column cs_net_profit { type: decimal, optional: true, description: "Net profit of the line", },
+    ]
+}
+
+def table channel_sales { description: """All-channel sales lines — store, web and marketplace sales in one relation, labelled by channel.
+Derived from store_sales, web_sales and catalog_sales; the one object on which revenue and
+units sold can be compared by channel.
+""", primaryKey: ["channel", "item_sk", "sold_date_sk", "customer_sk"],
+    columns: [
+        def column channel { type: text, isKey: true, description: "Sales channel", },
+        def column sold_date_sk { type: int, isKey: true, description: "Sale date — FK to the calendar", },
+        def column item_sk { type: int, isKey: true, description: "Sold product", },
+        def column customer_sk { type: int, isKey: true, description: "Buying customer", },
+        def column quantity { type: int, optional: true, description: "Units sold on this line", },
+        def column ext_sales_price { type: decimal, optional: true, description: "Extended sales price of the line — the revenue amount", },
+        def column warehouse_sk { type: int, optional: true, description: "Fulfilling distribution center of a web or marketplace line; NULL on a store line", },
+    ]
+}
+
+def table customer { description: """Customers of all sales channels (TPC-DS customer).
+""", primaryKey: ["c_customer_sk"],
+    columns: [
+        def column c_customer_sk { type: int, isKey: true, description: "Unique customer identifier", },
+        def column c_customer_id { type: text, optional: true, description: "Unique customer code", },
+        def column c_current_cdemo_sk { type: int, optional: true, description: "Current customer demographics", },
+        def column c_current_hdemo_sk { type: int, optional: true, description: "Current household demographics", },
+        def column c_current_addr_sk { type: int, optional: true, description: "Current address", },
+        def column c_first_shipto_date_sk { type: int, optional: true, description: "Date of the first shipment", },
+        def column c_first_sales_date_sk { type: int, optional: true, description: "Date of the first purchase", },
+        def column c_salutation { type: text, optional: true, description: "Salutation", },
+        def column c_first_name { type: text, optional: true, description: "First name", },
+        def column c_last_name { type: text, optional: true, description: "Last name", search { searchable: true }, },
+        def column c_preferred_cust_flag { type: text, optional: true, description: "Preferred customer flag", },
+        def column c_birth_day { type: int, optional: true, description: "Day of birth", },
+        def column c_birth_month { type: int, optional: true, description: "Month of birth", },
+        def column c_birth_year { type: int, optional: true, description: "Year of birth; age is derived at query time", },
+        def column c_birth_country { type: text, optional: true, description: "Country of birth", },
+        def column c_email_address { type: text, optional: true, description: "E-mail address", },
+        def column c_last_review_date_sk { type: int, optional: true, description: "Date of the customer's last review", },
+    ]
+}
+
+def table customer_address { description: """Customer addresses (TPC-DS customer_address).
+""", primaryKey: ["ca_address_sk"],
+    columns: [
+        def column ca_address_sk { type: int, isKey: true, description: "Unique address identifier", },
+        def column ca_address_id { type: text, optional: true, description: "Address code", },
+        def column ca_street_number { type: text, optional: true, description: "Street number", },
+        def column ca_street_name { type: text, optional: true, description: "Street name", },
+        def column ca_city { type: text, optional: true, description: "City of the address", search { searchable: true }, },
+        def column ca_county { type: text, optional: true, description: "County of the address", },
+        def column ca_state { type: text, optional: true, description: "Two-letter state code of the address", },
+        def column ca_zip { type: text, optional: true, description: "ZIP code", },
+        def column ca_country { type: text, optional: true, description: "Country", },
+        def column ca_gmt_offset { type: float, optional: true, description: "Offset from GMT in hours", },
+        def column ca_location_type { type: text, optional: true, description: "Location type", },
+    ]
+}
+
+def table customer_channel_summary { description: """Yearly summary of a customer's purchases by sales channel.
+""", primaryKey: ["ccs_customer_sk", "ccs_year"],
+    columns: [
+        def column ccs_customer_sk { type: int, isKey: true, description: "Customer", },
+        def column ccs_year { type: int, isKey: true, description: "Year", },
+        def column ccs_store_sales { type: decimal, optional: true, description: "Revenue in stores", },
+        def column ccs_web_sales { type: decimal, optional: true, description: "Revenue on the web", },
+        def column ccs_catalog_sales { type: decimal, optional: true, description: "Revenue on the marketplace", },
+        def column ccs_return_amt { type: decimal, optional: true, description: "Amount returned across channels", },
+        def column ccs_orders { type: int, optional: true, description: "Number of baskets (tickets and orders)", },
+    ]
+}
+
+def table customer_demographics { description: """Customer demographic profiles (TPC-DS customer_demographics).
+""", primaryKey: ["cd_demo_sk"],
+    columns: [
+        def column cd_demo_sk { type: int, isKey: true, description: "Unique demographic profile identifier", },
+        def column cd_gender { type: text, optional: true, description: "Gender code", },
+        def column cd_marital_status { type: text, optional: true, description: "Marital status code", },
+        def column cd_education_status { type: text, optional: true, description: "Highest education level", },
+        def column cd_purchase_estimate { type: int, optional: true, description: "Estimated yearly purchases", },
+        def column cd_credit_rating { type: text, optional: true, description: "Credit rating", },
+        def column cd_dep_count { type: int, optional: true, description: "Number of dependants", },
+        def column cd_dep_employed_count { type: int, optional: true, description: "Number of employed dependants", },
+        def column cd_dep_college_count { type: int, optional: true, description: "Number of dependants in college", },
+    ]
+}
+
+def table date_dim { description: """Calendar — one row per day (TPC-DS date_dim).
+Every date link of a fact points here through a *_date_sk column.
+""", primaryKey: ["d_date_sk"],
+    columns: [
+        def column d_date_sk { type: int, isKey: true, description: "Unique day identifier", },
+        def column d_date_id { type: text, optional: true, description: "Day code", },
+        def column d_date { type: date, optional: true, description: "Calendar date. The primary grain of the calendar", },
+        def column d_month_seq { type: int, optional: true, description: "Absolute month number", },
+        def column d_week_seq { type: int, optional: true, description: "Absolute week number from the beginning of the calendar", },
+        def column d_quarter_seq { type: int, optional: true, description: "Absolute quarter number", },
+        def column d_year { type: int, optional: true, description: "Year of the calendar date", },
+        def column d_dow { type: int, optional: true, description: "Day of week (0 = Sunday)", },
+        def column d_moy { type: int, optional: true, description: "Month of year, 1-12", },
+        def column d_dom { type: int, optional: true, description: "Day of month", },
+        def column d_qoy { type: int, optional: true, description: "Quarter of year, 1-4", },
+        def column d_fy_year { type: int, optional: true, description: "Fiscal year", },
+        def column d_day_name { type: text, optional: true, description: "Name of the day of the week", },
+        def column d_quarter_name { type: text, optional: true, description: "Quarter name (e.g. 2025Q1)", },
+        def column d_holiday { type: text, optional: true, description: "Is this a holiday? Y/N", },
+        def column d_weekend { type: text, optional: true, description: "Is this a weekend? Y/N", },
+        def column d_first_dom { type: int, optional: true, description: "Day identifier of the first day of the month", },
+        def column d_same_day_ly { type: int, optional: true, description: "Day identifier of the same day last year", },
+    ]
+}
+
+def table household_demographics { description: """Household demographic profiles (TPC-DS household_demographics).
+""", primaryKey: ["hd_demo_sk"],
+    columns: [
+        def column hd_demo_sk { type: int, isKey: true, description: "Unique household profile identifier", },
+        def column hd_income_band_sk { type: int, optional: true, description: "Income band of the household", },
+        def column hd_buy_potential { type: text, optional: true, description: "Household buying-potential label (e.g. '>10000', 'Unknown')", },
+        def column hd_dep_count { type: int, optional: true, description: "Number of dependants", },
+        def column hd_vehicle_count { type: int, optional: true, description: "Number of vehicles in the household", },
+    ]
+}
+
+def table income_band { description: """Household income bands (TPC-DS income_band).
+""", primaryKey: ["ib_income_band_sk"],
+    columns: [
+        def column ib_income_band_sk { type: int, isKey: true, description: "Unique income band identifier", },
+        def column ib_lower_bound { type: int, optional: true, description: "Lower bound of the yearly income range (USD)", },
+        def column ib_upper_bound { type: int, optional: true, description: "Upper bound of the yearly income range (USD)", },
+    ]
+}
+
+def table inventory { description: """Weekly on-hand snapshots per distribution center and item (TPC-DS inventory).
+Semi-additive: stock levels must not be added across snapshots.
+""", primaryKey: ["inv_date_sk", "inv_item_sk", "inv_warehouse_sk"],
+    columns: [
+        def column inv_date_sk { type: int, isKey: true, description: "Weekly snapshot date — FK to the calendar", },
+        def column inv_item_sk { type: int, isKey: true, description: "Product", },
+        def column inv_warehouse_sk { type: int, isKey: true, description: "Distribution center", },
+        def column inv_quantity_on_hand { type: int, optional: true, description: "Quantity on hand at the time of the snapshot", },
+    ]
+}
+
+def table inventory_weekly_summary { description: """Weekly summary of stock and sales of a product in a distribution center.
+""", primaryKey: ["iws_week_seq", "iws_item_sk", "iws_warehouse_sk"],
+    columns: [
+        def column iws_week_seq { type: int, isKey: true, description: "Absolute week number (d_week_seq)", },
+        def column iws_item_sk { type: int, isKey: true, description: "Product", },
+        def column iws_warehouse_sk { type: int, isKey: true, description: "Distribution center", },
+        def column iws_avg_on_hand { type: float, optional: true, description: "Average quantity on hand during the week", },
+        def column iws_min_on_hand { type: int, optional: true, description: "Minimum quantity on hand during the week", },
+        def column iws_units_sold { type: int, optional: true, description: "Units sold through the web and the marketplace", },
+        def column iws_days_of_cover { type: float, optional: true, description: "Days of sales the stock covers", },
+    ]
+}
+
+def table item { description: """Products (TPC-DS item), versioned by validity (i_rec_start_date / i_rec_end_date).
+The item entity reads only the currently valid version of each record.
+Hierarchy: category -> class -> brand -> item.
+""", primaryKey: ["i_item_sk"],
     search { searchable: true },
     columns: [
-        def column IDCENSKUP { type: int, isKey: true, description: "Unikátní identifikátor obchodního kanálu", },
-        def column CEN_SKUP { type: text, optional: true, description: "Unikátní kód obchodního kanálu", },
-        def column IDSKUPZNACZBOZI { type: int, optional: true, description: "Vazba na tržní skupinu", },
-        def column IDUZIVATEL { type: int, optional: true, description: "Identifikace uživatele, který je zodpovědný za tento obchodní kanál", },
-        def column VLNORMATIV_TRZBY_S { type: int, optional: true, description: "Určení přiřazení spočteného normativu tržby pro tento obchodní kanál  (0 = tržní skupina, 1 = obchodní kanál)", },
-        def column POCETSORT_MIN { type: int, optional: true, description: "Minimální počet sortimentů pro tento obchodní kanál", },
-        def column HDPODIL_DM_ZAJM_ARTIKL { type: text, optional: true, description: "Stanovuje hranici odebírajících dodacích míst kanálu, která musí být splněna pro indikaci zájmového artiklu. Hodnota v procentech (50.00 = 50 %).", },
+        def column i_item_sk { type: int, isKey: true, description: "Unique item identifier", },
+        def column i_item_id { type: text, optional: true, description: "Unique item code; the same for every version of the record", },
+        def column i_rec_start_date { type: date, optional: true, description: "Start of validity of this record version", },
+        def column i_rec_end_date { type: date, optional: true, description: "End of validity of this record version (NULL = current)", },
+        def column i_item_desc { type: text, optional: true, description: "Item description", },
+        def column i_current_price { type: decimal, optional: true, description: "Current sales price", },
+        def column i_wholesale_cost { type: decimal, optional: true, description: "Wholesale cost", },
+        def column i_brand_id { type: int, optional: true, description: "Link to the brand", },
+        def column i_class_id { type: int, optional: true, description: "Link to the class", },
+        def column i_category_id { type: int, optional: true, description: "Link to the category", },
+        def column i_manufact_id { type: int, optional: true, description: "Link to the manufacturer", },
+        def column i_size { type: text, optional: true, description: "The size of this item's SKU", },
+        def column i_formulation { type: text, optional: true, description: "Formulation", },
+        def column i_color { type: text, optional: true, description: "Color", },
+        def column i_units { type: text, optional: true, description: "Unit of measure", },
+        def column i_container { type: text, optional: true, description: "The packaging of this item's SKU", },
+        def column i_manager_id { type: int, optional: true, description: "Product manager", },
+        def column i_product_name { type: text, optional: true, description: "Product name, the human-readable label", search { searchable: true }, },
     ]
 }
 
-def table QDF_VYTEZNOST_REGALU { description: """Výtěžnost regálové plochy pro dodací místo a artikl.
-Určí se poslední návštěva DM s evidencí distribuce. Ke zjištěným návštěvám
-se doplní artikly z XXPLNPOLDISTR (bez prodejních akcí, ISNULL(VLPRODAKCE,0)=0)
-a prodeje z XXPRODEJE (kde ISNULL(HDTRZBA_24M,0)>0).
-Koeficient roční tržby (HDTRZBA_12M_KOEF, hodnoty 0–3) se stanoví dle data
-první dodávky. Přepočtená roční tržba = HDTRZBA_24M / HDTRZBA_12M_KOEF.
-Tržba na cm = přepočtená tržba 12M / délka regálu [Kč/cm].
-""", primaryKey: ["zkratka_dodacího_místa", "id_artiklu"],
+def table item_brand { description: """Product brands — normalised out of the i_brand* columns of item.
+""", primaryKey: ["i_brand_id"],
     columns: [
-        def column IDCENSKUP { type: int, optional: true, description: "Identifikace obchodního kanálu", },
-        def column SUBJADR_POZNAMKA { type: text, isKey: true, description: "Zkratka dodacího místa", },
-        def column IDSKUPZBOZI { type: int, optional: true, description: "Identifikace produktu", },
-        def column IDXXPODSKUPZBOZI { type: int, optional: true, description: "Identifikace podproduktu", },
-        def column IDZBOZI { type: int, isKey: true, description: "Identifikace artiklu", },
-        def column MNFACING { type: decimal, optional: true, description: "Počet čelních pozic artiklu na DM (z poslední návštěvy s evidencí distribuce)", },
-        def column HDTRZBA_24M { type: text, optional: true, description: "Tržba artiklu na DM za posledních 24 měsíců (z XXPRODEJE, kde HDTRZBA_24M > 0)", },
-        def column DTPRVNI_DOD { type: date, optional: true, description: "Datum první dodávky artiklu na DM", },
-        def column DTPOSLEDNI_DOD { type: date, optional: true, description: "Datum poslední dodávky artiklu na DM", },
-        def column MNPOSLEDNI_DOD { type: decimal, optional: true, description: "Množství poslední dodávky artiklu na DM", },
-        def column HDTRZBA_12M_KOEF { type: text, optional: true, description: """Koeficient roční tržby (hodnoty 0–3):
-- DTPRVNI_DOD > dnes - 365 dnů → 1
-- DTPRVNI_DOD <= dnes - 365 a > dnes - 730 → (počet dnů od DTPRVNI_DOD) / 365
-- DTPRVNI_DOD <= dnes - 730 dní → 3
-""", },
-        def column MNDELKA_REG_ART { type: decimal, optional: true, description: "Délka regálu v cm pro artikl a DM = facing × šířka artiklu", },
-        def column HDTRZBA_12M_PREP { type: text, optional: true, description: "Přepočtená roční tržba = HDTRZBA_24M / HDTRZBA_12M_KOEF", },
-        def column HDVYTEZNOST_REGALU { type: text, optional: true, description: "Tržba na cm regálové plochy artiklu na DM [Kč/cm] = HDTRZBA_12M_PREP / MNDELKA_REG_ART", },
+        def column i_brand_id { type: int, isKey: true, description: "Unique brand identifier", },
+        def column i_brand { type: text, optional: true, description: "Brand name", search { searchable: true }, },
+        def column i_class_id { type: int, optional: true, description: "Class the brand belongs to", },
+        def column i_manufact_id { type: int, optional: true, description: "Manufacturer owning the brand", },
     ]
 }
 
-def table QDF_VYTEZNOST_REGALU_KANAL { description: """Výtěžnost regálové plochy agregovaná za obchodní kanál a artikl.
-Pohled agreguje data z QDF_VYTEZNOST_REGALU za kanál a artikl.
-Hodnoty se počítají pouze z artiklů, které mají evidovaný facing > 0.
-Slouží k určení průměrné výtěžnosti artiklu v kanálu pro artikly
-s potenciálem k nabídce.
-""", primaryKey: ["id_obchodního_kanálu", "id_artiklu"],
+def table item_category { description: """Product categories — normalised out of the denormalised i_category* columns of item.
+""", primaryKey: ["i_category_id"],
     columns: [
-        def column IDCENSKUP { type: int, isKey: true, description: "Identifikace obchodního kanálu", },
-        def column IDZBOZI { type: int, isKey: true, description: "Identifikace artiklu", },
-        def column ODEBIRA_POCET_DM_KANAL { type: int, optional: true, description: "Počet DM v kanálu, které pro artikl mají tržbu 12M > 0", },
-        def column CELKEM_POCET_DM_KANAL { type: int, optional: true, description: "Celkový počet DM v kanálu", },
-        def column MNDELKA_REG_ART_KANAL { type: decimal, optional: true, description: "Celková délka regálu artiklu v kanálu v cm (SUM, nikoli AVG)", },
-        def column HDTRZBA_12M_PREP_KANAL { type: text, optional: true, description: "Průměrná přepočtená roční tržba artiklu v kanálu", },
-        def column HDVYTEZNOST_REGALU_KANAL { type: text, optional: true, description: "Tržba na cm regálové plochy artiklu v kanálu [Kč/cm] = SUM(HDTRZBA_12M_PREP WHERE facing>0) / NULLIF(SUM(MNDELKA_REG_ART), 0)", },
+        def column i_category_id { type: int, isKey: true, description: "Unique category identifier", },
+        def column i_category_code { type: text, optional: true, description: "Unique category code", },
+        def column i_category { type: text, optional: true, description: "Category name", search { searchable: true }, },
     ]
 }
 
-def table QHDOK_FAV_DF { description: """Hlavička dobropisu - obchodní doklad pro vrácení peněz zákazníkovi.
-""", primaryKey: ["id_dobropisu"],
+def table item_class { description: """Product classes within a category — normalised out of the i_class* columns of item.
+""", primaryKey: ["i_class_id"],
     columns: [
-        def column IDHDOK { type: int, isKey: true, description: "Unikátní identifikátor dobropisu", },
-        def column CIS_DOK { type: text, optional: true, description: "Číslo dobropisu", },
-        def column ZAK_HDOK { type: text, optional: true, description: "Vazba na číslo vratky", },
-        def column IDSUBJEKT { type: int, optional: true, description: "Vazba na zákazníka (subjekt)", },
-        def column DTZDANITPLN { type: date, optional: true, description: "Datum plnění dobropisu", },
-        def column DTVYSTAVENO { type: date, optional: true, description: "Datum vystavení dobropisu", },
-        def column DTSPLATNO { type: date, optional: true, description: "Datum splatnosti dobropisu", },
-        def column HDKUHRADEVAL { type: text, optional: true, description: "Celková hodnota dobropisu v Kč (záporná částka)", },
-        def column VLSTAVHDOK { type: int, optional: true, description: """Stav dobropisu:
- 0 = Rozpracovaná
- 2 = K tisku
- 3 = Vytištěná
- 4 = K odeslání
- 5 = Odeslaná
- 6 = Doručená
- 7 = K proplacení
- 8 = K zápočtu
- 9 = Zamítnuto
- 10 = Online szamla
- 20 = Storno
-""", },
+        def column i_class_id { type: int, isKey: true, description: "Unique class identifier", },
+        def column i_class_code { type: text, optional: true, description: "Unique class code", },
+        def column i_class { type: text, optional: true, description: "Class name", search { searchable: true }, },
+        def column i_category_id { type: int, optional: true, description: "Link to the parent category", },
     ]
 }
 
-def table QHDOK_ZAK_DF { description: """Hlavička reklamace - obchodní doklad pro reklamaci.
-""", primaryKey: ["id_reklamace"],
+def table item_manufacturer { description: """Manufacturers — normalised out of the i_manufact* columns of item.
+""", primaryKey: ["i_manufact_id"],
     columns: [
-        def column IDHDOK { type: int, isKey: true, description: "Unikátní identifikátor reklamace", },
-        def column CIS_DOK { type: text, optional: true, description: "Číslo reklamace", },
-        def column JEJICH_CISDOK { type: text, optional: true, description: "Vazba na číslo vratky", },
-        def column IDSUBJADRP { type: int, optional: true, description: "Vazba na dodací místo", },
-        def column DTZDANITPLN { type: date, optional: true, description: "Datum plnění reklamace", },
-        def column DTVYSTAVENO { type: date, optional: true, description: "Datum vystavení reklamace", },
-        def column VLSTAVHDOK { type: int, optional: true, description: """Stav reklamace:
- 0 = Pořízeno
- 1 = K ověření OA
- 2 = K ověření OZ
- 3 = Ověřeno OZ
- 4 = K ověření AG
- 5 = Ověřeno AG
- 6 = Ověřeno OA
- 9 = Čeká na zákazníka
- 10 = Uzavřeno
-""", },
+        def column i_manufact_id { type: int, isKey: true, description: "Unique manufacturer identifier", },
+        def column i_manufact { type: text, optional: true, description: "Manufacturer name", },
     ]
 }
 
-def table QHISHDOK_DF { description: "Vazba mezi doklady (předchůdce -> následník)", primaryKey: ["id_toku_dokladů"],
+def table item_price_history { description: """Sales price and wholesale cost history of a product.
+""", primaryKey: ["iph_item_sk", "iph_valid_from"],
     columns: [
-        def column IDHISHDOK { type: int, isKey: true, description: "Unikátní identifikátor toku dokladů", },
-        def column IDHDOKP { type: int, optional: true, description: "Identifikace předchozího dokladu (např. Objednávka)", },
-        def column CIS_DOKP { type: text, optional: true, description: "Číslo předchozího dokladu", },
-        def column NAZEV_TYPDOKP { type: text, optional: true, description: "Typ předchozího dokladu (např. Objednávka, Zakázka, Faktura)", },
-        def column DTZDANITPLNP { type: date, optional: true, description: "Datum plnění předchozího dokladu", },
-        def column STAVP { type: text, optional: true, description: "Stav předchozího dokladu", },
-        def column IDHDOKN { type: int, optional: true, description: "Identifikace následného dokladu (např. Faktura)", },
-        def column CIS_DOKN { type: text, optional: true, description: "Číslo následného dokladu", },
-        def column NAZEV_TYPDOKN { type: text, optional: true, description: "Typ následného dokladu (např. Faktura, Dobropis)", },
-        def column DTZDANITPLNN { type: date, optional: true, description: "Datum plnění následného dokladu", },
-        def column STAVN { type: text, optional: true, description: "Stav následného dokladu", },
+        def column iph_item_sk { type: int, isKey: true, description: "Product", },
+        def column iph_valid_from { type: datetime, isKey: true, description: "Moment the price became valid", },
+        def column iph_valid_to { type: datetime, optional: true, description: "Moment the price stopped being valid (NULL = current)", },
+        def column iph_current_price { type: decimal, optional: true, description: "Sales price", },
+        def column iph_wholesale_cost { type: decimal, optional: true, description: "Wholesale cost", },
     ]
 }
 
-def table QSDOK { description: """Složky obchodních dokladů – řádky dokladů s vazbou na hlavičku, zboží a účetní období.
-""", primaryKey: ["id_složky_dokladu"],
+def table promotion { description: """Promotions and the media they run in (TPC-DS promotion).
+""", primaryKey: ["p_promo_sk"],
     columns: [
-        def column IDSDOK { type: int, isKey: true, description: "Unikátní identifikátor složky dokladu", },
-        def column IDHDOK { type: int, optional: true, description: "FK na hlavičku dokladu", },
-        def column IDTYPDOK { type: int, optional: true, description: "FK na typ dokladu", },
-        def column IDSUBJEKT { type: int, optional: true, description: "FK na subjekt (odběratel/dodavatel)", },
-        def column CIS_DOK { type: text, optional: true, description: "Číslo dokladu", },
-        def column DTZDANITPLN { type: datetime, optional: true, description: "Datum uskutečnění zdanitelného plnění (DUZP)", },
-        def column TEXTPOZN { type: text, optional: true, description: "Text hlavičky / poznámka dokladu", },
-        def column ZAK_SDOK { type: text, optional: true, description: "Číslo zakázky na složce dokladu", },
-        def column PORADI_DOK { type: int, optional: true, description: "Pořadí složky v rámci dokladu", },
-        def column VLTYP_SLOZ { type: int, optional: true, description: "Typ složky (1=zboží, 2=služba, 3=ostatní, 9=poplatek)", },
-        def column KOD_POHYB { type: text, optional: true, description: "Kód pohybu složky (např. FV = Faktura vydaná)", },
-        def column SLOZKA_IDENT { type: text, optional: true, description: "Kód složky (identifikátor artiklu/zboží)", },
-        def column NAZEV_ZBOZI { type: text, optional: true, description: "Název složky (název zboží/služby)", },
-        def column TEXT_SLOZ { type: text, optional: true, description: "Text složky dokladu", },
-        def column MNPOCETMJ { type: decimal, optional: true, description: "Počet měrných jednotek", },
-        def column HDJCENAKC { type: text, optional: true, description: "Jednotková cena v Kč", },
-        def column HDCCENAKC { type: text, optional: true, description: "Celková cena v Kč", },
+        def column p_promo_sk { type: int, isKey: true, description: "Unique promotion identifier", },
+        def column p_promo_id { type: text, optional: true, description: "Promotion code", },
+        def column p_start_date_sk { type: int, optional: true, description: "Promotion start date", },
+        def column p_end_date_sk { type: int, optional: true, description: "Promotion end date", },
+        def column p_item_sk { type: int, optional: true, description: "Featured product of the promotion", },
+        def column p_cost { type: decimal, optional: true, description: "Cost of the promotion", },
+        def column p_response_target { type: int, optional: true, description: "Response target", },
+        def column p_promo_name { type: text, optional: true, description: "Promotion name, the human-readable label", search { searchable: true }, },
+        def column p_channel_dmail { type: text, optional: true, description: "Promoted by direct mail", },
+        def column p_channel_email { type: text, optional: true, description: "Promoted by e-mail", },
+        def column p_channel_catalog { type: text, optional: true, description: "Promoted in the catalog", },
+        def column p_channel_tv { type: text, optional: true, description: "Promoted on TV", },
+        def column p_channel_radio { type: text, optional: true, description: "Promoted on radio", },
+        def column p_channel_press { type: text, optional: true, description: "Promoted in the press", },
+        def column p_channel_event { type: text, optional: true, description: "Promoted at an event", },
+        def column p_channel_details { type: text, optional: true, description: "Details of the promotion media", },
+        def column p_purpose { type: text, optional: true, description: "Purpose of the promotion", },
+        def column p_discount_active { type: text, optional: true, description: "Discount active flag", },
     ]
 }
 
-def table QSDOK_PDO_DF { description: """Složka (položka) reklamace - jednotlivé artikly na reklamaci.
-""", primaryKey: ["id_složky_reklamace"],
+def table promotion_item { description: """Products taking part in a promotion — a bridge between promotion and item.
+""", primaryKey: ["pi_promo_sk", "pi_item_sk"],
     columns: [
-        def column IDSDOK { type: int, isKey: true, description: "Unikátní identifikátor složky reklamace", },
-        def column IDHDOK { type: int, optional: true, description: "Vazba na hlavičku reklamace", },
-        def column IDZBOZI { type: int, optional: true, description: "Vazba na artikl", },
-        def column MNCELKEMPOCET { type: decimal, optional: true, description: "Množství kusů na reklamaci", },
-        def column HDJCENAVAL { type: text, optional: true, description: "Cena za měrnou jednotku", },
-        def column HDCCENAVAL { type: text, optional: true, description: "Celková cena položky", },
+        def column pi_promo_sk { type: int, isKey: true, description: "Promotion", },
+        def column pi_item_sk { type: int, isKey: true, description: "Product in the promotion", },
+        def column pi_discount_pct { type: float, optional: true, description: "Discount in percent", },
+        def column pi_start_date_sk { type: int, optional: true, description: "Date the product joined the promotion", },
     ]
 }
 
-def table QSKUPUZIV { description: """Strom funkčních míst (pozic). Každý řádek = podřízené místo + jeho nadřízené místo.
-""", primaryKey: ["id_podřízeného_funkčního_místa"],
+def table reason { description: """Return reasons (TPC-DS reason). The reason text is stored in the language of the loaded data.
+""", primaryKey: ["r_reason_sk"],
     columns: [
-        def column IDSKUPUZIV { type: int, isKey: true, description: "Unikátní identifikátor podřízeného funkčního místa", },
-        def column NAZEV_SKUP_UZIV { type: text, optional: true, description: "Název podřízeného funkčního místa (pozice/role)", },
-        def column IDSKUPUZIV_R { type: int, optional: true, description: "FK na nadřazené (řídící) funkční místo. NULL = kořenové funkční místo bez nadřízeného.", },
-        def column NAZEV_SKUP_UZIV_R { type: text, optional: true, description: "Název nadřízeného funkčního místa (denormalizovaný)", },
+        def column r_reason_sk { type: int, isKey: true, description: "Unique reason identifier", },
+        def column r_reason_id { type: text, optional: true, description: "Return reason code", },
+        def column r_reason_desc { type: text, optional: true, description: "Return reason text, the human-readable label", search { searchable: true }, },
     ]
 }
 
-def table QSKUPZBOZI_DF { description: """Evidence produktů a jejich vlastností.
-⚠ Produkt seskupuje artikly různých velikostí/variant.
-""", primaryKey: ["id_produktu"],
+def table ship_mode { description: """Ship modes of web and marketplace orders (TPC-DS ship_mode).
+""", primaryKey: ["sm_ship_mode_sk"],
     columns: [
-        def column IDSKUPZBOZI { type: int, isKey: true, description: "Unikátní identifikátor produktu", },
-        def column KOD_SKUP_ZBOZI { type: text, optional: true, description: "Unikátní kód produktu", },
-        def column NAZEV_SKUP_ZBOZI { type: text, optional: true, description: "Obchodní název produktu", },
-        def column PORADI { type: int, optional: true, description: "Zadané pořadí produktu", },
-        def column VLVYZNAM_Z { type: int, optional: true, description: "Zadaný význam produktu", },
+        def column sm_ship_mode_sk { type: int, isKey: true, description: "Unique ship mode identifier", },
+        def column sm_ship_mode_id { type: text, optional: true, description: "Ship mode code", },
+        def column sm_type { type: text, optional: true, description: "Ship mode type", },
+        def column sm_code { type: text, optional: true, description: "Transport code (air, surface, sea)", },
+        def column sm_carrier { type: text, optional: true, description: "Carrier", },
+        def column sm_contract { type: text, optional: true, description: "Carrier contract number", },
     ]
 }
 
-def table QSKUPZNACZBOZI_DF { description: """Evidence tržních skupin a jejich vlastností.
-""", primaryKey: ["id_tržní_skupiny"],
+def table store { description: """Stores (TPC-DS store), versioned by validity (s_rec_start_date / s_rec_end_date).
+The store entity reads only the currently valid version of each record.
+""", primaryKey: ["s_store_sk"],
     columns: [
-        def column IDSKUPZNACZBOZI { type: int, isKey: true, description: "Unikátní identifikátor tržní skupiny", },
-        def column KOD_SKUPZNACZBOZI { type: text, optional: true, description: "Unikátní kód tržní skupiny", },
-        def column NAZEV_SKUPZNACZBOZI { type: text, optional: true, description: "Název tržní skupiny", },
+        def column s_store_sk { type: int, isKey: true, description: "Unique store identifier", },
+        def column s_store_id { type: text, optional: true, description: "Unique store code", },
+        def column s_store_name { type: text, optional: true, description: "Store name, the human-readable label", search { searchable: true }, },
+        def column s_rec_start_date { type: date, optional: true, description: "Start of validity of this record version", },
+        def column s_rec_end_date { type: date, optional: true, description: "End of validity of this record version (NULL = current)", },
+        def column s_closed_date_sk { type: int, optional: true, description: "Date the store closed", },
+        def column s_number_employees { type: int, optional: true, description: "Number of employees", },
+        def column s_floor_space { type: int, optional: true, description: "Selling floor space in square feet", },
+        def column s_hours { type: text, optional: true, description: "Opening hours", },
+        def column s_manager { type: text, optional: true, description: "Store manager", },
+        def column s_market_id { type: int, optional: true, description: "Link to the store's market", },
+        def column s_geography_class { type: text, optional: true, description: "Geography class of the location", },
+        def column s_city { type: text, optional: true, description: "The city the store is located in", },
+        def column s_county { type: text, optional: true, description: "The county the store is located in", },
+        def column s_state { type: text, optional: true, description: "The state the store is located in", },
+        def column s_zip { type: text, optional: true, description: "ZIP code", },
+        def column s_country { type: text, optional: true, description: "Country", },
+        def column s_tax_precentage { type: float, optional: true, description: "Sales tax rate in percent", },
     ]
 }
 
-def table QSTRED_DF { description: """Číselník účetních (nákladových) středisek.
-""", primaryKey: ["id_střediska"],
+def table store_company { description: """Companies operating the stores — normalised out of the s_company_* columns of store.
+""", primaryKey: ["s_company_id"],
     columns: [
-        def column IDSTRED { type: int, isKey: true, description: "Unikátní identifikátor střediska", },
-        def column KOD_STR { type: text, optional: true, description: "Kód střediska", },
-        def column NAZEV_STR { type: text, optional: true, description: "Název střediska", },
-        def column IDXXUKAZMU { type: int, optional: true, description: "FK na ukazatel manažerského účetnictví (QXXUKAZMU.IDXXUKAZMU)", },
+        def column s_company_id { type: int, isKey: true, description: "Unique company identifier", },
+        def column s_company_name { type: text, optional: true, description: "Company name", },
     ]
 }
 
-def table QSUBJADR_DF { description: """Evidence dodacích míst subjektů.
-""", primaryKey: ["id_dodacího_místa"],
+def table store_division { description: """Divisions the markets belong to — normalised out of the s_division_* columns of store.
+""", primaryKey: ["s_division_id"],
     columns: [
-        def column IDSUBJADR { type: int, isKey: true, description: "Unikátní identifikátor dodacího místa", },
-        def column IDSUBJEKT { type: int, optional: true, description: "Vazba na subjekt", },
-        def column SUBJADR_POZNAMKA { type: text, optional: true, description: "Zkratka dodacího místa", },
-        def column MESTO { type: text, optional: true, description: "Město dodacího místa", },
-        def column ULICE { type: text, optional: true, description: "Ulice a číslo popisné dodacího místa", },
-        def column IDUZIVATEL_DE { type: int, optional: true, description: "Identifikace obchodního zástupce přiřazeného k dodacímu místu", },
-        def column DTPOSLEDNI { type: date, optional: true, description: "Datum poslední návštěvy na dodacím místě", },
-        def column LATITUDE { type: float, optional: true, description: "Zeměpisná šířka dodacího místa", },
-        def column LONGITUDE { type: float, optional: true, description: "Zeměpisná délka dodacího místa", },
+        def column s_division_id { type: int, isKey: true, description: "Unique division identifier", },
+        def column s_division_code { type: text, optional: true, description: "Unique division code", },
+        def column s_division_name { type: text, optional: true, description: "Division name", },
+        def column s_company_id { type: int, optional: true, description: "Link to the company", },
     ]
 }
 
-def table QSUBJEKT { description: """Evidence zákazníků a jejich vlastností.
-⚠ Jeden zákazník může mít více dodacích míst.
-""", primaryKey: ["id_subjektu"],
+def table store_item_assortment { description: """Store assortment — which products a store carries, and since when.
+""", primaryKey: ["sia_store_sk", "sia_item_sk"],
     columns: [
-        def column IDSUBJEKT { type: int, isKey: true, description: "Unikátní identifikátor subjektu", },
-        def column KOD_SUBJEKTU { type: text, optional: true, description: "Kód subjektu", },
-        def column SUBJ_NAZEV { type: text, optional: true, description: "Název subjektu", },
+        def column sia_store_sk { type: int, isKey: true, description: "Store", },
+        def column sia_item_sk { type: int, isKey: true, description: "Product", },
+        def column sia_listed_date_sk { type: int, optional: true, description: "Date the product was listed", },
+        def column sia_delisted_date_sk { type: int, optional: true, description: "Date the product was delisted", },
+        def column sia_min_stock { type: int, optional: true, description: "Minimum stock level in the store", },
     ]
 }
 
-def table QSUBJOSOBA_DF { description: """Osoby dodacího místa.
-""", primaryKey: ["id_osoby_dodacího_místa"],
+def table store_market { description: """Store markets — normalised out of the denormalised s_market_* columns of store.
+""", primaryKey: ["s_market_id"],
     columns: [
-        def column IDSUBJOSOBA { type: int, isKey: true, description: "Unikátní identifikátor osoby dodacího místa", },
-        def column IDSUBJADR { type: int, optional: true, description: "Vazba na dodací místo", },
-        def column JMENO { type: text, optional: true, description: "Jméno osoby dodacího místa", },
-        def column FUNKCE { type: text, optional: true, description: "Funkce osoby na dodacím místě", },
-        def column TEL { type: text, optional: true, description: "Telefonní číslo osoby dodacího místa", },
-        def column EMAIL { type: text, optional: true, description: "Emailová adresa osoby dodacího místa", },
+        def column s_market_id { type: int, isKey: true, description: "Unique market identifier", },
+        def column s_market_code { type: text, optional: true, description: "Unique market code", },
+        def column s_market_desc { type: text, optional: true, description: "Market name", search { searchable: true }, },
+        def column s_market_manager { type: text, optional: true, description: "Market manager", },
+        def column s_division_id { type: int, optional: true, description: "Link to the division", },
     ]
 }
 
-def table QSUBJVTSUBJ_DF { description: """Evidence obchodních vztahů zákazníků.
-""", primaryKey: ["id_obchodního_vztahu"],
+def table store_returns { description: """Stores-channel returns (TPC-DS store_returns).
+""", primaryKey: ["sr_item_sk", "sr_ticket_number"],
     columns: [
-        def column IDSUBJVTSUBJ { type: int, isKey: true, description: "Unikátní identifikátor obchodního vztahu", },
-        def column IDSUBJEKT { type: int, optional: true, description: "Vazba na subjekt", },
-        def column IDCENSKUP { type: int, optional: true, description: "Vazba na obchodní kanál", },
+        def column sr_returned_date_sk { type: int, optional: true, description: "Return date — FK to the calendar", },
+        def column sr_return_time_sk { type: int, optional: true, description: "Return time of day — FK to the time dimension", },
+        def column sr_item_sk { type: int, isKey: true, description: "Returned product", },
+        def column sr_customer_sk { type: int, optional: true, description: "Returning customer", },
+        def column sr_cdemo_sk { type: int, optional: true, description: "Customer demographics at the time of the return", },
+        def column sr_addr_sk { type: int, optional: true, description: "Customer address at the time of the return", },
+        def column sr_store_sk { type: int, optional: true, description: "Store accepting the return", },
+        def column sr_reason_sk { type: int, optional: true, description: "Return reason", },
+        def column sr_ticket_number { type: int, isKey: true, description: "Original sales ticket number — pairs this return with its sale", },
+        def column sr_return_quantity { type: int, optional: true, description: "Units returned on this line", },
+        def column sr_return_amt { type: decimal, optional: true, description: "Refunded amount of the line, excluding tax", },
+        def column sr_return_tax { type: decimal, optional: true, description: "Tax on the refunded amount", },
+        def column sr_fee { type: decimal, optional: true, description: "Return handling fee", },
+        def column sr_refunded_cash { type: decimal, optional: true, description: "Amount refunded in cash", },
+        def column sr_store_credit { type: decimal, optional: true, description: "Amount refunded as store credit", },
+        def column sr_net_loss { type: decimal, optional: true, description: "Net loss of the return", },
     ]
 }
 
-def table QTYPDOK { description: """Číselník typů dokladů.
-""", primaryKey: ["id_typu_dokladu"],
+def table store_sales { description: """Stores-channel sales lines (TPC-DS store_sales).
+One row = one line of a sales ticket; the line revenue is ss_ext_sales_price.
+""", primaryKey: ["ss_item_sk", "ss_ticket_number"],
     columns: [
-        def column IDTYPDOK { type: int, isKey: true, description: "Unikátní identifikátor typu dokladu", },
-        def column TYP_DOK { type: text, optional: true, description: "Kód typu dokladu", },
-        def column NAZEV_TYPDOK { type: text, optional: true, description: "Název typu dokladu", },
+        def column ss_sold_date_sk { type: int, optional: true, description: "Sale date — FK to the calendar", },
+        def column ss_sold_time_sk { type: int, optional: true, description: "Sale time of day — FK to the time dimension", },
+        def column ss_item_sk { type: int, isKey: true, description: "Sold product", },
+        def column ss_customer_sk { type: int, optional: true, description: "Buying customer", },
+        def column ss_cdemo_sk { type: int, optional: true, description: "Customer demographics at the time of the sale", },
+        def column ss_hdemo_sk { type: int, optional: true, description: "Household demographics at the time of the sale", },
+        def column ss_addr_sk { type: int, optional: true, description: "Customer address at the time of the sale", },
+        def column ss_store_sk { type: int, optional: true, description: "Selling store", },
+        def column ss_promo_sk { type: int, optional: true, description: "Promotion applied to this line, if any", },
+        def column ss_ticket_number { type: int, isKey: true, description: "Sales ticket number; one ticket = one basket", },
+        def column ss_quantity { type: int, optional: true, description: "Units sold on this line", },
+        def column ss_list_price { type: decimal, optional: true, description: "List price per unit", },
+        def column ss_sales_price { type: decimal, optional: true, description: "Sales price per unit after discount", },
+        def column ss_ext_discount_amt { type: decimal, optional: true, description: "Total discount of the line", },
+        def column ss_ext_sales_price { type: decimal, optional: true, description: "Extended sales price of the line (unit price × quantity) — the revenue amount", },
+        def column ss_ext_tax { type: decimal, optional: true, description: "Tax of the line", },
+        def column ss_net_paid { type: decimal, optional: true, description: "Net amount paid, excluding tax", },
+        def column ss_net_profit { type: decimal, optional: true, description: "Net profit of the line", },
     ]
 }
 
-def table QUCETZAP { description: """Účetní zápisy – jednotlivé řádky účetních dokladů s obraty MD/Dal.
-""", primaryKey: ["id_účetního_zápisu"],
+def table store_sales_plan { description: """Planned store revenue by product category and month.
+""", primaryKey: ["ssp_store_sk", "ssp_category_id", "ssp_year", "ssp_moy"],
     columns: [
-        def column IDUCETZAP { type: int, isKey: true, description: "Unikátní identifikátor účetního zápisu", },
-        def column IDHDOK { type: int, optional: true, description: "FK na hlavičku účetního dokladu", },
-        def column IDSDOK { type: int, optional: true, description: "FK na složku účetního dokladu", },
-        def column IDSTRED { type: int, optional: true, description: "FK na účetní středisko (QSTRED_DF.IDSTRED)", },
-        def column IDUCTOSN { type: int, optional: true, description: "FK na účet účetní osnovy (QUCTOSN_DF.IDUCTOSN)", },
-        def column IDUCTOBD { type: int, optional: true, description: "FK na účetní období (QUCTOBD.IDUCTOBD)", },
-        def column UZTEXT { type: text, optional: true, description: "Text účetního zápisu", },
-        def column HDOBRAT_MD { type: text, optional: true, description: "Obrat strany Má dáti", },
-        def column HDOBRAT_DAL { type: text, optional: true, description: "Obrat strany Dal", },
-        def column HDKON_STAV { type: text, optional: true, description: "Účetní hodnota", },
+        def column ssp_store_sk { type: int, isKey: true, description: "Store", },
+        def column ssp_category_id { type: int, isKey: true, description: "Product category", },
+        def column ssp_year { type: int, isKey: true, description: "Plan year", },
+        def column ssp_moy { type: int, isKey: true, description: "Plan month, 1-12", },
+        def column ssp_planned_sales { type: decimal, optional: true, description: "Planned revenue", },
+        def column ssp_planned_quantity { type: int, optional: true, description: "Planned units sold", },
     ]
 }
 
-def table QUCTOBD { description: """Číselník účetních období. Každý záznam reprezentuje jedno účetní období (typicky měsíc)
-s vazbou na fiskální období, datem prvního a posledního dne.
-""", primaryKey: ["id_účetního_období"],
+def table time_dim { description: """Time of day at one-second grain (TPC-DS time_dim).
+""", primaryKey: ["t_time_sk"],
     columns: [
-        def column IDUCTOBD { type: int, isKey: true, description: "Unikátní identifikátor účetního období", },
-        def column UCET_OBD { type: text, optional: true, description: "Kód účetního období ve formátu RRRR.MM (např. 2026.04)", },
-        def column VLSTAVUO { type: int, optional: true, description: "Stav účetního období (0 = otevřené)", },
-        def column dtObd_PrvniDen { type: datetime, optional: true, description: "První den účetního období", },
-        def column dtObd_PoslDen { type: datetime, optional: true, description: "Poslední den účetního období", },
+        def column t_time_sk { type: int, isKey: true, description: "Unique time identifier", },
+        def column t_time_id { type: text, optional: true, description: "Time code", },
+        def column t_time { type: int, optional: true, description: "Second of the day", },
+        def column t_hour { type: int, optional: true, description: "Hour", },
+        def column t_minute { type: int, optional: true, description: "Minute", },
+        def column t_second { type: int, optional: true, description: "Second", },
+        def column t_am_pm { type: text, optional: true, description: "AM / PM", },
+        def column t_shift { type: text, optional: true, description: "Work shift", },
+        def column t_sub_shift { type: text, optional: true, description: "Part of the shift", },
+        def column t_meal_time { type: text, optional: true, description: "Meal time (breakfast, lunch, dinner)", },
     ]
 }
 
-def table QUCTOSN_DF { description: """Číselník účtů účetní osnovy.
-""", primaryKey: ["id_účtu"],
+def table warehouse { description: """Distribution centers fulfilling web and marketplace orders (TPC-DS warehouse).
+""", primaryKey: ["w_warehouse_sk"],
     columns: [
-        def column IDUCTOSN { type: int, isKey: true, description: "Unikátní identifikátor účtu", },
-        def column KOD_UCTU { type: text, optional: true, description: "Kód účtu (např. 013, 501001)", },
-        def column NAZEV_UCTU { type: text, optional: true, description: "Název účtu", },
+        def column w_warehouse_sk { type: int, isKey: true, description: "Unique distribution center identifier", },
+        def column w_warehouse_id { type: text, optional: true, description: "Distribution center code", },
+        def column w_warehouse_name { type: text, optional: true, description: "Distribution center name, the human-readable label", search { searchable: true }, },
+        def column w_warehouse_sq_ft { type: int, optional: true, description: "Warehouse floor space in square feet", },
+        def column w_street_name { type: text, optional: true, description: "Street", },
+        def column w_city { type: text, optional: true, description: "The city the distribution center is located in", },
+        def column w_county { type: text, optional: true, description: "County", },
+        def column w_state { type: text, optional: true, description: "The state the distribution center is located in", },
+        def column w_zip { type: text, optional: true, description: "ZIP code", },
+        def column w_country { type: text, optional: true, description: "Country", },
+        def column w_gmt_offset { type: float, optional: true, description: "Offset from GMT in hours", },
     ]
 }
 
-def table QUZIVATEL_DF { description: """Evidence uživatelů systému.
-""", primaryKey: ["id_uživatele"],
+def table web_page { description: """Pages of the web channel (TPC-DS web_page), versioned by validity.
+""", primaryKey: ["wp_web_page_sk"],
     columns: [
-        def column IDUZIVATEL { type: int, isKey: true, description: "Unikátní identifikátor uživatele", },
-        def column KOD_UZIV { type: text, optional: true, description: "Kód uživatele", },
-        def column JMENO_UZIV { type: text, optional: true, description: "Jméno uživatele", },
-        def column UZIV_EMAIL { type: text, optional: true, description: "Email uživatele", },
-        def column UZIV_TEL { type: text, optional: true, description: "Telefon uživatele", },
+        def column wp_web_page_sk { type: int, isKey: true, description: "Unique web page identifier", },
+        def column wp_web_page_id { type: text, optional: true, description: "Web page code", },
+        def column wp_rec_start_date { type: date, optional: true, description: "Start of validity of this record version", },
+        def column wp_rec_end_date { type: date, optional: true, description: "End of validity of this record version (NULL = current)", },
+        def column wp_creation_date_sk { type: int, optional: true, description: "Date the page was created", },
+        def column wp_access_date_sk { type: int, optional: true, description: "Date of the last access", },
+        def column wp_autogen_flag { type: text, optional: true, description: "Whether the page was generated automatically", },
+        def column wp_customer_sk { type: int, optional: true, description: "Customer the page was created for", },
+        def column wp_url { type: text, optional: true, description: "Page URL", },
+        def column wp_type { type: text, optional: true, description: "Page type (e.g. welcome, order, feedback)", },
+        def column wp_char_count { type: int, optional: true, description: "Number of characters on the page", },
+        def column wp_link_count { type: int, optional: true, description: "Number of links on the page", },
+        def column wp_image_count { type: int, optional: true, description: "Number of images on the page", },
     ]
 }
 
-def table QUZVESKUP { description: """Vazba mezi uživateli a skupinami uživatelů.
-Umožňuje zjistit, do které skupiny uživatel patří a jaké má tak přístupové práva.
-⚠ Uživatel může být ve VÍCE skupinách. Pro "výchozí skupinu" VŽDY filtruj WHERE VLVYCHOZI = 1.
-""", primaryKey: ["id_uživatele_ve_skupině"],
+def table web_returns { description: """Web-channel returns (TPC-DS web_returns).
+""", primaryKey: ["wr_item_sk", "wr_order_number"],
     columns: [
-        def column IDUZVESKUP { type: int, isKey: true, description: "Unikátní identifikátor záznamu vazby uživatele ve skupině", },
-        def column IDUZIVATEL { type: int, optional: true, description: "Vazba na uživatele", },
-        def column IDSKUPUZIV { type: int, optional: true, description: "Vazba na skupinu uživatelů", },
-        def column NAZEV_SKUP_UZIV { type: text, optional: true, description: "Název skupiny uživatelů (denormalizováno z JOIN na QSKUPUZIV)", },
-        def column KOD_SKUP_UZIV { type: text, optional: true, description: "Kód skupiny uživatelů (denormalizováno z JOIN na QSKUPUZIV)", },
-        def column VLVYCHOZI { type: int, optional: true, description: "Indikuje, zda je tato skupina výchozí pro uživatele (1 = ano, 0 = ne). Uživatel může být členem více skupin, ale pouze jedna může být výchozí.", },
+        def column wr_returned_date_sk { type: int, optional: true, description: "Return date — FK to the calendar", },
+        def column wr_item_sk { type: int, isKey: true, description: "Returned product", },
+        def column wr_refunded_customer_sk { type: int, optional: true, description: "Customer the amount was refunded to", },
+        def column wr_returning_customer_sk { type: int, optional: true, description: "Returning customer", },
+        def column wr_returning_addr_sk { type: int, optional: true, description: "Address the goods were returned from", },
+        def column wr_web_page_sk { type: int, optional: true, description: "Web page of the original order", },
+        def column wr_reason_sk { type: int, optional: true, description: "Return reason", },
+        def column wr_order_number { type: int, isKey: true, description: "Original web order number — pairs this return with its sale", },
+        def column wr_return_quantity { type: int, optional: true, description: "Units returned on this line", },
+        def column wr_return_amt { type: decimal, optional: true, description: "Refunded amount of the line, excluding tax", },
+        def column wr_account_credit { type: decimal, optional: true, description: "Amount credited to the customer account", },
+        def column wr_net_loss { type: decimal, optional: true, description: "Net loss of the return", },
     ]
 }
 
-def table QXXDENNIPLANOZ { description: """Evidence denních výkazů obchodních zástupců.
-""", primaryKey: ["id_denního_výkazu_oz"],
+def table web_sales { description: """Web-channel sales lines (TPC-DS web_sales).
+""", primaryKey: ["ws_item_sk", "ws_order_number"],
     columns: [
-        def column IDXXDENNIPLANOZ { type: int, isKey: true, description: "Unikátní identifikátor denního výkazu obchodního zástupce", },
-        def column IDUZIVATEL_DE { type: int, optional: true, description: "Vazba na obchodního zástupce", },
-        def column DTDEN { type: date, optional: true, description: "Datum denního výkazu obchodního zástupce", },
+        def column ws_sold_date_sk { type: int, optional: true, description: "Order date — FK to the calendar", },
+        def column ws_sold_time_sk { type: int, optional: true, description: "Order time of day — FK to the time dimension", },
+        def column ws_ship_date_sk { type: int, optional: true, description: "Ship date — FK to the calendar", },
+        def column ws_item_sk { type: int, isKey: true, description: "Ordered product", },
+        def column ws_bill_customer_sk { type: int, optional: true, description: "Billed customer", },
+        def column ws_bill_addr_sk { type: int, optional: true, description: "Billing address", },
+        def column ws_ship_customer_sk { type: int, optional: true, description: "Customer the order is shipped to", },
+        def column ws_ship_addr_sk { type: int, optional: true, description: "Shipping address", },
+        def column ws_web_page_sk { type: int, optional: true, description: "Web page the order was placed on", },
+        def column ws_web_site_sk { type: int, optional: true, description: "Web site the order was placed on", },
+        def column ws_ship_mode_sk { type: int, optional: true, description: "Ship mode", },
+        def column ws_warehouse_sk { type: int, optional: true, description: "Fulfilling distribution center", },
+        def column ws_promo_sk { type: int, optional: true, description: "Promotion applied to this line, if any", },
+        def column ws_order_number { type: int, isKey: true, description: "Web order number; one order = one basket", },
+        def column ws_quantity { type: int, optional: true, description: "Units ordered on this line", },
+        def column ws_list_price { type: decimal, optional: true, description: "List price per unit", },
+        def column ws_sales_price { type: decimal, optional: true, description: "Sales price per unit after discount", },
+        def column ws_ext_sales_price { type: decimal, optional: true, description: "Extended sales price of the line — the revenue amount", },
+        def column ws_ext_ship_cost { type: decimal, optional: true, description: "Shipping cost of the line", },
+        def column ws_net_paid { type: decimal, optional: true, description: "Net amount paid, excluding tax", },
+        def column ws_net_profit { type: decimal, optional: true, description: "Net profit of the line", },
     ]
 }
 
-def table QXXKONKINFO { description: """Evidence informací ke konkurenci.
-""", primaryKey: ["id_informace_ke_konkurenci"],
+def table web_site { description: """Web sites of the web channel (TPC-DS web_site), versioned by validity.
+""", primaryKey: ["web_site_sk"],
     columns: [
-        def column IDXXKONKINFO { type: int, isKey: true, description: "Unikátní identifikátor informace ke konkurenci", },
-        def column IDXXKONKURENT_D { type: int, optional: true, description: "Vazba na konkurenčního dodavatele", },
-        def column IDXXKONKURENT_Z { type: int, optional: true, description: "Vazba na konkurenční značku", },
-        def column IDSKUPZNACZBOZI { type: int, optional: true, description: "Vazba na tržní skupinu", },
-        def column ZJISTENI { type: text, optional: true, description: "Textový popis zjištění ke konkurenčnímu dodavateli nebo značce", },
-        def column IDCENSKUP { type: int, optional: true, description: "Vazba na obchodní kanál", },
-        def column IDSKUPZBOZI { type: int, optional: true, description: "Vazba na produkt", },
-        def column IDXXPODSKUPZBOZI { type: int, optional: true, description: "Vazba na podprodukt", },
-        def column VLTYP_INFO { type: int, optional: true, description: """Typ informace o konkurenci:
-10 = Zjištění dodavatel
-20 = Zjištění značka
-30 = Povolená kombinace
-40 = Zájmový konkurent
-""", },
-        def column VLVLASTNOST_INFO { type: int, optional: true, description: """Vlastnost pro typ informace o konkurenci:
--1 = Nelze vybrat
-0 = Neutrální zjištění
-10 = Silné stránky
-11 = Slabé stránky
-20 = Výhody
-21 = Nevýhody
-""", },
-        def column VLOBLAST_INFO { type: int, optional: true, description: """Oblast pro typ informace o konkurenci:
--1 = Nelze vybrat
-10 = Nabízený sortiment
-20 = Cenová politika
-30 = Marketingová podpora
-40 = Prodejní servis
-50 = Logistický servis
-""", },
-        def column DTPLATI_OD { type: date, optional: true, description: "Platnost informace od", },
-        def column DTPLATI_DO { type: date, optional: true, description: "Platnost informace do", },
-        def column DTAKTUALIZACE { type: date, optional: true, description: "Datum poslední změny na řádku", },
+        def column web_site_sk { type: int, isKey: true, description: "Unique web site identifier", },
+        def column web_site_id { type: text, optional: true, description: "Web site code", },
+        def column web_name { type: text, optional: true, description: "Web site name", },
+        def column web_rec_start_date { type: date, optional: true, description: "Start of validity of this record version", },
+        def column web_rec_end_date { type: date, optional: true, description: "End of validity of this record version (NULL = current)", },
+        def column web_open_date_sk { type: int, optional: true, description: "Date the site went live", },
+        def column web_close_date_sk { type: int, optional: true, description: "Date the site was shut down", },
+        def column web_class { type: text, optional: true, description: "Web site class", },
+        def column web_manager { type: text, optional: true, description: "Web site manager", },
+        def column web_mkt_id { type: int, optional: true, description: "Identifier of the market served", },
+        def column web_company_name { type: text, optional: true, description: "Operating company", },
+        def column web_country { type: text, optional: true, description: "Country", },
     ]
 }
 
-def table QXXKONKNADM { description: """Evidence konkurence spojené s návštěvou zákazníka.
-""", primaryKey: ["id_konkurence_návštěvy_zákazníka"],
-    columns: [
-        def column IDXXKONKNADM { type: int, isKey: true, description: "Unikátní identifikátor konkurence v návštěvě zákazníka", },
-        def column IDXXNAVSTEVAOZ { type: int, optional: true, description: "Identifikace návštěvy zákazníka", },
-        def column IDSKUPZBOZI { type: int, optional: true, description: "Identifikace produktu", },
-        def column IDXXKONKURENT_D { type: int, optional: true, description: "Identifikace konkurenčního dodavatele = XXKONKNADM.IDXXKONKURENT_D", },
-        def column IDXXKONKURENT_Z { type: int, optional: true, description: "Identifikace konkurenční značky = XXKONKNADM.IDXXKONKURENT_Z", },
-        def column OBSAZENO { type: int, optional: true, description: "Délkové cm regálu, které zabírá konkurent a značka", },
-        def column OBSAZENO_PROC { type: int, optional: true, description: "Podíl konkurenta v procentech", },
-    ]
-}
-
-def table QXXKONKURENT { description: """Evidence konkurenčních značek a jejich vlastností.
-⚠ Tabulka QXXKONKURENT je sdílená pro dodavatele i značky — rozlišení přes WHERE VLTYP_KONK.
-Pro JOIN z informace_ke_konkurenci použij FK IDXXKONKURENT_D (dodavatel) nebo IDXXKONKURENT_Z (značka).
-""", primaryKey: ["id_konkurenční_značky"],
-    columns: [
-        def column IDXXKONKURENT { type: int, isKey: true, description: "Unikátní identifikátor konkurenční značky", },
-        def column NAZEV_KONKURENTA { type: text, optional: true, description: "Název konkurenční značky", },
-        def column VLTYP_KONK { type: int, optional: true, description: "Typ konkurence (0 = Značka aktivní, 10 = Značka neaktivní)", },
-    ]
-}
-
-def table QXXNAVSTEVAOZ { description: """Evidence návštěv zákazníků obchodními zástupci.
-""", primaryKey: ["id_návštěvy_zákazníka"],
-    columns: [
-        def column IDXXNAVSTEVAOZ { type: int, isKey: true, description: "Unikátní identifikátor návštěvy zákazníka", },
-        def column IDXXDENNIPLANOZ { type: int, optional: true, description: "Vazba na denní výkaz obchodního zástupce", },
-        def column IDUZIVATEL_DE { type: int, optional: true, description: "Vazba na obchodního zástupce", },
-        def column JMENO_UZIV_DE { type: text, optional: true, description: "Jméno obchodního zástupce", },
-        def column IDSUBJADR { type: int, optional: true, description: "Vazba na dodací místo zákazníka", },
-        def column SUBJADR_POZNAMKA { type: text, optional: true, description: "Zkratka dodacího místa (denormalizováno z QSUBJADR_DF)", },
-        def column DTUSKUTECNENO { type: date, optional: true, description: "Datum návštěvy zákazníka", },
-        def column VLTYP_NAVSTEVY { type: int, optional: true, description: """Typ návštěvy zákazníka:
-0 = běžná
-1 = kontrola
-2 = ostatní
-3 = bez evidence
-4 = aktivita
-5 = objednávka
-6 = objednávka NT
-Výchozí filtr pro "počet návštěv": typ IN (0, 1, 2, 4) — bez typů 3 (bez evidence), 5 a 6 (objednávky).
-""", },
-        def column VLSTAV_XXNAVSTEVAOZ { type: int, optional: true, description: """Stav návštěvy zákazníka:
-0 = rozpracovaná (OZ ještě nedokončil návštěvu)
-1 = uzavřena (OZ dokončil návštěvu, ale nesplnil všechny úkoly/cíle)
-2 = splněna (OZ dokončil návštěvu a splnil všechny úkoly/cíle)
-Pro "dokončené návštěvy" použij filtr: stav IN (1, 2).
-""", },
-    ]
-}
-
-def table QXXNOZPODPROD { description: """Evidence podproduktů spojených s návštěvou zákazníka.
-VIEW nad XXNOZPODPROD s JOINy na XXNOZPRIPRAVA, XXPODSKUPZBOZI, XXNAVSTEVAOZ
-a subquery DISTRIBUCE z XXPLNPOLDISTR (facing, distribuce, obsazení regálu).
-Filtr: pouze podprodukty s VLVYZNAM_PODPROD > 0.
-Sloupce odvozené z XXPLNPOLDISTR vrací NULL, pokud HDNORMATIV_TRZBY_PODPROD = 0.
-""", primaryKey: ["id_podproduktu_návštěvy_zákazníka"],
-    columns: [
-        def column IDXXNOZPODPROD { type: int, isKey: true, description: "Unikátní identifikátor podproduktu v návštěvě zákazníka", },
-        def column IDXXNOZPRIPRAVA { type: int, optional: true, description: "Vazba na produkt spojený s návštěvou zákazníka", },
-        def column IDXXPODSKUPZBOZI { type: int, optional: true, description: "Vazba na podprodukt", },
-        def column PORADI_PODPROD { type: int, optional: true, description: "Pořadí podproduktu v rámci produktu na DM = XXNOZPODPROD.PORADI_PODPROD", },
-        def column IDXXNAVSTEVAOZ { type: int, optional: true, description: "Vazba na návštěvu zákazníka = XXNOZPRIPRAVA.IDXXNAVSTEVAOZ (přes JOIN na XXNOZPRIPRAVA)", },
-        def column HDNORMATIV_TRZBY_PODPROD { type: text, optional: true, description: "Normativ tržby podproduktu = XXNOZPODPROD.HDNORMATIV_TRZBY_PODPROD", },
-        def column VLVYZNAM_PODPROD { type: int, optional: true, description: "Význam podproduktu v kanálu = XXNOZPODPROD.VLVYZNAM_PODPROD", },
-        def column HDTRZBA_12M_PODPROD { type: int, optional: true, description: "Tržba podproduktu na DM za posledních 12 měsíců zaokrouhlená na celé Kč = CONVERT(int, ROUND(XXNOZPODPROD.HDTRZBA_12M_PODPROD, 0))", },
-        def column HDTRZBA_POTENCIAL_PODPROD { type: int, optional: true, description: "Rezerva tržby podproduktu zaokrouhlená na celé Kč = CONVERT(int, ROUND(XXNOZPODPROD.HDTRZBA_POTENCIAL_PODPROD, 0))", },
-        def column HDTRZBA_VYTEZNOST_PODPROD { type: int, optional: true, description: "Na kolik % aktuální tržba využívá rezervu tržby = CONVERT(int, XXNOZPODPROD.HDTRZBA_VYTEZNOST_PODPROD)", },
-        def column POCET_ART_PODPROD { type: int, optional: true, description: "Počet artiklů podproduktu na DM s facingem > 0 = SUM(CASE WHEN ISNULL(XXPLNPOLDISTR.MNFACING,0) > 0 THEN 1 END) z XXPLNPOLDISTR per IDXXNAVSTEVAOZ + IDXXPODSKUPZBOZI. NULL pokud HDNORMATIV_TRZBY_PODPROD = 0.", },
-        def column DI_PODPRODUKT { type: int, optional: true, description: "Distribuce podproduktu na DM v % = CONVERT(int, 100.0 * DISTRIBUCE.SKORE / NULLIF(DISTRIBUCE.VYZNAM, 0)) z XXPLNPOLDISTR. SKORE = SUM(VYZNAM) artiklů se zásobou, bez prodejní akce a s platnou sezónou.", },
-        def column HDTRZBA_12M_PREP_PODPROD { type: text, optional: true, description: "Přepočtená tržba podproduktu za 12 měsíců = XXNOZPODPROD.HDTRZBA_12M_PREP_PODPROD", },
-        def column HDTRZBA_CILOVYNORMATIV_PODPROD { type: int, optional: true, description: "Plánovaná tržba podproduktu zaokrouhlená na celé Kč = CONVERT(int, ROUND(XXNOZPODPROD.HDTRZBA_CILOVYNORMATIV_PODPROD, 0))", },
-        def column KOD_PODSKUPZBOZI { type: text, optional: true, description: "Kód podproduktu = XXPODSKUPZBOZI.KOD_PODSKUPZBOZI", },
-        def column NAZEV_PODSKUPZBOZI { type: text, optional: true, description: "Název podproduktu = XXPODSKUPZBOZI.NAZEV_PODSKUPZBOZI", },
-        def column HDVYTEZNOST_REGALU_PODPROD { type: text, optional: true, description: "Tržba na cm regálové plochy podproduktu [Kč/cm] = ROUND(XXNOZPODPROD.HDTRZBA_12M_PREP_PODPROD / NULLIF(DISTRIBUCE.MNOBSADIL_DF_CM_PODPROD, 0), 0|2). NULL pokud HDNORMATIV_TRZBY_PODPROD = 0. DISTRIBUCE.MNOBSADIL_DF_CM_PODPROD = SUM(MNARTIKL_SIRKA * MNFACING) z XXPLNPOLDISTR.", },
-        def column MNOBSADIL_DF_CM_PODPROD { type: decimal, optional: true, description: "Délka regálu obsažená DF za podprodukt v cm = SUM(XXPLNPOLDISTR.MNARTIKL_SIRKA * XXPLNPOLDISTR.MNFACING) per IDXXNAVSTEVAOZ + IDXXPODSKUPZBOZI. NULL pokud HDNORMATIV_TRZBY_PODPROD = 0.", },
-        def column HDTRZBA_12M_PREP_DM { type: text, optional: true, description: "Přepočtená tržba 12M za celé dodací místo = SUM(HDTRZBA_12M_PREP_PODPROD) OVER (PARTITION BY IDXXNAVSTEVAOZ)", },
-        def column MNOBSADIL_DF_CM_DM { type: decimal, optional: true, description: "Délka regálu obsazená DF za celé DM v cm = SUM(MNOBSADIL_DF_CM_PODPROD) OVER (PARTITION BY IDXXNAVSTEVAOZ)", },
-        def column HDVYTEZNOST_REGALU_DM { type: text, optional: true, description: "Tržba na cm regálové plochy celého DM [Kč/cm] = HDTRZBA_12M_PREP_DM / NULLIF(MNOBSADIL_DF_CM_DM, 0)", },
-        def column MNOBSADIL_DF_CM_PODPROD_INT { type: int, optional: true, description: "Výpočtové pole: CAST(MNOBSADIL_DF_CM_PODPROD AS int)", },
-        def column HDVYTEZNOST_REGALU_PODPROD_PODIL { type: text, optional: true, description: "Výpočtové pole: podíl tržby na cm podproduktu vůči DM = CAST(ROUND(100.0 * HDVYTEZNOST_REGALU_PODPROD / NULLIF(HDVYTEZNOST_REGALU_DM, 0), 2) AS DECIMAL(18,2))", },
-    ]
-}
-
-def table QXXNOZPRIPRAVA { description: """Evidence produktů spojených s návštěvou zákazníka.
-""", primaryKey: ["id_produktu_návštěvy_zákazníka"],
-    columns: [
-        def column IDXXNOZPRIPRAVA { type: int, isKey: true, description: "Unikátní identifikátor produktu v návštěvě zákazníka", },
-        def column IDXXNAVSTEVAOZ { type: int, optional: true, description: "Vazba na návštěvu zákazníka", },
-        def column IDSKUPZBOZI { type: int, optional: true, description: "Vazba na produkt", },
-        def column VLVYZNAM_PR { type: int, optional: true, description: "Význam produktu v kanálu = QXXMEZABC.VLVYZNAM_F WHERE VLTYP_NASTAVENI = 21 pro kanál a produkt", },
-        def column PORADI_PR { type: int, optional: true, description: "Pořadí produktu v kanálu = XXNOZPRIPRAVA.PORADI_PR", },
-        def column VYHRAZENO { type: int, optional: true, description: "Délkové cm regálu, které jsou vyhrazeny na DM pro daný produkt = XXNOZPRIPRAVA.VYHRAZENO", },
-        def column HDTRZBA_POTENCIAL_PROD { type: int, optional: true, description: "Rezerva tržby (nevyužitá rezerva tržby produktu) = CONVERT(int, ROUND(SUM(QXXNOZPODPROD.HDTRZBA_POTENCIAL_PODPROD), 0))", },
-        def column HDTRZBA_VYTEZNOST_PROD { type: int, optional: true, description: "Výtěžnost tržby v celých % = CONVERT(int, ROUND(SUM(HDTRZBA_12M_PODPROD) / NULLIF(SUM(HDTRZBA_CILOVYNORMATIV_PODPROD), 0) * 100, 0))", },
-        def column NAZEV_SKUP_ZBOZI { type: text, optional: true, description: "Název produktu = SKUPZBOZI.NAZEV_SKUP_ZBOZI", },
-        def column DI_PRODUKT { type: int, optional: true, description: "Distribuční index produktu v celých % = CONVERT(int, 100.0 * SUM(SKORE) / NULLIF(SUM(VYZNAM), 0))", },
-        def column MNOBSADIL_DF_CM_PROD { type: int, optional: true, description: "Délka regálu obsažená DF za návštěvu a produkt = SUM(QXXNOZPODPROD.MNOBSADIL_DF_CM_PODPROD)", },
-        def column PODIL_DF_PROD { type: int, optional: true, description: "Podíl DF na vyhrazeném prostoru produktu v celých % = CONVERT(int, ROUND(SUM(MNOBSADIL_DF_CM_PODPROD) / CONVERT(MONEY, NULLIF(VYHRAZENO, 0)) * 100.00, 0))", },
-        def column HDVYTEZNOST_REGALU_PROD { type: text, optional: true, description: "Tržba na cm regálové plochy za návštěvu a produkt [Kč/cm] = SUM ( QXXNOZPODPROD.HDTRZBA_12M_PREP_PODPROD ) / SUM ( QXXNOZPODPROD.MNOBSADIL_DF_CM_PODPROD ) za DM a produkt", },
-    ]
-}
-
-def table QXXPLNPOLDISTR_AT { description: """Evidence artiklů spojených s návštěvou zákazníka.
-""", primaryKey: ["id_artiklu_návštěvy_zákazníka"],
-    columns: [
-        def column IDXXPLNPOLDISTR { type: int, isKey: true, description: "Identifikace artiklu v návštěvě", },
-        def column IDXXNAVSTEVAOZ { type: int, optional: true, description: "Identifikace návštěvy", },
-        def column IDZBOZI { type: int, optional: true, description: "Identifikace artiklu", },
-        def column IDXXPODSKUPZBOZI { type: int, optional: true, description: "Identifikace podproduktu", },
-        def column MNKUSUDNES { type: int, optional: true, description: "Zásoba artiklu k dnešnímu dni na DM (= 0 není, =1 je)", },
-        def column DTPOSLDODANI { type: datetime, optional: true, description: "Datum poslední dodávky artiklu (IDZBOZI) na DM (SUBJADR_POZNAMKA) = XXPRODEJE.DTPOSLEDNI_DOD", },
-        def column MNPOSLDODANI { type: int, optional: true, description: "Množství poslední dodávky artiklu (IDZBOZI) na DM (SUBJADR_POZNAMKA) = XXPRODEJE.MNPOSLEDNI_DOD", },
-        def column MNFACING { type: decimal, optional: true, description: "Počet čelních pozic artiklu na DM. Výchozí hodnota přenesená z předchozí návštěvy, OZ ji může přepsat.", },
-        def column VYZNAM { type: int, optional: true, description: "Význam artiklu = QXXLISTING.VLVYZNAM_F", },
-        def column VLSEZONA { type: int, optional: true, description: """Indikace artiklu, zda-li v době generování aktivity byl validní pro výpočet distribuce.
-Naplnění podle hodnoty QXXPRODKRIVKA.VLPLATI pro prodejní křivku artiklu.
-0 = Ne
-1 = Ano
-""", },
-        def column MNARTIKL_SIRKA { type: decimal, optional: true, description: "Šířka KS artiklu v cm (ISNULL ( XXHODPARZBOZI.HODNOTA_PARZBOZI, 0 ) pro PORADI_TYPPARZBOZI = 2)", },
-        def column MNDELKA_REG_ART { type: decimal, optional: true, description: "Výpočtové pole (XXPLNPOLDISTR.MNARTIKL_SIRKA * XXPLNPOLDISTR.MNFACING)", },
-        def column MNMNOZSTVI_12M { type: decimal, optional: true, description: "Počet prodaných kusů (prodeje i dobropisy) za posledních 12 měsíců = XXPRODEJE.MNMNOZSTVI_12M", },
-        def column HDVYTEZNOST_REGALU { type: text, optional: true, description: "Tržba na cm regálové plochy artiklu pro návštěvu = QDF_VYTEZNOST_REGALU.HDVYTEZNOST_REGALU pro dodací místo a artikl", },
-        def column HDVYTEZNOST_REGALU_INT { type: text, optional: true, description: "Vypočítaný sloupec v pohledu QXXPLNPOLDISTR_AT. Výtěžnost 1 cm regálu na DM pro artikl. Existuje pouze v CZ aplikaci (SK používá HDVYTEZNOST_REGALU).", },
-        def column HDTRZBA_12M_PREP_KANAL { type: text, optional: true, description: "Přepočítaná tržba 12 M pro kanál a artikl = QDF_VYTEZNOST_REGALU_KANAL.HDTRZBA_12M_PREP_KANAL pro kanál a artikl", },
-        def column HDVYTEZNOST_REGALU_KANAL_INT { type: text, optional: true, description: "Tržba na cm regálové plochy pro kanál a artikl = QDF_VYTEZNOST_REGALU_KANAL.HDVYTEZNOST_REGALU_KANAL pro kanál a artikl", },
-        def column ODEBIRA_POCET_DM_KANAL { type: int, optional: true, description: "Počet DM v kanálu, které pro artikl mají tržbu 12M > 0 = QDF_VYTEZNOST_REGALU_KANAL.ODEBIRA_POCET_DM_KANAL pro kanál a artikl", },
-    ]
-}
-
-def table QXXPLNUKOLOZ { description: """Evidence úkolů spojených s návštěvou zákazníka.
-""", primaryKey: ["id_úkolu_návštěvy_zákazníka"],
-    columns: [
-        def column IDXXPLNUKOLOZ { type: int, isKey: true, description: "Unikátní identifikátor úkolu návštěvy zákazníka", },
-        def column IDXXNAVSTEVAOZ { type: int, optional: true, description: "Vazba na návštěvu zákazníka", },
-        def column SPEC_ZADANIUKOLOZ { type: text, optional: true, description: "Popis úkolu", },
-    ]
-}
-
-def table QXXPODNET { description: """Evidence podnětů spojených s návštěvou zákazníka.
-""", primaryKey: ["id_podnětu_návštěvy_zákazníka"],
-    columns: [
-        def column IDXXPODNET { type: int, isKey: true, description: "Unikátní identifikátor podnětu návštěvy zákazníka", },
-        def column IDXXNAVSTEVAOZ { type: int, optional: true, description: "Vazba na návštěvu zákazníka", },
-        def column IDSKUPZBOZI { type: int, optional: true, description: "Vazba na produkt", },
-        def column PODNET { type: text, optional: true, description: "Popis podnětu", },
-    ]
-}
-
-def table QXXPODSKUPZBOZI { description: """Evidence podproduktů a jejich vlastností.
-""", primaryKey: ["id_podproduktu"],
-    columns: [
-        def column IDXXPODSKUPZBOZI { type: int, isKey: true, description: "Unikátní identifikátor podproduktu", },
-        def column KOD_PODSKUPZBOZI { type: text, optional: true, description: "Unikátní kód podproduktu", },
-        def column NAZEV_PODSKUPZBOZI { type: text, optional: true, description: "Obchodní název podproduktu", },
-        def column IDSKUPZBOZI { type: int, optional: true, description: "Vazba na nadřazený produkt", },
-        def column PORADI { type: int, optional: true, description: "Zadané pořadí podproduktu", },
-        def column VLVYZNAM_Z { type: int, optional: true, description: "Zadaný význam podproduktu", },
-        def column LHUTA_POSL_DODAVKY { type: int, optional: true, description: """Lhůta poslední dodávky ve dnech. Pomocný parametr pro:
-- určení termínu poslední dodávky
-- výpočet obrátkovosti zásob
-""", },
-        def column VLOBJ_LIST { type: int, optional: true, description: """Identifikátor, zda-li se má artikl v tomto podproduktu tisknout v cenové nabídce DF Tablet:
-0 = Ne
-1 = Ano
-""", },
-        def column VLREZIE_ABC_ART_NE { type: int, optional: true, description: """Parametr pro rozpočítání nepřímých nákladů v ABC plán:
-0 = Ne
-1 = Ano (režie artiklů se na artiklech nerozpouští)
-""", },
-        def column VLREZIE_ABC_ZAK_NE { type: int, optional: true, description: """Parametr pro rozpočítání nepřímých nákladů v ABC plán:
-0 = Ne
-1 = Ano (režie zákazníků se na artiklech nerozpouští)
-""", },
-        def column IDUZIVATEL { type: int, optional: true, description: "Produkt manažer odpovědný za podprodukt", },
-    ]
-}
-
-def table QXXPRODAKCE { description: """Evidence prodejních akcí a jejich vlastností.
-""", primaryKey: ["id_prodejní_akce"],
-    columns: [
-        def column IDXXPRODAKCE { type: int, isKey: true, description: "Unikátní identifikátor prodejní akce", },
-        def column KOD_PRODAKCE { type: text, optional: true, description: "Kód/název prodejní akce", },
-        def column DTPLATI_OD { type: date, optional: true, description: "Datum platnosti prodejní akce od", },
-        def column DTPLATI_DO { type: date, optional: true, description: "Datum platnosti prodejní akce do. NULL = platné bez omezení.", },
-    ]
-}
-
-def table QXXTDMSUBJADR { description: """Platnost dodacího místa v typu dodacího místa.
-""", primaryKey: ["id_platnost_dm_v_tdm"],
-    columns: [
-        def column IDXXTDMSUBJADR { type: int, isKey: true, description: "Unikátní identifikátor platnosti přiřazeného typu dodacího místa", },
-        def column IDXXTYPDODMIST { type: int, optional: true, description: "Vazba na typ dodacího místa", },
-        def column IDSUBJADR { type: int, optional: true, description: "Vazba na dodací místo", },
-        def column DTPLATI_OD { type: date, optional: true, description: "Datum platnosti od (inkluzivní hranice)", },
-        def column DTPLATI_DO { type: date, optional: true, description: "Datum platnosti do (inkluzivní hranice). NULL = platné bez omezení.", },
-    ]
-}
-
-def table QXXTYPDODMIST { description: """Typ dodacího místa v obchodním kanálu.
-""", primaryKey: ["id_typ_dodacího_místa"],
-    columns: [
-        def column IDXXTYPDODMIST { type: int, isKey: true, description: "Unikátní identifikátor typu dodacího místa", },
-        def column IDCENSKUP { type: int, optional: true, description: "Vazba na obchodní kanál", },
-        def column KOD_TYPDODMIST { type: text, optional: true, description: "Kód typu dodacího místa", },
-    ]
-}
-
-def table QXXUKAZMU { description: """Číselník ukazatelů manažerského účetnictví. Každý ukazatel je přiřazen ke středisku.
-""", primaryKey: ["id_ukazatele"],
-    columns: [
-        def column IDXXUKAZMU { type: int, isKey: true, description: "Unikátní identifikátor ukazatele", },
-        def column KOD_UKAZMU { type: text, optional: true, description: "Kód ukazatele", },
-        def column NAZEV_UKAZMU { type: text, optional: true, description: "Název ukazatele", },
-    ]
-}
-
-def table QXXUKAZMUHOD { description: """Hodnoty ukazatelů manažerského účetnictví za účetní období (plán, skutečnost).
-""", primaryKey: ["id_hodnoty"],
-    columns: [
-        def column IDXXUKAZMUHOD { type: int, isKey: true, description: "Unikátní identifikátor záznamu hodnoty", },
-        def column IDXXUKAZMU { type: int, optional: true, description: "FK na ukazatel manažerského účetnictví (QXXUKAZMU.IDXXUKAZMU)", },
-        def column IDUCTOBD { type: int, optional: true, description: "FK na účetní období (QUCTOBD.IDUCTOBD)", },
-        def column HDPLAN { type: text, optional: true, description: "Plánovaná hodnota za období", },
-        def column HDSKUT { type: text, optional: true, description: "Skutečná hodnota za období", },
-        def column HDPLANKUM { type: text, optional: true, description: "Plánovaná hodnota kumulativně", },
-        def column HDSKUTKUM { type: text, optional: true, description: "Skutečná hodnota kumulativně", },
-    ]
-}
-
-def table QZBOZI_DF { description: """Evidence všech artiklů a jejich vlastností.
-⚠ Artikl patří k produktu přes IDSKUPZBOZI.
-Typ artiklu je určen hodnotou VLPODTYP_SLOZ:
-  1 = Výrobek
-  2 = Zboží
-  3 = Materiál
-  4 = Polotovar
-""", primaryKey: ["id_artiklu"],
-    columns: [
-        def column IDZBOZI { type: int, isKey: true, description: "Unikátní identifikátor artiklu", },
-        def column CIS_ZBOZI { type: text, optional: true, description: "Unikátní kód artiklu", },
-        def column NAZEV_ZBOZI { type: text, optional: true, description: "Obchodní název artiklu", search { searchable: true, fuzzy: true } },
-        def column VLPODTYP_SLOZ { type: int, optional: true, description: "Typ artiklu (1 = Výrobek, 2 = Zboží, 3 = Materiál, 4 = Polotovar)", },
-        def column IDSKUPZBOZI { type: int, optional: true, description: "Vazba na nadřazený produkt", },
-        def column IDXXPODSKUPZBOZI { type: int, optional: true, description: "Vazba na nadřazený podprodukt", },
-        def column VLSTAVZBOZI { type: int, optional: true, description: "Status artiklu (pouze hodnoty 0 = aktivní, 1 = neaktivní)", },
-    ]
-}
-
-def table QZBOZSDOK { description: """Složka (položka) dobropisu - jednotlivé artikly na dobropisu.
-⚠ Tabulka QZBOZSDOK je sdílená pro složky všech typů dokladů.
-Příslušnost ke konkrétnímu dokladu se určuje JOINem na hlavičku (IDHDOK).
-Pravidlo: Vždy použij JOIN na příslušnou hlavičku dokladu, nikdy nedotazuj QZBOZSDOK samostatně.
-""", primaryKey: ["id_složky_dobropisu"],
-    columns: [
-        def column IDSDOK { type: int, isKey: true, description: "Unikátní identifikátor složky dobropisu", },
-        def column IDHDOK { type: int, optional: true, description: "Vazba na hlavičku dobropisu", },
-        def column IDZBOZI { type: int, optional: true, description: "Vazba na artikl", },
-        def column MNCELKEMPOCET { type: decimal, optional: true, description: "Množství kusů na dobropisu", },
-        def column HDJCENAVAL { type: text, optional: true, description: "Cena za měrnou jednotku", },
-        def column HDCCENAVAL { type: text, optional: true, description: "Celková cena položky", },
-    ]
-}
-
-def table XXKONKINFOTYP { description: """Povolené typy informací o konkurenci.
-""", primaryKey: ["id_typu_informace"],
-    columns: [
-        def column IDXXKONKINFOTYP { type: int, isKey: true, description: "Unikátní identifikátor typu informace o konkurenci", },
-        def column VLTYP_INFO { type: int, optional: true, description: """Typ informace o konkurenci:
-10 = Zjištění dodavatel
-20 = Zjištění značka
-30 = Povolená kombinace
-40 = Zájmový konkurent
-""", },
-        def column VLVLASTNOST_INFO { type: int, optional: true, description: """Vlastnost pro typ informace o konkurenci:
--1 = Nelze vybrat
-0 = Neutrální zjištění
-10 = Silné stránky
-11 = Slabé stránky
-20 = Výhody
-21 = Nevýhody
-""", },
-        def column VLOBLAST_INFO { type: int, optional: true, description: """Oblast pro typ informace o konkurenci:
--1 =  Nelze vybrat
-10 = Nabízený sortiment
-20 = Cenová politika
-30 = Marketingová podpora
-40 = Prodejní servis
-50 = Logistický servis
-""", },
-        def column VLTRZNI_SKUPINA { type: int, optional: true, description: """Tržní skupina pro typ informace o konkurenci:
--1 = Nelze vybrat
-0 = Nepovinný
-1 = Povinný
-""", },
-        def column VLKANAL { type: int, optional: true, description: """Obchodní kanál pro typ informace o konkurenci:
--1 = Nelze vybrat
-0 = Nepovinný
-1 = Povinný
-""", },
-        def column VLPRODUKT { type: int, optional: true, description: """Produkt pro typ informace o konkurenci:
--1 = Nelze vybrat
-0 = Nepovinný
-1 = Povinný
-""", },
-        def column VLPODPRODUKT { type: int, optional: true, description: """Podprodukt pro typ informace o konkurenci:
--1 = Nelze vybrat
-0 = Nepovinný
-1 = Povinný
-""", },
-        def column VLDODAVATEL { type: int, optional: true, description: """Dodavatel pro typ informace o konkurenci:
--1 = Nelze vybrat
-0 = Nepovinný
-1 = Povinný
-""", },
-        def column VLZNACKA { type: int, optional: true, description: """Značka pro typ informace o konkurenci:
--1 = Nelze vybrat
-0 = Nepovinný
-1 = Povinný
-""", },
-        def column VLZJISTENI { type: int, optional: true, description: """Zjištění pro typ informace o konkurenci:
--1 = Nelze vybrat
-0 = Nepovinný
-1 = Povinný
-""", },
-    ]
-}
-
-def table XXPRODEJE { description: """Agregovaná evidence prodejů na úrovni dodacího místa, produktu a artiklu.
-Obsahuje kumulativní tržby a data první/poslední dodávky.
-""", primaryKey: ["id_dodacího_místa", "id_artiklu"],
-    columns: [
-        def column IDSUBJADR { type: int, isKey: true, description: "Identifikace dodacího místa", },
-        def column IDSKUPZNACZBOZI { type: int, optional: true, description: "Identifikace tržní skupiny", },
-        def column IDCENSKUP { type: int, optional: true, description: "Identifikace obchodního kanálu", },
-        def column SUBJADR_POZNAMKA { type: text, optional: true, description: "Zkratka dodacího místa", },
-        def column IDXXTYPDODMIST { type: int, optional: true, description: "Identifikace typu dodacího místa", },
-        def column IDSKUPZBOZI { type: int, optional: true, description: "Identifikace produktu", },
-        def column IDXXPODSKUPZBOZI { type: int, optional: true, description: "Identifikace podproduktu", },
-        def column IDZBOZI { type: int, isKey: true, description: "Identifikace artiklu", },
-        def column DTPRVNI_DOD { type: date, optional: true, description: "První dodávka, která nebyla dobropisem", },
-        def column DTPOSLEDNI_DOD { type: date, optional: true, description: "Poslední dodávka, která nebyla dobropisem", },
-        def column MNPOSLEDNI_DOD { type: decimal, optional: true, description: "Množství poslední dodávky v kusech", },
-        def column HDTRZBA_24M { type: text, optional: true, description: "Součet tržeb (prodeje i dobropisy) za posledních 24 měsíců. Bez DPH. Rolling window počítaný dávkovým přepočtem (nikoli od dneška).", },
-        def column HDTRZBA_12M { type: text, optional: true, description: "Součet tržeb (prodeje i dobropisy) za posledních 12 měsíců. Bez DPH. Rolling window počítaný dávkovým přepočtem (nikoli od dneška).", },
-        def column MNMNOZSTVI_24M { type: decimal, optional: true, description: "Součet prodaných kusů (prodeje i dobropisy) za posledních 24 měsíců", },
-        def column MNMNOZSTVI_12M { type: decimal, optional: true, description: "Součet prodaných kusů (prodeje i dobropisy) za posledních 12 měsíců", },
-    ]
-}
-
-def table XXREZERVA_TRZBY { description: """Výpočet rezervy tržeb a vytěženosti pro dodací místa a podprodukty.
-Tabulka XXREZERVA_TRZBY obsahuje všechny sloupce včetně indikačních a výpočtových.
-""", primaryKey: ["zkratka_dm", "id_obchodního_kanálu", "id_podproduktu"],
-    columns: [
-        def column SUBJADR_POZNAMKA { type: text, isKey: true, description: "Identifikace dodacího místa", },
-        def column IDCENSKUP { type: int, isKey: true, description: "Identifikace obchodního kanálu", },
-        def column IDXXPODSKUPZBOZI { type: int, isKey: true, description: "Identifikace podproduktu", },
-        def column DM_NEUPLNA_DATA { type: int, optional: true, description: """Indikace, zda-li se jedná o DM s úplnými nebo neúplnými daty:
-0 = Ne, 1 = Ano
-Hodnota "Ano" nastane, pokud:
-  • Dodací místo nemá tržbu 12M: ISNULL(PRODEJE.HDTRZBA_12M_DM, 0) <= 0
-  • Nebo první dodávka je < 120 dnů od dnešního dne:
-    ISNULL(PRODEJE.DTPRVNI_DOD, CONVERT(Date, GETDATE()))
-    BETWEEN DATEADD(DAY, -120, CONVERT(Date, GETDATE())) AND CONVERT(Date, GETDATE())
-  • Nebo podíl prodávaných zájmových podproduktů na DM vůči celkovému počtu
-    zájmových podproduktů v kanálu je < 25 %:
-    CONVERT(MONEY, PRODEJE.POCET_PODPROD_DM) / NULLIF(LISTING.POCET_PODPROD_KANAL, 0) * 100.00 < 25.00
-""", },
-        def column DM_KONKURENCE_ZAEVIDOVANA { type: int, optional: true, description: """Indikace, zda-li je na DM kompletně zaevidovaná konkurence:
-0 = Ne, 1 = Ano
-Zohledňuje evidovaný vyhrazený prostor v produktu na poslední návštěvě DM
-a pokud není, tak se používá délka regálové plochy evidovaná na dodacím místě.
-  • Z poslední návštěvy se zjistí celkový počet produktů.
-  • Z poslední návštěvy se zjistí počet produktů s evidovanou konkurencí
-    (na produktu není evidován <neurčený> dodavatel a <neurčená> značka).
-  • Z hlavičky adresy se zjistí délka regálové plochy v metrech
-    (SUBJADRADD.DELKA_REGALU * 100 cm/m). Použije se pokud není konkurence
-    zaevidovaná na 100 %.
-  • Pokud počet vyplněných produktů = počet produktů celkem, vezme se
-    hodnota VYHRAZENO, jinak NULL a použije se DELKA_REGALU.
-    Pokud celkový výsledek > 0, DM má vyplněnou konkurenci.
-WHEN ISNULL(
-     CASE
-          WHEN EVIDENCE_KONKURENCE.KONKURENCE_PRODUKTY_CELKEM
-               = EVIDENCE_KONKURENCE.KONKURENCE_PRODUKTY_VYPLNENO
-          THEN NULLIF(EVIDENCE_KONKURENCE.VYHRAZENO, 0)
-     END,
-     DELKA_REGALU.VYHRAZENO
-) > 0 THEN 1
-""", },
-        def column DTPRVNI_DOD { type: date, optional: true, description: "Datum první dodávky na dodacím místě: MIN(XXPRODEJE.DTPRVNI_DOD)", },
-        def column POCET_PODPROD_DM { type: int, optional: true, description: """Počet zájmových podproduktů, které na dodacím místě mají tržbu 12M > 0:
-COUNT(DISTINCT CASE WHEN XXPRODEJE.HDTRZBA_12M > 0 AND QXXMEZABC.VLVYZNAM_F > 0
-      THEN XXPRODEJE.IDXXPODSKUPZBOZI END)
-""", },
-        def column POCET_PODPROD_KANAL { type: int, optional: true, description: """Počet zájmových podproduktů v kanálu s aktivním listingem k dnešnímu dni:
-COUNT(DISTINCT ZBOZIADD.IDXXPODSKUPZBOZI) kde QXXMEZABC.VLVYZNAM_F > 0
-""", },
-        def column KONKURENCE_PRODUKTY_CELKEM { type: int, optional: true, description: "Počet produktů poslední návštěvy: COUNT(DISTINCT XXKONKNADM.IDSKUPZBOZI)", },
-        def column KONKURENCE_PRODUKTY_VYPLNENO { type: int, optional: true, description: """Počet produktů poslední návštěvy s evidovanou konkurencí:
-COUNT(DISTINCT CASE
-     WHEN XXKONKURENT_D.NAZEV_KONKURENTA <> '(neurčený)'
-          AND XXKONKURENT_Z.NAZEV_KONKURENTA <> '(neurčená)'
-     THEN XXKONKNADM.IDSKUPZBOZI
-END)
-""", },
-        def column VYHRAZENO { type: int, optional: true, description: """Celkový vyhrazený prostor na dodacím místě:
-ISNULL(
-     CASE
-          WHEN EVIDENCE_KONKURENCE.KONKURENCE_PRODUKTY_CELKEM
-               = EVIDENCE_KONKURENCE.KONKURENCE_PRODUKTY_VYPLNENO
-          THEN NULLIF(EVIDENCE_KONKURENCE.VYHRAZENO, 0)
-     END,
-     DELKA_REGALU.VYHRAZENO
-)
-""", },
-        def column HDTRZBA_12M_PODPROD { type: text, optional: true, description: "Skutečná tržba podproduktu na DM za posledních 12 měsíců", },
-        def column HDNORMATIV_TRZBY { type: text, optional: true, description: "Cílová (normativní) tržba podproduktu na DM — určuje očekávanou úroveň prodejů. Zdroj: QXXMEZABC.HDNORMATIV_TRZBY_F (VLTYP_NASTAVENI = 22), jen zájmové podprodukty v kanálu.", },
-        def column HDTRZBA_12M_DM { type: text, optional: true, description: "SUM ( HDTRZBA_12M_PODPROD ) Celkový součet prodejů za dodací místo", },
-        def column HDNORMATIV_TRZBY_DM { type: text, optional: true, description: "SUM ( HDNORMATIV_TRZBY ) Celkový součet normativů tržby za dodací místo", },
-        def column HDTRZBA_NORMATIV { type: text, optional: true, description: "Výpočtové pole podle pravidla: HDNORMATIV_TRZBY / 100 * ( HDTRZBA_12M_DM / ( HDNORMATIV_TRZBY_DM / 100 ) )", },
-        def column VLPODPROD_NADNORMATIV { type: int, optional: true, description: "Výpočtové pole: 1 = nadnormativní (HDTRZBA_12M_PODPROD >= HDTRZBA_NORMATIV), 0 = pod normou, NULL = nedefinováno", },
-        def column HDTRZBA_NORMATIV_UPRAV { type: text, optional: true, description: "Výpočtové pole podle pravidla: WHEN ISNULL ( HDTRZBA_NORMATIV, 0) <= 0 THEN 0 WHEN HDTRZBA_12M_PODPROD > HDTRZBA_NORMATIV AND HDTRZBA_12M_PODPROD / HDTRZBA_NORMATIV > 1.33 THEN HDTRZBA_NORMATIV * 1.33 ELSE HDTRZBA_12M_PODPROD", },
-        def column HDTRZBA_POTENCIAL_DM { type: text, optional: true, description: "WHEN ISNULL(HDTRZBA_12M_PODPROD,0) = 0 THEN 0 ELSE SUM(HDTRZBA_NORMATIV_UPRAV) pro VLPODPROD_NADNORMATIV = 1 za dodací místo / SUM(HDNORMATIV_TRZBY / 100) pro VLPODPROD_NADNORMATIV = 1 za dodací místo", },
-        def column HDTRZBA_CILOVYNORMATIV_PODPROD { type: text, optional: true, description: "HDTRZBA_POTENCIAL_DM * HDNORMATIV_TRZBY / 100 — cílová tržba podproduktu odvozená z celkového potenciálu DM", },
-        def column HDTRZBA_POTENCIAL_PODPROD { type: text, optional: true, description: "HDTRZBA_CILOVYNORMATIV_PODPROD - HDTRZBA_12M_PODPROD — rezerva tržby podproduktu (kladná = prostor pro růst, záporná = překonává cíl)", },
-        def column HDTRZBA_VYTEZNOST_PODPROD { type: text, optional: true, description: "HDTRZBA_12M_PODPROD / HDTRZBA_CILOVYNORMATIV_PODPROD * 100 zaokrouhlené na 1 desetinné číslo", },
-    ]
-}
-
-def table XXVYPADKYZASOB { description: """Evidence zásob artiklů na skladech.
-""", primaryKey: ["id_zásoby_artiklu"],
-    columns: [
-        def column IDXXVYPADKYZASOB { type: int, isKey: true, description: "Unikátní identifikátor zásoby artiklu na skladě", },
-        def column IDZBOZI { type: int, optional: true, description: "Vazba na artikl", },
-        def column MNZASOBA { type: decimal, optional: true, description: "Aktuální množství zásoby artiklu na skladě", },
-        def column DTDOPLNENI { type: date, optional: true, description: "Datum doplnění zásoby artiklu na skladě", },
-        def column MNDOPLNENI { type: decimal, optional: true, description: "Množství doplnění zásoby artiklu na skladě", },
-    ]
-}
-
-def fk artikl_navstevy_zakaznika_artikl { description: "Artikl návštěvy zákazníka odkazuje na artikl", from: [db.dbo.table.QXXPLNPOLDISTR_AT.IDZBOZI], to: [db.dbo.table.QZBOZI_DF.IDZBOZI],
-}
-
-def fk artikl_navstevy_zakaznika_navsteva_zakaznika { description: "Artikl návštěvy zákazníka patří k návštěvě zákazníka", from: [db.dbo.table.QXXPLNPOLDISTR_AT.IDXXNAVSTEVAOZ], to: [db.dbo.table.QXXNAVSTEVAOZ.IDXXNAVSTEVAOZ],
-}
-
-def fk artikl_navstevy_zakaznika_podprodukt { description: "Artikl návštěvy zákazníka odkazuje na podprodukt", from: [db.dbo.table.QXXPLNPOLDISTR_AT.IDXXPODSKUPZBOZI], to: [db.dbo.table.QXXPODSKUPZBOZI.IDXXPODSKUPZBOZI],
-}
-
-def fk artikl_podprodukt { description: "Artikl patří pod nadřazený podprodukt", from: [db.dbo.table.QZBOZI_DF.IDXXPODSKUPZBOZI], to: [db.dbo.table.QXXPODSKUPZBOZI.IDXXPODSKUPZBOZI],
-}
-
-def fk artikl_pro_obchodni_kanal_artikl { description: "Záznam artiklu v obchodním kanálu je navázán na artikl", from: [], to: [],
-}
-
-def fk artikl_pro_obchodni_kanal_obchodni_kanal { description: "Artikl přiřazený k obchodnímu kanálu ukazuje na daný kanál", from: [], to: [],
-}
-
-def fk artikl_pro_trzni_skupinu_artikl { description: "Záznam artiklu pro tržní skupinu je navázán na artikl", from: [], to: [],
-}
-
-def fk artikl_pro_trzni_skupinu_trzni_skupina { description: "Artikl přiřazený k tržní skupině vždy odkazuje na cílovou tržní skupinu", from: [], to: [],
-}
-
-def fk artikl_produkt { description: "Artikl patří pod nadřazený produkt", from: [db.dbo.table.QZBOZI_DF.IDSKUPZBOZI], to: [db.dbo.table.QSKUPZBOZI_DF.IDSKUPZBOZI],
-}
-
-def fk denni_vykaz_oz_uzivatel { description: "Denní výkaz OZ patří uživateli (obchodnímu zástupci)", from: [db.dbo.table.QXXDENNIPLANOZ.IDUZIVATEL_DE], to: [db.dbo.table.QUZIVATEL_DF.IDUZIVATEL],
-}
-
-def fk dobropis_slozka_artikl { description: "Složka dobropisu obsahuje konkrétní artikl", from: [db.dbo.table.QZBOZSDOK.IDZBOZI], to: [db.dbo.table.QZBOZI_DF.IDZBOZI],
+def fk fk_brand_class { description: "A brand belongs to a class", from: [db.dbo.table.item_brand.i_class_id], to: [db.dbo.table.item_class.i_class_id],
 }
 
-def fk dobropis_slozka_dobropis { description: "Složka dobropisu patří k dobropisu", from: [db.dbo.table.QZBOZSDOK.IDHDOK], to: [db.dbo.table.QHDOK_FAV_DF.IDHDOK],
+def fk fk_brand_manufact { description: "A brand is owned by a manufacturer", from: [db.dbo.table.item_brand.i_manufact_id], to: [db.dbo.table.item_manufacturer.i_manufact_id],
 }
 
-def fk dobropis_subjekt { description: "Dobropis patří k zákazníkovi (subjektu)", from: [db.dbo.table.QHDOK_FAV_DF.IDSUBJEKT], to: [db.dbo.table.QSUBJEKT.IDSUBJEKT],
+def fk fk_c_addr { description: "Current address of a customer", from: [db.dbo.table.customer.c_current_addr_sk], to: [db.dbo.table.customer_address.ca_address_sk],
 }
 
-def fk dodaci_misto_obchodni_zastupce { description: "Dodací místo má přiřazeného obchodního zástupce", from: [db.dbo.table.QSUBJADR_DF.IDUZIVATEL_DE], to: [db.dbo.table.QUZIVATEL_DF.IDUZIVATEL],
+def fk fk_c_cdemo { description: "Current demographics of a customer", from: [db.dbo.table.customer.c_current_cdemo_sk], to: [db.dbo.table.customer_demographics.cd_demo_sk],
 }
 
-def fk dodaci_misto_subjekt { description: "Dodací místo patří subjektu", from: [db.dbo.table.QSUBJADR_DF.IDSUBJEKT], to: [db.dbo.table.QSUBJEKT.IDSUBJEKT],
+def fk fk_c_first_sales_date { description: "First purchase of a customer", from: [db.dbo.table.customer.c_first_sales_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk faktura_slozka_artikl { description: "Složka faktury obsahuje konkrétní artikl", from: [db.dbo.table.QZBOZSDOK.IDZBOZI], to: [db.dbo.table.QZBOZI_DF.IDZBOZI],
+def fk fk_c_first_shipto_date { description: "First shipment to a customer", from: [db.dbo.table.customer.c_first_shipto_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk faktura_slozka_faktura { description: "Složka faktury patří k faktuře", from: [db.dbo.table.QZBOZSDOK.IDHDOK], to: [db.dbo.table.QHDOK_FAV_DF.IDHDOK],
+def fk fk_c_hdemo { description: "Current household demographics of a customer", from: [db.dbo.table.customer.c_current_hdemo_sk], to: [db.dbo.table.household_demographics.hd_demo_sk],
 }
 
-def fk faktura_subjekt { description: "Faktura patří k zákazníkovi (subjektu)", from: [db.dbo.table.QHDOK_FAV_DF.IDSUBJEKT], to: [db.dbo.table.QSUBJEKT.IDSUBJEKT],
+def fk fk_c_last_review_date { description: "Last review by a customer", from: [db.dbo.table.customer.c_last_review_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk hodnota_ukazatele_období { description: "Hodnota MÚ patří k účetnímu období", from: [db.dbo.table.QXXUKAZMUHOD.IDUCTOBD], to: [db.dbo.table.QUCTOBD.IDUCTOBD],
+def fk fk_cc_closed_date { description: "A seller support center closed on a calendar day", from: [db.dbo.table.call_center.cc_closed_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk hodnota_ukazatele_ukazatel { description: "Hodnota MÚ patří k ukazateli", from: [db.dbo.table.QXXUKAZMUHOD.IDXXUKAZMU], to: [db.dbo.table.QXXUKAZMU.IDXXUKAZMU],
+def fk fk_cc_open_date { description: "A seller support center opened on a calendar day", from: [db.dbo.table.call_center.cc_open_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk informace_ke_konkurenci_konkurencni_dodavatel { description: "Informace ke konkurenci odkazuje na konkurenčního dodavatele", from: [db.dbo.table.QXXKONKINFO.IDXXKONKURENT_D], to: [db.dbo.table.QXXKONKURENT.IDXXKONKURENT],
+def fk fk_ccs_customer { description: "A purchase summary of a customer", from: [db.dbo.table.customer_channel_summary.ccs_customer_sk], to: [db.dbo.table.customer.c_customer_sk],
 }
 
-def fk informace_ke_konkurenci_konkurencni_znacka { description: "Informace ke konkurenci odkazuje na konkurenční značku", from: [db.dbo.table.QXXKONKINFO.IDXXKONKURENT_Z], to: [db.dbo.table.QXXKONKURENT.IDXXKONKURENT],
+def fk fk_chs_customer { description: "A channel sale was bought by a customer", from: [db.dbo.table.channel_sales.customer_sk], to: [db.dbo.table.customer.c_customer_sk],
 }
 
-def fk informace_ke_konkurenci_obchodni_kanal { description: "Informace ke konkurenci odkazuje na obchodní kanál", from: [db.dbo.table.QXXKONKINFO.IDCENSKUP], to: [db.dbo.table.QCENSKUP_DF.IDCENSKUP],
+def fk fk_chs_date { description: "A channel sale happened on a calendar day", from: [db.dbo.table.channel_sales.sold_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk informace_ke_konkurenci_podprodukt { description: "Informace ke konkurenci odkazuje na podprodukt", from: [db.dbo.table.QXXKONKINFO.IDXXPODSKUPZBOZI], to: [db.dbo.table.QXXPODSKUPZBOZI.IDXXPODSKUPZBOZI],
+def fk fk_chs_item { description: "A channel sales line sells a product", from: [db.dbo.table.channel_sales.item_sk], to: [db.dbo.table.item.i_item_sk],
 }
 
-def fk informace_ke_konkurenci_produkt { description: "Informace ke konkurenci odkazuje na produkt", from: [db.dbo.table.QXXKONKINFO.IDSKUPZBOZI], to: [db.dbo.table.QSKUPZBOZI_DF.IDSKUPZBOZI],
+def fk fk_chs_warehouse { description: "A web or marketplace line was fulfilled by a distribution center", from: [db.dbo.table.channel_sales.warehouse_sk], to: [db.dbo.table.warehouse.w_warehouse_sk],
 }
 
-def fk informace_ke_konkurenci_trzni_skupina { description: "Informace ke konkurenci odkazuje na tržní skupinu", from: [db.dbo.table.QXXKONKINFO.IDSKUPZNACZBOZI], to: [db.dbo.table.QSKUPZNACZBOZI_DF.IDSKUPZNACZBOZI],
+def fk fk_class_category { description: "A class belongs to its parent category", from: [db.dbo.table.item_class.i_category_id], to: [db.dbo.table.item_category.i_category_id],
 }
 
-def fk informace_ke_konkurenci_typ_informace { description: "Informace ke konkurenci používá typ informace o konkurenci", from: [db.dbo.table.QXXKONKINFO.VLTYP_INFO, db.dbo.table.QXXKONKINFO.VLVLASTNOST_INFO, db.dbo.table.QXXKONKINFO.VLOBLAST_INFO], to: [db.dbo.table.XXKONKINFOTYP.VLTYP_INFO, db.dbo.table.XXKONKINFOTYP.VLVLASTNOST_INFO, db.dbo.table.XXKONKINFOTYP.VLOBLAST_INFO],
+def fk fk_cp_end_date { description: "A catalog is valid until a calendar day", from: [db.dbo.table.catalog_page.cp_end_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk konkurence_navstevy_zakaznika_konkurencni_dodavatel { description: "Konkurence návštěvy zákazníka odkazuje na konkurenčního dodavatele", from: [db.dbo.table.QXXKONKNADM.IDXXKONKURENT_D], to: [db.dbo.table.QXXKONKURENT.IDXXKONKURENT],
+def fk fk_cp_start_date { description: "A catalog is valid from a calendar day", from: [db.dbo.table.catalog_page.cp_start_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk konkurence_navstevy_zakaznika_konkurencni_znacka { description: "Konkurence návštěvy zákazníka odkazuje na konkurenční značku", from: [db.dbo.table.QXXKONKNADM.IDXXKONKURENT_Z], to: [db.dbo.table.QXXKONKURENT.IDXXKONKURENT],
+def fk fk_cr_addr { description: "Address a marketplace return came from", from: [db.dbo.table.catalog_returns.cr_returning_addr_sk], to: [db.dbo.table.customer_address.ca_address_sk],
 }
 
-def fk konkurence_navstevy_zakaznika_navsteva_zakaznika { description: "Konkurence návštěvy zákazníka odkazuje na návštěvu zákazníka", from: [db.dbo.table.QXXKONKNADM.IDXXNAVSTEVAOZ], to: [db.dbo.table.QXXNAVSTEVAOZ.IDXXNAVSTEVAOZ],
+def fk fk_cr_callcenter { description: "A marketplace return was handled by a seller support center", from: [db.dbo.table.catalog_returns.cr_call_center_sk], to: [db.dbo.table.call_center.cc_call_center_sk],
 }
 
-def fk konkurence_navstevy_zakaznika_produkt { description: "Konkurence návštěvy zákazníka odkazuje na produkt", from: [db.dbo.table.QXXKONKNADM.IDSKUPZBOZI], to: [db.dbo.table.QSKUPZBOZI_DF.IDSKUPZBOZI],
+def fk fk_cr_catalog_page { description: "Catalog page of the original marketplace order", from: [db.dbo.table.catalog_returns.cr_catalog_page_sk], to: [db.dbo.table.catalog_page.cp_catalog_page_sk],
 }
 
-def fk navsteva_zakaznika_denni_vykaz_oz { description: "Návštěva zákazníka patří do denního výkazu OZ", from: [db.dbo.table.QXXNAVSTEVAOZ.IDXXDENNIPLANOZ], to: [db.dbo.table.QXXDENNIPLANOZ.IDXXDENNIPLANOZ],
+def fk fk_cr_customer { description: "A marketplace return was made by a customer", from: [db.dbo.table.catalog_returns.cr_returning_customer_sk], to: [db.dbo.table.customer.c_customer_sk],
 }
 
-def fk navsteva_zakaznika_dodaci_misto { description: "Návštěva zákazníka odkazuje na dodací místo", from: [db.dbo.table.QXXNAVSTEVAOZ.IDSUBJADR], to: [db.dbo.table.QSUBJADR_DF.IDSUBJADR],
+def fk fk_cr_date { description: "A marketplace return was accepted on a calendar day", from: [db.dbo.table.catalog_returns.cr_returned_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk navsteva_zakaznika_uzivatel { description: "Návštěva zákazníka patří uživateli (obchodnímu zástupci)", from: [db.dbo.table.QXXNAVSTEVAOZ.IDUZIVATEL_DE], to: [db.dbo.table.QUZIVATEL_DF.IDUZIVATEL],
+def fk fk_cr_item { description: "A marketplace return concerns a product", from: [db.dbo.table.catalog_returns.cr_item_sk], to: [db.dbo.table.item.i_item_sk],
 }
 
-def fk obchodni_kanal_manazer { description: "Obchodní kanál má přiřazeného manažera", from: [db.dbo.table.QCENSKUP_DF.IDUZIVATEL], to: [db.dbo.table.QUZIVATEL_DF.IDUZIVATEL],
+def fk fk_cr_reason { description: "A marketplace return has a reason", from: [db.dbo.table.catalog_returns.cr_reason_sk], to: [db.dbo.table.reason.r_reason_sk],
 }
 
-def fk obchodni_kanal_trzni_skupina { description: "Obchodní kanál patří do tržní skupiny", from: [db.dbo.table.QCENSKUP_DF.IDSKUPZNACZBOZI], to: [db.dbo.table.QSKUPZNACZBOZI_DF.IDSKUPZNACZBOZI],
+def fk fk_cr_refunded_customer { description: "The amount of a marketplace return was refunded to a customer", from: [db.dbo.table.catalog_returns.cr_refunded_customer_sk], to: [db.dbo.table.customer.c_customer_sk],
 }
 
-def fk obchodni_vztah_obchodni_kanal { description: "Obchodní vztah je přiřazen k obchodnímu kanálu", from: [db.dbo.table.QSUBJVTSUBJ_DF.IDCENSKUP], to: [db.dbo.table.QCENSKUP_DF.IDCENSKUP],
+def fk fk_cr_sale { description: "A marketplace return returns a line of the original order", from: [db.dbo.table.catalog_returns.cr_item_sk, db.dbo.table.catalog_returns.cr_order_number], to: [db.dbo.table.catalog_sales.cs_item_sk, db.dbo.table.catalog_sales.cs_order_number],
 }
 
-def fk obchodni_vztah_subjekt { description: "Obchodní vztah patří subjektu", from: [db.dbo.table.QSUBJVTSUBJ_DF.IDSUBJEKT], to: [db.dbo.table.QSUBJEKT.IDSUBJEKT],
+def fk fk_cr_ship_mode { description: "Ship mode of a marketplace return", from: [db.dbo.table.catalog_returns.cr_ship_mode_sk], to: [db.dbo.table.ship_mode.sm_ship_mode_sk],
 }
 
-def fk organizacni_struktura_ridici { description: "Skupina je podřízena řídící skupině (hierarchie)", from: [db.dbo.table.QSKUPUZIV.IDSKUPUZIV_R], to: [db.dbo.table.QSKUPUZIV.IDSKUPUZIV],
+def fk fk_cr_warehouse { description: "A marketplace return was processed by a distribution center", from: [db.dbo.table.catalog_returns.cr_warehouse_sk], to: [db.dbo.table.warehouse.w_warehouse_sk],
 }
 
-def fk osoba_dodaciho_mista_dodaci_misto { description: "Osoba dodacího místa patří k dodacímu místu", from: [db.dbo.table.QSUBJOSOBA_DF.IDSUBJADR], to: [db.dbo.table.QSUBJADR_DF.IDSUBJADR],
+def fk fk_cs_addr { description: "Billing address of a marketplace order", from: [db.dbo.table.catalog_sales.cs_bill_addr_sk], to: [db.dbo.table.customer_address.ca_address_sk],
 }
 
-def fk platnost_dm_v_tdm_dodaci_misto { description: "Platnost dm v tdm patří k dodacímu místu", from: [db.dbo.table.QXXTDMSUBJADR.IDSUBJADR], to: [db.dbo.table.QSUBJADR_DF.IDSUBJADR],
+def fk fk_cs_callcenter { description: "A marketplace order is handled by a seller support center", from: [db.dbo.table.catalog_sales.cs_call_center_sk], to: [db.dbo.table.call_center.cc_call_center_sk],
 }
 
-def fk platnost_dm_v_tdm_typ_dodaciho_mista { description: "Platnost dm v tdm patří k typu dodacího místa", from: [db.dbo.table.QXXTDMSUBJADR.IDXXTYPDODMIST], to: [db.dbo.table.QXXTYPDODMIST.IDXXTYPDODMIST],
+def fk fk_cs_catalog_page { description: "A marketplace order came from a catalog page", from: [db.dbo.table.catalog_sales.cs_catalog_page_sk], to: [db.dbo.table.catalog_page.cp_catalog_page_sk],
 }
 
-def fk podnet_navstevy_zakaznika_navsteva_zakaznika { description: "Podnět návštěvy zákazníka patří k návštěvě zákazníka", from: [db.dbo.table.QXXPODNET.IDXXNAVSTEVAOZ], to: [db.dbo.table.QXXNAVSTEVAOZ.IDXXNAVSTEVAOZ],
+def fk fk_cs_cdemo { description: "Demographics of the billed customer", from: [db.dbo.table.catalog_sales.cs_bill_cdemo_sk], to: [db.dbo.table.customer_demographics.cd_demo_sk],
 }
 
-def fk podnet_navstevy_zakaznika_produkt { description: "Podnět návštěvy zákazníka odkazuje na produkt", from: [db.dbo.table.QXXPODNET.IDSKUPZBOZI], to: [db.dbo.table.QSKUPZBOZI_DF.IDSKUPZBOZI],
+def fk fk_cs_customer { description: "A marketplace order is billed to a customer", from: [db.dbo.table.catalog_sales.cs_bill_customer_sk], to: [db.dbo.table.customer.c_customer_sk],
 }
 
-def fk podprodukt_navstevy_zakaznika_navsteva_zakaznika { description: "Podprodukt návštěvy zákazníka patří k návštěvě zákazníka", from: [db.dbo.table.QXXNOZPODPROD.IDXXNAVSTEVAOZ], to: [db.dbo.table.QXXNAVSTEVAOZ.IDXXNAVSTEVAOZ],
+def fk fk_cs_date { description: "A marketplace order was placed on a calendar day", from: [db.dbo.table.catalog_sales.cs_sold_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk podprodukt_navstevy_zakaznika_podprodukt { description: "Podprodukt návštěvy zákazníka odkazuje na podprodukt", from: [db.dbo.table.QXXNOZPODPROD.IDXXPODSKUPZBOZI], to: [db.dbo.table.QXXPODSKUPZBOZI.IDXXPODSKUPZBOZI],
+def fk fk_cs_item { description: "A marketplace order line sells a product", from: [db.dbo.table.catalog_sales.cs_item_sk], to: [db.dbo.table.item.i_item_sk],
 }
 
-def fk podprodukt_navstevy_zakaznika_produkt_navstevy_zakaznika { description: "Podprodukt návštěvy zákazníka patří k produktu návštěvy zákazníka", from: [db.dbo.table.QXXNOZPODPROD.IDXXNOZPRIPRAVA], to: [db.dbo.table.QXXNOZPRIPRAVA.IDXXNOZPRIPRAVA],
+def fk fk_cs_promo { description: "A promotion was applied to a marketplace order line", from: [db.dbo.table.catalog_sales.cs_promo_sk], to: [db.dbo.table.promotion.p_promo_sk],
 }
 
-def fk podprodukt_pro_firmu_podprodukt { description: "Podprodukt přiřazený k firmě odkazuje na podprodukt", from: [], to: [],
+def fk fk_cs_ship_addr { description: "Shipping address of a marketplace order", from: [db.dbo.table.catalog_sales.cs_ship_addr_sk], to: [db.dbo.table.customer_address.ca_address_sk],
 }
 
-def fk podprodukt_pro_firmu_trzni_skupina { description: "Podprodukt přiřazený k firmě ukazuje na tržní skupinu", from: [], to: [],
+def fk fk_cs_ship_customer { description: "A marketplace order is shipped to a customer", from: [db.dbo.table.catalog_sales.cs_ship_customer_sk], to: [db.dbo.table.customer.c_customer_sk],
 }
 
-def fk podprodukt_pro_obchodni_kanal_obchodni_kanal { description: "Podprodukt přiřazený k obchodnímu kanálu ukazuje na daný kanál", from: [], to: [],
+def fk fk_cs_ship_date { description: "A marketplace order was shipped on a calendar day", from: [db.dbo.table.catalog_sales.cs_ship_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk podprodukt_pro_obchodni_kanal_podprodukt { description: "Záznam podproduktu v obchodním kanálu je navázán na podprodukt", from: [], to: [],
+def fk fk_cs_ship_mode { description: "A marketplace order ships with a ship mode", from: [db.dbo.table.catalog_sales.cs_ship_mode_sk], to: [db.dbo.table.ship_mode.sm_ship_mode_sk],
 }
 
-def fk podprodukt_pro_trzni_skupinu_podprodukt { description: "Záznam podproduktu pro tržní skupinu je navázán na podprodukt", from: [], to: [],
+def fk fk_cs_time { description: "A marketplace order was placed at a time of day", from: [db.dbo.table.catalog_sales.cs_sold_time_sk], to: [db.dbo.table.time_dim.t_time_sk],
 }
 
-def fk podprodukt_pro_trzni_skupinu_trzni_skupina { description: "Podprodukt přiřazený ke skupině ukazuje na cílovou tržní skupinu", from: [], to: [],
+def fk fk_cs_warehouse { description: "A marketplace order is fulfilled by a distribution center", from: [db.dbo.table.catalog_sales.cs_warehouse_sk], to: [db.dbo.table.warehouse.w_warehouse_sk],
 }
 
-def fk podprodukt_produkt_manazer { description: "Podprodukt má přiřazeného produkt manažera", from: [db.dbo.table.QXXPODSKUPZBOZI.IDUZIVATEL], to: [db.dbo.table.QUZIVATEL_DF.IDUZIVATEL],
+def fk fk_division_company { description: "A division belongs to a company", from: [db.dbo.table.store_division.s_company_id], to: [db.dbo.table.store_company.s_company_id],
 }
 
-def fk prodeje_artikl { description: "Prodeje odkazují na artikl", from: [db.dbo.table.XXPRODEJE.IDZBOZI], to: [db.dbo.table.QZBOZI_DF.IDZBOZI],
+def fk fk_hd_income { description: "A household belongs to an income band", from: [db.dbo.table.household_demographics.hd_income_band_sk], to: [db.dbo.table.income_band.ib_income_band_sk],
 }
 
-def fk prodeje_dodaci_misto { description: "Prodeje patří k dodacímu místu", from: [db.dbo.table.XXPRODEJE.IDSUBJADR], to: [db.dbo.table.QSUBJADR_DF.IDSUBJADR],
+def fk fk_inv_date { description: "An inventory snapshot was taken on a calendar day", from: [db.dbo.table.inventory.inv_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk prodeje_obchodni_kanal { description: "Prodeje patří k obchodnímu kanálu", from: [db.dbo.table.XXPRODEJE.IDCENSKUP], to: [db.dbo.table.QCENSKUP_DF.IDCENSKUP],
+def fk fk_inv_item { description: "An inventory snapshot counts a product", from: [db.dbo.table.inventory.inv_item_sk], to: [db.dbo.table.item.i_item_sk],
 }
 
-def fk prodeje_podprodukt { description: "Prodeje odkazují na podprodukt", from: [db.dbo.table.XXPRODEJE.IDXXPODSKUPZBOZI], to: [db.dbo.table.QXXPODSKUPZBOZI.IDXXPODSKUPZBOZI],
+def fk fk_inv_warehouse { description: "An inventory snapshot counts stock in a distribution center", from: [db.dbo.table.inventory.inv_warehouse_sk], to: [db.dbo.table.warehouse.w_warehouse_sk],
 }
 
-def fk prodeje_produkt { description: "Prodeje odkazují na produkt", from: [db.dbo.table.XXPRODEJE.IDSKUPZBOZI], to: [db.dbo.table.QSKUPZBOZI_DF.IDSKUPZBOZI],
+def fk fk_iph_item { description: "A price is valid for a product", from: [db.dbo.table.item_price_history.iph_item_sk], to: [db.dbo.table.item.i_item_sk],
 }
 
-def fk prodeje_trzni_skupina { description: "Prodeje patří k tržní skupině", from: [db.dbo.table.XXPRODEJE.IDSKUPZNACZBOZI], to: [db.dbo.table.QSKUPZNACZBOZI_DF.IDSKUPZNACZBOZI],
+def fk fk_item_brand { description: "An item is sold under a brand", from: [db.dbo.table.item.i_brand_id], to: [db.dbo.table.item_brand.i_brand_id],
 }
 
-def fk prodeje_typ_dodaciho_mista { description: "Prodeje patří k typu dodacího místa", from: [db.dbo.table.XXPRODEJE.IDXXTYPDODMIST], to: [db.dbo.table.QXXTYPDODMIST.IDXXTYPDODMIST],
+def fk fk_item_category { description: "An item belongs to its parent category", from: [db.dbo.table.item.i_category_id], to: [db.dbo.table.item_category.i_category_id],
 }
 
-def fk produkt_navstevy_zakaznika_navsteva_zakaznika { description: "Produkt návštěvy zákazníka patří k návštěvě zákazníka", from: [db.dbo.table.QXXNOZPRIPRAVA.IDXXNAVSTEVAOZ], to: [db.dbo.table.QXXNAVSTEVAOZ.IDXXNAVSTEVAOZ],
+def fk fk_item_class { description: "An item belongs to its parent class", from: [db.dbo.table.item.i_class_id], to: [db.dbo.table.item_class.i_class_id],
 }
 
-def fk produkt_navstevy_zakaznika_produkt { description: "Produkt návštěvy zákazníka odkazuje na produkt", from: [db.dbo.table.QXXNOZPRIPRAVA.IDSKUPZBOZI], to: [db.dbo.table.QSKUPZBOZI_DF.IDSKUPZBOZI],
+def fk fk_item_manufact { description: "An item is made by a manufacturer", from: [db.dbo.table.item.i_manufact_id], to: [db.dbo.table.item_manufacturer.i_manufact_id],
 }
 
-def fk produkt_podprodukt { description: "Podprodukt patří pod nadřazený produkt", from: [db.dbo.table.QXXPODSKUPZBOZI.IDSKUPZBOZI], to: [db.dbo.table.QSKUPZBOZI_DF.IDSKUPZBOZI],
+def fk fk_iws_item { description: "A weekly stock summary of a product", from: [db.dbo.table.inventory_weekly_summary.iws_item_sk], to: [db.dbo.table.item.i_item_sk],
 }
 
-def fk produkt_pro_firmu_produkt { description: "Produkt přiřazený k firmě odkazuje na produkt", from: [], to: [],
+def fk fk_iws_warehouse { description: "A weekly stock summary of a distribution center", from: [db.dbo.table.inventory_weekly_summary.iws_warehouse_sk], to: [db.dbo.table.warehouse.w_warehouse_sk],
 }
 
-def fk produkt_pro_firmu_trzni_skupina { description: "Produkt přiřazený k firmě ukazuje na tržní skupinu", from: [], to: [],
+def fk fk_market_division { description: "A market belongs to a division", from: [db.dbo.table.store_market.s_division_id], to: [db.dbo.table.store_division.s_division_id],
 }
 
-def fk produkt_pro_obchodni_kanal_obchodni_kanal { description: "Produkt přiřazený k obchodnímu kanálu vždy navazuje na konkrétní kanál", from: [], to: [],
+def fk fk_p_end_date { description: "A promotion ends on a calendar day", from: [db.dbo.table.promotion.p_end_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk produkt_pro_obchodni_kanal_produkt { description: "Záznam produktu v obchodním kanálu odkazuje na produkt", from: [], to: [],
+def fk fk_p_item { description: "Featured product of a promotion", from: [db.dbo.table.promotion.p_item_sk], to: [db.dbo.table.item.i_item_sk],
 }
 
-def fk produkt_pro_trzni_skupinu_produkt { description: "Záznam produktu pro tržní skupinu vždy odkazuje na produkt", from: [], to: [],
+def fk fk_p_start_date { description: "A promotion starts on a calendar day", from: [db.dbo.table.promotion.p_start_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk produkt_pro_trzni_skupinu_trzni_skupina { description: "Každý produkt přiřazený k tržní skupině ukazuje na danou tržní skupinu", from: [], to: [],
+def fk fk_pi_item { description: "The product taking part", from: [db.dbo.table.promotion_item.pi_item_sk], to: [db.dbo.table.item.i_item_sk],
 }
 
-def fk reklamace_dodaci_misto { description: "Reklamace patří k dodacímu místu", from: [db.dbo.table.QHDOK_ZAK_DF.IDSUBJADRP], to: [db.dbo.table.QSUBJADR_DF.IDSUBJADR],
+def fk fk_pi_promo { description: "A product takes part in a promotion", from: [db.dbo.table.promotion_item.pi_promo_sk], to: [db.dbo.table.promotion.p_promo_sk],
 }
 
-def fk reklamace_slozka_artikl { description: "Složka reklamace obsahuje konkrétní artikl", from: [db.dbo.table.QSDOK_PDO_DF.IDZBOZI], to: [db.dbo.table.QZBOZI_DF.IDZBOZI],
+def fk fk_pi_start_date { description: "A product joined a promotion on a calendar day", from: [db.dbo.table.promotion_item.pi_start_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk reklamace_slozka_reklamace { description: "Složka reklamace patří k reklamaci", from: [db.dbo.table.QSDOK_PDO_DF.IDHDOK], to: [db.dbo.table.QHDOK_ZAK_DF.IDHDOK],
+def fk fk_s_closed_date { description: "A store closed on a calendar day", from: [db.dbo.table.store.s_closed_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk rezerva_trzby_dodaci_misto { description: "Rezerva tržby patří k dodacímu místu", from: [db.dbo.table.XXREZERVA_TRZBY.SUBJADR_POZNAMKA], to: [db.dbo.table.QSUBJADR_DF.SUBJADR_POZNAMKA],
+def fk fk_sia_delisted_date { description: "A product was delisted on a calendar day", from: [db.dbo.table.store_item_assortment.sia_delisted_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk rezerva_trzby_obchodni_kanal { description: "Rezerva tržby patří k obchodnímu kanálu", from: [db.dbo.table.XXREZERVA_TRZBY.IDCENSKUP], to: [db.dbo.table.QCENSKUP_DF.IDCENSKUP],
+def fk fk_sia_item { description: "A product in a store's assortment", from: [db.dbo.table.store_item_assortment.sia_item_sk], to: [db.dbo.table.item.i_item_sk],
 }
 
-def fk rezerva_trzby_podprodukt { description: "Rezerva tržby patří k podproduktu", from: [db.dbo.table.XXREZERVA_TRZBY.IDXXPODSKUPZBOZI], to: [db.dbo.table.QXXPODSKUPZBOZI.IDXXPODSKUPZBOZI],
+def fk fk_sia_listed_date { description: "A product was listed on a calendar day", from: [db.dbo.table.store_item_assortment.sia_listed_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk tok_dokladu_naslednik_dobropis { description: "Následník v toku dokladů je dobropis. Disambiguace: cílová entita filtrována WHERE TYP_DOK='FVU' AND HDKUHRADEVAL<0.", from: [db.dbo.table.QHISHDOK_DF.IDHDOKN], to: [db.dbo.table.QHDOK_FAV_DF.IDHDOK],
+def fk fk_sia_store { description: "An assortment belongs to a store", from: [db.dbo.table.store_item_assortment.sia_store_sk], to: [db.dbo.table.store.s_store_sk],
 }
 
-def fk tok_dokladu_naslednik_faktura { description: "Následník v toku dokladů je faktura. Disambiguace: cílová entita filtrována WHERE TYP_DOK='FVU' AND HDKUHRADEVAL>=0.", from: [db.dbo.table.QHISHDOK_DF.IDHDOKN], to: [db.dbo.table.QHDOK_FAV_DF.IDHDOK],
+def fk fk_sr_addr { description: "Customer address at the time of a store return", from: [db.dbo.table.store_returns.sr_addr_sk], to: [db.dbo.table.customer_address.ca_address_sk],
 }
 
-def fk tok_dokladu_naslednik_reklamace { description: "Následník v toku dokladů je reklamace. Disambiguace: cílová entita filtrována WHERE TYP_DOK='PDO'.", from: [db.dbo.table.QHISHDOK_DF.IDHDOKN], to: [db.dbo.table.QHDOK_ZAK_DF.IDHDOK],
+def fk fk_sr_cdemo { description: "Customer demographics at the time of a store return", from: [db.dbo.table.store_returns.sr_cdemo_sk], to: [db.dbo.table.customer_demographics.cd_demo_sk],
 }
 
-def fk tok_dokladu_naslednik_vratka { description: "Následník v toku dokladů je vratka. Disambiguace: cílová entita filtrována WHERE TYP_DOK='POB' AND HDKUHRADEVAL<0.", from: [db.dbo.table.QHISHDOK_DF.IDHDOKN], to: [db.dbo.table.QHDOK_ZAK_DF.IDHDOK],
+def fk fk_sr_customer { description: "A store return was made by a customer", from: [db.dbo.table.store_returns.sr_customer_sk], to: [db.dbo.table.customer.c_customer_sk],
 }
 
-def fk tok_dokladu_naslednik_zakazka { description: "Následník v toku dokladů je zakázka. Disambiguace: cílová entita filtrována WHERE TYP_DOK='POB' AND HDKUHRADEVAL>=0.", from: [db.dbo.table.QHISHDOK_DF.IDHDOKN], to: [db.dbo.table.QHDOK_ZAK_DF.IDHDOK],
+def fk fk_sr_date { description: "A store return was accepted on a calendar day", from: [db.dbo.table.store_returns.sr_returned_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk tok_dokladu_predchudce_dobropis { description: "Předchůdce v toku dokladů je dobropis. Disambiguace: cílová entita filtrována WHERE TYP_DOK='FVU' AND HDKUHRADEVAL<0.", from: [db.dbo.table.QHISHDOK_DF.IDHDOKP], to: [db.dbo.table.QHDOK_FAV_DF.IDHDOK],
+def fk fk_sr_item { description: "A store return concerns a product", from: [db.dbo.table.store_returns.sr_item_sk], to: [db.dbo.table.item.i_item_sk],
 }
 
-def fk tok_dokladu_predchudce_faktura { description: "Předchůdce v toku dokladů je faktura. Disambiguace: cílová entita filtrována WHERE TYP_DOK='FVU' AND HDKUHRADEVAL>=0.", from: [db.dbo.table.QHISHDOK_DF.IDHDOKP], to: [db.dbo.table.QHDOK_FAV_DF.IDHDOK],
+def fk fk_sr_reason { description: "A store return has a reason", from: [db.dbo.table.store_returns.sr_reason_sk], to: [db.dbo.table.reason.r_reason_sk],
 }
 
-def fk tok_dokladu_predchudce_reklamace { description: "Předchůdce v toku dokladů je reklamace. Disambiguace: cílová entita filtrována WHERE TYP_DOK='PDO'.", from: [db.dbo.table.QHISHDOK_DF.IDHDOKP], to: [db.dbo.table.QHDOK_ZAK_DF.IDHDOK],
+def fk fk_sr_sale { description: "A store return returns a line of the original sale", from: [db.dbo.table.store_returns.sr_item_sk, db.dbo.table.store_returns.sr_ticket_number], to: [db.dbo.table.store_sales.ss_item_sk, db.dbo.table.store_sales.ss_ticket_number],
 }
 
-def fk tok_dokladu_predchudce_vratka { description: "Předchůdce v toku dokladů je vratka. Disambiguace: cílová entita filtrována WHERE TYP_DOK='POB' AND HDKUHRADEVAL<0.", from: [db.dbo.table.QHISHDOK_DF.IDHDOKP], to: [db.dbo.table.QHDOK_ZAK_DF.IDHDOK],
+def fk fk_sr_store { description: "A store return was accepted by a store", from: [db.dbo.table.store_returns.sr_store_sk], to: [db.dbo.table.store.s_store_sk],
 }
 
-def fk tok_dokladu_predchudce_zakazka { description: "Předchůdce v toku dokladů je zakázka. Disambiguace: cílová entita filtrována WHERE TYP_DOK='POB' AND HDKUHRADEVAL>=0.", from: [db.dbo.table.QHISHDOK_DF.IDHDOKP], to: [db.dbo.table.QHDOK_ZAK_DF.IDHDOK],
+def fk fk_sr_time { description: "A store return was accepted at a time of day", from: [db.dbo.table.store_returns.sr_return_time_sk], to: [db.dbo.table.time_dim.t_time_sk],
 }
 
-def fk typ_dodaciho_mista_obchodni_kanal { description: "Typ dodacího místa patří k obchodnímu kanálu", from: [db.dbo.table.QXXTYPDODMIST.IDCENSKUP], to: [db.dbo.table.QCENSKUP_DF.IDCENSKUP],
+def fk fk_ss_addr { description: "Customer address at the time of a store sale", from: [db.dbo.table.store_sales.ss_addr_sk], to: [db.dbo.table.customer_address.ca_address_sk],
 }
 
-def fk ukol_navstevy_zakaznika_navsteva_zakaznika { description: "Úkol návštěvy zákazníka patří k návštěvě zákazníka", from: [db.dbo.table.QXXPLNUKOLOZ.IDXXNAVSTEVAOZ], to: [db.dbo.table.QXXNAVSTEVAOZ.IDXXNAVSTEVAOZ],
+def fk fk_ss_cdemo { description: "Customer demographics at the time of a store sale", from: [db.dbo.table.store_sales.ss_cdemo_sk], to: [db.dbo.table.customer_demographics.cd_demo_sk],
 }
 
-def fk uzivatel_ve_skupine_skupina { description: "Členství uživatele ve skupině", from: [db.dbo.table.QUZVESKUP.IDSKUPUZIV], to: [db.dbo.table.QSKUPUZIV.IDSKUPUZIV],
+def fk fk_ss_customer { description: "A store sale was bought by a customer", from: [db.dbo.table.store_sales.ss_customer_sk], to: [db.dbo.table.customer.c_customer_sk],
 }
 
-def fk uzivatel_ve_skupine_uzivatel { description: "Členství uživatele ve skupině", from: [db.dbo.table.QUZVESKUP.IDUZIVATEL], to: [db.dbo.table.QUZIVATEL_DF.IDUZIVATEL],
+def fk fk_ss_date { description: "A store sale happened on a calendar day", from: [db.dbo.table.store_sales.ss_sold_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk vratka_dodaci_misto { description: "Vratka patří k dodacímu místu", from: [db.dbo.table.QHDOK_ZAK_DF.IDSUBJADRP], to: [db.dbo.table.QSUBJADR_DF.IDSUBJADR],
+def fk fk_ss_hdemo { description: "Household demographics at the time of a store sale", from: [db.dbo.table.store_sales.ss_hdemo_sk], to: [db.dbo.table.household_demographics.hd_demo_sk],
 }
 
-def fk vratka_slozka_artikl { description: "Složka vratky obsahuje konkrétní artikl", from: [db.dbo.table.QZBOZSDOK.IDZBOZI], to: [db.dbo.table.QZBOZI_DF.IDZBOZI],
+def fk fk_ss_item { description: "A store sales line sells a product", from: [db.dbo.table.store_sales.ss_item_sk], to: [db.dbo.table.item.i_item_sk],
 }
 
-def fk vratka_slozka_vratka { description: "Složka vratky patří k vratce", from: [db.dbo.table.QZBOZSDOK.IDHDOK], to: [db.dbo.table.QHDOK_ZAK_DF.IDHDOK],
+def fk fk_ss_promo { description: "A promotion was applied to a store sales line", from: [db.dbo.table.store_sales.ss_promo_sk], to: [db.dbo.table.promotion.p_promo_sk],
 }
 
-def fk vyteznost_regalu_artikl { description: "Tržba na cm odkazuje na artikl", from: [db.dbo.table.QDF_VYTEZNOST_REGALU.IDZBOZI], to: [db.dbo.table.QZBOZI_DF.IDZBOZI],
+def fk fk_ss_store { description: "A store sale happened in a store", from: [db.dbo.table.store_sales.ss_store_sk], to: [db.dbo.table.store.s_store_sk],
 }
 
-def fk vyteznost_regalu_dodaci_misto { description: "Tržba na cm patří k dodacímu místu (join přes zkratku DM)", from: [db.dbo.table.QDF_VYTEZNOST_REGALU.SUBJADR_POZNAMKA], to: [db.dbo.table.QSUBJADR_DF.SUBJADR_POZNAMKA],
+def fk fk_ss_time { description: "A store sale happened at a time of day", from: [db.dbo.table.store_sales.ss_sold_time_sk], to: [db.dbo.table.time_dim.t_time_sk],
 }
 
-def fk vyteznost_regalu_kanal_artikl { description: "Tržba na cm kanál odkazuje na artikl", from: [db.dbo.table.QDF_VYTEZNOST_REGALU_KANAL.IDZBOZI], to: [db.dbo.table.QZBOZI_DF.IDZBOZI],
+def fk fk_ssp_category { description: "A revenue plan for a product category", from: [db.dbo.table.store_sales_plan.ssp_category_id], to: [db.dbo.table.item_category.i_category_id],
 }
 
-def fk vyteznost_regalu_kanal_obchodni_kanal { description: "Tržba na cm kanál patří k obchodnímu kanálu", from: [db.dbo.table.QDF_VYTEZNOST_REGALU_KANAL.IDCENSKUP], to: [db.dbo.table.QCENSKUP_DF.IDCENSKUP],
+def fk fk_ssp_store { description: "A revenue plan of a store", from: [db.dbo.table.store_sales_plan.ssp_store_sk], to: [db.dbo.table.store.s_store_sk],
 }
 
-def fk vyteznost_regalu_obchodni_kanal { description: "Tržba na cm patří k obchodnímu kanálu", from: [db.dbo.table.QDF_VYTEZNOST_REGALU.IDCENSKUP], to: [db.dbo.table.QCENSKUP_DF.IDCENSKUP],
+def fk fk_store_market { description: "A store serves a market", from: [db.dbo.table.store.s_market_id], to: [db.dbo.table.store_market.s_market_id],
 }
 
-def fk vyteznost_regalu_podprodukt { description: "Tržba na cm odkazuje na podprodukt", from: [db.dbo.table.QDF_VYTEZNOST_REGALU.IDXXPODSKUPZBOZI], to: [db.dbo.table.QXXPODSKUPZBOZI.IDXXPODSKUPZBOZI],
+def fk fk_web_close_date { description: "A web site was shut down on a calendar day", from: [db.dbo.table.web_site.web_close_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk vyteznost_regalu_produkt { description: "Tržba na cm odkazuje na produkt", from: [db.dbo.table.QDF_VYTEZNOST_REGALU.IDSKUPZBOZI], to: [db.dbo.table.QSKUPZBOZI_DF.IDSKUPZBOZI],
+def fk fk_web_open_date { description: "A web site went live on a calendar day", from: [db.dbo.table.web_site.web_open_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk zakazka_dodaci_misto { description: "Zakázka patří k dodacímu místu", from: [db.dbo.table.QHDOK_ZAK_DF.IDSUBJADRP], to: [db.dbo.table.QSUBJADR_DF.IDSUBJADR],
+def fk fk_wp_access_date { description: "Last access to a web page", from: [db.dbo.table.web_page.wp_access_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk zakazka_slozka_artikl { description: "Složka zakázky obsahuje konkrétní artikl", from: [db.dbo.table.QZBOZSDOK.IDZBOZI], to: [db.dbo.table.QZBOZI_DF.IDZBOZI],
+def fk fk_wp_creation_date { description: "A web page was created on a calendar day", from: [db.dbo.table.web_page.wp_creation_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk zakazka_slozka_zakazka { description: "Složka zakázky patří k zakázce", from: [db.dbo.table.QZBOZSDOK.IDHDOK], to: [db.dbo.table.QHDOK_ZAK_DF.IDHDOK],
+def fk fk_wp_customer { description: "A web page was created for a customer", from: [db.dbo.table.web_page.wp_customer_sk], to: [db.dbo.table.customer.c_customer_sk],
 }
 
-def fk zasoba_artiklu_artikl { description: "Zásoba artiklu patří ke konkrétnímu artiklu", from: [db.dbo.table.XXVYPADKYZASOB.IDZBOZI], to: [db.dbo.table.QZBOZI_DF.IDZBOZI],
+def fk fk_wr_addr { description: "Address a web return came from", from: [db.dbo.table.web_returns.wr_returning_addr_sk], to: [db.dbo.table.customer_address.ca_address_sk],
 }
 
-def fk účetní_doklad_typ { description: "Doklad patří k typu dokladu", from: [db.dbo.table.QSDOK.IDTYPDOK], to: [db.dbo.table.QTYPDOK.IDTYPDOK],
+def fk fk_wr_customer { description: "A web return was made by a customer", from: [db.dbo.table.web_returns.wr_returning_customer_sk], to: [db.dbo.table.customer.c_customer_sk],
 }
 
-def fk účetní_středisko_ukazatel { description: "Středisko má přiřazený ukazatel manažerského účetnictví", from: [db.dbo.table.QSTRED_DF.IDXXUKAZMU], to: [db.dbo.table.QXXUKAZMU.IDXXUKAZMU],
+def fk fk_wr_date { description: "A web return was accepted on a calendar day", from: [db.dbo.table.web_returns.wr_returned_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
 }
 
-def fk účetní_zápis_doklad { description: "Účetní zápis patří k hlavičce dokladu", from: [db.dbo.table.QUCETZAP.IDHDOK], to: [db.dbo.table.QSDOK.IDHDOK],
+def fk fk_wr_item { description: "A web return concerns a product", from: [db.dbo.table.web_returns.wr_item_sk], to: [db.dbo.table.item.i_item_sk],
 }
 
-def fk účetní_zápis_období { description: "Účetní zápis patří k účetnímu období", from: [db.dbo.table.QUCETZAP.IDUCTOBD], to: [db.dbo.table.QUCTOBD.IDUCTOBD],
+def fk fk_wr_reason { description: "A web return has a reason", from: [db.dbo.table.web_returns.wr_reason_sk], to: [db.dbo.table.reason.r_reason_sk],
 }
 
-def fk účetní_zápis_složka_dokladu { description: "Účetní zápis patří ke složce dokladu", from: [db.dbo.table.QUCETZAP.IDSDOK], to: [db.dbo.table.QSDOK.IDSDOK],
+def fk fk_wr_refunded_customer { description: "The amount of a web return was refunded to a customer", from: [db.dbo.table.web_returns.wr_refunded_customer_sk], to: [db.dbo.table.customer.c_customer_sk],
 }
 
-def fk účetní_zápis_středisko { description: "Účetní zápis patří ke středisku", from: [db.dbo.table.QUCETZAP.IDSTRED], to: [db.dbo.table.QSTRED_DF.IDSTRED],
+def fk fk_wr_sale { description: "A web return returns a line of the original web order", from: [db.dbo.table.web_returns.wr_item_sk, db.dbo.table.web_returns.wr_order_number], to: [db.dbo.table.web_sales.ws_item_sk, db.dbo.table.web_sales.ws_order_number],
 }
 
-def fk účetní_zápis_účet { description: "Účetní zápis patří k účtu účetní osnovy", from: [db.dbo.table.QUCETZAP.IDUCTOSN], to: [db.dbo.table.QUCTOSN_DF.IDUCTOSN],
+def fk fk_wr_web_page { description: "Web page of the original web order", from: [db.dbo.table.web_returns.wr_web_page_sk], to: [db.dbo.table.web_page.wp_web_page_sk],
 }
 
+def fk fk_ws_addr { description: "Billing address of a web order", from: [db.dbo.table.web_sales.ws_bill_addr_sk], to: [db.dbo.table.customer_address.ca_address_sk],
+}
+
+def fk fk_ws_customer { description: "A web order is billed to a customer", from: [db.dbo.table.web_sales.ws_bill_customer_sk], to: [db.dbo.table.customer.c_customer_sk],
+}
+
+def fk fk_ws_date { description: "A web order was placed on a calendar day", from: [db.dbo.table.web_sales.ws_sold_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
+}
+
+def fk fk_ws_item { description: "A web order line sells a product", from: [db.dbo.table.web_sales.ws_item_sk], to: [db.dbo.table.item.i_item_sk],
+}
+
+def fk fk_ws_promo { description: "A promotion was applied to a web order line", from: [db.dbo.table.web_sales.ws_promo_sk], to: [db.dbo.table.promotion.p_promo_sk],
+}
+
+def fk fk_ws_ship_addr { description: "Shipping address of a web order", from: [db.dbo.table.web_sales.ws_ship_addr_sk], to: [db.dbo.table.customer_address.ca_address_sk],
+}
+
+def fk fk_ws_ship_customer { description: "A web order is shipped to a customer", from: [db.dbo.table.web_sales.ws_ship_customer_sk], to: [db.dbo.table.customer.c_customer_sk],
+}
+
+def fk fk_ws_ship_date { description: "A web order was shipped on a calendar day", from: [db.dbo.table.web_sales.ws_ship_date_sk], to: [db.dbo.table.date_dim.d_date_sk],
+}
+
+def fk fk_ws_ship_mode { description: "A web order ships with a ship mode", from: [db.dbo.table.web_sales.ws_ship_mode_sk], to: [db.dbo.table.ship_mode.sm_ship_mode_sk],
+}
+
+def fk fk_ws_time { description: "A web order was placed at a time of day", from: [db.dbo.table.web_sales.ws_sold_time_sk], to: [db.dbo.table.time_dim.t_time_sk],
+}
+
+def fk fk_ws_warehouse { description: "A web order is fulfilled by a distribution center", from: [db.dbo.table.web_sales.ws_warehouse_sk], to: [db.dbo.table.warehouse.w_warehouse_sk],
+}
+
+def fk fk_ws_web_page { description: "A web order was placed on a web page", from: [db.dbo.table.web_sales.ws_web_page_sk], to: [db.dbo.table.web_page.wp_web_page_sk],
+}
+
+def fk fk_ws_web_site { description: "A web order was placed on a web site", from: [db.dbo.table.web_sales.ws_web_site_sk], to: [db.dbo.table.web_site.web_site_sk],
+}

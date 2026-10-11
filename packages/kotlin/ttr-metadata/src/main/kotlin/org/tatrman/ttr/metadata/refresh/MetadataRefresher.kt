@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * DF-M04 / Phase 07 B2 — `Refresh` RPC handler. Re-loads model sources on demand, atomically
+ * Phase 07 B2 — `Refresh` RPC handler. Re-loads model sources on demand, atomically
  * swaps the registry snapshot, returns per-source results.
  *
  * Concurrency:

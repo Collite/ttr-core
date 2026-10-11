@@ -105,6 +105,7 @@ class MetadataServerSource(
             roles = a.roles + b.roles,
             drillMaps = a.drillMaps + b.drillMaps,
             areas = a.areas + b.areas,
+            rowSchemas = a.rowSchemas + b.rowSchemas,
             worlds = a.worlds + b.worlds,
             warnings = a.warnings + b.warnings,
             errors = a.errors + b.errors,

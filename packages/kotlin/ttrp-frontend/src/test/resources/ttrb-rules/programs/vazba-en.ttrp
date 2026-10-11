@@ -1,0 +1,15 @@
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container reklamovane(out seznam, out vse_reklamace) target erp """ttrb
+Load objednávky as o.
+Load reklamace as r.
+Join r with o on relation reklamace_objednavky as rj.
+Keep only the columns id, číslo_objednávky, částka.
+Send that to output seznam.
+Join r optionally with o on relation reklamace_objednavky as rv.
+Send that to output vse_reklamace.
+"""
+
+reklamovane.seznam -> display(seznam)
+reklamovane.vse_reklamace -> display(vse_reklamace)

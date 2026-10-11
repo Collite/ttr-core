@@ -23,11 +23,14 @@ flowchart LR
 
     Every command below was run for real; the outputs are pasted, not
     reconstructed. Steps 1–3 (install and import) run on any cluster with the
-    published chart and CLI. Steps 4–6 show real transcripts from a deployed
-    Tatrman catalog — your model and data differ, but the *shapes* are exactly
-    what you get. The end-to-end governed-execution acceptance run (real result
-    rows through a live query worker) is exercised in full at
-    [import a database](import-schema.md) and the reference deployment.
+    published chart and CLI. Steps 4–6 are real transcripts from running this
+    page on a local single-node cluster against the Hartland demo model — the
+    public [`Collite/ttr-demo`](https://github.com/Collite/ttr-demo) repository,
+    a retail schema built on TPC-DS — so your model and data differ, but the
+    *shapes* are exactly what you get. The end-to-end governed-execution
+    acceptance run (real result rows through a live query worker) is exercised
+    in full at [import a database](import-schema.md) and the reference
+    deployment.
 
 ---
 
@@ -83,6 +86,25 @@ Pulled: ghcr.io/collite/charts/tatrman-server:0.9.0
 Digest: sha256:6872f69eb33124795a533983fd3837ec9b59bff4049d0e3a2dc4690bea13b61e
 ```
 
+!!! warning "Chart 0.9.0 pins service images older than the current grammar"
+
+    The 0.9.0 chart pins the 0.9.x service images, and they predate the current
+    TTR-M grammar: Veles 0.9.0 cannot load a model that uses it (on the
+    Hartland demo model it reports hundreds of parse and package errors and
+    serves no entity-to-table bindings, so step 6 fails). Until the next chart
+    release, run the current public builds of the spine and the MCP doors —
+    save this as `current-images.yaml` and add `-f current-images.yaml` to the
+    install command above:
+
+    ```yaml
+    veles:     { image: { repository: ghcr.io/collite/veles,     tag: "0.11.7" } }
+    query:     { image: { repository: ghcr.io/collite/query,     tag: "0.11.3" } }
+    translate: { image: { repository: ghcr.io/collite/translate, tag: "0.11.6" } }
+    validate:  { image: { repository: ghcr.io/collite/validate,  tag: "0.11.5" } }
+    query-mcp: { image: { repository: ghcr.io/collite/query-mcp, tag: "0.11.4" } }
+    veles-mcp: { image: { repository: ghcr.io/collite/meta-mcp,  tag: "0.9.0" } }
+    ```
+
 `devIdp.enabled=true` brings up a bundled dev Keycloak (realm `tatrman`, a
 `demo`/`demo` user) so you can complete the quickstart with no external IdP.
 **It is not for production** — wire your own IdP for anything real
@@ -93,8 +115,10 @@ Digest: sha256:6872f69eb33124795a533983fd3837ec9b59bff4049d0e3a2dc4690bea13b61e
     The spine coming up — `veles`, `query`, `translate`, `validate`, the
     identity (`whois`) and `health` services, and the dev Keycloak — each pod
     reaching `Ready`, and `/ready` green on the front door. On a capacity-bound
-    node, lower the request floor with the documented deploy overlay; the
-    workers and MCP doors that need databases and an IdP come up once you wire
+    node, lower the request floor with the documented deploy overlay
+    (`deploy/values-bp-dsk-smoke.yaml` in the chart) — it also switches the MCP
+    doors off, so add `--set veles-mcp.enabled=true --set query-mcp.enabled=true`
+    (steps 4–6 use them); the workers that need databases come up once you wire
     steps 3–5.
 
 ## 3. Import your schema
@@ -186,7 +210,28 @@ a new model is a `git push`.
 # Veles reads METADATA_GIT_REMOTE_URI; set it via the chart's values
 # (or the model-repo field in the Designer viewer).
 helm upgrade ttr oci://ghcr.io/collite/charts/tatrman-server --version 0.9.0 \
-  --reuse-values --set veles.metadataGitRemoteUri="https://github.com/you/erp-model.git"
+  -n ttr --reuse-values \
+  --set veles.metadata.gitRemoteUri="https://github.com/you/erp-model.git"
+```
+
+Veles clones the `main` branch and reads the model from the repository root. A
+model on another branch or in a subdirectory names both in `veles.extraEnv` —
+the run on this page served the Hartland model from `master`, under `model/`:
+
+```yaml
+veles:
+  metadata:
+    gitRemoteUri: "https://github.com/Collite/ttr-demo.git"
+  extraEnv:
+    - { name: METADATA_GIT_BRANCH, value: "master" }
+    - { name: METADATA_GIT_SUBDIR, value: "model" }
+```
+
+`translate` re-reads the model from Veles every ten minutes (`validate` every
+minute); restart it to pick up a new model source now:
+
+```bash
+kubectl -n ttr rollout restart deploy/translate
 ```
 
 The catalog is now answering. Any MCP client can read it through the
@@ -194,21 +239,29 @@ The catalog is now answering. Any MCP client can read it through the
 
 ```console
 $ # tools/list on the veles-mcp door
-get_tables            get_table_details
-get_entities          get_entity_details
-get_relationships     get_pattern_queries
-get_model             list_roles           resolve_area
+get_tables                  get_table_details
+get_entities                get_entity_details
+get_relationships           get_pattern_queries
+get_pattern_query_details   get_sql_queries
+get_sql_query_details       get_stored_procedures
+get_stored_procedure_details
+get_model                   list_roles
+get_roles_for_entity        resolve_area
 ```
 
-Calling `get_entities` returns your logical model — real transcript from a
-deployed Czech field-sales catalog:
+Calling `get_entities` returns your logical model — real transcript over the
+Hartland model, `get_entities {"package": "hartland"}` (20 entities; the first
+six shown, each trimmed to `id` and `name`):
 
 ```json
 [
-  { "id": "er.entity.faktura",              "name": "faktura" },
-  { "id": "er.entity.prodeje",              "name": "prodeje" },
-  { "id": "er.entity.návštěva_zákazníka",   "name": "návštěva_zákazníka" },
-  { "id": "er.entity.organizační_struktura","name": "organizační_struktura" }
+  { "id": "er.entity.call_center",     "name": "call_center" },
+  { "id": "er.entity.catalog_returns", "name": "catalog_returns" },
+  { "id": "er.entity.catalog_sales",   "name": "catalog_sales" },
+  { "id": "er.entity.channel_sales",   "name": "channel_sales" },
+  { "id": "er.entity.customer",        "name": "customer" },
+  { "id": "er.entity.customer_address","name": "customer_address" },
+  …
 ]
 ```
 
@@ -226,6 +279,20 @@ That forwarding is not a formality: the platform answers **as your user**, which
 is what makes the governance in step 6 real rather than decorative. Add the door
 to your client (Claude Desktop's `mcpServers`, or `claude mcp add`), pointing at
 the door's URL and forwarding an `Authorization: Bearer <token>` from your IdP.
+
+With the bundled dev IdP, a bearer for the `demo` user comes from the realm's
+public `tatrman-agent` client:
+
+```bash
+kubectl -n ttr port-forward svc/ttr-keycloak 8080:8080 &
+curl -s -X POST http://localhost:8080/realms/tatrman/protocol/openid-connect/token \
+  -d grant_type=password -d client_id=tatrman-agent -d username=demo -d password=demo
+```
+
+On chart 0.9.0 that call first answers `"Account is not fully set up"`: Keycloak
+26 requires an email, first and last name on every user, and the dev realm's
+`demo` user has none. Fill them in once in the admin console (`admin`/`admin`,
+realm `tatrman` → Users → `demo`) and the call returns the token.
 
 The doors are **fail-closed**. Call one without an identity and it refuses,
 naming exactly what it needs — real transcript from the `query` door:
@@ -261,22 +328,22 @@ and returns the answer **with a record of what it did**.
 
 You can watch this without touching a row of data: `compile` runs the whole
 translation and governance pipeline and hands back the SQL it *would* execute.
-Here a question over the logical entity `prodeje` (Czech: *sales*) compiles to
-physical SQL over the real table — real transcript:
+Here a question over the logical entity `store_sales` (Hartland's store sales
+lines) compiles to physical SQL over the real table — real transcript. Hartland
+names its entities after their tables, so the call says `source_schema: "er"` to
+resolve the name against the entity model:
 
 ```console
-$ # compile "SELECT * FROM prodeje" as your user
-SELECT "IDSUBJADR"    AS "id_dodacího_místa",
-       "IDSKUPZNACZBOZI" AS "id_tržní_skupiny",
-       "DTPOSLEDNI_DOD"  AS "poslední_dodávka",
-       "HDTRZBA_24M"     AS "tržba_24_měsíců",
-       "HDTRZBA_12M"     AS "tržba_12_měsíců"
-FROM "XXPRODEJE"
+$ # compile "SELECT * FROM store_sales" as your user
+$ #   (source_schema: "er", target_dialect: "postgresql")
+SELECT "ss_item_sk" AS "item", "ss_ticket_number" AS "ticket_number", "ss_sold_date_sk" AS "sold_date", "ss_customer_sk" AS "customer", "ss_addr_sk" AS "addr", "ss_store_sk" AS "store", "ss_promo_sk" AS "promo", "ss_quantity" AS "quantity", "ss_ext_sales_price" AS "ext_sales_price"
+FROM "store_sales"
 ```
 
-The logical model you curated (`prodeje`, `poslední_dodávka`, `tržba_24_měsíců`)
-became physical SQL over the actual columns (`XXPRODEJE`, `DTPOSLEDNI_DOD`,
-`HDTRZBA_24M`) — the agent never sees, and never needs, the raw column soup.
+The logical model you curated (`item`, `sold_date`, `ext_sales_price`) became
+physical SQL over the actual columns (`ss_item_sk`, `ss_sold_date_sk`,
+`ss_ext_sales_price`) — the agent never sees, and never needs, the raw column
+soup.
 
 Run the same query with `query` instead of `compile` and you get the rows **plus
 the envelope**: `pipelineWarnings` naming every row-level filter, masked column,

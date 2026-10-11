@@ -1,0 +1,213 @@
+{
+  "nodes": [
+    {
+      "qname": "er.entity.item",
+      "kind": "entity",
+      "label": "item",
+      "schema": "er",
+      "pkg": "hartland",
+      "descriptionLocalized": {
+        "cs": "Produkty — členění podle kategorie a značky; dvojjazyčný katalog je rozsvítil (fáze 1).",
+        "en": "Products — category/brand drills; the bilingual catalog lit these up (Phase 1)."
+      },
+      "displayLabel": {
+        "cs": "Produkt",
+        "en": "Product"
+      },
+      "labelPlural": "Products"
+    },
+    {
+      "qname": "er.entity.store",
+      "kind": "entity",
+      "label": "store",
+      "schema": "er",
+      "pkg": "hartland",
+      "description": "Stores — the six TN stores (Stores-channel dim).",
+      "displayLabel": {
+        "cs": "Prodejna",
+        "en": "Store"
+      },
+      "labelPlural": "Stores"
+    },
+    {
+      "qname": "er.entity.store_sales",
+      "kind": "entity",
+      "label": "store_sales",
+      "schema": "er",
+      "pkg": "hartland",
+      "description": "Stores-channel sales lines — store / brick-and-mortar revenue (sales) = SUM(ext_sales_price), units sold = quantity, dated by sold_date.",
+      "displayLabel": {
+        "cs": "Tržby z prodejen",
+        "en": "Store Sales"
+      },
+      "labelPlural": "Store Sales"
+    },
+    {
+      "qname": "er.entity.customer_address",
+      "kind": "entity",
+      "label": "customer_address",
+      "schema": "er",
+      "pkg": "hartland",
+      "description": "Customer addresses — the regional-dying branch (revenue-by-state, confirmed flat).",
+      "displayLabel": {
+        "cs": "Adresa zákazníka",
+        "en": "Customer Address"
+      },
+      "labelPlural": "Customer Addresses"
+    },
+    {
+      "qname": "er.entity.item.sk",
+      "kind": "attribute",
+      "label": "sk",
+      "schema": "er",
+      "pkg": "hartland",
+      "descriptionLocalized": {
+        "cs": "Sekvenční klíč. Pouze interní primární klíč.",
+        "en": "Sequence key. Internal primary key only."
+      }
+    },
+    {
+      "qname": "er.entity.item.product_name",
+      "kind": "attribute",
+      "label": "product_name",
+      "schema": "er",
+      "pkg": "hartland",
+      "descriptionLocalized": {
+        "cs": "Název produktu, čitelné označení.",
+        "en": "Product name, the human-readable label."
+      }
+    },
+    {
+      "qname": "er.entity.item.category",
+      "kind": "attribute",
+      "label": "category",
+      "schema": "er",
+      "pkg": "hartland",
+      "descriptionLocalized": {
+        "cs": "Kategorie tohoto produktu",
+        "en": "Product category of this item"
+      }
+    },
+    {
+      "qname": "er.entity.store.sk",
+      "kind": "attribute",
+      "label": "sk",
+      "schema": "er",
+      "pkg": "hartland",
+      "description": "Sequence key. Internal primary key only."
+    },
+    {
+      "qname": "er.entity.store_sales.item",
+      "kind": "attribute",
+      "label": "item",
+      "schema": "er",
+      "pkg": "hartland",
+      "description": "Sold product — FK to the 'sk' attribute of the Product (item) entity."
+    },
+    {
+      "qname": "er.entity.store_sales.store",
+      "kind": "attribute",
+      "label": "store",
+      "schema": "er",
+      "pkg": "hartland",
+      "description": "Selling store — FK to the 'sk' attribute of the Store entity."
+    },
+    {
+      "qname": "er.entity.customer_address.sk",
+      "kind": "attribute",
+      "label": "sk",
+      "schema": "er",
+      "pkg": "hartland",
+      "description": "Sequence key. Internal primary key only."
+    },
+    {
+      "qname": "er.entity.customer_address.state",
+      "kind": "attribute",
+      "label": "state",
+      "schema": "er",
+      "pkg": "hartland",
+      "description": "Two-letter US state code of the address — revenue-by-state slices use this."
+    },
+    {
+      "qname": "er.entity.rel_store_sales_item",
+      "kind": "relation",
+      "label": "rel_store_sales_item",
+      "schema": "er",
+      "pkg": "hartland",
+      "from": "er.entity.store_sales",
+      "to": "er.entity.item",
+      "cardinality": {
+        "from": "0..*",
+        "to": "1"
+      }
+    },
+    {
+      "qname": "er.entity.rel_store_sales_store",
+      "kind": "relation",
+      "label": "rel_store_sales_store",
+      "schema": "er",
+      "pkg": "hartland",
+      "from": "er.entity.store_sales",
+      "to": "er.entity.store",
+      "cardinality": {
+        "from": "0..*",
+        "to": "1"
+      }
+    },
+    {
+      "qname": "er.entity.rel_store_sales_addr",
+      "kind": "relation",
+      "label": "rel_store_sales_addr",
+      "schema": "er",
+      "pkg": "hartland",
+      "from": "er.entity.store_sales",
+      "to": "er.entity.customer_address",
+      "cardinality": {
+        "from": "0..*",
+        "to": "1"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "er.entity.item.sk",
+      "to": "er.entity.item",
+      "type": "DEFINES"
+    },
+    {
+      "from": "er.entity.item.product_name",
+      "to": "er.entity.item",
+      "type": "DEFINES"
+    },
+    {
+      "from": "er.entity.item.category",
+      "to": "er.entity.item",
+      "type": "DEFINES"
+    },
+    {
+      "from": "er.entity.customer_address.sk",
+      "to": "er.entity.customer_address",
+      "type": "DEFINES"
+    },
+    {
+      "from": "er.entity.customer_address.state",
+      "to": "er.entity.customer_address",
+      "type": "DEFINES"
+    },
+    {
+      "from": "er.entity.store.sk",
+      "to": "er.entity.store",
+      "type": "DEFINES"
+    },
+    {
+      "from": "er.entity.store_sales.item",
+      "to": "er.entity.store_sales",
+      "type": "DEFINES"
+    },
+    {
+      "from": "er.entity.store_sales.store",
+      "to": "er.entity.store_sales",
+      "type": "DEFINES"
+    }
+  ]
+}

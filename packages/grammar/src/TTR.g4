@@ -1,7 +1,7 @@
 // =============================================================================
 // TTR (Tatrman) grammar
 //
-// @grammar-version: 0.13
+// @grammar-version: 0.14
 //
 // Version scheme: X.Y — X is a breaking/major change, Y is additive
 // (syntactic sugar, new optional constructs, bug fixes). Bump the marker
@@ -243,6 +243,23 @@
 //      → ""), see project/server/features/nlp-suite/tasks/tasks-nls-p10.md.
 //   Additive: no existing 0.12 file changes meaning. An empty map (`description:
 //   {}`) parses to an empty entry set — it is a LINT warning, not a parse error.
+//
+// Changes in 0.14 (additive — named row schemas; TTR-P action displays):
+//   1. New top-level def kind `def schema <id> { description?, tags?, columns: [...] }`:
+//      a named, ordered row shape. `objectDefinition` gains ONE alternative
+//      `SCHEMA id schemaDef`; `schemaProperty : descriptionProperty | tagsProperty |
+//      columnsProperty`. The column list REUSES `columnsProperty` / `columnDefList` /
+//      `columnProperty` verbatim, so a column is written exactly like a table column
+//      (`def column note { type: text, optional: true }`) — no new sub-production.
+//   2. No new token: SCHEMA already exists (`model <code> schema <id>`, the world
+//      storage `def schema`). The world-nested `DEF SCHEMA id worldSchemaDef`
+//      (storageProperty) is unchanged and stays a separate production — the two never
+//      meet (top-level `definition` vs inside `def storage { … }`).
+//   3. Consumer: TTR-P (`ttrp-frontend`) brings a schema into scope by `import <pkg>.*`
+//      (like entities) and holds `display(<name>)` rows to it (TTRP-DSP-001..004).
+//      The kind is tier-neutral and maps to the `db` model by default (the `area` /
+//      `query` precedent) — it is not a loadable object.
+//   Additive: no existing 0.13 file changes meaning.
 // =============================================================================
 
 grammar TTR;
@@ -388,6 +405,7 @@ objectDefinition
   | ER2CNC_ROLE    id  er2cncRoleDef      // Phase 2.2 — er2cnc_role.*
   | DRILL_MAP      id  drillMapDef        // v2.2 — drill mapping between two patterns
   | AREA           id  areaDef            // v3.0 — subject area (replaces the .ttrd domain block)
+  | SCHEMA         id  schemaDef          // 0.14 — named row schema (TTR-P action displays)
   // ----- v3.1 MD model — logical def kinds (schema md) -----
   | DOMAIN         id  mdDomainDef        // 3.1 — DOMAIN re-added (deleted in 3.0)
   | DIMENSION      id  dimensionDef       // 3.1
@@ -435,6 +453,7 @@ roleDef          : LBRACE (roleProperty          (COMMA? roleProperty)*         
 er2cncRoleDef    : LBRACE (er2cncRoleProperty    (COMMA? er2cncRoleProperty)*    COMMA?)? RBRACE ;
 drillMapDef      : LBRACE (drillMapProperty      (COMMA? drillMapProperty)*      COMMA?)? RBRACE ;
 areaDef          : LBRACE (areaProperty          (COMMA? areaProperty)*          COMMA?)? RBRACE ;
+schemaDef        : LBRACE (schemaProperty        (COMMA? schemaProperty)*        COMMA?)? RBRACE ;   // 0.14
 
 // v3.1 MD model def bodies (all follow the brace/comma-optional pattern).
 mdDomainDef      : LBRACE (mdDomainProperty      (COMMA? mdDomainProperty)*      COMMA?)? RBRACE ;
@@ -542,6 +561,11 @@ drillMapProperty         : descriptionProperty | tagsProperty | fromProperty | t
 // lives in ordinary model files; `id` members allow dotted nested-package names.
 // Reuses the PACKAGES / ENTITIES tokens.
 areaProperty             : descriptionProperty | tagsProperty | areaPackagesProperty | areaEntitiesProperty ;
+
+// 0.14 — named row schema (`def schema`): an ordered column list, written exactly like a
+// table's (`columns: [ def column x { type: text, optional: true } ]`). Tier-neutral; the
+// TTR-P consumer holds `display(<name>)` rows to it. Column-property validity is semantic.
+schemaProperty           : descriptionProperty | tagsProperty | columnsProperty ;
 areaPackagesProperty     : PACKAGES propSep? LBRACK ( id (COMMA id)* )? COMMA? RBRACK ;
 areaEntitiesProperty     : ENTITIES propSep? LBRACK ( id (COMMA id)* )? COMMA? RBRACK ;
 
@@ -867,8 +891,8 @@ listOfIds
 
 // `primaryKey` accepts three forms — a quoted-string list (legacy), a bare-id
 // list, or a single bare id. Column names are always valid identifiers, so the
-// bare forms are the cleaner authoring style (`primaryKey: IDSTRED` /
-// `primaryKey: [IDSTRED, KOD_STR]`); the quoted `["IDSTRED"]` form stays valid.
+// bare forms are the cleaner authoring style (`primaryKey: i_item_sk` /
+// `primaryKey: [ss_item_sk, ss_ticket_number]`); the quoted `["i_item_sk"]` form stays valid.
 // A list must be all-strings or all-ids (no mixing) — the per-element rules
 // keep the two unambiguous.
 primaryKeyValue

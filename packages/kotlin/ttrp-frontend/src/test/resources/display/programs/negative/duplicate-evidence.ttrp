@@ -1,0 +1,12 @@
+// TTRP-DSP-004: `evidence` is not a declared row schema, so it cannot take two sources.
+uses world "shop.worlds.host"
+import shop.orders.*
+
+container review(out late, out large) target erp {
+    o     = load(orders)
+    late  = o -> filter(status = 1) -> select(order_id)
+    large = o -> filter(amount > 1000) -> select(order_id)
+}
+
+review.late  -> display(evidence)
+review.large -> display(evidence)

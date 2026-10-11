@@ -162,8 +162,8 @@ class SymbolTableSpec :
             val t =
                 Fixtures.symbolTable(
                     "db.ttr" to
-                        "model db schema dbo\ndef table QSUBJEKT { columns: [ def column IDSUBJEKT { type: int } ] }",
+                        "model db schema dbo\ndef table CUSTOMER { columns: [ def column C_CUSTOMER_SK { type: int } ] }",
                 )
-            t.getBySuffix("QSUBJEKT").any { it.qname == "db.dbo.table.QSUBJEKT" } shouldBe true
+            t.getBySuffix("CUSTOMER").any { it.qname == "db.dbo.table.CUSTOMER" } shouldBe true
         }
     })

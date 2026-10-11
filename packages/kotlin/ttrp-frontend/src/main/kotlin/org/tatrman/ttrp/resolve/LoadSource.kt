@@ -19,7 +19,7 @@ import org.tatrman.ttr.metadata.model.Query
  * Pure data, resolved once by the frontend (which owns the model index); emit never touches ttr-metadata.
  */
 data class LoadSource(
-    /** The loaded model object's dotted qname (`er.entity.zakázka`, `db.dbo.QSDOK_ZAK_DF`) — provenance. */
+    /** The loaded model object's dotted qname (`er.entity.inventory`, `db.dbo.catalog_sales`) — provenance. */
     val objectQname: String,
     /** The physical schema (`dbo`); empty for an inline [sql] source. */
     val namespace: String,

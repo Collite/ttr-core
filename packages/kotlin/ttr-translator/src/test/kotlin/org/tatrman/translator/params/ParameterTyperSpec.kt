@@ -146,7 +146,7 @@ class ParameterTyperSpec :
             val prepared =
                 ParameterBridge.prepareSqlForCalcite(
                     "SELECT id FROM orders WHERE customer_id IN (SELECT id FROM customers WHERE name LIKE {q} || '%')",
-                    listOf(SqlParam("q", "text", "DF")),
+                    listOf(SqlParam("q", "text", "able")),
                     typed = true,
                 )
             val rel = parse(prepared.sql)

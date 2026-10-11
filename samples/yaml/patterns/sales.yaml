@@ -1,0 +1,156 @@
+# Sample of the YAML query-pattern format over the Hartland demo database (TPC-DS), hartland_us world.
+# Patterns: marketplace sales
+# Customer orders, order lines, revenue, returns by reason, distribution center comparison
+
+query_patterns:
+
+  # ===========================================================================
+  # ORDERS
+  # ===========================================================================
+
+  customer_orders:
+    pattern: "(orders|marketplace orders) (of |for |by |)(customer |){customer_code}"
+    pattern_alt: "(what|which orders) (did |has |)(customer |){customer_code} (order|ordered|placed)"
+    description: "Orders of a customer (bill-to) with their line count and order value"
+    entities: ["catalog_order", "catalog_sales", "customer", "date_dim", "warehouse"]
+    tested: true
+    param_labels:
+      customer_code: "Customer code"
+    test_values:
+      customer_id: ""
+    example:
+      question: "Orders of customer AAAAAAAABAAAAAAA"
+    sql_template: |
+      SELECT TOP 100
+             o.cs_order_number,
+             d.d_date AS order_date,
+             w.w_warehouse_name,
+             COUNT(s.cs_item_sk) AS line_count,
+             SUM(s.cs_ext_sales_price) AS order_value
+      FROM catalog_order o
+      JOIN customer c ON c.c_customer_sk = o.cs_bill_customer_sk
+      JOIN date_dim d ON d.d_date_sk = o.cs_sold_date_sk
+      JOIN catalog_sales s ON s.cs_order_number = o.cs_order_number
+      LEFT JOIN warehouse w ON w.w_warehouse_sk = o.cs_warehouse_sk
+      WHERE ('{customer_id}' = '' OR c.c_customer_sk = '{customer_id}')
+        AND c.c_customer_id = '{customer_code}'
+      GROUP BY o.cs_order_number, d.d_date, w.w_warehouse_name
+      ORDER BY d.d_date DESC;
+
+  order_lines:
+    pattern: "(lines|items|contents) of (the |this |)order"
+    description: "Lines of the order whose number is in context, with a returned flag"
+    entities: ["catalog_sales", "item", "catalog_returns"]
+    tested: true
+    test_values:
+      order_number: "1"
+    example:
+      question: "Show the lines of this order"
+    sql_template: |
+      SELECT
+             i.i_item_id,
+             i.i_product_name,
+             s.cs_quantity,
+             s.cs_ext_sales_price,
+             CASE WHEN EXISTS (SELECT 1
+                               FROM catalog_returns r
+                               WHERE r.cr_item_sk = s.cs_item_sk
+                                 AND r.cr_order_number = s.cs_order_number)
+                  THEN 'yes' ELSE 'no' END AS returned
+      FROM catalog_sales s
+      LEFT JOIN item i ON i.i_item_sk = s.cs_item_sk
+      WHERE s.cs_order_number = '{order_number}'
+      ORDER BY i.i_product_name;
+
+  # ===========================================================================
+  # REVENUE AND RETURNS
+  # ===========================================================================
+
+  revenue_by_category:
+    pattern: "(revenue|sales) by (product |)category (for |in |)(year |){year}"
+    description: "Marketplace revenue and units sold by item category for a year"
+    entities: ["catalog_sales", "item", "category", "date_dim"]
+    tested: true
+    param_labels:
+      year: "Year (YYYY)"
+    example:
+      question: "Revenue by category for 2025"
+    sql_template: |
+      SELECT
+             c.i_category,
+             SUM(s.cs_quantity) AS units_sold,
+             SUM(s.cs_ext_sales_price) AS revenue
+      FROM catalog_sales s
+      JOIN item i ON i.i_item_sk = s.cs_item_sk
+      JOIN item_category c ON c.i_category_id = i.i_category_id
+      JOIN date_dim d ON d.d_date_sk = s.cs_sold_date_sk
+      WHERE d.d_year = CAST('{year}' AS INT)
+      GROUP BY c.i_category
+      ORDER BY revenue DESC;
+
+  returns_by_reason:
+    pattern: "returns by reason (at |for |in |){warehouse_name}"
+    pattern_alt: "why (do |are |)customers return(ing|) (items |products |)(at |from |){warehouse_name}"
+    description: "Returned units and amount by return reason for a distribution center over the last 12 months"
+    entities: ["catalog_returns", "reason", "warehouse", "date_dim"]
+    tested: true
+    param_labels:
+      warehouse_name: "Distribution center name"
+    example:
+      question: "Returns by reason at Memphis DC"
+    sql_template: |
+      SELECT
+             rs.r_reason_desc,
+             SUM(r.cr_return_quantity) AS returned_units,
+             SUM(r.cr_return_amount) AS returned_amount
+      FROM catalog_returns r
+      JOIN reason rs ON rs.r_reason_sk = r.cr_reason_sk
+      JOIN warehouse w ON w.w_warehouse_sk = r.cr_warehouse_sk
+      JOIN date_dim d ON d.d_date_sk = r.cr_returned_date_sk
+      WHERE w.w_warehouse_name COLLATE Latin1_General_CI_AI LIKE '%{warehouse_name}%'
+        AND d.d_date >= DATEADD(month, -12, CAST(GETDATE() AS DATE))
+      GROUP BY rs.r_reason_desc
+      HAVING SUM(r.cr_return_quantity) > 0
+      ORDER BY returned_amount DESC;
+
+  compare_warehouses:
+    pattern: "compare (revenue|sales) (of |for |){warehouse_name_a} (and|vs|versus) {warehouse_name_b}"
+    pattern_alt: "compare (warehouses|distribution centers|DCs) {warehouse_name_a} (and|vs|versus) {warehouse_name_b}"
+    description: "Marketplace revenue of two distribution centers, this year against last year"
+    entities: ["catalog_sales", "warehouse", "date_dim"]
+    tested: false
+    param_labels:
+      warehouse_name_a: "First distribution center"
+      warehouse_name_b: "Second distribution center"
+    example:
+      question: "Compare revenue of Memphis DC and Dallas DC"
+    sql_template: |
+      SELECT
+             w.w_warehouse_name,
+             SUM(CASE WHEN d.d_year = YEAR(GETDATE()) THEN s.cs_ext_sales_price ELSE 0 END) AS revenue_this_year,
+             SUM(CASE WHEN d.d_year = YEAR(GETDATE()) - 1 THEN s.cs_ext_sales_price ELSE 0 END) AS revenue_last_year
+      FROM catalog_sales s
+      JOIN warehouse w ON w.w_warehouse_sk = s.cs_warehouse_sk
+      JOIN date_dim d ON d.d_date_sk = s.cs_sold_date_sk
+      WHERE (w.w_warehouse_name COLLATE Latin1_General_CI_AI LIKE '%{warehouse_name_a}%'
+         OR w.w_warehouse_name COLLATE Latin1_General_CI_AI LIKE '%{warehouse_name_b}%')
+        AND d.d_year >= YEAR(GETDATE()) - 1
+      GROUP BY w.w_warehouse_name
+      ORDER BY revenue_this_year DESC;
+
+  daily_revenue_yoy:
+    pattern: "revenue (on|for) {date} (vs|versus|against|compared to) (last year|the previous year)"
+    description: "Marketplace revenue on a day against the same day of the previous year (the date_dim -> date_dim relationship)"
+    entities: ["catalog_sales", "date_dim"]
+    tested: false
+    param_labels:
+      date: "Date (YYYY-MM-DD)"
+    sql_template: |
+      SELECT
+             d.d_date,
+             ly.d_date AS same_day_last_year,
+             (SELECT SUM(cs_ext_sales_price) FROM catalog_sales WHERE cs_sold_date_sk = d.d_date_sk) AS revenue,
+             (SELECT SUM(cs_ext_sales_price) FROM catalog_sales WHERE cs_sold_date_sk = ly.d_date_sk) AS revenue_last_year
+      FROM date_dim d
+      LEFT JOIN date_dim ly ON ly.d_date_sk = d.d_same_day_ly
+      WHERE d.d_date = CAST('{date}' AS DATE);

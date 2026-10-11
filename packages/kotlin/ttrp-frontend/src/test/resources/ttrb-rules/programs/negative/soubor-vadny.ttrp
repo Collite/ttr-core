@@ -1,0 +1,3 @@
+uses world "shop.worlds.host"
+import shop.prodej.*
+container rozhodnuti target erp from "../rules/vadne.ttrb-cs"

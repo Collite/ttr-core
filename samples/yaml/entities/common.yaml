@@ -1,0 +1,64 @@
+# Sample of the YAML entity format over the Hartland demo database (TPC-DS), hartland_us world.
+# Global rules (added to the system prompt)
+rules:
+  currency: "Amounts (cs_ext_sales_price, cr_return_amount) are in USD, excluding sales tax; any exception is stated in the column description."
+  dates: "Facts store no dates directly — they reference the calendar (table date_dim) through *_date_sk columns (cs_sold_date_sk, cr_returned_date_sk, inv_date_sk). To filter by date, always join date_dim and filter on d_date, d_year or d_moy."
+  default_period: "With no period given, query the current calendar year: WHERE d.d_year = YEAR(GETDATE())."
+  inventory: "Inventory is a weekly snapshot. Quantities on hand are NOT added across snapshots — within one snapshot sum over items or warehouses; for a period take the latest snapshot."
+
+# Common aggregations and how to use them
+aggregations:
+  count:
+    aliases: ["how many", "number of"]
+    sql_function: "COUNT"
+    description: "Counts the records"
+
+  sum:
+    aliases: ["total", "in total", "overall"]
+    sql_function: "SUM"
+    description: "Adds up the values"
+
+  average:
+    aliases: ["avg", "mean"]
+    sql_function: "AVG"
+    description: "Computes the average value"
+
+  maximum:
+    aliases: ["max", "most", "largest"]
+    sql_function: "MAX"
+    description: "Finds the largest value"
+
+# Time periods
+# NOTE: {date_column} is a placeholder — substitute the date column of the calendar joined to the
+# entity (e.g. d.d_date via cs_sold_date_sk for orders, via cr_returned_date_sk for returns)
+time_periods:
+  today:
+    sql_expression: "CAST(GETDATE() AS DATE)"
+
+  this_week:
+    sql_expression: "DATEPART(week, {date_column}) = DATEPART(week, GETDATE()) AND YEAR({date_column}) = YEAR(GETDATE())"
+    note: "The week starts on Monday — unless it is set elsewhere, start the query with SET DATEFIRST 1."
+
+  this_month:
+    sql_expression: "MONTH({date_column}) = MONTH(GETDATE()) AND YEAR({date_column}) = YEAR(GETDATE())"
+
+  last_year:
+    aliases: ["previous year", "a year ago", "prior year"]
+    sql_expression: "YEAR({date_column}) = YEAR(GETDATE()) - 1"
+
+  quarter:
+    aliases: ["this quarter", "Q"]
+    sql_expression: "DATEPART(quarter, {date_column}) = DATEPART(quarter, GETDATE()) AND YEAR({date_column}) = YEAR(GETDATE())"
+    note: "The current quarter. For a specific quarter n use d.d_qoy = n."
+
+# Record selection (modifiers that limit the number of returned records)
+record_selection:
+  first:
+    aliases: ["first", "earliest", "oldest"]
+    sql: "TOP 1 ... ORDER BY {date_column} ASC"
+    description: "Returns the single oldest record"
+
+  last:
+    aliases: ["last", "latest", "most recent"]
+    sql: "TOP 1 ... ORDER BY {date_column} DESC"
+    description: "Returns the single newest record"

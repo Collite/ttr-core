@@ -6,6 +6,7 @@ import org.tatrman.ttrp.emit.core.SsaNames
 import org.tatrman.ttrp.graph.capability.BoundWorld
 import org.tatrman.ttrp.graph.model.Container
 import org.tatrman.ttrp.graph.model.Display
+import org.tatrman.ttrp.graph.model.DisplayLeaves
 import org.tatrman.ttrp.graph.model.EdgeKind
 import org.tatrman.ttrp.graph.model.Load
 import org.tatrman.ttrp.graph.model.Node
@@ -68,7 +69,7 @@ class PolarsGraphEmitter(
             if (ref.port == "rejects") return@forEach // dead wire (RJ-101)
             val producer = graph.nodes[ref.nodeId] ?: return@forEach
             val producerVar = names[producer.id] ?: return@forEach
-            sinkFor(container, port)?.let { steps += it.copy(inputVars = listOf(producerVar)) }
+            sinksFor(container, port).forEach { steps += it.copy(inputVars = listOf(producerVar)) }
         }
         return steps
     }
@@ -178,19 +179,30 @@ class PolarsGraphEmitter(
         return schema.fields.entries.map { it.key to it.value }
     }
 
-    private fun sinkFor(
+    /**
+     * The external leaves consuming this OUT port — every one of them (a port may feed several displays, e.g.
+     * an evidence display and an action display). A display writes `out/<stem>.arrow`, its stem unique among
+     * same-named displays ([DisplayLeaves]); a store stages `staging/<port>.arrow`.
+     */
+    private fun sinksFor(
         container: Container,
         port: String,
-    ): PolarsStep? {
-        // Find the external leaf consuming this OUT port.
-        val leafEdge = graph.edges.firstOrNull { it.from.nodeId == container.id && it.from.port == port } ?: return null
-        val leaf = graph.nodes[leafEdge.to.nodeId] ?: return null
-        return when (leaf) {
-            is Display -> PolarsStep(varName = "_", node = leaf, sinkPath = "out/${leaf.name}.arrow")
-            is Store -> PolarsStep(varName = "_", node = leaf, sinkPath = "staging/$port.arrow")
-            else -> null
-        }
-    }
+    ): List<PolarsStep> =
+        graph.edges
+            .filter { it.from.nodeId == container.id && it.from.port == port }
+            .mapNotNull { graph.nodes[it.to.nodeId] }
+            .mapNotNull { leaf ->
+                when (leaf) {
+                    is Display ->
+                        PolarsStep(
+                            varName = "_",
+                            node = leaf,
+                            sinkPath = "out/${DisplayLeaves.stemOf(graph, leaf)}.arrow",
+                        )
+                    is Store -> PolarsStep(varName = "_", node = leaf, sinkPath = "staging/$port.arrow")
+                    else -> null
+                }
+            }.distinctBy { it.sinkPath }
 
     private fun stagedReadNode(
         container: Container,

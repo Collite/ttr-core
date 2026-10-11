@@ -1,0 +1,14 @@
+package billing.invoicing
+
+model er
+
+def entity store { description: """Stores and their properties.
+""",
+    nameAttribute: store_name,
+    attributes: [
+        def attribute sk { type: int, isKey: true, description: "Unique store identifier" },
+        def attribute store_id { type: text, optional: true, description: "Store code" },
+        def attribute store_name { type: text, optional: true, description: "Store name" },
+        def attribute market_id { type: int, optional: true, description: "Link to the market" }
+    ]
+}

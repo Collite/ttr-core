@@ -1,0 +1,8 @@
+{
+    "diagnostics": [],
+    "resolved": [],
+    "symbols": [
+        "shop.actions.db.dbo.schema.flag_order",
+        "shop.actions.db.dbo.schema.notify"
+    ]
+}

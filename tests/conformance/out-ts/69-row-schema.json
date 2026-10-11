@@ -1,0 +1,120 @@
+{
+    "definitions": [
+        {
+            "description": "Send a notification to a recipient",
+            "kind": "schema",
+            "name": "notify",
+            "properties": {
+                "columns": [
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "recipient",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": "one line",
+                        "kind": "column",
+                        "name": "subject",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "order_id",
+                        "properties": {
+                            "type": {
+                                "name": "int"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "amount",
+                        "properties": {
+                            "optional": true,
+                            "type": {
+                                "name": "decimal"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "note",
+                        "properties": {
+                            "optional": true,
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    }
+                ]
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "schema",
+            "name": "flag_order",
+            "properties": {
+                "columns": [
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "order_id",
+                        "properties": {
+                            "type": {
+                                "name": "int"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "reason",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "due",
+                        "properties": {
+                            "optional": true,
+                            "type": {
+                                "name": "date"
+                            }
+                        },
+                        "tags": []
+                    }
+                ]
+            },
+            "tags": [
+                "action"
+            ]
+        }
+    ],
+    "imports": [],
+    "package": "shop.actions",
+    "schemaDirective": null
+}

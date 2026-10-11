@@ -66,8 +66,8 @@ message PipelineContext {
   // Authentication roles for the calling identity, resolved at the trust boundary (today: the MCP
   // edge — `tools/ttr-query-mcp`'s `IdentityResolver` from a Keycloak JWT's `realm_access.roles`).
   // Used by downstream services for role-gated decisions, e.g. the Validator honours
-  // `apply_security = false` only when this list contains the service-configured admin role
-  // (DF-V02). v1 trust model: downstream gRPC services trust the upstream-populated context;
+  // `apply_security = false` only when this list contains the service-configured admin role.
+  // v1 trust model: downstream gRPC services trust the upstream-populated context;
   // inter-service mTLS / network isolation is the actual auth boundary. A future v2 zero-trust
   // pass should re-validate the JWT at each hop.
   repeated string auth_roles = 8;

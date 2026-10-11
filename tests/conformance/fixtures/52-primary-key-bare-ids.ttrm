@@ -1,9 +1,9 @@
 model db schema dbo
 
 def table t_single_bare {
-    primaryKey: IDSTRED
+    primaryKey: S_STORE_SK
     columns: [
-        def column IDSTRED { type: int, isKey: true }
+        def column S_STORE_SK { type: int, isKey: true }
     ]
 }
 
@@ -15,10 +15,10 @@ def table t_bare_list {
 }
 
 def table t_bare_multi {
-    primaryKey: [ID, KOD]
+    primaryKey: [ID, CODE]
     columns: [
         def column ID { type: int, isKey: true },
-        def column KOD { type: text }
+        def column CODE { type: text }
     ]
 }
 

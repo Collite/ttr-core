@@ -1,0 +1,30 @@
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container priprava(out otevrene, out chybi) target erp {
+  otevrene = load(objednávky) -> filter(stav = "otevřená")
+  chybi = load(zásoby) -> filter(množství = 0)
+}
+
+container nazvy(in otevrene, in chybi, out nalehave, out kontrola, out souhrn) target erp """ttrb-cs
+Načti otevrene.
+Ponech řádky, kde (částka je větší než 1000 nebo poznámka je prázdná) a (stav = "otevřená" nebo kód_zboží je prázdný).
+Spočti priorita jako 1, když (částka je větší než 5000 a poznámka není prázdná) nebo stav = "naléhavá", jinak 2.
+Pojmenuj to jako kandidati.
+Když (priorita = 1 nebo částka je větší než 10000) a stav = "otevřená":
+    Pošli to na výstup nalehave.
+Načti chybi.
+Ponech řádky, kde množství = 0 a (vedoucí_skladu je prázdný nebo vedoucí_skladu = "nikdo").
+Pojmenuj to jako bez_zasob.
+Načti kandidati.
+Ponech jen řádky, které mají protějšek v bez_zasob přes kód_zboží je bez_zasob.kód_zboží.
+Pošli to na výstup kontrola.
+Spoj kandidati volitelně s bez_zasob přes kód_zboží je bez_zasob.kód_zboží a (bez_zasob.množství = 0 nebo bez_zasob.vedoucí_skladu je prázdný) jako prehled.
+Pošli to na výstup souhrn.
+"""
+
+priprava.otevrene -> nazvy.otevrene
+priprava.chybi -> nazvy.chybi
+nazvy.nalehave -> display(nalehave)
+nazvy.kontrola -> display(kontrola)
+nazvy.souhrn -> display(souhrn)

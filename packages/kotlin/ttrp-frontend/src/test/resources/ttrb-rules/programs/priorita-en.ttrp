@@ -1,0 +1,11 @@
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container priorita(out serazene) target erp """ttrb
+Load objednávky.
+Compute pásmo as "A" when částka is bigger than 1000, "B" when částka is bigger than 100, otherwise "C".
+Compute kontakt as "chybí" when email_zástupce is empty, otherwise email_zástupce.
+Send that to output serazene.
+"""
+
+priorita.serazene -> display(serazene)

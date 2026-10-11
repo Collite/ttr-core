@@ -50,6 +50,21 @@ class BareProgramSpec :
             c.ports.none { it.kind == PortKind.OUT } shouldBe true
         }
 
+        "bare .ttrb-cs (Czech skin) compiles clean, to the same canonical body as its English twin" {
+            val cs = BareFixtures.check("report.ttrb-cs")
+            errors(cs) shouldBe emptyList()
+            val c = containerOf(cs)
+            c.name shouldBe "report"
+            (c.body as FragmentBody).tag shouldBe "ttrb-cs"
+            c.ports.none { it.kind == PortKind.OUT } shouldBe true
+            val en = containerOf(BareFixtures.check("report.ttrb"))
+            org.tatrman.ttrp.dialect.b.TtrbCorpus.canonical(
+                (c.body as FragmentBody).decomposition!!.statements,
+            ) shouldBe
+                org.tatrman.ttrp.dialect.b.TtrbCorpus
+                    .canonical((en.body as FragmentBody).decomposition!!.statements)
+        }
+
         "the interior is embedded verbatim (C2-f) — the fragment sourceText is the file bytes" {
             val c = containerOf(BareFixtures.check("crunch.ttr.sql"))
             (c.body as FragmentBody).sourceText.trim() shouldBe BareFixtures.read("crunch.ttr.sql").trim()

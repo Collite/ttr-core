@@ -1,0 +1,22 @@
+// Matches and optional joins, written by hand: keep the rows that have / have no match in another
+// input (semi / anti join), and an optional (left) join whose unmatched right columns are NULL.
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container priprava(out otevrene, out chybi) target erp {
+  otevrene = load(objednávky) -> filter(stav = "otevřená")
+  chybi = load(zásoby) -> filter(množství = 0)
+}
+
+container odklad(in otevrene, in chybi, out odlozit, out vyridit, out bez_skladu) target erp {
+  odlozit = join(left: otevrene, right: chybi, on: kód_zboží = right.kód_zboží, type: semi)
+  vyridit = join(left: otevrene, right: chybi, on: kód_zboží = right.kód_zboží, type: anti)
+  prehled_vse = join(left: otevrene, right: chybi, on: kód_zboží = right.kód_zboží and right.množství is not null, type: left)
+  bez_skladu = prehled_vse -> filter(množství is null)
+}
+
+priprava.otevrene -> odklad.otevrene
+priprava.chybi -> odklad.chybi
+odklad.odlozit -> display(odlozit)
+odklad.vyridit -> display(vyridit)
+odklad.bez_skladu -> display(bez_skladu)

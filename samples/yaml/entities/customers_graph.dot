@@ -1,0 +1,9 @@
+digraph Customers {
+  rankdir=LR;
+  node [shape=box, style="rounded,filled", fillcolor="#f4f4f4", fontname="Segoe UI"];
+
+  customer [label="customer"];
+  customer_address [label="customer_address"];
+
+  customer -> customer_address [label="current address"];
+}

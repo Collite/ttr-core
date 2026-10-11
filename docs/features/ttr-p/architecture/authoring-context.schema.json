@@ -210,7 +210,8 @@
                 "ttrp",
                 "sql",
                 "pandas",
-                "ttrb"
+                "ttrb",
+                "ttrb-cs"
               ]
             },
             "containerName": {
@@ -267,6 +268,12 @@
               }
             },
             "ttrb": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "ttrb-cs": {
               "type": "array",
               "items": {
                 "type": "string"

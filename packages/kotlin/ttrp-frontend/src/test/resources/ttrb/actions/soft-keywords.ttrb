@@ -1,0 +1,3 @@
+Load messages as m.
+Keep only the columns key, subject, email, description, reason, count.
+Sort that by key.

@@ -1,0 +1,11 @@
+# ttr: dialect=b lang=cs
+Načti orders jako o.
+Načti stock jako sk.
+Spoj o volitelně s sk přes item je sk.item a sk.qty není prázdné jako all_orders.
+Ponech jen řádky, které mají protějšek v sk přes item je sk.item.
+Ponech jen řádky, které nemají protějšek v returns přes item je returns.item.
+Odstraň řádky, které mají protějšek v blocked přes item je blocked.item.
+Ukaž výsledek jako checked.
+Spoj o s sk přes vazbu order_stock jako linked.
+Ukaž výsledek jako linked_view.
+Spoj o volitelně s sk přes vazbu order_stock jako maybe_linked.

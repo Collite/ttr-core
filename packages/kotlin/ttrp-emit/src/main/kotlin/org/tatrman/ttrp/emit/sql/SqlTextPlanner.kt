@@ -3,6 +3,8 @@ package org.tatrman.ttrp.emit.sql
 
 import org.tatrman.plan.v1.ColumnRef as PbColumnRef
 import org.tatrman.plan.v1.Expression as PbExpression
+import org.tatrman.plan.v1.FunctionCall as PbFunctionCall
+import org.tatrman.plan.v1.Literal
 import org.tatrman.plan.v1.NamedExpression
 import org.tatrman.plan.v1.PlanNode
 import org.tatrman.plan.v1.ProjectNode
@@ -14,9 +16,11 @@ import org.tatrman.translator.framework.ModelColumn
 import org.tatrman.translator.framework.ModelTable
 import org.tatrman.ttrp.emit.EmitDiagnosticId
 import org.tatrman.ttrp.emit.TtrpEmitException
+import org.tatrman.ttrp.emit.core.DisplayTypes
 import org.tatrman.ttrp.graph.capability.BoundWorld
 import org.tatrman.ttrp.graph.model.Container
 import org.tatrman.ttrp.graph.model.TtrpGraph
+import org.tatrman.ttrp.resolve.DisplaySchema
 
 /**
  * One `sql-text` island output (AG-P0): a single self-contained SELECT in the engine's dialect.
@@ -60,13 +64,23 @@ class SqlTextPlanner(
     private val tables = LinkedHashMap<Pair<String, String>, LinkedHashMap<String, String>>()
     private val inlineSql = LinkedHashMap<String, String>()
 
+    /**
+     * The statement for [container]'s OUT [port]. With a [projection] (an action display's row schema, grammar
+     * 0.14) the statement's columns are exactly the schema's, in schema order, each CAST to the schema column's type
+     * ([DisplayTypes.sqlText]) — a column the port carries as `CAST("c" AS …)`, an absent `optional` one as
+     * `CAST(NULL AS …)` — so every source of one display returns the same row type; an absent required one is an
+     * emit error (the frontend reports it first as TTRP-DSP-001). Columns the schema does not name are dropped
+     * (TTRP-DSP-003). The output's columns report the schema's own type spelling.
+     */
     fun emit(
         container: Container,
         port: String,
+        projection: DisplaySchema? = null,
     ): SqlTextOutput {
         tables.clear()
         inlineSql.clear()
-        val built = output(container, port, HashMap())
+        val portPlan = output(container, port, HashMap())
+        val built = projection?.let { project(portPlan, it, container, port) } ?: portPlan
         val model =
             tables.map { (key, cols) ->
                 ModelTable(
@@ -90,6 +104,43 @@ class SqlTextPlanner(
         return SqlTextOutput(port, sql.trim(), built.columns, order.distinct())
     }
 
+    /** [built] projected to an action display's [schema] columns, in schema order, each cast (see [emit]). */
+    private fun project(
+        built: Built,
+        schema: DisplaySchema,
+        container: Container,
+        port: String,
+    ): Built {
+        val byName = built.columns.associateBy { it.name }
+        val project = ProjectNode.newBuilder().setInput(built.plan)
+        val columns =
+            schema.columns.map { c ->
+                val operand =
+                    when {
+                        c.name in byName ->
+                            PbExpression.newBuilder().setColumnRef(PbColumnRef.newBuilder().setName(c.name)).build()
+                        c.optional -> PbExpression.newBuilder().setLiteral(Literal.newBuilder().setIsNull(true)).build()
+                        else ->
+                            throw TtrpEmitException(
+                                EmitDiagnosticId.UNSUPPORTED_NODE,
+                                detail =
+                                    "island '${container.label}' OUT port '$port' feeds action display schema " +
+                                        "`${schema.qualifiedName}` but has no column `${c.name}` (TTRP-DSP-001)",
+                                island = container.label,
+                            )
+                    }
+                val cast =
+                    PbExpression
+                        .newBuilder()
+                        .setFunction(PbFunctionCall.newBuilder().setOperation("cast").addOperands(operand))
+                        .setResultType(DisplayTypes.sqlText(DisplayTypes.of(c)))
+                        .build()
+                project.addExpressions(NamedExpression.newBuilder().setExpression(cast).setAlias(c.name))
+                EmitColumn(c.name, c.spelling)
+            }
+        return Built(PlanNode.newBuilder().setProject(project).build(), columns)
+    }
+
     /** The plan of [container]'s OUT [port] — its node chain over model scans and upstream outputs. */
     private fun output(
         container: Container,
@@ -97,7 +148,7 @@ class SqlTextPlanner(
         memo: HashMap<Pair<String, String>, Built>,
     ): Built =
         memo.getOrPut(container.id to port) {
-            container.fragment?.let { frag -> return@getOrPut fragmentSource(container, port, frag.sourceText) }
+            container.verbatimFragment?.let { frag -> return@getOrPut fragmentSource(container, port, frag.sourceText) }
             val chain =
                 SqlGraphEmitter(graph, world, sqlText = true).plansByOutput(container)[port]
                     ?: throw TtrpEmitException(

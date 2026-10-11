@@ -23,7 +23,11 @@ import java.nio.file.Paths
  * into a host-executed bundle: one self-contained T-SQL statement per island OUT port (`sql-text`),
  * typed outputs + bound params in the manifest, display → island-port sources, and no launcher. The
  * model is split across the project's `models/` (the world) and a host-GENERATED root
- * (`extra-model-roots`), the shape ai-models uses.
+ * (`extra-model-roots`), the shape a host's model repository uses. The generated model is a slice of
+ * the Hartland demo database (TPC-DS); its logical names and the program's names are Czech on purpose —
+ * this fixture is where Czech (diacritic) identifiers are carried end to end through `sql-text` (quoted
+ * aliases, named params, island / port / statement-file names, displays). They are taken from Hartland's
+ * Czech world (`hartland_cz`); physical names and descriptions stay TPC-DS / English.
  */
 class AipBundleTest :
     FunSpec({
@@ -63,7 +67,7 @@ class AipBundleTest :
 
         test("every island is a host-executed sql-text island of the aip executor") {
             val m = build().manifest
-            m.islands.map { it.name } shouldContainExactlyInAnyOrder listOf("zakázka", "sklad", "skladem", "verdikt")
+            m.islands.map { it.name } shouldContainExactlyInAnyOrder listOf("objednávka", "sklad", "skladem", "verdikt")
             m.islands.forEach {
                 it.invocation shouldBe "sql-text"
                 it.executor shouldBe "aip"
@@ -73,21 +77,21 @@ class AipBundleTest :
 
         test("one statement file per OUT port, with the output row type and the params it binds") {
             val r = build()
-            val zak = r.manifest.islands.first { it.name == "zakázka" }
-            zak.outputs!!.map { it.port } shouldContainExactly listOf("hlavička", "řádky")
-            val hl = zak.outputs!!.first { it.port == "hlavička" }
+            val obj = r.manifest.islands.first { it.name == "objednávka" }
+            obj.outputs!!.map { it.port } shouldContainExactly listOf("hlavička", "řádky")
+            val hl = obj.outputs!!.first { it.port == "hlavička" }
             // `select(...)` keeps exactly the listed columns (the SelectToProject fix).
-            hl.columns.map { it.name } shouldContainExactly listOf("id_zakázky", "číslo_zakázky", "id_subjektu")
-            hl.params shouldBe listOf("zakázka_id")
+            hl.columns.map { it.name } shouldContainExactly listOf("číslo_objednávky", "id_zákazníka", "datum_prodeje")
+            hl.params shouldBe listOf("objednávka_id")
             Files.isRegularFile(r.dir.resolve(hl.file)) shouldBe true
             val sklad =
                 r.manifest.islands
                     .first { it.name == "sklad" }
                     .outputs!!
                     .single()
-            sklad.params shouldBe listOf("zakázka_id", "sklad")
+            sklad.params shouldBe listOf("objednávka_id", "centrum", "stav_k")
             // a computed coalesce column keeps its argument's (physical, table-bound) type — not `text`
-            sklad.columns.first { it.name == "disponibilní" }.type shouldBe "decimal"
+            sklad.columns.first { it.name == "disponibilní" }.type shouldBe "int"
         }
 
         test("the island statements match their goldens") {
@@ -107,18 +111,18 @@ class AipBundleTest :
                 island: String,
                 port: String,
             ) = Files.readString(r.dir.resolve("islands/$island.$port.sql"))
-            val rows = sql("zakázka", "řádky")
+            val rows = sql("objednávka", "řádky")
             // physical table (unqualified — the door resolves DB tables unqualified), renamed to the
             // logical attribute names; identifiers double-quoted (the door's parser reads no brackets)
-            rows shouldContain "FROM \"QSDOK_ZAK\""
-            rows shouldContain "\"IDSDOK\" AS \"id_řádku_zakázky\""
+            rows shouldContain "FROM \"catalog_sales\""
+            rows shouldContain "\"cs_order_number\" AS \"číslo_objednávky\""
             // the query-bound entity's `__filter` source, inlined as a derived table
-            rows shouldContain "SELECT * FROM QHDOK_ZAK WHERE TYP_DOK='POB'"
-            rows shouldContain ") AS \"zakázka__filter\""
-            // `on: relation řádek_zakázka` in its LOGICAL spelling (the loads keep logical names)
-            rows shouldContain "\"t\".\"id_zakázky\" = \"t1\".\"id_zakázky\""
+            rows shouldContain "SELECT * FROM catalog_orders WHERE ship_mode_type='EXPRESS'"
+            rows shouldContain ") AS \"objednávka__filter\""
+            // `on: relation řádek_objednávka` in its LOGICAL spelling (the loads keep logical names)
+            rows shouldContain "\"t\".\"číslo_objednávky\" = \"t1\".\"číslo_objednávky\""
             // runtime params are named placeholders, never positional
-            rows shouldContain ":zakázka_id"
+            rows shouldContain ":objednávka_id"
             r.manifest.islands.flatMap { it.outputs.orEmpty() }.forEach { o ->
                 val text = Files.readString(r.dir.resolve(o.file))
                 text shouldNotContain "?"
@@ -139,8 +143,8 @@ class AipBundleTest :
             anti shouldContain "1 AS \"_ttrp_exists\""
             anti shouldContain "\"_ttrp_exists\" IS NULL"
             val semi = Files.readString(r.dir.resolve("islands/skladem.vedené.sql"))
-            semi shouldContain "INNER JOIN (SELECT \"IDZBOZI\" AS \"id_artiklu\""
-            semi shouldContain "GROUP BY \"IDZBOZI\""
+            semi shouldContain "INNER JOIN (SELECT \"inv_item_sk\" AS \"id_produktu\""
+            semi shouldContain "GROUP BY \"inv_item_sk\""
         }
 
         test("displays name the island port that feeds them; a host-executed bundle has no launcher") {
@@ -159,7 +163,7 @@ class AipBundleTest :
 
         test("params are declared in source order with the run-date-free defaults") {
             build().manifest.params!!.map { it.name to it.default } shouldContainExactly
-                listOf("zakázka_id" to null, "sklad" to "20")
+                listOf("objednávka_id" to null, "centrum" to "1", "stav_k" to null)
         }
 
         test("the aip manifest validates against the v2 JSON Schema (sql-text additions)") {
@@ -176,7 +180,7 @@ class AipBundleTest :
         }
 
         test("ModelFingerprint = sha256 over sorted `path\tsha256(content)` lines of .ttrm files (shared vector)") {
-            // The SAME vector is pinned in ai-platform's TtrGenSpec — the two implementations must agree.
+            // The SAME vector is pinned in the host generator's own spec — the two implementations must agree.
             val root = Files.createTempDirectory("fp-vector")
             Files.createDirectories(root.resolve("a"))
             Files.createDirectories(root.resolve("b"))
@@ -201,7 +205,7 @@ class AipBundleTest :
             ex.message!! shouldContain "TTRP-CAP-204"
         }
 
-        test("`retries` under the aip executor is TTRP-CAP-203 (Camunda owns retries)") {
+        test("`retries` under the aip executor is TTRP-CAP-203 (the host owns retries)") {
             val withRetries =
                 heroSource.replace(
                     "container sklad(in řádky, out výpadky) target erp {",

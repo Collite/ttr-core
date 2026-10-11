@@ -2,4 +2,4 @@ package billing.products
 
 model er
 
-def relation podprodukt_produkt { from: er.entity.podprodukt, to: er.entity.produkt }
+def relation class_in_category { from: er.entity.item_class, to: er.entity.category }

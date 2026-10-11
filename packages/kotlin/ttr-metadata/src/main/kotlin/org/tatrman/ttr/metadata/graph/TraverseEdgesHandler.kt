@@ -18,7 +18,7 @@ import org.tatrman.ttr.metadata.model.Model
 import java.util.ArrayDeque
 
 /**
- * DF-M03 / Phase 07 B1 — typed-edge graph keyed on `QualifiedName`, used by the user-facing
+ * Phase 07 B1 — typed-edge graph keyed on `QualifiedName`, used by the user-facing
  * `TraverseEdges` RPC.
  *
  * Distinct from [ModelGraph] (the JGraphT-backed graph keyed on `internalId`, used for
@@ -33,7 +33,7 @@ import java.util.ArrayDeque
  *     `Er2DbAttributeMapping.attribute → column qname` (Expression targets are skipped, no qname);
  *     `Er2DbRelationMapping.relation → foreign_key qname`; `Er2CncRoleMapping.entity → role qname`.
  *   - **`USES`** — `Query → object_referenced_qname`. Slot wired but currently empty (`Query.uses`
- *     tracking is DF-T03 follow-up).
+ *     tracking is a follow-up).
  *
  * BFS-traverses to [maxDepth] (clamped to 10 server-side); cycles handled by the standard
  * visited-set; respects [Direction] (OUTGOING / INCOMING / BOTH).
@@ -159,7 +159,7 @@ internal class TraverseEdgesHandler(
             }
         }
 
-        // USES — slot wired; populated when Query.uses tracking lands (DF-T03 follow-up).
+        // USES — slot wired; populated when Query.uses tracking lands (a follow-up).
         return acc
     }
 

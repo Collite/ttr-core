@@ -1,0 +1,14 @@
+// Stock rule in Czech: attach the one-row limits, a manual task with a fallback solver and an
+// attachment, an e-mail to a department.
+uses world "shop.worlds.host"
+import shop.prodej.*
+import shop.akce.*
+
+container sklad target erp """ttrb-cs
+Načti zásoby.
+Připoj limity k výsledku.
+Když množství je menší než minimum_zásoby:
+    Vytvoř ruční úkol pro vedoucí_skladu, jinak oddělení "sklad" "Doplnit zásobu" s popisem "Zásoba je pod minimem." a přílohou skladová_karta.
+Když množství je 0:
+    Pošli e-mail oddělení "nákup" s předmětem "Vyprodáno", šablonou "vyprodano" a klíčem kód_zboží.
+"""

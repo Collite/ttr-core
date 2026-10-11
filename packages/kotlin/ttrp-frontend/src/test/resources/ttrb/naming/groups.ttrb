@@ -1,0 +1,10 @@
+# ttr: dialect=b lang=en
+Load stock as sk.
+Load orders as o.
+Keep the rows where (aa is less than bb or cc is empty) and (dd = ee or ff is empty).
+Keep the rows where aa is less than bb or cc is empty and dd = ee.
+Keep the rows where (amount + fee) * 2 is more than 100.
+Compute prio as 1 when (amount is more than 5000 and note is not empty) or state = "urgent", otherwise 2.
+Join that with sk on kk = sk.kk2 and (aa is less than sk.bb or cc is more than sk.dd) as y.
+If (prio = 1 or amount is more than 10000) and state = "open":
+    Show the result as urgent.

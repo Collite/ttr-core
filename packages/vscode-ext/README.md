@@ -34,11 +34,11 @@ Boot a real VS Code window via `@vscode/test-electron`, open the `samples/v1-met
 |---|---|
 | TC1 — language detection | `er.ttrm` opens with `languageId === 'ttr'` |
 | TC2 — clean diagnostics | LSP publishes zero error-severity diagnostics on the known-good sample |
-| TC3 — go-to-definition | Cursor on a `to: er.entity.artikl` reference jumps to the line of `def entity artikl` |
+| TC3 — go-to-definition | Cursor on a `to: er.entity.item` reference jumps to the line of `def entity item` |
 | TC4 — unresolved reference | Inserting a relation with `to: er.entity.does_not_exist_*` produces a `ttr/unresolved-reference` diagnostic; the in-memory edit is reverted (the source file is never saved) |
-| TC5 — workspace symbols | `vscode.executeWorkspaceSymbolProvider('art')` returns at least one symbol whose name includes `artikl` |
+| TC5 — workspace symbols | `vscode.executeWorkspaceSymbolProvider('ite')` returns at least one symbol whose name includes `item` |
 
-A Mocha `before` hook gates on the LSP being live (polls `workspace/symbol` until `artikl` is findable) so test failures point at real regressions, not initialization races.
+A Mocha `before` hook gates on the LSP being live (polls `workspace/symbol` until `item` is findable) so test failures point at real regressions, not initialization races.
 
 ```bash
 # Local (macOS / Linux / Windows; first run downloads ~130 MB of Electron):

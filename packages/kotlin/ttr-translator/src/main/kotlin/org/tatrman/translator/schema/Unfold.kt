@@ -17,7 +17,7 @@ import org.tatrman.translator.joiner.JoinerPlanWalker
 import org.tatrman.translator.wire.PlanNodeEncoder
 
 /**
- * Phase 08 B1 / DF-T03 — UNFOLD_QUERY_REFS stage.
+ * Phase 08 B1 — UNFOLD_QUERY_REFS stage.
  *
  * Replaces explicit references to saved queries (`obj.query.<name>`) with the body of the saved
  * query, recursively.

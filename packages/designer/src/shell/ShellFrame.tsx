@@ -42,7 +42,8 @@ import { CommandRegistry } from './commands.js';
 import { CommandPalette, useCmdKShortcut } from './CommandPalette.js';
 import { syncUrl, parsePath, formatPath } from './url.js';
 import { tabUrl } from './popout.js';
-import { federationIntentFromPath, federationUrlForTab, askUrlForTab } from './federation-link.js';
+import { federationIntentFromPath, federationPathForTab, askUrlForTab } from './federation-link.js';
+import { absoluteUrlFor, currentAppPath, replaceAppPath } from './app-location.js';
 import { CopyLinkButton } from './CopyLinkButton.js';
 import { color, radius, space, fontSize } from '@tatrman/tokens';
 
@@ -122,10 +123,11 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   // the edit gate (FO-21) — true only when an authoring context is injected AND grants it.
   const canEdit = !!editContext?.editable;
   // Snapshot the address bar on first render, BEFORE the URL-sync effect can rewrite it — the
-  // deep-link boot parses this snapshot so it survives the catalog arriving a tick later.
+  // deep-link boot parses this snapshot so it survives the catalog arriving a tick later. It is the
+  // APP path: base path stripped, session parameters (`?veles=`, `?lang=`) removed (ttr-core#171).
   const initialUrlRef = useRef<string | null>(null);
   if (initialUrlRef.current === null) {
-    initialUrlRef.current = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '';
+    initialUrlRef.current = currentAppPath();
   }
 
   const tab = activeTab(shell);
@@ -231,6 +233,8 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   useEffect(() => {
     if (!bootedRef.current) return;
     if (!tab) { syncUrl({ kind: 'none', workspace }); return; }
+    // App paths throughout: replaceAppPath keeps the base path and the session parameters, so the
+    // rewritten URL reloads into this same backend and graph (ttr-core#171).
     let path: string;
     if (tab.perspective === 'lineage') {
       const ls = lineageState[tab.id];
@@ -240,7 +244,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     } else {
       path = tabUrl(workspace, tab);
     }
-    if (typeof window !== 'undefined') window.history.replaceState(null, '', path);
+    replaceAppPath(path);
   }, [tab, workspace, lineageState, bindingSel]);
 
   // ⌘K command registry — every toolbar action gets a command twin (E-4/D-6 parity)
@@ -295,6 +299,17 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
 
   async function onSelectNode(qname: string | null) {
     if (!qname) { setSelected(null); return; }
+    // A structural catalog (Veles) has no getSymbolDetail: it describes the object itself — the
+    // label in the viewer's language beside the identifier, plural, description, members (#170).
+    if (!dataSource.getSymbolDetail && dataSource.describe) {
+      const d = await dataSource.describe(qname).catch(() => null);
+      setSelected({
+        qname, kind: d?.kind ?? 'object', label: d?.label ?? qname.split('.').pop() ?? qname,
+        identifier: d?.identifier, labelPlural: d?.labelPlural, description: d?.description, members: d?.members,
+      });
+      setDrawerOpen(true);
+      return;
+    }
     const detail = await dataSource.getSymbolDetail?.(qname).catch(() => null);
     const src = detail?.sourceUri ? getSourceText?.(detail.sourceUri) : undefined;
     setSelected({
@@ -421,7 +436,8 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
           <div style={{ display: 'flex', alignItems: 'center', paddingRight: 12 }}>
             <Breadcrumb tab={tab} onDrillTo={(i) => setShell((s) => drillTo(s, s.activeTabId!, i))} />
             {(() => {
-              const url = typeof window !== 'undefined' ? federationUrlForTab(tab, window.location.origin) : null;
+              const path = federationPathForTab(tab);
+              const url = path && typeof window !== 'undefined' ? absoluteUrlFor(path) : null;
               return url ? <CopyLinkButton url={url} /> : null;
             })()}
             {(() => {

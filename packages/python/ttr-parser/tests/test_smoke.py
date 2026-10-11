@@ -35,10 +35,10 @@ def test_smoke_parses_empty_model():
 def test_smoke_parses_table_with_columns():
     text = (
         "model db schema dbo\n"
-        "def table QSUBJEKT {\n"
-        '  primaryKey: ["IDSUBJEKT"]\n'
+        "def table CUSTOMER {\n"
+        '  primaryKey: ["C_CUSTOMER_SK"]\n'
         "  columns: [\n"
-        '    def column IDSUBJEKT { type: int, isKey: true }\n'
+        '    def column C_CUSTOMER_SK { type: int, isKey: true }\n'
         "  ]\n"
         "}\n"
     )
@@ -50,7 +50,7 @@ def test_smoke_parses_table_with_columns():
 def test_smoke_parses_schema_then_defs():
     text = (
         "model er\n"
-        "def entity Artikl {\n"
+        "def entity Item {\n"
         '  attributes: [\n'
         '    def attribute ID { type: int, isKey: true }\n'
         "  ]\n"

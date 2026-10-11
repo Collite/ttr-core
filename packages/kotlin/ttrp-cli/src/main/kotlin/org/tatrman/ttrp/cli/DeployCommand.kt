@@ -107,7 +107,7 @@ class DeployCommand : CliktCommand(name = "deploy") {
             Files.isRegularFile(p) && p.toString().endsWith(".ttrp") -> {
                 val manifestResult = TtrpManifestReader.resolve(p.parent ?: p)
                 try {
-                    BundleAssembler()
+                    BundleAssembler(ToolchainVersion.current)
                         .build(
                             source = Files.readString(p),
                             fileName = p.toString(),

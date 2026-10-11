@@ -31,11 +31,46 @@ class AnalysisEngine(
     fun analyze(doc: OpenDocument): Analysis {
         analysisCache[doc.uri]?.let { if (it.version == doc.version) return it }
         val ctx = projects.resolve(doc.uri)
-        val checker = checkerFor(ctx.modelsRoot) { TtrpChecker(ctx.manifest, ctx.modelsRoot) }
-        val report = checker.check(doc.text, doc.uri, ctx.manifestDiagnostics)
+        val report =
+            ttrbSentenceCheck(doc, ctx)
+                ?: checkerFor(ctx.modelsRoot) { TtrpChecker(ctx.manifest, ctx.modelsRoot) }
+                    .check(doc.text, doc.uri, ctx.manifestDiagnostics)
         val analysis = Analysis(doc.uri, doc.version, report)
         analysisCache[doc.uri] = analysis
         return analysis
+    }
+
+    /**
+     * AG B6 — a bare TTR-B document (`ttrb` / `ttrb-cs`) in a project WITHOUT a `[ttrp] bare-target`
+     * (typically a rules file a program pulls in with `from "…"`) gets the fragment's own sentence check —
+     * the skin's reject table, its messages and suggested sentences — instead of a bare-program
+     * wrapper that could only report the missing bare-target. With a bare-target it is a full program.
+     */
+    private fun ttrbSentenceCheck(
+        doc: org.tatrman.ttrp.lsp.docs.OpenDocument,
+        ctx: org.tatrman.ttrp.lsp.project.ProjectContext,
+    ): TtrpChecker.Report? {
+        if (doc.languageId !in TTRB_LANGUAGES || ctx.manifest.bareTarget != null) return null
+        val dialect =
+            org.tatrman.ttrp.dialect.bare.DialectMarker
+                .resolve(doc.uri, doc.text) ?: doc.languageId
+        val skin =
+            org.tatrman.ttrp.dialect.b.TtrbSkin
+                .forTag(dialect) ?: return null
+        val whole =
+            org.tatrman.ttrp.ast
+                .SourceLocation(doc.uri, 1, 0, 1, 0, 0, doc.text.length)
+        val decomposition =
+            org.tatrman.ttrp.dialect.b.TtrB
+                .decompose(doc.text, whole, outPort = null, skin = skin)
+        return TtrpChecker.Report(
+            document =
+                org.tatrman.ttrp.ast
+                    .TtrpDocument(emptyList(), whole),
+            diagnostics = decomposition.diagnostics,
+            world = null,
+            rewrites = emptyList(),
+        )
     }
 
     fun evict(uri: String) {
@@ -58,4 +93,9 @@ class AnalysisEngine(
         modelsRoot: Path,
         build: () -> TtrpChecker,
     ): TtrpChecker = checkerCache.getOrPut(modelsRoot.toString(), build)
+
+    companion object {
+        /** The TTR-B language ids (English / Czech skin) the editor analyses sentence by sentence. */
+        val TTRB_LANGUAGES = setOf("ttrb", "ttrb-cs")
+    }
 }

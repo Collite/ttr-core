@@ -30,7 +30,7 @@
       ]
     },
     {
-      "begin": "(\"\"\")(ttrb)\\s*$",
+      "begin": "(\"\"\")(ttrb(?:-cs)?)\\s*$",
       "end": "(\"\"\")",
       "name": "string.quoted.fenced.ttrb.ttrp"
     },

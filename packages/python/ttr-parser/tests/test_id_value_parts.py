@@ -32,7 +32,7 @@ from ttr_parser import (  # noqa: F821 — will exist once stages 2.2/2.3 land
 def test_id_value_splits_dotted_reference_into_parts() -> None:
     text = (
         "def relation R {\n"
-        "    from: db.dbo.fk_artikl_produkt\n"
+        "    from: db.dbo.fk_item_category\n"
         "    to: db.dbo.Y\n"
         "}\n"
     )
@@ -43,8 +43,8 @@ def test_id_value_splits_dotted_reference_into_parts() -> None:
 
     frm = rel.from_  # type: ignore[attr-defined]
     assert isinstance(frm, IdValue)
-    assert frm.ref.path == "db.dbo.fk_artikl_produkt"
-    assert frm.parts == ("db", "dbo", "fk_artikl_produkt")
+    assert frm.ref.path == "db.dbo.fk_item_category"
+    assert frm.parts == ("db", "dbo", "fk_item_category")
 
     to = rel.to  # type: ignore[attr-defined]
     assert isinstance(to, IdValue)

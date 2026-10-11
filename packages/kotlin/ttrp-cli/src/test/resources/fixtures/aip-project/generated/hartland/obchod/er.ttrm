@@ -1,0 +1,31 @@
+package hartland.obchod
+def entity objednávka { description: "Marketplace order", nameAttribute: číslo_objednávky, binding: { target: { query: db.query.objednávka__filter } },
+    attributes: [
+        def attribute číslo_objednávky { type: int, isKey: true, binding: order_number, },
+        def attribute id_zákazníka { type: int, optional: true, binding: bill_customer_sk, },
+        def attribute centrum_podpory { type: int, optional: true, binding: call_center_sk, },
+        def attribute datum_prodeje { type: int, optional: true, binding: sold_date_sk, },
+    ]
+}
+
+def entity řádek_objednávky { description: "Marketplace order line", binding: { target: { table: db.dbo.catalog_sales } },
+    attributes: [
+        def attribute číslo_objednávky { type: int, isKey: true, binding: cs_order_number, },
+        def attribute id_produktu { type: int, isKey: true, binding: cs_item_sk, },
+        def attribute id_centra { type: int, optional: true, binding: cs_warehouse_sk, },
+        def attribute množství { type: int, optional: true, binding: cs_quantity, },
+        def attribute cena { type: float, optional: true, binding: cs_sales_price, },
+    ]
+}
+
+def entity stav_zásoby { description: "Stock level", binding: { target: { table: db.dbo.inventory } },
+    attributes: [
+        def attribute datum_stavu { type: int, isKey: true, binding: inv_date_sk, },
+        def attribute id_produktu { type: int, isKey: true, binding: inv_item_sk, },
+        def attribute id_centra { type: int, isKey: true, binding: inv_warehouse_sk, },
+        def attribute na_skladě { type: int, optional: true, binding: inv_quantity_on_hand, },
+    ]
+}
+
+def relation řádek_objednávka { description: "A line belongs to its order", from: er.entity.řádek_objednávky, to: er.entity.objednávka, cardinality: { from: "0..*", to: "1" }, join: [{ from: er.entity.řádek_objednávky.číslo_objednávky, to: er.entity.objednávka.číslo_objednávky }],
+}

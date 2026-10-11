@@ -33,19 +33,21 @@ npx http-server packages/designer/dist -p 8080
 
 Open [http://localhost:8080/?demo=v1.1-mini](http://localhost:8080/?demo=v1.1-mini). The build includes the bundled LSP web worker and the sample project copied into `dist/samples/v1.1-mini/`.
 
-### 1.3 The deployed Designer (GitHub Pages)
+### 1.3 The deployed Viewer (container image)
 
-> **⚠ Stale — verify before relying on this.** `designer-deploy.yml` is no longer
-> present in `.github/workflows/`, and repo Pages now serves the docs site
-> (`docs-publish.yml`). Use 1.1 or 1.2 until the current hosting path is written up.
+The Designer is not published to GitHub Pages: repo Pages serves the docs site (`docs-publish.yml`). The deployable form is the **Studio Viewer image**, `ghcr.io/collite/ttr-viewer`, a static bundle behind unprivileged nginx that reads the model a Veles catalog serves. `release-viewer.yml` publishes it from a `viewer/v<x.y.z>` tag (`just publish viewer`). Its base path, catalog URL and default language are environment variables read when the container starts, so one image serves any deployment.
 
-Once `.github/workflows/designer-deploy.yml` has run on `main` at least once (one-time setup: **Settings → Pages → Build and deployment → GitHub Actions**), the Designer is published at:
+How to run it, configure it, and put it behind a login: [Deploy the Studio Viewer](docs-site/docs/operate/studio-viewer.md).
 
+To build and try it locally against a Veles on your machine:
+
+```bash
+gh auth token | docker login ghcr.io -u <github-user> --password-stdin   # the base images are private GHCR mirrors
+just viewer-image                                                         # → ttr-viewer:dev
+docker run --rm -p 8080:8080 -e VIEWER_CATALOG_UPSTREAM=http://host.docker.internal:7260 ttr-viewer:dev
 ```
-https://<owner>.github.io/<repo>/
-```
 
-Same URL with `?demo=v1.1-mini` pre-loads the sample.
+Then open [http://localhost:8080/](http://localhost:8080/).
 
 ### 1.4 What the Designer does
 

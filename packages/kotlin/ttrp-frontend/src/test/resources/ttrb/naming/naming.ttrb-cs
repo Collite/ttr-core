@@ -1,0 +1,11 @@
+# ttr: dialect=b lang=cs
+Načti items jako pol.
+Načti stock jako z2.
+Ponech řádky, kde shop_code je "S1".
+Pojmenuj to jako z2.
+Spoj pol volitelně se z2 přes code je z2.code jako j.
+Ponech řádky, kde qty není prázdné.
+Nazvi výsledek candidates.
+Načti pol.
+Ponech jen řádky, které mají protějšek v candidates přes code je candidates.code.
+Ukaž výsledek jako matched.

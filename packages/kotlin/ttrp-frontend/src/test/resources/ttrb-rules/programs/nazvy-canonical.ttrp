@@ -1,0 +1,24 @@
+// Grouped conditions and named intermediate values, written by hand.
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container priprava(out otevrene, out chybi) target erp {
+  otevrene = load(objednávky) -> filter(stav = "otevřená")
+  chybi = load(zásoby) -> filter(množství = 0)
+}
+
+container nazvy(in otevrene, in chybi, out nalehave, out kontrola, out souhrn) target erp {
+  kandidati = otevrene
+    -> filter((částka > 1000 or poznámka is null) and (stav = "otevřená" or kód_zboží is null))
+    -> calc { priorita = case when (částka > 5000 and poznámka is not null) or stav = "naléhavá" then 1 else 2 end }
+  nalehave = kandidati -> filter((priorita = 1 or částka > 10000) and stav = "otevřená")
+  bez_zasob = chybi -> filter(množství = 0 and (vedoucí_skladu is null or vedoucí_skladu = "nikdo"))
+  kontrola = join(left: kandidati, right: bez_zasob, on: kód_zboží = right.kód_zboží, type: semi)
+  souhrn = join(left: kandidati, right: bez_zasob, on: kód_zboží = right.kód_zboží and (right.množství = 0 or right.vedoucí_skladu is null), type: left)
+}
+
+priprava.otevrene -> nazvy.otevrene
+priprava.chybi -> nazvy.chybi
+nazvy.nalehave -> display(nalehave)
+nazvy.kontrola -> display(kontrola)
+nazvy.souhrn -> display(souhrn)

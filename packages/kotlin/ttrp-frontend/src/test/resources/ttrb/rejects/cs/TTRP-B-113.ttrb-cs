@@ -1,0 +1,6 @@
+# out: seznam
+Načti items jako pol.
+Načti stock jako z2.
+Ponech řádky, kde shop_code je "S1".
+Spoj pol volitelně se z2 přes code je z2.code jako j.
+Pošli to na výstup seznam.

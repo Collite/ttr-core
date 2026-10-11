@@ -49,8 +49,15 @@ function copySamplesPlugin() {
   };
 }
 
+// Dev-only twin of the container image's same-origin catalog proxy (ttr-core#169): with
+// `VELES_PROXY_TARGET=http://localhost:7260`, `/veles/*` on the dev server reaches a local Veles, so
+// `?veles=/veles` works without CORS — the same URL shape the deployed viewer uses.
+const velesProxyTarget = process.env.VELES_PROXY_TARGET;
+
 export default defineConfig({
   plugins: [react(), copySamplesPlugin()],
+  // `/` by default; `/<sub-path>/` for a fixed sub-path build; `./` for the container image, whose
+  // base path is chosen at runtime (the entrypoint writes `<base href>` + config.json).
   base: process.env.DESIGNER_BASE_URL ?? '/',
   resolve: {
     alias: {
@@ -59,5 +66,8 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    ...(velesProxyTarget
+      ? { proxy: { '/veles': { target: velesProxyTarget, changeOrigin: true, rewrite: (p: string) => p.replace(/^\/veles/, '') } } }
+      : {}),
   },
 });

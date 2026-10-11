@@ -86,7 +86,7 @@ enum class TtrpDiagnosticId(
         "TTRP-PRS-005",
         "this name is a reserved port name (in, out, err, rejects, true, false, else) — choose another (S10)",
     ),
-    FRG_001("TTRP-FRG-001", "supported fragment dialects: sql, pandas, ttrb (C3-g/C4-f)"),
+    FRG_001("TTRP-FRG-001", "supported fragment dialects: sql, pandas, ttrb, ttrb-cs (C3-g/C4-f)"),
 
     // ---- Stage 6.3 bare-fragment programs (FRG) ----
     FRG_002(
@@ -96,6 +96,16 @@ enum class TtrpDiagnosticId(
     FRG_003(
         "TTRP-FRG-003",
         "a bare-fragment program needs [ttrp] bare-target (and bare-shell) — no fallback guessing (P2)",
+    ),
+
+    // ---- AG B5 file-backed fragments (FRG) ----
+    FRG_004(
+        "TTRP-FRG-004",
+        "check the path — it is relative to the program file (and the program must be saved to a file)",
+    ),
+    FRG_005(
+        "TTRP-FRG-005",
+        "name the fragment file .ttrb / .ttrb-cs / .ttr.sql / .ttr.py, or start it with a `# ttr: dialect=…` line",
     ),
 
     // ---- Stage 6.1 TTR-SQL dialect ids (SQL) — messages/suggestions come from the reject
@@ -134,15 +144,38 @@ enum class TtrpDiagnosticId(
     PD_009("TTRP-PD-009", "add .sort() before .limit() (deterministic results, A4/Q9)"), // S15 mirror
     PD_010("TTRP-PD-010", null), // generic TTR-pandas syntax error (grammar reject, no curated form)
 
-    // ---- Stage 7.1 TTR-B dialect ids (B) — messages/suggestions from ttr-b.rejects.toml ----
-    B_001("TTRP-B-001", "Store <name> to <model-ref>."),
-    B_002("TTRP-B-002", "Combine <name> with <name>. / Store <name> to <model-ref>."),
-    B_003("TTRP-B-003", "Model changes belong in TTR-M; data writes are Store."),
-    B_004("TTRP-B-004", "Start the sentence with a roster verb."),
-    B_005("TTRP-B-005", "Replace // with #."),
-    B_006("TTRP-B-006", "Write the sentence with the English v1 roster."),
+    // ---- TTR-B dialect ids (B) — messages + suggested sentences come from the skin's reject table
+    // (ttrb/rejects.<lang>.yaml, AG B6); the enum carries the English default suggestion.
+    B_001(
+        "TTRP-B-001",
+        "To ask the host for a change: Set <attribute> of <entity> with key <key> to <value> with reason \"<reason>\".",
+    ),
+    B_002("TTRP-B-002", "Combine that with <name>. / Store that to <model-ref>."),
+    B_003("TTRP-B-003", "Model changes belong in TTR-M; data writes are Store: Store that to <model-ref>."),
+    B_004("TTRP-B-004", "Start the sentence with a roster verb, e.g. Keep only the rows where <condition>."),
+    B_005("TTRP-B-005", "# a comment"),
+    B_006("TTRP-B-006", "Mark the fragment with the sentence's language (`\"\"\"ttrb-cs`) or use this skin's roster."),
     B_007("TTRP-B-007", "Use a listed verbose form or the canonical operator."),
     B_008("TTRP-B-008", "Author the Pivot node in canonical TTR-P."),
+    B_101("TTRP-B-101", "Remove the character, or put the text in quotes."),
+    B_102("TTRP-B-102", "If <condition>:  — then the block's sentences on the next lines, indented."),
+    B_103("TTRP-B-103", "Indent every sentence of a block by the same amount."),
+    B_104(
+        "TTRP-B-104",
+        "Send an e-mail to <recipient> with subject \"<subject>\", template \"<template>\", key <key> [and attachments <a>, <b>].",
+    ),
+    B_105("TTRP-B-105", "Set <attribute> of <entity> with key <key> to <value> with reason \"<reason>\"."),
+    B_106("TTRP-B-106", "Create a manual task for <recipient> \"<title>\" with description \"<description>\"."),
+    B_107("TTRP-B-107", "Count the rows of <table> as <name>."),
+    B_108("TTRP-B-108", "Attach <table> to the result."),
+    B_109("TTRP-B-109", "Choose another name — a keyword cannot name a column, a table or a result."),
+    B_110("TTRP-B-110", "Join the conditions with `and` in one block: If <a> and <b>:"),
+    B_111("TTRP-B-111", "Send that to output <port>."),
+    B_112("TTRP-B-112", "Declare the port in the container header — container <name>(…, out <port>) …"),
+    B_113(
+        "TTRP-B-113",
+        "Name it and use the name — Call that <name>. — continue from it with `that`, or send it to an output.",
+    ),
 
     // ---- Stage 1.2 expression ids (EQ above; FN/AGG/TYP/EXP here) ----
     FN_001(
@@ -491,6 +524,34 @@ enum class TtrpDiagnosticId(
         "TTRP-FAIL-003",
         "`absorbs` is reserved (F-4-iv γ) and unavailable in v1 — a handled failure still ends the run non-success; " +
             "drop `absorbs`",
+    ),
+
+    // ---- Action displays (DSP): `display(<name>)` held to a declared row schema (grammar 0.14 `def schema`,
+    // in scope through `import <pkg>.*`). 001/002/004/005 are errors, 003 a warning (severity set at the site). ----
+    DSP_001(
+        "TTRP-DSP-001",
+        "the action display's schema requires this column — produce it (e.g. `calc { <col> = … }`) before the " +
+            "display, or mark it `optional: true` in the schema",
+    ),
+    DSP_002(
+        "TTRP-DSP-002",
+        "the column's type is not assignable to the schema's — assignable is the same type, int → decimal/float, " +
+            "or any scalar → text; convert it with `cast(x as <type>)` before the display",
+    ),
+    DSP_003(
+        "TTRP-DSP-003",
+        "the column is not in the action display's schema and is dropped from the display's output — `select` " +
+            "the schema's columns to silence this",
+    ),
+    DSP_004(
+        "TTRP-DSP-004",
+        "only an action display (a declared row schema in an imported package) may take several sources — rename " +
+            "the displays, or declare `def schema <name>` in a TTR-M package and import it",
+    ),
+    DSP_005(
+        "TTRP-DSP-005",
+        "an action display's column must be a scalar every engine can produce — declare it as text, int, bigint, " +
+            "smallint, decimal (precision ≤ 38), float, bool, date, time, datetime or timestamp",
     ),
     ;
 

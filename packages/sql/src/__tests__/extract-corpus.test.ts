@@ -9,7 +9,7 @@ import { extract } from '../adapters/index.js';
 import { resolveDialect } from '../lexer-service.js';
 
 /**
- * Extraction corpus regression (3.2.6): `parseSql` → `extract` over every real
+ * Extraction corpus regression (3.2.6): `parseSql` → `extract` over every
  * embedded SQL block in the sample corpus must never throw, and the parse must
  * be clean (the spike parsed 100%). Any new failing construct goes in
  * `packages/sql/LAZY-PATCH.md` (DESIGN §12.7) — which starts empty.

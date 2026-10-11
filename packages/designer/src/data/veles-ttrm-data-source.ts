@@ -23,7 +23,7 @@ import type {
 } from './model-data-source.js';
 import type { TtrmSearchHit, TtrmStatus } from './ttrm-types.js';
 import type { GetGraphResponse } from '@tatrman/lsp';
-import { ttrmToGetGraphResponse } from './structural-graph.js';
+import { StructuralGraphCache, describeTtrmNode, ttrmToGetGraphResponse, type ObjectDescription } from './structural-graph.js';
 import {
   JsonRpcWsClient,
   TtrmRpcError,
@@ -62,6 +62,8 @@ export interface VelesTtrmDataSourceOptions {
   token?: string;
   /** Passed through to the JSON-RPC WS client (test seam / timeout). `bearerToken` is set from `token`. */
   wsClientOptions?: Omit<JsonRpcWsClientOptions, 'bearerToken'>;
+  /** The language model labels and descriptions are shown in (ttr-core#170); default `en`. */
+  lang?: string;
 }
 
 export class VelesTtrmDataSource implements ModelDataSource {
@@ -78,11 +80,13 @@ export class VelesTtrmDataSource implements ModelDataSource {
 
   private readonly client: JsonRpcWsClient;
   private status: TtrmStatus | null = null;
+  private readonly served: StructuralGraphCache;
 
   /** @param origin the platform Veles WS origin, e.g. `wss://veles.example`; `/v1/ttrm` is appended. */
   constructor(origin: string, opts: VelesTtrmDataSourceOptions = {}) {
     const url = origin.replace(/\/$/, '') + '/v1/ttrm';
     this.client = new JsonRpcWsClient(url, { ...opts.wsClientOptions, bearerToken: opts.token });
+    this.served = new StructuralGraphCache(opts.lang);
   }
 
   /** Connect (bearer on the handshake) and verify the ttrm handshake. */
@@ -136,7 +140,20 @@ export class VelesTtrmDataSource implements ModelDataSource {
   // the read-api mapping (§1.1a structural graph).
   async getGraph(ref: string): Promise<GetGraphResponse | null> {
     const g = await this.getModelGraph({ schema: ref });
-    return ttrmToGetGraphResponse(ref, g.nodes, g.edges);
+    this.served.remember(ref, g.nodes, g.edges);
+    return ttrmToGetGraphResponse(ref, g.nodes, g.edges, [], { lang: this.served.lang });
+  }
+
+  /** The inspector read (ttr-core#170) — see `VelesReadApiDataSource.describe`. */
+  async describe(qname: string): Promise<ObjectDescription | null> {
+    const cached = this.served.describe(qname);
+    if (cached) return cached;
+    const detail = await this.getObject(qname);
+    return describeTtrmNode(detail.object, [], this.served.lang);
+  }
+
+  knownLanguages(): string[] {
+    return this.served.languages();
   }
 
   async listCatalog(): Promise<CatalogListing> {

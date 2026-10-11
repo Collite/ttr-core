@@ -98,7 +98,8 @@ class RenameService(
 
         // A port declaration in a container header.
         if (container != null) {
-            container.ports.firstOrNull { SourceNav.contains(it.location, pos) }?.let {
+            // A synthesized TTR-B action port (AG B4) points into the fragment — not a renameable declaration.
+            container.ports.firstOrNull { !it.synthesized && SourceNav.contains(it.location, pos) }?.let {
                 return portTarget(doc, container, it)
             }
         }

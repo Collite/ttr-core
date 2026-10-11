@@ -1,0 +1,4 @@
+Načti objednávky.
+Když oblast je "S":
+    Když stav je "otevřená":
+        Ukaž výsledek jako sever_otevrene.

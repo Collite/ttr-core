@@ -19,11 +19,14 @@ import { mountDesignerPanels } from './ext/panels-host';
 import { VelesTtrmDataSource } from './data/veles-ttrm-data-source';
 import { makeViewStateStore, type ViewStateStoreIO } from './data/view-state-store-factory';
 import type { PrefsRecord } from './data/view-state-store';
-import { selectBackend, BackendSelectionError, type BackendSelection } from './data/select-data-source';
+import { selectBackend, serverWorkspaceName, BackendSelectionError, type BackendSelection } from './data/select-data-source';
 import { ManifestProgramSource } from './model/ttrp/manifest-program-source';
 import type { ProcessingGraphSource } from './model/processing-source';
 import { useAuthoringContext } from './ext/use-authoring-context.js';
 import { createLspClient, type LspClient } from './lsp-client';
+import { getRuntimeConfig } from './runtime-config';
+import { initialLanguage, saveLanguage } from './i18n/labels';
+import { setStickyParam } from './shell/app-location';
 import { loadDemoFiles } from './fs/demo-loader';
 import { loadProjectViaFileSystemAccessAPI, type ProjectFiles } from './fs/file-system';
 import { applyWorkspaceEdit } from './lsp/apply-workspace-edit';
@@ -36,7 +39,7 @@ function isModelFile(relativePath: string): boolean {
 
 function resolveBackend(): BackendSelection | { kind: 'error'; message: string } {
   try {
-    return selectBackend(window.location.search);
+    return selectBackend(window.location.search, getRuntimeConfig());
   } catch (err) {
     if (err instanceof BackendSelectionError) return { kind: 'error', message: err.message };
     throw err;
@@ -46,11 +49,13 @@ function resolveBackend(): BackendSelection | { kind: 'error'; message: string }
 /** The server-backed selections (everything except worker). */
 type ServerSelection = Extract<BackendSelection, { kind: 'ws' | 'veles' }>;
 
-function BackendErrorScreen({ message }: { message: string }) {
+/** A fatal screen. The title names WHAT failed: a bad backend selection, a failed load, or an
+ *  unreachable backend are different problems and must not share one heading (ttr-core#112). */
+function BackendErrorScreen({ message, title = 'Invalid backend selection' }: { message: string; title?: string }) {
   return (
     <div className="flex flex-col items-center justify-center h-screen gap-4 p-12 bg-gray-50">
       <div className="bg-white border border-red-300 rounded-xl shadow-lg p-8 max-w-md text-center">
-        <h2 className="text-xl font-bold text-red-700 mb-2">Invalid backend selection</h2>
+        <h2 data-testid="error-title" className="text-xl font-bold text-red-700 mb-2">{title}</h2>
         <p className="text-sm text-slate-600 break-words">{message}</p>
       </div>
     </div>
@@ -60,8 +65,14 @@ function BackendErrorScreen({ message }: { message: string }) {
 /** A ready Studio: the DS shell over a resolved data source + view-state store. Edit-absent in the
  *  OPEN build (no authoring loader registered → `editContext` undefined, FO-21); the COMMERCIAL build
  *  registers a loader that resolves a `ShellEditContext` here (FO-P0.S4). */
+/** The model-label language picker (ttr-core#170): the current language and how to change it. */
+interface LanguageChoice {
+  current: string;
+  onChange: (lang: string) => void;
+}
+
 function Studio({
-  dataSource, viewState, catalog, files, workspace, processingSource,
+  dataSource, viewState, catalog, files, workspace, processingSource, language,
 }: {
   dataSource: ModelDataSource;
   viewState?: ViewStateStore;
@@ -69,6 +80,8 @@ function Studio({
   files: string[];
   workspace: string;
   processingSource?: ProcessingGraphSource;
+  /** present on a catalog backend: model labels follow this language. */
+  language?: LanguageChoice;
 }) {
   const editContext = useAuthoringContext(dataSource);
   const [displayMode, setDisplayMode] = useState<DisplayMode>('just-names');
@@ -92,6 +105,24 @@ function Studio({
       <header className="flex items-center gap-4 px-4 py-2 border-b border-slate-200 bg-white" data-testid="studio-header">
         <span className="font-semibold text-slate-800">{active?.label ?? workspace}</span>
         <div className="ml-auto flex items-center gap-2 text-xs">
+          {language && (
+            // The languages the model's labels carry (as served so far), the deployment's list, and the
+            // current one. Re-read on every render: the active graph arriving re-renders this header.
+            <>
+              <label htmlFor="model-language" className="uppercase tracking-wide text-slate-400">Language</label>
+              <select
+                id="model-language"
+                data-testid="model-language"
+                value={language.current}
+                onChange={(e) => language.onChange(e.target.value)}
+                className="border border-slate-300 rounded px-2 py-1 mr-3"
+              >
+                {[...new Set([...getRuntimeConfig().languages, ...(dataSource.knownLanguages?.() ?? []), language.current, 'en'])]
+                  .sort()
+                  .map((l) => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </>
+          )}
           <span className="uppercase tracking-wide text-slate-400">Detail</span>
           <select
             data-testid="display-mode"
@@ -239,7 +270,7 @@ function WorkerStudio({ demo }: { demo: string | null }) {
     }
   };
 
-  if (error && !ready) return <BackendErrorScreen message={error} />;
+  if (error && !ready) return <BackendErrorScreen title="Could not load the project" message={error} />;
   if (ready) return <Studio {...ready} />;
   if (loading) return <Splash><p className="text-gray-500">Loading…</p></Splash>;
   return (
@@ -263,8 +294,9 @@ function WorkerStudio({ demo }: { demo: string | null }) {
   );
 }
 
-/** Server backends (WS / Veles): read-only deployed catalogs; connect, list, mount. */
-function ServerStudio(props: ServerSelection) {
+/** Server backends (WS / Veles): read-only deployed catalogs; connect, list, mount. Remounted (keyed
+ *  by language) when the model-label language changes — the URL brings it back to the same graph. */
+function ServerStudio(props: ServerSelection & { lang: string; onLanguageChange: (lang: string) => void }) {
   const [ready, setReady] = useState<{ dataSource: ModelDataSource; viewState: ViewStateStore; catalog: CatalogGroup[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -285,13 +317,13 @@ function ServerStudio(props: ServerSelection) {
           io = { kind: 'sidecar', layout: { getLayout: (uri) => ws.getLayout(uri), setLayout: async (uri, canvases) => { await ws.setLayout(uri, canvases); } } };
         } else if (props.transport === 'ttrm') {
           // Platform Veles: WS ttrm/* + bearer on the handshake (VS-2). No sidecar layout.
-          const v = new VelesTtrmDataSource(props.origin, { token: props.token ?? undefined });
+          const v = new VelesTtrmDataSource(props.origin, { token: props.token ?? undefined, lang: props.lang });
           created = v;
           await v.connect();
           dataSource = v;
           io = { kind: 'none' };
         } else {
-          const r = new VelesReadApiDataSource(props.base);
+          const r = new VelesReadApiDataSource(props.base, { lang: props.lang });
           created = r as unknown as { dispose?: () => void };
           dataSource = r;
           io = { kind: 'none' };
@@ -309,7 +341,7 @@ function ServerStudio(props: ServerSelection) {
     return () => { disposed = true; created?.dispose?.(); };
   }, []);
 
-  const label = props.kind === 'ws' ? props.origin : props.transport === 'ttrm' ? props.origin : props.base;
+  const label = serverWorkspaceName(props);
 
   // TTR-P program-graph panel (S9.T2): when `?manifest=<ref>` is present on a Veles backend, render the
   // static bundle manifest fetched from Veles's stored-manifest endpoint (`GET /v1/manifests/{ref}`).
@@ -355,11 +387,19 @@ function ServerStudio(props: ServerSelection) {
     // a re-mount (on a token/origin change) can't blank the live one.
   }, [ready, httpBase, bearer]);
 
-  if (error) return <BackendErrorScreen message={error} />;
+  if (error) return <BackendErrorScreen title={props.kind === 'ws' ? 'Could not reach the designer server' : 'Could not reach the catalog'} message={error} />;
   if (!ready) return <Splash><p className="text-gray-500">Connecting to the {props.kind} backend…</p></Splash>;
   return (
     <>
-      <Studio dataSource={ready.dataSource} viewState={ready.viewState} catalog={ready.catalog} files={[]} workspace={label} processingSource={processingSource} />
+      <Studio
+        dataSource={ready.dataSource}
+        viewState={ready.viewState}
+        catalog={ready.catalog}
+        files={[]}
+        workspace={label}
+        processingSource={processingSource}
+        language={props.kind === 'veles' ? { current: props.lang, onChange: props.onLanguageChange } : undefined}
+      />
       <aside ref={panelsHostRef} className="ttr-designer-panels" aria-label="Designer extension panels" />
     </>
   );
@@ -367,8 +407,17 @@ function ServerStudio(props: ServerSelection) {
 
 function App() {
   const backend = useMemo(resolveBackend, []);
+  // The model-label language (ttr-core#170): ?lang= → saved choice → VIEWER_DEFAULT_LANG → browser → en.
+  const [lang, setLang] = useState(initialLanguage);
+  const changeLanguage = (next: string) => {
+    saveLanguage(next);
+    setStickyParam('lang', next); // the address bar carries it, so a reload / a shared link keeps it
+    setLang(next);
+  };
   if (backend.kind === 'error') return <BackendErrorScreen message={backend.message} />;
-  if (backend.kind === 'ws' || backend.kind === 'veles') return <ServerStudio {...backend} />;
+  if (backend.kind === 'ws' || backend.kind === 'veles') {
+    return <ServerStudio key={lang} {...backend} lang={lang} onLanguageChange={changeLanguage} />;
+  }
   return <WorkerStudio demo={backend.demo} />;
 }
 

@@ -5,7 +5,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * DF-V07 / Phase 08 C2 — "did you mean…?" suggestions for misspelt identifiers.
+ * Phase 08 C2 — "did you mean…?" suggestions for misspelt identifiers.
  *
  * Given an unknown identifier (table or column name) parsed out of a Calcite validation error,
  * scan a small corpus of known names for nearest matches by case-insensitive Levenshtein

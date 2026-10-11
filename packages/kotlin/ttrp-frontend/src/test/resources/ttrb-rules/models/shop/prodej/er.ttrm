@@ -1,0 +1,31 @@
+package shop.prodej
+def entity objednávky { description: "Objednávky", binding: { target: { table: db.dbo.OBJ_HEAD } },
+    attributes: [
+        def attribute číslo { type: int, isKey: true, binding: CISLO, },
+        def attribute částka { type: decimal, optional: true, binding: CASTKA, },
+        def attribute stav { type: text, optional: true, binding: STAV, },
+        def attribute email_zástupce { type: text, optional: true, binding: EMAIL_ZAST, },
+        def attribute poznámka { type: text, optional: true, binding: POZNAMKA, },
+        def attribute kód_zboží { type: text, optional: true, binding: KOD_ZBOZI, },
+    ]
+}
+def entity reklamace { description: "Reklamace", binding: { target: { table: db.dbo.REKL } },
+    attributes: [
+        def attribute id { type: int, isKey: true, binding: REKL_ID, },
+        def attribute číslo_objednávky { type: int, optional: true, binding: CISLO_OBJ, },
+    ]
+}
+def entity zásoby { description: "Zásoby", binding: { target: { table: db.dbo.SKL_ZAS } },
+    attributes: [
+        def attribute kód_zboží { type: text, isKey: true, binding: KOD, },
+        def attribute množství { type: int, optional: true, binding: MNOZSTVI, },
+        def attribute vedoucí_skladu { type: text, optional: true, binding: VEDOUCI, },
+    ]
+}
+def entity limity { description: "Limity zásob (jeden řádek)", binding: { target: { table: db.dbo.LIM_ZAS } },
+    attributes: [
+        def attribute minimum_zásoby { type: int, optional: true, binding: MIN_ZASOBA, },
+    ]
+}
+def relation reklamace_objednavky { description: "A complaint belongs to an order", from: er.entity.reklamace, to: er.entity.objednávky, cardinality: { from: "0..*", to: "1" }, join: [{ from: er.entity.reklamace.číslo_objednávky, to: er.entity.objednávky.číslo }],
+}

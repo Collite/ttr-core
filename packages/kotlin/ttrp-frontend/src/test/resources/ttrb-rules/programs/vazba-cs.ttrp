@@ -1,0 +1,15 @@
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container reklamovane(out seznam, out vse_reklamace) target erp """ttrb-cs
+Načti objednávky jako o.
+Načti reklamace jako r.
+Spoj r s o přes vazbu reklamace_objednavky jako rj.
+Ponech jen sloupce id, číslo_objednávky, částka.
+Pošli to na výstup seznam.
+Spoj r volitelně s o přes vazbu reklamace_objednavky jako rv.
+Pošli to na výstup vse_reklamace.
+"""
+
+reklamovane.seznam -> display(seznam)
+reklamovane.vse_reklamace -> display(vse_reklamace)

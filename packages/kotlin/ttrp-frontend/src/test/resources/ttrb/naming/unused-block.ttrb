@@ -1,0 +1,4 @@
+Load orders as o.
+If amount is more than 100:
+    Load stock as s2.
+    Show the result as stock_view.

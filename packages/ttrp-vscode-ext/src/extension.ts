@@ -81,11 +81,13 @@ export function activate(context: vscode.ExtensionContext): void {
       { scheme: 'file', language: 'ttr-sql' },
       { scheme: 'file', language: 'ttr-pandas' },
       { scheme: 'file', language: 'ttrb' },
+      { scheme: 'file', language: 'ttrb-cs' },
     ],
     outputChannelName: 'TTR-P Language Server',
     synchronize: {
       // World + `[ttrp]` manifest changes must reach the server; `.ttrl` stays out until Stage 5.2.
-      fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{ttrp,ttr.sql,ttr.py,ttrb,ttrm,toml}'),
+      // `.ttrb` / `.ttrb-cs` also back `container … from "<file>"` bodies — a save re-checks the programs.
+      fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{ttrp,ttr.sql,ttr.py,ttrb,ttrb-cs,ttrm,toml}'),
     },
   };
 

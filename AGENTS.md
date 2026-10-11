@@ -71,3 +71,15 @@ skills later.
   served: the request falls through to the SPA fallback and the demo loader's
   `JSON.parse` chokes on the returned `<!DOCTYPE …>`.
 - Switching demos means editing that const, not just the URL.
+
+### A mocked render engine hides every render-time bug
+
+- Mocking the canvas engine (React Flow, ELK) in a unit test makes the test
+  blind to everything only the real engine does: a node measured at 0×0, a
+  layout that never settles, an edge pointing at a handle id that doesn't
+  exist, a graph shape the engine renders as a pile of boxes. Mocked tests are
+  necessary, not sufficient.
+- Either exercise a real instance against a fixture (jsdom runs real React
+  Flow once `src/test-setup.ts` stubs `ResizeObserver` and `matchMedia`), or
+  budget for render-time bugs being found by looking at the running app — the
+  dev server, or the built bundle / container image in a real browser.

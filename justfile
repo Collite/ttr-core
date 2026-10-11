@@ -510,6 +510,9 @@ _release-ext kind release="false" level="" version="":
 #                    the Kotlin `bundle grammar` below despite the similar name; external cut
 #                    gated on Bora + NPM_TOKEN per FO ⚑2)
 #   vscode | intellij  editor extensions (GitHub Release always; Marketplace on RELEASE)
+#   viewer           the Studio Viewer container image, ghcr.io/collite/ttr-viewer (release-viewer.yml;
+#                    GHCR is its only registry, so `release` gates nothing extra — the image tag is
+#                    always the bare x.y.z)
 #   bundle <name>    a named release lane — a lockstep set published together at one version:
 #                    grammar    THE TTR toolchain: ttr-parser + ttr-writer + ttr-semantics +
 #                               ttr-metadata + ttr-metadata-git + ttr-snapshot + ttr-md-resolver +
@@ -541,6 +544,7 @@ _release-ext kind release="false" level="" version="":
 #   just publish vscode minor                                   # ext: internal build, minor bump
 #   just publish vscode release                                  # ext: promote current x.y.z → Marketplace
 #   just publish intellij release minor                          # ext: bump minor, publish to Marketplace
+#   just publish viewer set 0.1.0                                  # ttr-viewer image, explicit version
 publish *args:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -553,7 +557,7 @@ publish *args:
         NEXT=2
     fi
     if [ -z "$WHAT" ] || [ "$WHAT" = "bundle " ]; then
-        echo "❌ Usage: just publish <module|path|grammar|vscode|intellij|bundle NAME> [release] [major|minor|patch|set VERSION]" >&2
+        echo "❌ Usage: just publish <module|path|grammar|vscode|intellij|viewer|bundle NAME> [release] [major|minor|patch|set VERSION]" >&2
         exit 1
     fi
     REST=("${ARGS[@]:$NEXT}")
@@ -637,6 +641,9 @@ publish *args:
         ts-grammar)
             PREFIX=ts-grammar
             DESC="@tatrman/grammar (public npmjs)" ;;
+        viewer)
+            PREFIX=viewer
+            DESC="ghcr.io/collite/ttr-viewer (Studio Viewer container image, linux/amd64 + linux/arm64)" ;;
         *)
             MOD_PATH=$(just _resolve "$WHAT")
             MOD_NAME=$(basename "$MOD_PATH")
@@ -714,7 +721,9 @@ publish *args:
     NEW_TAG="${PREFIX}/v${NEW_VERSION}"
     [ "$RELEASE" = true ] && NEW_TAG="${NEW_TAG}-RELEASE"
 
-    if [ "$RELEASE" = true ]; then
+    if [ "$PREFIX" = viewer ]; then
+        LANES="GHCR — ghcr.io/collite/ttr-viewer:${NEW_VERSION} (the image's only registry; RELEASE gates nothing extra)"
+    elif [ "$RELEASE" = true ]; then
         LANES="GH Packages/PyPI (internal) + the public registry (Maven Central / PyPI) — published as bare ${NEW_VERSION}"
     else
         LANES="GH Packages/PyPI (internal) ONLY — not marked RELEASE, no public-registry step runs"
@@ -735,3 +744,13 @@ publish *args:
     git push origin "${NEW_TAG}"
     echo "✅ Pushed ${NEW_TAG} — the matching workflow will publish: ${LANES}"
     echo "   Watch it: gh run watch  (or the repo's Actions tab)"
+
+# ── Studio Viewer image ─────────────────────────────────────────────────────────
+
+# The base images are private GHCR mirrors, so `docker login ghcr.io` first:
+#   gh auth token | docker login ghcr.io -u <github-user> --password-stdin
+# Run it against a Veles on the host:
+#   docker run --rm -p 8080:8080 -e VIEWER_CATALOG_UPSTREAM=http://host.docker.internal:7260 ttr-viewer:dev
+# Build the Studio Viewer container image locally (ttr-core#169; CI: release-viewer.yml)
+viewer-image tag="ttr-viewer:dev":
+    docker build -f packages/designer/Dockerfile -t {{tag}} .

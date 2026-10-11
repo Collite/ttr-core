@@ -1,0 +1,11 @@
+# ttr: dialect=b lang=cs
+# Vstupy `orders` a `shortages`, výstupy `big` a `rest`.
+Načti orders.
+Spočítej missing jako počet řádků shortages.
+Připoj limits k výsledku.
+Spoj to s shortages přes item je shortages.item jako matched.
+Ponech jen řádky, kde amount je větší než 1000.
+Pošli to na výstup big.
+Načti orders jako o.
+Sluč to s shortages.
+Pošli výsledek na výstup rest.

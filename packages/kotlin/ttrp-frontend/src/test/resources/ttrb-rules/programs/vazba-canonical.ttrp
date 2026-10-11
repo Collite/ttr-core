@@ -1,0 +1,14 @@
+// Joins on a modelled relation, written by hand (inner and optional).
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container reklamovane(out seznam, out vse_reklamace) target erp {
+  o = load(objednávky)
+  r = load(reklamace)
+  rj = join(left: r, right: o, on: relation reklamace_objednavky, type: inner)
+  seznam = rj -> project(id, číslo_objednávky, částka)
+  vse_reklamace = join(left: r, right: o, on: relation reklamace_objednavky, type: left)
+}
+
+reklamovane.seznam -> display(seznam)
+reklamovane.vse_reklamace -> display(vse_reklamace)

@@ -1,0 +1,4 @@
+Load orders.
+If amount is more than 100:
+    Keep only the columns id, amount.
+  Show the result as big.

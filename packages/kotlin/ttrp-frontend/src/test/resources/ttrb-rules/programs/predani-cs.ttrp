@@ -1,0 +1,23 @@
+// In-ports as names + sentence outputs: the rule reads the ports `otevrene` / `reklam` (fed by another
+// island) and hands its results out through the declared OUT ports `velke` / `ostatni`.
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container priprava(out otevrene, out reklam) target erp {
+  otevrene = load(objednávky) -> filter(stav = "otevřená")
+  reklam = load(reklamace) -> select(id, číslo_objednávky)
+}
+
+container predani(in otevrene, in reklam, out velke, out ostatni) target erp """ttrb-cs
+Načti otevrene.
+Spočítej počet_reklamací jako počet řádků reklam.
+Když částka je větší než 1000:
+    Pošli to na výstup velke.
+Když částka není větší než 1000:
+    Pošli to na výstup ostatni.
+"""
+
+priprava.otevrene -> predani.otevrene
+priprava.reklam -> predani.reklam
+predani.velke -> display(velke)
+predani.ostatni -> display(ostatni)

@@ -218,10 +218,32 @@ data class LineageInput(
 @Serializable
 data class DisplayEntry(
     val name: String,
-    /** `out/<name>.<fmt>`. */
+    /**
+     * `out/<name>.<fmt>` — unique per entry: several entries may share an action display's [name] (one per
+     * source, in wiring order), and the k-th (k ≥ 2) writes `out/<name>~<k>.<fmt>`.
+     */
     val file: String,
-    /** AG-P0 — the island OUT port feeding this display (set for `sql-text` bundles only; else omitted). */
+    /**
+     * AG-P0 — the island OUT port feeding this display (set for `sql-text` bundles only; else omitted). An
+     * action display fed from a port that also feeds a differently-shaped display names the derived
+     * `<port>~<schema>` output holding its projected statement.
+     */
     val source: DisplaySource? = null,
+    /**
+     * Grammar 0.14 — an **action display**: the package-qualified `def schema` its rows were held to (omitted for
+     * an ordinary display). The source statement's columns are the schema's, in schema order.
+     */
+    val schema: String? = null,
+    /** The action display's declared columns (the schema's, in order); omitted for an ordinary display. */
+    val columns: List<DisplayColumn>? = null,
+)
+
+/** One declared column of an action display's row schema: name, TTR-M type spelling, optional (omitted ⇒ required). */
+@Serializable
+data class DisplayColumn(
+    val name: String,
+    val type: String,
+    val optional: Boolean? = null,
 )
 
 @Serializable

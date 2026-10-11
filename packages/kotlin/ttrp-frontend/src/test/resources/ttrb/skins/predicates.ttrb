@@ -1,0 +1,14 @@
+# ttr: dialect=b lang=en
+Load objednávky as o.
+Keep the rows where částka is more than 10 and částka is less than 500.
+Keep the rows where částka is not more than 400 or částka is not less than 20.
+Keep the rows where stav is "otevřená" and stav is not "zrušená".
+Keep the rows where poznámka is not empty.
+Remove the rows where oblast is empty.
+Keep the rows where oblast is one of ('S', 'J').
+Keep the rows where částka is between 1 and 9.
+Keep the rows where částka is bigger than 1 and částka is smaller than 900.
+Keep the rows where částka is not bigger than 800 and částka is not smaller than 2.
+Keep the rows where stav is equal to "otevřená" or stav is not equal to "x".
+Keep the rows where příznak is true or příznak is false.
+Summarize sum of částka as celkem, count of číslo as počet_kusů by oblast.

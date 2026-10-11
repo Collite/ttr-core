@@ -1,0 +1,11 @@
+# ttr: dialect=b lang=en
+Load objednávky.
+Count the rows of reklamace as počet_reklamací.
+Send an e-mail to email_zástupce with subject "Velká objednávka", template "velka_objednavka", key číslo and attachments faktura, dodací_list.
+Send an e-mail to department "obchod" with subject "Kontrola", template "kontrola" and key číslo.
+Send an e-mail to email_zástupce, otherwise department "obchod" with subject "Připomínka", template "pripominka", key číslo and attachment faktura.
+Set stav of objednávky with key číslo to "uvolněná" with reason "zaplaceno".
+Set poznámka of objednávky with key 42 to částka with reason "kopie částky".
+Create a manual task for vedoucí, otherwise department "sklad" "Zkontrolovat" with description "Zkontrolovat objednávku." and attachments faktura.
+Create a manual task for department "sklad" "Zkontrolovat" with description "Bez přílohy.".
+Attach limity to the result.

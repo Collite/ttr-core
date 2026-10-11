@@ -29,10 +29,12 @@ class TtrbEmbeddedGraphSpec :
                 NormalizedGraphJson.write(GraphFixtures.graphOf(src))
         }
 
-        "the decomposed hero roster is present (non-vacuous): Load×2, Join, Filter, Aggregate, Sort, Limit, Display" {
+        "the decomposed hero roster is present (non-vacuous): Load, Join, Filter, Aggregate, Sort, Limit, Display" {
             val norm = NormalizedGraphJson.write(GraphFixtures.graphOf(src))
+            // `Load accounts as accounts.` names the container's IN port — read as the port, never loaded (B7).
+            norm.contains("Load(source=accounts") shouldBe false
             listOf(
-                "accounts#1 = Load(source=accounts",
+                "region_totals.accounts -DATA-> joined#1.left",
                 "sales#1 = Load(source=data/sales.csv",
                 "Join(type=INNER, on=op.eq(col(account_id),col(right.account_id))",
                 "Filter(op.and(op.gt(col(amount)",

@@ -26,6 +26,7 @@ import org.tatrman.ttrp.parser.generated.TTRBParser as P
 class TtrbExpr(
     private val loc: TtrSqlLoc,
     private val catalog: FunctionCatalog,
+    private val skin: TtrbSkin = TtrbSkin.EN,
 ) {
     fun foldBool(
         ctx: P.BoolExprContext,
@@ -161,7 +162,7 @@ class TtrbExpr(
             is P.LitPrimaryContext -> literal(ctx.literal())
             is P.CallPrimaryContext -> functionCall(ctx.funcCall(), ap)
             is P.ColPrimaryContext -> columnRef(ctx.dottedRef(), ap)
-            is P.ParenPrimaryContext -> foldExpr(ctx.expr(), ap)
+            is P.ParenPrimaryContext -> foldBool(ctx.boolExpr(), ap)
             else -> error("unhandled primary: ${ctx::class.simpleName}")
         }
 
@@ -169,7 +170,7 @@ class TtrbExpr(
         ctx: P.FuncCallContext,
         ap: Map<String, String>,
     ): Expression {
-        val name = ctx.name.text.lowercase()
+        val name = skin.function(ctx.name.text).lowercase()
         val args = ctx.expr().map { foldExpr(it, ap) }
         val entries = catalog.resolve(name)
         val aggEntry = entries.firstOrNull { it.kind == FunctionKind.AGGREGATE }
@@ -181,11 +182,14 @@ class TtrbExpr(
         }
     }
 
+    /** A dotted column reference outside any join (`email_zástupce`, `t.col`) — the recipient column of an action. */
+    fun foldRef(ctx: P.DottedRefContext): ColumnRef = columnRef(ctx, emptyMap())
+
     private fun columnRef(
         ctx: P.DottedRefContext,
         ap: Map<String, String>,
     ): ColumnRef {
-        val parts = ctx.IDENT().map { it.text }
+        val parts = ctx.ident().map { it.text }
         return if (parts.size >= 2) {
             ColumnRef(port = ap[parts[parts.size - 2]], column = parts.last(), location = loc.of(ctx))
         } else {

@@ -1,0 +1,11 @@
+# ttr: dialect=b lang=en
+Load raw as base.
+Keep only the columns region, total.
+Keep all columns except internal_id.
+Take only the rows where region is one of ('N', 'S').
+Remove the rows where region is empty.
+Rename total to region_total.
+Convert region to string.
+Compute amount * 0.21 as vat.
+Combine that with archive_sales.
+Store that to file "out/totals.csv".

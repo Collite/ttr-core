@@ -1,0 +1,19 @@
+uses world "shop.worlds.host"
+import shop.prodej.*
+
+container priprava(out otevrene, out reklam) target erp {
+  otevrene = load(objednávky) -> filter(stav = "otevřená")
+  reklam = load(reklamace) -> select(id, číslo_objednávky)
+}
+
+container predani(in otevrene, in reklam, out velke, out ostatni) target erp {
+  pocet = reklam -> calc { počet_reklamací = 1 } -> aggregate { počet_reklamací = count(počet_reklamací) }
+  s_poctem = join(left: otevrene, right: pocet, type: cross)
+  velke = s_poctem -> filter(částka > 1000)
+  ostatni = s_poctem -> filter(částka <= 1000)
+}
+
+priprava.otevrene -> predani.otevrene
+priprava.reklam -> predani.reklam
+predani.velke -> display(velke)
+predani.ostatni -> display(ostatni)

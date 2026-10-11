@@ -14,7 +14,14 @@ import org.tatrman.ttrp.resolve.Provenance
 data class FragmentSource(
     val tag: String,
     val sourceText: String,
-)
+) {
+    /**
+     * True when the interior is ENGINE text an emitter may run as written (`"""sql`, `"""pandas`). A TTR-B
+     * interior (`"""ttrb`, `"""ttrb-cs`) is sentences, never engine text: its container emits from the
+     * decomposed members like a canonical body (AG B4).
+     */
+    val verbatim: Boolean get() = !(tag == "ttrb" || tag.startsWith("ttrb-"))
+}
 
 /**
  * A container (B-T9): a closed function grouping ops, no processing value, whose
@@ -43,6 +50,9 @@ data class Container(
     override val provenance: Provenance? = null,
 ) : Node {
     override fun ports(): List<Port> = declaredPorts
+
+    /** The fragment an emitter runs as written, or null — a TTR-B fragment emits from its members. */
+    val verbatimFragment: FragmentSource? get() = fragment?.takeIf { it.verbatim }
 
     override fun defaultIn(): String? = declaredPorts.firstOrNull { it.direction == PortDirection.IN }?.name
 

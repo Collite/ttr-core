@@ -76,7 +76,7 @@ function strListDoc(arr: string[], quoted: boolean): Doc {
 const BARE_IDENT = /^[A-Za-zÀ-ɏ_][A-Za-z0-9_À-ɏ]*$/;
 
 /**
- * Render `primaryKey` as the clean bare-id list (`[IDSTRED, KOD_STR]`) when every
+ * Render `primaryKey` as the clean bare-id list (`[ss_item_sk, ss_ticket_number]`) when every
  * key is a valid identifier (column names always are). Falls back to the quoted
  * form if any name isn't a bare identifier — the grammar forbids mixing strings
  * and ids in one list, so it's all-or-nothing.
@@ -192,6 +192,11 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
     case 'er2cncRole':
       add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
       add('entity', v(def.entity), def.entity); add('role', v(def.role), def.role);
+      break;
+    // 0.14 — a named row schema: the column list, formatted exactly like a view's.
+    case 'schema':
+      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('columns', defList(def.columns));
       break;
     case 'area':
       add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));

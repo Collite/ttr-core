@@ -1,0 +1,8 @@
+uses world "acme.worlds.dev"
+container blocks(out result) target erp_pg {
+  t = load(erp.accounts)
+  north_rows = t -> filter(region = "N")
+  north_accounts = north_rows -> project(account_id, region) -> display(north_accounts)
+  open_rows = north_rows -> filter(status = "open" or region = "N")
+  open_accounts = open_rows -> calc { twice = account_id * 2 } -> display(open_accounts)
+}

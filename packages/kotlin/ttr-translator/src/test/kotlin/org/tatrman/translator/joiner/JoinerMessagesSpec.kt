@@ -4,70 +4,70 @@ package org.tatrman.translator.joiner
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import org.tatrman.plan.v1.PlanNode
-import org.tatrman.translator.framework.DfpJoinModel
-import org.tatrman.translator.framework.DfpJoinModel.er
+import org.tatrman.translator.framework.HartlandJoinModel
+import org.tatrman.translator.framework.HartlandJoinModel.er
 import org.tatrman.translator.framework.ModelRelation
 
 /** MJ-P3·S1 — codes, severities and the exact texts of contracts §4, plus the two-carrier reconciliation. */
 class JoinerMessagesSpec :
     StringSpec({
-        val dmZ = DfpJoinModel.relations.first { it.toEntity == er("zákazník") }
-        val oz = DfpJoinModel.relations.filter { it.toEntity == er("uživatel") }
+        val shopperHousehold = HartlandJoinModel.relations.first { it.toEntity == er("household") }
+        val calendarHops = HartlandJoinModel.relations.filter { it.toEntity == er("calendar") }
 
         "JOIN_NO_RELATION — cz wording verbatim, WARNING; a multi-entity side is rendered as the list" {
-            val w = JoinerWarning.NoRelation(er("kumulovaný_prodej"), er("zákazník"))
+            val w = JoinerWarning.NoRelation(er("sale"), er("household"))
             JoinerMessages.code(w) shouldBe "JOIN_NO_RELATION"
             JoinerMessages.severity(w) shouldBe JoinerMessages.Severity.WARNING
             JoinerMessages.text(w) shouldBe
-                "no declared relation between entity.kumulovaný_prodej and entity.zákazník; Cartesian product preserved"
+                "no declared relation between entity.sale and entity.household; Cartesian product preserved"
             val chain =
                 JoinerWarning.NoRelation(
-                    er("kumulovaný_prodej"),
-                    er("uživatel"),
-                    leftEntities = listOf(er("kumulovaný_prodej"), er("dodací_místo")),
-                    rightEntities = listOf(er("uživatel")),
+                    er("sale"),
+                    er("calendar"),
+                    leftEntities = listOf(er("sale"), er("shopper")),
+                    rightEntities = listOf(er("calendar")),
                 )
             JoinerMessages.text(chain) shouldBe
-                "no declared relation between entity.kumulovaný_prodej, entity.dodací_místo and entity.uživatel; " +
+                "no declared relation between entity.sale, entity.shopper and entity.calendar; " +
                 "Cartesian product preserved"
         }
 
         "JOIN_NO_RELATION — an empty side is a derived table (review-097 R2)" {
             val w =
                 JoinerWarning.NoRelation(
-                    er("kumulovaný_prodej"),
+                    er("sale"),
                     org.tatrman.plan.v1.QualifiedName
                         .getDefaultInstance(),
-                    leftEntities = listOf(er("kumulovaný_prodej")),
+                    leftEntities = listOf(er("sale")),
                     rightEntities = emptyList(),
                 )
             JoinerMessages.text(w) shouldBe
-                "no declared relation between entity.kumulovaný_prodej and a derived table; Cartesian product preserved"
+                "no declared relation between entity.sale and a derived table; Cartesian product preserved"
         }
 
         "JOIN_AMBIGUOUS_RELATIONS — lists the candidates as from → to (pairs); write the ON" {
-            val w = JoinerWarning.AmbiguousRelations(er("dodací_místo"), er("uživatel"), oz)
+            val w = JoinerWarning.AmbiguousRelations(er("shopper"), er("calendar"), calendarHops)
             JoinerMessages.code(w) shouldBe "JOIN_AMBIGUOUS_RELATIONS"
             JoinerMessages.severity(w) shouldBe JoinerMessages.Severity.WARNING
             JoinerMessages.text(w) shouldBe
-                "2 relations could join entity.dodací_místo and entity.uživatel: " +
-                "dodací_místo → uživatel (obchodní_zástupce = id_uživatele), " +
-                "dodací_místo → uživatel (vedoucí_obchodního_týmu = id_uživatele); write the ON"
+                "2 relations could join entity.shopper and entity.calendar: " +
+                "shopper → calendar (first_purchase_date = date_id), " +
+                "shopper → calendar (first_shipment_date = date_id); write the ON"
         }
 
         "JOIN_AMBIGUOUS_RELATIONS with `repeated` — the appears-more-than-once text (⚑MJ-6)" {
             val w =
                 JoinerWarning.AmbiguousRelations(
-                    er("zákazník"),
-                    er("zákazník"),
+                    er("shopper"),
+                    er("shopper"),
                     emptyList(),
-                    repeated = setOf(er("zákazník")),
+                    repeated = setOf(er("shopper")),
                 )
-            JoinerMessages.text(w) shouldBe "entity entity.zákazník appears more than once in the join; write the ON"
+            JoinerMessages.text(w) shouldBe "entity entity.shopper appears more than once in the join; write the ON"
         }
 
         "JOIN_AMBIGUOUS_RELATIONS from the physical carrier (no relations, only FKs)" {
-            val w = JoinerWarning.AmbiguousRelations(DfpJoinModel.db("A"), DfpJoinModel.db("C"), emptyList())
+            val w = JoinerWarning.AmbiguousRelations(HartlandJoinModel.db("A"), HartlandJoinModel.db("C"), emptyList())
             JoinerMessages.text(w) shouldBe "more than one foreign key could join dbo.A and dbo.C; write the ON"
         }
 
@@ -82,23 +82,23 @@ class JoinerMessagesSpec :
         "JOIN_KEY_NAME_COLLISION — wire carrier only, names the key and the side" {
             val w =
                 JoinerWarning.KeyNameCollision(
-                    er("dodací_místo"),
-                    er("zákazník"),
-                    dmZ,
-                    "id_subjektu",
+                    er("shopper"),
+                    er("household"),
+                    shopperHousehold,
+                    "current_household",
                     JoinerWarning.Side.LEFT,
                 )
             JoinerMessages.code(w) shouldBe "JOIN_KEY_NAME_COLLISION"
             JoinerMessages.severity(w) shouldBe JoinerMessages.Severity.WARNING
             JoinerMessages.text(w) shouldBe
-                "join key id_subjektu exists on more than one entity of the left side; Cartesian product preserved — write the ON"
+                "join key current_household exists on more than one entity of the left side; Cartesian product preserved — write the ON"
         }
 
         // ---- JoinerWarnings.merge (one verdict per join) ----
 
         val plan = PlanNode.getDefaultInstance()
         val noRel = JoinerWarning.NoRelation(er("a"), er("b"))
-        val noFk = JoinerWarning.NoRelation(DfpJoinModel.db("A"), DfpJoinModel.db("B"))
+        val noFk = JoinerWarning.NoRelation(HartlandJoinModel.db("A"), HartlandJoinModel.db("B"))
         val withoutPairs =
             JoinerWarning.RelationWithoutJoinPairs(
                 er("a"),

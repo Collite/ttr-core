@@ -1,0 +1,8 @@
+package shop.alerts
+
+// A second package that also declares `notify` — importing both makes the name ambiguous.
+def schema notify {
+    columns: [
+        def column recipient { type: text },
+    ]
+}

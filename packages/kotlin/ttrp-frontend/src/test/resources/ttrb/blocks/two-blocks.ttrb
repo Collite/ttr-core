@@ -1,0 +1,10 @@
+# ttr: dialect=b lang=en
+# Two overlapping blocks over the same rows: a row with region "N" and status "open" lands in both.
+Load accounts as t.
+If region is "N":
+    Keep only the columns account_id, region.
+    Show the result as north_accounts.
+If status is "open" or region is "N":
+    Compute account_id * 2 as twice.
+    Show the result as open_accounts.
+Sort that by account_id.

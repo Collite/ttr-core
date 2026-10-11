@@ -386,34 +386,34 @@ class JoinerPhysicalSpec :
         }
 
         "a scan under an alias Project is found and the FK column is mapped THROUGH the projection" {
-            // Project(id_obchodního_kanálu := IDCENSKUP) over the body's Project(IDCENSKUP := IDCENSKUP) over the scan
-            // — the shape MAP_TO_PHYSICAL builds for a query-backed entity. The condition must name the outermost
-            // visible name on each side.
+            // Project(call_center := cs_call_center_sk) over the body's Project(cs_call_center_sk := cs_call_center_sk)
+            // over the scan — the shape MAP_TO_PHYSICAL builds for a query-backed entity. The condition must name the
+            // outermost visible name on each side.
             val fk =
                 ModelForeignKey(
-                    listOf(colQname("QXXPLANPRODEJU", "IDCENSKUP")),
-                    listOf(colQname("QCENSKUP_DF", "IDCENSKUP")),
+                    listOf(colQname("catalog_sales", "cs_call_center_sk")),
+                    listOf(colQname("call_center", "cc_call_center_sk")),
                 )
             val model = InMemoryModelHandle(tables = emptyList(), foreignKeys = listOf(fk))
             val left =
                 aliasProject(
                     aliasProject(
-                        dbScan(tableQname("QXXPLANPRODEJU")),
-                        "IDCENSKUP" to "IDCENSKUP",
-                        "HDCCENAKC" to "HDCCENAKC",
+                        dbScan(tableQname("catalog_sales")),
+                        "cs_call_center_sk" to "cs_call_center_sk",
+                        "cs_ext_sales_price" to "cs_ext_sales_price",
                     ),
-                    "IDCENSKUP" to "id_obchodního_kanálu",
-                    "HDCCENAKC" to "tržba",
+                    "cs_call_center_sk" to "call_center",
+                    "cs_ext_sales_price" to "revenue",
                 )
             val right =
                 aliasProject(
-                    dbScan(tableQname("QCENSKUP_DF")),
-                    "IDCENSKUP" to "id_obchodního_kanálu",
-                    "CEN_SKUP" to "kód",
+                    dbScan(tableQname("call_center")),
+                    "cc_call_center_sk" to "call_center",
+                    "cc_call_center_id" to "code",
                 )
             val result = JoinerPhysical.apply(unconditionedJoin(left, right), model)
             result.warnings.shouldBeEmpty()
-            eqNames(result.plan.join.condition) shouldBe ("id_obchodního_kanálu" to "id_obchodního_kanálu")
+            eqNames(result.plan.join.condition) shouldBe ("call_center" to "call_center")
         }
 
         "a projection that does NOT expose the FK column drops that FK: NoRelation, not a decode-time failure" {

@@ -15,7 +15,7 @@ import org.tatrman.translator.framework.FixtureModel
 
 /**
  * NX-A.S2 — correlated `[NOT] EXISTS` sub-queries decorrelate before encode so they no longer
- * crash the encoder (ai-models#27), and the resulting plan round-trips SQL → plan → MSSQL.
+ * crash the encoder, and the resulting plan round-trips SQL → plan → MSSQL.
  *
  * **What Calcite 1.41 actually produces (verified empirically, incl. `expand=true`):** correlated
  * `NOT EXISTS` lowers to `LEFT JOIN + Aggregate + IS NULL` (anti) and `EXISTS` to
@@ -25,8 +25,8 @@ import org.tatrman.translator.framework.FixtureModel
  * plan's original "native semi/anti → renders NOT EXISTS" DoD. The concrete bug — the encoder
  * throwing `RexNode kind 'RexFieldAccess' is not in the v1 wire format` — is what is fixed here.
  *
- * The **hero fixture** is the ai-models#27 shape expressed against the fixture model
- * (`QHDOK_DF`/`QHISHDOK_DF` on `IDHDOKP = IDHDOK` → `customers`/`orders` on `customer_id = id`).
+ * The **hero fixture** is the reported shape (a document correlated with its history table on the header
+ * key) expressed against the fixture model (`customers`/`orders` on `customer_id = id`).
  */
 class SubqueryTranslationSpec :
     StringSpec({
@@ -87,9 +87,9 @@ class SubqueryTranslationSpec :
             return found
         }
 
-        // ---- S2.1 hero: the exact ai-models#27 shape (correlated NOT EXISTS) ----
+        // ---- S2.1 hero: the reported failing shape (correlated NOT EXISTS) ----
 
-        "hero: correlated NOT EXISTS translates SQL->plan->MSSQL without crashing (ai-models#27)" {
+        "hero: correlated NOT EXISTS translates SQL->plan->MSSQL without crashing" {
             // Was: encoder threw `RexNode kind 'RexFieldAccess' is not in the v1 wire format`.
             val r =
                 translateMssql(

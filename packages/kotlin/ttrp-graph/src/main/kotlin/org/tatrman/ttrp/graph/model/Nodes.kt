@@ -342,13 +342,19 @@ data class Index(
     override fun ports() = unaryDataPorts()
 }
 
-/** Sink-only leaf (Q11): dynamic schema exception — its input port accepts any schema. */
+/**
+ * Sink-only leaf (Q11): dynamic schema exception — its input port accepts any schema. An **action display**
+ * ([schema] non-null — its name is a `def schema` row schema an import brings into scope, grammar 0.14) is the
+ * exception to the exception: the frontend held its rows to [schema] (TTRP-DSP-*), and the emitters project
+ * the rows to the schema's columns, in schema order. Several Display nodes may share an action display's name.
+ */
 data class Display(
     override val id: String,
     override val label: String,
     override val location: SourceLocation,
     val name: String,
     override val provenance: Provenance? = null,
+    val schema: org.tatrman.ttrp.resolve.DisplaySchema? = null,
 ) : Node {
     override fun ports() =
         listOf(Port(PortNames.IN, PortKind.DATA, PortDirection.IN, schema = null)) + PortNames.errorPorts()

@@ -1,0 +1,11 @@
+# ttr: dialect=b lang=cs
+Načti objednávky.
+Spočítej počet_reklamací jako počet řádků reklamace.
+Pošli e-mail email_zástupce s předmětem "Velká objednávka", šablonou "velka_objednavka", klíčem číslo a přílohami faktura, dodací_list.
+Pošli e-mail oddělení "obchod" s předmětem "Kontrola", šablonou "kontrola" a klíčem číslo.
+Pošli e-mail email_zástupce, jinak oddělení "obchod" s předmětem "Připomínka", šablonou "pripominka", klíčem číslo a přílohou faktura.
+Nastav stav objednávky s klíčem číslo na "uvolněná" s důvodem "zaplaceno".
+Nastav poznámka objednávky s klíčem 42 na částka s důvodem "kopie částky".
+Vytvoř ruční úkol pro vedoucí, jinak oddělení "sklad" "Zkontrolovat" s popisem "Zkontrolovat objednávku." a přílohami faktura.
+Vytvoř ruční úkol pro oddělení "sklad" "Zkontrolovat" s popisem "Bez přílohy.".
+Připoj limity k výsledku.

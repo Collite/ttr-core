@@ -1,0 +1,12 @@
+uses world "shop.worlds.host"
+import shop.prodej.*
+import shop.akce.*
+
+container sklad target erp """ttrb
+Load zásoby.
+Attach limity to the result.
+If množství is less than minimum_zásoby:
+    Create a manual task for vedoucí_skladu, otherwise department "sklad" "Doplnit zásobu" with description "Zásoba je pod minimem." and attachment skladová_karta.
+If množství is 0:
+    Send an e-mail to department "nákup" with subject "Vyprodáno", template "vyprodano" and key kód_zboží.
+"""

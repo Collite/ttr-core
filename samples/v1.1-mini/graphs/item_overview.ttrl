@@ -1,0 +1,12 @@
+ttrl 1
+
+canvas item_overview {
+    mode: manual
+    nodes: {
+        "billing.invoicing.er.entity.item": { x: 320, y: 200 }
+        "billing.invoicing.er.entity.store_return": { x: 620, y: 200 }
+        "billing.invoicing.er.relation.item_in_category": { x: 320, y: 420 }
+        "billing.invoicing.er.relation.item_in_class": { x: 320, y: 600 }
+        "billing.products.er.relation.class_in_category": { x: 580, y: 600 }
+    }
+}

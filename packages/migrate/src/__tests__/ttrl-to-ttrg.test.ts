@@ -30,17 +30,17 @@ describe('convertTtrlToTtrg', () => {
           er: { zoom: 2.0, panX: 5, panY: 15, displayMode: 'with-types' },
         },
         nodes: {
-          'db.dbo.QZBOZI_DF': { x: 100, y: 200 },
-          'er.entity.artikl': { x: 300, y: 400 },
+          'db.dbo.item': { x: 100, y: 200 },
+          'er.entity.item': { x: 300, y: 400 },
         },
       }),
       'utf-8'
     );
 
     const projectSymbols = [
-      { qname: 'db.dbo.QZBOZI_DF', schemaCode: 'db' },
-      { qname: 'er.entity.artikl', schemaCode: 'er' },
-      { qname: 'er.entity.produkt', schemaCode: 'er' },
+      { qname: 'db.dbo.item', schemaCode: 'db' },
+      { qname: 'er.entity.item', schemaCode: 'er' },
+      { qname: 'er.entity.category', schemaCode: 'er' },
     ];
 
     const ops = await convertTtrlToTtrg(ttrlPath, tmpDir, projectSymbols);
@@ -62,21 +62,21 @@ describe('convertTtrlToTtrg', () => {
           er: { zoom: 2.5, panX: 99, panY: 88, displayMode: 'with-constraints' },
         },
         nodes: {
-          'er.entity.artikl': { x: 420, y: 130 },
+          'er.entity.item': { x: 420, y: 130 },
         },
       }),
       'utf-8'
     );
 
     const projectSymbols = [
-      { qname: 'er.entity.artikl', schemaCode: 'er' },
+      { qname: 'er.entity.item', schemaCode: 'er' },
     ];
 
     const ops = await convertTtrlToTtrg(ttrlPath, tmpDir, projectSymbols);
     const erOp = ops.find(op => op.path.includes('_all_er.ttrg'));
     expect(erOp).toBeDefined();
     expect(erOp!.content).toContain('zoom: 2.5');
-    expect(erOp!.content).toContain('er.entity.artikl: { x: 420, y: 130 }');
+    expect(erOp!.content).toContain('er.entity.item: { x: 420, y: 130 }');
   });
 
   it('generated .ttrg parses cleanly', async () => {
@@ -90,14 +90,14 @@ describe('convertTtrlToTtrg', () => {
           er: { zoom: 1.0, panX: 0, panY: 0, displayMode: 'just-names' },
         },
         nodes: {
-          'er.entity.artikl': { x: 100, y: 200 },
+          'er.entity.item': { x: 100, y: 200 },
         },
       }),
       'utf-8'
     );
 
     const projectSymbols = [
-      { qname: 'er.entity.artikl', schemaCode: 'er' },
+      { qname: 'er.entity.item', schemaCode: 'er' },
     ];
 
     const { parseString } = await import('@tatrman/parser');

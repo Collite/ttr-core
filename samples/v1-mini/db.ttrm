@@ -1,112 +1,118 @@
 model db schema dbo
 
-def table QZBOZI_DF { description: "Evidence všech artiklů (zboží) a jejich vlastností",
-    primaryKey: ["IDZBOZI"],
+// A small slice of the Hartland demo database (TPC-DS shaped). `item` keeps its TPC-DS columns;
+// its category and class, which TPC-DS denormalises onto `item`, are normalised out into
+// `item_category` / `item_class`, and the store's market and division likewise into
+// `store_market` / `store_division` — two small hierarchies: item -> class -> category and
+// store -> market -> division.
+
+def table item { description: "Products (TPC-DS item) and their properties",
+    primaryKey: ["i_item_sk"],
     columns: [
-        def column IDZBOZI { type: int, isKey: true, description: "Unikátní identifikátor artiklu" },
-        def column KOD_ZBOZI { type: text, optional: true, indexed: true, description: "Unikátní kód artiklu" },
-        def column NAZEV_ZBOZI { type: text, optional: true, description: "Obchodní název artiklu" },
-        def column IDSKUPZBOZI { type: int, optional: true, indexed: true, description: "FK na nadřazený produkt" },
-        def column IDXXPODSKUPZBOZI { type: int, optional: true, indexed: true, description: "FK na nadřazený podprodukt" },
-        def column VLPLATI { type: int, optional: true, description: "Příznak platnosti (0 = neaktivní, 1 = aktivní)" }
+        def column i_item_sk { type: int, isKey: true, description: "Unique item identifier" },
+        def column i_item_id { type: text, optional: true, indexed: true, description: "Unique item code" },
+        def column i_product_name { type: text, optional: true, description: "Product name" },
+        def column i_category_id { type: int, optional: true, indexed: true, description: "FK to the parent category" },
+        def column i_class_id { type: int, optional: true, indexed: true, description: "FK to the parent class" },
+        def column i_manufact_id { type: int, optional: true, description: "Manufacturer identifier" }
     ],
     indices: [
-        def index IX_QZBOZI_KOD { columns: ["KOD_ZBOZI"] },
-        def index IX_QZBOZI_SKUPINA_PODSKUPINA { columns: ["IDSKUPZBOZI", "IDXXPODSKUPZBOZI"] }
+        def index ix_item_id { columns: ["i_item_id"] },
+        def index ix_item_category_class { columns: ["i_category_id", "i_class_id"] }
     ],
     constraints: [
-        def constraint UQ_QZBOZI_KOD { type: unique, columns: ["KOD_ZBOZI"] }
+        def constraint uq_item_id { type: unique, columns: ["i_item_id"] }
     ]
 }
 
-def table QSKUPZBOZI_DF { description: "Evidence produktů a jejich vlastností",
-    primaryKey: ["IDSKUPZBOZI"],
+def table item_category { description: "Product categories",
+    primaryKey: ["i_category_id"],
     columns: [
-        def column IDSKUPZBOZI { type: int, isKey: true, description: "Unikátní identifikátor produktu" },
-        def column KOD_SKUPZBOZI { type: text, optional: true, indexed: true, description: "Unikátní kód produktu" },
-        def column NAZEV_SKUPZBOZI { type: text, optional: true, description: "Obchodní název produktu" }
+        def column i_category_id { type: int, isKey: true, description: "Unique category identifier" },
+        def column i_category_code { type: text, optional: true, indexed: true, description: "Unique category code" },
+        def column i_category { type: text, optional: true, description: "Category name" }
     ],
     indices: [
-        def index IX_QSKUPZBOZI_KOD { columns: ["KOD_SKUPZBOZI"] }
+        def index ix_item_category_code { columns: ["i_category_code"] }
     ],
     constraints: [
-        def constraint UQ_QSKUPZBOZI_KOD { type: unique, columns: ["KOD_SKUPZBOZI"] }
+        def constraint uq_item_category_code { type: unique, columns: ["i_category_code"] }
     ]
 }
 
-def table QXXPODSKUPZBOZI { description: "Evidence podproduktů a jejich vlastností",
-    primaryKey: ["IDXXPODSKUPZBOZI"],
+def table item_class { description: "Product classes within a category",
+    primaryKey: ["i_class_id"],
     columns: [
-        def column IDXXPODSKUPZBOZI { type: int, isKey: true, description: "Unikátní identifikátor podproduktu" },
-        def column KOD_PODSKUPZBOZI { type: text, optional: true, indexed: true, description: "Unikátní kód podproduktu" },
-        def column NAZEV_PODSKUPZBOZI { type: text, optional: true, description: "Obchodní název podproduktu" },
-        def column IDSKUPZBOZI { type: int, optional: true, indexed: true, description: "FK na nadřazený produkt" }
+        def column i_class_id { type: int, isKey: true, description: "Unique class identifier" },
+        def column i_class_code { type: text, optional: true, indexed: true, description: "Unique class code" },
+        def column i_class { type: text, optional: true, description: "Class name" },
+        def column i_category_id { type: int, optional: true, indexed: true, description: "FK to the parent category" }
     ],
     indices: [
-        def index IX_QXXPODSKUPZBOZI_KOD { columns: ["KOD_PODSKUPZBOZI"] }
+        def index ix_item_class_code { columns: ["i_class_code"] }
     ]
 }
 
-def table QCENSKUP_DF { description: "Evidence obchodních kanálů a jejich vlastností",
-    primaryKey: ["IDCENSKUP"],
+def table store_market { description: "Store markets",
+    primaryKey: ["s_market_id"],
     columns: [
-        def column IDCENSKUP { type: int, isKey: true, description: "Unikátní identifikátor obchodního kanálu" },
-        def column KOD_CENSKUP { type: text, optional: true, indexed: true, description: "Unikátní kód obchodního kanálu" },
-        def column NAZEV_CENSKUP { type: text, optional: true, description: "Název obchodního kanálu" },
-        def column IDSKUPZNACZBOZI { type: int, optional: true, indexed: true, description: "FK na tržní skupinu" }
+        def column s_market_id { type: int, isKey: true, description: "Unique market identifier" },
+        def column s_market_code { type: text, optional: true, indexed: true, description: "Unique market code" },
+        def column s_market_desc { type: text, optional: true, description: "Market name" },
+        def column s_division_id { type: int, optional: true, indexed: true, description: "FK to the division" }
     ],
     indices: [
-        def index IX_QCENSKUP_KOD { columns: ["KOD_CENSKUP"] }
+        def index ix_store_market_code { columns: ["s_market_code"] }
     ],
     constraints: [
-        def constraint UQ_QCENSKUP_KOD { type: unique, columns: ["KOD_CENSKUP"] }
+        def constraint uq_store_market_code { type: unique, columns: ["s_market_code"] }
     ]
 }
 
-def table QSKUPZNACZBOZI_DF { description: "Evidence tržních skupin a jejich vlastností",
-    primaryKey: ["IDSKUPZNACZBOZI"],
+def table store_division { description: "Divisions the markets belong to",
+    primaryKey: ["s_division_id"],
     columns: [
-        def column IDSKUPZNACZBOZI { type: int, isKey: true, description: "Unikátní identifikátor tržní skupiny" },
-        def column KOD_SKUPZNACZBOZI { type: text, optional: true, indexed: true, description: "Unikátní kód tržní skupiny" },
-        def column NAZEV_SKUPZNACZBOZI { type: text, optional: true, description: "Název tržní skupiny" }
+        def column s_division_id { type: int, isKey: true, description: "Unique division identifier" },
+        def column s_division_code { type: text, optional: true, indexed: true, description: "Unique division code" },
+        def column s_division_name { type: text, optional: true, description: "Division name" }
     ],
     indices: [
-        def index IX_QSKUPZNACZBOZI_KOD { columns: ["KOD_SKUPZNACZBOZI"] }
+        def index ix_store_division_code { columns: ["s_division_code"] }
     ]
 }
 
-def table QSUBJEKT { description: "Evidence zákazníků (subjektů) a jejich vlastností",
-    primaryKey: ["IDSUBJEKT"],
+def table store { description: "Stores (TPC-DS store) and their properties",
+    primaryKey: ["s_store_sk"],
     columns: [
-        def column IDSUBJEKT { type: int, isKey: true, description: "Unikátní identifikátor subjektu" },
-        def column ICO { type: text, optional: true, indexed: true, description: "IČO subjektu" },
-        def column NAZEV_SUBJEKT { type: text, optional: true, description: "Obchodní název subjektu" },
-        def column IDCENSKUP { type: int, optional: true, indexed: true, description: "FK na obchodní kanál" }
+        def column s_store_sk { type: int, isKey: true, description: "Unique store identifier" },
+        def column s_store_id { type: text, optional: true, indexed: true, description: "Store code" },
+        def column s_store_name { type: text, optional: true, description: "Store name" },
+        def column s_market_id { type: int, optional: true, indexed: true, description: "FK to the market" }
     ],
     indices: [
-        def index IX_QSUBJEKT_ICO { columns: ["ICO"] }
+        def index ix_store_id { columns: ["s_store_id"] }
     ],
     constraints: [
-        def constraint UQ_QSUBJEKT_ICO { type: unique, columns: ["ICO"] }
+        def constraint uq_store_id { type: unique, columns: ["s_store_id"] }
     ]
 }
 
-def fk fk_artikl_produkt { description: "Artikl odkazuje na nadřazený produkt",
-    from: [db.dbo.table.QZBOZI_DF.IDSKUPZBOZI], to: [db.dbo.table.QSKUPZBOZI_DF.IDSKUPZBOZI]
+def fk fk_item_category { description: "An item references its parent category",
+    from: [db.dbo.table.item.i_category_id], to: [db.dbo.table.item_category.i_category_id]
 }
 
-def fk fk_artikl_podprodukt { description: "Artikl odkazuje na nadřazený podprodukt",
-    from: [db.dbo.table.QZBOZI_DF.IDXXPODSKUPZBOZI], to: [db.dbo.table.QXXPODSKUPZBOZI.IDXXPODSKUPZBOZI]
+def fk fk_item_class { description: "An item references its parent class",
+    from: [db.dbo.table.item.i_class_id], to: [db.dbo.table.item_class.i_class_id]
 }
 
-def fk fk_podprodukt_produkt { description: "Podprodukt odkazuje na nadřazený produkt",
-    from: [db.dbo.table.QXXPODSKUPZBOZI.IDSKUPZBOZI], to: [db.dbo.table.QSKUPZBOZI_DF.IDSKUPZBOZI]
+def fk fk_class_category { description: "A class references its parent category",
+    from: [db.dbo.table.item_class.i_category_id], to: [db.dbo.table.item_category.i_category_id]
 }
 
-def fk fk_kanál_tržní_skupina { description: "Obchodní kanál odkazuje na tržní skupinu",
-    from: [db.dbo.table.QCENSKUP_DF.IDSKUPZNACZBOZI], to: [db.dbo.table.QSKUPZNACZBOZI_DF.IDSKUPZNACZBOZI]
+def fk fk_market_division { description: "A market references its division",
+    from: [db.dbo.table.store_market.s_division_id], to: [db.dbo.table.store_division.s_division_id]
 }
 
-def fk fk_subjekt_kanál { description: "Subjekt odkazuje na obchodní kanál",
-    from: [db.dbo.table.QSUBJEKT.IDCENSKUP], to: [db.dbo.table.QCENSKUP_DF.IDCENSKUP]
+def fk fk_store_market { description: "A store references its market",
+    from: [db.dbo.table.store.s_market_id], to: [db.dbo.table.store_market.s_market_id]
 }

@@ -54,20 +54,23 @@ class TtrpTextDocumentService(
 
     private companion object {
         const val TTRP_LANGUAGE_ID = "ttrp"
+
+        fun analysed(languageId: String): Boolean =
+            languageId == TTRP_LANGUAGE_ID || languageId in AnalysisEngine.TTRB_LANGUAGES
     }
 
     override fun didOpen(params: DidOpenTextDocumentParams) {
         val d = params.textDocument
         docs.open(d.uri, d.text, d.version, d.languageId)
-        // Only .ttrp is TTR-P; fragment/TTR-B languages (ttr-sql/ttr-pandas/ttrb) share this
-        // server for sync but must not be parsed as TTR-P (they'd light up with bogus TTRP-* diagnostics).
-        if (d.languageId == TTRP_LANGUAGE_ID) scheduler.schedule(d.uri)
+        // .ttrp is TTR-P; bare TTR-B (ttrb / ttrb-cs) is checked as a bare program or sentence by
+        // sentence (AG B6). ttr-sql / ttr-pandas share this server for sync only.
+        if (analysed(d.languageId)) scheduler.schedule(d.uri)
     }
 
     override fun didChange(params: DidChangeTextDocumentParams) {
         val id = params.textDocument
         val updated = docs.change(id.uri, id.version, params.contentChanges)
-        if (updated != null && updated.languageId == TTRP_LANGUAGE_ID) scheduler.schedule(id.uri)
+        if (updated != null && analysed(updated.languageId)) scheduler.schedule(id.uri)
     }
 
     override fun didClose(params: DidCloseTextDocumentParams) {
@@ -124,6 +127,16 @@ class TtrpTextDocumentService(
         CompletableFuture.supplyAsync {
             val doc = docs.get(params.textDocument.uri) ?: return@supplyAsync emptyLocations()
             val analysis = engine.analyze(doc)
+            // AG B5: on a `from "<file>"` clause, definition opens the fragment file.
+            org.tatrman.ttrp.lsp.nav.FragmentLinks
+                .of(params.textDocument.uri, analysis.report.document)
+                .firstOrNull {
+                    org.tatrman.ttrp.lsp.nav.SourceNav
+                        .contains(it.clause, params.position)
+                }?.let { link ->
+                    val start = Position(0, 0)
+                    return@supplyAsync Either.forLeft(mutableListOf(Location(link.target, Range(start, start))))
+                }
             val loc = definitionService.define(params.textDocument.uri, analysis.report.document, params.position)
             if (loc == null) emptyLocations() else Either.forLeft(mutableListOf(loc))
         }
@@ -153,6 +166,25 @@ class TtrpTextDocumentService(
                 params.position,
                 params.newName,
             ) ?: WorkspaceEdit(emptyList())
+        }
+
+    /** AG B5: one link per `container … from "<file>"` clause, targeting the fragment file. */
+    override fun documentLink(
+        params: org.eclipse.lsp4j.DocumentLinkParams,
+    ): CompletableFuture<MutableList<org.eclipse.lsp4j.DocumentLink>> =
+        CompletableFuture.supplyAsync {
+            val doc = docs.get(params.textDocument.uri) ?: return@supplyAsync mutableListOf()
+            if (doc.languageId != TTRP_LANGUAGE_ID) return@supplyAsync mutableListOf()
+            val analysis = engine.analyze(doc)
+            org.tatrman.ttrp.lsp.nav.FragmentLinks
+                .of(doc.uri, analysis.report.document)
+                .map {
+                    org.eclipse.lsp4j.DocumentLink(
+                        org.tatrman.ttrp.lsp.analysis.DiagnosticMapping
+                            .rangeOf(it.clause),
+                        it.target,
+                    )
+                }.toMutableList()
         }
 
     private fun emptyLocations(): Either<MutableList<out Location>, MutableList<out LocationLink>> =

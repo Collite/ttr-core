@@ -33,6 +33,12 @@ data class Model(
      * the concrete package set it must pull from the metadata service.
      */
     val areas: Map<String, AreaRecord> = emptyMap(),
+    /**
+     * Grammar 0.14 — named row schemas loaded from `def schema` blocks, keyed by their
+     * package-qualified name (`shop.actions.notify`). Not model objects (no tier / qname — the
+     * `areas` precedent): TTR-P reads them to hold `display(<name>)` rows to a declared shape.
+     */
+    val rowSchemas: Map<String, RowSchemaRecord> = emptyMap(),
 ) {
     /** Resolve a subject area by its bare name, or null if unknown. */
     fun areaByName(name: String): AreaRecord? = areas[name]
@@ -63,6 +69,40 @@ data class AreaRecord(
     val descriptionLocalized: LocalizedText = LocalizedText.EMPTY,
     val tags: List<String>,
     val packages: List<String>,
+)
+
+/**
+ * Grammar 0.14 — a `def schema` block: a named, ordered row shape. [pkg] is the declaring file's
+ * package (its `package` directive, else the directory-computed one); [sourceFile] lets a consumer
+ * scope it by import the way it scopes entities. Each column keeps its TTR-M type name and, from the structured
+ * form, its length / precision ([RowSchemaColumn]).
+ */
+data class RowSchemaRecord(
+    val name: String,
+    val pkg: String,
+    val sourceFile: String,
+    val columns: List<RowSchemaColumn>,
+    val description: String = "",
+    /** NLS-P10 — the localised `description: { … }` form; empty when the plain form was authored. */
+    val descriptionLocalized: LocalizedText = LocalizedText.EMPTY,
+    val tags: List<String> = emptyList(),
+) {
+    /** The package-qualified name (`shop.actions.notify`), or the bare name for a package-less file. */
+    val qualifiedName: String get() = if (pkg.isBlank()) name else "$pkg.$name"
+}
+
+/**
+ * One column of a [RowSchemaRecord]: name, TTR-M type name ([type] — `text`, `decimal`, `bigint`, …), whether it
+ * may be omitted, and the structured type form's [length] / [precision] (`{ type: decimal, length: 19,
+ * precision: 2 }` — for a decimal: precision and scale; null when the column writes a bare type name).
+ */
+data class RowSchemaColumn(
+    val name: String,
+    val type: String,
+    val optional: Boolean = false,
+    val description: String = "",
+    val length: Int? = null,
+    val precision: Int? = null,
 )
 
 /** Descriptive identity of a model bundle. */

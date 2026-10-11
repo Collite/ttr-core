@@ -82,6 +82,7 @@ export type {
   GraphBlock,
   GraphLayout,
   AreaDef,
+  SchemaDef,
   MdDomainDef,
   RestrictClause,
   RangeLiteral,

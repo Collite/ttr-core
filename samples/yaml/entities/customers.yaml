@@ -1,0 +1,90 @@
+# Sample of the YAML entity format over the Hartland demo database (TPC-DS), hartland_us world.
+# Customers and their addresses.
+entities:
+
+  customer:
+    table: "customer"
+    entity_type: master
+    aliases: ["buyer", "shopper", "customers"]
+    label_plural: "Customers"
+    code_column: "customer_id"
+    description: |
+      Customers — the channel-overlap and demographic analyses key off this entity.
+      ⚠ This entity holds no customer name — find a customer by code or by address.
+    columns:
+      - name: "sk"
+        column: "c_customer_sk"
+        type: "int"
+        primary_key: true
+        description: "Sequence key. Internal primary key only."
+
+      - name: "customer_id"
+        label: "Customer"
+        column: "c_customer_id"
+        type: "char(16)"
+        description: "Unique customer identifier (code) — 16 capital letters A-P"
+        searchable: true
+        search_hint: "Customer codes are matched exactly. Example: WHERE c_customer_id = 'AAAAAAAABAAAAAAA'"
+
+      - name: "addr"
+        column: "c_current_addr_sk"
+        type: "int"
+        description: "Current address — FK to the 'sk' attribute of the customer_address entity"
+
+      - name: "birth_year"
+        column: "c_birth_year"
+        type: "int"
+        description: "Customer's year of birth — age is derived in the query (YEAR(GETDATE()) - c_birth_year)"
+
+  customer_address:
+    table: "customer_address"
+    entity_type: master
+    aliases: ["address", "home address"]
+    label_plural: "Customer Addresses"
+    name_column: "city"
+    code_column: "address_id"
+    description: "Customer addresses — both current addresses and the billing addresses used on orders."
+    columns:
+      - name: "sk"
+        column: "ca_address_sk"
+        type: "int"
+        primary_key: true
+        description: "Sequence key. Internal primary key only."
+
+      - name: "address_id"
+        column: "ca_address_id"
+        type: "char(16)"
+        description: "Unique address identifier (code)"
+
+      - name: "city"
+        label: "City"
+        column: "ca_city"
+        type: "varchar(60)"
+        description: "City of the address"
+        searchable: true
+        search_hint: "Case-insensitive match on the city. Example: WHERE ca_city COLLATE Latin1_General_CI_AI LIKE '%fairview%'"
+
+      - name: "county"
+        column: "ca_county"
+        type: "varchar(30)"
+        description: "County of the address"
+
+      - name: "state"
+        column: "ca_state"
+        type: "char(2)"
+        description: |
+          Two-letter US state code of the address, e.g.:
+          TN = Tennessee
+          TX = Texas
+          OH = Ohio
+          NV = Nevada
+
+relationships:
+
+  customer_current_address:
+    from: "customer"
+    to: "customer_address"
+    type: "many-to-one"
+    join: "customer.c_current_addr_sk = customer_address.ca_address_sk"
+    description: "A customer has a current address"
+    note: "The current address can differ from the billing address on an order (relationship catalog_order_bill_address)."

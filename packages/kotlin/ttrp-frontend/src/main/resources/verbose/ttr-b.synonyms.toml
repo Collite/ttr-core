@@ -3,6 +3,9 @@
 # grammar (TTRB.g4 `comparator` + predicate forms) IS this closed set, this file is the
 # single source the drift spec pins and Stage 7.2's grammarSummary renders. NEVER fuzzy (P2).
 #
+# The Czech skin (roster.cs.yaml) spells the SAME token sequences (`je větší než` = IS BIGGER
+# THAN, `není` = IS NOT, …) — this table lists the English spellings.
+#
 # The two drafting `CHECK` rows resolved against the S16 shared table (TTRP.g4 lexer):
 #   inequality spelling = `<>` (NEQ); `between … and …` = canonical `between` (predicate).
 
@@ -17,19 +20,19 @@ verbose   = ["is less than", "is fewer than", "is lower than", "is smaller than"
 canonical = "<"
 
 [[entry]]
-verbose   = ["is not more than", "comes not after"]
+verbose   = ["is not more than", "is not bigger than", "is not larger than", "is not higher than", "comes not after"]
 canonical = "<="
 
 [[entry]]
-verbose   = ["is not less than", "comes not before"]
+verbose   = ["is not less than", "is not fewer than", "is not lower than", "is not smaller than", "comes not before"]
 canonical = ">="
 
 [[entry]]
-verbose   = ["is", "is equal to", "equals", "is the same as"]
+verbose   = ["is", "is equal to", "is equal", "equals", "is the same as", "is same as"]
 canonical = "="
 
 [[entry]]
-verbose   = ["is not", "is not equal to", "does not equal"]
+verbose   = ["is not", "is not equal to", "is not equal", "does not equal"]
 canonical = "<>"
 
 [[entry]]

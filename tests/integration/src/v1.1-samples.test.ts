@@ -116,35 +116,18 @@ describe('v1.1 samples resolve cleanly', () => {
     }
   });
 
-  describe('v1.1-metadata (carries pre-existing primary-key issues — documented)', () => {
-    // The original v1-metadata sample already emits ttr/primary-key-column-not-found
-    // (98 there; 49 survive into the partial v1.1 migration). These are a sample
-    // data-quality artifact, NOT a v1.1 migration defect, so they are the only
-    // error code tolerated here.
-    const ALLOWED = new Set(['ttr/primary-key-column-not-found']);
-    const knownMissingPKs = [
-      'billing.er.entity.dobropis_složka', 'billing.er.entity.faktura_složka',
-      'billing.er.entity.platnost_dm_v_tdm', 'billing.er.entity.podprodukt_návštěvy_zákazníka',
-      'billing.er.entity.prodeje', 'billing.er.entity.produkt_návštěvy_zákazníka',
-      'billing.er.entity.reklamace_složka', 'billing.er.entity.vratka_složka',
-      'billing.er.entity.výtěžnost_regálu', 'billing.er.entity.výtěžnost_regálu_kanál',
-      'billing.er.entity.zakázka_složka', 'billing.er.entity.úkol_návštěvy_zákazníka',
-      'billing.er.entity.účet_účetní_osnovy',
-    ];
-
+  describe('v1.1-metadata', () => {
     let state: SampleState;
     beforeAll(async () => { state = await loadSample(metadataDir); });
 
-    it('every .ttrm resolves with no errors other than the documented pre-existing PK issues', () => {
-      const unexpected = Object.keys(state.errorCodes).filter(c => !ALLOWED.has(c));
-      expect(unexpected, `unexpected error codes: ${JSON.stringify(state.errorCodes)}`).toEqual([]);
+    it('every .ttrm resolves with zero error diagnostics', () => {
+      expect(state.errorCodes, `unexpected errors: ${JSON.stringify(state.errorCodes)}`).toEqual({});
     });
 
     for (const graphName of walkGraphs(metadataDir).map(g => path.basename(g))) {
-      it(`${graphName} opens with no unexpected missingObjects`, () => {
+      it(`${graphName} opens with missingObjects === [] and nodes.length > 0`, () => {
         const r = state.graphs[graphName];
-        const unexpected = r.missingObjects.filter(q => !knownMissingPKs.includes(q));
-        expect(unexpected, `${graphName} unexpected missing: ${unexpected.join(', ')}`).toEqual([]);
+        expect(r.missingObjects, `${graphName} missing: ${r.missingObjects.join(', ')}`).toEqual([]);
         expect(r.nodes.length).toBeGreaterThan(0);
       });
     }

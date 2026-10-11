@@ -65,6 +65,7 @@ import {
   ImportDeclContext,
   GraphBlockContext,
   AreaDefContext,
+  SchemaDefContext,
   WorldDefContext,
   EngineDefContext,
   ExecutorDefContext,
@@ -166,6 +167,7 @@ import type {
   GraphBlock,
   GraphLayout,
   AreaDef,
+  SchemaDef,
   MdDomainDef,
   RestrictClause,
   RangeLiteral,
@@ -1298,6 +1300,7 @@ function walkDefinition(ctx: DefinitionContext, file: string, errors: ParseError
   if (objDef.ER2CNC_ROLE()) return walkEr2cncRoleDef(objDef.er2cncRoleDef()!, name, source, file);
   if (objDef.DRILL_MAP()) return walkDrillMapDef(objDef.drillMapDef()!, name, source, file);
   if (objDef.AREA()) return walkAreaDef(objDef.areaDef()!, name, source, file);
+  if (objDef.SCHEMA()) return walkSchemaDef(objDef.schemaDef()!, name, source, file, errors);
   if (objDef.WORLD()) return walkWorldDef(objDef.worldDef()!, name, source, file);
   // v3.1 MD logical kinds
   if (objDef.DOMAIN()) return walkMdDomainDef(objDef.mdDomainDef()!, name, source, file);
@@ -1564,7 +1567,7 @@ function walkListOfIds(ctx: ListOfIdsContext, _file: string): string[] {
 
 /**
  * `primaryKey` accepts a quoted-string list (legacy), a bare-id list, or a
- * single bare id (`primaryKey: IDSTRED`). All three collapse to the column-name
+ * single bare id (`primaryKey: i_item_sk`). All three collapse to the column-name
  * `string[]` — the AST doesn't distinguish the surface form (the formatter
  * re-emits the bare form when each name is a valid identifier).
  */
@@ -1740,6 +1743,35 @@ function walkViewDef(
   }
 
   return { kind: 'view', name, source, description, descriptionLocalized, tags, columns, definitionSql, search };
+}
+
+/** Grammar 0.14 — `def schema <name> { description?, tags?, columns: [...] }` (a named row schema). */
+function walkSchemaDef(
+  ctx: SchemaDefContext,
+  name: string,
+  source: SourceLocation,
+  file: string,
+  errors: ParseError[]
+): SchemaDef {
+  let description: StringValue | TripleStringValue | undefined;
+  let descriptionLocalized: LocalizedString | undefined;
+  let tags: string[] | undefined;
+  let columns: ColumnDef[] | undefined;
+
+  for (const p of ctx.schemaProperty()) {
+    if (p.descriptionProperty()) {
+      description = descriptionOf(p.descriptionProperty()!, file);
+      descriptionLocalized = descriptionLocalizedOf(p.descriptionProperty()!, file);
+    }
+    if (p.tagsProperty()) {
+      tags = walkListOfStrings(p.tagsProperty()!.listOfStrings()!, file);
+    }
+    if (p.columnsProperty()) {
+      columns = walkColumnDefList(p.columnsProperty()!.columnDefList()!, file, errors);
+    }
+  }
+
+  return { kind: 'schema', name, source, description, descriptionLocalized, tags, columns };
 }
 
 function walkColumnDef(

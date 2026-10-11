@@ -1,3 +1,3 @@
 model er
 
-def attribute id_produktu { type: int, binding: IDSKUPZBOZI }
+def attribute category_id { type: int, binding: i_category_id }

@@ -1,0 +1,17 @@
+package shop.orders
+def table ORD_HEAD { description: "Order header", primaryKey: ["ORDER_ID"],
+    columns: [
+        def column ORDER_ID { type: int, isKey: true, },
+        def column CUSTOMER_ID { type: int, optional: true, },
+        def column AMOUNT { type: decimal, optional: true, },
+        def column DUE_DATE { type: date, optional: true, },
+        def column STATUS { type: int, optional: true, },
+    ]
+}
+def table CUST { description: "Customer", primaryKey: ["CUSTOMER_ID"],
+    columns: [
+        def column CUSTOMER_ID { type: int, isKey: true, },
+        def column EMAIL { type: text, optional: true, },
+        def column FULL_NAME { type: text, optional: true, },
+    ]
+}

@@ -75,7 +75,7 @@ object TransDslCodec {
         query: Query,
         queryRefs: Map<String, PlanNode>? = null,
     ): PlanNode {
-        // Phase 08 B3 / DF-DSL03 — multi-core Cartesian guard. A TransDSL Query with multiple
+        // Phase 08 B3 — multi-core Cartesian guard. A TransDSL Query with multiple
         // cores joins them left-deep with no condition (`parseSources` builds the Cartesian);
         // pre-B3, the user got a silently-huge cross-product if they forgot to provide a
         // connecting filter. B0 chose option (b) — enforce join conditions in the codec /

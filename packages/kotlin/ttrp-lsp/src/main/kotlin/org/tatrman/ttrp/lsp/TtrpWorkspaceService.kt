@@ -27,10 +27,29 @@ class TtrpWorkspaceService(
             params.changes.any { c ->
                 c.uri.endsWith(".ttrm") || c.uri.endsWith(".ttrg") || c.uri.endsWith(".toml")
             }
+        // AG B5: a fragment file (`container … from "<file>"`) changed on disk — re-analyze the open
+        // programs (their cached analyses read the old file); the model snapshots stay.
+        val touchesFragment =
+            params.changes.any { c ->
+                FRAGMENT_SUFFIXES.any { c.uri.endsWith(it) }
+            }
+        if (touchesFragment && !touchesModel) {
+            for (uri in docs.openUris()) {
+                if (docs.get(uri)?.languageId == "ttrp") {
+                    engine.evict(uri)
+                    scheduler.schedule(uri)
+                }
+            }
+            return
+        }
         if (!touchesModel) return
         engine.invalidateAll()
         for (uri in docs.openUris()) {
             if (docs.get(uri)?.languageId == "ttrp") scheduler.schedule(uri)
         }
+    }
+
+    private companion object {
+        val FRAGMENT_SUFFIXES = listOf(".ttrb", ".ttrb-cs", ".ttr.sql", ".ttr.py")
     }
 }

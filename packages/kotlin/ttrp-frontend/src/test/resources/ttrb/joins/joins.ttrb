@@ -1,0 +1,11 @@
+# ttr: dialect=b lang=en
+Load orders as o.
+Load stock as sk.
+Join o optionally with sk on item is sk.item and sk.qty is not empty as all_orders.
+Keep only the rows that have a match in sk on item is sk.item.
+Keep only the rows that have no match in returns on item is returns.item.
+Remove the rows that have a match in blocked on item is blocked.item.
+Show the result as checked.
+Join o with sk on relation order_stock as linked.
+Show the result as linked_view.
+Join o optionally with sk on relation order_stock as maybe_linked.

@@ -51,51 +51,51 @@ class InlineMappingExportSpec :
                 name = name,
             )
 
-        // ----- shared fixture: artikl (entity-level block) + produkt (per-attribute) + relation -----
+        // ----- shared fixture: item (entity-level block) + category (per-attribute) + relation -----
 
-        val artiklQn = qn("er", "entity", "artikl")
-        val produktQn = qn("er", "entity", "produkt")
-        val relQn = qn("er", "relation", "artikl_produkt")
-        val fkQn = qn("db", "dbo", "fk_artikl_produkt")
+        val itemQn = qn("er", "entity", "item")
+        val categoryQn = qn("er", "entity", "category")
+        val relQn = qn("er", "relation", "item_in_category")
+        val fkQn = qn("db", "dbo", "fk_item_category")
 
         fun model(): Model {
-            val idAttrQn = qn("er", "entity", "artikl.id_artiklu")
-            val kodAttrQn = qn("er", "entity", "artikl.kód_artiklu")
-            val tableQn = qn("db", "dbo", "QZBOZI_DF")
-            val idColQn = qn("db", "dbo", "QZBOZI_DF.IDZBOZI")
+            val idAttrQn = qn("er", "entity", "item.sk")
+            val kodAttrQn = qn("er", "entity", "item.item_id")
+            val tableQn = qn("db", "dbo", "item")
+            val idColQn = qn("db", "dbo", "item.i_item_sk")
 
-            val idAttr = Attribute(internalId = "a1", qname = idAttrQn, entity = artiklQn, type = "int", isKey = true)
-            val kodAttr = Attribute(internalId = "a2", qname = kodAttrQn, entity = artiklQn, type = "text")
-            val artikl = Entity(internalId = "e1", qname = artiklQn, attributes = listOf(idAttr, kodAttr))
+            val idAttr = Attribute(internalId = "a1", qname = idAttrQn, entity = itemQn, type = "int", isKey = true)
+            val kodAttr = Attribute(internalId = "a2", qname = kodAttrQn, entity = itemQn, type = "text")
+            val item = Entity(internalId = "e1", qname = itemQn, attributes = listOf(idAttr, kodAttr))
 
-            // produkt: NO entity-level mapping ⇒ its attribute carries the inline mapping itself.
-            val pidAttrQn = qn("er", "entity", "produkt.id_produktu")
-            val pidColQn = qn("db", "dbo", "QSKUPZBOZI.IDSKUPZBOZI")
+            // category: NO entity-level mapping ⇒ its attribute carries the inline mapping itself.
+            val pidAttrQn = qn("er", "entity", "category.sk")
+            val pidColQn = qn("db", "dbo", "item_category.i_category_id")
             val pidAttr =
-                Attribute(internalId = "a3", qname = pidAttrQn, entity = produktQn, type = "int", isKey = true)
-            val produkt = Entity(internalId = "e2", qname = produktQn, attributes = listOf(pidAttr))
+                Attribute(internalId = "a3", qname = pidAttrQn, entity = categoryQn, type = "int", isKey = true)
+            val category = Entity(internalId = "e2", qname = categoryQn, attributes = listOf(pidAttr))
 
             val rel =
                 Relation(
                     internalId = "r1",
                     qname = relQn,
-                    fromEntity = artiklQn,
-                    toEntity = produktQn,
+                    fromEntity = itemQn,
+                    toEntity = categoryQn,
                     cardinality = Cardinality(0, -1, 0, 1),
                 )
 
             val entityMapping =
                 Er2DbEntityMapping(
                     internalId = "m1",
-                    qname = qn("map", "er2db_entity", "artikl"),
-                    entity = artiklQn,
+                    qname = qn("map", "er2db_entity", "item"),
+                    entity = itemQn,
                     target = MappingTarget.Table(tableQn),
                 )
             // plain column ⇒ short bare-id in the columns map
             val idAttrMapping =
                 Er2DbAttributeMapping(
                     internalId = "m2",
-                    qname = qn("map", "er2db_attribute", "artikl.id_artiklu"),
+                    qname = qn("map", "er2db_attribute", "item.sk"),
                     attribute = idAttrQn,
                     target = AttributeMappingTarget.Column(idColQn),
                 )
@@ -103,21 +103,21 @@ class InlineMappingExportSpec :
             val kodAttrMapping =
                 Er2DbAttributeMapping(
                     internalId = "m3",
-                    qname = qn("map", "er2db_attribute", "artikl.kód_artiklu"),
+                    qname = qn("map", "er2db_attribute", "item.item_id"),
                     attribute = kodAttrQn,
-                    target = AttributeMappingTarget.Expression("UPPER(KOD_ZBOZI)"),
+                    target = AttributeMappingTarget.Expression("UPPER(i_item_id)"),
                 )
             val pidAttrMapping =
                 Er2DbAttributeMapping(
                     internalId = "m4",
-                    qname = qn("map", "er2db_attribute", "produkt.id_produktu"),
+                    qname = qn("map", "er2db_attribute", "category.sk"),
                     attribute = pidAttrQn,
                     target = AttributeMappingTarget.Column(pidColQn),
                 )
             val relMapping =
                 Er2DbRelationMapping(
                     internalId = "m5",
-                    qname = qn("map", "er2db_relation", "artikl_produkt"),
+                    qname = qn("map", "er2db_relation", "item_in_category"),
                     relation = relQn,
                     foreignKey = fkQn,
                 )
@@ -129,7 +129,7 @@ class InlineMappingExportSpec :
                     mapOf(
                         "er" to
                             ErSchema(
-                                entities = mapOf(artiklQn to artikl, produktQn to produkt),
+                                entities = mapOf(itemQn to item, categoryQn to category),
                                 relations = mapOf(relQn to rel),
                             ),
                     ),
@@ -152,9 +152,9 @@ class InlineMappingExportSpec :
 
         "2.1 entity/attribute/relation defs carry the inline mapping" {
             val defs = ModelToDefinitions.convert(model()).files.flatMap { it.definitions }
-            val artikl = defs.filterIsInstance<EntityDef>().first { it.name == "artikl" }
-            artikl.binding.shouldBeInstanceOf<BindingPropertyBlock>()
-            val rel = defs.filterIsInstance<RelationDef>().first { it.name == "artikl_produkt" }
+            val item = defs.filterIsInstance<EntityDef>().first { it.name == "item" }
+            item.binding.shouldBeInstanceOf<BindingPropertyBlock>()
+            val rel = defs.filterIsInstance<RelationDef>().first { it.name == "item_in_category" }
             rel.binding.shouldBeInstanceOf<BindingPropertyBareId>()
         }
 
@@ -162,34 +162,34 @@ class InlineMappingExportSpec :
 
         "2.2 entity-level block carries only target, no columns map" {
             val defs = ModelToDefinitions.convert(model()).files.flatMap { it.definitions }
-            val artikl = defs.filterIsInstance<EntityDef>().first { it.name == "artikl" }
-            val block = artikl.binding as BindingPropertyBlock
+            val item = defs.filterIsInstance<EntityDef>().first { it.name == "item" }
+            val block = item.binding as BindingPropertyBlock
             block.columns.shouldBeEmpty()
         }
 
         "2.2 per-attribute mapping even under an entity-level block: plain ⇒ bare-id, expression ⇒ block" {
             val defs = ModelToDefinitions.convert(model()).files.flatMap { it.definitions }
-            val artikl = defs.filterIsInstance<EntityDef>().first { it.name == "artikl" }
-            val byName = artikl.attributes.associateBy { it.name }
+            val item = defs.filterIsInstance<EntityDef>().first { it.name == "item" }
+            val byName = item.attributes.associateBy { it.name }
             // plain column ⇒ short bare-id
-            byName.getValue("id_artiklu").binding.shouldBeInstanceOf<BindingPropertyBareId>()
-            (byName.getValue("id_artiklu").binding as BindingPropertyBareId).id.path shouldBe "IDZBOZI"
+            byName.getValue("sk").binding.shouldBeInstanceOf<BindingPropertyBareId>()
+            (byName.getValue("sk").binding as BindingPropertyBareId).id.path shouldBe "i_item_sk"
             // expression ⇒ block form
-            byName.getValue("kód_artiklu").binding.shouldBeInstanceOf<BindingPropertyBlock>()
+            byName.getValue("item_id").binding.shouldBeInstanceOf<BindingPropertyBlock>()
         }
 
-        "2.2 no entity-level block ⇒ per-attribute short mapping (produkt case)" {
+        "2.2 no entity-level block ⇒ per-attribute short mapping (category case)" {
             val defs = ModelToDefinitions.convert(model()).files.flatMap { it.definitions }
-            val produkt = defs.filterIsInstance<EntityDef>().first { it.name == "produkt" }
-            produkt.binding.shouldBeNull()
-            val pid = produkt.attributes.first { it.name == "id_produktu" }
+            val category = defs.filterIsInstance<EntityDef>().first { it.name == "category" }
+            category.binding.shouldBeNull()
+            val pid = category.attributes.first { it.name == "sk" }
             pid.binding.shouldBeInstanceOf<BindingPropertyBareId>()
-            (pid.binding as BindingPropertyBareId).id.path shouldBe "IDSKUPZBOZI"
+            (pid.binding as BindingPropertyBareId).id.path shouldBe "i_category_id"
         }
 
         "2.2 relation ⇒ bare-id fk reference (fully-qualified)" {
             val defs = ModelToDefinitions.convert(model()).files.flatMap { it.definitions }
-            val rel = defs.filterIsInstance<RelationDef>().first { it.name == "artikl_produkt" }
-            (rel.binding as BindingPropertyBareId).id.path shouldBe "db.dbo.fk_artikl_produkt"
+            val rel = defs.filterIsInstance<RelationDef>().first { it.name == "item_in_category" }
+            (rel.binding as BindingPropertyBareId).id.path shouldBe "db.dbo.fk_item_category"
         }
     })
