@@ -33,9 +33,10 @@ import java.io.File
  *   passes — so a fix that lands early is noticed and the status is flipped in the same commit.
  * * `"status": "out-of-scope"` — a failure by design (C13), asserted like `green`.
  *
- * `tf/legacy-cases.json` — the 101 legacy templates (against `tf/legacy-model.json`) with
- * `parse`/`unparse` = `ok|fail` only, same statuses, plus a summary test pinning the exact
- * `parse ok / unparse ok` counts.
+ * `tf/legacy-cases.json` — the 101 legacy-pattern templates (against `tf/legacy-model.json`): one per
+ * template of the original legacy corpus, rewritten over the Hartland demo database (TPC-DS) so that
+ * each exercises the same SQL constructs, with `parse`/`unparse` = `ok|fail` only, same statuses, plus
+ * a summary test pinning the exact `parse ok / unparse ok` counts.
  *
  * Golden text is never written from memory: run with `TF_DUMP=<file>` to record what the engine
  * actually produces for every case (plan rule 8), read it, then edit the JSON.
