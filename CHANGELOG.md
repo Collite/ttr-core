@@ -6,6 +6,29 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-translator`** ⚑ **behaviour fix — no VARCHAR cast without a length reaches SQL Server.** T-SQL reads
+  `CAST(x AS VARCHAR)` as `VARCHAR(30)`, and the MSSQL unparse wrote exactly that wherever the plan carried an
+  unbounded VARCHAR: around the column branch of the CASE `COALESCE` expands to (`CASE WHEN [email] IS NOT NULL
+  THEN CAST([email] AS VARCHAR) ELSE 'dept:sales' END`), for implicit casts (`CONCAT('x', <number>)`), and for
+  an authored `CAST(x AS varchar)`. Every value longer than 30 characters came back cut, without an error.
+  - `MssqlSqlDialectWithFloatCast.getCastSpec` spells a VARCHAR with no length `VARCHAR(MAX)`. A length the plan
+    carries is kept as it is, `VARCHAR(MAX)` included; `nvarchar` without a length stays T-SQL's own `CAST`
+    default, `VARCHAR(30)`, set at parse time (`TsqlDataTypes`).
+  - New `codec/sql/VarcharCastElision`, on the MSSQL unparse only: the VARCHAR → VARCHAR cast Calcite wraps
+    around a VARCHAR operand of another call (no length, or the operand's own length) is dropped, so
+    `COALESCE(col, 'x')` renders as a plain CASE, and an `nvarchar(n)` column (VARCHAR(n) to Calcite) is no
+    longer down-converted by `CAST(… AS VARCHAR(n))`. A top-level projection keeps its cast, as
+    `VARCHAR(MAX)`; CHAR and number operands, any other length, and `TRY_CAST` are untouched.
+  - Postgres: `varchar(max)` was written `VARCHAR(65536)`, and Postgres silently truncates an explicit cast to
+    that length; it is now an unbounded `VARCHAR`. A bare `VARCHAR` is unbounded on Postgres and stays.
+  - ⚠ The rendered SQL Server text changes for every statement that carried such a cast (golden strings
+    downstream move: `CAST(x AS VARCHAR)` → `CAST(x AS VARCHAR(MAX))`, or the cast disappears inside a CASE).
+    The plan wire format and the parse output are unchanged.
+  - Not changed: `CAST(NULL AS <type>)` still renders as a bare `NULL`. plan.v1 carries a literal's type only
+    as its surface tag (`text`, `bool`, `int`, `float`, `datetime`), so a decoded NULL cannot be given back its
+    authored type (`decimal(18,2)` would come back `FLOAT`, `date` a timestamp); that needs a wire change.
+  - `MssqlUnboundedVarcharSpec` (21 cases, the reported statement among them); the TF goldens `r12`, `r16`,
+    `r24`, `CastPhysicalTypeSpec` and `TsqlPlusSpec` move with the fix.
 - **`ttrp-frontend` · `ttrp-graph` · `ttrp-emit` · `ttrp-cli` · `ttrp-lsp`** ⚑ **TTR-B rules in Czech and English
   sentences (AG B1–B6).** A business rule — checks plus a decision that requests actions — can be written entirely
   in TTR-B sentences, in either language, and compiles to the same graph as its canonical TTR-P program.

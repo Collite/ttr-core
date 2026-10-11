@@ -477,9 +477,10 @@
     "sql": "SELECT CONCAT('Skladem (', a.ID, ' ks)') AS X FROM A a",
     "params": [],
     "expect": {
-      "sql": "SELECT CONCAT('Skladem (', CAST([ID] AS VARCHAR), ' ks)') AS [X] FROM [dbo].[A]"
+      "sql": "SELECT CONCAT('Skladem (', CAST([ID] AS VARCHAR(MAX)), ' ks)') AS [X] FROM [dbo].[A]"
     },
-    "status": "green"
+    "status": "green",
+    "note": "A bare VARCHAR is VARCHAR(30) in T-SQL; an unbounded VARCHAR cast is spelled VARCHAR(MAX)."
   },
   {
     "id": "r13_pipes",
@@ -517,9 +518,10 @@
     "sql": "SELECT COALESCE(a.NAME, 'n/a') AS X, NULLIF(a.ID, 0) AS Y FROM A a",
     "params": [],
     "expect": {
-      "sql": "SELECT CASE WHEN [NAME] IS NOT NULL THEN CAST([NAME] AS VARCHAR) ELSE 'n/a' END AS [X], CASE WHEN [ID] = 0 THEN NULL ELSE [ID] END AS [Y] FROM [dbo].[A]"
+      "sql": "SELECT CASE WHEN [NAME] IS NOT NULL THEN [NAME] ELSE 'n/a' END AS [X], CASE WHEN [ID] = 0 THEN NULL ELSE [ID] END AS [Y] FROM [dbo].[A]"
     },
-    "status": "green"
+    "status": "green",
+    "note": "COALESCE's CASE branch no longer carries CAST([NAME] AS VARCHAR), which T-SQL read as VARCHAR(30) and truncated."
   },
   {
     "id": "r17_having",
@@ -597,7 +599,7 @@
     "sql": "SELECT CAST(a.ID AS decimal(18,2)) AS D, CAST('2026-01-01' AS date) AS DT, CAST(a.ID AS varchar) AS V FROM A a",
     "params": [],
     "expect": {
-      "sql": "SELECT CAST([ID] AS DECIMAL(18, 2)) AS [D], '2026-01-01' AS [DT], CAST([ID] AS VARCHAR) AS [V] FROM [dbo].[A]"
+      "sql": "SELECT CAST([ID] AS DECIMAL(18, 2)) AS [D], '2026-01-01' AS [DT], CAST([ID] AS VARCHAR(MAX)) AS [V] FROM [dbo].[A]"
     },
     "status": "green"
   },

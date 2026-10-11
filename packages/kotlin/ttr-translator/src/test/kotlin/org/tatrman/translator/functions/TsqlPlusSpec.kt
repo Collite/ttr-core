@@ -112,9 +112,9 @@ class TsqlPlusSpec :
                 Outcome.Unparsed("SELECT CONCAT([NAME], [NAME]) AS [X] FROM [dbo].[A]")
         }
 
-        "text + number concatenates with a VARCHAR cast (lenient: T-SQL would try a numeric conversion)" {
+        "text + number concatenates with a VARCHAR(MAX) cast (lenient: T-SQL would try a numeric conversion)" {
             mssql("SELECT 'x' + a.ID AS X FROM A a") shouldBe
-                Outcome.Unparsed("SELECT CONCAT('x', CAST([ID] AS VARCHAR)) AS [X] FROM [dbo].[A]")
+                Outcome.Unparsed("SELECT CONCAT('x', CAST([ID] AS VARCHAR(MAX))) AS [X] FROM [dbo].[A]")
         }
 
         "numeric - is untouched" {

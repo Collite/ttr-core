@@ -7,6 +7,7 @@ import org.apache.calcite.rel.rel2sql.RelToSqlConverter
 import org.apache.calcite.sql.SqlDialect
 import org.apache.calcite.sql.SqlIdentifier
 import org.apache.calcite.sql.SqlNode
+import org.apache.calcite.sql.dialect.MssqlSqlDialect
 import org.apache.calcite.sql.dialect.PostgresqlSqlDialect
 import org.apache.calcite.sql.util.SqlShuttle
 import org.tatrman.translator.dialects.Dialects
@@ -58,7 +59,11 @@ object RelToSqlUnparser {
         dialect: SqlDialect,
     ): UnparsedSql {
         val converter = RelToSqlConverter(dialect)
-        val sqlNode = converter.visitRoot(BetweenRestoration.apply(rel)).asStatement()
+        val restored = BetweenRestoration.apply(rel)
+        // SQL Server reads a VARCHAR cast without a length as VARCHAR(30) — drop the redundant ones Calcite
+        // wraps around VARCHAR operands (COALESCE's CASE, implicit coercion); see VarcharCastElision.
+        val prepared = if (dialect is MssqlSqlDialect) VarcharCastElision.apply(restored) else restored
+        val sqlNode = converter.visitRoot(prepared).asStatement()
         // Postgres/DuckDB resolve unqualified names via search_path, so the v1 model's logical
         // namespace (the `dbo` default token) must NOT be emitted as a physical schema — the
         // physical schema is the connection's default (e.g. `public`). MSSQL keeps `<namespace>`.

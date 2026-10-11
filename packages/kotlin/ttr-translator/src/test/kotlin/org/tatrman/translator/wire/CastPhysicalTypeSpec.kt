@@ -63,7 +63,9 @@ class CastPhysicalTypeSpec :
                 Triple("CAST(a.ID AS varchar(20))", "varchar:20", "CAST([ID] AS VARCHAR(20))"),
                 Triple("CAST(a.ID AS decimal(18,2))", "decimal:18,2", "CAST([ID] AS DECIMAL(18, 2))"),
                 Triple("CAST(a.NAME AS int)", "int", "CAST([NAME] AS INTEGER)"),
-                Triple("CAST(a.ID AS varchar)", "varchar", "CAST([ID] AS VARCHAR)"),
+                // An unbounded VARCHAR rides as bare `varchar` and is spelled VARCHAR(MAX): T-SQL reads a bare
+                // VARCHAR as VARCHAR(30).
+                Triple("CAST(a.ID AS varchar)", "varchar", "CAST([ID] AS VARCHAR(MAX))"),
                 Triple("CAST(a.ID AS float)", "float", "CAST([ID] AS FLOAT)"),
                 Triple("CAST(a.NAME AS bigint)", "bigint", "CAST([NAME] AS BIGINT)"),
             )

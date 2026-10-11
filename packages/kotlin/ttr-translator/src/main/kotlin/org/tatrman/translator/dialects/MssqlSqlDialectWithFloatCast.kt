@@ -31,8 +31,9 @@ import org.apache.calcite.sql.validate.SqlConformance
  * but SQL Server has no `DOUBLE` type — its 8-byte double-precision type is
  * `FLOAT`. The bad cast produced `Incorrect syntax near ')'` at the database.
  * We override [getCastSpec] to render `DOUBLE` as `FLOAT`, and (TF-P3.S1) `BOOLEAN` as `BIT`,
- * `TIMESTAMP(3)` as `DATETIME`, any other `TIMESTAMP(p)` as `DATETIME2(p)` and the VARCHAR ceiling as
- * `VARCHAR(MAX)`; every other type defers to the stock dialect.
+ * `TIMESTAMP(3)` as `DATETIME`, any other `TIMESTAMP(p)` as `DATETIME2(p)` and the VARCHAR ceiling — and
+ * a VARCHAR with no length, which T-SQL would read as `VARCHAR(30)` — as `VARCHAR(MAX)`; every other type
+ * defers to the stock dialect.
  *
  * Also lowers the standard `EXTRACT(<unit> FROM <datetime>)` to T-SQL `DATEPART(<part>, <datetime>)`
  * — SQL Server has no `EXTRACT` (error 195 `'EXTRACT' is not a recognized built-in function name`),
@@ -57,8 +58,17 @@ class MssqlSqlDialectWithFloatCast(
                     DATETIME_PRECISION -> alien("DATETIME", type)
                     else -> alien("DATETIME2(${type.precision})", type)
                 }
+            // A VARCHAR without a length (Calcite's unbounded VARCHAR, PRECISION_NOT_SPECIFIED): T-SQL reads
+            // a bare `CAST(x AS VARCHAR)` as VARCHAR(30) and cuts every longer value without an error. It
+            // reaches us from the CASE COALESCE expands to (a column branch cast to the CASE's type), from
+            // implicit casts (`CONCAT('x', <number>)`) and from an authored `CAST(x AS varchar)`. Unbounded is
+            // VARCHAR(MAX) on SQL Server. A length the plan carries is kept as it is.
             SqlTypeName.VARCHAR ->
-                if (type.precision >= VARCHAR_MAX_PRECISION) alien("VARCHAR(MAX)", type) else super.getCastSpec(type)
+                if (type.precision == RelDataType.PRECISION_NOT_SPECIFIED || type.precision >= VARCHAR_MAX_PRECISION) {
+                    alien("VARCHAR(MAX)", type)
+                } else {
+                    super.getCastSpec(type)
+                }
             else -> super.getCastSpec(type)
         }
 
