@@ -4,7 +4,7 @@
 # Veles' READ routes and nothing else. Rendered by ttr-viewer-entrypoint when
 # VIEWER_CATALOG_UPSTREAM is set.
 #
-# Allowed — GET (and HEAD) only:
+# Allowed — GET only (`limit_except GET` also lets HEAD through, which Veles answers with 405):
 #   /model/index  /model/graph  /model/object  /model/search   the JSON read API the viewer browses
 #   /status                                                      polled for a changed model version
 # Everything else under @@BASE@@veles/ is a 404 here — in particular POST /refresh, /admin/*,

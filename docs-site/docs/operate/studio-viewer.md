@@ -61,7 +61,7 @@ it on every rewrite, so reloads keep the catalog.
 ## The catalog proxy: read routes only
 
 The viewer's catalog calls are same-origin `fetch`es to `<base>veles/…`. With
-`VIEWER_CATALOG_UPSTREAM` set, the image's nginx forwards exactly these, `GET` (and `HEAD`) only:
+`VIEWER_CATALOG_UPSTREAM` set, the image's nginx forwards exactly these, `GET` only:
 
 | Route | Used for |
 |---|---|
