@@ -18,58 +18,58 @@ class SchemaDetectorSpec :
         val dbNamespace = "dbo"
         val erNamespace = "entity"
 
-        val qskupzboziQname =
+        val itemCategoryQname =
             QualifiedName
                 .newBuilder()
                 .setSchemaCode(SchemaCode.DB)
                 .setNamespace(dbNamespace)
-                .setName("qskupzbozi_df")
+                .setName("item_category")
                 .build()
-        val qzboziQname =
+        val itemQname =
             QualifiedName
                 .newBuilder()
                 .setSchemaCode(SchemaCode.DB)
                 .setNamespace(dbNamespace)
-                .setName("qzbozi_df")
+                .setName("item")
                 .build()
-        val produktQname =
+        val productQname =
             QualifiedName
                 .newBuilder()
                 .setSchemaCode(SchemaCode.ER)
                 .setNamespace(erNamespace)
-                .setName("produkt")
+                .setName("product")
                 .build()
-        val skupinaQname =
+        val brandQname =
             QualifiedName
                 .newBuilder()
                 .setSchemaCode(SchemaCode.ER)
                 .setNamespace(erNamespace)
-                .setName("skupina")
+                .setName("brand")
                 .build()
 
-        val qskupzboziTable =
+        val itemCategoryTable =
             ModelTable(
-                qname = qskupzboziQname,
+                qname = itemCategoryQname,
                 columns =
                     listOf(
                         org.tatrman.translator.framework
                             .ModelColumn("id", SurfaceType.INT),
                         org.tatrman.translator.framework
-                            .ModelColumn("nazev", SurfaceType.TEXT),
+                            .ModelColumn("name", SurfaceType.TEXT),
                     ),
             )
-        val qzboziTable =
+        val itemTable =
             ModelTable(
-                qname = qzboziQname,
+                qname = itemQname,
                 columns =
                     listOf(
                         org.tatrman.translator.framework
                             .ModelColumn("id", SurfaceType.INT),
                     ),
             )
-        val produktEntity =
+        val productEntity =
             ModelEntity(
-                qname = produktQname,
+                qname = productQname,
                 attributes =
                     listOf(
                         org.tatrman.translator.framework
@@ -78,9 +78,9 @@ class SchemaDetectorSpec :
                             .ModelAttribute("name", SurfaceType.TEXT),
                     ),
             )
-        val skupinaEntity =
+        val brandEntity =
             ModelEntity(
-                qname = skupinaQname,
+                qname = brandQname,
                 attributes =
                     listOf(
                         org.tatrman.translator.framework
@@ -89,8 +89,8 @@ class SchemaDetectorSpec :
             )
 
         fun makeHandle(
-            tables: List<ModelTable> = listOf(qskupzboziTable, qzboziTable),
-            entities: List<ModelEntity> = listOf(produktEntity, skupinaEntity),
+            tables: List<ModelTable> = listOf(itemCategoryTable, itemTable),
+            entities: List<ModelEntity> = listOf(productEntity, brandEntity),
         ): InMemoryModelHandle =
             InMemoryModelHandle(
                 tables = tables,
@@ -98,7 +98,7 @@ class SchemaDetectorSpec :
             )
 
         "AUTODETECTED DB when stated=UNSPECIFIED and SQL uses DB table" {
-            val sql = "SELECT idskupzbozi, kod_skup_zbozi FROM QSKUPZBOZI_DF WHERE nazev LIKE 'O%'"
+            val sql = "SELECT i_category_id, i_category_code FROM ITEM_CATEGORY WHERE name LIKE 'E%'"
             val result = SchemaDetector.detect(sql, Language.SQL, SchemaCode.SCHEMA_CODE_UNSPECIFIED, makeHandle())
             result.decision shouldBe SchemaDecision.AUTODETECTED
             result.effectiveSchema shouldBe SchemaCode.DB
@@ -110,44 +110,44 @@ class SchemaDetectorSpec :
         // parser threw on `COLLATE`, detection returned NOT_APPLICABLE, and the caller silently fell
         // back to the wrong catalog.
         "AUTODETECTED DB when SQL uses a DB table with a T-SQL COLLATE clause" {
-            val sql = "SELECT idskupzbozi FROM QSKUPZBOZI_DF WHERE nazev COLLATE Latin1_General_CI_AI LIKE 'O%'"
+            val sql = "SELECT i_category_id FROM ITEM_CATEGORY WHERE name COLLATE Latin1_General_CI_AI LIKE 'E%'"
             val result = SchemaDetector.detect(sql, Language.SQL, SchemaCode.SCHEMA_CODE_UNSPECIFIED, makeHandle())
             result.decision shouldBe SchemaDecision.AUTODETECTED
             result.effectiveSchema shouldBe SchemaCode.DB
         }
 
         "AUTODETECTED ER when SQL uses ER entity" {
-            val sql = "SELECT id, name FROM produkt"
+            val sql = "SELECT id, name FROM product"
             val result = SchemaDetector.detect(sql, Language.SQL, SchemaCode.SCHEMA_CODE_UNSPECIFIED, makeHandle())
             result.decision shouldBe SchemaDecision.AUTODETECTED
             result.effectiveSchema shouldBe SchemaCode.ER
         }
 
         "CONFIRMED when stated matches" {
-            val sql = "SELECT id FROM QSKUPZBOZI_DF"
+            val sql = "SELECT id FROM ITEM_CATEGORY"
             val result = SchemaDetector.detect(sql, Language.SQL, SchemaCode.DB, makeHandle())
             result.decision shouldBe SchemaDecision.CONFIRMED
             result.effectiveSchema shouldBe SchemaCode.DB
         }
 
         "CORRECTED when stated=ER but SQL is physical DB" {
-            val sql = "SELECT id FROM QSKUPZBOZI_DF"
+            val sql = "SELECT id FROM ITEM_CATEGORY"
             val result = SchemaDetector.detect(sql, Language.SQL, SchemaCode.ER, makeHandle())
             result.decision shouldBe SchemaDecision.CORRECTED
             result.effectiveSchema shouldBe SchemaCode.DB
         }
 
         "UNKNOWN with suggestions for unknown table" {
-            val sql = "SELECT id FROM QSKUPZBOZIX"
+            val sql = "SELECT id FROM ITEM_CATEGORYX"
             val result = SchemaDetector.detect(sql, Language.SQL, SchemaCode.SCHEMA_CODE_UNSPECIFIED, makeHandle())
             result.decision shouldBe SchemaDecision.UNKNOWN
             result.effectiveSchema shouldBe SchemaCode.SCHEMA_CODE_UNSPECIFIED
-            result.unknownTables shouldContainExactlyInAnyOrder listOf("qskupzbozix")
-            result.suggestions.firstOrNull()?.candidates shouldContainExactlyInAnyOrder listOf("qskupzbozi_df")
+            result.unknownTables shouldContainExactlyInAnyOrder listOf("item_categoryx")
+            result.suggestions.firstOrNull()?.candidates shouldContainExactlyInAnyOrder listOf("item_category")
         }
 
         "MIXED when one DB and one ER table in one query" {
-            val sql = "SELECT * FROM QSKUPZBOZI_DF, produkt"
+            val sql = "SELECT * FROM ITEM_CATEGORY, product"
             val result = SchemaDetector.detect(sql, Language.SQL, SchemaCode.SCHEMA_CODE_UNSPECIFIED, makeHandle())
             result.decision shouldBe SchemaDecision.MIXED
             result.effectiveSchema shouldBe SchemaCode.SCHEMA_CODE_UNSPECIFIED
@@ -173,8 +173,8 @@ class SchemaDetectorSpec :
 
             val handle =
                 makeHandle(
-                    tables = listOf(qskupzboziTable, bothTable),
-                    entities = listOf(produktEntity, bothEntity),
+                    tables = listOf(itemCategoryTable, bothTable),
+                    entities = listOf(productEntity, bothEntity),
                 )
             val sql = "SELECT id FROM dual_name"
             val result = SchemaDetector.detect(sql, Language.SQL, SchemaCode.SCHEMA_CODE_UNSPECIFIED, handle)
@@ -202,8 +202,8 @@ class SchemaDetectorSpec :
 
             val handle =
                 makeHandle(
-                    tables = listOf(qskupzboziTable, bothTable),
-                    entities = listOf(produktEntity, bothEntity),
+                    tables = listOf(itemCategoryTable, bothTable),
+                    entities = listOf(productEntity, bothEntity),
                 )
             val sql = "SELECT id FROM dual_name"
             val result = SchemaDetector.detect(sql, Language.SQL, SchemaCode.DB, handle)
@@ -212,7 +212,7 @@ class SchemaDetectorSpec :
         }
 
         "NOT_APPLICABLE when sourceLanguage=DATAFRAME_DSL" {
-            val sql = "SELECT id FROM QSKUPZBOZI_DF"
+            val sql = "SELECT id FROM ITEM_CATEGORY"
             val result =
                 SchemaDetector.detect(
                     sql,

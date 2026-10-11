@@ -172,7 +172,7 @@ class TranslatorSpec :
                 translator.parseToRelNode(
                     source = "SELECT id FROM customers WHERE name LIKE {q}",
                     sourceLanguage = Language.SQL,
-                    parameters = listOf(SqlParam(name = "q", type = "text", value = "DF%")),
+                    parameters = listOf(SqlParam(name = "q", type = "text", value = "able%")),
                 )
             r.shouldBeInstanceOf<ParseResult.Success>()
         }
@@ -185,7 +185,7 @@ class TranslatorSpec :
                 translator.parseToRelNode(
                     source = "SELECT id FROM customers WHERE name LIKE {q} || '%'",
                     sourceLanguage = Language.SQL,
-                    parameters = listOf(SqlParam(name = "q", type = "text", value = "DF")),
+                    parameters = listOf(SqlParam(name = "q", type = "text", value = "able")),
                 )
             r.shouldBeInstanceOf<ParseResult.Success>()
         }
@@ -203,8 +203,8 @@ class TranslatorSpec :
                     sourceLanguage = Language.SQL,
                     parameters =
                         listOf(
-                            SqlParam(name = "a", type = "text", value = "DF ADNAK"),
-                            SqlParam(name = "b", type = "text", value = "2026.04"),
+                            SqlParam(name = "a", type = "text", value = "able ought"),
+                            SqlParam(name = "b", type = "text", value = "2024-03"),
                         ),
                 )
             r.shouldBeInstanceOf<ParseResult.Success>()
@@ -216,7 +216,7 @@ class TranslatorSpec :
                 translator.parseToRelNode(
                     source = "SELECT id FROM customers WHERE name LIKE '%' || {q} || '%'",
                     sourceLanguage = Language.SQL,
-                    parameters = listOf(SqlParam(name = "q", type = "text", value = "DF")),
+                    parameters = listOf(SqlParam(name = "q", type = "text", value = "able")),
                 ) as ParseResult.Success
             // The plan carries one `?`; supply its binding (the realistic worker path) so the
             // positional expansion runs — an unparse with placeholders but no bindings is a contract
@@ -229,7 +229,7 @@ class TranslatorSpec :
                     .setValue(
                         org.tatrman.plan.v1.Value
                             .newBuilder()
-                            .setStringValue("DF"),
+                            .setStringValue("able"),
                     ).build()
             val r =
                 translator.unparseFromRelNode(
@@ -257,7 +257,7 @@ class TranslatorSpec :
                     parameters =
                         listOf(
                             SqlParam(name = "n", type = "text", value = "Marketplace"),
-                            SqlParam(name = "q", type = "text", value = "DF"),
+                            SqlParam(name = "q", type = "text", value = "able"),
                         ),
                 )
             parsed.shouldBeInstanceOf<ParseResult.Success>()
@@ -279,7 +279,7 @@ class TranslatorSpec :
                     parsed.plan,
                     Language.SQL,
                     SqlDialectProto.MSSQL,
-                    parameters = listOf(binding("n", "Marketplace"), binding("q", "DF")),
+                    parameters = listOf(binding("n", "Marketplace"), binding("q", "able")),
                 )
             r.shouldBeInstanceOf<UnparseResult.Success>()
             r.output.shouldNotContainIgnoringCase("cast")
@@ -299,14 +299,14 @@ class TranslatorSpec :
                     .setValue(
                         org.tatrman.plan.v1.Value
                             .newBuilder()
-                            .setStringValue("DF")
+                            .setStringValue("able")
                             .build(),
                     ).build()
             val parsed =
                 translator.parseToRelNode(
                     source = "SELECT id FROM customers WHERE name = {q} OR name = {q}",
                     sourceLanguage = Language.SQL,
-                    parameters = listOf(SqlParam(name = "q", type = "text", value = "DF")),
+                    parameters = listOf(SqlParam(name = "q", type = "text", value = "able")),
                 ) as ParseResult.Success
             val r =
                 translator.unparseFromRelNode(
@@ -319,7 +319,7 @@ class TranslatorSpec :
             r.output.shouldContainIgnoringCase("?")
             // Two `?` positions, both bound to the single named value.
             r.parameters.size shouldBe 2
-            r.parameters.all { it.name == "q" && it.value.stringValue == "DF" } shouldBe true
+            r.parameters.all { it.name == "q" && it.value.stringValue == "able" } shouldBe true
         }
 
         "parseToRelNode dedups a repeated {name} to one binding identity" {
@@ -351,7 +351,7 @@ class TranslatorSpec :
                     source =
                         "SELECT id FROM customers WHERE ({q} = '' OR name COLLATE Latin1_General_CI_AI LIKE '%{q}%')",
                     sourceLanguage = Language.SQL,
-                    parameters = listOf(SqlParam(name = "q", type = "varchar", value = "DF")),
+                    parameters = listOf(SqlParam(name = "q", type = "varchar", value = "able")),
                 )
             parsed.shouldBeInstanceOf<ParseResult.Success>()
             val binding =
@@ -362,7 +362,7 @@ class TranslatorSpec :
                     .setValue(
                         org.tatrman.plan.v1.Value
                             .newBuilder()
-                            .setStringValue("DF"),
+                            .setStringValue("able"),
                     ).build()
             val r =
                 translator.unparseFromRelNode(

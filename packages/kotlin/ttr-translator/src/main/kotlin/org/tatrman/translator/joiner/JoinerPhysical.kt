@@ -179,7 +179,7 @@ object JoinerPhysical {
     /**
      * The `TableScan(DB)` leaves of a join side, in tree order, reachable through `Join`, `Filter` and
      * `Project` (MJ-P4·S2.6 — the [JoinerLogical.collectEntityScans] rule plus the projections
-     * MAP_TO_PHYSICAL itself puts above a query-backed entity's body; the df-test `*__filter` entities).
+     * MAP_TO_PHYSICAL itself puts above a query-backed entity's body; a served estate's `*__filter` entities).
      * A `Project` is recorded as a name map on the [ScanRef] — only its bare column-ref expressions expose
      * a name; a computed expression, an aggregate or a subquery hide the column, as the narrowed descent
      * intends. The handle is the scan node plus that map chain, which the condition resolves through.

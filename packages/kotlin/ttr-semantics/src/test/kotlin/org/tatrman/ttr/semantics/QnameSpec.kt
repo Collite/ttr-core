@@ -13,27 +13,27 @@ import io.kotest.matchers.shouldBe
 class QnameSpec :
     StringSpec({
         "segments splits on dots" {
-            Qname("er.entity.artikl").segments shouldBe listOf("er", "entity", "artikl")
+            Qname("er.entity.item").segments shouldBe listOf("er", "entity", "item")
         }
 
         "last is the final segment" {
-            Qname("db.dbo.QSUBJEKT").last shouldBe "QSUBJEKT"
+            Qname("db.dbo.customer").last shouldBe "customer"
         }
 
         "parent drops the last segment" {
-            Qname("er.entity.artikl").parent shouldBe Qname("er.entity")
+            Qname("er.entity.item").parent shouldBe Qname("er.entity")
         }
 
         "parent of a single-segment qname is null (root)" {
-            Qname("artikl").parent.shouldBeNull()
+            Qname("item").parent.shouldBeNull()
         }
 
         "append adds a segment" {
-            Qname("er.entity").append("artikl") shouldBe Qname("er.entity.artikl")
+            Qname("er.entity").append("item") shouldBe Qname("er.entity.item")
         }
 
         "append onto the empty qname yields the bare segment" {
-            Qname("").append("artikl") shouldBe Qname("artikl")
+            Qname("").append("item") shouldBe Qname("item")
         }
 
         "equality is by value" {

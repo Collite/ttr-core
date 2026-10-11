@@ -160,8 +160,8 @@ class RoundTripSpec :
         }
 
         "Q3d - self-JOIN on a colliding key name round-trips (Calcite uniquifies the right side)" {
-            // Real-world repro of `field [IDSTRED0] not found`: QUCETZAP JOIN QSTRED_DF
-            // both expose IDSTRED, so Calcite renames the right one to IDSTRED0 in the
+            // Real-world repro of `field [<key>0] not found`: two joined tables both expose the
+            // same key column, so Calcite renames the right one to `<key>0` in the
             // COMBINED row type. A self-join forces the same collision — the condition's
             // right operand is `id`, which is `id0` in the combined type. The encoder
             // must emit the per-INPUT name (`id`), or the decoder's $R lookup against
@@ -175,12 +175,12 @@ class RoundTripSpec :
 
         "Q8 - full pattern-shaped query unparses to MSSQL end-to-end (decode→optimize→RelToSql)" {
             // One guard for the whole wire-operator + MSSQL-dialect surface the
-            // `ucetni_zapisy_agregace_strediska` pattern needs — so we stop finding
+            // legacy per-centre aggregation pattern needs — so we stop finding
             // gaps one prod round-trip at a time. Exercises, in a single plan:
             //   - `||` concat used to build LIKE patterns,
             //   - SUBSTRING(col, 1, 1),
             //   - CAST(text → float),
-            //   - unary minus on an aggregate (the `-SUM(...)` MU_HODNOTA shape),
+            //   - unary minus on an aggregate (the `-SUM(...)` negated-amount shape),
             //   - INNER JOIN on a colliding key name (id ↔ id),
             //   - MIN + SUM aggregates with GROUP BY,
             //   - ORDER BY <agg> DESC + a row limit.

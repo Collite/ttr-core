@@ -31,7 +31,7 @@ import org.tatrman.translator.framework.SurfaceType
 class TwoHalfPipelineSpec :
     StringSpec({
 
-        // -- Fixture: customer entity → QSUBJEKT-like table -----------------------------------
+        // -- Fixture: customer entity → a customer table ------------------------------------------
 
         val customerEntityQname =
             QualifiedName

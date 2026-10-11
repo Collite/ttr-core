@@ -25,8 +25,8 @@ import org.tatrman.translator.framework.FixtureModel
  * plan's original "native semi/anti → renders NOT EXISTS" DoD. The concrete bug — the encoder
  * throwing `RexNode kind 'RexFieldAccess' is not in the v1 wire format` — is what is fixed here.
  *
- * The **hero fixture** is the ai-models#27 shape expressed against the fixture model
- * (`QHDOK_DF`/`QHISHDOK_DF` on `IDHDOKP = IDHDOK` → `customers`/`orders` on `customer_id = id`).
+ * The **hero fixture** is the reported shape (a document correlated with its history table on the header
+ * key) expressed against the fixture model (`customers`/`orders` on `customer_id = id`).
  */
 class SubqueryTranslationSpec :
     StringSpec({

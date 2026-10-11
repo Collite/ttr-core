@@ -17,7 +17,7 @@ import org.tatrman.translator.orchestrator.UnparseResult
  * [TsqlTypeCoercion] — a string operand where a datetime-family operand is expected (T-SQL's
  * `DATEDIFF(day, '19000101', …)`) validates, is cast to TIMESTAMP, and the unseparated `'YYYYMMDD'` form
  * is normalised to ISO so the cast survives the wire and the decode-side constant fold. Found on
- * df-test 2026-09-21: the LLM lane's "previous calendar week" idiom died at `ParseToRelNode` with
+ * A hosted test estate, 2026-09-21: the LLM lane's "previous calendar week" idiom died at `ParseToRelNode` with
  * `Cannot apply 'DATEDIFF' to arguments of type 'DATEDIFF(<INTERVAL DAY>, <CHAR(8)>, <DATE>)'`.
  *
  * Runs the service path (parse → plan.v1 → decode → unparse) so the second pass of query-runner's

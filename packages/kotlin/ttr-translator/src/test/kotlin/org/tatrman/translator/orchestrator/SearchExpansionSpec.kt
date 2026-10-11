@@ -34,7 +34,7 @@ class SearchExpansionSpec :
     StringSpec({
         val translator = Translator(FixtureModel.handle())
 
-        // TF-P1.S1 (P0 finding, legacy `nevyfakturovane_zakazky_dm`) — `NOT IN (-2, 10)` expands to
+        // TF-P1.S1 (P0 finding, a legacy uninvoiced-orders template) — `NOT IN (-2, 10)` expands to
         // `AND(<>, <>)`; nested inside the WHERE's own AND it left the condition non-flat, and Calcite's
         // Filter asserts `RexUtil.isFlat` — a parse that threw only with assertions on (-ea). The correlated
         // NOT EXISTS matters: the decorrelated plan carries a Filter that the old rel-level pass then copied.

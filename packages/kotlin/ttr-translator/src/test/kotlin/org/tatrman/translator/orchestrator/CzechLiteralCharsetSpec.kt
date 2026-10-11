@@ -8,7 +8,7 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import org.tatrman.translator.framework.FixtureModel
 
 /**
- * Regression for the df-test drill-down failure: a string literal carrying Czech letters
+ * Regression for a hosted test estate's drill-down failure: a string literal carrying Czech letters
  * outside ISO-8859-1 (Calcite's historical default charset) — `š č ř ž ů ě …` — used to fail
  * SQL→Rel conversion with "Failed to encode 'Poštovné' in character set 'ISO-8859-1'", which
  * reached callers as a bare parse error. [org.tatrman.translator.framework.TranslatorFramework]

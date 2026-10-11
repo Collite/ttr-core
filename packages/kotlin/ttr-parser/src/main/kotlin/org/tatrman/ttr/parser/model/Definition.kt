@@ -1144,7 +1144,7 @@ data class TargetReferenceValue(
     override val source: SourceLocation,
 ) : TargetValue
 
-/** v3.0 — one entry in a `binding: { columns: { id_artiklu: IDZBOZI, ... } }` map. */
+/** v3.0 — one entry in a `binding: { columns: { sk: i_item_sk, ... } }` map. */
 data class BindingColumnEntry(
     val name: String,
     val value: BindingColumnValue,
@@ -1153,7 +1153,7 @@ data class BindingColumnEntry(
 
 /**
  * v3.0 — one value in the inline `columns:` map. Two surface forms:
- *  - [BindingColumnBareId] — `id_artiklu: IDZBOZI`
+ *  - [BindingColumnBareId] — `sk: i_item_sk`
  *  - [BindingColumnObject] — `kód_artiklu: { target: KOD_ZBOZI }` etc.
  */
 sealed interface BindingColumnValue {
