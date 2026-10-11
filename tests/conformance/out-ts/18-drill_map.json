@@ -6,7 +6,7 @@
             "name": "agg_to_detail",
             "properties": {
                 "args": {
-                    "id_zapisu": "IDZAP"
+                    "order_number": "cr_order_number"
                 },
                 "display": {
                     "cs": "Detail",
@@ -20,7 +20,7 @@
         }
     ],
     "imports": [],
-    "package": "ucetnictvi",
+    "package": "returns",
     "schemaDirective": {
         "code": "query",
         "namespace": "drill"

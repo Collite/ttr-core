@@ -9,7 +9,7 @@
                     {
                         "description": null,
                         "kind": "column",
-                        "name": "IDSTRED",
+                        "name": "S_STORE_SK",
                         "properties": {
                             "isKey": true,
                             "type": {
@@ -20,7 +20,7 @@
                     }
                 ],
                 "primaryKey": [
-                    "IDSTRED"
+                    "S_STORE_SK"
                 ]
             },
             "tags": []
@@ -71,7 +71,7 @@
                     {
                         "description": null,
                         "kind": "column",
-                        "name": "KOD",
+                        "name": "CODE",
                         "properties": {
                             "type": {
                                 "name": "text"
@@ -82,7 +82,7 @@
                 ],
                 "primaryKey": [
                     "ID",
-                    "KOD"
+                    "CODE"
                 ]
             },
             "tags": []
