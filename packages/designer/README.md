@@ -61,6 +61,13 @@ remote — see `docs/features/import-schema/...` / the T5 decisions note in this
 **Veles read mode is read-only** (a served catalog, not a modeling repo): schema/package
 browse + object inspect + search; no editing, no `.ttrg`/layout.
 
+**The address bar** (`src/shell/app-location.ts`, ttr-core#171): once a graph is open the shell
+rewrites the URL to `<base>w/<workspace>/s/<subject>`. The rewrite stays under the base path the
+viewer is served from, and it keeps the session parameters `?veles=`, `?server=`, `?demo=`,
+`?manifest=` and `?lang=`, so a reload or a bookmark reopens the same backend and graph. `?velesToken=`
+is the one exception: a dev-only bearer, never written back into a URL. A server backend's workspace
+segment is a short name (`veles`, `localhost:7260`), not the raw backend value.
+
 **Server (read-only) mode** talks the `ttrm/*` JSON-RPC protocol to a locally-running
 [`ttr-designer-server`](../kotlin/ttr-designer-server/README.md):
 

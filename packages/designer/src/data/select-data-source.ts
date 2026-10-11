@@ -183,3 +183,21 @@ export function selectBackend(search: string | URLSearchParams, defaults?: Backe
 
   return { kind: 'worker', demo };
 }
+
+/**
+ * The workspace segment of a server backend's URLs (`/w/<workspace>/s/…`): a short, stable name —
+ * the host of an origin, the last segment of a same-origin path (`/models/veles` → `veles`) — rather
+ * than the raw backend value, which percent-encodes into an unreadable path segment (ttr-core#171).
+ * The backend itself rides the URL as `?veles=` / `?server=`, or comes from the runtime config.
+ */
+export function serverWorkspaceName(props: Extract<BackendSelection, { kind: 'ws' | 'veles' }>): string {
+  const raw = props.kind === 'ws' || props.transport === 'ttrm' ? props.origin : props.base;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) {
+    try {
+      return new URL(raw).host;
+    } catch {
+      /* fall through to the path form */
+    }
+  }
+  return raw.split('/').filter((seg) => seg.length > 0).pop() ?? 'catalog';
+}

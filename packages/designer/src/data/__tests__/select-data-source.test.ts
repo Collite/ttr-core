@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from 'vitest';
-import { selectBackend, BackendSelectionError } from '../select-data-source.js';
+import { selectBackend, serverWorkspaceName, BackendSelectionError } from '../select-data-source.js';
 
 describe('selectBackend', () => {
   it('selects the WS backend for a loopback ?server= origin', () => {
@@ -133,5 +133,18 @@ describe('selectBackend', () => {
       expect(() => selectBackend('', { veles: '//evil.example.com' })).toThrow(/config\.json/);
       expect(() => selectBackend('', { veles: 'http://localhost:7260/model' })).toThrow(BackendSelectionError);
     });
+  });
+});
+
+// ttr-core#171 — the workspace segment of a server backend's URLs is a short name, not the raw
+// backend value (which percent-encodes into `/w/%2Fmodels%2Fveles/…`).
+describe('serverWorkspaceName', () => {
+  it('names a same-origin catalog by its last path segment, an origin by its host', () => {
+    expect(serverWorkspaceName({ kind: 'veles', transport: 'read-api', base: '/veles' })).toBe('veles');
+    expect(serverWorkspaceName({ kind: 'veles', transport: 'read-api', base: '/models/veles' })).toBe('veles');
+    expect(serverWorkspaceName({ kind: 'veles', transport: 'read-api', base: 'http://localhost:7260' })).toBe('localhost:7260');
+    expect(serverWorkspaceName({ kind: 'veles', transport: 'ttrm', origin: 'wss://veles.example.com', token: null })).toBe('veles.example.com');
+    expect(serverWorkspaceName({ kind: 'ws', origin: 'ws://127.0.0.1:7270' })).toBe('127.0.0.1:7270');
+    expect(serverWorkspaceName({ kind: 'veles', transport: 'read-api', base: '' })).toBe('catalog');
   });
 });

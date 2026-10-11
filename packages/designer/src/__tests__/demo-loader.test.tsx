@@ -54,3 +54,17 @@ describe('loadDemoFiles', () => {
     await expect(loadDemoFiles('nonexistent')).rejects.toThrow('Demo manifest not found');
   });
 });
+describe('loadDemoFiles under a base path (ttr-core#171)', () => {
+  it('fetches the sample from under the configured base path', async () => {
+    const { setRuntimeConfig } = await import('../runtime-config');
+    setRuntimeConfig({ basePath: '/models/', veles: null, lang: null, languages: [] });
+    try {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] as string[], text: async () => '' });
+      global.fetch = fetchMock as unknown as typeof fetch;
+      await loadDemoFiles('v1.1-mini');
+      expect(fetchMock).toHaveBeenCalledWith('/models/samples/v1.1-mini/index.json');
+    } finally {
+      setRuntimeConfig(null);
+    }
+  });
+});

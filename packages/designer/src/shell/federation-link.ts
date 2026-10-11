@@ -40,11 +40,19 @@ export function federationLinkForTab(tab: SubjectTab | null | undefined): DeepLi
   return { kind: 'viewer', object: ref };
 }
 
-/** The absolute, copyable federation URL for the active tab (`origin` + path), or
- *  null when there is nothing shareable. The surface prepends its own origin. */
-export function federationUrlForTab(tab: SubjectTab | null | undefined, origin: string): string | null {
+/** The federation APP path for the active tab (`/s/viewer?object=…`), or null when there is
+ *  nothing shareable. A surface served under a base path prefixes it (`app-location.ts`). */
+export function federationPathForTab(tab: SubjectTab | null | undefined): string | null {
   const link = federationLinkForTab(tab);
-  return link ? `${origin}${buildDeepLink(link)}` : null;
+  return link ? buildDeepLink(link) : null;
+}
+
+/** The absolute, copyable federation URL for the active tab (`prefix` + path), or
+ *  null when there is nothing shareable. The surface prepends its own origin — plus its base
+ *  path when it is served under one. */
+export function federationUrlForTab(tab: SubjectTab | null | undefined, origin: string): string | null {
+  const path = federationPathForTab(tab);
+  return path ? `${origin}${path}` : null;
 }
 
 /** The "Ask about this" payload (§3) for the active view, or null when there is no

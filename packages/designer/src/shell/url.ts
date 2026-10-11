@@ -11,6 +11,7 @@
 //   /w/:workspace                                                        # none (workspace only)
 
 import type { SkinId, UrlState } from './types.js';
+import { currentAppPath, replaceAppPath } from './app-location.js';
 
 function seg(value: string): string {
   return encodeURIComponent(value);
@@ -98,15 +99,16 @@ export function parsePath(path: string, knownSubjectRefs?: ReadonlySet<string>):
 }
 
 // ---- thin browser sync (pure functions above are the core) ----
+// These paths are APP paths: `app-location.ts` adds the base path the viewer is served under and
+// carries the session parameters (`?veles=`, `?lang=`, …) across the rewrite (ttr-core#171).
 
 /** Replace the current history entry with the URL for `state` (no-op outside a browser). */
 export function syncUrl(state: UrlState): void {
-  if (typeof window === 'undefined') return;
-  window.history.replaceState(null, '', formatPath(state));
+  replaceAppPath(formatPath(state));
 }
 
 /** Read the current browser location into a URL state (returns `none` outside a browser). */
 export function readUrl(known?: ReadonlySet<string>): UrlState {
   if (typeof window === 'undefined') return { kind: 'none' };
-  return parsePath(window.location.pathname + window.location.search, known);
+  return parsePath(currentAppPath(), known);
 }

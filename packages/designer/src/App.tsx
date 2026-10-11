@@ -19,7 +19,7 @@ import { mountDesignerPanels } from './ext/panels-host';
 import { VelesTtrmDataSource } from './data/veles-ttrm-data-source';
 import { makeViewStateStore, type ViewStateStoreIO } from './data/view-state-store-factory';
 import type { PrefsRecord } from './data/view-state-store';
-import { selectBackend, BackendSelectionError, type BackendSelection } from './data/select-data-source';
+import { selectBackend, serverWorkspaceName, BackendSelectionError, type BackendSelection } from './data/select-data-source';
 import { ManifestProgramSource } from './model/ttrp/manifest-program-source';
 import type { ProcessingGraphSource } from './model/processing-source';
 import { useAuthoringContext } from './ext/use-authoring-context.js';
@@ -312,7 +312,7 @@ function ServerStudio(props: ServerSelection) {
     return () => { disposed = true; created?.dispose?.(); };
   }, []);
 
-  const label = props.kind === 'ws' ? props.origin : props.transport === 'ttrm' ? props.origin : props.base;
+  const label = serverWorkspaceName(props);
 
   // TTR-P program-graph panel (S9.T2): when `?manifest=<ref>` is present on a Veles backend, render the
   // static bundle manifest fetched from Veles's stored-manifest endpoint (`GET /v1/manifests/{ref}`).
