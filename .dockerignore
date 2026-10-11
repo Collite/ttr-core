@@ -1,0 +1,16 @@
+# Build context for packages/designer/Dockerfile (the ttr-viewer image, ttr-core#169). The
+# Dockerfile COPYs named paths only; this keeps local build output and dependencies out of them.
+.git
+**/node_modules
+**/dist
+**/build
+**/.gradle
+**/*.tsbuildinfo
+packages/parser/src/generated
+packages/grammar/src/generated
+packages/kotlin
+packages/python
+intellij-plugin
+docs
+docs-site
+graphify-out

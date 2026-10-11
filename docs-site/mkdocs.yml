@@ -125,6 +125,7 @@ nav:
       - operate/index.md
       - The values contract: operate/values-contract.md
       - OIDC and Keycloak: operate/identity-and-oidc.md
+      - Deploy the Studio Viewer: operate/studio-viewer.md
       - Policy in git: operate/policy-in-git.md
       - Upgrade and versioning: operate/upgrade-and-versioning.md
       - Component renames (2026-08): operate/component-renames.md

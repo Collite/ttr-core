@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The same-origin catalog proxy (ttr-core#169): @@BASE@@veles/<route> → @@UPSTREAM@@/<route>, for
+# Veles' READ routes and nothing else. Rendered by ttr-viewer-entrypoint when
+# VIEWER_CATALOG_UPSTREAM is set.
+#
+# Allowed — GET (and HEAD) only:
+#   /model/index  /model/graph  /model/object  /model/search   the JSON read API the viewer browses
+#   /status                                                      polled for a changed model version
+# Everything else under @@BASE@@veles/ is a 404 here — in particular POST /refresh, /admin/*,
+# /model/export and /model/export/dot, /metrics. Exact-match locations, so `/model/export` can never
+# ride in on a `/model/` prefix.
+#
+# The edge's session cookie stays at this hop: Veles reads no cookie, and a credential has no
+# business travelling further than the component that checks it. Identity headers an
+# authenticating proxy sets (X-Forwarded-User, X-Auth-Request-*) pass through unchanged.
+
+location = @@BASE@@veles/model/index {
+    limit_except GET { deny all; }
+    proxy_pass @@UPSTREAM@@/model/index;
+    proxy_http_version 1.1;
+    proxy_set_header Host $proxy_host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Cookie "";
+}
+
+location = @@BASE@@veles/model/graph {
+    limit_except GET { deny all; }
+    proxy_pass @@UPSTREAM@@/model/graph;
+    proxy_http_version 1.1;
+    proxy_set_header Host $proxy_host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Cookie "";
+}
+
+location = @@BASE@@veles/model/object {
+    limit_except GET { deny all; }
+    proxy_pass @@UPSTREAM@@/model/object;
+    proxy_http_version 1.1;
+    proxy_set_header Host $proxy_host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Cookie "";
+}
+
+location = @@BASE@@veles/model/search {
+    limit_except GET { deny all; }
+    proxy_pass @@UPSTREAM@@/model/search;
+    proxy_http_version 1.1;
+    proxy_set_header Host $proxy_host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Cookie "";
+}
+
+location = @@BASE@@veles/status {
+    limit_except GET { deny all; }
+    proxy_pass @@UPSTREAM@@/status;
+    proxy_http_version 1.1;
+    proxy_set_header Host $proxy_host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Cookie "";
+}
+
+location ^~ @@BASE@@veles/ {
+    default_type application/json;
+    add_header Cache-Control "no-store" always;
+    add_header X-Content-Type-Options nosniff always;
+    return 404 '{"error":"not a catalog read route"}';
+}

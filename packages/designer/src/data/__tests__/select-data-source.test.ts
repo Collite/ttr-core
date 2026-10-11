@@ -106,4 +106,32 @@ describe('selectBackend', () => {
   it('rejects `?veles=` and `?demo=` together (conflicting backends)', () => {
     expect(() => selectBackend('?veles=/veles&demo=v1.1-mini')).toThrow(BackendSelectionError);
   });
+
+  // ttr-core#169 — the deployment's catalog comes from the runtime config (config.json), not a
+  // query parameter. The URL still wins: an explicit choice beats a deployment default.
+  describe('runtime-config default (VIEWER_CATALOG_URL)', () => {
+    it('opens the configured catalog when the URL selects nothing', () => {
+      expect(selectBackend('', { veles: '/veles' })).toEqual({ kind: 'veles', transport: 'read-api', base: '/veles' });
+      expect(selectBackend('', { veles: '/models/veles' })).toEqual({ kind: 'veles', transport: 'read-api', base: '/models/veles' });
+      expect(selectBackend('', { veles: 'wss://veles.example.com' })).toEqual({
+        kind: 'veles', transport: 'ttrm', origin: 'wss://veles.example.com', token: null,
+      });
+    });
+
+    it('lets ?veles= / ?server= / ?demo= override the configured catalog', () => {
+      const cfg = { veles: '/veles' };
+      expect(selectBackend('?veles=http://localhost:7260', cfg)).toEqual({ kind: 'veles', transport: 'read-api', base: 'http://localhost:7260' });
+      expect(selectBackend('?server=ws://127.0.0.1:7270', cfg)).toEqual({ kind: 'ws', origin: 'ws://127.0.0.1:7270' });
+      expect(selectBackend('?demo=v1.1-mini', cfg)).toEqual({ kind: 'worker', demo: 'v1.1-mini' });
+    });
+
+    it('falls back to the worker landing with no configured catalog', () => {
+      expect(selectBackend('', { veles: null })).toEqual({ kind: 'worker', demo: null });
+    });
+
+    it('rejects a malformed configured catalog visibly, naming where it came from', () => {
+      expect(() => selectBackend('', { veles: '//evil.example.com' })).toThrow(/config\.json/);
+      expect(() => selectBackend('', { veles: 'http://localhost:7260/model' })).toThrow(BackendSelectionError);
+    });
+  });
 });

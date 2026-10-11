@@ -24,6 +24,7 @@ import { ManifestProgramSource } from './model/ttrp/manifest-program-source';
 import type { ProcessingGraphSource } from './model/processing-source';
 import { useAuthoringContext } from './ext/use-authoring-context.js';
 import { createLspClient, type LspClient } from './lsp-client';
+import { getRuntimeConfig } from './runtime-config';
 import { loadDemoFiles } from './fs/demo-loader';
 import { loadProjectViaFileSystemAccessAPI, type ProjectFiles } from './fs/file-system';
 import { applyWorkspaceEdit } from './lsp/apply-workspace-edit';
@@ -36,7 +37,7 @@ function isModelFile(relativePath: string): boolean {
 
 function resolveBackend(): BackendSelection | { kind: 'error'; message: string } {
   try {
-    return selectBackend(window.location.search);
+    return selectBackend(window.location.search, getRuntimeConfig());
   } catch (err) {
     if (err instanceof BackendSelectionError) return { kind: 'error', message: err.message };
     throw err;
@@ -46,11 +47,13 @@ function resolveBackend(): BackendSelection | { kind: 'error'; message: string }
 /** The server-backed selections (everything except worker). */
 type ServerSelection = Extract<BackendSelection, { kind: 'ws' | 'veles' }>;
 
-function BackendErrorScreen({ message }: { message: string }) {
+/** A fatal screen. The title names WHAT failed: a bad backend selection, a failed load, or an
+ *  unreachable backend are different problems and must not share one heading (ttr-core#112). */
+function BackendErrorScreen({ message, title = 'Invalid backend selection' }: { message: string; title?: string }) {
   return (
     <div className="flex flex-col items-center justify-center h-screen gap-4 p-12 bg-gray-50">
       <div className="bg-white border border-red-300 rounded-xl shadow-lg p-8 max-w-md text-center">
-        <h2 className="text-xl font-bold text-red-700 mb-2">Invalid backend selection</h2>
+        <h2 data-testid="error-title" className="text-xl font-bold text-red-700 mb-2">{title}</h2>
         <p className="text-sm text-slate-600 break-words">{message}</p>
       </div>
     </div>
@@ -239,7 +242,7 @@ function WorkerStudio({ demo }: { demo: string | null }) {
     }
   };
 
-  if (error && !ready) return <BackendErrorScreen message={error} />;
+  if (error && !ready) return <BackendErrorScreen title="Could not load the project" message={error} />;
   if (ready) return <Studio {...ready} />;
   if (loading) return <Splash><p className="text-gray-500">Loading…</p></Splash>;
   return (
@@ -355,7 +358,7 @@ function ServerStudio(props: ServerSelection) {
     // a re-mount (on a token/origin change) can't blank the live one.
   }, [ready, httpBase, bearer]);
 
-  if (error) return <BackendErrorScreen message={error} />;
+  if (error) return <BackendErrorScreen title={props.kind === 'ws' ? 'Could not reach the designer server' : 'Could not reach the catalog'} message={error} />;
   if (!ready) return <Splash><p className="text-gray-500">Connecting to the {props.kind} backend…</p></Splash>;
   return (
     <>

@@ -12,6 +12,9 @@ where policy lives, and how to answer "why did it say that?" six months later.
   honours, what it does, and what happens if you leave it at its default.
 - [**OIDC and Keycloak**](identity-and-oidc.md) — wiring your IdP, and the
   verification duty that stays yours.
+- [**Deploy the Studio Viewer**](studio-viewer.md) — the read-only model viewer
+  as a container next to Veles: runtime config, the read-only catalog proxy, and
+  the cookie-session edge it expects.
 - [**Policy in git**](policy-in-git.md) — the open validator store: writing,
   reviewing, and shipping policy the same way you ship the model.
 - [**Upgrade and versioning**](upgrade-and-versioning.md) — what the product
