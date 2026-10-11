@@ -13,22 +13,19 @@ import io.kotest.matchers.shouldBe
 import java.nio.file.Path
 
 /**
- * v2.1 — cross-loader round-trip against modeler's canonical `samples/2.1/`
- * corpus. The same three files (`db.ttr`, `er.ttr`, `map.ttr`) are checked in
- * here under `resources/v2-1-samples/` and loaded through ai-platform's
- * `FileBasedSource` → `ModelReconciler` pipeline.
+ * v2.1 — cross-loader round-trip against the canonical `samples/2.1/` corpus (a
+ * small slice of the Hartland demo database). The same three files (`db.ttr`,
+ * `er.ttr`, `map.ttr`) are checked in here under `resources/v2-1-samples/` and
+ * loaded through the `FileBasedSource` → `ModelReconciler` pipeline.
  *
  * This locks the inline-mapping contract between the two repos: any drift in
  * the grammar / walker / synthesizer / validator that changes the synthesised
  * `Er2Db*Mapping` inventory will fail this spec before it lands.
  *
- * Source of truth: `modeler/samples/2.1/{db,er,map}.ttr`. If the modeler
- * sample is intentionally changed, re-copy the files via:
- *
- *     cp ~/Dev/modeler/samples/2.1/{db,er,map}.ttr \
- *        infra/metadata/src/test/resources/v2-1-samples/
- *
- * and update the expected inventory below.
+ * Source of truth: `samples/2.1/{db,er,map}.ttrm` (repo root). The copies here use
+ * the older reference spelling (`db.dbo.<name>` without the `table.` / `fk.`
+ * segment, `model er schema entity`); if the sample is intentionally changed,
+ * re-copy it in that spelling and update the expected inventory below.
  */
 class V21SamplesSpec :
     StringSpec({
@@ -58,48 +55,48 @@ class V21SamplesSpec :
             dup shouldHaveSize 0
         }
 
-        "samples/2.1 — entity-level inline mapping (artikl) synthesises Er2DbEntityMapping + 5 columns" {
+        "samples/2.1 — entity-level inline mapping (item) synthesises Er2DbEntityMapping + 5 columns" {
             val result = load()
             val entityMappings = result.model.mappings.filterIsInstance<Er2DbEntityMapping>()
 
-            val artikl = entityMappings.single { it.qname.name == "artikl" }
-            artikl.mappingSource shouldBe MappingSource.Inline("entity")
+            val item = entityMappings.single { it.qname.name == "item" }
+            item.mappingSource shouldBe MappingSource.Inline("entity")
 
-            // 5 inline-entity attribute mappings for artikl's columns map
-            val artiklAttrs =
+            // 5 inline-entity attribute mappings for item's columns map
+            val itemAttrs =
                 result.model.mappings
                     .filterIsInstance<Er2DbAttributeMapping>()
-                    .filter { it.qname.name.startsWith("artikl.") }
-            artiklAttrs shouldHaveSize 5
-            artiklAttrs.all { it.mappingSource == MappingSource.Inline("entity") } shouldBe true
-            artiklAttrs.map { it.qname.name }.toSet() shouldBe
+                    .filter { it.qname.name.startsWith("item.") }
+            itemAttrs shouldHaveSize 5
+            itemAttrs.all { it.mappingSource == MappingSource.Inline("entity") } shouldBe true
+            itemAttrs.map { it.qname.name }.toSet() shouldBe
                 setOf(
-                    "artikl.id_artiklu",
-                    "artikl.kód_artiklu",
-                    "artikl.název_artiklu",
-                    "artikl.id_produktu",
-                    "artikl.id_podproduktu",
+                    "item.sk",
+                    "item.item_id",
+                    "item.product_name",
+                    "item.category_id",
+                    "item.class_id",
                 )
         }
 
-        "samples/2.1 — attribute-level inline mapping (produkt) synthesises 3 Er2DbAttributeMapping records" {
+        "samples/2.1 — attribute-level inline mapping (category) synthesises 3 Er2DbAttributeMapping records" {
             val result = load()
-            val produktAttrs =
+            val categoryAttrs =
                 result.model.mappings
                     .filterIsInstance<Er2DbAttributeMapping>()
-                    .filter { it.qname.name.startsWith("produkt.") }
-            produktAttrs shouldHaveSize 3
-            produktAttrs.all { it.mappingSource == MappingSource.Inline("attribute") } shouldBe true
-            produktAttrs.map { it.qname.name }.toSet() shouldBe
-                setOf("produkt.id_produktu", "produkt.kód_produktu", "produkt.název_produktu")
+                    .filter { it.qname.name.startsWith("category.") }
+            categoryAttrs shouldHaveSize 3
+            categoryAttrs.all { it.mappingSource == MappingSource.Inline("attribute") } shouldBe true
+            categoryAttrs.map { it.qname.name }.toSet() shouldBe
+                setOf("category.sk", "category.category_code", "category.category_name")
         }
 
-        "samples/2.1 — relation-level inline mappings (artikl_produkt + artikl_podprodukt) both Inline" {
+        "samples/2.1 — relation-level inline mappings (item_in_category + item_in_class) both Inline" {
             val result = load()
             val relMappings = result.model.mappings.filterIsInstance<Er2DbRelationMapping>()
             val inline = relMappings.filter { it.mappingSource is MappingSource.Inline }
             inline.map { it.qname.name }.toSet() shouldBe
-                setOf("artikl_produkt", "artikl_podprodukt")
+                setOf("item_in_category", "item_in_class")
         }
 
         "samples/2.1 — explicit map.ttr contributes 4 explicit entity mappings + 3 explicit relation mappings" {
@@ -109,14 +106,14 @@ class V21SamplesSpec :
                     .filterIsInstance<Er2DbEntityMapping>()
                     .filter { it.mappingSource is MappingSource.Explicit }
             explicitEntities.map { it.qname.name }.toSet() shouldBe
-                setOf("podprodukt", "obchodní_kanál", "tržní_skupina", "subjekt")
+                setOf("item_class", "market", "division", "store")
 
             val explicitRelations =
                 result.model.mappings
                     .filterIsInstance<Er2DbRelationMapping>()
                     .filter { it.mappingSource is MappingSource.Explicit }
             explicitRelations.map { it.qname.name }.toSet() shouldBe
-                setOf("podprodukt_produkt", "obchodní_kanál_tržní_skupina", "subjekt_obchodní_kanál")
+                setOf("class_in_category", "market_in_division", "store_in_market")
         }
 
         // MH — the authored `cardinality:` now reaches the model. It used to be dropped on the
@@ -134,22 +131,22 @@ class V21SamplesSpec :
 
             // `to: "0..1"` — the optional side. This is the shape that makes two readings of one
             // word DIFFER, so reading it as mandatory would be the expensive mistake.
-            relations.getValue("artikl_produkt").cardinality.toMin shouldBe 0
-            relations.getValue("artikl_produkt").cardinality.toMax shouldBe 1
+            relations.getValue("item_in_category").cardinality.toMin shouldBe 0
+            relations.getValue("item_in_category").cardinality.toMax shouldBe 1
             // `to: "1"` — exactly one.
-            relations.getValue("artikl_podprodukt").cardinality.toMin shouldBe 1
-            relations.getValue("artikl_podprodukt").cardinality.toMax shouldBe 1
+            relations.getValue("item_in_class").cardinality.toMin shouldBe 1
+            relations.getValue("item_in_class").cardinality.toMax shouldBe 1
             // `from: "0..*"` — unbounded is -1, the value the hardcoded default used.
-            relations.getValue("artikl_podprodukt").cardinality.fromMin shouldBe 0
-            relations.getValue("artikl_podprodukt").cardinality.fromMax shouldBe -1
+            relations.getValue("item_in_class").cardinality.fromMin shouldBe 0
+            relations.getValue("item_in_class").cardinality.fromMax shouldBe -1
             // `from: "1..*"`.
-            relations.getValue("obchodní_kanál_tržní_skupina").cardinality.fromMin shouldBe 1
-            relations.getValue("obchodní_kanál_tržní_skupina").cardinality.fromMax shouldBe -1
+            relations.getValue("market_in_division").cardinality.fromMin shouldBe 1
+            relations.getValue("market_in_division").cardinality.fromMax shouldBe -1
             // `from: "*"` (bare many) and `to: "1..*"`.
-            relations.getValue("subjekt_obchodní_kanál").cardinality.fromMin shouldBe 0
-            relations.getValue("subjekt_obchodní_kanál").cardinality.fromMax shouldBe -1
-            relations.getValue("subjekt_obchodní_kanál").cardinality.toMin shouldBe 1
-            relations.getValue("subjekt_obchodní_kanál").cardinality.toMax shouldBe -1
+            relations.getValue("store_in_market").cardinality.fromMin shouldBe 0
+            relations.getValue("store_in_market").cardinality.fromMax shouldBe -1
+            relations.getValue("store_in_market").cardinality.toMin shouldBe 1
+            relations.getValue("store_in_market").cardinality.toMax shouldBe -1
         }
 
         "samples/2.1 — full mapping inventory: 5 entity + 15 attribute + 5 relation" {

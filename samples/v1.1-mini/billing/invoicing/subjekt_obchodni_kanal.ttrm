@@ -1,9 +1,0 @@
-package billing.invoicing
-
-model er
-
-def relation subjekt_obchodní_kanál { description: "Subjekt obsluhuje obchodní kanál",
-    from: er.entity.subjekt, to: er.entity.obchodní_kanál,
-    cardinality: { from: "*", to: "1..*" },
-    join: [{ from: er.entity.subjekt.id_kanálu, to: er.entity.obchodní_kanál.id_kanálu }]
-}

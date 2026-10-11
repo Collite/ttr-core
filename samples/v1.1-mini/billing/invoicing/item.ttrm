@@ -1,0 +1,17 @@
+package billing.invoicing
+
+model er
+
+def entity item { description: """Products (TPC-DS item) and their properties.
+""",
+    displayLabel: { en: "Item", cs: "Produkt" },
+    nameAttribute: product_name,
+    codeAttribute: item_id,
+    attributes: [
+        def attribute sk { type: int, isKey: true, description: "Unique item identifier" },
+        def attribute item_id { type: text, optional: true, description: "Unique item code" },
+        def attribute product_name { type: text, optional: true, description: "Product name" },
+        def attribute category_id { type: int, optional: true, description: "Link to the parent category" },
+        def attribute class_id { type: int, optional: true, description: "Link to the parent class" }
+    ]
+}

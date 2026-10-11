@@ -1,1467 +1,1514 @@
 model query schema query
 
-def query aktivni_artikly { description: "Seznam aktivních artiklů", sourceText: """sql
+def query active_items { description: "List of currently valid items", sourceText: """sql
 SELECT
-  IDZBOZI,
-  CIS_ZBOZI,
-  NAZEV_ZBOZI,
-  VLPODTYP_SLOZ
-FROM QZBOZI_DF
-WHERE VLTYP_SLOZ = 1
-  AND VLSTAVZBOZI = 0
-ORDER BY NAZEV_ZBOZI;
-""", search { patterns: ["seznam (všech |)aktivních artiklů"], }}
+  i_item_sk,
+  i_item_id,
+  i_product_name,
+  i_current_price
+FROM item
+WHERE i_rec_end_date IS NULL
+ORDER BY i_product_name;
+""", search { patterns: ["(list of |)(all |)(active|current) (items|products)"], examples: ["List all active products"], }}
 
-def query artikl__filter { description: "Synthetic query materialising the row-filter declared on YAML entity artikl.", sourceText: "SELECT * FROM QZBOZI_DF WHERE VLTYP_SLOZ=1", tags: ["synthetic", "yaml-import", "where-filter"],}
+def query active_promotion__filter { description: "Synthetic query materialising the row filter of entity active_promotion.", sourceText: "SELECT * FROM promotion WHERE p_discount_active = 'Y'", tags: ["synthetic", "where-filter"],}
 
-def query artikly_navstevy { description: "Seznam artiklů pro konkrétní návštěvu zákazníka", sourceText: """sql
+def query basket_size_by_store { description: "Average basket size and value per store in a year", sourceText: """sql
 SELECT
-  anz.IDXXPLNPOLDISTR,
-  anz.IDXXNAVSTEVAOZ,
-  a.CIS_ZBOZI,
-  a.NAZEV_ZBOZI,
-  anz.DTPOSLDODANI,
-  anz.MNPOSLDODANI,
-  anz.MNFACING,
-  anz.MNARTIKL_SIRKA,
-  anz.MNDELKA_REG_ART
-FROM QXXPLNPOLDISTR_AT anz
-JOIN QZBOZI_DF a ON a.IDZBOZI = anz.IDZBOZI AND a.VLTYP_SLOZ = 1
-WHERE ({id_navstevy} = '' OR anz.IDXXNAVSTEVAOZ = {id_navstevy})
-ORDER BY a.NAZEV_ZBOZI;
-""", search { patterns: ["(seznam |)artikl(ů|y) (z |pro |)(konkrétní |)návštěv(y|u)( zákazníka|) {id_navstevy}"], }
+  s.s_store_name,
+  COUNT(DISTINCT ss.ss_ticket_number) AS baskets,
+  SUM(ss.ss_quantity) * 1.0 / COUNT(DISTINCT ss.ss_ticket_number) AS avg_units_per_basket,
+  SUM(ss.ss_ext_sales_price) / COUNT(DISTINCT ss.ss_ticket_number) AS avg_basket_value
+FROM store_sales ss
+JOIN store s ON s.s_store_sk = ss.ss_store_sk
+JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+WHERE d.d_year = {year}
+GROUP BY s.s_store_name
+ORDER BY avg_basket_value DESC;
+""", search { patterns: ["(average |)basket (size|value) (by|per) store (in |)({year}|)"], }
     parameters: [
-        { name: id_navstevy, type: varchar },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query artikly_pro_obchodni_kanal { description: "Seznam artiklů přiřazených k obchodnímu kanálu (listing)", sourceText: """sql
+def query brand_revenue_by_year { description: "Store revenue of a brand by year, read through the item's denormalised brand column", sourceText: """sql
+-- TPC-DS keeps the brand name on item itself (i_brand); the model normalises it into item_brand.
 SELECT
-  a.IDZBOZI,
-  a.CIS_ZBOZI,
-  a.NAZEV_ZBOZI,
-  ok.CEN_SKUP,
-  aok.VLVYZNAM_Z
-FROM QZBOZI_DF a
-JOIN QXXLISTING aok ON a.IDZBOZI = aok.IDZBOZI AND a.VLTYP_SLOZ = 1
-JOIN QCENSKUP_DF ok ON ok.IDCENSKUP = aok.IDCENSKUP
-WHERE ({id_obchodniho_kanalu} = '' OR aok.IDCENSKUP = {id_obchodniho_kanalu})
-  AND ok.CEN_SKUP COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_kanalu}, '%')
-ORDER BY a.NAZEV_ZBOZI;
-""", search { patterns: ["artikly (pro |v |)obchodní(m|) kanál(u|) {kod_kanalu}"], }
+  d.d_year,
+  i.i_brand,
+  SUM(ss.ss_ext_sales_price) AS revenue
+FROM store_sales ss
+JOIN item i ON i.i_item_sk = ss.ss_item_sk
+JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+WHERE i.i_brand COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {brand_name}, '%')
+GROUP BY d.d_year, i.i_brand
+ORDER BY d.d_year;
+""", search { patterns: ["(yearly |)revenue of (the |)brand {brand_name} (by|per) year"], }
     parameters: [
-        { name: id_obchodniho_kanalu, type: varchar },
-        { name: kod_kanalu, type: varchar, label: "Kód kanálu" },
+        { name: brand_name, type: varchar, label: "Brand name" },
     ]
 }
 
-def query artikly_pro_trzni_skupinu { description: "Seznam artiklů přiřazených k tržní skupině", sourceText: """sql
+def query brands_per_class { description: "Classes carried under more than one brand", sourceText: """sql
 SELECT
-  a.IDZBOZI,
-  a.CIS_ZBOZI,
-  a.NAZEV_ZBOZI,
-  ts.NAZEV_SKUPZNACZBOZI,
-  ats.VLVYZNAM_Z
-FROM QZBOZI_DF a
-JOIN QXXTRSKUPZBOZI ats ON a.IDZBOZI = ats.IDZBOZI AND a.VLTYP_SLOZ = 1
-JOIN QSKUPZNACZBOZI_DF ts ON ts.IDSKUPZNACZBOZI = ats.IDSKUPZNACZBOZI
-WHERE ({id_trzni_skupiny} = '' OR ats.IDSKUPZNACZBOZI = {id_trzni_skupiny})
-  AND ts.KOD_SKUPZNACZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_trzni_skupiny}, '%')
-ORDER BY a.NAZEV_ZBOZI;
-""", search { patterns: ["artikly (pro |v |)tržní skupin(u|ě) {kod_trzni_skupiny}"], }
+  cl.i_class,
+  COUNT(DISTINCT b.i_brand_id) AS brand_count
+FROM item_class cl
+JOIN item_brand b ON b.i_class_id = cl.i_class_id
+GROUP BY cl.i_class
+HAVING COUNT(DISTINCT b.i_brand_id) > 1
+ORDER BY brand_count DESC;
+""", search { patterns: ["(classes|class) with (more than one|several|multiple) brands"], }}
+
+def query bulk_catalog_order__filter { description: "Synthetic query materialising the row filter of entity bulk_catalog_order.", sourceText: "SELECT * FROM catalog_sales WHERE cs_quantity >= 50", tags: ["synthetic", "where-filter"],}
+
+def query bulk_marketplace_orders { description: "The 50 largest marketplace order lines of at least 50 units", sourceText: """sql
+SELECT TOP 50
+  cs.cs_order_number,
+  i.i_product_name,
+  c.c_customer_id,
+  cs.cs_quantity,
+  cs.cs_ext_sales_price
+FROM catalog_sales cs
+JOIN item i ON i.i_item_sk = cs.cs_item_sk
+LEFT JOIN customer c ON c.c_customer_sk = cs.cs_bill_customer_sk
+WHERE cs.cs_quantity >= 50
+ORDER BY cs.cs_quantity DESC, cs.cs_ext_sales_price DESC;
+""", search { patterns: ["(largest|bulk) marketplace order(s| lines)"], }}
+
+def query call_center__filter { description: "Synthetic query materialising the row filter of entity call_center.", sourceText: "SELECT * FROM call_center WHERE cc_rec_end_date IS NULL", tags: ["synthetic", "where-filter"],}
+
+def query call_centers_by_state { description: "Current seller support centers in a state", sourceText: """sql
+SELECT
+  cc_call_center_id,
+  cc_name,
+  cc_class,
+  cc_employees,
+  cc_city
+FROM call_center
+WHERE cc_rec_end_date IS NULL
+  AND ({state} = '' OR cc_state = {state})
+ORDER BY cc_name;
+""", search { patterns: ["(seller |)support centers (in|of) {state}"], }
     parameters: [
-        { name: id_trzni_skupiny, type: varchar },
-        { name: kod_trzni_skupiny, type: varchar, label: "Kód tržní skupiny" },
+        { name: state, type: varchar, label: "State" },
     ]
 }
 
-def query artikly_produktu { description: "Artikly v produktové skupině", sourceText: """sql
+def query catalog_pages { description: "Pages of a marketplace catalog", sourceText: """sql
 SELECT
-       z.IDZBOZI,
-       z.CIS_ZBOZI,
-       z.NAZEV_ZBOZI
-FROM QZBOZI_DF z
-JOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = z.IDSKUPZBOZI
-WHERE z.VLTYP_SLOZ = 1
-  AND p.NAZEV_SKUP_ZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_produktu}, '%')
-ORDER BY z.NAZEV_ZBOZI;
-""", search { patterns: ["(jaké|jake|jaka) artikly patří do produktu {nazev_produktu}"], examples: ["Jaké artikly patří do produktu Ostřikovače?"], }
+  cp_catalog_page_number,
+  cp_department,
+  cp_description,
+  cp_type
+FROM catalog_page
+WHERE cp_catalog_number = {catalog_number}
+ORDER BY cp_catalog_page_number;
+""", search { patterns: ["pages (of|in) (the |)catalog {catalog_number}"], }
     parameters: [
-        { name: nazev_produktu, type: varchar, label: "Název produktu" },
+        { name: catalog_number, type: int, label: "Catalog number" },
     ]
 }
 
-def query denni_vykazy_oz { description: "Seznam denních výkazů obchodních zástupců", sourceText: """sql
+def query category_class_tree { description: "Product categories with their classes and the number of items in each", sourceText: """sql
 SELECT
-       dv.IDXXDENNIPLANOZ,
-       dv.IDUZIVATEL_DE,
-       u.JMENO_UZIV,
-       dv.DTDEN
-FROM QXXDENNIPLANOZ dv
-JOIN QUZIVATEL_DF u ON u.IDUZIVATEL = dv.IDUZIVATEL_DE
-WHERE ({id_obchodniho_zastupce} = '' OR dv.IDUZIVATEL_DE = {id_obchodniho_zastupce})
-  AND ({jmeno_oz} = '' OR u.JMENO_UZIV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {jmeno_oz}, '%'))
-ORDER BY dv.DTDEN DESC;
-""", search { patterns: ["denní výkazy( obchodního zástupce|)( {jmeno_oz}|)"], }
+  c.i_category,
+  cl.i_class,
+  COUNT(i.i_item_sk) AS item_count
+FROM item_category c
+JOIN item_class cl ON cl.i_category_id = c.i_category_id
+LEFT JOIN item i ON i.i_class_id = cl.i_class_id AND i.i_rec_end_date IS NULL
+GROUP BY c.i_category, cl.i_class
+ORDER BY c.i_category, cl.i_class;
+""", search { patterns: ["(product |)(category|categories) (and|with) (their |)class(es|)"], examples: ["Show the product categories with their classes"], }}
+
+def query channel_revenue_monthly { description: "Monthly revenue by channel for a range of years; channel is store, web, marketplace, or all", sourceText: """sql
+WITH monthly AS (
+    SELECT CAST('store' AS VARCHAR(16)) AS channel, d.d_year, d.d_moy, SUM(ss.ss_ext_sales_price) AS revenue
+    FROM store_sales ss JOIN date_dim d ON ss.ss_sold_date_sk = d.d_date_sk
+    WHERE d.d_year BETWEEN {year_from} AND {year_to}
+    GROUP BY d.d_year, d.d_moy
+    UNION ALL
+    SELECT CAST('web' AS VARCHAR(16)), d.d_year, d.d_moy, SUM(ws.ws_ext_sales_price)
+    FROM web_sales ws JOIN date_dim d ON ws.ws_sold_date_sk = d.d_date_sk
+    WHERE d.d_year BETWEEN {year_from} AND {year_to}
+    GROUP BY d.d_year, d.d_moy
+    UNION ALL
+    SELECT CAST('marketplace' AS VARCHAR(16)), d.d_year, d.d_moy, SUM(cs.cs_ext_sales_price)
+    FROM catalog_sales cs JOIN date_dim d ON cs.cs_sold_date_sk = d.d_date_sk
+    WHERE d.d_year BETWEEN {year_from} AND {year_to}
+    GROUP BY d.d_year, d.d_moy
+)
+SELECT channel, d_year, d_moy, revenue
+FROM monthly
+WHERE {channel} = 'all' OR channel = {channel}
+ORDER BY d_year, d_moy, channel;
+""", search { patterns: ["(monthly|month by month) revenue (per|by) channel", "revenue by channel over time"], examples: ["Monthly revenue by channel"], }
     parameters: [
-        { name: id_obchodniho_zastupce, type: varchar },
-        { name: jmeno_oz, type: varchar, label: "Jméno obchodního zástupce" },
+        { name: channel, type: varchar, label: "Channel" },
+        { name: year_from, type: int, label: "From year" },
+        { name: year_to, type: int, label: "To year" },
     ]
 }
 
-def query dobropis__filter { description: "Synthetic query materialising the row-filter declared on YAML entity dobropis.", sourceText: "SELECT * FROM QHDOK_FAV_DF WHERE TYP_DOK='FVU' AND HDKUHRADEVAL<0", tags: ["synthetic", "yaml-import", "where-filter"],}
-
-def query dobropisy_zakaznika { description: "Seznam dobropisů pro zákazníka", sourceText: """sql
-SELECT
-       d.IDHDOK,
-       d.CIS_DOK,
-       s.SUBJ_NAZEV,
-       d.DTVYSTAVENO,
-       d.DTSPLATNO,
-       d.VLSTAVHDOK
-FROM QHDOK_FAV_DF d
-JOIN QSUBJEKT s ON s.IDSUBJEKT = d.IDSUBJEKT
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND d.TYP_DOK = 'FVU' 
-  AND d.HDKUHRADEVAL < 0
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-ORDER BY d.DTVYSTAVENO DESC;
-""", search { patterns: ["(existují dobropisy|existuji dobropisy|seznam dobropisů|seznam dobropisu) (pro |zákazníka |zakaznika ){nazev_zakaznika}"], examples: ["Existují dobropisy pro Tesco?"], }
+def query channel_revenue_yoy { description: "Year-over-year revenue by channel, with the change in percent", sourceText: """sql
+WITH cur AS (
+    SELECT channel, SUM(ext_sales_price) AS revenue
+    FROM channel_sales cs JOIN date_dim d ON d.d_date_sk = cs.sold_date_sk
+    WHERE d.d_year = {year}
+    GROUP BY channel
+), prior AS (
+    SELECT channel, SUM(ext_sales_price) AS revenue
+    FROM channel_sales cs JOIN date_dim d ON d.d_date_sk = cs.sold_date_sk
+    WHERE d.d_year = {prior_year}
+    GROUP BY channel
+)
+SELECT cur.channel,
+       cur.revenue AS revenue_current,
+       prior.revenue AS revenue_prior,
+       (cur.revenue - prior.revenue) / NULLIF(prior.revenue, 0) * 100 AS yoy_pct
+FROM cur
+JOIN prior ON cur.channel = prior.channel
+ORDER BY cur.channel;
+""", search { patterns: ["(year over year|year-over-year|yoy) revenue (per|by) channel", "compare revenue {prior_year} (vs|versus|and) {year}"], examples: ["Compare web and marketplace revenue, 2024 vs 2025"], }
     parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
+        { name: year, type: int, label: "Year" },
+        { name: prior_year, type: int, label: "Prior year" },
     ]
 }
 
-def query dodaci_mista_zakaznika { description: "Seznam dodacích míst zákazníka", sourceText: """sql
+def query channel_sales_by_category { description: "Revenue by channel and product category in a year", sourceText: """sql
 SELECT
-      dm.IDSUBJADR,
-       dm.SUBJADR_POZNAMKA,
-       dm.ULICE,
-       dm.MESTO
-FROM QSUBJADR_DF dm
-JOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND dm.VLSUBJADR_TYP = 2
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-ORDER BY dm.SUBJADR_POZNAMKA;
-""", search { patterns: ["(jaká|jake|jaka) (dodací místa|dodaci mista|pobočky|provozovny) (má|ma) {nazev_zakaznika}"], examples: ["Jaká dodací místa má Tesco?"], }
+  cs.channel,
+  c.i_category,
+  SUM(cs.ext_sales_price) AS revenue,
+  SUM(cs.quantity) AS units_sold
+FROM channel_sales cs
+JOIN item i ON i.i_item_sk = cs.item_sk
+JOIN item_category c ON c.i_category_id = i.i_category_id
+JOIN date_dim d ON d.d_date_sk = cs.sold_date_sk
+WHERE d.d_year = {year}
+GROUP BY cs.channel, c.i_category
+ORDER BY cs.channel, revenue DESC;
+""", search { patterns: ["revenue by channel and category (in |)({year}|)"], }
     parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query dodací_místo__filter { description: "Synthetic query materialising the row-filter declared on YAML entity dodací_místo.", sourceText: "SELECT * FROM QSUBJADR_DF WHERE VLSUBJADR_TYP = 2", tags: ["synthetic", "yaml-import", "where-filter"],}
-
-def query faktura__filter { description: "Synthetic query materialising the row-filter declared on YAML entity faktura.", sourceText: "SELECT * FROM QHDOK_FAV_DF WHERE TYP_DOK='FVU' AND HDKUHRADEVAL>=0", tags: ["synthetic", "yaml-import", "where-filter"],}
-
-def query faktury_zakaznika { description: "Seznam faktur zákazníka", sourceText: """sql
+def query closed_stores { description: "Stores that have closed, with the closing date", sourceText: """sql
 SELECT
-       f.IDHDOK,
-       f.CIS_DOK,
-       s.SUBJ_NAZEV,
-       f.DTVYSTAVENO,
-       f.DTSPLATNO,
-       f.HDKUHRADEVAL,
-       f.VLSTAVHDOK
-FROM QHDOK_FAV_DF f
-JOIN QSUBJEKT s ON s.IDSUBJEKT = f.IDSUBJEKT
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND f.TYP_DOK = 'FVU'
-  AND f.HDKUHRADEVAL >= 0
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-ORDER BY f.DTVYSTAVENO DESC;
-""", search { patterns: ["(faktury|seznam faktur) (zákazníka |zakaznika |pro zákazníka |pro zakaznika |pro |){nazev_zakaznika}", "(seznam faktur|faktury zákazníka|faktury zakaznika)"], }
+  s.s_store_id,
+  s.s_store_name,
+  s.s_city,
+  d.d_date AS closed_on,
+  DATEDIFF(day, d.d_date, GETDATE()) AS days_closed
+FROM store s
+JOIN date_dim d ON d.d_date_sk = s.s_closed_date_sk
+WHERE s.s_closed_date_sk IS NOT NULL
+ORDER BY d.d_date DESC;
+""", search { patterns: ["(closed|shut) stores", "which stores (have |)closed"], }}
+
+def query customer_channel_overlap { description: "How many customers buy in one, two or all three channels in a year", sourceText: """sql
+SELECT
+  channels_used,
+  COUNT(*) AS customers
+FROM (
+    SELECT
+      ccs_customer_sk,
+      CASE WHEN ccs_store_sales > 0 THEN 1 ELSE 0 END
+        + CASE WHEN ccs_web_sales > 0 THEN 1 ELSE 0 END
+        + CASE WHEN ccs_catalog_sales > 0 THEN 1 ELSE 0 END AS channels_used
+    FROM customer_channel_summary
+    WHERE ccs_year = {year}
+) t
+GROUP BY channels_used
+ORDER BY channels_used;
+""", search { patterns: ["(customer |)channel overlap (in |)({year}|)", "customers buying in (several|more) channels"], }
     parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query hledani_artiklu { description: "Vyhledání artiklu podle názvu", sourceText: """sql
+def query customer_detail { description: "Detail of a customer with the current address and demographics", sourceText: """sql
 SELECT
-       z.IDZBOZI,
-       z.CIS_ZBOZI,
-       z.NAZEV_ZBOZI
-FROM QZBOZI_DF z
-WHERE z.VLTYP_SLOZ = 1
-  AND z.NAZEV_ZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_artiklu}, '%')
-ORDER BY z.NAZEV_ZBOZI;
-""", search { patterns: ["(najdi|hledej|vyhledej) (artikl|zboží) {nazev_artiklu}"], examples: ["Najdi artikl SHERON Zimní ostřikovač"], }
+  c.c_customer_id,
+  c.c_salutation,
+  c.c_first_name,
+  c.c_last_name,
+  c.c_email_address,
+  c.c_birth_year,
+  ca.ca_city,
+  ca.ca_state,
+  cd.cd_gender,
+  cd.cd_marital_status,
+  cd.cd_education_status
+FROM customer c
+LEFT JOIN customer_address ca ON ca.ca_address_sk = c.c_current_addr_sk
+LEFT JOIN customer_demographics cd ON cd.cd_demo_sk = c.c_current_cdemo_sk
+WHERE c.c_customer_id = {customer_code};
+""", search { patterns: ["(detail|details|profile) (of|for) (the |)customer {customer_code}"], }
     parameters: [
-        { name: nazev_artiklu, type: varchar, label: "Název artiklu" },
+        { name: customer_code, type: varchar, label: "Customer code" },
     ]
 }
 
-def query hodnota_zakazky { description: "Hodnota zakázek zákazníka seřazená podle částky (od nejvyšší)", sourceText: """sql
+def query customer_logins { description: "Customers with a web login whose e-mail domain matches", sourceText: """sql
 SELECT
-        z.IDHDOK,
-       z.CIS_DOK,
-       s.SUBJ_NAZEV,
-       dm.SUBJADR_POZNAMKA,
-       z.DTZDANITPLN,
-       z.HDKUHRADEVAL,
-       z.VLSTAVHDOK
-FROM QHDOK_ZAK_DF z
-JOIN QSUBJADR_DF dm ON dm.IDSUBJADR = z.IDSUBJADRP
-JOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND ({id_dodaciho_mista} = '' OR dm.IDSUBJADR = {id_dodaciho_mista})
-  AND z.TYP_DOK = 'POB'
-  AND z.HDKUHRADEVAL >= 0
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-ORDER BY z.HDKUHRADEVAL DESC;
-""", search { patterns: ["(hodnota|cena|celková cena|částka) zakáz(ky|ek) (zákazníka |zakaznika |pro |){nazev_zakaznika}"], }
+  c_customer_id,
+  c_login,
+  c_email_address
+FROM customer
+WHERE c_login IS NOT NULL
+  AND c_email_address LIKE CONCAT('%@', {email_domain})
+ORDER BY c_login;
+""", search { patterns: ["customers with (an |)e-?mail (at|on|from) {email_domain}"], }
     parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: id_dodaciho_mista, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
+        { name: email_domain, type: varchar, label: "E-mail domain" },
     ]
 }
 
-def query info_o_zakaznikovi { description: "Souhrnné informace o zákazníkovi - zakázky, faktury, vratky, dobropisy", sourceText: """sql
--- Zakázky zákazníka
-SELECT 'zakázka' AS typ_zaznamu,
-       z.CIS_DOK AS cislo_dokladu,
-       z.DTVYSTAVENO AS datum,
-       z.DTZDANITPLN AS termin,
-       'datum dodání' AS typ_datumu,
-       CAST(z.VLSTAVHDOK AS VARCHAR) AS stav
-FROM QHDOK_ZAK_DF z
-JOIN QSUBJADR_DF dm ON dm.IDSUBJADR = z.IDSUBJADRP
-JOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND z.TYP_DOK = 'POB' 
-  AND z.HDKUHRADEVAL >= 0
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
+def query customer_names_unicode { description: "Customers whose last name matches a national-character pattern", sourceText: """sql
+SELECT
+  c_customer_id,
+  UPPER(LTRIM(RTRIM(c_last_name))) AS last_name,
+  LEN(c_first_name) AS first_name_length,
+  SUBSTRING(c_email_address, CHARINDEX('@', c_email_address) + 1, 100) AS email_domain
+FROM customer
+WHERE c_last_name LIKE N'%' + {last_name_part} + N'%'
+  AND COALESCE(c_birth_country, N'UNKNOWN') <> N'UNKNOWN'
+ORDER BY last_name;
+""", search { patterns: ["customers (whose|with) last name (containing|like) {last_name_part}"], }
+    parameters: [
+        { name: last_name_part, type: varchar, label: "Part of the last name" },
+    ]
+}
+
+def query customer_purchases { description: "All purchases of a customer across the store, web and marketplace channels", sourceText: """sql
+-- Store purchases
+SELECT CAST('store' AS VARCHAR(16)) AS channel,
+       ss.ss_ticket_number AS basket_number,
+       d.d_date AS purchase_date,
+       i.i_product_name AS product,
+       ss.ss_quantity AS quantity,
+       ss.ss_ext_sales_price AS amount
+FROM store_sales ss
+JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+JOIN item i ON i.i_item_sk = ss.ss_item_sk
+JOIN customer c ON c.c_customer_sk = ss.ss_customer_sk
+WHERE ({customer_sk} = '' OR c.c_customer_sk = {customer_sk})
+  AND c.c_customer_id = {customer_code}
 UNION ALL
--- Faktury zákazníka
-SELECT 'faktura' AS typ_zaznamu,
-       f.CIS_DOK AS cislo_dokladu,
-       f.DTVYSTAVENO AS datum,
-       f.DTSPLATNO AS termin,
-       'datum splatnosti' AS typ_datumu,
-       CAST(f.VLSTAVHDOK AS VARCHAR) AS stav
-FROM QHDOK_FAV_DF f
-JOIN QSUBJEKT s ON s.IDSUBJEKT = f.IDSUBJEKT
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND f.TYP_DOK = 'FVU' 
-  AND f.HDKUHRADEVAL >= 0
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
+-- Web purchases (billed customer)
+SELECT CAST('web' AS VARCHAR(16)),
+       ws.ws_order_number,
+       d.d_date,
+       i.i_product_name,
+       ws.ws_quantity,
+       ws.ws_ext_sales_price
+FROM web_sales ws
+JOIN date_dim d ON d.d_date_sk = ws.ws_sold_date_sk
+JOIN item i ON i.i_item_sk = ws.ws_item_sk
+JOIN customer c ON c.c_customer_sk = ws.ws_bill_customer_sk
+WHERE ({customer_sk} = '' OR c.c_customer_sk = {customer_sk})
+  AND c.c_customer_id = {customer_code}
 UNION ALL
--- Vratky zákazníka
-SELECT 'vratka' AS typ_zaznamu,
-       v.CIS_DOK AS cislo_dokladu,
-       v.DTVYSTAVENO AS datum,
-       v.DTZDANITPLN AS termin,
-       'datum stažení' AS typ_datumu,
-       CAST(v.VLSTAVHDOK AS VARCHAR) AS stav
-FROM QHDOK_ZAK_DF v
-JOIN QSUBJADR_DF dm ON dm.IDSUBJADR = v.IDSUBJADRP
-JOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND v.TYP_DOK = 'POB' 
-  AND v.HDKUHRADEVAL < 0
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
+-- Marketplace purchases (billed customer)
+SELECT CAST('marketplace' AS VARCHAR(16)),
+       cs.cs_order_number,
+       d.d_date,
+       i.i_product_name,
+       cs.cs_quantity,
+       cs.cs_ext_sales_price
+FROM catalog_sales cs
+JOIN date_dim d ON d.d_date_sk = cs.cs_sold_date_sk
+JOIN item i ON i.i_item_sk = cs.cs_item_sk
+JOIN customer c ON c.c_customer_sk = cs.cs_bill_customer_sk
+WHERE ({customer_sk} = '' OR c.c_customer_sk = {customer_sk})
+  AND c.c_customer_id = {customer_code}
+ORDER BY purchase_date DESC;
+""", search { patterns: ["(all |)purchases of (the |)customer {customer_code}", "what did (the |)customer {customer_code} buy"], }
+    parameters: [
+        { name: customer_sk, type: varchar },
+        { name: customer_code, type: varchar, label: "Customer code" },
+    ]
+}
+
+def query customer_returns { description: "All returns of a customer across channels", sourceText: """sql
+-- Store returns
+SELECT 'store' AS channel, sr.sr_ticket_number AS basket_number, d.d_date AS returned_on,
+       r.r_reason_desc AS reason, sr.sr_return_amt AS amount
+FROM store_returns sr
+JOIN date_dim d ON d.d_date_sk = sr.sr_returned_date_sk
+LEFT JOIN reason r ON r.r_reason_sk = sr.sr_reason_sk
+JOIN customer c ON c.c_customer_sk = sr.sr_customer_sk
+WHERE c.c_customer_id = {customer_code}
 UNION ALL
--- Dobropisy zákazníka
-SELECT 'dobropis' AS typ_zaznamu,
-       d.CIS_DOK AS cislo_dokladu,
-       d.DTVYSTAVENO AS datum,
-       d.DTSPLATNO AS termin,
-       'datum splatnosti' AS typ_datumu,
-       CAST(d.VLSTAVHDOK AS VARCHAR) AS stav
-FROM QHDOK_FAV_DF d
-JOIN QSUBJEKT s ON s.IDSUBJEKT = d.IDSUBJEKT
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND d.TYP_DOK = 'FVU' 
-  AND d.HDKUHRADEVAL < 0
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-ORDER BY datum DESC;
-""", search { patterns: ["(co víš o zákazníkovi|informace o zákazníkovi|přehled zákazníka|shrnutí zákazníka|vše o zákazníkovi) {nazev_zakaznika}"], }
+-- Web returns
+SELECT 'web', wr.wr_order_number, d.d_date, r.r_reason_desc, wr.wr_return_amt
+FROM web_returns wr
+JOIN date_dim d ON d.d_date_sk = wr.wr_returned_date_sk
+LEFT JOIN reason r ON r.r_reason_sk = wr.wr_reason_sk
+JOIN customer c ON c.c_customer_sk = wr.wr_returning_customer_sk
+WHERE c.c_customer_id = {customer_code}
+UNION ALL
+-- Marketplace returns
+SELECT 'marketplace', cr.cr_order_number, d.d_date, r.r_reason_desc, cr.cr_return_amount
+FROM catalog_returns cr
+JOIN date_dim d ON d.d_date_sk = cr.cr_returned_date_sk
+LEFT JOIN reason r ON r.r_reason_sk = cr.cr_reason_sk
+JOIN customer c ON c.c_customer_sk = cr.cr_returning_customer_sk
+WHERE c.c_customer_id = {customer_code}
+ORDER BY returned_on DESC;
+""", search { patterns: ["(all |)returns of (the |)customer {customer_code}"], }
     parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
+        { name: customer_code, type: varchar, label: "Customer code" },
     ]
 }
 
-def query informace_o_konkurenci { description: "Seznam informací o konkurenci, volitelně filtrovaný", sourceText: """sql
+def query customers_by_birth_decade { description: "Number of customers by decade of birth", sourceText: """sql
 SELECT
-  ik.IDXXKONKINFO,
-  kd.NAZEV_KONKURENTA AS NAZEV_KONKURENTA_D,
-  kz.NAZEV_KONKURENTA AS NAZEV_KONKURENTA_Z,
-  ts.NAZEV_SKUPZNACZBOZI,
-  ok.CEN_SKUP,
-  p.NAZEV_SKUP_ZBOZI,
-  ik.VLTYP_INFO,
-  ik.VLVLASTNOST_INFO,
-  ik.VLOBLAST_INFO,
-  ik.DTPLATI_OD,
-  ik.DTPLATI_DO
-FROM QXXKONKINFO ik
-LEFT JOIN QXXKONKURENT kd ON kd.IDXXKONKURENT = ik.IDXXKONKURENT_D AND kd.VLTYP_KONK = 1
-LEFT JOIN QXXKONKURENT kz ON kz.IDXXKONKURENT = ik.IDXXKONKURENT_Z AND kz.VLTYP_KONK = 0
-LEFT JOIN QSKUPZNACZBOZI_DF ts ON ts.IDSKUPZNACZBOZI = ik.IDSKUPZNACZBOZI
-LEFT JOIN QCENSKUP_DF ok ON ok.IDCENSKUP = ik.IDCENSKUP
-LEFT JOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = ik.IDSKUPZBOZI
-WHERE ({id_konkurencniho_dodavatele} = '' OR ik.IDXXKONKURENT_D = {id_konkurencniho_dodavatele})
-  AND ({id_konkurencni_znacky} = '' OR ik.IDXXKONKURENT_Z = {id_konkurencni_znacky})
-ORDER BY ik.DTPLATI_OD DESC;
-""", search { patterns: ["informace o konkurenci( pro dodavatele {id_konkurencniho_dodavatele}| pro značku {id_konkurencni_znacky}|)"], }
+  CASE
+    WHEN c_birth_year IS NULL THEN 'unknown'
+    WHEN c_birth_year < 1950 THEN 'before 1950'
+    ELSE CONCAT(CAST((c_birth_year / 10) * 10 AS VARCHAR(4)), 's')
+  END AS birth_decade,
+  COUNT(*) AS customers
+FROM customer
+GROUP BY CASE
+    WHEN c_birth_year IS NULL THEN 'unknown'
+    WHEN c_birth_year < 1950 THEN 'before 1950'
+    ELSE CONCAT(CAST((c_birth_year / 10) * 10 AS VARCHAR(4)), 's')
+  END
+ORDER BY birth_decade;
+""", search { patterns: ["customers by (decade of birth|birth decade|age group)"], }}
+
+def query customers_by_city { description: "Customers living in a city", sourceText: """sql
+SELECT
+  c.c_customer_id,
+  c.c_first_name,
+  c.c_last_name,
+  ca.ca_city,
+  ca.ca_state
+FROM customer c
+JOIN customer_address ca ON ca.ca_address_sk = c.c_current_addr_sk
+WHERE ca.ca_city COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {city}, '%')
+  AND ca.ca_gmt_offset IN (-5.00, -6.00)
+ORDER BY c.c_last_name, c.c_first_name;
+""", search { patterns: ["customers (in|from|living in) {city}"], examples: ["Customers living in Fairview"], }
     parameters: [
-        { name: id_konkurencniho_dodavatele, type: varchar },
-        { name: id_konkurencni_znacky, type: varchar },
+        { name: city, type: varchar, label: "City" },
     ]
 }
 
-def query konkurence_navstevy_zakaznika { description: "Seznam konkurence z návštěvy zákazníka", sourceText: """sql
+def query customers_by_income_band { description: "Number of customers per household income band", sourceText: """sql
 SELECT
-  knd.IDXXKONKNADM,
-  knd.IDXXNAVSTEVAOZ,
-  p.NAZEV_SKUP_ZBOZI,
-  kd.NAZEV_KONKURENTA AS NAZEV_KONKURENTA_D,
-  kz.NAZEV_KONKURENTA AS NAZEV_KONKURENTA_Z,
-  knd.OBSAZENO,
-  knd.OBSAZENO_PROC
-FROM QXXKONKNADM knd
-LEFT JOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = knd.IDSKUPZBOZI
-LEFT JOIN QXXKONKURENT kd ON kd.IDXXKONKURENT = knd.IDXXKONKURENT_D AND kd.VLTYP_KONK = 1
-LEFT JOIN QXXKONKURENT kz ON kz.IDXXKONKURENT = knd.IDXXKONKURENT_Z AND kz.VLTYP_KONK = 0
-WHERE ({id_navstevy} = '' OR knd.IDXXNAVSTEVAOZ = {id_navstevy})
-ORDER BY p.NAZEV_SKUP_ZBOZI;
-""", search { patterns: ["(seznam |)konkurenc(e|i) (z |pro |)(konkrétní |)návštěv(y|u)( zákazníka|) {id_navstevy}"], }
+  ib.ib_lower_bound,
+  ib.ib_upper_bound,
+  COUNT(c.c_customer_sk) AS customers
+FROM income_band ib
+LEFT JOIN household_demographics hd ON hd.hd_income_band_sk = ib.ib_income_band_sk
+LEFT JOIN customer c ON c.c_current_hdemo_sk = hd.hd_demo_sk
+GROUP BY ib.ib_lower_bound, ib.ib_upper_bound
+ORDER BY ib.ib_lower_bound;
+""", search { patterns: ["customers (by|per) income band"], }}
+
+def query customers_by_last_name { description: "Customers whose last name contains a text", sourceText: """sql
+SELECT
+  c_customer_id,
+  c_first_name,
+  c_last_name,
+  c_email_address
+FROM customer
+WHERE ('{last_name}' = '' OR c_last_name LIKE '%{last_name}%')
+ORDER BY c_last_name, c_first_name;
+""", search { patterns: ["customers (named|called|with (the |)last name) {last_name}"], }
     parameters: [
-        { name: id_navstevy, type: varchar },
+        { name: last_name, type: varchar, label: "Last name" },
     ]
 }
 
-def query konkurencni_dodavatele { description: "Seznam konkurenčních dodavatelů", sourceText: """sql
+def query daily_revenue_running_total { description: "Daily store revenue with a running total for a month", sourceText: """sql
 SELECT
-       IDXXKONKURENT,
-       NAZEV_KONKURENTA
-FROM QXXKONKURENT
-WHERE VLTYP_KONK = 1
-ORDER BY NAZEV_KONKURENTA;
-""", search { patterns: ["seznam (všech |)(aktivních |)konkurenčních dodavatelů"], }}
-
-def query konkurencni_znacky { description: "Seznam konkurenčních značek", sourceText: """sql
-SELECT
-       IDXXKONKURENT,
-       NAZEV_KONKURENTA
-FROM QXXKONKURENT
-WHERE VLTYP_KONK = 0
-ORDER BY NAZEV_KONKURENTA;
-""", search { patterns: ["seznam (všech |)(aktivních |)konkurenčních značek"], }}
-
-def query konkurenční_dodavatel__filter { description: "Synthetic query materialising the row-filter declared on YAML entity konkurenční_dodavatel.", sourceText: "SELECT * FROM QXXKONKURENT WHERE VLTYP_KONK=1", tags: ["synthetic", "yaml-import", "where-filter"],}
-
-def query konkurenční_značka__filter { description: "Synthetic query materialising the row-filter declared on YAML entity konkurenční_značka.", sourceText: "SELECT * FROM QXXKONKURENT WHERE VLTYP_KONK=0", tags: ["synthetic", "yaml-import", "where-filter"],}
-
-def query nadnormativni_podprodukty { description: "Seznam nadnormativních podproduktů s potenciálem", sourceText: """sql
-SELECT
-  rt.SUBJADR_POZNAMKA,
-  rt.IDXXPODSKUPZBOZI,
-  pp.NAZEV_PODSKUPZBOZI,
-  rt.HDTRZBA_NORMATIV,
-  rt.VLPODPROD_NADNORMATIV,
-  rt.HDTRZBA_NORMATIV_UPRAV
-FROM XXREZERVA_TRZBY rt
-JOIN QXXPODSKUPZBOZI pp ON pp.IDXXPODSKUPZBOZI = rt.IDXXPODSKUPZBOZI
-WHERE rt.VLPODPROD_NADNORMATIV = 1
-  AND ({zkratka_dm} = '' OR rt.SUBJADR_POZNAMKA COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {zkratka_dm}, '%'))
-ORDER BY rt.HDTRZBA_NORMATIV DESC;
-""", search { patterns: ["nadnormativní podprodukty( dodacího místa {zkratka_dm}|)"], }
+  d.d_date,
+  SUM(ss.ss_ext_sales_price) AS revenue,
+  SUM(SUM(ss.ss_ext_sales_price)) OVER (ORDER BY d.d_date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total
+FROM store_sales ss
+JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+WHERE d.d_year = {year}
+  AND d.d_moy = {month}
+GROUP BY d.d_date
+ORDER BY d.d_date;
+""", search { patterns: ["(daily revenue|running total) (for|in) {month}/{year}"], }
     parameters: [
-        { name: zkratka_dm, type: varchar, label: "Zkratka dodacího místa" },
+        { name: year, type: int, label: "Year" },
+        { name: month, type: int, label: "Month" },
     ]
 }
 
-def query naslednici_dokladu { description: "Seznam následných dokladů (např. faktury vytvořené ze zakázky)", sourceText: """sql
-SELECT
-  td.IDHISHDOK,
-  td.CIS_DOKN,
-  td.NAZEV_TYPDOKN,
-  td.DTZDANITPLNN,
-  td.STAVN
-FROM QHISHDOK_DF td
-WHERE ({id_dokladu} = '' OR td.IDHDOKP = {id_dokladu})
-  AND ('{číslo_dokladu}' = '' OR td.CIS_DOKP LIKE '%{číslo_dokladu}%')
-ORDER BY td.DTZDANITPLNN DESC;
-""", search { patterns: ["následníci (dokladu |zakázky |faktury ){číslo_dokladu}"], }
+def query email_promotion__filter { description: "Synthetic query materialising the row filter of entity email_promotion.", sourceText: "SELECT * FROM promotion WHERE p_channel_email = 'Y'", tags: ["synthetic", "where-filter"],}
+
+def query express_ship_mode__filter { description: "Synthetic query materialising the row filter of entity express_ship_mode.", sourceText: "SELECT * FROM ship_mode WHERE sm_type IN ('EXPRESS', 'NEXT DAY')", tags: ["synthetic", "where-filter"],}
+
+def query fiscal_quarters { description: "Quarters of a year with their first and last day", sourceText: """sql
+SELECT DISTINCT
+  d_quarter_name,
+  MIN(d_date) OVER (PARTITION BY d_quarter_name) AS first_day,
+  MAX(d_date) OVER (PARTITION BY d_quarter_name) AS last_day
+FROM date_dim
+WHERE d_fy_year = {year}
+ORDER BY d_quarter_name;
+""", search { patterns: ["(fiscal |)quarters (of|in) {year}"], }
     parameters: [
-        { name: id_dokladu, type: varchar },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query navstevy_pro_denni_vykaz_oz { description: "Seznam návštěv zákazníků v denním výkazu obchodního zástupce", sourceText: """sql
-SELECT
-  nz.IDXXNAVSTEVAOZ,
-  nz.IDXXDENNIPLANOZ,
-  nz.IDUZIVATEL_DE,
-  nz.IDSUBJADR,
-  nz.DTUSKUTECNENO,
-  nz.SUBJADR_POZNAMKA,
-  nz.JMENO_UZIV_DE,
-  nz.VLTYP_NAVSTEVY,
-  nz.VLSTAV_XXNAVSTEVAOZ
-FROM QXXNAVSTEVAOZ nz
-WHERE ('{id_denního_výkazu_oz}' = '' OR nz.IDXXDENNIPLANOZ = '{id_denního_výkazu_oz}')
-ORDER BY nz.DTUSKUTECNENO DESC;
-""", search { patterns: ["návštěvy (zákazníka |)pro denní výkaz {id_denního_výkazu_oz}"], }}
+def query foreign_address__filter { description: "Synthetic query materialising the row filter of entity foreign_address.", sourceText: "SELECT * FROM customer_address WHERE ca_country <> 'United States'", tags: ["synthetic", "where-filter"],}
 
-def query navstevy_zakaznika { description: "Seznam návštěv zákazníků", sourceText: """sql
+def query holiday__filter { description: "Synthetic query materialising the row filter of entity holiday.", sourceText: "SELECT * FROM date_dim WHERE d_holiday = 'Y'", tags: ["synthetic", "where-filter"],}
+
+def query holiday_sales { description: "Store revenue on public holidays in a year", sourceText: """sql
 SELECT
-  nz.IDXXNAVSTEVAOZ,
-  nz.IDXXDENNIPLANOZ,
-  nz.IDUZIVATEL_DE,
-  nz.IDSUBJADR,
-  nz.DTUSKUTECNENO,
-  nz.SUBJADR_POZNAMKA,
-  nz.JMENO_UZIV_DE,
-  nz.VLTYP_NAVSTEVY,
-  nz.VLSTAV_XXNAVSTEVAOZ
-FROM QXXNAVSTEVAOZ nz
-WHERE ({id_dodaciho_mista} = '' OR nz.IDSUBJADR = {id_dodaciho_mista})
-ORDER BY nz.DTUSKUTECNENO DESC;
-""", search { patterns: ["návštěvy (zákazníka |)(na dodacím místě {id_dodaciho_mista}|)", "(seznam |)(všech |)(návštěv|návštěvy)( zákazníka| zákazníků|)"], }
+  d.d_date,
+  d.d_day_name,
+  SUM(ss.ss_ext_sales_price) AS revenue
+FROM store_sales ss
+JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+WHERE d.d_year = {year}
+  AND d.d_holiday = 'Y'
+GROUP BY d.d_date, d.d_day_name
+ORDER BY d.d_date;
+""", search { patterns: ["(sales|revenue) on (public |)holidays (in |)({year}|)"], }
     parameters: [
-        { name: id_dodaciho_mista, type: varchar },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query nesplacene_faktury { description: "Faktury zákazníka po splatnosti", sourceText: """sql
+def query holidays_in_year { description: "Public holidays of a year", sourceText: """sql
 SELECT
-        f.IDHDOK,
-       f.CIS_DOK,
-       s.SUBJ_NAZEV,
-       f.DTVYSTAVENO,
-       f.DTSPLATNO,
-       f.HDKUHRADEVAL,
-       f.VLSTAVHDOK
-FROM QHDOK_FAV_DF f
-JOIN QSUBJEKT s ON s.IDSUBJEKT = f.IDSUBJEKT
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND f.TYP_DOK = 'FVU'
-  AND f.HDKUHRADEVAL >= 0
-  AND f.DTSPLATNO < GETDATE()
-  AND f.VLSTAVHDOK NOT IN (20) -- 20 = Storno
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-ORDER BY f.DTSPLATNO ASC;
-""", search { patterns: ["(nesplacené|neuhrazené|dlužné|po splatnosti) faktury (zákazníka |zakaznika |pro |){nazev_zakaznika}", "(nesplacené|neuhrazené|dlužné|po splatnosti) faktury"], }
+  d_date,
+  d_day_name,
+  d_quarter_name
+FROM date_dim
+WHERE d_year = {year}
+  AND d_holiday = 'Y'
+ORDER BY d_date;
+""", search { patterns: ["(public |)holidays (in|of) {year}"], }
     parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query nevyfakturovane_zakazky_dm { description: "Zakázky pro konkrétní dodací místo, ke kterým neexistuje navazující faktura", sourceText: """sql
+def query income_bands { description: "List of household income bands", sourceText: """sql
 SELECT
-  z.IDHDOK,
-  z.CIS_DOK,
-  z.DTZDANITPLN,       
-  z.VLSTAVHDOK
-FROM QHDOK_ZAK_DF z
-JOIN QSUBJADR_DF dm ON dm.IDSUBJADR = z.IDSUBJADRP
-WHERE z.TYP_DOK = 'POB'
-  AND z.HDKUHRADEVAL >= 0
-  AND z.VLSTAVHDOK NOT IN (-2, 10)
-  AND ({id_dodaciho_mista} = '' OR dm.IDSUBJADR = {id_dodaciho_mista})
-  AND dm.SUBJADR_POZNAMKA COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {zkratka_dodaciho_mista}, '%')
+  ib_income_band_sk,
+  ib_lower_bound,
+  ib_upper_bound
+FROM income_band
+ORDER BY ib_lower_bound;
+""", search { patterns: ["(list of |)income bands"], }}
+
+def query inventory_trend { description: "Weekly on-hand stock of an item summed over all distribution centers", sourceText: """sql
+SELECT
+  d.d_week_seq,
+  MIN(d.d_date) AS week_start,
+  SUM(inv.inv_quantity_on_hand) AS quantity_on_hand
+FROM inventory inv
+JOIN item i ON i.i_item_sk = inv.inv_item_sk
+JOIN date_dim d ON d.d_date_sk = inv.inv_date_sk
+WHERE i.i_item_id = {item_code}
+GROUP BY d.d_week_seq
+ORDER BY d.d_week_seq;
+""", search { patterns: ["(stock|inventory) trend (of|for) (the |)(item|product) {item_code}"], }
+    parameters: [
+        { name: item_code, type: varchar, label: "Item code" },
+    ]
+}
+
+def query item__filter { description: "Synthetic query materialising the row filter of entity item.", sourceText: "SELECT * FROM item WHERE i_rec_end_date IS NULL", tags: ["synthetic", "where-filter"],}
+
+def query item_detail { description: "Detail of an item with its category, class and brand", sourceText: """sql
+SELECT
+  i.i_item_id,
+  i.i_product_name,
+  i.i_item_desc,
+  i.i_size,
+  i.i_color,
+  i.i_container,
+  i.i_current_price,
+  c.i_category,
+  cl.i_class,
+  b.i_brand
+FROM item i
+LEFT JOIN item_category c ON c.i_category_id = i.i_category_id
+LEFT JOIN item_class cl ON cl.i_class_id = i.i_class_id
+LEFT JOIN item_brand b ON b.i_brand_id = i.i_brand_id
+WHERE i.i_rec_end_date IS NULL
+  AND i.i_item_id = {item_code};
+""", search { patterns: ["(detail|details|everything) (of|about) (the |)(item|product) {item_code}"], }
+    parameters: [
+        { name: item_code, type: varchar, label: "Item code" },
+    ]
+}
+
+def query item_margin { description: "Price margin of current items within a category", sourceText: """sql
+-- Margin = (price - wholesale cost) / price, in percent, one decimal
+SELECT
+  i.i_item_id,
+  i.i_product_name,
+  i.i_current_price,
+  i.i_wholesale_cost,
+  CAST(ROUND((i.i_current_price - i.i_wholesale_cost) * 100.0
+    / NULLIF(i.i_current_price, 0), 1) AS DECIMAL(18,1)) AS margin_pct
+FROM item i
+JOIN item_category c ON c.i_category_id = i.i_category_id
+WHERE i.i_rec_end_date IS NULL
+  AND c.i_category COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {category_name}, '%')
+ORDER BY margin_pct DESC;
+""", search { patterns: ["(price |)margin of (items|products) in (the |)category {category_name}"], }
+    parameters: [
+        { name: category_name, type: varchar, label: "Category name" },
+    ]
+}
+
+def query item_price_history_for_item { description: "Price history of an item", sourceText: """sql
+SELECT
+  i.i_item_id,
+  i.i_product_name,
+  ph.iph_valid_from,
+  ph.iph_valid_to,
+  ph.iph_current_price,
+  ph.iph_wholesale_cost
+FROM item_price_history ph
+JOIN item i ON i.i_item_sk = ph.iph_item_sk
+WHERE i.i_item_id = {item_code}
+ORDER BY ph.iph_valid_from DESC;
+""", search { patterns: ["price history (of|for) (the |)(item|product) {item_code}"], }
+    parameters: [
+        { name: item_code, type: varchar, label: "Item code" },
+    ]
+}
+
+def query items_by_manufacturer { description: "Items made by a manufacturer, with their brand", sourceText: """sql
+SELECT
+  m.i_manufact,
+  b.i_brand,
+  i.i_item_id,
+  i.i_product_name
+FROM item i
+JOIN item_manufacturer m ON m.i_manufact_id = i.i_manufact_id
+LEFT JOIN item_brand b ON b.i_brand_id = i.i_brand_id
+WHERE ({manufact_id} = '' OR m.i_manufact_id = {manufact_id})
+  AND m.i_manufact COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {manufacturer_name}, '%')
+ORDER BY b.i_brand, i.i_product_name;
+""", search { patterns: ["(items|products) (made by|from) (the |)manufacturer {manufacturer_name}"], }
+    parameters: [
+        { name: manufact_id, type: varchar },
+        { name: manufacturer_name, type: varchar, label: "Manufacturer name" },
+    ]
+}
+
+def query items_in_category { description: "Items in a product category", sourceText: """sql
+SELECT
+  i.i_item_sk,
+  i.i_item_id,
+  i.i_product_name,
+  c.i_category
+FROM item i
+JOIN item_category c ON c.i_category_id = i.i_category_id
+WHERE i.i_rec_end_date IS NULL
+  AND c.i_category COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {category_name}, '%')
+ORDER BY i.i_product_name;
+""", search { patterns: ["(which|what) (items|products) (are in|belong to) (the |)category {category_name}"], examples: ["Which products belong to the category Electronics?"], }
+    parameters: [
+        { name: category_name, type: varchar, label: "Category name" },
+    ]
+}
+
+def query items_in_class { description: "Items in a product class", sourceText: """sql
+SELECT
+  i.i_item_sk,
+  i.i_item_id,
+  i.i_product_name,
+  cl.i_class,
+  c.i_category
+FROM item i
+JOIN item_class cl ON cl.i_class_id = i.i_class_id
+JOIN item_category c ON c.i_category_id = cl.i_category_id
+WHERE ({class_id} = '' OR i.i_class_id = {class_id})
+  AND cl.i_class COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {class_name}, '%')
+ORDER BY c.i_category, i.i_product_name;
+""", search { patterns: ["(items|products) (in|of) (the |)class {class_name}"], }
+    parameters: [
+        { name: class_id, type: varchar },
+        { name: class_name, type: varchar, label: "Class name" },
+    ]
+}
+
+def query items_of_brand { description: "Items sold under a brand", sourceText: """sql
+SELECT
+  i.i_item_sk,
+  i.i_item_id,
+  i.i_product_name,
+  b.i_brand,
+  i.i_current_price
+FROM item i
+JOIN item_brand b ON b.i_brand_id = i.i_brand_id
+WHERE i.i_rec_end_date IS NULL
+  AND b.i_brand COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {brand_name}, '%')
+ORDER BY i.i_product_name;
+""", search { patterns: ["(items|products) (of|from|by) (the |)brand {brand_name}"], examples: ["Products of the brand amalgamalg #1"], }
+    parameters: [
+        { name: brand_name, type: varchar, label: "Brand name" },
+    ]
+}
+
+def query items_without_sales { description: "Current items with no store or web sale in a year", sourceText: """sql
+SELECT
+  i.i_item_id,
+  i.i_product_name
+FROM item i
+WHERE i.i_rec_end_date IS NULL
   AND NOT EXISTS (
-    SELECT 1 FROM QHISHDOK_DF td
-    WHERE td.IDHDOKP = z.IDHDOK
-      AND td.NAZEV_TYPDOKN LIKE '%aktur%'
+    SELECT 1 FROM store_sales ss
+    JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+    WHERE ss.ss_item_sk = i.i_item_sk
+      AND d.d_year = {year}
   )
-ORDER BY z.DTZDANITPLN DESC;
-""", search { patterns: ["(které |)(nevyfakturované |)zakázky (pro |na |)(dodací místo|dodacího místa|dodacím místě) {zkratka_dodaciho_mista} (nemají fakturu|bez faktury|nemá fakturu)", "(které |)(nevyfakturované |)zakázky (pro |na |)(dodací místo|dodacího místa|dodacím místě) {zkratka_dodaciho_mista}"], }
+  AND NOT EXISTS (
+    SELECT 1 FROM web_sales ws
+    JOIN date_dim d ON d.d_date_sk = ws.ws_sold_date_sk
+    WHERE ws.ws_item_sk = i.i_item_sk
+      AND d.d_year = {year}
+  )
+ORDER BY i.i_product_name;
+""", search { patterns: ["(items|products) (with no|without) (sales|a sale) in {year}"], }
     parameters: [
-        { name: id_dodaciho_mista, type: varchar },
-        { name: zkratka_dodaciho_mista, type: varchar, label: "Zkratka dodacího místa" },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query nevytezena_dodaci_mista { description: "Nevytěžená dodací místa", sourceText: """sql
+def query large_warehouse__filter { description: "Synthetic query materialising the row filter of entity large_warehouse.", sourceText: "SELECT * FROM warehouse WHERE w_warehouse_sq_ft >= 500000", tags: ["synthetic", "where-filter"],}
+
+def query loss_making_store_return__filter { description: "Synthetic query materialising the row filter of entity loss_making_store_return.", sourceText: "SELECT * FROM store_returns WHERE sr_net_loss > 0", tags: ["synthetic", "where-filter"],}
+
+def query loss_making_store_returns { description: "The ten store returns with the highest net loss", sourceText: """sql
 SELECT TOP 10
-  dm.IDSUBJADR,
-  rt.SUBJADR_POZNAMKA,
-  MAX(rt.DM_NEUPLNA_DATA) AS DM_NEUPLNA_DATA,
-  MAX(rt.DM_KONKURENCE_ZAEVIDOVANA) AS DM_KONKURENCE_ZAEVIDOVANA,
-  MAX(rt.HDTRZBA_12M_DM) AS HDTRZBA_12M_DM,
-  MAX(rt.HDTRZBA_POTENCIAL_DM) AS HDTRZBA_POTENCIAL_DM,
-  CAST(ROUND(MAX(rt.HDTRZBA_12M_DM) * 100.0
-    / NULLIF(MAX(rt.HDTRZBA_POTENCIAL_DM), 0), 1) AS DECIMAL(18,1)) AS VYTEZNOST
-FROM XXREZERVA_TRZBY rt
--- JOIN přes SUBJADR_POZNAMKA je záměrný (XXREZERVA_TRZBY neobsahuje IDSUBJADR)
-LEFT JOIN QSUBJADR_DF dm ON dm.SUBJADR_POZNAMKA = rt.SUBJADR_POZNAMKA and dm.VLSUBJADR_TYP = 2
-GROUP BY dm.IDSUBJADR, rt.SUBJADR_POZNAMKA
-HAVING CAST(ROUND(MAX(rt.HDTRZBA_12M_DM) * 100.0
-           / NULLIF(MAX(rt.HDTRZBA_POTENCIAL_DM), 0), 1) AS DECIMAL(18,1)) < 50
-ORDER BY VYTEZNOST ASC;
-""", search { patterns: ["nevytěžen(á|ých|é) dodací(ch|) míst(a|)", "(nízk|špatn)(á|ou|é) vytěžnost(í|) dodací(ch|) míst"], }}
+  sr.sr_ticket_number,
+  s.s_store_name,
+  i.i_product_name,
+  sr.sr_net_loss,
+  sr.sr_fee,
+  sr.sr_refunded_cash,
+  sr.sr_store_credit
+FROM store_returns sr
+JOIN store s ON s.s_store_sk = sr.sr_store_sk
+JOIN item i ON i.i_item_sk = sr.sr_item_sk
+WHERE sr.sr_net_loss > 0
+ORDER BY sr.sr_net_loss DESC;
+""", search { patterns: ["(top |)store returns with the (highest|largest) (net |)loss"], }}
 
-def query obchodni_kanaly_trzni_skupiny { description: "Seznam obchodních kanálů s vazbou na tržní skupinu", sourceText: """sql
+def query low_days_of_cover { description: "Items whose stock covers less than a week of sales in the latest week", sourceText: """sql
 SELECT
-  ok.IDCENSKUP,
-  ok.CEN_SKUP,
-  ts.NAZEV_SKUPZNACZBOZI
-FROM QCENSKUP_DF ok
-LEFT JOIN QSKUPZNACZBOZI_DF ts ON ts.IDSKUPZNACZBOZI = ok.IDSKUPZNACZBOZI
-WHERE ({id_trzni_skupiny} = '' OR ok.IDSKUPZNACZBOZI = {id_trzni_skupiny})
-  AND ({nazev_trzni_skupiny} = '' OR ts.NAZEV_SKUPZNACZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_trzni_skupiny}, '%'))
-  AND ok.CEN_SKUP NOT LIKE 'Z%'
-ORDER BY ts.NAZEV_SKUPZNACZBOZI, ok.CEN_SKUP;
-""", search { patterns: ["seznam (všech |vsech |)(obchodních kanálů|obchodnich kanalu) (pro |)(tržní skupinu|trzni skupinu) {nazev_trzni_skupiny}"], examples: ["Seznam obchodních kanálů pro tržní skupinu"], }
+  w.w_warehouse_name,
+  i.i_item_id,
+  i.i_product_name,
+  iws.iws_avg_on_hand,
+  iws.iws_days_of_cover
+FROM inventory_weekly_summary iws
+JOIN item i ON i.i_item_sk = iws.iws_item_sk
+JOIN warehouse w ON w.w_warehouse_sk = iws.iws_warehouse_sk
+WHERE iws.iws_days_of_cover < 7.0
+  AND iws.iws_week_seq = (SELECT MAX(iws_week_seq) FROM inventory_weekly_summary)
+ORDER BY iws.iws_days_of_cover;
+""", search { patterns: ["(items|products) with (low|less than a week of) (stock |)cover"], }}
+
+def query marketplace_orders_by_catalog_page { description: "Marketplace orders by catalog page of a catalog", sourceText: """sql
+SELECT
+  cp.cp_catalog_page_number,
+  cp.cp_department,
+  COUNT(DISTINCT cs.cs_order_number) AS orders,
+  SUM(cs.cs_quantity) AS units
+FROM catalog_sales cs
+JOIN catalog_page cp ON cp.cp_catalog_page_sk = cs.cs_catalog_page_sk
+WHERE cp.cp_catalog_number = {catalog_number}
+GROUP BY cp.cp_catalog_page_number, cp.cp_department
+ORDER BY cp.cp_catalog_page_number;
+""", search { patterns: ["(marketplace |)orders (by|per) (catalog |)page (of|in) catalog {catalog_number}"], }
     parameters: [
-        { name: id_trzni_skupiny, type: varchar },
-        { name: nazev_trzni_skupiny, type: varchar, label: "Název tržní skupiny" },
+        { name: catalog_number, type: int, label: "Catalog number" },
     ]
 }
 
-def query obchodni_zastupce { description: "Najde obchodního zástupce podle jména/kódu, nebo zobrazí seznam všech OZ", sourceText: """sql
+def query marketplace_returns_by_warehouse { description: "Marketplace returns processed by a distribution center", sourceText: """sql
 SELECT
-  u.IDUZIVATEL,
-  u.KOD_UZIV,
-  u.JMENO_UZIV
-FROM QUZIVATEL_DF u
-WHERE u.IDUZIVATEL IN (SELECT IDUZIVATEL FROM QUZVESKUP WHERE KOD_SKUP_UZIV = 'OZ')
-  AND NOT u.IDUZIVATEL IN (SELECT IDUZIVATEL FROM QUZVESKUP WHERE KOD_SKUP_UZIV = '00')
-  AND (u.JMENO_UZIV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {jmeno_uzivatele}, '%')
-       OR u.KOD_UZIV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {jmeno_uzivatele}, '%'))
-ORDER BY u.JMENO_UZIV;
-""", search { patterns: ["(najdi|hledej|kdo je|info o) (obchodního zástupce|obchodním zástupci|obchodní zástupce|oz) {jmeno_uzivatele}", "(seznam |)(všech |)(obchodních zástupců|obchodní zástupce|oz)"], examples: ["Najdi obchodního zástupce Novák"], }
+  w.w_warehouse_name,
+  r.r_reason_desc,
+  COUNT(*) AS return_lines,
+  SUM(cr.cr_return_amount) AS amount_returned,
+  SUM(cr.cr_return_ship_cost) AS return_shipping
+FROM catalog_returns cr
+JOIN warehouse w ON w.w_warehouse_sk = cr.cr_warehouse_sk
+LEFT JOIN reason r ON r.r_reason_sk = cr.cr_reason_sk
+WHERE w.w_warehouse_name COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {warehouse_name}, '%')
+GROUP BY w.w_warehouse_name, r.r_reason_desc
+ORDER BY amount_returned DESC;
+""", search { patterns: ["marketplace returns (processed |)(by|at|in) (the |)(distribution center|DC|warehouse) {warehouse_name}"], }
     parameters: [
-        { name: jmeno_uzivatele, type: varchar, label: "Jméno uživatele" },
+        { name: warehouse_name, type: varchar, label: "Distribution center" },
     ]
 }
 
-def query obchodní_kanál__filter { description: "Synthetic query materialising the row-filter declared on YAML entity obchodní_kanál.", sourceText: "SELECT * FROM QCENSKUP_DF WHERE (CEN_SKUP not like '0%') AND (VLNEAKTIVNI = 0)", tags: ["synthetic", "yaml-import", "where-filter"],}
-
-def query obchodní_vztah__filter { description: "Synthetic query materialising the row-filter declared on YAML entity obchodní_vztah.", sourceText: "SELECT * FROM QSUBJVTSUBJ_DF WHERE TYP_SUBJ='ODB'", tags: ["synthetic", "yaml-import", "where-filter"],}
-
-def query organizacni_struktura { description: "Zobrazení organizační struktury (strom funkčních míst)", sourceText: """sql
+def query marketplace_revenue_by_call_center { description: "Marketplace revenue handled by each seller support center in a year", sourceText: """sql
 SELECT
-       P.IDSKUPUZIV IDSKUPUZIV_P,
-       P.KOD_SKUP_UZIV KOD_SKUP_UZIV_P,
-       P.NAZEV_SKUP_UZIV NAZEV_SKUP_UZIV_P,
-       R.IDSKUPUZIV IDSKUPUZIV_R,
-       R.KOD_SKUP_UZIV KOD_SKUP_UZIV_R,
-       R.NAZEV_SKUP_UZIV NAZEV_SKUP_UZIV_R
-FROM QSKUPUZIV P
-JOIN QSKUPUZIV R ON R.IDSKUPUZIV = P.IDSKUPUZIV_R
-ORDER BY P.KOD_SKUP_UZIV, R.KOD_SKUP_UZIV;
-""", search { patterns: ["seznam organizační struktury"], examples: ["Organizační struktura"], }}
-
-def query organizační_struktura__filter { description: "Synthetic query materialising the row-filter declared on YAML entity organizační_struktura.", sourceText: "SELECT * FROM QSKUPUZIV WHERE NOT IDSKUPUZIV_R IS NULL", tags: ["synthetic", "yaml-import", "where-filter"],}
-
-def query osoby_dodaciho_mista { description: "Seznam osob na dodacím místě", sourceText: """sql
-SELECT
-  o.IDSUBJOSOBA,
-  o.IDSUBJADR,
-  o.JMENO,
-  o.FUNKCE,
-  o.TEL,
-  o.EMAIL
-FROM QSUBJOSOBA_DF o
-WHERE ({id_dodaciho_mista} = '' OR o.IDSUBJADR = {id_dodaciho_mista})
-ORDER BY o.JMENO;
-""", search { patterns: ["osoby (dodacího místa |na dodacím místě ){id_dodaciho_mista}"], }
+  cc.cc_call_center_id,
+  cc.cc_name,
+  cc.cc_class,
+  SUM(cs.cs_ext_sales_price) AS revenue,
+  SUM(cs.cs_net_profit) AS net_profit
+FROM catalog_sales cs
+JOIN call_center cc ON cc.cc_call_center_sk = cs.cs_call_center_sk
+JOIN date_dim d ON d.d_date_sk = cs.cs_sold_date_sk
+WHERE d.d_year = {year}
+GROUP BY cc.cc_call_center_id, cc.cc_name, cc.cc_class
+ORDER BY revenue DESC;
+""", search { patterns: ["marketplace revenue (by|per) (seller |)support center (in |)({year}|)"], }
     parameters: [
-        { name: id_dodaciho_mista, type: varchar },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query platnosti_dm_v_tdm { description: "Platnosti dodacího místa v typech dodacích míst", sourceText: """sql
+def query most_expensive_items { description: "The 20 most expensive current items", sourceText: """sql
+SELECT TOP 20
+  i_item_id,
+  i_product_name,
+  i_current_price
+FROM item
+WHERE i_rec_end_date IS NULL
+ORDER BY i_current_price DESC;
+""", search { patterns: ["(top |)(20 |)most expensive (items|products)"], }}
+
+def query new_customers_by_month { description: "Number of customers by month of their first purchase", sourceText: """sql
 SELECT
-  pt.IDXXTDMSUBJADR,
-  pt.IDSUBJADR,
-  tdm.KOD_TYPDODMIST,
-  pt.DTPLATI_OD,
-  pt.DTPLATI_DO
-FROM QXXTDMSUBJADR pt
-JOIN QXXTYPDODMIST tdm ON tdm.IDXXTYPDODMIST = pt.IDXXTYPDODMIST
-WHERE ({id_dodaciho_mista} = '' OR pt.IDSUBJADR = {id_dodaciho_mista})
-ORDER BY pt.DTPLATI_OD DESC;
-""", search { patterns: ["platnosti dodacího místa {id_dodaciho_mista} v typu", "platnosti dodacího místa {id_dodaciho_mista}"], }
+  d.d_year,
+  d.d_moy,
+  COUNT(*) AS new_customers
+FROM customer c
+JOIN date_dim d ON d.d_date_sk = c.c_first_sales_date_sk
+WHERE d.d_year = {year}
+GROUP BY d.d_year, d.d_moy
+ORDER BY d.d_moy;
+""", search { patterns: ["new customers (by|per) month (in |)({year}|)"], }
     parameters: [
-        { name: id_dodaciho_mista, type: varchar },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query podnety_navstevy { description: "Seznam podnětů pro konkrétní návštěvu zákazníka", sourceText: """sql
+def query orders_by_ship_mode { description: "Marketplace order lines and shipping cost by ship mode type in a year", sourceText: """sql
 SELECT
-  pn.IDXXPODNET,
-  pn.IDXXNAVSTEVAOZ,
-  p.NAZEV_SKUP_ZBOZI,
-  pn.PODNET
-FROM QXXPODNET pn
-LEFT JOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = pn.IDSKUPZBOZI
-WHERE ({id_navstevy} = '' OR pn.IDXXNAVSTEVAOZ = {id_navstevy})
-ORDER BY p.NAZEV_SKUP_ZBOZI;
-""", search { patterns: ["(seznam |)podnět(ů|y) (z |pro |)(konkrétní |)návštěv(y|u)( zákazníka|) {id_navstevy}"], }
+  sm.sm_type,
+  sm.sm_carrier,
+  COUNT(*) AS order_lines,
+  SUM(cs.cs_ext_ship_cost) AS shipping_cost
+FROM catalog_sales cs
+JOIN ship_mode sm ON sm.sm_ship_mode_sk = cs.cs_ship_mode_sk
+JOIN date_dim d ON d.d_date_sk = cs.cs_sold_date_sk
+WHERE d.d_year = {year}
+GROUP BY sm.sm_type, sm.sm_carrier
+ORDER BY shipping_cost DESC;
+""", search { patterns: ["(orders|shipping cost) (by|per) ship mode (in |)({year}|)"], }
     parameters: [
-        { name: id_navstevy, type: varchar },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query podprodukt__filter { description: "Synthetic query materialising the row-filter declared on YAML entity podprodukt.", sourceText: "SELECT * FROM QXXPODSKUPZBOZI WHERE not NAZEV_PODSKUPZBOZI like 'ZK%'", tags: ["synthetic", "yaml-import", "where-filter"],}
-
-def query podprodukty { description: "Seznam podproduktů, podle produktu", sourceText: """sql
+def query orders_shipped_late { description: "Web orders shipped more than a number of days after they were placed", sourceText: """sql
 SELECT
-  pp.IDXXPODSKUPZBOZI,
-  pp.KOD_PODSKUPZBOZI,
-  pp.NAZEV_PODSKUPZBOZI,
-  p.NAZEV_SKUP_ZBOZI
-FROM QXXPODSKUPZBOZI pp
-JOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = pp.IDSKUPZBOZI
-WHERE ({id_produktu} = '' OR pp.IDSKUPZBOZI = {id_produktu})
-  AND ({nazev_produktu} = '' OR p.NAZEV_SKUP_ZBOZI LIKE CONCAT('%', {nazev_produktu}, '%'))
-  AND pp.NAZEV_PODSKUPZBOZI not LIKE 'Z%'
-ORDER BY p.NAZEV_SKUP_ZBOZI, pp.NAZEV_PODSKUPZBOZI;
-""", search { patterns: ["seznam (všech |)podproduktů( produktu {nazev_produktu}|)"], }
+  ws.ws_order_number,
+  sold.d_date AS ordered_on,
+  shipped.d_date AS shipped_on,
+  DATEDIFF(day, sold.d_date, shipped.d_date) AS days_to_ship,
+  sm.sm_type,
+  w.w_warehouse_name
+FROM web_sales ws
+JOIN date_dim sold ON sold.d_date_sk = ws.ws_sold_date_sk
+JOIN date_dim shipped ON shipped.d_date_sk = ws.ws_ship_date_sk
+JOIN ship_mode sm ON sm.sm_ship_mode_sk = ws.ws_ship_mode_sk
+JOIN warehouse w ON w.w_warehouse_sk = ws.ws_warehouse_sk
+WHERE DATEDIFF(day, sold.d_date, shipped.d_date) > {days}
+  AND sm.sm_type NOT IN ('LIBRARY')
+ORDER BY days_to_ship DESC;
+""", search { patterns: ["(web |)orders shipped (late|more than {days} days after ordering)"], }
     parameters: [
-        { name: id_produktu, type: varchar },
-        { name: nazev_produktu, type: varchar, label: "Název produktu" },
+        { name: days, type: int, label: "Days" },
     ]
 }
 
-def query podprodukty_navstevy_zakaznika { description: "Seznam podproduktů z návštěvy zákazníka", sourceText: """sql
+def query preferred_customer__filter { description: "Synthetic query materialising the row filter of entity preferred_customer.", sourceText: "SELECT * FROM customer WHERE c_preferred_cust_flag = 'Y'", tags: ["synthetic", "where-filter"],}
+
+def query preferred_customers_by_state { description: "Preferred customers whose current address is in a state", sourceText: """sql
 SELECT
-  ppd.IDXXNOZPODPROD,
-  ppd.IDXXNOZPRIPRAVA,
-  pp.KOD_PODSKUPZBOZI,
-  pp.NAZEV_PODSKUPZBOZI,
-  ppd.PORADI_PODPROD,
-  ppd.VLVYZNAM_PODPROD,
-  ppd.HDNORMATIV_TRZBY_PODPROD,
-  ppd.HDTRZBA_12M_PODPROD,
-  ppd.HDTRZBA_POTENCIAL_PODPROD,
-  ppd.HDTRZBA_VYTEZNOST_PODPROD,
-  ppd.POCET_ART_PODPROD,
-  ppd.DI_PODPRODUKT
-FROM QXXNOZPODPROD ppd
-JOIN QXXPODSKUPZBOZI pp ON pp.IDXXPODSKUPZBOZI = ppd.IDXXPODSKUPZBOZI
-WHERE ({id_navstevy} = '' OR ppd.IDXXNAVSTEVAOZ = {id_navstevy})
-ORDER BY ppd.PORADI_PODPROD;
-""", search { patterns: ["(seznam |)podprodukt(ů|y) (z |pro |)(konkrétní |)návštěv(y|u)( zákazníka|) {id_navstevy}"], }
+  c.c_customer_id,
+  c.c_first_name,
+  c.c_last_name,
+  ca.ca_city
+FROM customer c
+JOIN customer_address ca ON ca.ca_address_sk = c.c_current_addr_sk
+WHERE c.c_preferred_cust_flag = 'Y'
+  and ca.ca_state = {state}
+ORDER BY ca.ca_city, c.c_last_name;
+""", search { patterns: ["preferred customers in {state}"], }
     parameters: [
-        { name: id_navstevy, type: varchar },
+        { name: state, type: varchar, label: "State" },
     ]
 }
 
-def query podprodukty_pro_firmu { description: "Seznam podproduktů přiřazených na úrovni firmy", sourceText: """sql
+def query promotion_items { description: "Items taking part in a promotion, with their discount", sourceText: """sql
 SELECT
-  pp.IDXXPODSKUPZBOZI,
-  pp.KOD_PODSKUPZBOZI,
-  pp.NAZEV_PODSKUPZBOZI,
-  sz.NAZEV_SKUP_ZBOZI,
-  ppf.PORADI_F,
-  ppf.VLVYZNAM_F,
-  ppf.HDNORMATIV_TRZBY_F
-FROM QXXPODSKUPZBOZI pp
-JOIN QXXMEZABC ppf ON pp.IDXXPODSKUPZBOZI = ppf.IDXXPODSKUPZBOZI
-JOIN QSKUPZBOZI_DF sz ON sz.IDSKUPZBOZI = ppf.IDSKUPZBOZI
-WHERE ppf.VLTYP_NASTAVENI = 2
-ORDER BY ppf.PORADI_F;
-""", search { patterns: ["podprodukty (pro |)firm(u|y)"], }}
-
-def query podprodukty_pro_obchodni_kanal { description: "Seznam podproduktů přiřazených k obchodnímu kanálu", sourceText: """sql
-SELECT
-  pp.IDXXPODSKUPZBOZI,
-  pp.KOD_PODSKUPZBOZI,
-  pp.NAZEV_PODSKUPZBOZI,
-  ok.CEN_SKUP,
-  ppok.PORADI_F,
-  ppok.VLVYZNAM_F,
-  ppok.HDNORMATIV_TRZBY_F
-FROM QXXPODSKUPZBOZI pp
-JOIN QXXMEZABC ppok ON pp.IDXXPODSKUPZBOZI = ppok.IDXXPODSKUPZBOZI
-JOIN QCENSKUP_DF ok ON ok.IDCENSKUP = ppok.IDCENSKUP
-WHERE ppok.VLTYP_NASTAVENI = 22
-  AND ({id_obchodniho_kanalu} = '' OR ppok.IDCENSKUP = {id_obchodniho_kanalu})
-  AND ok.CEN_SKUP COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_kanalu}, '%')
-ORDER BY ppok.PORADI_F;
-""", search { patterns: ["podprodukty (pro |v |)obchodní(m|) kanál(u|) {kod_kanalu}"], }
+  p.p_promo_id,
+  p.p_promo_name,
+  i.i_item_id,
+  i.i_product_name,
+  pi.pi_discount_pct
+FROM promotion_item pi
+JOIN promotion p ON p.p_promo_sk = pi.pi_promo_sk
+JOIN item i ON i.i_item_sk = pi.pi_item_sk
+WHERE p.p_promo_id = {promo_code}
+ORDER BY pi.pi_discount_pct DESC;
+""", search { patterns: ["(items|products) in (the |)promotion {promo_code}"], }
     parameters: [
-        { name: id_obchodniho_kanalu, type: varchar },
-        { name: kod_kanalu, type: varchar, label: "Kód kanálu" },
+        { name: promo_code, type: varchar, label: "Promotion code" },
     ]
 }
 
-def query podprodukty_pro_trzni_skupinu { description: "Seznam podproduktů přiřazených k tržní skupině", sourceText: """sql
+def query promotion_lift { description: "Store revenue of a promotion's featured item with and without the promotion", sourceText: """sql
+/* Lift = revenue on lines carrying the promotion vs. lines of the same item without it. */
 SELECT
-  pp.IDXXPODSKUPZBOZI,
-  pp.KOD_PODSKUPZBOZI,
-  pp.NAZEV_PODSKUPZBOZI,
-  ts.NAZEV_SKUPZNACZBOZI,
-  ppts.PORADI_F,
-  ppts.VLVYZNAM_F,
-  ppts.HDNORMATIV_TRZBY_F
-FROM QXXPODSKUPZBOZI pp
-JOIN QXXMEZABC ppts ON pp.IDXXPODSKUPZBOZI = ppts.IDXXPODSKUPZBOZI
-JOIN QSKUPZNACZBOZI_DF ts ON ts.IDSKUPZNACZBOZI = ppts.IDSKUPZNACZBOZI
-WHERE ppts.VLTYP_NASTAVENI = 12
-  AND ({id_trzni_skupiny} = '' OR ppts.IDSKUPZNACZBOZI = {id_trzni_skupiny})
-  AND ts.KOD_SKUPZNACZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_trzni_skupiny}, '%')
-ORDER BY ppts.PORADI_F;
-""", search { patterns: ["podprodukty (pro |v |)tržní skupin(u|ě) {kod_trzni_skupiny}"], }
+  p.p_promo_name,
+  i.i_product_name,
+  SUM(CASE WHEN ss.ss_promo_sk = p.p_promo_sk THEN ss.ss_ext_sales_price ELSE 0 END) AS revenue_with_promo,
+  SUM(CASE WHEN ss.ss_promo_sk IS NULL THEN ss.ss_ext_sales_price ELSE 0 END) AS revenue_without_promo
+FROM promotion p
+JOIN item i ON i.i_item_sk = p.p_item_sk
+JOIN store_sales ss ON ss.ss_item_sk = p.p_item_sk
+WHERE p.p_promo_name COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {promo_name}, '%')
+GROUP BY p.p_promo_name, i.i_product_name;
+""", search { patterns: ["(lift|effect) of (the |)promotion {promo_name}"], }
     parameters: [
-        { name: id_trzni_skupiny, type: varchar },
-        { name: kod_trzni_skupiny, type: varchar, label: "Kód tržní skupiny" },
+        { name: promo_name, type: varchar, label: "Promotion name" },
     ]
 }
 
-def query polozky_dokladu { description: "Zobrazí položky (artikly) dokladu podle ID dokladu v kontextu", sourceText: """sql
+def query promotions_by_media { description: "Number of promotions run in each medium", sourceText: """sql
 SELECT
-       zs.IDSDOK,
-       zs.IDZBOZI,
-       a.CIS_ZBOZI,
-       a.NAZEV_ZBOZI,
-       zs.MNCELKEMPOCET,
-       zs.HDJCENAVAL,
-       zs.HDCCENAVAL
-FROM QZBOZSDOK zs
-JOIN QZBOZI_DF a ON a.IDZBOZI = zs.IDZBOZI AND a.VLTYP_SLOZ = 1
-WHERE zs.IDHDOK = {id_dokladu}
-ORDER BY a.NAZEV_ZBOZI;
-""", search { patterns: ["(položky|artikly|zboží|obsah) (zakázky|zakazky|faktury|vratky|dobropisu|dokladu)"], examples: ["Zobraz artikly zakázky"], }
+  SUM(CASE WHEN p_channel_dmail = 'Y' THEN 1 ELSE 0 END) AS direct_mail,
+  SUM(CASE WHEN p_channel_email = 'Y' THEN 1 ELSE 0 END) AS email,
+  SUM(CASE WHEN p_channel_catalog = 'Y' THEN 1 ELSE 0 END) AS catalog,
+  SUM(CASE WHEN p_channel_tv = 'Y' THEN 1 ELSE 0 END) AS tv,
+  SUM(CASE WHEN p_channel_radio = 'Y' THEN 1 ELSE 0 END) AS radio,
+  SUM(CASE WHEN p_channel_press = 'Y' THEN 1 ELSE 0 END) AS press,
+  SUM(CASE WHEN p_channel_event = 'Y' THEN 1 ELSE 0 END) AS event
+FROM promotion;
+""", search { patterns: ["promotions (by|per) (medium|media|channel)"], }}
+
+def query promotions_running_today { description: "Promotions running today", sourceText: """sql
+SELECT
+  p.p_promo_id,
+  p.p_promo_name,
+  ds.d_date AS starts_on,
+  de.d_date AS ends_on
+FROM promotion p
+JOIN date_dim ds ON ds.d_date_sk = p.p_start_date_sk
+JOIN date_dim de ON de.d_date_sk = p.p_end_date_sk
+WHERE CAST(GETDATE() AS DATE) BETWEEN ds.d_date AND de.d_date
+ORDER BY de.d_date;
+""", search { patterns: ["(which |)promotions (are |)running (today|now)"], examples: ["Which promotions are running today?"], }}
+
+def query quarterly_catalog_page__filter { description: "Synthetic query materialising the row filter of entity quarterly_catalog_page.", sourceText: "SELECT * FROM catalog_page WHERE cp_type = 'quarterly'", tags: ["synthetic", "where-filter"],}
+
+def query return_rate_by_category { description: "Store return rate by product category in a year", sourceText: """sql
+SELECT
+  c.i_category,
+  SUM(ss.ss_ext_sales_price) AS revenue,
+  SUM(ISNULL(sr.sr_return_amt, 0)) AS returned,
+  ROUND(SUM(ISNULL(sr.sr_return_amt, 0)) * 100.0 / NULLIF(SUM(ss.ss_ext_sales_price), 0), 2) AS return_rate_pct
+FROM store_sales ss
+LEFT JOIN store_returns sr ON sr.sr_item_sk = ss.ss_item_sk AND sr.sr_ticket_number = ss.ss_ticket_number
+JOIN item i ON i.i_item_sk = ss.ss_item_sk
+JOIN item_category c ON c.i_category_id = i.i_category_id
+JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+WHERE d.d_year = {year}
+GROUP BY c.i_category
+ORDER BY return_rate_pct DESC;
+""", search { patterns: ["return rate (by|per) (product |)category (in |)({year}|)"], }
     parameters: [
-        { name: id_dokladu, type: varchar },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query porovnani_trzeb_zakazniku { description: "Porovnání tržeb dvou zákazníků za 12 měsíců", sourceText: """sql
-SELECT s.SUBJ_NAZEV,
-       SUM(p.HDTRZBA_12M) AS HDTRZBA_12M,
-       SUM(p.HDTRZBA_24M) AS HDTRZBA_24M
-FROM XXPRODEJE p
-JOIN QSUBJADR_DF dm ON dm.IDSUBJADR = p.IDSUBJADR AND dm.VLSUBJADR_TYP = 2
-JOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT
-WHERE (s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika_a}, '%')
-   OR s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika_b}, '%'))
-GROUP BY s.SUBJ_NAZEV
-ORDER BY HDTRZBA_12M DESC;
-""", search { patterns: ["(porovnej|srovnej) trzby {nazev_zakaznika_a} a {nazev_zakaznika_b}", "(porovnej|srovnej) zakazniky {nazev_zakaznika_a} a {nazev_zakaznika_b}"], }
+def query return_reasons { description: "List of all return reasons", sourceText: """sql
+SELECT
+  r_reason_sk,
+  r_reason_id,
+  r_reason_desc
+FROM reason
+ORDER BY r_reason_id;
+""", search { patterns: ["(list of |)(all |)return reasons"], examples: ["List of all return reasons"], }}
+
+def query returns_by_reason { description: "Returned amount by return reason across channels in a year", sourceText: """sql
+SELECT reason, SUM(amount) AS amount_returned, SUM(units) AS units_returned
+FROM (
+    SELECT r.r_reason_desc AS reason, sr.sr_return_amt AS amount, sr.sr_return_quantity AS units
+    FROM store_returns sr
+    JOIN reason r ON r.r_reason_sk = sr.sr_reason_sk
+    JOIN date_dim d ON d.d_date_sk = sr.sr_returned_date_sk
+    WHERE d.d_year = {year}
+    UNION ALL
+    SELECT r.r_reason_desc, wr.wr_return_amt, wr.wr_return_quantity
+    FROM web_returns wr
+    JOIN reason r ON r.r_reason_sk = wr.wr_reason_sk
+    JOIN date_dim d ON d.d_date_sk = wr.wr_returned_date_sk
+    WHERE d.d_year = {year}
+    UNION ALL
+    SELECT r.r_reason_desc, cr.cr_return_amount, cr.cr_return_quantity
+    FROM catalog_returns cr
+    JOIN reason r ON r.r_reason_sk = cr.cr_reason_sk
+    JOIN date_dim d ON d.d_date_sk = cr.cr_returned_date_sk
+    WHERE d.d_year = {year}
+) all_returns
+GROUP BY reason
+ORDER BY amount_returned DESC;
+""", search { patterns: ["returns (by|per) reason (in |)({year}|)", "why (do|did) customers return (goods|items)"], }
     parameters: [
-        { name: nazev_zakaznika_a, type: varchar, label: "Název 1. zákazníka" },
-        { name: nazev_zakaznika_b, type: varchar, label: "Název 2. zákazníka" },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query posledni_dodavka_zakaznika { description: "Datum poslední dodávky pro zákazníka", sourceText: """sql
+def query revenue_by_customer_age { description: "Store revenue by customer age band in a year; age derived from the birth year", sourceText: """sql
 SELECT
-       s.SUBJ_NAZEV,
-       a.NAZEV_ZBOZI,
-       p.DTPOSLEDNI_DOD,
-       p.MNPOSLEDNI_DOD
-FROM XXPRODEJE p
-JOIN QSUBJADR_DF dm ON dm.IDSUBJADR = p.IDSUBJADR AND dm.VLSUBJADR_TYP = 2
-JOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT
-JOIN QZBOZI_DF a ON a.IDZBOZI = p.IDZBOZI AND a.VLTYP_SLOZ = 1
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-  AND p.DTPOSLEDNI_DOD IS NOT NULL
-ORDER BY p.DTPOSLEDNI_DOD DESC;
-""", search { patterns: ["(kdy byla poslední dodávka|kdy jsme naposledy dodávali|posledni dodavka|poslední dodávka) (pro |){nazev_zakaznika}", "(co|kdy) jsme (naposledy|naposled) (dodali|dodávali) (pro |){nazev_zakaznika}"], }
+  CASE
+    WHEN {year} - c.c_birth_year < 30 THEN 'under 30'
+    WHEN {year} - c.c_birth_year < 50 THEN '30-49'
+    WHEN {year} - c.c_birth_year < 70 THEN '50-69'
+    ELSE '70 and over'
+  END AS age_band,
+  SUM(ss.ss_ext_sales_price) AS revenue
+FROM store_sales ss
+JOIN customer c ON c.c_customer_sk = ss.ss_customer_sk
+JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+WHERE d.d_year = {year}
+  AND c.c_birth_year IS NOT NULL
+GROUP BY CASE
+    WHEN {year} - c.c_birth_year < 30 THEN 'under 30'
+    WHEN {year} - c.c_birth_year < 50 THEN '30-49'
+    WHEN {year} - c.c_birth_year < 70 THEN '50-69'
+    ELSE '70 and over'
+  END
+ORDER BY age_band;
+""", search { patterns: ["revenue by (customer |)age (band|group) (in |)({year}|)"], }
     parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query predchudci_dokladu { description: "Seznam předchozích dokladů (např. zakázky, ze kterých vznikla faktura)", sourceText: """sql
+def query revenue_by_demographics { description: "Store revenue by gender and marital status in a year", sourceText: """sql
 SELECT
-  td.IDHISHDOK,
-  td.CIS_DOKP,
-  td.NAZEV_TYPDOKP,
-  td.DTZDANITPLNP,
-  td.STAVP
-FROM QHISHDOK_DF td
-WHERE ({id_dokladu} = '' OR td.IDHDOKN = {id_dokladu})
-  AND ('{číslo_dokladu}' = '' OR td.CIS_DOKN LIKE '%{číslo_dokladu}%')
-ORDER BY td.DTZDANITPLNP DESC;
-""", search { patterns: ["předchůdci (dokladu |faktury |dobropisu ){číslo_dokladu}"], }
+  cd.cd_gender,
+  cd.cd_marital_status,
+  COUNT(DISTINCT ss.ss_customer_sk) AS customers,
+  SUM(ss.ss_ext_sales_price) AS revenue
+FROM store_sales ss
+JOIN customer_demographics cd ON cd.cd_demo_sk = ss.ss_cdemo_sk
+JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+WHERE d.d_year = {year}
+GROUP BY cd.cd_gender, cd.cd_marital_status
+ORDER BY revenue DESC;
+""", search { patterns: ["revenue by (gender|marital status|demographics) (in |)({year}|)"], }
     parameters: [
-        { name: id_dokladu, type: varchar },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query prodeje_na_dodacim_miste { description: "Seznam prodejů pro konkrétní dodací místo (LIKE match na zkratku je záměrný — zkratka může být podřetězec)", sourceText: """sql
+def query revenue_by_state { description: "Web and marketplace revenue by the billing state of the customer in a year", sourceText: """sql
 SELECT
-  pr.SUBJADR_POZNAMKA,
-  ok.CEN_SKUP,
-  p.NAZEV_SKUP_ZBOZI,
-  pp.NAZEV_PODSKUPZBOZI,
-  a.CIS_ZBOZI,
-  a.NAZEV_ZBOZI,
-  pr.DTPRVNI_DOD,
-  pr.DTPOSLEDNI_DOD,
-  pr.HDTRZBA_24M,
-  pr.HDTRZBA_12M
-FROM XXPRODEJE pr
-LEFT JOIN QCENSKUP_DF ok ON ok.IDCENSKUP = pr.IDCENSKUP
-LEFT JOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = pr.IDSKUPZBOZI
-LEFT JOIN QXXPODSKUPZBOZI pp ON pp.IDXXPODSKUPZBOZI = pr.IDXXPODSKUPZBOZI
-LEFT JOIN QZBOZI_DF a ON a.IDZBOZI = pr.IDZBOZI AND a.VLTYP_SLOZ = 1
-WHERE ({id_dodaciho_mista} = '' OR pr.IDSUBJADR = {id_dodaciho_mista})
-  AND pr.SUBJADR_POZNAMKA COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {zkratka_dodaciho_mista}, '%')
-ORDER BY p.NAZEV_SKUP_ZBOZI, a.NAZEV_ZBOZI;
-""", search { patterns: ["prodeje (na |)(dodacím místě |){zkratka_dodaciho_mista}", "(seznam |)(prodeje|prodejů|tržby|tržeb) (na dodacím místě|dodacího místa)"], }
+  ca.ca_state,
+  SUM(cs.ext_sales_price) AS revenue
+FROM channel_sales cs
+JOIN customer c ON c.c_customer_sk = cs.customer_sk
+JOIN customer_address ca ON ca.ca_address_sk = c.c_current_addr_sk
+JOIN date_dim d ON d.d_date_sk = cs.sold_date_sk
+WHERE d.d_year = {year}
+  AND cs.channel IN ('web', 'marketplace')
+GROUP BY ca.ca_state
+ORDER BY revenue DESC;
+""", search { patterns: ["revenue (by|per) (customer |)state (in |)({year}|)"], }
     parameters: [
-        { name: id_dodaciho_mista, type: varchar },
-        { name: zkratka_dodaciho_mista, type: varchar, label: "Zkratka dodacího místa" },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query prodeje_produktu_u_zakaznika { description: "Prodeje konkrétního produktu u zákazníka", sourceText: """sql
+def query sales_by_hour { description: "Store revenue by hour of the day in a year", sourceText: """sql
 SELECT
-       dm.SUBJADR_POZNAMKA,
-       a.CIS_ZBOZI,
-       a.NAZEV_ZBOZI,
-       p.HDTRZBA_12M,
-       p.HDTRZBA_24M,
-       p.DTPOSLEDNI_DOD
-FROM XXPRODEJE p
-JOIN QSUBJADR_DF dm ON dm.IDSUBJADR = p.IDSUBJADR AND dm.VLSUBJADR_TYP = 2
-JOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT
-JOIN QSKUPZBOZI_DF pr ON pr.IDSKUPZBOZI = p.IDSKUPZBOZI
-JOIN QZBOZI_DF a ON a.IDZBOZI = p.IDZBOZI AND a.VLTYP_SLOZ = 1
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-  AND pr.NAZEV_SKUP_ZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_produktu}, '%')
-ORDER BY p.HDTRZBA_12M DESC;
-""", search { patterns: ["prodeje produkt(u|) {nazev_produktu} (u |u zákazníka |u zakaznika |pro |pro zákazníka |){nazev_zakaznika}", "(kolik|jak) {nazev_zakaznika} nakupuje {nazev_produktu}"], }
+  t.t_hour,
+  t.t_am_pm,
+  COUNT(DISTINCT ss.ss_ticket_number) AS baskets,
+  SUM(ss.ss_ext_sales_price) AS revenue
+FROM store_sales ss
+JOIN time_dim t ON t.t_time_sk = ss.ss_sold_time_sk
+JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+WHERE d.d_year = {year}
+GROUP BY t.t_hour, t.t_am_pm
+ORDER BY t.t_hour;
+""", search { patterns: ["(store |)(sales|revenue) by hour (of (the |)day|) (in |)({year}|)"], }
     parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
-        { name: nazev_produktu, type: varchar, label: "Název produktu" },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query prodeje_zakaznika { description: "Celková tržba zákazníka za 12 měsíců", sourceText: """sql
-SELECT 
-  s.IDSUBJEKT,
-  s.SUBJ_NAZEV,
-  COUNT(DISTINCT dm.IDSUBJADR) AS POCET_DM,
-  SUM(p.HDTRZBA_12M) AS HDTRZBA_12M,
-  SUM(p.HDTRZBA_24M) AS HDTRZBA_24M
-FROM QSUBJEKT s
-JOIN QSUBJADR_DF dm ON dm.IDSUBJEKT = s.IDSUBJEKT AND dm.VLSUBJADR_TYP = 2
-JOIN XXPRODEJE p ON p.IDSUBJADR = dm.IDSUBJADR
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-GROUP BY s.IDSUBJEKT, s.SUBJ_NAZEV
-ORDER BY HDTRZBA_12M DESC;
-""", search { patterns: ["(jake ma zakaznik|jaké má zákazník|ukaz mi trzby zakaznika|ukaž mi tržby zákazníka|prodeje zakaznika|prodeje zákazníka|obraty zakaznika|obraty zákazníka|trzby zakaznika|tržby zákazníka) {nazev_zakaznika}", "(jake ma|jaké má) {nazev_zakaznika} prodeje"], examples: ["Jaké má Kaufland prodeje?"], }
+def query ship_modes { description: "List of ship modes", sourceText: """sql
+SELECT
+  sm_ship_mode_sk,
+  sm_type,
+  sm_code,
+  sm_carrier
+FROM ship_mode
+ORDER BY sm_type, sm_carrier;
+""", search { patterns: ["(list of |)ship(ping|) modes"], }}
+
+def query stock_on_hand { description: "Latest on-hand stock of an item in a distribution center", sourceText: """sql
+SELECT
+  i.i_item_id,
+  i.i_product_name,
+  w.w_warehouse_name,
+  inv.inv_quantity_on_hand,
+  d.d_date AS as_of
+FROM inventory inv
+JOIN item i ON i.i_item_sk = inv.inv_item_sk
+JOIN warehouse w ON w.w_warehouse_sk = inv.inv_warehouse_sk
+JOIN date_dim d ON d.d_date_sk = inv.inv_date_sk
+WHERE i.i_item_id = {item_code}
+  AND w.w_warehouse_name COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {warehouse_name}, '%')
+  AND inv.inv_date_sk = (
+    SELECT MAX(inv2.inv_date_sk)
+    FROM inventory inv2
+    WHERE inv2.inv_item_sk = inv.inv_item_sk
+      AND inv2.inv_warehouse_sk = inv.inv_warehouse_sk
+  );
+""", search { patterns: ["(stock|stock on hand|how many) (of |)(the |)(item|product) {item_code} (in|at) {warehouse_name}"], }
     parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
+        { name: item_code, type: varchar, label: "Item code" },
+        { name: warehouse_name, type: varchar, label: "Distribution center" },
     ]
 }
 
-def query prodejni_akce { description: "Seznam platných prodejních akcí", sourceText: """sql
+def query stockout_weeks { description: "Weeks in which an item ran out of stock in a distribution center", sourceText: """sql
 SELECT
-  IDXXPRODAKCE,
-  KOD_PRODAKCE
-FROM QXXPRODAKCE
-WHERE DTPLATI_OD <= GETDATE()
-  AND (DTPLATI_DO IS NULL OR DTPLATI_DO >= GETDATE())
-ORDER BY KOD_PRODAKCE;
-""", search { patterns: ["seznam (všech |)platných prodejních akcí"], }}
-
-def query produkty { description: "Seznam všech produktů", sourceText: """sql
-SELECT
-       IDSKUPZBOZI,
-       KOD_SKUP_ZBOZI,
-       NAZEV_SKUP_ZBOZI
-FROM QSKUPZBOZI_DF
-WHERE NAZEV_SKUP_ZBOZI not LIKE 'Z%'
-ORDER BY NAZEV_SKUP_ZBOZI;
-""", search { patterns: ["seznam (vsech |všech |)(produktu|produktů)"], examples: ["Seznam všech produktů"], }}
-
-def query produkty_navstevy_zakaznika { description: "Seznam produktů z návštěvy zákazníka", sourceText: """sql
-SELECT
-  pdm.IDXXNOZPRIPRAVA,
-  pdm.IDXXNAVSTEVAOZ,
-  p.NAZEV_SKUP_ZBOZI,
-  pdm.PORADI_PR,
-  pdm.VYHRAZENO,
-  pdm.HDVYTEZNOST_REGALU_PROD
-FROM QXXNOZPRIPRAVA pdm
-JOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = pdm.IDSKUPZBOZI
-WHERE ({id_navstevy} = '' OR pdm.IDXXNAVSTEVAOZ = {id_navstevy})
-ORDER BY pdm.PORADI_PR;
-""", search { patterns: ["(seznam |)produkt(ů|y) (z |pro |)(konkrétní |)návštěv(y|u)( zákazníka|) {id_navstevy}"], }
+  iws.iws_week_seq,
+  i.i_item_id,
+  i.i_product_name,
+  iws.iws_avg_on_hand,
+  iws.iws_units_sold
+FROM inventory_weekly_summary iws
+JOIN item i ON i.i_item_sk = iws.iws_item_sk
+JOIN warehouse w ON w.w_warehouse_sk = iws.iws_warehouse_sk
+WHERE iws.iws_min_on_hand = 0
+  AND w.w_warehouse_name COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {warehouse_name}, '%')
+ORDER BY iws.iws_week_seq DESC, i.i_item_id;
+""", search { patterns: ["stock[- ]?outs (in|at) (the |)(distribution center|DC|warehouse) {warehouse_name}", "(which |)(items|products) ran out of stock (in|at) {warehouse_name}"], }
     parameters: [
-        { name: id_navstevy, type: varchar },
+        { name: warehouse_name, type: varchar, label: "Distribution center" },
     ]
 }
 
-def query produkty_pro_firmu { description: "Seznam produktů přiřazených na úrovni firmy", sourceText: """sql
-SELECT
-  p.IDSKUPZBOZI,
-  p.KOD_SKUP_ZBOZI,
-  p.NAZEV_SKUP_ZBOZI,
-  pf.PORADI_F,
-  pf.VLVYZNAM_F,
-  pf.HDNORMATIV_TRZBY_F
-FROM QSKUPZBOZI_DF p
-JOIN QXXMEZABC pf ON p.IDSKUPZBOZI = pf.IDSKUPZBOZI
-WHERE pf.VLTYP_NASTAVENI = 1
-ORDER BY pf.PORADI_F;
-""", search { patterns: ["produkty (pro |)firm(u|y)"], }}
+def query store__filter { description: "Synthetic query materialising the row filter of entity store.", sourceText: "SELECT * FROM store WHERE s_rec_end_date IS NULL", tags: ["synthetic", "where-filter"],}
 
-def query produkty_pro_obchodni_kanal { description: "Seznam produktů přiřazených k obchodnímu kanálu", sourceText: """sql
+def query store_assortment { description: "Items currently listed in a store's assortment", sourceText: """sql
 SELECT
-  p.IDSKUPZBOZI,
-  p.KOD_SKUP_ZBOZI,
-  p.NAZEV_SKUP_ZBOZI,
-  ok.CEN_SKUP,
-  pok.PORADI_F,
-  pok.VLVYZNAM_F,
-  pok.HDNORMATIV_TRZBY_F
-FROM QSKUPZBOZI_DF p 
-JOIN QXXMEZABC pok ON p.IDSKUPZBOZI = pok.IDSKUPZBOZI
-JOIN QCENSKUP_DF ok ON ok.IDCENSKUP = pok.IDCENSKUP
-WHERE pok.VLTYP_NASTAVENI = 21
-  AND ({id_obchodniho_kanalu} = '' OR pok.IDCENSKUP = {id_obchodniho_kanalu})
-  AND ok.CEN_SKUP COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_kanalu}, '%')
-ORDER BY pok.PORADI_F;
-""", search { patterns: ["produkty (pro |v |)obchodní(m|) kanál(u|) {kod_kanalu}"], }
+  i.i_item_id,
+  i.i_product_name,
+  d.d_date AS listed_on,
+  sia.sia_min_stock
+FROM store_item_assortment sia
+JOIN store s ON s.s_store_sk = sia.sia_store_sk
+JOIN item i ON i.i_item_sk = sia.sia_item_sk
+JOIN date_dim d ON d.d_date_sk = sia.sia_listed_date_sk
+WHERE sia.sia_delisted_date_sk IS NULL
+  AND s.s_store_name COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {store_name}, '%')
+ORDER BY i.i_product_name;
+""", search { patterns: ["(assortment|items listed) (of|in) (the |)store {store_name}"], }
     parameters: [
-        { name: id_obchodniho_kanalu, type: varchar },
-        { name: kod_kanalu, type: varchar, label: "Kód kanálu" },
+        { name: store_name, type: varchar, label: "Store name" },
     ]
 }
 
-def query produkty_pro_trzni_skupinu { description: "Seznam produktů přiřazených k tržní skupině", sourceText: """sql
+def query store_plan_vs_actual { description: "Store revenue against plan, by category, for a year", sourceText: """sql
+WITH actual AS (
+    SELECT ss.ss_store_sk AS store_sk, i.i_category_id AS category_id, SUM(ss.ss_ext_sales_price) AS revenue
+    FROM store_sales ss
+    JOIN item i ON i.i_item_sk = ss.ss_item_sk
+    JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+    WHERE d.d_year = {year}
+    GROUP BY ss.ss_store_sk, i.i_category_id
+), plan_total AS (
+    SELECT ssp_store_sk AS store_sk, ssp_category_id AS category_id, SUM(ssp_planned_sales) AS planned
+    FROM store_sales_plan
+    WHERE ssp_year = {year}
+    GROUP BY ssp_store_sk, ssp_category_id
+)
 SELECT
-  p.IDSKUPZBOZI,
-  p.KOD_SKUP_ZBOZI,
-  p.NAZEV_SKUP_ZBOZI,
-  ts.NAZEV_SKUPZNACZBOZI,
-  pts.PORADI_F,
-  pts.VLVYZNAM_F,
-  pts.HDNORMATIV_TRZBY_F
-FROM QSKUPZBOZI_DF p
-JOIN  QXXMEZABC pts ON p.IDSKUPZBOZI = pts.IDSKUPZBOZI
-JOIN QSKUPZNACZBOZI_DF ts ON ts.IDSKUPZNACZBOZI = pts.IDSKUPZNACZBOZI
-WHERE pts.VLTYP_NASTAVENI = 11
-  AND ({id_trzni_skupiny} = '' OR pts.IDSKUPZNACZBOZI = {id_trzni_skupiny})
-  AND ts.KOD_SKUPZNACZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_trzni_skupiny}, '%')
-ORDER BY pts.PORADI_F;
-""", search { patterns: ["produkty (pro |v |)tržní skupin(u|ě) {kod_trzni_skupiny}"], }
+  s.s_store_name,
+  c.i_category,
+  p.planned,
+  a.revenue,
+  CASE WHEN p.planned > 0
+       THEN ROUND(a.revenue * 100.0 / p.planned, 1)
+  END AS plan_fulfilment_pct
+FROM plan_total p
+LEFT JOIN actual a ON a.store_sk = p.store_sk AND a.category_id = p.category_id
+JOIN store s ON s.s_store_sk = p.store_sk
+JOIN item_category c ON c.i_category_id = p.category_id
+ORDER BY s.s_store_name, c.i_category;
+""", search { patterns: ["(store |)(revenue |)plan (vs|versus|against) actual (in |for |)({year}|)"], }
     parameters: [
-        { name: id_trzni_skupiny, type: varchar },
-        { name: kod_trzni_skupiny, type: varchar, label: "Kód tržní skupiny" },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query produkty_zakaznika { description: "Produkty nakupované zákazníkem", sourceText: """sql
-SELECT 
-  pr.IDSKUPZBOZI,
-  s.SUBJ_NAZEV,
-  pr.NAZEV_SKUP_ZBOZI,
-  SUM(p.HDTRZBA_12M) AS HDTRZBA_12M
-FROM QSKUPZBOZI_DF pr 
-JOIN XXPRODEJE p ON pr.IDSKUPZBOZI = p.IDSKUPZBOZI
-JOIN QSUBJADR_DF dm ON dm.IDSUBJADR = p.IDSUBJADR AND dm.VLSUBJADR_TYP = 2
-JOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-GROUP BY pr.IDSKUPZBOZI, s.SUBJ_NAZEV, pr.NAZEV_SKUP_ZBOZI
-ORDER BY HDTRZBA_12M DESC;
-""", search { patterns: ["(jake produkty kupuje|jaké produkty kupuje|co nakupuje zakaznik|co nakupuje zákazník) {nazev_zakaznika}", "(produkty|sortiment) (zákazníka |zakaznika ){nazev_zakaznika}"], examples: ["Jaké produkty kupuje Kaufland?"], }
+def query store_return_rate { description: "Return rate of each store in a year", sourceText: """sql
+WITH sales AS (
+    SELECT ss_store_sk AS store_sk, SUM(ss_ext_sales_price) AS revenue
+    FROM store_sales ss JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+    WHERE d.d_year = {year}
+    GROUP BY ss_store_sk
+), returned AS (
+    SELECT sr_store_sk AS store_sk, SUM(sr_return_amt) AS amount
+    FROM store_returns sr JOIN date_dim d ON d.d_date_sk = sr.sr_returned_date_sk
+    WHERE d.d_year = {year}
+    GROUP BY sr_store_sk
+)
+SELECT
+  s.s_store_name,
+  sales.revenue,
+  ISNULL(returned.amount, 0) AS returned_amount,
+  CAST(ISNULL(returned.amount, 0) * 100.0 / NULLIF(sales.revenue, 0) AS DECIMAL(18,2)) AS return_rate_pct
+FROM sales
+JOIN store s ON s.s_store_sk = sales.store_sk
+LEFT JOIN returned ON returned.store_sk = sales.store_sk
+ORDER BY return_rate_pct DESC;
+""", search { patterns: ["return rate (of|by|per) store(s|) (in |)({year}|)"], }
     parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query prvni_nakup_artiklu { description: "Datum prvního nákupu artiklu zákazníkem", sourceText: """sql
+def query store_returns_by_reason { description: "Store returns of a store by return reason", sourceText: """sql
 SELECT
-       s.SUBJ_NAZEV,
-       a.NAZEV_ZBOZI,
-       p.DTPRVNI_DOD
-FROM XXPRODEJE p
-JOIN QSUBJADR_DF dm ON dm.IDSUBJADR = p.IDSUBJADR AND dm.VLSUBJADR_TYP = 2
-JOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT
-JOIN QZBOZI_DF a ON a.IDZBOZI = p.IDZBOZI AND a.VLTYP_SLOZ = 1
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-  AND a.NAZEV_ZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_artiklu}, '%')
-  AND p.DTPRVNI_DOD IS NOT NULL
-ORDER BY p.DTPRVNI_DOD;
-""", search { patterns: ["(kdy|datum) {nazev_zakaznika} poprvé (nakoupil|koupil) {nazev_artiklu}"], }
+  r.r_reason_desc,
+  COUNT(*) AS return_lines,
+  SUM(sr.sr_return_quantity) AS units_returned,
+  SUM(sr.sr_return_amt) AS amount_returned
+FROM store_returns sr
+JOIN reason r ON r.r_reason_sk = sr.sr_reason_sk
+JOIN store s ON s.s_store_sk = sr.sr_store_sk
+WHERE s.s_store_name COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {store_name}, '%')
+GROUP BY r.r_reason_desc
+ORDER BY amount_returned DESC;
+""", search { patterns: ["returns (of|in|at) (the |)store {store_name} by reason"], }
     parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
-        { name: nazev_artiklu, type: varchar, label: "Název artiklu" },
+        { name: store_name, type: varchar, label: "Store name" },
     ]
 }
 
-def query reklamace__filter { description: "Synthetic query materialising the row-filter declared on YAML entity reklamace.", sourceText: "SELECT * FROM QHDOK_ZAK_DF WHERE TYP_DOK='PDO'", tags: ["synthetic", "yaml-import", "where-filter"],}
-
-def query rezerva_trzby_dodaciho_mista { description: "Rezerva tržeb a vytěženost pro konkrétní dodací místo", sourceText: """sql
+def query store_revenue_by_month { description: "Monthly revenue of a store in a year", sourceText: """sql
 SELECT
-  rt.SUBJADR_POZNAMKA,
-  rt.IDCENSKUP,
-  rt.IDXXPODSKUPZBOZI,
-  rt.DM_NEUPLNA_DATA,
-  rt.DM_KONKURENCE_ZAEVIDOVANA,
-  rt.HDNORMATIV_TRZBY,
-  rt.HDTRZBA_POTENCIAL_PODPROD,
-  rt.HDTRZBA_CILOVYNORMATIV_PODPROD,
-  rt.HDTRZBA_VYTEZNOST_PODPROD
-FROM XXREZERVA_TRZBY rt
-WHERE rt.SUBJADR_POZNAMKA COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {zkratka_dm}, '%')
-ORDER BY rt.HDTRZBA_POTENCIAL_PODPROD DESC;
-""", search { patterns: ["rezerva tržeb (pro |)dodací(ho|) míst(o|a) {zkratka_dm}"], }
+  d.d_year,
+  d.d_moy,
+  SUM(ss.ss_ext_sales_price) AS revenue,
+  SUM(ss.ss_quantity) AS units_sold
+FROM store_sales ss
+JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+JOIN store s ON s.s_store_sk = ss.ss_store_sk
+WHERE d.d_year = {year}
+  AND s.s_store_name COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {store_name}, '%')
+GROUP BY d.d_year, d.d_moy
+ORDER BY d.d_moy;
+""", search { patterns: ["(monthly revenue|revenue by month) (of|for) (the |)store {store_name} in {year}"], }
     parameters: [
-        { name: zkratka_dm, type: varchar, label: "Zkratka dodacího místa" },
+        { name: store_name, type: varchar, label: "Store name" },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query rezerva_trzby_podle_produktu { description: "Agregovaná rezerva tržeb podle produktů (přes podprodukty)", sourceText: """sql
-SELECT 
-  pp.IDSKUPZBOZI,
-  p.NAZEV_SKUP_ZBOZI,
-  SUM(rt.HDTRZBA_POTENCIAL_PODPROD) AS HDTRZBA_POTENCIAL_PODPROD,
-  CASE WHEN SUM(rt.HDTRZBA_CILOVYNORMATIV_PODPROD) > 0
-       THEN ROUND(SUM(rt.HDTRZBA_12M_PODPROD) * 100.0 / SUM(rt.HDTRZBA_CILOVYNORMATIV_PODPROD), 1)
-  END AS HDTRZBA_VYTEZNOST_PODPROD
-FROM XXREZERVA_TRZBY rt
-JOIN QXXPODSKUPZBOZI pp ON pp.IDXXPODSKUPZBOZI = rt.IDXXPODSKUPZBOZI
-JOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = pp.IDSKUPZBOZI
-GROUP BY pp.IDSKUPZBOZI, p.NAZEV_SKUP_ZBOZI
-ORDER BY HDTRZBA_POTENCIAL_PODPROD DESC;
-""", search { patterns: ["rezerva tržeb (podle |pro |)produkt(u|ů|)"], }}
-
-def query role { description: "Seznam všech rolí", sourceText: """sql
+def query store_sales_with_coupons { description: "Store sales lines paid partly with a coupon in a year", sourceText: """sql
 SELECT
-       IDSKUPUZIV,
-       KOD_SKUP_UZIV,
-       NAZEV_SKUP_UZIV
-FROM QSKUPUZIV
-ORDER BY KOD_SKUP_UZIV;
-""", search { patterns: ["seznam (vsech |všech |)(rolí|role)"], examples: ["Seznam všech rolí"], }}
-
-def query subjekty_obchodniho_kanalu { description: "Seznam subjektů (odběratelů) v daném obchodním kanálu", sourceText: """sql
-SELECT
-  s.IDSUBJEKT,
-  s.KOD_SUBJEKTU,
-  s.SUBJ_NAZEV,
-  ok.CEN_SKUP
-FROM QSUBJEKT s
-JOIN QSUBJVTSUBJ_DF ov ON ov.IDSUBJEKT = s.IDSUBJEKT AND ov.TYP_SUBJ = 'ODB'
-JOIN QCENSKUP_DF ok ON ok.IDCENSKUP = ov.IDCENSKUP
-WHERE ({id_obchodniho_kanalu} = '' OR ok.IDCENSKUP = {id_obchodniho_kanalu})
-  AND ok.CEN_SKUP LIKE CONCAT('%', {kod_kanalu}, '%')
-ORDER BY s.SUBJ_NAZEV;
-""", search { patterns: ["subjekty (v |)(obchodním |)kanálu {kod_kanalu}"], }
+  ss.ss_ticket_number,
+  i.i_product_name,
+  ss.ss_ext_sales_price,
+  ss.ss_coupon_amt,
+  ss.ss_net_paid_inc_tax
+FROM store_sales ss
+JOIN item i ON i.i_item_sk = ss.ss_item_sk
+JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+WHERE d.d_year = {year}
+  AND ss.ss_coupon_amt > 0
+ORDER BY ss.ss_coupon_amt DESC;
+""", search { patterns: ["(store |)sales (paid |)with (a |)coupon(s|) (in |)({year}|)"], }
     parameters: [
-        { name: id_obchodniho_kanalu, type: varchar },
-        { name: kod_kanalu, type: varchar, label: "Kód kanálu" },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query termin_obnoveni_zasoby { description: "Zjištění termínu obnovení zásoby artiklu", sourceText: """sql
+def query stores_by_state { description: "Open stores in a state", sourceText: """sql
 SELECT
-       z.IDXXVYPADKYZASOB,
-       a.CIS_ZBOZI,
-       a.NAZEV_ZBOZI,
-       z.DTDOPLNENI,
-       z.MNDOPLNENI
-FROM XXVYPADKYZASOB z
-JOIN QZBOZI_DF a ON a.IDZBOZI = z.IDZBOZI AND a.VLTYP_SLOZ = 1
-WHERE a.NAZEV_ZBOZI COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_artiklu}, '%')
-  AND z.DTDOPLNENI IS NOT NULL
-ORDER BY z.DTDOPLNENI;
-""", search { patterns: ["(kdy bude obnovena zásoba|termín obnovení zásoby|termín doplnění) {nazev_artiklu}"], }
+  [s].[s_store_id] AS [Store code],
+  [s].[s_store_name] AS [Store name],
+  [s].[s_city] AS [City],
+  [s].[s_floor_space] AS [Floor space]
+FROM [store] AS [s]
+WHERE [s].[s_rec_end_date] IS NULL
+  AND [s].[s_closed_date_sk] IS NULL
+  AND [s].[s_state] = {state}
+ORDER BY [s].[s_city];
+""", search { patterns: ["(open |)stores in {state}"], examples: ["Open stores in TN"], }
     parameters: [
-        { name: nazev_artiklu, type: varchar, label: "Název artiklu" },
+        { name: state, type: varchar, label: "State" },
     ]
 }
 
-def query termin_stazeni_vratky { description: "Zjištění termínu stažení vratky od zákazníka", sourceText: """sql
+def query stores_in_division { description: "Stores of a division, through their markets", sourceText: """sql
 SELECT
-       v.IDHDOK,
-       v.CIS_DOK,
-       s.KOD_SUBJEKTU,
-       s.SUBJ_NAZEV,
-       v.DTZDANITPLN,
-       v.VLSTAVHDOK
-FROM QHDOK_ZAK_DF v
-JOIN QSUBJADR_DF dm ON dm.IDSUBJADR = v.IDSUBJADRP
-JOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND v.TYP_DOK = 'POB' 
-  AND v.HDKUHRADEVAL < 0
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-ORDER BY v.DTZDANITPLN DESC;
-""", search { patterns: ["(kdy bude staženo zboží|termín stažení vratky|termín vratky|kdy budou staženy vratky) (od zákazníka |pro zákazníka |pro |){nazev_zakaznika}"], }
+  dv.s_division_name,
+  m.s_market_desc,
+  s.s_store_name,
+  s.s_state
+FROM store s
+JOIN store_market m ON m.s_market_id = s.s_market_id
+JOIN store_division dv ON dv.s_division_id = m.s_division_id
+WHERE s.s_rec_end_date IS NULL
+  AND dv.s_division_name COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {division_name}, '%')
+ORDER BY m.s_market_desc, s.s_store_name;
+""", search { patterns: ["stores (in|of) (the |)division {division_name}"], }
     parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
+        { name: division_name, type: varchar, label: "Division name" },
     ]
 }
 
-def query termin_uhrady_dobropisu { description: "Zjištění termínu úhrady dobropisu zákazníkovi", sourceText: """sql
+def query stores_in_market { description: "Stores serving a market", sourceText: """sql
 SELECT
-       d.IDHDOK,
-       d.CIS_DOK,
-       s.KOD_SUBJEKTU,
-       s.SUBJ_NAZEV,
-       d.ZAK_HDOK,
-       d.DTVYSTAVENO,
-       d.DTSPLATNO,
-       d.VLSTAVHDOK
-FROM QHDOK_FAV_DF d
-JOIN QSUBJEKT s ON s.IDSUBJEKT = d.IDSUBJEKT
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND d.TYP_DOK = 'FVU' 
-  AND d.HDKUHRADEVAL < 0
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-ORDER BY d.DTSPLATNO DESC;
-""", search { patterns: ["(kdy bude (zákazníkovi |)uhrazen dobropis|termín proplacení dobropisu) {nazev_zakaznika}", "(kdy bude uhrazen dobropis|uhrada dobropisu) (zákazníka |){nazev_zakaznika}"], }
+  s.s_store_sk,
+  s.s_store_id,
+  s.s_store_name,
+  s.s_city,
+  m.s_market_desc
+FROM store s
+JOIN store_market m ON m.s_market_id = s.s_market_id
+WHERE s.s_rec_end_date IS NULL
+  AND ({market_id} = '' OR m.s_market_id = {market_id})
+  AND m.s_market_desc COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {market_name}, '%')
+ORDER BY s.s_store_name;
+""", search { patterns: ["stores (in|of|serving) (the |)market {market_name}"], }
     parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
+        { name: market_id, type: varchar },
+        { name: market_name, type: varchar, label: "Market name" },
     ]
 }
 
-def query tok_dokladu { description: "Celý tok dokladu - všechny vazby (předchůdci i následníci)", sourceText: """sql
-SELECT
-  td.IDHISHDOK,
-  td.CIS_DOKP,
-  td.NAZEV_TYPDOKP,
-  td.DTZDANITPLNP,
-  td.STAVP,
-  td.CIS_DOKN,
-  td.NAZEV_TYPDOKN,
-  td.DTZDANITPLNN,
-  td.STAVN
-FROM QHISHDOK_DF td
-WHERE ({id_dokladu} = '' OR td.IDHDOKP = {id_dokladu} OR td.IDHDOKN = {id_dokladu})
-  AND ('{číslo_dokladu}' = '' OR td.CIS_DOKP LIKE '%{číslo_dokladu}%' OR td.CIS_DOKN LIKE '%{číslo_dokladu}%')
-ORDER BY td.DTZDANITPLNP, td.DTZDANITPLNN;
-""", search { patterns: ["(tok|historie|vazby) dokladu {číslo_dokladu}"], }
+def query top_customers_by_revenue { description: "The 25 customers with the highest revenue across channels in a year", sourceText: """sql
+SELECT TOP 25
+  c.c_customer_id,
+  c.c_first_name,
+  c.c_last_name,
+  s.ccs_store_sales + s.ccs_web_sales + s.ccs_catalog_sales AS total_revenue,
+  ROW_NUMBER() OVER (ORDER BY s.ccs_store_sales + s.ccs_web_sales + s.ccs_catalog_sales DESC) AS revenue_rank
+FROM customer_channel_summary s
+JOIN customer c ON c.c_customer_sk = s.ccs_customer_sk
+WHERE s.ccs_year = {year}
+ORDER BY revenue_rank;
+""", search { patterns: ["top (25 |)customers (by revenue|) (in |)({year}|)", "best customers (in |)({year}|)"], examples: ["Top 25 customers in 2025"], }
     parameters: [
-        { name: id_dokladu, type: varchar },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query top_artikly_zakaznika { description: "Artikly zákazníka s nejvyšší tržbou", sourceText: """sql
+def query top_items_page { description: "One page of current items ordered by price", sourceText: """sql
+SELECT
+  i_item_id,
+  i_product_name,
+  i_current_price
+FROM item
+WHERE i_rec_end_date IS NULL
+ORDER BY i_current_price DESC
+OFFSET {page_offset} ROWS FETCH NEXT 25 ROWS ONLY;
+""", search { patterns: ["(next |)page of (items|products) (by price|)"], }
+    parameters: [
+        { name: page_offset, type: int, label: "Offset" },
+    ]
+}
+
+def query top_items_per_category { description: "The five best-selling items of each category in a year", sourceText: """sql
+WITH item_revenue AS (
+    SELECT
+      c.i_category,
+      i.i_product_name,
+      SUM(cs.ext_sales_price) AS revenue,
+      ROW_NUMBER() OVER (PARTITION BY c.i_category ORDER BY SUM(cs.ext_sales_price) DESC) AS rn
+    FROM channel_sales cs
+    JOIN item i ON i.i_item_sk = cs.item_sk
+    JOIN item_category c ON c.i_category_id = i.i_category_id
+    JOIN date_dim d ON d.d_date_sk = cs.sold_date_sk
+    WHERE d.d_year = {year}
+    GROUP BY c.i_category, i.i_product_name
+)
+SELECT i_category, i_product_name, revenue, rn
+FROM item_revenue
+WHERE rn <= 5
+ORDER BY i_category, rn;
+""", search { patterns: ["(top|best[- ]selling) (5 |five |)(items|products) (per|of each|in each) category (in |)({year}|)"], examples: ["Top 5 products per category in 2025"], }
+    parameters: [
+        { name: year, type: int, label: "Year" },
+    ]
+}
+
+def query top_stores_by_revenue { description: "The ten stores with the highest revenue in a year", sourceText: """sql
 SELECT TOP 10
-       s.SUBJ_NAZEV,
-       a.NAZEV_ZBOZI,
-       SUM(p.HDTRZBA_12M) AS HDTRZBA_12M
-FROM XXPRODEJE p
-JOIN QSUBJADR_DF dm ON dm.IDSUBJADR = p.IDSUBJADR AND dm.VLSUBJADR_TYP = 2
-JOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT
-JOIN QZBOZI_DF a ON a.IDZBOZI = p.IDZBOZI AND a.VLTYP_SLOZ = 1
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-GROUP BY s.SUBJ_NAZEV, a.NAZEV_ZBOZI
-ORDER BY HDTRZBA_12M DESC;
-""", search { patterns: ["(které artikly má|top artikly zákazníka) {nazev_zakaznika} s nejvyšší tržbou", "(nejprodávanější|nejlepší) artikly (zákazníka |){nazev_zakaznika}"], }
+  s.s_store_id,
+  s.s_store_name,
+  SUM(ss.ss_ext_sales_price) AS revenue
+FROM store_sales ss
+JOIN store s ON s.s_store_sk = ss.ss_store_sk
+JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+WHERE d.d_year = {year}
+GROUP BY s.s_store_id, s.s_store_name
+ORDER BY revenue DESC;
+""", search { patterns: ["top (10 |ten |)stores (by|with the highest) revenue (in |)({year}|)"], examples: ["Top 10 stores by revenue in 2025"], }
     parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query top_rezervy_trzeb { description: "Dodací místa s největší rezervou tržeb", sourceText: """sql
-SELECT TOP 10
-  dm.IDSUBJADR,
-  rt.SUBJADR_POZNAMKA,
-  MAX(rt.DM_NEUPLNA_DATA) AS DM_NEUPLNA_DATA,
-  MAX(rt.DM_KONKURENCE_ZAEVIDOVANA) AS DM_KONKURENCE_ZAEVIDOVANA,
-  MAX(rt.HDTRZBA_12M_DM) AS HDTRZBA_12M_DM,
-  MAX(rt.HDTRZBA_POTENCIAL_DM) AS HDTRZBA_POTENCIAL_DM,
-  MAX(rt.HDTRZBA_POTENCIAL_DM) - MAX(rt.HDTRZBA_12M_DM) AS REZERVA
-FROM XXREZERVA_TRZBY rt
--- JOIN přes SUBJADR_POZNAMKA je záměrný (XXREZERVA_TRZBY neobsahuje IDSUBJADR)
-LEFT JOIN QSUBJADR_DF dm ON dm.SUBJADR_POZNAMKA = rt.SUBJADR_POZNAMKA and dm.VLSUBJADR_TYP = 2
-GROUP BY dm.IDSUBJADR, rt.SUBJADR_POZNAMKA
-ORDER BY REZERVA DESC;
-""", search { patterns: ["(top |největší |)(dodací(ch|) míst(a|) s |)největší rezerv(ou|y) tržeb", "top (největší |)rezervy tržeb"], }}
+def query warehouse_fulfilment_volume { description: "Units shipped by each distribution center for the web and the marketplace in a year", sourceText: """sql
+SELECT w.w_warehouse_name, x.channel, SUM(x.units) AS units_shipped
+FROM (
+    SELECT ws_warehouse_sk AS warehouse_sk, 'web' AS channel, ws_quantity AS units, ws_sold_date_sk AS date_sk
+    FROM web_sales
+    UNION ALL
+    SELECT cs_warehouse_sk, 'marketplace', cs_quantity, cs_sold_date_sk
+    FROM catalog_sales
+) x
+JOIN warehouse w ON w.w_warehouse_sk = x.warehouse_sk
+JOIN date_dim d ON d.d_date_sk = x.date_sk
+WHERE d.d_year = {year}
+GROUP BY w.w_warehouse_name, x.channel
+ORDER BY w.w_warehouse_name, x.channel;
+""", search { patterns: ["(units shipped|fulfilment volume) (by|per) (distribution center|DC|warehouse) (in |)({year}|)"], }
+    parameters: [
+        { name: year, type: int, label: "Year" },
+    ]
+}
 
-def query trzba_na_cm_dm { description: "Tržba na cm regálové plochy artiklů na dodacím místě", sourceText: """sql
+def query warehouses { description: "List of distribution centers", sourceText: """sql
 SELECT
-       vr.SUBJADR_POZNAMKA,
-       a.CIS_ZBOZI,
-       a.NAZEV_ZBOZI,
-       p.NAZEV_SKUP_ZBOZI,
-       vr.MNFACING,
-       vr.MNDELKA_REG_ART,
-       vr.HDTRZBA_12M_PREP,
-       vr.HDVYTEZNOST_REGALU
-FROM QDF_VYTEZNOST_REGALU vr
-JOIN QZBOZI_DF a ON a.IDZBOZI = vr.IDZBOZI AND a.VLTYP_SLOZ = 1
-JOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = vr.IDSKUPZBOZI
-WHERE vr.SUBJADR_POZNAMKA COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {zkratka_dodaciho_mista}, '%')
-ORDER BY vr.HDVYTEZNOST_REGALU DESC;
-""", search { patterns: ["tržba na cm (na |pro |)(dodací(m|ho) míst(ě|o|a) |){zkratka_dodaciho_mista}"], }
-    parameters: [
-        { name: zkratka_dodaciho_mista, type: varchar, label: "Zkratka dodacího místa" },
-    ]
-}
+  w_warehouse_sk,
+  w_warehouse_id,
+  w_warehouse_name,
+  w_warehouse_sq_ft,
+  w_city,
+  w_state
+FROM warehouse
+ORDER BY w_warehouse_name;
+""", search { patterns: ["(list of |)(all |)(distribution centers|DCs|warehouses)"], examples: ["List all distribution centers"], }}
 
-def query trzba_na_cm_kanal { description: "Tržba na cm regálové plochy artiklů v obchodním kanálu", sourceText: """sql
+def query web_clickstream_sessions { description: "Web page views per session of a day", sourceText: """sql
 SELECT
-       ok.CEN_SKUP,
-       a.CIS_ZBOZI,
-       a.NAZEV_ZBOZI,
-       vr.ODEBIRA_POCET_DM_KANAL,
-       vr.CELKEM_POCET_DM_KANAL,
-       vr.MNDELKA_REG_ART_KANAL,
-       vr.HDTRZBA_12M_PREP_KANAL,
-       vr.HDVYTEZNOST_REGALU_KANAL
-FROM QDF_VYTEZNOST_REGALU_KANAL vr
-JOIN QZBOZI_DF a ON a.IDZBOZI = vr.IDZBOZI AND a.VLTYP_SLOZ = 1
-JOIN QCENSKUP_DF ok ON ok.IDCENSKUP = vr.IDCENSKUP
-WHERE ({kod_kanalu} = '' OR ok.CEN_SKUP LIKE CONCAT('%', {kod_kanalu}, '%'))
-ORDER BY vr.HDVYTEZNOST_REGALU_KANAL DESC;
-""", search { patterns: ["tržba na cm (v |pro |)(obchodní(m|) |)kanál(u|) {kod_kanalu}"], }
+  wcs_user_sk,
+  COUNT(*) AS page_views
+FROM web_clickstreams
+WHERE wcs_click_date_sk = {date_sk}
+GROUP BY wcs_user_sk
+ORDER BY page_views DESC;
+""", search { patterns: ["web (sessions|page views) on {date_sk}"], }
     parameters: [
-        { name: kod_kanalu, type: varchar, label: "Kód kanálu" },
+        { name: date_sk, type: int, label: "Day" },
     ]
 }
 
-def query trzba_zakaznika_24m { description: "Tržba zákazníka za 24 měsíců", sourceText: """sql
-SELECT s.SUBJ_NAZEV,
-       SUM(p.HDTRZBA_24M) AS HDTRZBA_24M
-FROM XXPRODEJE p
-JOIN QSUBJADR_DF dm ON dm.IDSUBJADR = p.IDSUBJADR AND dm.VLSUBJADR_TYP = 2
-JOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-GROUP BY s.SUBJ_NAZEV
-ORDER BY HDTRZBA_24M DESC;
-""", search { patterns: ["(jaká je tržba|tržba zákazníka) {nazev_zakaznika} za (posledních |)24 měsíců", "(celková |)(tržba|trzba|obrat) {nazev_zakaznika} za (posledních |)24 měsíců"], }
-    parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
-    ]
-}
-
-def query trzby_podle_kanalu { description: "Souhrn tržeb podle obchodních kanálů", sourceText: """sql
-SELECT 
-    ok.CEN_SKUP,
-    SUM(pr.HDTRZBA_24M) AS HDTRZBA_24M,
-    SUM(pr.HDTRZBA_12M) AS HDTRZBA_12M
-FROM XXPRODEJE pr
-JOIN QCENSKUP_DF ok ON ok.IDCENSKUP = pr.IDCENSKUP
-WHERE ({id_obchodniho_kanalu} = '' OR ok.IDCENSKUP = {id_obchodniho_kanalu})
-  AND ({kod_kanalu} = '' OR ok.CEN_SKUP LIKE CONCAT('%', {kod_kanalu}, '%'))
-GROUP BY ok.CEN_SKUP
-ORDER BY HDTRZBA_12M DESC;
-""", search { patterns: ["tržby (podle |pro |)(obchodní |prodejní |)kanál(u|)( {kod_kanalu}|)"], }
-    parameters: [
-        { name: id_obchodniho_kanalu, type: varchar },
-        { name: kod_kanalu, type: varchar, label: "Kód kanálu" },
-    ]
-}
-
-def query trzby_podle_produktu { description: "Souhrn tržeb podle produktů", sourceText: """sql
-SELECT 
-  p.IDSKUPZBOZI,
-  p.KOD_SKUP_ZBOZI,
-  p.NAZEV_SKUP_ZBOZI,
-  SUM(pr.HDTRZBA_24M) AS HDTRZBA_24M,
-  SUM(pr.HDTRZBA_12M) AS HDTRZBA_12M
-FROM XXPRODEJE pr
-JOIN QSKUPZBOZI_DF p ON p.IDSKUPZBOZI = pr.IDSKUPZBOZI
-WHERE ({id_produktu} = '' OR pr.IDSKUPZBOZI = {id_produktu})
-  AND ({nazev_produktu} = '' OR p.NAZEV_SKUP_ZBOZI LIKE CONCAT('%', {nazev_produktu}, '%'))
-GROUP BY p.IDSKUPZBOZI, p.KOD_SKUP_ZBOZI, p.NAZEV_SKUP_ZBOZI
-ORDER BY HDTRZBA_12M DESC;
-""", search { patterns: ["tržby (podle |pro |)produkt(u|)( {nazev_produktu}|)"], }
-    parameters: [
-        { name: id_produktu, type: varchar },
-        { name: nazev_produktu, type: varchar, label: "Název produktu" },
-    ]
-}
-
-def query trzni_skupiny { description: "Seznam všech tržních skupin", sourceText: """sql
+def query web_orders_by_page_type { description: "Web orders by the type of page they were placed on", sourceText: """sql
 SELECT
-       IDSKUPZNACZBOZI,
-       KOD_SKUPZNACZBOZI,
-       NAZEV_SKUPZNACZBOZI
-FROM QSKUPZNACZBOZI_DF
-WHERE NAZEV_SKUPZNACZBOZI not LIKE 'Z%'
-ORDER BY NAZEV_SKUPZNACZBOZI;
-""", search { patterns: ["seznam (všech |)tržních skupin"], }}
-
-def query tržní_skupina__filter { description: "Synthetic query materialising the row-filter declared on YAML entity tržní_skupina.", sourceText: "SELECT * FROM QSKUPZNACZBOZI_DF WHERE (NAZEV_SKUPZNACZBOZI not like 'Z%')", tags: ["synthetic", "yaml-import", "where-filter"],}
-
-def query typy_dodacich_mist { description: "Seznam typů dodacích míst", sourceText: """sql
-SELECT
-  tdm.IDXXTYPDODMIST,
-  tdm.KOD_TYPDODMIST,
-  ok.CEN_SKUP
-FROM QXXTYPDODMIST tdm
-JOIN QCENSKUP_DF ok ON ok.IDCENSKUP = tdm.IDCENSKUP
-WHERE ({id_obchodniho_kanalu} = '' OR ok.IDCENSKUP = {id_obchodniho_kanalu})
-  AND ({kod_kanalu} = '' OR ok.CEN_SKUP COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {kod_kanalu}, '%'))
-ORDER BY ok.CEN_SKUP, tdm.KOD_TYPDODMIST;
-""", search { patterns: ["typy dodacích míst( pro kanál {kod_kanalu}|)"], }
+  wp.wp_type,
+  COUNT(DISTINCT ws.ws_order_number) AS orders,
+  AVG(ws.ws_ext_sales_price) AS avg_line_amount
+FROM web_sales ws
+JOIN web_page wp ON wp.wp_web_page_sk = ws.ws_web_page_sk
+JOIN date_dim d ON d.d_date_sk = ws.ws_sold_date_sk
+WHERE d.d_year = {year}
+  AND wp.wp_autogen_flag = 'N'
+GROUP BY wp.wp_type
+ORDER BY orders DESC;
+""", search { patterns: ["web orders (by|per) page type (in |)({year}|)"], }
     parameters: [
-        { name: id_obchodniho_kanalu, type: varchar },
-        { name: kod_kanalu, type: varchar, label: "Kód kanálu" },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query typy_informaci_o_konkurenci { description: "Seznam povolených typů informací o konkurenci", sourceText: """sql
-SELECT
-       IDXXKONKINFOTYP,
-       VLTYP_INFO,
-       VLVLASTNOST_INFO,
-       VLOBLAST_INFO,
-       VLTRZNI_SKUPINA,
-       VLKANAL,
-       VLPRODUKT,
-       VLDODAVATEL,
-       VLZNACKA
-FROM XXKONKINFOTYP
-ORDER BY VLTYP_INFO, VLVLASTNOST_INFO;
-""", search { patterns: ["typy informací o konkurenci"], }}
+def query web_page__filter { description: "Synthetic query materialising the row filter of entity web_page.", sourceText: "SELECT * FROM web_page WHERE wp_rec_end_date IS NULL", tags: ["synthetic", "where-filter"],}
 
-def query ukoly_navstevy { description: "Seznam úkolů pro konkrétní návštěvu zákazníka", sourceText: """sql
+def query web_returns_for_reason { description: "Web returns with a given reason", sourceText: """sql
 SELECT
-  u.IDXXPLNUKOLOZ,
-  u.IDXXNAVSTEVAOZ,
-  u.SPEC_ZADANIUKOLOZ
-FROM QXXPLNUKOLOZ u
-WHERE ({id_navstevy} = '' OR u.IDXXNAVSTEVAOZ = {id_navstevy})
-ORDER BY u.IDXXPLNUKOLOZ;
-""", search { patterns: ["(seznam |)úkol(ů|y) (z |pro |)(konkrétní |)návštěv(y|u)( zákazníka|) {id_navstevy}"], }
+  wr.wr_order_number,
+  i.i_product_name,
+  d.d_date AS returned_on,
+  wr.wr_return_quantity,
+  wr.wr_return_amt,
+  wr.wr_account_credit
+FROM web_returns wr
+JOIN reason r ON r.r_reason_sk = wr.wr_reason_sk
+JOIN item i ON i.i_item_sk = wr.wr_item_sk
+JOIN date_dim d ON d.d_date_sk = wr.wr_returned_date_sk
+WHERE ({reason_id} = '' OR r.r_reason_id = {reason_id})
+  AND r.r_reason_desc COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {reason}, '%')
+ORDER BY d.d_date DESC;
+""", search { patterns: ["web returns (because of|for|with (the |)reason) {reason}"], }
     parameters: [
-        { name: id_navstevy, type: varchar },
+        { name: reason_id, type: varchar },
+        { name: reason, type: varchar, label: "Return reason" },
     ]
 }
 
-def query uzivatel_v_rolich { description: "Seznam rolí přiřazených k uživateli", sourceText: """sql
-SELECT      
-       u.IDUZIVATEL,
-       u.KOD_UZIV,
-       u.JMENO_UZIV,
-       su.IDSKUPUZIV,
-       su.KOD_SKUP_UZIV,
-       su.NAZEV_SKUP_UZIV     
-FROM QUZIVATEL_DF u
-JOIN QUZVESKUP su ON su.IDUZIVATEL = u.IDUZIVATEL
-WHERE u.KOD_UZIV = {kod_uzivatele};
-""", search { patterns: ["seznam (vsech |všech |) (roli |rolí) (uzivatele |uživatele) {kod_uzivatele}"], examples: ["Seznam rolí uživatele jkrov"], }
+def query web_revenue_by_site { description: "Web revenue by web site in a year", sourceText: """sql
+SELECT
+  w.web_site_id,
+  w.web_name,
+  COUNT(DISTINCT ws.ws_order_number) AS orders,
+  SUM(ws.ws_ext_sales_price) AS revenue
+FROM web_sales ws
+JOIN web_site w ON w.web_site_sk = ws.ws_web_site_sk
+JOIN date_dim d ON d.d_date_sk = ws.ws_sold_date_sk
+WHERE d.d_year = {year}
+GROUP BY w.web_site_id, w.web_name
+ORDER BY revenue DESC;
+""", search { patterns: ["web revenue (by|per) (web |)site (in |)({year}|)"], }
     parameters: [
-        { name: kod_uzivatele, type: varchar, label: "Kód uživatele" },
+        { name: year, type: int, label: "Year" },
     ]
 }
 
-def query uzivatele { description: "Seznam všech uživatelů", sourceText: """sql
-SELECT
-       IDUZIVATEL,
-       KOD_UZIV,
-       JMENO_UZIV,
-       UZIV_EMAIL
-FROM QUZIVATEL_DF
-WHERE VLZAKAZPRISTUP = 0
-ORDER BY KOD_UZIV;
-""", search { patterns: ["seznam (vsech |všech |)(uzivatelu|uživatelů)"], examples: ["Seznam všech uživatelů"], }}
+def query web_site__filter { description: "Synthetic query materialising the row filter of entity web_site.", sourceText: "SELECT * FROM web_site WHERE web_rec_end_date IS NULL", tags: ["synthetic", "where-filter"],}
 
-def query vazby_podle_typu { description: "Seznam vazeb mezi konkrétními typy dokladů", sourceText: """sql
-SELECT
-  td.IDHISHDOK,
-  td.CIS_DOKP,
-  td.NAZEV_TYPDOKP,
-  td.DTZDANITPLNP,
-  td.STAVP,
-  td.CIS_DOKN,
-  td.NAZEV_TYPDOKN,
-  td.DTZDANITPLNN,
-  td.STAVN
-FROM QHISHDOK_DF td
-WHERE td.NAZEV_TYPDOKP COLLATE Latin1_General_CI_AI LIKE '%{typ_předchůdce}%'
-  AND td.NAZEV_TYPDOKN COLLATE Latin1_General_CI_AI LIKE '%{typ_následníka}%'
-ORDER BY td.DTZDANITPLNP DESC;
-""", search { patterns: ["vazby (z|mezi) {typ_předchůdce} (na|do|→) {typ_následníka}"], }}
+def query weekend_day__filter { description: "Synthetic query materialising the row filter of entity weekend_day.", sourceText: "SELECT * FROM date_dim WHERE d_weekend = 'Y'", tags: ["synthetic", "where-filter"],}
 
-def query vratka__filter { description: "Synthetic query materialising the row-filter declared on YAML entity vratka.", sourceText: "SELECT * FROM QHDOK_ZAK_DF WHERE TYP_DOK='POB' AND HDKUHRADEVAL<0", tags: ["synthetic", "yaml-import", "where-filter"],}
-
-def query vratky_zakaznika { description: "Seznam vratek pro zákazníka", sourceText: """sql
+def query weekend_vs_weekday_sales { description: "Store revenue on weekend days versus weekdays in a year", sourceText: """sql
 SELECT
-       v.IDHDOK,
-       v.CIS_DOK,
-       s.SUBJ_NAZEV,
-       v.DTZDANITPLN,
-       v.VLSTAVHDOK
-FROM QHDOK_ZAK_DF v
-JOIN QSUBJADR_DF dm ON dm.IDSUBJADR = v.IDSUBJADRP
-JOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND v.TYP_DOK = 'POB' 
-  AND v.HDKUHRADEVAL < 0
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-ORDER BY v.DTZDANITPLN DESC;
-""", search { patterns: ["(jsou plánované|jsou planovane|existují|existuji|seznam) vrat(ky|ek) (pro |od |zákazníka |zakaznika ){nazev_zakaznika}"], examples: ["Jsou plánované vratky pro Kaufland?"], }
+  CASE WHEN d.d_weekend = 'Y' THEN 'weekend' ELSE 'weekday' END AS day_type,
+  COUNT(DISTINCT d.d_date_sk) AS days,
+  SUM(ss.ss_ext_sales_price) AS revenue,
+  SUM(ss.ss_ext_sales_price) / COUNT(DISTINCT d.d_date_sk) AS revenue_per_day
+FROM store_sales ss
+JOIN date_dim d ON d.d_date_sk = ss.ss_sold_date_sk
+WHERE d.d_year = {year}
+GROUP BY CASE WHEN d.d_weekend = 'Y' THEN 'weekend' ELSE 'weekday' END;
+""", search { patterns: ["weekend (vs|versus) weekday (sales|revenue) (in |)({year}|)"], }
     parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
+        { name: year, type: int, label: "Year" },
     ]
 }
-
-def query zakazky_zakaznika { description: "Seznam zakázek zákazníka řazený podle data dodání (nejnovější nahoře)", sourceText: """sql
-SELECT
-        z.IDHDOK,
-       z.CIS_DOK,
-       s.SUBJ_NAZEV,
-       dm.SUBJADR_POZNAMKA,
-       z.DTZDANITPLN,
-       z.HDKUHRADEVAL,
-       z.VLSTAVHDOK
-FROM QHDOK_ZAK_DF z
-JOIN QSUBJADR_DF dm ON dm.IDSUBJADR = z.IDSUBJADRP
-JOIN QSUBJEKT s ON s.IDSUBJEKT = dm.IDSUBJEKT
-WHERE ({id_subjektu} = '' OR s.IDSUBJEKT = {id_subjektu})
-  AND ({id_dodaciho_mista} = '' OR dm.IDSUBJADR = {id_dodaciho_mista})
-  AND z.TYP_DOK = 'POB'
-  AND z.HDKUHRADEVAL >= 0
-  AND s.SUBJ_NAZEV COLLATE Latin1_General_CI_AI LIKE CONCAT('%', {nazev_zakaznika}, '%')
-ORDER BY z.DTZDANITPLN DESC;
-""", search { patterns: ["(zakázky|zakazky|seznam zakázek|seznam zakazek) (zákazníka |zakaznika |pro zákazníka |pro zakaznika |pro |){nazev_zakaznika}", "(jaké|jake) zakázky (má|ma) {nazev_zakaznika}"], }
-    parameters: [
-        { name: id_subjektu, type: varchar },
-        { name: id_dodaciho_mista, type: varchar },
-        { name: nazev_zakaznika, type: varchar, label: "Název zákazníka" },
-    ]
-}
-
-def query zakázka__filter { description: "Synthetic query materialising the row-filter declared on YAML entity zakázka.", sourceText: "SELECT * FROM QHDOK_ZAK_DF WHERE TYP_DOK='POB' AND HDKUHRADEVAL>=0", tags: ["synthetic", "yaml-import", "where-filter"],}
-
-def query zasoby_artiklu { description: "Seznam zásob artiklů", sourceText: """sql
-SELECT
-  za.IDXXVYPADKYZASOB,
-  a.CIS_ZBOZI,
-  a.NAZEV_ZBOZI,
-  za.MNZASOBA,
-  za.DTDOPLNENI,
-  za.MNDOPLNENI
-FROM XXVYPADKYZASOB za
-JOIN QZBOZI_DF a ON a.IDZBOZI = za.IDZBOZI AND a.VLTYP_SLOZ = 1
-WHERE ({id_artiklu} = '' OR za.IDZBOZI = {id_artiklu})
-  AND ({kod_artiklu} = '' OR a.CIS_ZBOZI LIKE CONCAT('%', {kod_artiklu}, '%'))
-  AND ({nazev_artiklu} = '' OR a.NAZEV_ZBOZI LIKE CONCAT('%', {nazev_artiklu}, '%'))
-ORDER BY a.NAZEV_ZBOZI;
-""", search { patterns: ["zásoby artikl(ů|u) (kód|kod) {kod_artiklu}", "zásoby artikl(ů|u)( {nazev_artiklu}|)"], }
-    parameters: [
-        { name: id_artiklu, type: varchar },
-        { name: kod_artiklu, type: varchar, label: "Kód artiklu" },
-        { name: nazev_artiklu, type: varchar, label: "Název artiklu" },
-    ]
-}
-
-def query účet_účetní_osnovy__filter { description: "Synthetic query materialising the row-filter declared on YAML entity účet_účetní_osnovy.", sourceText: "SELECT * FROM QUCTOSN_DF WHERE substring(KOD_UCTU,1,1) in ('5','6','8','9')", tags: ["synthetic", "yaml-import", "where-filter"],}
-
-def query účetní_období__filter { description: "Synthetic query materialising the row-filter declared on YAML entity účetní_období.", sourceText: "SELECT * FROM QUCTOBD WHERE UCET_OBD >= '2025.01'", tags: ["synthetic", "yaml-import", "where-filter"],}
-

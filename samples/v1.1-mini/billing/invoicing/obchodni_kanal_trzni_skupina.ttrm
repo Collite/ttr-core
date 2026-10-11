@@ -1,9 +1,0 @@
-package billing.invoicing
-
-model er
-
-def relation obchodní_kanál_tržní_skupina { description: "Obchodní kanál patří k tržní skupině",
-    from: er.entity.obchodní_kanál, to: er.entity.tržní_skupina,
-    cardinality: { from: "1..*", to: "1" },
-    join: [{ from: er.entity.obchodní_kanál.id_tržní_skupiny, to: er.entity.tržní_skupina.id_tržní_skupiny }]
-}

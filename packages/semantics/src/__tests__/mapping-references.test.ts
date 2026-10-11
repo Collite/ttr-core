@@ -10,13 +10,13 @@ import { collectBindingReferences } from '../mapping-references.js';
 // doc.
 function setup(er: string, pkg = '') {
   const db = `${pkg ? `package ${pkg}\n` : ''}model db schema dbo
-def table QXXUKAZMUHOD {
+def table promotion {
   columns: [
-    def column IDXXUKAZMU { type: int },
-    def column NAZEV_UKAZ { type: text }
+    def column p_promo_sk { type: int },
+    def column p_promo_name { type: text }
   ]
 }
-def fk fk_hodnoty_ukaz { description: "x" }
+def fk fk_p_item { description: "x" }
 `;
   const symbols = new ProjectSymbolTable();
   const dbAst = parseString(db).ast!;
@@ -30,40 +30,40 @@ def fk fk_hodnoty_ukaz { description: "x" }
 }
 
 describe('collectBindingReferences — Increment A (attribute column mappings)', () => {
-  it('resolves a bare-id mapping (`binding: IDXXUKAZMU`) to the db column', () => {
+  it('resolves a bare-id mapping (`binding: p_promo_sk`) to the db column', () => {
     const refs = setup(`model er schema entity
-def entity hodnoty {
-  binding: { target: { table: db.dbo.QXXUKAZMUHOD } },
-  attributes: [ def attribute id_uk { type: int, binding: IDXXUKAZMU } ]
+def entity promotion {
+  binding: { target: { table: db.dbo.promotion } },
+  attributes: [ def attribute sk { type: int, binding: p_promo_sk } ]
 }
 `);
     expect(refs).toHaveLength(1);
-    expect(refs[0].ref.path).toBe('IDXXUKAZMU');
-    expect(refs[0].targetQname).toBe('db.dbo.table.QXXUKAZMUHOD.IDXXUKAZMU');
-    expect(refs[0].referrerQname).toBe('er.entity.hodnoty');
+    expect(refs[0].ref.path).toBe('p_promo_sk');
+    expect(refs[0].targetQname).toBe('db.dbo.table.promotion.p_promo_sk');
+    expect(refs[0].referrerQname).toBe('er.entity.promotion');
   });
 
   it('resolves `{ target: COL }` and `{ target: { column: COL } }` forms', () => {
     const refs = setup(`model er schema entity
-def entity hodnoty {
-  binding: { target: { table: db.dbo.QXXUKAZMUHOD } },
+def entity promotion {
+  binding: { target: { table: db.dbo.promotion } },
   attributes: [
-    def attribute a { type: int, binding: { target: IDXXUKAZMU } },
-    def attribute b { type: text, binding: { target: { column: NAZEV_UKAZ } } }
+    def attribute a { type: int, binding: { target: p_promo_sk } },
+    def attribute b { type: text, binding: { target: { column: p_promo_name } } }
   ]
 }
 `);
     const targets = refs.map((r) => r.targetQname).sort();
     expect(targets).toEqual([
-      'db.dbo.table.QXXUKAZMUHOD.IDXXUKAZMU',
-      'db.dbo.table.QXXUKAZMUHOD.NAZEV_UKAZ',
+      'db.dbo.table.promotion.p_promo_name',
+      'db.dbo.table.promotion.p_promo_sk',
     ]);
   });
 
   it('skips mappings whose column does not exist in the target table', () => {
     const refs = setup(`model er schema entity
-def entity hodnoty {
-  binding: { target: { table: db.dbo.QXXUKAZMUHOD } },
+def entity promotion {
+  binding: { target: { table: db.dbo.promotion } },
   attributes: [ def attribute a { type: int, binding: NOSUCHCOL } ]
 }
 `);
@@ -72,8 +72,8 @@ def entity hodnoty {
 
   it('skips attribute mappings when the entity has no resolvable target table', () => {
     const refs = setup(`model er schema entity
-def entity hodnoty {
-  attributes: [ def attribute a { type: int, binding: IDXXUKAZMU } ]
+def entity promotion {
+  attributes: [ def attribute a { type: int, binding: p_promo_sk } ]
 }
 `);
     expect(refs).toHaveLength(0);
@@ -81,51 +81,51 @@ def entity hodnoty {
 
   it('resolves an entity-level `columns:` map (all three value forms)', () => {
     const refs = setup(`model er schema entity
-def entity hodnoty {
+def entity promotion {
   binding: {
-    target: { table: db.dbo.QXXUKAZMUHOD },
+    target: { table: db.dbo.promotion },
     columns: {
-      id_uk: IDXXUKAZMU,
-      a:     { target: NAZEV_UKAZ },
-      b:     { target: { column: IDXXUKAZMU } }
+      sk: p_promo_sk,
+      a:  { target: p_promo_name },
+      b:  { target: { column: p_promo_sk } }
     }
   },
-  attributes: [ def attribute id_uk { type: int }, def attribute a { type: text }, def attribute b { type: int } ]
+  attributes: [ def attribute sk { type: int }, def attribute a { type: text }, def attribute b { type: int } ]
 }
 `);
     const targets = refs.map((r) => r.targetQname).sort();
     expect(targets).toEqual([
-      'db.dbo.table.QXXUKAZMUHOD.IDXXUKAZMU',
-      'db.dbo.table.QXXUKAZMUHOD.IDXXUKAZMU',
-      'db.dbo.table.QXXUKAZMUHOD.NAZEV_UKAZ',
+      'db.dbo.table.promotion.p_promo_name',
+      'db.dbo.table.promotion.p_promo_sk',
+      'db.dbo.table.promotion.p_promo_sk',
     ]);
   });
 
   it('resolves a relation fk mapping (bare-id and wrapped forms) to the db fk', () => {
     const bare = setup(`model er schema entity
-def relation r { from: er.entity.x, to: er.entity.y, binding: db.dbo.fk_hodnoty_ukaz }
+def relation r { from: er.entity.x, to: er.entity.y, binding: db.dbo.fk_p_item }
 `);
-    expect(bare.map((r) => r.targetQname)).toEqual(['db.dbo.fk.fk_hodnoty_ukaz']);
+    expect(bare.map((r) => r.targetQname)).toEqual(['db.dbo.fk.fk_p_item']);
     expect(bare[0].referrerQname).toBe('er.relation.r');
 
     const wrapped = setup(`model er schema entity
-def relation r { from: er.entity.x, to: er.entity.y, binding: { fk: db.dbo.fk_hodnoty_ukaz } }
+def relation r { from: er.entity.x, to: er.entity.y, binding: { fk: db.dbo.fk_p_item } }
 `);
-    expect(wrapped.map((r) => r.targetQname)).toEqual(['db.dbo.fk.fk_hodnoty_ukaz']);
+    expect(wrapped.map((r) => r.targetQname)).toEqual(['db.dbo.fk.fk_p_item']);
   });
 
   it('resolves the target table from an explicit def er2db_entity (Increment B2)', () => {
     // Entity has attribute mappings but NO inline mapping block; the target
     // table is declared in a separate map.ttrm via `def er2db_entity`.
     const db = `model db schema dbo
-def table QXXUKAZMUHOD { columns: [ def column IDXXUKAZMU { type: int } ] }
+def table promotion { columns: [ def column p_promo_sk { type: int } ] }
 `;
     const map = `model binding
-def er2db_entity hodnoty { entity: er.entity.hodnoty, target: { table: db.dbo.QXXUKAZMUHOD } }
+def er2db_entity promotion { entity: er.entity.promotion, target: { table: db.dbo.promotion } }
 `;
     const er = `model er schema entity
-def entity hodnoty {
-  attributes: [ def attribute id_uk { type: int, binding: IDXXUKAZMU } ]
+def entity promotion {
+  attributes: [ def attribute sk { type: int, binding: p_promo_sk } ]
 }
 `;
     const symbols = new ProjectSymbolTable();
@@ -136,23 +136,23 @@ def entity hodnoty {
 
     const refs = collectBindingReferences(erAst, new Resolver(symbols), 'er', 'entity', '');
     expect(refs).toHaveLength(1);
-    expect(refs[0].targetQname).toBe('db.dbo.table.QXXUKAZMUHOD.IDXXUKAZMU');
+    expect(refs[0].targetQname).toBe('db.dbo.table.promotion.p_promo_sk');
   });
 
   it('resolves an inline `target: { view: … }` (view treated like a table)', () => {
     // A db view with columns; the entity binds to it via the `view` target key.
     const db = `model db schema dbo
-def view V_HODNOTY {
-  columns: [ def column IDV { type: int }, def column NAZEV { type: text } ],
+def view v_promotion {
+  columns: [ def column promo_sk { type: int }, def column promo_name { type: text } ],
   definitionSql: """SELECT 1"""
 }
 `;
     const er = `model er schema entity
-def entity hodnoty {
-  binding: { target: { view: db.dbo.V_HODNOTY } },
+def entity promotion {
+  binding: { target: { view: db.dbo.v_promotion } },
   attributes: [
-    def attribute a { type: int, binding: IDV },
-    def attribute b { type: text, binding: { target: { column: NAZEV } } }
+    def attribute a { type: int, binding: promo_sk },
+    def attribute b { type: text, binding: { target: { column: promo_name } } }
   ]
 }
 `;
@@ -163,21 +163,21 @@ def entity hodnoty {
 
     const refs = collectBindingReferences(erAst, new Resolver(symbols), 'er', 'entity', '');
     expect(refs.map((r) => r.targetQname).sort()).toEqual([
-      'db.dbo.view.V_HODNOTY.IDV',
-      'db.dbo.view.V_HODNOTY.NAZEV',
+      'db.dbo.view.v_promotion.promo_name',
+      'db.dbo.view.v_promotion.promo_sk',
     ]);
   });
 
   it('resolves the target view from an explicit def er2db_entity { target: { view: … } }', () => {
     const db = `model db schema dbo
-def view V_HODNOTY { columns: [ def column IDV { type: int } ], definitionSql: """SELECT 1""" }
+def view v_promotion { columns: [ def column promo_sk { type: int } ], definitionSql: """SELECT 1""" }
 `;
     const map = `model binding
-def er2db_entity hodnoty { entity: er.entity.hodnoty, target: { view: db.dbo.V_HODNOTY } }
+def er2db_entity promotion { entity: er.entity.promotion, target: { view: db.dbo.v_promotion } }
 `;
     const er = `model er schema entity
-def entity hodnoty {
-  attributes: [ def attribute id_v { type: int, binding: IDV } ]
+def entity promotion {
+  attributes: [ def attribute sk { type: int, binding: promo_sk } ]
 }
 `;
     const symbols = new ProjectSymbolTable();
@@ -188,18 +188,18 @@ def entity hodnoty {
 
     const refs = collectBindingReferences(erAst, new Resolver(symbols), 'er', 'entity', '');
     expect(refs).toHaveLength(1);
-    expect(refs[0].targetQname).toBe('db.dbo.view.V_HODNOTY.IDV');
+    expect(refs[0].targetQname).toBe('db.dbo.view.v_promotion.promo_sk');
   });
 
   it('respects the package prefix on both sides', () => {
     const refs = setup(`package billing
 model er schema entity
-def entity hodnoty {
-  binding: { target: { table: db.dbo.QXXUKAZMUHOD } },
-  attributes: [ def attribute a { type: int, binding: IDXXUKAZMU } ]
+def entity promotion {
+  binding: { target: { table: db.dbo.promotion } },
+  attributes: [ def attribute a { type: int, binding: p_promo_sk } ]
 }
 `, 'billing');
     expect(refs).toHaveLength(1);
-    expect(refs[0].targetQname).toBe('billing.db.dbo.table.QXXUKAZMUHOD.IDXXUKAZMU');
+    expect(refs[0].targetQname).toBe('billing.db.dbo.table.promotion.p_promo_sk');
   });
 });

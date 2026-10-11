@@ -45,7 +45,7 @@ describe('Extension smoke test', function () {
       // proves the LSP has populated its symbol table.
       const symbols = await vscode.commands.executeCommand<vscode.SymbolInformation[]>(
         'vscode.executeWorkspaceSymbolProvider',
-        'artikl',
+        'item',
       );
       return Array.isArray(symbols) && symbols.length > 0;
     }, 15000);
@@ -62,24 +62,24 @@ describe('Extension smoke test', function () {
   });
 
   it('TC3 — go-to-definition on a reference jumps to its def line', async () => {
-    // Find a *reference* to `er.entity.artikl` (not the def itself).
-    // Relations near the bottom of er.ttrm contain `to: er.entity.artikl, ...`.
-    // The cursor needs to land INSIDE the identifier `artikl` of that ref.
+    // Find a *reference* to `er.entity.item` (not the def itself).
+    // Relations near the bottom of er.ttrm contain `to: er.entity.item, ...`.
+    // The cursor needs to land INSIDE the identifier `item` of that ref.
     const content = doc.getText();
-    const m = content.match(/to:\s+er\.entity\.(artikl)\b/);
+    const m = content.match(/to:\s+er\.entity\.(item),/);
     if (!m || m.index === undefined) {
-      throw new Error('no `to: er.entity.artikl` reference in er.ttrm');
+      throw new Error('no `to: er.entity.item` reference in er.ttrm');
     }
-    // Position past "to: er.entity." onto the "a" of "artikl".
+    // Position past "to: er.entity." onto the "i" of "item".
     const refIdx = m.index + m[0].lastIndexOf(m[1]);
     const refPos = doc.positionAt(refIdx + 1); // inside the identifier
     const editor = await vscode.window.showTextDocument(doc);
     editor.selection = new vscode.Selection(refPos, refPos);
 
     const before = refPos.line;
-    // Find the def line for `def entity artikl` so we can assert the jump landed there.
-    const defMatch = content.match(/def entity artikl\b/);
-    if (!defMatch || defMatch.index === undefined) throw new Error('no `def entity artikl` in er.ttrm');
+    // Find the def line for `def entity item` so we can assert the jump landed there.
+    const defMatch = content.match(/def entity item\b/);
+    if (!defMatch || defMatch.index === undefined) throw new Error('no `def entity item` in er.ttrm');
     const defLine = doc.positionAt(defMatch.index).line;
     assert.notStrictEqual(defLine, before, 'sanity: def line and ref line should differ');
 
@@ -98,7 +98,7 @@ describe('Extension smoke test', function () {
     // `def relation ... to: er.entity.<nonexistent>` triggers the unresolved-reference
     // path (the dotted ref doesn't resolve to any symbol).
     const endPos = doc.lineAt(doc.lineCount - 1).range.end;
-    const inserted = `\ndef relation smoke_unresolved_xyz { from: er.entity.artikl, to: er.entity.does_not_exist_smoke_xyz, cardinality: { from: "1", to: "1" } }\n`;
+    const inserted = `\ndef relation smoke_unresolved_xyz { from: er.entity.item, to: er.entity.does_not_exist_smoke_xyz, cardinality: { from: "1", to: "1" } }\n`;
     const edit = new vscode.WorkspaceEdit();
     edit.insert(doc.uri, endPos, inserted);
     await vscode.workspace.applyEdit(edit);
@@ -124,16 +124,16 @@ describe('Extension smoke test', function () {
     }
   });
 
-  it('TC5 — workspaceSymbol query "art" returns at least one artikl symbol', async () => {
-    // The before-hook already proved this works (it waits for `artikl` to be
+  it('TC5 — workspaceSymbol query "ite" returns at least one item symbol', async () => {
+    // The before-hook already proved this works (it waits for `item` to be
     // findable). Re-running here as the formal TC5 assertion.
     const symbols = await vscode.commands.executeCommand<vscode.SymbolInformation[]>(
       'vscode.executeWorkspaceSymbolProvider',
-      'art',
+      'ite',
     );
-    assert.ok(symbols && symbols.length > 0, `expected ≥1 symbol for "art", got ${symbols?.length ?? 0}`);
-    const hasArtikl = symbols.some((s) => s.name.includes('artikl'));
-    assert.ok(hasArtikl, `expected an artikl symbol; got: ${symbols.map((s) => s.name).slice(0, 10).join(', ')}`);
+    assert.ok(symbols && symbols.length > 0, `expected ≥1 symbol for "ite", got ${symbols?.length ?? 0}`);
+    const hasItem = symbols.some((s) => s.name.includes('item'));
+    assert.ok(hasItem, `expected an item symbol; got: ${symbols.map((s) => s.name).slice(0, 10).join(', ')}`);
   });
 
   it('TC6 — .ttrg language detection and LSP diagnostics', async () => {

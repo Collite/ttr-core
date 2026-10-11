@@ -10,16 +10,16 @@ describe('inline mapping grammar — all surface forms', () => {
 
   it('entity full — forms (a), (b), (c) with entity target shorthand', () => {
     const src = `model er schema entity
-def entity artikl {
+def entity item {
   binding: {
-    target: { table: db.dbo.QZBOZI_DF },
+    target: { table: db.dbo.item },
     columns: {
-      id_artiklu:    IDZBOZI,
-      kód_artiklu:   { target: KOD_ZBOZI },
-      název_artiklu: { target: { column: NAZEV_ZBOZI } }
+      sk:           i_item_sk,
+      item_id:      { target: i_item_id },
+      product_name: { target: { column: i_product_name } }
     }
   },
-  attributes: [ def attribute id_artiklu { type: int, isKey: true } ]
+  attributes: [ def attribute sk { type: int, isKey: true } ]
 }`;
     expect(errors(src), 'entity full a+b+c must parse').toHaveLength(0);
   });
@@ -27,7 +27,7 @@ def entity artikl {
   it('attribute bare-id — binding: <bareId>', () => {
     const src = `model er schema entity
 def entity a { attributes: [
-  def attribute id_produktu { type: int, binding: IDSKUPZBOZI }
+  def attribute category_id { type: int, binding: i_category_id }
 ] }`;
     expect(errors(src), 'attribute bare-id must parse').toHaveLength(0);
   });
@@ -35,7 +35,7 @@ def entity a { attributes: [
   it('attribute full — binding: { target: { column: ... } }', () => {
     const src = `model er schema entity
 def entity a { attributes: [
-  def attribute název { type: text, binding: { target: { column: NAZEV_ZBOZI } } }
+  def attribute product_name { type: text, binding: { target: { column: i_product_name } } }
 ] }`;
     expect(errors(src), 'attribute full must parse').toHaveLength(0);
   });
@@ -44,7 +44,7 @@ def entity a { attributes: [
     const src = `model er schema entity
 def entity a {}
 def entity b {}
-def relation r { from: er.entity.a, to: er.entity.b, binding: db.dbo.fk_artikl_produkt }`;
+def relation r { from: er.entity.a, to: er.entity.b, binding: db.dbo.fk_item_category }`;
     expect(errors(src), 'relation bare-fk must parse').toHaveLength(0);
   });
 
@@ -52,13 +52,13 @@ def relation r { from: er.entity.a, to: er.entity.b, binding: db.dbo.fk_artikl_p
     const src = `model er schema entity
 def entity a {}
 def entity b {}
-def relation r { from: er.entity.a, to: er.entity.b, binding: { fk: db.dbo.fk_artikl_produkt } }`;
+def relation r { from: er.entity.a, to: er.entity.b, binding: { fk: db.dbo.fk_item_category } }`;
     expect(errors(src), 'relation full must parse').toHaveLength(0);
   });
 
   it('target: shorthand in explicit er2db_attribute', () => {
     const src = `model binding schema m
-def er2db_attribute foo { target: KOD_ZBOZI }`;
+def er2db_attribute foo { target: i_item_id }`;
     expect(errors(src), 'target shorthand in er2db_attribute must parse').toHaveLength(0);
   });
 });

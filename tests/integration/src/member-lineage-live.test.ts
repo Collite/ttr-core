@@ -64,18 +64,18 @@ describe('member lineage — live LSP path (W2)', () => {
   afterAll(() => { client.dispose(); server.dispose(); });
 
   it('getSymbolDetail on a nested ATTRIBUTE member resolves the member (not the parent) + lineageRoot', async () => {
-    // discover a real attribute of er.entity.artikl from the parent detail (no hardcoded name)
-    const parent = await client.sendRequest('modeler/getSymbolDetail', { qname: 'er.entity.artikl' }) as Detail | null;
-    expect(parent, 'parent er.entity.artikl must resolve').not.toBeNull();
+    // discover a real attribute of er.entity.item from the parent detail (no hardcoded name)
+    const parent = await client.sendRequest('modeler/getSymbolDetail', { qname: 'er.entity.item' }) as Detail | null;
+    expect(parent, 'parent er.entity.item must resolve').not.toBeNull();
     const attrs = parent!.perKindData?.attributes ?? [];
-    expect(attrs.length, 'er.entity.artikl must have at least one attribute').toBeGreaterThanOrEqual(1);
+    expect(attrs.length, 'er.entity.item must have at least one attribute').toBeGreaterThanOrEqual(1);
     const memberQname = attrs[0].qname;
 
     const member = await client.sendRequest('modeler/getSymbolDetail', { qname: memberQname }) as Detail | null;
     expect(member, `member ${memberQname} must resolve over the live path`).not.toBeNull();
     expect(member!.kind).toBe('member');
     expect(member!.name).toBe(attrs[0].name);
-    expect(member!.member?.parent).toBe('er.entity.artikl');
+    expect(member!.member?.parent).toBe('er.entity.item');
     expect(member!.member?.memberKind).toBe('attribute');
     expect(member!.lineageRoot).toEqual({ kind: 'member', qname: memberQname, label: attrs[0].name });
   });

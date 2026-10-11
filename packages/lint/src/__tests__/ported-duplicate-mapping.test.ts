@@ -24,8 +24,8 @@ describe('ttr/duplicate-mapping — entity', () => {
   it('inline entity + explicit er2db_entity → error on both', () => {
     expect(
       dupCount({
-        'er.ttrm': `package p\nmodel er\ndef entity artikl {\n binding: { target: { table: db.dbo.QZBOZI_DF } },\n attributes: [ def attribute id { type: int, isKey: true } ]\n}`,
-        'map.ttrm': `package p\nmodel binding\ndef er2db_entity artikl { entity: er.entity.artikl, target: { table: db.dbo.QZBOZI_DF } }`,
+        'er.ttrm': `package p\nmodel er\ndef entity item {\n binding: { target: { table: db.dbo.item } },\n attributes: [ def attribute id { type: int, isKey: true } ]\n}`,
+        'map.ttrm': `package p\nmodel binding\ndef er2db_entity item { entity: er.entity.item, target: { table: db.dbo.item } }`,
       })
     ).toBe(2);
   });
@@ -33,7 +33,7 @@ describe('ttr/duplicate-mapping — entity', () => {
   it('only inline entity → no duplicate-mapping', () => {
     expect(
       dupCount({
-        'er.ttrm': `package p\nmodel er\ndef entity foo {\n binding: { target: { table: db.dbo.QZBOZI_DF } },\n attributes: [ def attribute id { type: int, isKey: true } ]\n}`,
+        'er.ttrm': `package p\nmodel er\ndef entity foo {\n binding: { target: { table: db.dbo.item } },\n attributes: [ def attribute id { type: int, isKey: true } ]\n}`,
       })
     ).toBe(0);
   });
@@ -42,7 +42,7 @@ describe('ttr/duplicate-mapping — entity', () => {
     expect(
       dupCount({
         'er.ttrm': `package p\nmodel er\ndef entity foo { attributes: [ def attribute id { type: int, isKey: true } ] }`,
-        'map.ttrm': `package p\nmodel binding\ndef er2db_entity foo { entity: er.entity.foo, target: { table: db.dbo.QZBOZI_DF } }`,
+        'map.ttrm': `package p\nmodel binding\ndef er2db_entity foo { entity: er.entity.foo, target: { table: db.dbo.item } }`,
       })
     ).toBe(0);
   });
@@ -53,7 +53,7 @@ describe('ttr/duplicate-mapping — attribute', () => {
     expect(
       dupCount({
         'er.ttrm': `package p\nmodel er\ndef entity foo {\n attributes: [\n def attribute id { type: int, isKey: true, binding: IDX }\n ]\n}`,
-        'map.ttrm': `package p\nmodel binding\ndef er2db_attribute foo.id { attribute: er.entity.foo.id, target: { column: db.dbo.QZBOZI_DF.IDX } }`,
+        'map.ttrm': `package p\nmodel binding\ndef er2db_attribute foo.id { attribute: er.entity.foo.id, target: { column: db.dbo.item.IDX } }`,
       })
     ).toBe(2);
   });
@@ -61,8 +61,8 @@ describe('ttr/duplicate-mapping — attribute', () => {
   it('entity-level columns + explicit er2db_attribute → error', () => {
     expect(
       dupCount({
-        'er.ttrm': `package p\nmodel er\ndef entity foo {\n binding: { target: { table: db.dbo.QZBOZI_DF }, columns: { id: IDX } },\n attributes: [ def attribute id { type: int, isKey: true } ]\n}`,
-        'map.ttrm': `package p\nmodel binding\ndef er2db_attribute foo.id { attribute: er.entity.foo.id, target: { column: db.dbo.QZBOZI_DF.IDX } }`,
+        'er.ttrm': `package p\nmodel er\ndef entity foo {\n binding: { target: { table: db.dbo.item }, columns: { id: IDX } },\n attributes: [ def attribute id { type: int, isKey: true } ]\n}`,
+        'map.ttrm': `package p\nmodel binding\ndef er2db_attribute foo.id { attribute: er.entity.foo.id, target: { column: db.dbo.item.IDX } }`,
       })
     ).toBeGreaterThanOrEqual(2);
   });
@@ -79,7 +79,7 @@ describe('ttr/duplicate-mapping — attribute', () => {
     expect(
       dupCount({
         'er.ttrm': `package p\nmodel er\ndef entity foo {\n attributes: [\n def attribute id { type: int, isKey: true }\n ]\n}`,
-        'map.ttrm': `package p\nmodel binding\ndef er2db_attribute foo.id { attribute: er.entity.foo.id, target: { column: db.dbo.QZBOZI_DF.IDX } }`,
+        'map.ttrm': `package p\nmodel binding\ndef er2db_attribute foo.id { attribute: er.entity.foo.id, target: { column: db.dbo.item.IDX } }`,
       })
     ).toBe(0);
   });

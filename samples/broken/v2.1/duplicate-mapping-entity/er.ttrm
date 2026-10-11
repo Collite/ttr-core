@@ -2,8 +2,8 @@ package broken.v2_1.dup_entity
 
 model er
 
-def entity artikl {
-  binding: { target: { table: db.dbo.QZBOZI_DF } },
+def entity item {
+  binding: { target: { table: db.dbo.item } },
   attributes: [
     def attribute id { type: int, isKey: true }
   ]

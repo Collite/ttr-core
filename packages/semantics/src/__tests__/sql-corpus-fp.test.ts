@@ -12,11 +12,12 @@ import { resolveSqlReferences } from '../sql/resolve.js';
 
 /**
  * 3.4.6 — false-positive pass over the sample corpus. The resolver is run over
- * every real embedded-SQL query in `samples/v1-metadata` against a representative
+ * every embedded-SQL query in `samples/v1-metadata` against a representative
  * `[sql]` config + the sample `db` model. The guard that matters: a masked
  * `{param}` placeholder must NEVER be reported as a column (the one true
  * resolver-level FP we fixed). Genuine model↔SQL mismatches in the sample (e.g.
- * `VLTYP_SLOZ` vs modelled `VLPODTYP_SLOZ`) are expected and documented in
+ * SQL reading TPC-DS's denormalised `item.i_brand`, which the model normalises out
+ * into `item_brand`) are expected and documented in
  * `packages/sql/LAZY-PATCH.md`; the remaining residual (SELECT-alias-in-ORDER-BY)
  * is tracked there too.
  */

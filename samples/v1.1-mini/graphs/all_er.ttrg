@@ -1,17 +1,17 @@
 graph all_er {
   model: er,
   objects: [
-    billing.invoicing.er.entity.artikl,
-    billing.invoicing.er.entity.dobropis,
-    billing.invoicing.er.entity.obchodní_kanál,
-    billing.invoicing.er.entity.subjekt,
-    billing.invoicing.er.entity.tržní_skupina,
-    billing.products.er.entity.produkt,
-    billing.products.er.entity.podprodukt,
-    billing.invoicing.er.relation.artikl_produkt,
-    billing.invoicing.er.relation.artikl_podprodukt,
-    billing.products.er.relation.podprodukt_produkt,
-    billing.invoicing.er.relation.obchodní_kanál_tržní_skupina,
-    billing.invoicing.er.relation.subjekt_obchodní_kanál
+    billing.invoicing.er.entity.item,
+    billing.invoicing.er.entity.store_return,
+    billing.invoicing.er.entity.market,
+    billing.invoicing.er.entity.store,
+    billing.invoicing.er.entity.division,
+    billing.products.er.entity.category,
+    billing.products.er.entity.item_class,
+    billing.invoicing.er.relation.item_in_category,
+    billing.invoicing.er.relation.item_in_class,
+    billing.products.er.relation.class_in_category,
+    billing.invoicing.er.relation.market_in_division,
+    billing.invoicing.er.relation.store_in_market
   ]
 }

@@ -124,10 +124,10 @@ describe('symbol-indexing-extended (H.4)', () => {
     expect(detail!.perKindData?.kind ?? detail!.kind).toBe('relation');
   });
 
-  it('er.entity.artikl referencedBy includes at least one relation and one er2dbEntity', async () => {
-    const detail = await client.sendRequest('modeler/getSymbolDetail', { qname: 'er.entity.artikl' }) as { qname: string; referencedBy: Array<{ qname: string }> } | null;
+  it('er.entity.item referencedBy includes at least one relation and one er2dbEntity', async () => {
+    const detail = await client.sendRequest('modeler/getSymbolDetail', { qname: 'er.entity.item' }) as { qname: string; referencedBy: Array<{ qname: string }> } | null;
     expect(detail).not.toBeNull();
-    expect(detail!.referencedBy.length, `Expected at least 1 referencedBy for er.entity.artikl, got ${detail!.referencedBy.length}`).toBeGreaterThanOrEqual(1);
+    expect(detail!.referencedBy.length, `Expected at least 1 referencedBy for er.entity.item, got ${detail!.referencedBy.length}`).toBeGreaterThanOrEqual(1);
 
     const referrerKinds = await Promise.all(
       detail!.referencedBy.map(async (r) => {

@@ -97,7 +97,7 @@ describe('Phase 3 custom LSP methods', () => {
       const layoutPayload = {
         version: 1 as const,
         viewport: { zoom: 2.0, panX: 0, panY: 0, displayMode: 'just-names' as const },
-        nodes: { 'er.entity.artikl': { x: 100, y: 200 } },
+        nodes: { 'er.entity.item': { x: 100, y: 200 } },
         edges: {} as Record<string, { bendPoints: [number, number][] }>,
       };
       const setResult = await client.sendRequest('modeler/setLayout', {
@@ -125,7 +125,7 @@ describe('Phase 3 custom LSP methods', () => {
       const getResult = await client.sendRequest('modeler/getLayout', { graphUri: uri }) as typeof layoutPayload;
       expect(getResult.version).toBe(1);
       expect(getResult.viewport?.zoom).toBe(2.0);
-      expect(getResult.nodes['er.entity.artikl']).toEqual({ x: 100, y: 200 });
+      expect(getResult.nodes['er.entity.item']).toEqual({ x: 100, y: 200 });
     } finally {
       rmSync(graphPath, { recursive: true, force: true });
     }
@@ -139,7 +139,7 @@ describe('Phase 3 custom LSP methods', () => {
     expect(result.reason).toBe('edit-mode-not-available-in-v1');
   });
 
-  it('4.4 getSymbolDetail for er.entity.artikl returns Czech label, description, perKindData, referencedBy', async () => {
+  it('4.4 getSymbolDetail for er.entity.item returns its label, description, perKindData, referencedBy', async () => {
     const ttrFiles = await getAllTtrFiles(samplesDir, ['broken', 'v1-mini', 'v1.1-mini', 'v1.1-metadata', 'v1.1-mini-migrated', '2.1']);
     for (const file of ttrFiles) {
       const content = await import('fs/promises').then(fs => fs.readFile(file, 'utf-8'));
@@ -155,7 +155,7 @@ describe('Phase 3 custom LSP methods', () => {
     await sleep(100);
 
     const result = await client.sendRequest('modeler/getSymbolDetail', {
-      qname: 'er.entity.artikl',
+      qname: 'er.entity.item',
     }) as {
       qname: string;
       label: string;
@@ -165,7 +165,7 @@ describe('Phase 3 custom LSP methods', () => {
     } | null;
 
     expect(result).not.toBeNull();
-    expect(result!.label).toBe('artikl');
+    expect(result!.label).toBe('item');
     expect(result!.description).not.toBeNull();
     expect(result!.perKindData.kind).toBe('entity');
     expect((result!.perKindData as { attributes?: unknown[] }).attributes?.length).toBeGreaterThan(0);
@@ -198,7 +198,7 @@ describe('Phase 3 custom LSP methods', () => {
 
     expect(result.schemaCode).toBe('db');
     expect(result.nodes.length).toBeGreaterThan(0);
-    // samples/v1-metadata/db.ttrm has 111 fk defs; bump if the sample changes.
+    // samples/v1-metadata/db.ttrm has 114 fk defs; bump if the sample changes.
     expect(result.edges.length).toBeGreaterThanOrEqual(5);
     for (const edge of result.edges) {
       expect(result.nodes.some(n => n.qname === edge.fromNode)).toBe(true);
@@ -239,10 +239,10 @@ describe('Phase 3 custom LSP methods', () => {
       expect(edge.fromCardinality).not.toBeNull();
       expect(edge.toCardinality).not.toBeNull();
     }
-    // er.ttrm has no displayLabel on artikl, so label falls back to def.name.
-    const artikl = result.nodes.find(n => n.qname === 'er.entity.artikl');
-    expect(artikl).toBeDefined();
-    expect(artikl!.label).toBe('artikl');
+    // er.ttrm has no displayLabel on item, so label falls back to def.name.
+    const item = result.nodes.find(n => n.qname === 'er.entity.item');
+    expect(item).toBeDefined();
+    expect(item!.label).toBe('item');
   });
 
   it('4.7 parse-recovery-info diagnostics arrive with Information severity', async () => {
@@ -288,7 +288,7 @@ describe('Phase 3 custom LSP methods', () => {
     }
     await sleep(100);
     const result = await client.sendRequest('modeler/getSymbolDetail', {
-      qname: 'db.dbo.QCENSKUP_DF.IDCENSKUP',
+      qname: 'db.dbo.store.s_market_id',
     });
     expect(result).toBeNull();
   });

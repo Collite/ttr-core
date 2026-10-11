@@ -1,0 +1,14 @@
+package billing.invoicing
+
+model er
+
+def entity market { description: """Store markets.
+""",
+    codeAttribute: market_code,
+    attributes: [
+        def attribute sk { type: int, isKey: true, description: "Unique market identifier" },
+        def attribute market_code { type: text, optional: true, description: "Unique market code" },
+        def attribute market_name { type: text, optional: true, description: "Market name" },
+        def attribute division_id { type: int, optional: true, description: "Link to the division" }
+    ]
+}

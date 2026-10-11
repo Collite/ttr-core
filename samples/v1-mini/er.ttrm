@@ -1,105 +1,105 @@
 model er
 
-def entity artikl { description: """Evidence všech artiklů a jejich vlastností.
+def entity item { description: """Products (TPC-DS item) and their properties.
 """,
-    displayLabel: { cs: "Artikl", en: "Item" },
-    nameAttribute: název_artiklu,
-    codeAttribute: kód_artiklu,
+    displayLabel: { en: "Item", cs: "Produkt" },
+    nameAttribute: product_name,
+    codeAttribute: item_id,
     attributes: [
-        def attribute id_artiklu { type: int, isKey: true, description: "Unikátní identifikátor artiklu" },
-        def attribute kód_artiklu { type: text, optional: true, description: "Unikátní kód artiklu" },
-        def attribute název_artiklu { type: text, optional: true, description: "Obchodní název artiklu" },
-        def attribute id_produktu { type: int, optional: true, description: "Vazba na nadřazený produkt" },
-        def attribute id_podproduktu { type: int, optional: true, description: "Vazba na nadřazený podprodukt" }
+        def attribute sk { type: int, isKey: true, description: "Unique item identifier" },
+        def attribute item_id { type: text, optional: true, description: "Unique item code" },
+        def attribute product_name { type: text, optional: true, description: "Product name" },
+        def attribute category_id { type: int, optional: true, description: "Link to the parent category" },
+        def attribute class_id { type: int, optional: true, description: "Link to the parent class" }
     ]
 }
 
-def entity produkt { description: """Evidence produktů a jejich vlastností.
+def entity category { description: """Product categories.
 """,
-    displayLabel: { cs: "Produkt", en: "Product" },
-    nameAttribute: název_produktu,
+    displayLabel: { en: "Category", cs: "Kategorie" },
+    nameAttribute: category_name,
     attributes: [
-        def attribute id_produktu { type: int, isKey: true, description: "Unikátní identifikátor produktu" },
-        def attribute kód_produktu { type: text, optional: true, description: "Unikátní kód produktu" },
-        def attribute název_produktu { type: text, optional: true, description: "Obchodní název produktu" }
+        def attribute sk { type: int, isKey: true, description: "Unique category identifier" },
+        def attribute category_code { type: text, optional: true, description: "Unique category code" },
+        def attribute category_name { type: text, optional: true, description: "Category name" }
     ]
 }
 
-def entity podprodukt { description: """Evidence podproduktů a jejich vlastností.
+def entity item_class { description: """Product classes within a category.
 """,
-    nameAttribute: název_podproduktu,
+    nameAttribute: class_name,
     attributes: [
-        def attribute id_podproduktu { type: int, isKey: true, description: "Unikátní identifikátor podproduktu" },
-        def attribute kód_podproduktu { type: text, optional: true, description: "Unikátní kód podproduktu" },
-        def attribute název_podproduktu { type: text, optional: true, description: "Obchodní název podproduktu" },
-        def attribute id_produktu { type: int, optional: true, description: "Vazba na nadřazený produkt" }
+        def attribute sk { type: int, isKey: true, description: "Unique class identifier" },
+        def attribute class_code { type: text, optional: true, description: "Unique class code" },
+        def attribute class_name { type: text, optional: true, description: "Class name" },
+        def attribute category_id { type: int, optional: true, description: "Link to the parent category" }
     ]
 }
 
-def entity obchodní_kanál { description: """Evidence obchodních kanálů a jejich vlastností.
+def entity market { description: """Store markets.
 """,
-    codeAttribute: kód_kanálu,
+    codeAttribute: market_code,
     attributes: [
-        def attribute id_kanálu { type: int, isKey: true, description: "Unikátní identifikátor obchodního kanálu" },
-        def attribute kód_kanálu { type: text, optional: true, description: "Unikátní kód obchodního kanálu" },
-        def attribute název_kanálu { type: text, optional: true, description: "Název obchodního kanálu" },
-        def attribute id_tržní_skupiny { type: int, optional: true, description: "Vazba na tržní skupinu" }
+        def attribute sk { type: int, isKey: true, description: "Unique market identifier" },
+        def attribute market_code { type: text, optional: true, description: "Unique market code" },
+        def attribute market_name { type: text, optional: true, description: "Market name" },
+        def attribute division_id { type: int, optional: true, description: "Link to the division" }
     ]
 }
 
-def entity tržní_skupina { description: """Evidence tržních skupin a jejich vlastností.
+def entity division { description: """Divisions the markets belong to.
 """,
-    nameAttribute: název_skupiny,
-    codeAttribute: kód_skupiny,
+    nameAttribute: division_name,
+    codeAttribute: division_code,
     attributes: [
-        def attribute id_tržní_skupiny { type: int, isKey: true, description: "Unikátní identifikátor tržní skupiny" },
-        def attribute kód_skupiny { type: text, optional: true, description: "Unikátní kód tržní skupiny" },
-        def attribute název_skupiny { type: text, optional: true, description: "Název tržní skupiny" }
+        def attribute sk { type: int, isKey: true, description: "Unique division identifier" },
+        def attribute division_code { type: text, optional: true, description: "Unique division code" },
+        def attribute division_name { type: text, optional: true, description: "Division name" }
     ]
 }
 
-def entity subjekt { description: """Evidence zákazníků (subjektů) a jejich vlastností.
+def entity store { description: """Stores and their properties.
 """,
-    nameAttribute: název_subjektu,
+    nameAttribute: store_name,
     attributes: [
-        def attribute id_subjektu { type: int, isKey: true, description: "Unikátní identifikátor subjektu" },
-        def attribute ičo { type: text, optional: true, description: "IČO subjektu" },
-        def attribute název_subjektu { type: text, optional: true, description: "Obchodní název subjektu" },
-        def attribute id_kanálu { type: int, optional: true, description: "Vazba na obchodní kanál" }
+        def attribute sk { type: int, isKey: true, description: "Unique store identifier" },
+        def attribute store_id { type: text, optional: true, description: "Store code" },
+        def attribute store_name { type: text, optional: true, description: "Store name" },
+        def attribute market_id { type: int, optional: true, description: "Link to the market" }
     ]
 }
 
-// many → zero-or-one  (one artikl belongs to at most one produkt)
-def relation artikl_produkt { description: "Artikl patří pod nadřazený produkt",
-    from: er.entity.artikl, to: er.entity.produkt,
+// many → zero-or-one  (one item belongs to at most one category)
+def relation item_in_category { description: "An item belongs to its parent category",
+    from: er.entity.item, to: er.entity.category,
     cardinality: { from: "0..*", to: "0..1" },
-    join: [{ from: er.entity.artikl.id_produktu, to: er.entity.produkt.id_produktu }]
+    join: [{ from: er.entity.item.category_id, to: er.entity.category.sk }]
 }
 
-// many → one  (artikl mandatorily belongs to one podprodukt)
-def relation artikl_podprodukt { description: "Artikl patří pod nadřazený podprodukt",
-    from: er.entity.artikl, to: er.entity.podprodukt,
+// many → one  (an item mandatorily belongs to one class)
+def relation item_in_class { description: "An item belongs to its parent class",
+    from: er.entity.item, to: er.entity.item_class,
     cardinality: { from: "0..*", to: "1" },
-    join: [{ from: er.entity.artikl.id_podproduktu, to: er.entity.podprodukt.id_podproduktu }]
+    join: [{ from: er.entity.item.class_id, to: er.entity.item_class.sk }]
 }
 
-// many → one  (each podprodukt rolls up to one produkt)
-def relation podprodukt_produkt { description: "Podprodukt patří pod nadřazený produkt",
-    from: er.entity.podprodukt, to: er.entity.produkt,
+// many → one  (each class rolls up to one category)
+def relation class_in_category { description: "A class belongs to its parent category",
+    from: er.entity.item_class, to: er.entity.category,
     cardinality: { from: "0..*", to: "1" },
-    join: [{ from: er.entity.podprodukt.id_produktu, to: er.entity.produkt.id_produktu }]
+    join: [{ from: er.entity.item_class.category_id, to: er.entity.category.sk }]
 }
 
-// one-or-many → one  (every kanál hangs off exactly one tržní skupina, every skupina has ≥1 kanál)
-def relation obchodní_kanál_tržní_skupina { description: "Obchodní kanál patří k tržní skupině",
-    from: er.entity.obchodní_kanál, to: er.entity.tržní_skupina,
+// one-or-many → one  (every market hangs off exactly one division, every division has ≥1 market)
+def relation market_in_division { description: "A market belongs to a division",
+    from: er.entity.market, to: er.entity.division,
     cardinality: { from: "1..*", to: "1" },
-    join: [{ from: er.entity.obchodní_kanál.id_tržní_skupiny, to: er.entity.tržní_skupina.id_tržní_skupiny }]
+    join: [{ from: er.entity.market.division_id, to: er.entity.division.sk }]
 }
 
-// many → one-or-many  (subjekt is reachable via 1+ kanál; a kanál has 0..n subjekts)
-def relation subjekt_obchodní_kanál { description: "Subjekt obsluhuje obchodní kanál",
-    from: er.entity.subjekt, to: er.entity.obchodní_kanál,
+// many → one-or-many  (a store is reachable via 1+ market; a market has 0..n stores)
+def relation store_in_market { description: "A store serves a market",
+    from: er.entity.store, to: er.entity.market,
     cardinality: { from: "*", to: "1..*" },
-    join: [{ from: er.entity.subjekt.id_kanálu, to: er.entity.obchodní_kanál.id_kanálu }]
+    join: [{ from: er.entity.store.market_id, to: er.entity.market.sk }]
 }

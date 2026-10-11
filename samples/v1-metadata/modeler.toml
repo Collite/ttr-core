@@ -1,8 +1,8 @@
 [project]
-name = "df-erp-metadata"
+name = "hartland-metadata"
 
 [language]
-preferred = "cs"
+preferred = "en"
 
 [schemas]
 declared = ["db", "er", "map"]

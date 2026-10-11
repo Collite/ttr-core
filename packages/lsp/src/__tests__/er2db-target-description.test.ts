@@ -21,11 +21,11 @@ function obj(key: string, path: string): ObjectValue {
 
 describe('er2dbTargetDescription', () => {
   it('renders a table target', () => {
-    expect(er2dbTargetDescription(obj('table', 'db.dbo.QXXUKAZMUHOD'))).toBe('table:db.dbo.QXXUKAZMUHOD');
+    expect(er2dbTargetDescription(obj('table', 'db.dbo.promotion'))).toBe('table:db.dbo.promotion');
   });
 
   it('renders a view target', () => {
-    expect(er2dbTargetDescription(obj('view', 'db.dbo.V_HODNOTY'))).toBe('view:db.dbo.V_HODNOTY');
+    expect(er2dbTargetDescription(obj('view', 'db.dbo.v_promotion'))).toBe('view:db.dbo.v_promotion');
   });
 
   it('renders a query target with the new key (renamed from sqlQuery)', () => {

@@ -1,6 +1,6 @@
 package billing.invoicing
 
-import billing.products.er.entity.produkt
-import billing.products.er.entity.podprodukt
+import billing.products.er.entity.category
+import billing.products.er.entity.item_class
 
 model er

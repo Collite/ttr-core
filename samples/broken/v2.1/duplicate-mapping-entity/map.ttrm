@@ -2,7 +2,7 @@ package broken.v2_1.dup_entity
 
 model binding
 
-def er2db_entity artikl {
-  entity: er.entity.artikl,
-  target: { table: db.dbo.QZBOZI_DF }
+def er2db_entity item {
+  entity: er.entity.item,
+  target: { table: db.dbo.item }
 }

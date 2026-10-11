@@ -1,8 +1,8 @@
 [project]
-name = "df-erp-2.1-inline-mappings"
+name = "hartland-2.1-inline-mappings"
 
 [language]
-preferred = "cs"
+preferred = "en"
 
 [schemas]
 declared = ["db", "er", "map"]

@@ -3,120 +3,120 @@ import samples.v2_1.db.*
 
 model er
 
-// ---- artikl: entity-level mapping with mixed inline-column forms ----
-def entity artikl { description: """Evidence všech artiklů a jejich vlastností.""",
-    displayLabel: { cs: "Artikl", en: "Item" },
-    nameAttribute: název_artiklu,
-    codeAttribute: kód_artiklu,
+// ---- item: entity-level mapping with mixed inline-column forms ----
+def entity item { description: """Products (TPC-DS item) and their properties.""",
+    displayLabel: { en: "Item", cs: "Produkt" },
+    nameAttribute: product_name,
+    codeAttribute: item_id,
     binding: {
-        target: { table: db.dbo.table.QZBOZI_DF },
+        target: { table: db.dbo.table.item },
         columns: {
-            id_artiklu:     IDZBOZI,
-            kód_artiklu:    { target: KOD_ZBOZI },
-            název_artiklu:  { target: { column: NAZEV_ZBOZI } },
-            id_produktu:    IDSKUPZBOZI,
-            id_podproduktu: IDSKUPZBOZI
+            sk:           i_item_sk,
+            item_id:      { target: i_item_id },
+            product_name: { target: { column: i_product_name } },
+            category_id:  i_category_id,
+            class_id:     i_class_id
         }
     },
     attributes: [
-        def attribute id_artiklu     { type: int, isKey: true, description: "Unikátní identifikátor artiklu" },
-        def attribute kód_artiklu    { type: text, optional: true, description: "Unikátní kód artiklu" },
-        def attribute název_artiklu  { type: text, optional: true, description: "Obchodní název artiklu" },
-        def attribute id_produktu    { type: int, optional: true, description: "Vazba na nadřazený produkt" },
-        def attribute id_podproduktu { type: int, optional: true, description: "Vazba na nadřazený podprodukt" }
+        def attribute sk           { type: int, isKey: true, description: "Unique item identifier" },
+        def attribute item_id      { type: text, optional: true, description: "Unique item code" },
+        def attribute product_name { type: text, optional: true, description: "Product name" },
+        def attribute category_id  { type: int, optional: true, description: "Link to the parent category" },
+        def attribute class_id     { type: int, optional: true, description: "Link to the parent class" }
     ]
 }
 
-// ---- produkt: attribute-level inline mappings (no entity-level mapping block) ----
-def entity produkt { description: """Evidence produktů a jejich vlastností.""",
-    displayLabel: { cs: "Produkt", en: "Product" },
-    nameAttribute: název_produktu,
+// ---- category: attribute-level inline mappings (no entity-level mapping block) ----
+def entity category { description: """Product categories.""",
+    displayLabel: { en: "Category", cs: "Kategorie" },
+    nameAttribute: category_name,
     attributes: [
-        def attribute id_produktu     { type: int, isKey: true, binding: IDSKUPZBOZI },
-        def attribute kód_produktu    { type: text, optional: true, binding: KOD_SKUPZBOZI },
-        def attribute název_produktu  { type: text, optional: true, binding: { target: { column: NAZEV_SKUPZBOZI } } }
+        def attribute sk             { type: int, isKey: true, binding: i_category_id },
+        def attribute category_code  { type: text, optional: true, binding: i_category_code },
+        def attribute category_name  { type: text, optional: true, binding: { target: { column: i_category } } }
     ]
 }
 
-// ---- podprodukt: NO inline mappings — covered by explicit def er2db_* in map.ttrm ----
-def entity podprodukt { description: """Evidence podproduktů a jejich vlastností.""",
-    nameAttribute: název_podproduktu,
+// ---- item_class: NO inline mappings — covered by explicit def er2db_* in map.ttrm ----
+def entity item_class { description: """Product classes within a category.""",
+    nameAttribute: class_name,
     attributes: [
-        def attribute id_podproduktu     { type: int, isKey: true },
-        def attribute kód_podproduktu    { type: text, optional: true },
-        def attribute název_podproduktu  { type: text, optional: true },
-        def attribute id_produktu        { type: int, optional: true }
+        def attribute sk           { type: int, isKey: true },
+        def attribute class_code   { type: text, optional: true },
+        def attribute class_name   { type: text, optional: true },
+        def attribute category_id  { type: int, optional: true }
     ]
 }
 
-// ---- obchodní_kanál: no inline mappings ----
-def entity obchodní_kanál { description: """Evidence obchodních kanálů a jejich vlastností.""",
-    codeAttribute: kód_kanálu,
+// ---- market: no inline mappings ----
+def entity market { description: """Store markets.""",
+    codeAttribute: market_code,
     attributes: [
-        def attribute id_kanálu { type: int, isKey: true },
-        def attribute kód_kanálu { type: text, optional: true },
-        def attribute název_kanálu { type: text, optional: true },
-        def attribute id_tržní_skupiny { type: int, optional: true }
+        def attribute sk { type: int, isKey: true },
+        def attribute market_code { type: text, optional: true },
+        def attribute market_name { type: text, optional: true },
+        def attribute division_id { type: int, optional: true }
     ]
 }
 
-// ---- tržní_skupina: no inline mappings ----
-def entity tržní_skupina { description: """Evidence tržních skupin a jejich vlastností.""",
-    nameAttribute: název_skupiny,
-    codeAttribute: kód_skupiny,
+// ---- division: no inline mappings ----
+def entity division { description: """Divisions the markets belong to.""",
+    nameAttribute: division_name,
+    codeAttribute: division_code,
     attributes: [
-        def attribute id_tržní_skupiny { type: int, isKey: true },
-        def attribute kód_skupiny { type: text, optional: true },
-        def attribute název_skupiny { type: text, optional: true }
+        def attribute sk { type: int, isKey: true },
+        def attribute division_code { type: text, optional: true },
+        def attribute division_name { type: text, optional: true }
     ]
 }
 
-// ---- subjekt: no inline mappings ----
-def entity subjekt { description: """Evidence zákazníků (subjektů) a jejich vlastností.""",
-    nameAttribute: název_subjektu,
+// ---- store: no inline mappings ----
+def entity store { description: """Stores and their properties.""",
+    nameAttribute: store_name,
     attributes: [
-        def attribute id_subjektu { type: int, isKey: true },
-        def attribute ičo { type: text, optional: true },
-        def attribute název_subjektu { type: text, optional: true },
-        def attribute id_kanálu { type: int, optional: true }
+        def attribute sk { type: int, isKey: true },
+        def attribute store_id { type: text, optional: true },
+        def attribute store_name { type: text, optional: true },
+        def attribute market_id { type: int, optional: true }
     ]
 }
 
-// ---- relations: artikl_produkt and artikl_podprodukt have inline mapping; others are explicit ----
+// ---- relations: item_in_category and item_in_class have inline mapping; others are explicit ----
 
-// artikl -> produkt: bare-id FK form
-def relation artikl_produkt { description: "Artikl patří pod nadřazený produkt",
-    from: er.entity.artikl, to: er.entity.produkt,
+// item -> category: bare-id FK form
+def relation item_in_category { description: "An item belongs to its parent category",
+    from: er.entity.item, to: er.entity.category,
     cardinality: { from: "0..*", to: "0..1" },
-    join: [{ from: er.entity.artikl.id_produktu, to: er.entity.produkt.id_produktu }],
-    binding: db.dbo.fk.fk_artikl_produkt
+    join: [{ from: er.entity.item.category_id, to: er.entity.category.sk }],
+    binding: db.dbo.fk.fk_item_category
 }
 
-// artikl -> podprodukt: wrapped FK form
-def relation artikl_podprodukt { description: "Artikl patří pod nadřazený podprodukt",
-    from: er.entity.artikl, to: er.entity.podprodukt,
+// item -> item_class: wrapped FK form
+def relation item_in_class { description: "An item belongs to its parent class",
+    from: er.entity.item, to: er.entity.item_class,
     cardinality: { from: "0..*", to: "1" },
-    join: [{ from: er.entity.artikl.id_podproduktu, to: er.entity.podprodukt.id_podproduktu }],
-    binding: { fk: db.dbo.fk.fk_artikl_podprodukt }
+    join: [{ from: er.entity.item.class_id, to: er.entity.item_class.sk }],
+    binding: { fk: db.dbo.fk.fk_item_class }
 }
 
-// podprodukt -> produkt: no inline mapping (explicit in map.ttrm)
-def relation podprodukt_produkt { description: "Podprodukt patří pod nadřazený produkt",
-    from: er.entity.podprodukt, to: er.entity.produkt,
+// item_class -> category: no inline mapping (explicit in map.ttrm)
+def relation class_in_category { description: "A class belongs to its parent category",
+    from: er.entity.item_class, to: er.entity.category,
     cardinality: { from: "0..*", to: "1" },
-    join: [{ from: er.entity.podprodukt.id_produktu, to: er.entity.produkt.id_produktu }]
+    join: [{ from: er.entity.item_class.category_id, to: er.entity.category.sk }]
 }
 
-// obchodní kanál -> tržní skupina: no inline mapping
-def relation obchodní_kanál_tržní_skupina { description: "Obchodní kanál patří k tržní skupině",
-    from: er.entity.obchodní_kanál, to: er.entity.tržní_skupina,
+// market -> division: no inline mapping
+def relation market_in_division { description: "A market belongs to a division",
+    from: er.entity.market, to: er.entity.division,
     cardinality: { from: "1..*", to: "1" },
-    join: [{ from: er.entity.obchodní_kanál.id_tržní_skupiny, to: er.entity.tržní_skupina.id_tržní_skupiny }]
+    join: [{ from: er.entity.market.division_id, to: er.entity.division.sk }]
 }
 
-// subjekt -> obchodní kanál: no inline mapping
-def relation subjekt_obchodní_kanál { description: "Subjekt obsluhuje obchodní kanál",
-    from: er.entity.subjekt, to: er.entity.obchodní_kanál,
+// store -> market: no inline mapping
+def relation store_in_market { description: "A store serves a market",
+    from: er.entity.store, to: er.entity.market,
     cardinality: { from: "*", to: "1..*" },
-    join: [{ from: er.entity.subjekt.id_kanálu, to: er.entity.obchodní_kanál.id_kanálu }]
+    join: [{ from: er.entity.store.market_id, to: er.entity.market.sk }]
 }

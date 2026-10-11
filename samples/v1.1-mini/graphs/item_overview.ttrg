@@ -1,0 +1,12 @@
+graph item_overview {
+  model: er,
+  description: "Item and its direct relations",
+  tags: ["core-domain", "item"],
+  objects: [
+    billing.invoicing.er.entity.item,
+    billing.invoicing.er.entity.store_return,
+    billing.invoicing.er.relation.item_in_category,
+    billing.invoicing.er.relation.item_in_class,
+    billing.products.er.relation.class_in_category
+  ]
+}

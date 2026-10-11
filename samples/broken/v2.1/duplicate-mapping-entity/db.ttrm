@@ -2,7 +2,7 @@ package broken.v2_1.dup_entity
 
 model db schema dbo
 
-def table QZBOZI_DF {
+def table item {
   primaryKey: ["ID"],
   columns: [
     def column ID { type: int, isKey: true }

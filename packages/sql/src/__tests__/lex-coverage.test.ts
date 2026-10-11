@@ -7,7 +7,7 @@ import type { QueryDef, TaggedBlockValue } from '@tatrman/parser';
 import { lexSql, resolveDialect } from '../lexer-service.js';
 
 /**
- * Lex-coverage regression (ports the SPIKE S0.2 harness): every real embedded
+ * Lex-coverage regression (ports the SPIKE S0.2 harness): every embedded
  * SQL block in the sample corpus lexes with **zero** error tokens — tsql via the
  * `{param}` mask, postgres natively. A regression here means the mask or dialect
  * wiring broke the "restores 100% lex" guarantee.

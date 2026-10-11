@@ -1,8 +1,8 @@
 [project]
-name = "df-erp-mini"
+name = "hartland-mini"
 
 [language]
-preferred = "cs"
+preferred = "en"
 
 [schemas]
 declared = ["db", "er", "map"]

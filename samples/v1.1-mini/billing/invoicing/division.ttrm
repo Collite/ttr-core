@@ -1,0 +1,14 @@
+package billing.invoicing
+
+model er
+
+def entity division { description: """Divisions the markets belong to.
+""",
+    nameAttribute: division_name,
+    codeAttribute: division_code,
+    attributes: [
+        def attribute sk { type: int, isKey: true, description: "Unique division identifier" },
+        def attribute division_code { type: text, optional: true, description: "Unique division code" },
+        def attribute division_name { type: text, optional: true, description: "Division name" }
+    ]
+}

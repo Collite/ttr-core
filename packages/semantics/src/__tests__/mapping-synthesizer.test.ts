@@ -19,27 +19,27 @@ describe('mapping-synthesizer — entity', () => {
     const symbols = setup(`
       package billing.products
       model er
-      def entity artikl {
+      def entity item {
         binding: {
-          target: { table: db.dbo.QZBOZI_DF },
-          columns: { id_artiklu: IDZBOZI, název: NAZEV_ZBOZI }
+          target: { table: db.dbo.item },
+          columns: { sk: i_item_sk, product_name: i_product_name }
         },
         attributes: [
-          def attribute id_artiklu { type: int, isKey: true },
-          def attribute název { type: text }
+          def attribute sk { type: int, isKey: true },
+          def attribute product_name { type: text }
         ]
       }
     `);
 
-    const entityEntry = symbols.get('billing.products.binding.er2dbEntity.artikl');
+    const entityEntry = symbols.get('billing.products.binding.er2dbEntity.item');
     expect(entityEntry).toBeDefined();
     expect(entityEntry!.kind).toBe('er2dbEntity');
     expect(entityEntry!.source.line).toBeGreaterThan(0);
     expect(entityEntry!.mappingSource).toBe('inline');
 
-    const attrA = symbols.get('billing.products.binding.er2dbAttribute.artikl.id_artiklu');
+    const attrA = symbols.get('billing.products.binding.er2dbAttribute.item.sk');
     expect(attrA).toBeDefined();
-    const attrB = symbols.get('billing.products.binding.er2dbAttribute.artikl.název');
+    const attrB = symbols.get('billing.products.binding.er2dbAttribute.item.product_name');
     expect(attrB).toBeDefined();
   });
 });
@@ -121,12 +121,12 @@ describe('mapping-synthesizer — collision with explicit def', () => {
   it('duplicates() reports inline+explicit collision at the same qname', () => {
     const er = parseString(`package billing.products
   model er
-  def entity artikl {
-    binding: { target: { table: db.dbo.QZBOZI_DF }, columns: { id: IDZBOZI } }
+  def entity item {
+    binding: { target: { table: db.dbo.item }, columns: { id: i_item_sk } }
   }`);
     const map = parseString(`package billing.products
   model binding
-  def er2db_entity artikl { entity: er.entity.artikl, target: { table: db.dbo.QZBOZI_DF } }`);
+  def er2db_entity item { entity: er.entity.item, target: { table: db.dbo.item } }`);
     if (er.errors.length || map.errors.length) throw new Error('fixture parse errors');
 
     const symbols = new ProjectSymbolTable();
@@ -135,7 +135,7 @@ describe('mapping-synthesizer — collision with explicit def', () => {
     symbols.upsertDocument('file:///map.ttrm', map.ast!, 'binding', '', 'billing.products');
 
     const dupes = symbols.duplicates();
-    const entityDup = dupes.find((d) => d.qname === 'billing.products.binding.er2dbEntity.artikl');
+    const entityDup = dupes.find((d) => d.qname === 'billing.products.binding.er2dbEntity.item');
     expect(entityDup, `duplicates(): ${JSON.stringify(dupes)}`).toBeDefined();
     const sources = entityDup!.entries.map((e) => e.mappingSource).sort();
     expect(sources).toEqual(['explicit', 'inline']);

@@ -1,0 +1,14 @@
+package billing.products
+
+model er
+
+def entity category { description: """Product categories.
+""",
+    displayLabel: { en: "Category", cs: "Kategorie" },
+    nameAttribute: category_name,
+    attributes: [
+        def attribute sk { type: int, isKey: true, description: "Unique category identifier" },
+        def attribute category_code { type: text, optional: true, description: "Unique category code" },
+        def attribute category_name { type: text, optional: true, description: "Category name" }
+    ]
+}

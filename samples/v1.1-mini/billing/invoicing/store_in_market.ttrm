@@ -1,0 +1,9 @@
+package billing.invoicing
+
+model er
+
+def relation store_in_market { description: "A store serves a market",
+    from: er.entity.store, to: er.entity.market,
+    cardinality: { from: "*", to: "1..*" },
+    join: [{ from: er.entity.store.market_id, to: er.entity.market.sk }]
+}
