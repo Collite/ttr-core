@@ -89,7 +89,7 @@ class DrillMapValidator(
                     // Numeric literal — accept.
                     if (sourceExpr.toDoubleOrNull() != null) continue
                     // Heuristic: bare identifier must appear (case-insensitive) somewhere
-                    // in `from.sourceText`. The SQL may reference it as `t.IDUCETZAP`, so
+                    // in `from.sourceText`. The SQL may reference it as `t.cr_order_number`, so
                     // a substring match is sufficient.
                     if (!sourceText.contains(sourceExpr, ignoreCase = true)) {
                         errors +=

@@ -1,10 +1,10 @@
-package ucetnictvi
+package returns
 model query schema drill
 
-def drill_map agg_strediska_na_doklad {
-    from: query.query.ucetni_zapisy_agregace_strediska,
-    to:   query.query.ucetni_doklad_detail,
-    args: { id_ucetniho_zapisu: "IDUCETZAP" },
-    display: { cs: "Detail dokladu" },
+def drill_map reason_to_return_detail {
+    from: query.query.returns_by_reason,
+    to:   query.query.return_detail,
+    args: { order_number: "cr_order_number" },
+    display: { en: "Return detail" },
     override: true,
 }

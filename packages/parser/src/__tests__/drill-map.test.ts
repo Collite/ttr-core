@@ -7,14 +7,14 @@ describe('grammar v2.2 — drill_map', () => {
   it('parses a full drill_map block', () => {
     const r = parseString(
       [
-        'package ucetnictvi',
+        'package returns',
         'model query schema drill',
         '',
-        'def drill_map agg_strediska_na_doklad {',
-        '  from: query.query.ucetni_zapisy_agregace_strediska,',
-        '  to:   query.query.ucetni_doklad_detail,',
-        '  args: { id_ucetniho_zapisu: "IDUCETZAP" },',
-        '  display: { cs: "Detail dokladu", en: "Document detail" },',
+        'def drill_map reason_to_return_detail {',
+        '  from: query.query.returns_by_reason,',
+        '  to:   query.query.return_detail,',
+        '  args: { order_number: "cr_order_number" },',
+        '  display: { en: "Return detail", cs: "Detail reklamace" },',
         '  override: true,',
         '}',
         '',
@@ -25,27 +25,27 @@ describe('grammar v2.2 — drill_map', () => {
     expect(r.ast?.definitions).toHaveLength(1);
     const def = r.ast!.definitions[0] as DrillMapDef;
     expect(def.kind).toBe('drillMap');
-    expect(def.name).toBe('agg_strediska_na_doklad');
-    expect(def.from?.path).toBe('query.query.ucetni_zapisy_agregace_strediska');
-    expect(def.to?.path).toBe('query.query.ucetni_doklad_detail');
+    expect(def.name).toBe('reason_to_return_detail');
+    expect(def.from?.path).toBe('query.query.returns_by_reason');
+    expect(def.to?.path).toBe('query.query.return_detail');
     expect(def.args).toHaveLength(1);
-    expect(def.args[0].name).toBe('id_ucetniho_zapisu');
-    expect(def.args[0].value.value).toBe('IDUCETZAP');
-    expect(def.display?.entries['cs']).toBe('Detail dokladu');
-    expect(def.display?.entries['en']).toBe('Document detail');
+    expect(def.args[0].name).toBe('order_number');
+    expect(def.args[0].value.value).toBe('cr_order_number');
+    expect(def.display?.entries['cs']).toBe('Detail reklamace');
+    expect(def.display?.entries['en']).toBe('Return detail');
     expect(def.overrideAuto).toBe(true);
   });
 
   it('parses a minimal drill_map (no display, no override)', () => {
     const r = parseString(
       [
-        'package ucetnictvi',
+        'package returns',
         'model query schema drill',
         '',
-        'def drill_map agg_uctu_na_doklad {',
-        '  from: query.query.ucetni_zapisy_agregace_uctu,',
-        '  to:   query.query.ucetni_doklad_detail,',
-        '  args: { id_ucetniho_zapisu: "IDUCETZAP" },',
+        'def drill_map warehouse_to_return_detail {',
+        '  from: query.query.returns_by_warehouse,',
+        '  to:   query.query.return_detail,',
+        '  args: { order_number: "cr_order_number" },',
         '}',
         '',
       ].join('\n'),
@@ -62,7 +62,7 @@ describe('grammar v2.2 — drill_map', () => {
     // accepts the listed drillMapProperty alternatives.
     const r = parseString(
       [
-        'package ucetnictvi',
+        'package returns',
         'model query schema drill',
         '',
         'def drill_map x {',
@@ -79,10 +79,10 @@ describe('grammar v2.2 — drill_map', () => {
 
   it('accepts an empty args block', () => {
     // Validation of "args keys must be parameters on `to`" is enforced by the
-    // metadata-side validator (ai-platform), not the parser.
+    // metadata-side validator, not the parser.
     const r = parseString(
       [
-        'package ucetnictvi',
+        'package returns',
         'model query schema drill',
         '',
         'def drill_map x {',

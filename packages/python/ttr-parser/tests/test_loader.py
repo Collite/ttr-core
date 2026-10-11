@@ -81,7 +81,7 @@ EXPECTED = [
     ("15-query.ttrm", "query", QueryDef, "topCustomers"),
     ("16-role.ttrm", "role", RoleDef, "fact"),
     ("17-er2cnc-role.ttrm", "er2cnc_role", Er2CncRoleDef, "objednavka_is_fact"),
-    ("18-drill-map.ttrm", "drill_map", DrillMapDef, "agg_strediska_na_doklad"),
+    ("18-drill-map.ttrm", "drill_map", DrillMapDef, "reason_to_return_detail"),
 ]
 
 
@@ -203,16 +203,16 @@ def test_parse_string_er2cnc_role_long_form() -> None:
 def test_parse_string_drill_map_full() -> None:
     r = ttr_parser.parse_string(_read("18-drill-map.ttrm"))
     assert r.ok
-    assert r.package_name == "ucetnictvi"
+    assert r.package_name == "returns"
     d = r.definitions[0]
     assert isinstance(d, DrillMapDef)
     assert d.from_ is not None
-    assert d.from_.path == "query.query.ucetni_zapisy_agregace_strediska"
+    assert d.from_.path == "query.query.returns_by_reason"
     assert d.to is not None
-    assert d.to.path == "query.query.ucetni_doklad_detail"
-    assert d.args == {"id_ucetniho_zapisu": "IDUCETZAP"}
+    assert d.to.path == "query.query.return_detail"
+    assert d.args == {"order_number": "cr_order_number"}
     assert d.display is not None
-    assert d.display.by_language["cs"] == "Detail dokladu"
+    assert d.display.by_language["en"] == "Return detail"
     assert d.override_auto is True
 
 

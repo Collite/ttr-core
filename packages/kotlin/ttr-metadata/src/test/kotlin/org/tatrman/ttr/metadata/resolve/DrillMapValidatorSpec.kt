@@ -35,23 +35,23 @@ class DrillMapValidatorSpec :
                     queries =
                         listOf(
                             patternQuery(
-                                "ucetni_zapisy_agregace_strediska",
+                                "returns_by_reason",
                                 params = emptyList(),
-                                sql = "SELECT s.NAZEV, SUM(z.CASTKA) AS soucet, z.IDUCETZAP FROM ucet_zapis z",
+                                sql = "SELECT r.r_reason_desc, SUM(cr.cr_return_amount) AS returned_amount, cr.cr_order_number FROM catalog_returns cr",
                             ),
                             patternQuery(
-                                "ucetni_doklad_detail",
-                                params = listOf(QueryParameterDef("id_ucetniho_zapisu", "int")),
-                                sql = "SELECT * FROM ucet_zapis WHERE IDUCETZAP = :id_ucetniho_zapisu",
+                                "return_detail",
+                                params = listOf(QueryParameterDef("order_number", "int")),
+                                sql = "SELECT * FROM catalog_returns WHERE cr_order_number = :order_number",
                             ),
                         ),
                     drillMaps =
                         listOf(
                             drill(
-                                name = "agg_strediska_na_doklad",
-                                from = "ucetni_zapisy_agregace_strediska",
-                                to = "ucetni_doklad_detail",
-                                args = mapOf("id_ucetniho_zapisu" to "IDUCETZAP"),
+                                name = "reason_to_return_detail",
+                                from = "returns_by_reason",
+                                to = "return_detail",
+                                args = mapOf("order_number" to "cr_order_number"),
                             ),
                         ),
                 )
@@ -64,15 +64,15 @@ class DrillMapValidatorSpec :
                 modelWith(
                     queries =
                         listOf(
-                            patternQuery("ucetni_zapisy_agregace_strediska", emptyList(), "SELECT IDUCETZAP"),
+                            patternQuery("returns_by_reason", emptyList(), "SELECT cr_order_number"),
                         ),
                     drillMaps =
                         listOf(
                             drill(
-                                name = "agg_strediska_na_doklad",
-                                from = "ucetni_zapisy_agregace_strediska",
-                                to = "ucetni_doklad_detail",
-                                args = mapOf("id_ucetniho_zapisu" to "IDUCETZAP"),
+                                name = "reason_to_return_detail",
+                                from = "returns_by_reason",
+                                to = "return_detail",
+                                args = mapOf("order_number" to "cr_order_number"),
                             ),
                         ),
                 )
@@ -90,8 +90,8 @@ class DrillMapValidatorSpec :
                             patternQuery("a", emptyList(), "SELECT 1"),
                             patternQuery(
                                 "b",
-                                params = listOf(QueryParameterDef("id_ucetniho_zapisu", "int")),
-                                sql = "SELECT * WHERE IDUCETZAP = :id_ucetniho_zapisu",
+                                params = listOf(QueryParameterDef("order_number", "int")),
+                                sql = "SELECT * WHERE cr_order_number = :order_number",
                             ),
                         ),
                     drillMaps =
@@ -100,7 +100,7 @@ class DrillMapValidatorSpec :
                                 name = "x",
                                 from = "a",
                                 to = "b",
-                                args = mapOf("not_a_param" to "1", "id_ucetniho_zapisu" to "1"),
+                                args = mapOf("not_a_param" to "1", "order_number" to "1"),
                             ),
                         ),
                 )
@@ -118,11 +118,11 @@ class DrillMapValidatorSpec :
                             patternQuery(
                                 "a",
                                 emptyList(),
-                                sql = "SELECT NAZEV, CASTKA FROM doklad",
+                                sql = "SELECT r_reason_desc, cr_return_amount FROM catalog_returns",
                             ),
                             patternQuery(
                                 "b",
-                                params = listOf(QueryParameterDef("id_ucetniho_zapisu", "int")),
+                                params = listOf(QueryParameterDef("order_number", "int")),
                                 sql = "SELECT 1",
                             ),
                         ),
@@ -132,8 +132,8 @@ class DrillMapValidatorSpec :
                                 name = "x",
                                 from = "a",
                                 to = "b",
-                                // IDUCETZAP isn't in the from SQL → typo
-                                args = mapOf("id_ucetniho_zapisu" to "IDUCETZAP"),
+                                // cr_order_number isn't in the from SQL → typo
+                                args = mapOf("order_number" to "cr_order_number"),
                             ),
                         ),
                 )
@@ -147,13 +147,13 @@ class DrillMapValidatorSpec :
                 modelWith(
                     queries =
                         listOf(
-                            patternQuery("a", emptyList(), "SELECT IDUCETZAP"),
+                            patternQuery("a", emptyList(), "SELECT cr_order_number"),
                             patternQuery(
                                 "b",
                                 params =
                                     listOf(
-                                        QueryParameterDef("id_ucetniho_zapisu", "int"),
-                                        QueryParameterDef("rok", "int"),
+                                        QueryParameterDef("order_number", "int"),
+                                        QueryParameterDef("year", "int"),
                                     ),
                                 sql = "SELECT 1",
                             ),
@@ -164,13 +164,13 @@ class DrillMapValidatorSpec :
                                 name = "x",
                                 from = "a",
                                 to = "b",
-                                args = mapOf("id_ucetniho_zapisu" to "IDUCETZAP"),
+                                args = mapOf("order_number" to "cr_order_number"),
                             ),
                         ),
                 )
 
             val errors = DrillMapValidator().validate(model).errors
-            errors.any { it.message.contains("DRILL_MAP_MISSING_PARAM") && it.message.contains("rok") } shouldBe true
+            errors.any { it.message.contains("DRILL_MAP_MISSING_PARAM") && it.message.contains("year") } shouldBe true
         }
 
         "string literal in args value — bypasses the from-SQL substring check" {
@@ -178,7 +178,7 @@ class DrillMapValidatorSpec :
                 modelWith(
                     queries =
                         listOf(
-                            patternQuery("a", emptyList(), "SELECT NAZEV FROM x"),
+                            patternQuery("a", emptyList(), "SELECT r_reason_desc FROM x"),
                             patternQuery(
                                 "b",
                                 params = listOf(QueryParameterDef("mode", "string")),
