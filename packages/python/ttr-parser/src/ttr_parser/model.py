@@ -387,7 +387,7 @@ class TargetReferenceValue(TargetValue):
 
 @dataclass(frozen=True, slots=True)
 class BindingColumnEntry:
-    """One entry in a `binding: { columns: { id_artiklu: IDZBOZI, … } }` map."""
+    """One entry in a `binding: { columns: { sk: i_item_sk, … } }` map."""
 
     name: str = ""
     value: BindingColumnValue | None = None
@@ -404,7 +404,7 @@ class BindingColumnValue:
 
 @dataclass(frozen=True, slots=True)
 class BindingColumnBareId(BindingColumnValue):
-    """`id_artiklu: IDZBOZI` (bare-id form)."""
+    """`sk: i_item_sk` (bare-id form)."""
 
     id: Reference | None = None
     kind: ClassVar[str] = "bareId"

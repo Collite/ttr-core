@@ -1,6 +1,6 @@
 model binding
 
-def er2db_attribute artikl_id {
-    attribute: er.entity.artikl.id
-    target: { column: IDZBOZI }
+def er2db_attribute item_sk {
+    attribute: er.entity.item.sk
+    target: { column: i_item_sk }
 }

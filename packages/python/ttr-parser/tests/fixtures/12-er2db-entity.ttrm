@@ -1,6 +1,6 @@
 model binding
 
-def er2db_entity artikl_to_qbozi {
-    entity: er.entity.artikl
-    target: { table: db.dbo.QZBOZI_DF }
+def er2db_entity item_to_table {
+    entity: er.entity.item
+    target: { table: db.dbo.item }
 }

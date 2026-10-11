@@ -75,8 +75,8 @@ EXPECTED = [
     ("09-entity.ttrm", "entity", EntityDef, "Customer"),
     ("10-attribute.ttrm", "attribute", AttributeDef, "stav"),
     ("11-relation.ttrm", "relation", RelationDef, "rel_a_b"),
-    ("12-er2db-entity.ttrm", "er2db_entity", Er2DbEntityDef, "artikl_to_qbozi"),
-    ("13-er2db-attribute.ttrm", "er2db_attribute", Er2DbAttributeDef, "artikl_id"),
+    ("12-er2db-entity.ttrm", "er2db_entity", Er2DbEntityDef, "item_to_table"),
+    ("13-er2db-attribute.ttrm", "er2db_attribute", Er2DbAttributeDef, "item_sk"),
     ("14-er2db-relation.ttrm", "er2db_relation", Er2DbRelationDef, "rel_a_b_to_fk"),
     ("15-query.ttrm", "query", QueryDef, "topCustomers"),
     ("16-role.ttrm", "role", RoleDef, "fact"),
@@ -227,9 +227,9 @@ def test_parse_string_inline_binding_block() -> None:
     assert isinstance(m, BindingPropertyBlock)
     assert isinstance(m.target, TargetObjectValue)
     cols = {c.name: c.value for c in m.columns}
-    assert isinstance(cols["id_artiklu"], BindingColumnBareId)       # bare-id form
-    assert isinstance(cols["kod_artiklu"], BindingColumnObject)      # object form
-    assert isinstance(cols["nazev_artiklu"], BindingColumnObject)    # nested target
+    assert isinstance(cols["sk"], BindingColumnBareId)               # bare-id form
+    assert isinstance(cols["item_id"], BindingColumnObject)          # object form
+    assert isinstance(cols["product_name"], BindingColumnObject)     # nested target
 
 
 # --- Error handling (contracts §2.1, §2.3) ---
