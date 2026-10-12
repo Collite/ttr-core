@@ -177,8 +177,10 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   const schemaLoadingRef = useRef<Map<string, Promise<GetGraphResponse | null>>>(new Map());
   // the hop edge open in the inspector (VL V-26), by edge id; derived, cleared when it disappears.
   const [selectedHop, setSelectedHop] = useState<string | null>(null);
-  // shift-click multi-selection (V-27): node ids the view menu's items apply to together
+  // shift-click multi-selection (V-27): node ids the view menu's items apply to together — and exactly
+  // what the canvas draws selected while it is non-empty. Per tab: a tab switch clears it.
   const [multiSel, setMultiSel] = useState<ReadonlySet<string>>(new Set());
+  const selectedIds = useMemo(() => [...multiSel], [multiSel]);
   // Save as… (V-32): the tab being saved; the tab menu (V-33): where it was opened
   const [saveAsTab, setSaveAsTab] = useState<string | null>(null);
   const [tabMenu, setTabMenu] = useState<{ tabId: string; x: number; y: number } | null>(null);
@@ -340,6 +342,9 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
       if (tab.layout || graphs[tab.subject.ref] !== undefined) void ensureSchemaGraph(tab.subject.schemaCode);
     }
   }, [tab?.subject.ref, tab?.perspective, tab?.layout ? 'layout' : 'plain', tab ? graphs[tab.subject.ref] : undefined]);
+
+  // a multi-selection belongs to the tab it was made on (V-27) — another tab's ids must not leak into its menu
+  useEffect(() => { setMultiSel(new Set()); }, [tab?.id]);
 
   // fetch the project-wide binding map once the catalog is available (C-2). Failure is soft:
   // no bindings ⇒ no show-bindings decoration and an empty ribbon. getBindings is absent on
@@ -1124,7 +1129,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
               nodePositions={tabLayout ? layoutNodePositions ?? NO_POSITIONS : positions[tab.subject.ref] ?? NO_POSITIONS}
               viewportCenterRef={viewportCenterRef}
               canvasKey={tabLayout ? tab.id : tab.subject.ref}
-              selectedQname={selected?.qname ?? null}
+              selectedQname={multiSel.size > 0 ? null : selected?.qname ?? null}
               selectedEdgeId={inspectedHop?.id ?? null}
               onEdgeSelect={(id) => {
                 if (id && id.startsWith('hop:')) { setSelectedHop(id); setDrawerOpen(false); } else setSelectedHop(null);
@@ -1132,13 +1137,20 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
               onNodeSelect={(q, additive) => {
                 setSelectedHop(null);
                 if (additive && q) {
-                  setMultiSel((m) => { const n = new Set(m); if (n.has(q)) n.delete(q); else n.add(q); return n; });
+                  const single = selected?.qname;
+                  setMultiSel((m) => {
+                    const n = new Set(m);
+                    // the first shift-click extends the selection already drawn — the card clicked before it
+                    if (n.size === 0 && single && single !== q) n.add(single);
+                    if (n.has(q)) n.delete(q); else n.add(q);
+                    return n;
+                  });
                   return;
                 }
                 setMultiSel(new Set());
                 void onSelectNode(q);
               }}
-              selectedIds={[...multiSel]}
+              selectedIds={selectedIds}
               layoutChip={layoutChip(tab, dataSource.capabilities)}
               renderViewMenu={wholeGraph && wholeIndex
                 ? (target, close) => <ViewMenu items={viewMenuItems(target)} onClose={close} />

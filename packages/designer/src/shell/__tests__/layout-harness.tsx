@@ -21,6 +21,7 @@ export function KernelStandIn(p: KernelProps) {
       data-edges={real.map((e) => e.id).sort().join(',')}
       data-hops={hops.map((e) => `${e.from.node}|${e.to.node}|${(e.via ?? []).join('+')}`).sort().join(',')}
       data-positions={JSON.stringify(p.positions)}
+      data-selected={[...new Set([p.selectedId, ...(p.selectedIds ?? [])])].filter(Boolean).sort().join(',')}
     >
       {p.graph.nodes.map((n) => (
         <button
