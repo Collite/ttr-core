@@ -6,6 +6,27 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-parser` · `ttr-writer` · `ttr-metadata`** — **layout files (VL-P0).** A *layout* — a schema, the cards
+  it shows, their positions — read and written as a `.ttrg` graph block with the in-file `layout:` block, its
+  references resolved against the model (docs: *Model → Layout files*).
+  - `ttr-parser`: **`TtrgGraphReader`** — `ttr-designer-server`'s `graph/TtrgGraphFile` moved here as
+    `org.tatrman.ttr.parser.loader.TtrgGraphReader` (`parseHeader` / `findObjectsBrackets` / `parseObjects`
+    unchanged; the designer server uses the moved object). New `scan` / `parseLayoutBlock` / `parseObjectRefs`
+    read the in-file `layout: { nodes: { … } }` block and the `objects` list — bare or quoted keys, integer or
+    decimal coordinates, comments and strings skipped, a viewport dropped. New `model.LayoutDocument` /
+    `LayoutPoint` (canonical form: code-point order, coordinates `floor(x + 0.5)`) and `loader.TtrId` (whether a
+    reference is a grammar `id`, by running the grammar's own `id` rule).
+  - `ttr-writer`: **`TtrgLayoutWriter`** — the canonical `.ttrg` of a layout; reproduces the shared test vectors
+    byte for byte.
+  - `ttr-metadata`: **`layout.LayoutResolver`** — the four-step resolution rule (full qname · qname ·
+    `kind.name` · bare name; ambiguous never guessed; relations and foreign keys ignored) over a
+    `LayoutModelIndex`; `indexOf(model, packageOf)` builds the index in the catalog's node shape, and
+    `packagesFrom(sourceSnapshots)` supplies the packages the reconciled model does not keep.
+  - Alongside (not Maven artifacts): `@tatrman/designer` gains the TypeScript layout module
+    (`src/layout/` — the document, YAML and TTR readers/writers, `.ttrl` sidecar merge, resolution; the `yaml`
+    package 2.9.1 is its one new dependency), and `@tatrman/package-sdk` publishes
+    `schemas/layout.schema.json` (the YAML form, format 1) and `schemas/layout-vectors/` (eleven shared test
+    cases every implementation of the format is held to).
 - **`ttr-translator`** ⚑ **behaviour fix — no VARCHAR cast without a length reaches SQL Server.** T-SQL reads
   `CAST(x AS VARCHAR)` as `VARCHAR(30)`, and the MSSQL unparse wrote exactly that wherever the plan carried an
   unbounded VARCHAR: around the column branch of the CASE `COALESCE` expands to (`CASE WHEN [email] IS NOT NULL

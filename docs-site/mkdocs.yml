@@ -113,6 +113,7 @@ nav:
       - Your first three tables: model/first-three-tables.md
       - The layers: model/layers.md
       - Language reference: model/language-reference.md
+      - Layout files: model/layout-files.md
       - Why the model is the artifact: model/why-model-is-the-artifact.md
   - Connect:
       - connect/index.md
