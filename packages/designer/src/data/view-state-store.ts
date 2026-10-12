@@ -174,7 +174,10 @@ export interface LayoutDocState {
   collapsed?: string[];
 }
 
-/** Where a `LayoutDocumentStore` keeps its state: the shell binds it to the tab's layout (`set` marks it dirty). */
+/**
+ * Where a `LayoutDocumentStore` keeps its state — by default a session map (`memoryLayoutDocIO`: a catalog's
+ * plain subjects). A layout tab's own positions and skin are kept by the shell in the tab's layout.
+ */
 export interface LayoutDocIO {
   get(canvasKey: string): LayoutDocState | undefined;
   set(canvasKey: string, state: LayoutDocState): void;

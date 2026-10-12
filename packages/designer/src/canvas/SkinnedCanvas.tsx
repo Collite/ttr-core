@@ -46,6 +46,8 @@ export interface SkinnedCanvasProps {
   viewportCenterRef?: MutableRefObject<(() => { x: number; y: number } | null) | null>;
   /** skin id from view-state (may be unknown ⇒ DS-SKIN-002 fallback + truth-chip note) */
   initialSkin?: SkinId;
+  /** the notation picker's choice — a layout keeps it (VL V-28) */
+  onSkinChange?: (skin: SkinId) => void;
   /** a card was clicked; `additive` — shift held (multi-select, VL V-27) */
   onNodeSelect: (qname: string | null, additive?: boolean) => void;
   /** FO-21: the node context menu is injected by the shell's authoring context (absent in OPEN →
@@ -71,7 +73,7 @@ function project(cg: CanvasGraph, mode: DisplayMode): CanvasGraph {
 }
 
 export function SkinnedCanvas({
-  graph, displayMode, nodePositions, canvasKey, selectedQname, selectedEdgeId, onEdgeSelect, viewportCenterRef, initialSkin, onNodeSelect, renderNodeMenu, renderViewMenu, onPersistView, onDrillIn,
+  graph, displayMode, nodePositions, canvasKey, selectedQname, selectedEdgeId, onEdgeSelect, viewportCenterRef, initialSkin, onSkinChange, onNodeSelect, renderNodeMenu, renderViewMenu, onPersistView, onDrillIn,
   selectedIds, layoutChip,
   bindingHints, showBindings, onToggleShowBindings,
 }: SkinnedCanvasProps) {
@@ -176,7 +178,11 @@ export function SkinnedCanvas({
         <select
           data-testid="skin-picker"
           value={skinId}
-          onChange={(e) => setSkinChoice((c) => ({ ...c, [kind]: e.target.value }))}
+          onChange={(e) => {
+            const picked = e.target.value;
+            setSkinChoice((c) => ({ ...c, [kind]: picked }));
+            onSkinChange?.(picked);
+          }}
           style={{ font: 'inherit', fontSize: 12.5, padding: '3px 8px', border: `1px solid ${palette.grid}`, borderRadius: 6 }}
         >
           {roster.map((s) => (

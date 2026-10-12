@@ -32,7 +32,7 @@ import type { ShellEditContext } from './edit-context.js';
 import type { CatalogGroup, CatalogItem, ShellState, Subject, SubjectKind, SubjectTab, TabLayout } from './types.js';
 import {
   emptyShell, openSubject, promoteTab, closeTab, dropPreviewIfLeaving, drillIn, drillTo, activeTab, setPerspective,
-  setLayoutObjects, setLayoutPositions, toLayoutTab, openLayoutTab, markSaved, hasUnsavedLocalLayout,
+  setLayoutObjects, setLayoutPositions, setLayoutSkin, toLayoutTab, openLayoutTab, markSaved, hasUnsavedLocalLayout,
 } from './shell-state.js';
 import { ViewMenu, type ViewMenuEntry, type ViewMenuTarget } from './ViewMenu.js';
 import { projectLayout, layoutIndexOf, hiddenNeighbours, hiddenClosure, visibleNeighbours, type HopEdge, type LayoutGraphIndex, type LayoutProjection } from '../model/layout-projection.js';
@@ -50,7 +50,6 @@ import { SaveAsDialog, layoutFileOf, layoutTextOf, type LayoutFormat } from './S
 import { getRuntimeConfig } from '../runtime-config.js';
 import type { LayoutDocument } from '../layout/layout-document.js';
 import type { ModelKind } from '../data/model-data-source.js';
-import { LayoutDocumentStore } from '../data/view-state-store.js';
 import type { LayoutPoint } from '../layout/layout-document.js';
 import { HopEdgeInspector } from './HopEdgeInspector.js';
 import { layoutChip } from './layout-chip.js';
@@ -215,15 +214,9 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   const shellRef = useRef(shell);
   shellRef.current = shell;
 
-  // the layout tabs' store (VL V-28): positions / skin / collapsed live in the tab's layout; a write
-  // marks it dirty. Keyed by tab id.
-  const layoutStore = useMemo(() => new LayoutDocumentStore({
-    get: (tabId) => {
-      const l = shellRef.current.tabs.find((t) => t.id === tabId)?.layout;
-      return l ? { positions: l.doc.positions, skin: l.doc.skin, collapsed: l.doc.collapsed } : undefined;
-    },
-    set: (tabId, st) => setShell((s) => setLayoutPositions(s, tabId, st.positions, { collapsed: st.collapsed })),
-  }), []);
+  // the notation picked on a plain subject's canvas, by tab id — Save as… / New layout / the first
+  // selection edit carry it (a layout tab keeps its own in the layout, V-28)
+  const [subjectSkins, setSubjectSkins] = useState<Record<string, string>>({});
 
   /**
    * The whole graph of schema `code` (VL V-21): held, in flight, or read now — one read per schema. A
@@ -622,8 +615,9 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     const seeded: Record<string, LayoutPoint> = {};
     for (const [id, p] of Object.entries(held)) seeded[wholeIndex?.fullQnameOf.get(id) ?? id] = p;
     const placed = placeCards(added, seeded, nextCards);
+    const skin = subjectSkins[tab.id];
     const layout: TabLayout = {
-      doc: { name: seedLayoutName(tab), model: tab.subject.schemaCode as TabLayout['doc']['model'], objects: [], positions: {} },
+      doc: { name: seedLayoutName(tab), model: tab.subject.schemaCode as TabLayout['doc']['model'], objects: [], positions: {}, ...(skin ? { skin } : {}) },
       source: 'new',
       dirty: true,
     };
@@ -760,7 +754,8 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
       const fq = wholeIndex?.fullQnameOf.get(id) ?? id;
       if (listed.has(fq)) pos[fq] = p;
     }
-    return { name: seedLayoutName(t), model: t.subject.schemaCode as LayoutDocument['model'], objects, positions: pos };
+    const skin = subjectSkins[t.id];
+    return { name: seedLayoutName(t), model: t.subject.schemaCode as LayoutDocument['model'], objects, positions: pos, ...(skin ? { skin } : {}) };
   }
 
   const formatKey = `ttr-viewer:layout-format:${workspace}`;
@@ -822,21 +817,25 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
         .sort((a, b) => compareAlphabetical(a.ref, b.ref))
     : []), [projection]);
 
-  // a drag on a layout tab → its positions, by full qname (V-28), keeping the missing cards' ones. A
-  // display-mode switch re-emits the canvas's positions too: an `auto` one is the canvas's own layout
-  // (the layout stays auto, V-2), a `manual` one that moves nothing leaves the layout clean.
+  // a drag on a layout tab → its positions, by full qname (V-28), keeping the missing cards' ones; the
+  // skin and collapsed stay as they are. A display-mode switch re-emits the canvas's positions too: an
+  // `auto` one is the canvas's own layout (the layout stays auto, V-2), a `manual` one that moves nothing
+  // leaves the layout clean.
   function persistLayoutView(tabId: string, change: CanvasViewChange) {
     if (change.mode !== 'manual') return;
     const given = layoutNodePositions ?? NO_POSITIONS;
     if (Object.entries(change.positions).every(([id, p]) => given[id]?.x === p.x && given[id]?.y === p.y)) return;
-    const l = shellRef.current.tabs.find((t) => t.id === tabId)?.layout;
-    if (!l || !wholeIndex) return;
-    const next: Record<string, LayoutPoint> = { ...l.doc.positions };
-    for (const [id, p] of Object.entries(change.positions)) {
-      const fq = wholeIndex.fullQnameOf.get(id);
-      if (fq) next[fq] = { x: p.x, y: p.y };
-    }
-    void layoutStore.write(tabId, { skin: l.doc.skin ?? 'er.crow', mode: 'manual', nodes: next, collapsed: l.doc.collapsed ?? [] });
+    if (!wholeIndex) return;
+    setShell((s) => {
+      const l = s.tabs.find((t) => t.id === tabId)?.layout;
+      if (!l) return s;
+      const next: Record<string, LayoutPoint> = { ...l.doc.positions };
+      for (const [id, p] of Object.entries(change.positions)) {
+        const fq = wholeIndex.fullQnameOf.get(id);
+        if (fq) next[fq] = { x: p.x, y: p.y };
+      }
+      return setLayoutPositions(s, tabId, next);
+    });
   }
 
   // a drag on a plain subject → the store, and the shell's own copy: the first selection edit (V-22),
@@ -1129,6 +1128,11 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
               nodePositions={tabLayout ? layoutNodePositions ?? NO_POSITIONS : positions[tab.subject.ref] ?? NO_POSITIONS}
               viewportCenterRef={viewportCenterRef}
               canvasKey={tabLayout ? tab.id : tab.subject.ref}
+              // the notation: a layout's own (V-28; one this viewer lacks shows substituted), else the session's pick
+              initialSkin={tabLayout ? tabLayout.doc.skin : subjectSkins[tab.id]}
+              onSkinChange={(skin) => (tabLayout
+                ? setShell((s) => setLayoutSkin(s, tab.id, skin))
+                : setSubjectSkins((m) => ({ ...m, [tab.id]: skin })))}
               selectedQname={multiSel.size > 0 ? null : selected?.qname ?? null}
               selectedEdgeId={inspectedHop?.id ?? null}
               onEdgeSelect={(id) => {

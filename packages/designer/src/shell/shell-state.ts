@@ -194,6 +194,11 @@ export function setLayoutPositions(
   });
 }
 
+/** The notation picked on the canvas (V-28: the skin lives in the tab's layout). Marks dirty when it changes. */
+export function setLayoutSkin(state: ShellState, tabId: string, skin: string): ShellState {
+  return updateLayout(state, tabId, (l) => (l.doc.skin === skin ? l : { ...l, dirty: true, doc: { ...l.doc, skin } }));
+}
+
 /** Save as… succeeded (V-32): the tab is now the local file `fileName`, named `name`, clean. */
 export function markSaved(state: ShellState, tabId: string, name: string, fileName: string): ShellState {
   const tab = state.tabs.find((t) => t.id === tabId);
