@@ -32,7 +32,7 @@ import type { ShellEditContext } from './edit-context.js';
 import type { CatalogGroup, CatalogItem, ShellState, Subject, SubjectKind, SubjectTab, TabLayout } from './types.js';
 import {
   emptyShell, openSubject, promoteTab, closeTab, dropPreviewIfLeaving, drillIn, drillTo, activeTab, setPerspective,
-  setLayoutObjects, setLayoutPositions, toLayoutTab,
+  setLayoutObjects, setLayoutPositions, toLayoutTab, openLayoutTab,
 } from './shell-state.js';
 import { ViewMenu, type ViewMenuEntry, type ViewMenuTarget } from './ViewMenu.js';
 import { projectLayout, layoutIndexOf, hiddenNeighbours, hiddenClosure, visibleNeighbours, type HopEdge, type LayoutGraphIndex, type LayoutProjection } from '../model/layout-projection.js';
@@ -42,6 +42,11 @@ import { createSkinRegistry } from '../skins/index.js';
 import type { DesignerSkin } from '../canvas/skin-component.js';
 import { compareAlphabetical } from '../layout/layout-document.js';
 import { ObjectsPanel, type MissingRef } from './ObjectsPanel.js';
+import { readLayoutFiles, normalizeForTab, LAYOUT_FILE_ACCEPT } from '../layout/open-files.js';
+import { resolveRefs } from '../layout/resolve.js';
+import { modelKindHint } from '../data/capability-hints.js';
+import { pickFiles as pickFilesFromDisk } from '../fs/file-system.js';
+import type { ModelKind } from '../data/model-data-source.js';
 import { LayoutDocumentStore } from '../data/view-state-store.js';
 import type { LayoutPoint } from '../layout/layout-document.js';
 import { HopEdgeInspector } from './HopEdgeInspector.js';
@@ -81,6 +86,8 @@ export interface ShellFrameProps {
   onError?: (msg: string) => void;
   /** a passing notice (`Expanded: +3`, `Every neighbour is already visible`) — the host's info toast. */
   onNotice?: (msg: string) => void;
+  /** Open layout…'s file picker (VL V-31) — the browser's by default; a test injects its own. */
+  pickFiles?: (accept: string, multiple: boolean) => Promise<File[]>;
   /** fires when the active tab (or its loaded graph) changes — drives the host header. */
   onActiveChange?: (active: ActiveSubject | null) => void;
   /** view-state persistence (FO-31, DM-P2.S1) — selected by capabilities.layoutPersist. Absent ⇒
@@ -109,6 +116,8 @@ export interface ShellFrameProps {
 const subjectOf = (item: CatalogItem): Subject => ({
   ref: item.ref, kind: item.kind, schemaCode: item.schemaCode, label: item.label,
 });
+
+const toolbarButton = { border: '1px solid #CBD8E6', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 12, padding: '3px 10px', color: '#33506e' } as const;
 
 /** No positions (a stable object, so the canvas does not re-run its layout on every render). */
 const NO_POSITIONS: Record<string, LayoutPoint> = {};
@@ -139,7 +148,7 @@ function seedLayoutName(tab: SubjectTab): string {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : 'untitled';
 }
 
-export function ShellFrame({ dataSource, workspace, catalog, files, displayMode, getSourceText, onError, onNotice, onActiveChange, viewState, editContext, irisBaseUrl, processingSource, runSource, validateProgram }: ShellFrameProps) {
+export function ShellFrame({ dataSource, workspace, catalog, files, displayMode, getSourceText, onError, onNotice, pickFiles = pickFilesFromDisk, onActiveChange, viewState, editContext, irisBaseUrl, processingSource, runSource, validateProgram }: ShellFrameProps) {
   const [shell, setShell] = useState<ShellState>(emptyShell);
   // processing face (DM-P4): the fixture source serves the hero graph in dev + tests; the live
   // TtrpServerProcessingSource plugs in behind the same interface. The run backend is a separate
@@ -153,7 +162,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   // the whole-schema graph per schema code (VL V-21) — what the Objects panel lists, layouts resolve
   // against and are projected from. On a catalog it is the schema subject's own graph.
   const [schemaGraphs, setSchemaGraphs] = useState<Record<string, GetGraphResponse | null>>({});
-  const schemaLoadingRef = useRef<Set<string>>(new Set());
+  const schemaLoadingRef = useRef<Map<string, Promise<GetGraphResponse | null>>>(new Map());
   // the hop edge open in the inspector (VL V-26), by edge id; derived, cleared when it disappears.
   const [selectedHop, setSelectedHop] = useState<string | null>(null);
   // shift-click multi-selection (V-27): node ids the view menu's items apply to together
@@ -199,20 +208,50 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     set: (tabId, st) => setShell((s) => setLayoutPositions(s, tabId, st.positions, { collapsed: st.collapsed })),
   }), []);
 
-  async function ensureSchemaGraph(code: string) {
-    if (schemaGraphs[code] !== undefined || schemaLoadingRef.current.has(code) || !dataSource.getSchemaGraph) return;
-    if (code !== 'db' && code !== 'er' && code !== 'md' && code !== 'cnc') return;
-    if (graphs[code]) { setSchemaGraphs((m) => ({ ...m, [code]: graphs[code] })); return; } // a catalog's schema subject
-    schemaLoadingRef.current.add(code);
-    try {
-      const g = await dataSource.getSchemaGraph(code);
+  /** The whole graph of schema `code` (VL V-21): held, in flight, or read now — one read per schema. */
+  function loadSchemaGraph(code: string): Promise<GetGraphResponse | null> {
+    if (schemaGraphs[code] !== undefined) return Promise.resolve(schemaGraphs[code]);
+    const inFlight = schemaLoadingRef.current.get(code);
+    if (inFlight) return inFlight;
+    if (!dataSource.getSchemaGraph || (code !== 'db' && code !== 'er' && code !== 'md' && code !== 'cnc')) return Promise.resolve(null);
+    const held = graphs[code]; // a catalog's schema subject IS the whole schema
+    const read = held
+      ? Promise.resolve(held)
+      : dataSource.getSchemaGraph(code).catch((e) => {
+          onError?.(`Failed to read the ${code} schema: ${e}`);
+          return null;
+        });
+    const p = read.then((g) => {
       setSchemaGraphs((m) => ({ ...m, [code]: g }));
-    } catch (e) {
-      onError?.(`Failed to read the ${code} schema: ${e}`);
-      setSchemaGraphs((m) => ({ ...m, [code]: null }));
-    } finally {
-      schemaLoadingRef.current.delete(code);
-    }
+      return g;
+    });
+    schemaLoadingRef.current.set(code, p);
+    return p;
+  }
+  function ensureSchemaGraph(code: string) {
+    void loadSchemaGraph(code);
+  }
+
+  /**
+   * Open layout… (V-31): read the picked / dropped files, resolve them against the schema's whole graph
+   * (read first when not held) and open a `file` tab. A model this backend does not serve, an unreadable
+   * file or a lone `.ttrl` is an error toast — no tab.
+   */
+  async function openLayoutFiles(picked: readonly File[]) {
+    if (picked.length === 0) return;
+    const inputs = await Promise.all(picked.map(async (f) => ({ name: f.name, text: await f.text() })));
+    const r = readLayoutFiles(inputs);
+    if (!r.ok) { onError?.(`Cannot open the layout — ${r.error}`); return; }
+    const model = r.doc.model;
+    const kindHint = modelKindHint(dataSource.capabilities, model as ModelKind);
+    if (kindHint) { onError?.(`Cannot open ${r.fileName}: ${kindHint.message}`); return; }
+    const whole = await loadSchemaGraph(model);
+    if (!whole) { onError?.(`Cannot open ${r.fileName}: the ${model} schema could not be read.`); return; }
+    const res = resolveRefs([...r.doc.objects, ...Object.keys(r.doc.positions)], layoutIndexOf(whole).index, model);
+    const doc = normalizeForTab(r.doc, res);
+    setShell((s) => openLayoutTab(s, { doc, source: 'file', fileName: r.fileName, dirty: false }));
+    const unresolved = doc.objects.filter((o) => !res.resolved.has(o) && ![...res.resolved.values()].includes(o)).length;
+    onNotice?.(`Opened ${doc.name}: ${doc.objects.length - unresolved} cards${unresolved ? `, ${unresolved} missing` : ''}${r.positionsFrom === 'sidecar' ? ' · positions from the .ttrl sidecar' : ''}`);
   }
 
   // load a schema subject's graph (once) + its saved layout positions (from the ViewStateStore,
@@ -798,21 +837,22 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
             })()}
           </div>
         )}
+        {/* the layout actions (VL §5.4) — Open works with no tab open; the rest need a schema canvas */}
+        <div data-testid="layout-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderBottom: '1px solid #EDF2F9' }}>
+          <button data-testid="layout-open" title="Open a layout file (.yaml, .ttrg + .ttrl) — or drop it on the canvas"
+            onClick={() => void pickFiles(LAYOUT_FILE_ACCEPT, true).then(openLayoutFiles)} style={toolbarButton}>
+            Open layout…
+          </button>
+          <button data-testid="layout-relayout" title="Arrange the cards shown automatically (they keep the new positions)"
+            disabled={!(tab?.subject.kind === 'schema' && !tab.perspective && currentGraph)} onClick={() => void relayout()} style={toolbarButton}>
+            Re-layout
+          </button>
+        </div>
         {tab?.subject.kind === 'schema' && (
           <div
             data-testid="shell-subject-toolbar"
             style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderBottom: '1px solid #E5E7EB' }}
           >
-            {!tab.perspective && currentGraph && (
-              <button
-                data-testid="layout-relayout"
-                title="Arrange the cards shown automatically (they keep the new positions)"
-                onClick={() => void relayout()}
-                style={{ border: '1px solid #CBD8E6', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 12, padding: '3px 10px', color: '#33506e' }}
-              >
-                Re-layout
-              </button>
-            )}
             {canEdit && editContext?.renderToolbarActions({
               graphRef: tab.subject.ref,
               currentImports,
@@ -862,7 +902,18 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
             })}
           </div>
         )}
-        <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+        <div
+          data-testid="canvas-host"
+          style={{ flex: 1, minHeight: 0, position: 'relative' }}
+          // drop a layout file on the canvas = Open layout… (V-31)
+          onDragOver={(e) => { if (e.dataTransfer?.types?.includes('Files')) e.preventDefault(); }}
+          onDrop={(e) => {
+            const dropped = Array.from(e.dataTransfer?.files ?? []);
+            if (dropped.length === 0) return;
+            e.preventDefault();
+            void openLayoutFiles(dropped);
+          }}
+        >
           {!tab ? (
             <div data-testid="shell-no-tab" style={{ padding: 24, color: '#96989B' }}>Open a subject from the catalog.</div>
           ) : tab.subject.kind === 'program' ? (
