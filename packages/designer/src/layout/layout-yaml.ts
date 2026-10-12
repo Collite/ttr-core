@@ -31,7 +31,7 @@ const ROOT_KEYS = ['layout', 'name', 'model', 'objects', 'positions', 'skin', 'c
 const POINT_KEYS = ['x', 'y'] as const;
 
 /** Plain-scalar shape: the TTR id letters, digits, `_`, `.`, `-`; never a leading digit, dot or dash. */
-const PLAIN = /^[A-Za-z_À-ɏ][A-Za-z0-9_.À-ɏ-]*$/;
+const PLAIN = /^[A-Za-z_\u00C0-\u024F][A-Za-z0-9_.\u00C0-\u024F-]*$/;
 /** Words a YAML 1.1 or 1.2 reader resolves to a boolean or null when plain (compared lowercased). */
 const NOT_A_STRING = new Set(['true', 'false', 'yes', 'no', 'on', 'off', 'y', 'n', 'null']);
 

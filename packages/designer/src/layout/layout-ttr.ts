@@ -37,7 +37,7 @@ export const TTR_NON_ID_WORDS: ReadonlySet<string> = new Set([
 ]);
 
 /** The grammar's IDENT token: ASCII + Latin-1/Latin Extended-A/B letters, digits, underscore. */
-const IDENT_PART = /^[A-Za-z_À-ɏ][A-Za-z0-9_À-ɏ]*$/;
+const IDENT_PART = /^[A-Za-z_\u00C0-\u024F][A-Za-z0-9_\u00C0-\u024F]*$/;
 
 /** Whether `s` is a grammar `id` — `idPart ( '.' idPart )*` — and so may be written bare (V-12). */
 export function isTtrId(s: string): boolean {
@@ -89,8 +89,8 @@ class ScanError extends Error {
   }
 }
 
-const WORD_START = /[A-Za-z_À-ɏ]/;
-const WORD_CHAR = /[A-Za-z0-9_.À-ɏ]/;
+const WORD_START = /[A-Za-z_\u00C0-\u024F]/;
+const WORD_CHAR = /[A-Za-z0-9_.\u00C0-\u024F]/;
 const NUMBER = /-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?/y;
 
 function tokenize(src: string): Tok[] {
@@ -101,7 +101,7 @@ function tokenize(src: string): Tok[] {
   while (i < src.length) {
     const c = src[i];
     if (c === '\n') { line++; i++; continue; }
-    if (c === ' ' || c === '\t' || c === '\r' || c === '\f' || c === '﻿') { i++; continue; }
+    if (c === ' ' || c === '\t' || c === '\r' || c === '\f' || c === '\uFEFF') { i++; continue; }
     if (c === '/' && src[i + 1] === '/') {
       while (i < src.length && src[i] !== '\n') i++;
       continue;

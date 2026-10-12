@@ -51,13 +51,13 @@ Each sub-folder is one case:
   `positions`, `skin`, `collapsed`, in that order, empty optional keys omitted, an empty card list written
   `objects: []`. Lists in block style with two-space indent (`  - ref`), positions in flow style
   (`  ref: { x: 320, y: 180 }`). A string is written plain when it matches
-  `^[A-Za-z_À-ɏ][A-Za-z0-9_.À-ɏ-]*$` and is not, lowercased, one of `true false yes
+  `^[A-Za-z_\u00C0-\u024F][A-Za-z0-9_.\u00C0-\u024F-]*$` and is not, lowercased, one of `true false yes
   no on off y n null`; otherwise double-quoted, with `\` and `"` escaped by a backslash.
 - **TTR:** `graph <name> {`, then two-space indented `model: <model>,`, `objects: [ … ]` one ref per line
   (four spaces, comma-separated; `objects: []` when empty) and — only when there are positions —
   `layout: { nodes: { … } }` with one `ref: { x: N, y: N }` per line (six spaces, comma-separated); `}`.
   A ref is written bare when it is a TTR identifier (dot-separated parts, each matching
-  `[A-Za-z_À-ɏ][A-Za-z0-9_À-ɏ]*` and not one of the grammar keywords its `idPart` rule
+  `[A-Za-z_\u00C0-\u024F][A-Za-z0-9_\u00C0-\u024F]*` and not one of the grammar keywords its `idPart` rule
   does not admit — `text`, `date`, `true`, `null`, `description`, …), otherwise as a string literal with
   `\` and `"` escaped. A `.ttrg` never carries `skin`, `collapsed`, a viewport or edges.
 

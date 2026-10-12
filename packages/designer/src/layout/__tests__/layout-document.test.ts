@@ -28,7 +28,7 @@ describe('compareCodePoints (V-5 — code point, not locale)', () => {
 
   it('compares astral characters by code point, not by UTF-16 code unit', () => {
     // U+1F600 is a surrogate pair (D83D DE00) — code-unit order would put it before U+FF5E.
-    expect(['\u{1F600}', '～'].sort(compareCodePoints)).toEqual(['～', '\u{1F600}']);
+    expect(['\u{1F600}', '\uFF5E'].sort(compareCodePoints)).toEqual(['\uFF5E', '\u{1F600}']);
   });
 
   it('is a total order with a shorter prefix first', () => {

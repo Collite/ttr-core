@@ -100,7 +100,7 @@ describe('isTtrId — the grammar `id` rule, mirrored', () => {
       const alts = m[2].split('|').map((a) => a.replace(/->.*/, '').trim());
       const lits = alts.map((a) => /^'([^']*)'$/.exec(a)?.[1]);
       if (inIdPart.has(m[1]) || lits.some((l) => l === undefined)) continue;
-      for (const l of lits) if (/^[A-Za-z_À-ɏ][A-Za-z0-9_À-ɏ]*$/.test(l!)) words.add(l!);
+      for (const l of lits) if (/^[A-Za-z_\u00C0-\u024F][A-Za-z0-9_\u00C0-\u024F]*$/.test(l!)) words.add(l!);
     }
     expect([...TTR_NON_ID_WORDS].sort()).toEqual([...words].sort());
   });
