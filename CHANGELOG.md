@@ -6,6 +6,26 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **Studio Viewer (`@tatrman/designer`, image `ttr-viewer`)** — **layouts (VL-P1).** Pick the cards, place
+  them, save the picture (docs: *Operate → Deploy the Studio Viewer → Layouts*).
+  - The **Objects** panel: every card of the schema by package, with checkboxes, search, All · None ·
+    Neighbours · Invert and a *Missing* group; the whole schema's first change makes the tab an unsaved
+    layout. **Hop edges**: a dashed `…` edge between two shown cards joined through a hidden one, with an
+    inspector and **Show**. A **view menu** on a card (Expand (+n) · Expand all levels… · Hide · Hide others ·
+    Inspect) and on a hop edge (Show), beside the injected edit menu, never instead of it; shift-click
+    multi-select. A checked card is placed beside its neighbour; **Re-layout** runs ELK over what is shown.
+  - **Open layout…** (`.yaml`, or `.ttrg` + `.ttrl`; also by dropping a file) and **Save as…** (YAML or TTR,
+    the exact text shown first); commands `layout.open|saveAs|new|relayout`; a tab with unsaved layout
+    edits is marked `*` and guards a page leave. New runtime setting `VIEWER_LAYOUT_FORMAT` (`yaml` | `ttr`,
+    default `yaml`; anything else stops the container with exit 64).
+  - On a catalog: `layoutPersist` is now `'file'` (was `'none'`) — the tab holds the layout, **Save as…**
+    downloads it; the spine lists the layouts the catalog serves (`GET /model/layouts`,
+    `/model/layout?name=`, once a Veles serves them) after `db` and `er`, each with a shareable link. The
+    truth chip says where the layout lives (`layout: file · sales.yaml`, `layout: catalog · sales`). The
+    Export Layout button is gone (Save as… replaces it).
+  - Supporting changes: `@tatrman/lsp` `ModelGraphEdge.kind` gains `'hop'` (+ `via`) and `ModelGraphNode` an
+    optional `pkg`; `@tatrman/canvas-core` `CanvasEdge` carries `kind` / `via`; `@tatrman/tokens` gains
+    `canvas.edgeHop`.
 - **`ttr-parser` · `ttr-writer` · `ttr-metadata`** — **layout files (VL-P0).** A *layout* — a schema, the cards
   it shows, their positions — read and written as a `.ttrg` graph block with the in-file `layout:` block, its
   references resolved against the model (docs: *Model → Layout files*).

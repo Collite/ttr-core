@@ -124,6 +124,12 @@ const subjectOf = (item: CatalogItem): Subject => ({
 });
 
 const toolbarButton = { border: '1px solid #CBD8E6', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 12, padding: '3px 10px', color: '#33506e' } as const;
+/** a toolbar button's style, greyed out when there is nothing to act on */
+const toolbarStyle = (enabled: boolean, primary = false) => ({
+  ...toolbarButton,
+  ...(primary && enabled ? { background: '#16283F', color: '#fff', borderColor: '#16283F' } : {}),
+  ...(enabled ? {} : { opacity: 0.45, cursor: 'default' }),
+});
 
 /** No positions (a stable object, so the canvas does not re-run its layout on every render). */
 const NO_POSITIONS: Record<string, LayoutPoint> = {};
@@ -951,7 +957,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
         {/* the layout actions (VL §5.4) — Open works with no tab open; the rest need a schema canvas */}
         <div data-testid="layout-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderBottom: '1px solid #EDF2F9' }}>
           <button data-testid="layout-new" title="A new layout of what this tab shows" disabled={!canvasTab}
-            onClick={() => layoutActions.current.newLayout()} style={toolbarButton}>
+            onClick={() => layoutActions.current.newLayout()} style={toolbarStyle(canvasTab)}>
             New layout
           </button>
           <button data-testid="layout-open" title="Open a layout file (.yaml, .ttrg + .ttrl) — or drop it on the canvas"
@@ -959,11 +965,11 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
             Open layout…
           </button>
           <button data-testid="layout-save-as" title="Download this layout as YAML or TTR" disabled={!canvasTab}
-            onClick={() => layoutActions.current.saveAs()} style={{ ...toolbarButton, ...(canvasTab ? { background: '#16283F', color: '#fff', borderColor: '#16283F' } : {}) }}>
+            onClick={() => layoutActions.current.saveAs()} style={toolbarStyle(canvasTab, true)}>
             Save as…
           </button>
           <button data-testid="layout-relayout" title="Arrange the cards shown automatically (they keep the new positions)"
-            disabled={!(tab?.subject.kind === 'schema' && !tab.perspective && currentGraph)} onClick={() => void relayout()} style={toolbarButton}>
+            disabled={!(canvasTab && currentGraph)} onClick={() => void relayout()} style={toolbarStyle(!!(canvasTab && currentGraph))}>
             Re-layout
           </button>
         </div>

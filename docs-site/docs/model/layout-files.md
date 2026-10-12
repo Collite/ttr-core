@@ -9,6 +9,9 @@ A **layout** is a schema (`er` or `db`), the **cards** it shows — entities for
 `db` — and, optionally, their **positions**. It is written either as a YAML file or as a TTR `.ttrg`
 graph file; the two say the same thing in the same words, and every reader accepts both.
 
+You rarely write one by hand: the Studio Viewer draws it — pick the cards, drag them, **Save as…** — and
+opens one back ([Layouts in the Studio Viewer](../operate/studio-viewer.md#layouts-pick-place-save)).
+
 ## The document
 
 | field | required | what it is |

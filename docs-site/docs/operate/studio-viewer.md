@@ -5,8 +5,9 @@
 
 The **Studio Viewer** is the open, read-only view of a Tatrman model. In *catalog mode* it reads the
 model a Veles instance serves, through Veles' JSON read API, and draws the ER and DB graphs, with an
-inspector and search on top. It never writes anything: there is no edit, no layout save, and no call
-outside the read routes listed below.
+inspector and search on top. It never writes anything to the server: there is no edit, and no call
+outside the read routes listed below. A picture you arrange — which cards, where — is a *layout*, and
+it leaves the viewer only as a download (see [Layouts](#layouts-pick-place-save)); git is how it is shared.
 
 It ships as one container image: a static bundle behind nginx.
 
@@ -35,12 +36,13 @@ and nothing depends on a query parameter. The entrypoint refuses a value it cann
 | `VIEWER_CATALOG_UPSTREAM` | unset | Veles' HTTP origin, e.g. `http://veles.ttr-server.svc:7260`. When set, nginx proxies `<base>veles/` to it, **read routes only** (see below). When unset, `<base>veles/` answers `503` with a JSON error. |
 | `VIEWER_DEFAULT_LANG` | unset | The language for model labels and descriptions when neither the URL nor the user picked one. Unset means the browser's language, then `en`. |
 | `VIEWER_LANGUAGES` | unset | Extra languages the language picker offers, comma-separated (`en,cs`). The model's own labels add theirs. |
+| `VIEWER_LAYOUT_FORMAT` | `yaml` | The format **Save as…** offers first: `yaml` or `ttr`. Once a user picks one, their choice wins in that browser. |
 | `VIEWER_PORT` | `8080` | The listen port. |
 
 The entrypoint renders these into two files the app reads:
 
-- `<base>config.json` — `{ "basePath", "veles", "lang", "languages" }`, fetched once before the first
-  render.
+- `<base>config.json` — `{ "basePath", "veles", "lang", "languages", "layoutFormat" }`, fetched once
+  before the first render.
 - `<base>index.html` — with `<base href="<base>">`, so every asset URL resolves under the prefix.
 
 ### URLs
@@ -86,6 +88,37 @@ buttons and headings stay English.
     The labels, descriptions and relation endpoints are fields of Veles' JSON read API from the
     release after `0.11.7` (Collite/ttr-server#185). Against an older Veles the viewer still works,
     but it shows identifiers, and relations appear as cards of their own instead of edges.
+
+## Layouts: pick, place, save
+
+A schema opens whole: every entity (or table) the catalog serves, laid out automatically. To draw a
+smaller picture, use the **Objects** panel on the left of the canvas — every card of the schema, grouped
+by package, each with a checkbox. Uncheck what you do not need; search narrows the list (label,
+identifier, qualified name, package), and **All · None · Neighbours · Invert** act on it. The first such
+change turns the tab into a new layout, `er · untitled`, marked `*` while it has unsaved changes.
+
+- **Relations through hidden cards.** When two shown cards are joined only through a card you hid, a
+  dashed **`…`** edge connects them (`… ×2` when there are several such cards). Click it: the inspector
+  names the hidden card(s) and the two relations each joins, with **Show** to bring one back.
+- **Right-click a card** for **Expand (+n)** (add its direct neighbours), **Expand all levels…** (everything
+  reachable through hidden cards, after a confirmation that says how many), **Hide**, **Hide others**
+  (keep the card and its visible neighbours) and **Inspect**. Shift-click selects several cards; the menu
+  then acts on all of them. Each row of the panel offers Expand and Hide on hover too.
+- **Drag** cards where you want them. A card you check later is placed beside its nearest visible
+  neighbour, and nothing you placed moves. **Re-layout** arranges everything shown automatically.
+- **Save as…** downloads the layout as **YAML** (`<name>.yaml`) or **TTR** (`<name>.ttrg`), showing the
+  exact text first. The name follows the graph-name rule: letters, digits and underscore, not starting
+  with a digit. The TTR form does not carry the notation (skin); the dialog says so.
+- **Open layout…** (or drop a file on the canvas) reads a `.yaml`, or a `.ttrg` together with its `.ttrl`
+  sidecar, and opens it in a new tab. Objects can be named in any of the forms the
+  [layout format](../model/layout-files.md) accepts, bare names included; a name the model does not have
+  is listed under **Missing** in the panel, kept until you remove it.
+
+The truth chip above the canvas says where the picture lives: `layout: file · unsaved`,
+`layout: file · sales.yaml`, `layout: catalog · sales`. Nothing of this is stored on the server; leaving
+the page with unsaved changes asks first. A downloaded layout file is shared the way the model is: commit
+it next to the model, and a catalog that serves layouts lists it in the spine as `er · <name>` for
+everyone, with a link of its own. A layout opened from your disk has no shareable link.
 
 ## The catalog proxy: read routes only
 

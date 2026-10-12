@@ -151,6 +151,9 @@ importers:
       vitest:
         specifier: ^4.1.6
         version: 4.1.6(@types/node@22.19.19)(jsdom@29.1.1)(vite@6.4.2(@types/node@22.19.19)(jiti@1.21.7)(tsx@4.22.0)(yaml@2.9.1))
+      vscode-languageserver:
+        specifier: ^9.0.1
+        version: 9.0.1
 
   packages/edit:
     dependencies:
