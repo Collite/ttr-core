@@ -107,9 +107,12 @@ export const activeTab = (state: ShellState): SubjectTab | null =>
 
 // ---- the working layout (VL contracts §5: V-22, V-28, V-30, V-35) ----
 
-/** A layout tab's subject ref (V-35): a catalog layout is addressed by its name, a local one by `file:` / `new:`. */
+/**
+ * A layout tab's subject ref (V-35, A-VL-4): `layout:<name>` for a catalog layout, `file:<name>` / `new:<name>`
+ * for a local one — never the bare name, which a schema subject (`er`, `db`) may share.
+ */
 export function layoutRef(source: LayoutSource, name: string): string {
-  return source === 'catalog' ? name : `${source}:${name}`;
+  return `${source === 'catalog' ? 'layout' : source}:${name}`;
 }
 
 /** The subject a layout tab shows: `<model> · <name>`. */

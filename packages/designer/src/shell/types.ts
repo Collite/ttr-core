@@ -64,7 +64,7 @@ export interface CatalogItem {
   label: string;
   schemaCode?: SchemaCode;
   packageName?: string | null;
-  /** a layout the catalog serves (VL V-34): opened through `getLayoutDoc(name)`, its ref is the name */
+  /** a layout the catalog serves (VL V-34): opened through `getLayoutDoc(name)`, its ref is `layout:<name>` (V-35) */
   layout?: { name: string; missingCount: number };
 }
 

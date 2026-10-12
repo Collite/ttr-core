@@ -6,6 +6,7 @@
 
 import type { SchemaCode } from '@tatrman/canvas-core';
 import type { CatalogItem, CatalogGroup, SubjectKind } from './types.js';
+import { layoutRef } from './shell-state.js';
 
 /** One graph as reported by `listCatalog` (contracts §6). `schema` is a free string — the
  *  backend-agnostic `CatalogGraphMeta` shape; `RENDERABLE_SCHEMAS` narrows it to a subject kind. */
@@ -59,8 +60,9 @@ export function buildCatalog(graphs: GraphMeta[], symbols: SymbolMeta[]): Catalo
     const schemaCode = g.schema as SchemaCode; // narrowed by RENDERABLE_SCHEMAS
     if (g.layout) {
       const missing = g.layout.missingCount > 0 ? ` · ${g.layout.missingCount} missing` : '';
+      const ref = layoutRef('catalog', g.name);
       layouts.push({
-        ref: g.uri, qname: g.uri, kind: 'schema', label: `${g.schema} · ${g.name}${missing}`, schemaCode, packageName: null,
+        ref, qname: ref, kind: 'schema', label: `${g.schema} · ${g.name}${missing}`, schemaCode, packageName: null,
         layout: { name: g.name, missingCount: g.layout.missingCount },
       });
       continue;

@@ -223,20 +223,27 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     set: (tabId, st) => setShell((s) => setLayoutPositions(s, tabId, st.positions, { collapsed: st.collapsed })),
   }), []);
 
-  /** The whole graph of schema `code` (VL V-21): held, in flight, or read now — one read per schema. */
+  /**
+   * The whole graph of schema `code` (VL V-21): held, in flight, or read now — one read per schema. A
+   * failed read is not kept: the next open (a tab, a layout) reads again.
+   */
   function loadSchemaGraph(code: string): Promise<GetGraphResponse | null> {
     if (schemaGraphs[code] !== undefined) return Promise.resolve(schemaGraphs[code]);
     const inFlight = schemaLoadingRef.current.get(code);
     if (inFlight) return inFlight;
     if (!dataSource.getSchemaGraph || (code !== 'db' && code !== 'er' && code !== 'md' && code !== 'cnc')) return Promise.resolve(null);
     const held = graphs[code]; // a catalog's schema subject IS the whole schema
-    const read = held
+    const read: Promise<GetGraphResponse | null | 'failed'> = held
       ? Promise.resolve(held)
       : dataSource.getSchemaGraph(code).catch((e) => {
           onError?.(`Failed to read the ${code} schema: ${e}`);
-          return null;
+          return 'failed' as const;
         });
     const p = read.then((g) => {
+      if (g === 'failed') {
+        schemaLoadingRef.current.delete(code);
+        return null;
+      }
       setSchemaGraphs((m) => ({ ...m, [code]: g }));
       return g;
     });
@@ -250,25 +257,24 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   /**
    * Open a layout the catalog serves (V-34, V-36): read it, re-resolve it against the schema's whole graph
    * (a stale catalog cannot show a card the current graph lacks) and open a `catalog` tab. A layout the
-   * catalog does not have (404) or cannot serve is an error toast — never a blank tab.
+   * catalog does not have (404) or cannot serve — or serves short of the §6 shape — is an error toast,
+   * never a blank tab.
    */
   async function openCatalogLayout(name: string) {
     if (!dataSource.getLayoutDoc) return;
-    let served: Awaited<ReturnType<NonNullable<ModelDataSource['getLayoutDoc']>>>;
     try {
-      served = await dataSource.getLayoutDoc(name);
+      const served = await dataSource.getLayoutDoc(name);
+      const whole = await loadSchemaGraph(served.schema);
+      if (!whole) { onError?.(`Could not open the layout ${name}: the ${served.schema} schema could not be read.`); return; }
+      const objects = [...served.objects, ...served.missing, ...served.ambiguous.map((a) => a.ref)];
+      const raw: LayoutDocument = { name: served.name, model: served.schema as LayoutDocument['model'], objects, positions: served.positions };
+      if (served.skin) raw.skin = served.skin;
+      if (served.collapsed.length > 0) raw.collapsed = served.collapsed;
+      const res = resolveRefs([...objects, ...Object.keys(served.positions)], layoutIndexOf(whole).index, raw.model);
+      setShell((s) => openLayoutTab(s, { doc: normalizeForTab(raw, res), source: 'catalog', dirty: false }));
     } catch (e) {
       onError?.(`Could not open the layout ${name}: ${e instanceof Error ? e.message : String(e)}`);
-      return;
     }
-    const whole = await loadSchemaGraph(served.schema);
-    if (!whole) { onError?.(`Could not open the layout ${name}: the ${served.schema} schema could not be read.`); return; }
-    const objects = [...served.objects, ...served.missing, ...served.ambiguous.map((a) => a.ref)];
-    const raw: LayoutDocument = { name: served.name, model: served.schema as LayoutDocument['model'], objects, positions: served.positions };
-    if (served.skin) raw.skin = served.skin;
-    if (served.collapsed.length > 0) raw.collapsed = served.collapsed;
-    const res = resolveRefs([...objects, ...Object.keys(served.positions)], layoutIndexOf(whole).index, raw.model);
-    setShell((s) => openLayoutTab(s, { doc: normalizeForTab(raw, res), source: 'catalog', dirty: false }));
   }
 
   /**
@@ -804,8 +810,13 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
         .sort((a, b) => compareAlphabetical(a.ref, b.ref))
     : []), [projection]);
 
-  // a drag on a layout tab → its positions, by full qname (V-28), keeping the missing cards' ones
+  // a drag on a layout tab → its positions, by full qname (V-28), keeping the missing cards' ones. A
+  // display-mode switch re-emits the canvas's positions too: an `auto` one is the canvas's own layout
+  // (the layout stays auto, V-2), a `manual` one that moves nothing leaves the layout clean.
   function persistLayoutView(tabId: string, change: CanvasViewChange) {
+    if (change.mode !== 'manual') return;
+    const given = layoutNodePositions ?? NO_POSITIONS;
+    if (Object.entries(change.positions).every(([id, p]) => given[id]?.x === p.x && given[id]?.y === p.y)) return;
     const l = shellRef.current.tabs.find((t) => t.id === tabId)?.layout;
     if (!l || !wholeIndex) return;
     const next: Record<string, LayoutPoint> = { ...l.doc.positions };
@@ -814,6 +825,16 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
       if (fq) next[fq] = { x: p.x, y: p.y };
     }
     void layoutStore.write(tabId, { skin: l.doc.skin ?? 'er.crow', mode: 'manual', nodes: next, collapsed: l.doc.collapsed ?? [] });
+  }
+
+  // a drag on a plain subject → the store, and the shell's own copy: the first selection edit (V-22),
+  // Save as… and New layout start from it (a backend without a store keeps the drags only here). An
+  // `auto` change is a display-mode switch re-emitting the canvas's own layout — nothing to keep, and an
+  // auto canvas with nodes is a `.ttrl` the designer server's own loader refuses.
+  function persistSubjectView(ref: string, change: CanvasViewChange) {
+    if (change.mode !== 'manual') return;
+    setPositions((m) => ({ ...m, [ref]: change.positions }));
+    void persistView(ref, change);
   }
 
   const currentGraph = useMemo(() => {
@@ -1118,7 +1139,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
               renderNodeMenu={canEdit && editContext
                 ? (qname, close) => editContext.renderNodeMenu({ qname, graphRef: tab.subject.ref, onApplied: () => void refetchGraph(tab.subject.ref), onClose: close })
                 : undefined}
-              onPersistView={(change) => (tabLayout ? persistLayoutView(tab.id, change) : void persistView(tab.subject.ref, change))}
+              onPersistView={(change) => (tabLayout ? persistLayoutView(tab.id, change) : persistSubjectView(tab.subject.ref, change))}
               onDrillIn={(id, label) => setShell((s) => drillIn(s, s.activeTabId!, { id, label }))}
               bindingHints={isErTab ? bindingHints : undefined}
               showBindings={isErTab && showBindings}

@@ -177,6 +177,39 @@ describe('readTtrg / mergeTtr (V-11)', () => {
     expect(auto.doc.positions[STORE]).toEqual({ x: 580, y: 180 });
   });
 
+  it('a sidecar the Studio’s WS store wrote (`canvas main`) is read; a canvas named after the graph wins over it', () => {
+    const ttrg = writeTtrg(POSITIONED);
+    const canvas = (key: string, x: number) => `canvas ${key} {\n    mode: manual\n    nodes: {\n        "${ITEM}": { x: ${x}, y: 2 }\n    }\n}\n`;
+    const main = ok(mergeTtr(ttrg, `ttrl 1\n\n${canvas('main', 1)}`));
+    expect(main.positionsFrom).toBe('sidecar');
+    expect(main.doc.positions).toEqual({ [ITEM]: { x: 1, y: 2 } });
+    expect(main.warnings).toEqual([]);
+
+    const both = ok(mergeTtr(ttrg, `ttrl 1\n\n${canvas('main', 1)}\n${canvas('sales_overview', 5)}`));
+    expect(both.doc.positions).toEqual({ [ITEM]: { x: 5, y: 2 } });
+  });
+
+  it('what the sidecar holds beyond the graph is dropped with a warning, not an error (A-VL-3)', () => {
+    const ttrg = writeTtrg(POSITIONED);
+    const gone = 'hartland.er.entity.customer';
+    const stale = ok(mergeTtr(ttrg, `ttrl 1\n\ncanvas sales_overview {\n    mode: manual\n    nodes: {\n        "${gone}": { x: 9, y: 9 }\n        "${ITEM}": { x: 1, y: 2 }\n    }\n}\n`));
+    expect(stale.positionsFrom).toBe('sidecar');
+    expect(stale.doc.positions).toEqual({ [ITEM]: { x: 1, y: 2 } });
+    expect(stale.warnings).toEqual([{ path: `ttrl.nodes.${gone}`, message: `the sidecar positions ${gone}, which the graph does not list — dropped` }]);
+
+    const onlyStale = ok(mergeTtr(ttrg, `ttrl 1\n\ncanvas sales_overview {\n    mode: manual\n    nodes: {\n        "${gone}": { x: 9, y: 9 }\n    }\n}\n`));
+    expect(onlyStale.positionsFrom).toBe('in-file');
+    expect(onlyStale.doc.positions[STORE]).toEqual({ x: 580, y: 180 });
+
+    const auto = ok(mergeTtr(ttrg, `ttrl 1\n\ncanvas sales_overview {\n    mode: auto\n    nodes: {\n        "${ITEM}": { x: 1, y: 2 }\n    }\n}\n`));
+    expect(auto.positionsFrom).toBe('in-file');
+    expect(auto.doc.positions[ITEM]).not.toEqual({ x: 1, y: 2 });
+    expect(auto.warnings).toEqual([{ path: 'ttrl', message: "the sidecar's canvas sales_overview is `mode: auto` — its nodes are not positions" }]);
+
+    const unstated = ok(mergeTtr(ttrg, `ttrl 1\n\ncanvas sales_overview {\n    nodes: {\n        "${ITEM}": { x: 1, y: 2 }\n    }\n}\n`));
+    expect(unstated.doc.positions).toEqual({ [ITEM]: { x: 1, y: 2 } }); // no `mode` stated — TtrlLoader takes the nodes too
+  });
+
   it('reads the worker mode block shape (no commas, 4-space indent, a viewport) and drops the viewport (C1-b)', () => {
     const worker = [
       'import hartland',
@@ -241,13 +274,14 @@ describe('readTtrg / mergeTtr (V-11)', () => {
 describe('readTtrl', () => {
   it('reads every canvas: skin, mode, nodes, collapsed; chains are TTR-P-only and skipped', () => {
     const r = readTtrl(
-      'ttrl 1\n\ncanvas a {\n    skin: "er.crow"\n    mode: manual\n    nodes: {\n        "x.y": { x: 1, y: -2 }\n    }\n    collapsed: ["x.y"]\n    chains: {\n        "s": 2\n    }\n}\n\ncanvas b {\n    mode: auto\n}\n',
+      'ttrl 1\n\ncanvas a {\n    skin: "er.crow"\n    mode: manual\n    nodes: {\n        "x.y": { x: 1, y: -2 }\n    }\n    collapsed: ["x.y"]\n    chains: {\n        "s": 2\n    }\n}\n\ncanvas b {\n    mode: auto\n}\n\ncanvas c {\n}\n',
     );
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.canvases).toEqual([
       { key: 'a', skin: 'er.crow', mode: 'manual', nodes: { 'x.y': { x: 1, y: -2 } }, collapsed: ['x.y'] },
       { key: 'b', mode: 'auto', nodes: {}, collapsed: [] },
+      { key: 'c', nodes: {}, collapsed: [] },
     ]);
   });
 

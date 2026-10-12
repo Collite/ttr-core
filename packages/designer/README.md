@@ -115,7 +115,7 @@ The shell features are the same on every backend:
   `VIEWER_LAYOUT_FORMAT` (`yaml`), then the user's last choice. Commands `layout.open|saveAs|new|relayout`
   in ⌘K and on the tab's context menu.
 - **Served layouts** — on a catalog, the spine lists `db`, `er`, then `<model> · <name>` per layout the
-  catalog serves (`GET /model/layouts`, `/model/layout?name=`), with a shareable `/w/<ws>/s/<name>` link.
+  catalog serves (`GET /model/layouts`, `/model/layout?name=`), with a shareable `/w/<ws>/s/layout:<name>` link.
 
 Where a drag goes depends on the backend (`capabilities.layoutPersist`, `src/data/view-state-store.ts`):
 

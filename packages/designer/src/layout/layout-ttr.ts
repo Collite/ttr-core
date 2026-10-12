@@ -328,7 +328,8 @@ export function parseTtrg(text: string): { graph?: RawTtrGraph; errors: LayoutIs
 export interface TtrlCanvasBlock {
   key: string;
   skin?: string;
-  mode: 'auto' | 'manual';
+  /** as the block states it — absent when it does not (`TtrlLoader` objects to nodes only under a stated `auto`) */
+  mode?: 'auto' | 'manual';
   nodes: Record<string, LayoutPoint>;
   collapsed: string[];
 }
@@ -358,7 +359,7 @@ export function readTtrl(text: string): TtrlReadResult {
         throw new ScanError({ path: 'ttrl', message: 'expected `canvas <key> {`', line: kw.line });
       }
       c.expect('{', { path: 'ttrl', message: 'expected `canvas <key> {`', line: kw.line });
-      const canvas: TtrlCanvasBlock = { key: key.text, mode: 'auto', nodes: {}, collapsed: [] };
+      const canvas: TtrlCanvasBlock = { key: key.text, nodes: {}, collapsed: [] };
       for (;;) {
         if (c.is('}')) { c.next(); break; }
         if (c.is(',')) { c.next(); continue; }
@@ -413,8 +414,11 @@ export type TtrReadResult =
 
 /**
  * A `.ttrg` and, optionally, its sibling `.ttrl` → one layout document (V-11). Positions come from the
- * sidecar's `canvas <graph name>` when it has nodes (the sidecar wins), else from the in-file block.
- * The sidecar also contributes `skin` and `collapsed`, which the `.ttrg` block cannot carry.
+ * sidecar's `canvas <graph name>` — else its `canvas main`, the name the Studio's WS store writes for a
+ * single-canvas document — when it has nodes (the sidecar wins), else from the in-file block. The
+ * sidecar also contributes `skin` and `collapsed`, which the `.ttrg` block cannot carry. It is view state
+ * the designer server writes and never prunes, so what it holds beyond the graph is dropped with a warning
+ * rather than failing the pair (A-VL-3): nodes under a stated `mode: auto`, and keys the graph does not list.
  */
 export function mergeTtr(ttrgText: string, ttrlText?: string, opts: ReadOptions = {}): TtrReadResult {
   const parsed = parseTtrg(ttrgText);
@@ -432,12 +436,22 @@ export function mergeTtr(ttrgText: string, ttrlText?: string, opts: ReadOptions 
     const side = readTtrl(ttrlText);
     if (!side.ok) return { ok: false, errors: side.errors, warnings: [...warnings, ...side.warnings] };
     warnings.push(...side.warnings);
-    const canvas = side.canvases.find((cv) => cv.key === g.name);
+    const canvas = side.canvases.find((cv) => cv.key === g.name) ?? side.canvases.find((cv) => cv.key === 'main');
     if (!canvas) {
       warnings.push({ path: 'ttrl', message: `the sidecar has no canvas ${g.name} — its positions are not used` });
     } else {
-      if (Object.keys(canvas.nodes).length > 0) {
-        positions = canvas.nodes;
+      const auto = canvas.mode === 'auto';
+      if (auto && Object.keys(canvas.nodes).length > 0) {
+        warnings.push({ path: 'ttrl', message: `the sidecar's canvas ${canvas.key} is \`mode: auto\` — its nodes are not positions` });
+      }
+      const listed = new Set(g.objects);
+      const kept: Record<string, LayoutPoint> = {};
+      for (const [key, p] of auto ? [] : Object.entries(canvas.nodes)) {
+        if (listed.has(key)) kept[key] = p;
+        else warnings.push({ path: `ttrl.nodes.${key}`, message: `the sidecar positions ${key}, which the graph does not list — dropped` });
+      }
+      if (Object.keys(kept).length > 0) {
+        positions = kept;
         positionsFrom = 'sidecar';
         for (const k of Object.keys(positionLines)) delete positionLines[k];
       }

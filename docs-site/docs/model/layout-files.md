@@ -85,7 +85,10 @@ graph sales_overview {
   are positions. It never writes `skin` or `collapsed` (the graph block cannot carry them), a viewport, or
   edges.
 - A reader also accepts the positions in a **`.ttrl` sidecar** next to the `.ttrg` — `<name>.ttrl` with a
-  `canvas <name> { … }` block. When both carry positions, **the sidecar wins**; it also supplies the skin.
+  `canvas <name> { … }` block, or the `canvas main { … }` block the Studio writes when it has no canvas named
+  after the graph. When both carry positions, **the sidecar wins**; it also supplies the skin. A sidecar is view
+  state the Studio rewrites as you work, so a position for a card the graph no longer lists, or nodes under
+  `mode: auto`, are dropped with a warning instead of failing the file.
 - References are written bare, as TTR identifiers (Czech letters included: `hartland.er.entity.zákazník`).
   A reference that is not an identifier — only ever one the model does not have, such as a label typed by
   hand — is written as a quoted string. Layout readers accept it; the TTR language server reports it as a

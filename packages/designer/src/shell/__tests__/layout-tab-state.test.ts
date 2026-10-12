@@ -17,8 +17,8 @@ function layout(over: Partial<TabLayout> = {}, docOver: Partial<TabLayout['doc']
 }
 
 describe('layout tab refs (V-35)', () => {
-  it('a catalog layout is addressed by its name, a local one by file: / new:', () => {
-    expect(layoutRef('catalog', 'sales_overview')).toBe('sales_overview');
+  it('a catalog layout is addressed by layout:, a local one by file: / new: — never the bare name (A-VL-4)', () => {
+    expect(layoutRef('catalog', 'sales_overview')).toBe('layout:sales_overview');
     expect(layoutRef('file', 'sales_overview')).toBe('file:sales_overview');
     expect(layoutRef('new', 'untitled')).toBe('new:untitled');
   });
@@ -28,7 +28,7 @@ describe('openLayoutTab', () => {
   it('opens a durable tab labelled <model> · <name> and focuses it', () => {
     const s = openLayoutTab(emptyShell, layout());
     const t = activeTab(s)!;
-    expect(t.subject).toEqual({ ref: 'sales_overview', kind: 'schema', schemaCode: 'er', label: 'er · sales_overview' });
+    expect(t.subject).toEqual({ ref: 'layout:sales_overview', kind: 'schema', schemaCode: 'er', label: 'er · sales_overview' });
     expect(t.preview).toBe(false);
     expect(t.layout?.source).toBe('catalog');
   });

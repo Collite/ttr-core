@@ -2,7 +2,7 @@
 // VL-P1 T9 — the spine, the address and the data seam (VL contracts V-34…V-36): both Veles sources read
 // GET /model/layouts and /model/layout?name=; the spine lists the schemas, then the served layouts by model
 // then name with `· n missing`; opening one re-resolves and projects it; a 404 is a toast, not a blank tab;
-// a catalog layout is addressed by its name (a shareable link), a local file by `file:` (no link).
+// a catalog layout is addressed by `layout:<name>` (a shareable link), a local file by `file:` (no link).
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react';
@@ -106,16 +106,76 @@ describe('the spine (V-34)', () => {
     expect(errors[0]).toMatch(/^Could not open the layout positions: Veles \/model\/layout\?name=positions → 404/);
     expect(screen.queryByTestId('subject-tab')).toBeNull();
   });
+
+  it('a served layout short of the §6 shape is a toast too — not a silent nothing', async () => {
+    const errors: string[] = [];
+    const short: Record<string, unknown> = { ...positionsLayout };
+    delete short.ambiguous;
+    await mountCatalog({ ...ROUTES, '/model/layout?name=positions': short }, errors);
+    fireEvent.click(item('er · positions · 1 missing'));
+    await waitFor(() => expect(errors).toHaveLength(1));
+    expect(errors[0]).toMatch(/^Could not open the layout positions: /);
+    expect(screen.queryByTestId('subject-tab')).toBeNull();
+  });
+
+  it('a schema read that fails is not kept — opening the layout again reads it again', async () => {
+    const errors: string[] = [];
+    const { source } = fakeVeles(ROUTES);
+    const read = source.getSchemaGraph.bind(source);
+    let fail = true;
+    source.getSchemaGraph = (code) => {
+      if (!fail) return read(code);
+      fail = false;
+      return Promise.reject(new Error('502'));
+    };
+    const { graphs, symbols } = await source.listCatalog();
+    render(<ShellFrame dataSource={source} workspace="veles" catalog={buildCatalog(graphs, symbols)} files={[]} displayMode="just-names" onError={(m) => errors.push(m)} />);
+    fireEvent.click(item('db · db_tables · 2 missing'));
+    await waitFor(() => expect(errors).toEqual([
+      'Failed to read the db schema: Error: 502',
+      'Could not open the layout db_tables: the db schema could not be read.',
+    ]));
+    expect(screen.queryByTestId('subject-tab')).toBeNull();
+    fireEvent.click(item('db · db_tables · 2 missing'));
+    await waitFor(() => expect(attr('nodes')).toBe('db.dbo.item,db.dbo.store_sales'));
+    expect(errors).toHaveLength(2);
+  });
 });
 
 describe('the address (V-35)', () => {
-  it('a catalog layout’s ref is its name — the URL round-trips and a shared link opens it', async () => {
-    expect(parsePath(formatPath({ kind: 'subject', workspace: 'veles', subjectRef: 'positions' }))).toEqual({ kind: 'subject', workspace: 'veles', subjectRef: 'positions' });
-    window.history.replaceState(null, '', '/w/veles/s/positions');
+  it('a catalog layout’s ref is layout:<name> — the URL round-trips and a shared link opens it', async () => {
+    const ref = 'layout:positions';
+    expect(parsePath(formatPath({ kind: 'subject', workspace: 'veles', subjectRef: ref }))).toEqual({ kind: 'subject', workspace: 'veles', subjectRef: ref });
+    window.history.replaceState(null, '', '/w/veles/s/layout%3Apositions');
     await mountCatalog();
     await waitFor(() => expect(screen.getAllByTestId('subject-tab').map((t) => t.textContent)).toEqual(['er · positions×']));
-    expect(window.location.pathname).toBe('/w/veles/s/positions');
+    expect(window.location.pathname).toBe('/w/veles/s/layout%3Apositions');
     expect(screen.getByTestId('copy-federation-link')).toBeEnabled();
+  });
+
+  it('a layout named like a schema (`er`) is its own subject — the schema still opens, and its link opens the schema (A-VL-4)', async () => {
+    const named = {
+      ...ROUTES,
+      '/model/layouts': { ...layouts, layouts: [...layouts.layouts, { ...layouts.layouts[1], name: 'er', source: 'layouts/er.ttrg' }] },
+      '/model/layout?name=er': { ...positionsLayout, name: 'er', source: 'layouts/er.ttrg' },
+    };
+    const { source } = fakeVeles(named);
+    const { graphs, symbols } = await source.listCatalog();
+    const catalog = buildCatalog(graphs, symbols);
+    const refs = catalog.flatMap((g) => g.items).map((i) => i.ref);
+    expect(new Set(refs).size).toBe(refs.length);
+    expect(refs).toEqual(expect.arrayContaining(['er', 'layout:er']));
+
+    window.history.replaceState(null, '', '/w/veles/s/er');
+    render(<ShellFrame dataSource={source} workspace="veles" catalog={catalog} files={[]} displayMode="just-names" />);
+    await screen.findByTestId('objects-panel');
+    expect(screen.getAllByTestId('subject-tab').map((t) => t.textContent)).toEqual(['er×']);
+    fireEvent.click(item('er · er · 1 missing'));
+    await waitFor(() => expect(screen.getAllByTestId('subject-tab').map((t) => t.textContent)).toEqual(['er×', 'er · er×']));
+    expect(window.location.pathname).toBe('/w/veles/s/layout%3Aer');
+    fireEvent.click(item('er'));
+    await waitFor(() => expect(window.location.pathname).toBe('/w/veles/s/er'));
+    expect(screen.getAllByTestId('subject-tab')).toHaveLength(2);
   });
 
   it('a local file’s ref is file:<name> — the URL round-trips, the link is disabled with the reason', async () => {
