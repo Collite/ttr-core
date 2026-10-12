@@ -18,6 +18,7 @@
     "@tatrman/canvas-core": "workspace:*",
     "@tatrman/deep-links": "workspace:*",
     "@tatrman/lsp": "workspace:*",
+    "@tatrman/parser": "workspace:*",
     "@tatrman/perspectives": "workspace:*",
     "@tatrman/tokens": "workspace:*",
     "@xyflow/react": "^12.3.5",

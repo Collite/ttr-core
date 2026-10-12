@@ -22,7 +22,7 @@ package org.tatrman.ttr.parser.loader
  * the same reader, and grown [scan] / [parseLayoutBlock] / [parseObjectRefs] for the
  * in-file `layout: { nodes: { … } }` block. Those three use a small tokenizer that skips
  * comments and strings and reads bare or quoted keys (V-12) — the same approach as the
- * viewer's TypeScript reader (`packages/designer/src/layout/layout-ttr.ts`); the shared
+ * TypeScript reader (`@tatrman/parser/layout`, `packages/parser/src/layout/layout-ttr.ts`); the shared
  * vectors (`packages/package-sdk/schemas/layout-vectors/`) hold the two together.
  */
 object TtrgGraphReader {

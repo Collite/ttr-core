@@ -40,7 +40,7 @@ import { placeNew, centreOf, type Point, type Size } from '../model/placement.js
 import { modelGraphToCanvas, layoutAuto, type CanvasGraph, type SchemaCode } from '@tatrman/canvas-core';
 import { createSkinRegistry } from '../skins/index.js';
 import type { DesignerSkin } from '../canvas/skin-component.js';
-import { compareAlphabetical } from '../layout/layout-document.js';
+import { compareAlphabetical, type LayoutDocument, type LayoutPoint } from '@tatrman/parser/layout';
 import { ObjectsPanel, type MissingRef } from './ObjectsPanel.js';
 import { readLayoutFiles, normalizeForTab, LAYOUT_FILE_ACCEPT } from '../layout/open-files.js';
 import { resolveRefs } from '../layout/resolve.js';
@@ -48,9 +48,7 @@ import { modelKindHint } from '../data/capability-hints.js';
 import { pickFiles as pickFilesFromDisk, downloadFile as downloadToDisk } from '../fs/file-system.js';
 import { SaveAsDialog, layoutFileOf, layoutTextOf, type LayoutFormat } from './SaveAsDialog.js';
 import { getRuntimeConfig } from '../runtime-config.js';
-import type { LayoutDocument } from '../layout/layout-document.js';
 import type { ModelKind } from '../data/model-data-source.js';
-import type { LayoutPoint } from '../layout/layout-document.js';
 import { HopEdgeInspector } from './HopEdgeInspector.js';
 import { layoutChip } from './layout-chip.js';
 import { CatalogSpine } from './CatalogSpine.js';

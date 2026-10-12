@@ -3,10 +3,8 @@
 // (`.yaml` / `.yml`), or TTR — a `.ttrg`, with its `.ttrl` sidecar when picked together (the sidecar's
 // positions win, V-11). A `.ttrl` alone names no graph and is refused, naming the file it needs.
 
-import type { LayoutDocument, LayoutIssue } from './layout-document.js';
-import { fileStem } from './layout-document.js';
+import { fileStem, mergeTtr, type LayoutDocument, type LayoutIssue } from '@tatrman/parser/layout';
 import { readYaml } from './layout-yaml.js';
-import { mergeTtr } from './layout-ttr.js';
 import type { Resolution } from './resolve.js';
 
 export interface LayoutFileInput {

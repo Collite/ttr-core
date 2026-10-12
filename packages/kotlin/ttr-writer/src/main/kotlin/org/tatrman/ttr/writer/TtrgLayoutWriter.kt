@@ -6,7 +6,7 @@ import org.tatrman.ttr.parser.model.LayoutDocument
 
 /**
  * Canonical, byte-stable `.ttrg` emission of a layout (VL contracts §3, V-5, V-10…V-13) — the JVM twin
- * of the viewer's `writeTtrg` (`packages/designer/src/layout/layout-ttr.ts`); both reproduce the shared
+ * of `writeTtrg` (`@tatrman/parser/layout`, `packages/parser/src/layout/layout-ttr.ts`); both reproduce the shared
  * vectors' `layout.ttrg` byte for byte (`packages/package-sdk/schemas/layout-vectors/`).
  *
  * One graph block: `model`, the sorted `objects`, and — only when there are positions — the in-file

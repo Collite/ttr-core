@@ -18,7 +18,7 @@ import {
   type LayoutPoint,
   type LayoutReadResult,
   type ReadOptions,
-} from './layout-document.js';
+} from '@tatrman/parser/layout';
 
 /** The docs page every written file links to (V-7). */
 export const LAYOUT_DOCS_URL = 'https://docs.tatrman.org/model/layout-files/';

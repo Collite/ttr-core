@@ -13,7 +13,7 @@
 // No card at any step ⇒ the ref names a relation / foreign key (the same four forms against the
 // schema's edges, or a qname whose kind segment says so) and is IGNORED (V-1), else it is MISSING.
 
-import { compareAlphabetical, sortAlphabetical } from './layout-document.js';
+import { compareAlphabetical, sortAlphabetical } from '@tatrman/parser/layout';
 
 /** One model object as resolution sees it. `fullQname` = `pkg` + `.` + `qname` (`fullQname()` format). */
 export interface LayoutIndexEntry {

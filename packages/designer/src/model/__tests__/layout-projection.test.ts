@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import type { GetGraphResponse, ModelGraphEdge, ModelGraphNode } from '@tatrman/lsp';
 import { ttrmToGetGraphResponse } from '../../data/structural-graph.js';
 import type { TtrmGraph } from '../../data/ttrm-types.js';
-import type { LayoutDocument } from '../../layout/layout-document.js';
+import type { LayoutDocument } from '@tatrman/parser/layout';
 import erFixture from '../../data/__tests__/fixtures/veles/hartland-er-graph.json';
 import dbFixture from '../../data/__tests__/fixtures/veles/hartland-db-graph.json';
 import {

@@ -6,6 +6,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
+import { BaseErrorListener, CharStream, CommonTokenStream, Token } from 'antlr4ng';
+import { TTRLexer } from '../../generated/TTRLexer.js';
+import { TTRParser } from '../../generated/TTRParser.js';
 import type { LayoutDocument } from '../layout-document.js';
 import { isTtrId, mergeTtr, parseTtrg, readTtrg, readTtrl, ttrUnwritable, writeTtrg, TTR_NON_ID_WORDS } from '../layout-ttr.js';
 
@@ -23,6 +26,29 @@ const POSITIONED: LayoutDocument = {
   objects: [SALES, ITEM, STORE],
   positions: { [STORE]: { x: 580, y: 180 }, [ITEM]: { x: 320, y: -40 } },
 };
+
+/** Whether the generated parser's `id` rule takes all of `s` — the oracle `isTtrId` is held to (the JVM's `TtrId`). */
+function grammarSaysId(s: string): boolean {
+  let bad = false;
+  class Flag extends BaseErrorListener {
+    override syntaxError(): void {
+      bad = true;
+    }
+  }
+  const lexer = new TTRLexer(CharStream.fromString(s));
+  lexer.removeErrorListeners();
+  lexer.addErrorListener(new Flag());
+  const tokens = new CommonTokenStream(lexer);
+  tokens.fill();
+  const all = tokens.getTokens().filter((tk) => tk.type !== Token.EOF);
+  // every character in a default-channel token: no skipped whitespace, no comment
+  if (bad || all.some((tk) => tk.channel !== Token.DEFAULT_CHANNEL) || all.reduce((n, tk) => n + (tk.text?.length ?? 0), 0) !== s.length) return false;
+  const parser = new TTRParser(tokens);
+  parser.removeErrorListeners();
+  parser.addErrorListener(new Flag());
+  parser.id();
+  return !bad && tokens.LA(1) === Token.EOF;
+}
 
 function ok(r: ReturnType<typeof readTtrg>) {
   if (!r.ok) throw new Error(JSON.stringify(r.errors));
@@ -88,20 +114,19 @@ describe('isTtrId — the grammar `id` rule, mirrored', () => {
     }
   });
 
-  it('TTR_NON_ID_WORDS is exactly the lexer keywords outside idPart in TTR.g4 (fails when the grammar moves)', () => {
-    const g4 = sample('packages/grammar/src/TTR.g4')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/\/\/[^\n]*/g, '');
-    const idPartBody = /\bidPart\s*:([\s\S]*?);/.exec(g4)![1];
-    const inIdPart = new Set(idPartBody.match(/\b[A-Z][A-Z0-9_]*\b/g));
-    const words = new Set<string>();
-    for (const m of g4.matchAll(/^\s*([A-Z][A-Z0-9_]*)\s*:\s*([^;]*?);/gm)) {
-      const alts = m[2].split('|').map((a) => a.replace(/->.*/, '').trim());
-      const lits = alts.map((a) => /^'([^']*)'$/.exec(a)?.[1]);
-      if (inIdPart.has(m[1]) || lits.some((l) => l === undefined)) continue;
-      for (const l of lits) if (/^[A-Za-z_\u00C0-\u024F][A-Za-z0-9_\u00C0-\u024F]*$/.test(l!)) words.add(l!);
-    }
-    expect([...TTR_NON_ID_WORDS].sort()).toEqual([...words].sort());
+  // the grammar's keyword-like literals: what the generated word set must classify as the parser does
+  const literals = () => new Set([...sample('packages/grammar/src/TTR.g4').matchAll(/'([A-Za-z_][A-Za-z0-9_]*)'/g)].map((m) => m[1]));
+
+  it('TTR_NON_ID_WORDS (generated from TTR.g4) holds exactly the literals the generated parser refuses as an `id`', () => {
+    const words = literals();
+    expect(words.size).toBeGreaterThan(TTR_NON_ID_WORDS.size);
+    expect([...TTR_NON_ID_WORDS].sort()).toEqual([...words].filter((w) => !grammarSaysId(w)).sort());
+  });
+
+  it('isTtrId agrees with the generated parser on every keyword, alone and as a qname part', () => {
+    const corpus = ['zákazník', 'hartland.er.entity.zákazník', 'Ωmega', 'a//b', 'a b', 'a-b', '9a', 'a..b', '_x9'];
+    for (const w of literals()) corpus.push(w, `hartland.er.entity.${w}`, `${w}.item`);
+    for (const s of corpus) expect(isTtrId(s), s).toBe(grammarSaysId(s));
   });
 });
 

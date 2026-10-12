@@ -13,7 +13,7 @@
 // the two and is the index the resolution rule (§4) runs against.
 
 import type { GetGraphResponse, ModelGraphEdge, ModelGraphNode } from '@tatrman/lsp';
-import { compareAlphabetical, sortAlphabetical, type LayoutDocument } from '../layout/layout-document.js';
+import { compareAlphabetical, sortAlphabetical, type LayoutDocument } from '@tatrman/parser/layout';
 import { resolveRefs, type Ambiguity, type LayoutIndexEntry, type LayoutModelIndex } from '../layout/resolve.js';
 
 /** A path through one hidden card, drawn as one dashed `…` edge (V-24). */
