@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.tatrman.org/model/layout.schema.json",
+  "title": "Tatrman layout (format 1)",
+  "description": "One named picture of a schema: the cards it shows and, optionally, where they sit. The YAML serialization of the Tatrman layout document; the same document is also written as a TTR `.ttrg` graph block. See https://docs.tatrman.org/model/layout-files/ and the shared test vectors in layout-vectors/.",
+  "type": "object",
+  "required": ["layout", "name", "model", "objects"],
+  "additionalProperties": false,
+  "properties": {
+    "layout": {
+      "description": "The format version. A reader that meets a higher version refuses the file: \"layout format N is newer than this reader\".",
+      "const": 1
+    },
+    "name": {
+      "description": "The layout's name — the `.ttrg` graph-name rule; a writer also uses it as the file stem.",
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "model": {
+      "description": "The schema the cards come from. `md` and `cnc` are admitted, untested.",
+      "enum": ["er", "db", "md", "cnc"]
+    },
+    "objects": {
+      "description": "The cards shown — entities (er), tables and views (db). A writer lists full qnames, sorted alphabetically (see the vectors' README); a reader resolves any form the resolution rule accepts.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/objectRef" }
+    },
+    "positions": {
+      "description": "Manual positions, keyed by a ref that is also in `objects`. Absent or empty means auto layout.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/objectRef" },
+      "additionalProperties": { "$ref": "#/$defs/point" }
+    },
+    "skin": {
+      "description": "The notation id (`er.crow`, `db.table-classic`).",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+    },
+    "collapsed": {
+      "description": "Reserved: carried, not acted on in format 1.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/objectRef" }
+    }
+  },
+  "$defs": {
+    "objectRef": {
+      "description": "A model object: a full qname `<pkg>.<qname>` (`hartland.er.entity.item`, `hartland.db.dbo.item`), or a shorter form the resolution rule accepts (`er.entity.item`, `entity.item`, `item`).",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+    },
+    "point": {
+      "type": "object",
+      "required": ["x", "y"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    }
+  }
+}

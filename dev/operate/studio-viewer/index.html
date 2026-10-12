@@ -736,6 +736,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../model/layout-files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Layout files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../model/why-model-is-the-artifact/" class="md-nav__link">
         
   
@@ -1238,6 +1266,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#layouts-pick-place-save" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layouts: pick, place, save
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-catalog-proxy-read-routes-only" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1475,6 +1514,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#layouts-pick-place-save" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layouts: pick, place, save
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-catalog-proxy-read-routes-only" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1576,8 +1626,9 @@
 <p><em>How-to. Run the read-only model viewer next to a Veles catalog.</em></p>
 <p>The <strong>Studio Viewer</strong> is the open, read-only view of a Tatrman model. In <em>catalog mode</em> it reads the
 model a Veles instance serves, through Veles' JSON read API, and draws the ER and DB graphs, with an
-inspector and search on top. It never writes anything: there is no edit, no layout save, and no call
-outside the read routes listed below.</p>
+inspector and search on top. It never writes anything to the server: there is no edit, and no call
+outside the read routes listed below. A picture you arrange — which cards, where — is a <em>layout</em>, and
+it leaves the viewer only as a download (see <a href="#layouts-pick-place-save">Layouts</a>); git is how it is shared.</p>
 <p>It ships as one container image: a static bundle behind nginx.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ghcr.io/collite/ttr-viewer:&lt;version&gt;
 </code></pre></div>
@@ -1650,6 +1701,11 @@ and nothing depends on a query parameter. The entrypoint refuses a value it cann
 <td>Extra languages the language picker offers, comma-separated (<code>en,cs</code>). The model's own labels add theirs.</td>
 </tr>
 <tr>
+<td><code>VIEWER_LAYOUT_FORMAT</code></td>
+<td><code>yaml</code></td>
+<td>The format <strong>Save as…</strong> offers first: <code>yaml</code> or <code>ttr</code>. Once a user picks one, their choice wins in that browser.</td>
+</tr>
+<tr>
 <td><code>VIEWER_PORT</code></td>
 <td><code>8080</code></td>
 <td>The listen port.</td>
@@ -1658,8 +1714,8 @@ and nothing depends on a query parameter. The entrypoint refuses a value it cann
 </table>
 <p>The entrypoint renders these into two files the app reads:</p>
 <ul>
-<li><code>&lt;base&gt;config.json</code> — <code>{ "basePath", "veles", "lang", "languages" }</code>, fetched once before the first
-  render.</li>
+<li><code>&lt;base&gt;config.json</code> — <code>{ "basePath", "veles", "lang", "languages", "layoutFormat" }</code>, fetched once
+  before the first render.</li>
 <li><code>&lt;base&gt;index.html</code> — with <code>&lt;base href="&lt;base&gt;"&gt;</code>, so every asset URL resolves under the prefix.</li>
 </ul>
 <h3 id="urls">URLs<a class="headerlink" href="#urls" title="Permanent link">&para;</a></h3>
@@ -1697,6 +1753,35 @@ buttons and headings stay English.</p>
 release after <code>0.11.7</code> (Collite/ttr-server#185). Against an older Veles the viewer still works,
 but it shows identifiers, and relations appear as cards of their own instead of edges.</p>
 </div>
+<h2 id="layouts-pick-place-save">Layouts: pick, place, save<a class="headerlink" href="#layouts-pick-place-save" title="Permanent link">&para;</a></h2>
+<p>A schema opens whole: every entity (or table) the catalog serves, laid out automatically. To draw a
+smaller picture, use the <strong>Objects</strong> panel on the left of the canvas — every card of the schema, grouped
+by package, each with a checkbox. Uncheck what you do not need; search narrows the list (label,
+identifier, qualified name, package), and <strong>All · None · Neighbours · Invert</strong> act on it. The first such
+change turns the tab into a new layout, <code>er · untitled</code>, marked <code>*</code> while it has unsaved changes.</p>
+<ul>
+<li><strong>Relations through hidden cards.</strong> When two shown cards are joined only through a card you hid, a
+  dashed <strong><code>…</code></strong> edge connects them (<code>… ×2</code> when there are several such cards). Click it: the inspector
+  names the hidden card(s) and the two relations each joins, with <strong>Show</strong> to bring one back.</li>
+<li><strong>Right-click a card</strong> for <strong>Expand (+n)</strong> (add its direct neighbours), <strong>Expand all levels…</strong> (everything
+  reachable through hidden cards, after a confirmation that says how many), <strong>Hide</strong>, <strong>Hide others</strong>
+  (keep the card and its visible neighbours) and <strong>Inspect</strong>. Shift-click selects several cards; the menu
+  then acts on all of them. Each row of the panel offers Expand and Hide on hover too.</li>
+<li><strong>Drag</strong> cards where you want them. A card you check later is placed beside its nearest visible
+  neighbour, and nothing you placed moves. <strong>Re-layout</strong> arranges everything shown automatically.</li>
+<li><strong>Save as…</strong> downloads the layout as <strong>YAML</strong> (<code>&lt;name&gt;.yaml</code>) or <strong>TTR</strong> (<code>&lt;name&gt;.ttrg</code>), showing the
+  exact text first. The name follows the graph-name rule: letters, digits and underscore, not starting
+  with a digit. The TTR form does not carry the notation (skin); the dialog says so.</li>
+<li><strong>Open layout…</strong> (or drop a file on the canvas) reads a <code>.yaml</code>, or a <code>.ttrg</code> together with its <code>.ttrl</code>
+  sidecar, and opens it in a new tab. Objects can be named in any of the forms the
+  <a href="../../model/layout-files/">layout format</a> accepts, bare names included; a name the model does not have
+  is listed under <strong>Missing</strong> in the panel, kept until you remove it.</li>
+</ul>
+<p>The truth chip above the canvas says where the picture lives: <code>layout: file · unsaved</code>,
+<code>layout: file · sales.yaml</code>, <code>layout: catalog · sales</code>. Nothing of this is stored on the server; leaving
+the page with unsaved changes asks first. A downloaded layout file is shared the way the model is: commit
+it next to the model, and a catalog that serves layouts lists it in the spine as <code>er · &lt;name&gt;</code> for
+everyone, with a link of its own. A layout opened from your disk has no shareable link.</p>
 <h2 id="the-catalog-proxy-read-routes-only">The catalog proxy: read routes only<a class="headerlink" href="#the-catalog-proxy-read-routes-only" title="Permanent link">&para;</a></h2>
 <p>The viewer's catalog calls are same-origin <code>fetch</code>es to <code>&lt;base&gt;veles/…</code>. With
 <code>VIEWER_CATALOG_UPSTREAM</code> set, the image's nginx forwards exactly these, <code>GET</code> only:</p>
