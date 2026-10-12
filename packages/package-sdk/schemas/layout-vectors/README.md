@@ -18,7 +18,7 @@ Each sub-folder is one case:
 |---|---|---|
 | `document.json` | the layout document, canonical: `name`, `model`, `objects` (sorted), `positions` (keys sorted, integer coordinates); `skin` / `collapsed` only when present | — the reference value |
 | `layout.yaml` | the YAML serialization | `writeYaml(document) == layout.yaml` **byte for byte**; `readYaml(layout.yaml) == document`; the file validates against `layout.schema.json` |
-| `layout.ttrg` | the TTR serialization — one `.ttrg` graph block, positions in its in-file `layout:` block | `writeTtrg(document) == layout.ttrg` byte for byte; `readTtrg(layout.ttrg) == document` on `name`, `model`, `objects`, `positions` (a `.ttrg` does not carry `skin` or `collapsed`) |
+| `layout.ttrg` | the TTR serialization — one `.ttrg` graph block, positions in its in-file `layout:` block; it parses with `TTR.g4`. **Absent** when the document has no TTR form (a ref that is not a TTR `id`, below) | `writeTtrg(document) == layout.ttrg` byte for byte; `readTtrg(layout.ttrg) == document` on `name`, `model`, `objects`, `positions` (a `.ttrg` does not carry `skin` or `collapsed`). When absent: `writeTtrg(document)` refuses, naming the refs |
 | `model.json` | the model index the case resolves against: `cards` (entities, tables, views) and `edges` (relations, foreign keys), each `{ fullQname, qname, kind, name, pkg, schema }` | — input to resolution |
 | `expect.json` | the resolution of `document.objects` against `model.json` for `document.model`: `resolved` (ref → full qname), `missing`, `ambiguous` (`{ ref, candidates }`), `ignored` — keys and lists in the canonical (alphabetical) order | `resolve(document.objects, model, document.model) == expect.json` |
 | `input.ttrg` + `input.ttrl` | (`sidecar-wins` only) a `.ttrg` and its `.ttrl` sidecar whose positions differ | reading the pair gives `document` — the sidecar's positions and skin win |
@@ -32,7 +32,8 @@ Each sub-folder is one case:
 | `diacritics` | Czech letters in qnames — written raw (UTF-8, never `\u` escapes) and bare in TTR (the grammar's identifiers admit U+00C0–U+024F); alphabetical order — `příjmové_pásmo` before `prodejna`, which code-point order would swap |
 | `bare-names` | the four reference forms, one per resolution step: full qname · `er.entity.store` · `entity.store_sales` · `item`; a position keyed by a bare name |
 | `ambiguous` | a name two packages define: the bare form and the `qname` form are ambiguous (both candidates listed, never guessed); the full qname still resolves |
-| `missing` | a ref the model does not have, and one that is not an identifier at all (`"Customer Address"` — a label, not a ref): both kept, both reported missing; the latter quoted in YAML and in TTR |
+| `missing` | a ref the model does not have, with a position: kept, reported missing, in both serializations |
+| `not-an-id` | refs that are not a TTR `id` — a label (`"Customer Address"`) and a qname whose last part is a keyword the grammar's `idPart` does not admit (`hartland.er.entity.date`): kept and reported missing, the label quoted in YAML; **no `layout.ttrg`** — the document has no TTR form and a TTR writer refuses it |
 | `relation-ignored` | relations listed in `objects` (hand-authored, sample style): ignored, never missing — one known to the model's `edges`, one recognised by its qname's `relation` segment |
 | `sidecar-wins` | a `.ttrg` with in-file positions plus a `.ttrl` sidecar with others: the sidecar wins and contributes the skin |
 | `db-tables` | a `db` layout: tables and a view by each form, a foreign key ignored, a bare name that is both an `er` entity and a `db` view resolving to the view; a hyphenated skin |
@@ -60,10 +61,11 @@ Each sub-folder is one case:
 - **TTR:** `graph <name> {`, then two-space indented `model: <model>,`, `objects: [ … ]` one ref per line
   (four spaces, comma-separated; `objects: []` when empty) and — only when there are positions —
   `layout: { nodes: { … } }` with one `ref: { x: N, y: N }` per line (six spaces, comma-separated); `}`.
-  A ref is written bare when it is a TTR identifier (dot-separated parts, each matching
-  `[A-Za-z_\u00C0-\u024F][A-Za-z0-9_\u00C0-\u024F]*` and not one of the grammar keywords its `idPart` rule
-  does not admit — `text`, `date`, `true`, `null`, `description`, …), otherwise as a string literal with
-  `\` and `"` escaped. A `.ttrg` never carries `skin`, `collapsed`, a viewport or edges.
+  Every ref is written bare: `TTR.g4` admits only an `id` in `objects: [ … ]` and as a `nodes` key — dot-separated
+  parts, each matching `[A-Za-z_\u00C0-\u024F][A-Za-z0-9_\u00C0-\u024F]*` and not one of the grammar keywords its
+  `idPart` rule does not admit (`text`, `date`, `true`, `null`, `description`, …). A document with any other ref
+  has no TTR form; a writer refuses it and names the refs (save it as YAML). A reader still accepts a quoted
+  ref or key. A `.ttrg` never carries `skin`, `collapsed`, a viewport or edges.
 
 The model indexes use the names of Hartland, Collite's public demo model (`hartland.er.entity.item`,
 `hartland.db.dbo.item`; the Czech names are Hartland's Czech labels). `ambiguous` splits it into two

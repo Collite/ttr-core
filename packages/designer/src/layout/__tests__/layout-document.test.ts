@@ -6,6 +6,7 @@ import {
   alphabeticalKey,
   canonicalize,
   compareAlphabetical,
+  sortAlphabetical,
   compareCodePoints,
   roundCoordinate,
   validateDocument,
@@ -20,6 +21,16 @@ const SALES = 'hartland.er.entity.store_sales';
 function doc(over: Partial<LayoutDocument> = {}): LayoutDocument {
   return { name: 'sales_overview', model: 'er', objects: [SALES, ITEM, STORE], positions: {}, ...over };
 }
+
+describe('sortAlphabetical — the same order, each key computed once (ttr-core#180 #7)', () => {
+  it('equals a sort by compareAlphabetical and leaves its input alone', () => {
+    const xs = ['zásoby', 'Item', 'čas', 'item_class', 'item', 'daň', 'cz', 'čb', 'adresa', 'C\u030Cas', '\uFF5E', '\uD83D\uDE00'];
+    const copy = [...xs];
+    expect(sortAlphabetical(xs)).toEqual([...xs].sort(compareAlphabetical));
+    expect(xs).toEqual(copy);
+    expect(sortAlphabetical(new Set(['b', 'a']))).toEqual(['a', 'b']);
+  });
+});
 
 describe('compareAlphabetical (V-5, A-VL-1 — alphabetical, locale-free)', () => {
   it('sorts a letter with diacritics beside its base letter, not after z', () => {

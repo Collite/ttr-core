@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import type { LayoutDocument } from '../layout-document.js';
-import { isTtrId, mergeTtr, parseTtrg, readTtrg, readTtrl, ttrToken, writeTtrg, TTR_NON_ID_WORDS } from '../layout-ttr.js';
+import { isTtrId, mergeTtr, parseTtrg, readTtrg, readTtrl, ttrUnwritable, writeTtrg, TTR_NON_ID_WORDS } from '../layout-ttr.js';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..');
 const repo = (p: string) => join(REPO, p);
@@ -65,14 +65,13 @@ describe('writeTtrg (V-10, V-12, V-13)', () => {
     expect(text).not.toMatch(/skin|collapsed|viewport|edges/);
   });
 
-  it('V-12: bare when the ref is a grammar `id` (diacritics and keyword parts included), quoted otherwise', () => {
-    expect(ttrToken('hartland.er.entity.zákazník')).toBe('hartland.er.entity.zákazník');
-    expect(ttrToken('hartland.db.dbo.item')).toBe('hartland.db.dbo.item');
-    expect(ttrToken('er.entity.graph')).toBe('er.entity.graph'); // GRAPH is in idPart
-    expect(ttrToken('Customer Address')).toBe('"Customer Address"');
-    expect(ttrToken('hartland.er.entity.text')).toBe('"hartland.er.entity.text"'); // TEXT is not
-    expect(ttrToken('1abc')).toBe('"1abc"');
-    expect(ttrToken('a."b"\\c')).toBe('"a.\\"b\\"\\\\c"');
+  it('A-VL-5: every ref bare (diacritics and idPart keywords included); a ref that is not an `id` has no TTR form', () => {
+    const ok = { name: 'g', model: 'er' as const, objects: ['hartland.er.entity.zákazník', 'er.entity.graph'], positions: { 'er.entity.graph': { x: 1, y: 2 } } };
+    expect(ttrUnwritable(ok)).toEqual([]);
+    expect(writeTtrg(ok)).toContain('    er.entity.graph,\n    hartland.er.entity.zákazník\n'); // GRAPH is in idPart
+    const bad = { ...ok, objects: [...ok.objects, 'Customer Address', 'hartland.er.entity.text', '1abc'], positions: { ...ok.positions, 'a-b': { x: 0, y: 0 } } };
+    expect(ttrUnwritable(bad)).toEqual(['1abc', 'a-b', 'Customer Address', 'hartland.er.entity.text']); // TEXT is not in idPart
+    expect(() => writeTtrg(bad)).toThrow('g has no TTR form: "1abc", "a-b", "Customer Address", "hartland.er.entity.text" are not a TTR id');
   });
 });
 
@@ -248,9 +247,10 @@ describe('readTtrg / mergeTtr (V-11)', () => {
     expect(r.doc.positions).toEqual({ [ITEM]: { x: 1, y: 2 } });
   });
 
-  it('reads a quoted (non-id) ref back exactly', () => {
-    const d: LayoutDocument = { name: 'odd', model: 'er', objects: ['Customer Address', 'a"b'], positions: { 'Customer Address': { x: 0, y: 0 } } };
-    expect(ok(readTtrg(writeTtrg(d))).doc).toEqual({ ...d, objects: ['a"b', 'Customer Address'] });
+  it('reads a quoted (non-id) ref back exactly — a writer never writes one (A-VL-5), a reader accepts it (V-12)', () => {
+    const text = 'graph odd {\n  model: er,\n  objects: [\n    "Customer Address",\n    "a\\"b"\n  ],\n  layout: { nodes: { "Customer Address": { x: 0, y: 0 } } }\n}\n';
+    const d: LayoutDocument = { name: 'odd', model: 'er', objects: ['a"b', 'Customer Address'], positions: { 'Customer Address': { x: 0, y: 0 } } };
+    expect(ok(readTtrg(text)).doc).toEqual(d);
   });
 
   it('reports what makes a file unreadable, with lines', () => {

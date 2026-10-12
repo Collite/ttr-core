@@ -10,6 +10,16 @@ import erFixture from '../../data/__tests__/fixtures/veles/hartland-er-graph.jso
 import dbFixture from '../../data/__tests__/fixtures/veles/hartland-db-graph.json';
 import type { CatalogGroup } from '../types.js';
 
+// a number per graph object the kernel was handed — equal numbers = the same object, not rebuilt
+const graphIds = new WeakMap<object, number>();
+let nextGraphId = 0;
+const graphIdOf = (g: object): number => {
+  const held = graphIds.get(g);
+  if (held !== undefined) return held;
+  graphIds.set(g, ++nextGraphId);
+  return nextGraphId;
+};
+
 /** The kernel, flattened to data attributes + the gestures a test drives (drag, right-click, select). */
 export function KernelStandIn(p: KernelProps) {
   const real = p.graph.edges.filter((e) => e.kind !== 'hop');
@@ -21,6 +31,8 @@ export function KernelStandIn(p: KernelProps) {
       data-edges={real.map((e) => e.id).sort().join(',')}
       data-hops={hops.map((e) => `${e.from.node}|${e.to.node}|${(e.via ?? []).join('+')}`).sort().join(',')}
       data-positions={JSON.stringify(p.positions)}
+      data-graph={graphIdOf(p.graph)}
+      data-selected={[...new Set([p.selectedId, ...(p.selectedIds ?? [])])].filter(Boolean).sort().join(',')}
     >
       {p.graph.nodes.map((n) => (
         <button

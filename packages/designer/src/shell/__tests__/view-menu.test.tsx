@@ -97,6 +97,33 @@ describe('the view menu on a card', () => {
     await waitFor(() => expect(attr('nodes')).toBe('er.entity.customer_address,er.entity.store_sales'));
   });
 
+  it('a click, then a shift-click: both are drawn selected and the menu acts on both (ttr-core#180 #2)', async () => {
+    await openEr();
+    fireEvent.click(node('er.entity.item'));
+    await waitFor(() => expect(attr('selected')).toBe('er.entity.item'));
+    fireEvent.click(node('er.entity.store'), { shiftKey: true });
+    await waitFor(() => expect(attr('selected')).toBe('er.entity.item,er.entity.store'));
+    fireEvent.contextMenu(node('er.entity.store'));
+    expect(menuItem('hide')).toHaveTextContent('Hide (2 cards)');
+    // shift-click the first card again: it leaves the set and is no longer drawn selected
+    fireEvent.click(node('er.entity.item'), { shiftKey: true });
+    await waitFor(() => expect(attr('selected')).toBe('er.entity.store'));
+    fireEvent.contextMenu(node('er.entity.store'));
+    expect(menuItem('hide')).toHaveTextContent(/^Hide$/);
+  });
+
+  it('a tab switch clears the multi-selection — another tab never acts on its ids (ttr-core#180 #2)', async () => {
+    await openEr();
+    fireEvent.click(node('er.entity.item'), { shiftKey: true });
+    fireEvent.click(node('er.entity.store'), { shiftKey: true });
+    await waitFor(() => expect(attr('selected')).toBe('er.entity.item,er.entity.store'));
+    fireEvent.click(screen.getByTestId('layout-new')); // a second tab with the same cards
+    await waitFor(() => expect(screen.getAllByTestId('subject-tab')).toHaveLength(2));
+    await waitFor(() => expect(attr('selected')).toBe(''));
+    fireEvent.contextMenu(node('er.entity.store'));
+    expect(menuItem('hide')).toHaveTextContent(/^Hide$/);
+  });
+
   it('Inspect opens the card in the inspector', async () => {
     await openEr();
     fireEvent.contextMenu(node('er.entity.item'));

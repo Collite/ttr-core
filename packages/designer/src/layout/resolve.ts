@@ -13,7 +13,7 @@
 // No card at any step ⇒ the ref names a relation / foreign key (the same four forms against the
 // schema's edges, or a qname whose kind segment says so) and is IGNORED (V-1), else it is MISSING.
 
-import { compareAlphabetical } from './layout-document.js';
+import { compareAlphabetical, sortAlphabetical } from './layout-document.js';
 
 /** One model object as resolution sees it. `fullQname` = `pkg` + `.` + `qname` (`fullQname()` format). */
 export interface LayoutIndexEntry {
@@ -60,11 +60,45 @@ const STEPS: ReadonlyArray<(e: LayoutIndexEntry) => string> = [
   (e) => e.name,
 ];
 
+/** Per step: a form → the distinct full qnames of the entries spelled so, sorted. */
+type StepMaps = ReadonlyArray<ReadonlyMap<string, readonly string[]>>;
+
+function stepMapsOf(entries: readonly LayoutIndexEntry[]): StepMaps {
+  return STEPS.map((form) => {
+    const by = new Map<string, Set<string>>();
+    for (const e of entries) {
+      const key = form(e);
+      const hits = by.get(key) ?? new Set<string>();
+      hits.add(e.fullQname);
+      by.set(key, hits);
+    }
+    return new Map([...by].map(([key, hits]) => [key, sortAlphabetical(hits)]));
+  });
+}
+
+// the step maps of an index, per model — built on the first resolution against it, then looked up (an
+// index is never changed once built: `layoutIndexOf` and the vectors' `model.json` build it whole)
+const LOOKUPS = new WeakMap<LayoutModelIndex, Map<string, { cards: StepMaps; edges: StepMaps }>>();
+
+function lookupOf(index: LayoutModelIndex, model: string): { cards: StepMaps; edges: StepMaps } {
+  const perModel = LOOKUPS.get(index) ?? new Map<string, { cards: StepMaps; edges: StepMaps }>();
+  LOOKUPS.set(index, perModel);
+  let lookup = perModel.get(model);
+  if (!lookup) {
+    lookup = {
+      cards: stepMapsOf(index.cards.filter((e) => e.schema === model)),
+      edges: stepMapsOf((index.edges ?? []).filter((e) => e.schema === model)),
+    };
+    perModel.set(model, lookup);
+  }
+  return lookup;
+}
+
 /** The first step whose form of some entry equals `ref` decides; its distinct full qnames, sorted. */
-function match(ref: string, entries: readonly LayoutIndexEntry[]): string[] {
-  for (const form of STEPS) {
-    const hits = new Set(entries.filter((e) => form(e) === ref).map((e) => e.fullQname));
-    if (hits.size > 0) return [...hits].sort(compareAlphabetical);
+function match(ref: string, steps: StepMaps): readonly string[] {
+  for (const step of steps) {
+    const hits = step.get(ref);
+    if (hits) return hits;
   }
   return [];
 }
@@ -76,13 +110,12 @@ function namesAnEdgeKind(ref: string): boolean {
 
 /** Resolve `refs` against the cards (and edges) of `model` in `index` — §4, steps 1–4. */
 export function resolveRefs(refs: readonly string[], index: LayoutModelIndex, model: string): Resolution {
-  const cards = index.cards.filter((e) => e.schema === model);
-  const edges = (index.edges ?? []).filter((e) => e.schema === model);
+  const { cards, edges } = lookupOf(index, model);
   const out: Resolution = { resolved: new Map(), missing: [], ambiguous: [], ignored: [] };
-  for (const ref of [...new Set(refs)].sort(compareAlphabetical)) {
+  for (const ref of sortAlphabetical(new Set(refs))) {
     const hits = match(ref, cards);
     if (hits.length === 1) out.resolved.set(ref, hits[0]);
-    else if (hits.length > 1) out.ambiguous.push({ ref, candidates: hits });
+    else if (hits.length > 1) out.ambiguous.push({ ref, candidates: [...hits] });
     else if (match(ref, edges).length > 0 || namesAnEdgeKind(ref)) out.ignored.push(ref);
     else out.missing.push(ref);
   }

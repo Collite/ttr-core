@@ -1,0 +1,11 @@
+# Tatrman layout — https://docs.tatrman.org/model/layout-files/ (format 1)
+layout: 1
+name: not_an_id
+model: er
+objects:
+  - "Customer Address"
+  - hartland.er.entity.date
+  - hartland.er.entity.item
+positions:
+  "Customer Address": { x: 40, y: 400 }
+  hartland.er.entity.item: { x: 320, y: 180 }

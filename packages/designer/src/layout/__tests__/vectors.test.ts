@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import { canonicalize, type LayoutDocument } from '../layout-document.js';
 import { readYaml, writeYaml } from '../layout-yaml.js';
-import { mergeTtr, readTtrg, writeTtrg } from '../layout-ttr.js';
+import { mergeTtr, readTtrg, ttrUnwritable, writeTtrg } from '../layout-ttr.js';
 import { resolutionToJson, resolveRefs, type LayoutModelIndex } from '../resolve.js';
 
 const VECTORS = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', 'package-sdk', 'schemas', 'layout-vectors');
@@ -23,7 +23,7 @@ const ttrPart = ({ name, model, objects, positions }: LayoutDocument) => ({ name
 describe('layout vectors', () => {
   it('has the contracted cases (≥ 8)', () => {
     expect(cases.length).toBeGreaterThanOrEqual(8);
-    for (const required of ['minimal', 'positions', 'diacritics', 'bare-names', 'ambiguous', 'missing', 'relation-ignored', 'sidecar-wins', 'db-tables']) {
+    for (const required of ['minimal', 'positions', 'diacritics', 'bare-names', 'ambiguous', 'missing', 'not-an-id', 'relation-ignored', 'sidecar-wins', 'db-tables']) {
       expect(cases).toContain(required);
     }
   });
@@ -41,11 +41,20 @@ describe('layout vectors', () => {
       expect(r.ok && r.doc).toEqual(doc);
     });
 
-    it('writeTtrg(document) == layout.ttrg, byte for byte; readTtrg gives the document back (what TTR carries)', () => {
-      expect(writeTtrg(doc)).toBe(text(c, 'layout.ttrg'));
-      const r = readTtrg(text(c, 'layout.ttrg'));
-      expect(r.ok && r.doc).toEqual(ttrPart(doc));
-    });
+    if (existsSync(join(VECTORS, c, 'layout.ttrg'))) {
+      it('writeTtrg(document) == layout.ttrg, byte for byte; readTtrg gives the document back (what TTR carries)', () => {
+        expect(ttrUnwritable(doc)).toEqual([]);
+        expect(writeTtrg(doc)).toBe(text(c, 'layout.ttrg'));
+        const r = readTtrg(text(c, 'layout.ttrg'));
+        expect(r.ok && r.doc).toEqual(ttrPart(doc));
+      });
+    } else {
+      it('no layout.ttrg: the document has no TTR form — writeTtrg refuses, naming the refs (A-VL-5)', () => {
+        const refs = ttrUnwritable(doc);
+        expect(refs.length).toBeGreaterThan(0);
+        expect(() => writeTtrg(doc)).toThrow(`${doc.name} has no TTR form: ${refs.map((r) => JSON.stringify(r)).join(', ')}`);
+      });
+    }
 
     it('resolution of document.objects against model.json == expect.json', () => {
       const index = json<LayoutModelIndex>(c, 'model.json');

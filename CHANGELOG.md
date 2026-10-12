@@ -26,6 +26,13 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   - Supporting changes: `@tatrman/lsp` `ModelGraphEdge.kind` gains `'hop'` (+ `via`) and `ModelGraphNode` an
     optional `pkg`; `@tatrman/canvas-core` `CanvasEdge` carries `kind` / `via`; `@tatrman/tokens` gains
     `canvas.edgeHop`.
+  - From the review (ttr-core#180): **Save as…** writes only what Open layout… reads — a plain subject's stale
+    positions are left out, and the dialog names what the readers would refuse instead of saving it; for
+    TTR it names the references the grammar cannot spell (a label, a keyword-named table) and offers YAML.
+    The notation lives in the layout: an opened layout's skin reaches the canvas, a pick marks the layout
+    edited. The shift-selection is exactly what is drawn and stays on its tab; a relation edge's right-click
+    keeps the browser menu; the tab menu closes on an outside click and on Escape; a drag no longer
+    re-projects the picture.
 - **`ttr-parser` · `ttr-writer` · `ttr-metadata`** — **layout files (VL-P0).** A *layout* — a schema, the cards
   it shows, their positions — read and written as a `.ttrg` graph block with the in-file `layout:` block, its
   references resolved against the model (docs: *Model → Layout files*).
@@ -37,7 +44,9 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
     `LayoutPoint` (canonical form: alphabetical order, coordinates `floor(x + 0.5)`) and `loader.TtrId` (whether a
     reference is a grammar `id`, by running the grammar's own `id` rule).
   - `ttr-writer`: **`TtrgLayoutWriter`** — the canonical `.ttrg` of a layout; reproduces the shared test vectors
-    byte for byte.
+    byte for byte. Every reference is written bare — the grammar admits only an `id` in `objects` and as a
+    `nodes` key — so a layout holding any other reference (a label, a table named `date`) has no TTR form:
+    `write` refuses it and `unwritable` names the references.
   - `ttr-metadata`: **`layout.LayoutResolver`** — the four-step resolution rule (full qname · qname ·
     `kind.name` · bare name; ambiguous never guessed; relations and foreign keys ignored) over a
     `LayoutModelIndex`; `indexOf(model, packageOf)` builds the index in the catalog's node shape, and
@@ -45,8 +54,8 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   - Alongside (not Maven artifacts): `@tatrman/designer` gains the TypeScript layout module
     (`src/layout/` — the document, YAML and TTR readers/writers, `.ttrl` sidecar merge, resolution; the `yaml`
     package 2.9.1 is its one new dependency), and `@tatrman/package-sdk` publishes
-    `schemas/layout.schema.json` (the YAML form, format 1) and `schemas/layout-vectors/` (eleven shared test
-    cases every implementation of the format is held to).
+    `schemas/layout.schema.json` (the YAML form, format 1) and `schemas/layout-vectors/` (twelve shared test
+    cases every implementation of the format is held to; every `.ttrg` among them parses with `TTR.g4`).
 - **`ttr-translator`** ⚑ **behaviour fix — no VARCHAR cast without a length reaches SQL Server.** T-SQL reads
   `CAST(x AS VARCHAR)` as `VARCHAR(30)`, and the MSSQL unparse wrote exactly that wherever the plan carried an
   unbounded VARCHAR: around the column branch of the CASE `COALESCE` expands to (`CASE WHEN [email] IS NOT NULL

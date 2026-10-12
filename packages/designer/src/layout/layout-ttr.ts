@@ -5,13 +5,14 @@
 // with its `.ttrl` sidecar (grammar v4.3) — and when both carry positions, the sidecar wins.
 //
 // The reader is a small tokenizer + scanner, not `@tatrman/parser`: the grammar's `layout:` object takes
-// `id` keys only, so the quoted keys a reader must accept (V-12) are outside it, and the JVM reader
+// `id` keys only, so the quoted keys a reader accepts (V-12; a writer never writes one, A-VL-5) are outside it, and the JVM reader
 // (`TtrgGraphReader`, ttr-parser) scans text the same way — one approach, held together by the shared
 // vectors. Unlike a naive scan it skips comments and strings, so neither can fake a block.
 // Never read or written here: the viewport (C1-b) and `edges` (reserved).
 
 import {
   canonicalize,
+  compareAlphabetical,
   stemWarning,
   validateDocument,
   type LayoutDocument,
@@ -39,18 +40,31 @@ export const TTR_NON_ID_WORDS: ReadonlySet<string> = new Set([
 /** The grammar's IDENT token: ASCII + Latin-1/Latin Extended-A/B letters, digits, underscore. */
 const IDENT_PART = /^[A-Za-z_\u00C0-\u024F][A-Za-z0-9_\u00C0-\u024F]*$/;
 
-/** Whether `s` is a grammar `id` — `idPart ( '.' idPart )*` — and so may be written bare (V-12). */
+/** Whether `s` is a grammar `id` — `idPart ( '.' idPart )*` — the only spelling a `.ttrg` has for a ref (A-VL-5). */
 export function isTtrId(s: string): boolean {
   return s.length > 0 && s.split('.').every((p) => IDENT_PART.test(p) && !TTR_NON_ID_WORDS.has(p));
 }
 
-/** One ref as the `.ttrg` writer spells it: bare when it is an `id`, else a string literal (V-12). */
-export function ttrToken(s: string): string {
-  return isTtrId(s) ? s : `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+/**
+ * The refs of `doc` a `.ttrg` cannot spell, sorted (A-VL-5). The grammar admits only an `id` in
+ * `objects: [ … ]` (`graphObjectsProperty`) and as a `layout: { nodes: { … } }` key (`key : id`), so a
+ * ref that is not one — a label with a space, a qname with a keyword part (`…entity.date`) — has no TTR
+ * form: the document is saved as YAML.
+ */
+export function ttrUnwritable(doc: LayoutDocument): string[] {
+  const refs = new Set([...doc.objects, ...Object.keys(doc.positions ?? {})]);
+  return [...refs].filter((r) => !isTtrId(r)).sort(compareAlphabetical);
 }
 
-/** Serialize `doc` as one canonical `.ttrg` (V-10). `skin`/`collapsed` are not carried (GQ-1). */
+/**
+ * Serialize `doc` as one canonical `.ttrg` (V-10), every ref bare. `skin`/`collapsed` are not carried
+ * (GQ-1). Throws when a ref is not an `id` (A-VL-5) — `ttrUnwritable` says which, before calling.
+ */
 export function writeTtrg(doc: LayoutDocument): string {
+  const unwritable = ttrUnwritable(doc);
+  if (unwritable.length > 0) {
+    throw new Error(`${doc.name} has no TTR form: ${unwritable.map((r) => JSON.stringify(r)).join(', ')} ${unwritable.length === 1 ? 'is' : 'are'} not a TTR id`);
+  }
   const d = canonicalize(doc).doc;
   const keys = Object.keys(d.positions);
   const lines = [`graph ${d.name} {`, `  model: ${d.model},`];
@@ -59,14 +73,14 @@ export function writeTtrg(doc: LayoutDocument): string {
     lines.push(`  objects: []${objectsEnd}`);
   } else {
     lines.push('  objects: [');
-    d.objects.forEach((o, i) => lines.push(`    ${ttrToken(o)}${i < d.objects.length - 1 ? ',' : ''}`));
+    d.objects.forEach((o, i) => lines.push(`    ${o}${i < d.objects.length - 1 ? ',' : ''}`));
     lines.push(`  ]${objectsEnd}`);
   }
   if (keys.length > 0) {
     lines.push('  layout: {', '    nodes: {');
     keys.forEach((k, i) => {
       const p = d.positions[k];
-      lines.push(`      ${ttrToken(k)}: { x: ${p.x}, y: ${p.y} }${i < keys.length - 1 ? ',' : ''}`);
+      lines.push(`      ${k}: { x: ${p.x}, y: ${p.y} }${i < keys.length - 1 ? ',' : ''}`);
     });
     lines.push('    }', '  }');
   }

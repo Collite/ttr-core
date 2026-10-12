@@ -5,12 +5,15 @@
 // program tab; leaving the page is guarded iff a local layout has unsaved edits.
 
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react';
 import type { GetGraphResponse, ModelGraphEdge, ModelGraphNode } from '@tatrman/lsp';
 import { ShellFrame } from '../ShellFrame.js';
+import { SaveAsDialog, layoutWriteProblems } from '../SaveAsDialog.js';
+import { readYaml } from '../../layout/layout-yaml.js';
+import type { LayoutDocument } from '../../layout/layout-document.js';
 import type { ModelDataSource } from '../../data/model-data-source.js';
 import type { LayoutIndexEntry } from '../../layout/resolve.js';
 import type { CatalogGroup } from '../types.js';
@@ -85,17 +88,27 @@ async function saveAs(format: 'yaml' | 'ttr', name?: string) {
 
 describe('Save as… reproduces the shared vectors byte for byte (V-5, V-32)', () => {
   it('opens the vectors that resolve to themselves', () => {
-    expect(SAME_ON_OPEN).toEqual(['diacritics', 'empty', 'minimal', 'missing', 'positions', 'sidecar-wins', 'skin-collapsed']);
+    expect(SAME_ON_OPEN).toEqual(['diacritics', 'empty', 'minimal', 'missing', 'not-an-id', 'positions', 'sidecar-wins', 'skin-collapsed']);
   });
 
-  it.each(SAME_ON_OPEN)('%s — YAML and TTR', async (c) => {
+  it.each(SAME_ON_OPEN)('%s — YAML and TTR (or no TTR form, A-VL-5)', async (c) => {
     const { saved, name } = await openVector(c);
     await saveAs('yaml');
     await waitFor(() => expect(saved).toHaveLength(1));
     expect(saved[0]).toEqual({ fileName: `${name}.yaml`, content: read(c, 'layout.yaml'), mimeType: 'application/yaml' });
+    if (existsSync(join(VECTORS, c, 'layout.ttrg'))) {
+      await saveAs('ttr');
+      await waitFor(() => expect(saved).toHaveLength(2));
+      expect(saved[1]).toEqual({ fileName: `${name}.ttrg`, content: read(c, 'layout.ttrg'), mimeType: 'text/plain' });
+      return;
+    }
+    // a ref that is not a TTR name: the dialog names it, shows no text and saves nothing
     await saveAs('ttr');
-    await waitFor(() => expect(saved).toHaveLength(2));
-    expect(saved[1]).toEqual({ fileName: `${name}.ttrg`, content: read(c, 'layout.ttrg'), mimeType: 'text/plain' });
+    const dialog = screen.getByTestId('save-as-dialog');
+    expect(within(dialog).getByTestId('save-as-problem')).toHaveTextContent('TTR cannot spell “Customer Address”, “hartland.er.entity.date” — a .ttrg lists TTR names only. Save as YAML, or remove them from the layout.');
+    expect(within(dialog).getByTestId('save-as-preview')).toHaveTextContent(/^$/);
+    expect(within(dialog).getByTestId('save-as-save')).toBeDisabled();
+    expect(saved).toHaveLength(1);
   });
 
   it('after the save the tab is the clean local file, renamed', async () => {
@@ -161,6 +174,36 @@ describe('the Save as… dialog', () => {
   });
 });
 
+describe('Save as… writes only what Open layout… reads (V-3; ttr-core#180 #1)', () => {
+  it('a plain subject saves the positions of the cards it shows — a stale node in the store is left out', async () => {
+    const saved: Saved[] = [];
+    const viewState = {
+      read: async () => ({ skin: 'er.crow', mode: 'manual' as const, nodes: { 'er.entity.item': { x: 10, y: 20 }, 'er.entity.gone': { x: 30, y: 40 } }, collapsed: [] }),
+      write: async () => {},
+    };
+    render(
+      <ShellFrame dataSource={fakeVeles().source} workspace="w" catalog={SCHEMA_CATALOG} files={[]} displayMode="just-names" viewState={viewState}
+        downloadFile={async (fileName, content, mimeType) => { saved.push({ fileName, content, mimeType }); }} />,
+    );
+    fireEvent.click(screen.getAllByTestId('catalog-item').find((b) => b.getAttribute('data-ref') === 'er')!);
+    await screen.findByTestId('objects-panel');
+    await saveAs('yaml', 'everything');
+    await waitFor(() => expect(saved).toHaveLength(1));
+    const back = readYaml(saved[0].content);
+    expect(back.ok).toBe(true);
+    if (back.ok) expect(back.doc.positions).toEqual({ 'hartland.er.entity.item': { x: 10, y: 20 } });
+  });
+
+  it('a document the readers would refuse is not offered for saving: the reasons, no preview, Save disabled', () => {
+    const doc: LayoutDocument = { name: 'g', model: 'er', objects: ['a'], positions: { b: { x: 1, y: 2 } } };
+    expect(layoutWriteProblems(doc, 'g', 'yaml')).toEqual(['positions key b is not in objects']);
+    render(<SaveAsDialog doc={doc} initialName="g" initialFormat="yaml" onSave={() => {}} onCancel={() => {}} />);
+    expect(screen.getByTestId('save-as-problem')).toHaveTextContent('positions key b is not in objects');
+    expect(screen.getByTestId('save-as-preview')).toHaveTextContent(/^$/);
+    expect(screen.getByTestId('save-as-save')).toBeDisabled();
+  });
+});
+
 describe('the layout commands (V-33)', () => {
   const PROGRAMS: CatalogGroup[] = [
     ...SCHEMA_CATALOG,
@@ -191,6 +234,23 @@ describe('the layout commands (V-33)', () => {
     expect(within(menu).getAllByTestId('view-menu-item').map((b) => b.textContent)).toEqual(['Save layout as…', 'New layout from this view', 'Re-layout', 'Open layout…']);
     fireEvent.click(within(menu).getAllByTestId('view-menu-item')[1]);
     await waitFor(() => expect(screen.getAllByTestId('subject-tab').map((t) => t.textContent)).toEqual(['er📌×', 'er · untitled*×']));
+  });
+});
+
+describe('the tab menu (ttr-core#180 #6)', () => {
+  it('closes on a press outside it and on Escape — not on a press inside', async () => {
+    mount(fakeVeles().source);
+    fireEvent.click(screen.getAllByTestId('catalog-item').find((b) => b.getAttribute('data-ref') === 'er')!);
+    await screen.findByTestId('objects-panel');
+    fireEvent.contextMenu(screen.getAllByTestId('subject-tab')[0]);
+    fireEvent.pointerDown(within(screen.getByTestId('tab-menu')).getAllByTestId('view-menu-item')[0]);
+    expect(screen.getByTestId('tab-menu')).toBeInTheDocument();
+    fireEvent.pointerDown(screen.getByTestId('canvas-host'));
+    expect(screen.queryByTestId('tab-menu')).toBeNull();
+    fireEvent.contextMenu(screen.getAllByTestId('subject-tab')[0]);
+    expect(screen.getByTestId('tab-menu')).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByTestId('tab-menu')).toBeNull();
   });
 });
 
