@@ -1,0 +1,14 @@
+# Tatrman layout — https://docs.tatrman.org/model/layout-files/ (format 1)
+layout: 1
+name: positions
+model: er
+objects:
+  - hartland.er.entity.customer
+  - hartland.er.entity.item
+  - hartland.er.entity.store
+  - hartland.er.entity.store_sales
+positions:
+  hartland.er.entity.customer: { x: -40, y: 400 }
+  hartland.er.entity.item: { x: 320, y: 180 }
+  hartland.er.entity.store: { x: 580, y: 180 }
+  hartland.er.entity.store_sales: { x: 320, y: 400 }

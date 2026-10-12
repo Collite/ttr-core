@@ -1,0 +1,9 @@
+# Tatrman layout — https://docs.tatrman.org/model/layout-files/ (format 1)
+layout: 1
+name: ambiguous
+model: er
+objects:
+  - er.entity.item
+  - hartland.web.er.entity.item
+  - item
+  - store

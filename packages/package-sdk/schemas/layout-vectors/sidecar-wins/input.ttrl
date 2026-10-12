@@ -1,0 +1,10 @@
+ttrl 1
+
+canvas sidecar_wins {
+    skin: "er.crow"
+    mode: manual
+    nodes: {
+        "hartland.er.entity.item": { x: 320, y: 180 }
+        "hartland.er.entity.store": { x: 580, y: 180 }
+    }
+}

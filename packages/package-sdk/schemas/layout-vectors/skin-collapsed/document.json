@@ -1,0 +1,13 @@
+{
+  "name": "skin_collapsed",
+  "model": "er",
+  "objects": [
+    "hartland.er.entity.item",
+    "hartland.er.entity.store"
+  ],
+  "positions": {},
+  "skin": "er.crow",
+  "collapsed": [
+    "hartland.er.entity.store"
+  ]
+}

@@ -1,0 +1,8 @@
+# Tatrman layout — https://docs.tatrman.org/model/layout-files/ (format 1)
+layout: 1
+name: minimal
+model: er
+objects:
+  - hartland.er.entity.item
+  - hartland.er.entity.store
+  - hartland.er.entity.store_sales

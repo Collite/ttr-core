@@ -1,0 +1,4 @@
+graph empty {
+  model: db,
+  objects: []
+}

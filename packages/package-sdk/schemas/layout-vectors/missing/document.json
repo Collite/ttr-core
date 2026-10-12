@@ -1,0 +1,19 @@
+{
+  "name": "missing",
+  "model": "er",
+  "objects": [
+    "Customer Address",
+    "hartland.er.entity.item",
+    "hartland.er.entity.warehouse_old"
+  ],
+  "positions": {
+    "Customer Address": {
+      "x": 40,
+      "y": 400
+    },
+    "hartland.er.entity.item": {
+      "x": 320,
+      "y": 180
+    }
+  }
+}

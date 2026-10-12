@@ -1,0 +1,24 @@
+{
+  "resolved": {
+    "hartland.web.er.entity.item": "hartland.web.er.entity.item",
+    "store": "hartland.store.er.entity.store"
+  },
+  "missing": [],
+  "ambiguous": [
+    {
+      "ref": "er.entity.item",
+      "candidates": [
+        "hartland.store.er.entity.item",
+        "hartland.web.er.entity.item"
+      ]
+    },
+    {
+      "ref": "item",
+      "candidates": [
+        "hartland.store.er.entity.item",
+        "hartland.web.er.entity.item"
+      ]
+    }
+  ],
+  "ignored": []
+}

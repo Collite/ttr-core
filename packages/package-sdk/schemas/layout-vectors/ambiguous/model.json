@@ -1,0 +1,28 @@
+{
+  "cards": [
+    {
+      "fullQname": "hartland.store.er.entity.item",
+      "qname": "er.entity.item",
+      "kind": "entity",
+      "name": "item",
+      "pkg": "hartland.store",
+      "schema": "er"
+    },
+    {
+      "fullQname": "hartland.web.er.entity.item",
+      "qname": "er.entity.item",
+      "kind": "entity",
+      "name": "item",
+      "pkg": "hartland.web",
+      "schema": "er"
+    },
+    {
+      "fullQname": "hartland.store.er.entity.store",
+      "qname": "er.entity.store",
+      "kind": "entity",
+      "name": "store",
+      "pkg": "hartland.store",
+      "schema": "er"
+    }
+  ]
+}

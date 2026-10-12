@@ -1,0 +1,62 @@
+{
+  "cards": [
+    {
+      "fullQname": "hartland.db.dbo.channel_sales",
+      "qname": "db.dbo.channel_sales",
+      "kind": "view",
+      "name": "channel_sales",
+      "pkg": "hartland",
+      "schema": "db"
+    },
+    {
+      "fullQname": "hartland.db.dbo.item",
+      "qname": "db.dbo.item",
+      "kind": "table",
+      "name": "item",
+      "pkg": "hartland",
+      "schema": "db"
+    },
+    {
+      "fullQname": "hartland.db.dbo.store",
+      "qname": "db.dbo.store",
+      "kind": "table",
+      "name": "store",
+      "pkg": "hartland",
+      "schema": "db"
+    },
+    {
+      "fullQname": "hartland.db.dbo.store_sales",
+      "qname": "db.dbo.store_sales",
+      "kind": "table",
+      "name": "store_sales",
+      "pkg": "hartland",
+      "schema": "db"
+    },
+    {
+      "fullQname": "hartland.er.entity.channel_sales",
+      "qname": "er.entity.channel_sales",
+      "kind": "entity",
+      "name": "channel_sales",
+      "pkg": "hartland",
+      "schema": "er"
+    },
+    {
+      "fullQname": "hartland.er.entity.item",
+      "qname": "er.entity.item",
+      "kind": "entity",
+      "name": "item",
+      "pkg": "hartland",
+      "schema": "er"
+    }
+  ],
+  "edges": [
+    {
+      "fullQname": "hartland.db.dbo.fk_ss_item",
+      "qname": "db.dbo.fk_ss_item",
+      "kind": "foreign_key",
+      "name": "fk_ss_item",
+      "pkg": "hartland",
+      "schema": "db"
+    }
+  ]
+}

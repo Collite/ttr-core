@@ -4,7 +4,8 @@
 // language-agnostic artifact a third-party writer of the format validates against; its docs-site copy
 // (served at the schema's `$id`) must never drift from it.
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import Ajv2020Module from 'ajv/dist/2020.js';
@@ -19,6 +20,7 @@ const AjvClass = ((Ajv2020Module as unknown as { default?: AjvCtor }).default ??
 
 const schemaPath = fileURLToPath(new URL('../../schemas/layout.schema.json', import.meta.url));
 const docsCopyPath = fileURLToPath(new URL('../../../../docs-site/docs/model/layout.schema.json', import.meta.url));
+const vectorsDir = fileURLToPath(new URL('../../schemas/layout-vectors', import.meta.url));
 const schemaText = readFileSync(schemaPath, 'utf8');
 const validate = new AjvClass({ allErrors: true, strict: true }).compile(JSON.parse(schemaText));
 
@@ -77,5 +79,15 @@ describe('layout.schema.json', () => {
     expect(errorsOf(VALID.replace('layout: 1', 'layout: 2'))).toEqual([
       { instancePath: '/layout', keyword: 'const', params: { allowedValue: 1 } },
     ]);
+  });
+
+  const vectorCases = readdirSync(vectorsDir).filter((d) => statSync(join(vectorsDir, d)).isDirectory()).sort();
+
+  it('has the published vectors to validate', () => {
+    expect(vectorCases.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it.each(vectorCases)('vector %s: layout.yaml validates', (c) => {
+    expect(errorsOf(readFileSync(join(vectorsDir, c, 'layout.yaml'), 'utf8'))).toEqual([]);
   });
 });

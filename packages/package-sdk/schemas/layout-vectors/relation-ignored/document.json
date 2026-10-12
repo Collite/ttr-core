@@ -1,0 +1,11 @@
+{
+  "name": "relation_ignored",
+  "model": "er",
+  "objects": [
+    "hartland.er.entity.item",
+    "hartland.er.entity.rel_store_sales_item",
+    "hartland.er.entity.store_sales",
+    "hartland.er.relation.rel_store_sales_store"
+  ],
+  "positions": {}
+}
