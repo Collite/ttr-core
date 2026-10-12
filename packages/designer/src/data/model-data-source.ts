@@ -46,8 +46,11 @@ export interface DataSourceCapabilities {
   readonly bindings: boolean;
   /** perspectives (binding/lineage) generable — implied by bindings + cross-face reach. */
   readonly perspectives: boolean;
-  /** view-persistence (FO-31) mechanism, or `none` (auto-layout only). */
-  readonly layoutPersist: 'in-file' | 'sidecar' | 'none';
+  /**
+   * view-persistence (FO-31) mechanism: the `.ttrg` block, the `.ttrl` sidecar, or `file` — the backend
+   * stores no layouts, the tab holds them and **Save as…** downloads them (VL V-29; `'none'` retired).
+   */
+  readonly layoutPersist: 'in-file' | 'sidecar' | 'file';
   /**
    * The SHAPE of graph a served kind returns (contracts §1.1a — the second capability axis).
    * `'rich'` = the DS `CanvasGraph` slot data the skins render fully (rows/PK/FK, measures/`calc:`,

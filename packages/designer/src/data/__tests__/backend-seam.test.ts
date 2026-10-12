@@ -12,7 +12,7 @@ import { WorkerLspDataSource } from '../worker-lsp-data-source.js';
 import { WsDesignerServerDataSource } from '../ws-designer-server-data-source.js';
 import { VelesReadApiDataSource } from '../veles-read-api-data-source.js';
 import { ttrmToGetGraphResponse } from '../structural-graph.js';
-import { WorkerLayoutStore, WsSidecarStore, VelesNoStore, type LayoutIO, type PrefsIO, type TtrmLayoutIO } from '../view-state-store.js';
+import { WorkerLayoutStore, WsSidecarStore, LayoutDocumentStore, type LayoutIO, type PrefsIO, type TtrmLayoutIO } from '../view-state-store.js';
 import type { LayoutFile } from '@tatrman/lsp';
 import type { TtrmLayoutPayload, TtrmLayoutCanvas } from '../ttrm-types.js';
 
@@ -87,17 +87,16 @@ describe('DM-P2 seam — WS (structural, sidecar, no bindings)', () => {
   });
 });
 
-describe('DM-P2 seam — Veles (thinnest: structural, no layout)', () => {
+describe('DM-P2 seam — Veles (thinnest: structural, layouts held by the tab)', () => {
   const src = new VelesReadApiDataSource('/veles');
 
-  it('capabilities: db/er only, structural, no perspectives, no layout persist (DM-CAP-003)', () => {
-    expect(src.capabilities).toMatchObject({ edit: false, modelKinds: ['db', 'er'], graphShape: 'structural', perspectives: false, layoutPersist: 'none' });
+  it("capabilities: db/er only, structural, no perspectives, layout persist 'file' (VL V-29)", () => {
+    expect(src.capabilities).toMatchObject({ edit: false, modelKinds: ['db', 'er'], graphShape: 'structural', perspectives: false, layoutPersist: 'file' });
   });
-  it('ViewStateStore (none) is an honest no-op — auto-layout, never claims to save', async () => {
-    const vss = new VelesNoStore();
-    const before = await vss.read('x');
-    expect(before.mode).toBe('auto');
+  it("ViewStateStore ('file') keeps the session's positions in memory — Save as… downloads them", async () => {
+    const vss = new LayoutDocumentStore();
+    expect((await vss.read('x')).mode).toBe('auto');
     await vss.write('x', { skin: 'er.crow', mode: 'manual', nodes: { A: { x: 1, y: 1 } }, collapsed: [] });
-    expect(await vss.read('x')).toEqual(before); // write did nothing
+    expect((await vss.read('x')).nodes).toEqual({ A: { x: 1, y: 1 } });
   });
 });

@@ -63,7 +63,7 @@ export class VelesReadApiDataSource implements ModelDataSource {
     modelKinds: ['db', 'er'],
     bindings: false,
     perspectives: false,
-    layoutPersist: 'none',
+    layoutPersist: 'file', // the tab holds the layout; Save as… downloads it (VL V-29)
     graphShape: 'structural', // thin browse graph, no slot bodies (§1.1a) → DM-CAP-002
   } as const;
   private readonly base: string;

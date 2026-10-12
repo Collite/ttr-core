@@ -60,7 +60,7 @@ export function structuralGraphHint(caps: DataSourceCapabilities, kind: ModelKin
 
 /** DM-CAP-003 — the active backend does not persist layout (auto-layout only); say so, never silently. */
 export function layoutPersistHint(caps: DataSourceCapabilities): CapabilityHint | null {
-  if (caps.layoutPersist !== 'none') return null;
+  if (caps.layoutPersist !== 'file') return null;
   return {
     code: 'DM-CAP-003',
     severity: 'info',

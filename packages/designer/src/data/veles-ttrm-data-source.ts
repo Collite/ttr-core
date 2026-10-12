@@ -74,7 +74,7 @@ export class VelesTtrmDataSource implements ModelDataSource {
     modelKinds: ['db', 'er', 'cnc'],
     bindings: false,
     perspectives: false,
-    layoutPersist: 'none',
+    layoutPersist: 'file', // the tab holds the layout; Save as… downloads it (VL V-29)
     graphShape: 'structural',
   } as const;
 

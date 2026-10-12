@@ -13,7 +13,7 @@ const CAPS: DataSourceCapabilities = {
   modelKinds: ['db', 'er'],
   bindings: false,
   perspectives: false,
-  layoutPersist: 'none',
+  layoutPersist: 'file',
   graphShape: 'structural',
 } as const;
 

@@ -16,7 +16,7 @@ const WS: DataSourceCapabilities = {
   edit: false, modelKinds: ['db', 'er', 'cnc'], bindings: false, perspectives: false, layoutPersist: 'sidecar', graphShape: 'structural',
 };
 const VELES: DataSourceCapabilities = {
-  edit: false, modelKinds: ['db', 'er'], bindings: false, perspectives: false, layoutPersist: 'none', graphShape: 'structural',
+  edit: false, modelKinds: ['db', 'er'], bindings: false, perspectives: false, layoutPersist: 'file', graphShape: 'structural',
 };
 
 describe('DM-CAP-* capability hints', () => {

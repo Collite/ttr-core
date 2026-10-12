@@ -316,17 +316,17 @@ function ServerStudio(props: ServerSelection & { lang: string; onLanguageChange:
           dataSource = ws;
           io = { kind: 'sidecar', layout: { getLayout: (uri) => ws.getLayout(uri), setLayout: async (uri, canvases) => { await ws.setLayout(uri, canvases); } } };
         } else if (props.transport === 'ttrm') {
-          // Platform Veles: WS ttrm/* + bearer on the handshake (VS-2). No sidecar layout.
+          // Platform Veles: WS ttrm/* + bearer on the handshake (VS-2). No stored layouts: the tab holds them.
           const v = new VelesTtrmDataSource(props.origin, { token: props.token ?? undefined, lang: props.lang });
           created = v;
           await v.connect();
           dataSource = v;
-          io = { kind: 'none' };
+          io = { kind: 'file' };
         } else {
           const r = new VelesReadApiDataSource(props.base, { lang: props.lang });
           created = r as unknown as { dispose?: () => void };
           dataSource = r;
-          io = { kind: 'none' };
+          io = { kind: 'file' };
         }
         const { graphs, symbols } = await dataSource.listCatalog();
         if (disposed) {

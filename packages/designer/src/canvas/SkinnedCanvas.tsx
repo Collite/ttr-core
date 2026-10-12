@@ -6,7 +6,7 @@
 //
 // DM-P2.S2 seam rewire: the canvas no longer talks to `LspClient.setLayout` directly. It EMITS a
 // view change (`onPersistView`) and the shell (DM-P2.S3) persists it through the ViewStateStore
-// selected by `capabilities.layoutPersist` (DM-P2.S1) — Worker in-file / WS `.ttrl` / Veles none.
+// selected by `capabilities.layoutPersist` (DM-P2.S1) — Worker in-file / WS `.ttrl` / Veles `file` (the tab).
 // This is what makes the one canvas run against all three backends.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';

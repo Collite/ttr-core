@@ -5,6 +5,7 @@
 // Model/Process mode (A-4 α): a tab's subject decides its canvas kind.
 
 import type { SkinId, SchemaCode } from '@tatrman/canvas-core';
+import type { LayoutDocument } from '../layout/layout-document.js';
 export type { SkinId } from '@tatrman/canvas-core'; // re-exported for shell consumers
 
 export type SubjectKind = 'schema' | 'cube' | 'concept' | 'program';
@@ -30,6 +31,24 @@ export interface SubjectTab {
   perspective?: 'binding' | 'lineage'; // in-tab perspective switch (A-2 β) — stubs in P2
   drillPath: DrillSegment[]; // in-tab drill breadcrumb (P-2, both faces)
   preview: boolean; // S-7 preview-tab discipline: transient italic until pinned
+  /** the working layout (VL contracts §5) — present on a layout tab; absent on a plain subject. */
+  layout?: TabLayout;
+}
+
+/** Where a tab's layout came from (VL V-29, V-35): the catalog, a local file, or nowhere yet. */
+export type LayoutSource = 'catalog' | 'file' | 'new';
+
+/**
+ * The working layout of a tab (VL V-22, V-28, V-30). `doc.objects` holds the resolved cards as full
+ * qnames and the unresolved refs verbatim (missing / ambiguous stay until removed, V-15); `doc.positions`
+ * is keyed the same way and is non-empty only in manual mode (V-2). Lives in tab memory only (⚑VL-10).
+ */
+export interface TabLayout {
+  doc: LayoutDocument;
+  source: LayoutSource;
+  /** the file it was opened from or saved as (`sales.yaml`) — source `file` only. */
+  fileName?: string;
+  dirty: boolean;
 }
 
 export interface ShellState {

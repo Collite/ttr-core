@@ -8,7 +8,7 @@
 //   • data seam: consumes `ModelDataSource` (contracts §1), never a transport/`LspClient`. Runs
 //     against Worker (full) / WS / Veles (honestly degraded) behind the one interface.
 //   • view-state: layout persists through the injected `ViewStateStore` (DM-P2.S1), selected by the
-//     backend's `capabilities.layoutPersist` — Worker in-file / WS `.ttrl` / Veles none.
+//     backend's `capabilities.layoutPersist` — Worker in-file / WS `.ttrl` / Veles `file` (the tab).
 //   • FO-21: edit affordances render ONLY through an injected `ShellEditContext` — ABSENT here, so
 //     the Viewer ships no edit code (add/remove/applyGraphEdit + pickers are DM-P3 authoring). The
 //     processing face (program tabs) is a placeholder until DM-P4.
