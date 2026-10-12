@@ -12,11 +12,13 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./schema/package-manifest.schema.json": "./src/schema/package-manifest.schema.json"
+    "./schema/package-manifest.schema.json": "./src/schema/package-manifest.schema.json",
+    "./schemas/layout.schema.json": "./schemas/layout.schema.json"
   },
   "files": [
     "dist",
-    "src/schema"
+    "src/schema",
+    "schemas"
   ],
   "scripts": {
     "build": "tsc",
@@ -30,6 +32,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "yaml": "2.9.1"
   }
 }
