@@ -35,7 +35,8 @@ export interface KernelProps {
   runStates?: Record<string, { runStatus?: RunStatus; diagnostics?: DiagnosticsState }>;
   /** per-node display preview (S-6 base-layer chip) — row count now, sparkline post-v1. */
   previews?: Record<string, { rows: number }>;
-  onSelect?: (id: string | null) => void;
+  /** a node was clicked (`additive` — shift held: add to / remove from a multi-selection, VL V-27); null = cleared */
+  onSelect?: (id: string | null, additive?: boolean) => void;
   /** edge selection (processing insertion targets) — the palette/⌘K insert onto the selected edge. */
   onEdgeSelect?: (id: string | null) => void;
   /** a right-click on an edge (a hop edge's pill included) — the view menu (VL V-27) */
@@ -125,7 +126,7 @@ function KernelInner({
         edges={rfEdges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        onNodeClick={(_, n) => onSelect?.(n.id)}
+        onNodeClick={(e, n) => onSelect?.(n.id, e.shiftKey)}
         onEdgeClick={(_, e) => onEdgeSelect?.(e.id)}
         onEdgeContextMenu={(ev, e) => { ev.preventDefault(); onEdgeContextMenu?.(e.id, ev.clientX, ev.clientY); }}
         onPaneClick={() => { onSelect?.(null); onEdgeSelect?.(null); }}

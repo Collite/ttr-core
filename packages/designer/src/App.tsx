@@ -145,6 +145,7 @@ function Studio({
           viewState={viewState}
           onActiveChange={onActiveChange}
           onError={addToast}
+          onNotice={(m) => addToast(m, 'info')}
           editContext={editContext ?? undefined}
           processingSource={processingSource}
         />

@@ -34,7 +34,9 @@ import {
   emptyShell, openSubject, promoteTab, closeTab, dropPreviewIfLeaving, drillIn, drillTo, activeTab, setPerspective,
   setLayoutObjects, setLayoutPositions, toLayoutTab,
 } from './shell-state.js';
-import { projectLayout, layoutIndexOf, type HopEdge, type LayoutGraphIndex, type LayoutProjection } from '../model/layout-projection.js';
+import { projectLayout, layoutIndexOf, hiddenNeighbours, type HopEdge, type LayoutGraphIndex, type LayoutProjection } from '../model/layout-projection.js';
+import { compareAlphabetical } from '../layout/layout-document.js';
+import { ObjectsPanel, type MissingRef } from './ObjectsPanel.js';
 import { LayoutDocumentStore } from '../data/view-state-store.js';
 import type { LayoutPoint } from '../layout/layout-document.js';
 import { HopEdgeInspector } from './HopEdgeInspector.js';
@@ -72,6 +74,8 @@ export interface ShellFrameProps {
   displayMode: DisplayMode;
   getSourceText?: (uri: string) => string | undefined;
   onError?: (msg: string) => void;
+  /** a passing notice (`Expanded: +3`, `Every neighbour is already visible`) — the host's info toast. */
+  onNotice?: (msg: string) => void;
   /** fires when the active tab (or its loaded graph) changes — drives the host header. */
   onActiveChange?: (active: ActiveSubject | null) => void;
   /** view-state persistence (FO-31, DM-P2.S1) — selected by capabilities.layoutPersist. Absent ⇒
@@ -117,7 +121,7 @@ function seedLayoutName(tab: SubjectTab): string {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : 'untitled';
 }
 
-export function ShellFrame({ dataSource, workspace, catalog, files, displayMode, getSourceText, onError, onActiveChange, viewState, editContext, irisBaseUrl, processingSource, runSource, validateProgram }: ShellFrameProps) {
+export function ShellFrame({ dataSource, workspace, catalog, files, displayMode, getSourceText, onError, onNotice, onActiveChange, viewState, editContext, irisBaseUrl, processingSource, runSource, validateProgram }: ShellFrameProps) {
   const [shell, setShell] = useState<ShellState>(emptyShell);
   // processing face (DM-P4): the fixture source serves the hero graph in dev + tests; the live
   // TtrpServerProcessingSource plugs in behind the same interface. The run backend is a separate
@@ -466,6 +470,39 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     applyObjects([...new Set([...shownCards(tab), ...cards])]);
   }
 
+  /** Expand (V-27) / Neighbours (V-20): check the hidden cards one real edge away from `of`. */
+  function expandCards(of: string[]) {
+    if (!tab || !wholeGraph || !wholeIndex) return;
+    const shownIds = new Set(shownCards(tab).map((fq) => wholeIndex.nodeOf.get(fq) ?? fq));
+    const ids = of.map((fq) => wholeIndex.nodeOf.get(fq) ?? fq);
+    const add = hiddenNeighbours(wholeGraph, shownIds, ids).map((id) => wholeIndex.fullQnameOf.get(id) ?? id);
+    if (add.length === 0) { onNotice?.('Every neighbour is already visible'); return; }
+    showCards(add);
+    onNotice?.(`Expanded: +${add.length}`);
+  }
+
+  /** Hide (V-27, the panel): uncheck `cards`. */
+  function hideCards(cards: string[]) {
+    if (!tab) return;
+    const drop = new Set(cards);
+    applyObjects(shownCards(tab).filter((fq) => !drop.has(fq)));
+  }
+
+  /** Remove a missing / ambiguous ref from the layout (V-17). */
+  function removeRef(ref: string) {
+    if (!tab?.layout) return;
+    const id = tab.id;
+    setShell((s) => {
+      const l = s.tabs.find((t) => t.id === id)?.layout;
+      return l ? setLayoutObjects(s, id, l.doc.objects.filter((o) => o !== ref)) : s;
+    });
+  }
+
+  const missingRefs: MissingRef[] = useMemo(() => (projection
+    ? [...projection.missing.map((ref) => ({ ref })), ...projection.ambiguous.map((a) => ({ ref: a.ref, candidates: a.candidates }))]
+        .sort((a, b) => compareAlphabetical(a.ref, b.ref))
+    : []), [projection]);
+
   // a drag on a layout tab → its positions, by full qname (V-28), keeping the missing cards' ones
   function persistLayoutView(tabId: string, change: CanvasViewChange) {
     const l = shellRef.current.tabs.find((t) => t.id === tabId)?.layout;
@@ -544,6 +581,19 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     <div style={{ display: 'flex', flex: 1, minHeight: 0 }} data-testid="shell-frame">
       <CatalogSpine groups={catalog} onOpen={(item) => openItem(item, true)} />
       <FileRail files={files} />
+      {tab?.subject.kind === 'schema' && !tab.perspective && wholeGraph && wholeIndex && (!tabLayout || projection) && (
+        <ObjectsPanel
+          whole={wholeGraph}
+          index={wholeIndex}
+          shown={new Set(shownCards(tab))}
+          missing={missingRefs}
+          onSetCards={(cards) => applyObjects(cards)}
+          onNeighbours={() => expandCards(shownCards(tab))}
+          onRemoveMissing={removeRef}
+          onExpand={(fq) => expandCards([fq])}
+          onHide={(fq) => hideCards([fq])}
+        />
+      )}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* FO-33 (contracts §7): the suite brand names "Tatrman Studio"; the OPEN build identifies as
             "Studio Viewer" (no editContext). The commercial module names (Studio Modeler/Designer)
