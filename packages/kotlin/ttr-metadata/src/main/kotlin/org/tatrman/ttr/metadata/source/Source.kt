@@ -219,8 +219,9 @@ class LocalFsStorage(
     override fun fetchVersion(): String =
         Files
             .walk(rootPath)
-            .filter { Files.isRegularFile(it) && it.fileName.toString().substringAfterLast('.', "") in LOADED_EXTENSIONS }
-            .sorted()
+            .filter {
+                Files.isRegularFile(it) && it.fileName.toString().substringAfterLast('.', "") in LOADED_EXTENSIONS
+            }.sorted()
             .map { "$it=${Files.getLastModifiedTime(it).toMillis()}" }
             .toList()
             .joinToString(separator = ";")

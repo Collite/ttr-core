@@ -120,8 +120,10 @@ class TtrgLayoutReaderSpec :
             r.warnings.single().message shouldContain "does not list"
         }
 
-        "A-VL-3 (b): nodes under a stated `mode: auto` are dropped with a warning; the in-file positions and the skin stay" {
-            val ttrl = "ttrl 1\ncanvas g {\n  skin: \"er.crow\"\n  mode: auto\n  nodes: { \"p.er.entity.b\": { x: 3, y: 4 } }\n}\n"
+        "A-VL-3 (b): nodes under a stated `mode: auto` are dropped with a warning; in-file positions + skin stay" {
+            val ttrl =
+                "ttrl 1\ncanvas g {\n  skin: \"er.crow\"\n  mode: auto\n" +
+                    "  nodes: { \"p.er.entity.b\": { x: 3, y: 4 } }\n}\n"
             val r = ok(TtrgLayoutReader.read(ttrg, ttrl, "g.ttrg"))
             r.document.positions shouldBe mapOf("p.er.entity.a" to LayoutPoint(1.0, 2.0))
             r.document.skin shouldBe "er.crow"
@@ -143,7 +145,9 @@ class TtrgLayoutReaderSpec :
         }
 
         "V-3: an in-file position whose key is not in objects is an error naming the key" {
-            val bad = "graph g {\n  model: er,\n  objects: [ p.er.entity.a ],\n  layout: { nodes: { p.er.entity.z: { x: 1, y: 2 } } }\n}\n"
+            val bad =
+                "graph g {\n  model: er,\n  objects: [ p.er.entity.a ],\n" +
+                    "  layout: { nodes: { p.er.entity.z: { x: 1, y: 2 } } }\n}\n"
             val r = failed(TtrgLayoutReader.read(bad, fileName = "g.ttrg"))
             r.errors.single().path shouldBe "positions.p.er.entity.z"
             r.errors.single().message shouldContain "p.er.entity.z is not in objects"

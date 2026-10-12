@@ -148,7 +148,10 @@ class LayoutIndex(
             return ResolvedLayout(
                 name = doc.name,
                 schema = doc.model,
-                objects = r.resolved.values.distinct().sortedWith(LayoutDocument.ALPHABETICAL_ORDER),
+                objects =
+                    r.resolved.values
+                        .distinct()
+                        .sortedWith(LayoutDocument.ALPHABETICAL_ORDER),
                 positions = positions.toSortedMap(LayoutDocument.ALPHABETICAL_ORDER),
                 skin = doc.skin,
                 collapsed = doc.collapsed,

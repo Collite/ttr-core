@@ -50,7 +50,8 @@ class LayoutIndexSpec :
 
         "authored: in-file positions, a bare name resolved, the relation ignored" {
             val a = idx["authored"]!!
-            a.objects shouldBe listOf("hartland.er.entity.item", "hartland.er.entity.store", "hartland.er.entity.store_sales")
+            a.objects shouldBe
+                listOf("hartland.er.entity.item", "hartland.er.entity.store", "hartland.er.entity.store_sales")
             a.positions shouldBe
                 mapOf(
                     "hartland.er.entity.item" to LayoutPoint(320.0, 180.0),
@@ -66,7 +67,7 @@ class LayoutIndexSpec :
             a.collapsed.shouldBeEmpty()
         }
 
-        "sidecar: the sidecar's positions and skin win; its extra key is dropped with a warning, never an issue (A-VL-3 a)" {
+        "sidecar: its positions and skin win; its extra key is dropped with a warning, never an issue (A-VL-3 a)" {
             val s = idx["sidecar"]!!
             s.positionsFrom shouldBe "sidecar"
             s.positions shouldBe
@@ -75,7 +76,10 @@ class LayoutIndexSpec :
                     "hartland.er.entity.store" to LayoutPoint(300.0, 120.0),
                 )
             s.skin shouldBe "er.crow"
-            idx.warnings.filter { it.path == "layouts/sidecar.ttrg" }.single().reason shouldContain
+            idx.warnings
+                .filter { it.path == "layouts/sidecar.ttrg" }
+                .single()
+                .reason shouldContain
                 "hartland.er.entity.store_returns"
         }
 
@@ -90,7 +94,10 @@ class LayoutIndexSpec :
             r.positionsFrom shouldBe "in-file"
             r.positions["hartland.er.entity.item"] shouldBe LayoutPoint(10.0, 20.0)
             r.skin shouldBe "er.chen"
-            idx.warnings.filter { it.path == "layouts/auto_residue.ttrg" }.single().reason shouldContain "mode: auto"
+            idx.warnings
+                .filter { it.path == "layouts/auto_residue.ttrg" }
+                .single()
+                .reason shouldContain "mode: auto"
             idx.issues.map { it.path }.contains("layouts/auto_residue.ttrg") shouldBe false
         }
 
@@ -98,7 +105,8 @@ class LayoutIndexSpec :
             val m = idx["missing"]!!
             m.objects shouldBe listOf("hartland.er.entity.store")
             m.missing shouldBe listOf("hartland.er.entity.customer")
-            m.ambiguous shouldBe listOf(LayoutAmbiguity("item", listOf("hartland.er.entity.item", "outlet.er.outlet.item")))
+            m.ambiguous shouldBe
+                listOf(LayoutAmbiguity("item", listOf("hartland.er.entity.item", "outlet.er.outlet.item")))
             m.mode shouldBe "auto"
             m.positionsFrom shouldBe null
         }
