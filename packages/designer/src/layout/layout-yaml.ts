@@ -10,11 +10,14 @@
 import { isMap, isScalar, isSeq, LineCounter, parseDocument, type Node as YamlNode } from 'yaml';
 import {
   canonicalize,
+  stemWarning,
   validateDocument,
   type LayoutDocument,
   type LayoutIssue,
   type LayoutModel,
   type LayoutPoint,
+  type LayoutReadResult,
+  type ReadOptions,
 } from './layout-document.js';
 
 /** The docs page every written file links to (V-7). */
@@ -62,28 +65,6 @@ export function writeYaml(doc: LayoutDocument, opts: WriteYamlOptions = {}): str
   if (d.skin) lines.push(`skin: ${yamlScalar(d.skin)}`);
   if (d.collapsed && d.collapsed.length > 0) lines.push('collapsed:', ...d.collapsed.map((c) => `  - ${yamlScalar(c)}`));
   return lines.join('\n') + '\n';
-}
-
-/** What every layout reader returns: the canonical document, or the reasons it could not be read. */
-export type LayoutReadResult =
-  | { ok: true; doc: LayoutDocument; warnings: LayoutIssue[] }
-  | { ok: false; errors: LayoutIssue[]; warnings: LayoutIssue[] };
-
-export interface ReadOptions {
-  /** The file the text came from — only to warn when its stem differs from the layout's name (V-4). */
-  fileName?: string;
-}
-
-/** `downloads/sales (1).yaml` → `sales (1)`; the layout name a VL writer would have used for the file. */
-export function fileStem(fileName: string): string {
-  const base = fileName.split(/[\\/]/).pop() ?? fileName;
-  return base.replace(/\.(ya?ml|ttrg|ttrl)$/i, '');
-}
-
-export function stemWarning(fileName: string | undefined, name: string): LayoutIssue[] {
-  if (!fileName || fileStem(fileName) === name) return [];
-  const base = fileName.split(/[\\/]/).pop() ?? fileName;
-  return [{ path: 'name', message: `file name ${base} does not match the layout name ${name}` }];
 }
 
 /** Parse YAML text into a layout document (V-6, V-8). */

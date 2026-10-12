@@ -141,3 +141,25 @@ export function validateDocument(doc: LayoutDocument): { ok: boolean; errors: La
 export function modeOf(doc: LayoutDocument): 'auto' | 'manual' {
   return Object.keys(doc.positions ?? {}).length > 0 ? 'manual' : 'auto';
 }
+
+/** What every layout reader returns: the canonical document, or the reasons it could not be read. */
+export type LayoutReadResult =
+  | { ok: true; doc: LayoutDocument; warnings: LayoutIssue[] }
+  | { ok: false; errors: LayoutIssue[]; warnings: LayoutIssue[] };
+
+export interface ReadOptions {
+  /** The file the text came from — only to warn when its stem differs from the layout's name (V-4). */
+  fileName?: string;
+}
+
+/** `downloads/sales (1).yaml` → `sales (1)`; the layout name a VL writer would have used for the file. */
+export function fileStem(fileName: string): string {
+  const base = fileName.split(/[\\/]/).pop() ?? fileName;
+  return base.replace(/\.(ya?ml|ttrg|ttrl)$/i, '');
+}
+
+export function stemWarning(fileName: string | undefined, name: string): LayoutIssue[] {
+  if (!fileName || fileStem(fileName) === name) return [];
+  const base = fileName.split(/[\\/]/).pop() ?? fileName;
+  return [{ path: 'name', message: `file name ${base} does not match the layout name ${name}` }];
+}
