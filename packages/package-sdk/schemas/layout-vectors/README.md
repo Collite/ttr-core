@@ -20,7 +20,7 @@ Each sub-folder is one case:
 | `layout.yaml` | the YAML serialization | `writeYaml(document) == layout.yaml` **byte for byte**; `readYaml(layout.yaml) == document`; the file validates against `layout.schema.json` |
 | `layout.ttrg` | the TTR serialization — one `.ttrg` graph block, positions in its in-file `layout:` block | `writeTtrg(document) == layout.ttrg` byte for byte; `readTtrg(layout.ttrg) == document` on `name`, `model`, `objects`, `positions` (a `.ttrg` does not carry `skin` or `collapsed`) |
 | `model.json` | the model index the case resolves against: `cards` (entities, tables, views) and `edges` (relations, foreign keys), each `{ fullQname, qname, kind, name, pkg, schema }` | — input to resolution |
-| `expect.json` | the resolution of `document.objects` against `model.json` for `document.model`: `resolved` (ref → full qname), `missing`, `ambiguous` (`{ ref, candidates }`), `ignored` — keys and lists sorted by code point | `resolve(document.objects, model, document.model) == expect.json` |
+| `expect.json` | the resolution of `document.objects` against `model.json` for `document.model`: `resolved` (ref → full qname), `missing`, `ambiguous` (`{ ref, candidates }`), `ignored` — keys and lists in the canonical (alphabetical) order | `resolve(document.objects, model, document.model) == expect.json` |
 | `input.ttrg` + `input.ttrl` | (`sidecar-wins` only) a `.ttrg` and its `.ttrl` sidecar whose positions differ | reading the pair gives `document` — the sidecar's positions and skin win |
 
 ## The cases
@@ -29,7 +29,7 @@ Each sub-folder is one case:
 |---|---|
 | `minimal` | three cards, no positions: no `positions:` key in YAML, no `layout:` block in TTR |
 | `positions` | positions, including a negative coordinate |
-| `diacritics` | Czech letters in qnames — written raw (UTF-8, never `\u` escapes) and bare in TTR (the grammar's identifiers admit U+00C0–U+024F); code-point order |
+| `diacritics` | Czech letters in qnames — written raw (UTF-8, never `\u` escapes) and bare in TTR (the grammar's identifiers admit U+00C0–U+024F); alphabetical order — `příjmové_pásmo` before `prodejna`, which code-point order would swap |
 | `bare-names` | the four reference forms, one per resolution step: full qname · `er.entity.store` · `entity.store_sales` · `item`; a position keyed by a bare name |
 | `ambiguous` | a name two packages define: the bare form and the `qname` form are ambiguous (both candidates listed, never guessed); the full qname still resolves |
 | `missing` | a ref the model does not have, and one that is not an identifier at all (`"Customer Address"` — a label, not a ref): both kept, both reported missing; the latter quoted in YAML and in TTR |
@@ -41,8 +41,12 @@ Each sub-folder is one case:
 
 ## The canonical form, in one place
 
-- `objects` de-duplicated and sorted by **Unicode code point** (not by locale: `z` < `č`); `positions`
-  keys sorted the same way; `collapsed` sorted and de-duplicated.
+- `objects` de-duplicated and sorted **alphabetically**: compare the strings' *keys* code point by code
+  point — the key is the string in Unicode NFD with the nonspacing marks (general category `Mn`) removed,
+  lower-cased (`hartland.er.entity.příjmové_pásmo` → `hartland.er.entity.prijmove_pasmo`) — and break a tie
+  by comparing the strings themselves code point by code point. No locale is involved: `a < č < d < z`,
+  `Item < item < item_class`, `čb < cz`. `positions` keys sorted the same way; `collapsed` sorted and
+  de-duplicated.
 - Coordinates are integers: a reader accepts any number, a writer rounds to the nearest integer with
   halves toward +∞ (`floor(x + 0.5)`: `319.5 → 320`, `-319.5 → -319`).
 - LF line endings, a trailing newline, no trailing spaces.

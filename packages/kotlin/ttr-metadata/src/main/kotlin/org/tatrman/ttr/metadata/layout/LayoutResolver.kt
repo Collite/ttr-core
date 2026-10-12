@@ -30,11 +30,11 @@ data class LayoutModelIndex(
 
 data class LayoutAmbiguity(
     val ref: String,
-    /** the full qnames the deciding step matched, sorted by code point */
+    /** the full qnames the deciding step matched, sorted alphabetically */
     val candidates: List<String>,
 )
 
-/** Every list and the [resolved] keys in code-point order of the ref. */
+/** Every list and the [resolved] keys in alphabetical order of the ref. */
 data class LayoutResolution(
     val resolved: Map<String, String>,
     val missing: List<String>,
@@ -113,7 +113,7 @@ object LayoutResolver {
                     schema = schema,
                 )
         }
-        val order = compareBy(LayoutDocument.CODE_POINT_ORDER) { e: LayoutIndexEntry -> e.fullQname }
+        val order = compareBy(LayoutDocument.ALPHABETICAL_ORDER) { e: LayoutIndexEntry -> e.fullQname }
         return LayoutModelIndex(cards.sortedWith(order), edges.sortedWith(order))
     }
 
@@ -134,7 +134,7 @@ object LayoutResolver {
         val missing = mutableListOf<String>()
         val ambiguous = mutableListOf<LayoutAmbiguity>()
         val ignored = mutableListOf<String>()
-        for (ref in refs.distinct().sortedWith(LayoutDocument.CODE_POINT_ORDER)) {
+        for (ref in refs.distinct().sortedWith(LayoutDocument.ALPHABETICAL_ORDER)) {
             val hits = match(ref, cards)
             when {
                 hits.size == 1 -> resolved[ref] = hits.single()
@@ -160,7 +160,7 @@ object LayoutResolver {
     ): List<String> {
         for (form in steps) {
             val hits = entries.filter { form(it) == ref }.map { it.fullQname }.distinct()
-            if (hits.isNotEmpty()) return hits.sortedWith(LayoutDocument.CODE_POINT_ORDER)
+            if (hits.isNotEmpty()) return hits.sortedWith(LayoutDocument.ALPHABETICAL_ORDER)
         }
         return emptyList()
     }

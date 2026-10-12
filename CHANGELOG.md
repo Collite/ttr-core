@@ -14,7 +14,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
     unchanged; the designer server uses the moved object). New `scan` / `parseLayoutBlock` / `parseObjectRefs`
     read the in-file `layout: { nodes: { … } }` block and the `objects` list — bare or quoted keys, integer or
     decimal coordinates, comments and strings skipped, a viewport dropped. New `model.LayoutDocument` /
-    `LayoutPoint` (canonical form: code-point order, coordinates `floor(x + 0.5)`) and `loader.TtrId` (whether a
+    `LayoutPoint` (canonical form: alphabetical order, coordinates `floor(x + 0.5)`) and `loader.TtrId` (whether a
     reference is a grammar `id`, by running the grammar's own `id` rule).
   - `ttr-writer`: **`TtrgLayoutWriter`** — the canonical `.ttrg` of a layout; reproduces the shared test vectors
     byte for byte.

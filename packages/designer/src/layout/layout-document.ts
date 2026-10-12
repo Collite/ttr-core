@@ -44,8 +44,8 @@ export const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const CONTROL = /[\u0000-\u001F\u007F]/;
 
 /**
- * Order two strings by Unicode code point (V-5) — not by locale, and not by UTF-16 code unit (the two
- * differ above U+FFFF). `č` (U+010D) sorts after `z` (U+007A).
+ * Order two strings by Unicode code point — not by locale, and not by UTF-16 code unit (the two differ
+ * above U+FFFF). The tie-break of {@link compareAlphabetical}.
  */
 export function compareCodePoints(a: string, b: string): number {
   const ia = a[Symbol.iterator]();
@@ -59,13 +59,28 @@ export function compareCodePoints(a: string, b: string): number {
   }
 }
 
+const NONSPACING_MARK = /\p{Mn}/gu;
+
+/** The alphabetical key: NFD, nonspacing marks (category Mn) removed, lower-cased — `Čas` → `cas`. */
+export function alphabeticalKey(s: string): string {
+  return s.normalize('NFD').replace(NONSPACING_MARK, '').toLowerCase();
+}
+
+/**
+ * The canonical order (V-5, A-VL-1): alphabetical — by {@link alphabeticalKey} code point by code point,
+ * ties by the strings' own code points. Locale-free, so every writer agrees: `a < č < z`, `Item < item`.
+ */
+export function compareAlphabetical(a: string, b: string): number {
+  return compareCodePoints(alphabeticalKey(a), alphabeticalKey(b)) || compareCodePoints(a, b);
+}
+
 /** Round a coordinate to an integer, halves toward +∞ — `floor(x + 0.5)`; never `-0` (V-3). */
 export function roundCoordinate(v: number): number {
   return Math.floor(v + 0.5) || 0;
 }
 
 function sortedUnique(refs: readonly string[]): string[] {
-  return [...new Set(refs)].sort(compareCodePoints);
+  return [...new Set(refs)].sort(compareAlphabetical);
 }
 
 function duplicateWarnings(objects: readonly string[]): LayoutIssue[] {
@@ -83,12 +98,12 @@ function duplicateWarnings(objects: readonly string[]): LayoutIssue[] {
 }
 
 /**
- * The canonical form (V-5): objects de-duplicated and sorted by code point, positions keys sorted,
+ * The canonical form (V-5): objects de-duplicated and sorted alphabetically, positions keys sorted,
  * coordinates rounded, empty optional fields dropped. Idempotent; never mutates its input.
  */
 export function canonicalize(doc: LayoutDocument): { doc: LayoutDocument; warnings: LayoutIssue[] } {
   const positions: Record<string, LayoutPoint> = {};
-  for (const key of Object.keys(doc.positions ?? {}).sort(compareCodePoints)) {
+  for (const key of Object.keys(doc.positions ?? {}).sort(compareAlphabetical)) {
     const p = doc.positions[key];
     positions[key] = { x: roundCoordinate(p.x), y: roundCoordinate(p.y) };
   }

@@ -89,7 +89,7 @@ class LayoutResolverSpec :
                 val exp = expected(json(case, "expect.json"))
                 withClue(case.name) {
                     asJson(r) shouldBe exp
-                    // and in the same (code-point) order
+                    // and in the same (alphabetical) order
                     r.resolved.keys.toList() shouldBe (exp.getValue("resolved") as Map<*, *>).keys.toList()
                 }
             }

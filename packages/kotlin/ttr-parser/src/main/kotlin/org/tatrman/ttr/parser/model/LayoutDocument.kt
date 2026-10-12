@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.parser.model
 
+import java.text.Normalizer
 import kotlin.math.floor
 
 /**
@@ -27,28 +28,45 @@ data class LayoutDocument(
     val collapsed: List<String> = emptyList(),
 ) {
     /**
-     * The canonical form (V-5): objects de-duplicated and sorted by code point, positions keys sorted,
+     * The canonical form (V-5): objects de-duplicated and sorted alphabetically ([ALPHABETICAL_ORDER]), positions keys sorted,
      * coordinates rounded ([roundCoordinate]), an empty skin dropped, collapsed sorted + de-duplicated.
      */
     fun canonical(): LayoutDocument =
         LayoutDocument(
             name = name,
             model = model,
-            objects = objects.distinct().sortedWith(CODE_POINT_ORDER),
+            objects = objects.distinct().sortedWith(ALPHABETICAL_ORDER),
             positions =
-                positions.keys.sortedWith(CODE_POINT_ORDER).associateWith { k ->
+                positions.keys.sortedWith(ALPHABETICAL_ORDER).associateWith { k ->
                     val p = positions.getValue(k)
                     LayoutPoint(roundCoordinate(p.x), roundCoordinate(p.y))
                 },
             skin = skin?.takeIf { it.isNotEmpty() },
-            collapsed = collapsed.distinct().sortedWith(CODE_POINT_ORDER),
+            collapsed = collapsed.distinct().sortedWith(ALPHABETICAL_ORDER),
         )
 
     companion object {
         /** The `.ttrg` graph-name rule (V-4, V-13): ASCII letters, digits, underscore; no leading digit. */
         val IDENTIFIER = Regex("^[A-Za-z_][A-Za-z0-9_]*$")
 
-        /** Unicode code point order (V-5) — not locale order, and not UTF-16 code-unit order. */
+        private val NONSPACING_MARK = Regex("\\p{Mn}")
+
+        /** The alphabetical key: NFD, nonspacing marks (category Mn) removed, lower-cased — `Čas` → `cas`. */
+        fun alphabeticalKey(s: String): String =
+            NONSPACING_MARK.replace(Normalizer.normalize(s, Normalizer.Form.NFD), "").lowercase()
+
+        /**
+         * The canonical order (V-5, A-VL-1): alphabetical — by [alphabeticalKey] code point by code point, ties
+         * by the strings' own code points ([CODE_POINT_ORDER]). Locale-free, so every writer agrees with the
+         * viewer's `compareAlphabetical`: `a < č < z`, `Item < item`.
+         */
+        val ALPHABETICAL_ORDER: Comparator<String> =
+            Comparator { a, b ->
+                CODE_POINT_ORDER.compare(alphabeticalKey(a), alphabeticalKey(b)).takeIf { it != 0 }
+                    ?: CODE_POINT_ORDER.compare(a, b)
+            }
+
+        /** Unicode code point order — not locale order, and not UTF-16 code-unit order. */
         val CODE_POINT_ORDER: Comparator<String> =
             Comparator { a, b ->
                 var i = 0

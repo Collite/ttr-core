@@ -21,7 +21,7 @@
       "enum": ["er", "db", "md", "cnc"]
     },
     "objects": {
-      "description": "The cards shown — entities (er), tables and views (db). A writer lists full qnames, sorted by code point; a reader resolves any form the resolution rule accepts.",
+      "description": "The cards shown — entities (er), tables and views (db). A writer lists full qnames, sorted alphabetically (see the vectors' README); a reader resolves any form the resolution rule accepts.",
       "type": "array",
       "items": { "$ref": "#/$defs/objectRef" }
     },

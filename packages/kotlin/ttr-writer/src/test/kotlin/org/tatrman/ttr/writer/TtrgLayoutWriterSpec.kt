@@ -47,7 +47,7 @@ class TtrgLayoutWriterSpec :
             }
         }
 
-        "write canonicalizes: sorted by code point, de-duplicated, coordinates rounded halves up" {
+        "write canonicalizes: sorted alphabetically, de-duplicated, coordinates rounded halves up" {
             val messy =
                 LayoutDocument(
                     name = "g",
@@ -63,8 +63,8 @@ class TtrgLayoutWriterSpec :
                     "  model: er,",
                     "  objects: [",
                     "    a,",
-                    "    z,",
-                    "    č",
+                    "    č,",
+                    "    z",
                     "  ],",
                     "  layout: {",
                     "    nodes: {",
@@ -77,9 +77,19 @@ class TtrgLayoutWriterSpec :
                 ).joinToString("\n")
         }
 
-        "the code-point order is not the locale order, nor the UTF-16 code-unit order" {
-            listOf("zásoby", "zákazník", "čas", "daň", "adresa").sortedWith(LayoutDocument.CODE_POINT_ORDER) shouldBe
-                listOf("adresa", "daň", "zákazník", "zásoby", "čas")
+        "the alphabetical order matches the viewer's compareAlphabetical (A-VL-1)" {
+            val order = LayoutDocument.ALPHABETICAL_ORDER
+            listOf("zásoby", "zákazník", "čas", "daň", "adresa").sortedWith(order) shouldBe
+                listOf("adresa", "čas", "daň", "zákazník", "zásoby")
+            listOf("prodejna", "příjmové_pásmo").sortedWith(order) shouldBe listOf("příjmové_pásmo", "prodejna")
+            listOf("item", "Item", "item_class", "Zeta", "alpha").sortedWith(order) shouldBe
+                listOf("alpha", "Item", "item", "item_class", "Zeta")
+            listOf("č", "c", "d").sortedWith(order) shouldBe listOf("c", "č", "d")
+            listOf("cz", "čb").sortedWith(order) shouldBe listOf("čb", "cz")
+            LayoutDocument.alphabeticalKey("C\u030Cas") shouldBe "cas"
+        }
+
+        "the code-point tie-break is not the UTF-16 code-unit order" {
             listOf("\uD83D\uDE00", "\uFF5E").sortedWith(LayoutDocument.CODE_POINT_ORDER) shouldBe
                 listOf("\uFF5E", "\uD83D\uDE00")
         }

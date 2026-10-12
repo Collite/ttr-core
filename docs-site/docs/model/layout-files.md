@@ -116,7 +116,8 @@ others.
 ## The canonical form
 
 Writers produce one exact text for one document, so saving an unchanged layout is never a diff in git:
-`objects` sorted (by Unicode code point, not by locale) and without duplicates, `positions` keys sorted,
+`objects` sorted alphabetically (letters with diacritics beside their base letter, case ignored; the same
+order on every machine, no locale involved) and without duplicates, `positions` keys sorted,
 coordinates rounded to whole numbers, LF line endings and a final newline, the YAML keys in the order
 shown above. The precise rules — down to when a YAML string is quoted — are written out with the test
 vectors.

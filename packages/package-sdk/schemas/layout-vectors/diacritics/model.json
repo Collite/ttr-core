@@ -25,6 +25,14 @@
       "schema": "er"
     },
     {
+      "fullQname": "hartland.er.entity.prodejna",
+      "qname": "er.entity.prodejna",
+      "kind": "entity",
+      "name": "prodejna",
+      "pkg": "hartland",
+      "schema": "er"
+    },
+    {
       "fullQname": "hartland.er.entity.zákazník",
       "qname": "er.entity.zákazník",
       "kind": "entity",

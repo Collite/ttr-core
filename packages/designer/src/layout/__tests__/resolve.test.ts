@@ -105,7 +105,7 @@ describe('resolveRefs (§4)', () => {
     expect(db.ignored).toEqual(['billing.invoicing.db.dbo.fk.fk_item_class', 'hartland.db.dbo.fk_ss_item']);
   });
 
-  it('reports each ref once, sorted by code point', () => {
+  it('reports each ref once, sorted alphabetically', () => {
     const r = resolveRefs(['zzz', 'aaa', 'zzz', 'item', 'item'], HARTLAND, 'er');
     expect(r.missing).toEqual(['aaa', 'zzz']);
     expect([...r.resolved.keys()]).toEqual(['item']);

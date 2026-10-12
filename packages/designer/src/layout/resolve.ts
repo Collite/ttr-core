@@ -13,7 +13,7 @@
 // No card at any step ⇒ the ref names a relation / foreign key (the same four forms against the
 // schema's edges, or a qname whose kind segment says so) and is IGNORED (V-1), else it is MISSING.
 
-import { compareCodePoints } from './layout-document.js';
+import { compareAlphabetical } from './layout-document.js';
 
 /** One model object as resolution sees it. `fullQname` = `pkg` + `.` + `qname` (`fullQname()` format). */
 export interface LayoutIndexEntry {
@@ -43,7 +43,7 @@ export interface Ambiguity {
 }
 
 export interface Resolution {
-  /** ref → full qname, in code-point order of the ref */
+  /** ref → full qname, in alphabetical order of the ref */
   resolved: Map<string, string>;
   missing: string[];
   ambiguous: Ambiguity[];
@@ -64,7 +64,7 @@ const STEPS: ReadonlyArray<(e: LayoutIndexEntry) => string> = [
 function match(ref: string, entries: readonly LayoutIndexEntry[]): string[] {
   for (const form of STEPS) {
     const hits = new Set(entries.filter((e) => form(e) === ref).map((e) => e.fullQname));
-    if (hits.size > 0) return [...hits].sort(compareCodePoints);
+    if (hits.size > 0) return [...hits].sort(compareAlphabetical);
   }
   return [];
 }
@@ -79,7 +79,7 @@ export function resolveRefs(refs: readonly string[], index: LayoutModelIndex, mo
   const cards = index.cards.filter((e) => e.schema === model);
   const edges = (index.edges ?? []).filter((e) => e.schema === model);
   const out: Resolution = { resolved: new Map(), missing: [], ambiguous: [], ignored: [] };
-  for (const ref of [...new Set(refs)].sort(compareCodePoints)) {
+  for (const ref of [...new Set(refs)].sort(compareAlphabetical)) {
     const hits = match(ref, cards);
     if (hits.length === 1) out.resolved.set(ref, hits[0]);
     else if (hits.length > 1) out.ambiguous.push({ ref, candidates: hits });
@@ -97,11 +97,11 @@ export function resolutionToJson(r: Resolution): {
   ignored: string[];
 } {
   const resolved: Record<string, string> = {};
-  for (const ref of [...r.resolved.keys()].sort(compareCodePoints)) resolved[ref] = r.resolved.get(ref)!;
+  for (const ref of [...r.resolved.keys()].sort(compareAlphabetical)) resolved[ref] = r.resolved.get(ref)!;
   return {
     resolved,
-    missing: [...r.missing].sort(compareCodePoints),
-    ambiguous: [...r.ambiguous].sort((a, b) => compareCodePoints(a.ref, b.ref)),
-    ignored: [...r.ignored].sort(compareCodePoints),
+    missing: [...r.missing].sort(compareAlphabetical),
+    ambiguous: [...r.ambiguous].sort((a, b) => compareAlphabetical(a.ref, b.ref)),
+    ignored: [...r.ignored].sort(compareAlphabetical),
   };
 }

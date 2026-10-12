@@ -2,7 +2,9 @@
 // The layout module (VL-P0): one document, two serializations, one resolution rule (VL contracts §1–§4).
 
 export {
+  alphabeticalKey,
   canonicalize,
+  compareAlphabetical,
   compareCodePoints,
   fileStem,
   modeOf,

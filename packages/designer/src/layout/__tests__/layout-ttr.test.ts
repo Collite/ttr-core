@@ -217,7 +217,7 @@ describe('readTtrg / mergeTtr (V-11)', () => {
 
   it('reads a quoted (non-id) ref back exactly', () => {
     const d: LayoutDocument = { name: 'odd', model: 'er', objects: ['Customer Address', 'a"b'], positions: { 'Customer Address': { x: 0, y: 0 } } };
-    expect(ok(readTtrg(writeTtrg(d))).doc).toEqual({ ...d, objects: ['Customer Address', 'a"b'] });
+    expect(ok(readTtrg(writeTtrg(d))).doc).toEqual({ ...d, objects: ['a"b', 'Customer Address'] });
   });
 
   it('reports what makes a file unreadable, with lines', () => {
