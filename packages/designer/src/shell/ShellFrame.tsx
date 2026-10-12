@@ -241,6 +241,30 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   }
 
   /**
+   * Open a layout the catalog serves (V-34, V-36): read it, re-resolve it against the schema's whole graph
+   * (a stale catalog cannot show a card the current graph lacks) and open a `catalog` tab. A layout the
+   * catalog does not have (404) or cannot serve is an error toast — never a blank tab.
+   */
+  async function openCatalogLayout(name: string) {
+    if (!dataSource.getLayoutDoc) return;
+    let served: Awaited<ReturnType<NonNullable<ModelDataSource['getLayoutDoc']>>>;
+    try {
+      served = await dataSource.getLayoutDoc(name);
+    } catch (e) {
+      onError?.(`Could not open the layout ${name}: ${e instanceof Error ? e.message : String(e)}`);
+      return;
+    }
+    const whole = await loadSchemaGraph(served.schema);
+    if (!whole) { onError?.(`Could not open the layout ${name}: the ${served.schema} schema could not be read.`); return; }
+    const objects = [...served.objects, ...served.missing, ...served.ambiguous.map((a) => a.ref)];
+    const raw: LayoutDocument = { name: served.name, model: served.schema as LayoutDocument['model'], objects, positions: served.positions };
+    if (served.skin) raw.skin = served.skin;
+    if (served.collapsed.length > 0) raw.collapsed = served.collapsed;
+    const res = resolveRefs([...objects, ...Object.keys(served.positions)], layoutIndexOf(whole).index, raw.model);
+    setShell((s) => openLayoutTab(s, { doc: normalizeForTab(raw, res), source: 'catalog', dirty: false }));
+  }
+
+  /**
    * Open layout… (V-31): read the picked / dropped files, resolve them against the schema's whole graph
    * (read first when not held) and open a `file` tab. A model this backend does not serve, an unreadable
    * file or a lone `.ttrl` is an error toast — no tab.
@@ -288,6 +312,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   }
 
   function openItem(item: CatalogItem, preview = true) {
+    if (item.layout) { void openCatalogLayout(item.layout.name); return; }
     const subject = subjectOf(item);
     setShell((s) => openSubject(s, subject, { preview }));
     if (item.kind === 'schema') void ensureGraph(item.ref);
@@ -896,6 +921,10 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
           <div style={{ display: 'flex', alignItems: 'center', paddingRight: 12 }}>
             <Breadcrumb tab={tab} onDrillTo={(i) => setShell((s) => drillTo(s, s.activeTabId!, i))} />
             {(() => {
+              // a local layout is not on the server — its link would open nothing (V-35)
+              if (tab.layout && tab.layout.source !== 'catalog') {
+                return <CopyLinkButton url="" disabledReason="Saved files are not on the server — commit it to share." />;
+              }
               const path = federationPathForTab(tab);
               const url = path && typeof window !== 'undefined' ? absoluteUrlFor(path) : null;
               return url ? <CopyLinkButton url={url} /> : null;

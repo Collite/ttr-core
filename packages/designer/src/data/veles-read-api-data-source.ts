@@ -29,7 +29,7 @@ import type {
   CatalogListing,
   ModelKind,
 } from './model-data-source.js';
-import type { TtrmSearchHit } from './ttrm-types.js';
+import type { TtrmSearchHit, LayoutSummary, LayoutsResponse, ResolvedLayout } from './ttrm-types.js';
 import type { GetGraphResponse } from '@tatrman/lsp';
 import { StructuralGraphCache, describeTtrmNode, ttrmToGetGraphResponse, type ObjectDescription } from './structural-graph.js';
 
@@ -129,11 +129,25 @@ export class VelesReadApiDataSource implements ModelDataSource {
   async listCatalog(): Promise<CatalogListing> {
     // Veles browses by schema (no per-graph listing, no symbols) — synthesize one catalog entry per
     // served schema so the spine opens; cube/concept/program groups stay empty (honest degradation).
-    const index = await this.getModelIndex();
+    // Then the layouts it serves (VL V-34); a catalog without the layout routes lists none.
+    const [index, layouts] = await Promise.all([this.getModelIndex(), this.listLayouts().catch(() => [] as LayoutSummary[])]);
     return {
-      graphs: index.schemas.map((schema) => ({ uri: schema, name: schema, schema })),
+      graphs: [
+        ...index.schemas.map((schema) => ({ uri: schema, name: schema, schema })),
+        ...layouts.map((l) => ({ uri: l.name, name: l.name, schema: l.schema, layout: { missingCount: l.missingCount } })),
+      ],
       symbols: [],
     };
+  }
+
+  /** The layouts committed next to the model (VL V-36 — `GET /model/layouts`). */
+  async listLayouts(): Promise<LayoutSummary[]> {
+    return (await this.getJson<LayoutsResponse>('/model/layouts')).layouts;
+  }
+
+  /** One layout, resolved by the catalog (VL V-36 — `GET /model/layout?name=`). A 404 rejects. */
+  getLayoutDoc(name: string): Promise<ResolvedLayout> {
+    return this.getJson<ResolvedLayout>(`/model/layout?name=${encodeURIComponent(name)}`);
   }
 
   /**

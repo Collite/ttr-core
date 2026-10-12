@@ -1,0 +1,28 @@
+{
+  "name": "db_tables",
+  "schema": "db",
+  "objects": [
+    "hartland.db.dbo.item",
+    "hartland.db.dbo.store_sales"
+  ],
+  "positions": {
+    "hartland.db.dbo.item": {
+      "x": 320,
+      "y": 180
+    }
+  },
+  "mode": "manual",
+  "skin": "db.table-classic",
+  "collapsed": [],
+  "missing": [
+    "channel_sales",
+    "table.store"
+  ],
+  "ambiguous": [],
+  "ignored": [
+    "hartland.db.dbo.fk_ss_item"
+  ],
+  "positionsFrom": "in-file",
+  "source": "layouts/db_tables.ttrg",
+  "modelVersion": "hartland-fixture"
+}

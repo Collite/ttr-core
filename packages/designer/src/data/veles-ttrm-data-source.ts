@@ -22,7 +22,7 @@ import type {
   CatalogListing,
   ModelKind,
 } from './model-data-source.js';
-import type { TtrmSearchHit, TtrmStatus } from './ttrm-types.js';
+import type { TtrmSearchHit, TtrmStatus, LayoutSummary, LayoutsResponse, ResolvedLayout } from './ttrm-types.js';
 import type { GetGraphResponse } from '@tatrman/lsp';
 import { StructuralGraphCache, describeTtrmNode, ttrmToGetGraphResponse, type ObjectDescription } from './structural-graph.js';
 import {
@@ -65,6 +65,8 @@ export interface VelesTtrmDataSourceOptions {
   wsClientOptions?: Omit<JsonRpcWsClientOptions, 'bearerToken'>;
   /** The language model labels and descriptions are shown in (ttr-core#170); default `en`. */
   lang?: string;
+  /** The layout routes are plain GETs on the same host (VL V-36); injected for tests, defaults to `fetch`. */
+  fetchImpl?: typeof fetch;
 }
 
 export class VelesTtrmDataSource implements ModelDataSource {
@@ -82,12 +84,37 @@ export class VelesTtrmDataSource implements ModelDataSource {
   private readonly client: JsonRpcWsClient;
   private status: TtrmStatus | null = null;
   private readonly served: StructuralGraphCache;
+  private readonly httpOrigin: string;
+  private readonly token: string | undefined;
+  private readonly fetchImpl: typeof fetch;
 
   /** @param origin the platform Veles WS origin, e.g. `wss://veles.example`; `/v1/ttrm` is appended. */
   constructor(origin: string, opts: VelesTtrmDataSourceOptions = {}) {
     const url = origin.replace(/\/$/, '') + '/v1/ttrm';
     this.client = new JsonRpcWsClient(url, { ...opts.wsClientOptions, bearerToken: opts.token });
     this.served = new StructuralGraphCache(opts.lang);
+    this.httpOrigin = origin.replace(/\/$/, '').replace(/^ws/i, 'http');
+    this.token = opts.token;
+    this.fetchImpl = opts.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
+  }
+
+  /** A layout route (VL V-36): a GET on the same host over http(s), the bearer when there is one. */
+  private async getLayoutJson<T>(path: string): Promise<T> {
+    const res = await this.fetchImpl(this.httpOrigin + path, {
+      headers: { Accept: 'application/json', ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}) },
+    });
+    if (!res.ok) throw new Error(`veles ${path} → ${res.status}`);
+    return (await res.json()) as T;
+  }
+
+  /** The layouts committed next to the model (VL V-36 — `GET /model/layouts`). */
+  async listLayouts(): Promise<LayoutSummary[]> {
+    return (await this.getLayoutJson<LayoutsResponse>('/model/layouts')).layouts;
+  }
+
+  /** One layout, resolved by the catalog (VL V-36 — `GET /model/layout?name=`). */
+  getLayoutDoc(name: string): Promise<ResolvedLayout> {
+    return this.getLayoutJson<ResolvedLayout>(`/model/layout?name=${encodeURIComponent(name)}`);
   }
 
   /** Connect (bearer on the handshake) and verify the ttrm handshake. */
@@ -163,9 +190,12 @@ export class VelesTtrmDataSource implements ModelDataSource {
   }
 
   async listCatalog(): Promise<CatalogListing> {
-    const index = await this.getModelIndex();
+    const [index, layouts] = await Promise.all([this.getModelIndex(), this.listLayouts().catch(() => [] as LayoutSummary[])]);
     return {
-      graphs: index.schemas.map((schema) => ({ uri: schema, name: schema, schema })),
+      graphs: [
+        ...index.schemas.map((schema) => ({ uri: schema, name: schema, schema })),
+        ...layouts.map((l) => ({ uri: l.name, name: l.name, schema: l.schema, layout: { missingCount: l.missingCount } })),
+      ],
       symbols: [],
     };
   }
