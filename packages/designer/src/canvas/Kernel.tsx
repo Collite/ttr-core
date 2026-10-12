@@ -26,6 +26,8 @@ export interface KernelProps {
   skinId: SkinId;
   positions: Positions;
   selectedId?: string | null;
+  /** further selected nodes (shift-click multi-select — VL V-27) */
+  selectedIds?: readonly string[];
   /** the selected edge (a hop edge in the inspector) — drawn heavier */
   selectedEdgeId?: string | null;
   orphanIds?: string[];
@@ -58,7 +60,7 @@ export function CanvasKernel(props: KernelProps) {
 }
 
 function KernelInner({
-  graph, registry, skinId, positions, selectedId, selectedEdgeId, orphanIds, derived, theme = 'ice', runStates, previews, onSelect, onEdgeSelect, onEdgeContextMenu, onNodeDrag, onNodeContextMenu, onDrillIn,
+  graph, registry, skinId, positions, selectedId, selectedIds, selectedEdgeId, orphanIds, derived, theme = 'ice', runStates, previews, onSelect, onEdgeSelect, onEdgeContextMenu, onNodeDrag, onNodeContextMenu, onDrillIn,
   viewportCenterRef,
 }: KernelProps) {
   const labelOf = (id: string) => graph.nodes.find((n) => n.id === id)?.label ?? id;
@@ -75,6 +77,7 @@ function KernelInner({
   }, [rf, viewportCenterRef]);
   const skin = registry.resolve(skinId) as DesignerSkin | undefined;
   const orphanSet = useMemo(() => new Set(orphanIds ?? []), [orphanIds]);
+  const multiSet = useMemo(() => new Set(selectedIds ?? []), [selectedIds]);
 
   const rfNodes: Node<CNodeData>[] = useMemo(() => {
     if (!skin) return [];
@@ -82,7 +85,7 @@ function KernelInner({
       const size = skin.nodeSize(n);
       const run = runStates?.[n.id];
       const state: NodeBaseState = {
-        selected: selectedId === n.id,
+        selected: selectedId === n.id || multiSet.has(n.id),
         // v1 has no focus concept distinct from selection; the selected node IS the focused one.
         // This drives cnc.bubbles' properties-on-focus (its only consumer) on the live canvas.
         focused: selectedId === n.id,
@@ -97,11 +100,11 @@ function KernelInner({
         type: 'cnode',
         position: positions[n.id] ?? { x: 0, y: 0 },
         data: { node: n, skin, state, theme, bindingHint: graph.bindingHints?.[n.id], preview: previews?.[n.id] },
-        selected: selectedId === n.id,
+        selected: selectedId === n.id || multiSet.has(n.id),
         style: { width: size.width, height: size.height },
       };
     });
-  }, [graph, skin, positions, selectedId, orphanSet, derived, theme, runStates, previews]);
+  }, [graph, skin, positions, selectedId, multiSet, orphanSet, derived, theme, runStates, previews]);
 
   const rfEdges: Edge<CEdgeData>[] = useMemo(() => {
     if (!skin) return [];

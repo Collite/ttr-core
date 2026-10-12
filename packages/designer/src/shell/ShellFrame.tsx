@@ -34,7 +34,8 @@ import {
   emptyShell, openSubject, promoteTab, closeTab, dropPreviewIfLeaving, drillIn, drillTo, activeTab, setPerspective,
   setLayoutObjects, setLayoutPositions, toLayoutTab,
 } from './shell-state.js';
-import { projectLayout, layoutIndexOf, hiddenNeighbours, visibleNeighbours, type HopEdge, type LayoutGraphIndex, type LayoutProjection } from '../model/layout-projection.js';
+import { ViewMenu, type ViewMenuEntry, type ViewMenuTarget } from './ViewMenu.js';
+import { projectLayout, layoutIndexOf, hiddenNeighbours, hiddenClosure, visibleNeighbours, type HopEdge, type LayoutGraphIndex, type LayoutProjection } from '../model/layout-projection.js';
 import { placeNew, centreOf, type Point, type Size } from '../model/placement.js';
 import { modelGraphToCanvas, layoutAuto, type CanvasGraph, type SchemaCode } from '@tatrman/canvas-core';
 import { createSkinRegistry } from '../skins/index.js';
@@ -155,6 +156,10 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   const schemaLoadingRef = useRef<Set<string>>(new Set());
   // the hop edge open in the inspector (VL V-26), by edge id; derived, cleared when it disappears.
   const [selectedHop, setSelectedHop] = useState<string | null>(null);
+  // shift-click multi-selection (V-27): node ids the view menu's items apply to together
+  const [multiSel, setMultiSel] = useState<ReadonlySet<string>>(new Set());
+  // Expand all levels… asks first (V-27): the count, then apply or cancel
+  const [confirm, setConfirm] = useState<{ text: string; onYes: () => void } | null>(null);
   // what the canvas shows the user, in canvas coordinates — where a card with no neighbour goes (V-19)
   const viewportCenterRef = useRef<(() => Point | null) | null>(null);
   const [positions, setPositions] = useState<Record<string, Record<string, { x: number; y: number }>>>({});
@@ -595,6 +600,54 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     }
   }
 
+  /**
+   * The view menu's items (V-27) for a right-clicked card — applied to the shift-selection when the card
+   * is in it — or a hop edge (Show <H> per hidden card).
+   */
+  function viewMenuItems(target: ViewMenuTarget): ViewMenuEntry[] {
+    if (!tab || !wholeGraph || !wholeIndex) return [];
+    const toFq = (id: string) => wholeIndex.fullQnameOf.get(id) ?? id;
+    const nodeOf = new Map(wholeGraph.nodes.map((n) => [n.qname, n]));
+    if (target.kind === 'edge') {
+      const hop = projection?.hopEdges.find((h) => h.id === target.id);
+      return (hop?.via ?? []).map((fq) => ({
+        id: `show:${fq}`,
+        label: `Show ${nodeOf.get(wholeIndex.nodeOf.get(fq) ?? fq)?.label ?? fq}`,
+        run: () => showCards([fq]),
+      }));
+    }
+    const set = multiSel.has(target.id) && multiSel.size > 1 ? [...multiSel] : [target.id];
+    const many = set.length > 1 ? ` (${set.length} cards)` : '';
+    const shownIds = new Set(shownCards(tab).map((fq) => wholeIndex.nodeOf.get(fq) ?? fq));
+    const frontier = hiddenNeighbours(wholeGraph, shownIds, set);
+    return [
+      { id: 'expand', label: `Expand${many}`, hint: `+${frontier.length}`, disabled: frontier.length === 0, run: () => expandCards(set.map(toFq)) },
+      {
+        id: 'expand-all', label: 'Expand all levels…', hint: 'closure',
+        run: () => {
+          const add = hiddenClosure(wholeGraph, shownIds, set);
+          if (add.length === 0) { onNotice?.('Nothing to add'); return; }
+          setConfirm({
+            text: `This adds ${add.length} card${add.length === 1 ? '' : 's'} (${shownIds.size + add.length} of ${wholeGraph.nodes.length} shown afterwards). On a connected model that is usually most of it.`,
+            onYes: () => showCards(add.map(toFq)),
+          });
+        },
+      },
+      { separator: true },
+      { id: 'hide', label: `Hide${many}`, run: () => { hideCards(set.map(toFq)); setMultiSel(new Set()); } },
+      {
+        id: 'hide-others', label: 'Hide others', hint: 'keep + neighbours',
+        run: () => {
+          const keep = new Set(set);
+          for (const id of set) for (const n of visibleNeighbours(wholeGraph, shownIds, id)) keep.add(n);
+          applyObjects([...keep].map(toFq));
+        },
+      },
+      { separator: true },
+      { id: 'inspect', label: 'Inspect', run: () => { setSelectedHop(null); void onSelectNode(target.id); } },
+    ];
+  }
+
   const missingRefs: MissingRef[] = useMemo(() => (projection
     ? [...projection.missing.map((ref) => ({ ref })), ...projection.ambiguous.map((a) => ({ ref: a.ref, candidates: a.candidates }))]
         .sort((a, b) => compareAlphabetical(a.ref, b.ref))
@@ -872,7 +925,19 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
               onEdgeSelect={(id) => {
                 if (id && id.startsWith('hop:')) { setSelectedHop(id); setDrawerOpen(false); } else setSelectedHop(null);
               }}
-              onNodeSelect={(q) => { setSelectedHop(null); void onSelectNode(q); }}
+              onNodeSelect={(q, additive) => {
+                setSelectedHop(null);
+                if (additive && q) {
+                  setMultiSel((m) => { const n = new Set(m); if (n.has(q)) n.delete(q); else n.add(q); return n; });
+                  return;
+                }
+                setMultiSel(new Set());
+                void onSelectNode(q);
+              }}
+              selectedIds={[...multiSel]}
+              renderViewMenu={wholeGraph && wholeIndex
+                ? (target, close) => <ViewMenu items={viewMenuItems(target)} onClose={close} />
+                : undefined}
               renderNodeMenu={canEdit && editContext
                 ? (qname, close) => editContext.renderNodeMenu({ qname, graphRef: tab.subject.ref, onApplied: () => void refetchGraph(tab.subject.ref), onClose: close })
                 : undefined}
@@ -916,6 +981,21 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
         }}
       />
       <CommandPalette registry={registry} open={cmdkOpen} onClose={() => setCmdkOpen(false)} />
+      {confirm && (
+        <div data-testid="confirm-dialog" role="dialog" aria-modal="true"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(22,40,63,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+          onKeyDown={(e) => { if (e.key === 'Escape') setConfirm(null); }}>
+          <div style={{ background: '#fff', borderRadius: 10, padding: 18, maxWidth: 420, boxShadow: '0 10px 30px rgba(0,0,0,.2)', fontSize: 13 }}>
+            <p data-testid="confirm-text" style={{ margin: '0 0 14px' }}>{confirm.text}</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button data-testid="confirm-no" autoFocus onClick={() => setConfirm(null)}
+                style={{ border: '1px solid #CBD8E6', borderRadius: 6, background: '#fff', cursor: 'pointer', padding: '4px 12px' }}>Cancel</button>
+              <button data-testid="confirm-yes" onClick={() => { const yes = confirm.onYes; setConfirm(null); yes(); }}
+                style={{ border: 'none', borderRadius: 6, background: '#16283F', color: '#fff', cursor: 'pointer', padding: '4px 12px' }}>Add them</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
