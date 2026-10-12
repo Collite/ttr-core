@@ -33,6 +33,10 @@ export interface SkinnedCanvasProps {
   /** the ViewStateStore key for this canvas (the graph uri); null ⇒ persistence is skipped. */
   canvasKey: string | null;
   selectedQname?: string | null;
+  /** the selected edge (a hop edge open in the inspector — VL V-26) */
+  selectedEdgeId?: string | null;
+  /** an edge was clicked (a hop edge's pill included); null = cleared */
+  onEdgeSelect?: (id: string | null) => void;
   /** skin id from view-state (may be unknown ⇒ DS-SKIN-002 fallback + truth-chip note) */
   initialSkin?: SkinId;
   onNodeSelect: (qname: string | null) => void;
@@ -56,7 +60,7 @@ function project(cg: CanvasGraph, mode: DisplayMode): CanvasGraph {
 }
 
 export function SkinnedCanvas({
-  graph, displayMode, nodePositions, canvasKey, selectedQname, initialSkin, onNodeSelect, renderNodeMenu, onPersistView, onDrillIn,
+  graph, displayMode, nodePositions, canvasKey, selectedQname, selectedEdgeId, onEdgeSelect, initialSkin, onNodeSelect, renderNodeMenu, onPersistView, onDrillIn,
   bindingHints, showBindings, onToggleShowBindings,
 }: SkinnedCanvasProps) {
   const registry = useMemo(() => createSkinRegistry(), []);
@@ -190,7 +194,9 @@ export function SkinnedCanvas({
           skinId={skinId}
           positions={positions}
           selectedId={selectedQname ?? null}
+          selectedEdgeId={selectedEdgeId ?? null}
           onSelect={onNodeSelect}
+          onEdgeSelect={onEdgeSelect}
           onNodeDrag={onNodeDrag}
           // the node context menu is edit UI (FO-21) — only armed when the shell injects an authoring
           // menu renderer; the OPEN Viewer passes none, so right-click has no menu (read-only).

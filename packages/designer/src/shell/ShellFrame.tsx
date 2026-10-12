@@ -14,7 +14,7 @@
 //     processing face (program tabs) is a placeholder until DM-P4.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { BindingMapData, DisplayMode, GetGraphResponse, LineageRootRef } from '@tatrman/lsp';
+import type { BindingMapData, DisplayMode, GetGraphResponse, LineageRootRef, ModelGraphEdge } from '@tatrman/lsp';
 import { generateBindingRibbon, generateLineage, type LineageScope, type LineageDirection, type ObjectKind } from '@tatrman/perspectives';
 import type { ModelDataSource } from '../data/model-data-source.js';
 import type { ViewStateStore } from '@tatrman/canvas-core';
@@ -29,10 +29,15 @@ import { fixtureProcessingSource, type ProcessingGraphSource } from '../model/pr
 import { absentRunSource, type RunSource } from '../model/run-source.js';
 import { DerivedCanvas } from '../perspectives/index.js';
 import type { ShellEditContext } from './edit-context.js';
-import type { CatalogGroup, CatalogItem, ShellState, Subject, SubjectKind } from './types.js';
+import type { CatalogGroup, CatalogItem, ShellState, Subject, SubjectKind, SubjectTab, TabLayout } from './types.js';
 import {
   emptyShell, openSubject, promoteTab, closeTab, dropPreviewIfLeaving, drillIn, drillTo, activeTab, setPerspective,
+  setLayoutObjects, setLayoutPositions, toLayoutTab,
 } from './shell-state.js';
+import { projectLayout, layoutIndexOf, type HopEdge, type LayoutGraphIndex, type LayoutProjection } from '../model/layout-projection.js';
+import { LayoutDocumentStore } from '../data/view-state-store.js';
+import type { LayoutPoint } from '../layout/layout-document.js';
+import { HopEdgeInspector } from './HopEdgeInspector.js';
 import { CatalogSpine } from './CatalogSpine.js';
 import { FileRail } from './FileRail.js';
 import { TabBar } from './TabBar.js';
@@ -96,6 +101,22 @@ const subjectOf = (item: CatalogItem): Subject => ({
   ref: item.ref, kind: item.kind, schemaCode: item.schemaCode, label: item.label,
 });
 
+/** A hop edge as the canvas draws it: one more edge kind, dashed (VL V-26). */
+function hopAsEdge(h: HopEdge): ModelGraphEdge {
+  return {
+    id: h.id, qname: h.id, kind: 'hop', via: h.via, fromNode: h.fromNode, toNode: h.toNode,
+    fromCardinality: null, toCardinality: null, sourceUri: '', sourceLocation: { line: 0, column: 0 },
+  };
+}
+
+/** The layout a plain tab becomes on its first selection edit (V-22): the whole schema ⇒ `untitled`,
+ *  a project graph ⇒ its own name, either way a new, unsaved layout. */
+function seedLayoutName(tab: SubjectTab): string {
+  if (tab.subject.ref === tab.subject.schemaCode) return 'untitled';
+  const name = tab.subject.label.split(' · ').pop() ?? '';
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : 'untitled';
+}
+
 export function ShellFrame({ dataSource, workspace, catalog, files, displayMode, getSourceText, onError, onActiveChange, viewState, editContext, irisBaseUrl, processingSource, runSource, validateProgram }: ShellFrameProps) {
   const [shell, setShell] = useState<ShellState>(emptyShell);
   // processing face (DM-P4): the fixture source serves the hero graph in dev + tests; the live
@@ -107,6 +128,12 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   const procRunRef = useRef<(() => void) | null>(null);
   const insertPaletteRef = useRef<(() => void) | null>(null);
   const [graphs, setGraphs] = useState<Record<string, GetGraphResponse | null>>({});
+  // the whole-schema graph per schema code (VL V-21) — what the Objects panel lists, layouts resolve
+  // against and are projected from. On a catalog it is the schema subject's own graph.
+  const [schemaGraphs, setSchemaGraphs] = useState<Record<string, GetGraphResponse | null>>({});
+  const schemaLoadingRef = useRef<Set<string>>(new Set());
+  // the hop edge open in the inspector (VL V-26), by edge id; derived, cleared when it disappears.
+  const [selectedHop, setSelectedHop] = useState<string | null>(null);
   const [positions, setPositions] = useState<Record<string, Record<string, { x: number; y: number }>>>({});
   const [selected, setSelected] = useState<DrawerNode | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -131,6 +158,34 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   }
 
   const tab = activeTab(shell);
+  const shellRef = useRef(shell);
+  shellRef.current = shell;
+
+  // the layout tabs' store (VL V-28): positions / skin / collapsed live in the tab's layout; a write
+  // marks it dirty. Keyed by tab id.
+  const layoutStore = useMemo(() => new LayoutDocumentStore({
+    get: (tabId) => {
+      const l = shellRef.current.tabs.find((t) => t.id === tabId)?.layout;
+      return l ? { positions: l.doc.positions, skin: l.doc.skin, collapsed: l.doc.collapsed } : undefined;
+    },
+    set: (tabId, st) => setShell((s) => setLayoutPositions(s, tabId, st.positions, { collapsed: st.collapsed })),
+  }), []);
+
+  async function ensureSchemaGraph(code: string) {
+    if (schemaGraphs[code] !== undefined || schemaLoadingRef.current.has(code) || !dataSource.getSchemaGraph) return;
+    if (code !== 'db' && code !== 'er' && code !== 'md' && code !== 'cnc') return;
+    if (graphs[code]) { setSchemaGraphs((m) => ({ ...m, [code]: graphs[code] })); return; } // a catalog's schema subject
+    schemaLoadingRef.current.add(code);
+    try {
+      const g = await dataSource.getSchemaGraph(code);
+      setSchemaGraphs((m) => ({ ...m, [code]: g }));
+    } catch (e) {
+      onError?.(`Failed to read the ${code} schema: ${e}`);
+      setSchemaGraphs((m) => ({ ...m, [code]: null }));
+    } finally {
+      schemaLoadingRef.current.delete(code);
+    }
+  }
 
   // load a schema subject's graph (once) + its saved layout positions (from the ViewStateStore,
   // falling back to the graph's own in-file layout when no store is wired).
@@ -140,6 +195,8 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     try {
       const g = await dataSource.getGraph(ref);
       setGraphs((m) => ({ ...m, [ref]: g }));
+      // a catalog's schema subject IS the whole schema — keep one read (VL V-21)
+      if (g && ref === g.schema && dataSource.getSchemaGraph) setSchemaGraphs((m) => (m[ref] !== undefined ? m : { ...m, [ref]: g }));
       let saved: Record<string, { x: number; y: number }> | null = null;
       if (viewState) {
         const vs = await viewState.read(ref).catch(() => null);
@@ -162,9 +219,14 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   }
 
   useEffect(() => {
-    // a lineage tab roots at an object qname (not a graph uri) — don't fetch a graph for it.
-    if (tab?.subject.kind === 'schema' && tab.perspective !== 'lineage') void ensureGraph(tab.subject.ref);
-  }, [tab?.subject.ref, tab?.perspective]);
+    // a lineage tab roots at an object qname (not a graph uri) — don't fetch a graph for it; a layout
+    // tab is projected from its schema's whole graph, it has no graph of its own.
+    if (tab?.subject.kind === 'schema' && tab.perspective !== 'lineage' && !tab.layout) void ensureGraph(tab.subject.ref);
+    if (tab?.subject.kind === 'schema' && tab.perspective !== 'lineage' && tab.subject.schemaCode) {
+      // a plain schema subject's whole graph: once its own graph is in (a catalog shares the read)
+      if (tab.layout || graphs[tab.subject.ref] !== undefined) void ensureSchemaGraph(tab.subject.schemaCode);
+    }
+  }, [tab?.subject.ref, tab?.perspective, tab?.layout ? 'layout' : 'plain', tab ? graphs[tab.subject.ref] : undefined]);
 
   // fetch the project-wide binding map once the catalog is available (C-2). Failure is soft:
   // no bindings ⇒ no show-bindings decoration and an empty ribbon. getBindings is absent on
@@ -342,7 +404,85 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     } catch (e) { onError?.(`Failed to save layout: ${e}`); }
   }
 
-  const currentGraph = tab?.subject.kind === 'schema' ? graphs[tab.subject.ref] : null;
+  // ---- the working layout (VL §5): a layout tab shows its projection of the schema's whole graph ----
+  const tabLayout = tab?.subject.kind === 'schema' ? tab.layout : undefined;
+  const schemaCode = tab?.subject.kind === 'schema' ? tab.subject.schemaCode : undefined;
+  const wholeGraph = schemaCode ? schemaGraphs[schemaCode] ?? null : null;
+  const wholeIndex = useMemo<LayoutGraphIndex | null>(() => (wholeGraph ? layoutIndexOf(wholeGraph) : null), [wholeGraph]);
+  const projection = useMemo<LayoutProjection | null>(
+    () => (tabLayout && wholeGraph && wholeIndex ? projectLayout(wholeGraph, tabLayout.doc, { hops: 1 }, wholeIndex) : null),
+    [tabLayout?.doc, wholeGraph, wholeIndex],
+  );
+  // node positions of a layout tab, by the canvas's node ids (the doc keys them by full qname)
+  const layoutNodePositions = useMemo(() => {
+    if (!tabLayout || !projection || !wholeIndex) return null;
+    const out: Record<string, LayoutPoint> = {};
+    for (const [ref, p] of Object.entries(tabLayout.doc.positions)) {
+      const id = wholeIndex.nodeOf.get(projection.resolved.get(ref) ?? ref);
+      if (id !== undefined) out[id] = p;
+    }
+    return out;
+  }, [tabLayout?.doc.positions, projection, wholeIndex]);
+  const inspectedHop = selectedHop ? projection?.hopEdges.find((h) => h.id === selectedHop) ?? null : null;
+
+  /** The full qnames a tab shows: its layout's resolved cards, or — a plain subject — its graph's nodes. */
+  function shownCards(t: SubjectTab): string[] {
+    if (t.layout) return projection && t === tab ? [...new Set(projection.resolved.values())] : t.layout.doc.objects;
+    const g = graphs[t.subject.ref];
+    return g ? g.nodes.map((n) => wholeIndex?.fullQnameOf.get(n.qname) ?? n.qname) : [];
+  }
+
+  /**
+   * Set the active tab's cards (V-19). A plain subject becomes a new, unsaved layout on its first
+   * selection edit (V-22) — its positions (session drags) come along; on a layout tab the refs the
+   * model lacks (missing / ambiguous) stay until removed (V-15).
+   */
+  function applyObjects(nextCards: string[], placed: Record<string, LayoutPoint> = {}, keepUnresolved = true) {
+    if (!tab || tab.subject.kind !== 'schema' || !tab.subject.schemaCode) return;
+    const unresolved = tab.layout && keepUnresolved && projection ? [...projection.missing, ...projection.ambiguous.map((a) => a.ref)] : [];
+    const objects = [...new Set([...nextCards, ...unresolved])];
+    if (tab.layout) { setShell((s) => setLayoutObjects(s, tab.id, objects, placed)); return; }
+    const held = positions[tab.subject.ref] ?? {};
+    const seeded: Record<string, LayoutPoint> = {};
+    for (const [id, p] of Object.entries(held)) seeded[wholeIndex?.fullQnameOf.get(id) ?? id] = p;
+    const layout: TabLayout = {
+      doc: { name: seedLayoutName(tab), model: tab.subject.schemaCode as TabLayout['doc']['model'], objects: [], positions: {} },
+      source: 'new',
+      dirty: true,
+    };
+    const keep = new Set(objects);
+    const start: Record<string, LayoutPoint> = {};
+    if (Object.keys(seeded).length > 0) {
+      for (const [fq, p] of Object.entries(seeded)) if (keep.has(fq)) start[fq] = p;
+      Object.assign(start, placed);
+    }
+    layout.doc = { ...layout.doc, objects, positions: start };
+    setShell((s) => toLayoutTab(s, tab.id, layout));
+  }
+
+  /** Check `cards` into the active tab (Show, Expand, the panel) — V-19. */
+  function showCards(cards: string[]) {
+    if (!tab) return;
+    applyObjects([...new Set([...shownCards(tab), ...cards])]);
+  }
+
+  // a drag on a layout tab → its positions, by full qname (V-28), keeping the missing cards' ones
+  function persistLayoutView(tabId: string, change: CanvasViewChange) {
+    const l = shellRef.current.tabs.find((t) => t.id === tabId)?.layout;
+    if (!l || !wholeIndex) return;
+    const next: Record<string, LayoutPoint> = { ...l.doc.positions };
+    for (const [id, p] of Object.entries(change.positions)) {
+      const fq = wholeIndex.fullQnameOf.get(id);
+      if (fq) next[fq] = { x: p.x, y: p.y };
+    }
+    void layoutStore.write(tabId, { skin: l.doc.skin ?? 'er.crow', mode: 'manual', nodes: next, collapsed: l.doc.collapsed ?? [] });
+  }
+
+  const currentGraph = useMemo(() => {
+    if (tab?.subject.kind !== 'schema') return null;
+    if (!tabLayout) return graphs[tab.subject.ref] ?? null;
+    return projection ? { ...projection.graph, edges: [...projection.graph.edges, ...projection.hopEdges.map(hopAsEdge)] } : null;
+  }, [tab?.subject.kind, tab?.subject.ref, tabLayout, projection, graphs]);
   const modelGraph = useMemo(
     () => (currentGraph ? applyGraphFixtures(getGraphResponseToModelGraph(currentGraph)) : null),
     [currentGraph],
@@ -564,16 +704,21 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
             <div data-testid="shell-loading" style={{ padding: 24, color: '#96989B' }}>loading…</div>
           ) : (
             <SkinnedCanvas
+              key={tab.id}
               graph={modelGraph}
               displayMode={displayMode}
-              nodePositions={positions[tab.subject.ref] ?? {}}
-              canvasKey={tab.subject.ref}
+              nodePositions={tabLayout ? layoutNodePositions ?? {} : positions[tab.subject.ref] ?? {}}
+              canvasKey={tabLayout ? tab.id : tab.subject.ref}
               selectedQname={selected?.qname ?? null}
-              onNodeSelect={onSelectNode}
+              selectedEdgeId={inspectedHop?.id ?? null}
+              onEdgeSelect={(id) => {
+                if (id && id.startsWith('hop:')) { setSelectedHop(id); setDrawerOpen(false); } else setSelectedHop(null);
+              }}
+              onNodeSelect={(q) => { setSelectedHop(null); void onSelectNode(q); }}
               renderNodeMenu={canEdit && editContext
                 ? (qname, close) => editContext.renderNodeMenu({ qname, graphRef: tab.subject.ref, onApplied: () => void refetchGraph(tab.subject.ref), onClose: close })
                 : undefined}
-              onPersistView={(change) => void persistView(tab.subject.ref, change)}
+              onPersistView={(change) => (tabLayout ? persistLayoutView(tab.id, change) : void persistView(tab.subject.ref, change))}
               onDrillIn={(id, label) => setShell((s) => drillIn(s, s.activeTabId!, { id, label }))}
               bindingHints={isErTab ? bindingHints : undefined}
               showBindings={isErTab && showBindings}
@@ -582,8 +727,17 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
           )}
         </div>
       </div>
+      {inspectedHop && wholeGraph && wholeIndex && (
+        <HopEdgeInspector
+          hop={inspectedHop}
+          whole={wholeGraph}
+          nodeOf={wholeIndex.nodeOf}
+          onShow={(fq) => { showCards([fq]); setSelectedHop(null); }}
+          onClose={() => setSelectedHop(null)}
+        />
+      )}
       <TextDrawer
-        open={drawerOpen}
+        open={drawerOpen && !inspectedHop}
         node={selected}
         onOpenInIde={(uri, line) => onError?.(`Open in IDE: ${uri}${line != null ? `:${line}` : ''} (host handoff)`)}
         onClose={() => setDrawerOpen(false)}

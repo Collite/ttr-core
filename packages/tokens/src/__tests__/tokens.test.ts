@@ -59,6 +59,7 @@ describe('@tatrman/tokens — canvas family (D1 palette-stability audit)', () =>
       edgeStar: '#7C93AE',
       edgeScript: '#7EA4D6',
       edgeLabel: '#4A4B4D',
+      edgeHop: '#B4651A',
       alive: '#FFCB2E',
       aliveDeep: '#F2A200',
       selOutline: '#F2A200',

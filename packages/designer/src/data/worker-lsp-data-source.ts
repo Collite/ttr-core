@@ -106,6 +106,26 @@ export class WorkerLspDataSource implements ModelDataSource {
     return this.lspClient.getSymbolDetail(qname);
   }
 
+  /**
+   * The whole-schema graph (VL V-21): the project's model graph for `schema`, each card's package from
+   * the symbol listing (the worker's qnames already carry it; the panel groups by it).
+   */
+  async getSchemaGraph(schema: RenderableSchemaCode): Promise<GetGraphResponse | null> {
+    const [mg, symbols] = await Promise.all([
+      this.lspClient.getModelGraph(this.ctx.graphUri ?? this.ctx.projectRoot, schema),
+      this.lspClient.listSymbols({ kinds: ['entity', 'table', 'view'] }),
+    ]);
+    const pkg = new Map(symbols.map((s) => [s.qname, s.packageName ?? '']));
+    return {
+      schema,
+      nodes: mg.nodes.map((n) => ({ ...n, pkg: pkg.get(n.qname) ?? '' })),
+      edges: mg.edges,
+      layout: { nodes: {}, edges: {} },
+      missingObjects: [],
+      imports: [],
+    };
+  }
+
   getGraph(ref: string): Promise<GetGraphResponse | null> {
     // Native rich shape — the Worker path carries the DS LSP graft (slot data, layout, imports).
     return this.lspClient.getGraph(ref);

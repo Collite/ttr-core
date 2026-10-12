@@ -142,4 +142,10 @@ export interface ModelDataSource {
   describe?(qname: string): Promise<ObjectDescription | null>;
   /** The languages the model's labels carry, as far as this backend has served them (the language picker). */
   knownLanguages?(): string[];
+  /**
+   * Every card of one schema, with the relations / foreign keys between them (VL V-18, V-21) — the
+   * whole-schema graph the Objects panel lists, layouts resolve against (§4) and are projected from
+   * (§5.2). Nodes carry `pkg` when the qname does not. Absent ⇒ no Objects panel on this backend.
+   */
+  getSchemaGraph?(schema: ModelKind): Promise<GetGraphResponse | null>;
 }

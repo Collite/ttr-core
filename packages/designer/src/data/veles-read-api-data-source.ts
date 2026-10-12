@@ -27,6 +27,7 @@ import type {
   GraphScope,
   Disposable,
   CatalogListing,
+  ModelKind,
 } from './model-data-source.js';
 import type { TtrmSearchHit } from './ttrm-types.js';
 import type { GetGraphResponse } from '@tatrman/lsp';
@@ -143,6 +144,11 @@ export class VelesReadApiDataSource implements ModelDataSource {
     const g = await this.getModelGraph({ schema: ref });
     this.served.remember(ref, g.nodes, g.edges);
     return ttrmToGetGraphResponse(ref, g.nodes, g.edges, [], { lang: this.served.lang });
+  }
+
+  /** The whole-schema graph (VL V-21) — on a catalog it is the schema subject's own graph. */
+  getSchemaGraph(schema: ModelKind): Promise<GetGraphResponse | null> {
+    return this.getGraph(schema);
   }
 
   /**

@@ -24,6 +24,7 @@ import type {
   Disposable,
   LayoutPayload,
   CatalogListing,
+  ModelKind,
 } from './model-data-source.js';
 import type {
   TtrmStatus,
@@ -137,6 +138,12 @@ export class WsDesignerServerDataSource implements ModelDataSource {
   /** The raw `ttrm/getGraph` structural payload (row-less dependency graph). */
   getGraphRaw(uri: string): Promise<TtrmGetGraphResponse> {
     return this.client.request<TtrmGetGraphResponse>('ttrm/getGraph', { uri });
+  }
+
+  /** The whole-schema graph (VL V-21): every object of `schema`, mapped like `getGraph`. */
+  async getSchemaGraph(schema: ModelKind): Promise<GetGraphResponse | null> {
+    const g = await this.getModelGraph({ schema });
+    return ttrmToGetGraphResponse(schema, g.nodes, g.edges);
   }
 
   /** The shell read (DM-P2.S3): map the structural payload up to `GetGraphResponse` (§1.1a). */

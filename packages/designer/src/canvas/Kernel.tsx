@@ -26,6 +26,8 @@ export interface KernelProps {
   skinId: SkinId;
   positions: Positions;
   selectedId?: string | null;
+  /** the selected edge (a hop edge in the inspector) — drawn heavier */
+  selectedEdgeId?: string | null;
   orphanIds?: string[];
   derived?: boolean;
   theme?: Theme;
@@ -36,6 +38,8 @@ export interface KernelProps {
   onSelect?: (id: string | null) => void;
   /** edge selection (processing insertion targets) — the palette/⌘K insert onto the selected edge. */
   onEdgeSelect?: (id: string | null) => void;
+  /** a right-click on an edge (a hop edge's pill included) — the view menu (VL V-27) */
+  onEdgeContextMenu?: (id: string, clientX: number, clientY: number) => void;
   onNodeDrag?: (id: string, pos: { x: number; y: number }) => void;
   onNodeContextMenu?: (id: string, clientX: number, clientY: number) => void;
   /** drill into a node/container (double-click) — the shell pushes a breadcrumb segment (P-2) */
@@ -51,7 +55,7 @@ export function CanvasKernel(props: KernelProps) {
 }
 
 function KernelInner({
-  graph, registry, skinId, positions, selectedId, orphanIds, derived, theme = 'ice', runStates, previews, onSelect, onEdgeSelect, onNodeDrag, onNodeContextMenu, onDrillIn,
+  graph, registry, skinId, positions, selectedId, selectedEdgeId, orphanIds, derived, theme = 'ice', runStates, previews, onSelect, onEdgeSelect, onEdgeContextMenu, onNodeDrag, onNodeContextMenu, onDrillIn,
 }: KernelProps) {
   const labelOf = (id: string) => graph.nodes.find((n) => n.id === id)?.label ?? id;
   const skin = registry.resolve(skinId) as DesignerSkin | undefined;
@@ -96,11 +100,18 @@ function KernelInner({
         targetHandle: e.to.port,
         type: 'cedge',
         label: e.label,
-        data: { style, theme, cardinality: e.cardinality },
+        selected: e.id === selectedEdgeId,
+        data: e.kind === 'hop'
+          ? {
+              style, theme, kind: 'hop' as const, viaCount: e.via?.length ?? 1,
+              onSelect: () => onEdgeSelect?.(e.id),
+              onContextMenu: (x: number, y: number) => onEdgeContextMenu?.(e.id, x, y),
+            }
+          : { style, theme, cardinality: e.cardinality },
         markerEnd: style.marker === 'none' ? undefined : { type: MarkerType.ArrowClosed, color: style.stroke },
       };
     });
-  }, [graph, skin, theme]);
+  }, [graph, skin, theme, selectedEdgeId, onEdgeSelect, onEdgeContextMenu]);
 
   if (!skin) {
     return <div data-testid="unknown-skin" style={{ padding: 16, color: palette.err }}>unknown skin: {skinId}</div>;
@@ -116,6 +127,7 @@ function KernelInner({
         edgeTypes={edgeTypes}
         onNodeClick={(_, n) => onSelect?.(n.id)}
         onEdgeClick={(_, e) => onEdgeSelect?.(e.id)}
+        onEdgeContextMenu={(ev, e) => { ev.preventDefault(); onEdgeContextMenu?.(e.id, ev.clientX, ev.clientY); }}
         onPaneClick={() => { onSelect?.(null); onEdgeSelect?.(null); }}
         onNodeDragStop={(_, n) => onNodeDrag?.(n.id, n.position)}
         onNodeContextMenu={(e, n) => { e.preventDefault(); onNodeContextMenu?.(n.id, e.clientX, e.clientY); }}

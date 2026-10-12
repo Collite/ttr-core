@@ -40,7 +40,10 @@ export interface ModelGraphRow {
 export interface ModelGraphEdge {
   id: string;
   qname: string;
-  kind: 'fk' | 'relation' | 'grain';
+  /** `hop` — a viewer-derived path through hidden cards (VL V-24), never served by a backend */
+  kind: 'fk' | 'relation' | 'grain' | 'hop';
+  /** hop edges: the hidden cards in between, as full qnames */
+  via?: string[];
   fromNode: string;
   toNode: string;
   fromCardinality: Cardinality | null;

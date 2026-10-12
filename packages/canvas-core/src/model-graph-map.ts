@@ -34,7 +34,9 @@ export interface ModelGraphNodeInput {
 export interface ModelGraphEdgeInput {
   id: string;
   qname: string;
-  kind: 'fk' | 'relation' | 'grain';
+  kind: 'fk' | 'relation' | 'grain' | 'hop';
+  /** hop edges: the hidden cards in between (VL V-24) */
+  via?: string[];
   fromNode: string;
   toNode: string;
   fromCardinality: LsCardinality | null;
@@ -77,14 +79,21 @@ export function modelGraphToCanvas(mg: ModelGraphInput): CanvasGraph {
     };
   });
 
-  const edges: CanvasEdge[] = mg.edges.map((e) => ({
-    id: e.id,
-    from: { node: e.fromNode, port: `${e.fromNode}::out` },
-    to: { node: e.toNode, port: `${e.toNode}::in` },
-    role: 'data',
-    label: e.kind === 'relation' ? shortName(e.qname) : undefined,
-    cardinality: { from: mapCard(e.fromCardinality), to: mapCard(e.toCardinality) },
-  }));
+  const edges: CanvasEdge[] = mg.edges.map((e) => {
+    const ends = { from: { node: e.fromNode, port: `${e.fromNode}::out` }, to: { node: e.toNode, port: `${e.toNode}::in` } };
+    if (e.kind === 'hop') {
+      // a path through hidden cards (VL V-24/V-26): dashed, no cardinalities, `…` or `… ×n` at the midpoint
+      const via = e.via ?? [];
+      return { id: e.id, ...ends, role: 'data', kind: 'hop', via, label: via.length > 1 ? `… ×${via.length}` : '…' };
+    }
+    return {
+      id: e.id,
+      ...ends,
+      role: 'data',
+      label: e.kind === 'relation' ? shortName(e.qname) : undefined,
+      cardinality: { from: mapCard(e.fromCardinality), to: mapCard(e.toCardinality) },
+    };
+  });
 
   return {
     id: `${mg.schemaCode}-graph`,
