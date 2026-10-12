@@ -11,6 +11,9 @@ import { fileURLToPath } from 'node:url';
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react';
 import type { GetGraphResponse, ModelGraphEdge, ModelGraphNode } from '@tatrman/lsp';
 import { ShellFrame } from '../ShellFrame.js';
+import { SaveAsDialog, layoutWriteProblems } from '../SaveAsDialog.js';
+import { readYaml } from '../../layout/layout-yaml.js';
+import type { LayoutDocument } from '../../layout/layout-document.js';
 import type { ModelDataSource } from '../../data/model-data-source.js';
 import type { LayoutIndexEntry } from '../../layout/resolve.js';
 import type { CatalogGroup } from '../types.js';
@@ -158,6 +161,36 @@ describe('the Save as… dialog', () => {
     await waitFor(() => expect(saved).toHaveLength(1));
     expect(saved[0].content).toContain('  - hartland.er.entity.customer_address\n  - hartland.er.entity.item\n');
     await waitFor(() => expect(screen.getAllByTestId('subject-tab')[0]).toHaveTextContent(/^er · everything×$/));
+  });
+});
+
+describe('Save as… writes only what Open layout… reads (V-3; ttr-core#180 #1)', () => {
+  it('a plain subject saves the positions of the cards it shows — a stale node in the store is left out', async () => {
+    const saved: Saved[] = [];
+    const viewState = {
+      read: async () => ({ skin: 'er.crow', mode: 'manual' as const, nodes: { 'er.entity.item': { x: 10, y: 20 }, 'er.entity.gone': { x: 30, y: 40 } }, collapsed: [] }),
+      write: async () => {},
+    };
+    render(
+      <ShellFrame dataSource={fakeVeles().source} workspace="w" catalog={SCHEMA_CATALOG} files={[]} displayMode="just-names" viewState={viewState}
+        downloadFile={async (fileName, content, mimeType) => { saved.push({ fileName, content, mimeType }); }} />,
+    );
+    fireEvent.click(screen.getAllByTestId('catalog-item').find((b) => b.getAttribute('data-ref') === 'er')!);
+    await screen.findByTestId('objects-panel');
+    await saveAs('yaml', 'everything');
+    await waitFor(() => expect(saved).toHaveLength(1));
+    const back = readYaml(saved[0].content);
+    expect(back.ok).toBe(true);
+    if (back.ok) expect(back.doc.positions).toEqual({ 'hartland.er.entity.item': { x: 10, y: 20 } });
+  });
+
+  it('a document the readers would refuse is not offered for saving: the reasons, no preview, Save disabled', () => {
+    const doc: LayoutDocument = { name: 'g', model: 'er', objects: ['a'], positions: { b: { x: 1, y: 2 } } };
+    expect(layoutWriteProblems(doc, 'g', 'yaml')).toEqual(['positions key b is not in objects']);
+    render(<SaveAsDialog doc={doc} initialName="g" initialFormat="yaml" onSave={() => {}} onCancel={() => {}} />);
+    expect(screen.getByTestId('save-as-problem')).toHaveTextContent('positions key b is not in objects');
+    expect(screen.getByTestId('save-as-preview')).toHaveTextContent(/^$/);
+    expect(screen.getByTestId('save-as-save')).toBeDisabled();
   });
 });
 

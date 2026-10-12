@@ -6,7 +6,7 @@
 
 import { useMemo, useState } from 'react';
 import { canvas as palette } from '@tatrman/tokens';
-import { IDENTIFIER, type LayoutDocument } from '../layout/layout-document.js';
+import { IDENTIFIER, validateDocument, type LayoutDocument } from '../layout/layout-document.js';
 import { writeYaml } from '../layout/layout-yaml.js';
 import { isTtrId, writeTtrg } from '../layout/layout-ttr.js';
 
@@ -23,6 +23,14 @@ export function layoutTextOf(doc: LayoutDocument, name: string, format: LayoutFo
   return format === 'yaml' ? writeYaml(named) : writeTtrg(named);
 }
 
+/**
+ * Why `doc` named `name` cannot be saved as `format` — what the readers would refuse (V-1…V-4) — so
+ * Save as… never writes a file Open layout… rejects. Empty ⇒ it can be saved.
+ */
+export function layoutWriteProblems(doc: LayoutDocument, name: string, _format: LayoutFormat): string[] {
+  return validateDocument({ ...doc, name }).errors.map((e) => e.message);
+}
+
 export function SaveAsDialog({
   doc, initialName, initialFormat, onSave, onCancel,
 }: {
@@ -36,15 +44,17 @@ export function SaveAsDialog({
   const [name, setName] = useState(initialName);
   const [format, setFormat] = useState<LayoutFormat>(initialFormat);
   const valid = IDENTIFIER.test(name);
-  const preview = useMemo(() => layoutTextOf(doc, valid ? name : doc.name, format), [doc, name, valid, format]);
+  const problems = useMemo(() => layoutWriteProblems(doc, valid ? name : doc.name, format), [doc, name, valid, format]);
+  const preview = useMemo(() => (problems.length > 0 ? '' : layoutTextOf(doc, valid ? name : doc.name, format)), [doc, name, valid, format, problems]);
   const keyword = valid && format === 'ttr' && !isTtrId(name);
+  const savable = valid && problems.length === 0;
 
   return (
     <div data-testid="save-as-dialog" role="dialog" aria-modal="true" aria-label="Save layout as"
       onKeyDown={(e) => { if (e.key === 'Escape') onCancel(); }}
       style={{ position: 'fixed', inset: 0, background: 'rgba(22,40,63,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
       <form
-        onSubmit={(e) => { e.preventDefault(); if (valid) onSave(name, format); }}
+        onSubmit={(e) => { e.preventDefault(); if (savable) onSave(name, format); }}
         style={{ background: '#fff', borderRadius: 10, padding: 18, width: 560, maxWidth: '92vw', boxShadow: '0 10px 30px rgba(0,0,0,.2)', fontSize: 13, display: 'flex', flexDirection: 'column', gap: 10 }}
       >
         <strong style={{ fontSize: 14 }}>Save as…</strong>
@@ -78,14 +88,19 @@ export function SaveAsDialog({
             “{name}” is a TTR keyword: <code>graph {name} {'{'}</code> will not parse. Pick another name, or save as YAML.
           </p>
         )}
+        {problems.length > 0 && (
+          <div data-testid="save-as-problems" style={{ color: palette.err, fontSize: 12 }}>
+            {problems.map((p) => <p key={p} data-testid="save-as-problem" style={{ margin: 0 }}>{p}</p>)}
+          </div>
+        )}
         <pre data-testid="save-as-preview" style={{ margin: 0, maxHeight: 260, overflow: 'auto', background: palette.tableHeaderBg, border: `1px solid ${palette.divider}`, borderRadius: 6, padding: 10, fontSize: 11.5 }}>
           {preview}
         </pre>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button type="button" data-testid="save-as-cancel" onClick={onCancel}
             style={{ border: `1px solid ${palette.grid}`, borderRadius: 6, background: '#fff', cursor: 'pointer', padding: '4px 12px' }}>Cancel</button>
-          <button type="submit" data-testid="save-as-save" disabled={!valid}
-            style={{ border: 'none', borderRadius: 6, background: valid ? '#16283F' : palette.muted, color: '#fff', cursor: valid ? 'pointer' : 'default', padding: '4px 12px' }}>Save</button>
+          <button type="submit" data-testid="save-as-save" disabled={!savable}
+            style={{ border: 'none', borderRadius: 6, background: savable ? '#16283F' : palette.muted, color: '#fff', cursor: savable ? 'pointer' : 'default', padding: '4px 12px' }}>Save</button>
         </div>
       </form>
     </div>

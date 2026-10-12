@@ -745,10 +745,17 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   function docForSave(t: SubjectTab): LayoutDocument | null {
     if (t.subject.kind !== 'schema' || !t.subject.schemaCode || t.perspective) return null;
     if (t.layout) return t.layout.doc;
+    const objects = shownCards(t);
+    const listed = new Set(objects);
     const held = positions[t.subject.ref] ?? {};
     const pos: Record<string, LayoutPoint> = {};
-    for (const [id, p] of Object.entries(held)) pos[wholeIndex?.fullQnameOf.get(id) ?? id] = p;
-    return { name: seedLayoutName(t), model: t.subject.schemaCode as LayoutDocument['model'], objects: shownCards(t), positions: pos };
+    for (const [id, p] of Object.entries(held)) {
+      // a held position is not always a card shown (a stale node in the store, an id the whole graph
+      // cannot map) — the file lists its positions' cards, or its reader refuses it (V-3)
+      const fq = wholeIndex?.fullQnameOf.get(id) ?? id;
+      if (listed.has(fq)) pos[fq] = p;
+    }
+    return { name: seedLayoutName(t), model: t.subject.schemaCode as LayoutDocument['model'], objects, positions: pos };
   }
 
   const formatKey = `ttr-viewer:layout-format:${workspace}`;
