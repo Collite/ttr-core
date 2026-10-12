@@ -27,7 +27,8 @@ function veles(lang: string) {
 async function openErAndSelectItem(lang: string) {
   render(<ShellFrame dataSource={veles(lang)} workspace="veles" catalog={CATALOG} files={[]} displayMode="with-types" />);
   fireEvent.click(screen.getByTestId('catalog-item'));
-  await waitFor(() => expect(screen.getAllByTestId('node-label').length).toBe(4));
+  // the real kernel draws the cards after an ELK run — ~0.2 s here, ~2 s on a loaded CI runner
+  await waitFor(() => expect(screen.getAllByTestId('node-label').length).toBe(4), { timeout: 5000 });
   const label = lang === 'cs' ? 'Produkt' : 'Product';
   const card = screen.getAllByTestId('row-card').find((c) => within(c).getByTestId('node-label').textContent === label)!;
   expect(card).toBeDefined();
