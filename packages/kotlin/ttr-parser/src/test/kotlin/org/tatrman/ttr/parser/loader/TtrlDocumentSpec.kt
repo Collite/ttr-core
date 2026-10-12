@@ -72,6 +72,37 @@ class TtrlDocumentSpec :
             r.errors.joinToString(" ") { it.message } shouldContain "auto"
         }
 
+        // VL A-VL-3 (b): a layout reader takes the designer server's residue as a warning, not a failure
+        "dropAutoNodes: nodes under a stated mode: auto are dropped with a warning, the rest of the canvas kept" {
+            val residue =
+                """
+                ttrl 1
+                canvas program {
+                    skin: "er.crow"
+                    mode: auto
+                    nodes: { "a": { x: 1, y: 2 } }
+                    collapsed: ["b"]
+                }
+                canvas other {
+                    nodes: { "c": { x: 3, y: 4 } }
+                }
+                """.trimIndent()
+            val r = TtrlLoader.parseString(residue, "residue.ttrl", dropAutoNodes = true)
+            r.ok shouldBe true
+            val program = r.document!!.canvases.first { it.key == "program" }
+            program.nodes shouldHaveSize 0
+            program.skin shouldBe "er.crow"
+            program.collapsed shouldBe listOf("b")
+            // no `mode` stated ⇒ the nodes are kept, as without the flag
+            r.document!!
+                .canvases
+                .first { it.key == "other" }
+                .nodes shouldHaveSize 1
+            r.warnings shouldHaveSize 1
+            r.warnings.single().message shouldContain "mode: auto"
+            r.warnings.single().line shouldBe 2
+        }
+
         "rejects a viewport key (dropped, C1-c-iii)" {
             val bad =
                 """
