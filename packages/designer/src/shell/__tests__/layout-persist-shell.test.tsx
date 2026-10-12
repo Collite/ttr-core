@@ -82,6 +82,16 @@ describe('a display-mode switch is not an edit', () => {
     await persisted();
     await waitFor(() => expect(layoutChipText()).toBe(' · layout: catalog · positions (edited, unsaved)'));
   });
+
+  it('a drag moves cards, not the picture: the canvas keeps the graph it was handed (ttr-core#180 #7)', async () => {
+    await openCatalogLayout('er · positions · 1 missing');
+    const graph = attr('graph');
+    fireEvent.click(screen.getByTestId('mock-drag'));
+    await persisted();
+    await waitFor(() => expect(layoutChipText()).toBe(' · layout: catalog · positions (edited, unsaved)'));
+    expect(positions()['er.entity.item']).toEqual({ x: 777, y: 333 });
+    expect(attr('graph')).toBe(graph); // not re-projected, not re-mapped, no fresh ELK run
+  });
 });
 
 describe('a drag on a plain subject is kept (V-22, V-33)', () => {

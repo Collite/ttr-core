@@ -13,7 +13,7 @@
 //     the Viewer ships no edit code (add/remove/applyGraphEdit + pickers are DM-P3 authoring). The
 //     processing face (program tabs) is a placeholder until DM-P4.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { BindingMapData, DisplayMode, GetGraphResponse, LineageRootRef, ModelGraphEdge } from '@tatrman/lsp';
 import { generateBindingRibbon, generateLineage, type LineageScope, type LineageDirection, type ObjectKind } from '@tatrman/perspectives';
 import type { ModelDataSource } from '../data/model-data-source.js';
@@ -540,9 +540,14 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   const schemaCode = tab?.subject.kind === 'schema' ? tab.subject.schemaCode : undefined;
   const wholeGraph = schemaCode ? schemaGraphs[schemaCode] ?? null : null;
   const wholeIndex = useMemo<LayoutGraphIndex | null>(() => (wholeGraph ? layoutIndexOf(wholeGraph) : null), [wholeGraph]);
+  // the picture's contents follow the cards and the model only — a drag, a skin pick or a save keeps them
+  const layoutObjects = tabLayout?.doc.objects;
+  const layoutModel = tabLayout?.doc.model;
   const projection = useMemo<LayoutProjection | null>(
-    () => (tabLayout && wholeGraph && wholeIndex ? projectLayout(wholeGraph, tabLayout.doc, { hops: 1 }, wholeIndex) : null),
-    [tabLayout?.doc, wholeGraph, wholeIndex],
+    () => (layoutObjects && layoutModel && wholeGraph && wholeIndex
+      ? projectLayout(wholeGraph, { objects: layoutObjects, model: layoutModel }, { hops: 1 }, wholeIndex)
+      : null),
+    [layoutObjects, layoutModel, wholeGraph, wholeIndex],
   );
   // node sizes as the schema's default skin draws them (placement, V-19)
   const sizeOf = useMemo(() => {
@@ -862,11 +867,18 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     void persistView(ref, change);
   }
 
+  const isLayoutTab = !!tabLayout;
+  const subjectGraph = tab?.subject.kind === 'schema' ? graphs[tab.subject.ref] : undefined;
   const currentGraph = useMemo(() => {
     if (tab?.subject.kind !== 'schema') return null;
-    if (!tabLayout) return graphs[tab.subject.ref] ?? null;
+    if (!isLayoutTab) return subjectGraph ?? null;
     return projection ? { ...projection.graph, edges: [...projection.graph.edges, ...projection.hopEdges.map(hopAsEdge)] } : null;
-  }, [tab?.subject.kind, tab?.subject.ref, tabLayout, projection, graphs]);
+  }, [tab?.subject.kind, isLayoutTab, subjectGraph, projection]);
+
+  // stable, so the kernel's React Flow edges are not rebuilt on every shell render
+  const onEdgeSelect = useCallback((id: string | null) => {
+    if (id && id.startsWith('hop:')) { setSelectedHop(id); setDrawerOpen(false); } else setSelectedHop(null);
+  }, []);
   const modelGraph = useMemo(
     () => (currentGraph ? applyGraphFixtures(getGraphResponseToModelGraph(currentGraph)) : null),
     [currentGraph],
@@ -1149,9 +1161,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
                 : setSubjectSkins((m) => ({ ...m, [tab.id]: skin })))}
               selectedQname={multiSel.size > 0 ? null : selected?.qname ?? null}
               selectedEdgeId={inspectedHop?.id ?? null}
-              onEdgeSelect={(id) => {
-                if (id && id.startsWith('hop:')) { setSelectedHop(id); setDrawerOpen(false); } else setSelectedHop(null);
-              }}
+              onEdgeSelect={onEdgeSelect}
               onNodeSelect={(q, additive) => {
                 setSelectedHop(null);
                 if (additive && q) {

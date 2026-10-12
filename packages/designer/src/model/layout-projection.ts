@@ -13,7 +13,7 @@
 // the two and is the index the resolution rule (§4) runs against.
 
 import type { GetGraphResponse, ModelGraphEdge, ModelGraphNode } from '@tatrman/lsp';
-import { compareAlphabetical, type LayoutDocument } from '../layout/layout-document.js';
+import { compareAlphabetical, sortAlphabetical, type LayoutDocument } from '../layout/layout-document.js';
 import { resolveRefs, type Ambiguity, type LayoutIndexEntry, type LayoutModelIndex } from '../layout/resolve.js';
 
 /** A path through one hidden card, drawn as one dashed `…` edge (V-24). */
@@ -81,8 +81,14 @@ export function layoutIndexOf(whole: GetGraphResponse): LayoutGraphIndex {
   return { index: { cards, edges }, nodeOf, fullQnameOf };
 }
 
-/** Undirected adjacency over the whole graph's real edges (self-loops dropped). */
-function adjacencyOf(edges: readonly ModelGraphEdge[]): Map<string, Set<string>> {
+// one adjacency per graph's edge list — Expand, Neighbours, Hide others, placement and the hop edges all
+// ask it, many times per gesture
+const ADJACENCY = new WeakMap<readonly ModelGraphEdge[], ReadonlyMap<string, ReadonlySet<string>>>();
+
+/** Undirected adjacency over the whole graph's real edges (self-loops dropped), built once per edge list. */
+function adjacencyOf(edges: readonly ModelGraphEdge[]): ReadonlyMap<string, ReadonlySet<string>> {
+  const held = ADJACENCY.get(edges);
+  if (held) return held;
   const adj = new Map<string, Set<string>>();
   const link = (a: string, b: string) => {
     if (!adj.has(a)) adj.set(a, new Set());
@@ -93,6 +99,7 @@ function adjacencyOf(edges: readonly ModelGraphEdge[]): Map<string, Set<string>>
     link(e.fromNode, e.toNode);
     link(e.toNode, e.fromNode);
   }
+  ADJACENCY.set(edges, adj);
   return adj;
 }
 
@@ -106,7 +113,7 @@ export function hopEdgesOf(whole: GetGraphResponse, visible: ReadonlySet<string>
   const hops = new Map<string, { a: string; b: string; via: string[] }>();
   for (const h of whole.nodes) {
     if (visible.has(h.qname)) continue;
-    const nb = [...(adj.get(h.qname) ?? [])].filter((n) => visible.has(n)).sort(compareAlphabetical);
+    const nb = sortAlphabetical([...(adj.get(h.qname) ?? [])].filter((n) => visible.has(n)));
     for (let i = 0; i < nb.length; i++) {
       for (let j = i + 1; j < nb.length; j++) {
         const key = pairKey(nb[i], nb[j]);
@@ -120,18 +127,19 @@ export function hopEdgesOf(whole: GetGraphResponse, visible: ReadonlySet<string>
   return [...hops.entries()]
     .sort(([k1], [k2]) => compareAlphabetical(k1, k2))
     .map(([key, h]) => {
-      const via = [...new Set(h.via)].sort(compareAlphabetical);
+      const via = sortAlphabetical(new Set(h.via));
       return { id: `hop:${key}`, fromNode: h.a, toNode: h.b, via, viaCount: via.length, kind: 'hop' as const };
     });
 }
 
 /**
- * Project `doc` onto `whole` (§5.2). `opts.hops` is fixed at 1 in v1 (G-1, ruled: one hop stays).
- * Pass `idx` when the caller already holds `layoutIndexOf(whole)`.
+ * Project `doc` onto `whole` (§5.2) — its cards and model only; positions, skin and collapsed do not
+ * change the picture's contents. `opts.hops` is fixed at 1 in v1 (G-1, ruled: one hop stays). Pass `idx`
+ * when the caller already holds `layoutIndexOf(whole)`.
  */
 export function projectLayout(
   whole: GetGraphResponse,
-  doc: LayoutDocument,
+  doc: Pick<LayoutDocument, 'objects' | 'model'>,
   _opts: { hops: 1 } = { hops: 1 },
   idx: LayoutGraphIndex = layoutIndexOf(whole),
 ): LayoutProjection {
@@ -158,7 +166,7 @@ export function hiddenNeighbours(whole: GetGraphResponse, visible: ReadonlySet<s
   const adj = adjacencyOf(whole.edges);
   const out = new Set<string>();
   for (const id of of) for (const n of adj.get(id) ?? []) if (!visible.has(n)) out.add(n);
-  return [...out].sort(compareAlphabetical);
+  return sortAlphabetical(out);
 }
 
 /**
@@ -182,10 +190,10 @@ export function hiddenClosure(whole: GetGraphResponse, visible: ReadonlySet<stri
     }
     frontier = next;
   }
-  return added.sort(compareAlphabetical);
+  return sortAlphabetical(added);
 }
 
 /** The visible cards one real edge away from `id` (Hide others keeps them — V-27; placement — V-19). */
 export function visibleNeighbours(whole: GetGraphResponse, visible: ReadonlySet<string>, id: string): string[] {
-  return [...(adjacencyOf(whole.edges).get(id) ?? [])].filter((n) => visible.has(n)).sort(compareAlphabetical);
+  return sortAlphabetical([...(adjacencyOf(whole.edges).get(id) ?? [])].filter((n) => visible.has(n)));
 }

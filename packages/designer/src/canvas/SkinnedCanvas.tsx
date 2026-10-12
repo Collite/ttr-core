@@ -165,6 +165,17 @@ export function SkinnedCanvas({
   // the right-click menu: the view menu and/or the injected edit menu (FO-21), on a card or a hop edge
   const [menu, setMenu] = useState<{ target: ViewMenuTarget; x: number; y: number } | null>(null);
   const closeMenu = () => setMenu(null);
+  // stable while the menus' presence is — the kernel rebuilds its React Flow edges when a handler changes
+  const anyMenu = !!(renderNodeMenu || renderViewMenu);
+  const viewMenu = !!renderViewMenu;
+  const onNodeContextMenu = useMemo(
+    () => (anyMenu ? (id: string, x: number, y: number) => setMenu({ target: { kind: 'node', id }, x, y }) : undefined),
+    [anyMenu],
+  );
+  const onEdgeContextMenu = useMemo(
+    () => (viewMenu ? (id: string, x: number, y: number) => setMenu({ target: { kind: 'edge', id }, x, y }) : undefined),
+    [viewMenu],
+  );
 
   if (!canvasGraph || !positions || !skin) {
     return <div data-testid="skinned-canvas-empty" style={{ padding: 20, color: palette.muted }}>laying out…</div>;
@@ -223,8 +234,8 @@ export function SkinnedCanvas({
           onNodeDrag={onNodeDrag}
           // the right-click menu: the VIEW menu (always armed in the open viewer, VL V-27) and the EDIT
           // menu (FO-21 — only when the shell injects an authoring renderer). Neither ⇒ no menu.
-          onNodeContextMenu={renderNodeMenu || renderViewMenu ? (id, x, y) => setMenu({ target: { kind: 'node', id }, x, y }) : undefined}
-          onEdgeContextMenu={renderViewMenu ? (id, x, y) => setMenu({ target: { kind: 'edge', id }, x, y }) : undefined}
+          onNodeContextMenu={onNodeContextMenu}
+          onEdgeContextMenu={onEdgeContextMenu}
           onDrillIn={onDrillIn}
         />
         {menu && (renderNodeMenu || renderViewMenu) && (

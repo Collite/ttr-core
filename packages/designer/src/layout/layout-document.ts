@@ -74,6 +74,17 @@ export function compareAlphabetical(a: string, b: string): number {
   return compareCodePoints(alphabeticalKey(a), alphabeticalKey(b)) || compareCodePoints(a, b);
 }
 
+/**
+ * `xs` in the canonical order ({@link compareAlphabetical}) — each key computed once, where a comparator
+ * would normalize both strings on every comparison. Never mutates `xs`.
+ */
+export function sortAlphabetical(xs: Iterable<string>): string[] {
+  return [...xs]
+    .map((s) => ({ s, k: alphabeticalKey(s) }))
+    .sort((a, b) => compareCodePoints(a.k, b.k) || compareCodePoints(a.s, b.s))
+    .map((e) => e.s);
+}
+
 /** Round a coordinate to an integer, halves toward +∞ — `floor(x + 0.5)`; never `-0` (V-3). */
 export function roundCoordinate(v: number): number {
   return Math.floor(v + 0.5) || 0;
