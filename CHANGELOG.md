@@ -26,6 +26,13 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   - Supporting changes: `@tatrman/lsp` `ModelGraphEdge.kind` gains `'hop'` (+ `via`) and `ModelGraphNode` an
     optional `pkg`; `@tatrman/canvas-core` `CanvasEdge` carries `kind` / `via`; `@tatrman/tokens` gains
     `canvas.edgeHop`.
+  - From the review (ttr-core#180): **Save as…** writes only what Open layout… reads — a plain subject's stale
+    positions are left out, and the dialog names what the readers would refuse instead of saving it; for
+    TTR it names the references the grammar cannot spell (a label, a keyword-named table) and offers YAML.
+    The notation lives in the layout: an opened layout's skin reaches the canvas, a pick marks the layout
+    edited. The shift-selection is exactly what is drawn and stays on its tab; a relation edge's right-click
+    keeps the browser menu; the tab menu closes on an outside click and on Escape; a drag no longer
+    re-projects the picture.
 - **`ttr-parser` · `ttr-writer` · `ttr-metadata`** — **layout files (VL-P0).** A *layout* — a schema, the cards
   it shows, their positions — read and written as a `.ttrg` graph block with the in-file `layout:` block, its
   references resolved against the model (docs: *Model → Layout files*).
