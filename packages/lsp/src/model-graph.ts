@@ -18,6 +18,8 @@ export interface ModelGraphNode {
   kind: 'table' | 'view' | 'entity' | 'cubelet' | 'dimension';
   name: string;
   schemaCode: RenderableSchemaCode;
+  /** the package, when the backend reports it apart from the qname (a catalog serves `er.entity.item` + `hartland`) */
+  pkg?: string;
   label: string;
   sourceUri: string;
   sourceLocation: { line: number; column: number };
