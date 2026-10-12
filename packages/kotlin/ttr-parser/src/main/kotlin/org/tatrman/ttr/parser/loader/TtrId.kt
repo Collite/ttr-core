@@ -11,8 +11,8 @@ import org.tatrman.ttr.parser.generated.TTRLexer
 import org.tatrman.ttr.parser.generated.TTRParser
 
 /**
- * Whether a string is a grammar `id` — `idPart ( '.' idPart )*` — and so may be written BARE in a
- * `.ttrg` (VL contracts V-12); anything else is written as a string literal. Decided by running the
+ * Whether a string is a grammar `id` — `idPart ( '.' idPart )*` — the only spelling a `.ttrg` has for a
+ * ref (VL contracts A-VL-5): anything else has no TTR form. Decided by running the
  * grammar's own `id` rule, so it can never drift from `TTR.g4` (the viewer's TypeScript twin keeps a
  * word list that a test recomputes from the grammar).
  */
@@ -52,7 +52,4 @@ object TtrId {
         parser.id()
         return !bad && tokens.LA(1) == Token.EOF
     }
-
-    /** One ref as the `.ttrg` writer spells it: bare when it is an `id`, else a string literal (V-12). */
-    fun token(s: String): String = if (isId(s)) s else "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 }

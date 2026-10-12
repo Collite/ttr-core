@@ -26,7 +26,7 @@ export {
   parseTtrg,
   readTtrg,
   readTtrl,
-  ttrToken,
+  ttrUnwritable,
   writeTtrg,
   TTR_NON_ID_WORDS,
   type RawTtrGraph,

@@ -11,6 +11,13 @@ import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.antlr.v4.runtime.BaseErrorListener
+import org.antlr.v4.runtime.CharStreams
+import org.antlr.v4.runtime.CommonTokenStream
+import org.antlr.v4.runtime.RecognitionException
+import org.antlr.v4.runtime.Recognizer
+import org.tatrman.ttr.parser.generated.TTRLexer
+import org.tatrman.ttr.parser.generated.TTRParser
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.isDirectory
@@ -27,6 +34,9 @@ class TtrgGraphReaderSpec :
         // the test working dir is the module dir (packages/kotlin/ttr-parser)
         val vectors = Path.of("../../package-sdk/schemas/layout-vectors")
         val cases = vectors.listDirectoryEntries().filter { it.isDirectory() }.sortedBy { it.name }
+
+        // a case without layout.ttrg has no TTR form (A-VL-5)
+        val ttrgCases = cases.filter { Files.exists(it.resolve("layout.ttrg")) }
 
         fun doc(case: Path) = Json.parseToJsonElement(Files.readString(case.resolve("document.json"))).jsonObject
 
@@ -57,7 +67,7 @@ class TtrgGraphReaderSpec :
         }
 
         "parseLayoutBlock over every vector .ttrg equals document.json positions" {
-            for (case in cases) {
+            for (case in ttrgCases) {
                 val expected =
                     doc(case)["positions"]!!.jsonObject.mapValues { (_, p) ->
                         p.jsonObject["x"]!!.jsonPrimitive.double to p.jsonObject["y"]!!.jsonPrimitive.double
@@ -67,14 +77,37 @@ class TtrgGraphReaderSpec :
             }
         }
 
-        "parseObjectRefs over every vector .ttrg equals document.json objects (quoted refs unquoted)" {
-            for (case in cases) {
+        "parseObjectRefs over every vector .ttrg equals document.json objects" {
+            for (case in ttrgCases) {
                 val expected = doc(case)["objects"]!!.jsonArray.map { it.jsonPrimitive.content }
                 withClue(case.name) {
                     TtrgGraphReader.parseObjectRefs(Files.readString(case.resolve("layout.ttrg"))) shouldBe
                         expected
                 }
             }
+        }
+
+        "every vector .ttrg parses with TTR.g4 — the grammar judges the TTR form (A-VL-5)" {
+            val files =
+                Files.walk(vectors).use { s -> s.filter { it.name.endsWith(".ttrg") }.sorted().toList() }
+            files shouldHaveAtLeastSize ttrgCases.size
+            for (f in files) {
+                withClue(vectors.relativize(f).toString()) {
+                    grammarErrors(Files.readString(f)) shouldBe
+                        emptyList()
+                }
+            }
+        }
+
+        "a quoted ref in objects is outside the grammar — why a writer refuses one (A-VL-5)" {
+            grammarErrors(
+                "graph g {\n  model: er,\n  objects: [\n    \"Customer Address\"\n  ]\n}\n",
+            ).isEmpty() shouldBe
+                false
+            grammarErrors(
+                "graph g {\n  model: er,\n  objects: [\n    hartland.er.entity.date\n  ]\n}\n",
+            ).isEmpty() shouldBe
+                false
         }
 
         "the sidecar-wins input carries its own in-file positions (the sidecar winning is the caller's merge)" {
@@ -153,3 +186,33 @@ class TtrgGraphReaderSpec :
                 TtrgIssue("objects", "expected `,` or `]` in objects", 2)
         }
     })
+
+/** The syntax errors `TTR.g4`'s `document` rule reports for [text] — empty when it parses. */
+private fun grammarErrors(text: String): List<String> {
+    val errors = mutableListOf<String>()
+    val listener =
+        object : BaseErrorListener() {
+            override fun syntaxError(
+                recognizer: Recognizer<*, *>?,
+                offendingSymbol: Any?,
+                line: Int,
+                charPositionInLine: Int,
+                msg: String?,
+                e: RecognitionException?,
+            ) {
+                errors += "$line:$charPositionInLine $msg"
+            }
+        }
+    val lexer =
+        TTRLexer(CharStreams.fromString(text)).apply {
+            removeErrorListeners()
+            addErrorListener(listener)
+        }
+    val parser =
+        TTRParser(CommonTokenStream(lexer)).apply {
+            removeErrorListeners()
+            addErrorListener(listener)
+        }
+    parser.document()
+    return errors
+}

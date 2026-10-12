@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.writer
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldHaveAtLeastSize
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldStartWith
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.double
@@ -35,16 +37,45 @@ class TtrgLayoutWriterSpec :
             cases shouldHaveAtLeastSize 8
         }
 
-        "write(document.json) == layout.ttrg, byte for byte, for every vector" {
+        "write(document.json) == layout.ttrg, byte for byte — or, with no layout.ttrg, write refuses (A-VL-5)" {
             for (case in cases) {
                 val doc =
                     layoutDocumentOf(
                         Json.parseToJsonElement(Files.readString(case.resolve("document.json"))).jsonObject,
                     )
-                withClue(
-                    case.name,
-                ) { TtrgLayoutWriter.write(doc) shouldBe Files.readString(case.resolve("layout.ttrg")) }
+                val ttrg = case.resolve("layout.ttrg")
+                withClue(case.name) {
+                    if (Files.exists(ttrg)) {
+                        TtrgLayoutWriter.unwritable(doc) shouldBe emptyList()
+                        TtrgLayoutWriter.write(doc) shouldBe Files.readString(ttrg)
+                    } else {
+                        TtrgLayoutWriter.unwritable(doc).isEmpty() shouldBe false
+                        shouldThrow<IllegalArgumentException> { TtrgLayoutWriter.write(doc) }
+                            .message!! shouldStartWith "${doc.name} has no TTR form: "
+                    }
+                }
             }
+        }
+
+        "a ref that is not an id has no TTR form: write refuses, naming the refs as the viewer does (A-VL-5)" {
+            val bad =
+                LayoutDocument(
+                    name = "g",
+                    model = "er",
+                    objects =
+                        listOf(
+                            "hartland.er.entity.zákazník",
+                            "er.entity.graph",
+                            "Customer Address",
+                            "hartland.er.entity.text",
+                            "1abc",
+                        ),
+                    positions = mapOf("er.entity.graph" to LayoutPoint(1.0, 2.0), "a-b" to LayoutPoint(0.0, 0.0)),
+                )
+            TtrgLayoutWriter.unwritable(bad) shouldBe
+                listOf("1abc", "a-b", "Customer Address", "hartland.er.entity.text")
+            shouldThrow<IllegalArgumentException> { TtrgLayoutWriter.write(bad) }.message shouldBe
+                "g has no TTR form: \"1abc\", \"a-b\", \"Customer Address\", \"hartland.er.entity.text\" are not a TTR id"
         }
 
         "write canonicalizes: sorted alphabetically, de-duplicated, coordinates rounded halves up" {
@@ -125,8 +156,6 @@ class TtrgLayoutWriterSpec :
             )) {
                 withClue(s) { TtrId.isId(s) shouldBe false }
             }
-            TtrId.token("Customer Address") shouldBe "\"Customer Address\""
-            TtrId.token("a.\"b\"\\c") shouldBe "\"a.\\\"b\\\"\\\\c\""
         }
     })
 

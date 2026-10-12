@@ -5,7 +5,7 @@
 // program tab; leaving the page is guarded iff a local layout has unsaved edits.
 
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react';
@@ -88,17 +88,27 @@ async function saveAs(format: 'yaml' | 'ttr', name?: string) {
 
 describe('Save as… reproduces the shared vectors byte for byte (V-5, V-32)', () => {
   it('opens the vectors that resolve to themselves', () => {
-    expect(SAME_ON_OPEN).toEqual(['diacritics', 'empty', 'minimal', 'missing', 'positions', 'sidecar-wins', 'skin-collapsed']);
+    expect(SAME_ON_OPEN).toEqual(['diacritics', 'empty', 'minimal', 'missing', 'not-an-id', 'positions', 'sidecar-wins', 'skin-collapsed']);
   });
 
-  it.each(SAME_ON_OPEN)('%s — YAML and TTR', async (c) => {
+  it.each(SAME_ON_OPEN)('%s — YAML and TTR (or no TTR form, A-VL-5)', async (c) => {
     const { saved, name } = await openVector(c);
     await saveAs('yaml');
     await waitFor(() => expect(saved).toHaveLength(1));
     expect(saved[0]).toEqual({ fileName: `${name}.yaml`, content: read(c, 'layout.yaml'), mimeType: 'application/yaml' });
+    if (existsSync(join(VECTORS, c, 'layout.ttrg'))) {
+      await saveAs('ttr');
+      await waitFor(() => expect(saved).toHaveLength(2));
+      expect(saved[1]).toEqual({ fileName: `${name}.ttrg`, content: read(c, 'layout.ttrg'), mimeType: 'text/plain' });
+      return;
+    }
+    // a ref that is not a TTR name: the dialog names it, shows no text and saves nothing
     await saveAs('ttr');
-    await waitFor(() => expect(saved).toHaveLength(2));
-    expect(saved[1]).toEqual({ fileName: `${name}.ttrg`, content: read(c, 'layout.ttrg'), mimeType: 'text/plain' });
+    const dialog = screen.getByTestId('save-as-dialog');
+    expect(within(dialog).getByTestId('save-as-problem')).toHaveTextContent('TTR cannot spell “Customer Address”, “hartland.er.entity.date” — a .ttrg lists TTR names only. Save as YAML, or remove them from the layout.');
+    expect(within(dialog).getByTestId('save-as-preview')).toHaveTextContent(/^$/);
+    expect(within(dialog).getByTestId('save-as-save')).toBeDisabled();
+    expect(saved).toHaveLength(1);
   });
 
   it('after the save the tab is the clean local file, renamed', async () => {

@@ -90,9 +90,12 @@ graph sales_overview {
   state the Studio rewrites as you work, so a position for a card the graph no longer lists, or nodes under
   `mode: auto`, are dropped with a warning instead of failing the file.
 - References are written bare, as TTR identifiers (Czech letters included: `hartland.er.entity.zákazník`).
-  A reference that is not an identifier — only ever one the model does not have, such as a label typed by
-  hand — is written as a quoted string. Layout readers accept it; the TTR language server reports it as a
-  syntax error until it is removed.
+  The TTR grammar admits nothing else in `objects` or as a `nodes` key, so a layout holding a reference
+  that is not an identifier has **no TTR form**: a label typed by hand (`"Customer Address"`), or the name
+  of a table that is a TTR keyword (`hartland.db.dbo.date` — `date`, `type`, `text`, … are keywords).
+  Save as… then offers YAML only and names the references; remove them, or keep the YAML file. Layout
+  readers still accept a quoted reference in a hand-written `.ttrg`, but the TTR language server reports it
+  as a syntax error.
 - Hand-written graph files that also carry `description`, `tags`, or relations in `objects` load fine; the
   first two are reported as not part of a layout, the relations are ignored.
 

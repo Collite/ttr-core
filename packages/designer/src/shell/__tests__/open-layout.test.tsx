@@ -5,7 +5,7 @@
 // a toast, no tab.
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react';
@@ -78,7 +78,8 @@ function panelState() {
 }
 
 describe('readLayoutFiles + normalizeForTab (V-31)', () => {
-  it.each(CASES)('%s: the YAML and the TTR form open to the same document', (c) => {
+  // a vector without a layout.ttrg has no TTR form (A-VL-5)
+  it.each(CASES.filter((c) => existsSync(join(VECTORS, c, 'layout.ttrg'))))('%s: the YAML and the TTR form open to the same document', (c) => {
     const y = readLayoutFiles([{ name: `${c}.yaml`, text: read(c, 'layout.yaml') }]);
     const t = readLayoutFiles([{ name: `${c}.ttrg`, text: read(c, 'layout.ttrg') }]);
     if (!y.ok || !t.ok) throw new Error(JSON.stringify([y, t]));

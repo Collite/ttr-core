@@ -2,13 +2,14 @@
 // Save as… (VL contracts V-32): name the layout, pick YAML or TTR, see the exact text, download it.
 // The name is the file stem and the `.ttrg` graph name, so the Identifier rule is enforced as you type
 // (V-4); a TTR keyword is a valid name but not a valid graph name, so TTR warns (VL-P0 Q1). The TTR form
-// does not carry the skin (V-10) — the dialog says so when the layout has one.
+// does not carry the skin (V-10) — the dialog says so when the layout has one. A ref that is not a TTR
+// name has no TTR form at all (A-VL-5): the dialog names it and offers YAML.
 
 import { useMemo, useState } from 'react';
 import { canvas as palette } from '@tatrman/tokens';
 import { IDENTIFIER, validateDocument, type LayoutDocument } from '../layout/layout-document.js';
 import { writeYaml } from '../layout/layout-yaml.js';
-import { isTtrId, writeTtrg } from '../layout/layout-ttr.js';
+import { isTtrId, ttrUnwritable, writeTtrg } from '../layout/layout-ttr.js';
 
 export type LayoutFormat = 'yaml' | 'ttr';
 
@@ -24,11 +25,18 @@ export function layoutTextOf(doc: LayoutDocument, name: string, format: LayoutFo
 }
 
 /**
- * Why `doc` named `name` cannot be saved as `format` — what the readers would refuse (V-1…V-4) — so
- * Save as… never writes a file Open layout… rejects. Empty ⇒ it can be saved.
+ * Why `doc` named `name` cannot be saved as `format` — what the readers would refuse (V-1…V-4), and for
+ * TTR a ref the grammar cannot spell (A-VL-5) — so Save as… never writes a file Open layout… or the TTR
+ * parser rejects. Empty ⇒ it can be saved.
  */
-export function layoutWriteProblems(doc: LayoutDocument, name: string, _format: LayoutFormat): string[] {
-  return validateDocument({ ...doc, name }).errors.map((e) => e.message);
+export function layoutWriteProblems(doc: LayoutDocument, name: string, format: LayoutFormat): string[] {
+  const problems = validateDocument({ ...doc, name }).errors.map((e) => e.message);
+  if (format === 'ttr') {
+    const refs = ttrUnwritable(doc);
+    const shown = refs.slice(0, 5).map((r) => `“${r}”`).join(', ') + (refs.length > 5 ? ` and ${refs.length - 5} more` : '');
+    if (refs.length > 0) problems.push(`TTR cannot spell ${shown} — a .ttrg lists TTR names only. Save as YAML, or remove ${refs.length === 1 ? 'it' : 'them'} from the layout.`);
+  }
+  return problems;
 }
 
 export function SaveAsDialog({
