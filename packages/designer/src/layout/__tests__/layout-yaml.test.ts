@@ -2,7 +2,7 @@
 // VL-P0 T2 — the YAML serialization (contracts §2, V-6…V-9).
 
 import { describe, it, expect } from 'vitest';
-import type { LayoutDocument } from '../layout-document.js';
+import type { LayoutDocument } from '@tatrman/parser/layout';
 import { readYaml, writeYaml, yamlScalar, LAYOUT_YAML_HEADER } from '../layout-yaml.js';
 
 const ITEM = 'hartland.er.entity.item';

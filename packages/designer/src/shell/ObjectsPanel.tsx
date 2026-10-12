@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GetGraphResponse, ModelGraphNode } from '@tatrman/lsp';
 import { canvas as palette } from '@tatrman/tokens';
-import { compareAlphabetical } from '../layout/layout-document.js';
+import { compareAlphabetical } from '@tatrman/parser/layout';
 import type { LayoutGraphIndex } from '../model/layout-projection.js';
 
 export interface MissingRef {

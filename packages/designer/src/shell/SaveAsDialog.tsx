@@ -7,9 +7,8 @@
 
 import { useMemo, useState } from 'react';
 import { canvas as palette } from '@tatrman/tokens';
-import { IDENTIFIER, validateDocument, type LayoutDocument } from '../layout/layout-document.js';
+import { IDENTIFIER, isTtrId, ttrUnwritable, validateDocument, writeTtrg, type LayoutDocument } from '@tatrman/parser/layout';
 import { writeYaml } from '../layout/layout-yaml.js';
-import { isTtrId, ttrUnwritable, writeTtrg } from '../layout/layout-ttr.js';
 
 export type LayoutFormat = 'yaml' | 'ttr';
 

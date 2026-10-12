@@ -51,9 +51,11 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
     `kind.name` · bare name; ambiguous never guessed; relations and foreign keys ignored) over a
     `LayoutModelIndex`; `indexOf(model, packageOf)` builds the index in the catalog's node shape, and
     `packagesFrom(sourceSnapshots)` supplies the packages the reconciled model does not keep.
-  - Alongside (not Maven artifacts): `@tatrman/designer` gains the TypeScript layout module
-    (`src/layout/` — the document, YAML and TTR readers/writers, `.ttrl` sidecar merge, resolution; the `yaml`
-    package 2.9.1 is its one new dependency), and `@tatrman/package-sdk` publishes
+  - Alongside (not Maven artifacts): `@tatrman/parser` gains **`@tatrman/parser/layout`** — the document, its
+    canonical form, the `.ttrg` writer and the `.ttrg` + `.ttrl` reader, without the ANTLR runtime (the
+    keywords that cannot be an `id` part are generated from `TTR.g4` at build time and held to the generated
+    parser by its tests); `@tatrman/designer` keeps the YAML form and the resolution rule (`src/layout/`; the
+    `yaml` package 2.9.1 is its one new dependency); and `@tatrman/package-sdk` publishes
     `schemas/layout.schema.json` (the YAML form, format 1) and `schemas/layout-vectors/` (twelve shared test
     cases every implementation of the format is held to; every `.ttrg` among them parses with `TTR.g4`).
 - **`ttr-translator`** ⚑ **behaviour fix — no VARCHAR cast without a length reaches SQL Server.** T-SQL reads

@@ -75,6 +75,9 @@ importers:
       '@tatrman/lsp':
         specifier: workspace:*
         version: link:../lsp
+      '@tatrman/parser':
+        specifier: workspace:*
+        version: link:../parser
       '@tatrman/perspectives':
         specifier: workspace:*
         version: link:../perspectives

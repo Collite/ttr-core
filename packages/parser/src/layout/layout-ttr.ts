@@ -4,10 +4,11 @@
 // (the v1.1 D4 shape the worker mode writes). Read a `.ttrg` with or without that block, optionally
 // with its `.ttrl` sidecar (grammar v4.3) — and when both carry positions, the sidecar wins.
 //
-// The reader is a small tokenizer + scanner, not `@tatrman/parser`: the grammar's `layout:` object takes
-// `id` keys only, so the quoted keys a reader accepts (V-12; a writer never writes one, A-VL-5) are outside it, and the JVM reader
-// (`TtrgGraphReader`, ttr-parser) scans text the same way — one approach, held together by the shared
-// vectors. Unlike a naive scan it skips comments and strings, so neither can fake a block.
+// The reader is a small tokenizer + scanner, not the generated parser: the grammar's `layout:` object takes
+// `id` keys only, so the quoted keys a reader accepts (V-12; a writer never writes one, A-VL-5) are outside
+// it; the JVM reader (`TtrgGraphReader`, ttr-parser) scans text the same way — one approach, held together
+// by the shared vectors; and this module must not load the ANTLR runtime (the Studio Viewer imports it as
+// `@tatrman/parser/layout`). Unlike a naive scan it skips comments and strings, so neither can fake a block.
 // Never read or written here: the viewport (C1-b) and `edges` (reserved).
 
 import {
@@ -21,21 +22,10 @@ import {
   type LayoutPoint,
   type ReadOptions,
 } from './layout-document.js';
+import { TTR_NON_ID_WORDS } from '../generated/ttr-id-words.js';
 
-/**
- * The lexer keywords of `TTR.g4` that the `idPart` rule does NOT admit — an `id` part spelled like one
- * of these is not an `id`. Kept in sync with the grammar by a test that recomputes it from `TTR.g4`.
- */
-export const TTR_NON_ID_WORDS: ReadonlySet<string> = new Set([
-  'DATAFRAME_DSL', 'REL_NODE', 'SQL', 'TRANSFORMATION_DSL', 'attributes', 'bool', 'boolean', 'btree',
-  'cardinality', 'char', 'codeAttribute', 'columns', 'constraints', 'date', 'datetime', 'decimal', 'def',
-  'definitionSql', 'description', 'descriptions', 'displayLabel', 'double', 'extends', 'false', 'float',
-  'fulltext', 'fuzzy', 'hosts', 'indexed', 'indices', 'int', 'integer', 'isKey', 'join', 'keywords',
-  'labelPlural', 'language', 'length', 'list', 'nameAttribute', 'notNull', 'null', 'number', 'object',
-  'optional', 'ordered', 'parameters', 'precision', 'primary', 'primaryKey', 'resultColumns', 'roles',
-  'search', 'searchable', 'secondary', 'sourceText', 'staging', 'string', 'tags', 'target', 'text',
-  'timestamp', 'true', 'type', 'unique', 'valueLabels', 'varchar', 'whereFilter',
-]);
+// the lexer keywords of TTR.g4 that `idPart` does not admit — generated from the grammar at build time
+export { TTR_NON_ID_WORDS };
 
 /** The grammar's IDENT token: ASCII + Latin-1/Latin Extended-A/B letters, digits, underscore. */
 const IDENT_PART = /^[A-Za-z_\u00C0-\u024F][A-Za-z0-9_\u00C0-\u024F]*$/;

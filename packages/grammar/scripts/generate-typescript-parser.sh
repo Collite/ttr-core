@@ -19,3 +19,6 @@ rm -rf "$OUTPUT_DIR"/*.ts "$OUTPUT_DIR"/*.interp "$OUTPUT_DIR"/*.tokens 2>/dev/n
 cd "$GRAMMAR_DIR/.."
 npx antlr-ng -o "$OUTPUT_DIR" -l -v -Dlanguage=TypeScript -- "$GRAMMAR_FILE"
 echo "Parser generated to $OUTPUT_DIR"
+
+# the keywords that cannot be an `id` part — for `@tatrman/parser/layout`, which must not load ANTLR
+node "$GRAMMAR_DIR/generate-ttr-id-words.mjs" "$GRAMMAR_FILE" "$OUTPUT_DIR/ttr-id-words.ts"

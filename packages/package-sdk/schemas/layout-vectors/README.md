@@ -1,8 +1,8 @@
 # Tatrman layout — shared test vectors (format 1)
 
 **This folder is published.** It is the contract every implementation of the Tatrman layout format is
-tested against — Tatrman's own (the Studio Viewer's TypeScript writer and reader, the JVM
-`TtrgLayoutWriter` / `TtrgGraphReader` / `LayoutResolver`) and any third party's. A third party may copy
+tested against — Tatrman's own (in TypeScript `@tatrman/parser/layout` and the Studio Viewer's YAML form
+and resolution; on the JVM `TtrgLayoutWriter` / `TtrgGraphReader` / `LayoutResolver`) and any third party's. A third party may copy
 it (pin the commit it was copied from) and assert the same equalities below. Change a file here only
 together with every implementation; the tests read these files directly, never a copy.
 

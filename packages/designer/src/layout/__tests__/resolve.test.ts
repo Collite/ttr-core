@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
-import { mergeTtr } from '../layout-ttr.js';
+import { mergeTtr } from '@tatrman/parser/layout';
 import { resolutionToJson, resolveRefs, type LayoutIndexEntry, type LayoutModelIndex } from '../resolve.js';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..');

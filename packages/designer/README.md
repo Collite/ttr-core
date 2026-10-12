@@ -97,7 +97,8 @@ identifiers and relation cards, never an error. The UI chrome itself stays Engli
 ## Layouts
 
 A layout is one named picture of a schema: the cards it shows and, optionally, where they sit
-(VL — the format is [Layout files](../../docs-site/docs/model/layout-files.md); the code is `src/layout/`).
+(VL — the format is [Layout files](../../docs-site/docs/model/layout-files.md); the document and its TTR form
+are `@tatrman/parser/layout`, the YAML form and the resolution rule are `src/layout/`).
 The shell features are the same on every backend:
 
 - **Objects panel** (`src/shell/ObjectsPanel.tsx`) — every card of the subject's schema, grouped by package,

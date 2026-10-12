@@ -18,6 +18,11 @@ pnpm install
 bash ../grammar/scripts/generate-typescript-parser.sh
 ```
 
+It ends by running `generate-ttr-id-words.mjs`, which writes `src/generated/ttr-id-words.ts`: the lexer keywords
+the `idPart` rule does not admit (`text`, `date`, `true`, …). `@tatrman/parser/layout` decides whether a string
+is a TTR `id` from that list, without loading the ANTLR runtime; the parser's tests hold the list to the
+generated parser's own `id` rule.
+
 ### `sync-to-ai-platform.sh <ai-platform-path>`
 
 Copies `TTR.g4` to the ai-platform vendored location:

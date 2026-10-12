@@ -6,8 +6,8 @@ import kotlin.math.floor
 
 /**
  * The layout document (VL contracts §1) — one named picture of a schema: the CARDS it shows and,
- * optionally, where they sit. Mirrors the viewer's TypeScript `LayoutDocument`
- * (`packages/designer/src/layout/layout-document.ts`); the two are held together by the shared vectors
+ * optionally, where they sit. Mirrors the TypeScript `LayoutDocument`
+ * (`packages/parser/src/layout/layout-document.ts`); the two are held together by the shared vectors
  * (`packages/package-sdk/schemas/layout-vectors/`).
  *
  * Derived, never stored (V-2): `mode` (manual iff [positions] is non-empty), the edges, the hop edges,

@@ -3,7 +3,7 @@ package org.tatrman.ttr.parser.loader
 
 /**
  * The tokenizer + scanner behind [TtrgGraphReader.scan] (VL-P0, contracts V-14) — the JVM twin of the
- * viewer's TypeScript reader (`packages/designer/src/layout/layout-ttr.ts`): words (an `id` with its
+ * TypeScript reader (`packages/parser/src/layout/layout-ttr.ts`): words (an `id` with its
  * dots), numbers, strings (`"…"` with backslash escapes, `"""…"""`), punctuation; `//` and block
  * comments skipped. Properties take an optional `:` / `=` separator and optional commas, as the
  * grammar's `graphBlock` and `object_` rules do; node keys may be bare or quoted (V-12).

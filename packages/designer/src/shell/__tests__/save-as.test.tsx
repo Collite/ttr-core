@@ -13,7 +13,7 @@ import type { GetGraphResponse, ModelGraphEdge, ModelGraphNode } from '@tatrman/
 import { ShellFrame } from '../ShellFrame.js';
 import { SaveAsDialog, layoutWriteProblems } from '../SaveAsDialog.js';
 import { readYaml } from '../../layout/layout-yaml.js';
-import type { LayoutDocument } from '../../layout/layout-document.js';
+import type { LayoutDocument } from '@tatrman/parser/layout';
 import type { ModelDataSource } from '../../data/model-data-source.js';
 import type { LayoutIndexEntry } from '../../layout/resolve.js';
 import type { CatalogGroup } from '../types.js';

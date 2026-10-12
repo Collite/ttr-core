@@ -4,7 +4,7 @@
 // breadcrumb (P-2, both faces). No React here; the shell components drive these.
 
 import type { SkinId } from '@tatrman/canvas-core';
-import type { LayoutPoint } from '../layout/layout-document.js';
+import type { LayoutPoint } from '@tatrman/parser/layout';
 import type { ShellState, Subject, SubjectTab, DrillSegment, LayoutSource, TabLayout } from './types.js';
 
 export const emptyShell: ShellState = { tabs: [], activeTabId: null };

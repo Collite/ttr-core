@@ -5,7 +5,7 @@
 // Model/Process mode (A-4 α): a tab's subject decides its canvas kind.
 
 import type { SkinId, SchemaCode } from '@tatrman/canvas-core';
-import type { LayoutDocument } from '../layout/layout-document.js';
+import type { LayoutDocument } from '@tatrman/parser/layout';
 export type { SkinId } from '@tatrman/canvas-core'; // re-exported for shell consumers
 
 export type SubjectKind = 'schema' | 'cube' | 'concept' | 'program';
