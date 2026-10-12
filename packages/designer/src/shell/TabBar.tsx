@@ -5,12 +5,14 @@
 import type { ShellState } from './types.js';
 
 export function TabBar({
-  state, onFocus, onPromote, onClose,
+  state, onFocus, onPromote, onClose, onContextMenu,
 }: {
   state: ShellState;
   onFocus: (id: string) => void;
   onPromote: (id: string) => void;
   onClose: (id: string) => void;
+  /** a right-click on a tab — the shell's tab menu (the layout commands, VL V-33) */
+  onContextMenu?: (id: string, clientX: number, clientY: number) => void;
 }) {
   if (state.tabs.length === 0) return null;
   return (
@@ -27,6 +29,7 @@ export function TabBar({
             data-active={active || undefined}
             onClick={() => onFocus(t.id)}
             onDoubleClick={() => onPromote(t.id)}
+            onContextMenu={onContextMenu ? (e) => { e.preventDefault(); onContextMenu(t.id, e.clientX, e.clientY); } : undefined}
             title={t.subject.ref}
             style={{
               display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', cursor: 'pointer',
@@ -39,6 +42,7 @@ export function TabBar({
             }}
           >
             <span>{t.subject.label}</span>
+            {t.layout?.dirty && <span data-testid="tab-dirty" title="unsaved changes" style={{ color: '#F2A200', fontWeight: 'bold' }}>*</span>}
             {t.preview && (
               <button
                 data-testid="pin-tab"

@@ -37,9 +37,10 @@ export class CommandRegistry {
     });
   }
 
-  /** Run the command's run(); no-op if the id is unknown. */
+  /** Run the command's run(); no-op if the id is unknown or the command is disabled. */
   execute(id: string): void {
-    this.byId.get(id)?.run();
+    const cmd = this.byId.get(id);
+    if (cmd && !cmd.disabled) cmd.run();
   }
 }
 

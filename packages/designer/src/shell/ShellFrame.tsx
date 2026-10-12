@@ -32,7 +32,7 @@ import type { ShellEditContext } from './edit-context.js';
 import type { CatalogGroup, CatalogItem, ShellState, Subject, SubjectKind, SubjectTab, TabLayout } from './types.js';
 import {
   emptyShell, openSubject, promoteTab, closeTab, dropPreviewIfLeaving, drillIn, drillTo, activeTab, setPerspective,
-  setLayoutObjects, setLayoutPositions, toLayoutTab, openLayoutTab,
+  setLayoutObjects, setLayoutPositions, toLayoutTab, openLayoutTab, markSaved, hasUnsavedLocalLayout,
 } from './shell-state.js';
 import { ViewMenu, type ViewMenuEntry, type ViewMenuTarget } from './ViewMenu.js';
 import { projectLayout, layoutIndexOf, hiddenNeighbours, hiddenClosure, visibleNeighbours, type HopEdge, type LayoutGraphIndex, type LayoutProjection } from '../model/layout-projection.js';
@@ -45,7 +45,10 @@ import { ObjectsPanel, type MissingRef } from './ObjectsPanel.js';
 import { readLayoutFiles, normalizeForTab, LAYOUT_FILE_ACCEPT } from '../layout/open-files.js';
 import { resolveRefs } from '../layout/resolve.js';
 import { modelKindHint } from '../data/capability-hints.js';
-import { pickFiles as pickFilesFromDisk } from '../fs/file-system.js';
+import { pickFiles as pickFilesFromDisk, downloadFile as downloadToDisk } from '../fs/file-system.js';
+import { SaveAsDialog, layoutFileOf, layoutTextOf, type LayoutFormat } from './SaveAsDialog.js';
+import { getRuntimeConfig } from '../runtime-config.js';
+import type { LayoutDocument } from '../layout/layout-document.js';
 import type { ModelKind } from '../data/model-data-source.js';
 import { LayoutDocumentStore } from '../data/view-state-store.js';
 import type { LayoutPoint } from '../layout/layout-document.js';
@@ -88,6 +91,8 @@ export interface ShellFrameProps {
   onNotice?: (msg: string) => void;
   /** Open layout…'s file picker (VL V-31) — the browser's by default; a test injects its own. */
   pickFiles?: (accept: string, multiple: boolean) => Promise<File[]>;
+  /** Save as…'s download (VL V-32) — the browser's by default; a test injects its own. */
+  downloadFile?: (fileName: string, content: string, mimeType: string) => Promise<void>;
   /** fires when the active tab (or its loaded graph) changes — drives the host header. */
   onActiveChange?: (active: ActiveSubject | null) => void;
   /** view-state persistence (FO-31, DM-P2.S1) — selected by capabilities.layoutPersist. Absent ⇒
@@ -148,7 +153,7 @@ function seedLayoutName(tab: SubjectTab): string {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : 'untitled';
 }
 
-export function ShellFrame({ dataSource, workspace, catalog, files, displayMode, getSourceText, onError, onNotice, pickFiles = pickFilesFromDisk, onActiveChange, viewState, editContext, irisBaseUrl, processingSource, runSource, validateProgram }: ShellFrameProps) {
+export function ShellFrame({ dataSource, workspace, catalog, files, displayMode, getSourceText, onError, onNotice, pickFiles = pickFilesFromDisk, downloadFile = downloadToDisk, onActiveChange, viewState, editContext, irisBaseUrl, processingSource, runSource, validateProgram }: ShellFrameProps) {
   const [shell, setShell] = useState<ShellState>(emptyShell);
   // processing face (DM-P4): the fixture source serves the hero graph in dev + tests; the live
   // TtrpServerProcessingSource plugs in behind the same interface. The run backend is a separate
@@ -167,6 +172,9 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   const [selectedHop, setSelectedHop] = useState<string | null>(null);
   // shift-click multi-selection (V-27): node ids the view menu's items apply to together
   const [multiSel, setMultiSel] = useState<ReadonlySet<string>>(new Set());
+  // Save as… (V-32): the tab being saved; the tab menu (V-33): where it was opened
+  const [saveAsTab, setSaveAsTab] = useState<string | null>(null);
+  const [tabMenu, setTabMenu] = useState<{ tabId: string; x: number; y: number } | null>(null);
   // Expand all levels… asks first (V-27): the count, then apply or cancel
   const [confirm, setConfirm] = useState<{ text: string; onYes: () => void } | null>(null);
   // what the canvas shows the user, in canvas coordinates — where a card with no neighbour goes (V-19)
@@ -383,6 +391,12 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     for (const g of catalog) for (const item of g.items) {
       r.register({ id: `open:${item.ref}`, title: `Open ${item.label}`, group: 'Catalog', toolbarAction: 'open.subject', run: () => openItem(item, false) });
     }
+    // the layout commands (V-33) — ⌘K twins of the layout toolbar; Save as… / New / Re-layout need a canvas
+    const canvas = !!tab && tab.subject.kind === 'schema' && !tab.perspective;
+    r.register({ id: 'layout.open', title: 'Open layout…', group: 'Layout', toolbarAction: 'layout.open', run: () => layoutActions.current.open() });
+    r.register({ id: 'layout.saveAs', title: 'Save layout as…', group: 'Layout', toolbarAction: 'layout.saveAs', disabled: !canvas, run: () => layoutActions.current.saveAs() });
+    r.register({ id: 'layout.new', title: 'New layout from this view', group: 'Layout', toolbarAction: 'layout.new', disabled: !canvas, run: () => layoutActions.current.newLayout() });
+    r.register({ id: 'layout.relayout', title: 'Re-layout', group: 'Layout', toolbarAction: 'layout.relayout', disabled: !canvas, run: () => layoutActions.current.relayout() });
     r.unregister('perspective.binding');
     r.unregister('bindings.toggle');
     r.unregister('processing.run');
@@ -687,6 +701,72 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     ];
   }
 
+  // ---- Save as… / New layout (V-32, V-33) ----
+
+  /** The layout a tab would save: its working layout, or — a plain subject — the cards it shows. */
+  function docForSave(t: SubjectTab): LayoutDocument | null {
+    if (t.subject.kind !== 'schema' || !t.subject.schemaCode || t.perspective) return null;
+    if (t.layout) return t.layout.doc;
+    const held = positions[t.subject.ref] ?? {};
+    const pos: Record<string, LayoutPoint> = {};
+    for (const [id, p] of Object.entries(held)) pos[wholeIndex?.fullQnameOf.get(id) ?? id] = p;
+    return { name: seedLayoutName(t), model: t.subject.schemaCode as LayoutDocument['model'], objects: shownCards(t), positions: pos };
+  }
+
+  const formatKey = `ttr-viewer:layout-format:${workspace}`;
+  /** Save as…'s format: the user's last choice in this workspace → VIEWER_LAYOUT_FORMAT → yaml (V-32). */
+  function preferredFormat(): LayoutFormat {
+    try {
+      const saved = window.localStorage.getItem(formatKey);
+      if (saved === 'yaml' || saved === 'ttr') return saved;
+    } catch { /* no storage — fall through */ }
+    return getRuntimeConfig().layoutFormat;
+  }
+
+  async function saveLayoutAs(tabId: string, name: string, format: LayoutFormat) {
+    const t = shellRef.current.tabs.find((x) => x.id === tabId);
+    const doc = t ? docForSave(t) : null;
+    if (!t || !doc) return;
+    const { fileName, mimeType } = layoutFileOf(name, format);
+    try {
+      await downloadFile(fileName, layoutTextOf(doc, name, format), mimeType);
+    } catch (e) {
+      onError?.(`Could not save ${fileName}: ${e}`);
+      return;
+    }
+    try { window.localStorage.setItem(formatKey, format); } catch { /* no storage — the choice is not remembered */ }
+    setShell((s) => (t.layout
+      ? markSaved(s, tabId, name, fileName)
+      : toLayoutTab(s, tabId, { doc: { ...doc, name }, source: 'file', fileName, dirty: false })));
+    onNotice?.(`Saved ${fileName}`);
+  }
+
+  /** New layout (V-33): a new, unsaved layout tab of what the current tab shows. */
+  function newLayout() {
+    if (!tab) return;
+    const doc = docForSave(tab);
+    if (!doc) return;
+    setShell((s) => openLayoutTab(s, { doc: { ...doc, name: 'untitled' }, source: 'new', dirty: true }));
+  }
+
+  const layoutActions = useRef({ open: () => {}, saveAs: () => {}, newLayout: () => {}, relayout: () => {} });
+  layoutActions.current = {
+    open: () => void pickFiles(LAYOUT_FILE_ACCEPT, true).then(openLayoutFiles),
+    saveAs: () => { if (tab && docForSave(tab)) setSaveAsTab(tab.id); },
+    newLayout,
+    relayout: () => void relayout(),
+  };
+  const canvasTab = !!tab && tab.subject.kind === 'schema' && !tab.perspective;
+
+  // unsaved local work arms the browser's leave-page prompt (V-30); a catalog layout re-reads on reload
+  const unsaved = hasUnsavedLocalLayout(shell);
+  useEffect(() => {
+    if (!unsaved) return;
+    const guard = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', guard);
+    return () => window.removeEventListener('beforeunload', guard);
+  }, [unsaved]);
+
   const missingRefs: MissingRef[] = useMemo(() => (projection
     ? [...projection.missing.map((ref) => ({ ref })), ...projection.ambiguous.map((a) => ({ ref: a.ref, candidates: a.candidates }))]
         .sort((a, b) => compareAlphabetical(a.ref, b.ref))
@@ -810,6 +890,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
           onFocus={(id) => setShell((s) => dropPreviewIfLeaving(s, id))}
           onPromote={(id) => setShell((s) => promoteTab(s, id))}
           onClose={(id) => setShell((s) => closeTab(s, id))}
+          onContextMenu={(id, x, y) => { setShell((s) => dropPreviewIfLeaving(s, id)); setTabMenu({ tabId: id, x, y }); }}
         />
         {tab && (
           <div style={{ display: 'flex', alignItems: 'center', paddingRight: 12 }}>
@@ -839,9 +920,17 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
         )}
         {/* the layout actions (VL §5.4) — Open works with no tab open; the rest need a schema canvas */}
         <div data-testid="layout-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderBottom: '1px solid #EDF2F9' }}>
+          <button data-testid="layout-new" title="A new layout of what this tab shows" disabled={!canvasTab}
+            onClick={() => layoutActions.current.newLayout()} style={toolbarButton}>
+            New layout
+          </button>
           <button data-testid="layout-open" title="Open a layout file (.yaml, .ttrg + .ttrl) — or drop it on the canvas"
-            onClick={() => void pickFiles(LAYOUT_FILE_ACCEPT, true).then(openLayoutFiles)} style={toolbarButton}>
+            onClick={() => layoutActions.current.open()} style={toolbarButton}>
             Open layout…
+          </button>
+          <button data-testid="layout-save-as" title="Download this layout as YAML or TTR" disabled={!canvasTab}
+            onClick={() => layoutActions.current.saveAs()} style={{ ...toolbarButton, ...(canvasTab ? { background: '#16283F', color: '#fff', borderColor: '#16283F' } : {}) }}>
+            Save as…
           </button>
           <button data-testid="layout-relayout" title="Arrange the cards shown automatically (they keep the new positions)"
             disabled={!(tab?.subject.kind === 'schema' && !tab.perspective && currentGraph)} onClick={() => void relayout()} style={toolbarButton}>
@@ -1032,6 +1121,40 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
         }}
       />
       <CommandPalette registry={registry} open={cmdkOpen} onClose={() => setCmdkOpen(false)} />
+      {tabMenu && (
+        <div data-testid="tab-menu" onMouseLeave={() => setTabMenu(null)}
+          style={{ position: 'fixed', left: tabMenu.x, top: tabMenu.y, background: '#fff', border: '1px solid #CBD8E6', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.15)', zIndex: 20 }}>
+          <ViewMenu
+            onClose={() => setTabMenu(null)}
+            items={(() => {
+              const t = shell.tabs.find((x) => x.id === tabMenu.tabId);
+              const canvas = !!t && t.subject.kind === 'schema' && !t.perspective;
+              return [
+                { id: 'layout.saveAs', label: 'Save layout as…', disabled: !canvas, run: () => layoutActions.current.saveAs() },
+                { id: 'layout.new', label: 'New layout from this view', disabled: !canvas, run: () => layoutActions.current.newLayout() },
+                { id: 'layout.relayout', label: 'Re-layout', disabled: !canvas, run: () => layoutActions.current.relayout() },
+                { separator: true as const },
+                { id: 'layout.open', label: 'Open layout…', run: () => layoutActions.current.open() },
+              ];
+            })()}
+          />
+        </div>
+      )}
+      {saveAsTab && (() => {
+        const t = shell.tabs.find((x) => x.id === saveAsTab);
+        const doc = t ? docForSave(t) : null;
+        if (!t || !doc) return null;
+        const initialName = t.layout ? (t.layout.doc.name === 'untitled' ? '' : t.layout.doc.name) : t.subject.ref === t.subject.schemaCode ? '' : doc.name;
+        return (
+          <SaveAsDialog
+            doc={doc}
+            initialName={initialName}
+            initialFormat={preferredFormat()}
+            onCancel={() => setSaveAsTab(null)}
+            onSave={(name, format) => { setSaveAsTab(null); void saveLayoutAs(t.id, name, format); }}
+          />
+        );
+      })()}
       {confirm && (
         <div data-testid="confirm-dialog" role="dialog" aria-modal="true"
           style={{ position: 'fixed', inset: 0, background: 'rgba(22,40,63,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}

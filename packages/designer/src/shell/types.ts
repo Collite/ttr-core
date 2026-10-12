@@ -86,5 +86,7 @@ export interface Command {
   group?: string;
   /** the toolbar action id this command mirrors — parity is asserted structurally */
   toolbarAction?: string;
+  /** listed but not runnable here (`layout.saveAs` on a program tab — VL V-33) */
+  disabled?: boolean;
   run: () => void;
 }

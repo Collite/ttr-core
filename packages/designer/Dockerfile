@@ -17,6 +17,7 @@
 #   VIEWER_CATALOG_URL       the catalog the browser reads                    (default <base>veles; `none` = no catalog)
 #   VIEWER_CATALOG_UPSTREAM  where nginx forwards <base>veles/ — read routes only (default unset → 503)
 #   VIEWER_DEFAULT_LANG      the language for model labels                    (default: the browser's, then en)
+#   VIEWER_LAYOUT_FORMAT     Save as…'s first format: yaml | ttr             (default: yaml)
 #   VIEWER_LANGUAGES         extra languages the picker offers, comma-separated (default none)
 #   VIEWER_PORT              the listen port                                  (default 8080)
 

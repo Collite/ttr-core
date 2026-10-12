@@ -10,6 +10,7 @@
 #   VIEWER_CATALOG_UPSTREAM  Veles' origin; nginx proxies <base>veles/ to it   default unset (503)
 #   VIEWER_DEFAULT_LANG      model-label language when the URL/user set none   default unset (browser, then en)
 #   VIEWER_LANGUAGES         extra languages the picker offers, e.g. en,cs     default unset
+#   VIEWER_LAYOUT_FORMAT     Save as…'s first format: yaml | ttr                default yaml
 #   VIEWER_PORT              listen port                                       default 8080
 #
 # Rendered: index.html (with <base href>), config.json (read by the app before its first render),
@@ -70,6 +71,12 @@ if [ -n "$LANGUAGES" ] && ! matches "$LANG_TAG(,$LANG_TAG)*" "$LANGUAGES"; then
     die "VIEWER_LANGUAGES must be comma-separated language tags (en,cs), got '$LANGUAGES'"
 fi
 
+LAYOUT_FORMAT=${VIEWER_LAYOUT_FORMAT:-yaml}
+case "$LAYOUT_FORMAT" in
+    yaml | ttr) ;;
+    *) die "VIEWER_LAYOUT_FORMAT must be yaml or ttr, got '$LAYOUT_FORMAT'" ;;
+esac
+
 mkdir -p "$OUT/client_temp" "$OUT/proxy_temp" "$OUT/fastcgi_temp" "$OUT/uwsgi_temp" "$OUT/scgi_temp"
 
 # --- index.html: the bundle's relative asset URLs resolve against <base href> ---------------------
@@ -89,7 +96,8 @@ cat > "$OUT/config.json" <<EOF
   "basePath": "$BASE",
   "veles": $(json_or_null "$CATALOG"),
   "lang": $(json_or_null "$DEFAULT_LANG"),
-  "languages": [$LANG_LIST]
+  "languages": [$LANG_LIST],
+  "layoutFormat": "$LAYOUT_FORMAT"
 }
 EOF
 

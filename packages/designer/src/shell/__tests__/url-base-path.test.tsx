@@ -32,7 +32,7 @@ const erGraph: GetGraphResponse = {
 };
 
 function config(basePath: string): RuntimeConfig {
-  return { basePath, veles: null, lang: null, languages: [] };
+  return { basePath, veles: null, lang: null, languages: [], layoutFormat: 'yaml' };
 }
 
 function mountShell() {
