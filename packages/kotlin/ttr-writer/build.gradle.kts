@@ -14,6 +14,8 @@ kotlin {
 
 tasks.test {
     useJUnitPlatform()
+    // VL-P0: TtrgLayoutWriterSpec reads the shared layout vectors in place (never a copy).
+    inputs.dir("../../package-sdk/schemas/layout-vectors")
 }
 
 dependencies {
@@ -22,6 +24,7 @@ dependencies {
 
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.ser.json)
 }
 
 ktlint {

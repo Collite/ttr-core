@@ -10,7 +10,11 @@ plugins {
 }
 
 kotlin { jvmToolchain(21) }
-tasks.test { useJUnitPlatform() }
+tasks.test {
+    useJUnitPlatform()
+    // VL-P0: LayoutResolverSpec reads the shared layout vectors in place (never a copy).
+    inputs.dir("../../package-sdk/schemas/layout-vectors")
+}
 
 dependencies {
     // Re-exported: consumers get one coherent ttr-* set (contracts §1).
