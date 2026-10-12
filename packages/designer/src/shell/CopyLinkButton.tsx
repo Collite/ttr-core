@@ -10,7 +10,7 @@
 import { useState } from 'react';
 import { color, radius, space, fontSize } from '@tatrman/tokens';
 
-export function CopyLinkButton({ url }: { url: string }) {
+export function CopyLinkButton({ url, disabledReason }: { url: string; disabledReason?: string }) {
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -23,6 +23,16 @@ export function CopyLinkButton({ url }: { url: string }) {
       // in the title for a manual copy; never throw from a share affordance.
     }
   };
+
+  if (disabledReason) {
+    // nothing to link to (a local layout file, VL V-35) — visible, disabled, and saying why
+    return (
+      <button type="button" data-testid="copy-federation-link" disabled aria-disabled="true" title={disabledReason} aria-label={`Copy link — ${disabledReason}`}
+        style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: space.xs + 2, border: `1px dashed ${color.accentBorder}`, borderRadius: radius.sm, background: color.surface, color: '#96989B', padding: `3px ${space.md - 2}px`, fontSize: fontSize.sm, cursor: 'not-allowed' }}>
+        🔗 Copy link
+      </button>
+    );
+  }
 
   return (
     <button

@@ -3,35 +3,22 @@ package org.tatrman.ttr.designer.server.graph
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import org.tatrman.ttr.parser.loader.TtrgGraphReader
 
-class TtrgGraphFileSpec :
+/**
+ * The `.ttrg` MUTATORS (FO-21 edit half). The reader tests moved with the reader to `ttr-parser`
+ * (`TtrgGraphReaderSpec`, VL-P0); these read their results back through it.
+ */
+class TtrgGraphMutationsSpec :
     StringSpec({
-        "parseHeader reads the graph name and model schema" {
-            val h = TtrgGraphFile.parseHeader("graph all_er {\n  model: er,\n  objects: []\n}\n")
-            h shouldBe TtrgGraphFile.Header(name = "all_er", schema = "er")
-        }
-
-        "parseHeader returns null for a non-graph file" {
-            TtrgGraphFile.parseHeader("package p\nmodel db schema dbo\n") shouldBe null
-        }
-
-        "parseObjects splits and trims the bracket contents" {
-            val objs = TtrgGraphFile.parseObjects("graph g {\n  objects: [a.b.c, a.b.d]\n}\n")
-            objs shouldBe listOf("a.b.c", "a.b.d")
-        }
-
-        "parseObjects returns empty for an empty list" {
-            TtrgGraphFile.parseObjects("graph g {\n  objects: []\n}\n") shouldBe emptyList()
-        }
-
         "addObject appends to a non-empty list without a trailing comma" {
             val out = TtrgGraphMutations.addObject("graph g {\n  objects: [a.b.c]\n}\n", "a.b.d", null)
-            TtrgGraphFile.parseObjects(out!!) shouldBe listOf("a.b.c", "a.b.d")
+            TtrgGraphReader.parseObjects(out!!) shouldBe listOf("a.b.c", "a.b.d")
         }
 
         "addObject inserts into an empty list" {
             val out = TtrgGraphMutations.addObject("graph g {\n  objects: []\n}\n", "a.b.c", null)
-            TtrgGraphFile.parseObjects(out!!) shouldBe listOf("a.b.c")
+            TtrgGraphReader.parseObjects(out!!) shouldBe listOf("a.b.c")
         }
 
         "addObject inserts a missing import line when packageToImport is given" {
@@ -51,12 +38,12 @@ class TtrgGraphFileSpec :
                     "a.b.d",
                     false,
                 )
-            TtrgGraphFile.parseObjects(out!!) shouldBe listOf("a.b.c", "a.b.e")
+            TtrgGraphReader.parseObjects(out!!) shouldBe listOf("a.b.c", "a.b.e")
         }
 
         "removeObject on the only entry leaves an empty list" {
             val out = TtrgGraphMutations.removeObject("graph g {\n  objects: [a.b.c]\n}\n", "a.b.c", false)
-            TtrgGraphFile.parseObjects(out!!) shouldBe emptyList()
+            TtrgGraphReader.parseObjects(out!!) shouldBe emptyList()
         }
 
         "removeObject returns null when the qname isn't present" {
@@ -65,7 +52,7 @@ class TtrgGraphFileSpec :
 
         "removeObject never removes on a substring match — a.b.cd stays when removing a.b.c" {
             val out = TtrgGraphMutations.removeObject("graph g {\n  objects: [a.b.c, a.b.cd]\n}\n", "a.b.c", false)
-            TtrgGraphFile.parseObjects(out!!) shouldBe listOf("a.b.cd")
+            TtrgGraphReader.parseObjects(out!!) shouldBe listOf("a.b.cd")
         }
 
         "removeObject prunes the import when no sibling object still needs the package" {

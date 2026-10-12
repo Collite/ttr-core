@@ -8,7 +8,7 @@ import {
   type RuntimeConfig,
 } from '../runtime-config.js';
 
-const DEFAULTS: RuntimeConfig = { basePath: '/', veles: null, lang: null, languages: [] };
+const DEFAULTS: RuntimeConfig = { basePath: '/', veles: null, lang: null, languages: [], layoutFormat: 'yaml' };
 
 function fetchReturning(status: number, body: string) {
   return vi.fn(async () => new Response(body, { status })) as unknown as typeof fetch;
@@ -18,14 +18,24 @@ describe('runtime config', () => {
   afterEach(() => setRuntimeConfig(null));
 
   it('parses the file the entrypoint renders', () => {
-    const raw = { basePath: '/models/', veles: '/models/veles', lang: 'cs', languages: ['en', 'cs'] };
+    const raw = { basePath: '/models/', veles: '/models/veles', lang: 'cs', languages: ['en', 'cs'], layoutFormat: 'ttr' };
     expect(parseRuntimeConfig(raw, DEFAULTS)).toEqual(raw);
+  });
+
+  it('VIEWER_LAYOUT_FORMAT: yaml or ttr, anything else keeps the default (VL V-32)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(parseRuntimeConfig({ layoutFormat: 'yaml' }, DEFAULTS).layoutFormat).toBe('yaml');
+    expect(parseRuntimeConfig({ layoutFormat: 'ttr' }, DEFAULTS).layoutFormat).toBe('ttr');
+    expect(parseRuntimeConfig({ layoutFormat: 'TTRG' }, DEFAULTS).layoutFormat).toBe('yaml');
+    expect(parseRuntimeConfig({}, DEFAULTS).layoutFormat).toBe('yaml');
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 
   it('keeps the default for each invalid field, and only that field', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const parsed = parseRuntimeConfig({ basePath: 'models', veles: '/veles', lang: 'english!', languages: ['en', 7] }, DEFAULTS);
-    expect(parsed).toEqual({ basePath: '/', veles: '/veles', lang: null, languages: [] });
+    expect(parsed).toEqual({ basePath: '/', veles: '/veles', lang: null, languages: [], layoutFormat: 'yaml' });
     expect(warn).toHaveBeenCalledTimes(3);
     warn.mockRestore();
   });

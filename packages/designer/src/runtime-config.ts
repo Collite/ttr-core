@@ -22,6 +22,8 @@ export interface RuntimeConfig {
   lang: string | null;
   /** Languages the language picker offers on top of the ones the model's labels carry. */
   languages: string[];
+  /** Save as…'s first format until the user picks one (`VIEWER_LAYOUT_FORMAT`, VL V-32). */
+  layoutFormat: 'yaml' | 'ttr';
 }
 
 /** A path prefix: `/`, or `/seg/…/seg/` with URL-safe segment characters. */
@@ -59,7 +61,7 @@ export function defaultBasePath(buildBase: string = import.meta.env.BASE_URL, do
 }
 
 export function defaultRuntimeConfig(): RuntimeConfig {
-  return { basePath: defaultBasePath(), veles: null, lang: null, languages: [] };
+  return { basePath: defaultBasePath(), veles: null, lang: null, languages: [], layoutFormat: 'yaml' };
 }
 
 /**
@@ -86,6 +88,10 @@ export function parseRuntimeConfig(raw: unknown, defaults: RuntimeConfig = defau
     if (r.lang === null || r.lang === '') out.lang = null;
     else if (isLanguageTag(r.lang)) out.lang = r.lang.toLowerCase();
     else warn('lang');
+  }
+  if ('layoutFormat' in r) {
+    if (r.layoutFormat === 'yaml' || r.layoutFormat === 'ttr') out.layoutFormat = r.layoutFormat;
+    else warn('layoutFormat');
   }
   if ('languages' in r) {
     if (Array.isArray(r.languages) && r.languages.every(isLanguageTag)) {

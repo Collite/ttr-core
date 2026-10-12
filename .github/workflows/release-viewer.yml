@@ -87,7 +87,7 @@ jobs:
       - name: Smoke test
         run: |
           set -euo pipefail
-          docker run -d --name viewer -p 8080:8080 -e VIEWER_BASE_PATH=/models/ -e VIEWER_DEFAULT_LANG=en ttr-viewer:smoke
+          docker run -d --name viewer -p 8080:8080 -e VIEWER_BASE_PATH=/models/ -e VIEWER_DEFAULT_LANG=en -e VIEWER_LAYOUT_FORMAT=ttr ttr-viewer:smoke
           trap 'docker logs viewer; docker rm -f viewer >/dev/null' EXIT
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/healthz >/dev/null 2>&1 && break; sleep 1; done
           curl -fsS http://127.0.0.1:8080/healthz | grep -qx ok
@@ -95,6 +95,9 @@ jobs:
           curl -fsS http://127.0.0.1:8080/models/w/hartland/s/er | grep -q '<base href="/models/" />'
           curl -fsS http://127.0.0.1:8080/models/config.json | grep -q '"basePath": "/models/"'
           curl -fsS http://127.0.0.1:8080/models/config.json | grep -q '"veles": "/models/veles"'
+          curl -fsS http://127.0.0.1:8080/models/config.json | grep -q '"layoutFormat": "ttr"'
+          set +e; docker run --rm -e VIEWER_LAYOUT_FORMAT=bogus ttr-viewer:smoke; refused=$?; set -e
+          test "$refused" = 64
           ASSET=$(curl -fsS http://127.0.0.1:8080/models/ | grep -o 'assets/index-[^"]*\.js' | head -n1)
           curl -fsS -o /dev/null "http://127.0.0.1:8080/models/${ASSET}"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/models/assets/missing.js)" = 404

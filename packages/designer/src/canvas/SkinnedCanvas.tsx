@@ -6,10 +6,10 @@
 //
 // DM-P2.S2 seam rewire: the canvas no longer talks to `LspClient.setLayout` directly. It EMITS a
 // view change (`onPersistView`) and the shell (DM-P2.S3) persists it through the ViewStateStore
-// selected by `capabilities.layoutPersist` (DM-P2.S1) — Worker in-file / WS `.ttrl` / Veles none.
+// selected by `capabilities.layoutPersist` (DM-P2.S1) — Worker in-file / WS `.ttrl` / Veles `file` (the tab).
 // This is what makes the one canvas run against all three backends.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import type { DisplayMode, ModelGraph } from '@tatrman/lsp';
 import {
   modelGraphToCanvas, layoutAuto, type BindingHint, type CanvasGraph, type Positions, type SkinId, type SchemaCode,
@@ -17,6 +17,7 @@ import {
 import { createSkinRegistry } from '../skins/index.js';
 import type { DesignerSkin } from './skin-component.js';
 import { CanvasKernel } from './Kernel.js';
+import type { ViewMenuTarget } from '../shell/ViewMenu.js';
 import { canvas as palette } from '@tatrman/tokens'; // canvas token family (contracts §6)
 
 /** A view change the canvas emits for the shell to persist through its ViewStateStore (DM-P2.S1/S3). */
@@ -33,12 +34,26 @@ export interface SkinnedCanvasProps {
   /** the ViewStateStore key for this canvas (the graph uri); null ⇒ persistence is skipped. */
   canvasKey: string | null;
   selectedQname?: string | null;
+  /** the selected edge (a hop edge open in the inspector — VL V-26) */
+  selectedEdgeId?: string | null;
+  /** an edge was clicked (a hop edge's pill included); null = cleared */
+  onEdgeSelect?: (id: string | null) => void;
+  /** further selected cards (shift-click multi-select, VL V-27) */
+  selectedIds?: readonly string[];
+  /** the truth chip's layout part (VL V-29): where the picture lives */
+  layoutChip?: { text: string; title?: string } | null;
+  /** filled with a reader of the visible area's centre (placement — VL V-19) */
+  viewportCenterRef?: MutableRefObject<(() => { x: number; y: number } | null) | null>;
   /** skin id from view-state (may be unknown ⇒ DS-SKIN-002 fallback + truth-chip note) */
   initialSkin?: SkinId;
-  onNodeSelect: (qname: string | null) => void;
+  /** a card was clicked; `additive` — shift held (multi-select, VL V-27) */
+  onNodeSelect: (qname: string | null, additive?: boolean) => void;
   /** FO-21: the node context menu is injected by the shell's authoring context (absent in OPEN →
    *  no menu, read-only). The label/ops live in the extension, never in this bundle. */
   renderNodeMenu?: (qname: string, close: () => void) => ReactNode;
+  /** the VIEW menu (VL V-27): always armed in the open viewer — on a card and on a hop edge. When the
+   *  edit menu is injected too, a card's right-click shows one list: view items, a separator, edit items. */
+  renderViewMenu?: (target: ViewMenuTarget, close: () => void) => ReactNode;
   /** emit a view change to persist (positions/displayMode/mode); the shell writes it to the store. */
   onPersistView?: (change: CanvasViewChange) => void;
   onDrillIn?: (id: string, label: string) => void;
@@ -56,7 +71,8 @@ function project(cg: CanvasGraph, mode: DisplayMode): CanvasGraph {
 }
 
 export function SkinnedCanvas({
-  graph, displayMode, nodePositions, canvasKey, selectedQname, initialSkin, onNodeSelect, renderNodeMenu, onPersistView, onDrillIn,
+  graph, displayMode, nodePositions, canvasKey, selectedQname, selectedEdgeId, onEdgeSelect, viewportCenterRef, initialSkin, onNodeSelect, renderNodeMenu, renderViewMenu, onPersistView, onDrillIn,
+  selectedIds, layoutChip,
   bindingHints, showBindings, onToggleShowBindings,
 }: SkinnedCanvasProps) {
   const registry = useMemo(() => createSkinRegistry(), []);
@@ -115,8 +131,9 @@ export function SkinnedCanvas({
     layoutAuto(canvasGraph, { orientation: skin.flow.orientation, sizeOf: (n) => skin.nodeSize(n) })
       .then((p) => { if (alive) { workingPositions.current = p; setPositions(p); } });
     return () => { alive = false; };
-    // re-layout when the graph or skin (orientation/size) changes; NOT on selection
-  }, [canvasGraph, skinId]);
+    // re-layout when the graph or skin (orientation/size) changes, or the shell hands new positions
+    // (a layout's Re-layout, a placed card — VL V-19); NOT on selection
+  }, [canvasGraph, skinId, nodePositions]);
 
   // drag → update working positions + emit a persist-view (debounced). The shell writes it through
   // the ViewStateStore selected by the active backend's capabilities.layoutPersist (DM-P2.S1/S3).
@@ -143,8 +160,9 @@ export function SkinnedCanvas({
     onPersistView?.({ positions: { ...workingPositions.current }, displayMode, mode: modeRef.current });
   }, [displayMode, canvasKey]);
 
-  // context-menu remove
-  const [menu, setMenu] = useState<{ qname: string; x: number; y: number } | null>(null);
+  // the right-click menu: the view menu and/or the injected edit menu (FO-21), on a card or a hop edge
+  const [menu, setMenu] = useState<{ target: ViewMenuTarget; x: number; y: number } | null>(null);
+  const closeMenu = () => setMenu(null);
 
   if (!canvasGraph || !positions || !skin) {
     return <div data-testid="skinned-canvas-empty" style={{ padding: 20, color: palette.muted }}>laying out…</div>;
@@ -180,6 +198,7 @@ export function SkinnedCanvas({
           canvas={kind} · skin={skinId} · mode={mode}
           {fellBack && <span data-testid="skin-fallback" style={{ color: palette.warnInk }}> · substituted ({requested} not available here)</span>}
           <span style={{ color: palette.muted }}> · skin: prefs (GQ-1)</span>
+          {layoutChip && <span data-testid="truth-chip-layout" title={layoutChip.title}> · {layoutChip.text}</span>}
         </span>
       </div>
 
@@ -190,19 +209,29 @@ export function SkinnedCanvas({
           skinId={skinId}
           positions={positions}
           selectedId={selectedQname ?? null}
+          selectedIds={selectedIds}
+          selectedEdgeId={selectedEdgeId ?? null}
           onSelect={onNodeSelect}
+          onEdgeSelect={onEdgeSelect}
+          viewportCenterRef={viewportCenterRef}
           onNodeDrag={onNodeDrag}
-          // the node context menu is edit UI (FO-21) — only armed when the shell injects an authoring
-          // menu renderer; the OPEN Viewer passes none, so right-click has no menu (read-only).
-          onNodeContextMenu={renderNodeMenu ? (id, x, y) => setMenu({ qname: id, x, y }) : undefined}
+          // the right-click menu: the VIEW menu (always armed in the open viewer, VL V-27) and the EDIT
+          // menu (FO-21 — only when the shell injects an authoring renderer). Neither ⇒ no menu.
+          onNodeContextMenu={renderNodeMenu || renderViewMenu ? (id, x, y) => setMenu({ target: { kind: 'node', id }, x, y }) : undefined}
+          onEdgeContextMenu={renderViewMenu ? (id, x, y) => setMenu({ target: { kind: 'edge', id }, x, y }) : undefined}
           onDrillIn={onDrillIn}
         />
-        {menu && renderNodeMenu && (
+        {menu && (renderNodeMenu || renderViewMenu) && (
           <div
             data-testid="node-context-menu"
+            onClick={(e) => e.stopPropagation()}
             style={{ position: 'fixed', left: menu.x, top: menu.y, background: palette.nodeFill, border: `1px solid ${palette.grid}`, borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.15)', zIndex: 20, fontSize: 13, overflow: 'hidden' }}
           >
-            {renderNodeMenu(menu.qname, () => setMenu(null))}
+            {renderViewMenu?.(menu.target, closeMenu)}
+            {renderViewMenu && renderNodeMenu && menu.target.kind === 'node' && (
+              <hr data-testid="menu-separator" style={{ border: 'none', borderTop: `1px solid ${palette.grid}`, margin: 0 }} />
+            )}
+            {renderNodeMenu && menu.target.kind === 'node' && renderNodeMenu(menu.target.id, closeMenu)}
           </div>
         )}
       </div>

@@ -48,8 +48,25 @@ export async function loadProjectViaFileSystemAccessAPI(): Promise<ProjectFiles 
   }
 }
 
-export async function downloadFile(filename: string, content: string): Promise<void> {
-  const blob = new Blob([content], { type: 'text/plain' });
+/**
+ * Ask the user for files (Open layout… — VL V-31): a transient `<input type=file>`. Resolves with the
+ * picked files, or `[]` when the dialog is cancelled.
+ */
+export function pickFiles(accept: string, multiple: boolean): Promise<File[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.multiple = multiple;
+    input.addEventListener('change', () => resolve(input.files ? Array.from(input.files) : []));
+    input.addEventListener('cancel', () => resolve([]));
+    input.click();
+  });
+}
+
+/** Download `content` as `filename` — `text/plain` unless a MIME type is named (`application/yaml`, VL V-9). */
+export async function downloadFile(filename: string, content: string, mimeType = 'text/plain'): Promise<void> {
+  const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

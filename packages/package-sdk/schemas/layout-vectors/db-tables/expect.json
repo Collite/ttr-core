@@ -1,0 +1,13 @@
+{
+  "resolved": {
+    "channel_sales": "hartland.db.dbo.channel_sales",
+    "db.dbo.store_sales": "hartland.db.dbo.store_sales",
+    "hartland.db.dbo.item": "hartland.db.dbo.item",
+    "table.store": "hartland.db.dbo.store"
+  },
+  "missing": [],
+  "ambiguous": [],
+  "ignored": [
+    "hartland.db.dbo.fk_ss_item"
+  ]
+}

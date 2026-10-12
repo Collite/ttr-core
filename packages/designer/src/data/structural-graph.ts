@@ -155,6 +155,7 @@ export function ttrmToGetGraphResponse(
       kind: coerceKind(n.kind, s),
       name: n.label, // the identifier
       schemaCode: s,
+      ...(n.pkg ? { pkg: n.pkg } : {}),
       label: localizedLabel(n.label, n.displayLabel, lang),
       sourceUri: '',
       sourceLocation: { line: 0, column: 0 },

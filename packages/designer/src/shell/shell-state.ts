@@ -4,7 +4,8 @@
 // breadcrumb (P-2, both faces). No React here; the shell components drive these.
 
 import type { SkinId } from '@tatrman/canvas-core';
-import type { ShellState, Subject, SubjectTab, DrillSegment } from './types.js';
+import type { LayoutPoint } from '../layout/layout-document.js';
+import type { ShellState, Subject, SubjectTab, DrillSegment, LayoutSource, TabLayout } from './types.js';
 
 export const emptyShell: ShellState = { tabs: [], activeTabId: null };
 
@@ -103,3 +104,111 @@ function updateTab(state: ShellState, id: string, fn: (t: SubjectTab) => Subject
 
 export const activeTab = (state: ShellState): SubjectTab | null =>
   state.tabs.find((t) => t.id === state.activeTabId) ?? null;
+
+// ---- the working layout (VL contracts §5: V-22, V-28, V-30, V-35) ----
+
+/**
+ * A layout tab's subject ref (V-35, A-VL-4): `layout:<name>` for a catalog layout, `file:<name>` / `new:<name>`
+ * for a local one — never the bare name, which a schema subject (`er`, `db`) may share.
+ */
+export function layoutRef(source: LayoutSource, name: string): string {
+  return `${source === 'catalog' ? 'layout' : source}:${name}`;
+}
+
+/** The subject a layout tab shows: `<model> · <name>`. */
+export function layoutSubject(layout: TabLayout): Subject {
+  const { doc, source } = layout;
+  return { ref: layoutRef(source, doc.name), kind: 'schema', schemaCode: doc.model, label: `${doc.model} · ${doc.name}` };
+}
+
+/** `base`, or `base~2`, `base~3`… — the first id no open tab uses (two local files may share a name). */
+function freeTabId(state: ShellState, base: string, except?: string): string {
+  const taken = new Set(state.tabs.filter((t) => t.id !== except).map((t) => t.id));
+  if (!taken.has(base)) return base;
+  for (let n = 2; ; n++) if (!taken.has(`${base}~${n}`)) return `${base}~${n}`;
+}
+
+/**
+ * Open a layout as a durable tab and focus it (V-31, V-34). A catalog layout already open is focused,
+ * never reset — its unsaved edits survive; a local file always gets its own tab.
+ */
+export function openLayoutTab(state: ShellState, layout: TabLayout): ShellState {
+  const subject = layoutSubject(layout);
+  if (layout.source === 'catalog') {
+    const open = state.tabs.find((t) => t.layout?.source === 'catalog' && t.subject.ref === subject.ref);
+    if (open) return { ...state, activeTabId: open.id };
+  }
+  const tab: SubjectTab = { id: freeTabId(state, subject.ref), subject, drillPath: [], preview: false, layout };
+  return { tabs: [...state.tabs, tab], activeTabId: tab.id };
+}
+
+/**
+ * Turn a plain subject tab into a layout tab in place (V-22: the whole schema's first selection edit
+ * makes it `er · untitled*`). The tab keeps its position in the bar; its id follows the new subject.
+ */
+export function toLayoutTab(state: ShellState, tabId: string, layout: TabLayout): ShellState {
+  const subject = layoutSubject(layout);
+  const id = freeTabId(state, subject.ref, tabId);
+  return {
+    tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, id, subject, perspective: undefined, preview: false, layout } : t)),
+    activeTabId: state.activeTabId === tabId ? id : state.activeTabId,
+  };
+}
+
+function updateLayout(state: ShellState, tabId: string, fn: (l: TabLayout) => TabLayout): ShellState {
+  return updateTab(state, tabId, (t) => (t.layout ? { ...t, layout: fn(t.layout) } : t));
+}
+
+/**
+ * The selection changed (V-19): `objects` replaces the cards; positions of cards no longer shown are
+ * dropped, `placed` (new cards' positions) are added. Marks the layout dirty.
+ */
+export function setLayoutObjects(
+  state: ShellState,
+  tabId: string,
+  objects: string[],
+  placed: Record<string, LayoutPoint> = {},
+): ShellState {
+  return updateLayout(state, tabId, (l) => {
+    const keep = new Set(objects);
+    const positions: Record<string, LayoutPoint> = {};
+    for (const [ref, p] of Object.entries(l.doc.positions)) if (keep.has(ref)) positions[ref] = p;
+    for (const [ref, p] of Object.entries(placed)) if (keep.has(ref)) positions[ref] = p;
+    const collapsed = l.doc.collapsed?.filter((ref) => keep.has(ref));
+    return { ...l, dirty: true, doc: { ...l.doc, objects: [...objects], positions, ...(collapsed ? { collapsed } : {}) } };
+  });
+}
+
+/** Positions changed (a drag, Re-layout — V-28): replaces them, and the skin / collapsed when given. Marks dirty. */
+export function setLayoutPositions(
+  state: ShellState,
+  tabId: string,
+  positions: Record<string, LayoutPoint>,
+  extra: { skin?: string; collapsed?: string[] } = {},
+): ShellState {
+  return updateLayout(state, tabId, (l) => {
+    const doc = { ...l.doc, positions: { ...positions } };
+    if (extra.skin !== undefined) doc.skin = extra.skin;
+    if (extra.collapsed !== undefined) doc.collapsed = [...extra.collapsed];
+    return { ...l, dirty: true, doc };
+  });
+}
+
+/** Save as… succeeded (V-32): the tab is now the local file `fileName`, named `name`, clean. */
+export function markSaved(state: ShellState, tabId: string, name: string, fileName: string): ShellState {
+  const tab = state.tabs.find((t) => t.id === tabId);
+  if (!tab?.layout) return state;
+  const layout: TabLayout = { doc: { ...tab.layout.doc, name }, source: 'file', fileName, dirty: false };
+  const subject = layoutSubject(layout);
+  const id = freeTabId(state, subject.ref, tabId);
+  return {
+    tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, id, subject, layout } : t)),
+    activeTabId: state.activeTabId === tabId ? id : state.activeTabId,
+  };
+}
+
+/** Whether leaving the page loses work (V-30): a `file` / `new` layout with unsaved edits. */
+export function hasUnsavedLocalLayout(state: ShellState): boolean {
+  return state.tabs.some((t) => t.layout && t.layout.dirty && t.layout.source !== 'catalog');
+}
+

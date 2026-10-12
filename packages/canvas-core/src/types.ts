@@ -61,6 +61,10 @@ export interface CanvasEdge {
   role: EdgeRole;
   label?: string;
   cardinality?: { from?: Cardinality; to?: Cardinality };
+  /** `hop` — a derived path through hidden cards (VL V-24): skins draw it dashed, no cardinality */
+  kind?: 'hop';
+  /** hop edges: the hidden cards in between, as full qnames */
+  via?: string[];
 }
 
 export interface CanvasContainer {

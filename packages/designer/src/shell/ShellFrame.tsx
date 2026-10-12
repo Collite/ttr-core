@@ -8,13 +8,13 @@
 //   • data seam: consumes `ModelDataSource` (contracts §1), never a transport/`LspClient`. Runs
 //     against Worker (full) / WS / Veles (honestly degraded) behind the one interface.
 //   • view-state: layout persists through the injected `ViewStateStore` (DM-P2.S1), selected by the
-//     backend's `capabilities.layoutPersist` — Worker in-file / WS `.ttrl` / Veles none.
+//     backend's `capabilities.layoutPersist` — Worker in-file / WS `.ttrl` / Veles `file` (the tab).
 //   • FO-21: edit affordances render ONLY through an injected `ShellEditContext` — ABSENT here, so
 //     the Viewer ships no edit code (add/remove/applyGraphEdit + pickers are DM-P3 authoring). The
 //     processing face (program tabs) is a placeholder until DM-P4.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { BindingMapData, DisplayMode, GetGraphResponse, LineageRootRef } from '@tatrman/lsp';
+import type { BindingMapData, DisplayMode, GetGraphResponse, LineageRootRef, ModelGraphEdge } from '@tatrman/lsp';
 import { generateBindingRibbon, generateLineage, type LineageScope, type LineageDirection, type ObjectKind } from '@tatrman/perspectives';
 import type { ModelDataSource } from '../data/model-data-source.js';
 import type { ViewStateStore } from '@tatrman/canvas-core';
@@ -29,10 +29,31 @@ import { fixtureProcessingSource, type ProcessingGraphSource } from '../model/pr
 import { absentRunSource, type RunSource } from '../model/run-source.js';
 import { DerivedCanvas } from '../perspectives/index.js';
 import type { ShellEditContext } from './edit-context.js';
-import type { CatalogGroup, CatalogItem, ShellState, Subject, SubjectKind } from './types.js';
+import type { CatalogGroup, CatalogItem, ShellState, Subject, SubjectKind, SubjectTab, TabLayout } from './types.js';
 import {
   emptyShell, openSubject, promoteTab, closeTab, dropPreviewIfLeaving, drillIn, drillTo, activeTab, setPerspective,
+  setLayoutObjects, setLayoutPositions, toLayoutTab, openLayoutTab, markSaved, hasUnsavedLocalLayout,
 } from './shell-state.js';
+import { ViewMenu, type ViewMenuEntry, type ViewMenuTarget } from './ViewMenu.js';
+import { projectLayout, layoutIndexOf, hiddenNeighbours, hiddenClosure, visibleNeighbours, type HopEdge, type LayoutGraphIndex, type LayoutProjection } from '../model/layout-projection.js';
+import { placeNew, centreOf, type Point, type Size } from '../model/placement.js';
+import { modelGraphToCanvas, layoutAuto, type CanvasGraph, type SchemaCode } from '@tatrman/canvas-core';
+import { createSkinRegistry } from '../skins/index.js';
+import type { DesignerSkin } from '../canvas/skin-component.js';
+import { compareAlphabetical } from '../layout/layout-document.js';
+import { ObjectsPanel, type MissingRef } from './ObjectsPanel.js';
+import { readLayoutFiles, normalizeForTab, LAYOUT_FILE_ACCEPT } from '../layout/open-files.js';
+import { resolveRefs } from '../layout/resolve.js';
+import { modelKindHint } from '../data/capability-hints.js';
+import { pickFiles as pickFilesFromDisk, downloadFile as downloadToDisk } from '../fs/file-system.js';
+import { SaveAsDialog, layoutFileOf, layoutTextOf, type LayoutFormat } from './SaveAsDialog.js';
+import { getRuntimeConfig } from '../runtime-config.js';
+import type { LayoutDocument } from '../layout/layout-document.js';
+import type { ModelKind } from '../data/model-data-source.js';
+import { LayoutDocumentStore } from '../data/view-state-store.js';
+import type { LayoutPoint } from '../layout/layout-document.js';
+import { HopEdgeInspector } from './HopEdgeInspector.js';
+import { layoutChip } from './layout-chip.js';
 import { CatalogSpine } from './CatalogSpine.js';
 import { FileRail } from './FileRail.js';
 import { TabBar } from './TabBar.js';
@@ -67,6 +88,12 @@ export interface ShellFrameProps {
   displayMode: DisplayMode;
   getSourceText?: (uri: string) => string | undefined;
   onError?: (msg: string) => void;
+  /** a passing notice (`Expanded: +3`, `Every neighbour is already visible`) — the host's info toast. */
+  onNotice?: (msg: string) => void;
+  /** Open layout…'s file picker (VL V-31) — the browser's by default; a test injects its own. */
+  pickFiles?: (accept: string, multiple: boolean) => Promise<File[]>;
+  /** Save as…'s download (VL V-32) — the browser's by default; a test injects its own. */
+  downloadFile?: (fileName: string, content: string, mimeType: string) => Promise<void>;
   /** fires when the active tab (or its loaded graph) changes — drives the host header. */
   onActiveChange?: (active: ActiveSubject | null) => void;
   /** view-state persistence (FO-31, DM-P2.S1) — selected by capabilities.layoutPersist. Absent ⇒
@@ -96,7 +123,44 @@ const subjectOf = (item: CatalogItem): Subject => ({
   ref: item.ref, kind: item.kind, schemaCode: item.schemaCode, label: item.label,
 });
 
-export function ShellFrame({ dataSource, workspace, catalog, files, displayMode, getSourceText, onError, onActiveChange, viewState, editContext, irisBaseUrl, processingSource, runSource, validateProgram }: ShellFrameProps) {
+const toolbarButton = { border: '1px solid #CBD8E6', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 12, padding: '3px 10px', color: '#33506e' } as const;
+/** a toolbar button's style, greyed out when there is nothing to act on */
+const toolbarStyle = (enabled: boolean, primary = false) => ({
+  ...toolbarButton,
+  ...(primary && enabled ? { background: '#16283F', color: '#fff', borderColor: '#16283F' } : {}),
+  ...(enabled ? {} : { opacity: 0.45, cursor: 'default' }),
+});
+
+/** No positions (a stable object, so the canvas does not re-run its layout on every render). */
+const NO_POSITIONS: Record<string, LayoutPoint> = {};
+
+/** The default skin of a schema and the canvas graph it draws — node sizes for placement, ELK for Re-layout. */
+function defaultSkinFor(kind: string): DesignerSkin {
+  const registry = createSkinRegistry();
+  return registry.resolve(registry.defaultSkin('modeling', kind as SchemaCode)) as DesignerSkin;
+}
+function canvasOf(g: GetGraphResponse, displayMode: DisplayMode): CanvasGraph {
+  const cg = modelGraphToCanvas(applyGraphFixtures(getGraphResponseToModelGraph(g)));
+  return displayMode === 'just-names' ? { ...cg, nodes: cg.nodes.map((n) => ({ ...n, slotData: { ...n.slotData, rows: [] } })) } : cg;
+}
+
+/** A hop edge as the canvas draws it: one more edge kind, dashed (VL V-26). */
+function hopAsEdge(h: HopEdge): ModelGraphEdge {
+  return {
+    id: h.id, qname: h.id, kind: 'hop', via: h.via, fromNode: h.fromNode, toNode: h.toNode,
+    fromCardinality: null, toCardinality: null, sourceUri: '', sourceLocation: { line: 0, column: 0 },
+  };
+}
+
+/** The layout a plain tab becomes on its first selection edit (V-22): the whole schema ⇒ `untitled`,
+ *  a project graph ⇒ its own name, either way a new, unsaved layout. */
+function seedLayoutName(tab: SubjectTab): string {
+  if (tab.subject.ref === tab.subject.schemaCode) return 'untitled';
+  const name = tab.subject.label.split(' · ').pop() ?? '';
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : 'untitled';
+}
+
+export function ShellFrame({ dataSource, workspace, catalog, files, displayMode, getSourceText, onError, onNotice, pickFiles = pickFilesFromDisk, downloadFile = downloadToDisk, onActiveChange, viewState, editContext, irisBaseUrl, processingSource, runSource, validateProgram }: ShellFrameProps) {
   const [shell, setShell] = useState<ShellState>(emptyShell);
   // processing face (DM-P4): the fixture source serves the hero graph in dev + tests; the live
   // TtrpServerProcessingSource plugs in behind the same interface. The run backend is a separate
@@ -107,6 +171,21 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   const procRunRef = useRef<(() => void) | null>(null);
   const insertPaletteRef = useRef<(() => void) | null>(null);
   const [graphs, setGraphs] = useState<Record<string, GetGraphResponse | null>>({});
+  // the whole-schema graph per schema code (VL V-21) — what the Objects panel lists, layouts resolve
+  // against and are projected from. On a catalog it is the schema subject's own graph.
+  const [schemaGraphs, setSchemaGraphs] = useState<Record<string, GetGraphResponse | null>>({});
+  const schemaLoadingRef = useRef<Map<string, Promise<GetGraphResponse | null>>>(new Map());
+  // the hop edge open in the inspector (VL V-26), by edge id; derived, cleared when it disappears.
+  const [selectedHop, setSelectedHop] = useState<string | null>(null);
+  // shift-click multi-selection (V-27): node ids the view menu's items apply to together
+  const [multiSel, setMultiSel] = useState<ReadonlySet<string>>(new Set());
+  // Save as… (V-32): the tab being saved; the tab menu (V-33): where it was opened
+  const [saveAsTab, setSaveAsTab] = useState<string | null>(null);
+  const [tabMenu, setTabMenu] = useState<{ tabId: string; x: number; y: number } | null>(null);
+  // Expand all levels… asks first (V-27): the count, then apply or cancel
+  const [confirm, setConfirm] = useState<{ text: string; onYes: () => void } | null>(null);
+  // what the canvas shows the user, in canvas coordinates — where a card with no neighbour goes (V-19)
+  const viewportCenterRef = useRef<(() => Point | null) | null>(null);
   const [positions, setPositions] = useState<Record<string, Record<string, { x: number; y: number }>>>({});
   const [selected, setSelected] = useState<DrawerNode | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -131,6 +210,94 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   }
 
   const tab = activeTab(shell);
+  const shellRef = useRef(shell);
+  shellRef.current = shell;
+
+  // the layout tabs' store (VL V-28): positions / skin / collapsed live in the tab's layout; a write
+  // marks it dirty. Keyed by tab id.
+  const layoutStore = useMemo(() => new LayoutDocumentStore({
+    get: (tabId) => {
+      const l = shellRef.current.tabs.find((t) => t.id === tabId)?.layout;
+      return l ? { positions: l.doc.positions, skin: l.doc.skin, collapsed: l.doc.collapsed } : undefined;
+    },
+    set: (tabId, st) => setShell((s) => setLayoutPositions(s, tabId, st.positions, { collapsed: st.collapsed })),
+  }), []);
+
+  /**
+   * The whole graph of schema `code` (VL V-21): held, in flight, or read now — one read per schema. A
+   * failed read is not kept: the next open (a tab, a layout) reads again.
+   */
+  function loadSchemaGraph(code: string): Promise<GetGraphResponse | null> {
+    if (schemaGraphs[code] !== undefined) return Promise.resolve(schemaGraphs[code]);
+    const inFlight = schemaLoadingRef.current.get(code);
+    if (inFlight) return inFlight;
+    if (!dataSource.getSchemaGraph || (code !== 'db' && code !== 'er' && code !== 'md' && code !== 'cnc')) return Promise.resolve(null);
+    const held = graphs[code]; // a catalog's schema subject IS the whole schema
+    const read: Promise<GetGraphResponse | null | 'failed'> = held
+      ? Promise.resolve(held)
+      : dataSource.getSchemaGraph(code).catch((e) => {
+          onError?.(`Failed to read the ${code} schema: ${e}`);
+          return 'failed' as const;
+        });
+    const p = read.then((g) => {
+      if (g === 'failed') {
+        schemaLoadingRef.current.delete(code);
+        return null;
+      }
+      setSchemaGraphs((m) => ({ ...m, [code]: g }));
+      return g;
+    });
+    schemaLoadingRef.current.set(code, p);
+    return p;
+  }
+  function ensureSchemaGraph(code: string) {
+    void loadSchemaGraph(code);
+  }
+
+  /**
+   * Open a layout the catalog serves (V-34, V-36): read it, re-resolve it against the schema's whole graph
+   * (a stale catalog cannot show a card the current graph lacks) and open a `catalog` tab. A layout the
+   * catalog does not have (404) or cannot serve — or serves short of the §6 shape — is an error toast,
+   * never a blank tab.
+   */
+  async function openCatalogLayout(name: string) {
+    if (!dataSource.getLayoutDoc) return;
+    try {
+      const served = await dataSource.getLayoutDoc(name);
+      const whole = await loadSchemaGraph(served.schema);
+      if (!whole) { onError?.(`Could not open the layout ${name}: the ${served.schema} schema could not be read.`); return; }
+      const objects = [...served.objects, ...served.missing, ...served.ambiguous.map((a) => a.ref)];
+      const raw: LayoutDocument = { name: served.name, model: served.schema as LayoutDocument['model'], objects, positions: served.positions };
+      if (served.skin) raw.skin = served.skin;
+      if (served.collapsed.length > 0) raw.collapsed = served.collapsed;
+      const res = resolveRefs([...objects, ...Object.keys(served.positions)], layoutIndexOf(whole).index, raw.model);
+      setShell((s) => openLayoutTab(s, { doc: normalizeForTab(raw, res), source: 'catalog', dirty: false }));
+    } catch (e) {
+      onError?.(`Could not open the layout ${name}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  /**
+   * Open layout… (V-31): read the picked / dropped files, resolve them against the schema's whole graph
+   * (read first when not held) and open a `file` tab. A model this backend does not serve, an unreadable
+   * file or a lone `.ttrl` is an error toast — no tab.
+   */
+  async function openLayoutFiles(picked: readonly File[]) {
+    if (picked.length === 0) return;
+    const inputs = await Promise.all(picked.map(async (f) => ({ name: f.name, text: await f.text() })));
+    const r = readLayoutFiles(inputs);
+    if (!r.ok) { onError?.(`Cannot open the layout — ${r.error}`); return; }
+    const model = r.doc.model;
+    const kindHint = modelKindHint(dataSource.capabilities, model as ModelKind);
+    if (kindHint) { onError?.(`Cannot open ${r.fileName}: ${kindHint.message}`); return; }
+    const whole = await loadSchemaGraph(model);
+    if (!whole) { onError?.(`Cannot open ${r.fileName}: the ${model} schema could not be read.`); return; }
+    const res = resolveRefs([...r.doc.objects, ...Object.keys(r.doc.positions)], layoutIndexOf(whole).index, model);
+    const doc = normalizeForTab(r.doc, res);
+    setShell((s) => openLayoutTab(s, { doc, source: 'file', fileName: r.fileName, dirty: false }));
+    const unresolved = doc.objects.filter((o) => !res.resolved.has(o) && ![...res.resolved.values()].includes(o)).length;
+    onNotice?.(`Opened ${doc.name}: ${doc.objects.length - unresolved} cards${unresolved ? `, ${unresolved} missing` : ''}${r.positionsFrom === 'sidecar' ? ' · positions from the .ttrl sidecar' : ''}`);
+  }
 
   // load a schema subject's graph (once) + its saved layout positions (from the ViewStateStore,
   // falling back to the graph's own in-file layout when no store is wired).
@@ -140,6 +307,8 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     try {
       const g = await dataSource.getGraph(ref);
       setGraphs((m) => ({ ...m, [ref]: g }));
+      // a catalog's schema subject IS the whole schema — keep one read (VL V-21)
+      if (g && ref === g.schema && dataSource.getSchemaGraph) setSchemaGraphs((m) => (m[ref] !== undefined ? m : { ...m, [ref]: g }));
       let saved: Record<string, { x: number; y: number }> | null = null;
       if (viewState) {
         const vs = await viewState.read(ref).catch(() => null);
@@ -156,15 +325,21 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   }
 
   function openItem(item: CatalogItem, preview = true) {
+    if (item.layout) { void openCatalogLayout(item.layout.name); return; }
     const subject = subjectOf(item);
     setShell((s) => openSubject(s, subject, { preview }));
     if (item.kind === 'schema') void ensureGraph(item.ref);
   }
 
   useEffect(() => {
-    // a lineage tab roots at an object qname (not a graph uri) — don't fetch a graph for it.
-    if (tab?.subject.kind === 'schema' && tab.perspective !== 'lineage') void ensureGraph(tab.subject.ref);
-  }, [tab?.subject.ref, tab?.perspective]);
+    // a lineage tab roots at an object qname (not a graph uri) — don't fetch a graph for it; a layout
+    // tab is projected from its schema's whole graph, it has no graph of its own.
+    if (tab?.subject.kind === 'schema' && tab.perspective !== 'lineage' && !tab.layout) void ensureGraph(tab.subject.ref);
+    if (tab?.subject.kind === 'schema' && tab.perspective !== 'lineage' && tab.subject.schemaCode) {
+      // a plain schema subject's whole graph: once its own graph is in (a catalog shares the read)
+      if (tab.layout || graphs[tab.subject.ref] !== undefined) void ensureSchemaGraph(tab.subject.schemaCode);
+    }
+  }, [tab?.subject.ref, tab?.perspective, tab?.layout ? 'layout' : 'plain', tab ? graphs[tab.subject.ref] : undefined]);
 
   // fetch the project-wide binding map once the catalog is available (C-2). Failure is soft:
   // no bindings ⇒ no show-bindings decoration and an empty ribbon. getBindings is absent on
@@ -254,6 +429,12 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     for (const g of catalog) for (const item of g.items) {
       r.register({ id: `open:${item.ref}`, title: `Open ${item.label}`, group: 'Catalog', toolbarAction: 'open.subject', run: () => openItem(item, false) });
     }
+    // the layout commands (V-33) — ⌘K twins of the layout toolbar; Save as… / New / Re-layout need a canvas
+    const canvas = !!tab && tab.subject.kind === 'schema' && !tab.perspective;
+    r.register({ id: 'layout.open', title: 'Open layout…', group: 'Layout', toolbarAction: 'layout.open', run: () => layoutActions.current.open() });
+    r.register({ id: 'layout.saveAs', title: 'Save layout as…', group: 'Layout', toolbarAction: 'layout.saveAs', disabled: !canvas, run: () => layoutActions.current.saveAs() });
+    r.register({ id: 'layout.new', title: 'New layout from this view', group: 'Layout', toolbarAction: 'layout.new', disabled: !canvas, run: () => layoutActions.current.newLayout() });
+    r.register({ id: 'layout.relayout', title: 'Re-layout', group: 'Layout', toolbarAction: 'layout.relayout', disabled: !canvas, run: () => layoutActions.current.relayout() });
     r.unregister('perspective.binding');
     r.unregister('bindings.toggle');
     r.unregister('processing.run');
@@ -342,7 +523,325 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     } catch (e) { onError?.(`Failed to save layout: ${e}`); }
   }
 
-  const currentGraph = tab?.subject.kind === 'schema' ? graphs[tab.subject.ref] : null;
+  // ---- the working layout (VL §5): a layout tab shows its projection of the schema's whole graph ----
+  const tabLayout = tab?.subject.kind === 'schema' ? tab.layout : undefined;
+  const schemaCode = tab?.subject.kind === 'schema' ? tab.subject.schemaCode : undefined;
+  const wholeGraph = schemaCode ? schemaGraphs[schemaCode] ?? null : null;
+  const wholeIndex = useMemo<LayoutGraphIndex | null>(() => (wholeGraph ? layoutIndexOf(wholeGraph) : null), [wholeGraph]);
+  const projection = useMemo<LayoutProjection | null>(
+    () => (tabLayout && wholeGraph && wholeIndex ? projectLayout(wholeGraph, tabLayout.doc, { hops: 1 }, wholeIndex) : null),
+    [tabLayout?.doc, wholeGraph, wholeIndex],
+  );
+  // node sizes as the schema's default skin draws them (placement, V-19)
+  const sizeOf = useMemo(() => {
+    if (!wholeGraph) return null;
+    const skin = defaultSkinFor(wholeGraph.schema);
+    const nodes = new Map(canvasOf(wholeGraph, displayMode).nodes.map((n) => [n.id, n]));
+    return (id: string): Size => {
+      const n = nodes.get(id);
+      return n ? skin.nodeSize(n) : { width: 200, height: 60 };
+    };
+  }, [wholeGraph, displayMode]);
+
+  /**
+   * Positions for `cards` (full qnames) not yet placed, beside their nearest visible neighbour (V-19).
+   * `held` are the placed cards by full qname; empty ⇒ auto mode, which stays auto (nothing to place).
+   */
+  function placeCards(cards: readonly string[], held: Record<string, LayoutPoint>, shown: readonly string[], centre?: Point): Record<string, LayoutPoint> {
+    if (!wholeGraph || !wholeIndex || !sizeOf || Object.keys(held).length === 0) return {};
+    const toId = (fq: string) => wholeIndex.nodeOf.get(fq) ?? fq;
+    const byId: Record<string, Point> = {};
+    for (const [fq, p] of Object.entries(held)) byId[toId(fq)] = p;
+    const visibleIds = new Set([...shown, ...cards].map(toId));
+    const at = centre ?? viewportCenterRef.current?.() ?? centreOf(byId, sizeOf);
+    const placed: Record<string, LayoutPoint> = {};
+    for (const fq of cards) {
+      const id = toId(fq);
+      if (byId[id] || !wholeIndex.fullQnameOf.has(id)) continue;
+      const nbs = visibleNeighbours(wholeGraph, visibleIds, id).filter((n) => byId[n]);
+      const p = placeNew(id, byId, sizeOf, nbs, at);
+      byId[id] = p;
+      placed[fq] = p;
+    }
+    return placed;
+  }
+
+  // node positions of a layout tab, by the canvas's node ids (the doc keys them by full qname). A manual
+  // layout with cards it has no position for (a hand-written file) places them for display (V-19).
+  const layoutNodePositions = useMemo(() => {
+    if (!tabLayout || !projection || !wholeIndex) return null;
+    const out: Record<string, LayoutPoint> = {};
+    const held: Record<string, LayoutPoint> = {};
+    for (const [ref, p] of Object.entries(tabLayout.doc.positions)) {
+      const fq = projection.resolved.get(ref) ?? ref;
+      const id = wholeIndex.nodeOf.get(fq);
+      if (id !== undefined) { out[id] = p; held[fq] = p; }
+    }
+    if (Object.keys(out).length === 0) return NO_POSITIONS;
+    const shown = [...new Set(projection.resolved.values())];
+    const unplaced = shown.filter((fq) => !held[fq]).sort(compareAlphabetical);
+    if (unplaced.length > 0 && sizeOf) {
+      for (const [fq, p] of Object.entries(placeCards(unplaced, held, shown, centreOf(out, sizeOf)))) out[wholeIndex.nodeOf.get(fq) ?? fq] = p;
+    }
+    return out;
+  }, [tabLayout?.doc.positions, projection, wholeIndex, sizeOf]);
+  const inspectedHop = selectedHop ? projection?.hopEdges.find((h) => h.id === selectedHop) ?? null : null;
+
+  /** The full qnames a tab shows: its layout's resolved cards, or — a plain subject — its graph's nodes. */
+  function shownCards(t: SubjectTab): string[] {
+    if (t.layout) return projection && t === tab ? [...new Set(projection.resolved.values())] : t.layout.doc.objects;
+    const g = graphs[t.subject.ref];
+    return g ? g.nodes.map((n) => wholeIndex?.fullQnameOf.get(n.qname) ?? n.qname) : [];
+  }
+
+  /**
+   * Set the active tab's cards (V-19). A plain subject becomes a new, unsaved layout on its first
+   * selection edit (V-22) — its positions (session drags) come along; on a layout tab the refs the
+   * model lacks (missing / ambiguous) stay until removed (V-15).
+   */
+  function applyObjects(nextCards: string[]) {
+    if (!tab || tab.subject.kind !== 'schema' || !tab.subject.schemaCode) return;
+    const unresolved = tab.layout && projection ? [...projection.missing, ...projection.ambiguous.map((a) => a.ref)] : [];
+    const objects = [...new Set([...nextCards, ...unresolved])];
+    const before = new Set(shownCards(tab));
+    const added = nextCards.filter((fq) => !before.has(fq));
+    if (tab.layout) {
+      // the canvas's own view of a manual layout includes the cards placed for display only
+      const held: Record<string, LayoutPoint> = {};
+      if (layoutNodePositions && wholeIndex) for (const [id, p] of Object.entries(layoutNodePositions)) held[wholeIndex.fullQnameOf.get(id) ?? id] = p;
+      const placed = Object.keys(tab.layout.doc.positions).length > 0 ? { ...held, ...placeCards(added, held, nextCards) } : {};
+      setShell((s) => setLayoutObjects(s, tab.id, objects, placed));
+      return;
+    }
+    const held = positions[tab.subject.ref] ?? {};
+    const seeded: Record<string, LayoutPoint> = {};
+    for (const [id, p] of Object.entries(held)) seeded[wholeIndex?.fullQnameOf.get(id) ?? id] = p;
+    const placed = placeCards(added, seeded, nextCards);
+    const layout: TabLayout = {
+      doc: { name: seedLayoutName(tab), model: tab.subject.schemaCode as TabLayout['doc']['model'], objects: [], positions: {} },
+      source: 'new',
+      dirty: true,
+    };
+    const keep = new Set(objects);
+    const start: Record<string, LayoutPoint> = {};
+    if (Object.keys(seeded).length > 0) {
+      for (const [fq, p] of Object.entries(seeded)) if (keep.has(fq)) start[fq] = p;
+      Object.assign(start, placed);
+    }
+    layout.doc = { ...layout.doc, objects, positions: start };
+    setShell((s) => toLayoutTab(s, tab.id, layout));
+  }
+
+  /** Check `cards` into the active tab (Show, Expand, the panel) — V-19. */
+  function showCards(cards: string[]) {
+    if (!tab) return;
+    applyObjects([...new Set([...shownCards(tab), ...cards])]);
+  }
+
+  /** Expand (V-27) / Neighbours (V-20): check the hidden cards one real edge away from `of`. */
+  function expandCards(of: string[]) {
+    if (!tab || !wholeGraph || !wholeIndex) return;
+    const shownIds = new Set(shownCards(tab).map((fq) => wholeIndex.nodeOf.get(fq) ?? fq));
+    const ids = of.map((fq) => wholeIndex.nodeOf.get(fq) ?? fq);
+    const add = hiddenNeighbours(wholeGraph, shownIds, ids).map((id) => wholeIndex.fullQnameOf.get(id) ?? id);
+    if (add.length === 0) { onNotice?.('Every neighbour is already visible'); return; }
+    showCards(add);
+    onNotice?.(`Expanded: +${add.length}`);
+  }
+
+  /** Hide (V-27, the panel): uncheck `cards`. */
+  function hideCards(cards: string[]) {
+    if (!tab) return;
+    const drop = new Set(cards);
+    applyObjects(shownCards(tab).filter((fq) => !drop.has(fq)));
+  }
+
+  /** Remove a missing / ambiguous ref from the layout (V-17). */
+  function removeRef(ref: string) {
+    if (!tab?.layout) return;
+    const id = tab.id;
+    setShell((s) => {
+      const l = s.tabs.find((t) => t.id === id)?.layout;
+      return l ? setLayoutObjects(s, id, l.doc.objects.filter((o) => o !== ref)) : s;
+    });
+  }
+
+  /** Re-layout (V-19): ELK over the cards shown, then manual with the result — the layout's or the session's. */
+  async function relayout() {
+    if (!tab || tab.subject.kind !== 'schema' || !currentGraph) return;
+    const skin = defaultSkinFor(currentGraph.schema);
+    const p = await layoutAuto(canvasOf(currentGraph, displayMode), { orientation: skin.flow.orientation, sizeOf: (n) => skin.nodeSize(n) });
+    const tabId = tab.id;
+    const ref = tab.subject.ref;
+    if (tab.layout) {
+      if (!wholeIndex) return;
+      setShell((s) => {
+        const l = s.tabs.find((t) => t.id === tabId)?.layout;
+        if (!l) return s;
+        const next: Record<string, LayoutPoint> = { ...l.doc.positions }; // the missing refs keep theirs
+        for (const [id, pt] of Object.entries(p)) {
+          const fq = wholeIndex.fullQnameOf.get(id);
+          if (fq) next[fq] = { x: pt.x, y: pt.y };
+        }
+        return setLayoutPositions(s, tabId, next);
+      });
+    } else {
+      setPositions((m) => ({ ...m, [ref]: p }));
+      void persistView(ref, { positions: p, displayMode, mode: 'manual' });
+    }
+  }
+
+  /**
+   * The view menu's items (V-27) for a right-clicked card — applied to the shift-selection when the card
+   * is in it — or a hop edge (Show <H> per hidden card).
+   */
+  function viewMenuItems(target: ViewMenuTarget): ViewMenuEntry[] {
+    if (!tab || !wholeGraph || !wholeIndex) return [];
+    const toFq = (id: string) => wholeIndex.fullQnameOf.get(id) ?? id;
+    const nodeOf = new Map(wholeGraph.nodes.map((n) => [n.qname, n]));
+    if (target.kind === 'edge') {
+      const hop = projection?.hopEdges.find((h) => h.id === target.id);
+      return (hop?.via ?? []).map((fq) => ({
+        id: `show:${fq}`,
+        label: `Show ${nodeOf.get(wholeIndex.nodeOf.get(fq) ?? fq)?.label ?? fq}`,
+        run: () => showCards([fq]),
+      }));
+    }
+    const set = multiSel.has(target.id) && multiSel.size > 1 ? [...multiSel] : [target.id];
+    const many = set.length > 1 ? ` (${set.length} cards)` : '';
+    const shownIds = new Set(shownCards(tab).map((fq) => wholeIndex.nodeOf.get(fq) ?? fq));
+    const frontier = hiddenNeighbours(wholeGraph, shownIds, set);
+    return [
+      { id: 'expand', label: `Expand${many}`, hint: `+${frontier.length}`, disabled: frontier.length === 0, run: () => expandCards(set.map(toFq)) },
+      {
+        id: 'expand-all', label: 'Expand all levels…', hint: 'closure',
+        run: () => {
+          const add = hiddenClosure(wholeGraph, shownIds, set);
+          if (add.length === 0) { onNotice?.('Nothing to add'); return; }
+          setConfirm({
+            text: `This adds ${add.length} card${add.length === 1 ? '' : 's'} (${shownIds.size + add.length} of ${wholeGraph.nodes.length} shown afterwards). On a connected model that is usually most of it.`,
+            onYes: () => showCards(add.map(toFq)),
+          });
+        },
+      },
+      { separator: true },
+      { id: 'hide', label: `Hide${many}`, run: () => { hideCards(set.map(toFq)); setMultiSel(new Set()); } },
+      {
+        id: 'hide-others', label: 'Hide others', hint: 'keep + neighbours',
+        run: () => {
+          const keep = new Set(set);
+          for (const id of set) for (const n of visibleNeighbours(wholeGraph, shownIds, id)) keep.add(n);
+          applyObjects([...keep].map(toFq));
+        },
+      },
+      { separator: true },
+      { id: 'inspect', label: 'Inspect', run: () => { setSelectedHop(null); void onSelectNode(target.id); } },
+    ];
+  }
+
+  // ---- Save as… / New layout (V-32, V-33) ----
+
+  /** The layout a tab would save: its working layout, or — a plain subject — the cards it shows. */
+  function docForSave(t: SubjectTab): LayoutDocument | null {
+    if (t.subject.kind !== 'schema' || !t.subject.schemaCode || t.perspective) return null;
+    if (t.layout) return t.layout.doc;
+    const held = positions[t.subject.ref] ?? {};
+    const pos: Record<string, LayoutPoint> = {};
+    for (const [id, p] of Object.entries(held)) pos[wholeIndex?.fullQnameOf.get(id) ?? id] = p;
+    return { name: seedLayoutName(t), model: t.subject.schemaCode as LayoutDocument['model'], objects: shownCards(t), positions: pos };
+  }
+
+  const formatKey = `ttr-viewer:layout-format:${workspace}`;
+  /** Save as…'s format: the user's last choice in this workspace → VIEWER_LAYOUT_FORMAT → yaml (V-32). */
+  function preferredFormat(): LayoutFormat {
+    try {
+      const saved = window.localStorage.getItem(formatKey);
+      if (saved === 'yaml' || saved === 'ttr') return saved;
+    } catch { /* no storage — fall through */ }
+    return getRuntimeConfig().layoutFormat;
+  }
+
+  async function saveLayoutAs(tabId: string, name: string, format: LayoutFormat) {
+    const t = shellRef.current.tabs.find((x) => x.id === tabId);
+    const doc = t ? docForSave(t) : null;
+    if (!t || !doc) return;
+    const { fileName, mimeType } = layoutFileOf(name, format);
+    try {
+      await downloadFile(fileName, layoutTextOf(doc, name, format), mimeType);
+    } catch (e) {
+      onError?.(`Could not save ${fileName}: ${e}`);
+      return;
+    }
+    try { window.localStorage.setItem(formatKey, format); } catch { /* no storage — the choice is not remembered */ }
+    setShell((s) => (t.layout
+      ? markSaved(s, tabId, name, fileName)
+      : toLayoutTab(s, tabId, { doc: { ...doc, name }, source: 'file', fileName, dirty: false })));
+    onNotice?.(`Saved ${fileName}`);
+  }
+
+  /** New layout (V-33): a new, unsaved layout tab of what the current tab shows. */
+  function newLayout() {
+    if (!tab) return;
+    const doc = docForSave(tab);
+    if (!doc) return;
+    setShell((s) => openLayoutTab(s, { doc: { ...doc, name: 'untitled' }, source: 'new', dirty: true }));
+  }
+
+  const layoutActions = useRef({ open: () => {}, saveAs: () => {}, newLayout: () => {}, relayout: () => {} });
+  layoutActions.current = {
+    open: () => void pickFiles(LAYOUT_FILE_ACCEPT, true).then(openLayoutFiles),
+    saveAs: () => { if (tab && docForSave(tab)) setSaveAsTab(tab.id); },
+    newLayout,
+    relayout: () => void relayout(),
+  };
+  const canvasTab = !!tab && tab.subject.kind === 'schema' && !tab.perspective;
+
+  // unsaved local work arms the browser's leave-page prompt (V-30); a catalog layout re-reads on reload
+  const unsaved = hasUnsavedLocalLayout(shell);
+  useEffect(() => {
+    if (!unsaved) return;
+    const guard = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', guard);
+    return () => window.removeEventListener('beforeunload', guard);
+  }, [unsaved]);
+
+  const missingRefs: MissingRef[] = useMemo(() => (projection
+    ? [...projection.missing.map((ref) => ({ ref })), ...projection.ambiguous.map((a) => ({ ref: a.ref, candidates: a.candidates }))]
+        .sort((a, b) => compareAlphabetical(a.ref, b.ref))
+    : []), [projection]);
+
+  // a drag on a layout tab → its positions, by full qname (V-28), keeping the missing cards' ones. A
+  // display-mode switch re-emits the canvas's positions too: an `auto` one is the canvas's own layout
+  // (the layout stays auto, V-2), a `manual` one that moves nothing leaves the layout clean.
+  function persistLayoutView(tabId: string, change: CanvasViewChange) {
+    if (change.mode !== 'manual') return;
+    const given = layoutNodePositions ?? NO_POSITIONS;
+    if (Object.entries(change.positions).every(([id, p]) => given[id]?.x === p.x && given[id]?.y === p.y)) return;
+    const l = shellRef.current.tabs.find((t) => t.id === tabId)?.layout;
+    if (!l || !wholeIndex) return;
+    const next: Record<string, LayoutPoint> = { ...l.doc.positions };
+    for (const [id, p] of Object.entries(change.positions)) {
+      const fq = wholeIndex.fullQnameOf.get(id);
+      if (fq) next[fq] = { x: p.x, y: p.y };
+    }
+    void layoutStore.write(tabId, { skin: l.doc.skin ?? 'er.crow', mode: 'manual', nodes: next, collapsed: l.doc.collapsed ?? [] });
+  }
+
+  // a drag on a plain subject → the store, and the shell's own copy: the first selection edit (V-22),
+  // Save as… and New layout start from it (a backend without a store keeps the drags only here). An
+  // `auto` change is a display-mode switch re-emitting the canvas's own layout — nothing to keep, and an
+  // auto canvas with nodes is a `.ttrl` the designer server's own loader refuses.
+  function persistSubjectView(ref: string, change: CanvasViewChange) {
+    if (change.mode !== 'manual') return;
+    setPositions((m) => ({ ...m, [ref]: change.positions }));
+    void persistView(ref, change);
+  }
+
+  const currentGraph = useMemo(() => {
+    if (tab?.subject.kind !== 'schema') return null;
+    if (!tabLayout) return graphs[tab.subject.ref] ?? null;
+    return projection ? { ...projection.graph, edges: [...projection.graph.edges, ...projection.hopEdges.map(hopAsEdge)] } : null;
+  }, [tab?.subject.kind, tab?.subject.ref, tabLayout, projection, graphs]);
   const modelGraph = useMemo(
     () => (currentGraph ? applyGraphFixtures(getGraphResponseToModelGraph(currentGraph)) : null),
     [currentGraph],
@@ -404,6 +903,19 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     <div style={{ display: 'flex', flex: 1, minHeight: 0 }} data-testid="shell-frame">
       <CatalogSpine groups={catalog} onOpen={(item) => openItem(item, true)} />
       <FileRail files={files} />
+      {tab?.subject.kind === 'schema' && !tab.perspective && wholeGraph && wholeIndex && (!tabLayout || projection) && (
+        <ObjectsPanel
+          whole={wholeGraph}
+          index={wholeIndex}
+          shown={new Set(shownCards(tab))}
+          missing={missingRefs}
+          onSetCards={(cards) => applyObjects(cards)}
+          onNeighbours={() => expandCards(shownCards(tab))}
+          onRemoveMissing={removeRef}
+          onExpand={(fq) => expandCards([fq])}
+          onHide={(fq) => hideCards([fq])}
+        />
+      )}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* FO-33 (contracts §7): the suite brand names "Tatrman Studio"; the OPEN build identifies as
             "Studio Viewer" (no editContext). The commercial module names (Studio Modeler/Designer)
@@ -431,11 +943,16 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
           onFocus={(id) => setShell((s) => dropPreviewIfLeaving(s, id))}
           onPromote={(id) => setShell((s) => promoteTab(s, id))}
           onClose={(id) => setShell((s) => closeTab(s, id))}
+          onContextMenu={(id, x, y) => { setShell((s) => dropPreviewIfLeaving(s, id)); setTabMenu({ tabId: id, x, y }); }}
         />
         {tab && (
           <div style={{ display: 'flex', alignItems: 'center', paddingRight: 12 }}>
             <Breadcrumb tab={tab} onDrillTo={(i) => setShell((s) => drillTo(s, s.activeTabId!, i))} />
             {(() => {
+              // a local layout is not on the server — its link would open nothing (V-35)
+              if (tab.layout && tab.layout.source !== 'catalog') {
+                return <CopyLinkButton url="" disabledReason="Saved files are not on the server — commit it to share." />;
+              }
               const path = federationPathForTab(tab);
               const url = path && typeof window !== 'undefined' ? absoluteUrlFor(path) : null;
               return url ? <CopyLinkButton url={url} /> : null;
@@ -458,6 +975,25 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
             })()}
           </div>
         )}
+        {/* the layout actions (VL §5.4) — Open works with no tab open; the rest need a schema canvas */}
+        <div data-testid="layout-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderBottom: '1px solid #EDF2F9' }}>
+          <button data-testid="layout-new" title="A new layout of what this tab shows" disabled={!canvasTab}
+            onClick={() => layoutActions.current.newLayout()} style={toolbarStyle(canvasTab)}>
+            New layout
+          </button>
+          <button data-testid="layout-open" title="Open a layout file (.yaml, .ttrg + .ttrl) — or drop it on the canvas"
+            onClick={() => layoutActions.current.open()} style={toolbarButton}>
+            Open layout…
+          </button>
+          <button data-testid="layout-save-as" title="Download this layout as YAML or TTR" disabled={!canvasTab}
+            onClick={() => layoutActions.current.saveAs()} style={toolbarStyle(canvasTab, true)}>
+            Save as…
+          </button>
+          <button data-testid="layout-relayout" title="Arrange the cards shown automatically (they keep the new positions)"
+            disabled={!(canvasTab && currentGraph)} onClick={() => void relayout()} style={toolbarStyle(!!(canvasTab && currentGraph))}>
+            Re-layout
+          </button>
+        </div>
         {tab?.subject.kind === 'schema' && (
           <div
             data-testid="shell-subject-toolbar"
@@ -512,7 +1048,18 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
             })}
           </div>
         )}
-        <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+        <div
+          data-testid="canvas-host"
+          style={{ flex: 1, minHeight: 0, position: 'relative' }}
+          // drop a layout file on the canvas = Open layout… (V-31)
+          onDragOver={(e) => { if (e.dataTransfer?.types?.includes('Files')) e.preventDefault(); }}
+          onDrop={(e) => {
+            const dropped = Array.from(e.dataTransfer?.files ?? []);
+            if (dropped.length === 0) return;
+            e.preventDefault();
+            void openLayoutFiles(dropped);
+          }}
+        >
           {!tab ? (
             <div data-testid="shell-no-tab" style={{ padding: 24, color: '#96989B' }}>Open a subject from the catalog.</div>
           ) : tab.subject.kind === 'program' ? (
@@ -564,16 +1111,35 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
             <div data-testid="shell-loading" style={{ padding: 24, color: '#96989B' }}>loading…</div>
           ) : (
             <SkinnedCanvas
+              key={tab.id}
               graph={modelGraph}
               displayMode={displayMode}
-              nodePositions={positions[tab.subject.ref] ?? {}}
-              canvasKey={tab.subject.ref}
+              nodePositions={tabLayout ? layoutNodePositions ?? NO_POSITIONS : positions[tab.subject.ref] ?? NO_POSITIONS}
+              viewportCenterRef={viewportCenterRef}
+              canvasKey={tabLayout ? tab.id : tab.subject.ref}
               selectedQname={selected?.qname ?? null}
-              onNodeSelect={onSelectNode}
+              selectedEdgeId={inspectedHop?.id ?? null}
+              onEdgeSelect={(id) => {
+                if (id && id.startsWith('hop:')) { setSelectedHop(id); setDrawerOpen(false); } else setSelectedHop(null);
+              }}
+              onNodeSelect={(q, additive) => {
+                setSelectedHop(null);
+                if (additive && q) {
+                  setMultiSel((m) => { const n = new Set(m); if (n.has(q)) n.delete(q); else n.add(q); return n; });
+                  return;
+                }
+                setMultiSel(new Set());
+                void onSelectNode(q);
+              }}
+              selectedIds={[...multiSel]}
+              layoutChip={layoutChip(tab, dataSource.capabilities)}
+              renderViewMenu={wholeGraph && wholeIndex
+                ? (target, close) => <ViewMenu items={viewMenuItems(target)} onClose={close} />
+                : undefined}
               renderNodeMenu={canEdit && editContext
                 ? (qname, close) => editContext.renderNodeMenu({ qname, graphRef: tab.subject.ref, onApplied: () => void refetchGraph(tab.subject.ref), onClose: close })
                 : undefined}
-              onPersistView={(change) => void persistView(tab.subject.ref, change)}
+              onPersistView={(change) => (tabLayout ? persistLayoutView(tab.id, change) : persistSubjectView(tab.subject.ref, change))}
               onDrillIn={(id, label) => setShell((s) => drillIn(s, s.activeTabId!, { id, label }))}
               bindingHints={isErTab ? bindingHints : undefined}
               showBindings={isErTab && showBindings}
@@ -582,8 +1148,17 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
           )}
         </div>
       </div>
+      {inspectedHop && wholeGraph && wholeIndex && (
+        <HopEdgeInspector
+          hop={inspectedHop}
+          whole={wholeGraph}
+          nodeOf={wholeIndex.nodeOf}
+          onShow={(fq) => { showCards([fq]); setSelectedHop(null); }}
+          onClose={() => setSelectedHop(null)}
+        />
+      )}
       <TextDrawer
-        open={drawerOpen}
+        open={drawerOpen && !inspectedHop}
         node={selected}
         onOpenInIde={(uri, line) => onError?.(`Open in IDE: ${uri}${line != null ? `:${line}` : ''} (host handoff)`)}
         onClose={() => setDrawerOpen(false)}
@@ -604,6 +1179,55 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
         }}
       />
       <CommandPalette registry={registry} open={cmdkOpen} onClose={() => setCmdkOpen(false)} />
+      {tabMenu && (
+        <div data-testid="tab-menu" onMouseLeave={() => setTabMenu(null)}
+          style={{ position: 'fixed', left: tabMenu.x, top: tabMenu.y, background: '#fff', border: '1px solid #CBD8E6', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.15)', zIndex: 20 }}>
+          <ViewMenu
+            onClose={() => setTabMenu(null)}
+            items={(() => {
+              const t = shell.tabs.find((x) => x.id === tabMenu.tabId);
+              const canvas = !!t && t.subject.kind === 'schema' && !t.perspective;
+              return [
+                { id: 'layout.saveAs', label: 'Save layout as…', disabled: !canvas, run: () => layoutActions.current.saveAs() },
+                { id: 'layout.new', label: 'New layout from this view', disabled: !canvas, run: () => layoutActions.current.newLayout() },
+                { id: 'layout.relayout', label: 'Re-layout', disabled: !canvas, run: () => layoutActions.current.relayout() },
+                { separator: true as const },
+                { id: 'layout.open', label: 'Open layout…', run: () => layoutActions.current.open() },
+              ];
+            })()}
+          />
+        </div>
+      )}
+      {saveAsTab && (() => {
+        const t = shell.tabs.find((x) => x.id === saveAsTab);
+        const doc = t ? docForSave(t) : null;
+        if (!t || !doc) return null;
+        const initialName = t.layout ? (t.layout.doc.name === 'untitled' ? '' : t.layout.doc.name) : t.subject.ref === t.subject.schemaCode ? '' : doc.name;
+        return (
+          <SaveAsDialog
+            doc={doc}
+            initialName={initialName}
+            initialFormat={preferredFormat()}
+            onCancel={() => setSaveAsTab(null)}
+            onSave={(name, format) => { setSaveAsTab(null); void saveLayoutAs(t.id, name, format); }}
+          />
+        );
+      })()}
+      {confirm && (
+        <div data-testid="confirm-dialog" role="dialog" aria-modal="true"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(22,40,63,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+          onKeyDown={(e) => { if (e.key === 'Escape') setConfirm(null); }}>
+          <div style={{ background: '#fff', borderRadius: 10, padding: 18, maxWidth: 420, boxShadow: '0 10px 30px rgba(0,0,0,.2)', fontSize: 13 }}>
+            <p data-testid="confirm-text" style={{ margin: '0 0 14px' }}>{confirm.text}</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button data-testid="confirm-no" autoFocus onClick={() => setConfirm(null)}
+                style={{ border: '1px solid #CBD8E6', borderRadius: 6, background: '#fff', cursor: 'pointer', padding: '4px 12px' }}>Cancel</button>
+              <button data-testid="confirm-yes" onClick={() => { const yes = confirm.onYes; setConfirm(null); yes(); }}
+                style={{ border: 'none', borderRadius: 6, background: '#16283F', color: '#fff', cursor: 'pointer', padding: '4px 12px' }}>Add them</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

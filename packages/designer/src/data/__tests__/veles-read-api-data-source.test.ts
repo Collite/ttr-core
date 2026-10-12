@@ -26,13 +26,13 @@ const INDEX = { packages: ['er'], schemas: ['er', 'db'], areas: [], counts: { ob
 describe('VelesReadApiDataSource', () => {
   it('is read-only', () => {
     expect(new VelesReadApiDataSource('/veles').capabilities.edit).toBe(false);
-    // DM-P1 capability descriptor: the thinnest backend — db/er only, no bindings, auto-layout.
+    // DM-P1 capability descriptor: the thinnest backend — db/er only, no bindings; layouts held by the tab (VL V-29).
     expect(new VelesReadApiDataSource('/veles').capabilities).toEqual({
       edit: false,
       modelKinds: ['db', 'er'],
       bindings: false,
       perspectives: false,
-      layoutPersist: 'none',
+      layoutPersist: 'file',
       graphShape: 'structural',
     });
   });

@@ -12,7 +12,8 @@
 - Inspector panel with symbol details, source-file:line copy, and clickable Referenced-by navigation
 - Layout persistence: node positions, per-schema viewport, and display mode round-trip
 - Demo mode via `?demo=v1.1-mini` query parameter
-- Layout export (browser mode) via the **Export Layout** button
+- Layouts — the **Objects** panel, `…` hop edges through hidden cards, the card view menu (Expand,
+  Hide others…), **Open layout…** and **Save as…** (YAML or TTR) — see [Layouts](#layouts)
 - A container image for catalog-mode deployments next to Veles (`ghcr.io/collite/ttr-viewer`)
 
 ## Quick start
@@ -59,7 +60,8 @@ explicit choice, CORS- and auth-gated by Veles). Unlike `?server=`, a non-loopba
 origin is allowed here because Veles is the *deployed* catalog service, inherently
 remote — see `docs/features/import-schema/...` / the T5 decisions note in this repo.
 **Veles read mode is read-only** (a served catalog, not a modeling repo): schema/package
-browse + object inspect + search; no editing, no `.ttrg`/layout.
+browse + object inspect + search + the layouts it serves; no editing — a layout you arrange is
+held in the tab and leaves as a **Save as…** download, never as a write to Veles.
 
 **The address bar** (`src/shell/app-location.ts`, ttr-core#171): once a graph is open the shell
 rewrites the URL to `<base>w/<workspace>/s/<subject>`. The rewrite stays under the base path the
@@ -92,6 +94,37 @@ header picker's saved choice → the runtime config's `lang` → the browser →
 catalog view in place. The fields come from Veles' JSON read API (ttr-server#185); an older Veles yields
 identifiers and relation cards, never an error. The UI chrome itself stays English.
 
+## Layouts
+
+A layout is one named picture of a schema: the cards it shows and, optionally, where they sit
+(VL — the format is [Layout files](../../docs-site/docs/model/layout-files.md); the code is `src/layout/`).
+The shell features are the same on every backend:
+
+- **Objects panel** (`src/shell/ObjectsPanel.tsx`) — every card of the subject's schema, grouped by package,
+  with checkboxes, search, All · None · Neighbours · Invert, and a *Missing* group for refs the model lacks.
+  Fed from the whole-schema graph (`ModelDataSource.getSchemaGraph`); the whole schema's first selection
+  change makes the tab an unsaved layout `er · untitled*`.
+- **Projection + hop edges** (`src/model/layout-projection.ts`) — the layout's cards, every real edge
+  between two of them, and one dashed `…` edge per pair joined through a hidden card (derived, never saved).
+- **View menu** (`src/shell/ViewMenu.tsx`, the `renderViewMenu` seam) — Expand (+n) · Expand all levels… ·
+  Hide · Hide others · Inspect; on a hop edge, Show. Beside the injected edit menu (FO-21), never instead.
+- **Placement** (`src/model/placement.ts`) — a checked card goes beside its nearest visible neighbour;
+  **Re-layout** runs ELK over the cards shown.
+- **Open layout… / Save as…** (`src/layout/open-files.ts`, `src/shell/SaveAsDialog.tsx`) — `.yaml`, or `.ttrg`
+  (+ `.ttrl`, the sidecar's positions win); downloads `<name>.yaml` / `<name>.ttrg`. The first format is
+  `VIEWER_LAYOUT_FORMAT` (`yaml`), then the user's last choice. Commands `layout.open|saveAs|new|relayout`
+  in ⌘K and on the tab's context menu.
+- **Served layouts** — on a catalog, the spine lists `db`, `er`, then `<model> · <name>` per layout the
+  catalog serves (`GET /model/layouts`, `/model/layout?name=`), with a shareable `/w/<ws>/s/layout:<name>` link.
+
+Where a drag goes depends on the backend (`capabilities.layoutPersist`, `src/data/view-state-store.ts`):
+
+| backend | `layoutPersist` | a drag on a plain subject | a layout tab |
+|---|---|---|---|
+| worker | `in-file` | the `.ttrg` `layout` block (`modeler/setLayout`) | the tab; Save as… |
+| `?server=` | `sidecar` | the `.ttrl` sidecar (`ttrm/setLayout`) | the tab; Save as… |
+| catalog (`?veles=`) | `file` | the tab, session only | the tab; Save as… |
+
 ## Loading a project (worker mode)
 
 Two entry points, depending on the browser:
@@ -109,7 +142,7 @@ Two entry points, depending on the browser:
 Layouts round-trip through the LSP's `modeler/setLayout` / `modeler/getLayout` custom methods. Behaviour depends on which transport is running:
 
 - **Node mode (VS Code extension):** node positions are written into each `.ttrg` graph file's `layout` block (v1.1 decision D4 — there is no separate `.ttrl` sidecar). The LSP synthesizes the edit; hosts apply it.
-- **Browser mode (worker):** the browser has no filesystem. Layouts are kept in an in-memory `Map` keyed by project root and lost on tab close. Use **Export Layout** to download the current `.ttrg` for re-import or to commit alongside the project.
+- **Browser mode (worker):** the browser has no filesystem. Layouts are kept in an in-memory `Map` keyed by project root and lost on tab close. Use **Save as…** to download the layout (`.yaml` or `.ttrg`) for re-import or to commit alongside the project.
 
 Save triggers (Canvas):
 
@@ -141,7 +174,7 @@ Runtime: `config.json` beside `index.html`, read once before the first render (`
 Absent ⇒ the defaults (build base, no catalog, browser language).
 
 ```json
-{ "basePath": "/models/", "veles": "/models/veles", "lang": "en", "languages": ["en", "cs"] }
+{ "basePath": "/models/", "veles": "/models/veles", "lang": "en", "languages": ["en", "cs"], "layoutFormat": "yaml" }
 ```
 
 Local serve of the built site:
@@ -170,7 +203,7 @@ at `<base>veles/` that forwards Veles' read routes and nothing else (`docker/cat
 ## Architecture notes
 
 - LSP runs in a browser Web Worker (`@tatrman/lsp/browser?worker`). The Designer never owns model state directly — it sends LSP requests and renders the responses.
-- The "Export Layout" button is only shown when `transportKind === 'browser'`. The VS Code extension has direct filesystem access via the LSP server, so the affordance isn't needed there.
+- **Save as…** / **Open layout…** are shell features on every backend (they replace the worker-only Export Layout button); the download is the only way a layout leaves the browser.
 - Phase-3 reducer state lives in `src/state/designer-reducer.ts`; LSP integration is split into `useProjectGraph` (fetches `getModelGraph` per active schema) and `useLayoutSync` (load on project open).
 
 ## Embedding the Designer (v1.x — not yet)

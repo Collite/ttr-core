@@ -106,6 +106,7 @@ export const canvas = {
   edgeStar: '#7C93AE', // star edge; cnc-bubble border
   edgeScript: '#7EA4D6',
   edgeLabel: '#4A4B4D',
+  edgeHop: '#B4651A', // a hop edge — a path through a hidden card, dashed (VL V-26)
 
   // living / active (Tatrman Yellow — living/active ONLY, invariant 8; value FROZEN)
   alive: '#FFCB2E',

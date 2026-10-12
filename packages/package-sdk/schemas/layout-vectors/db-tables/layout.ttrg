@@ -1,0 +1,16 @@
+graph db_tables {
+  model: db,
+  objects: [
+    channel_sales,
+    db.dbo.store_sales,
+    hartland.db.dbo.fk_ss_item,
+    hartland.db.dbo.item,
+    table.store
+  ],
+  layout: {
+    nodes: {
+      hartland.db.dbo.item: { x: 320, y: 180 },
+      table.store: { x: 580, y: 180 }
+    }
+  }
+}

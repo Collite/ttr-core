@@ -16,7 +16,7 @@
 // `WorkerLspDataSource` doesn't implement it (the worker path already has its own
 // separate `LspClient.getLayout` against the in-file block, untouched until T5).
 
-import type { TtrmIndex, TtrmGraph, TtrmObjectDetail, TtrmSearchHit, TtrmLayoutPayload } from './ttrm-types.js';
+import type { TtrmIndex, TtrmGraph, TtrmObjectDetail, TtrmSearchHit, TtrmLayoutPayload, LayoutSummary, ResolvedLayout } from './ttrm-types.js';
 import type { RenderableSchemaCode, BindingMapData, SymbolDetail, GetGraphResponse } from '@tatrman/lsp';
 import type { ObjectDescription } from './structural-graph.js';
 
@@ -25,6 +25,7 @@ export type ModelGraphPayload = TtrmGraph;
 export type ObjectDetail = TtrmObjectDetail;
 export type SearchHit = TtrmSearchHit;
 export type LayoutPayload = TtrmLayoutPayload;
+export type { LayoutSummary, ResolvedLayout } from './ttrm-types.js';
 
 /** Model kinds a backend may serve (mirrors `@tatrman/lsp` RenderableSchemaCode: db|er|md|cnc). */
 export type ModelKind = RenderableSchemaCode;
@@ -46,8 +47,11 @@ export interface DataSourceCapabilities {
   readonly bindings: boolean;
   /** perspectives (binding/lineage) generable — implied by bindings + cross-face reach. */
   readonly perspectives: boolean;
-  /** view-persistence (FO-31) mechanism, or `none` (auto-layout only). */
-  readonly layoutPersist: 'in-file' | 'sidecar' | 'none';
+  /**
+   * view-persistence (FO-31) mechanism: the `.ttrg` block, the `.ttrl` sidecar, or `file` — the backend
+   * stores no layouts, the tab holds them and **Save as…** downloads them (VL V-29; `'none'` retired).
+   */
+  readonly layoutPersist: 'in-file' | 'sidecar' | 'file';
   /**
    * The SHAPE of graph a served kind returns (contracts §1.1a — the second capability axis).
    * `'rich'` = the DS `CanvasGraph` slot data the skins render fully (rows/PK/FK, measures/`calc:`,
@@ -63,6 +67,8 @@ export interface CatalogGraphMeta {
   uri: string;
   name: string;
   schema: string;
+  /** a layout the catalog serves (VL V-34) — listed after the schemas, opened by `getLayoutDoc` */
+  layout?: { missingCount: number };
 }
 
 /** One symbol as the catalog spine needs it (cube/concept/program subjects). */
@@ -139,4 +145,14 @@ export interface ModelDataSource {
   describe?(qname: string): Promise<ObjectDescription | null>;
   /** The languages the model's labels carry, as far as this backend has served them (the language picker). */
   knownLanguages?(): string[];
+  /**
+   * Every card of one schema, with the relations / foreign keys between them (VL V-18, V-21) — the
+   * whole-schema graph the Objects panel lists, layouts resolve against (§4) and are projected from
+   * (§5.2). Nodes carry `pkg` when the qname does not. Absent ⇒ no Objects panel on this backend.
+   */
+  getSchemaGraph?(schema: ModelKind): Promise<GetGraphResponse | null>;
+  /** The layouts the catalog serves (VL V-36, `GET /model/layouts`). Present on the two Veles sources. */
+  listLayouts?(): Promise<LayoutSummary[]>;
+  /** One served layout, resolved by the catalog (VL V-36, `GET /model/layout?name=`); the viewer re-resolves it. */
+  getLayoutDoc?(name: string): Promise<ResolvedLayout>;
 }

@@ -1,0 +1,5 @@
+# Tatrman layout — https://docs.tatrman.org/model/layout-files/ (format 1)
+layout: 1
+name: empty
+model: db
+objects: []

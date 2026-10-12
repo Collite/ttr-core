@@ -11,6 +11,13 @@ export interface CEdgeData {
   style: EdgeStyleSpec;
   theme: Theme;
   cardinality?: { from?: string; to?: string };
+  /** `hop` — a derived path through hidden cards (VL V-26) */
+  kind?: 'hop';
+  /** hop edges: how many hidden cards the `…` stands for */
+  viaCount?: number;
+  /** the hop pill is the edge's handle: a click selects it, a right-click opens its view menu */
+  onSelect?: () => void;
+  onContextMenu?: (clientX: number, clientY: number) => void;
   [key: string]: unknown;
 }
 
@@ -42,9 +49,48 @@ function CardEnd({ x, y, card, testid, stroke }: { x: number; y: number; card?: 
   );
 }
 
+/** A hop edge (VL V-26): dashed, no cardinality glyphs, the `…` / `… ×n` pill at the midpoint. */
+function HopEdgeView(props: EdgeProps, spec: EdgeStyleSpec, data: CEdgeData) {
+  const [path, labelX, labelY] = getBezierPath({
+    sourceX: props.sourceX, sourceY: props.sourceY, targetX: props.targetX, targetY: props.targetY,
+    sourcePosition: props.sourcePosition, targetPosition: props.targetPosition,
+  });
+  return (
+    <>
+      <BaseEdge
+        id={props.id}
+        path={path}
+        className="hop-edge-path"
+        interactionWidth={14}
+        style={{ stroke: spec.stroke, strokeWidth: props.selected ? spec.width + 0.8 : spec.width, strokeDasharray: spec.dash }}
+      />
+      <EdgeLabelRenderer>
+        <div
+          data-testid="hop-edge"
+          data-edge-id={props.id}
+          data-via-count={data.viaCount ?? 1}
+          className="hop-edge nodrag nopan"
+          title="A path through hidden cards — click to see them"
+          onClick={(e) => { e.stopPropagation(); data.onSelect?.(); }}
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); data.onContextMenu?.(e.clientX, e.clientY); }}
+          style={{
+            position: 'absolute', transform: `translate(-50%,-50%) translate(${labelX}px,${labelY}px)`, pointerEvents: 'all', cursor: 'pointer',
+            background: palette.nodeFill, color: spec.stroke, border: `${props.selected ? 1.6 : 0.8}px dashed ${spec.stroke}`,
+            borderRadius: 8, padding: '0 7px', fontSize: 11, fontWeight: 500, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+          }}
+        >
+          {String(props.label ?? '…')}
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
 export function CanvasEdgeView(props: EdgeProps) {
-  const { style, theme, cardinality } = (props.data ?? {}) as CEdgeData;
+  const data = (props.data ?? {}) as CEdgeData;
+  const { style, theme, cardinality } = data;
   const spec: EdgeStyleSpec = style ?? { stroke: palette.edgeData, width: 2 };
+  if (data.kind === 'hop') return HopEdgeView(props, spec, data);
   const [path, labelX, labelY] = getBezierPath({
     sourceX: props.sourceX, sourceY: props.sourceY, targetX: props.targetX, targetY: props.targetY,
     sourcePosition: props.sourcePosition, targetPosition: props.targetPosition,

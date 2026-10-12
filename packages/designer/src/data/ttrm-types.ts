@@ -159,3 +159,42 @@ export interface TtrmCreateGraphResult {
   uri?: string;
   reason?: string;
 }
+
+// ---- layouts (VL contracts §6 — `GET /model/layouts`, `GET /model/layout?name=`) ----
+
+/** One layout as `GET /model/layouts` lists it. */
+export interface LayoutSummary {
+  name: string;
+  schema: string;
+  objectCount: number;
+  missingCount: number;
+  ambiguousCount: number;
+  hasPositions: boolean;
+  /** the file under the model root (`layouts/sales.ttrg`) */
+  source: string;
+}
+
+/** `GET /model/layouts`. */
+export interface LayoutsResponse {
+  layouts: LayoutSummary[];
+  modelVersion: string;
+}
+
+/** `GET /model/layout?name=` — a layout resolved by the catalog (§4); refs it could not resolve are listed apart. */
+export interface ResolvedLayout {
+  name: string;
+  schema: string;
+  /** the resolved cards, as full qnames */
+  objects: string[];
+  positions: Record<string, { x: number; y: number }>;
+  mode: 'auto' | 'manual';
+  skin: string | null;
+  collapsed: string[];
+  missing: string[];
+  ambiguous: Array<{ ref: string; candidates: string[] }>;
+  ignored: string[];
+  positionsFrom: 'in-file' | 'sidecar' | null;
+  source: string;
+  modelVersion: string;
+}
+

@@ -1,0 +1,7 @@
+graph skin_collapsed {
+  model: er,
+  objects: [
+    hartland.er.entity.item,
+    hartland.er.entity.store
+  ]
+}

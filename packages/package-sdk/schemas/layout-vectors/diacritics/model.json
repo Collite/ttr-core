@@ -1,0 +1,44 @@
+{
+  "cards": [
+    {
+      "fullQname": "hartland.er.entity.adresa_zákazníka",
+      "qname": "er.entity.adresa_zákazníka",
+      "kind": "entity",
+      "name": "adresa_zákazníka",
+      "pkg": "hartland",
+      "schema": "er"
+    },
+    {
+      "fullQname": "hartland.er.entity.důvod_reklamace",
+      "qname": "er.entity.důvod_reklamace",
+      "kind": "entity",
+      "name": "důvod_reklamace",
+      "pkg": "hartland",
+      "schema": "er"
+    },
+    {
+      "fullQname": "hartland.er.entity.příjmové_pásmo",
+      "qname": "er.entity.příjmové_pásmo",
+      "kind": "entity",
+      "name": "příjmové_pásmo",
+      "pkg": "hartland",
+      "schema": "er"
+    },
+    {
+      "fullQname": "hartland.er.entity.prodejna",
+      "qname": "er.entity.prodejna",
+      "kind": "entity",
+      "name": "prodejna",
+      "pkg": "hartland",
+      "schema": "er"
+    },
+    {
+      "fullQname": "hartland.er.entity.zákazník",
+      "qname": "er.entity.zákazník",
+      "kind": "entity",
+      "name": "zákazník",
+      "pkg": "hartland",
+      "schema": "er"
+    }
+  ]
+}

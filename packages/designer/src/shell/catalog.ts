@@ -6,6 +6,7 @@
 
 import type { SchemaCode } from '@tatrman/canvas-core';
 import type { CatalogItem, CatalogGroup, SubjectKind } from './types.js';
+import { layoutRef } from './shell-state.js';
 
 /** One graph as reported by `listCatalog` (contracts §6). `schema` is a free string — the
  *  backend-agnostic `CatalogGraphMeta` shape; `RENDERABLE_SCHEMAS` narrows it to a subject kind. */
@@ -13,6 +14,8 @@ export interface GraphMeta {
   uri: string;
   name: string;
   schema: string;
+  /** a layout the catalog serves (VL V-34) */
+  layout?: { missingCount: number };
 }
 
 /** One symbol as reported by the LSP `listSymbols` custom request. */
@@ -48,18 +51,33 @@ export function buildCatalog(graphs: GraphMeta[], symbols: SymbolMeta[]): Catalo
   const concepts: CatalogItem[] = [];
   const programs: CatalogItem[] = [];
 
+  // Schemas (VL V-34): a catalog's whole-schema subjects (`er`, `db`) first, then the project's graphs,
+  // then the layouts the catalog serves — `<model> · <name>`, by model then name, `· n missing` when so.
+  const wholeSchemas: CatalogItem[] = [];
+  const layouts: CatalogItem[] = [];
   for (const g of graphs) {
     if (!RENDERABLE_SCHEMAS.has(g.schema)) continue;
     const schemaCode = g.schema as SchemaCode; // narrowed by RENDERABLE_SCHEMAS
-    schemas.push({
+    if (g.layout) {
+      const missing = g.layout.missingCount > 0 ? ` · ${g.layout.missingCount} missing` : '';
+      const ref = layoutRef('catalog', g.name);
+      layouts.push({
+        ref, qname: ref, kind: 'schema', label: `${g.schema} · ${g.name}${missing}`, schemaCode, packageName: null,
+        layout: { name: g.name, missingCount: g.layout.missingCount },
+      });
+      continue;
+    }
+    const whole = g.name === g.schema && g.uri === g.schema;
+    (whole ? wholeSchemas : schemas).push({
       ref: g.uri,
       qname: g.uri,
       kind: 'schema',
-      label: `${g.schema} · ${g.name}`,
+      label: whole ? g.schema : `${g.schema} · ${g.name}`,
       schemaCode,
       packageName: null,
     });
   }
+  layouts.sort((a, b) => a.schemaCode!.localeCompare(b.schemaCode!) || a.layout!.name.localeCompare(b.layout!.name));
 
   for (const s of symbols) {
     switch (s.kind) {
@@ -101,7 +119,7 @@ export function buildCatalog(graphs: GraphMeta[], symbols: SymbolMeta[]): Catalo
   }
 
   const byKind: Record<SubjectKind, CatalogItem[]> = {
-    schema: schemas.sort(byLabel),
+    schema: [...wholeSchemas.sort(byLabel), ...schemas.sort(byLabel), ...layouts],
     cube: cubes.sort(byLabel),
     concept: concepts.sort(byLabel),
     program: programs.sort(byLabel),

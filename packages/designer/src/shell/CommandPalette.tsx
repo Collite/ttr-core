@@ -36,7 +36,7 @@ export function CommandPalette({
       onClose();
     } else if (event.key === 'Enter') {
       event.preventDefault();
-      const top = results[0];
+      const top = results.find((c) => !c.disabled);
       if (top) runAndClose(top.id);
     }
   };
@@ -59,9 +59,12 @@ export function CommandPalette({
             <li
               key={c.id}
               data-testid="cmdk-item"
+              data-command={c.id}
               className="cmdk-item"
               role="option"
-              onClick={() => runAndClose(c.id)}
+              aria-disabled={c.disabled || undefined}
+              onClick={() => { if (!c.disabled) runAndClose(c.id); }}
+              style={c.disabled ? { opacity: 0.45, cursor: 'default' } : undefined}
             >
               {c.title}
             </li>

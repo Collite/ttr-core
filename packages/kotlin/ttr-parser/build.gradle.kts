@@ -15,6 +15,11 @@ kotlin {
 
 tasks.test {
     useJUnitPlatform()
+    // VL-P0: TtrgGraphReaderSpec reads the shared layout vectors and two samples in place (never a
+    // copy) — declare them, or a vector change leaves this task UP-TO-DATE.
+    inputs.dir("../../package-sdk/schemas/layout-vectors")
+    inputs.dir("../../../samples/v1.1-mini/graphs")
+    inputs.file("../../../samples/broken/v1.1/graph-layout-stale-node.ttrg")
 }
 
 // The canonical grammar lives in the pnpm workspace; the Kotlin build reads it

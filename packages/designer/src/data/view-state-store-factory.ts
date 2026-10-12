@@ -8,7 +8,8 @@ import type { DataSourceCapabilities } from './model-data-source.js';
 import {
   WorkerLayoutStore,
   WsSidecarStore,
-  VelesNoStore,
+  LayoutDocumentStore,
+  type LayoutDocIO,
   type LayoutIO,
   type PrefsIO,
   type TtrmLayoutIO,
@@ -18,7 +19,7 @@ import {
 export type ViewStateStoreIO =
   | { kind: 'in-file'; layout: LayoutIO; prefs: PrefsIO }
   | { kind: 'sidecar'; layout: TtrmLayoutIO }
-  | { kind: 'none' };
+  | { kind: 'file'; layout?: LayoutDocIO };
 
 export interface ViewStateStoreFactoryOptions {
   defaultSkin?: string;
@@ -41,7 +42,7 @@ export function makeViewStateStore(
       return new WorkerLayoutStore(io.layout, io.prefs, opts);
     case 'sidecar':
       return new WsSidecarStore(io.layout, opts);
-    case 'none':
-      return new VelesNoStore(opts);
+    case 'file':
+      return new LayoutDocumentStore(io.layout, opts);
   }
 }

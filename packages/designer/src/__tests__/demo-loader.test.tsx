@@ -57,7 +57,7 @@ describe('loadDemoFiles', () => {
 describe('loadDemoFiles under a base path (ttr-core#171)', () => {
   it('fetches the sample from under the configured base path', async () => {
     const { setRuntimeConfig } = await import('../runtime-config');
-    setRuntimeConfig({ basePath: '/models/', veles: null, lang: null, languages: [] });
+    setRuntimeConfig({ basePath: '/models/', veles: null, lang: null, languages: [], layoutFormat: 'yaml' });
     try {
       const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] as string[], text: async () => '' });
       global.fetch = fetchMock as unknown as typeof fetch;

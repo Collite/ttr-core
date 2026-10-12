@@ -1,0 +1,14 @@
+# Tatrman layout — https://docs.tatrman.org/model/layout-files/ (format 1)
+layout: 1
+name: db_tables
+model: db
+objects:
+  - channel_sales
+  - db.dbo.store_sales
+  - hartland.db.dbo.fk_ss_item
+  - hartland.db.dbo.item
+  - table.store
+positions:
+  hartland.db.dbo.item: { x: 320, y: 180 }
+  table.store: { x: 580, y: 180 }
+skin: db.table-classic

@@ -4,9 +4,9 @@
 // ONLY place that knows about React Flow — skins emit contract-level output, never RF
 // primitives, so the SVG-kernel fallback stays survivable.
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import {
-  ReactFlow, ReactFlowProvider, Background, Controls, MarkerType,
+  ReactFlow, ReactFlowProvider, Background, Controls, MarkerType, useReactFlow,
   type Node, type Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -26,6 +26,10 @@ export interface KernelProps {
   skinId: SkinId;
   positions: Positions;
   selectedId?: string | null;
+  /** further selected nodes (shift-click multi-select — VL V-27) */
+  selectedIds?: readonly string[];
+  /** the selected edge (a hop edge in the inspector) — drawn heavier */
+  selectedEdgeId?: string | null;
   orphanIds?: string[];
   derived?: boolean;
   theme?: Theme;
@@ -33,13 +37,18 @@ export interface KernelProps {
   runStates?: Record<string, { runStatus?: RunStatus; diagnostics?: DiagnosticsState }>;
   /** per-node display preview (S-6 base-layer chip) — row count now, sparkline post-v1. */
   previews?: Record<string, { rows: number }>;
-  onSelect?: (id: string | null) => void;
+  /** a node was clicked (`additive` — shift held: add to / remove from a multi-selection, VL V-27); null = cleared */
+  onSelect?: (id: string | null, additive?: boolean) => void;
   /** edge selection (processing insertion targets) — the palette/⌘K insert onto the selected edge. */
   onEdgeSelect?: (id: string | null) => void;
+  /** a right-click on an edge (a hop edge's pill included) — the view menu (VL V-27) */
+  onEdgeContextMenu?: (id: string, clientX: number, clientY: number) => void;
   onNodeDrag?: (id: string, pos: { x: number; y: number }) => void;
   onNodeContextMenu?: (id: string, clientX: number, clientY: number) => void;
   /** drill into a node/container (double-click) — the shell pushes a breadcrumb segment (P-2) */
   onDrillIn?: (id: string, label: string) => void;
+  /** filled with a reader of the visible area's centre, in canvas coordinates (placement — VL V-19) */
+  viewportCenterRef?: MutableRefObject<(() => { x: number; y: number } | null) | null>;
 }
 
 export function CanvasKernel(props: KernelProps) {
@@ -51,11 +60,24 @@ export function CanvasKernel(props: KernelProps) {
 }
 
 function KernelInner({
-  graph, registry, skinId, positions, selectedId, orphanIds, derived, theme = 'ice', runStates, previews, onSelect, onEdgeSelect, onNodeDrag, onNodeContextMenu, onDrillIn,
+  graph, registry, skinId, positions, selectedId, selectedIds, selectedEdgeId, orphanIds, derived, theme = 'ice', runStates, previews, onSelect, onEdgeSelect, onEdgeContextMenu, onNodeDrag, onNodeContextMenu, onDrillIn,
+  viewportCenterRef,
 }: KernelProps) {
   const labelOf = (id: string) => graph.nodes.find((n) => n.id === id)?.label ?? id;
+  const rf = useReactFlow();
+  const hostRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!viewportCenterRef) return;
+    viewportCenterRef.current = () => {
+      const r = hostRef.current?.getBoundingClientRect();
+      if (!r || r.width === 0 || r.height === 0) return null;
+      return rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+    };
+    return () => { viewportCenterRef.current = null; };
+  }, [rf, viewportCenterRef]);
   const skin = registry.resolve(skinId) as DesignerSkin | undefined;
   const orphanSet = useMemo(() => new Set(orphanIds ?? []), [orphanIds]);
+  const multiSet = useMemo(() => new Set(selectedIds ?? []), [selectedIds]);
 
   const rfNodes: Node<CNodeData>[] = useMemo(() => {
     if (!skin) return [];
@@ -63,7 +85,7 @@ function KernelInner({
       const size = skin.nodeSize(n);
       const run = runStates?.[n.id];
       const state: NodeBaseState = {
-        selected: selectedId === n.id,
+        selected: selectedId === n.id || multiSet.has(n.id),
         // v1 has no focus concept distinct from selection; the selected node IS the focused one.
         // This drives cnc.bubbles' properties-on-focus (its only consumer) on the live canvas.
         focused: selectedId === n.id,
@@ -78,11 +100,11 @@ function KernelInner({
         type: 'cnode',
         position: positions[n.id] ?? { x: 0, y: 0 },
         data: { node: n, skin, state, theme, bindingHint: graph.bindingHints?.[n.id], preview: previews?.[n.id] },
-        selected: selectedId === n.id,
+        selected: selectedId === n.id || multiSet.has(n.id),
         style: { width: size.width, height: size.height },
       };
     });
-  }, [graph, skin, positions, selectedId, orphanSet, derived, theme, runStates, previews]);
+  }, [graph, skin, positions, selectedId, multiSet, orphanSet, derived, theme, runStates, previews]);
 
   const rfEdges: Edge<CEdgeData>[] = useMemo(() => {
     if (!skin) return [];
@@ -96,26 +118,34 @@ function KernelInner({
         targetHandle: e.to.port,
         type: 'cedge',
         label: e.label,
-        data: { style, theme, cardinality: e.cardinality },
+        selected: e.id === selectedEdgeId,
+        data: e.kind === 'hop'
+          ? {
+              style, theme, kind: 'hop' as const, viaCount: e.via?.length ?? 1,
+              onSelect: () => onEdgeSelect?.(e.id),
+              onContextMenu: (x: number, y: number) => onEdgeContextMenu?.(e.id, x, y),
+            }
+          : { style, theme, cardinality: e.cardinality },
         markerEnd: style.marker === 'none' ? undefined : { type: MarkerType.ArrowClosed, color: style.stroke },
       };
     });
-  }, [graph, skin, theme]);
+  }, [graph, skin, theme, selectedEdgeId, onEdgeSelect, onEdgeContextMenu]);
 
   if (!skin) {
     return <div data-testid="unknown-skin" style={{ padding: 16, color: palette.err }}>unknown skin: {skinId}</div>;
   }
 
   return (
-    <div style={{ width: '100%', height: '100%', background: skin.canvas.background, position: 'relative' }} data-testid="canvas-kernel" data-skin={skinId}>
+    <div ref={hostRef} style={{ width: '100%', height: '100%', background: skin.canvas.background, position: 'relative' }} data-testid="canvas-kernel" data-skin={skinId}>
       {derived && <DerivedBanner />}
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        onNodeClick={(_, n) => onSelect?.(n.id)}
+        onNodeClick={(e, n) => onSelect?.(n.id, e.shiftKey)}
         onEdgeClick={(_, e) => onEdgeSelect?.(e.id)}
+        onEdgeContextMenu={(ev, e) => { ev.preventDefault(); onEdgeContextMenu?.(e.id, ev.clientX, ev.clientY); }}
         onPaneClick={() => { onSelect?.(null); onEdgeSelect?.(null); }}
         onNodeDragStop={(_, n) => onNodeDrag?.(n.id, n.position)}
         onNodeContextMenu={(e, n) => { e.preventDefault(); onNodeContextMenu?.(n.id, e.clientX, e.clientY); }}

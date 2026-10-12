@@ -1,0 +1,8 @@
+graph minimal {
+  model: er,
+  objects: [
+    hartland.er.entity.item,
+    hartland.er.entity.store,
+    hartland.er.entity.store_sales
+  ]
+}

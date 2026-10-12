@@ -1,0 +1,11 @@
+{
+  "name": "ambiguous",
+  "model": "er",
+  "objects": [
+    "er.entity.item",
+    "hartland.web.er.entity.item",
+    "item",
+    "store"
+  ],
+  "positions": {}
+}

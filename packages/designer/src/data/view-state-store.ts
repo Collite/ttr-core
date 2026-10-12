@@ -3,9 +3,9 @@
 // contracts §3, inherited from DM-P1). One `ViewStateStore` (`@tatrman/canvas-core`, contracts §7)
 // with three impls, selected by the active backend's `capabilities.layoutPersist`:
 //
-//   in-file  → WorkerLayoutStore  (modeler/getLayout+setLayout → the .ttrg `layout` block)
-//   sidecar  → WsSidecarStore     (ttrm/getLayout+setLayout → the .ttrl sidecar on disk)
-//   none     → VelesNoStore       (read: auto view-state; write: no-op + DM-CAP-003)
+//   in-file  → WorkerLayoutStore    (modeler/getLayout+setLayout → the .ttrg `layout` block)
+//   sidecar  → WsSidecarStore       (ttrm/getLayout+setLayout → the .ttrl sidecar on disk)
+//   file     → LayoutDocumentStore  (the tab's layout in memory; Save as… downloads it — VL V-28/V-29)
 //
 // Ported from modeler DS-v1 `canvas/view-state-store.ts` (`TtrgLayoutBlockStore` → `WorkerLayoutStore`,
 // @modeler/*→@tatrman/*) and extended with the WS/.ttrl + Veles/none impls that DM-P1 refined here as
@@ -165,30 +165,68 @@ export class WsSidecarStore implements ViewStateStore {
   }
 }
 
-// ── none — the Veles deployed read-only catalog ─────────────────────────────
+// ── file — the catalog backends: the layout lives in the tab, Save as… downloads it ──
 
-export interface VelesNoStoreOptions {
+/** One canvas's layout state as the tab holds it (VL V-28): positions, skin, collapsed. */
+export interface LayoutDocState {
+  positions: Record<string, { x: number; y: number }>;
+  skin?: string;
+  collapsed?: string[];
+}
+
+/** Where a `LayoutDocumentStore` keeps its state: the shell binds it to the tab's layout (`set` marks it dirty). */
+export interface LayoutDocIO {
+  get(canvasKey: string): LayoutDocState | undefined;
+  set(canvasKey: string, state: LayoutDocState): void;
+}
+
+/** A session-only `LayoutDocIO` (a plain map) that remembers which canvases were written since load. */
+export function memoryLayoutDocIO(): LayoutDocIO & { isDirty(canvasKey: string): boolean } {
+  const states = new Map<string, LayoutDocState>();
+  const dirty = new Set<string>();
+  return {
+    get: (key) => states.get(key),
+    set: (key, state) => {
+      states.set(key, state);
+      dirty.add(key);
+    },
+    isDirty: (key) => dirty.has(key),
+  };
+}
+
+export interface LayoutDocumentStoreOptions {
   defaultSkin?: string;
 }
 
 /**
- * Veles serves no sidecars (gap ③): `read` returns an auto view-state (empty positions → the viewer
- * auto-lays-out) and `write` is a no-op. The honest signal is `capabilities.layoutPersist === 'none'`
- * → `DM-CAP-003` truth chip (see `capability-hints.ts`); this store never claims to persist.
+ * The `'file'` store (VL V-28, V-29): the backend stores no layouts, so the open tab holds its
+ * positions / skin / collapsed in memory and **Save as…** downloads them. `read` maps the held state to a
+ * view-state (mode is derived — manual iff positions exist, V-2); `write` replaces it, which marks the
+ * layout dirty. Never a viewport (C1-b).
  */
-export class VelesNoStore implements ViewStateStore {
+export class LayoutDocumentStore implements ViewStateStore {
+  readonly #io: LayoutDocIO;
   readonly #defaultSkin: string;
 
-  constructor(opts?: VelesNoStoreOptions) {
+  constructor(io: LayoutDocIO = memoryLayoutDocIO(), opts?: LayoutDocumentStoreOptions) {
+    this.#io = io;
     this.#defaultSkin = opts?.defaultSkin ?? FALLBACK_SKIN;
   }
 
-  async read(_canvasKey: string): Promise<CanvasViewState> {
-    return { skin: this.#defaultSkin, mode: 'auto', nodes: {}, collapsed: [], skinStorage: 'prefs' };
+  async read(canvasKey: string): Promise<CanvasViewState> {
+    const state = this.#io.get(canvasKey);
+    const nodes: CanvasViewState['nodes'] = { ...(state?.positions ?? {}) };
+    return {
+      skin: (state?.skin ?? this.#defaultSkin) as SkinId,
+      mode: Object.keys(nodes).length > 0 ? 'manual' : 'auto',
+      nodes,
+      collapsed: [...(state?.collapsed ?? [])],
+      skinStorage: 'prefs',
+    };
   }
 
-  async write(_canvasKey: string, _vs: CanvasViewState): Promise<void> {
-    // no-op by design — Veles is a served catalog, not a modeling repo (DM-CAP-003).
+  async write(canvasKey: string, vs: CanvasViewState): Promise<void> {
+    this.#io.set(canvasKey, { positions: { ...vs.nodes }, skin: vs.skin, collapsed: [...vs.collapsed] });
   }
 }
 

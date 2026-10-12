@@ -1,0 +1,12 @@
+{
+  "resolved": {
+    "hartland.er.entity.adresa_zákazníka": "hartland.er.entity.adresa_zákazníka",
+    "hartland.er.entity.důvod_reklamace": "hartland.er.entity.důvod_reklamace",
+    "hartland.er.entity.příjmové_pásmo": "hartland.er.entity.příjmové_pásmo",
+    "hartland.er.entity.prodejna": "hartland.er.entity.prodejna",
+    "hartland.er.entity.zákazník": "hartland.er.entity.zákazník"
+  },
+  "missing": [],
+  "ambiguous": [],
+  "ignored": []
+}

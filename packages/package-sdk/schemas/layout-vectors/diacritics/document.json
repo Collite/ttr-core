@@ -1,0 +1,29 @@
+{
+  "name": "diacritics",
+  "model": "er",
+  "objects": [
+    "hartland.er.entity.adresa_zákazníka",
+    "hartland.er.entity.důvod_reklamace",
+    "hartland.er.entity.příjmové_pásmo",
+    "hartland.er.entity.prodejna",
+    "hartland.er.entity.zákazník"
+  ],
+  "positions": {
+    "hartland.er.entity.adresa_zákazníka": {
+      "x": 580,
+      "y": 180
+    },
+    "hartland.er.entity.příjmové_pásmo": {
+      "x": 840,
+      "y": 420
+    },
+    "hartland.er.entity.prodejna": {
+      "x": 840,
+      "y": 180
+    },
+    "hartland.er.entity.zákazník": {
+      "x": 320,
+      "y": 180
+    }
+  }
+}

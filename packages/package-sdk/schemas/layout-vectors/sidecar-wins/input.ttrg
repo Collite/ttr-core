@@ -1,0 +1,13 @@
+graph sidecar_wins {
+  model: er,
+  objects: [
+    hartland.er.entity.item,
+    hartland.er.entity.store
+  ],
+  layout: {
+    nodes: {
+      hartland.er.entity.item: { x: 100, y: 100 },
+      hartland.er.entity.store: { x: 300, y: 100 }
+    }
+  }
+}

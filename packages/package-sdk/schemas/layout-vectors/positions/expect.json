@@ -1,0 +1,11 @@
+{
+  "resolved": {
+    "hartland.er.entity.customer": "hartland.er.entity.customer",
+    "hartland.er.entity.item": "hartland.er.entity.item",
+    "hartland.er.entity.store": "hartland.er.entity.store",
+    "hartland.er.entity.store_sales": "hartland.er.entity.store_sales"
+  },
+  "missing": [],
+  "ambiguous": [],
+  "ignored": []
+}

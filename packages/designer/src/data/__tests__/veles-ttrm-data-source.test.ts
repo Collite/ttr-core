@@ -92,7 +92,7 @@ describe('VelesTtrmDataSource', () => {
 
   it('capabilities.edit === false (read-only)', () => {
     expect(new VelesTtrmDataSource('wss://x').capabilities.edit).toBe(false);
-    expect(new VelesTtrmDataSource('wss://x').capabilities.layoutPersist).toBe('none');
+    expect(new VelesTtrmDataSource('wss://x').capabilities.layoutPersist).toBe('file');
   });
 
   it('onModelChanged fires on a ttrm/modelChanged notification', async () => {

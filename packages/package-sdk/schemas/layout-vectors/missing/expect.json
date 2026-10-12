@@ -1,0 +1,11 @@
+{
+  "resolved": {
+    "hartland.er.entity.item": "hartland.er.entity.item"
+  },
+  "missing": [
+    "Customer Address",
+    "hartland.er.entity.warehouse_old"
+  ],
+  "ambiguous": [],
+  "ignored": []
+}

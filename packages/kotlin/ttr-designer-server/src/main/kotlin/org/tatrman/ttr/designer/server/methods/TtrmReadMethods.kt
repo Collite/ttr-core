@@ -7,12 +7,12 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.tatrman.ttr.designer.server.DesignerServerDeps
-import org.tatrman.ttr.designer.server.graph.TtrgGraphFile
 import org.tatrman.ttr.designer.server.rpc.JsonRpcDispatcher
 import org.tatrman.ttr.designer.server.rpc.RpcCodes
 import org.tatrman.ttr.designer.server.rpc.TtrmRpcException
 import org.tatrman.ttr.metadata.query.MetadataQuery
 import org.tatrman.ttr.metadata.registry.RegistrySnapshot
+import org.tatrman.ttr.parser.loader.TtrgGraphReader
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -27,7 +27,7 @@ import java.nio.file.Path
  * [registerTtrmEditMethods] — the edit half that relocates to the
  * `ttr-designer-edit-server` module (tatrman-platform) at the cross-repo cutover
  * (gated on S3 publishing this read half as a library; see move manifest §1a).
- * `.ttrg` reads go through the shared parse lib [TtrgGraphFile]; the mutators use
+ * `.ttrg` reads go through the shared parse lib [TtrgGraphReader]; the mutators use
  * [org.tatrman.ttr.designer.server.graph.TtrgGraphMutations].
  */
 fun registerTtrmReadMethods(
@@ -56,8 +56,8 @@ fun registerTtrmReadMethods(
                 ?.mapTo(mutableSetOf()) { fullQname(it.qname) } ?: emptySet()
         val graphs = mutableListOf<JsonObject>()
         walkTtrg(deps.repoRoot) { path, content ->
-            val header = TtrgGraphFile.parseHeader(content) ?: return@walkTtrg
-            val objects = TtrgGraphFile.parseObjects(content)
+            val header = TtrgGraphReader.parseHeader(content) ?: return@walkTtrg
+            val objects = TtrgGraphReader.parseObjects(content)
             graphs +=
                 buildJsonObject {
                     put("uri", path.toUri().toString())
@@ -84,13 +84,13 @@ fun registerTtrmReadMethods(
         }
         val content = Files.readString(path)
         val header =
-            TtrgGraphFile.parseHeader(content)
+            TtrgGraphReader.parseHeader(content)
                 ?: throw TtrmRpcException(
                     RpcCodes.INVALID_PARAMS,
                     "not-a-graph-file",
                     buildJsonObject { put("uri", uri) },
                 )
-        val objects = TtrgGraphFile.parseObjects(content)
+        val objects = TtrgGraphReader.parseObjects(content)
 
         val snap = snapshotOrError()
         val byQname =

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // DM-P2.S1 — view-state seam reconciliation (contracts §3, inherited from DM-P1).
-// Drives WorkerLayoutStore / WsSidecarStore / VelesNoStore + the factory with in-memory fakes (no
+// Drives WorkerLayoutStore / WsSidecarStore / LayoutDocumentStore + the factory with in-memory fakes (no
 // live LSP/WS). Ported from modeler DS-v1 `view-state-seam.test.ts` (TtrgLayoutBlockStore →
-// WorkerLayoutStore) and extended with the sidecar + none impls that DM-P1 refined here.
+// WorkerLayoutStore) and extended with the sidecar impl DM-P1 refined here and VL's 'file' store.
 
 import { describe, it, expect } from 'vitest';
 import type { CanvasViewState } from '@tatrman/canvas-core';
@@ -11,14 +11,16 @@ import type { TtrmLayoutPayload, TtrmLayoutCanvas } from '../ttrm-types.js';
 import {
   WorkerLayoutStore,
   WsSidecarStore,
-  VelesNoStore,
+  LayoutDocumentStore,
+  memoryLayoutDocIO,
   detectOrphanedLayout,
   parseCanvasKey,
   type LayoutIO,
   type PrefsIO,
   type TtrmLayoutIO,
 } from '../view-state-store.js';
-import { makeViewStateStore } from '../view-state-store-factory.js';
+import { makeViewStateStore, type ViewStateStoreIO } from '../view-state-store-factory.js';
+import type { DataSourceCapabilities } from '../model-data-source.js';
 
 // ---- in-memory fakes -------------------------------------------------------
 
@@ -216,17 +218,39 @@ describe('WsSidecarStore', () => {
   });
 });
 
-// ---- VelesNoStore (none) ---------------------------------------------------
+// ---- LayoutDocumentStore (file — VL V-28) -----------------------------------
 
-describe('VelesNoStore', () => {
-  it('reads an auto view-state and no-ops on write (DM-CAP-003)', async () => {
-    const store = new VelesNoStore();
-    const before = await store.read(KEY);
-    expect(before.mode).toBe('auto');
-    expect(before.nodes).toEqual({});
-    // write is a no-op: reading afterwards is still the auto default.
-    await store.write(KEY, { skin: 'db.uml', mode: 'manual', nodes: { A: { x: 1, y: 1 } }, collapsed: [] });
-    expect(await store.read(KEY)).toEqual(before);
+describe('LayoutDocumentStore', () => {
+  it('reads an auto view-state before anything is written', async () => {
+    const store = new LayoutDocumentStore();
+    expect(await store.read(KEY)).toEqual({ skin: 'er.crow', mode: 'auto', nodes: {}, collapsed: [], skinStorage: 'prefs' });
+  });
+
+  it('round-trips positions, skin and collapsed; mode is derived (manual iff positions exist)', async () => {
+    const store = new LayoutDocumentStore();
+    await store.write(KEY, { skin: 'db.table-classic', mode: 'manual', nodes: { A: { x: 1, y: 2 } }, collapsed: ['A'] });
+    expect(await store.read(KEY)).toEqual({ skin: 'db.table-classic', mode: 'manual', nodes: { A: { x: 1, y: 2 } }, collapsed: ['A'], skinStorage: 'prefs' });
+    await store.write(KEY, { skin: 'db.table-classic', mode: 'manual', nodes: {}, collapsed: [] });
+    expect((await store.read(KEY)).mode).toBe('auto');
+  });
+
+  it('a write marks that canvas dirty, and only that one', async () => {
+    const io = memoryLayoutDocIO();
+    const store = new LayoutDocumentStore(io);
+    expect(io.isDirty(KEY)).toBe(false);
+    await store.write(KEY, { skin: 'er.crow', mode: 'manual', nodes: { A: { x: 0, y: 0 } }, collapsed: [] });
+    expect(io.isDirty(KEY)).toBe(true);
+    expect(io.isDirty('other')).toBe(false);
+  });
+
+  it('writes through an injected IO (the shell binds it to the tab) and never surfaces a viewport', async () => {
+    const written: Array<[string, unknown]> = [];
+    const store = new LayoutDocumentStore({ get: () => ({ positions: { B: { x: 3, y: 4 } } }), set: (k, st) => written.push([k, st]) });
+    const vs = await store.read('tab-1');
+    expect(vs.nodes).toEqual({ B: { x: 3, y: 4 } });
+    expect(Object.keys(vs)).not.toContain('viewport');
+    await store.write('tab-1', { ...vs, nodes: { B: { x: 5, y: 6 } } });
+    expect(written).toEqual([['tab-1', { positions: { B: { x: 5, y: 6 } }, skin: 'er.crow', collapsed: [] }]]);
   });
 });
 
@@ -236,11 +260,21 @@ describe('makeViewStateStore', () => {
   it('selects the store from layoutPersist', () => {
     expect(makeViewStateStore('in-file', { kind: 'in-file', layout: makeLayoutIO(), prefs: makePrefsIO() })).toBeInstanceOf(WorkerLayoutStore);
     expect(makeViewStateStore('sidecar', { kind: 'sidecar', layout: makeTtrmLayoutIO() })).toBeInstanceOf(WsSidecarStore);
-    expect(makeViewStateStore('none', { kind: 'none' })).toBeInstanceOf(VelesNoStore);
+    expect(makeViewStateStore('file', { kind: 'file' })).toBeInstanceOf(LayoutDocumentStore);
   });
 
   it('throws when the IO kind does not match the persist mechanism (wiring bug, not silent degrade)', () => {
-    expect(() => makeViewStateStore('sidecar', { kind: 'none' })).toThrow(/does not match/);
+    expect(() => makeViewStateStore('sidecar', { kind: 'file' })).toThrow(/does not match/);
+    expect(() => makeViewStateStore('file', { kind: 'sidecar', layout: makeTtrmLayoutIO() })).toThrow(/does not match/);
+  });
+
+  it("'none' is retired: every backend can at least download (VL V-29)", () => {
+    // @ts-expect-error — 'none' is no longer a layoutPersist value
+    const retired: DataSourceCapabilities['layoutPersist'] = 'none';
+    expect(retired).toBe('none');
+    // @ts-expect-error — nor an IO kind
+    const io: ViewStateStoreIO = { kind: 'none' };
+    expect(io.kind).toBe('none');
   });
 });
 
