@@ -351,7 +351,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   }, [tabMenu]);
 
   // a multi-selection belongs to the tab it was made on (V-27) — another tab's ids must not leak into its menu
-  useEffect(() => { setMultiSel(new Set()); }, [tab?.id]);
+  useEffect(() => { setMultiSel((m) => (m.size === 0 ? m : new Set())); }, [tab?.id]);
 
   // fetch the project-wide binding map once the catalog is available (C-2). Failure is soft:
   // no bindings ⇒ no show-bindings decoration and an empty ribbon. getBindings is absent on

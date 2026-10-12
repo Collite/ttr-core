@@ -149,7 +149,7 @@ describe('the address (V-35)', () => {
     window.history.replaceState(null, '', '/w/veles/s/layout%3Apositions');
     await mountCatalog();
     await waitFor(() => expect(screen.getAllByTestId('subject-tab').map((t) => t.textContent)).toEqual(['er · positions×']));
-    expect(window.location.pathname).toBe('/w/veles/s/layout%3Apositions');
+    await waitFor(() => expect(window.location.pathname).toBe('/w/veles/s/layout%3Apositions')); // the address follows the tab in an effect
     expect(screen.getByTestId('copy-federation-link')).toBeEnabled();
   });
 
@@ -172,7 +172,7 @@ describe('the address (V-35)', () => {
     expect(screen.getAllByTestId('subject-tab').map((t) => t.textContent)).toEqual(['er×']);
     fireEvent.click(item('er · er · 1 missing'));
     await waitFor(() => expect(screen.getAllByTestId('subject-tab').map((t) => t.textContent)).toEqual(['er×', 'er · er×']));
-    expect(window.location.pathname).toBe('/w/veles/s/layout%3Aer');
+    await waitFor(() => expect(window.location.pathname).toBe('/w/veles/s/layout%3Aer')); // the address follows the tab in an effect
     fireEvent.click(item('er'));
     await waitFor(() => expect(window.location.pathname).toBe('/w/veles/s/er'));
     expect(screen.getAllByTestId('subject-tab')).toHaveLength(2);
