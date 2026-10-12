@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.designer.server.graph
 
+import org.tatrman.ttr.parser.loader.TtrgGraphReader
+
 /**
  * The MUTATION half of `.ttrg` graph-block editing (FO-21, FO-P0.S2.T5).
  *
- * Split out of [TtrgGraphFile] per the move manifest §6: the parse helpers
- * (`parseHeader`/`findObjectsBrackets`/`parseObjects`) are read-half and STAY in
- * [TtrgGraphFile]; these object/graph MUTATORS are the edit half. They ride the
+ * Split out of the former `TtrgGraphFile` per the move manifest §6: the parse helpers
+ * (`parseHeader`/`findObjectsBrackets`/`parseObjects`) are read-half and live in
+ * [TtrgGraphReader] (moved into `ttr-parser` by VL-P0, so the metadata service reads
+ * `.ttrg` layouts through the same reader); these object/graph MUTATORS are the edit half. They ride the
  * `ttrm/addObjectToGraph`/`removeObjectFromGraph`/`createGraph` handlers
  * ([org.tatrman.ttr.designer.server.methods.registerTtrmEditMethods]) and are the
  * unit that relocates to the `ttr-designer-edit-server` module in tatrman-platform
@@ -16,7 +19,7 @@ package org.tatrman.ttr.designer.server.graph
  *
  * Mutators operate on full file content and return full new content for the
  * caller to write (T3.1's ratified edit-application model — no `WorkspaceEdit`
- * deltas). Bracket/qname scanning is delegated to [TtrgGraphFile] (the shared
+ * deltas). Bracket/qname scanning is delegated to [TtrgGraphReader] (the shared
  * parse lib), never re-implemented here.
  */
 object TtrgGraphMutations {
@@ -36,7 +39,7 @@ object TtrgGraphMutations {
         qname: String,
         packageToImport: String?,
     ): String? {
-        val brackets = TtrgGraphFile.findObjectsBrackets(content) ?: return null
+        val brackets = TtrgGraphReader.findObjectsBrackets(content) ?: return null
         val inner = content.substring(brackets.first + 1, brackets.last)
         val insertion =
             if (inner.trim().isEmpty()) {
@@ -74,7 +77,7 @@ object TtrgGraphMutations {
         qname: String,
         pruneUnusedImport: Boolean,
     ): String? {
-        val brackets = TtrgGraphFile.findObjectsBrackets(content) ?: return null
+        val brackets = TtrgGraphReader.findObjectsBrackets(content) ?: return null
         val inner = content.substring(brackets.first + 1, brackets.last)
         val newInner = removeFromObjectsList(inner, qname) ?: return null
 

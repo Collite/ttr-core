@@ -6,11 +6,11 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import org.tatrman.ttr.designer.server.graph.TtrgGraphFile
 import org.tatrman.ttr.designer.server.graph.TtrgGraphMutations
 import org.tatrman.ttr.designer.server.rpc.JsonRpcDispatcher
 import org.tatrman.ttr.designer.server.rpc.RpcCodes
 import org.tatrman.ttr.designer.server.rpc.TtrmRpcException
+import org.tatrman.ttr.parser.loader.TtrgGraphReader
 import java.nio.file.Files
 
 /**
@@ -22,7 +22,7 @@ import java.nio.file.Files
  * They apply T3.1's ratified edit-application model: this process writes files to
  * disk itself and returns a plain ack — no `WorkspaceEdit` wire type. `.ttrg`
  * mutation goes through [TtrgGraphMutations]; `.ttrg` reads (object counts) reuse
- * the shared parse lib [TtrgGraphFile]. No `deps`: the mutators work on files.
+ * the shared parse lib [TtrgGraphReader]. No `deps`: the mutators work on files.
  *
  * WALL / cutover (move manifest §1a): this is the relocation unit for the
  * `ttr-designer-edit-server` module in tatrman-platform. It cannot physically move
@@ -68,7 +68,7 @@ fun registerTtrmEditMethods(dispatcher: JsonRpcDispatcher) {
         Files.writeString(path, updated)
         buildJsonObject {
             put("ok", true)
-            put("objectCount", TtrgGraphFile.parseObjects(updated).size)
+            put("objectCount", TtrgGraphReader.parseObjects(updated).size)
         }
     }
 
@@ -95,7 +95,7 @@ fun registerTtrmEditMethods(dispatcher: JsonRpcDispatcher) {
             Files.writeString(path, updated)
             buildJsonObject {
                 put("ok", true)
-                put("objectCount", TtrgGraphFile.parseObjects(updated).size)
+                put("objectCount", TtrgGraphReader.parseObjects(updated).size)
             }
         }
     }
