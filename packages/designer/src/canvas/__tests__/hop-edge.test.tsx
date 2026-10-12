@@ -11,6 +11,7 @@ import type { GetGraphResponse } from '@tatrman/lsp';
 import { canvas as palette } from '@tatrman/tokens';
 import { erCrow, dbTableClassic } from '../../skins/index.js';
 import { CanvasEdgeView } from '../edges.js';
+import { edgeContextMenuHandler } from '../Kernel.js';
 import { HopEdgeInspector } from '../../shell/HopEdgeInspector.js';
 import { ttrmToGetGraphResponse } from '../../data/structural-graph.js';
 import type { TtrmGraph } from '../../data/ttrm-types.js';
@@ -113,5 +114,27 @@ describe('the hop inspector — Show checks the hidden card, and the hop is gone
     const after = projectLayout(whole, activeTab(s)!.layout!.doc, { hops: 1 }, idx);
     expect(after.hopEdges).toEqual([]);
     expect(after.graph.edges.map((e) => e.id).sort()).toEqual(['er.entity.rel_store_sales_item', 'er.entity.rel_store_sales_store']);
+  });
+});
+
+describe('the edge right-click (VL V-27; ttr-core#180 #5)', () => {
+  const event = () => ({ preventDefault: vi.fn(), clientX: 7, clientY: 9 });
+
+  it('a hop edge opens the view menu', () => {
+    const open = vi.fn();
+    const ev = event();
+    edgeContextMenuHandler(open)(ev, { id: 'hop:a|b', data: { kind: 'hop' } });
+    expect(open).toHaveBeenCalledWith('hop:a|b', 7, 9);
+    expect(ev.preventDefault).toHaveBeenCalled();
+  });
+
+  it('a relation or foreign-key edge opens nothing and keeps the browser menu', () => {
+    const open = vi.fn();
+    for (const data of [{}, { kind: undefined }, undefined]) {
+      const ev = event();
+      edgeContextMenuHandler(open)(ev, { id: 'er.relation.r', data });
+      expect(ev.preventDefault).not.toHaveBeenCalled();
+    }
+    expect(open).not.toHaveBeenCalled();
   });
 });

@@ -59,6 +59,18 @@ export function CanvasKernel(props: KernelProps) {
   );
 }
 
+/**
+ * React Flow's edge right-click → the view menu, for a hop edge only: a real edge has no view items
+ * (VL V-27), so its right-click keeps the browser's own menu instead of opening an empty one.
+ */
+export function edgeContextMenuHandler(onEdgeContextMenu?: (id: string, clientX: number, clientY: number) => void) {
+  return (ev: { preventDefault(): void; clientX: number; clientY: number }, e: { id: string; data?: { kind?: string } }) => {
+    if (!onEdgeContextMenu || e.data?.kind !== 'hop') return;
+    ev.preventDefault();
+    onEdgeContextMenu(e.id, ev.clientX, ev.clientY);
+  };
+}
+
 function KernelInner({
   graph, registry, skinId, positions, selectedId, selectedIds, selectedEdgeId, orphanIds, derived, theme = 'ice', runStates, previews, onSelect, onEdgeSelect, onEdgeContextMenu, onNodeDrag, onNodeContextMenu, onDrillIn,
   viewportCenterRef,
@@ -145,7 +157,7 @@ function KernelInner({
         edgeTypes={edgeTypes}
         onNodeClick={(e, n) => onSelect?.(n.id, e.shiftKey)}
         onEdgeClick={(_, e) => onEdgeSelect?.(e.id)}
-        onEdgeContextMenu={(ev, e) => { ev.preventDefault(); onEdgeContextMenu?.(e.id, ev.clientX, ev.clientY); }}
+        onEdgeContextMenu={edgeContextMenuHandler(onEdgeContextMenu)}
         onPaneClick={() => { onSelect?.(null); onEdgeSelect?.(null); }}
         onNodeDragStop={(_, n) => onNodeDrag?.(n.id, n.position)}
         onNodeContextMenu={(e, n) => { e.preventDefault(); onNodeContextMenu?.(n.id, e.clientX, e.clientY); }}
