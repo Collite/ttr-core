@@ -6,6 +6,7 @@
 #
 # Allowed — GET only (`limit_except GET` also lets HEAD through, which Veles answers with 405):
 #   /model/index  /model/graph  /model/object  /model/search   the JSON read API the viewer browses
+#   /model/layouts  /model/layout                                the layouts committed next to the model (VL)
 #   /status                                                      polled for a changed model version
 # Everything else under @@BASE@@veles/ is a 404 here — in particular POST /refresh, /admin/*,
 # /model/export and /model/export/dot, /metrics. Exact-match locations, so `/model/export` can never
@@ -45,6 +46,24 @@ location = @@BASE@@veles/model/object {
 location = @@BASE@@veles/model/search {
     limit_except GET { deny all; }
     proxy_pass @@UPSTREAM@@/model/search;
+    proxy_http_version 1.1;
+    proxy_set_header Host $proxy_host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Cookie "";
+}
+
+location = @@BASE@@veles/model/layouts {
+    limit_except GET { deny all; }
+    proxy_pass @@UPSTREAM@@/model/layouts;
+    proxy_http_version 1.1;
+    proxy_set_header Host $proxy_host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Cookie "";
+}
+
+location = @@BASE@@veles/model/layout {
+    limit_except GET { deny all; }
+    proxy_pass @@UPSTREAM@@/model/layout;
     proxy_http_version 1.1;
     proxy_set_header Host $proxy_host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
