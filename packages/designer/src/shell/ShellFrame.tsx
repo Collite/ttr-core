@@ -183,6 +183,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   // Save as… (V-32): the tab being saved; the tab menu (V-33): where it was opened
   const [saveAsTab, setSaveAsTab] = useState<string | null>(null);
   const [tabMenu, setTabMenu] = useState<{ tabId: string; x: number; y: number } | null>(null);
+  const tabMenuRef = useRef<HTMLDivElement>(null);
   // Expand all levels… asks first (V-27): the count, then apply or cancel
   const [confirm, setConfirm] = useState<{ text: string; onYes: () => void } | null>(null);
   // what the canvas shows the user, in canvas coordinates — where a card with no neighbour goes (V-19)
@@ -335,6 +336,19 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
       if (tab.layout || graphs[tab.subject.ref] !== undefined) void ensureSchemaGraph(tab.subject.schemaCode);
     }
   }, [tab?.subject.ref, tab?.perspective, tab?.layout ? 'layout' : 'plain', tab ? graphs[tab.subject.ref] : undefined]);
+
+  // the tab menu closes on a press outside it and on Escape, like any menu
+  useEffect(() => {
+    if (!tabMenu) return;
+    const outside = (e: Event) => { if (!tabMenuRef.current?.contains(e.target as Node)) setTabMenu(null); };
+    const escape = (e: KeyboardEvent) => { if (e.key === 'Escape') setTabMenu(null); };
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [tabMenu]);
 
   // a multi-selection belongs to the tab it was made on (V-27) — another tab's ids must not leak into its menu
   useEffect(() => { setMultiSel(new Set()); }, [tab?.id]);
@@ -1203,7 +1217,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
       />
       <CommandPalette registry={registry} open={cmdkOpen} onClose={() => setCmdkOpen(false)} />
       {tabMenu && (
-        <div data-testid="tab-menu" onMouseLeave={() => setTabMenu(null)}
+        <div data-testid="tab-menu" ref={tabMenuRef} onMouseLeave={() => setTabMenu(null)}
           style={{ position: 'fixed', left: tabMenu.x, top: tabMenu.y, background: '#fff', border: '1px solid #CBD8E6', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.15)', zIndex: 20 }}>
           <ViewMenu
             onClose={() => setTabMenu(null)}

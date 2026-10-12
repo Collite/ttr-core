@@ -237,6 +237,23 @@ describe('the layout commands (V-33)', () => {
   });
 });
 
+describe('the tab menu (ttr-core#180 #6)', () => {
+  it('closes on a press outside it and on Escape — not on a press inside', async () => {
+    mount(fakeVeles().source);
+    fireEvent.click(screen.getAllByTestId('catalog-item').find((b) => b.getAttribute('data-ref') === 'er')!);
+    await screen.findByTestId('objects-panel');
+    fireEvent.contextMenu(screen.getAllByTestId('subject-tab')[0]);
+    fireEvent.pointerDown(within(screen.getByTestId('tab-menu')).getAllByTestId('view-menu-item')[0]);
+    expect(screen.getByTestId('tab-menu')).toBeInTheDocument();
+    fireEvent.pointerDown(screen.getByTestId('canvas-host'));
+    expect(screen.queryByTestId('tab-menu')).toBeNull();
+    fireEvent.contextMenu(screen.getAllByTestId('subject-tab')[0]);
+    expect(screen.getByTestId('tab-menu')).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByTestId('tab-menu')).toBeNull();
+  });
+});
+
 describe('leaving the page (V-30)', () => {
   const leave = () => {
     const e = new Event('beforeunload', { cancelable: true });
