@@ -9,7 +9,7 @@
 // selected by `capabilities.layoutPersist` (DM-P2.S1) — Worker in-file / WS `.ttrl` / Veles `file` (the tab).
 // This is what makes the one canvas run against all three backends.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import type { DisplayMode, ModelGraph } from '@tatrman/lsp';
 import {
   modelGraphToCanvas, layoutAuto, type BindingHint, type CanvasGraph, type Positions, type SkinId, type SchemaCode,
@@ -37,6 +37,8 @@ export interface SkinnedCanvasProps {
   selectedEdgeId?: string | null;
   /** an edge was clicked (a hop edge's pill included); null = cleared */
   onEdgeSelect?: (id: string | null) => void;
+  /** filled with a reader of the visible area's centre (placement — VL V-19) */
+  viewportCenterRef?: MutableRefObject<(() => { x: number; y: number } | null) | null>;
   /** skin id from view-state (may be unknown ⇒ DS-SKIN-002 fallback + truth-chip note) */
   initialSkin?: SkinId;
   onNodeSelect: (qname: string | null) => void;
@@ -60,7 +62,7 @@ function project(cg: CanvasGraph, mode: DisplayMode): CanvasGraph {
 }
 
 export function SkinnedCanvas({
-  graph, displayMode, nodePositions, canvasKey, selectedQname, selectedEdgeId, onEdgeSelect, initialSkin, onNodeSelect, renderNodeMenu, onPersistView, onDrillIn,
+  graph, displayMode, nodePositions, canvasKey, selectedQname, selectedEdgeId, onEdgeSelect, viewportCenterRef, initialSkin, onNodeSelect, renderNodeMenu, onPersistView, onDrillIn,
   bindingHints, showBindings, onToggleShowBindings,
 }: SkinnedCanvasProps) {
   const registry = useMemo(() => createSkinRegistry(), []);
@@ -119,8 +121,9 @@ export function SkinnedCanvas({
     layoutAuto(canvasGraph, { orientation: skin.flow.orientation, sizeOf: (n) => skin.nodeSize(n) })
       .then((p) => { if (alive) { workingPositions.current = p; setPositions(p); } });
     return () => { alive = false; };
-    // re-layout when the graph or skin (orientation/size) changes; NOT on selection
-  }, [canvasGraph, skinId]);
+    // re-layout when the graph or skin (orientation/size) changes, or the shell hands new positions
+    // (a layout's Re-layout, a placed card — VL V-19); NOT on selection
+  }, [canvasGraph, skinId, nodePositions]);
 
   // drag → update working positions + emit a persist-view (debounced). The shell writes it through
   // the ViewStateStore selected by the active backend's capabilities.layoutPersist (DM-P2.S1/S3).
@@ -197,6 +200,7 @@ export function SkinnedCanvas({
           selectedEdgeId={selectedEdgeId ?? null}
           onSelect={onNodeSelect}
           onEdgeSelect={onEdgeSelect}
+          viewportCenterRef={viewportCenterRef}
           onNodeDrag={onNodeDrag}
           // the node context menu is edit UI (FO-21) — only armed when the shell injects an authoring
           // menu renderer; the OPEN Viewer passes none, so right-click has no menu (read-only).

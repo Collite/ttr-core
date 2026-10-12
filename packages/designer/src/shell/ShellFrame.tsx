@@ -34,7 +34,11 @@ import {
   emptyShell, openSubject, promoteTab, closeTab, dropPreviewIfLeaving, drillIn, drillTo, activeTab, setPerspective,
   setLayoutObjects, setLayoutPositions, toLayoutTab,
 } from './shell-state.js';
-import { projectLayout, layoutIndexOf, hiddenNeighbours, type HopEdge, type LayoutGraphIndex, type LayoutProjection } from '../model/layout-projection.js';
+import { projectLayout, layoutIndexOf, hiddenNeighbours, visibleNeighbours, type HopEdge, type LayoutGraphIndex, type LayoutProjection } from '../model/layout-projection.js';
+import { placeNew, centreOf, type Point, type Size } from '../model/placement.js';
+import { modelGraphToCanvas, layoutAuto, type CanvasGraph, type SchemaCode } from '@tatrman/canvas-core';
+import { createSkinRegistry } from '../skins/index.js';
+import type { DesignerSkin } from '../canvas/skin-component.js';
 import { compareAlphabetical } from '../layout/layout-document.js';
 import { ObjectsPanel, type MissingRef } from './ObjectsPanel.js';
 import { LayoutDocumentStore } from '../data/view-state-store.js';
@@ -105,6 +109,19 @@ const subjectOf = (item: CatalogItem): Subject => ({
   ref: item.ref, kind: item.kind, schemaCode: item.schemaCode, label: item.label,
 });
 
+/** No positions (a stable object, so the canvas does not re-run its layout on every render). */
+const NO_POSITIONS: Record<string, LayoutPoint> = {};
+
+/** The default skin of a schema and the canvas graph it draws — node sizes for placement, ELK for Re-layout. */
+function defaultSkinFor(kind: string): DesignerSkin {
+  const registry = createSkinRegistry();
+  return registry.resolve(registry.defaultSkin('modeling', kind as SchemaCode)) as DesignerSkin;
+}
+function canvasOf(g: GetGraphResponse, displayMode: DisplayMode): CanvasGraph {
+  const cg = modelGraphToCanvas(applyGraphFixtures(getGraphResponseToModelGraph(g)));
+  return displayMode === 'just-names' ? { ...cg, nodes: cg.nodes.map((n) => ({ ...n, slotData: { ...n.slotData, rows: [] } })) } : cg;
+}
+
 /** A hop edge as the canvas draws it: one more edge kind, dashed (VL V-26). */
 function hopAsEdge(h: HopEdge): ModelGraphEdge {
   return {
@@ -138,6 +155,8 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   const schemaLoadingRef = useRef<Set<string>>(new Set());
   // the hop edge open in the inspector (VL V-26), by edge id; derived, cleared when it disappears.
   const [selectedHop, setSelectedHop] = useState<string | null>(null);
+  // what the canvas shows the user, in canvas coordinates — where a card with no neighbour goes (V-19)
+  const viewportCenterRef = useRef<(() => Point | null) | null>(null);
   const [positions, setPositions] = useState<Record<string, Record<string, { x: number; y: number }>>>({});
   const [selected, setSelected] = useState<DrawerNode | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -417,16 +436,59 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     () => (tabLayout && wholeGraph && wholeIndex ? projectLayout(wholeGraph, tabLayout.doc, { hops: 1 }, wholeIndex) : null),
     [tabLayout?.doc, wholeGraph, wholeIndex],
   );
-  // node positions of a layout tab, by the canvas's node ids (the doc keys them by full qname)
+  // node sizes as the schema's default skin draws them (placement, V-19)
+  const sizeOf = useMemo(() => {
+    if (!wholeGraph) return null;
+    const skin = defaultSkinFor(wholeGraph.schema);
+    const nodes = new Map(canvasOf(wholeGraph, displayMode).nodes.map((n) => [n.id, n]));
+    return (id: string): Size => {
+      const n = nodes.get(id);
+      return n ? skin.nodeSize(n) : { width: 200, height: 60 };
+    };
+  }, [wholeGraph, displayMode]);
+
+  /**
+   * Positions for `cards` (full qnames) not yet placed, beside their nearest visible neighbour (V-19).
+   * `held` are the placed cards by full qname; empty ⇒ auto mode, which stays auto (nothing to place).
+   */
+  function placeCards(cards: readonly string[], held: Record<string, LayoutPoint>, shown: readonly string[], centre?: Point): Record<string, LayoutPoint> {
+    if (!wholeGraph || !wholeIndex || !sizeOf || Object.keys(held).length === 0) return {};
+    const toId = (fq: string) => wholeIndex.nodeOf.get(fq) ?? fq;
+    const byId: Record<string, Point> = {};
+    for (const [fq, p] of Object.entries(held)) byId[toId(fq)] = p;
+    const visibleIds = new Set([...shown, ...cards].map(toId));
+    const at = centre ?? viewportCenterRef.current?.() ?? centreOf(byId, sizeOf);
+    const placed: Record<string, LayoutPoint> = {};
+    for (const fq of cards) {
+      const id = toId(fq);
+      if (byId[id] || !wholeIndex.fullQnameOf.has(id)) continue;
+      const nbs = visibleNeighbours(wholeGraph, visibleIds, id).filter((n) => byId[n]);
+      const p = placeNew(id, byId, sizeOf, nbs, at);
+      byId[id] = p;
+      placed[fq] = p;
+    }
+    return placed;
+  }
+
+  // node positions of a layout tab, by the canvas's node ids (the doc keys them by full qname). A manual
+  // layout with cards it has no position for (a hand-written file) places them for display (V-19).
   const layoutNodePositions = useMemo(() => {
     if (!tabLayout || !projection || !wholeIndex) return null;
     const out: Record<string, LayoutPoint> = {};
+    const held: Record<string, LayoutPoint> = {};
     for (const [ref, p] of Object.entries(tabLayout.doc.positions)) {
-      const id = wholeIndex.nodeOf.get(projection.resolved.get(ref) ?? ref);
-      if (id !== undefined) out[id] = p;
+      const fq = projection.resolved.get(ref) ?? ref;
+      const id = wholeIndex.nodeOf.get(fq);
+      if (id !== undefined) { out[id] = p; held[fq] = p; }
+    }
+    if (Object.keys(out).length === 0) return NO_POSITIONS;
+    const shown = [...new Set(projection.resolved.values())];
+    const unplaced = shown.filter((fq) => !held[fq]).sort(compareAlphabetical);
+    if (unplaced.length > 0 && sizeOf) {
+      for (const [fq, p] of Object.entries(placeCards(unplaced, held, shown, centreOf(out, sizeOf)))) out[wholeIndex.nodeOf.get(fq) ?? fq] = p;
     }
     return out;
-  }, [tabLayout?.doc.positions, projection, wholeIndex]);
+  }, [tabLayout?.doc.positions, projection, wholeIndex, sizeOf]);
   const inspectedHop = selectedHop ? projection?.hopEdges.find((h) => h.id === selectedHop) ?? null : null;
 
   /** The full qnames a tab shows: its layout's resolved cards, or — a plain subject — its graph's nodes. */
@@ -441,14 +503,24 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
    * selection edit (V-22) — its positions (session drags) come along; on a layout tab the refs the
    * model lacks (missing / ambiguous) stay until removed (V-15).
    */
-  function applyObjects(nextCards: string[], placed: Record<string, LayoutPoint> = {}, keepUnresolved = true) {
+  function applyObjects(nextCards: string[]) {
     if (!tab || tab.subject.kind !== 'schema' || !tab.subject.schemaCode) return;
-    const unresolved = tab.layout && keepUnresolved && projection ? [...projection.missing, ...projection.ambiguous.map((a) => a.ref)] : [];
+    const unresolved = tab.layout && projection ? [...projection.missing, ...projection.ambiguous.map((a) => a.ref)] : [];
     const objects = [...new Set([...nextCards, ...unresolved])];
-    if (tab.layout) { setShell((s) => setLayoutObjects(s, tab.id, objects, placed)); return; }
+    const before = new Set(shownCards(tab));
+    const added = nextCards.filter((fq) => !before.has(fq));
+    if (tab.layout) {
+      // the canvas's own view of a manual layout includes the cards placed for display only
+      const held: Record<string, LayoutPoint> = {};
+      if (layoutNodePositions && wholeIndex) for (const [id, p] of Object.entries(layoutNodePositions)) held[wholeIndex.fullQnameOf.get(id) ?? id] = p;
+      const placed = Object.keys(tab.layout.doc.positions).length > 0 ? { ...held, ...placeCards(added, held, nextCards) } : {};
+      setShell((s) => setLayoutObjects(s, tab.id, objects, placed));
+      return;
+    }
     const held = positions[tab.subject.ref] ?? {};
     const seeded: Record<string, LayoutPoint> = {};
     for (const [id, p] of Object.entries(held)) seeded[wholeIndex?.fullQnameOf.get(id) ?? id] = p;
+    const placed = placeCards(added, seeded, nextCards);
     const layout: TabLayout = {
       doc: { name: seedLayoutName(tab), model: tab.subject.schemaCode as TabLayout['doc']['model'], objects: [], positions: {} },
       source: 'new',
@@ -496,6 +568,31 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
       const l = s.tabs.find((t) => t.id === id)?.layout;
       return l ? setLayoutObjects(s, id, l.doc.objects.filter((o) => o !== ref)) : s;
     });
+  }
+
+  /** Re-layout (V-19): ELK over the cards shown, then manual with the result — the layout's or the session's. */
+  async function relayout() {
+    if (!tab || tab.subject.kind !== 'schema' || !currentGraph) return;
+    const skin = defaultSkinFor(currentGraph.schema);
+    const p = await layoutAuto(canvasOf(currentGraph, displayMode), { orientation: skin.flow.orientation, sizeOf: (n) => skin.nodeSize(n) });
+    const tabId = tab.id;
+    const ref = tab.subject.ref;
+    if (tab.layout) {
+      if (!wholeIndex) return;
+      setShell((s) => {
+        const l = s.tabs.find((t) => t.id === tabId)?.layout;
+        if (!l) return s;
+        const next: Record<string, LayoutPoint> = { ...l.doc.positions }; // the missing refs keep theirs
+        for (const [id, pt] of Object.entries(p)) {
+          const fq = wholeIndex.fullQnameOf.get(id);
+          if (fq) next[fq] = { x: pt.x, y: pt.y };
+        }
+        return setLayoutPositions(s, tabId, next);
+      });
+    } else {
+      setPositions((m) => ({ ...m, [ref]: p }));
+      void persistView(ref, { positions: p, displayMode, mode: 'manual' });
+    }
   }
 
   const missingRefs: MissingRef[] = useMemo(() => (projection
@@ -653,6 +750,16 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
             data-testid="shell-subject-toolbar"
             style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderBottom: '1px solid #E5E7EB' }}
           >
+            {!tab.perspective && currentGraph && (
+              <button
+                data-testid="layout-relayout"
+                title="Arrange the cards shown automatically (they keep the new positions)"
+                onClick={() => void relayout()}
+                style={{ border: '1px solid #CBD8E6', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 12, padding: '3px 10px', color: '#33506e' }}
+              >
+                Re-layout
+              </button>
+            )}
             {canEdit && editContext?.renderToolbarActions({
               graphRef: tab.subject.ref,
               currentImports,
@@ -757,7 +864,8 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
               key={tab.id}
               graph={modelGraph}
               displayMode={displayMode}
-              nodePositions={tabLayout ? layoutNodePositions ?? {} : positions[tab.subject.ref] ?? {}}
+              nodePositions={tabLayout ? layoutNodePositions ?? NO_POSITIONS : positions[tab.subject.ref] ?? NO_POSITIONS}
+              viewportCenterRef={viewportCenterRef}
               canvasKey={tabLayout ? tab.id : tab.subject.ref}
               selectedQname={selected?.qname ?? null}
               selectedEdgeId={inspectedHop?.id ?? null}

@@ -4,9 +4,9 @@
 // ONLY place that knows about React Flow — skins emit contract-level output, never RF
 // primitives, so the SVG-kernel fallback stays survivable.
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import {
-  ReactFlow, ReactFlowProvider, Background, Controls, MarkerType,
+  ReactFlow, ReactFlowProvider, Background, Controls, MarkerType, useReactFlow,
   type Node, type Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -45,6 +45,8 @@ export interface KernelProps {
   onNodeContextMenu?: (id: string, clientX: number, clientY: number) => void;
   /** drill into a node/container (double-click) — the shell pushes a breadcrumb segment (P-2) */
   onDrillIn?: (id: string, label: string) => void;
+  /** filled with a reader of the visible area's centre, in canvas coordinates (placement — VL V-19) */
+  viewportCenterRef?: MutableRefObject<(() => { x: number; y: number } | null) | null>;
 }
 
 export function CanvasKernel(props: KernelProps) {
@@ -57,8 +59,20 @@ export function CanvasKernel(props: KernelProps) {
 
 function KernelInner({
   graph, registry, skinId, positions, selectedId, selectedEdgeId, orphanIds, derived, theme = 'ice', runStates, previews, onSelect, onEdgeSelect, onEdgeContextMenu, onNodeDrag, onNodeContextMenu, onDrillIn,
+  viewportCenterRef,
 }: KernelProps) {
   const labelOf = (id: string) => graph.nodes.find((n) => n.id === id)?.label ?? id;
+  const rf = useReactFlow();
+  const hostRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!viewportCenterRef) return;
+    viewportCenterRef.current = () => {
+      const r = hostRef.current?.getBoundingClientRect();
+      if (!r || r.width === 0 || r.height === 0) return null;
+      return rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+    };
+    return () => { viewportCenterRef.current = null; };
+  }, [rf, viewportCenterRef]);
   const skin = registry.resolve(skinId) as DesignerSkin | undefined;
   const orphanSet = useMemo(() => new Set(orphanIds ?? []), [orphanIds]);
 
@@ -119,7 +133,7 @@ function KernelInner({
   }
 
   return (
-    <div style={{ width: '100%', height: '100%', background: skin.canvas.background, position: 'relative' }} data-testid="canvas-kernel" data-skin={skinId}>
+    <div ref={hostRef} style={{ width: '100%', height: '100%', background: skin.canvas.background, position: 'relative' }} data-testid="canvas-kernel" data-skin={skinId}>
       {derived && <DerivedBanner />}
       <ReactFlow
         nodes={rfNodes}
