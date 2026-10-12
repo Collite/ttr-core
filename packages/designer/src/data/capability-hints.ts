@@ -58,13 +58,13 @@ export function structuralGraphHint(caps: DataSourceCapabilities, kind: ModelKin
   };
 }
 
-/** DM-CAP-003 — the active backend does not persist layout (auto-layout only); say so, never silently. */
+/** DM-CAP-003 — the active backend stores no layouts (VL V-29): the tab holds them, Save as… downloads them. */
 export function layoutPersistHint(caps: DataSourceCapabilities): CapabilityHint | null {
   if (caps.layoutPersist !== 'file') return null;
   return {
     code: 'DM-CAP-003',
     severity: 'info',
-    message: 'Layout is auto-arranged on this backend and is not saved.',
+    message: 'This backend does not store layouts — Save as… downloads them.',
   };
 }
 

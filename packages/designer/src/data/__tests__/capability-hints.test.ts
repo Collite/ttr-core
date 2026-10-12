@@ -48,11 +48,13 @@ describe('DM-CAP-* capability hints', () => {
     expect(structuralGraphHint(VELES, 'er')?.code).toBe('DM-CAP-002');
   });
 
-  it('DM-CAP-003: layout saved on Worker (in-file) + WS (sidecar), auto-only on Veles', () => {
+  it('DM-CAP-003: layout saved on Worker (in-file) + WS (sidecar); on Veles the tab holds it, Save as… downloads it', () => {
     expect(layoutPersistHint(WORKER)).toBeNull();
     expect(layoutPersistHint(WS)).toBeNull();
     expect(layoutPersistHint(VELES)?.code).toBe('DM-CAP-003');
     expect(layoutPersistHint(VELES)?.severity).toBe('info');
+    // VL V-29: the catalog stores no layouts, but every backend can download one
+    expect(layoutPersistHint(VELES)?.message).toBe('This backend does not store layouts — Save as… downloads them.');
   });
 
   it('DM-CAP-004: a failed advertised capability surfaces, never swallowed', () => {

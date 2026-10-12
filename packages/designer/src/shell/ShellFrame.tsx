@@ -53,6 +53,7 @@ import type { ModelKind } from '../data/model-data-source.js';
 import { LayoutDocumentStore } from '../data/view-state-store.js';
 import type { LayoutPoint } from '../layout/layout-document.js';
 import { HopEdgeInspector } from './HopEdgeInspector.js';
+import { layoutChip } from './layout-chip.js';
 import { CatalogSpine } from './CatalogSpine.js';
 import { FileRail } from './FileRail.js';
 import { TabBar } from './TabBar.js';
@@ -1104,6 +1105,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
                 void onSelectNode(q);
               }}
               selectedIds={[...multiSel]}
+              layoutChip={layoutChip(tab, dataSource.capabilities)}
               renderViewMenu={wholeGraph && wholeIndex
                 ? (target, close) => <ViewMenu items={viewMenuItems(target)} onClose={close} />
                 : undefined}

@@ -58,7 +58,7 @@ export class VelesReadError extends Error {
 
 export class VelesReadApiDataSource implements ModelDataSource {
   // Deployed read-only catalog: serves db/er browse graphs; no md/cnc, no bindings, no sidecar
-  // (auto-layout only → DM-CAP-003). The thinnest backend — honest degradation covers the rest.
+  // (the tab holds a layout, Save as… downloads it → DM-CAP-003). The thinnest backend — honest degradation covers the rest.
   readonly capabilities: DataSourceCapabilities = {
     edit: false,
     modelKinds: ['db', 'er'],

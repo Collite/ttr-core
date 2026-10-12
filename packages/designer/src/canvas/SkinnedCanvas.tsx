@@ -40,6 +40,8 @@ export interface SkinnedCanvasProps {
   onEdgeSelect?: (id: string | null) => void;
   /** further selected cards (shift-click multi-select, VL V-27) */
   selectedIds?: readonly string[];
+  /** the truth chip's layout part (VL V-29): where the picture lives */
+  layoutChip?: { text: string; title?: string } | null;
   /** filled with a reader of the visible area's centre (placement — VL V-19) */
   viewportCenterRef?: MutableRefObject<(() => { x: number; y: number } | null) | null>;
   /** skin id from view-state (may be unknown ⇒ DS-SKIN-002 fallback + truth-chip note) */
@@ -70,7 +72,7 @@ function project(cg: CanvasGraph, mode: DisplayMode): CanvasGraph {
 
 export function SkinnedCanvas({
   graph, displayMode, nodePositions, canvasKey, selectedQname, selectedEdgeId, onEdgeSelect, viewportCenterRef, initialSkin, onNodeSelect, renderNodeMenu, renderViewMenu, onPersistView, onDrillIn,
-  selectedIds,
+  selectedIds, layoutChip,
   bindingHints, showBindings, onToggleShowBindings,
 }: SkinnedCanvasProps) {
   const registry = useMemo(() => createSkinRegistry(), []);
@@ -196,6 +198,7 @@ export function SkinnedCanvas({
           canvas={kind} · skin={skinId} · mode={mode}
           {fellBack && <span data-testid="skin-fallback" style={{ color: palette.warnInk }}> · substituted ({requested} not available here)</span>}
           <span style={{ color: palette.muted }}> · skin: prefs (GQ-1)</span>
+          {layoutChip && <span data-testid="truth-chip-layout" title={layoutChip.title}> · {layoutChip.text}</span>}
         </span>
       </div>
 
