@@ -86,9 +86,10 @@ graph sales_overview {
   edges.
 - A reader also accepts the positions in a **`.ttrl` sidecar** next to the `.ttrg` — `<name>.ttrl` with a
   `canvas <name> { … }` block, or the `canvas main { … }` block the Studio writes when it has no canvas named
-  after the graph. When both carry positions, **the sidecar wins**; it also supplies the skin. A sidecar is view
-  state the Studio rewrites as you work, so a position for a card the graph no longer lists, or nodes under
-  `mode: auto`, are dropped with a warning instead of failing the file.
+  after the graph. When both carry positions, **the sidecar wins**; it also supplies the skin and `collapsed`. A
+  sidecar is view state the Studio rewrites as you work, so a position for a card the graph no longer lists, or
+  nodes under `mode: auto`, are dropped with a warning instead of failing the file; so is a property a layout
+  does not use (`viewport`, …). Node keys and `collapsed` items may be bare or quoted.
 - References are written bare, as TTR identifiers (Czech letters included: `hartland.er.entity.zákazník`).
   The TTR grammar admits nothing else in `objects` or as a `nodes` key, so a layout holding a reference
   that is not an identifier has **no TTR form**: a label typed by hand (`"Customer Address"`), or the name

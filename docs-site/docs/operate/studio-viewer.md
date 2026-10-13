@@ -145,8 +145,11 @@ A layout file committed under the model root — a `.ttrg` the viewer's **Save a
 `.ttrl` sidecar when there is one — is served to every viewer of that model: Veles reads the layout
 files with each model load, resolves their cards against that model and answers `/model/layouts` and
 `/model/layout?name=` from them. The model's own files load as before; a layout file is never read as
-model. A layout file that does not parse, or repeats a name another file already has, is left out and
-listed in `/status` under `issues` (`layout layouts/sales.ttrg: …`), and the model is served regardless.
+model. A layout file that cannot be read (not UTF-8 text) or does not parse is left out and listed in
+`/status` under `issues` (`layout layouts/sales.ttrg: …`; a problem in the sidecar names the `.ttrl`
+and its line). When two files declare the same layout name, neither is served — each is listed, naming
+the other — so which picture a viewer gets never depends on file order. The model is served regardless.
+The sidecar is read as the viewer reads it: a property a layout does not use (`viewport`, …) is skipped.
 There is no write route: committing the file to the model's repository is how a layout is published.
 
 The proxy also drops the `Cookie` header. The session cookie belongs to the edge (next section), and
