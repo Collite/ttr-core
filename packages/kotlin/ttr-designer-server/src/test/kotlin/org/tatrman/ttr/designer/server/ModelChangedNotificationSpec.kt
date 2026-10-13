@@ -70,6 +70,29 @@ class ModelChangedNotificationSpec :
             after shouldNotBe before
         }
 
+        "a view-state write (.ttrl, .ttrg) → refresh → no swap, no modelChanged (the designer serves no layouts)" {
+            val temp = Files.createTempDirectory("ttrm-repo-layout")
+            copyDir(MetadataFixtures.erpProjectRoot(), temp)
+            val deps = DesignerServerDeps.forRepo(temp)
+            val before =
+                deps.registry
+                    .read()!!
+                    .model.version.value
+            val frames = CopyOnWriteArrayList<String>()
+            deps.broadcaster.register { frames += it }
+
+            // what ttrm/setLayout and a graph edit write: a sidecar and a graph file
+            temp.resolve("models/erp/overview.ttrl").writeText("ttrl 1\ncanvas overview {\n  mode: auto\n}\n")
+            temp.resolve("models/erp/overview.ttrg").writeText("graph overview {\n  model: er,\n  objects: [ ]\n}\n")
+            val results = runBlocking { deps.refresher.refresh(sourceId = "", force = false) }
+
+            results.map { it.snapshotSwapped } shouldBe listOf(false)
+            deps.registry
+                .read()!!
+                .model.version.value shouldBe before
+            frames.size shouldBe 0
+        }
+
         "a dead session is dropped and the survivor still receives" {
             runTest {
                 val deps = DesignerServerDeps.forRepo(MetadataFixtures.erpProjectRoot())

@@ -1,0 +1,13 @@
+graph sidecar_lenient {
+  model: er,
+  objects: [
+    hartland.er.entity.item,
+    hartland.er.entity.store
+  ],
+  layout: {
+    nodes: {
+      hartland.er.entity.item: { x: 240, y: 60 },
+      hartland.er.entity.store: { x: 480, y: 60 }
+    }
+  }
+}

@@ -2,7 +2,7 @@
 
 **This folder is published.** It is the contract every implementation of the Tatrman layout format is
 tested against — Tatrman's own (in TypeScript `@tatrman/parser/layout` and the Studio Viewer's YAML form
-and resolution; on the JVM `TtrgLayoutWriter` / `TtrgGraphReader` / `LayoutResolver`) and any third party's. A third party may copy
+and resolution; on the JVM `TtrgLayoutWriter` / `TtrgGraphReader` / `TtrgLayoutReader` / `LayoutResolver`) and any third party's. A third party may copy
 it (pin the commit it was copied from) and assert the same equalities below. Change a file here only
 together with every implementation; the tests read these files directly, never a copy.
 
@@ -21,7 +21,7 @@ Each sub-folder is one case:
 | `layout.ttrg` | the TTR serialization — one `.ttrg` graph block, positions in its in-file `layout:` block; it parses with `TTR.g4`. **Absent** when the document has no TTR form (a ref that is not a TTR `id`, below) | `writeTtrg(document) == layout.ttrg` byte for byte; `readTtrg(layout.ttrg) == document` on `name`, `model`, `objects`, `positions` (a `.ttrg` does not carry `skin` or `collapsed`). When absent: `writeTtrg(document)` refuses, naming the refs |
 | `model.json` | the model index the case resolves against: `cards` (entities, tables, views) and `edges` (relations, foreign keys), each `{ fullQname, qname, kind, name, pkg, schema }` | — input to resolution |
 | `expect.json` | the resolution of `document.objects` against `model.json` for `document.model`: `resolved` (ref → full qname), `missing`, `ambiguous` (`{ ref, candidates }`), `ignored` — keys and lists in the canonical (alphabetical) order | `resolve(document.objects, model, document.model) == expect.json` |
-| `input.ttrg` + `input.ttrl` | (`sidecar-wins` only) a `.ttrg` and its `.ttrl` sidecar whose positions differ | reading the pair gives `document` — the sidecar's positions and skin win |
+| `input.ttrg` + `input.ttrl` | (`sidecar-wins`, `sidecar-lenient`) a `.ttrg` and its `.ttrl` sidecar whose positions differ | reading the pair gives `document` — the sidecar's positions, skin and collapsed win |
 
 ## The cases
 
@@ -36,6 +36,7 @@ Each sub-folder is one case:
 | `not-an-id` | refs that are not a TTR `id` — a label (`"Customer Address"`) and a qname whose last part is a keyword the grammar's `idPart` does not admit (`hartland.er.entity.date`): kept and reported missing, the label quoted in YAML; **no `layout.ttrg`** — the document has no TTR form and a TTR writer refuses it |
 | `relation-ignored` | relations listed in `objects` (hand-authored, sample style): ignored, never missing — one known to the model's `edges`, one recognised by its qname's `relation` segment |
 | `sidecar-wins` | a `.ttrg` with in-file positions plus a `.ttrl` sidecar with others: the sidecar wins and contributes the skin |
+| `sidecar-lenient` | a sidecar as hands and older tools leave it — a `viewport`, an unknown property, a `chains` record, a bare node key beside a quoted one, a bare word in `collapsed`: still read (the extras skipped, with a warning) — its positions, skin and collapsed win |
 | `db-tables` | a `db` layout: tables and a view by each form, a foreign key ignored, a bare name that is both an `er` entity and a `db` view resolving to the view; a hyphenated skin |
 | `skin-collapsed` | the optional YAML keys after `positions`, in order |
 | `empty` | no cards: `objects: []` in both serializations |

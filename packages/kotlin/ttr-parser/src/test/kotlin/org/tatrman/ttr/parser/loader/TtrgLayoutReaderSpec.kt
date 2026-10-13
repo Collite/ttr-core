@@ -33,6 +33,7 @@ class TtrgLayoutReaderSpec :
         val vectors = Path.of("../../package-sdk/schemas/layout-vectors")
         val cases = vectors.listDirectoryEntries().filter { it.isDirectory() }.sortedBy { it.name }
         val ttrgCases = cases.filter { Files.exists(it.resolve("layout.ttrg")) }
+        val inputCases = cases.filter { Files.exists(it.resolve("input.ttrg")) }
 
         fun text(
             case: Path,
@@ -65,7 +66,7 @@ class TtrgLayoutReaderSpec :
         }
 
         "every vector layout.ttrg reads back as document.json on name, model, objects, positions" {
-            ttrgCases shouldHaveSize 11
+            ttrgCases shouldHaveSize 12
             for (case in ttrgCases) {
                 val want = document(case)
                 val r = ok(TtrgLayoutReader.read(text(case, "layout.ttrg"), fileName = "${want.name}.ttrg"))
@@ -77,12 +78,37 @@ class TtrgLayoutReaderSpec :
             }
         }
 
-        "sidecar-wins: the pair reads as document.json — the sidecar's positions and skin win" {
-            val case = vectors.resolve("sidecar-wins")
-            val r = ok(TtrgLayoutReader.read(text(case, "input.ttrg"), text(case, "input.ttrl"), "sidecar_wins.ttrg"))
-            r.document shouldBe document(case)
-            r.positionsFrom shouldBe PositionsFrom.SIDECAR
-            r.warnings.shouldBeEmpty()
+        "every vector input.ttrg + input.ttrl pair reads as document.json — the sidecar wins, as in the viewer" {
+            inputCases.map { it.name } shouldBe listOf("sidecar-lenient", "sidecar-wins")
+            for (case in inputCases) {
+                val want = document(case)
+                val r =
+                    ok(TtrgLayoutReader.read(text(case, "input.ttrg"), text(case, "input.ttrl"), "${want.name}.ttrg"))
+                withClue(case.name) {
+                    r.document shouldBe want
+                    r.positionsFrom shouldBe PositionsFrom.SIDECAR
+                }
+            }
+            ok(
+                TtrgLayoutReader.read(
+                    text(vectors.resolve("sidecar-wins"), "input.ttrg"),
+                    text(vectors.resolve("sidecar-wins"), "input.ttrl"),
+                    "sidecar_wins.ttrg",
+                ),
+            ).warnings
+                .shouldBeEmpty()
+        }
+
+        "sidecar-lenient: what the viewer skips is a warning on the sidecar, with its line — not a failure" {
+            val case = vectors.resolve("sidecar-lenient")
+            val r =
+                ok(TtrgLayoutReader.read(text(case, "input.ttrg"), text(case, "input.ttrl"), "sidecar_lenient.ttrg"))
+            // `chains` (TTR-P's record) is skipped silently, as the TypeScript reader does
+            r.warnings shouldBe
+                listOf(
+                    TtrgIssue("ttrl.viewport", "unknown canvas property `viewport` — ignored", 9, sidecar = true),
+                    TtrgIssue("ttrl.grid", "unknown canvas property `grid` — ignored", 10, sidecar = true),
+                )
         }
 
         val ttrg =
@@ -138,10 +164,26 @@ class TtrgLayoutReaderSpec :
             r.warnings.single().message shouldContain "no canvas g"
         }
 
-        "a malformed sidecar fails the pair, naming the sidecar" {
-            val r = failed(TtrgLayoutReader.read(ttrg, "ttrl 1\ncanvas g { wobble: \"x\" }\n", "g.ttrg"))
-            r.errors.single().path shouldBe "ttrl"
-            r.errors.single().message shouldContain "unknown canvas property"
+        "a malformed sidecar fails the pair; the error is the sidecar's, with its line" {
+            val r = failed(TtrgLayoutReader.read(ttrg, "ttrl 1\ncanvas g {\n  mode: sideways\n}\n", "g.ttrg"))
+            r.errors.single() shouldBe TtrgIssue("ttrl.mode", "`mode` must be `auto` or `manual`", 3, sidecar = true)
+        }
+
+        "a sidecar of another version, or without its header, fails the pair" {
+            failed(
+                TtrgLayoutReader.read(ttrg, "ttrl 2\ncanvas g { }\n", "g.ttrg"),
+            ).errors.single().message shouldContain
+                "version 2 is not supported"
+            failed(TtrgLayoutReader.read(ttrg, "canvas g { }\n", "g.ttrg")).errors.single().message shouldContain
+                "starts with `ttrl 1`"
+        }
+
+        "the residue warnings are the sidecar's; the .ttrg's own findings are not" {
+            val ttrl =
+                "ttrl 1\ncanvas g {\n  mode: manual\n  nodes: { p.er.entity.gone: { x: 9, y: 9 } }\n}\n"
+            val r = ok(TtrgLayoutReader.read(ttrg, ttrl, "other.ttrg"))
+            r.warnings.map { it.path to it.sidecar } shouldBe
+                listOf("ttrl.nodes.p.er.entity.gone" to true, "name" to false)
         }
 
         "V-3: an in-file position whose key is not in objects is an error naming the key" {

@@ -200,6 +200,104 @@ internal object TtrgScanner {
         }
     }
 
+    /**
+     * A `.ttrl` sidecar — `ttrl 1`, then `canvas <key> { skin, mode, nodes, collapsed }` blocks — read as the
+     * TypeScript `readTtrl` reads it, so the catalog takes every sidecar the viewer opens: node keys bare or
+     * quoted, `collapsed` items bare or quoted, any other property (`viewport`, …) skipped with a warning
+     * (`chains`, TTR-P's SSA record, silently). The designer server's `TtrlLoader` stays the strict reader.
+     */
+    fun readTtrl(content: String): TtrlScan {
+        val warnings = mutableListOf<TtrgIssue>()
+        return try {
+            val c = Cursor(tokenize(content))
+            val head = c.next()
+            val version = c.next()
+            if (head?.kind != Kind.WORD || head.text != "ttrl" || version?.kind != Kind.NUMBER) {
+                throw Fail(TtrgIssue("ttrl", "a `.ttrl` sidecar starts with `ttrl 1`", head?.line))
+            }
+            if (version.text != "1") {
+                throw Fail(
+                    TtrgIssue("ttrl", "`.ttrl` version ${version.text} is not supported (expected 1)", version.line),
+                )
+            }
+            val canvases = mutableListOf<TtrlBlock>()
+            while (!c.atEnd()) {
+                val kw = c.next()!!
+                val key = c.next()
+                if (kw.kind != Kind.WORD || kw.text != "canvas" || key?.kind != Kind.WORD) {
+                    throw Fail(TtrgIssue("ttrl", "expected `canvas <key> {`", kw.line))
+                }
+                c.expect("{", TtrgIssue("ttrl", "expected `canvas <key> {`", kw.line))
+                var skin: String? = null
+                var mode: String? = null
+                val nodes = linkedMapOf<String, Pair<Double, Double>>()
+                val collapsed = mutableListOf<String>()
+                while (true) {
+                    if (c.isPunct("}")) {
+                        c.next()
+                        break
+                    }
+                    if (c.isPunct(",")) {
+                        c.next()
+                        continue
+                    }
+                    val prop = c.next() ?: throw Fail(TtrgIssue("ttrl", "unclosed canvas ${key.text}", key.line))
+                    c.sep()
+                    when (prop.text) {
+                        "skin" -> {
+                            val v = c.next()
+                            if (v?.kind != Kind.STRING) {
+                                throw Fail(TtrgIssue("ttrl.skin", "`skin` must be a string", prop.line))
+                            }
+                            skin = v.text
+                        }
+                        "mode" -> {
+                            val v = c.next()
+                            if (v?.text != "auto" && v?.text != "manual") {
+                                throw Fail(TtrgIssue("ttrl.mode", "`mode` must be `auto` or `manual`", prop.line))
+                            }
+                            mode = v.text
+                        }
+                        "nodes" -> parseNodeMap(c, nodes, linkedMapOf())
+                        "collapsed" -> {
+                            val notAList =
+                                TtrgIssue("ttrl.collapsed", "`collapsed` must be a list of strings", prop.line)
+                            c.expect("[", notAList)
+                            while (true) {
+                                if (c.isPunct("]")) {
+                                    c.next()
+                                    break
+                                }
+                                if (c.isPunct(",")) {
+                                    c.next()
+                                    continue
+                                }
+                                val v = c.next()
+                                if (v?.kind != Kind.STRING && v?.kind != Kind.WORD) throw Fail(notAList)
+                                collapsed += v.text
+                            }
+                        }
+                        else -> {
+                            c.skipValue() // chains — TTR-P's SSA orphaning record, meaningless to a layout
+                            if (prop.text != "chains") {
+                                warnings +=
+                                    TtrgIssue(
+                                        "ttrl.${prop.text}",
+                                        "unknown canvas property `${prop.text}` — ignored",
+                                        prop.line,
+                                    )
+                            }
+                        }
+                    }
+                }
+                canvases += TtrlBlock(key.text, skin, mode, nodes, collapsed)
+            }
+            TtrlScan(canvases, emptyList(), warnings)
+        } catch (e: Fail) {
+            TtrlScan(null, listOf(e.issue), warnings)
+        }
+    }
+
     fun scan(content: String): TtrgScan {
         val warnings = mutableListOf<TtrgIssue>()
         return try {

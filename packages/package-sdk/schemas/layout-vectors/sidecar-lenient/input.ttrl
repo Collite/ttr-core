@@ -1,0 +1,17 @@
+ttrl 1
+
+// A sidecar as hands and older tools leave it: a viewport, a property no layout knows, a TTR-P
+// `chains` record, a bare node key beside a quoted one, a bare word in `collapsed`. A layout reader
+// takes the positions, skin and collapsed, and skips the rest with a warning (`chains` silently).
+canvas sidecar_lenient {
+    skin: "er.chen"
+    mode: manual
+    viewport: { x: 0, y: 0, zoom: 1.5 }
+    grid: 8
+    chains: { "hartland.er.entity.item": 2 }
+    nodes: {
+        hartland.er.entity.item: { x: 240, y: 60 }
+        "hartland.er.entity.store": { x: 480, y: 60 }
+    }
+    collapsed: [hartland.er.entity.store]
+}

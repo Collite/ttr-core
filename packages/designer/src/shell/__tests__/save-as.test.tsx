@@ -88,7 +88,7 @@ async function saveAs(format: 'yaml' | 'ttr', name?: string) {
 
 describe('Save as… reproduces the shared vectors byte for byte (V-5, V-32)', () => {
   it('opens the vectors that resolve to themselves', () => {
-    expect(SAME_ON_OPEN).toEqual(['diacritics', 'empty', 'minimal', 'missing', 'not-an-id', 'positions', 'sidecar-wins', 'skin-collapsed']);
+    expect(SAME_ON_OPEN).toEqual(['diacritics', 'empty', 'minimal', 'missing', 'not-an-id', 'positions', 'sidecar-lenient', 'sidecar-wins', 'skin-collapsed']);
   });
 
   it.each(SAME_ON_OPEN)('%s — YAML and TTR (or no TTR form, A-VL-5)', async (c) => {
