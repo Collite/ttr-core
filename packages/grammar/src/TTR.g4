@@ -1,7 +1,7 @@
 // =============================================================================
 // TTR (Tatrman) grammar
 //
-// @grammar-version: 0.14
+// @grammar-version: 0.15
 //
 // Version scheme: X.Y — X is a breaking/major change, Y is additive
 // (syntactic sugar, new optional constructs, bug fixes). Bump the marker
@@ -260,6 +260,14 @@
 //      The kind is tier-neutral and maps to the `db` model by default (the `area` /
 //      `query` precedent) — it is not a loadable object.
 //   Additive: no existing 0.13 file changes meaning.
+//
+// Changes in 0.15 (no syntax change — a version cut for the toolchain; VL-P2 review):
+//   The grammar is byte-identical to 0.14 below this header: every 0.14 file parses
+//   unchanged and every conformance golden is unchanged. The minor moves because the
+//   bundle that ships with it changes public JVM signatures (`ttr-metadata`
+//   `MetadataRegistry.swap(…, layouts)`, `RegistrySnapshot` / `SourceSnapshot` /
+//   `TtrgGraph` gain fields) — a patch would let a 0.14-compiled jar meet them at run
+//   time — and the bundle's <major.minor> is this marker (publish.yml enforces it).
 // =============================================================================
 
 grammar TTR;
