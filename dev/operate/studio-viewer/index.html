@@ -1285,6 +1285,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="The catalog proxy: read routes only">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layouts-the-catalog-serves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layouts the catalog serves
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1532,6 +1549,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="The catalog proxy: read routes only">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layouts-the-catalog-serves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layouts the catalog serves
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1810,14 +1844,30 @@ everyone, with a link of its own. A layout opened from your disk has no shareabl
 <td>search</td>
 </tr>
 <tr>
+<td><code>/model/layouts</code></td>
+<td>the layouts committed next to the model (the spine's <code>er · &lt;name&gt;</code> entries)</td>
+</tr>
+<tr>
+<td><code>/model/layout</code></td>
+<td>one layout, resolved against the model</td>
+</tr>
+<tr>
 <td><code>/status</code></td>
 <td>polled for a new model version</td>
 </tr>
 </tbody>
 </table>
 <p>Everything else under <code>&lt;base&gt;veles/</code> is a <code>404</code> at the viewer, in particular <code>POST /refresh</code>, <code>/admin/*</code>,
-<code>/model/export</code>, <code>/model/export/dot</code> and <code>/metrics</code>. The matches are exact, so <code>/model/export</code> cannot
-ride in on a <code>/model/</code> prefix.</p>
+<code>/model/export</code>, <code>/model/export/dot</code> and <code>/metrics</code>; a read route asked with anything but <code>GET</code> is a <code>403</code>.
+The matches are exact, so <code>/model/export</code> cannot ride in on a <code>/model/</code> prefix.</p>
+<h3 id="layouts-the-catalog-serves">Layouts the catalog serves<a class="headerlink" href="#layouts-the-catalog-serves" title="Permanent link">&para;</a></h3>
+<p>A layout file committed under the model root — a <code>.ttrg</code> the viewer's <strong>Save as…</strong> wrote, with its
+<code>.ttrl</code> sidecar when there is one — is served to every viewer of that model: Veles reads the layout
+files with each model load, resolves their cards against that model and answers <code>/model/layouts</code> and
+<code>/model/layout?name=</code> from them. The model's own files load as before; a layout file is never read as
+model. A layout file that does not parse, or repeats a name another file already has, is left out and
+listed in <code>/status</code> under <code>issues</code> (<code>layout layouts/sales.ttrg: …</code>), and the model is served regardless.
+There is no write route: committing the file to the model's repository is how a layout is published.</p>
 <p>The proxy also drops the <code>Cookie</code> header. The session cookie belongs to the edge (next section), and
 Veles reads none. Identity headers an authenticating proxy adds (<code>X-Forwarded-User</code>,
 <code>X-Auth-Request-*</code>) pass through unchanged.</p>
@@ -1914,12 +1964,14 @@ resolves even before its pods are ready, but a name that does not exist at all s
 <h3 id="reference-your-own-edge-routes-the-catalog">Reference: your own edge routes the catalog<a class="headerlink" href="#reference-your-own-edge-routes-the-catalog" title="Permanent link">&para;</a></h3>
 <p>If your edge already routes <code>&lt;base&gt;veles/</code> to Veles, leave <code>VIEWER_CATALOG_UPSTREAM</code> unset. The edge
 then owns the allow-list. This is the nginx equivalent of the image's own proxy, for a viewer at <code>/</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/veles/model/index</span><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="kn">limit_except</span><span class="w"> </span><span class="s">GET</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">deny</span><span class="w"> </span><span class="s">all</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://veles:7260/model/index</span><span class="p">;</span><span class="w">  </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Cookie</span><span class="w"> </span><span class="s">""</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/veles/model/graph</span><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="kn">limit_except</span><span class="w"> </span><span class="s">GET</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">deny</span><span class="w"> </span><span class="s">all</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://veles:7260/model/graph</span><span class="p">;</span><span class="w">  </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Cookie</span><span class="w"> </span><span class="s">""</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/veles/model/object</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">limit_except</span><span class="w"> </span><span class="s">GET</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">deny</span><span class="w"> </span><span class="s">all</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://veles:7260/model/object</span><span class="p">;</span><span class="w"> </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Cookie</span><span class="w"> </span><span class="s">""</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/veles/model/search</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">limit_except</span><span class="w"> </span><span class="s">GET</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">deny</span><span class="w"> </span><span class="s">all</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://veles:7260/model/search</span><span class="p">;</span><span class="w"> </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Cookie</span><span class="w"> </span><span class="s">""</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/veles/status</span><span class="w">       </span><span class="p">{</span><span class="w"> </span><span class="kn">limit_except</span><span class="w"> </span><span class="s">GET</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">deny</span><span class="w"> </span><span class="s">all</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://veles:7260/status</span><span class="p">;</span><span class="w">       </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Cookie</span><span class="w"> </span><span class="s">""</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="k">location</span><span class="w"> </span><span class="s">^~</span><span class="w"> </span><span class="s">/veles/</span><span class="w">            </span><span class="p">{</span><span class="w"> </span><span class="kn">return</span><span class="w"> </span><span class="mi">404</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/veles/model/index</span><span class="w">   </span><span class="p">{</span><span class="w"> </span><span class="kn">limit_except</span><span class="w"> </span><span class="s">GET</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">deny</span><span class="w"> </span><span class="s">all</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://veles:7260/model/index</span><span class="p">;</span><span class="w">   </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Cookie</span><span class="w"> </span><span class="s">""</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/veles/model/graph</span><span class="w">   </span><span class="p">{</span><span class="w"> </span><span class="kn">limit_except</span><span class="w"> </span><span class="s">GET</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">deny</span><span class="w"> </span><span class="s">all</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://veles:7260/model/graph</span><span class="p">;</span><span class="w">   </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Cookie</span><span class="w"> </span><span class="s">""</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/veles/model/object</span><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="kn">limit_except</span><span class="w"> </span><span class="s">GET</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">deny</span><span class="w"> </span><span class="s">all</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://veles:7260/model/object</span><span class="p">;</span><span class="w">  </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Cookie</span><span class="w"> </span><span class="s">""</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/veles/model/search</span><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="kn">limit_except</span><span class="w"> </span><span class="s">GET</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">deny</span><span class="w"> </span><span class="s">all</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://veles:7260/model/search</span><span class="p">;</span><span class="w">  </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Cookie</span><span class="w"> </span><span class="s">""</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/veles/model/layouts</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">limit_except</span><span class="w"> </span><span class="s">GET</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">deny</span><span class="w"> </span><span class="s">all</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://veles:7260/model/layouts</span><span class="p">;</span><span class="w"> </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Cookie</span><span class="w"> </span><span class="s">""</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="k">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/veles/model/layout</span><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="kn">limit_except</span><span class="w"> </span><span class="s">GET</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">deny</span><span class="w"> </span><span class="s">all</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://veles:7260/model/layout</span><span class="p">;</span><span class="w">  </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Cookie</span><span class="w"> </span><span class="s">""</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="k">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/veles/status</span><span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="kn">limit_except</span><span class="w"> </span><span class="s">GET</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">deny</span><span class="w"> </span><span class="s">all</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://veles:7260/status</span><span class="p">;</span><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Cookie</span><span class="w"> </span><span class="s">""</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="k">location</span><span class="w"> </span><span class="s">^~</span><span class="w"> </span><span class="s">/veles/</span><span class="w">             </span><span class="p">{</span><span class="w"> </span><span class="kn">return</span><span class="w"> </span><span class="mi">404</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div>
 <h2 id="try-it-locally-the-hartland-demo-model">Try it locally: the Hartland demo model<a class="headerlink" href="#try-it-locally-the-hartland-demo-model" title="Permanent link">&para;</a></h2>
 <p>Veles serves a model from a directory with its filesystem source. The public demo model
@@ -1947,7 +1999,8 @@ the graph shows identifiers.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>curl<span class="w"> </span>-fsS<span class="w"> </span>http://localhost:8080/healthz<span class="w">                       </span><span class="c1"># ok</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>curl<span class="w"> </span>-fsS<span class="w"> </span>http://localhost:8080/config.json<span class="w">                   </span><span class="c1"># the rendered runtime config</span>
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>curl<span class="w"> </span>-fsS<span class="w"> </span>http://localhost:8080/veles/model/index<span class="w">             </span><span class="c1"># the catalog, through the proxy</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>curl<span class="w"> </span>-s<span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>-w<span class="w"> </span><span class="s1">'%{http_code}\n'</span><span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8080/veles/refresh<span class="w">   </span><span class="c1"># 404: not a read route</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>curl<span class="w"> </span>-fsS<span class="w"> </span>http://localhost:8080/veles/model/layouts<span class="w">           </span><span class="c1"># the layouts the catalog serves</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>curl<span class="w"> </span>-s<span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>-w<span class="w"> </span><span class="s1">'%{http_code}\n'</span><span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8080/veles/refresh<span class="w">   </span><span class="c1"># 404: not a read route</span>
 </code></pre></div>
 
 
