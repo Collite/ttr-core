@@ -33,6 +33,37 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
     SQL for the ttr-server#203 query), `TypedEmptyValuesRelToSqlConverterSpec`. The plan wire format and the
     parse output are unchanged.
 
+- **Grammar marker `0.15` — no syntax change; the toolchain bundle cuts at `0.15.0`.** `TTR.g4` is unchanged
+  below its header. The minor moves because this bundle changes public JVM signatures in `ttr-metadata`
+  (`MetadataRegistry.swap(…, layouts)`, new fields on `RegistrySnapshot`, `SourceSnapshot`, `LayoutFileRef`,
+  `TtrgGraph`, `TtrgIssue`): a `0.14.x` patch would let a jar compiled against `0.14.0` meet them at run time as
+  a `NoSuchMethodError`. Move the grammar and metadata refs to `0.15.0` together and recompile.
+- **`ttr-parser` · `ttr-metadata` · image `ttr-viewer`** — **the catalog serves layouts (VL-P2).** A layout file
+  committed under the model root reaches every viewer of that model (docs: *Operate → Deploy the Studio Viewer →
+  Layouts the catalog serves*).
+  - `ttr-metadata`: a source asked for layouts — **`FileBasedSource(…, layouts = true)`**, off by default;
+    only a process that serves layouts asks — collects the layout files (every `.ttrg` with its sibling
+    `.ttrl`, in the same listing as the model files, never parsed as model) as `SourceSnapshot.layoutFiles`
+    (`source.LayoutFileRef`), and its version covers them (`ModelStorage.fetchVersion(extensions)`, new,
+    defaulted; `LocalFsStorage` hashes only what the load reads), so a layout-only change is swapped in — and
+    a designer's `.ttrg` / `.ttrl` write is no new model version where nobody serves layouts. A layout file
+    that cannot be read is marked `LayoutFileRef.unreadable`, never a failed load.
+    **`layout.LayoutIndex`**: `build(snapshots, model)` reads and resolves every layout file into
+    `ResolvedLayout` (full-qname objects and positions, missing / ambiguous / ignored, `positionsFrom`, the
+    path under the model root); a file that cannot be read or does not parse is a `LayoutIssue` (a sidecar's
+    own under the `.ttrl`, one line each) and is not indexed; a name two files declare is served by neither,
+    each an issue naming the other; a failure of the whole index costs the layouts, never the model.
+    `RegistrySnapshot.layouts` (default empty) is published by `MetadataRegistry.swap(…, layouts)`, which
+    `MetadataRefresher` now calls with the index built from the loads it reconciles.
+  - `ttr-parser`: **`loader.TtrgLayoutReader`** — a `.ttrg` and its optional `.ttrl` → one layout document,
+    the JVM twin of the viewer's reader: the sidecar's positions win, a sidecar without `canvas <graph name>` is
+    read from `canvas main`, and a sidecar's residue (a key the graph does not list, nodes under a stated
+    `mode: auto`) is dropped with a warning. The sidecar is read as the viewer's `readTtrl` reads it (a
+    `viewport` or another unknown property skipped with a warning, bare node keys and `collapsed` items), not
+    by the strict `TtrlLoader`, which is unchanged; the shared vectors gain the case `sidecar-lenient`.
+    `TtrgIssue.sidecar` marks a finding about the `.ttrl`; `TtrgGraph.nodeLines` is new, defaulted.
+  - Image `ttr-viewer`: the catalog proxy forwards `GET /model/layouts` and `GET /model/layout` (seven read
+    routes); anything else under `<base>veles/` is still a 404, and a read route asked with another method a 403.
 - **Studio Viewer (`@tatrman/designer`, image `ttr-viewer`)** — **layouts (VL-P1).** Pick the cards, place
   them, save the picture (docs: *Operate → Deploy the Studio Viewer → Layouts*).
   - The **Objects** panel: every card of the schema by package, with checkboxes, search, All · None ·

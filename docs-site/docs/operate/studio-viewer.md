@@ -131,11 +131,26 @@ The viewer's catalog calls are same-origin `fetch`es to `<base>veles/…`. With
 | `/model/graph` | a schema's graph |
 | `/model/object` | one object's detail |
 | `/model/search` | search |
+| `/model/layouts` | the layouts committed next to the model (the spine's `er · <name>` entries) |
+| `/model/layout` | one layout, resolved against the model |
 | `/status` | polled for a new model version |
 
 Everything else under `<base>veles/` is a `404` at the viewer, in particular `POST /refresh`, `/admin/*`,
-`/model/export`, `/model/export/dot` and `/metrics`. The matches are exact, so `/model/export` cannot
-ride in on a `/model/` prefix.
+`/model/export`, `/model/export/dot` and `/metrics`; a read route asked with anything but `GET` is a `403`.
+The matches are exact, so `/model/export` cannot ride in on a `/model/` prefix.
+
+### Layouts the catalog serves
+
+A layout file committed under the model root — a `.ttrg` the viewer's **Save as…** wrote, with its
+`.ttrl` sidecar when there is one — is served to every viewer of that model: Veles reads the layout
+files with each model load, resolves their cards against that model and answers `/model/layouts` and
+`/model/layout?name=` from them. The model's own files load as before; a layout file is never read as
+model. A layout file that cannot be read (not UTF-8 text) or does not parse is left out and listed in
+`/status` under `issues` (`layout layouts/sales.ttrg: …`; a problem in the sidecar names the `.ttrl`
+and its line). When two files declare the same layout name, neither is served — each is listed, naming
+the other — so which picture a viewer gets never depends on file order. The model is served regardless.
+The sidecar is read as the viewer reads it: a property a layout does not use (`viewport`, …) is skipped.
+There is no write route: committing the file to the model's repository is how a layout is published.
 
 The proxy also drops the `Cookie` header. The session cookie belongs to the edge (next section), and
 Veles reads none. Identity headers an authenticating proxy adds (`X-Forwarded-User`,
@@ -244,12 +259,14 @@ If your edge already routes `<base>veles/` to Veles, leave `VIEWER_CATALOG_UPSTR
 then owns the allow-list. This is the nginx equivalent of the image's own proxy, for a viewer at `/`:
 
 ```nginx
-location = /veles/model/index  { limit_except GET { deny all; } proxy_pass http://veles:7260/model/index;  proxy_set_header Cookie ""; }
-location = /veles/model/graph  { limit_except GET { deny all; } proxy_pass http://veles:7260/model/graph;  proxy_set_header Cookie ""; }
-location = /veles/model/object { limit_except GET { deny all; } proxy_pass http://veles:7260/model/object; proxy_set_header Cookie ""; }
-location = /veles/model/search { limit_except GET { deny all; } proxy_pass http://veles:7260/model/search; proxy_set_header Cookie ""; }
-location = /veles/status       { limit_except GET { deny all; } proxy_pass http://veles:7260/status;       proxy_set_header Cookie ""; }
-location ^~ /veles/            { return 404; }
+location = /veles/model/index   { limit_except GET { deny all; } proxy_pass http://veles:7260/model/index;   proxy_set_header Cookie ""; }
+location = /veles/model/graph   { limit_except GET { deny all; } proxy_pass http://veles:7260/model/graph;   proxy_set_header Cookie ""; }
+location = /veles/model/object  { limit_except GET { deny all; } proxy_pass http://veles:7260/model/object;  proxy_set_header Cookie ""; }
+location = /veles/model/search  { limit_except GET { deny all; } proxy_pass http://veles:7260/model/search;  proxy_set_header Cookie ""; }
+location = /veles/model/layouts { limit_except GET { deny all; } proxy_pass http://veles:7260/model/layouts; proxy_set_header Cookie ""; }
+location = /veles/model/layout  { limit_except GET { deny all; } proxy_pass http://veles:7260/model/layout;  proxy_set_header Cookie ""; }
+location = /veles/status        { limit_except GET { deny all; } proxy_pass http://veles:7260/status;        proxy_set_header Cookie ""; }
+location ^~ /veles/             { return 404; }
 ```
 
 ## Try it locally: the Hartland demo model
@@ -286,5 +303,6 @@ the graph shows identifiers.
 curl -fsS http://localhost:8080/healthz                       # ok
 curl -fsS http://localhost:8080/config.json                   # the rendered runtime config
 curl -fsS http://localhost:8080/veles/model/index             # the catalog, through the proxy
+curl -fsS http://localhost:8080/veles/model/layouts           # the layouts the catalog serves
 curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8080/veles/refresh   # 404: not a read route
 ```

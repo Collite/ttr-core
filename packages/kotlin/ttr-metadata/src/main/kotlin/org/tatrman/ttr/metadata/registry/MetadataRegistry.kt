@@ -2,6 +2,7 @@
 package org.tatrman.ttr.metadata.registry
 
 import org.tatrman.ttr.metadata.graph.ModelGraph
+import org.tatrman.ttr.metadata.layout.LayoutIndex
 import org.tatrman.ttr.metadata.model.Model
 import org.tatrman.ttr.metadata.source.LoadWarning
 import java.time.Instant
@@ -27,6 +28,7 @@ class MetadataRegistry {
         model: Model,
         graph: ModelGraph,
         lastWarnings: List<LoadWarning> = emptyList(),
+        layouts: LayoutIndex = LayoutIndex.EMPTY,
     ) {
         val snapshot =
             RegistrySnapshot(
@@ -34,6 +36,7 @@ class MetadataRegistry {
                 graph = graph,
                 swappedAt = Instant.now(),
                 warnings = lastWarnings,
+                layouts = layouts,
             )
         ref.set(snapshot)
         listeners.forEach { it.runCatching { invoke(snapshot) } }
@@ -52,4 +55,6 @@ data class RegistrySnapshot(
     val graph: ModelGraph,
     val swappedAt: Instant,
     val warnings: List<LoadWarning>,
+    /** the layouts of [model] (VL V-37), built from the same loads and published in the same swap */
+    val layouts: LayoutIndex = LayoutIndex.EMPTY,
 )

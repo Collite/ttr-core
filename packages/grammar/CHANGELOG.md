@@ -12,6 +12,16 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
+## 0.15 — 2026-10-13
+
+**No syntax change.** `TTR.g4` below its header is byte-identical to `0.14`; every `0.14` file
+parses unchanged and every conformance golden is unchanged. The marker moves because the bundle
+cut with it changes public JVM signatures in `ttr-metadata` (`MetadataRegistry.swap(…, layouts)`,
+new fields on `RegistrySnapshot`, `SourceSnapshot`, `TtrgGraph`), and the bundle's `<major.minor>`
+is this marker: a `0.14.x` patch would let a jar compiled against `0.14.0` meet the new signatures
+at run time (`NoSuchMethodError`). Consumers move the grammar and metadata refs to `0.15.0` together
+and recompile.
+
 ## 0.14 — 2026-10-10
 
 **Additive (named row schemas — TTR-P action displays).** Every previously-valid `0.13`

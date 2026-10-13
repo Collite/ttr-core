@@ -119,6 +119,35 @@ data class SourceSnapshot(
      * and the raw definitions before they are turned into model objects.
      */
     val loadedFiles: List<LoadedFile> = emptyList(),
+    /**
+     * VL contracts V-37 — the layout files under the model root: every `.ttrg` with its sibling `.ttrl`
+     * when present. Collected and read with the model files (one listing, one version) but never parsed as
+     * model: they become the registry's `LayoutIndex` at the swap. Empty unless the source was asked for
+     * them ([FileBasedSource]'s `layouts`).
+     */
+    val layoutFiles: List<LayoutFileRef> = emptyList(),
+)
+
+/**
+ * One layout file (VL V-37): a `.ttrg` and, when one sits beside it, its `<stem>.ttrl` sidecar, read in
+ * the same load as the model they lay out. [source] is the `.ttrg`'s path under the model root, `/`-separated
+ * (`layouts/sales.ttrg`) — the form the catalog reports; [sidecarSource] the same for the `.ttrl`.
+ */
+data class LayoutFileRef(
+    val path: String,
+    val source: String,
+    val content: String,
+    val sidecarPath: String? = null,
+    val sidecarContent: String? = null,
+    val sidecarSource: String? = null,
+    /** set when the `.ttrg` or its sidecar could not be read; [content] is then empty (V-38: an issue, not a failed load) */
+    val unreadable: LayoutReadFailure? = null,
+)
+
+/** Why a layout file could not be read: [source] is the file's path under the model root (the `.ttrg` or the `.ttrl`). */
+data class LayoutReadFailure(
+    val source: String,
+    val reason: String,
 )
 
 data class LoadWarning(
@@ -137,6 +166,13 @@ interface ModelStorage {
     val id: String
 
     fun fetchVersion(): String
+
+    /**
+     * The version of what a load of the files with [extensions] reads. A storage whose version covers every
+     * file (a git commit, an archive id) ignores [extensions]; one that hashes files ([LocalFsStorage]) hashes
+     * only those, so a file nobody loads (a designer's `.ttrl` write) never makes a new version.
+     */
+    fun fetchVersion(extensions: List<String>): String = fetchVersion()
 
     fun listFiles(
         extensions: List<String>,
@@ -177,7 +213,21 @@ private fun listFilesMatching(
         .map { StorageFile(path = it.toString(), sizeBytes = Files.size(it), rootPath = rootPath) }
         .toList()
 
-/** Read every `.ttr`/`.ttrm` file under [rootPath]. Recursive. */
+/** What a [FileBasedSource] load reads as model. */
+internal val MODEL_EXTENSIONS = listOf("ttr", "ttrm")
+
+/** What a [FileBasedSource] asked for layouts reads besides: the layout files (VL V-37). */
+internal val MODEL_AND_LAYOUT_EXTENSIONS = MODEL_EXTENSIONS + listOf("ttrg", "ttrl")
+
+internal fun StorageFile.extension(): String = path.substringAfterLast('/').substringAfterLast('.', "")
+
+/** The file's path under its storage root, `/`-separated; the bare path when the storage has no root. */
+internal fun StorageFile.underRoot(): String {
+    val root = rootPath ?: return path
+    return runCatching { root.relativize(Path.of(path)).joinToString("/") }.getOrDefault(path)
+}
+
+/** Read every `.ttr`/`.ttrm` file under [rootPath] (and, when a load asks, the layout files, VL V-37). Recursive. */
 class LocalFsStorage(
     override val id: String,
     private val rootPath: Path,
@@ -185,12 +235,15 @@ class LocalFsStorage(
     // M1 fix: the kantheon original hashed only `.ttr`, so a change to a
     // `.ttrm`-only file (the tatrman model extension, CLAUDE.md v3.0) would not
     // bump the version and the refresher would miss it. Hash both extensions.
-    override fun fetchVersion(): String =
+    override fun fetchVersion(): String = fetchVersion(MODEL_EXTENSIONS)
+
+    // VL: the layout files only when the load reads them — a designer's `.ttrg`/`.ttrl` write must not make a
+    // new model version (and a `ttrm/modelChanged` to every client) where nobody serves layouts.
+    override fun fetchVersion(extensions: List<String>): String =
         Files
             .walk(rootPath)
             .filter {
-                Files.isRegularFile(it) &&
-                    (it.fileName.toString().endsWith(".ttr") || it.fileName.toString().endsWith(".ttrm"))
+                Files.isRegularFile(it) && it.fileName.toString().substringAfterLast('.', "") in extensions
             }.sorted()
             .map { "$it=${Files.getLastModifiedTime(it).toMillis()}" }
             .toList()
@@ -234,12 +287,23 @@ class FileBasedSource(
     private val priority: Int,
     private val storage: ModelStorage,
     private val schemaCodeOverride: String? = null,
+    /**
+     * VL V-37 — also collect the layout files (`.ttrg` + `.ttrl`) as [SourceSnapshot.layoutFiles]. Off by
+     * default: only a process that serves layouts (Veles) asks, so no other consumer reads them, builds a layout
+     * index from them, or gets a new version when one is written.
+     */
+    private val layouts: Boolean = false,
 ) : ModelSource {
     override fun load(): SourceSnapshot {
-        val version = storage.fetchVersion()
+        val extensions = if (layouts) MODEL_AND_LAYOUT_EXTENSIONS else MODEL_EXTENSIONS
+        val version = storage.fetchVersion(extensions)
         // Golem P4 S4.2 — area files carry a `.ttrm` extension (directive-less,
         // `def area` blocks). Walk both so they load alongside the model `.ttr` files.
-        val files = storage.listFiles(listOf("ttr", "ttrm"))
+        // VL V-37 — the layout files ride the same listing (a git storage fetches on every call, so a
+        // second one could see another commit); they are collected, never parsed as model.
+        val listed = storage.listFiles(extensions)
+        val files = listed.filter { it.extension() in MODEL_EXTENSIONS }
+        val layoutFiles = if (layouts) collectLayoutFiles(listed, storage) else emptyList()
         val warnings = mutableListOf<LoadWarning>()
         val errors = mutableListOf<LoadWarning>()
         val loadedFiles = mutableListOf<LoadedFile>()
@@ -464,8 +528,52 @@ class FileBasedSource(
             warnings = warnings,
             errors = errors,
             loadedFiles = loadedFiles.toList(),
+            layoutFiles = layoutFiles,
         )
     }
+
+    /**
+     * Every `.ttrg` in [listed], paired with the `.ttrl` of the same stem in the same directory (V-37). A file
+     * that cannot be read (not UTF-8, no permission) is marked [LayoutFileRef.unreadable] — that layout's issue
+     * (V-38), never the load's failure.
+     */
+    private fun collectLayoutFiles(
+        listed: List<StorageFile>,
+        storage: ModelStorage,
+    ): List<LayoutFileRef> {
+        val sidecars = listed.filter { it.extension() == "ttrl" }.associateBy { it.path.removeSuffix(".ttrl") }
+        return listed.filter { it.extension() == "ttrg" }.map { file ->
+            val sidecar = sidecars[file.path.removeSuffix(".ttrg")]
+            val ref =
+                LayoutFileRef(
+                    path = file.path,
+                    source = file.underRoot(),
+                    content = "",
+                    sidecarPath = sidecar?.path,
+                    sidecarSource = sidecar?.underRoot(),
+                )
+            val content =
+                try {
+                    storage.read(file)
+                } catch (e: Exception) {
+                    return@map ref.copy(unreadable = LayoutReadFailure(ref.source, e.readFailure()))
+                }
+            val sidecarContent =
+                try {
+                    sidecar?.let { storage.read(it) }
+                } catch (e: Exception) {
+                    return@map ref.copy(unreadable = LayoutReadFailure(ref.sidecarSource!!, e.readFailure()))
+                }
+            ref.copy(content = content, sidecarContent = sidecarContent)
+        }
+    }
+
+    private fun Exception.readFailure(): String =
+        if (this is java.nio.charset.CharacterCodingException) {
+            "not UTF-8 text"
+        } else {
+            "${this::class.java.simpleName}: $message"
+        }
 
     /**
      * v4.1 (M2) — parser `WorldDef` → typed [org.tatrman.ttr.metadata.model.World]

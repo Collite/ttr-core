@@ -1,0 +1,5 @@
+// dup_b.ttrg declares the same name: neither file is served (V-38, A-VL-7)
+graph dup_a {
+  model: db,
+  objects: [ hartland.db.dbo.item ]
+}

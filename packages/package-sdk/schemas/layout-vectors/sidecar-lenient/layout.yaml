@@ -1,0 +1,13 @@
+# Tatrman layout — https://docs.tatrman.org/model/layout-files/ (format 1)
+layout: 1
+name: sidecar_lenient
+model: er
+objects:
+  - hartland.er.entity.item
+  - hartland.er.entity.store
+positions:
+  hartland.er.entity.item: { x: 240, y: 60 }
+  hartland.er.entity.store: { x: 480, y: 60 }
+skin: er.chen
+collapsed:
+  - hartland.er.entity.store

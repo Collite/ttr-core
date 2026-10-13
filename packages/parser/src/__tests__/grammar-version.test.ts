@@ -6,8 +6,8 @@ import { TTR_GRAMMAR_VERSION, PROPERTY_MAP } from '@tatrman/grammar';
 // the grammar prebuild) is what moves this constant; the assertion is the
 // reminder that the CHANGELOG entry + downstream proto/version sync move with it.
 describe('grammar version', () => {
-  it('is 0.14 (named row schemas — top-level `def schema <name> { columns: [...] }`)', () => {
-    expect(TTR_GRAMMAR_VERSION).toBe('0.14');
+  it('is 0.15 (no syntax change since 0.14 — a toolchain cut; 0.14 added `def schema <name> { columns: [...] }`)', () => {
+    expect(TTR_GRAMMAR_VERSION).toBe('0.15');
   });
 
   it('advertises the `def schema` properties: description, tags, columns', () => {
