@@ -3,7 +3,6 @@ package org.tatrman.translator.codec.sql
 
 import org.tatrman.translate.v1.SqlDialect as SqlDialectProto
 import org.apache.calcite.rel.RelNode
-import org.apache.calcite.rel.rel2sql.RelToSqlConverter
 import org.apache.calcite.sql.SqlDialect
 import org.apache.calcite.sql.SqlIdentifier
 import org.apache.calcite.sql.SqlNode
@@ -58,7 +57,8 @@ object RelToSqlUnparser {
         rel: RelNode,
         dialect: SqlDialect,
     ): UnparsedSql {
-        val converter = RelToSqlConverter(dialect)
+        // An empty Values (a relation Calcite proved empty) keeps its column types; see the converter.
+        val converter = TypedEmptyValuesRelToSqlConverter(dialect)
         val restored = BetweenRestoration.apply(rel)
         // SQL Server reads a VARCHAR cast without a length as VARCHAR(30) — drop the redundant ones Calcite
         // wraps around VARCHAR operands (COALESCE's CASE, implicit coercion); see VarcharCastElision.

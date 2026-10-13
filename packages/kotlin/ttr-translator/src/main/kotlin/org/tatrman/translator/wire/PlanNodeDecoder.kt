@@ -308,6 +308,10 @@ object PlanNodeDecoder {
         builder: RelBuilder,
         values: ValuesNode,
     ) {
+        if (values.rowsCount == 0) {
+            pushEmptyValues(builder, values)
+            return
+        }
         // RelBuilder.values takes a flat array of cells laid out row-major,
         // with the field names supplied separately.
         val fieldNames = values.outputColumnsList.map { it.name }.toTypedArray()
@@ -317,6 +321,33 @@ object PlanNodeDecoder {
                     row.cellsList.map { decodeLiteralValue(it) }
                 }.toTypedArray()
         builder.values(fieldNames, *cells)
+    }
+
+    /**
+     * ttr-core#148 — an empty relation: `RelBuilder.filter` folds a filter it proves always false
+     * (`a = 'x' AND a = 'y'`) into a `Values` that keeps the row type and has no tuples, and
+     * [PlanNodeEncoder] writes it as a `ValuesNode` with `output_columns` and no `rows`. The cell-array
+     * overload of [RelBuilder.values] infers the row type from the cells and needs a positive multiple of
+     * the field count, so zero cells threw "Value count must be a positive multiple of field count".
+     * With no rows to infer from, the row type comes from `output_columns`: each tag maps to the type
+     * the encoder took it from ([Expressions.sqlTypeNameFor]), nullable since no row says otherwise.
+     * The operators above (a Project, an Aggregate) are rebuilt against this row type, and the unparser
+     * casts each column's NULL to it, so the result keeps the plan's columns.
+     */
+    private fun pushEmptyValues(
+        builder: RelBuilder,
+        values: ValuesNode,
+    ) {
+        val typeFactory = builder.typeFactory
+        val rowType =
+            typeFactory
+                .builder()
+                .apply {
+                    values.outputColumnsList.forEach { column ->
+                        add(column.name, Expressions.sqlTypeNameFor(column.type)).nullable(true)
+                    }
+                }.build()
+        builder.values(rowType)
     }
 
     private fun decodeLiteralValue(lit: org.tatrman.plan.v1.Literal): Any? =

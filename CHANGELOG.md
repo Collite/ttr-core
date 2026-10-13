@@ -6,6 +6,33 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-translator`** ⚑ **behaviour fix — a filter that can never hold returns no rows instead of failing
+  (ttr-core#148, ttr-server#203).** `RelBuilder.filter` folds a contradiction (`warehouse_name = 'Memphis DC'
+  AND warehouse_name = 'Allentown DC'`, two disjoint date ranges ANDed) into an empty `Values`: the row type,
+  no rows. The REL_NODE re-entry of the two-half pipeline writes it to the wire as a `ValuesNode` with
+  `output_columns` and no `rows`, and `UnparseFromRelNode` then failed in every dialect with `Value count must
+  be a positive multiple of field count`.
+  - `PlanNodeDecoder`: an empty `ValuesNode` decodes to an empty `Values` whose row type comes from
+    `output_columns` (each tag → the type the encoder took it from, nullable), so the operators above it are
+    rebuilt against the plan's columns. It round-trips the wire byte for byte.
+  - New `codec/sql/TypedEmptyValuesRelToSqlConverter`, used by `RelToSqlUnparser`: Calcite renders an empty
+    `Values` as `(VALUES (NULL, …)) … WHERE 1 = 0`, and a bare NULL takes whatever type the engine picks.
+    PostgreSQL picks `text`, so `SUM` over the empty relation failed with `function sum(text) does not exist`
+    and a join on one of its columns with `operator does not exist: bigint = text`. DuckDB and SQL Server
+    pick an integer. Each NULL is now cast to its column's type in the dialect's spelling:
+    `CAST(NULL AS BIGINT)`, `VARCHAR(MAX)` / `VARCHAR` / `CHAR`, `FLOAT` / `DOUBLE PRECISION` / `DOUBLE`,
+    `DATETIME2(0)` / `TIMESTAMP(0)` / `DATETIME`, `BIT` / `BOOLEAN` (SQL Server / PostgreSQL and DuckDB /
+    MySQL). MySQL has no CAST to BOOLEAN, so that one NULL stays bare. A non-empty `Values` renders as before.
+  - The answer: an ungrouped aggregate over the empty relation is its one row (`SUM` → NULL, `COUNT` → 0),
+    anything else is no rows, and the result columns keep their names and types. This also applies when the
+    filter folds during the unparse itself (a single-pass `Translate`), which already rendered untyped NULLs.
+  - Types come back at the wire's resolution: a relation that crossed the wire carries surface tags, so a
+    `decimal(18,2)` column's NULL comes back `DOUBLE`, as every decoded column does.
+  - `EmptyValuesWireSpec`, `EmptyValuesUnparseSpec` (the ttr-server#203 and ttr-core#148 queries, a projection,
+    an inner and a left join with one side empty × every dialect × `optimize` on and off, plus the per-dialect
+    SQL for the ttr-server#203 query), `TypedEmptyValuesRelToSqlConverterSpec`. The plan wire format and the
+    parse output are unchanged.
+
 - **Grammar marker `0.15` — no syntax change; the toolchain bundle cuts at `0.15.0`.** `TTR.g4` is unchanged
   below its header. The minor moves because this bundle changes public JVM signatures in `ttr-metadata`
   (`MetadataRegistry.swap(…, layouts)`, new fields on `RegistrySnapshot`, `SourceSnapshot`, `LayoutFileRef`,
