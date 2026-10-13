@@ -16,8 +16,9 @@ import kotlin.io.path.createTempDirectory
 import kotlin.io.path.deleteRecursively
 
 /**
- * VL-P2 T1 (contracts V-37) — the source load collects the layout files under the model root: every `.ttrg`
- * with its sibling `.ttrl`, never parsed as model.
+ * VL-P2 T1 (contracts V-37) — a source asked for layouts collects the layout files under the model root: every
+ * `.ttrg` with its sibling `.ttrl`, never parsed as model. A source not asked (the default) reads none of them,
+ * and its version ignores them.
  */
 @OptIn(kotlin.io.path.ExperimentalPathApi::class)
 class LayoutFilesSourceSpec :
@@ -25,7 +26,10 @@ class LayoutFilesSourceSpec :
         // the test working dir is the module dir (packages/kotlin/ttr-metadata)
         val fixture = Path.of("src/test/resources/layout-fixture").toAbsolutePath()
 
-        fun load(root: Path) = FileBasedSource("fixture", 100, LocalFsStorage("fixture", root)).load()
+        fun load(
+            root: Path,
+            layouts: Boolean = true,
+        ) = FileBasedSource("fixture", 100, LocalFsStorage("fixture", root), layouts = layouts).load()
 
         fun objectCount(snapshot: SourceSnapshot) =
             ModelReconciler(ModelDescriptor("t", "t"))
@@ -46,13 +50,47 @@ class LayoutFilesSourceSpec :
                     "layouts/main_canvas.ttrg",
                     "layouts/missing.ttrg",
                     "layouts/sidecar.ttrg",
+                    "layouts/tables.ttrg",
                 )
-            snap.layoutFiles.filter { it.sidecarPath != null }.map { it.source } shouldBe
-                listOf("layouts/auto_residue.ttrg", "layouts/main_canvas.ttrg", "layouts/sidecar.ttrg")
+            snap.layoutFiles.filter { it.sidecarPath != null }.map { it.sidecarSource } shouldBe
+                listOf("layouts/auto_residue.ttrl", "layouts/main_canvas.ttrl", "layouts/sidecar.ttrl")
             val sidecar = snap.layoutFiles.single { it.source == "layouts/sidecar.ttrg" }
             sidecar.sidecarPath shouldBe fixture.resolve("layouts/sidecar.ttrl").toString()
             sidecar.content shouldStartWith "graph sidecar {"
             sidecar.sidecarContent!! shouldStartWith "ttrl 1"
+            snap.layoutFiles.mapNotNull { it.unreadable }.shouldBeEmpty()
+        }
+
+        "a source not asked for layouts (the default) collects none" {
+            val snap = load(fixture, layouts = false)
+            snap.layoutFiles.shouldBeEmpty()
+            snap.errors shouldBe emptyList()
+            objectCount(snap) shouldBe objectCount(load(fixture))
+        }
+
+        "V-38: a layout file that cannot be read is that file's failure, never the load's" {
+            val tree = createTempDirectory("vl-unreadable")
+            try {
+                fixture.copyToRecursively(tree, followLinks = false, overwrite = true)
+                // Latin-1 bytes for "graph café { … }" — not UTF-8
+                Files.write(
+                    tree.resolve("layouts/latin1.ttrg"),
+                    "graph caf".toByteArray() + byteArrayOf(0xE9.toByte()) + " {\n  model: er\n}\n".toByteArray(),
+                )
+                Files.write(
+                    tree.resolve("layouts/sidecar.ttrl"),
+                    byteArrayOf(0x74, 0x74, 0x72, 0x6C, 0x20, 0xE8.toByte()),
+                )
+                val snap = load(tree)
+                snap.errors shouldBe emptyList()
+                snap.layoutFiles.single { it.source == "layouts/latin1.ttrg" }.unreadable shouldBe
+                    LayoutReadFailure("layouts/latin1.ttrg", "not UTF-8 text")
+                snap.layoutFiles.single { it.source == "layouts/sidecar.ttrg" }.unreadable shouldBe
+                    LayoutReadFailure("layouts/sidecar.ttrl", "not UTF-8 text")
+                snap.layoutFiles.single { it.source == "layouts/authored.ttrg" }.unreadable shouldBe null
+            } finally {
+                tree.deleteRecursively()
+            }
         }
 
         "the model is the one a tree without the layout files gives — no .ttrg/.ttrl is parsed as model" {
@@ -72,19 +110,29 @@ class LayoutFilesSourceSpec :
             }
         }
 
-        "a changed layout file changes the filesystem version, so a refresh picks it up" {
+        "a changed layout file is a new version for a source that reads layouts, and only for one" {
             val tree = createTempDirectory("vl-version")
             try {
                 fixture.copyToRecursively(tree, followLinks = false, overwrite = true)
-                val storage = LocalFsStorage("fixture", tree)
-                val before = storage.fetchVersion()
-                val ttrg = tree.resolve("layouts/authored.ttrg")
-                Files.setLastModifiedTime(ttrg, FileTime.fromMillis(Files.getLastModifiedTime(ttrg).toMillis() + 5_000))
-                storage.fetchVersion() shouldNotBe before
-                val ttrl = tree.resolve("layouts/sidecar.ttrl")
-                val mid = storage.fetchVersion()
-                Files.setLastModifiedTime(ttrl, FileTime.fromMillis(Files.getLastModifiedTime(ttrl).toMillis() + 5_000))
-                storage.fetchVersion() shouldNotBe mid
+
+                fun touch(path: String) {
+                    val f = tree.resolve(path)
+                    Files.setLastModifiedTime(f, FileTime.fromMillis(Files.getLastModifiedTime(f).toMillis() + 5_000))
+                }
+                val withLayouts = load(tree).version
+                val modelOnly = load(tree, layouts = false).version
+                LocalFsStorage("fixture", tree).fetchVersion() shouldBe modelOnly
+
+                touch("layouts/authored.ttrg")
+                val afterTtrg = load(tree).version
+                afterTtrg shouldNotBe withLayouts
+                touch("layouts/sidecar.ttrl")
+                load(tree).version shouldNotBe afterTtrg
+                // a designer's .ttrg/.ttrl write is no model change where nobody serves layouts
+                load(tree, layouts = false).version shouldBe modelOnly
+
+                touch("hartland/er.ttr")
+                load(tree, layouts = false).version shouldNotBe modelOnly
             } finally {
                 tree.deleteRecursively()
             }

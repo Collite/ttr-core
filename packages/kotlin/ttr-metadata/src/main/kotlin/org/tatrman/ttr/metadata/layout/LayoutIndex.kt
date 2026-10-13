@@ -5,10 +5,12 @@ import org.slf4j.LoggerFactory
 import org.tatrman.ttr.metadata.model.Model
 import org.tatrman.ttr.metadata.source.LayoutFileRef
 import org.tatrman.ttr.metadata.source.SourceSnapshot
+import org.tatrman.ttr.parser.loader.TtrgIssue
 import org.tatrman.ttr.parser.loader.TtrgLayoutRead
 import org.tatrman.ttr.parser.loader.TtrgLayoutReader
 import org.tatrman.ttr.parser.model.LayoutDocument
 import org.tatrman.ttr.parser.model.LayoutPoint
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * One layout as the catalog serves it (VL contracts §6, `GET /model/layout`): the document's refs resolved
@@ -36,7 +38,11 @@ data class ResolvedLayout(
     val mode: String get() = if (positions.isEmpty()) "auto" else "manual"
 }
 
-/** A layout file left out of the index (V-38): it does not parse, or its name is taken. */
+/**
+ * A layout file left out of the index (V-38) — it cannot be read, it does not parse, or another file declares
+ * its name — or a reader's warning about one. [path] is the file the finding is in, under the model root: the
+ * `.ttrl` for a sidecar's own finding, else the `.ttrg`. [reason] is one line.
+ */
 data class LayoutIssue(
     val path: String,
     val reason: String,
@@ -47,10 +53,11 @@ data class LayoutIssue(
 
 /**
  * The layouts of one model (VL contracts V-37, V-38), built from the layout files its sources read and
- * published with it in the same registry swap. A file that fails to parse, or repeats a name an earlier file
- * holds, is an [issues] entry and is not indexed; the model is served regardless. A reader's warnings (a
- * sidecar's residue, A-VL-3) are logged as WARN lines naming the path and kept in [warnings]: §6 has no
- * warnings field and `/status.issues[]` is for failures only.
+ * published with it in the same registry swap. A file that cannot be read or fails to parse is an [issues]
+ * entry and is not indexed; a name two files declare is served by neither — each is an issue naming the
+ * other, so which picture a viewer gets never hangs on file order (A-VL-7). The model is served regardless. A
+ * reader's warnings (a sidecar's residue, A-VL-3) are logged as WARN lines naming the path and kept in
+ * [warnings]: §6 has no warnings field and `/status.issues[]` is for failures only.
  */
 class LayoutIndex(
     /** by name, in the order [all] gives */
@@ -83,10 +90,11 @@ class LayoutIndex(
         ): LayoutIndex =
             try {
                 buildIndex(snapshots, model)
-            } catch (e: RuntimeException) {
+            } catch (e: Throwable) {
+                if (!e.recoverable()) throw e
                 // the layouts never cost the model its swap (V-38)
                 log.warn("layout index failed — no layouts served", e)
-                LayoutIndex(emptyMap(), listOf(LayoutIssue("(all layouts)", "the index failed: ${e.message}")))
+                LayoutIndex(emptyMap(), listOf(LayoutIssue("(all layouts)", "the index failed: ${oneLine(e.message)}")))
             }
 
         private fun buildIndex(
@@ -96,41 +104,68 @@ class LayoutIndex(
             val files = snapshots.flatMap { s -> s.layoutFiles.sortedBy { it.path } }
             if (files.isEmpty()) return EMPTY
             val index = LayoutResolver.indexOf(model, LayoutResolver.packagesFrom(snapshots))
-            val byName = linkedMapOf<String, ResolvedLayout>()
+            val read = mutableListOf<Pair<LayoutFileRef, TtrgLayoutRead.Ok>>()
             val issues = mutableListOf<LayoutIssue>()
             val warnings = mutableListOf<LayoutIssue>()
             for (file in files) {
-                val read =
+                file.unreadable?.let {
+                    issues += LayoutIssue(it.source, "could not be read: ${oneLine(it.reason)}")
+                    continue
+                }
+                val r =
                     try {
                         TtrgLayoutReader.read(file.content, file.sidecarContent, file.source)
-                    } catch (e: RuntimeException) {
-                        issues += LayoutIssue(file.source, "could not be read: ${e.message}")
+                    } catch (e: Throwable) {
+                        if (!e.recoverable()) throw e
+                        issues +=
+                            LayoutIssue(
+                                file.source,
+                                "could not be read: ${oneLine(e.message ?: e::class.java.simpleName)}",
+                            )
                         continue
                     }
-                read.warnings.forEach { w ->
-                    warnings += LayoutIssue(file.source, w.line?.let { "line $it: ${w.message}" } ?: w.message)
-                }
-                when (read) {
-                    is TtrgLayoutRead.Failed -> {
-                        val e = read.errors.first()
-                        issues += LayoutIssue(file.source, e.line?.let { "line $it: ${e.message}" } ?: e.message)
-                    }
-                    is TtrgLayoutRead.Ok -> {
-                        val name = read.document.name
-                        val holder = byName[name]
-                        if (holder != null) {
-                            issues += LayoutIssue(file.source, "the name $name is already taken by ${holder.source}")
-                        } else {
-                            byName[name] = resolve(read, file, index)
-                        }
-                    }
+                r.warnings.forEach { warnings += issueOf(file, it) }
+                when (r) {
+                    is TtrgLayoutRead.Failed -> issues += issueOf(file, r.errors.first())
+                    is TtrgLayoutRead.Ok -> read += file to r
                 }
             }
+            val layouts = mutableListOf<ResolvedLayout>()
+            for ((name, holders) in read.groupBy { it.second.document.name }) {
+                if (holders.size == 1) {
+                    val (file, r) = holders.single()
+                    layouts += resolve(r, file, index)
+                    continue
+                }
+                // A-VL-7: served by neither — whichever came first would win on file order alone
+                for (holder in holders) {
+                    val others = holders.filter { it !== holder }.joinToString(", ") { it.first.source }
+                    issues += LayoutIssue(holder.first.source, "the name $name is also declared by $others")
+                }
+            }
+            issues.sortWith(compareBy({ it.path }, { it.reason }))
             warnings.forEach { log.warn("{}", it) }
             issues.forEach { log.warn("{} — not served", it) }
-            val sorted = byName.values.sortedWith(ORDER)
+            val sorted = layouts.sortedWith(ORDER)
             return LayoutIndex(sorted.associateBy { it.name }, issues, warnings)
         }
+
+        /** A reader's finding, under the file it is in — the `.ttrl` for the sidecar's own (its line numbers). */
+        private fun issueOf(
+            file: LayoutFileRef,
+            issue: TtrgIssue,
+        ): LayoutIssue {
+            val path = if (issue.sidecar) file.sidecarSource ?: file.source else file.source
+            val message = oneLine(issue.message)
+            return LayoutIssue(path, issue.line?.let { "line $it: $message" } ?: message)
+        }
+
+        /** `/status.issues[]` entries and WARN lines are one line each. */
+        private fun oneLine(s: String?): String = s.orEmpty().trim().replace(Regex("\\s*\\R\\s*"), " ")
+
+        /** what the layouts may swallow: anything but a cancellation, or a JVM error other than a stack overflow */
+        private fun Throwable.recoverable(): Boolean =
+            this !is CancellationException && (this !is VirtualMachineError || this is StackOverflowError)
 
         private fun resolve(
             read: TtrgLayoutRead.Ok,

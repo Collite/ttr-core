@@ -26,7 +26,11 @@ data class LayoutIndexEntry(
 data class LayoutModelIndex(
     val cards: List<LayoutIndexEntry>,
     val edges: List<LayoutIndexEntry> = emptyList(),
-)
+) {
+    // built once per index, so resolving a layout is a map lookup per ref and step, not a scan of every card
+    internal val cardSteps: Map<String, List<Map<String, List<String>>>> by lazy { LayoutResolver.stepsBySchema(cards) }
+    internal val edgeSteps: Map<String, List<Map<String, List<String>>>> by lazy { LayoutResolver.stepsBySchema(edges) }
+}
 
 data class LayoutAmbiguity(
     val ref: String,
@@ -65,6 +69,12 @@ object LayoutResolver {
 
     private val steps: List<(LayoutIndexEntry) -> String> =
         listOf({ it.fullQname }, { it.qname }, { "${it.kind}.${it.name}" }, { it.name })
+
+    /** Per schema, one map per step (§4, in order): the step's form of an entry → the entries' full qnames. */
+    internal fun stepsBySchema(entries: List<LayoutIndexEntry>): Map<String, List<Map<String, List<String>>>> =
+        entries.groupBy { it.schema }.mapValues { (_, inSchema) ->
+            steps.map { form -> inSchema.groupBy(form) { it.fullQname } }
+        }
 
     /**
      * The package of every model object, by the loader's rule — a file's declared `package`, else the
@@ -128,8 +138,8 @@ object LayoutResolver {
         index: LayoutModelIndex,
         model: String,
     ): LayoutResolution {
-        val cards = index.cards.filter { it.schema == model }
-        val edges = index.edges.filter { it.schema == model }
+        val cards = index.cardSteps[model].orEmpty()
+        val edges = index.edgeSteps[model].orEmpty()
         val resolved = linkedMapOf<String, String>()
         val missing = mutableListOf<String>()
         val ambiguous = mutableListOf<LayoutAmbiguity>()
@@ -156,11 +166,11 @@ object LayoutResolver {
     /** The first step whose form of some entry equals [ref] decides; its distinct full qnames, sorted. */
     private fun match(
         ref: String,
-        entries: List<LayoutIndexEntry>,
+        steps: List<Map<String, List<String>>>,
     ): List<String> {
-        for (form in steps) {
-            val hits = entries.filter { form(it) == ref }.map { it.fullQname }.distinct()
-            if (hits.isNotEmpty()) return hits.sortedWith(LayoutDocument.ALPHABETICAL_ORDER)
+        for (byForm in steps) {
+            val hits = byForm[ref] ?: continue
+            return hits.distinct().sortedWith(LayoutDocument.ALPHABETICAL_ORDER)
         }
         return emptyList()
     }

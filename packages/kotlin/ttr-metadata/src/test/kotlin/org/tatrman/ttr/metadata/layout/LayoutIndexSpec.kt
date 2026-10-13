@@ -3,6 +3,7 @@ package org.tatrman.ttr.metadata.layout
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import kotlinx.coroutines.runBlocking
@@ -22,8 +23,8 @@ import kotlin.io.path.createTempDirectory
 import kotlin.io.path.deleteRecursively
 
 /**
- * VL-P2 T2 (contracts V-37, V-38, §6; A-VL-1…A-VL-3) — the layout index built from a really loaded tree
- * (`src/test/resources/layout-fixture`: packages `hartland` and `outlet`, eight `.ttrg` files under `layouts/`).
+ * VL-P2 T2 (contracts V-37, V-38, §6; A-VL-1…A-VL-3, A-VL-7) — the layout index built from a really loaded tree
+ * (`src/test/resources/layout-fixture`: packages `hartland` and `outlet`, nine `.ttrg` files under `layouts/`).
  */
 @OptIn(kotlin.io.path.ExperimentalPathApi::class)
 class LayoutIndexSpec :
@@ -32,20 +33,43 @@ class LayoutIndexSpec :
         val fixture = Path.of("src/test/resources/layout-fixture").toAbsolutePath()
         val reconciler = ModelReconciler(ModelDescriptor("t", "t"))
 
+        fun source(root: Path) = FileBasedSource("fixture", 100, LocalFsStorage("fixture", root), layouts = true)
+
         fun index(root: Path = fixture): LayoutIndex {
-            val snaps = listOf(FileBasedSource("fixture", 100, LocalFsStorage("fixture", root)).load())
+            val snaps = listOf(source(root).load())
             return LayoutIndex.build(snaps, reconciler.reconcile(snaps).model)
+        }
+
+        fun copyOfFixture(
+            prefix: String,
+            body: (Path) -> Unit,
+        ) {
+            val tree = createTempDirectory(prefix)
+            try {
+                fixture.copyToRecursively(tree, followLinks = false, overwrite = true)
+                body(tree)
+            } finally {
+                tree.deleteRecursively()
+            }
         }
 
         val idx = index()
 
-        "six layouts indexed, by schema then name; broken and the second dup_a are issues (V-38)" {
+        "six layouts indexed, by schema then name; broken is an issue (V-38)" {
             idx.all.map { "${it.schema}·${it.name}" } shouldBe
-                listOf("db·dup_a", "er·authored", "er·auto_residue", "er·main_canvas", "er·missing", "er·sidecar")
-            idx.issues.map { it.path } shouldBe listOf("layouts/broken.ttrg", "layouts/dup_b.ttrg")
-            idx.issues[1].reason shouldBe "the name dup_a is already taken by layouts/dup_a.ttrg"
-            idx.issues[0].toString() shouldContain "layout layouts/broken.ttrg: "
-            idx["dup_a"]!!.source shouldBe "layouts/dup_a.ttrg"
+                listOf("db·tables", "er·authored", "er·auto_residue", "er·main_canvas", "er·missing", "er·sidecar")
+            idx.issues.map { it.path } shouldBe
+                listOf("layouts/broken.ttrg", "layouts/dup_a.ttrg", "layouts/dup_b.ttrg")
+            idx.issues[0].toString() shouldBe "layout layouts/broken.ttrg: line 6: expected `,` or `]` in objects"
+        }
+
+        "A-VL-7: a name two files declare is served by neither, each an issue naming the other" {
+            idx["dup_a"] shouldBe null
+            idx.issues.drop(1).map { it.toString() } shouldBe
+                listOf(
+                    "layout layouts/dup_a.ttrg: the name dup_a is also declared by layouts/dup_b.ttrg",
+                    "layout layouts/dup_b.ttrg: the name dup_a is also declared by layouts/dup_a.ttrg",
+                )
         }
 
         "authored: in-file positions, a bare name resolved, the relation ignored" {
@@ -76,11 +100,13 @@ class LayoutIndexSpec :
                     "hartland.er.entity.store" to LayoutPoint(300.0, 120.0),
                 )
             s.skin shouldBe "er.crow"
+            // the finding is the sidecar's, so it names the .ttrl, not the .ttrg
             idx.warnings
-                .filter { it.path == "layouts/sidecar.ttrg" }
+                .filter { it.path == "layouts/sidecar.ttrl" }
                 .single()
                 .reason shouldContain
                 "hartland.er.entity.store_returns"
+            idx.warnings.filter { it.path == "layouts/sidecar.ttrg" }.shouldBeEmpty()
         }
 
         "main_canvas: a sidecar with only `canvas main` is read (A-VL-2)" {
@@ -95,7 +121,7 @@ class LayoutIndexSpec :
             r.positions["hartland.er.entity.item"] shouldBe LayoutPoint(10.0, 20.0)
             r.skin shouldBe "er.chen"
             idx.warnings
-                .filter { it.path == "layouts/auto_residue.ttrg" }
+                .filter { it.path == "layouts/auto_residue.ttrl" }
                 .single()
                 .reason shouldContain "mode: auto"
             idx.issues.map { it.path }.contains("layouts/auto_residue.ttrg") shouldBe false
@@ -111,28 +137,72 @@ class LayoutIndexSpec :
             m.positionsFrom shouldBe null
         }
 
-        "dup_a: a db layout — tables as package + catalog qname (A-VL-6), the foreign key ignored" {
-            val d = idx["dup_a"]!!
+        "tables: a db layout — tables as package + catalog qname (A-VL-6), the foreign key ignored" {
+            val d = idx["tables"]!!
             d.objects shouldBe listOf("hartland.db.dbo.item", "hartland.db.dbo.store_sales")
             d.ignored shouldBe listOf("hartland.db.dbo.fk_ss_item")
         }
 
+        "a sidecar error is reported under the .ttrl, with the .ttrl's line, on one line" {
+            copyOfFixture("vl-index-sidecar-error") { tree ->
+                Files.writeString(
+                    tree.resolve("layouts/sidecar.ttrl"),
+                    "ttrl 1\n\ncanvas sidecar {\n  mode: sideways\n}\n",
+                )
+                val i = index(tree)
+                i["sidecar"] shouldBe null
+                i.issues.single { it.path == "layouts/sidecar.ttrl" }.toString() shouldBe
+                    "layout layouts/sidecar.ttrl: line 4: `mode` must be `auto` or `manual`"
+            }
+        }
+
+        "V-38: an unreadable layout file is an issue; the model and the other layouts are served" {
+            copyOfFixture("vl-index-unreadable") { tree ->
+                Files.write(tree.resolve("layouts/authored.ttrg"), byteArrayOf(0x67, 0xE9.toByte(), 0x0A))
+                Files.write(tree.resolve("layouts/main_canvas.ttrl"), byteArrayOf(0x74, 0xE9.toByte(), 0x0A))
+                val i = index(tree)
+                i["authored"] shouldBe null
+                i["main_canvas"] shouldBe null
+                i["sidecar"]!!.positionsFrom shouldBe "sidecar"
+                i.issues.map { it.toString() } shouldContainAll
+                    listOf(
+                        "layout layouts/authored.ttrg: could not be read: not UTF-8 text",
+                        "layout layouts/main_canvas.ttrl: could not be read: not UTF-8 text",
+                    )
+            }
+        }
+
+        "the viewer's lenient sidecar shapes are served, not refused" {
+            copyOfFixture("vl-index-lenient") { tree ->
+                Files.writeString(
+                    tree.resolve("layouts/sidecar.ttrl"),
+                    "ttrl 1\ncanvas sidecar {\n  viewport: { x: 0, y: 0, zoom: 1 }\n  mode: manual\n" +
+                        "  nodes: { hartland.er.entity.item: { x: 7, y: 8 } }\n  collapsed: [hartland.er.entity.item]\n}\n",
+                )
+                val s = index(tree)["sidecar"]!!
+                s.positions shouldBe mapOf("hartland.er.entity.item" to LayoutPoint(7.0, 8.0))
+                s.collapsed shouldBe listOf("hartland.er.entity.item")
+            }
+        }
+
         "no layout files ⇒ the empty index" {
-            val bare = createTempDirectory("vl-index-bare")
-            try {
-                fixture.copyToRecursively(bare, followLinks = false, overwrite = true)
+            copyOfFixture("vl-index-bare") { bare ->
                 bare.resolve("layouts").deleteRecursively()
                 index(bare).all.shouldBeEmpty()
-            } finally {
-                bare.deleteRecursively()
             }
+        }
+
+        "a source not asked for layouts ⇒ the empty index, and no layout issue or warning" {
+            val snaps = listOf(FileBasedSource("fixture", 100, LocalFsStorage("fixture", fixture)).load())
+            val i = LayoutIndex.build(snaps, reconciler.reconcile(snaps).model)
+            i shouldBe LayoutIndex.EMPTY
         }
 
         "the refresher publishes the layouts in the same swap as the model (V-37)" {
             val tree = createTempDirectory("vl-refresh")
             try {
                 fixture.copyToRecursively(tree, followLinks = false, overwrite = true)
-                val source = FileBasedSource("fixture", 100, LocalFsStorage("fixture", tree))
+                val source = source(tree)
                 val registry = MetadataRegistry()
                 val first = listOf(source.load())
                 val model = reconciler.reconcile(first).model
@@ -148,7 +218,7 @@ class LayoutIndexSpec :
                 runBlocking { refresher.refresh("", force = true) }
                 val after = registry.read()!!
                 after.layouts["broken"]!!.objects shouldBe listOf("hartland.er.entity.item")
-                after.layouts.issues.map { it.path } shouldBe listOf("layouts/dup_b.ttrg")
+                after.layouts.issues.map { it.path } shouldBe listOf("layouts/dup_a.ttrg", "layouts/dup_b.ttrg")
             } finally {
                 tree.deleteRecursively()
             }
