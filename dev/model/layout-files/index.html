@@ -1617,9 +1617,10 @@ viewport — pan and zoom — is never part of a layout.</p>
   edges.</li>
 <li>A reader also accepts the positions in a <strong><code>.ttrl</code> sidecar</strong> next to the <code>.ttrg</code> — <code>&lt;name&gt;.ttrl</code> with a
   <code>canvas &lt;name&gt; { … }</code> block, or the <code>canvas main { … }</code> block the Studio writes when it has no canvas named
-  after the graph. When both carry positions, <strong>the sidecar wins</strong>; it also supplies the skin. A sidecar is view
-  state the Studio rewrites as you work, so a position for a card the graph no longer lists, or nodes under
-  <code>mode: auto</code>, are dropped with a warning instead of failing the file.</li>
+  after the graph. When both carry positions, <strong>the sidecar wins</strong>; it also supplies the skin and <code>collapsed</code>. A
+  sidecar is view state the Studio rewrites as you work, so a position for a card the graph no longer lists, or
+  nodes under <code>mode: auto</code>, are dropped with a warning instead of failing the file; so is a property a layout
+  does not use (<code>viewport</code>, …). Node keys and <code>collapsed</code> items may be bare or quoted.</li>
 <li>References are written bare, as TTR identifiers (Czech letters included: <code>hartland.er.entity.zákazník</code>).
   The TTR grammar admits nothing else in <code>objects</code> or as a <code>nodes</code> key, so a layout holding a reference
   that is not an identifier has <strong>no TTR form</strong>: a label typed by hand (<code>"Customer Address"</code>), or the name

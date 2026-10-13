@@ -1865,8 +1865,11 @@ The matches are exact, so <code>/model/export</code> cannot ride in on a <code>/
 <code>.ttrl</code> sidecar when there is one — is served to every viewer of that model: Veles reads the layout
 files with each model load, resolves their cards against that model and answers <code>/model/layouts</code> and
 <code>/model/layout?name=</code> from them. The model's own files load as before; a layout file is never read as
-model. A layout file that does not parse, or repeats a name another file already has, is left out and
-listed in <code>/status</code> under <code>issues</code> (<code>layout layouts/sales.ttrg: …</code>), and the model is served regardless.
+model. A layout file that cannot be read (not UTF-8 text) or does not parse is left out and listed in
+<code>/status</code> under <code>issues</code> (<code>layout layouts/sales.ttrg: …</code>; a problem in the sidecar names the <code>.ttrl</code>
+and its line). When two files declare the same layout name, neither is served — each is listed, naming
+the other — so which picture a viewer gets never depends on file order. The model is served regardless.
+The sidecar is read as the viewer reads it: a property a layout does not use (<code>viewport</code>, …) is skipped.
 There is no write route: committing the file to the model's repository is how a layout is published.</p>
 <p>The proxy also drops the <code>Cookie</code> header. The session cookie belongs to the edge (next section), and
 Veles reads none. Identity headers an authenticating proxy adds (<code>X-Forwarded-User</code>,
