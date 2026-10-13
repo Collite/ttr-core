@@ -41,6 +41,10 @@ sealed interface TtrgLayoutRead {
  * with a warning rather than failing the pair (A-VL-3): nodes under a stated `mode: auto`, and keys the graph
  * does not list. The in-file block is the author's own: a key it positions that `objects` does not list is an
  * error (V-3).
+ *
+ * The sidecar is read by [TtrgScanner.readTtrl], the twin of the viewer's `readTtrl`, not by the strict
+ * `TtrlLoader`: a sidecar the viewer opens (a `viewport`, an unknown property, a bare key) is one the catalog
+ * serves. Every finding about the sidecar carries [TtrgIssue.sidecar], so a caller can name the `.ttrl`.
  */
 object TtrgLayoutReader {
     private val MODELS = listOf("er", "db", "md", "cnc")
@@ -67,28 +71,40 @@ object TtrgLayoutReader {
         var skin: String? = null
         var collapsed: List<String> = emptyList()
         if (ttrl != null) {
-            val side = TtrlLoader.parseString(ttrl, sidecarLabel(fileName), dropAutoNodes = true)
-            warnings += side.warnings.map { TtrgIssue("ttrl", it.message, it.line) }
-            val doc =
-                side.document
-                    ?: return TtrgLayoutRead.Failed(
-                        side.errors.map { TtrgIssue("ttrl", it.message, it.line) },
-                        warnings,
-                    )
-            val canvas = doc.canvases.firstOrNull { it.key == g.name } ?: doc.canvases.firstOrNull { it.key == "main" }
+            val side = TtrgScanner.readTtrl(ttrl)
+            warnings += side.warnings.map { it.copy(sidecar = true) }
+            val canvases =
+                side.canvases
+                    ?: return TtrgLayoutRead.Failed(side.errors.map { it.copy(sidecar = true) }, warnings)
+            val canvas = canvases.firstOrNull { it.key == g.name } ?: canvases.firstOrNull { it.key == "main" }
             if (canvas == null) {
-                warnings += TtrgIssue("ttrl", "the sidecar has no canvas ${g.name} — its positions are not used")
+                warnings +=
+                    TtrgIssue(
+                        "ttrl",
+                        "the sidecar has no canvas ${g.name} — its positions are not used",
+                        sidecar = true,
+                    )
             } else {
+                val auto = canvas.mode == "auto"
+                if (auto && canvas.nodes.isNotEmpty()) {
+                    warnings +=
+                        TtrgIssue(
+                            "ttrl",
+                            "the sidecar's canvas ${canvas.key} is `mode: auto` — its nodes are not positions",
+                            sidecar = true,
+                        )
+                }
                 val listed = g.objects.toSet()
                 val kept = linkedMapOf<String, LayoutPoint>()
-                for (n in canvas.nodes) {
-                    if (n.zeta in listed) {
-                        kept[n.zeta] = LayoutPoint(n.x, n.y)
+                for ((key, p) in if (auto) emptyMap() else canvas.nodes) {
+                    if (key in listed) {
+                        kept[key] = LayoutPoint(p.first, p.second)
                     } else {
                         warnings +=
                             TtrgIssue(
-                                "ttrl.nodes.${n.zeta}",
-                                "the sidecar positions ${n.zeta}, which the graph does not list — dropped",
+                                "ttrl.nodes.$key",
+                                "the sidecar positions $key, which the graph does not list — dropped",
+                                sidecar = true,
                             )
                     }
                 }
@@ -178,6 +194,4 @@ object TtrgLayoutReader {
         val stem = base.replace(Regex("\\.(ya?ml|ttrg|ttrl)$", RegexOption.IGNORE_CASE), "")
         return if (stem == name) null else TtrgIssue("name", "file name $base does not match the layout name $name")
     }
-
-    private fun sidecarLabel(fileName: String?): String = fileName?.replace(Regex("\\.ttrg$"), ".ttrl") ?: "<sidecar>"
 }

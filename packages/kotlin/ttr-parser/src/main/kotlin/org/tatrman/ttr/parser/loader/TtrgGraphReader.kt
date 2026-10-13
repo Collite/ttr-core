@@ -103,11 +103,15 @@ object TtrgGraphReader {
     }
 }
 
-/** One finding while scanning a `.ttrg` — `path` names the field (`objects`, `positions.<ref>.x`). */
+/**
+ * One finding while scanning a `.ttrg` — `path` names the field (`objects`, `positions.<ref>.x`). [sidecar] is
+ * true when the finding is about the `.ttrl` beside it, so [line] counts that file's lines, not the `.ttrg`'s.
+ */
 data class TtrgIssue(
     val path: String,
     val message: String,
     val line: Int? = null,
+    val sidecar: Boolean = false,
 )
 
 class TtrgParseException(
@@ -129,6 +133,23 @@ data class TtrgGraph(
 /** [TtrgGraphReader.scan]'s result: `graph` is null iff `errors` is non-empty. */
 data class TtrgScan(
     val graph: TtrgGraph?,
+    val errors: List<TtrgIssue>,
+    val warnings: List<TtrgIssue>,
+)
+
+/** One `canvas` block of a `.ttrl` sidecar as a layout reads it — the twin of the TypeScript `TtrlCanvasBlock`. */
+internal data class TtrlBlock(
+    val key: String,
+    val skin: String?,
+    /** `auto` / `manual` as the block states it; null when it does not */
+    val mode: String?,
+    val nodes: Map<String, Pair<Double, Double>>,
+    val collapsed: List<String>,
+)
+
+/** [TtrgScanner.readTtrl]'s result: `canvases` is null iff `errors` is non-empty. */
+internal data class TtrlScan(
+    val canvases: List<TtrlBlock>?,
     val errors: List<TtrgIssue>,
     val warnings: List<TtrgIssue>,
 )

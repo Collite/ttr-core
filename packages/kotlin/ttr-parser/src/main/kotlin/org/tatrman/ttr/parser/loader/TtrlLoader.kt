@@ -26,19 +26,13 @@ import java.nio.file.Path
  * (skin/mode/nodes/collapsed only; no `nodes` under `mode: auto`; no `viewport`) are
  * enforced HERE, as named parse errors — so a malformed sidecar is a visible diagnostic,
  * never silent decay (C1-c-i point 3).
- *
- * One exception on request: with `dropAutoNodes`, `nodes` under a stated `mode: auto` are dropped with a
- * warning instead of failing the sidecar (VL A-VL-3 b). A layout reader asks for it — the designer server
- * rewrites the `.ttrl` and never prunes it, so that residue is not the author's mistake.
  */
 object TtrlLoader {
     fun parseString(
         content: String,
         fileLabel: String = "<inline>",
-        dropAutoNodes: Boolean = false,
     ): TtrlParseResult {
         val errors = mutableListOf<ParseError>()
-        val warnings = mutableListOf<ParseError>()
         val lines = content.lines()
         val errorListener =
             object : BaseErrorListener() {
@@ -148,19 +142,13 @@ object TtrlLoader {
                     }
                 }
                 if (mode == TtrlMode.AUTO && nodes.isNotEmpty() && modeSeen) {
-                    if (dropAutoNodes) {
-                        warnings +=
-                            err(fileLabel, c, "canvas `$key` is `mode: auto` — its nodes are not positions (dropped)")
-                        nodes.clear()
-                    } else {
-                        errors += err(fileLabel, c, "`nodes` are not allowed on an auto-layout canvas")
-                    }
+                    errors += err(fileLabel, c, "`nodes` are not allowed on an auto-layout canvas")
                 }
                 TtrlCanvas(key, skin, mode, nodes, collapsed, chains, locationOf(fileLabel, c))
             }
 
-        if (errors.isNotEmpty()) return TtrlParseResult(null, errors, fileLabel, warnings)
-        return TtrlParseResult(TtrlDocument(version, canvases, fileLabel), emptyList(), fileLabel, warnings)
+        if (errors.isNotEmpty()) return TtrlParseResult(null, errors, fileLabel)
+        return TtrlParseResult(TtrlDocument(version, canvases, fileLabel), emptyList(), fileLabel)
     }
 
     fun parseFile(path: Path): TtrlParseResult =
@@ -210,8 +198,6 @@ data class TtrlParseResult(
     val document: TtrlDocument?,
     val errors: List<ParseError>,
     val sourceFile: String,
-    /** what a lenient parse dropped (`dropAutoNodes`); always empty otherwise */
-    val warnings: List<ParseError> = emptyList(),
 ) {
     val ok: Boolean get() = errors.isEmpty()
 }
