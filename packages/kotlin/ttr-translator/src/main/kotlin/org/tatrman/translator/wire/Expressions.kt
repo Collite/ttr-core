@@ -801,8 +801,11 @@ object Expressions {
         org.apache.calcite.rel.type.RelDataTypeSystem.DEFAULT
             .getMaxPrecision(SqlTypeName.VARCHAR)
 
-    /** Surface-type tag → the [SqlTypeName] the encoder used. Shared by parameter + cast decoding. */
-    private fun sqlTypeNameFor(resultType: String): SqlTypeName =
+    /**
+     * Surface-type tag → the [SqlTypeName] the encoder used. Shared by parameter + cast decoding, and by
+     * [PlanNodeDecoder] for the columns of an empty `VALUES` (no rows to infer them from).
+     */
+    internal fun sqlTypeNameFor(resultType: String): SqlTypeName =
         when (resultType) {
             "text" -> SqlTypeName.VARCHAR
             "int" -> SqlTypeName.BIGINT
