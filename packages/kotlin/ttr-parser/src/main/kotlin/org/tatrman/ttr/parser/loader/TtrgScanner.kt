@@ -148,6 +148,7 @@ internal object TtrgScanner {
     private fun parseNodeMap(
         c: Cursor,
         nodes: MutableMap<String, Pair<Double, Double>>,
+        lines: MutableMap<String, Int>,
     ) {
         c.expect("{", TtrgIssue("nodes", "nodes must be { <ref>: { x, y } … }"))
         while (true) {
@@ -195,6 +196,7 @@ internal object TtrgScanner {
             if (x == null) throw Fail(TtrgIssue("$path.x", "missing x", key.line))
             if (y == null) throw Fail(TtrgIssue("$path.y", "missing y", key.line))
             nodes[key.text] = x to y
+            lines[key.text] = key.line
         }
     }
 
@@ -214,6 +216,7 @@ internal object TtrgScanner {
             var model: String? = null
             val objects = mutableListOf<String>()
             val nodes = linkedMapOf<String, Pair<Double, Double>>()
+            val nodeLines = linkedMapOf<String, Int>()
             val c = Cursor(toks)
             c.p = at + 3
             while (true) {
@@ -279,7 +282,7 @@ internal object TtrgScanner {
                             val prop = c.next() ?: throw Fail(TtrgIssue("layout", "unclosed layout block", key.line))
                             c.sep()
                             if (prop.text == "nodes") {
-                                parseNodeMap(c, nodes)
+                                parseNodeMap(c, nodes, nodeLines)
                             } else {
                                 c.skipValue() // viewport (never read, C1-b) · edges (reserved)
                                 if (prop.text != "viewport" && prop.text != "edges") {
@@ -308,7 +311,7 @@ internal object TtrgScanner {
                     }
                 }
             }
-            TtrgScan(TtrgGraph(name, model, objects, nodes, nameLine), emptyList(), warnings)
+            TtrgScan(TtrgGraph(name, model, objects, nodes, nameLine, nodeLines), emptyList(), warnings)
         } catch (e: Fail) {
             TtrgScan(null, listOf(e.issue), warnings)
         }

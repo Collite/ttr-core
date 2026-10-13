@@ -2,6 +2,7 @@
 package org.tatrman.ttr.metadata.refresh
 
 import org.tatrman.ttr.metadata.graph.ModelGraph
+import org.tatrman.ttr.metadata.layout.LayoutIndex
 import org.tatrman.ttr.metadata.reconcile.ModelReconciler
 import org.tatrman.ttr.metadata.registry.MetadataRegistry
 import org.tatrman.ttr.metadata.source.ModelSource
@@ -157,7 +158,9 @@ class MetadataRefresher(
         return try {
             val reconciled = reconciler.reconcile(freshOrCached)
             val graph = ModelGraph.build(reconciled.model)
-            registry.swap(reconciled.model, graph, reconciled.warnings + reconciled.errors)
+            // VL V-37/V-38: the layouts of this model, from the same loads, in the same swap
+            val layouts = LayoutIndex.build(freshOrCached, reconciled.model)
+            registry.swap(reconciled.model, graph, reconciled.warnings + reconciled.errors, layouts)
             // Only reached when a source actually changed (the no-change short-circuit returns
             // earlier), so this won't re-spam the issue list every quiet refresh interval.
             log.info(

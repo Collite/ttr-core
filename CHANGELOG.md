@@ -6,6 +6,25 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-parser` · `ttr-metadata` · image `ttr-viewer`** — **the catalog serves layouts (VL-P2).** A layout file
+  committed under the model root reaches every viewer of that model (docs: *Operate → Deploy the Studio Viewer →
+  Layouts the catalog serves*).
+  - `ttr-metadata`: the source load collects the layout files — every `.ttrg` with its sibling `.ttrl`, in the
+    same listing as the model files, never parsed as model — as `SourceSnapshot.layoutFiles`
+    (`source.LayoutFileRef`); `LocalFsStorage.fetchVersion` now hashes them too, so a layout-only change is
+    swapped in. **`layout.LayoutIndex`**: `build(snapshots, model)` reads and resolves every layout file into
+    `ResolvedLayout` (full-qname objects and positions, missing / ambiguous / ignored, `positionsFrom`, the
+    path under the model root); a file that does not parse, or repeats a taken name, is a `LayoutIssue`
+    and is not indexed; a failure of the whole index costs the layouts, never the model.
+    `RegistrySnapshot.layouts` (default empty) is published by `MetadataRegistry.swap(…, layouts)`, which
+    `MetadataRefresher` now calls with the index built from the loads it reconciles.
+  - `ttr-parser`: **`loader.TtrgLayoutReader`** — a `.ttrg` and its optional `.ttrl` → one layout document,
+    the JVM twin of the viewer's reader: the sidecar's positions win, a sidecar without `canvas <graph name>` is
+    read from `canvas main`, and a sidecar's residue (a key the graph does not list, nodes under a stated
+    `mode: auto`) is dropped with a warning. `TtrlLoader.parseString(…, dropAutoNodes = true)` is that last
+    rule (the default is unchanged); `TtrlParseResult.warnings` and `TtrgGraph.nodeLines` are new, defaulted.
+  - Image `ttr-viewer`: the catalog proxy forwards `GET /model/layouts` and `GET /model/layout` (seven read
+    routes); anything else under `<base>veles/` is still a 404, and a read route asked with another method a 403.
 - **Studio Viewer (`@tatrman/designer`, image `ttr-viewer`)** — **layouts (VL-P1).** Pick the cards, place
   them, save the picture (docs: *Operate → Deploy the Studio Viewer → Layouts*).
   - The **Objects** panel: every card of the schema by package, with checkboxes, search, All · None ·

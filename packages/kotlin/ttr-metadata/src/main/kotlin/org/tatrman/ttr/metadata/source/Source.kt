@@ -119,6 +119,25 @@ data class SourceSnapshot(
      * and the raw definitions before they are turned into model objects.
      */
     val loadedFiles: List<LoadedFile> = emptyList(),
+    /**
+     * VL contracts V-37 — the layout files under the model root: every `.ttrg` with its sibling `.ttrl`
+     * when present. Collected and read with the model files (one listing, one version) but never parsed as
+     * model: they become the registry's `LayoutIndex` at the swap.
+     */
+    val layoutFiles: List<LayoutFileRef> = emptyList(),
+)
+
+/**
+ * One layout file (VL V-37): a `.ttrg` and, when one sits beside it, its `<stem>.ttrl` sidecar, read in
+ * the same load as the model they lay out. [source] is the `.ttrg`'s path under the model root, `/`-separated
+ * (`layouts/sales.ttrg`) — the form the catalog reports.
+ */
+data class LayoutFileRef(
+    val path: String,
+    val source: String,
+    val content: String,
+    val sidecarPath: String? = null,
+    val sidecarContent: String? = null,
 )
 
 data class LoadWarning(
@@ -177,20 +196,31 @@ private fun listFilesMatching(
         .map { StorageFile(path = it.toString(), sizeBytes = Files.size(it), rootPath = rootPath) }
         .toList()
 
-/** Read every `.ttr`/`.ttrm` file under [rootPath]. Recursive. */
+/** What a [FileBasedSource] load reads: the model files (`.ttr`, `.ttrm`) and the layout files (`.ttrg`, `.ttrl`). */
+internal val LOADED_EXTENSIONS = listOf("ttr", "ttrm", "ttrg", "ttrl")
+
+internal fun StorageFile.extension(): String = path.substringAfterLast('/').substringAfterLast('.', "")
+
+/** The file's path under its storage root, `/`-separated; the bare path when the storage has no root. */
+internal fun StorageFile.underRoot(): String {
+    val root = rootPath ?: return path
+    return runCatching { root.relativize(Path.of(path)).joinToString("/") }.getOrDefault(path)
+}
+
+/** Read every `.ttr`/`.ttrm` file under [rootPath] (and the layout files, VL V-37). Recursive. */
 class LocalFsStorage(
     override val id: String,
     private val rootPath: Path,
 ) : ModelStorage {
     // M1 fix: the kantheon original hashed only `.ttr`, so a change to a
     // `.ttrm`-only file (the tatrman model extension, CLAUDE.md v3.0) would not
-    // bump the version and the refresher would miss it. Hash both extensions.
+    // bump the version and the refresher would miss it. Hash both extensions —
+    // and the layout files (VL V-37), which the same load reads.
     override fun fetchVersion(): String =
         Files
             .walk(rootPath)
             .filter {
-                Files.isRegularFile(it) &&
-                    (it.fileName.toString().endsWith(".ttr") || it.fileName.toString().endsWith(".ttrm"))
+                Files.isRegularFile(it) && it.fileName.toString().substringAfterLast('.', "") in LOADED_EXTENSIONS
             }.sorted()
             .map { "$it=${Files.getLastModifiedTime(it).toMillis()}" }
             .toList()
@@ -239,7 +269,11 @@ class FileBasedSource(
         val version = storage.fetchVersion()
         // Golem P4 S4.2 — area files carry a `.ttrm` extension (directive-less,
         // `def area` blocks). Walk both so they load alongside the model `.ttr` files.
-        val files = storage.listFiles(listOf("ttr", "ttrm"))
+        // VL V-37 — the layout files ride the same listing (a git storage fetches on every call, so a
+        // second one could see another commit); they are collected, never parsed as model.
+        val listed = storage.listFiles(LOADED_EXTENSIONS)
+        val files = listed.filter { it.extension() == "ttr" || it.extension() == "ttrm" }
+        val layoutFiles = collectLayoutFiles(listed, storage)
         val warnings = mutableListOf<LoadWarning>()
         val errors = mutableListOf<LoadWarning>()
         val loadedFiles = mutableListOf<LoadedFile>()
@@ -464,7 +498,26 @@ class FileBasedSource(
             warnings = warnings,
             errors = errors,
             loadedFiles = loadedFiles.toList(),
+            layoutFiles = layoutFiles,
         )
+    }
+
+    /** Every `.ttrg` in [listed], paired with the `.ttrl` of the same stem in the same directory (V-37). */
+    private fun collectLayoutFiles(
+        listed: List<StorageFile>,
+        storage: ModelStorage,
+    ): List<LayoutFileRef> {
+        val sidecars = listed.filter { it.extension() == "ttrl" }.associateBy { it.path.removeSuffix(".ttrl") }
+        return listed.filter { it.extension() == "ttrg" }.map { file ->
+            val sidecar = sidecars[file.path.removeSuffix(".ttrg")]
+            LayoutFileRef(
+                path = file.path,
+                source = file.underRoot(),
+                content = storage.read(file),
+                sidecarPath = sidecar?.path,
+                sidecarContent = sidecar?.let { storage.read(it) },
+            )
+        }
     }
 
     /**

@@ -122,6 +122,8 @@ data class TtrgGraph(
     /** the in-file `layout.nodes` block, verbatim, in file order */
     val nodes: Map<String, Pair<Double, Double>>,
     val nameLine: Int,
+    /** the line of each [nodes] key */
+    val nodeLines: Map<String, Int> = emptyMap(),
 )
 
 /** [TtrgGraphReader.scan]'s result: `graph` is null iff `errors` is non-empty. */
