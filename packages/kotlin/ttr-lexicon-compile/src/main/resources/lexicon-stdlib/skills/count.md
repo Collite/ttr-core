@@ -10,14 +10,19 @@ op: op:count
 #  - `count` is EXACT: one edit away is `county`, a place.
 #  - `kolik` / `kolika` are EXACT: one edit away is `kolin`, a town typed without diacritics.
 #    `kolika` is the oblique case ("v kolika prodejnách").
-#  - `počet` and its cases are TYPOS(1), which also reaches the diacritic-free `pocet`.
+#  - `počet` and `počtem` are TYPOS(1), which also reaches the diacritic-free `pocet` / `poctem`.
+#  - `počty` / `počtu` / `počtů` are EXACT: one edit away are `pošty` / `poštu`, the post office
+#    and the mail. Their diacritic-free forms are listed instead (`poctu` is also `počtů`'s).
 triggers:
   - { text: "kolik", lang: cs, method: EXACT }
   - { text: "kolika", lang: cs, method: EXACT }
   - { text: "počet", lang: cs, method: TYPOS(1) }
-  - { text: "počtu", lang: cs, method: TYPOS(1) }
   - { text: "počtem", lang: cs, method: TYPOS(1) }
-  - { text: "počty", lang: cs, method: TYPOS(1) }
+  - { text: "počtu", lang: cs, method: EXACT }
+  - { text: "počty", lang: cs, method: EXACT }
+  - { text: "počtů", lang: cs, method: EXACT }
+  - { text: "poctu", lang: cs, method: EXACT }
+  - { text: "pocty", lang: cs, method: EXACT }
   - { text: "how many", lang: en, method: EXACT }
   - { text: "number of", lang: en, method: EXACT }
   - { text: "count of", lang: en, method: EXACT }

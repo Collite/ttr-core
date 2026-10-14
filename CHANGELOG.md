@@ -12,11 +12,13 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   (`LexiconStdlib.OPERATORS`), and every estate archive built with this toolchain carries them.
   - **`op:count`** (`skills/count.md`, requires `count-subject`): distinct identities, not rows — a dimension
     that keeps history holds several rows per member. A counted word that names a measure ("how many units",
-    „kolik činily tržby“) is the measure's amount, not a count. Triggers: cs *kolik · kolika* (EXACT),
-    *počet · počtu · počtem · počty* (TYPOS(1)); en *how many · number of · count of · count* (EXACT).
+    „kolik činily tržby“) is the measure's amount, not a count. Triggers: cs *kolik · kolika · počtu · počty ·
+    počtů*, and the diacritic-free *poctu · pocty* (EXACT; one edit from *počty · počtu* are *pošty · poštu*, the
+    post office and the mail), *počet · počtem* (TYPOS(1)); en *how many · number of · count of · count* (EXACT).
   - **`op:avg`** (`skills/avg.md`, requires `avg-measure`): a sum over a count of the unit, from one result
     set, with the unit named in the answer. Triggers: cs *průměrný* in all eleven case forms, *průměrně ·
-    průměr · průměru* (TYPOS(1)), *v průměru* (EXACT); en *average* (TYPOS(1)), *mean* (EXACT).
+    průměr · průměru* (TYPOS(1)), *v průměru* (EXACT); en *average · averages · mean* (EXACT; one edit from
+    *average* is *overage*, a surplus).
   - **`op:top-n` superlatives**: cs *nejlepší · největší · nejvyšší · nejprodávanější*, each in all six case
     forms (*nejprodávanějších* used to look up nothing), TYPOS(1); en *highest · biggest* (TYPOS(1)), *best*
     (EXACT).

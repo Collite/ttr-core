@@ -277,8 +277,8 @@ and compiled through exactly the path an estate's own skills take — no special
 | `op:drilldown` | rozpad · rozpad podle · detail podle | drill down · breakdown · break down | `parent-context` |
 | `op:top-n` | prvních · top · nejlepší · největší · nejvyšší · nejprodávanější (each in all six case forms) | top · first · largest · highest · biggest · best | `order-measure` |
 | `op:share-of` | podíl · procento z | share · share of · percentage of | — |
-| `op:count` | kolik · kolika · počet · počtu · počtem · počty | how many · number of · count of · count | `count-subject` |
-| `op:avg` | průměrný (all eleven case forms) · průměrně · průměr · průměru · v průměru | average · mean | `avg-measure` |
+| `op:count` | kolik · kolika · počet · počtu · počtem · počty · počtů (and *poctu · pocty* without diacritics) | how many · number of · count of · count | `count-subject` |
+| `op:avg` | průměrný (all eleven case forms) · průměrně · průměr · průměru · v průměru | average · averages · mean | `avg-measure` |
 
 **They live here, not in `tatrman-server`,** which is what the P1.3 list assumed. The stdlib is
 *compiler input*: the compile happens in the toolchain, and the toolchain cannot depend on the
@@ -304,7 +304,9 @@ trigger up the way the matcher does and holds three rules:
 - **A multi-word trigger is `EXACT`.** A `TOKENS` row is scored over the question's own words, so
   `number of` would fire on *number* alone — *order number* is an attribute, not a count.
 - **No fuzz where a neighbour means something else.** `best` (*west*), `count` (*county*), `mean`
-  (*meat*) and `kolik` (*kolin*, typed without diacritics) are `EXACT`.
+  (*meat*), `average` (*overage*), `kolik` (*kolin*, typed without diacritics) and `počty` / `počtu`
+  (*pošty* / *poštu*, the post office and the mail) are `EXACT`. An `EXACT` word reaches no
+  diacritic-free spelling, so `pocty` / `poctu` are listed beside them.
 
 Three words were considered and left out, and the spec's guard keeps them out — no operator may
 fire anywhere in a plain question that holds them:

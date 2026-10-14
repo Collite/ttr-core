@@ -10,6 +10,8 @@ op: op:avg
 #    one. (`na` is also a function word, and both are too short for any fuzz.) They stay the
 #    words that name the UNIT once an average was asked for.
 #  - `mean` is EXACT: one edit away are `meat`, `meal`, `means`, `men`.
+#  - `average` is EXACT: one edit away is `overage`, a surplus (an inventory overage). Its plural
+#    is listed instead.
 #  - Multi-word forms are EXACT, never TOKENS: `v průměru` as TOKENS is `průměru` alone.
 #  - The Czech adjective is listed in every case form: the matcher compares the surface form,
 #    and a TYPOS(1) on one form does not reach a form two edits away (průměrná → průměrnou).
@@ -29,7 +31,8 @@ triggers:
   - { text: "průměr", lang: cs, method: TYPOS(1) }
   - { text: "průměru", lang: cs, method: TYPOS(1) }
   - { text: "v průměru", lang: cs, method: EXACT }
-  - { text: "average", lang: en, method: TYPOS(1) }
+  - { text: "average", lang: en, method: EXACT }
+  - { text: "averages", lang: en, method: EXACT }
   - { text: "mean", lang: en, method: EXACT }
 requires: [ avg-measure ]
 version: 1

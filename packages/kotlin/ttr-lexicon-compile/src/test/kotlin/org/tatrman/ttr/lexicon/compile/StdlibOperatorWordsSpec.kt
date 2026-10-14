@@ -113,6 +113,10 @@ class StdlibOperatorWordsSpec :
                 Triple("počtu", Lang.CS, "op:count"),
                 Triple("počtem", Lang.CS, "op:count"),
                 Triple("pocet", Lang.CS, "op:count"),
+                Triple("počty", Lang.CS, "op:count"),
+                Triple("počtů", Lang.CS, "op:count"),
+                Triple("pocty", Lang.CS, "op:count"),
+                Triple("poctu", Lang.CS, "op:count"),
                 // op:avg — "What was the average marketplace revenue per line item in 2025?"
                 Triple("average", Lang.EN, "op:avg"),
                 Triple("averages", Lang.EN, "op:avg"),
@@ -180,6 +184,11 @@ class StdlibOperatorWordsSpec :
                 "Revenue by order number" to Lang.EN,
                 // One edit from `kolik`, typed without its diacritics.
                 "Tržby prodejny Kolin v roce 2025" to Lang.CS,
+                // One edit from `počty` · `počtu`: the post office and the mail.
+                "Tržby pošty v roce 2025" to Lang.CS,
+                "Náklady na poštu v roce 2025" to Lang.CS,
+                // One edit from `average`: a surplus, not an average.
+                "Inventory overage by warehouse" to Lang.EN,
             )
 
         plain.forEach { (question, lang) ->
