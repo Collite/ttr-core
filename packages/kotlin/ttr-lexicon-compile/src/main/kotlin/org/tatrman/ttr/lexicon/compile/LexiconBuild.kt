@@ -88,7 +88,7 @@ object LexiconBuild {
 
     /**
      * @param includeStdlib layer the RV-P1.3 operator stdlib under the estate's own skills. On by
-     *   default — the six operators are what makes an estate's questions answerable at all, and an
+     *   default — the stdlib operators are what makes an estate's questions answerable at all, and an
      *   estate that wanted none of them would be the surprising case. Off for tests that assert
      *   exactly what one repo contributes.
      */

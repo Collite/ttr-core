@@ -12,7 +12,8 @@ import org.tatrman.ttr.lexicon.TargetClass
 import org.tatrman.ttr.lexicon.TermNormalizer
 
 /**
- * RV-P1.3 T1 — the operator stdlib's build-level gate, written before the six files.
+ * RV-P1.3 T1 — the operator stdlib's build-level gate, written before the six files (eight since
+ * ttr-core#178 added op:count and op:avg).
  *
  * The collision rule is the load-bearing one: two operators that answer to the same word make the
  * lattice ambiguous for every question containing it, and no downstream layer can un-do that.
@@ -26,9 +27,19 @@ class LexiconStdlibSpec :
             b: Lang,
         ): Boolean = a == b || a == Lang.CS_EN || b == Lang.CS_EN
 
-        test("the six ruled operators are all present, and nothing else is") {
+        test("the eight operators are all present, and nothing else is") {
+            // The six ruled at ⚑RV-2, then op:count and op:avg (ttr-core#178).
             LexiconStdlib.skills().map { it.opId } shouldContainExactly
-                listOf("op:show", "op:trend", "op:compare", "op:drilldown", "op:top-n", "op:share-of")
+                listOf(
+                    "op:show",
+                    "op:trend",
+                    "op:compare",
+                    "op:drilldown",
+                    "op:top-n",
+                    "op:share-of",
+                    "op:count",
+                    "op:avg",
+                )
         }
 
         test("every frontmatter validates against ttr-skill/v1") {
@@ -59,7 +70,7 @@ class LexiconStdlibSpec :
             collisions shouldBe emptyList()
         }
 
-        test("compiling the stdlib alone yields six operators and no warnings") {
+        test("compiling the stdlib alone yields every operator and no warnings") {
             val result =
                 LexiconCompiler.compile(
                     LexiconSources(area = LexiconArea(emptyList(), LexiconStdlib.skills())),
