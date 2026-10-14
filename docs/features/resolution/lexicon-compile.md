@@ -265,9 +265,9 @@ in the compiler reads a clock, a locale, a file system order or a hash-map itera
 
 ## 7. The operator standard library (RV-P1.3)
 
-Six operators, ruled ⚑RV-2, shipped as ordinary `ttr-skill/v1` files under
-`ttr-lexicon-compile/src/main/resources/lexicon-stdlib/skills/` and compiled through exactly the
-path an estate's own skills take — no special case anywhere.
+Eight operators — the six ruled ⚑RV-2, then `op:count` and `op:avg` (ttr-core#178) — shipped as
+ordinary `ttr-skill/v1` files under `ttr-lexicon-compile/src/main/resources/lexicon-stdlib/skills/`
+and compiled through exactly the path an estate's own skills take — no special case anywhere.
 
 | Op | cs triggers | en triggers | `requires` |
 |---|---|---|---|
@@ -275,8 +275,10 @@ path an estate's own skills take — no special case anywhere.
 | `op:trend` | vývoj · trend | evolution · trend · over time | `time-grain` |
 | `op:compare` | porovnej · srovnej · srovnání | compare · versus · vs | `two-series` |
 | `op:drilldown` | rozpad · rozpad podle · detail podle | drill down · breakdown · break down | `parent-context` |
-| `op:top-n` | prvních · top · nejlepších · největších | top · first · largest | `order-measure` |
+| `op:top-n` | prvních · top · nejlepší · největší · nejvyšší · nejprodávanější (each in all six case forms) | top · first · largest · highest · biggest · best | `order-measure` |
 | `op:share-of` | podíl · procento z | share · share of · percentage of | — |
+| `op:count` | kolik · kolika · počet · počtu · počtem · počty · počtů (and *poctu · pocty* without diacritics) | how many · number of · count of · count | `count-subject` |
+| `op:avg` | průměrný (all eleven case forms) · průměrně · průměr · průměru · v průměru | average · averages · mean | `avg-measure` |
 
 **They live here, not in `tatrman-server`,** which is what the P1.3 list assumed. The stdlib is
 *compiler input*: the compile happens in the toolchain, and the toolchain cannot depend on the
@@ -286,11 +288,39 @@ its own files. Same reasoning that moved the validator here under (a3).
 Files rather than Kotlin constants, because an operator body is prose a non-engineer should be
 able to read and revise, and it has to diff as prose.
 
-`LexiconStdlibSpec` gates two things a schema cannot: that the six are all present and nothing
+`LexiconStdlibSpec` gates two things a schema cannot: that the eight are all present and nothing
 else is, and that **no two operators answer to the same word in an overlapping language**
 (`cs|en` overlaps both, so a collision cannot hide behind a lang label). Two operators sharing a
 trigger make the lattice ambiguous for every question containing it, and no downstream layer can
 undo that.
+
+**How a trigger is matched is part of the decision** (ttr-core#178). The matcher compares a
+word's surface form and cannot see the words around it, so `StdlibOperatorWordsSpec` looks every
+trigger up the way the matcher does and holds three rules:
+
+- **Every case form is listed.** The lemma of a Czech superlative is its positive degree
+  (*nejvyšší* → *vysoký*), and a `TYPOS(1)` on one form does not reach a form two edits away
+  (*nejvyšší* → *nejvyšších*), so each adjective is listed in all its forms.
+- **A multi-word trigger is `EXACT`.** A `TOKENS` row is scored over the question's own words, so
+  `number of` would fire on *number* alone — *order number* is an attribute, not a count.
+- **No fuzz where a neighbour means something else.** `best` (*west*), `count` (*county*), `mean`
+  (*meat*), `average` (*overage*), `kolik` (*kolin*, typed without diacritics) and `počty` / `počtu`
+  (*pošty* / *poštu*, the post office and the mail) are `EXACT`. An `EXACT` word reaches no
+  diacritic-free spelling, so `pocty` / `poctu` are listed beside them.
+
+Three words were considered and left out, and the spec's guard keeps them out — no operator may
+fire anywhere in a plain question that holds them:
+
+- **`per` and `na`** name an average's unit, but far more often a grouping, a place or a share's
+  whole: "revenue per month" asks for twelve totals, „tržby na tržišti“ names a channel. As
+  `op:avg` triggers they would turn plain totals into an average.
+- **`most`** forms the superlative of another adjective: "the most recent month" is a period,
+  "most of our revenue" a share.
+
+The `Applicability:` paragraph of a body names exactly the frontmatter's `requires:` — a consumer
+reads the requirement from that prose, because `requires:` does not reach the archive's operator
+entry. `count-subject` and `avg-measure` are new names: a consumer that cannot evaluate a
+requirement it does not know should refuse the operator, never wave it through.
 
 `LexiconBuild.run(..., includeStdlib = true)` layers them **under** the estate's own skills, which
 is the precedence statement the compiler reads: an estate redefining `op:trend` wins, and the

@@ -8,8 +8,9 @@ import org.tatrman.ttr.lexicon.LexiconViolation
 import org.tatrman.ttr.lexicon.SkillDef
 
 /**
- * RV-P1.3 — the operator standard library: the six ruled operators (⚑RV-2), shipped as ordinary
- * `ttr-skill/v1` files and compiled through exactly the same path an estate's own skills take.
+ * RV-P1.3 — the operator standard library: the six ruled operators (⚑RV-2) plus `op:count` and
+ * `op:avg` (ttr-core#178), shipped as ordinary `ttr-skill/v1` files and compiled through exactly
+ * the same path an estate's own skills take.
  *
  * **Why it lives in `tatrman` and not in `tatrman-server`,** which is what the P1.3 list assumed:
  * the stdlib is *compiler input*. The compile happens here (P1.2 T6 — the toolchain CLI and the
@@ -38,12 +39,16 @@ object LexiconStdlib {
      */
     val PREDICATE_SLICES: List<String> = listOf("string")
 
-    /** The ruled set (⚑RV-2). Listed explicitly: a stdlib that quietly loses a file is worse than one that fails. */
+    /**
+     * The ruled set (⚑RV-2), then the count and the average (ttr-core#178). Listed explicitly: a
+     * stdlib that quietly loses a file is worse than one that fails — and a new file that is not
+     * listed here is not loaded.
+     */
     val OPERATORS: List<String> =
-        listOf("show", "trend", "compare", "drilldown", "top-n", "share-of")
+        listOf("show", "trend", "compare", "drilldown", "top-n", "share-of", "count", "avg")
 
     /**
-     * Loads all six. Throws on a missing or malformed file: this is shipped content, so a failure
+     * Loads every one of [OPERATORS]. Throws on a missing or malformed file: this is shipped content, so a failure
      * here is a broken build of the toolchain itself, not an authoring mistake anyone can fix by
      * editing their repo.
      */
