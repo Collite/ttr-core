@@ -6,6 +6,33 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-lexicon-compile`** ⚑ **the operator stdlib asks for a count, an average and a superlative
+  (ttr-core#178).** A question asking "how many" or "average" resolved to the same lattice as a plain total,
+  so a consumer writing a query from it answered a SUM. The stdlib grows from six operators to eight
+  (`LexiconStdlib.OPERATORS`), and every estate archive built with this toolchain carries them.
+  - **`op:count`** (`skills/count.md`, requires `count-subject`): distinct identities, not rows — a dimension
+    that keeps history holds several rows per member. A counted word that names a measure ("how many units",
+    „kolik činily tržby“) is the measure's amount, not a count. Triggers: cs *kolik · kolika* (EXACT),
+    *počet · počtu · počtem · počty* (TYPOS(1)); en *how many · number of · count of · count* (EXACT).
+  - **`op:avg`** (`skills/avg.md`, requires `avg-measure`): a sum over a count of the unit, from one result
+    set, with the unit named in the answer. Triggers: cs *průměrný* in all eleven case forms, *průměrně ·
+    průměr · průměru* (TYPOS(1)), *v průměru* (EXACT); en *average* (TYPOS(1)), *mean* (EXACT).
+  - **`op:top-n` superlatives**: cs *nejlepší · největší · nejvyšší · nejprodávanější*, each in all six case
+    forms (*nejprodávanějších* used to look up nothing), TYPOS(1); en *highest · biggest* (TYPOS(1)), *best*
+    (EXACT).
+  - **Left out on purpose**: en `per` and cs `na` (they name a grouping, a place or a share's whole far more
+    often than an average's unit — "revenue per month" is twelve totals), and en `most` ("the most recent
+    month" is a period). Bare en `number` is left out too (*order number*). A multi-word trigger is EXACT, as
+    a TOKENS row fires on its fragment.
+  - **`op:top-n` body**: a top-N with no number answers the top 10 and says so; it is no longer a gap. A
+    question that asks for one thing in the singular ("which store has the highest …") asks for the top one.
+  - New `StdlibOperatorWordsSpec`: every trigger looked up as the matcher looks it up, a guard of plain
+    questions in which no operator may fire, and a check that each `Applicability:` paragraph names exactly
+    the frontmatter's `requires:`.
+  - ⚠ **Consumers**: `count-subject` and `avg-measure` are new requirement names. A consumer that reads
+    requirements from the `Applicability:` prose and does not know them should refuse the operator (as it
+    would any requirement it cannot evaluate) until it learns them. The archive schema is unchanged.
+
 - **`ttr-translator`** ⚑ **behaviour fix — a filter that can never hold returns no rows instead of failing
   (ttr-core#148, ttr-server#203).** `RelBuilder.filter` folds a contradiction (`warehouse_name = 'Memphis DC'
   AND warehouse_name = 'Allentown DC'`, two disjoint date ranges ANDed) into an empty `Values`: the row type,
