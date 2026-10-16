@@ -102,7 +102,10 @@ class Translator(
      *   secure — the entities the body reads. Applies when [targetSchema] is `ER` (the first call of the
      *   two-half pipeline); with a `DB` target MAP_TO_PHYSICAL inlines the bodies anyway and the option is a
      *   no-op. Default `false`: byte-identical to today. See [org.tatrman.translator.schema.ExpandLogicalBodies].
+     *
+     * `@JvmOverloads` keeps the 0.11.x JVM signatures callable by consumers compiled against them.
      */
+    @JvmOverloads
     fun parseToRelNode(
         source: String,
         sourceLanguage: Language,
@@ -226,6 +229,7 @@ class Translator(
             else -> false
         }
 
+    @JvmOverloads
     fun translate(
         source: String,
         sourceLanguage: Language,
