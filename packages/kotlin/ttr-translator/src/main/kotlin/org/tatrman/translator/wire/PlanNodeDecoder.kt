@@ -17,6 +17,7 @@ import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.core.JoinRelType
 import org.apache.calcite.rex.RexNode
 import org.apache.calcite.sql.SqlAggFunction
+import org.apache.calcite.rel.logical.LogicalProject
 import org.apache.calcite.tools.RelBuilder
 import org.tatrman.translator.framework.TranslatorFramework
 import org.tatrman.translator.functions.FunctionCatalog
@@ -157,7 +158,20 @@ object PlanNodeDecoder {
         // whose nodes equal the input's row type, which breaks structure-preserving round-trips
         // (e.g. encode/decode/encode byte stability) and the two-half pipeline's byte-equality
         // contract between single-call target=DB and (target=ER → REL_NODE → target=DB).
-        builder.project(nodes, aliases, true)
+        // LQ (L-10, L-11) — a logical-query boundary (a Project stamped `expanded_from`) is never merged: not
+        // with the body's root Project below it, nor into the Project above it. RelBuilder merges adjacent
+        // Projects; the option-off path never meets them adjacent (MAP_TO_PHYSICAL builds the boundary after
+        // the decode), so a merge here would make the two physical plans differ. The stamp rides the decoded
+        // Project as a hint; the encoder restores it.
+        val stamped = project.hasExpandedFrom()
+        val overBoundary =
+            project.input.nodeCase == PlanNode.NodeCase.PROJECT && project.input.project.hasExpandedFrom()
+        if (stamped || overBoundary) {
+            val hints = if (stamped) listOf(ExpandedFromHint.of(project.expandedFrom)) else emptyList()
+            builder.push(LogicalProject.create(builder.build(), hints, nodes, aliases))
+        } else {
+            builder.project(nodes, aliases, true)
+        }
     }
 
     private fun pushFilter(
