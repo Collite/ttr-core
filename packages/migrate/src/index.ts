@@ -320,7 +320,9 @@ export async function runMigration(args: MigrateArgs): Promise<{ report: Migrate
     if (result.ast) {
       fileDocs.set(file, result.ast);
       const pkg = inferPackage(file, projectRoot);
-      const schemaCode = result.ast.modelDirective?.modelCode ?? 'er';
+      // The raw directive ('' when absent): the symbol table derives each def's model from its kind, and
+      // the directive moves only a query declared under `model er` (a logical query, LQ L-1).
+      const schemaCode = result.ast.modelDirective?.modelCode ?? '';
       const ns = result.ast.modelDirective?.schema ?? '';
       const symbolTable = new DocumentSymbolTable(file, result.ast, schemaCode, ns);
       for (const entry of symbolTable.all()) {

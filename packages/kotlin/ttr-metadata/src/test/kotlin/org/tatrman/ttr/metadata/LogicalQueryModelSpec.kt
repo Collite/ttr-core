@@ -189,6 +189,19 @@ class LogicalQueryModelSpec :
             val again = reloaded.queries[erQuery].shouldNotBeNull()
             again.sourceText shouldBe model.queries.getValue(erQuery).sourceText
             reloaded.queries.keys shouldContain erQuery
+            // … and the stacked entity still maps ToQuery onto it, its binding to `revenue` intact
+            reloaded.mappings
+                .filterIsInstance<Er2DbEntityMapping>()
+                .single { it.entity == stacked }
+                .target
+                .shouldBeInstanceOf<MappingTarget.SqlQuery>()
+                .qname shouldBe erQuery
+            reloaded.mappings
+                .filterIsInstance<Er2DbAttributeMapping>()
+                .single { it.attribute.name == "shopper_revenue.total_revenue" }
+                .target
+                .shouldBeInstanceOf<AttributeMappingTarget.Column>()
+                .qname.name shouldBe "revenue"
         }
 
         "a db query is unchanged: db.dbo.<name>, exported in db.ttr" {

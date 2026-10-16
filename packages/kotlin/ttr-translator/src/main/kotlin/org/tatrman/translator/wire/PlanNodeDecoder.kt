@@ -229,10 +229,38 @@ object PlanNodeDecoder {
         catalog: FunctionCatalog,
     ) {
         push(builder, aggregate.input, catalog)
+        // LQ (L-10, L-12) — over a logical-query boundary RelBuilder would (a) prune the stamped Project, or drop
+        // it, when it is the Aggregate's direct input, and (b) drop an Aggregate whose keys it can prove unique
+        // (or whose input it can prove single-row) through the expanded body, wherever the boundary sits below.
+        // The option-off path meets an entity scan there, where neither happens, so this Aggregate is built with
+        // (a) off for a direct boundary input and (b) off whenever a boundary is below.
+        val directBoundary =
+            aggregate.input.nodeCase == PlanNode.NodeCase.PROJECT && aggregate.input.project.hasExpandedFrom()
+        val boundaryBelow = directBoundary || hasBoundary(aggregate.input)
+        val b =
+            if (boundaryBelow) {
+                builder
+                    .transform { it.withPruneInputOfAggregate(!directBoundary).withAggregateUnique(true) }
+                    .push(builder.build())
+            } else {
+                builder
+            }
         val keyFields = aggregate.groupKeysList.map { it.name }
-        val groupKey = builder.groupKey(keyFields.map { Expressions.fieldByName(builder, it) })
-        val aggCalls = aggregate.aggregatesList.map { decodeAggCall(builder, it) }
-        builder.aggregate(groupKey, aggCalls)
+        val groupKey = b.groupKey(keyFields.map { Expressions.fieldByName(b, it) })
+        val aggCalls = aggregate.aggregatesList.map { decodeAggCall(b, it) }
+        b.aggregate(groupKey, aggCalls)
+        if (boundaryBelow) builder.push(b.build())
+    }
+
+    /** LQ — true when [plan] holds a logical-query boundary (a Project stamped `expanded_from`) anywhere. */
+    private fun hasBoundary(plan: PlanNode): Boolean {
+        if (plan.nodeCase == PlanNode.NodeCase.PROJECT && plan.project.hasExpandedFrom()) return true
+        var found = false
+        org.tatrman.translator.joiner.JoinerPlanWalker.rewriteChildren(plan) { child ->
+            if (!found && hasBoundary(child)) found = true
+            child
+        }
+        return found
     }
 
     private fun decodeAggCall(

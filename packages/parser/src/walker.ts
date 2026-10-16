@@ -340,14 +340,15 @@ function walkDocument(ctx: DocumentContext, file: string, syntaxErrors: ParseErr
 
   // LQ (logical queries, L-2 / ruling LQ-5): a `def query` in a `model er` file is a
   // logical query over entities and takes no parameters — a parametrized query stays a
-  // db query. The definition still walks; the load-time refusal is ttr-metadata's.
+  // db query. A warning, as in the Kotlin walker: an error would make whole-file tools
+  // (format, migrate) refuse the file; the load-time refusal is ttr-metadata's.
   if (modelDirective?.modelCode === 'er') {
     for (const def of definitions) {
       if (def.kind === 'query' && def.parameters && def.parameters.length > 0) {
         localErrors.push({
           code: DiagnosticCode.LogicalQueryParameters,
           message: `logical query '${def.name}' (model er) cannot declare parameters; a parametrized query stays a db query`,
-          severity: 'error',
+          severity: 'warning',
           source: def.source,
         });
       }

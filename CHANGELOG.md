@@ -18,8 +18,8 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
     keeps the old signatures (`@JvmOverloads`). Conformance fixture `70-logical-query`, identical in all three
     runtimes.
   - **`ttr-parser`** — new `DiagnosticCode.LogicalQueryParameters` (`ttr/logical-query-parameters`): a logical query
-    with `parameters` (a parametrized query stays a db query). A warning in the Kotlin walker (an error there would
-    empty the file), an error in TS.
+    with `parameters` (a parametrized query stays a db query). A warning in both walkers (an error would empty the
+    file in Kotlin and make TS whole-file tools refuse it); the load-time refusal is ttr-metadata's.
   - **`ttr-metadata`** — a `model er` query loads as `Query((ER, "query", name))`; the er file-kind allowlist admits
     `query`; export writes logical queries to their own `er-query.ttr` under `model er`; the reconciler refuses a
     logical query with parameters (`logical_query_parameters`).
@@ -38,7 +38,13 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
       `ToQuery` boundary and ends the stamp, so the physical plan is byte-identical with the option on or off.
     - `Translator.outputColumnNames(plan)` — a stored body's output names (for the workers' binding check).
     - REL_NODE re-entry: the stamp rides the decoded Project as a Calcite hint; the decoder never merges a stamped
-      Project with an adjacent one (RelBuilder's Project merge would otherwise break the on/off identity).
+      Project with an adjacent one, and an Aggregate over a boundary is neither pruned nor dropped as redundant
+      (RelBuilder would otherwise break the on/off identity).
+    - The strict lane is checked on the plan too: a sub-query (WHERE / select list / HAVING) or an unfolded saved
+      query reading the other lane is `mixed_lanes` — the detector reads only the FROM clauses.
+    - ⚠ Binary compatibility: both entry points carry `@JvmOverloads`, so explicit-argument (Java-style) callers
+      compiled against 0.11.x keep working; Kotlin callers that relied on default arguments call the synthetic
+      `$default` method, whose signature changed — recompile against 0.12.0.
   - **`ttr-plan-proto`** — plan.v1 `ProjectNode.expanded_from = 3` (`QualifiedName`, optional; reserved `4 to 7`).
     The only wire change; readers that do not know it ignore it.
   - Test fixtures: `HartlandStackModel` (the MJ Hartland slice + `shopper_revenue` stacked on

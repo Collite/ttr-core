@@ -14,9 +14,9 @@ import org.tatrman.ttr.parser.model.QueryDef
 /**
  * LQ-T0·S1 — mirrors the TypeScript `logical-query.test.ts`. A `def query` in a `model er` file is a
  * logical query (project `ttr-translator/logical-queries`, L-1/L-2); declaring `parameters` on it is
- * flagged `ttr/logical-query-parameters` (ruling LQ-5). Like the other query diagnostics of this
- * walker it is a warning here — the Kotlin parser empties a file's definitions on any error, so the
- * load-time refusal lives in ttr-metadata (`logical_query_parameters`), not in the parser.
+ * flagged `ttr/logical-query-parameters` (ruling LQ-5). A warning in both walkers — the Kotlin
+ * parser empties a file's definitions on any error, and TS whole-file tools (format, migrate) refuse
+ * a file with one — so the load-time refusal lives in ttr-metadata (`logical_query_parameters`).
  */
 class LogicalQuerySpec :
     StringSpec({

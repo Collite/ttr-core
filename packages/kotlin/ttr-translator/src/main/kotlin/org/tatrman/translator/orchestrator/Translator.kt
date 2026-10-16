@@ -103,7 +103,9 @@ class Translator(
      *   two-half pipeline); with a `DB` target MAP_TO_PHYSICAL inlines the bodies anyway and the option is a
      *   no-op. Default `false`: byte-identical to today. See [org.tatrman.translator.schema.ExpandLogicalBodies].
      *
-     * `@JvmOverloads` keeps the 0.11.x JVM signatures callable by consumers compiled against them.
+     * `@JvmOverloads` keeps the explicit-argument 0.11.x JVM signatures (callers that pass every argument, e.g.
+     * Java). A Kotlin caller compiled against 0.11.x that omitted a defaulted argument goes through the
+     * synthetic `$default` method, whose signature changed — it must be recompiled (consumers are, at the pin bump).
      */
     @JvmOverloads
     fun parseToRelNode(
@@ -497,6 +499,7 @@ class Translator(
                         prepared,
                         hintsByTable = hintsByTable,
                         expandLogicalBodies = expandLogicalBodies,
+                        strictLane = if (strictLane) sourceSchema else null,
                     )
                 when (r) {
                     is ParseResult.Success -> r.copy(modelJoinsSql = modelJoinsSql)
@@ -563,6 +566,41 @@ class Translator(
                 )
             }
         }
+    }
+
+    /**
+     * LQ (L-2) — a strict parse's plan must read one lane: an ER-lane plan no table, a DB-lane plan no entity,
+     * anywhere — expression sub-queries included. Null when it holds; else `mixed_lanes` naming both sets.
+     */
+    private fun laneLeak(
+        plan: PlanNode,
+        lane: SchemaCode,
+    ): ParseResult.Failure? {
+        val entities = sortedSetOf<String>()
+        val tables = sortedSetOf<String>()
+
+        fun walk(node: PlanNode) {
+            when (node.nodeCase) {
+                PlanNode.NodeCase.TABLE_SCAN -> tables += node.tableScan.table.name
+                PlanNode.NodeCase.SCAN ->
+                    if (node.scan.getObject().schemaCode == SchemaCode.ER) entities += node.scan.getObject().name
+                else -> Unit
+            }
+            org.tatrman.translator.joiner.JoinerPlanWalker.rewriteChildren(node) { child ->
+                walk(child)
+                child
+            }
+        }
+        walk(plan)
+        val leaks = if (lane == SchemaCode.ER) tables.isNotEmpty() else entities.isNotEmpty()
+        if (!leaks) return null
+        return ParseResult.Failure(
+            code = MIXED_LANES,
+            message =
+                "the query reads entities (${entities.joinToString()}) and tables (${tables.joinToString()}) " +
+                    "together — a sub-query or a referenced saved query reads the other lane; a saved query " +
+                    "reads one lane — entities in a logical (er) query, tables in a db query",
+        )
     }
 
     private fun laneNoun(schema: SchemaCode): String =
@@ -643,6 +681,7 @@ class Translator(
         relNodeNames: Map<Int, String> = emptyMap(),
         hintsByTable: Map<String, List<TableHintSpec>> = emptyMap(),
         expandLogicalBodies: Boolean = false,
+        strictLane: SchemaCode? = null,
     ): ParseResult =
         try {
             // NX-A: decorrelate correlated `[NOT] EXISTS` / `IN` sub-queries before encode. A
@@ -689,6 +728,11 @@ class Translator(
             val logical = JoinerLogical.apply(plan, model)
             plan = logical.plan
             var warnings: List<org.tatrman.translator.joiner.JoinerWarning> = logical.warnings
+
+            // LQ (L-2) — the strict lane, on the plan itself: the detector reads only the FROM clauses, so a
+            // sub-query (WHERE / select list / HAVING) or an unfolded saved query could still bring in the
+            // other lane. Checked before MAP_TO_PHYSICAL, which would turn entity scans into tables.
+            if (strictLane != null) laneLeak(plan, strictLane)?.let { return it }
 
             // 4b. EXPAND_LOGICAL_BODIES (LQ, L-8) — the end of the ER half, opt-in, ER target only.
             if (expandLogicalBodies && targetSchema == SchemaCode.ER) {

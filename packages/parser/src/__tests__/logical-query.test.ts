@@ -21,11 +21,13 @@ describe('LQ — logical query (def query under model er)', () => {
     expect(r.ast?.definitions[0].kind).toBe('query');
   });
 
-  it('a logical query with parameters is flagged ttr/logical-query-parameters (error)', () => {
+  it('a logical query with parameters is flagged ttr/logical-query-parameters (a warning, as in Kotlin)', () => {
     const r = parseString(LOGICAL_PARAMS);
     const d = r.errors.filter((e) => e.code === 'ttr/logical-query-parameters');
     expect(d).toHaveLength(1);
-    expect(d[0].severity).toBe('error');
+    // a warning: an error would make whole-file tools (format, migrate) refuse the file
+    expect(d[0].severity).toBe('warning');
+    expect(r.errors.filter((e) => e.severity === 'error')).toEqual([]);
     expect(d[0].message).toContain("'q'");
     // the query still walks — the diagnostic does not drop the definition
     expect(r.ast?.definitions[0].kind).toBe('query');

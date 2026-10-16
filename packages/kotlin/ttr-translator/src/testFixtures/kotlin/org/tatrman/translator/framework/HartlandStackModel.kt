@@ -47,7 +47,8 @@ object HartlandStackModel {
 
     /**
      * A level-2 body with no literal: shoppers with a household. (A literal compared with a FLOAT attribute —
-     * [BIG_SPENDERS_SQL] — re-encodes differently after a Calcite round trip; see `LogicalQuerySpec` K1.)
+     * [BIG_SPENDERS_SQL] — re-encodes differently after a Calcite round trip, `CAST(int)` → FLOAT literal: a
+     * pre-existing encoder trait outside LQ, recorded in the CHANGELOG; byte-identity cases avoid it.)
      */
     const val HOUSEHOLDERS_SQL: String =
         "SELECT shopper_revenue.shopper_id, shopper_revenue.last_name, shopper_revenue.total_revenue " +

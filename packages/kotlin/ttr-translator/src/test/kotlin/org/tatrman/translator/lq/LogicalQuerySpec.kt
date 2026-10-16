@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.translator.lq
 
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
@@ -110,6 +111,29 @@ class LogicalQuerySpec :
             failure.code.shouldNotContain("lane")
         }
 
+        "H3e — the other lane inside a sub-query (WHERE, select list), strict: mixed_lanes" {
+            for (sql in listOf(
+                "SELECT sale.revenue FROM sale WHERE sale.store_id IN (SELECT s.store_id FROM db.dbo.store_sales s)",
+                "SELECT sale.revenue, (SELECT MAX(c.shopper_id) FROM db.dbo.customer c) AS m FROM sale",
+            )) {
+                val failure = strict(sql, SchemaCode.ER).shouldBeInstanceOf<ParseResult.Failure>()
+                failure.code shouldBe "mixed_lanes"
+                failure.message shouldContain "sale"
+            }
+        }
+
+        "H3f — a db query reading an entity in a sub-query, strict: mixed_lanes" {
+            val failure =
+                strict(
+                    "SELECT store_sales.revenue FROM store_sales " +
+                        "WHERE store_sales.shopper_id IN (SELECT e.shopper_id FROM er.entity.shopper e)",
+                    SchemaCode.DB,
+                ).shouldBeInstanceOf<ParseResult.Failure>()
+            failure.code shouldBe "mixed_lanes"
+            failure.message shouldContain "shopper"
+            failure.message shouldContain "store_sales"
+        }
+
         "H4 — a logical query with a parameter: logical_query_parameters" {
             strict(
                 "SELECT sale.revenue FROM sale WHERE sale.store_id = {store}",
@@ -200,11 +224,28 @@ class LogicalQuerySpec :
                 "SELECT SUM(shopper_revenue.total_revenue) AS t FROM shopper_revenue",
                 "SELECT shopper_revenue.last_name FROM shopper_revenue",
                 "SELECT shopper_revenue.last_name, shopper_revenue.total_revenue * 2 AS doubled FROM shopper_revenue",
+                "SELECT COUNT(*) AS n FROM shopper_revenue",
+                "SELECT DISTINCT shopper_revenue.shopper_id, shopper_revenue.last_name, " +
+                    "shopper_revenue.current_household, shopper_revenue.total_revenue FROM shopper_revenue",
+                "SELECT household.buy_potential, (SELECT COUNT(*) FROM shopper_revenue) AS n FROM household",
             )) {
-                val plan = Corpus.er(stacked, sql, expand = true)
-                Corpus.stamped(plan) shouldHaveSize 1
-                Corpus.reenter(stacked, plan) shouldBeBytes Corpus.p(stacked, sql)
+                withClue(sql) {
+                    val plan = Corpus.er(stacked, sql, expand = true)
+                    Corpus.stamped(plan) shouldHaveSize 1
+                    Corpus.reenter(stacked, plan) shouldBeBytes Corpus.p(stacked, sql)
+                }
             }
+        }
+
+        "H8d — COUNT(*) straight over a two-level stack: both stamps kept on ER → ER re-entry; L-10 holds" {
+            val twice = HartlandStackModel.stackedTwice(level2Sql = HartlandStackModel.HOUSEHOLDERS_SQL)
+            val sql = "SELECT COUNT(*) AS n FROM big_spender"
+            val plan = Corpus.er(twice, sql, expand = true)
+            Corpus.stamped(plan).map { it.project.expandedFrom.name } shouldBe listOf("big_spender", "shopper_revenue")
+            Corpus
+                .stamped(Corpus.reenter(twice, plan, target = SchemaCode.ER, expand = true))
+                .map { it.project.expandedFrom.name } shouldBe listOf("big_spender", "shopper_revenue")
+            Corpus.reenter(twice, plan) shouldBeBytes Corpus.p(twice, sql)
         }
 
         "H9 — an entity on a DB-lane query (the __filter shape), option on: not expanded in the ER half" {
@@ -239,6 +280,45 @@ class LogicalQuerySpec :
             Translator(looped)
                 .parseToRelNode(
                     "SELECT loop.shopper_id FROM loop",
+                    Language.SQL,
+                    targetSchema = SchemaCode.ER,
+                    sourceSchema = SchemaCode.ER,
+                    expandLogicalBodies = true,
+                ).shouldBeInstanceOf<ParseResult.Failure>()
+                .code shouldBe "entity_query_mapping_cycle"
+        }
+
+        "H10b — an indirect stack loop (a on b, b on a), option on: entity_query_mapping_cycle" {
+            val a = HartlandJoinModel.er("loop_a")
+            val b = HartlandJoinModel.er("loop_b")
+            val qa = HartlandStackModel.erQuery("loop_a_q")
+            val qb = HartlandStackModel.erQuery("loop_b_q")
+            val attrs = listOf(ModelAttribute("shopper_id", SurfaceType.INT))
+
+            fun model(bodies: Map<QualifiedName, SavedQueryBody>) =
+                InMemoryModelHandle(
+                    tables = HartlandJoinModel.tables,
+                    entities = HartlandJoinModel.entities + ModelEntity(a, attrs) + ModelEntity(b, attrs),
+                    relations = HartlandJoinModel.relations,
+                    entityMappings =
+                        HartlandJoinModel.entityMappings + (a to EntityMapping.ToQuery(qa)) +
+                            (b to EntityMapping.ToQuery(qb)),
+                    savedQueries = listOf(ModelSavedQuery(qa), ModelSavedQuery(qb)),
+                    savedQueryBodies = bodies,
+                    attributeRenames = HartlandJoinModel.renames,
+                )
+            val bodyA = HartlandStackModel.parseEr(model(emptyMap()), "SELECT loop_b.shopper_id FROM loop_b")
+            val bodyB = HartlandStackModel.parseEr(model(emptyMap()), "SELECT loop_a.shopper_id FROM loop_a")
+            val looped =
+                model(
+                    mapOf(
+                        qa to SavedQueryBody(bodyA, emptyList(), emptyList()),
+                        qb to SavedQueryBody(bodyB, emptyList(), emptyList()),
+                    ),
+                )
+            Translator(looped)
+                .parseToRelNode(
+                    "SELECT loop_a.shopper_id FROM loop_a",
                     Language.SQL,
                     targetSchema = SchemaCode.ER,
                     sourceSchema = SchemaCode.ER,
