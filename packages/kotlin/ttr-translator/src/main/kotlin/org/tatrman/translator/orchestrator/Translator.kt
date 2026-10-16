@@ -33,6 +33,8 @@ import org.tatrman.translator.params.ParameterInStringLiteralException
 import org.tatrman.translator.params.PositionalParameters
 import org.tatrman.translator.params.PreparedSql
 import org.tatrman.translator.params.SqlParam
+import org.tatrman.translator.schema.ExpandLogicalBodies
+import org.tatrman.translator.schema.ExpandLogicalBodiesResult
 import org.tatrman.translator.schema.MapToPhysical
 import org.tatrman.translator.schema.MapToPhysicalResult
 import org.tatrman.translator.schema.Resolve
@@ -94,6 +96,12 @@ class Translator(
      *   stated `ER` (a logical query) with [parameters] is `logical_query_parameters` (ruling LQ-5).
      *   A body that does not parse keeps the parser's own error. SQL only. Default `false` keeps
      *   every existing caller byte-identical; the metadata workers set it for saved queries.
+     * @param expandLogicalBodies LQ (contract L-8) — end the ER half with EXPAND_LOGICAL_BODIES: every entity
+     *   stacked on a logical query (a saved query over entities, stored at the ER level) is expanded in place
+     *   under a boundary Project stamped `expanded_from = <entity>`, so a validator's ER pass sees — and can
+     *   secure — the entities the body reads. Applies when [targetSchema] is `ER` (the first call of the
+     *   two-half pipeline); with a `DB` target MAP_TO_PHYSICAL inlines the bodies anyway and the option is a
+     *   no-op. Default `false`: byte-identical to today. See [org.tatrman.translator.schema.ExpandLogicalBodies].
      */
     fun parseToRelNode(
         source: String,
@@ -103,6 +111,7 @@ class Translator(
         sourceSchema: SchemaCode = SchemaCode.SCHEMA_CODE_UNSPECIFIED,
         parameters: List<SqlParam> = emptyList(),
         strictLane: Boolean = false,
+        expandLogicalBodies: Boolean = false,
     ): ParseResult =
         try {
             // Promote Calcite's default literal charset to UTF-8 before any Calcite class loads
@@ -110,8 +119,16 @@ class Translator(
             org.tatrman.translator.framework.CalciteCharset
                 .ensureUtf8()
             when (sourceLanguage) {
-                Language.SQL -> parseSql(source, targetSchema, sourceSchema, parameters, strictLane)
-                Language.REL_NODE -> parseRelNodeBytes(source, targetSchema)
+                Language.SQL ->
+                    parseSql(
+                        source,
+                        targetSchema,
+                        sourceSchema,
+                        parameters,
+                        strictLane,
+                        expandLogicalBodies,
+                    )
+                Language.REL_NODE -> parseRelNodeBytes(source, targetSchema, expandLogicalBodies)
                 Language.TRANSFORMATION_DSL -> parseTransDsl(source, queryRefs)
                 Language.DATAFRAME_DSL -> parseDfDsl(source)
                 Language.LANGUAGE_UNSPECIFIED,
@@ -219,8 +236,20 @@ class Translator(
         queryRefs: Map<String, PlanNode>? = null,
         sourceSchema: SchemaCode = SchemaCode.SCHEMA_CODE_UNSPECIFIED,
         parameters: List<SqlParam> = emptyList(),
+        expandLogicalBodies: Boolean = false,
     ): TranslateResult =
-        when (val parse = parseToRelNode(source, sourceLanguage, targetSchema, queryRefs, sourceSchema, parameters)) {
+        when (
+            val parse =
+                parseToRelNode(
+                    source,
+                    sourceLanguage,
+                    targetSchema,
+                    queryRefs,
+                    sourceSchema,
+                    parameters,
+                    expandLogicalBodies = expandLogicalBodies,
+                )
+        ) {
             is ParseResult.Failure -> TranslateResult.Failure(parse.code, parse.message)
             is ParseResult.Success ->
                 // Intentionally omits the `parameters` arg: the string-only translate RPC produces
@@ -263,6 +292,7 @@ class Translator(
         sourceSchema: SchemaCode,
         parameters: List<SqlParam>,
         strictLane: Boolean = false,
+        expandLogicalBodies: Boolean = false,
     ): ParseResult {
         // LQ (L-2, L-7) — a strict saved-query parse needs its lane; a logical query takes no parameters.
         if (strictLane) {
@@ -456,7 +486,14 @@ class Translator(
                     )
                 }
                 val r =
-                    runFrontHalfStages(v.rel, validatedFramework, targetSchema, prepared, hintsByTable = hintsByTable)
+                    runFrontHalfStages(
+                        v.rel,
+                        validatedFramework,
+                        targetSchema,
+                        prepared,
+                        hintsByTable = hintsByTable,
+                        expandLogicalBodies = expandLogicalBodies,
+                    )
                 when (r) {
                     is ParseResult.Success -> r.copy(modelJoinsSql = modelJoinsSql)
                     is ParseResult.Failure -> r.copy(modelJoinsSql = modelJoinsSql)
@@ -581,6 +618,9 @@ class Translator(
      *       Blocking failures: `entity_unmapped`, `mapping_kind_not_supported`.
      *   6. **EXPAND_JOINS-physical** — only when `targetSchema = DB`. Insert FK-based conditions
      *       between physical TableScans; "don't double-join" leaves logical-stage conditions intact.
+     *   4b. **EXPAND_LOGICAL_BODIES** (LQ, opt-in) — only when `targetSchema = ER` and
+     *       `expandLogicalBodies`: entities stacked on logical queries are expanded in place under a stamped
+     *       boundary Project (L-8). Blocking failure: `entity_query_mapping_cycle`.
      *
      * When `targetSchema = ER`, stages 5 and 6 are skipped; the returned plan keeps its ER
      * scans for the two-half pipeline (call-1 produces ER, validator pass 1 runs against it,
@@ -598,6 +638,7 @@ class Translator(
         preparedSql: PreparedSql? = null,
         relNodeNames: Map<Int, String> = emptyMap(),
         hintsByTable: Map<String, List<TableHintSpec>> = emptyMap(),
+        expandLogicalBodies: Boolean = false,
     ): ParseResult =
         try {
             // NX-A: decorrelate correlated `[NOT] EXISTS` / `IN` sub-queries before encode. A
@@ -644,6 +685,18 @@ class Translator(
             val logical = JoinerLogical.apply(plan, model)
             plan = logical.plan
             var warnings: List<org.tatrman.translator.joiner.JoinerWarning> = logical.warnings
+
+            // 4b. EXPAND_LOGICAL_BODIES (LQ, L-8) — the end of the ER half, opt-in, ER target only.
+            if (expandLogicalBodies && targetSchema == SchemaCode.ER) {
+                plan =
+                    when (val expanded = ExpandLogicalBodies.apply(plan, model)) {
+                        is ExpandLogicalBodiesResult.Success -> expanded.plan
+                        is ExpandLogicalBodiesResult.Failure -> return ParseResult.Failure(
+                            expanded.code,
+                            expanded.message,
+                        )
+                    }
+            }
 
             // 5 + 6. Physical stages — gated on targetSchema.
             if (targetSchema == SchemaCode.DB || targetSchema == SchemaCode.SCHEMA_CODE_UNSPECIFIED) {
@@ -793,6 +846,7 @@ class Translator(
     private fun parseRelNodeBytes(
         sourceText: String,
         targetSchema: SchemaCode,
+        expandLogicalBodies: Boolean = false,
     ): ParseResult {
         val plan =
             try {
@@ -830,6 +884,7 @@ class Translator(
             framework,
             targetSchema,
             relNodeNames = PositionalParameters.namesByIndex(plan),
+            expandLogicalBodies = expandLogicalBodies,
         )
     }
 

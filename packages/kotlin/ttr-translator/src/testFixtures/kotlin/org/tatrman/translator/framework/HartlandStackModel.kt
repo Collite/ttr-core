@@ -45,6 +45,14 @@ object HartlandStackModel {
         "SELECT shopper_revenue.shopper_id, shopper_revenue.last_name, shopper_revenue.total_revenue " +
             "FROM shopper_revenue WHERE shopper_revenue.total_revenue > 1000"
 
+    /**
+     * A level-2 body with no literal: shoppers with a household. (A literal compared with a FLOAT attribute —
+     * [BIG_SPENDERS_SQL] — re-encodes differently after a Calcite round trip; see `LogicalQuerySpec` K1.)
+     */
+    const val HOUSEHOLDERS_SQL: String =
+        "SELECT shopper_revenue.shopper_id, shopper_revenue.last_name, shopper_revenue.total_revenue " +
+            "FROM shopper_revenue WHERE shopper_revenue.current_household IS NOT NULL"
+
     /** `er.query.<name>` — the ER-lane saved-query qname (L-1). */
     fun erQuery(name: String): QualifiedName =
         QualifiedName
@@ -130,9 +138,15 @@ object HartlandStackModel {
             attributeRenames = HartlandJoinModel.renames + stackRenames,
         )
 
-    /** [level1] + `big_spender` stacked on `er.query.big_spenders`, a logical query over `shopper_revenue`. */
-    fun stackedTwice(level1: InMemoryModelHandle = stacked()): InMemoryModelHandle {
-        val body = parseEr(level1, BIG_SPENDERS_SQL)
+    /**
+     * [level1] + `big_spender` stacked on `er.query.big_spenders`, a logical query over `shopper_revenue` —
+     * [BIG_SPENDERS_SQL] unless [level2Sql] says otherwise.
+     */
+    fun stackedTwice(
+        level1: InMemoryModelHandle = stacked(),
+        level2Sql: String = BIG_SPENDERS_SQL,
+    ): InMemoryModelHandle {
+        val body = parseEr(level1, level2Sql)
         check(erScans(body).map { it.name } == listOf("shopper_revenue")) { "level-2 body must keep the stacked scan" }
         return InMemoryModelHandle(
             tables = HartlandJoinModel.tables,

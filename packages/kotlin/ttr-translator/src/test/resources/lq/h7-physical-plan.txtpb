@@ -1,0 +1,259 @@
+project {
+  input {
+    filter {
+      input {
+        project {
+          input {
+            aggregate {
+              input {
+                project {
+                  input {
+                    join {
+                      left {
+                        table_scan {
+                          table {
+                            schema_code: DB
+                            namespace: "dbo"
+                            name: "store_sales"
+                          }
+                          output_columns {
+                            name: "shopper_id"
+                            type: "int"
+                          }
+                          output_columns {
+                            name: "address_id"
+                            type: "int"
+                          }
+                          output_columns {
+                            name: "store_id"
+                            type: "int"
+                          }
+                          output_columns {
+                            name: "product_id"
+                            type: "int"
+                          }
+                          output_columns {
+                            name: "ticket_number"
+                            type: "int"
+                          }
+                          output_columns {
+                            name: "promo_id"
+                            type: "int"
+                          }
+                          output_columns {
+                            name: "sale_month"
+                            type: "text"
+                          }
+                          output_columns {
+                            name: "revenue"
+                            type: "float"
+                          }
+                          output_columns {
+                            name: "quantity"
+                            type: "float"
+                          }
+                        }
+                      }
+                      right {
+                        table_scan {
+                          table {
+                            schema_code: DB
+                            namespace: "dbo"
+                            name: "customer"
+                          }
+                          output_columns {
+                            name: "shopper_id"
+                            type: "int"
+                          }
+                          output_columns {
+                            name: "last_name"
+                            type: "text"
+                          }
+                          output_columns {
+                            name: "current_household"
+                            type: "int"
+                          }
+                          output_columns {
+                            name: "address_id"
+                            type: "int"
+                          }
+                          output_columns {
+                            name: "first_purchase_date"
+                            type: "int"
+                          }
+                          output_columns {
+                            name: "first_shipment_date"
+                            type: "int"
+                          }
+                          output_columns {
+                            name: "birth_country"
+                            type: "text"
+                          }
+                        }
+                      }
+                      join_type: INNER
+                      condition {
+                        function {
+                          operation: "eq"
+                          operands {
+                            column_ref {
+                              source_alias: "$L"
+                              name: "shopper_id"
+                              type: "int"
+                            }
+                            result_type: "int"
+                          }
+                          operands {
+                            column_ref {
+                              source_alias: "$R"
+                              name: "shopper_id"
+                              type: "int"
+                            }
+                            result_type: "int"
+                          }
+                        }
+                        result_type: "bool"
+                      }
+                    }
+                  }
+                  expressions {
+                    expression {
+                      column_ref {
+                        name: "shopper_id0"
+                        type: "int"
+                      }
+                      result_type: "int"
+                    }
+                    alias: "shopper_id"
+                  }
+                  expressions {
+                    expression {
+                      column_ref {
+                        name: "last_name"
+                        type: "text"
+                      }
+                      result_type: "text"
+                    }
+                    alias: "last_name"
+                  }
+                  expressions {
+                    expression {
+                      column_ref {
+                        name: "current_household"
+                        type: "int"
+                      }
+                      result_type: "int"
+                    }
+                    alias: "current_household"
+                  }
+                  expressions {
+                    expression {
+                      column_ref {
+                        name: "revenue"
+                        type: "float"
+                      }
+                      result_type: "float"
+                    }
+                    alias: "revenue"
+                  }
+                }
+              }
+              group_keys {
+                name: "shopper_id"
+                type: "int"
+              }
+              group_keys {
+                name: "last_name"
+                type: "text"
+              }
+              group_keys {
+                name: "current_household"
+                type: "int"
+              }
+              aggregates {
+                function: "sum"
+                args {
+                  name: "revenue"
+                  type: "float"
+                }
+                alias: "revenue"
+              }
+            }
+          }
+          expressions {
+            expression {
+              column_ref {
+                name: "shopper_id"
+              }
+            }
+            alias: "shopper_id"
+          }
+          expressions {
+            expression {
+              column_ref {
+                name: "last_name"
+              }
+            }
+            alias: "last_name"
+          }
+          expressions {
+            expression {
+              column_ref {
+                name: "current_household"
+              }
+            }
+            alias: "current_household"
+          }
+          expressions {
+            expression {
+              column_ref {
+                name: "revenue"
+              }
+            }
+            alias: "total_revenue"
+          }
+        }
+      }
+      condition {
+        function {
+          operation: "gt"
+          operands {
+            column_ref {
+              name: "shopper_id"
+              type: "int"
+            }
+            result_type: "int"
+          }
+          operands {
+            literal {
+              int_value: 1000
+              type: "int"
+            }
+            result_type: "int"
+          }
+        }
+        result_type: "bool"
+      }
+    }
+  }
+  expressions {
+    expression {
+      column_ref {
+        name: "last_name"
+        type: "text"
+      }
+      result_type: "text"
+    }
+    alias: "last_name"
+  }
+  expressions {
+    expression {
+      column_ref {
+        name: "total_revenue"
+        type: "float"
+      }
+      result_type: "float"
+    }
+    alias: "total_revenue"
+  }
+}

@@ -103,6 +103,9 @@ object MapToPhysical {
         visited: Set<QualifiedName>,
     ): PlanNode {
         val withChildren = JoinerPlanWalker.rewriteChildren(plan) { rewrite(it, model, visited) }
+        if (withChildren.nodeCase == PlanNode.NodeCase.PROJECT && withChildren.project.hasExpandedFrom()) {
+            return closeBoundary(withChildren)
+        }
         if (withChildren.nodeCase != PlanNode.NodeCase.SCAN) return withChildren
         if (withChildren.scan.getObject().schemaCode != SchemaCode.ER) return withChildren
         return rewriteEntityScan(withChildren, model, visited)
@@ -154,16 +157,30 @@ object MapToPhysical {
         // entities). Map it to physical too; `visited` already carries this entity so a self-
         // reference is caught as a cycle rather than recursing forever.
         val physicalBody = rewrite(body, model, visited)
+        return boundaryProject(scanPlan, model, physicalBody)?.let { PlanNode.newBuilder().setProject(it).build() }
+            ?: physicalBody
+    }
 
-        // Alias-at-boundary: select, for each attribute the scan declares, the backing query's
-        // output column it maps to (attributeColumnRenames; identity when unmapped), aliased back
-        // to the ER attribute name so upstream operators keep resolving by attribute name. A bare
-        // scan with no declared columns lets the body's natural shape through (mirrors Unfold).
+    /**
+     * Alias-at-boundary: select, for each attribute the entity [scanPlan] declares, the backing query's
+     * output column it maps to ([ModelHandle.attributeColumnRenames]; identity when unmapped), aliased back
+     * to the ER attribute name so upstream operators keep resolving by attribute name. Null for a bare scan
+     * with no declared columns — its caller lets the body's natural shape through (mirrors Unfold).
+     *
+     * The one implementation of the boundary: MAP_TO_PHYSICAL places it over an inlined physical body, and
+     * [ExpandLogicalBodies] over an ER-lane body expanded in the ER half (then stamped `expanded_from`) — so
+     * the two paths produce the same plan (contract L-10).
+     */
+    internal fun boundaryProject(
+        scanPlan: PlanNode,
+        model: ModelHandle,
+        body: PlanNode,
+    ): ProjectNode.Builder? {
         val scanCols = scanPlan.scan.outputColumnsList
-        if (scanCols.isEmpty()) return physicalBody
+        if (scanCols.isEmpty()) return null
 
-        val renames = model.attributeColumnRenames(entityQname)
-        val project = ProjectNode.newBuilder().setInput(physicalBody)
+        val renames = model.attributeColumnRenames(scanPlan.scan.getObject())
+        val project = ProjectNode.newBuilder().setInput(body)
         for (erCol in scanCols) {
             val erName = erCol.name
             val sourceName = renames[erName] ?: erName
@@ -179,6 +196,36 @@ object MapToPhysical {
                     .build(),
             )
         }
+        return project
+    }
+
+    /**
+     * LQ (L-10, L-11) — a stamped Project is the boundary of a logical-query body EXPAND_LOGICAL_BODIES
+     * already inlined in the ER half (its inner entity scans are mapped by the walk, like any). MAP_TO_PHYSICAL
+     * owns the boundary's physical form: it re-emits it exactly as [boundaryProject] builds every `ToQuery`
+     * boundary (each attribute a bare column ref to the body's output, aliased to the attribute — a Calcite
+     * round trip has typed those refs since) and ends the stamp here. So the physical plan is the same whether
+     * the body was expanded in the ER half or inlined now, and no physical plan carries `expanded_from`.
+     */
+    private fun closeBoundary(plan: PlanNode): PlanNode {
+        val stamped = plan.project
+        if (stamped.expressionsList.any { it.expression.exprCase != Expression.ExprCase.COLUMN_REF }) {
+            return plan.toBuilder().setProject(stamped.toBuilder().clearExpandedFrom()).build()
+        }
+        val project = ProjectNode.newBuilder().setInput(stamped.input)
+        for (ne in stamped.expressionsList) {
+            project.addExpressions(
+                NamedExpression
+                    .newBuilder()
+                    .setExpression(
+                        Expression
+                            .newBuilder()
+                            .setColumnRef(ColumnRef.newBuilder().setName(ne.expression.columnRef.name).build())
+                            .build(),
+                    ).setAlias(ne.alias)
+                    .build(),
+            )
+        }
         return PlanNode.newBuilder().setProject(project).build()
     }
 
@@ -188,9 +235,10 @@ object MapToPhysical {
      * `query` namespace, `schema_code` UNSPECIFIED — the `query` token isn't a real SchemaCode),
      * while an `er2db_entity` `sqlQuery` reference may carry a schema token (e.g. `db.query.x`).
      * Try the reference as-is, then with the schema stripped. Returns null when no compiled body
-     * exists under either key.
+     * exists under either key. A logical query (LQ) is keyed `er.query.<name>` — the same tolerance
+     * finds it under that key or schemaless.
      */
-    private fun resolveQueryBody(
+    internal fun resolveQueryBody(
         queryQname: QualifiedName,
         model: ModelHandle,
     ): PlanNode? {
