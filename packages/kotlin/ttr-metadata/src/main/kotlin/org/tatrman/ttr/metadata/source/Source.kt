@@ -392,7 +392,8 @@ class FileBasedSource(
                 val schemaKindAllowlist =
                     mapOf(
                         "db" to setOf("table", "view", "procedure", "foreign_key"),
-                        "er" to setOf("entity", "relation"),
+                        // LQ (L-1): a query declared in a `model er` file is a logical query.
+                        "er" to setOf("entity", "relation", "query"),
                         "cnc" to setOf("role"),
                     )
                 for (def in pr.definitions) {
@@ -936,7 +937,14 @@ class FileBasedSource(
                 // references resolve to it. Was hardcoded `qname("query","query",…)`,
                 // which stranded queries at UNSPECIFIED.query.<name> and broke every
                 // entity→query mapping (entity_query_mapping_unresolved).
-                val qn = qname(schemaCode, namespace, def.name)
+                // LQ (L-1): declared in a `model er` file it is a logical query, written
+                // over entities — `er.query.<name>`, whatever the file's namespace.
+                val qn =
+                    if (schemaCode.equals("er", ignoreCase = true)) {
+                        qname("er", "query", def.name)
+                    } else {
+                        qname(schemaCode, namespace, def.name)
+                    }
                 // Prefer the structured tagged block (DESIGN §10): its tag carries
                 // language + dialect. Fall back to the soft-deprecated `language:`
                 // property only when no tagged block is present.

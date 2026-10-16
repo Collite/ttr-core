@@ -12,6 +12,7 @@ import org.tatrman.ttr.metadata.model.Model
 import org.tatrman.ttr.metadata.model.ModelDescriptor
 import org.tatrman.ttr.metadata.model.ModelVersion
 import org.tatrman.ttr.metadata.model.Query
+import org.tatrman.ttr.metadata.model.SchemaCode
 import org.tatrman.ttr.metadata.resolve.ReferenceResolutionPass
 import org.tatrman.ttr.metadata.source.LoadWarning
 import org.tatrman.ttr.metadata.source.SourceSnapshot
@@ -138,6 +139,24 @@ class ModelReconciler(
                 .DrillMapValidator()
                 .validate(model)
                 .errors
+
+        // LQ (L-2, ruling LQ-5) — a logical query (`er.query.<name>`) takes no parameters:
+        // a parametrized query stays a db query. The editor flags the same rule
+        // (`ttr/logical-query-parameters`); this is the load-time refusal.
+        for (query in queries.values) {
+            if (query.qname.schemaCode != SchemaCode.ER || query.parameters.isEmpty()) continue
+            errors +=
+                LoadWarning(
+                    sourceId = "<reconcile>",
+                    file = query.sourceFile.ifEmpty { "<reconcile>" },
+                    line = -1,
+                    column = -1,
+                    message =
+                        "logical_query_parameters: logical query 'er.query.${query.qname.name}' declares " +
+                            "parameters (${query.parameters.joinToString { it.name }}); a parametrized " +
+                            "query stays a db query",
+                )
+        }
 
         return ReconciliationResult(model = model, warnings = warnings, errors = errors)
     }

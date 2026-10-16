@@ -23,6 +23,7 @@ import org.tatrman.ttr.metadata.model.Mapping
 import org.tatrman.ttr.metadata.model.MappingTarget
 import org.tatrman.ttr.metadata.model.Model
 import org.tatrman.ttr.metadata.model.Query
+import org.tatrman.ttr.metadata.model.SchemaCode
 import org.tatrman.ttr.metadata.model.Relation
 import org.tatrman.ttr.metadata.model.Role
 import org.tatrman.ttr.metadata.model.SearchHints
@@ -117,6 +118,9 @@ object ModelToDefinitions {
     /** Stock roles come from BuiltinStockSource; their sourceFile ends with this path. */
     private const val STOCK_ROLES_PATH = "cnc-stock-roles.ttr"
 
+    /** LQ — the bucket (and file stem) of the logical queries: `er-query.ttr`, under `model er`. */
+    private const val ER_QUERY_BUCKET = "er-query"
+
     /**
      * Converts the full [Model] into an [ExportBundle] partitioned **per source file**:
      * one package directory per originating YAML file (package name = file name minus its
@@ -184,8 +188,13 @@ object ModelToDefinitions {
             }
         }
         // Queries live in `db.ttr` (they describe DB-side SQL); they derive the `query`
-        // schema from their kind in the directive-less file.
-        model.queries.values.forEach { tagged += Tagged(queryToQueryDef(it), "db", it.sourceFile) }
+        // schema from their kind in the directive-less file. A logical query (LQ L-1,
+        // `er.query.<name>`) is only one because it sits in a `model er` file, so it gets
+        // a file of its own with that directive — `er.ttr` stays directive-less.
+        model.queries.values.forEach {
+            val bucket = if (it.qname.schemaCode == SchemaCode.ER) ER_QUERY_BUCKET else "db"
+            tagged += Tagged(queryToQueryDef(it), bucket, it.sourceFile)
+        }
 
         // One file per (package, bucket): at most `db.ttr` / `er.ttr` / `cnc.ttr`.
         // All defs of a bucket — even from several source files in the same package —
@@ -198,7 +207,7 @@ object ModelToDefinitions {
                 files +=
                     ExportFile(
                         filename = "$schema.ttr",
-                        schemaCode = null,
+                        schemaCode = if (schema == ER_QUERY_BUCKET) "er" else null,
                         namespace = null,
                         definitions = schemaItems.map { it.def },
                         packageName = pkg,
