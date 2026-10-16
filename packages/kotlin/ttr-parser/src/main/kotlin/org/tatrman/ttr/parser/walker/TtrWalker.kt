@@ -131,6 +131,23 @@ class TtrWalker(
             warn(doc.graphBlock(), "graph block ignored in a .ttr file — graphs belong in .ttrg render artefacts")
         }
 
+        // LQ (logical queries, L-2 / ruling LQ-5): a `def query` in a `model er` file is a logical
+        // query over entities and takes no parameters. A warning here, like the other query
+        // diagnostics: an error would empty the file's definitions; ttr-metadata refuses the load.
+        if (schema?.modelCode == "er") {
+            doc.definition().forEach { d ->
+                val od = d.objectDefinition()
+                val q = defs.firstOrNull { it is QueryDef && it.name == od.id().text } as? QueryDef
+                if (od.queryDef() != null && q != null && q.parameters.isNotEmpty()) {
+                    warn(
+                        od,
+                        "${DiagnosticCode.LogicalQueryParameters}: logical query '${q.name}' (model er) cannot " +
+                            "declare parameters; a parametrized query stays a db query",
+                    )
+                }
+            }
+        }
+
         return WalkResult(
             modelDirective = schema,
             definitions = defs,

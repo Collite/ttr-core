@@ -1,0 +1,16 @@
+[project]
+name = "hartland-2.1-logical-query"
+
+[language]
+preferred = "en"
+
+[schemas]
+declared = ["db", "er"]
+namespaces = { db = "dbo", er = "entity" }
+
+[stock]
+load = ["cnc-roles"]
+
+[lint]
+strict = false
+require-descriptions = false

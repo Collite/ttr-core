@@ -89,7 +89,10 @@ fun kindOf(def: Definition): String =
  * (D14, not the retired `query` value). Kept identical to the TS twin
  * (`defaultSchemaForKind` in `default-schema.ts`, also an alias of `modelForKind`).
  */
-internal fun defaultSchemaForKind(kind: String): String = modelForKind(kind)
+internal fun defaultSchemaForKind(
+    kind: String,
+    declaringModel: String = "",
+): String = modelForKind(kind, declaringModel)
 
 /** The reserved model codes (D14: no `query`; D15: `cnc` schema-less; `world` v4.1). */
 val MODEL_CODES = setOf("db", "er", "md", "binding", "cnc", "world")
@@ -98,8 +101,22 @@ val MODEL_CODES = setOf("db", "er", "md", "binding", "cnc", "world")
  * Kind → model layer (D14/D15). Mirrors TS `modelForKind` (`qname.ts`).
  * `query`/`drillMap` → `db` (D14); `role`/`er2cncRole` → `cnc` (D15); er2db / md2
  * binding kinds → `binding`; MD logical kinds → `md`; everything else → `db`.
+ * A `query` declared in a `model er` file ([declaringModel] = the file's `model`
+ * directive code) is a logical query → `er` (LQ L-1); [declaringModel] moves no
+ * other kind (D12).
  */
-fun modelForKind(kind: String): String =
+@JvmOverloads
+fun modelForKind(
+    kind: String,
+    declaringModel: String = "",
+): String =
+    if (kind == "query" && declaringModel == "er") {
+        "er"
+    } else {
+        modelForKindOnly(kind)
+    }
+
+private fun modelForKindOnly(kind: String): String =
     when (kind) {
         "entity", "attribute", "relation" -> "er"
         "er2dbEntity", "er2dbAttribute", "er2dbRelation",
@@ -135,16 +152,19 @@ fun namespaceForKind(kind: String): String =
 /**
  * The single source of the v4.0 uniform canonical-key shape
  * `<package>.<model>.<schema?>.<kind>.<parts>`. Mirrors TS `buildCanonicalKey`
- * (`qname.ts`): model derived from [kind]; schema present only for `db` (default
- * `dbo`); kind segment uses the namespace alias where one exists, else [kind].
+ * (`qname.ts`): model derived from [kind] (and, for a `query`, [declaringModel] —
+ * LQ L-1); schema present only for `db` (default `dbo`); kind segment uses the
+ * namespace alias where one exists, else [kind].
  */
+@JvmOverloads
 fun buildCanonicalKey(
     packageName: String,
     schemaId: String,
     kind: String,
     parts: List<String>,
+    declaringModel: String = "",
 ): String {
-    val model = modelForKind(kind)
+    val model = modelForKind(kind, declaringModel)
     val segments = mutableListOf<String>()
     if (packageName.isNotEmpty()) segments += packageName
     segments += model

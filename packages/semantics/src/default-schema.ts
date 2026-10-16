@@ -33,7 +33,11 @@ export function defaultNamespaceForSchema(schemaCode: string): string {
 
 /**
  * The single-valued kind→model map (D4/D14/D15) and the one source of truth for
- * model derivation. `query`/`drillMap` → `db` (D14 — there is no `query` model);
+ * model derivation. `query`/`drillMap` → `db` (D14 — there is no `query` model),
+ * except that a `query` declared in a `model er` file is a **logical query** →
+ * `er` (LQ, contract L-1: the lane is the model the query sits in; the body is
+ * never inspected). `declaringModel` is the file's `model` directive code (`''`
+ * or absent for a directive-less file) and moves no other kind (D12);
  * `role`/`er2cncRole` → `cnc` (D15, schema-less); er2db / md2db binding kinds →
  * `binding`; MD logical kinds → `md`; everything else (table, view, …) → `db`.
  *
@@ -42,7 +46,8 @@ export function defaultNamespaceForSchema(schemaCode: string): string {
  * value. `qname.ts` re-exports `modelForKind` so the public API name is stable.
  * Mirrored byte-for-byte in Kotlin (`Kinds.kt`) and Python (`qname.py`).
  */
-export function modelForKind(kind: string): ModelCode {
+export function modelForKind(kind: string, declaringModel?: string): ModelCode {
+  if (kind === 'query' && declaringModel === 'er') return 'er';
   switch (kind) {
     case 'entity':
     case 'attribute':
@@ -92,7 +97,7 @@ export function modelForKind(kind: string): ModelCode {
 }
 
 /** @deprecated Use {@link modelForKind}. Kept as an alias for existing callers. */
-export const defaultSchemaForKind: (kind: string) => ModelCode = modelForKind;
+export const defaultSchemaForKind: (kind: string, declaringModel?: string) => ModelCode = modelForKind;
 
 /**
  * The symbol-table namespace segment for a def kind, where it differs from the

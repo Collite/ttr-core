@@ -104,6 +104,7 @@ export class DocumentSymbolTable {
       schemaId: this.namespace,
       kind,
       parts,
+      declaringModel: this.schemaCode,
     });
   }
 
@@ -129,7 +130,7 @@ export class DocumentSymbolTable {
       documentUri: this.documentUri,
       parent: parentQname,
       packageName: this.packageName,
-      schemaCode: modelForKind(def.kind),
+      schemaCode: modelForKind(def.kind, this.schemaCode),
     };
 
     if (def.kind === 'er2dbEntity' || def.kind === 'er2dbAttribute' || def.kind === 'er2dbRelation') {

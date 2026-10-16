@@ -336,10 +336,28 @@ function walkDocument(ctx: DocumentContext, file: string, syntaxErrors: ParseErr
   // v3.0: the `.ttrd` domain file-kind is gone — subject areas are now plain
   // `def area` definitions (see walkAreaDef) that coexist with other defs.
 
+  const modelDirective = schemaCtx ? walkModelDirective(schemaCtx, file) : undefined;
+
+  // LQ (logical queries, L-2 / ruling LQ-5): a `def query` in a `model er` file is a
+  // logical query over entities and takes no parameters — a parametrized query stays a
+  // db query. The definition still walks; the load-time refusal is ttr-metadata's.
+  if (modelDirective?.modelCode === 'er') {
+    for (const def of definitions) {
+      if (def.kind === 'query' && def.parameters && def.parameters.length > 0) {
+        localErrors.push({
+          code: DiagnosticCode.LogicalQueryParameters,
+          message: `logical query '${def.name}' (model er) cannot declare parameters; a parametrized query stays a db query`,
+          severity: 'error',
+          source: def.source,
+        });
+      }
+    }
+  }
+
   const doc: Document = {
     packageDecl: packageCtx ? walkPackageDecl(packageCtx, file) : undefined,
     imports: importCtxs.map((ic) => walkImportDecl(ic, file)),
-    modelDirective: schemaCtx ? walkModelDirective(schemaCtx, file) : undefined,
+    modelDirective,
     graph: graphCtx ? walkGraphBlock(graphCtx, file) : undefined,
     definitions,
     securityBlocks: ctx.securityBlock().map((sb) => walkSecurityBlock(sb, file)),

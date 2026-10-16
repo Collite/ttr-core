@@ -1,0 +1,79 @@
+{
+    "definitions": [
+        {
+            "description": "Revenue per shopper, written over entities",
+            "kind": "query",
+            "name": "shopper_revenue",
+            "properties": {
+                "sourceText": {
+                    "dialect": null,
+                    "kind": "taggedBlock",
+                    "language": "SQL",
+                    "tag": "sql",
+                    "value": "SELECT shopper.shopper_id, SUM(sale.revenue) AS revenue\nFROM sale JOIN shopper\nGROUP BY shopper.shopper_id"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": "A shopper with the revenue of their sales",
+            "kind": "entity",
+            "name": "shopper_revenue",
+            "properties": {
+                "attributes": [
+                    {
+                        "description": "Shopper",
+                        "kind": "attribute",
+                        "name": "shopper_id",
+                        "properties": {
+                            "isKey": true,
+                            "type": {
+                                "name": "int"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": "Revenue",
+                        "kind": "attribute",
+                        "name": "total_revenue",
+                        "properties": {
+                            "binding": {
+                                "id": "revenue",
+                                "kind": "bareId"
+                            },
+                            "type": {
+                                "name": "decimal"
+                            }
+                        },
+                        "tags": []
+                    }
+                ],
+                "binding": {
+                    "kind": "block",
+                    "target": {
+                        "entries": {
+                            "query": {
+                                "kind": "id",
+                                "parts": [
+                                    "er",
+                                    "query",
+                                    "shopper_revenue"
+                                ],
+                                "path": "er.query.shopper_revenue"
+                            }
+                        },
+                        "kind": "object"
+                    }
+                }
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": null,
+    "schemaDirective": {
+        "code": "er",
+        "namespace": null
+    }
+}

@@ -9,8 +9,9 @@ import { collectBindingReferences } from './mapping-references.js';
 /**
  * The canonical key of a container def that can host references (so the
  * reference index can attribute each ref to its referrer). `schemaCode` is the
- * file's `model` directive code (unused for the key — the model is now derived
- * from `def.kind`), `namespace` the file's `schema` id (db only). Returns
+ * file's `model` directive code (the model is derived from `def.kind`; the
+ * directive only moves a `query` declared under `model er`, LQ L-1),
+ * `namespace` the file's `schema` id (db only). Returns
  * undefined for kinds that never enclose references.
  */
 export function enclosingQnameOf(def: Definition, schemaCode: string, namespace: string, packageName?: string): string | undefined {
@@ -20,7 +21,7 @@ export function enclosingQnameOf(def: Definition, schemaCode: string, namespace:
     def.kind === 'er2dbEntity' || def.kind === 'er2dbAttribute' ||
     def.kind === 'er2dbRelation' || def.kind === 'er2cncRole'
   ) {
-    return buildCanonicalKey({ packageName, schemaId: namespace, kind: def.kind, parts: [def.name] });
+    return buildCanonicalKey({ packageName, schemaId: namespace, kind: def.kind, parts: [def.name], declaringModel: schemaCode });
   }
   return undefined;
 }
