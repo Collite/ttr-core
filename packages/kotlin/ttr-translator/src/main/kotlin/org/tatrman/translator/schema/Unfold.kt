@@ -188,6 +188,9 @@ object Unfold {
             else -> 0
         }
 
+    /** The output column names of [plan], in order — UNFOLD's rename source; public as [org.tatrman.translator.orchestrator.Translator.outputColumnNames]. */
+    internal fun outputColumnNames(plan: PlanNode): List<String> = collectOutputNames(plan)
+
     private fun collectOutputNames(plan: PlanNode): List<String> =
         when (plan.nodeCase) {
             PlanNode.NodeCase.TABLE_SCAN -> plan.tableScan.outputColumnsList.map { it.name }

@@ -17,9 +17,9 @@ import org.tatrman.translator.detect.SchemaDecision
 import org.tatrman.translator.detect.SchemaDetector
 import org.tatrman.translator.framework.EntityMapping
 import org.tatrman.translator.framework.HartlandJoinModel
-import org.tatrman.translator.framework.HartlandJoinModel.attr
 import org.tatrman.translator.framework.HartlandJoinModel.db
 import org.tatrman.translator.framework.HartlandJoinModel.er
+import org.tatrman.translator.framework.HartlandStackModel
 import org.tatrman.translator.framework.InMemoryModelHandle
 import org.tatrman.translator.framework.ModelAttribute
 import org.tatrman.translator.framework.ModelColumn
@@ -31,7 +31,6 @@ import org.tatrman.translator.framework.ModelTable
 import org.tatrman.translator.framework.SavedQueryBody
 import org.tatrman.translator.framework.SurfaceType
 import org.tatrman.translator.joiner.JoinerMessages
-import org.tatrman.translator.joiner.JoinerPlanWalker
 import org.tatrman.translator.orchestrator.ParseResult
 import org.tatrman.translator.orchestrator.TranslateResult
 import org.tatrman.translator.orchestrator.Translator
@@ -267,21 +266,8 @@ class LogicalQueryConfirmationSpec :
     })
 
 private object Lq {
-    const val REVENUE_SQL: String =
-        "SELECT shopper.shopper_id, shopper.last_name, shopper.current_household, SUM(sale.revenue) AS revenue " +
-            "FROM sale JOIN shopper " +
-            "GROUP BY shopper.shopper_id, shopper.last_name, shopper.current_household"
-
-    /** The same query written against the tables. */
-    const val REVENUE_SQL_PHYSICAL: String =
-        "SELECT customer.shopper_id, customer.last_name, customer.current_household, " +
-            "SUM(store_sales.revenue) AS revenue " +
-            "FROM store_sales JOIN customer ON store_sales.shopper_id = customer.shopper_id " +
-            "GROUP BY customer.shopper_id, customer.last_name, customer.current_household"
-
-    const val BIG_SPENDERS_SQL: String =
-        "SELECT shopper_revenue.shopper_id, shopper_revenue.last_name, shopper_revenue.total_revenue " +
-            "FROM shopper_revenue WHERE shopper_revenue.total_revenue > 1000"
+    const val REVENUE_SQL: String = HartlandStackModel.REVENUE_SQL
+    const val REVENUE_SQL_PHYSICAL: String = HartlandStackModel.REVENUE_SQL_PHYSICAL
 
     const val C1_BARE: String =
         "SELECT household.buy_potential, SUM(shopper_revenue.total_revenue) AS revenue " +
@@ -291,46 +277,7 @@ private object Lq {
         "SELECT household.buy_potential, SUM(shopper_revenue.total_revenue) AS revenue " +
             "FROM shopper_revenue, household GROUP BY household.buy_potential"
 
-    fun erQuery(name: String): QualifiedName =
-        QualifiedName
-            .newBuilder()
-            .setSchemaCode(SchemaCode.ER)
-            .setNamespace("query")
-            .setName(name)
-            .build()
-
-    val revenueQuery = erQuery("shopper_revenue")
-    val bigSpendersQuery = erQuery("big_spenders")
-
-    /** Declared attributes (LQ-3); `total_revenue` is bound to the output column `revenue`. */
-    val shopperRevenue =
-        ModelEntity(
-            er("shopper_revenue"),
-            listOf(
-                ModelAttribute("shopper_id", SurfaceType.INT, nullable = false, isKey = true),
-                ModelAttribute("last_name", SurfaceType.TEXT),
-                ModelAttribute("current_household", SurfaceType.INT),
-                ModelAttribute("total_revenue", SurfaceType.FLOAT),
-            ),
-        )
-
-    val bigSpender =
-        ModelEntity(
-            er("big_spender"),
-            listOf(
-                ModelAttribute("shopper_id", SurfaceType.INT, nullable = false, isKey = true),
-                ModelAttribute("last_name", SurfaceType.TEXT),
-                ModelAttribute("total_revenue", SurfaceType.FLOAT),
-            ),
-        )
-
-    /** `join:` pairs only — no FK exists anywhere in the model (C-1). */
-    val revenueHousehold =
-        ModelRelation(
-            fromEntity = er("shopper_revenue"),
-            toEntity = er("household"),
-            joinPairs = listOf(attr("shopper_revenue", "current_household") to attr("household", "household_id")),
-        )
+    fun erQuery(name: String): QualifiedName = HartlandStackModel.erQuery(name)
 
     fun table(
         name: String,
@@ -340,72 +287,19 @@ private object Lq {
     fun parseEr(
         model: ModelHandle,
         sql: String,
-    ): PlanNode {
-        val parsed =
-            Translator(
-                model,
-            ).parseToRelNode(sql, Language.SQL, targetSchema = SchemaCode.ER, sourceSchema = SchemaCode.ER)
-        check(parsed is ParseResult.Success) { "logical query did not parse: $parsed" }
-        // what a worker stores and a snapshot serves is bytes
-        return PlanNode.parseFrom(parsed.plan.toByteArray())
-    }
+    ): PlanNode = HartlandStackModel.parseEr(model, sql)
 
-    /**
-     * [base] + `shopper_revenue` stacked on `er.query.shopper_revenue`. The body is parsed against [bodyModel]
-     * (default: the base model — the stacked entity does not exist yet when its own query is parsed).
-     */
     fun stacked(
         base: InMemoryModelHandle,
         tables: List<ModelTable> = HartlandJoinModel.tables,
         mappings: Map<QualifiedName, EntityMapping> = HartlandJoinModel.entityMappings,
-        relations: List<ModelRelation> = HartlandJoinModel.relations + revenueHousehold,
+        relations: List<ModelRelation> = HartlandJoinModel.relations + HartlandStackModel.revenueHousehold,
         bodyModel: ModelHandle = base,
         body: PlanNode = parseEr(bodyModel, REVENUE_SQL),
-        storedUnder: QualifiedName = revenueQuery,
-    ): InMemoryModelHandle =
-        InMemoryModelHandle(
-            tables = tables,
-            entities = HartlandJoinModel.entities + shopperRevenue,
-            relations = relations,
-            entityMappings = mappings + (shopperRevenue.qname to EntityMapping.ToQuery(revenueQuery)),
-            savedQueries = listOf(ModelSavedQuery(storedUnder)),
-            savedQueryBodies = mapOf(storedUnder to SavedQueryBody(body, emptyList(), emptyList())),
-            attributeRenames =
-                HartlandJoinModel.renames + (
-                    shopperRevenue.qname to
-                        mapOf(
-                            "total_revenue" to "revenue",
-                        )
-                ),
-        )
+        storedUnder: QualifiedName = HartlandStackModel.revenueQuery,
+    ): InMemoryModelHandle = HartlandStackModel.stacked(base, tables, mappings, relations, bodyModel, body, storedUnder)
 
-    /** [level1] + `big_spender` stacked on `er.query.big_spenders`, a logical query over `shopper_revenue`. */
-    fun stackedTwice(level1: InMemoryModelHandle): InMemoryModelHandle {
-        val body = parseEr(level1, BIG_SPENDERS_SQL)
-        check(erScans(body).map { it.name } == listOf("shopper_revenue")) { "level-2 body must keep the stacked scan" }
-        return InMemoryModelHandle(
-            tables = HartlandJoinModel.tables,
-            entities = HartlandJoinModel.entities + shopperRevenue + bigSpender,
-            relations = HartlandJoinModel.relations + revenueHousehold,
-            entityMappings =
-                HartlandJoinModel.entityMappings +
-                    (shopperRevenue.qname to EntityMapping.ToQuery(revenueQuery)) +
-                    (bigSpender.qname to EntityMapping.ToQuery(bigSpendersQuery)),
-            savedQueries = listOf(ModelSavedQuery(revenueQuery), ModelSavedQuery(bigSpendersQuery)),
-            savedQueryBodies =
-                mapOf(
-                    revenueQuery to level1.savedQueryBody(revenueQuery),
-                    bigSpendersQuery to SavedQueryBody(body, emptyList(), emptyList()),
-                ),
-            attributeRenames =
-                HartlandJoinModel.renames + (
-                    shopperRevenue.qname to
-                        mapOf(
-                            "total_revenue" to "revenue",
-                        )
-                ),
-        )
-    }
+    fun stackedTwice(level1: InMemoryModelHandle): InMemoryModelHandle = HartlandStackModel.stackedTwice(level1)
 
     fun mssql(
         model: ModelHandle,
@@ -420,24 +314,9 @@ private object Lq {
             sourceSchema = SchemaCode.ER,
         )
 
-    fun nodes(plan: PlanNode): List<PlanNode> {
-        val out = mutableListOf(plan)
-        JoinerPlanWalker.rewriteChildren(plan) { child ->
-            out += nodes(child)
-            child
-        }
-        return out
-    }
+    fun erScans(plan: PlanNode): List<QualifiedName> = HartlandStackModel.erScans(plan)
 
-    fun erScans(plan: PlanNode): List<QualifiedName> =
-        nodes(
-            plan,
-        ).filter { it.nodeCase == PlanNode.NodeCase.SCAN && it.scan.getObject().schemaCode == SchemaCode.ER }.map {
-            it.scan.getObject()
-        }
-
-    fun tableScans(plan: PlanNode): List<QualifiedName> =
-        nodes(plan).filter { it.nodeCase == PlanNode.NodeCase.TABLE_SCAN }.map { it.tableScan.table }
+    fun tableScans(plan: PlanNode): List<QualifiedName> = HartlandStackModel.tableScans(plan)
 
     fun outputNames(plan: PlanNode): List<String> =
         when (plan.nodeCase) {

@@ -86,6 +86,14 @@ class Translator(
      *   and each `?` is pre-typed from the declared `type` via `ParameterTyper`. Empty (the
      *   default) keeps the verbatim-SQL behaviour — `{…}` is left untouched so free-SQL using
      *   JDBC escapes / literal curlies is unaffected. Ignored for RelNode / TransDSL / DF-DSL.
+     * @param strictLane LQ (contract L-7) — parse a **saved query** in the lane it is declared in.
+     *   `true` runs [SchemaDetector] even though [sourceSchema] is stated (a lenient parse skips it)
+     *   and refuses anything the detector does not `CONFIRM`: `mixed_lanes` when the body reads
+     *   entities and tables together, `lane_mismatch` otherwise (the other lane, unknown names, no
+     *   stated lane, or a body that names nothing) — both name the offending identifiers. A query
+     *   stated `ER` (a logical query) with [parameters] is `logical_query_parameters` (ruling LQ-5).
+     *   A body that does not parse keeps the parser's own error. SQL only. Default `false` keeps
+     *   every existing caller byte-identical; the metadata workers set it for saved queries.
      */
     fun parseToRelNode(
         source: String,
@@ -94,6 +102,7 @@ class Translator(
         queryRefs: Map<String, PlanNode>? = null,
         sourceSchema: SchemaCode = SchemaCode.SCHEMA_CODE_UNSPECIFIED,
         parameters: List<SqlParam> = emptyList(),
+        strictLane: Boolean = false,
     ): ParseResult =
         try {
             // Promote Calcite's default literal charset to UTF-8 before any Calcite class loads
@@ -101,7 +110,7 @@ class Translator(
             org.tatrman.translator.framework.CalciteCharset
                 .ensureUtf8()
             when (sourceLanguage) {
-                Language.SQL -> parseSql(source, targetSchema, sourceSchema, parameters)
+                Language.SQL -> parseSql(source, targetSchema, sourceSchema, parameters, strictLane)
                 Language.REL_NODE -> parseRelNodeBytes(source, targetSchema)
                 Language.TRANSFORMATION_DSL -> parseTransDsl(source, queryRefs)
                 Language.DATAFRAME_DSL -> parseDfDsl(source)
@@ -253,7 +262,27 @@ class Translator(
         targetSchema: SchemaCode,
         sourceSchema: SchemaCode,
         parameters: List<SqlParam>,
+        strictLane: Boolean = false,
     ): ParseResult {
+        // LQ (L-2, L-7) — a strict saved-query parse needs its lane; a logical query takes no parameters.
+        if (strictLane) {
+            if (sourceSchema == SchemaCode.SCHEMA_CODE_UNSPECIFIED) {
+                return ParseResult.Failure(
+                    code = LANE_MISMATCH,
+                    message =
+                        "a strict saved-query parse needs the lane the query is declared in (er or db); " +
+                            "none stated",
+                )
+            }
+            if (sourceSchema == SchemaCode.ER && parameters.isNotEmpty()) {
+                return ParseResult.Failure(
+                    code = LOGICAL_QUERY_PARAMETERS,
+                    message =
+                        "a logical query (er lane) takes no parameters; got ${parameters.joinToString { it.name }} " +
+                            "— a parametrized query stays a db query",
+                )
+            }
+        }
         // Calcite parses a single statement and rejects a trailing terminator (`Encountered ";"`).
         // Authored pattern queries and hand-written SQL routinely end with one, so strip a single
         // trailing `;` (plus surrounding whitespace) up front — before the rails below and schema
@@ -299,6 +328,18 @@ class Translator(
                 null
             }
         val effectiveSql = prepared?.sql ?: preSource
+        // LQ (L-7) — the strict lane gate, on the SQL the validator will see (rails applied, `{name}` → `?`).
+        // NOT_APPLICABLE (no table names, or a body the detector cannot parse) is no lane evidence: the parse
+        // below decides — its error stands, and a body that parses is still refused (it names no entity).
+        var laneUnproven = false
+        if (strictLane) {
+            val lane = SchemaDetector.detect(effectiveSql, Language.SQL, sourceSchema, model)
+            when (lane.decision) {
+                SchemaDecision.CONFIRMED -> Unit
+                SchemaDecision.NOT_APPLICABLE -> laneUnproven = true
+                else -> return laneFailure(lane, sourceSchema)
+            }
+        }
         // Calcite's default schema for resolving unqualified identifiers.
         //   - explicit `sourceSchema`               → honour it (the caller knows the catalog).
         //   - UNSPECIFIED + identifiers resolve to a
@@ -405,6 +446,15 @@ class Translator(
         return when (val v = validated) {
             is ValidateResult.Failure -> ParseResult.Failure(v.error.code, v.error.message, modelJoinsSql)
             is ValidateResult.Success -> {
+                if (laneUnproven) {
+                    return ParseResult.Failure(
+                        code = LANE_MISMATCH,
+                        message =
+                            "the query names no ${laneNoun(sourceSchema)}; a saved query declared in the " +
+                                "${schemaToken(sourceSchema)} lane must read ${laneNoun(sourceSchema)}",
+                        modelJoinsSql = modelJoinsSql,
+                    )
+                }
                 val r =
                     runFrontHalfStages(v.rel, validatedFramework, targetSchema, prepared, hintsByTable = hintsByTable)
                 when (r) {
@@ -414,6 +464,79 @@ class Translator(
             }
         }
     }
+
+    /**
+     * LQ (L-2) — the refusal for a strict parse whose lane the detector did not confirm. Names the offending
+     * identifiers: per lane for `mixed_lanes`, the other lane's names (or the unknown ones) for `lane_mismatch`.
+     */
+    private fun laneFailure(
+        lane: org.tatrman.translator.detect.SchemaDetectionResult,
+        stated: SchemaCode,
+    ): ParseResult.Failure {
+        fun only(
+            schema: SchemaCode,
+            other: SchemaCode,
+        ): List<String> =
+            lane.perTableSchemas
+                .filter { (_, s) -> schema in s && other !in s }
+                .keys
+                .sorted()
+        val entities = only(SchemaCode.ER, SchemaCode.DB)
+        val tables = only(SchemaCode.DB, SchemaCode.ER)
+        val statedToken = schemaToken(stated)
+        return when (lane.decision) {
+            SchemaDecision.MIXED ->
+                ParseResult.Failure(
+                    code = MIXED_LANES,
+                    message =
+                        "the query reads entities (${entities.joinToString()}) and tables (${tables.joinToString()}) " +
+                            "together; a saved query reads one lane — entities in a logical (er) query, tables in a " +
+                            "db query",
+                )
+            SchemaDecision.UNKNOWN -> {
+                val hints =
+                    lane.suggestions
+                        .filter { it.candidates.isNotEmpty() }
+                        .joinToString("") { "; '${it.unknownName}' — did you mean ${it.candidates.joinToString()}?" }
+                ParseResult.Failure(
+                    code = LANE_MISMATCH,
+                    message =
+                        "the query names objects that are neither entities nor tables: " +
+                            "${lane.unknownTables.joinToString()}$hints",
+                )
+            }
+            else -> {
+                val read = if (lane.effectiveSchema == SchemaCode.DB) tables else entities
+                val readNoun = laneNoun(lane.effectiveSchema)
+                ParseResult.Failure(
+                    code = LANE_MISMATCH,
+                    message =
+                        if (read.isNotEmpty()) {
+                            "the query is declared in the $statedToken lane but reads $readNoun: " +
+                                "${read.joinToString()}; a saved query reads ${laneNoun(stated)} of the lane " +
+                                "it is declared in"
+                        } else {
+                            "the query is declared in the $statedToken lane but its names do not confirm it " +
+                                "(${lane.decision}): ${lane.referencedTables.joinToString()}"
+                        },
+                )
+            }
+        }
+    }
+
+    private fun laneNoun(schema: SchemaCode): String =
+        when (schema) {
+            SchemaCode.ER -> "entities"
+            SchemaCode.DB -> "tables"
+            else -> "objects"
+        }
+
+    private fun schemaToken(schema: SchemaCode): String =
+        when (schema) {
+            SchemaCode.ER -> "er"
+            SchemaCode.DB -> "db"
+            else -> schema.name.lowercase()
+        }
 
     /** One validation attempt of [parseSql]: the outcome, its (single-use) framework, and the MJ artefact. */
     private data class Attempt(
@@ -714,6 +837,30 @@ class Translator(
         code: String,
         summary: String,
     ): StageArtifact = StageArtifact(code, summary)
+
+    companion object {
+        /** LQ (L-2) — a strict saved-query parse whose body reads another lane than it is declared in. */
+        const val LANE_MISMATCH: String = "lane_mismatch"
+
+        /** LQ (L-2) — a strict saved-query parse whose body reads entities and tables together. */
+        const val MIXED_LANES: String = "mixed_lanes"
+
+        /** LQ (L-2, ruling LQ-5) — a logical (er-lane) query declares parameters. */
+        const val LOGICAL_QUERY_PARAMETERS: String = "logical_query_parameters"
+
+        /**
+         * LQ (L-4) — reserved for the metadata workers: an entity stacked on a query binds an attribute to a
+         * column the query's body does not output. The translator never returns it; the workers compare the
+         * bindings against [outputColumnNames] of the stored body.
+         */
+        const val ENTITY_QUERY_OUTPUT_MISMATCH: String = "entity_query_output_mismatch"
+
+        /**
+         * LQ (L-4) — the output column names of a parsed (stored) query body, in order: what an entity stacked
+         * on the query binds its attributes to. The same derivation UNFOLD's cardinality check uses.
+         */
+        fun outputColumnNames(plan: PlanNode): List<String> = Unfold.outputColumnNames(plan)
+    }
 }
 
 sealed interface ParseResult {
