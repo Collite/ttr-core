@@ -23,6 +23,7 @@ import org.tatrman.ttr.metadata.model.Mapping
 import org.tatrman.ttr.metadata.model.MappingTarget
 import org.tatrman.ttr.metadata.model.Model
 import org.tatrman.ttr.metadata.model.Query
+import org.tatrman.ttr.metadata.model.SchemaCode
 import org.tatrman.ttr.metadata.model.Relation
 import org.tatrman.ttr.metadata.model.Role
 import org.tatrman.ttr.metadata.model.SearchHints
@@ -117,16 +118,20 @@ object ModelToDefinitions {
     /** Stock roles come from BuiltinStockSource; their sourceFile ends with this path. */
     private const val STOCK_ROLES_PATH = "cnc-stock-roles.ttr"
 
+    /** LQ — the bucket (and file stem) of the logical queries: `er-query.ttr`, under `model er`. */
+    private const val ER_QUERY_BUCKET = "er-query"
+
     /**
      * Converts the full [Model] into an [ExportBundle] partitioned **per source file**:
      * one package directory per originating YAML file (package name = file name minus its
      * `NNnn_` code prefix, e.g. `hl05_returns` → `returns`). Inside each package the
      * content collapses to at most three **directive-less** files (v2.1 / yaml-converter
-     * split): `db.ttr` (tables, views, foreign keys, procedures, **and queries**),
+     * split): `db.ttr` (tables, views, foreign keys, procedures, **and db queries**),
      * `er.ttr` (entities **and** relations, with inline `mapping:`), and `cnc.ttr` (roles
      * **and** `er2cnc_role`). Each def derives its schema+namespace from its kind on
      * reload, so these files carry no `schema`/`namespace` directive. er2db mappings are
-     * inline (no `map.ttr`).
+     * inline (no `map.ttr`). Logical queries (LQ L-1) are the one exception: a fourth file,
+     * `er-query.ttr`, under `model er` — the directive is what makes them logical.
      *
      * References are emitted fully-qualified, so they resolve via the resolver's exact
      * `byFull` step regardless of imports — no `import` statements are emitted (packages are
@@ -184,21 +189,27 @@ object ModelToDefinitions {
             }
         }
         // Queries live in `db.ttr` (they describe DB-side SQL); they derive the `query`
-        // schema from their kind in the directive-less file.
-        model.queries.values.forEach { tagged += Tagged(queryToQueryDef(it), "db", it.sourceFile) }
+        // schema from their kind in the directive-less file. A logical query (LQ L-1,
+        // `er.query.<name>`) is only one because it sits in a `model er` file, so it gets
+        // a file of its own with that directive — `er.ttr` stays directive-less.
+        model.queries.values.forEach {
+            val bucket = if (it.qname.schemaCode == SchemaCode.ER) ER_QUERY_BUCKET else "db"
+            tagged += Tagged(queryToQueryDef(it), bucket, it.sourceFile)
+        }
 
-        // One file per (package, bucket): at most `db.ttr` / `er.ttr` / `cnc.ttr`.
-        // All defs of a bucket — even from several source files in the same package —
-        // merge into the single file, and it carries **no** schema/namespace directive
-        // (schemaCode = namespace = null); each def derives its schema+namespace from
-        // its kind on reload (kind-derived defaults, ttr-semantics ≥ 0.4.0).
+        // One file per (package, bucket): at most `db.ttr` / `er.ttr` / `cnc.ttr`, plus
+        // `er-query.ttr` for logical queries. All defs of a bucket — even from several source
+        // files in the same package — merge into the single file, and it carries **no**
+        // schema/namespace directive (schemaCode = namespace = null); each def derives its
+        // schema+namespace from its kind on reload (kind-derived defaults, ttr-semantics
+        // ≥ 0.4.0). `er-query.ttr` alone carries `model er` (LQ L-1).
         val files = mutableListOf<ExportFile>()
         tagged.groupBy { packageOf(it.sourceFile) }.forEach { (pkg, pkgItems) ->
             pkgItems.groupBy { it.schema }.forEach { (schema, schemaItems) ->
                 files +=
                     ExportFile(
                         filename = "$schema.ttr",
-                        schemaCode = null,
+                        schemaCode = if (schema == ER_QUERY_BUCKET) "er" else null,
                         namespace = null,
                         definitions = schemaItems.map { it.def },
                         packageName = pkg,

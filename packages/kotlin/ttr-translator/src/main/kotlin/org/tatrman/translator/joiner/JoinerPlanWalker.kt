@@ -197,4 +197,33 @@ object JoinerPlanWalker {
             }
             else -> expr
         }
+
+    /**
+     * Visit every node of [plan], pre-order — plan children and expression-level subqueries alike (the nodes
+     * [rewriteChildren] reaches), [plan] itself first.
+     */
+    fun forEachNode(
+        plan: PlanNode,
+        visit: (PlanNode) -> Unit,
+    ) {
+        visit(plan)
+        rewriteChildren(plan) { child ->
+            forEachNode(child, visit)
+            child
+        }
+    }
+
+    /** True when some node of [plan] — [plan] itself, a plan child or an expression subquery — matches [predicate]. */
+    fun anyNode(
+        plan: PlanNode,
+        predicate: (PlanNode) -> Boolean,
+    ): Boolean {
+        if (predicate(plan)) return true
+        var found = false
+        rewriteChildren(plan) { child ->
+            if (!found && anyNode(child, predicate)) found = true
+            child
+        }
+        return found
+    }
 }

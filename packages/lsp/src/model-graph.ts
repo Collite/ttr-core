@@ -351,10 +351,11 @@ export interface SymbolDetail {
 
 // v4.0 uniform key. The model/schema/kind come from the owning def's `kind`
 // (a column/attribute row passes its parent table/entity kind); `namespace` is
-// the file `schema` id (db only). `schemaCode` (the file model directive) is
-// retained in the signature for call-site symmetry but is not part of the key.
-function buildQname(_schemaCode: string, namespace: string, kind: string, parts: string[], packageName = ''): string {
-  return buildCanonicalKey({ packageName, schemaId: namespace, kind, parts });
+// the file `schema` id (db only). `schemaCode` (the file model directive, or the
+// model segment of a symbol's key) only moves a `query`: under `er` it is a
+// logical query, `er.query.<name>` (LQ L-1).
+function buildQname(schemaCode: string, namespace: string, kind: string, parts: string[], packageName = ''): string {
+  return buildCanonicalKey({ packageName, schemaId: namespace, kind, parts, declaringModel: schemaCode });
 }
 
 /**

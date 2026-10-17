@@ -70,7 +70,7 @@ internal class DocumentSymbols(
     private fun makeQname(
         kind: String,
         parts: List<String>,
-    ): String = buildCanonicalKey(packageName, namespace, kind, parts)
+    ): String = buildCanonicalKey(packageName, namespace, kind, parts, schemaCode)
 
     private fun makeQnameChild(
         parentEntry: SymbolEntry,
@@ -91,7 +91,7 @@ internal class DocumentSymbols(
                 documentUri = documentUri,
                 parent = null,
                 packageName = packageName,
-                schemaCode = modelForKind(kind),
+                schemaCode = modelForKind(kind, schemaCode),
                 mappingSource =
                     if (def is Er2DbEntityDef || def is Er2DbAttributeDef || def is Er2DbRelationDef) {
                         MappingSource.Explicit

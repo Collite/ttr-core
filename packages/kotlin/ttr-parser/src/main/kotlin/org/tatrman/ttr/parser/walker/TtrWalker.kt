@@ -131,6 +131,19 @@ class TtrWalker(
             warn(doc.graphBlock(), "graph block ignored in a .ttr file — graphs belong in .ttrg render artefacts")
         }
 
+        // LQ (logical queries, L-2 / ruling LQ-5): a `def query` in a `model er` file is a logical
+        // query over entities and takes no parameters. A warning here, like the other query
+        // diagnostics: an error would empty the file's definitions; ttr-metadata refuses the load.
+        if (schema?.modelCode == "er") {
+            defs.filterIsInstance<QueryDef>().filter { it.parameters.isNotEmpty() }.forEach { q ->
+                warnAt(
+                    q.source,
+                    "${DiagnosticCode.LogicalQueryParameters}: logical query '${q.name}' (model er) cannot " +
+                        "declare parameters; a parametrized query stays a db query",
+                )
+            }
+        }
+
         return WalkResult(
             modelDirective = schema,
             definitions = defs,
@@ -182,6 +195,14 @@ class TtrWalker(
                 column = ctx.start.charPositionInLine + 1,
                 message = message,
             )
+    }
+
+    /** [warn] at a walked definition's [source] (its start — the same position [warn] reports for its context). */
+    private fun warnAt(
+        source: SourceLocation,
+        message: String,
+    ) {
+        warnings += ParseWarning(file = fileLabel, line = source.line, column = source.column + 1, message = message)
     }
 
     private fun err(

@@ -6,6 +6,64 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-translator` + `ttr-plan-proto` + `ttr-metadata` + `ttr-semantics` / `ttr-parser`** ⚑ **logical queries
+  (LQ) — a saved query written over the E-R model, and entities stacked on it.** A `def query` declared in a
+  `model er` file is a *logical query*, `er.query.<name>`: its body is SQL over entities (entity and attribute
+  names, a bare `JOIN` conditioned from the relations' `join:` pairs), and an entity bound to it
+  (`binding: { target: { query: er.query.<name> } }`) is an ordinary entity whose attributes bind to the
+  query's output columns. A query anywhere else stays the db-layer object it was (`db.<schema>.query.<name>`).
+  Everything new is opt-in; every existing caller is byte-identical.
+  - **`ttr-semantics`, `@tatrman/semantics`, Python `ttr_parser.semantics`** — `modelForKind(kind, declaringModel)`
+    / `buildCanonicalKey(…, declaringModel)`: the file's `model` directive moves only a `query` (to `er`). Kotlin
+    keeps the old signatures (`@JvmOverloads`). Conformance fixture `70-logical-query`, identical in all three
+    runtimes.
+  - **`ttr-parser`** — new `DiagnosticCode.LogicalQueryParameters` (`ttr/logical-query-parameters`): a logical query
+    with `parameters` (a parametrized query stays a db query). A warning in both walkers (an error would empty the
+    file in Kotlin and make TS whole-file tools refuse it); the load-time refusal is ttr-metadata's.
+  - **`ttr-metadata`** — a `model er` query loads as `Query((ER, "query", name))`; the er file-kind allowlist admits
+    `query`; export writes logical queries to their own `er-query.ttr` under `model er`; the reconciler refuses a
+    logical query with parameters (`logical_query_parameters`). A short `query:` binding target (`query: x`,
+    `query: query.x`) whose db-lane default names no loaded query resolves to the one loaded query of that name — a
+    logical query — as the editor resolves it.
+  - **`ttr-translator`** — `Translator.parseToRelNode(…, strictLane = false, expandLogicalBodies = false)` and
+    `translate(…, expandLogicalBodies = false)`:
+    - `strictLane` parses a saved query in its declared lane: the schema detector runs although `sourceSchema` is
+      stated, and anything it does not confirm fails — `mixed_lanes` (entities and tables together), `lane_mismatch`
+      (the other lane, unknown names, no stated lane); a stated-ER query with parameters is
+      `logical_query_parameters`. Codes are constants on `Translator` (+ `entity_query_output_mismatch`, reserved for
+      the metadata workers).
+    - `expandLogicalBodies` ends the ER half (ER target only) with the new stage `EXPAND_LOGICAL_BODIES`: an entity
+      stacked on a logical query whose stored body is an ER plan is expanded in place under a boundary Project stamped
+      `expanded_from = <entity>`, recursively (`entity_query_mapping_cycle` on a loop). Bodies that read tables
+      (the `__filter` row-filter queries) are left to MAP_TO_PHYSICAL. A validator's ER pass can then secure the
+      entities a stacked entity reads. MAP_TO_PHYSICAL closes a stamped boundary into the form it gives every
+      `ToQuery` boundary and ends the stamp, so the physical plan is byte-identical with the option on or off.
+    - `Translator.outputColumnNames(plan)` — a stored body's output names (for the workers' binding check).
+    - REL_NODE re-entry: the stamp rides the decoded Project as a Calcite hint (its schema code by wire number, so
+      an unknown code round-trips); the decoder never merges a stamped Project with an adjacent one, never pushes a
+      limit straight above a boundary into the body's Sort, and an Aggregate over a boundary is neither pruned nor
+      dropped as redundant (RelBuilder would otherwise break the on/off identity).
+    - The strict lane is decided on the plan: the detector reads only the FROM clauses and leaves saved-query
+      references (`obj.query.<name>`) out of its verdict, so after UNFOLD the plan must read the declared lane and
+      only it — a sub-query (WHERE / select list / HAVING) or an unfolded saved query reading the other lane is
+      `mixed_lanes` (beside the declared lane) or `lane_mismatch` (instead of it); a body whose lane is read only in
+      a sub-query, or through a saved query of the same lane, parses. New: `SchemaDetector.detect(…,
+      savedQueryRefsNeutral = false)` and `TableIdentifierExtractor.fromQuery(…, skipSavedQueryRefs = false)`
+      (`@JvmOverloads`; defaults unchanged).
+    - `EXPAND_LOGICAL_BODIES` refuses a stacked scan that declares no columns (`entity_query_no_columns`) rather
+      than leave it unexpanded, where the entities its body reads would escape the ER-level checks.
+    - ⚠ Binary compatibility: both entry points carry `@JvmOverloads`, so explicit-argument (Java-style) callers
+      compiled against 0.11.x keep working; Kotlin callers that relied on default arguments call the synthetic
+      `$default` method, whose signature changed — recompile against 0.12.0.
+  - **`ttr-plan-proto`** — plan.v1 `ProjectNode.expanded_from = 3` (`QualifiedName`, optional; reserved `4 to 7`).
+    The only wire change; readers that do not know it ignore it.
+  - Test fixtures: `HartlandStackModel` (the MJ Hartland slice + `shopper_revenue` stacked on
+    `er.query.shopper_revenue`, a two-level `big_spender`), published with the translator's test fixtures.
+  - Known, pre-existing (not LQ): a literal compared with a FLOAT attribute encodes as `CAST(int)` on the first
+    encode and as a FLOAT literal after a REL_NODE round trip, so a body with such a comparison yields physical plans
+    that differ in that literal's encoding between the option on and off — the same difference today's single-call
+    vs two-half paths already show.
+
 - **`ttr-lexicon-compile`** ⚑ **the operator stdlib asks for a count, an average and a superlative
   (ttr-core#178).** A question asking "how many" or "average" resolved to the same lattice as a plain total,
   so a consumer writing a query from it answered a SUM. The stdlib grows from six operators to eight

@@ -128,7 +128,12 @@ message TableHint {
 message ProjectNode {
   PlanNode input = 1;
   repeated NamedExpression expressions = 2;
-  reserved 3 to 7;
+  // LQ (logical queries, contract L-11). Set ONLY by the translator's EXPAND_LOGICAL_BODIES stage, on
+  // the boundary Project of an inlined logical-query body: the entity stacked on that query
+  // (`er.entity.<name>`). The validator's ER pass matches the stacked entity's own row policies on it.
+  // Absent on every other Project. MAP_TO_PHYSICAL ends it: no physical plan carries it.
+  QualifiedName expanded_from = 3;
+  reserved 4 to 7;
 }
 
 // Filter — applies a boolean condition to rows.

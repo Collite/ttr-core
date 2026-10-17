@@ -17,9 +17,13 @@ import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.core.JoinRelType
 import org.apache.calcite.rex.RexNode
 import org.apache.calcite.sql.SqlAggFunction
+import org.apache.calcite.rel.RelCollations
+import org.apache.calcite.rel.logical.LogicalProject
+import org.apache.calcite.rel.logical.LogicalSort
 import org.apache.calcite.tools.RelBuilder
 import org.tatrman.translator.framework.TranslatorFramework
 import org.tatrman.translator.functions.FunctionCatalog
+import org.tatrman.translator.joiner.JoinerPlanWalker
 import org.tatrman.plan.v1.schemaCodeToToken
 
 /**
@@ -157,8 +161,35 @@ object PlanNodeDecoder {
         // whose nodes equal the input's row type, which breaks structure-preserving round-trips
         // (e.g. encode/decode/encode byte stability) and the two-half pipeline's byte-equality
         // contract between single-call target=DB and (target=ER → REL_NODE → target=DB).
-        builder.project(nodes, aliases, true)
+        // LQ (L-10, L-11) — a logical-query boundary (a Project stamped `expanded_from`) is never merged: not
+        // with the body's root Project below it, nor into the Project above it. RelBuilder merges adjacent
+        // Projects; the option-off path never meets them adjacent (MAP_TO_PHYSICAL builds the boundary after
+        // the decode), so a merge here would make the two physical plans differ. The stamp rides the decoded
+        // Project as a hint; the encoder restores it. A Project straight above a boundary is otherwise built
+        // like any — RelBuilder simplifies its expressions and infers its aliases, as it does over the entity
+        // scan the option-off path meets there — only with merging off (`bloat < 0`).
+        when {
+            project.hasExpandedFrom() ->
+                builder.push(
+                    LogicalProject.create(
+                        builder.build(),
+                        listOf(ExpandedFromHint.of(project.expandedFrom)),
+                        nodes,
+                        aliases,
+                    ),
+                )
+            isBoundary(project.input) -> {
+                val noMerge = builder.transform { it.withBloat(-1) }.push(builder.build())
+                noMerge.project(nodes, aliases, true)
+                builder.push(noMerge.build())
+            }
+            else -> builder.project(nodes, aliases, true)
+        }
     }
+
+    /** LQ — a logical-query boundary: a Project stamped `expanded_from`. */
+    private fun isBoundary(plan: PlanNode): Boolean =
+        plan.nodeCase == PlanNode.NodeCase.PROJECT && plan.project.hasExpandedFrom()
 
     private fun pushFilter(
         builder: RelBuilder,
@@ -215,10 +246,26 @@ object PlanNodeDecoder {
         catalog: FunctionCatalog,
     ) {
         push(builder, aggregate.input, catalog)
+        // LQ (L-10, L-12) — over a logical-query boundary RelBuilder would (a) prune the stamped Project, or drop
+        // it, when it is the Aggregate's direct input, and (b) drop an Aggregate whose keys it can prove unique
+        // (or whose input it can prove single-row) through the expanded body, wherever the boundary sits below.
+        // The option-off path meets an entity scan there, where neither happens, so this Aggregate is built with
+        // (a) off for a direct boundary input and (b) off whenever a boundary is below.
+        val directBoundary = isBoundary(aggregate.input)
+        val boundaryBelow = JoinerPlanWalker.anyNode(aggregate.input, ::isBoundary)
+        val b =
+            if (boundaryBelow) {
+                builder
+                    .transform { it.withPruneInputOfAggregate(!directBoundary).withAggregateUnique(true) }
+                    .push(builder.build())
+            } else {
+                builder
+            }
         val keyFields = aggregate.groupKeysList.map { it.name }
-        val groupKey = builder.groupKey(keyFields.map { Expressions.fieldByName(builder, it) })
-        val aggCalls = aggregate.aggregatesList.map { decodeAggCall(builder, it) }
-        builder.aggregate(groupKey, aggCalls)
+        val groupKey = b.groupKey(keyFields.map { Expressions.fieldByName(b, it) })
+        val aggCalls = aggregate.aggregatesList.map { decodeAggCall(b, it) }
+        b.aggregate(groupKey, aggCalls)
+        if (boundaryBelow) builder.push(b.build())
     }
 
     private fun decodeAggCall(
@@ -301,6 +348,18 @@ object PlanNodeDecoder {
         push(builder, lo.input, catalog)
         val limit = if (lo.hasLimit()) lo.limit.toInt() else -1
         val offset = if (lo.hasOffset()) lo.offset.toInt() else 0
+        // LQ (L-10) — RelBuilder pushes a pure limit through a Project into a Sort straight below it
+        // (`sortLimit`); over a logical-query boundary that would move the limit inside the stacked entity's
+        // body, which the option-off path (an entity scan there) never does. The same Sort, built directly.
+        // Offset and fetch as `sortLimit` reads them; a bare `LIMIT 0` (→ empty) and a no-op limit take
+        // RelBuilder's own path — neither merges.
+        val offsetNode = if (offset > 0) builder.literal(offset) else null
+        val fetchNode = if (limit >= 0) builder.literal(limit) else null
+        val emptyOrNoOp = offsetNode == null && (limit == 0 || fetchNode == null)
+        if (isBoundary(lo.input) && !emptyOrNoOp) {
+            builder.push(LogicalSort.create(builder.build(), RelCollations.EMPTY, offsetNode, fetchNode))
+            return
+        }
         builder.limit(offset, limit)
     }
 

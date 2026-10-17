@@ -79,6 +79,8 @@ export enum DiagnosticCode {
   UnknownLanguageTag = 'ttr/unknown-language-tag',
   LanguageTagMismatch = 'ttr/language-tag-mismatch',
   DeprecatedLanguageProperty = 'ttr/deprecated-language-property',
+  // LQ (logical queries, LQ-5) — a `def query` in a `model er` file takes no parameters.
+  LogicalQueryParameters = 'ttr/logical-query-parameters',
   // v3.1 MD (multidimensional) model — contracts §7. Logical + binding codes.
   MdUnknownSchemaDef = 'md/unknown-schema-def',
   MdUnknownRef = 'md/unknown-ref',

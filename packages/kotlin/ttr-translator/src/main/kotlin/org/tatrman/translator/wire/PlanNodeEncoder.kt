@@ -263,6 +263,8 @@ object PlanNodeEncoder {
                     .setAlias(rel.rowType.fieldList[idx].name),
             )
         }
+        // LQ (L-11) — restore a logical-query boundary stamp carried through Calcite as a hint.
+        ExpandedFromHint.from(rel.hints)?.let { builder.setExpandedFrom(it) }
         return PlanNode.newBuilder().setProject(builder).build()
     }
 

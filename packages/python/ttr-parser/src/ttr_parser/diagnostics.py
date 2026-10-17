@@ -57,6 +57,8 @@ class DiagnosticCode(Enum):
     UNKNOWN_LANGUAGE_TAG = "ttr/unknown-language-tag"
     LANGUAGE_TAG_MISMATCH = "ttr/language-tag-mismatch"
     DEPRECATED_LANGUAGE_PROPERTY = "ttr/deprecated-language-property"
+    # LQ (logical queries, LQ-5) - a `def query` in a `model er` file takes no parameters.
+    LOGICAL_QUERY_PARAMETERS = "ttr/logical-query-parameters"
 
     def __str__(self) -> str:
         return self.value

@@ -55,8 +55,11 @@ function buildQnameToDef(asts: Document[]): Map<string, { def: Definition; schem
     const schemaCode = ast.modelDirective?.modelCode ?? 'er';
     const namespace = ast.modelDirective?.schema ?? '';
     const packageName = ast.packageDecl?.name ?? '';
+    // The key reads the raw directive, not the presentation default above: only a
+    // query declared under an explicit `model er` is a logical query (LQ L-1).
+    const declaringModel = ast.modelDirective?.modelCode ?? '';
     for (const def of ast.definitions) {
-      addDefAndChildren(map, def, schemaCode, namespace, packageName);
+      addDefAndChildren(map, def, schemaCode, namespace, packageName, declaringModel);
     }
   }
   return map;
@@ -67,9 +70,10 @@ function addDefAndChildren(
   def: Definition,
   schemaCode: string,
   namespace: string,
-  packageName: string
+  packageName: string,
+  declaringModel: string
 ): void {
-  const qname = buildCanonicalKey({ packageName, schemaId: namespace, kind: def.kind, parts: [def.name] });
+  const qname = buildCanonicalKey({ packageName, schemaId: namespace, kind: def.kind, parts: [def.name], declaringModel });
   map.set(qname, { def, schemaCode, namespace, packageName });
 
   const children: Definition[] = [];
@@ -185,11 +189,11 @@ function canonicalizeBindingRef(path: string, defaultPkg: string, forcedKind?: s
     if (nameParts.length === 0) return null;
     return buildCanonicalKey({ packageName: pkg, schemaId, kind: 'query', parts: nameParts });
   }
-  // er.<kind>.<name>[.<member>]
+  // er.<kind>.<name>[.<member>] — incl. a logical query `er.query.<name>` (LQ L-1)
   const kind = forcedKind ?? rest[1];
   const nameParts = rest.slice(2);
   if (!kind || nameParts.length === 0) return null;
-  return buildCanonicalKey({ packageName: pkg, kind, parts: nameParts });
+  return buildCanonicalKey({ packageName: pkg, kind, parts: nameParts, declaringModel: model });
 }
 
 /** Naive base-table provenance from a query's SQL (stub, honest): the FROM/JOIN dbo.* tables. */
@@ -270,7 +274,9 @@ export function buildBindingMap(documents: Map<string, string>, preferredLang = 
         // use the file's actual `schema` so the query-def qname matches the entity's query-target
         // qname (both go through canonicalizeBindingRef, which reads the schema from segment 1).
         const qSchema = ast.modelDirective?.schema ?? 'query';
-        const qname = canonicalizeBindingRef(`query.${qSchema}.${q.name}`, pkg, 'query') ?? q.name;
+        // a query declared under `model er` is a logical query, `er.query.<name>` (LQ L-1)
+        const qPath = ast.modelDirective?.modelCode === 'er' ? `er.query.${q.name}` : `query.${qSchema}.${q.name}`;
+        const qname = canonicalizeBindingRef(qPath, pkg, 'query') ?? q.name;
         // NLS-P10 D7 chain: requested language → plain form → `en` → first by code → ''.
         // Presence on the map steps, non-emptiness on the plain one — same as Veles'
         // `selectDescription` and the LSP's `resolveDescription`.

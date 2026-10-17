@@ -343,7 +343,10 @@ export function createServerConnection(
     // member uses its enclosing def's kind, with the name path growing under it.
     const kind = enclosing ? enclosing.kind : def.kind;
     const parts = enclosing ? [enclosing.name, def.name] : [def.name];
-    return buildCanonicalKey({ packageName: pkg, schemaId: namespace, kind, parts });
+    // The raw directive (no presentation default): it moves only a `query` declared under
+    // `model er` — a logical query, `er.query.<name>` (LQ L-1), as the symbol table keys it.
+    const declaringModel = ast.modelDirective?.modelCode ?? '';
+    return buildCanonicalKey({ packageName: pkg, schemaId: namespace, kind, parts, declaringModel });
   }
 
   // A symbol's stored `source` is the whole `def <kind> <name> { … }` span, but
@@ -381,7 +384,7 @@ export function createServerConnection(
   const sqlModelCache = new Map<string, SqlRefModel | null>();
   function analyzeSqlCached(value: string, dialect: SqlDialect): SqlRefModel | undefined {
     if (!opts.analyzeSqlBlock) return undefined;
-    const key = `${dialect} ${value}`;
+    const key = `${dialect}\u0000${value}`;
     const cached = sqlModelCache.get(key);
     if (cached !== undefined) return cached ?? undefined;
     let model: SqlRefModel | undefined;
@@ -1140,7 +1143,13 @@ export function createServerConnection(
       const namespace = ast.modelDirective?.schema ?? '';
       const packageName = ast.packageDecl?.name ?? '';
       for (const def of ast.definitions) {
-        const qname = buildCanonicalKey({ packageName, schemaId: namespace, kind: def.kind, parts: [def.name] });
+        const qname = buildCanonicalKey({
+          packageName,
+          schemaId: namespace,
+          kind: def.kind,
+          parts: [def.name],
+          declaringModel: ast.modelDirective?.modelCode ?? '',
+        });
         qnameToDef.set(qname, { def, schemaCode, namespace });
       }
     }

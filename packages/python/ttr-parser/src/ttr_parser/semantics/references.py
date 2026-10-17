@@ -157,9 +157,10 @@ def enclosing_qname_of(
     if kind not in _ENCLOSING_KINDS:
         return None
     # v4.0 uniform key: model/schema/kind from the def's kind; `namespace` is the
-    # file `schema` id (db only). `schema_code` (file model) is unused.
+    # file `schema` id (db only). `schema_code` (file model) only moves a query
+    # declared under `model er` (a logical query, LQ L-1).
     return build_canonical_key(
-        package_name, namespace, definition.kind, [definition.name]
+        package_name, namespace, definition.kind, [definition.name], schema_code
     )
 
 

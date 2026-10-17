@@ -64,11 +64,13 @@ class SymbolTable:
 
         directive = result.model_directive
         namespace = (directive.schema if directive else "") or ""
+        # the file's `model` code only moves a query declared under `model er` (LQ L-1)
+        declaring_model = (directive.model_code if directive else "") or ""
         package = package_name or (result.package_name or "")
 
         entries: list[SymbolEntry] = []
         for definition in result.definitions:
-            self._add_definition(entries, definition, uri, namespace, package)
+            self._add_definition(entries, definition, uri, namespace, package, declaring_model)
 
         self._by_document[uri] = entries
         for entry in entries:
@@ -97,11 +99,12 @@ class SymbolTable:
         uri: str,
         namespace: str,
         package: str,
+        declaring_model: str = "",
     ) -> None:
         # v4.0 uniform key: model/schema/kind from the def's own kind (D12);
         # schema slot db-only (file `schema` id, else dbo); kind segment present.
         qname = build_canonical_key(
-            package, namespace, definition.kind, [definition.name]
+            package, namespace, definition.kind, [definition.name], declaring_model
         )
         out.append(
             SymbolEntry(
@@ -109,7 +112,7 @@ class SymbolTable:
                 kind=definition.kind,
                 name=definition.name,
                 package_name=package,
-                schema_code=model_for_kind(definition.kind),
+                schema_code=model_for_kind(definition.kind, declaring_model),
                 definition=definition,
                 source_file=uri,
             )

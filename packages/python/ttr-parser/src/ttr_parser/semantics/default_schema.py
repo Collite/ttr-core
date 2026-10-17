@@ -20,13 +20,13 @@ def default_namespace_for_schema(schema_code: str) -> str:
     return "dbo" if schema_code == "db" else ""
 
 
-def default_schema_for_kind(kind: str) -> str:
+def default_schema_for_kind(kind: str, declaring_model: str = "") -> str:
     """Deprecated alias of :func:`model_for_kind` — the single kind→model source of
     truth (D4/D14/D15). Applied only when a file has no explicit ``schema``
     directive. ``query``/``drill_map`` → ``db`` (D14, not the retired ``query``
     value). Mirrors the TS twin, where ``defaultSchemaForKind`` aliases
     ``modelForKind``."""
-    return model_for_kind(kind)
+    return model_for_kind(kind, declaring_model)
 
 
 # The TS/Kotlin `def.kind` is camelCase (`er2dbEntity`); the Python model uses
@@ -80,9 +80,13 @@ _MODEL_BY_KIND: dict[str, str] = {
 }
 
 
-def model_for_kind(kind: str) -> str:
+def model_for_kind(kind: str, declaring_model: str = "") -> str:
     """Kind → model layer (D14/D15). `query`/`drill_map` and everything not
-    explicitly mapped → `db`. Mirrors TS `modelForKind`."""
+    explicitly mapped → `db`, except a `query` declared in a `model er` file
+    (``declaring_model`` = the file's `model` directive code): a logical query
+    → `er` (LQ L-1). Mirrors TS `modelForKind`."""
+    if kind == "query" and declaring_model == "er":
+        return "er"
     return _MODEL_BY_KIND.get(kind, "db")
 
 
@@ -107,13 +111,17 @@ def namespace_for_kind(kind: str) -> str:
 
 
 def build_canonical_key(
-    package_name: str, schema_id: str, kind: str, parts: list[str]
+    package_name: str,
+    schema_id: str,
+    kind: str,
+    parts: list[str],
+    declaring_model: str = "",
 ) -> str:
     """The single v4.0 uniform-key builder
     `<package>.<model>.<schema?>.<kind>.<parts>` (← TS `buildCanonicalKey`):
     model from the kind, schema slot db-only (default `dbo`), kind segment via
     the namespace alias else the camelCase kind."""
-    model = model_for_kind(kind)
+    model = model_for_kind(kind, declaring_model)
     segments: list[str] = []
     if package_name:
         segments.append(package_name)

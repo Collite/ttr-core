@@ -316,6 +316,7 @@ class FileBasedSource(
         val relations = mutableMapOf<QualifiedName, Relation>()
         val mappings = mutableListOf<org.tatrman.ttr.metadata.model.Mapping>()
         val queries = mutableMapOf<QualifiedName, Query>()
+        val shortQueryTargets = mutableSetOf<String>()
         val roles = mutableMapOf<QualifiedName, Role>()
         val drillMaps = mutableMapOf<QualifiedName, org.tatrman.ttr.metadata.model.DrillMap>()
         val areas = mutableMapOf<String, AreaRecord>()
@@ -382,9 +383,9 @@ class FileBasedSource(
             }
 
             // A5 Task 4 — wrong-file-kind: def-kind must belong to the declared schema.
-            // The mapping kinds (er2db_*, er2cnc_role) and query are schema-pinned (always
-            // map/query) and are not constrained by the file's schema directive; they are
-            // excluded from this check.  See Stage 09 decision record.
+            // A `query` is allowed under `model er` (a logical query, LQ L-1); under `model db`
+            // it is not (yet — ttr-core#193), so a db query lives in a directive-less file.
+            // See Stage 09 decision record.
             // Directive-less files (Stage 3) legitimately mix kinds (db.ttr holds tables +
             // queries; er.ttr holds entities + relations; cnc.ttr holds roles + er2cnc),
             // so the check applies only when a schema is declared.
@@ -392,7 +393,8 @@ class FileBasedSource(
                 val schemaKindAllowlist =
                     mapOf(
                         "db" to setOf("table", "view", "procedure", "foreign_key"),
-                        "er" to setOf("entity", "relation"),
+                        // LQ (L-1): a query declared in a `model er` file is a logical query.
+                        "er" to setOf("entity", "relation", "query"),
                         "cnc" to setOf("role"),
                     )
                 for (def in pr.definitions) {
@@ -493,6 +495,7 @@ class FileBasedSource(
                     roles,
                     drillMaps,
                     semanticsResolved,
+                    shortQueryTargets,
                 )
             }
             loadedFiles.add(
@@ -507,6 +510,8 @@ class FileBasedSource(
                 ),
             )
         }
+
+        resolveShortQueryTargets(mappings, queries, shortQueryTargets)
 
         return SourceSnapshot(
             sourceId = sourceId,
@@ -730,6 +735,7 @@ class FileBasedSource(
         roles: MutableMap<QualifiedName, Role>,
         drillMaps: MutableMap<QualifiedName, org.tatrman.ttr.metadata.model.DrillMap>,
         semanticsResolved: Map<SourceLocation, ResolvedSemantics>,
+        shortQueryTargets: MutableSet<String>,
     ) {
         when (def) {
             is TableDef -> {
@@ -873,7 +879,7 @@ class FileBasedSource(
                 // explicit `def er2db_*` declarations; the duplicate-mapping validator
                 // catches collisions where the inline and explicit forms target the
                 // same qname.
-                synthesiseInlineEntityMappings(def, qn, sourceFile, mappings)
+                synthesiseInlineEntityMappings(def, qn, sourceFile, mappings, shortQueryTargets)
                 synthesiseInlineAttributeMappings(def, qn, sourceFile, mappings)
             }
             is RelationDef -> {
@@ -936,7 +942,14 @@ class FileBasedSource(
                 // references resolve to it. Was hardcoded `qname("query","query",…)`,
                 // which stranded queries at UNSPECIFIED.query.<name> and broke every
                 // entity→query mapping (entity_query_mapping_unresolved).
-                val qn = qname(schemaCode, namespace, def.name)
+                // LQ (L-1): declared in a `model er` file it is a logical query, written
+                // over entities — `er.query.<name>`, whatever the file's namespace.
+                val qn =
+                    if (schemaCode.equals("er", ignoreCase = true)) {
+                        qname("er", "query", def.name)
+                    } else {
+                        qname(schemaCode, namespace, def.name)
+                    }
                 // Prefer the structured tagged block (DESIGN §10): its tag carries
                 // language + dialect. Fall back to the soft-deprecated `language:`
                 // property only when no tagged block is present.
@@ -976,7 +989,7 @@ class FileBasedSource(
                                 entries.containsKey("view") ->
                                     MappingTarget.View(refToQname(entries["view"], "db", "dbo"))
                                 entries.containsKey("query") ->
-                                    MappingTarget.SqlQuery(refToQname(entries["query"], "db", "dbo"))
+                                    queryTarget(entries["query"], idFor("map.er2db_entity", qn), shortQueryTargets)
                                 else -> null
                             }
                         }
@@ -1138,8 +1151,10 @@ class FileBasedSource(
         entityQn: QualifiedName,
         sourceFile: String,
         mappings: MutableList<org.tatrman.ttr.metadata.model.Mapping>,
+        shortQueryTargets: MutableSet<String>,
     ) {
         val mapping = def.binding as? BindingPropertyBlock ?: return
+        val mappingId = idFor("map.er2db_entity", qname("binding", "er2db_entity", def.name))
         val target =
             when (val t = mapping.target) {
                 is TargetObjectValue -> {
@@ -1150,7 +1165,7 @@ class FileBasedSource(
                         entries.containsKey("view") ->
                             MappingTarget.View(refToQname(entries["view"], "db", "dbo"))
                         entries.containsKey("query") ->
-                            MappingTarget.SqlQuery(refToQname(entries["query"], "db", "dbo"))
+                            queryTarget(entries["query"], mappingId, shortQueryTargets)
                         else -> null
                     }
                 }
@@ -1460,6 +1475,42 @@ class FileBasedSource(
                 }
             else -> emptyList()
         }
+
+    /**
+     * A `query:` binding target. A full reference (`er.query.x`, `db.dbo.x`) is taken as written. A short one
+     * (`x`, `query.x`) defaults to the db lane here and is noted in [shortQueryTargets] by mapping id:
+     * [resolveShortQueryTargets] points it at the loaded query of that name once every file is in — so a short
+     * reference to a logical query (LQ L-1, `er.query.<name>`) resolves as it does in the editor.
+     */
+    private fun queryTarget(
+        v: PropertyValue?,
+        mappingId: String,
+        shortQueryTargets: MutableSet<String>,
+    ): MappingTarget.SqlQuery {
+        val path = (v as? PropertyValue.IdValue)?.ref?.path
+        if (path != null && path.split('.').size < 3) shortQueryTargets += mappingId
+        return MappingTarget.SqlQuery(refToQname(v, "db", "dbo"))
+    }
+
+    /**
+     * LQ (L-1) — the second half of [queryTarget]: a short `query:` target whose db-lane default names no loaded
+     * query is pointed at the one loaded query of that name (a logical query, `er.query.<name>`). None, or more
+     * than one, leaves the default — the query may come from another source, and an ambiguous name is not guessed.
+     */
+    private fun resolveShortQueryTargets(
+        mappings: MutableList<org.tatrman.ttr.metadata.model.Mapping>,
+        queries: Map<QualifiedName, Query>,
+        shortQueryTargets: Set<String>,
+    ) {
+        if (shortQueryTargets.isEmpty()) return
+        val byName = queries.keys.groupBy { it.name }
+        mappings.replaceAll { m ->
+            val target = ((m as? Er2DbEntityMapping)?.target as? MappingTarget.SqlQuery)?.qname
+            if (target == null || m.internalId !in shortQueryTargets || target in queries) return@replaceAll m
+            val only = byName[target.name]?.singleOrNull() ?: return@replaceAll m
+            (m as Er2DbEntityMapping).copy(target = MappingTarget.SqlQuery(only))
+        }
+    }
 
     private fun refToQname(
         v: PropertyValue?,

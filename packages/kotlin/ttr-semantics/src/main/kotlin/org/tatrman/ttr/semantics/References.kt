@@ -143,6 +143,7 @@ fun enclosingQnameOf(
     val kind = kindOf(def)
     if (kind !in ENCLOSING_KINDS) return null
     // v4.0 uniform key: model/schema/kind derive from the def's kind; `namespace`
-    // is the file `schema` id (db only). `schemaCode` (file model) is unused.
-    return buildCanonicalKey(packageName ?: "", namespace, kind, listOf(def.name))
+    // is the file `schema` id (db only). `schemaCode` (file model) only moves a
+    // query declared under `model er` (a logical query, LQ L-1).
+    return buildCanonicalKey(packageName ?: "", namespace, kind, listOf(def.name), schemaCode)
 }

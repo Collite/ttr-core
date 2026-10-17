@@ -8,7 +8,8 @@
 //   - **Surface reference** — what authors write; short, almost every slot
 //     elided. Classified by `classifyReference` and filled by `resolveReference`.
 //
-// `query` is NOT a model (D14) — a `def query` resolves to model `db`. `cnc` is
+// `query` is NOT a model (D14) — a `def query` resolves to model `db`, or to `er`
+// when it is declared in a `model er` file (a logical query, LQ L-1). `cnc` is
 // schema-less with no namespace echo (D15). The schema slot is **db only** (D6).
 
 import { namespaceForKind, modelForKind } from './default-schema.js';
@@ -77,8 +78,13 @@ export function buildCanonicalKey(opts: {
   kind: string;
   /** Name path: `[def.name]` for a top-level def, `[parent, child]` for a member. */
   parts: string[];
+  /**
+   * The declaring file's `model` directive code. Only a `query` reads it: declared
+   * under `model er` it is a logical query, `er.query.<name>` (LQ L-1).
+   */
+  declaringModel?: string;
 }): string {
-  const model = modelForKind(opts.kind);
+  const model = modelForKind(opts.kind, opts.declaringModel);
   return qnameToKey({
     package: opts.packageName ?? '',
     model,

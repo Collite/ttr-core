@@ -1,0 +1,21 @@
+// LQ (logical queries, L-1): a query declared in a `model er` file is a logical query,
+// `er.query.<name>`; an entity stacks on it through `binding: { target: { query: … } }`.
+model er
+
+def query shopper_revenue {
+    description: "Revenue per shopper, written over entities"
+    sourceText: """sql
+SELECT shopper.shopper_id, SUM(sale.revenue) AS revenue
+FROM sale JOIN shopper
+GROUP BY shopper.shopper_id
+"""
+}
+
+def entity shopper_revenue {
+    description: "A shopper with the revenue of their sales"
+    binding: { target: { query: er.query.shopper_revenue } }
+    attributes: [
+        def attribute shopper_id { type: int, isKey: true, description: "Shopper" },
+        def attribute total_revenue { type: decimal, binding: revenue, description: "Revenue" }
+    ]
+}

@@ -36,3 +36,19 @@ def test_dfdsl_pipeline_roundtrip() -> None:
 
     parsed = dfdsl_pb2.Pipeline.FromString(pipeline.SerializeToString())
     assert parsed == pipeline
+
+
+def test_project_expanded_from_roundtrip() -> None:
+    """LQ (L-11) - `ProjectNode.expanded_from`, the boundary stamp of an inlined logical query."""
+    from org.tatrman.plan.v1 import plan_pb2
+
+    node = plan_pb2.PlanNode()
+    node.project.input.scan.object.name = "sale"
+    node.project.expanded_from.schema_code = plan_pb2.SchemaCode.ER
+    node.project.expanded_from.namespace = "entity"
+    node.project.expanded_from.name = "shopper_revenue"
+
+    parsed = plan_pb2.PlanNode.FromString(node.SerializeToString())
+    assert parsed == node
+    assert parsed.project.HasField("expanded_from")
+    assert not plan_pb2.ProjectNode().HasField("expanded_from")

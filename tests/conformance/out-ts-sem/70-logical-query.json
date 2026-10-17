@@ -1,0 +1,10 @@
+{
+    "diagnostics": [],
+    "resolved": [],
+    "symbols": [
+        "er.entity.shopper_revenue",
+        "er.entity.shopper_revenue.shopper_id",
+        "er.entity.shopper_revenue.total_revenue",
+        "er.query.shopper_revenue"
+    ]
+}
