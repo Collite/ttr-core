@@ -22,7 +22,9 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
     file in Kotlin and make TS whole-file tools refuse it); the load-time refusal is ttr-metadata's.
   - **`ttr-metadata`** — a `model er` query loads as `Query((ER, "query", name))`; the er file-kind allowlist admits
     `query`; export writes logical queries to their own `er-query.ttr` under `model er`; the reconciler refuses a
-    logical query with parameters (`logical_query_parameters`).
+    logical query with parameters (`logical_query_parameters`). A short `query:` binding target (`query: x`,
+    `query: query.x`) whose db-lane default names no loaded query resolves to the one loaded query of that name — a
+    logical query — as the editor resolves it.
   - **`ttr-translator`** — `Translator.parseToRelNode(…, strictLane = false, expandLogicalBodies = false)` and
     `translate(…, expandLogicalBodies = false)`:
     - `strictLane` parses a saved query in its declared lane: the schema detector runs although `sourceSchema` is
@@ -37,11 +39,19 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
       entities a stacked entity reads. MAP_TO_PHYSICAL closes a stamped boundary into the form it gives every
       `ToQuery` boundary and ends the stamp, so the physical plan is byte-identical with the option on or off.
     - `Translator.outputColumnNames(plan)` — a stored body's output names (for the workers' binding check).
-    - REL_NODE re-entry: the stamp rides the decoded Project as a Calcite hint; the decoder never merges a stamped
-      Project with an adjacent one, and an Aggregate over a boundary is neither pruned nor dropped as redundant
-      (RelBuilder would otherwise break the on/off identity).
-    - The strict lane is checked on the plan too: a sub-query (WHERE / select list / HAVING) or an unfolded saved
-      query reading the other lane is `mixed_lanes` — the detector reads only the FROM clauses.
+    - REL_NODE re-entry: the stamp rides the decoded Project as a Calcite hint (its schema code by wire number, so
+      an unknown code round-trips); the decoder never merges a stamped Project with an adjacent one, never pushes a
+      limit straight above a boundary into the body's Sort, and an Aggregate over a boundary is neither pruned nor
+      dropped as redundant (RelBuilder would otherwise break the on/off identity).
+    - The strict lane is decided on the plan: the detector reads only the FROM clauses and leaves saved-query
+      references (`obj.query.<name>`) out of its verdict, so after UNFOLD the plan must read the declared lane and
+      only it — a sub-query (WHERE / select list / HAVING) or an unfolded saved query reading the other lane is
+      `mixed_lanes` (beside the declared lane) or `lane_mismatch` (instead of it); a body whose lane is read only in
+      a sub-query, or through a saved query of the same lane, parses. New: `SchemaDetector.detect(…,
+      savedQueryRefsNeutral = false)` and `TableIdentifierExtractor.fromQuery(…, skipSavedQueryRefs = false)`
+      (`@JvmOverloads`; defaults unchanged).
+    - `EXPAND_LOGICAL_BODIES` refuses a stacked scan that declares no columns (`entity_query_no_columns`) rather
+      than leave it unexpanded, where the entities its body reads would escape the ER-level checks.
     - ⚠ Binary compatibility: both entry points carry `@JvmOverloads`, so explicit-argument (Java-style) callers
       compiled against 0.11.x keep working; Kotlin callers that relied on default arguments call the synthetic
       `$default` method, whose signature changed — recompile against 0.12.0.

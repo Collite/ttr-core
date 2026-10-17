@@ -92,7 +92,8 @@ class Translator(
      *   `true` runs [SchemaDetector] even though [sourceSchema] is stated (a lenient parse skips it)
      *   and refuses anything the detector does not `CONFIRM`: `mixed_lanes` when the body reads
      *   entities and tables together, `lane_mismatch` otherwise (the other lane, unknown names, no
-     *   stated lane, or a body that names nothing) — both name the offending identifiers. A query
+     *   stated lane, or a body that names nothing) — both name the offending identifiers. A saved-query
+     *   reference (`obj.query.<name>`) counts by what it unfolds to, checked on the plan. A query
      *   stated `ER` (a logical query) with [parameters] is `logical_query_parameters` (ruling LQ-5).
      *   A body that does not parse keeps the parser's own error. SQL only. Default `false` keeps
      *   every existing caller byte-identical; the metadata workers set it for saved queries.
@@ -365,14 +366,21 @@ class Translator(
             }
         val effectiveSql = prepared?.sql ?: preSource
         // LQ (L-7) — the strict lane gate, on the SQL the validator will see (rails applied, `{name}` → `?`).
-        // NOT_APPLICABLE (no table names, or a body the detector cannot parse) is no lane evidence: the parse
-        // below decides — its error stands, and a body that parses is still refused (it names no entity).
-        var laneUnproven = false
+        // The detector reads only FROM clauses and leaves saved-query references (`obj.query.<name>`) out of
+        // its verdict. NOT_APPLICABLE (no lane names there — the lane may sit in a sub-query or an unfolded
+        // saved query — or a body the detector cannot parse) is no verdict: the parse below decides — its
+        // error stands — and the plan-level check in runFrontHalfStages proves the lane (laneCheck).
         if (strictLane) {
-            val lane = SchemaDetector.detect(effectiveSql, Language.SQL, sourceSchema, model)
+            val lane =
+                SchemaDetector.detect(
+                    effectiveSql,
+                    Language.SQL,
+                    sourceSchema,
+                    model,
+                    savedQueryRefsNeutral = true,
+                )
             when (lane.decision) {
-                SchemaDecision.CONFIRMED -> Unit
-                SchemaDecision.NOT_APPLICABLE -> laneUnproven = true
+                SchemaDecision.CONFIRMED, SchemaDecision.NOT_APPLICABLE -> Unit
                 else -> return laneFailure(lane, sourceSchema)
             }
         }
@@ -482,15 +490,6 @@ class Translator(
         return when (val v = validated) {
             is ValidateResult.Failure -> ParseResult.Failure(v.error.code, v.error.message, modelJoinsSql)
             is ValidateResult.Success -> {
-                if (laneUnproven) {
-                    return ParseResult.Failure(
-                        code = LANE_MISMATCH,
-                        message =
-                            "the query names no ${laneNoun(sourceSchema)}; a saved query declared in the " +
-                                "${schemaToken(sourceSchema)} lane must read ${laneNoun(sourceSchema)}",
-                        modelJoinsSql = modelJoinsSql,
-                    )
-                }
                 val r =
                     runFrontHalfStages(
                         v.rel,
@@ -569,31 +568,46 @@ class Translator(
     }
 
     /**
-     * LQ (L-2) — a strict parse's plan must read one lane: an ER-lane plan no table, a DB-lane plan no entity,
-     * anywhere — expression sub-queries included. Null when it holds; else `mixed_lanes` naming both sets.
+     * LQ (L-2) — a strict parse's plan must read its lane and only its lane: an ER-lane plan at least one entity and
+     * no table, a DB-lane plan at least one table and no entity — anywhere, expression sub-queries and unfolded
+     * saved queries included. Null when it holds; else `mixed_lanes` naming both sets when it reads both lanes, or
+     * `lane_mismatch` when it reads only the other lane, or nothing.
      */
-    private fun laneLeak(
+    private fun laneCheck(
         plan: PlanNode,
         lane: SchemaCode,
     ): ParseResult.Failure? {
         val entities = sortedSetOf<String>()
         val tables = sortedSetOf<String>()
 
-        fun walk(node: PlanNode) {
+        org.tatrman.translator.joiner.JoinerPlanWalker.forEachNode(plan) { node ->
             when (node.nodeCase) {
                 PlanNode.NodeCase.TABLE_SCAN -> tables += node.tableScan.table.name
                 PlanNode.NodeCase.SCAN ->
                     if (node.scan.getObject().schemaCode == SchemaCode.ER) entities += node.scan.getObject().name
                 else -> Unit
             }
-            org.tatrman.translator.joiner.JoinerPlanWalker.rewriteChildren(node) { child ->
-                walk(child)
-                child
-            }
         }
-        walk(plan)
-        val leaks = if (lane == SchemaCode.ER) tables.isNotEmpty() else entities.isNotEmpty()
-        if (!leaks) return null
+        val (own, other) = if (lane == SchemaCode.ER) entities to tables else tables to entities
+        val otherLane = if (lane == SchemaCode.ER) SchemaCode.DB else SchemaCode.ER
+        when {
+            other.isEmpty() && own.isNotEmpty() -> return null
+            other.isEmpty() ->
+                return ParseResult.Failure(
+                    code = LANE_MISMATCH,
+                    message =
+                        "the query names no ${laneNoun(lane)}; a saved query declared in the ${schemaToken(lane)} " +
+                            "lane must read ${laneNoun(lane)}",
+                )
+            own.isEmpty() ->
+                return ParseResult.Failure(
+                    code = LANE_MISMATCH,
+                    message =
+                        "the query is declared in the ${schemaToken(lane)} lane but reads ${laneNoun(otherLane)}: " +
+                            "${other.joinToString()} — through a sub-query or a referenced saved query; a saved " +
+                            "query reads ${laneNoun(lane)} of the lane it is declared in",
+                )
+        }
         return ParseResult.Failure(
             code = MIXED_LANES,
             message =
@@ -731,8 +745,9 @@ class Translator(
 
             // LQ (L-2) — the strict lane, on the plan itself: the detector reads only the FROM clauses, so a
             // sub-query (WHERE / select list / HAVING) or an unfolded saved query could still bring in the
-            // other lane. Checked before MAP_TO_PHYSICAL, which would turn entity scans into tables.
-            if (strictLane != null) laneLeak(plan, strictLane)?.let { return it }
+            // other lane — or be the only place the query's own lane is read. Checked before MAP_TO_PHYSICAL,
+            // which would turn entity scans into tables.
+            if (strictLane != null) laneCheck(plan, strictLane)?.let { return it }
 
             // 4b. EXPAND_LOGICAL_BODIES (LQ, L-8) — the end of the ER half, opt-in, ER target only.
             if (expandLogicalBodies && targetSchema == SchemaCode.ER) {

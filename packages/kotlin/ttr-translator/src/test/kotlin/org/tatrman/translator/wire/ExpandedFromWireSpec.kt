@@ -69,6 +69,23 @@ class ExpandedFromWireSpec :
             PlanNodeEncoder.encode(rel).toByteArray().contentEquals(plan.toByteArray()) shouldBe true
         }
 
+        "a stamp whose schema code this reader does not know survives the Calcite round trip by its number" {
+            val unknown =
+                HartlandStackModel.shopperRevenue.qname
+                    .toBuilder()
+                    .setSchemaCodeValue(99)
+                    .build()
+            unknown.schemaCode shouldBe SchemaCode.UNRECOGNIZED
+            val plan =
+                stamped().let { p ->
+                    p.toBuilder().setProject(p.project.toBuilder().setExpandedFrom(unknown)).build()
+                }
+            val rel = PlanNodeDecoder.decode(plan, TranslatorFramework(model, SchemaCode.ER, "entity"))
+            val again = PlanNodeEncoder.encode(rel)
+            again.project.expandedFrom.schemaCodeValue shouldBe 99
+            again.toByteArray().contentEquals(plan.toByteArray()) shouldBe true
+        }
+
         "an unstamped Project decodes with no hint (nothing new reaches Calcite)" {
             val plain = HartlandStackModel.parseEr(model, "SELECT sale.revenue AS revenue FROM sale")
             PlanNodeDecoder

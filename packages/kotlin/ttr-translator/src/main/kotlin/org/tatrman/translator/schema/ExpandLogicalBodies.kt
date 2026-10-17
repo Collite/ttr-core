@@ -30,8 +30,11 @@ import org.tatrman.translator.joiner.JoinerPlanWalker
  *  - a body containing any table scan (a db-lane query: the `__filter` row-filter queries, a physical
  *    `source.query`) — expanding it would mix ER and DB scans in one plan, which the validator rejects (L-9
  *    holds by construction);
- *  - a body the model cannot resolve (MAP_TO_PHYSICAL reports `entity_query_mapping_unresolved`);
- *  - a scan with no declared columns (no boundary to stamp).
+ *  - a body the model cannot resolve (MAP_TO_PHYSICAL reports `entity_query_mapping_unresolved`).
+ *
+ * **Refused** — a stacked scan that declares no columns has no boundary to stamp (`entity_query_no_columns`):
+ * left unexpanded, the entities its body reads would stay invisible to the validator's ER pass, the very gap
+ * this stage closes — so it fails closed rather than pass the scan on silently.
  *
  * Idempotent: an expanded plan has no eligible scan left. The stamp survives a REL_NODE re-entry (carried as a
  * Calcite hint, [org.tatrman.translator.wire.ExpandedFromHint]); MAP_TO_PHYSICAL closes each stamped boundary
@@ -76,7 +79,14 @@ object ExpandLogicalBodies {
             )
         }
         val expandedBody = rewrite(body, model, visited + entity)
-        val boundary = MapToPhysical.boundaryProject(scanPlan, model, expandedBody) ?: return scanPlan
+        val boundary =
+            MapToPhysical.boundaryProject(scanPlan, model, expandedBody)
+                ?: throw ExpandLogicalBodiesException(
+                    "entity_query_no_columns",
+                    "Entity ${qnameToken(entity)} is stacked on a logical query but its scan declares no " +
+                        "columns: its body cannot be expanded under a boundary, and left unexpanded the entities " +
+                        "it reads would escape the ER-level checks",
+                )
         return PlanNode
             .newBuilder()
             .setProject(boundary.setExpandedFrom(entity))
@@ -84,15 +94,8 @@ object ExpandLogicalBodies {
     }
 
     /** True when [plan] scans a table anywhere — expression sub-queries included. */
-    private fun readsTables(plan: PlanNode): Boolean {
-        if (plan.nodeCase == PlanNode.NodeCase.TABLE_SCAN) return true
-        var found = false
-        JoinerPlanWalker.rewriteChildren(plan) { child ->
-            if (!found && readsTables(child)) found = true
-            child
-        }
-        return found
-    }
+    private fun readsTables(plan: PlanNode): Boolean =
+        JoinerPlanWalker.anyNode(plan) { it.nodeCase == PlanNode.NodeCase.TABLE_SCAN }
 
     private fun qnameToken(qn: QualifiedName): String = "${schemaCodeToToken(qn.schemaCode)}.${qn.namespace}.${qn.name}"
 }

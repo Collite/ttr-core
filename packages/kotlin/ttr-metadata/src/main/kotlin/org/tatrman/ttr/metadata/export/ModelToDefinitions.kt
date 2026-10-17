@@ -126,11 +126,12 @@ object ModelToDefinitions {
      * one package directory per originating YAML file (package name = file name minus its
      * `NNnn_` code prefix, e.g. `hl05_returns` → `returns`). Inside each package the
      * content collapses to at most three **directive-less** files (v2.1 / yaml-converter
-     * split): `db.ttr` (tables, views, foreign keys, procedures, **and queries**),
+     * split): `db.ttr` (tables, views, foreign keys, procedures, **and db queries**),
      * `er.ttr` (entities **and** relations, with inline `mapping:`), and `cnc.ttr` (roles
      * **and** `er2cnc_role`). Each def derives its schema+namespace from its kind on
      * reload, so these files carry no `schema`/`namespace` directive. er2db mappings are
-     * inline (no `map.ttr`).
+     * inline (no `map.ttr`). Logical queries (LQ L-1) are the one exception: a fourth file,
+     * `er-query.ttr`, under `model er` — the directive is what makes them logical.
      *
      * References are emitted fully-qualified, so they resolve via the resolver's exact
      * `byFull` step regardless of imports — no `import` statements are emitted (packages are
@@ -196,11 +197,12 @@ object ModelToDefinitions {
             tagged += Tagged(queryToQueryDef(it), bucket, it.sourceFile)
         }
 
-        // One file per (package, bucket): at most `db.ttr` / `er.ttr` / `cnc.ttr`.
-        // All defs of a bucket — even from several source files in the same package —
-        // merge into the single file, and it carries **no** schema/namespace directive
-        // (schemaCode = namespace = null); each def derives its schema+namespace from
-        // its kind on reload (kind-derived defaults, ttr-semantics ≥ 0.4.0).
+        // One file per (package, bucket): at most `db.ttr` / `er.ttr` / `cnc.ttr`, plus
+        // `er-query.ttr` for logical queries. All defs of a bucket — even from several source
+        // files in the same package — merge into the single file, and it carries **no**
+        // schema/namespace directive (schemaCode = namespace = null); each def derives its
+        // schema+namespace from its kind on reload (kind-derived defaults, ttr-semantics
+        // ≥ 0.4.0). `er-query.ttr` alone carries `model er` (LQ L-1).
         val files = mutableListOf<ExportFile>()
         tagged.groupBy { packageOf(it.sourceFile) }.forEach { (pkg, pkgItems) ->
             pkgItems.groupBy { it.schema }.forEach { (schema, schemaItems) ->

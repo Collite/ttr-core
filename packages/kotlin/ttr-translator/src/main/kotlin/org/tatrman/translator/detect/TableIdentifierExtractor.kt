@@ -12,104 +12,108 @@ import org.apache.calcite.sql.SqlWith
 import org.apache.calcite.sql.SqlWithItem
 
 object TableIdentifierExtractor {
-    fun fromQuery(sqlNode: SqlNode): List<String> {
+    /**
+     * The lowercased simple names of the tables / entities [sqlNode] reads in its FROM clauses (CTE names
+     * excluded). [skipSavedQueryRefs] (LQ) leaves out saved-query references (`obj.<namespace>.<name>`):
+     * they name neither lane — UNFOLD replaces them with their bodies.
+     */
+    @JvmOverloads
+    fun fromQuery(
+        sqlNode: SqlNode,
+        skipSavedQueryRefs: Boolean = false,
+    ): List<String> {
+        val collector = Collector(skipSavedQueryRefs)
+        collector.collect(sqlNode)
+        return collector.tables.sorted()
+    }
+
+    private class Collector(
+        private val skipSavedQueryRefs: Boolean,
+    ) {
         val tables = mutableSetOf<String>()
-        val cteNames = mutableSetOf<String>()
-        collect(sqlNode, tables, cteNames)
-        return tables.sorted()
-    }
+        private val cteNames = mutableSetOf<String>()
 
-    private fun collect(
-        node: SqlNode?,
-        tables: MutableSet<String>,
-        cteNames: MutableSet<String>,
-    ) {
-        if (node == null) return
+        fun collect(node: SqlNode?) {
+            if (node == null) return
 
-        when (node) {
-            is SqlWith -> {
-                node.withList.forEach { withItem ->
-                    if (withItem is SqlWithItem) {
-                        cteNames.add(withItem.name.toString().lowercase())
-                        collect(withItem.query, tables, cteNames)
+            when (node) {
+                is SqlWith -> {
+                    node.withList.forEach { withItem ->
+                        if (withItem is SqlWithItem) {
+                            cteNames.add(withItem.name.toString().lowercase())
+                            collect(withItem.query)
+                        }
+                    }
+                    collect(node.body)
+                }
+
+                is SqlOrderBy -> {
+                    collect(node.query)
+                }
+
+                is SqlSelect -> {
+                    collectFrom(node.from)
+                }
+
+                is SqlJoin -> {
+                    collectFrom(node.left)
+                    collectFrom(node.right)
+                }
+
+                is SqlBasicCall -> {
+                    if (node.operator.kind == SqlKind.AS) {
+                        collectFrom(node.operandList.getOrNull(0))
+                    } else {
+                        node.operandList.filterIsInstance<SqlNode>().forEach { operand ->
+                            collect(operand)
+                        }
                     }
                 }
-                collect(node.body, tables, cteNames)
-            }
 
-            is SqlOrderBy -> {
-                collect(node.query, tables, cteNames)
-            }
+                is SqlIdentifier -> add(node)
 
-            is SqlSelect -> {
-                collectFrom(node.from, tables, cteNames)
+                else -> {}
             }
-
-            is SqlJoin -> {
-                collectFrom(node.left, tables, cteNames)
-                collectFrom(node.right, tables, cteNames)
-            }
-
-            is SqlBasicCall -> {
-                if (node.operator.kind == SqlKind.AS) {
-                    collectFrom(node.operandList.getOrNull(0), tables, cteNames)
-                } else {
-                    node.operandList.filterIsInstance<SqlNode>().forEach { operand ->
-                        collect(operand, tables, cteNames)
-                    }
-                }
-            }
-
-            is SqlIdentifier -> {
-                val name = node.names.lastOrNull() ?: return
-                val lname = name.lowercase()
-                if (lname !in cteNames) {
-                    tables.add(lname)
-                }
-            }
-
-            else -> {}
         }
-    }
 
-    private fun collectFrom(
-        node: SqlNode?,
-        tables: MutableSet<String>,
-        cteNames: MutableSet<String>,
-    ) {
-        when (node) {
-            is SqlIdentifier -> {
-                val name = node.names.lastOrNull() ?: return
-                val lname = name.lowercase()
-                if (lname !in cteNames) {
-                    tables.add(lname)
+        private fun collectFrom(node: SqlNode?) {
+            when (node) {
+                is SqlIdentifier -> add(node)
+
+                is SqlJoin -> {
+                    collectFrom(node.left)
+                    collectFrom(node.right)
                 }
-            }
 
-            is SqlJoin -> {
-                collectFrom(node.left, tables, cteNames)
-                collectFrom(node.right, tables, cteNames)
-            }
+                is SqlSelect -> {
+                    collectFrom(node.from)
+                }
 
-            is SqlSelect -> {
-                collectFrom(node.from, tables, cteNames)
-            }
+                is SqlWith -> {
+                    collect(node)
+                }
 
-            is SqlWith -> {
-                collect(node, tables, cteNames)
-            }
-
-            is SqlBasicCall -> {
-                if (node.operator.kind == SqlKind.AS) {
-                    collectFrom(node.operandList.getOrNull(0), tables, cteNames)
-                } else {
-                    node.operandList.filterIsInstance<SqlNode>().forEach { operand ->
-                        collectFrom(operand, tables, cteNames)
+                is SqlBasicCall -> {
+                    if (node.operator.kind == SqlKind.AS) {
+                        collectFrom(node.operandList.getOrNull(0))
+                    } else {
+                        node.operandList.filterIsInstance<SqlNode>().forEach { operand ->
+                            collectFrom(operand)
+                        }
                     }
                 }
-            }
 
-            else -> {}
+                else -> {}
+            }
+        }
+
+        private fun add(node: SqlIdentifier) {
+            if (skipSavedQueryRefs && node.names.size >= 2 && node.names[0].equals("obj", ignoreCase = true)) return
+            val name = node.names.lastOrNull() ?: return
+            val lname = name.lowercase()
+            if (lname !in cteNames) {
+                tables.add(lname)
+            }
         }
     }
 }

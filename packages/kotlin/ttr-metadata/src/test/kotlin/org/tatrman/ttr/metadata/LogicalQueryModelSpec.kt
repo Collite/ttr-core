@@ -231,4 +231,44 @@ class LogicalQueryModelSpec :
             refusal shouldHaveSize 1
             refusal.single().message shouldContain "er.query.shopper_revenue"
         }
+        "a short query: target resolves to the logical query of that name, as the editor resolves it" {
+            for (spelling in listOf("shopper_revenue", "query.shopper_revenue")) {
+                val files =
+                    sample +
+                        ("revenue.ttrm" to revenue().replace("query: er.query.shopper_revenue", "query: $spelling"))
+                val result = load(files)
+                result.errors.shouldBeEmpty()
+                result.model
+                    .shouldNotBeNull()
+                    .mappings
+                    .filterIsInstance<Er2DbEntityMapping>()
+                    .single { it.entity == stacked }
+                    .target
+                    .shouldBeInstanceOf<MappingTarget.SqlQuery>()
+                    .qname shouldBe erQuery
+            }
+        }
+
+        "a short query: target to a db query keeps the db lane" {
+            val dbQuery =
+                """
+                def query store_revenue {
+                    sourceText: "SELECT ss_customer_sk, SUM(ss_net_paid) AS revenue FROM store_sales GROUP BY ss_customer_sk"
+                }
+
+                def entity store_revenue {
+                    binding: { target: { query: store_revenue } },
+                    attributes: [ def attribute ss_customer_sk { type: int, isKey: true } ]
+                }
+                """.trimIndent()
+            load(sample + ("dbq.ttrm" to dbQuery))
+                .model
+                .shouldNotBeNull()
+                .mappings
+                .filterIsInstance<Er2DbEntityMapping>()
+                .single { it.entity.name == "store_revenue" }
+                .target
+                .shouldBeInstanceOf<MappingTarget.SqlQuery>()
+                .qname shouldBe QualifiedName(SchemaCode.DB, "dbo", "store_revenue")
+        }
     })

@@ -17,10 +17,13 @@ import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.core.JoinRelType
 import org.apache.calcite.rex.RexNode
 import org.apache.calcite.sql.SqlAggFunction
+import org.apache.calcite.rel.RelCollations
 import org.apache.calcite.rel.logical.LogicalProject
+import org.apache.calcite.rel.logical.LogicalSort
 import org.apache.calcite.tools.RelBuilder
 import org.tatrman.translator.framework.TranslatorFramework
 import org.tatrman.translator.functions.FunctionCatalog
+import org.tatrman.translator.joiner.JoinerPlanWalker
 import org.tatrman.plan.v1.schemaCodeToToken
 
 /**
@@ -162,17 +165,31 @@ object PlanNodeDecoder {
         // with the body's root Project below it, nor into the Project above it. RelBuilder merges adjacent
         // Projects; the option-off path never meets them adjacent (MAP_TO_PHYSICAL builds the boundary after
         // the decode), so a merge here would make the two physical plans differ. The stamp rides the decoded
-        // Project as a hint; the encoder restores it.
-        val stamped = project.hasExpandedFrom()
-        val overBoundary =
-            project.input.nodeCase == PlanNode.NodeCase.PROJECT && project.input.project.hasExpandedFrom()
-        if (stamped || overBoundary) {
-            val hints = if (stamped) listOf(ExpandedFromHint.of(project.expandedFrom)) else emptyList()
-            builder.push(LogicalProject.create(builder.build(), hints, nodes, aliases))
-        } else {
-            builder.project(nodes, aliases, true)
+        // Project as a hint; the encoder restores it. A Project straight above a boundary is otherwise built
+        // like any — RelBuilder simplifies its expressions and infers its aliases, as it does over the entity
+        // scan the option-off path meets there — only with merging off (`bloat < 0`).
+        when {
+            project.hasExpandedFrom() ->
+                builder.push(
+                    LogicalProject.create(
+                        builder.build(),
+                        listOf(ExpandedFromHint.of(project.expandedFrom)),
+                        nodes,
+                        aliases,
+                    ),
+                )
+            isBoundary(project.input) -> {
+                val noMerge = builder.transform { it.withBloat(-1) }.push(builder.build())
+                noMerge.project(nodes, aliases, true)
+                builder.push(noMerge.build())
+            }
+            else -> builder.project(nodes, aliases, true)
         }
     }
+
+    /** LQ — a logical-query boundary: a Project stamped `expanded_from`. */
+    private fun isBoundary(plan: PlanNode): Boolean =
+        plan.nodeCase == PlanNode.NodeCase.PROJECT && plan.project.hasExpandedFrom()
 
     private fun pushFilter(
         builder: RelBuilder,
@@ -234,9 +251,8 @@ object PlanNodeDecoder {
         // (or whose input it can prove single-row) through the expanded body, wherever the boundary sits below.
         // The option-off path meets an entity scan there, where neither happens, so this Aggregate is built with
         // (a) off for a direct boundary input and (b) off whenever a boundary is below.
-        val directBoundary =
-            aggregate.input.nodeCase == PlanNode.NodeCase.PROJECT && aggregate.input.project.hasExpandedFrom()
-        val boundaryBelow = directBoundary || hasBoundary(aggregate.input)
+        val directBoundary = isBoundary(aggregate.input)
+        val boundaryBelow = JoinerPlanWalker.anyNode(aggregate.input, ::isBoundary)
         val b =
             if (boundaryBelow) {
                 builder
@@ -250,17 +266,6 @@ object PlanNodeDecoder {
         val aggCalls = aggregate.aggregatesList.map { decodeAggCall(b, it) }
         b.aggregate(groupKey, aggCalls)
         if (boundaryBelow) builder.push(b.build())
-    }
-
-    /** LQ — true when [plan] holds a logical-query boundary (a Project stamped `expanded_from`) anywhere. */
-    private fun hasBoundary(plan: PlanNode): Boolean {
-        if (plan.nodeCase == PlanNode.NodeCase.PROJECT && plan.project.hasExpandedFrom()) return true
-        var found = false
-        org.tatrman.translator.joiner.JoinerPlanWalker.rewriteChildren(plan) { child ->
-            if (!found && hasBoundary(child)) found = true
-            child
-        }
-        return found
     }
 
     private fun decodeAggCall(
@@ -343,6 +348,18 @@ object PlanNodeDecoder {
         push(builder, lo.input, catalog)
         val limit = if (lo.hasLimit()) lo.limit.toInt() else -1
         val offset = if (lo.hasOffset()) lo.offset.toInt() else 0
+        // LQ (L-10) — RelBuilder pushes a pure limit through a Project into a Sort straight below it
+        // (`sortLimit`); over a logical-query boundary that would move the limit inside the stacked entity's
+        // body, which the option-off path (an entity scan there) never does. The same Sort, built directly.
+        // Offset and fetch as `sortLimit` reads them; a bare `LIMIT 0` (→ empty) and a no-op limit take
+        // RelBuilder's own path — neither merges.
+        val offsetNode = if (offset > 0) builder.literal(offset) else null
+        val fetchNode = if (limit >= 0) builder.literal(limit) else null
+        val emptyOrNoOp = offsetNode == null && (limit == 0 || fetchNode == null)
+        if (isBoundary(lo.input) && !emptyOrNoOp) {
+            builder.push(LogicalSort.create(builder.build(), RelCollations.EMPTY, offsetNode, fetchNode))
+            return
+        }
         builder.limit(offset, limit)
     }
 

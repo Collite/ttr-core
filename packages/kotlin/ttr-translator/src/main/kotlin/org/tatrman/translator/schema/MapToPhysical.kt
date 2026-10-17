@@ -183,21 +183,25 @@ object MapToPhysical {
         val project = ProjectNode.newBuilder().setInput(body)
         for (erCol in scanCols) {
             val erName = erCol.name
-            val sourceName = renames[erName] ?: erName
-            project.addExpressions(
-                NamedExpression
-                    .newBuilder()
-                    .setExpression(
-                        Expression
-                            .newBuilder()
-                            .setColumnRef(ColumnRef.newBuilder().setName(sourceName).build())
-                            .build(),
-                    ).setAlias(erName)
-                    .build(),
-            )
+            project.addExpressions(boundaryColumn(source = renames[erName] ?: erName, alias = erName))
         }
         return project
     }
+
+    /** One boundary column: a bare ref to the body's output column [source], aliased to the attribute [alias]. */
+    private fun boundaryColumn(
+        source: String,
+        alias: String,
+    ): NamedExpression =
+        NamedExpression
+            .newBuilder()
+            .setExpression(
+                Expression
+                    .newBuilder()
+                    .setColumnRef(ColumnRef.newBuilder().setName(source).build())
+                    .build(),
+            ).setAlias(alias)
+            .build()
 
     /**
      * LQ (L-10, L-11) — a stamped Project is the boundary of a logical-query body EXPAND_LOGICAL_BODIES
@@ -214,17 +218,7 @@ object MapToPhysical {
         }
         val project = ProjectNode.newBuilder().setInput(stamped.input)
         for (ne in stamped.expressionsList) {
-            project.addExpressions(
-                NamedExpression
-                    .newBuilder()
-                    .setExpression(
-                        Expression
-                            .newBuilder()
-                            .setColumnRef(ColumnRef.newBuilder().setName(ne.expression.columnRef.name).build())
-                            .build(),
-                    ).setAlias(ne.alias)
-                    .build(),
-            )
+            project.addExpressions(boundaryColumn(source = ne.expression.columnRef.name, alias = ne.alias))
         }
         return PlanNode.newBuilder().setProject(project).build()
     }

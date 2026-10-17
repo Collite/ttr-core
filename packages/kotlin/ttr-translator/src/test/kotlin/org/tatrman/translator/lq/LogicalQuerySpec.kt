@@ -14,6 +14,7 @@ import org.tatrman.plan.v1.PlanNode
 import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.translate.v1.Language
+import org.tatrman.translator.framework.AttributeOrColumnRef
 import org.tatrman.translator.framework.EntityMapping
 import org.tatrman.translator.framework.HartlandJoinModel
 import org.tatrman.translator.framework.HartlandStackModel
@@ -43,8 +44,9 @@ class LogicalQuerySpec :
             sql: String,
             stated: SchemaCode,
             parameters: List<SqlParam> = emptyList(),
+            model: ModelHandle = base,
         ): ParseResult =
-            Translator(base).parseToRelNode(
+            Translator(model).parseToRelNode(
                 sql,
                 Language.SQL,
                 targetSchema = SchemaCode.ER,
@@ -132,6 +134,74 @@ class LogicalQuerySpec :
             failure.code shouldBe "mixed_lanes"
             failure.message shouldContain "shopper"
             failure.message shouldContain "store_sales"
+        }
+
+        "H3g — a saved-query reference (`obj.query.<name>`) counts by what it unfolds to, strict" {
+            // a db query reading a db saved query, a logical query reading a logical saved query: Success
+            val dbRead =
+                strict(
+                    "SELECT r.shopper_id, r.revenue FROM obj.query.store_revenue r",
+                    SchemaCode.DB,
+                    model = SavedRefs.model,
+                ).shouldBeInstanceOf<ParseResult.Success>()
+            HartlandStackModel.tableScans(dbRead.plan).map { it.name } shouldContainExactlyInAnyOrder
+                listOf("store_sales", "customer")
+            val erRead =
+                strict(
+                    "SELECT r.shopper_id, r.revenue FROM obj.query.shopper_revenue r",
+                    SchemaCode.ER,
+                    model = SavedRefs.model,
+                ).shouldBeInstanceOf<ParseResult.Success>()
+            HartlandStackModel.erScans(erRead.plan).map { it.name } shouldContainExactlyInAnyOrder
+                listOf("sale", "shopper")
+            // … beside a name of its own lane in the same FROM, too
+            strict(
+                "SELECT h.buy_potential, r.revenue FROM household h, obj.query.shopper_revenue r " +
+                    "WHERE h.buy_potential = r.last_name",
+                SchemaCode.ER,
+                model = SavedRefs.model,
+            ).shouldBeInstanceOf<ParseResult.Success>()
+            // a logical query reading only a db saved query reads tables, a db query reading only a logical one reads
+            // entities: lane_mismatch naming them; beside a name of the declared lane: mixed_lanes
+            for ((sql, stated, names) in listOf(
+                Triple("SELECT r.shopper_id FROM obj.query.store_revenue r", SchemaCode.ER, listOf("store_sales")),
+                Triple(
+                    "SELECT r.shopper_id FROM obj.query.shopper_revenue r",
+                    SchemaCode.DB,
+                    listOf("sale", "shopper"),
+                ),
+            )) {
+                withClue("$stated: $sql") {
+                    val failure =
+                        strict(sql, stated, model = SavedRefs.model).shouldBeInstanceOf<ParseResult.Failure>()
+                    failure.code shouldBe "lane_mismatch"
+                    names.forEach { failure.message shouldContain it }
+                }
+            }
+            strict(
+                "SELECT h.buy_potential FROM household h, obj.query.store_revenue r WHERE h.household_id > 0",
+                SchemaCode.ER,
+                model = SavedRefs.model,
+            ).shouldBeInstanceOf<ParseResult.Failure>().code shouldBe "mixed_lanes"
+        }
+
+        "H3h — the lane read only in a sub-query (no FROM of its own), strict: Success" {
+            strict("SELECT (SELECT SUM(sale.revenue) FROM sale) AS total", SchemaCode.ER)
+                .shouldBeInstanceOf<ParseResult.Success>()
+            strict("SELECT (SELECT COUNT(*) FROM store_sales) AS n", SchemaCode.DB)
+                .shouldBeInstanceOf<ParseResult.Success>()
+            // the other lane only in the sub-query is still the other lane
+            strict("SELECT (SELECT COUNT(*) FROM db.dbo.store_sales) AS n", SchemaCode.ER)
+                .shouldBeInstanceOf<ParseResult.Failure>()
+                .code shouldBe "lane_mismatch"
+        }
+
+        "H3i — a body that reads nothing, strict: lane_mismatch (a saved query reads its lane)" {
+            for (stated in listOf(SchemaCode.ER, SchemaCode.DB)) {
+                val failure = strict("SELECT 1 AS n", stated).shouldBeInstanceOf<ParseResult.Failure>()
+                failure.code shouldBe "lane_mismatch"
+                failure.message shouldContain "names no"
+            }
         }
 
         "H4 — a logical query with a parameter: logical_query_parameters" {
@@ -248,6 +318,71 @@ class LogicalQuerySpec :
             Corpus.reenter(twice, plan) shouldBeBytes Corpus.p(twice, sql)
         }
 
+        "H8e — expressions in the select list straight over the stacked entity: L-10 holds" {
+            // the Project above a boundary is simplified and aliased like the one the option-off path builds
+            // over the entity scan (RelBuilder, merging off)
+            val stacked = HartlandStackModel.stacked()
+            val r = "shopper_revenue"
+            for (expr in listOf(
+                "CASE WHEN $r.shopper_id BETWEEN 1 AND 10 THEN 1 ELSE 0 END",
+                "CASE WHEN $r.shopper_id IN (1, 2, 3) THEN 1 ELSE 0 END",
+                "CASE WHEN 1 = 1 THEN $r.last_name ELSE 'x' END",
+                "COALESCE($r.last_name, $r.last_name)",
+                "CAST($r.shopper_id AS INT)",
+                "$r.shopper_id + CAST(1 AS INT)",
+                "CASE WHEN NOT (NOT ($r.shopper_id > 1)) THEN 1 ELSE 0 END",
+                "CASE WHEN $r.shopper_id > 1 AND $r.shopper_id > 1 THEN 1 ELSE 0 END",
+                "CASE WHEN $r.shopper_id >= 1 AND $r.shopper_id <= 10 THEN 1 ELSE 0 END",
+                "CASE WHEN $r.last_name IS NULL OR $r.last_name = 'a' OR $r.last_name = 'b' THEN 1 ELSE 0 END",
+            )) {
+                val sql = "SELECT $r.last_name, $expr AS b FROM $r"
+                withClue(sql) {
+                    val plan = Corpus.er(stacked, sql, expand = true)
+                    Corpus.stamped(plan) shouldHaveSize 1
+                    Corpus.reenter(stacked, plan) shouldBeBytes Corpus.p(stacked, sql)
+                }
+            }
+        }
+
+        "H8f — a limit straight over a stacked entity whose body ends in ORDER BY stays above the boundary: L-10" {
+            // SQL keeps a Project between the two (`SELECT *`); a REL_NODE / TransDSL plan need not — RelBuilder
+            // would push such a limit into the body's Sort
+            val ordered =
+                HartlandStackModel.stacked(
+                    body =
+                        HartlandStackModel.parseEr(
+                            HartlandJoinModel.handle(),
+                            HartlandStackModel.REVENUE_SQL + " ORDER BY SUM(sale.revenue) DESC",
+                        ),
+                )
+            val sql = "SELECT TOP 5 * FROM shopper_revenue"
+
+            fun limitOverInput(
+                plan: PlanNode,
+                offset: Long?,
+                limit: Long?,
+            ): PlanNode {
+                plan.nodeCase shouldBe PlanNode.NodeCase.LIMIT_OFFSET
+                val lo = plan.limitOffset.toBuilder().setInput(plan.limitOffset.input.project.input)
+                lo.clearOffset().clearLimit()
+                offset?.let { lo.setOffset(it) }
+                limit?.let { lo.setLimit(it) }
+                return plan.toBuilder().setLimitOffset(lo).build()
+            }
+            for ((offset, limit) in listOf(null to 5L, 2L to 5L, 2L to null)) {
+                withClue("offset=$offset limit=$limit") {
+                    val on = limitOverInput(Corpus.er(ordered, sql, expand = true), offset, limit)
+                    on.limitOffset.input.project
+                        .hasExpandedFrom() shouldBe true
+                    val off = limitOverInput(Corpus.er(ordered, sql, expand = false), offset, limit)
+                    off.limitOffset.input.nodeCase shouldBe PlanNode.NodeCase.SCAN
+                    val physical = Corpus.reenter(ordered, on)
+                    physical.nodeCase shouldBe PlanNode.NodeCase.LIMIT_OFFSET
+                    physical shouldBeBytes Corpus.reenter(ordered, off)
+                }
+            }
+        }
+
         "H9 — an entity on a DB-lane query (the __filter shape), option on: not expanded in the ER half" {
             val queryBacked = HartlandJoinModel.handleQueryBacked(relations = HartlandJoinModel.relations)
             val sql = "SELECT product.product_name FROM product"
@@ -353,6 +488,22 @@ class LogicalQuerySpec :
             HartlandStackModel.erScans(again).map { it.name } shouldContainExactlyInAnyOrder listOf("sale", "shopper")
         }
 
+        "H12d — a stacked scan that declares no columns is refused, not passed on unexpanded" {
+            // left as Scan(ER, stacked), the entities its body reads would escape the validator's ER pass
+            val bare =
+                PlanNode
+                    .newBuilder()
+                    .setScan(
+                        org.tatrman.plan.v1.ScanNode
+                            .newBuilder()
+                            .setObject(HartlandStackModel.shopperRevenue.qname),
+                    ).build()
+            ExpandLogicalBodies
+                .apply(bare, HartlandStackModel.stacked())
+                .shouldBeInstanceOf<ExpandLogicalBodiesResult.Failure>()
+                .code shouldBe "entity_query_no_columns"
+        }
+
         "outputColumnNames — the stored body's output names (what a stacked entity's bindings are checked against)" {
             val body = HartlandStackModel.parseEr(base, HartlandStackModel.REVENUE_SQL)
             Translator.outputColumnNames(body) shouldBe
@@ -376,6 +527,70 @@ private infix fun PlanNode.shouldBeBytes(expected: PlanNode) {
         toString() shouldBe expected.toString()
         error("plans differ in bytes but not in text")
     }
+}
+
+/**
+ * H3g — the Hartland model plus two saved queries reachable as `obj.query.<name>` (an OBJ-schema saved query is
+ * what the SQL surface resolves): `store_revenue`, a db body over the tables, and `shopper_revenue`, a logical body
+ * over the entities ([HartlandStackModel.REVENUE_SQL], as a metadata worker stores it).
+ */
+private object SavedRefs {
+    private fun obj(name: String): QualifiedName =
+        QualifiedName
+            .newBuilder()
+            .setSchemaCode(SchemaCode.OBJ)
+            .setNamespace("query")
+            .setName(name)
+            .build()
+
+    private fun outputs(vararg names: String): List<AttributeOrColumnRef> =
+        names.map { n ->
+            AttributeOrColumnRef.Col(
+                QualifiedName
+                    .newBuilder()
+                    .setSchemaCode(SchemaCode.DB)
+                    .setNamespace("dbo")
+                    .setName(n)
+                    .build(),
+            )
+        }
+
+    private val base = HartlandJoinModel.handle()
+
+    private val dbBody: PlanNode =
+        (
+            Translator(base).parseToRelNode(
+                HartlandStackModel.REVENUE_SQL_PHYSICAL,
+                Language.SQL,
+                targetSchema = SchemaCode.DB,
+                sourceSchema = SchemaCode.DB,
+            ) as ParseResult.Success
+        ).plan
+
+    val model: InMemoryModelHandle =
+        InMemoryModelHandle(
+            tables = HartlandJoinModel.tables,
+            entities = HartlandJoinModel.entities,
+            relations = HartlandJoinModel.relations,
+            entityMappings = HartlandJoinModel.entityMappings,
+            savedQueries = listOf(ModelSavedQuery(obj("store_revenue")), ModelSavedQuery(obj("shopper_revenue"))),
+            savedQueryBodies =
+                mapOf(
+                    obj("store_revenue") to
+                        SavedQueryBody(
+                            dbBody,
+                            emptyList(),
+                            outputs("shopper_id", "last_name", "current_household", "revenue"),
+                        ),
+                    obj("shopper_revenue") to
+                        SavedQueryBody(
+                            HartlandStackModel.parseEr(base, HartlandStackModel.REVENUE_SQL),
+                            emptyList(),
+                            outputs("shopper_id", "last_name", "current_household", "revenue"),
+                        ),
+                ),
+            attributeRenames = HartlandJoinModel.renames,
+        )
 }
 
 private object Corpus {
@@ -456,21 +671,6 @@ private object Corpus {
             .nodes(
                 plan,
             ).filter { it.nodeCase == PlanNode.NodeCase.PROJECT && it.project.hasExpandedFrom() }
-
-    fun clearStamps(plan: PlanNode): PlanNode =
-        if (plan.nodeCase == PlanNode.NodeCase.PROJECT) {
-            plan
-                .toBuilder()
-                .setProject(
-                    plan.project
-                        .toBuilder()
-                        .clearExpandedFrom()
-                        .setInput(clearStamps(plan.project.input)),
-                ).build()
-        } else {
-            org.tatrman.translator.joiner.JoinerPlanWalker
-                .rewriteChildren(plan, ::clearStamps)
-        }
 
     fun sha256(plan: PlanNode): String =
         java.security.MessageDigest

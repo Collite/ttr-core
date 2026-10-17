@@ -167,13 +167,10 @@ object HartlandStackModel {
         )
     }
 
-    /** Every node of [plan], pre-order (plan children only — not expression subqueries). */
+    /** Every node of [plan], pre-order — plan children and expression subqueries alike. */
     fun nodes(plan: PlanNode): List<PlanNode> {
-        val out = mutableListOf(plan)
-        JoinerPlanWalker.rewriteChildren(plan) { child ->
-            out += nodes(child)
-            child
-        }
+        val out = mutableListOf<PlanNode>()
+        JoinerPlanWalker.forEachNode(plan) { out += it }
         return out
     }
 

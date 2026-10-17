@@ -135,16 +135,12 @@ class TtrWalker(
         // query over entities and takes no parameters. A warning here, like the other query
         // diagnostics: an error would empty the file's definitions; ttr-metadata refuses the load.
         if (schema?.modelCode == "er") {
-            doc.definition().forEach { d ->
-                val od = d.objectDefinition()
-                val q = defs.firstOrNull { it is QueryDef && it.name == od.id().text } as? QueryDef
-                if (od.queryDef() != null && q != null && q.parameters.isNotEmpty()) {
-                    warn(
-                        od,
-                        "${DiagnosticCode.LogicalQueryParameters}: logical query '${q.name}' (model er) cannot " +
-                            "declare parameters; a parametrized query stays a db query",
-                    )
-                }
+            defs.filterIsInstance<QueryDef>().filter { it.parameters.isNotEmpty() }.forEach { q ->
+                warnAt(
+                    q.source,
+                    "${DiagnosticCode.LogicalQueryParameters}: logical query '${q.name}' (model er) cannot " +
+                        "declare parameters; a parametrized query stays a db query",
+                )
             }
         }
 
@@ -199,6 +195,14 @@ class TtrWalker(
                 column = ctx.start.charPositionInLine + 1,
                 message = message,
             )
+    }
+
+    /** [warn] at a walked definition's [source] (its start — the same position [warn] reports for its context). */
+    private fun warnAt(
+        source: SourceLocation,
+        message: String,
+    ) {
+        warnings += ParseWarning(file = fileLabel, line = source.line, column = source.column + 1, message = message)
     }
 
     private fun err(

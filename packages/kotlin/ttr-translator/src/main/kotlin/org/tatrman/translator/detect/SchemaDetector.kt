@@ -35,11 +35,18 @@ data class SchemaDetectionResult(
 object SchemaDetector {
     val CONSIDERED: List<SchemaCode> = listOf(SchemaCode.DB, SchemaCode.ER)
 
+    /**
+     * Classifies [source] by the lane of the names its FROM clauses read. [savedQueryRefsNeutral] (LQ, the strict
+     * saved-query parse) leaves saved-query references (`obj.<namespace>.<name>`) out of the verdict: they name
+     * neither lane, and the translator checks the lane of what they unfold to on the plan.
+     */
+    @JvmOverloads
     fun detect(
         source: String,
         sourceLanguage: Language,
         statedSchema: SchemaCode,
         model: ModelHandle,
+        savedQueryRefsNeutral: Boolean = false,
     ): SchemaDetectionResult {
         // Schema detection parses SQL via Calcite and is often the first Calcite touch in a
         // request (parseSql calls it before building the framework). Promote the default literal
@@ -69,7 +76,7 @@ object SchemaDetector {
             )
         }
 
-        val tables = TableIdentifierExtractor.fromQuery(parseResult.sqlNode)
+        val tables = TableIdentifierExtractor.fromQuery(parseResult.sqlNode, skipSavedQueryRefs = savedQueryRefsNeutral)
         if (tables.isEmpty()) {
             return SchemaDetectionResult(
                 effectiveSchema = statedSchema,

@@ -47,6 +47,17 @@ class LogicalQuerySpec :
             w.single().message shouldContain "'q'"
         }
 
+        "two logical queries of the same name: the parametrized one is flagged, at its own line" {
+            val clean = "def query q {\n  sourceText: \"SELECT 1\"\n}\n"
+            val withParams =
+                "def query q {\n  sourceText: \"SELECT 1\",\n  parameters: [ { name: since, type: date } ]\n}\n"
+            val src = "model er\n\n$clean\n$withParams"
+            val w = lqWarnings(src)
+            w shouldHaveSize 1
+            w.single().line shouldBe 7
+            lqWarnings("model er\n\n$withParams\n$clean").map { it.line } shouldBe listOf(3)
+        }
+
         "the same parameters on a db or directive-less query are not flagged" {
             lqWarnings(logicalParams.replace("model er", "model db")).shouldBeEmpty()
             lqWarnings(logicalParams.replace("model er\n\n", "")).shouldBeEmpty()

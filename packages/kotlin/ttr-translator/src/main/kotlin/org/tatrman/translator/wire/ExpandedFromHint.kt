@@ -13,6 +13,9 @@ import org.tatrman.plan.v1.SchemaCode
  * hints, so the stamp survives the front-half rel passes), and the encoder turns it back into the field — the
  * same carry table hints use on scans. MAP_TO_PHYSICAL ends the stamp (it closes the boundary into its own
  * physical form), so no rendering of a physical plan ever sees the hint.
+ *
+ * The schema code rides as its wire number, not its enum name: a stamp from a newer writer whose code this reader
+ * does not know is `UNRECOGNIZED` here, which has no name to restore — its number round-trips untouched.
  */
 internal object ExpandedFromHint {
     const val NAME: String = "TTR_LQ_EXPANDED_FROM"
@@ -20,7 +23,7 @@ internal object ExpandedFromHint {
     fun of(qname: QualifiedName): RelHint =
         RelHint
             .builder(NAME)
-            .hintOption("schema_code", qname.schemaCode.name)
+            .hintOption("schema_code", qname.schemaCodeValue.toString())
             .hintOption("namespace", qname.namespace)
             .hintOption("name", qname.name)
             .hintOption("package", qname.`package`)
@@ -31,7 +34,7 @@ internal object ExpandedFromHint {
         val kv = hint.kvOptions
         return QualifiedName
             .newBuilder()
-            .setSchemaCode(kv["schema_code"]?.let { SchemaCode.valueOf(it) } ?: SchemaCode.SCHEMA_CODE_UNSPECIFIED)
+            .setSchemaCodeValue(kv["schema_code"]?.toIntOrNull() ?: SchemaCode.SCHEMA_CODE_UNSPECIFIED_VALUE)
             .setNamespace(kv["namespace"].orEmpty())
             .setName(kv["name"].orEmpty())
             .setPackage(kv["package"].orEmpty())
