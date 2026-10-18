@@ -57,6 +57,8 @@ import org.tatrman.ttr.parser.model.TargetReferenceValue
 import org.tatrman.ttr.parser.model.SemanticsBlock
 import org.tatrman.ttr.parser.model.SourceLocation
 import org.tatrman.ttr.parser.model.ViewDef
+import org.tatrman.ttr.semantics.kindOf
+import org.tatrman.ttr.semantics.modelForKind
 import org.tatrman.ttr.semantics.semanticsblock.ResolvedAttributeSemantics
 import org.tatrman.ttr.semantics.semanticsblock.ResolvedEntitySemantics
 import org.tatrman.ttr.semantics.semanticsblock.SymbolRef
@@ -382,28 +384,36 @@ class FileBasedSource(
                     )
             }
 
-            // A5 Task 4 — wrong-file-kind: def-kind must belong to the declared schema.
-            // A `query` is allowed under `model er` (a logical query, LQ L-1) and under `model db`
-            // (a db query, the same object a directive-less file declares — ttr-core#193).
-            // See Stage 09 decision record.
+            // A5 Task 4 — wrong-file-kind: a def must belong to the model its file declares.
+            // The model is `modelForKind` (Kinds.kt) — the one kind→model map the symbol table
+            // keys on — so the check cannot drift from it: a `query` belongs under `model db`
+            // (ttr-core#193) and under `model er` (a logical query, LQ L-1), a `drill_map` under
+            // `model db`, an `er2cnc_role` under `model cnc`. Only the db/er/cnc models are
+            // checked. See Stage 09 decision record.
             // Directive-less files (Stage 3) legitimately mix kinds (db.ttr holds tables +
             // queries; er.ttr holds entities + relations; cnc.ttr holds roles + er2cnc),
             // so the check applies only when a schema is declared.
-            if (!directiveLess) {
-                val schemaKindAllowlist =
-                    mapOf(
-                        "db" to setOf("table", "view", "procedure", "foreign_key", "query"),
-                        // LQ (L-1): a query declared in a `model er` file is a logical query.
-                        "er" to setOf("entity", "relation", "query"),
-                        "cnc" to setOf("role"),
-                    )
+            if (!directiveLess && schemaCode.lowercase() in setOf("db", "er", "cnc")) {
+                val fileModel = schemaCode.lowercase()
                 for (def in pr.definitions) {
-                    // Grammar 0.14 — a `def schema` row schema is tier-neutral (the `area` precedent):
-                    // legal beside any directive, so it is never a wrong-file-kind.
-                    if (def is org.tatrman.ttr.parser.model.SchemaDef) continue
+                    // Tier-neutral defs are legal beside any directive, so they are never a
+                    // wrong-file-kind: a `def schema` row schema (grammar 0.14), a `def area`
+                    // (a model slice the loader does not load) and the `def project` file header.
+                    if (def is org.tatrman.ttr.parser.model.SchemaDef ||
+                        def is AreaDef ||
+                        def is org.tatrman.ttr.parser.model.ProjectDef
+                    ) {
+                        continue
+                    }
                     val defKind = definitionKind(def)
-                    val allowedKinds = schemaKindAllowlist[schemaCode.lowercase()]
-                    if (allowedKinds != null && defKind !in allowedKinds) {
+                    // A lexicon entry belongs to `model lexicon`, a model `modelForKind` does not know.
+                    val defModel =
+                        if (def is org.tatrman.ttr.parser.model.LexiconEntryDef) {
+                            "lexicon"
+                        } else {
+                            modelForKind(kindOf(def), fileModel)
+                        }
+                    if (defModel != fileModel) {
                         errors +=
                             LoadWarning(
                                 sourceId = sourceId,
