@@ -96,9 +96,52 @@ def relation shopper_revenue_household {
 - A stacked entity has no foreign key, so it relates to other entities through `join:` pairs, as above.
 - Entities can stack on queries over other stacked entities; a cycle is an error.
 
-Everything above the model sees a stacked entity as an ordinary entity — its roles, name attribute, aliases and relations work unchanged, and an agent asks over `shopper_revenue` without knowing a query is behind it. A logical query is read through its entity, never run on its own: a saved-query reference to one is refused. The runtime inlines the query's body where the entity is read — there is no view and no materialized copy — so row-level policies on the entities the body reads still apply to a question asked through the stacked entity, as does a policy on the stacked entity itself.
+Everything above the model sees a stacked entity as an ordinary entity — its roles, name attribute, aliases and relations work unchanged, and an agent asks over `shopper_revenue` without knowing a query is behind it. A logical query is read through its entity, never run on its own: an agent asks the stacked entity, not the query. Another saved query can read it by name, though ([below](#reading-another-saved-query)). The runtime inlines the query's body where the entity is read — there is no view and no materialized copy — so row-level policies on the entities the body reads still apply to a question asked through the stacked entity, as does a policy on the stacked entity itself.
 
 A complete, loadable example — the tables, the entities and relations, the logical query and the entity stacked on it — is [`samples/2.1/logical-query`](../../../samples/2.1/logical-query/).
+
+## Reading another saved query
+
+A saved query's body can read another saved query as if it were a table, by naming it under `obj`:
+
+```ttr
+model er
+
+def query big_shoppers {
+    description: "Shoppers whose store-sales revenue passes 1,000",
+    sourceText: """sql
+SELECT r.shopper_id, r.revenue
+FROM obj.query.shopper_revenue r
+WHERE r.revenue > 1000
+"""
+}
+```
+
+The name is `obj.<namespace>.<name>`:
+
+| The saved query | Read it as |
+|---|---|
+| a logical query, `er.query.<name>` | `obj.query.<name>` |
+| a query in a `model query` file, `query.<name>` | `obj.query.<name>` |
+| a db query, `db.<schema>.<name>` (in a `model db schema <schema>` file; `dbo` in a file with no `model` directive) | `obj.<schema>.<name>` |
+
+Its columns are the read query's output columns, with their types: `r.revenue` above is the `SUM(…) AS revenue` of `shopper_revenue`, a decimal.
+
+**Inlined when parsed.** When the metadata service parses the reader, it inlines the body of the query it reads, and the reader's stored plan carries that body. At run time nothing looks a saved query up: the translator, the row-level policies and an entity stacked on the reader all see an ordinary plan, whose scans are the scans of the inlined body. So a policy on `sale` applies to `big_shoppers` just as it does to `shopper_revenue`. The service parses the whole model again for each new version, so a change to `shopper_revenue` reaches `big_shoppers` at the next load.
+
+**Lanes are checked after inlining.** A reference does not let a body cross lanes. A logical query may read a logical query, and a db query may read a db query. A logical query that reads a db query reads that query's tables, and is refused `lane_mismatch`, naming them. The same holds the other way round.
+
+**Order and refusals.** A query is parsed after every query it reads, so references can be chained. A body is refused, naming the reference, when:
+
+- it reads a saved query that does not exist (`saved_query_unknown`);
+- it reads a query that failed to parse (`saved_query_failed`, carrying that query's own failure);
+- the name fits two saved queries, for example a logical query and a `model query` query that are both called `x` (`saved_query_ambiguous`, naming both). Neither is served under that name;
+- the query it reads declares parameters (`saved_query_parameters`). A body cannot pass values to the query it reads, so a parametrized query can only be run on its own. Logical queries take no parameters, so this concerns db queries only;
+- it is on a reference cycle, such as `a` reads `b` and `b` reads `a` (`query_reference_cycle`). Every query on the cycle is refused, and the message names the path.
+
+Questions asked at run time do not name saved queries. An agent asks the entity stacked on one. The editor does not yet resolve `obj.*` names inside a query's `sourceText`, so go-to-definition does not follow them.
+
+> Reading another saved query needs `ttr-translator` 0.12.1 or later, and a metadata service that parses saved queries in reference order and serves the earlier ones under `obj`. A service that does not reports the reference as `Object '<name>' not found within 'obj.query'`.
 
 ## Procedures
 
