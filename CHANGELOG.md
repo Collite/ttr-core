@@ -6,6 +6,20 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-concept`** (new module, **not published**) — the conceptual-model (cn) layer below the determinism
+  frontier: `ConceptService` (statement validate/lower/explain · assertion validate/lower/explain ·
+  `definitionRender(md|er)` · `materialize` · `hygieneReport`) as an **interface** with a `NotImplementedConceptService`
+  stand-in, plus its result types. Scaffold only (CN-P0 S0.4): every body is CN-P3. A `verifyNoLlmDependency` task in
+  `check` fails the build if the module's runtime classpath ever resolves an LLM, gateway, kantheon or HTTP-client
+  artifact. Not in any publish bundle yet (see `publish.yml`'s header).
+- **`ttr-plan-proto`** — three **pre-release** packages for the cn frames: `org.tatrman.concept.v1` (`refs.proto`:
+  `ConceptRef`, `Candidate`, `Confidence`, `MemberRef`, `Instant` + `Granularity`, `Period` + `EndState`, `Value`),
+  `org.tatrman.statement.v1` (`statement.proto`: the read frame, `as_of = 10`; `ASK_SET` reserved and refused) and
+  `org.tatrman.assertion.v1` (`assertion.proto`: the write frame, `asserted_as_of` apart from `period`). They ship in
+  the jar from the next translator tag but are **not a stable wire** until cn's P3 freezes them — no consumer
+  should depend on them before then. The jar now bundles 9 `.proto` files (`verifyProtosInJar`). The Python wheel is
+  unchanged: it lists its protos explicitly.
+
 - **`ttr-metadata`** — a `def query` in a `model db` file loads as the db query it is (`db.<schema>.query.<name>`,
   the same object a directive-less file declares); it was refused as `ttr/wrong-file-kind` (ttr-core#193).
 - **`@tatrman/semantics`** — binding targets are references (ttr-core#194): an entity's

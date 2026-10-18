@@ -1,0 +1,140 @@
+// SPDX-License-Identifier: Apache-2.0
+// =============================================================================
+// CN (conceptual model) v1 — `statement.v1`, the READ frame (cn contracts §2.2; AM-6, AM-41)
+//
+// An agent (the kantheon frame builder) proposes a Statement over concept IDs. `ttr-concept` validates it
+// (refusing ambiguity, a missing time, an unreachable slot), lowers it to `plan.v1` through the md path, and
+// explains it back in the user's language. Nothing below this frame calls an LLM (P-3 v2).
+//
+// JSON mapping: protobuf JsonFormat, canonical. ⚠ PRE-RELEASE (CN-P0 S0.4): the top-level `Statement` and the
+// messages contracts §2.2 pins are written as pinned. The sub-message field sets it only names (MemberFilter,
+// QualityFilter, BoolGroup, ExprFilter, DateRange, OrderKey, MemberPair, CompareMode) follow the round-1 sketch and
+// are provisional until CN-P3 S3.1 freezes the package — the J-v2 additive-only rule starts there.
+// =============================================================================
+syntax = "proto3";
+
+package org.tatrman.statement.v1;
+
+import "org/tatrman/concept/v1/refs.proto";
+
+option java_package = "org.tatrman.statement.v1";
+option java_multiple_files = true;
+
+enum Ask {
+  ASK_UNSPECIFIED = 0;
+  ASK_VALUE = 1;
+  // RESERVED, REJECTED in v1: `statement_validate` refuses it. A set-valued ask is a sibling IR, not this frame
+  // (E-6 closed as "sibling IR", AM-6). The number is kept so the value can never be reused for anything else.
+  ASK_SET = 2;
+}
+
+message Statement {
+  Ask ask = 1;
+  repeated org.tatrman.concept.v1.ConceptRef measures = 2;   // qualities — an AGGREGATING slot (needs an md grounding)
+  repeated Filter filters = 3;
+  TimeSpec time = 4;                                          // REQUIRED unless all_time (E-3; cn/missing-time)
+  repeated org.tatrman.concept.v1.ConceptRef group_by = 5;    // an aggregating slot
+  OrderLimit order_limit = 6;
+  Compare compare = 7;                                        // an aggregating slot
+  string snapshot_hash = 8;                                   // the model snapshot the frame was built against
+  string locale = 9;                                          // BCP-47; the explain-back default
+  org.tatrman.concept.v1.Instant as_of = 10;                  // AM-41 (D-T4): the evaluation instant for phases; absent = now
+}
+
+message Filter {
+  oneof form {
+    MemberFilter member = 1;
+    QualityFilter quality = 2;
+    PhaseFilter phase = 3;   // lowers via the md renderer or the stacked entity's md grounding (AM-5)
+    BoolGroup group = 4;
+    ExprFilter expr = 5;     // the E-2 hatch
+  }
+}
+
+message MemberFilter {
+  org.tatrman.concept.v1.ConceptRef concept = 1;
+  org.tatrman.concept.v1.MemberRef member = 2;
+}
+
+enum ComparisonOp {
+  COMPARISON_OP_UNSPECIFIED = 0;
+  EQ = 1;
+  NEQ = 2;
+  LT = 3;
+  LTE = 4;
+  GT = 5;
+  GTE = 6;
+}
+
+message QualityFilter {
+  org.tatrman.concept.v1.ConceptRef quality = 1;
+  ComparisonOp op = 2;
+  org.tatrman.concept.v1.Value value = 3;
+}
+
+message PhaseFilter {
+  org.tatrman.concept.v1.ConceptRef phase = 1;
+  bool negated = 2;
+}
+
+enum BoolOp {
+  BOOL_OP_UNSPECIFIED = 0;
+  ALL = 1;
+  ANY = 2;
+  NOT = 3;
+}
+
+message BoolGroup {
+  BoolOp op = 1;
+  repeated Filter filters = 2;
+}
+
+message ExprFilter {
+  string pl_expr = 1;   // a PL expression over concept names
+}
+
+message TimeSpec {
+  oneof spec {
+    string period_code = 1;   // "2026-01", "2026Q1" — period-table codes
+    DateRange range = 2;
+    string relative = 3;      // a closed vocabulary: "last(365,days)"-class
+    bool all_time = 4;
+  }
+}
+
+// Half-open [from, to) — the `period_end` convention.
+message DateRange {
+  org.tatrman.concept.v1.Instant from = 1;
+  org.tatrman.concept.v1.Instant to = 2;
+}
+
+message OrderKey {
+  org.tatrman.concept.v1.ConceptRef by = 1;
+  bool descending = 2;
+}
+
+message OrderLimit {
+  repeated OrderKey by = 1;
+  uint32 limit = 2;
+}
+
+message MemberPair {
+  org.tatrman.concept.v1.MemberRef left = 1;
+  org.tatrman.concept.v1.MemberRef right = 2;
+}
+
+enum CompareMode {
+  COMPARE_MODE_UNSPECIFIED = 0;
+  ABSOLUTE = 1;
+  DELTA = 2;
+  RATIO = 3;
+}
+
+// E-1 bounded: period ↔ period or member ↔ member.
+message Compare {
+  oneof against {
+    string period_code = 1;
+    MemberPair members = 2;
+  }
+  CompareMode mode = 3;
+}

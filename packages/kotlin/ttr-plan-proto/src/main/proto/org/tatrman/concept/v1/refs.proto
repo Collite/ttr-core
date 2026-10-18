@@ -1,0 +1,93 @@
+// SPDX-License-Identifier: Apache-2.0
+// =============================================================================
+// CN (conceptual model) v1 — the shared refs package (cn contracts §2.1, AM-7)
+//
+// What both frames below the frontier share: `statement.v1` (read) and `assertion.v1` (write) name concepts,
+// members, confidences, instants and periods with these messages. Ambiguity is REPRESENTABLE (a ref with
+// candidates) and refused at lowering — never guessed (P-3 v2).
+//
+// ⚠ PRE-RELEASE (CN-P0 S0.4). The messages contracts §2.1 pins are written as pinned. Field sets the contracts
+// leave open (`Value`; `Period.precision`'s type) are provisional until CN-P3 S3.1 freezes this package. No
+// consumer exists before then, so the J-v2 additive-only rule starts at that freeze, not at this commit.
+// =============================================================================
+syntax = "proto3";
+
+package org.tatrman.concept.v1;
+
+option java_package = "org.tatrman.concept.v1";
+option java_multiple_files = true;
+
+// A concept by qualified name — or, when the producer could not decide, its candidates.
+message ConceptRef {
+  string qname = 1;                    // "cn.revenue" — empty iff ambiguous
+  repeated Candidate candidates = 2;   // non-empty ⇒ AMBIGUOUS (refused at lower)
+}
+
+message Candidate {
+  string qname = 1;
+  Confidence confidence = 2;
+  string resume_token = 3;             // the resolver's HMAC resume token (C-Δ3), optional
+}
+
+// Producer-tagged (RG S-4): never compared across producers below the frontier.
+message Confidence {
+  double value = 1;
+  string producer = 2;
+  string method = 3;
+}
+
+// A member of a concept's vocabulary — a governed value, as spoken and as resolved.
+message MemberRef {
+  string label = 1;                    // as spoken: "Acme Market"
+  string resolved_value = 2;           // "A123" — empty ⇒ unresolved (refused)
+  Confidence confidence = 3;
+  string source = 4;                   // the matcher's source tag
+  string resume_token = 5;
+}
+
+enum Granularity {
+  GRANULARITY_UNSPECIFIED = 0;
+  MINUTE = 1;
+  HOUR = 2;
+  DAY = 3;
+  MONTH = 4;
+  YEAR = 5;
+}
+
+// An instant with its granularity: `value` is ISO-8601 text truncated to `granularity` (a month instant is
+// "2024-03"). It stands for the half-open interval [value, value + 1 granularity) — the three-valued
+// `certainly | possibly` comparisons read those bounds (AM-42).
+message Instant {
+  string value = 1;
+  Granularity granularity = 2;
+}
+
+// How an absent period end reads (AM-43, D-T6).
+enum EndState {
+  END_STATE_UNSPECIFIED = 0;
+  END_CLOSED = 1;                      // the end is present
+  END_OPEN = 2;                        // not ended (still running)
+  END_UNKNOWN = 3;                     // ended or not — unknown
+}
+
+message Period {
+  Instant start = 1;
+  Instant end = 2;
+  EndState end_state = 3;
+  // contracts §2.1 writes `Precision precision = 4`; its only reading (§1.1 `period:` "precision: optional
+  // override") is a granularity override, so it is typed as one here (provisional; S0.4 memo ⚑S04-2).
+  Granularity precision = 4;
+}
+
+// A value as a frame carries it (a quality's value, a filter's operand). Provisional: contracts §2 names `Value`
+// without a field set (CN-P3 S3.1 pins it).
+message Value {
+  oneof v {
+    string string_value = 1;
+    int64 int_value = 2;
+    double float_value = 3;
+    bool bool_value = 4;
+    Instant instant_value = 5;
+  }
+  bool is_null = 6;
+}
