@@ -31,6 +31,8 @@ dependencies {
     api(libs.protobuf.kotlin)
 
     testImplementation(libs.bundles.kotest)
+    // CN-P0 S0.4 T4 — the cn frames' canonical-JSON round trip (contracts §2: JSON mapping = JsonFormat).
+    testImplementation(libs.protobuf.java.util)
 }
 
 protobuf {
@@ -59,6 +61,8 @@ ktlint {
 // plugin upgrade could silently drop them — fail `check` if the count drifts.
 // (6 = the 5 plan/transdsl/dfdsl protos + translate/v1/translator.proto, the
 // Language/SqlDialect enum stub the translator compiles against — blocker A2-1.)
+// (9 since CN-P0 S0.4: + concept/v1/refs.proto, statement/v1/statement.proto, assertion/v1/assertion.proto —
+// the cn frames, pre-release until CN-P3 S3.1.)
 val verifyProtosInJar =
     tasks.register("verifyProtosInJar") {
         dependsOn(tasks.jar)
@@ -68,8 +72,8 @@ val verifyProtosInJar =
                 ZipFile(jarProvider.get().asFile).use { zip ->
                     zip.entries().asSequence().count { it.name.endsWith(".proto") }
                 }
-            check(count == 6) {
-                "Expected 6 .proto files bundled in the jar (import-path contract §4.1), found $count."
+            check(count == 9) {
+                "Expected 9 .proto files bundled in the jar (import-path contract §4.1), found $count."
             }
         }
     }

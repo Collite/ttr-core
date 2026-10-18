@@ -21,6 +21,12 @@ name: Publish Kotlin artifacts
 #                        stale tag FAILS LOUDLY instead of publishing the wrong module set.
 #   translator/v<x.y.z>  bundle: ttr-plan-proto + ttr-translator (lockstep; ttr-translator
 #                        extraction arc, docs/ttr-translator/architecture/contracts.md §5) (was kotlin-translator/v*)
+#                        ttr-concept (cn, CN-P0 S0.4 scaffold) is in NO bundle yet, on purpose: it
+#                        `implementation`s ttrp-emit / ttr-metadata / ttr-md-resolver, so on a translator
+#                        tag its POM would name those at the TRANSLATOR version — versions the grammar line
+#                        never cut (the AG-14 reason the TTR-P toolchain joined grammar/v*). Its bundle is
+#                        settled before CN-P3 S3.1 first publishes it. The cn protos (concept/statement/
+#                        assertion v1) ride ttr-plan-proto here, pre-release until that same step.
 #   validator/v<x.y.z>   bundle: ttr-validator-spi (the ⑤ C-5-i plugin SPI, PL-P4.S2 — one module today,
 #                        named a bundle so more validator artifacts can join its lockstep later)
 #   security-gen/v<x.y.z> bundle: ttr-security-gen (the ⑤ H-1 security-block → Rego generator, PL-P4.S3;

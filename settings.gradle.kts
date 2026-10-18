@@ -49,6 +49,9 @@ include(":packages:kotlin:ttr-md-agent")
 // core, extracted from kantheon shared/libs/kotlin/query-translator.
 include(":packages:kotlin:ttr-plan-proto")
 include(":packages:kotlin:ttr-translator")
+// CN (conceptual model, project/tatrman/features/conceptual/) — statements · assertions · definition rendering
+// below the determinism frontier; CN-P0 S0.4 scaffold (bodies are CN-P3). Not in a publish bundle yet.
+include(":packages:kotlin:ttr-concept")
 
 // TTR-P toolchain (module cut per docs/ttr-p/implementation/v1/plan.md Phase 0)
 include(":packages:kotlin:ttrp-frontend")
