@@ -54,7 +54,8 @@ import org.tatrman.translator.wire.PlanNodeEncoder
  *
  * ## Parameter substitution
  *
- * NOT YET IMPLEMENTED. Requires `ScanNode.parameter_bindings` field in plan.proto (currently
+ * NOT YET IMPLEMENTED — so a referenced body that declares parameters is refused (`saved_query_parameters`, LQ
+ * contract L-25) rather than inlined with its parameters unbound. Requires `ScanNode.parameter_bindings` field in plan.proto (currently
  * reserved 3 to 7). When added, this stage will substitute outer parameter bindings into the
  * inner body's `RexDynamicParam` nodes. See Section B-3 of the Stage-2 task list.
  */
@@ -116,15 +117,25 @@ object Unfold {
             val path = (visited + obj).joinToString(" → ", transform = ::qnameToken)
             throw UnfoldException("query_reference_cycle", "Cycle: $path")
         }
-        val body =
+        val saved =
             try {
-                model.savedQueryBody(obj).planNode
+                model.savedQueryBody(obj)
             } catch (e: Exception) {
                 throw UnfoldException(
                     "saved_query_body_missing",
                     "No saved query body for ${qnameToken(obj)}",
                 )
             }
+        // LQ (contract L-25): parameter substitution is not implemented (see the class doc), so a body that
+        // declares parameters cannot be inlined — it would carry unbound dynamic parameters into the reader's plan.
+        if (saved.parameters.isNotEmpty()) {
+            throw UnfoldException(
+                "saved_query_parameters",
+                "Saved query ${qnameToken(obj)} declares parameters (${saved.parameters.joinToString { it.name }}); " +
+                    "a saved query that takes parameters cannot be read by another query",
+            )
+        }
+        val body = saved.planNode
         // Recurse into the body (it may itself contain OBJ scans) with `obj` added to visited.
         val unfoldedBody = unfoldPlan(body, model, visited + obj)
 

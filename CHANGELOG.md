@@ -72,6 +72,18 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
     that differ in that literal's encoding between the option on and off — the same difference today's single-call
     vs two-half paths already show.
 
+- **`ttr-translator`** ⚑ **saved-query references a metadata worker can serve (LQ, D4).** A SQL body reads
+  another saved query as `obj.<namespace>.<name>`; UNFOLD inlines its stored plan. The surface existed, but nothing a
+  worker can build fed it. Additive for every body without an `obj.*` reference.
+  - `Translator.savedQueryReferences(source, language)` — the `obj.*` references a body reads (FROM positions at any
+    depth: joins, CTE bodies, derived tables, set-operation branches, sub-queries), as OBJ qnames, deduplicated,
+    first occurrence first; the source as a worker holds it (`;`, `TOP`, hints, `{name}`). For parsing a model's
+    saved queries in dependency order. Pure (no model).
+  - An OBJ saved query with no declared `outputColumns` takes its row type — names **and** types — from its stored
+    plan (`SavedQueryCalciteTable`), so `SUM(…) AS revenue` is numeric to the reader. Declared columns still win.
+  - UNFOLD refuses a referenced body that declares parameters: `saved_query_parameters` (substitution is not
+    implemented; before, the body was inlined with its parameters unbound).
+
 - **`ttr-lexicon-compile`** ⚑ **the operator stdlib asks for a count, an average and a superlative
   (ttr-core#178).** A question asking "how many" or "average" resolved to the same lattice as a plain total,
   so a consumer writing a query from it answered a SUM. The stdlib grows from six operators to eight

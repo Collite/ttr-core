@@ -978,6 +978,22 @@ class Translator(
          * on the query binds its attributes to. The same derivation UNFOLD's cardinality check uses.
          */
         fun outputColumnNames(plan: PlanNode): List<String> = Unfold.outputColumnNames(plan)
+
+        /**
+         * LQ (L-24) — the saved queries [source] reads as `obj.<namespace>.<name>` (OBJ qnames, as written,
+         * deduplicated, first occurrence first): what a metadata worker parses before it parses [source]. Empty for
+         * a body that does not parse — its parse reports the error — and for a non-SQL [language]. Pure: no model.
+         */
+        fun savedQueryReferences(
+            source: String,
+            language: Language,
+        ): List<org.tatrman.plan.v1.QualifiedName> =
+            if (language == Language.SQL) {
+                org.tatrman.translator.detect.SavedQueryReferenceExtractor
+                    .fromSource(source)
+            } else {
+                emptyList()
+            }
     }
 }
 
