@@ -145,6 +145,30 @@ describe('LQ — editor features on a logical query (er.query.<name>)', () => {
     expect(binding!.newText).toBe('er.query.revenue_per_shopper');
   });
 
+  // The cursor on the binding target is not on an AST ref: rename must reach the query through the reference
+  // index, as definition does — not fall back to the enclosing entity (line 6), which shares the query's name.
+  it('prepareRename + rename on the binding target rename the query, not the enclosing entity', async () => {
+    const prep = (await client.sendRequest('textDocument/prepareRename', {
+      textDocument: { uri: ER_URI },
+      position: ON_BINDING_TARGET,
+    })) as { range: lsp.Range; placeholder: string } | null;
+    expect(prep, 'prepareRename returned null on a query binding target').not.toBeNull();
+    expect(prep!.range.start.line).toBe(7);
+
+    const edit = (await client.sendRequest('textDocument/rename', {
+      textDocument: { uri: ER_URI },
+      position: ON_BINDING_TARGET,
+      newName: 'revenue_per_shopper',
+    })) as lsp.WorkspaceEdit;
+    const lines = (edit.documentChanges ?? [])
+      .map((d) => d as lsp.TextDocumentEdit)
+      .filter((d) => d.textDocument.uri === ER_URI)
+      .flatMap((d) => d.edits.map((e) => e.range.start.line));
+    expect(lines, JSON.stringify(edit)).toContain(2);
+    expect(lines, JSON.stringify(edit)).toContain(7);
+    expect(lines, JSON.stringify(edit)).not.toContain(6);
+  });
+
   it('modeler/listGraphs finds the logical query a graph lists (no missing object)', async () => {
     const result = (await client.sendRequest('modeler/listGraphs', { projectRoot: 'file:///lq' })) as {
       graphs: Array<{ uri: string; objectCount: number; missingObjectCount: number }>;
