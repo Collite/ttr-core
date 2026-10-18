@@ -38,6 +38,7 @@ def entity customer {
 Two shorthands are at work here:
 
 - On the entity, `binding: { target: { table: db.dbo.CUSTOMER } }` says "this entity is stored in `CUSTOMER`."
+- The target can also be a view (`{ view: db.dbo.V }`) or a query (`{ query: er.query.shopper_revenue }`): an entity stacked on a query binds its attributes to the query's output columns — see [Entities on queries](12-queries-and-procedures.md#entities-on-queries).
 - On an attribute, `binding: EMAIL` is the shortest form: a bare column name, resolved against the entity's mapped table. `binding: { target: { column: db.dbo.CUSTOMER.CUSTOMER_ID } }` is the explicit equivalent. Use the bare form when the column lives in the entity's own table; use the explicit form when you need a full path.
 
 If you are migrating from YAML, this is the form to reach for first. It carries the same information in the same place, plus the editor now checks every column name.
@@ -78,7 +79,7 @@ def er2db_attribute customer.full_name { attribute: er.entity.customer.full_name
 
 There are three binding kinds:
 
-- **`er2db_entity`** — binds an entity to a table. `entity:` names the source, `target: { table: … }` the destination.
+- **`er2db_entity`** — binds an entity to a table. `entity:` names the source, `target: { table: … }` the destination (or `{ view: … }`, or `{ query: … }` for an entity stacked on a query).
 - **`er2db_attribute`** — binds an attribute to a column. `attribute:` and `target: { column: … }`.
 - **`er2db_relation`** — binds a relation to a foreign key. `relation:` and `fk:`.
 

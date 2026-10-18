@@ -9,12 +9,12 @@ A *model* is a perspective on the data, selected with the `model` directive. Onl
 | Model | Purpose | Has schema? |
 |---|---|---|
 | `db` | Physical database — tables, columns, keys, indexes, FKs, queries, procedures | yes (`dbo`, …) |
-| `er` | Conceptual — entities, attributes, relations | no |
+| `er` | Conceptual — entities, attributes, relations, logical queries | no |
 | `binding` | Correspondence between `er` and `db` (`er2db_*`, `md2*`) | no |
 | `cnc` | Semantic roles (fact, dimension, …) | no |
 | `md` | Multidimensional logical model ([MD model](15-md-model.md)) | no |
 
-A file selects a model with `model <code> [schema <id>]` (the `schema` only for `db`). A `.ttrg` graph names its model with `model: <code>`. There is no separate `query` model — `def query` and `def procedure` are `db`-layer objects (grammar 4.0).
+A file selects a model with `model <code> [schema <id>]` (the `schema` only for `db`). A `.ttrg` graph names its model with `model: <code>`. There is no separate `query` model — `def query` and `def procedure` are `db`-layer objects (grammar 4.0); a `def query` declared in a `model er` file is an `er`-layer [logical query](12-queries-and-procedures.md#logical-queries), `er.query.<name>`.
 
 ## File kinds
 
@@ -36,12 +36,12 @@ The two are mutually exclusive per file; mixing them is a `wrong-file-kind` erro
 | `index` | `db` | `type` (`primary`/`secondary`/`ordered`/`btree`/`fulltext`), `columns` |
 | `constraint` | `db` | `type` (`unique`/`not_null`), `columns` |
 | `fk` | `db` | `from`, `to` (lists of column paths), `description` |
-| `query` | `db` | `language`, `parameters`, `sourceText` |
+| `query` | `db`, or `er` (logical query) | `language`, `parameters` (db only), `sourceText` |
 | `procedure` | `db` | `parameters` (with `direction`), `resultColumns` |
 | `entity` | `er` | `nameAttribute`, `codeAttribute`, `attributes`, `roles`, `displayLabel`, `aliases`, `labelPlural`, `binding` |
 | `attribute` | `er` | `type`, `isKey`, `optional`, `valueLabels`, `displayLabel`, `binding` |
 | `relation` | `er` | `from`, `to`, `cardinality`, `join`, `binding` |
-| `er2db_entity` | `binding` | `entity`, `target` (`{ table }`), `whereFilter` |
+| `er2db_entity` | `binding` | `entity`, `target` (`{ table }`, `{ view }` or `{ query }`), `whereFilter` |
 | `er2db_attribute` | `binding` | `attribute`, `target` (`{ column }`) |
 | `er2db_relation` | `binding` | `relation`, `fk` |
 | `role` | `cnc` | `label` (localized), `description` |
@@ -124,6 +124,7 @@ Cardinality multiplicities: `1`, `0..1`, `1..*`, `0..*`, `*`, `1..n`, `n`.
 | `ttr/duplicate-area` | Error | Two `def area` definitions declare the same area name. |
 | `ttr/area-redundant-member` | Info | An `entities:` entry already covered by a recursive `packages:` member. |
 | `ttr/missing-package-declaration` | Info | File is in the default package. Add a `package` line. |
+| `ttr/logical-query-parameters` | Warning | A logical query (a `def query` in a `model er` file) declares `parameters`; logical queries take none, and the metadata loader refuses it. Drop the parameters or move the query to a `db` file. |
 
 ¹ Package-mismatch severities are set by `modeler.toml [packages] layout` — `flexible` (default) reports `package-declaration-mismatch` as a Warning, `strict` as an Error, `off` not at all; `package-prefix-divergence` and `invalid-package-segment` are a Warning under `flexible`/`off` and an Error under `strict` (never silenced). See [Packages, imports, and areas](10-packages-and-imports.md#packages-and-folders).
 

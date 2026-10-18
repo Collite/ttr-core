@@ -210,6 +210,9 @@ shipped list rather than replacing it — but the eight predicates themselves ar
 - **Named queries** — `def query <name> { … }` with a SQL/DSL template and a parameter list;
   surfaced through `list_queries` and runnable through the query door.
 - **Pattern queries** — parameterized query shapes an agent can bind and run.
+- **Logical queries** — a `def query` declared in a `model er` file is written over entities (`er.query.<name>`,
+  bare `JOIN`s conditioned from the relations, no parameters), and an entity can be stacked on it
+  (`binding: { target: { query: er.query.<name> } }`) — agents then ask over that entity.
 
 ## Governance — roles, not a `security` block
 
