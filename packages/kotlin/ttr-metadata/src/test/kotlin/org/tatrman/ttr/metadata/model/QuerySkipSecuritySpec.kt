@@ -83,9 +83,8 @@ class QuerySkipSecuritySpec :
             )
 
         // Hand-authored, in the shape the committed seed uses: a **directive-less** file
-        // (`def query` is schema-pinned to db.dbo and is rejected by the wrong-file-kind check
-        // in a file that declares `model db`), `language:` + a triple-quoted sourceText. Not
-        // generated from the writer, so it can actually disagree with it.
+        // (`def query` is schema-pinned to db.dbo there), `language:` + a triple-quoted
+        // sourceText. Not generated from the writer, so it can actually disagree with it.
         val dbTtr =
             "def query find_customers { description: \"Find customers by name\", language: SQL, " +
                 "sourceText: \"\"\"SELECT * FROM customers WHERE name LIKE @name\"\"\" }"

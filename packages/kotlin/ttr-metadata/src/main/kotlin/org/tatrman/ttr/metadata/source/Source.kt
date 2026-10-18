@@ -383,8 +383,8 @@ class FileBasedSource(
             }
 
             // A5 Task 4 — wrong-file-kind: def-kind must belong to the declared schema.
-            // A `query` is allowed under `model er` (a logical query, LQ L-1); under `model db`
-            // it is not (yet — ttr-core#193), so a db query lives in a directive-less file.
+            // A `query` is allowed under `model er` (a logical query, LQ L-1) and under `model db`
+            // (a db query, the same object a directive-less file declares — ttr-core#193).
             // See Stage 09 decision record.
             // Directive-less files (Stage 3) legitimately mix kinds (db.ttr holds tables +
             // queries; er.ttr holds entities + relations; cnc.ttr holds roles + er2cnc),
@@ -392,7 +392,7 @@ class FileBasedSource(
             if (!directiveLess) {
                 val schemaKindAllowlist =
                     mapOf(
-                        "db" to setOf("table", "view", "procedure", "foreign_key"),
+                        "db" to setOf("table", "view", "procedure", "foreign_key", "query"),
                         // LQ (L-1): a query declared in a `model er` file is a logical query.
                         "er" to setOf("entity", "relation", "query"),
                         "cnc" to setOf("role"),

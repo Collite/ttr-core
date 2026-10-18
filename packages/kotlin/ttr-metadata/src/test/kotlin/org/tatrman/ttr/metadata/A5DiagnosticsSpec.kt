@@ -63,6 +63,27 @@ class A5DiagnosticsSpec :
             r.ok shouldBe false
         }
 
+        "a `def query` in a `model db` file is a db query, not a wrong-file-kind (ttr-core#193)" {
+            val root = Files.createTempDirectory("diag-dbq")
+            write(
+                root,
+                "db.ttr",
+                """
+                model db schema dbo
+                def table customers { columns: [ def column id { type: int, isKey: true } ] }
+                def query all_customers { sourceText: ""${'"'}sql
+                SELECT id FROM customers
+                ""${'"'} }
+                """,
+            )
+            val r = reconcile(root)
+            r.errHas("ttr/wrong-file-kind") shouldBe false
+            r.ok shouldBe true
+            r.model.queries.keys
+                .map { "${it.schemaCode}.${it.namespace}.${it.name}" } shouldBe
+                listOf("DB.dbo.all_customers")
+        }
+
         "ttr/package-declaration-mismatch (ERROR) — declared package != directory blocks load" {
             val root = Files.createTempDirectory("diag-pdm")
             write(
