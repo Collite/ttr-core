@@ -124,7 +124,7 @@ Cardinality multiplicities: `1`, `0..1`, `1..*`, `0..*`, `*`, `1..n`, `n`.
 | `ttr/duplicate-area` | Error | Two `def area` definitions declare the same area name. |
 | `ttr/area-redundant-member` | Info | An `entities:` entry already covered by a recursive `packages:` member. |
 | `ttr/missing-package-declaration` | Info | File is in the default package. Add a `package` line. |
-| `ttr/logical-query-parameters` | Warning | A logical query (a `def query` in a `model er` file) declares `parameters`; logical queries take none, and the metadata loader refuses it. Drop the parameters or move the query to a `db` file. |
+| `ttr/logical-query-parameters` | Warning | A logical query (a `def query` in a `model er` file) declares `parameters`; logical queries take none, and the metadata loader reports an error that fails the whole model's load. Drop the parameters or move the query to a `db` file. |
 
 ¹ Package-mismatch severities are set by `modeler.toml [packages] layout` — `flexible` (default) reports `package-declaration-mismatch` as a Warning, `strict` as an Error, `off` not at all; `package-prefix-divergence` and `invalid-package-segment` are a Warning under `flexible`/`off` and an Error under `strict` (never silenced). See [Packages, imports, and areas](10-packages-and-imports.md#packages-and-folders).
 

@@ -84,6 +84,70 @@ class A5DiagnosticsSpec :
                 listOf("DB.dbo.all_customers")
         }
 
+        // The allowed kinds come from `modelForKind`, so every kind the manual places in a model is legal
+        // there — not only the ones a hand-kept list remembered (drill_map, er2cnc_role were missing).
+        "a `def drill_map` in a `model db` file and a `def er2cnc_role` in a `model cnc` file are legal" {
+            val root = Files.createTempDirectory("diag-kinds")
+            write(
+                root,
+                "db.ttrm",
+                """
+                model db schema dbo
+                def drill_map store_to_sales {
+                    from: db.dbo.store_totals,
+                    to:   db.dbo.store_sales,
+                    args: { store: "s_store_id" },
+                }
+                """,
+            )
+            write(
+                root,
+                "cnc.ttrm",
+                """
+                model cnc
+                def er2cnc_role store_is_master { entity: er.entity.store, role: cnc.role.master }
+                """,
+            )
+            reconcile(root).errHas("ttr/wrong-file-kind") shouldBe false
+        }
+
+        "a kind of another model is still a wrong-file-kind (entity in db, er2db_entity in er)" {
+            val root = Files.createTempDirectory("diag-other")
+            write(
+                root,
+                "db.ttrm",
+                """
+                model db schema dbo
+                def entity store { attributes: [ def attribute id { type: int, isKey: true } ] }
+                """,
+            )
+            write(
+                root,
+                "er.ttrm",
+                """
+                model er
+                def er2db_entity store { entity: er.entity.store, target: { table: db.dbo.store } }
+                """,
+            )
+            val r = reconcile(root)
+            r.errors.count { it.message.contains("ttr/wrong-file-kind") } shouldBe 2
+            r.ok shouldBe false
+        }
+
+        "a tier-neutral `def area` beside a model directive is not a wrong-file-kind" {
+            val root = Files.createTempDirectory("diag-area")
+            write(
+                root,
+                "er.ttrm",
+                """
+                model er
+                def area sales { packages: [sales] }
+                def entity store { attributes: [ def attribute id { type: int, isKey: true } ] }
+                """,
+            )
+            reconcile(root).errHas("ttr/wrong-file-kind") shouldBe false
+        }
+
         "ttr/package-declaration-mismatch (ERROR) — declared package != directory blocks load" {
             val root = Files.createTempDirectory("diag-pdm")
             write(

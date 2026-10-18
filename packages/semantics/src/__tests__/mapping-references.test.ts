@@ -274,3 +274,99 @@ def entity b { binding: { target: { query: db.dbo.promotion } }, attributes: [ d
     expect(refs).toEqual([]);
   });
 });
+
+// A short target (`x`, `<schema>.x`) resolves as the metadata loader reads it (Source.kt `refToQname(…, "db",
+// "dbo")` + `resolveShortQueryTargets`): the db lane first — never the er scope it is written in — and for a
+// `query:`, else the one query of that name in either lane.
+describe('collectBindingTargetReferences — short targets read as the loader reads them', () => {
+  function targets(files: Array<[string, string, string]>, file: string, pkg = '') {
+    const symbols = new ProjectSymbolTable();
+    files.forEach(([src, schemaCode, namespace], i) =>
+      symbols.upsertDocument(`file:///p/f${i}.ttrm`, parseString(src).ast!, schemaCode, namespace, pkg),
+    );
+    const ast = parseString(file).ast!;
+    symbols.upsertDocument('file:///p/x.ttrm', ast, 'er', 'entity', pkg);
+    return collectBindingTargetReferences(ast, new Resolver(symbols), 'er', 'entity', pkg).map((r) => r.targetQname);
+  }
+  const dbo: [string, string, string] = [
+    `model db schema dbo
+def table promotion { columns: [ def column p_promo_sk { type: int } ] }
+def view v_promotion { columns: [ def column promo_sk { type: int } ], definitionSql: """SELECT 1""" }
+`,
+    'db',
+    'dbo',
+  ];
+  const sales: [string, string, string] = [
+    `model db schema sales
+def query store_totals { sourceText: "SELECT 1" }
+`,
+    'db',
+    'sales',
+  ];
+
+  it('a short `table:` / `view:` target names the db object, not the entity of that name', () => {
+    expect(
+      targets(
+        [dbo],
+        `model er schema entity
+def entity promotion { binding: { target: { table: promotion } }, attributes: [ def attribute x { type: int } ] }
+def entity v_promotion { binding: { target: { view: v_promotion } }, attributes: [ def attribute x { type: int } ] }
+def entity bare { binding: { target: promotion }, attributes: [ def attribute x { type: int } ] }
+`,
+      ),
+    ).toEqual(['db.dbo.table.promotion', 'db.dbo.view.v_promotion', 'db.dbo.table.promotion']);
+  });
+
+  it('a short target in a package finds the db object of its own package', () => {
+    expect(
+      targets(
+        [dbo],
+        `package shop
+model er schema entity
+def entity promotion { binding: { target: { table: promotion } }, attributes: [ def attribute x { type: int } ] }
+`,
+        'shop',
+      ),
+    ).toEqual(['shop.db.dbo.table.promotion']);
+  });
+
+  it('a short `query:` target reaches a db query in another schema (ttr-core#193), short or schema-qualified', () => {
+    expect(
+      targets(
+        [dbo, sales],
+        `model er schema entity
+def entity store_totals { binding: { target: { query: store_totals } }, attributes: [ def attribute x { type: int } ] }
+def entity b { binding: { target: { query: sales.store_totals } }, attributes: [ def attribute x { type: int } ] }
+`,
+      ),
+    ).toEqual(['db.sales.query.store_totals', 'db.sales.query.store_totals']);
+  });
+
+  it('a short `query:` target naming two queries, none in the db-lane default, is not guessed', () => {
+    const logical: [string, string, string] = [
+      `model er
+def query store_totals { sourceText: "SELECT 1" }
+`,
+      'er',
+      '',
+    ];
+    expect(
+      targets(
+        [dbo, sales, logical],
+        `model er schema entity
+def entity a { binding: { target: { query: store_totals } }, attributes: [ def attribute x { type: int } ] }
+`,
+      ),
+    ).toEqual([]);
+  });
+
+  it('the column bridge reads a short `table:` target the same way', () => {
+    const refs = setup(`model er schema entity
+def entity promotion {
+  binding: { target: { table: promotion } },
+  attributes: [ def attribute sk { type: int, binding: p_promo_sk } ]
+}
+`);
+    expect(refs.map((r) => r.targetQname)).toEqual(['db.dbo.table.promotion.p_promo_sk']);
+  });
+});

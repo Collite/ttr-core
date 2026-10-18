@@ -1621,6 +1621,17 @@ export function createServerConnection(
     }
 
     const found = findNodeAtPosition(ast, params.position);
+
+    // An inline-mapping ref (a column, an fk, a binding target) is not in the AST
+    // walk: the cursor lands on the enclosing def. Rename the object the ref names,
+    // through the reference index — as definition, references and hover do.
+    if (found?.kind !== 'ref') {
+      const m = refIndex.findAtPosition(uri, params.position.line + 1, params.position.character);
+      if (m?.viaMapping) {
+        const symbol = projectSymbols.get(m.targetQname);
+        return symbol ? { range: sourceLocationToRange(m.source), placeholder: symbol.name } : null;
+      }
+    }
     if (!found || found.kind === 'ref' && !found.ref) return null;
 
     const schemaCode = ast.modelDirective?.modelCode ?? 'db';
@@ -1692,8 +1703,15 @@ export function createServerConnection(
       targetQname = syms[0].qname;
     } else {
       const found = findNodeAtPosition(ast, params.position);
-      if (!found) return null;
-      if (found.kind === 'def') {
+      // An inline-mapping ref: rename the object it names, not the enclosing def.
+      const m = found?.kind !== 'ref'
+        ? refIndex.findAtPosition(uri, params.position.line + 1, params.position.character)
+        : undefined;
+      if (m?.viaMapping) {
+        targetQname = m.targetQname;
+      } else if (!found) {
+        return null;
+      } else if (found.kind === 'def') {
         targetQname = qnameOf(found.def, ast, found.enclosing, uri);
       } else if (found.kind === 'ref') {
         const res = resolver.resolveReference(

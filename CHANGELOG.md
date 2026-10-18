@@ -25,8 +25,19 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - **`@tatrman/semantics`** — binding targets are references (ttr-core#194): an entity's
   `binding: { target: { table | view | query: … } }` and a `def er2db_entity`'s `target:` are in the reference index,
   so find-references, rename and go-to-definition on a table, a view or a query (db or logical) reach the entities
-  bound to it. A short `query:` target resolves as the metadata loader resolves it (`db.dbo.<name>`, else
-  `er.query.<name>`). New `collectBindingTargetReferences`.
+  bound to it. New `collectBindingTargetReferences`.
+- **`@tatrman/semantics`** — a short binding target (`x`, `<schema>.x`) resolves as the metadata loader reads it: the
+  db lane first (`db.dbo.x`, `db.<schema>.x`) for a `table:`, a `view:`, a `query:` and a bare `target:` alike, never
+  the entity of that name; a short `query:` whose default names no query falls to the one query of that name in
+  either lane (a logical query, or a db query in another schema), and none or several leave it unresolved. The column
+  bridge (`binding: <column>`) reads the entity's target the same way, so attribute bindings under a short
+  `table: x` are navigable too. Short targets are resolved by canonical key, not by a full resolver walk.
+- **`@tatrman/lsp`** — prepareRename / rename on a binding target, a mapping column or an fk renames the object it
+  names; it renamed the enclosing entity (definition, references and hover already followed the ref).
+- **`ttr-metadata`** — `ttr/wrong-file-kind` derives the kinds a `model db` / `er` / `cnc` file may hold from
+  `modelForKind`, so it cannot drift from the symbol table: a `def drill_map` in a `model db` file and a
+  `def er2cnc_role` in a `model cnc` file load (both were refused). `def area` and the `def project` header are
+  tier-neutral, like `def schema`.
 
 - **`ttr-translator` + `ttr-plan-proto` + `ttr-metadata` + `ttr-semantics` / `ttr-parser`** ⚑ **logical queries
   (LQ) — a saved query written over the E-R model, and entities stacked on it.** A `def query` declared in a
