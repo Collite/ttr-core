@@ -10,11 +10,14 @@ import type {
 } from '@tatrman/parser';
 import { Resolver } from './resolver.js';
 import { defaultSchemaForKind } from './default-schema.js';
+import { buildCanonicalKey } from './qname.js';
 import { enclosingQnameOf } from './reference-index.js';
+import type { SymbolEntry } from './symbol-table.js';
 
 /**
- * A navigable reference discovered inside a v2.1 inline `binding:` property,
- * already resolved to the db column (or other target) it points at.
+ * A navigable reference discovered inside a v2.1 inline `binding:` property (or
+ * an explicit `def er2db_entity`), already resolved to the object it points at:
+ * a db column, an fk, or the table / view / query an entity binds to.
  *
  * Inline-mapping column references can't go through the generic
  * `collectReferences` + `resolveReference` path: the bare id (`binding:
@@ -32,6 +35,8 @@ import { enclosingQnameOf } from './reference-index.js';
  *   same target table, in all three column-value shapes above.
  *   Relation `fk` (Increment B) — `binding: db.dbo.fk_x` / `binding: { fk:
  *   db.dbo.fk_x }`; the fk is a top-level `def fk`, so it resolves directly.
+ *   Binding targets (LQ-14) — the `target:` of an entity's `binding:` or of a
+ *   `def er2db_entity`; see {@link collectBindingTargetReferences}.
  *
  * The enclosing entity's target table is taken from its inline `mapping {
  * target: { table: … } }` when present, otherwise from an explicit `def
@@ -41,7 +46,7 @@ import { enclosingQnameOf } from './reference-index.js';
 export interface BindingReference {
   /** The column-name token (its source span drives highlight / hover / definition). */
   ref: Reference;
-  /** Resolved db column symbol qname, e.g. `<pkg>.db.dbo.promotion.p_promo_sk`. */
+  /** Resolved target symbol qname, e.g. the column `<pkg>.db.dbo.table.promotion.p_promo_sk`. */
   targetQname: string;
   /** The enclosing entity's qname (the referrer), or null if it can't be derived. */
   referrerQname: string | null;
@@ -52,13 +57,83 @@ function isReference(v: ObjectValue | Reference): v is Reference {
   return !('kind' in v);
 }
 
+/** The object kinds a binding-target key names. */
+type TargetKind = 'table' | 'view' | 'query';
+
+/** A bare `target: X` may name any of them. */
+const TARGET_KINDS: readonly TargetKind[] = ['table', 'view', 'query'];
+
+/** Columns bridge to a table or a view. */
+const TABLE_OR_VIEW: readonly TargetKind[] = ['table', 'view'];
+
+/** One reference of a binding target; `key` is undefined for a bare `target: X`. */
+interface TargetRef {
+  key?: TargetKind;
+  ref: Reference;
+}
+
+function isTargetKind(key: string): key is TargetKind {
+  return (TARGET_KINDS as readonly string[]).includes(key);
+}
+
+/** The `table:` / `view:` / `query:` references of a binding target, in source order. */
+function bindingTargets(target: ObjectValue | Reference): TargetRef[] {
+  if (isReference(target)) return [{ ref: target }];
+  const out: TargetRef[] = [];
+  for (const e of target.entries) {
+    if (isTargetKind(e.key) && e.value.kind === 'id') {
+      out.push({ key: e.key, ref: { path: e.value.path, parts: e.value.parts, source: e.value.source } });
+    }
+  }
+  return out;
+}
+
+/**
+ * Resolve one binding-target reference to the table, view or query (one of `kinds`) it names, the way the
+ * metadata loader reads it (`Source.kt`: `refToQname(…, "db", "dbo")`, then `resolveShortQueryTargets`):
+ *
+ * - a full reference (three or more parts) is taken as written;
+ * - a short one (`x`, `<schema>.x`) names the db lane, `db.dbo.x` / `db.<schema>.x`, looked up by canonical
+ *   key in the binding's own package, then package-less. It is never resolved in the er scope it is written
+ *   in, where `x` would find the entity of that name;
+ * - a short `query:` target whose db-lane default names no query falls to the one query of that name in the
+ *   project, in either lane (a logical query `er.query.<name>`, or a db query in another schema). None, or
+ *   several, leave it unresolved: the loader keeps its default then, and does not guess.
+ *
+ * A short target costs a few map lookups; only the query fall-back scans the symbol table, once.
+ */
+function resolveBindingTarget(
+  key: TargetKind | undefined,
+  ref: { path: string; parts: string[] },
+  kinds: readonly TargetKind[],
+  resolver: Resolver,
+  ctx: { schemaCode: string; namespace: string; packageName: string },
+): SymbolEntry | undefined {
+  if (ref.parts.length >= 3) {
+    const res = resolver.resolveReference({ path: ref.path, parts: ref.parts }, ctx);
+    return res.resolved && (kinds as readonly string[]).includes(res.symbol.kind) ? res.symbol : undefined;
+  }
+  const name = ref.parts[ref.parts.length - 1];
+  const schemaId = ref.parts.length === 2 ? ref.parts[0] : 'dbo';
+  const packages = ctx.packageName ? [ctx.packageName, ''] : [''];
+  for (const kind of kinds) {
+    for (const packageName of packages) {
+      const sym = resolver.getSymbol(buildCanonicalKey({ packageName, schemaId, kind, parts: [name] }));
+      if (sym) return sym;
+    }
+  }
+  if (key !== 'query') return undefined;
+  const queries = resolver.symbolsNamed(name).filter((s) => s.kind === 'query');
+  return queries.length === 1 ? queries[0] : undefined;
+}
+
 /**
  * Resolve the db-table (or db-view) qname an entity maps to. Prefers the
- * entity's inline `mapping.target.table` / `mapping.target.view`; falls back to
- * the target declared on an explicit `def er2db_entity <name>` (Increment B2)
- * for entities with no inline block. Views resolve identically to tables —
- * their columns are registered as child symbols, so column bridging works the
- * same way.
+ * entity's inline `binding: { target: … }` (a `table:` / `view:` entry, or a
+ * bare `target: X`); falls back to the target declared on an explicit `def
+ * er2db_entity <name>` (Increment B2) for entities with no inline block. Views
+ * resolve identically to tables — their columns are registered as child
+ * symbols, so column bridging works the same way.
  */
 function entityTargetTableQname(
   entity: EntityDef,
@@ -67,25 +142,15 @@ function entityTargetTableQname(
   namespace: string,
   packageName: string,
 ): string | undefined {
-  const resolveTablePath = (path: string, parts: string[]): string | undefined => {
-    const res = resolver.resolveReference({ path, parts }, { schemaCode, namespace, packageName });
-    return res.resolved ? res.symbol.qname : undefined;
-  };
+  const ctx = { schemaCode, namespace, packageName };
+  const tableOrView = (key: TargetKind | undefined, ref: { path: string; parts: string[] }): string | undefined =>
+    key === 'query' ? undefined : resolveBindingTarget(key, ref, key ? [key] : TABLE_OR_VIEW, resolver, ctx)?.qname;
 
-  // 1. Inline `mapping { target: { table: … } }` (or `{ view: … }`) on the entity.
+  // 1. Inline `binding: { target: … }` on the entity.
   const m = entity.binding;
   if (m && m.kind === 'block' && m.target) {
-    let tableRef: Reference | undefined;
-    if (isReference(m.target)) {
-      tableRef = m.target;
-    } else {
-      const tableEntry = m.target.entries.find((e) => e.key === 'table' || e.key === 'view');
-      if (tableEntry && tableEntry.value.kind === 'id') {
-        tableRef = { path: tableEntry.value.path, parts: tableEntry.value.parts, source: tableEntry.value.source };
-      }
-    }
-    if (tableRef) {
-      const q = resolveTablePath(tableRef.path, tableRef.parts);
+    for (const { key, ref } of bindingTargets(m.target)) {
+      const q = tableOrView(key, ref);
       if (q) return q;
     }
   }
@@ -100,7 +165,7 @@ function entityTargetTableQname(
   for (const qname of candidates) {
     const sym = resolver.getSymbol(qname);
     if (sym?.targetTableRef) {
-      const q = resolveTablePath(sym.targetTableRef, sym.targetTableRef.split('.'));
+      const q = tableOrView(undefined, { path: sym.targetTableRef, parts: sym.targetTableRef.split('.') });
       if (q) return q;
     }
   }
@@ -239,9 +304,6 @@ function collectFromRelation(
   });
 }
 
-/** The object kind each binding-target key names; a bare `target: X` may name any of them. */
-const TARGET_KINDS = new Set(['table', 'view', 'query']);
-
 /**
  * Every resolvable binding *target* in a document — the table, view or query an entity's inline `binding: {
  * target: … }` or an explicit `def er2db_entity { target: … }` points at — as a reference to that object, so
@@ -249,9 +311,9 @@ const TARGET_KINDS = new Set(['table', 'view', 'query']);
  * bound to it (LQ-14). A target that does not resolve to an object of its key's kind is skipped, like any other
  * dangling reference.
  *
- * A short `query:` target (fewer than three parts) follows the metadata loader: the db-lane default
- * `db.dbo.<name>` first, then the name as written, then the logical query `er.query.<name>` — so an entity
- * stacked on a query of its own name binds to the query, not to itself.
+ * A short target (`x`, `<schema>.x`) resolves as the metadata loader reads it — the db lane first, and for a
+ * `query:` the one query of that name — so an entity stacked on a query of its own name binds to the query, not
+ * to itself. See {@link resolveBindingTarget}.
  */
 export function collectBindingTargetReferences(
   ast: Document,
@@ -273,31 +335,10 @@ export function collectBindingTargetReferences(
     const ctx = { schemaCode: effSchema, namespace, packageName };
 
     for (const { key, ref } of bindingTargets(target)) {
-      const kinds = key ? new Set([key]) : TARGET_KINDS;
-      const short = key === 'query' && ref.parts.length < 3;
-      const name = ref.parts[ref.parts.length - 1];
-      const candidates = short ? [`db.dbo.${ref.path}`, ref.path, `er.query.${name}`] : [ref.path];
-      for (const path of candidates) {
-        const res = resolver.resolveReference({ path, parts: path.split('.') }, ctx);
-        if (res.resolved && kinds.has(res.symbol.kind)) {
-          out.push({ ref, targetQname: res.symbol.qname, referrerQname });
-          break;
-        }
-      }
+      const sym = resolveBindingTarget(key, ref, key ? [key] : TARGET_KINDS, resolver, ctx);
+      if (sym) out.push({ ref, targetQname: sym.qname, referrerQname });
     }
   }
 
-  return out;
-}
-
-/** The `table:` / `view:` / `query:` references of a binding target (`key` undefined for a bare `target: X`). */
-function bindingTargets(target: ObjectValue | Reference): Array<{ key?: string; ref: Reference }> {
-  if (isReference(target)) return [{ ref: target }];
-  const out: Array<{ key?: string; ref: Reference }> = [];
-  for (const e of target.entries) {
-    if (TARGET_KINDS.has(e.key) && e.value.kind === 'id') {
-      out.push({ key: e.key, ref: { path: e.value.path, parts: e.value.parts, source: e.value.source } });
-    }
-  }
   return out;
 }

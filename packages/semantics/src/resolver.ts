@@ -211,6 +211,11 @@ export class Resolver {
     return this.symbols.get(qname);
   }
 
+  /** Every symbol with this local name, in any package or model (one scan of the table). */
+  symbolsNamed(name: string): SymbolEntry[] {
+    return this.symbols.findByName(name);
+  }
+
   /**
    * The root-elision variants of a dotted name: the name itself, plus the name
    * with the configured `root` stripped (if present) or prepended (if absent).
