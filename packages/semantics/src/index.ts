@@ -76,7 +76,7 @@ export {
 } from './md-catalog-source.js';
 export type { CatalogEntry } from './md-catalog-source.js';
 export { synthesizeMappings } from './mapping-synthesizer.js';
-export { collectBindingReferences } from './mapping-references.js';
+export { collectBindingReferences, collectBindingTargetReferences } from './mapping-references.js';
 export type { BindingReference } from './mapping-references.js';
 export { foldEq, foldIdent } from './sql/fold.js';
 export {
