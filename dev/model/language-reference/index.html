@@ -1919,7 +1919,7 @@ participles in every case (<em>firmy obsahující</em>, <em>firem obsahujících
 both word orders where Czech uses both (<em>rovná se</em> · <em>se rovná</em>). A form may be at most three
 words. Negation is part of the vocabulary: <em>not starting with</em> and <em>nezačínající na</em> are the
 <code>not_starts_with</code> predicate, never <em>starts_with</em>, and a predicate word right after a negator
-(<em>does </em><em>not</em><em> start with</em>, <em>never</em>, <em>ne</em>) is negated too. The bare <em>named</em> / <em>s názvem</em> are
+(<em>does <strong>not</strong> start with</em>, <em>never</em>, <em>ne</em>) is negated too. The bare <em>named</em> / <em>s názvem</em> are
 deliberately not predicate words: quoting a name after them keeps the name default below; say
 <em>named exactly</em> / <em>s názvem přesně</em> to mean equals.</p>
 <p>With <strong>no</strong> predicate word, what happens depends on where the literal landed:</p>
@@ -1952,6 +1952,9 @@ exactly that text.</p>
 <li><strong>Named queries</strong> — <code>def query &lt;name&gt; { … }</code> with a SQL/DSL template and a parameter list;
   surfaced through <code>list_queries</code> and runnable through the query door.</li>
 <li><strong>Pattern queries</strong> — parameterized query shapes an agent can bind and run.</li>
+<li><strong>Logical queries</strong> — a <code>def query</code> declared in a <code>model er</code> file is written over entities (<code>er.query.&lt;name&gt;</code>,
+  bare <code>JOIN</code>s conditioned from the relations, no parameters), and an entity can be stacked on it
+  (<code>binding: { target: { query: er.query.&lt;name&gt; } }</code>) — agents then ask over that entity.</li>
 </ul>
 <h2 id="governance-roles-not-a-security-block">Governance — roles, not a <code>security</code> block<a class="headerlink" href="#governance-roles-not-a-security-block" title="Permanent link">&para;</a></h2>
 <div class="admonition warning">
