@@ -66,7 +66,7 @@ GROUP BY shopper.shopper_id, shopper.last_name, shopper.current_household
 
 - A logical query whose body names a table is refused (`lane_mismatch`, naming the table); one that reads entities and tables together is refused too (`mixed_lanes`). Mixing layers in one body is not supported.
 - The same check runs the other way: a db query whose body names an entity, or names no table at all, is `lane_mismatch`.
-- A logical query takes **no parameters**. The editor warns (`ttr/logical-query-parameters`) and the metadata loader refuses the query. A query that needs parameters stays a db query.
+- A logical query takes **no parameters**. The editor warns (`ttr/logical-query-parameters`). The metadata loader reports an error (`logical_query_parameters`), and the error is the model's, not the query's: the query is not dropped, the whole model fails to reconcile. A query that needs parameters stays a db query.
 
 ### Entities on queries
 
@@ -95,6 +95,7 @@ def relation shopper_revenue_household {
 - Either lane can back an entity: `target: { query: … }` may name a logical query or a db query.
 - A stacked entity has no foreign key, so it relates to other entities through `join:` pairs, as above.
 - Entities can stack on queries over other stacked entities; a cycle is an error.
+- **Column rules do not reach through the query.** A column rule (`deny` or `mask`) on a column of an entity the body reads does not apply to the stacked entity, not even to an attribute computed from that column: with `sale.revenue` masked, `total_revenue` above is still served unmasked. A column rule sees the stacked entity as an ordinary entity, so put the rule on the stacked entity's attribute too. Row-level policies do reach through (below).
 
 Everything above the model sees a stacked entity as an ordinary entity — its roles, name attribute, aliases and relations work unchanged, and an agent asks over `shopper_revenue` without knowing a query is behind it. A logical query is read through its entity, never run on its own: a saved-query reference to one is refused. The runtime inlines the query's body where the entity is read — there is no view and no materialized copy — so row-level policies on the entities the body reads still apply to a question asked through the stacked entity, as does a policy on the stacked entity itself.
 
