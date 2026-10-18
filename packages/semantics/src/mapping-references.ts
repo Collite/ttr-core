@@ -238,3 +238,66 @@ function collectFromRelation(
     referrerQname: enclosingQnameOf(def, effSchema, namespace, packageName) ?? null,
   });
 }
+
+/** The object kind each binding-target key names; a bare `target: X` may name any of them. */
+const TARGET_KINDS = new Set(['table', 'view', 'query']);
+
+/**
+ * Every resolvable binding *target* in a document — the table, view or query an entity's inline `binding: {
+ * target: … }` or an explicit `def er2db_entity { target: … }` points at — as a reference to that object, so
+ * find-references, rename and go-to-definition on a table, a view or a query (either lane) reach the entities
+ * bound to it (LQ-14). A target that does not resolve to an object of its key's kind is skipped, like any other
+ * dangling reference.
+ *
+ * A short `query:` target (fewer than three parts) follows the metadata loader: the db-lane default
+ * `db.dbo.<name>` first, then the name as written, then the logical query `er.query.<name>` — so an entity
+ * stacked on a query of its own name binds to the query, not to itself.
+ */
+export function collectBindingTargetReferences(
+  ast: Document,
+  resolver: Resolver,
+  schemaCode: string,
+  namespace: string,
+  packageName: string,
+): BindingReference[] {
+  const out: BindingReference[] = [];
+
+  for (const def of ast.definitions) {
+    let target: ObjectValue | Reference | undefined;
+    if (def.kind === 'entity') target = def.binding?.kind === 'block' ? def.binding.target : undefined;
+    else if (def.kind === 'er2dbEntity') target = def.target;
+    if (!target) continue;
+
+    const effSchema = schemaCode || defaultSchemaForKind(def.kind);
+    const referrerQname = enclosingQnameOf(def, effSchema, namespace, packageName) ?? null;
+    const ctx = { schemaCode: effSchema, namespace, packageName };
+
+    for (const { key, ref } of bindingTargets(target)) {
+      const kinds = key ? new Set([key]) : TARGET_KINDS;
+      const short = key === 'query' && ref.parts.length < 3;
+      const name = ref.parts[ref.parts.length - 1];
+      const candidates = short ? [`db.dbo.${ref.path}`, ref.path, `er.query.${name}`] : [ref.path];
+      for (const path of candidates) {
+        const res = resolver.resolveReference({ path, parts: path.split('.') }, ctx);
+        if (res.resolved && kinds.has(res.symbol.kind)) {
+          out.push({ ref, targetQname: res.symbol.qname, referrerQname });
+          break;
+        }
+      }
+    }
+  }
+
+  return out;
+}
+
+/** The `table:` / `view:` / `query:` references of a binding target (`key` undefined for a bare `target: X`). */
+function bindingTargets(target: ObjectValue | Reference): Array<{ key?: string; ref: Reference }> {
+  if (isReference(target)) return [{ ref: target }];
+  const out: Array<{ key?: string; ref: Reference }> = [];
+  for (const e of target.entries) {
+    if (TARGET_KINDS.has(e.key) && e.value.kind === 'id') {
+      out.push({ key: e.key, ref: { path: e.value.path, parts: e.value.parts, source: e.value.source } });
+    }
+  }
+  return out;
+}

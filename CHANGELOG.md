@@ -6,6 +6,14 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-metadata`** — a `def query` in a `model db` file loads as the db query it is (`db.<schema>.query.<name>`,
+  the same object a directive-less file declares); it was refused as `ttr/wrong-file-kind` (ttr-core#193).
+- **`@tatrman/semantics`** — binding targets are references (ttr-core#194): an entity's
+  `binding: { target: { table | view | query: … } }` and a `def er2db_entity`'s `target:` are in the reference index,
+  so find-references, rename and go-to-definition on a table, a view or a query (db or logical) reach the entities
+  bound to it. A short `query:` target resolves as the metadata loader resolves it (`db.dbo.<name>`, else
+  `er.query.<name>`). New `collectBindingTargetReferences`.
+
 - **`ttr-translator` + `ttr-plan-proto` + `ttr-metadata` + `ttr-semantics` / `ttr-parser`** ⚑ **logical queries
   (LQ) — a saved query written over the E-R model, and entities stacked on it.** A `def query` declared in a
   `model er` file is a *logical query*, `er.query.<name>`: its body is SQL over entities (entity and attribute

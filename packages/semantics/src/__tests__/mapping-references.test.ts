@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { parseString } from '@tatrman/parser';
 import { ProjectSymbolTable } from '../project-symbols.js';
 import { Resolver } from '../resolver.js';
-import { collectBindingReferences } from '../mapping-references.js';
+import { collectBindingReferences, collectBindingTargetReferences } from '../mapping-references.js';
 
 // A db file providing the target table + columns + a top-level fk, plus an er
 // file with inline mappings. Returns the collected mapping references for the er
@@ -201,5 +201,76 @@ def entity promotion {
 `, 'billing');
     expect(refs).toHaveLength(1);
     expect(refs[0].targetQname).toBe('billing.db.dbo.table.promotion.p_promo_sk');
+  });
+});
+
+// LQ-14 — a binding's *target* (`table:` / `view:` / `query:`) is itself a reference to that object, on an inline
+// entity binding and on an explicit `def er2db_entity`, for a query of either lane.
+describe('collectBindingTargetReferences — the object a binding targets', () => {
+  const db = `model db schema dbo
+def table promotion { columns: [ def column p_promo_sk { type: int } ] }
+def view v_promotion { columns: [ def column promo_sk { type: int } ], definitionSql: """SELECT 1""" }
+`;
+  const dbQueries = `def query store_revenue { sourceText: "SELECT p_promo_sk FROM promotion" }
+`;
+  const erQueries = `model er
+def query shopper_revenue { sourceText: "SELECT promotion.sk FROM promotion" }
+`;
+
+  function targets(file: string, schemaCode = 'er', namespace = 'entity') {
+    const symbols = new ProjectSymbolTable();
+    symbols.upsertDocument('file:///p/db.ttrm', parseString(db).ast!, 'db', 'dbo', '');
+    symbols.upsertDocument('file:///p/queries.ttrm', parseString(dbQueries).ast!, '', '', '');
+    symbols.upsertDocument('file:///p/logical.ttrm', parseString(erQueries).ast!, 'er', '', '');
+    const ast = parseString(file).ast!;
+    symbols.upsertDocument('file:///p/x.ttrm', ast, schemaCode, namespace, '');
+    return collectBindingTargetReferences(ast, new Resolver(symbols), schemaCode, namespace, '');
+  }
+
+  it('an inline `target: { table: … }` / `{ view: … }` references the table / view', () => {
+    const refs = targets(`model er schema entity
+def entity a { binding: { target: { table: db.dbo.promotion } }, attributes: [ def attribute x { type: int } ] }
+def entity b { binding: { target: { view: db.dbo.v_promotion } }, attributes: [ def attribute x { type: int } ] }
+`);
+    expect(refs.map((r) => [r.ref.path, r.targetQname, r.referrerQname])).toEqual([
+      ['db.dbo.promotion', 'db.dbo.table.promotion', 'er.entity.a'],
+      ['db.dbo.v_promotion', 'db.dbo.view.v_promotion', 'er.entity.b'],
+    ]);
+  });
+
+  it('an inline `target: { query: … }` references the query — logical (er.query) and db, qualified or short', () => {
+    const refs = targets(`model er schema entity
+def entity a { binding: { target: { query: er.query.shopper_revenue } }, attributes: [ def attribute x { type: int } ] }
+def entity b { binding: { target: { query: db.dbo.store_revenue } }, attributes: [ def attribute x { type: int } ] }
+def entity c { binding: { target: { query: store_revenue } }, attributes: [ def attribute x { type: int } ] }
+`);
+    expect(refs.map((r) => r.targetQname)).toEqual([
+      'er.query.shopper_revenue',
+      'db.dbo.query.store_revenue',
+      'db.dbo.query.store_revenue',
+    ]);
+  });
+
+  it('a short `query:` target names the query even when an entity of the same name binds to it', () => {
+    const refs = targets(`model er
+def entity shopper_revenue { binding: { target: { query: shopper_revenue } }, attributes: [ def attribute x { type: int } ] }
+`, 'er', '');
+    expect(refs.map((r) => r.targetQname)).toEqual(['er.query.shopper_revenue']);
+  });
+
+  it('an explicit `def er2db_entity { target: { … } }` references its target', () => {
+    const refs = targets(`model binding
+def er2db_entity a { entity: er.entity.a, target: { table: db.dbo.promotion } }
+def er2db_entity b { entity: er.entity.b, target: { query: er.query.shopper_revenue } }
+`, 'binding', '');
+    expect(refs.map((r) => r.targetQname)).toEqual(['db.dbo.table.promotion', 'er.query.shopper_revenue']);
+  });
+
+  it('skips a target that does not resolve, or resolves to an object of another kind', () => {
+    const refs = targets(`model er schema entity
+def entity a { binding: { target: { table: db.dbo.nothing } }, attributes: [ def attribute x { type: int } ] }
+def entity b { binding: { target: { query: db.dbo.promotion } }, attributes: [ def attribute x { type: int } ] }
+`);
+    expect(refs).toEqual([]);
   });
 });

@@ -102,6 +102,22 @@ def relation line_product {
 
 Full paths always resolve; [Packages and imports](10-packages-and-imports.md) shows how to shorten them with `import`.
 
+## Entities on queries
+
+An entity does not have to be stored in a table. It can be **stacked on a query** — the output of a saved query, often a [logical query](12-queries-and-procedures.md#logical-queries) written over other entities:
+
+```ttr
+def entity shopper_revenue {
+    binding: { target: { query: er.query.shopper_revenue } },
+    attributes: [
+        def attribute shopper_id    { type: int, isKey: true },
+        def attribute total_revenue { type: decimal, optional: true, binding: revenue }
+    ]
+}
+```
+
+Its attributes bind to the query's output columns, and it relates to other entities through `join:` pairs, since it has no foreign key. [Entities on queries](12-queries-and-procedures.md#entities-on-queries) has the details.
+
 ## The conceptual retail model
 
 The retail example has five entities — `customer`, `order`, `order_line` in `shop.sales`, and `product`, `category` in `shop.catalog` — wired by four relations: `order_customer`, `line_order`, `line_product`, and `product_category`. `order_line` sits at the center, referring to an order and a product; that shape is exactly what makes it the *fact* of the model, which the [CNC roles](09-cnc-roles.md) page builds on.

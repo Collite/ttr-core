@@ -4,7 +4,7 @@ import { collectAllReferences } from './references.js';
 import { defaultSchemaForKind } from './default-schema.js';
 import { buildCanonicalKey } from './qname.js';
 import type { Resolver } from './resolver.js';
-import { collectBindingReferences } from './mapping-references.js';
+import { collectBindingReferences, collectBindingTargetReferences } from './mapping-references.js';
 
 /**
  * The canonical key of a container def that can host references (so the
@@ -83,8 +83,13 @@ export class ReferenceIndex {
     }
 
     // Inline mapping column references resolve against the enclosing entity's
-    // target table, not the generic er scope, so they're collected separately.
-    for (const m of collectBindingReferences(ast, resolver, schemaCode, namespace, packageName ?? '')) {
+    // target table, not the generic er scope, so they're collected separately;
+    // so are binding targets (the table / view / query an entity binds to).
+    const pkg = packageName ?? '';
+    for (const m of [
+      ...collectBindingReferences(ast, resolver, schemaCode, namespace, pkg),
+      ...collectBindingTargetReferences(ast, resolver, schemaCode, namespace, pkg),
+    ]) {
       const loc: ReferenceLocation = {
         documentUri: uri,
         source: m.ref.source,

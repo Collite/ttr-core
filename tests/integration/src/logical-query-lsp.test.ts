@@ -54,6 +54,7 @@ const GRAPH_FILE = `graph revenue {
 }`;
 
 const ON_QUERY_NAME = { line: 2, character: 14 }; // inside `shopper_revenue` of `def query shopper_revenue`
+const ON_BINDING_TARGET = { line: 7, character: 45 }; // inside `er.query.shopper_revenue` of the binding
 
 describe('LQ — editor features on a logical query (er.query.<name>)', () => {
   let client: lsp.Connection;
@@ -100,15 +101,25 @@ describe('LQ — editor features on a logical query (er.query.<name>)', () => {
     expect(JSON.stringify(hover!.contents)).toContain('shopper_revenue');
   });
 
-  // `query:` binding targets are not in the reference index for either lane (it collects `table:` / `view:`
-  // only) — a pre-existing gap, so these two pin the declaration site, which the key mismatch lost.
-  it('find-references on the query name finds its declaration', async () => {
+  // A stacked entity's `binding: { target: { query: … } }` is a reference to the query (LQ-14): find-references
+  // reaches it, rename edits it — the declaration site alone was all these found before.
+  it('find-references on the query name finds its declaration and the stacked entity binding to it', async () => {
     const refs = (await client.sendRequest('textDocument/references', {
       textDocument: { uri: ER_URI },
       position: ON_QUERY_NAME,
       context: { includeDeclaration: true },
     })) as lsp.Location[];
     expect(refs.some((r) => r.uri === ER_URI && r.range.start.line === 2), JSON.stringify(refs)).toBe(true);
+    expect(refs.some((r) => r.uri === ER_URI && r.range.start.line === 7), JSON.stringify(refs)).toBe(true);
+  });
+
+  it('go-to-definition on the binding target jumps to the query', async () => {
+    const loc = (await client.sendRequest('textDocument/definition', {
+      textDocument: { uri: ER_URI },
+      position: ON_BINDING_TARGET,
+    })) as lsp.Location | null;
+    expect(loc, 'definition returned null on a query binding target').not.toBeNull();
+    expect(loc!.range.start.line).toBe(2);
   });
 
   it('prepareRename + rename on the query name edit the def', async () => {
@@ -124,11 +135,14 @@ describe('LQ — editor features on a logical query (er.query.<name>)', () => {
       position: ON_QUERY_NAME,
       newName: 'revenue_per_shopper',
     })) as lsp.WorkspaceEdit;
-    const lines = (edit.documentChanges ?? [])
+    const edits = (edit.documentChanges ?? [])
       .map((d) => d as lsp.TextDocumentEdit)
       .filter((d) => d.textDocument.uri === ER_URI)
-      .flatMap((d) => d.edits.map((e) => e.range.start.line));
-    expect(lines).toContain(2);
+      .flatMap((d) => d.edits);
+    expect(edits.map((e) => e.range.start.line)).toContain(2);
+    const binding = edits.find((e) => e.range.start.line === 7);
+    expect(binding, JSON.stringify(edits)).toBeDefined();
+    expect(binding!.newText).toBe('er.query.revenue_per_shopper');
   });
 
   it('modeler/listGraphs finds the logical query a graph lists (no missing object)', async () => {
