@@ -69,8 +69,10 @@ data class LostKey(
  * op table as a `when`. It is conservative by design (D-28): what it cannot prove keyed is not keyed.
  *
  * - **Seeds.** The candidates' (default) out port is keyed by definition.
- * - **Ops that keep the input's lineage:** `filter`, `sort`, `limit` (06 A-5's table), `distinct`, `within`, and the
+ * - **Ops that keep the input's lineage:** `filter`, `sort` (06 A-5's table), `distinct`, `within`, and the
  *   `switch` / `branch` outputs.
+ *   - A `limit` over keyed rows loses the key (D-133, amending A-5): whether a candidate's row is among the first N
+ *     depends on the others.
  *   - A `filter` whose fragment held an `IN` / `EXISTS` subquery the decomposition could not follow loses the key,
  *     when its island reads the candidates.
  *   - A `calc` that overwrites a key column loses it.
@@ -169,7 +171,8 @@ class KeyLineage(
         return when (node) {
             is Load, is Values -> Lineage.LOOKUP
             is Filter -> filter(node)
-            is Sort, is Limit, is Distinct, is Branch, is Switch -> input(node.id)
+            is Sort, is Distinct, is Branch, is Switch -> input(node.id)
+            is Limit -> limit(node)
             is TimeSugar -> if (node.kind == "latest") latest(node) else input(node.id)
             is Calc -> calc(node)
             is Project ->
@@ -248,6 +251,22 @@ class KeyLineage(
         return lose(
             inp.copy(lostAt = null),
             "an `IN` / `EXISTS` subquery the checker cannot follow — restate it as a join",
+            node,
+        )
+    }
+
+    /**
+     * D-133: a `limit` keeps the first N rows of the whole stream. Over the candidates' rows, a candidate's row survives
+     * only while fewer than N others come before it, so its verdict would change with the candidates a run holds — a
+     * batch of all of them or one key on an event. Over a lookup it reads no candidate and changes nothing.
+     */
+    private fun limit(node: Limit): Lineage {
+        val inp = input(node.id)
+        if (!inp.keyed) return inp
+        val op = node.count?.let { "`limit($it)`" } ?: "`limit`"
+        return lose(
+            inp,
+            "$op keeps the first rows of all the candidates taken together — whether one survives depends on the others",
             node,
         )
     }

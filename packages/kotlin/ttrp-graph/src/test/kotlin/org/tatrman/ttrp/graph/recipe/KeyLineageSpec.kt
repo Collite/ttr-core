@@ -39,9 +39,15 @@ class KeyLineageSpec :
         val keyed = ContextClass.PER_CANDIDATE
         val set = ContextClass.SET_LEVEL
 
-        "filter / calc / sort / limit keep the key" {
-            classOf("orders -> filter(value > 0) -> sort(value) -> limit(10) -> rows").contextClass shouldBe keyed
+        "filter / calc / sort keep the key" {
+            classOf("orders -> filter(value > 0) -> sort(value) -> rows").contextClass shouldBe keyed
             classOf("orders -> calc(double = value * 2) -> rows").contextClass shouldBe keyed
+        }
+
+        "a limit over the candidates loses the key (D-133)" {
+            val c = classOf("orders -> filter(value > 0) -> sort(value) -> limit(10) -> rows")
+            c.contextClass shouldBe set
+            c.lostKeyAt!! shouldContain "`limit(10)` keeps the first rows of all the candidates taken together"
         }
 
         "a calc that overwrites the key column loses it" {

@@ -155,9 +155,12 @@ its snapshot dates without `latest` first is the warning `TTRP-REC-050`.
 | per-candidate | every row it produces carries the key and comes from exactly one candidate | |
 | set-level | it reads the candidates but an op loses the key | needs a `window`, or runs in batch only |
 
-The key survives a `filter`, `calc`, `sort`, `limit`, `within`; a `latest` whose `per:` includes the key; a
+The key survives a `filter`, `calc`, `sort`, `within`; a `latest` whose `per:` includes the key; a
 `select`/projection that keeps the key column; an `aggregate` that groups by it; a `union` whose inputs carry it at the
-same position. A join keeps it when the other side is a **lookup** (rows of the model, none built from the
+same position. A `limit` loses it. The first N rows of all the candidates keep one only while fewer than N others come
+first, so "the 10 largest orders" picks a different set in a batch of 500 than for one order on its own event. Such a
+context is set-level: declare a `window`, or restate the rank as a threshold. A `limit` over a lookup (the two highest
+income bands) reads no candidate and is fine. A join keeps it when the other side is a **lookup** (rows of the model, none built from the
 candidates): an `inner` join, a `left` or `semi` join with the candidates on the left, or a join whose other side
 equates to the key — `on: left.order_number = right.order_number`, or `on: relation rel_order_line` from the key's
 entity to the many side. Joining candidate rows with candidate rows on the key is the same candidate. Joining them

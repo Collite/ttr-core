@@ -195,8 +195,70 @@ class Review115Spec :
             d.any { it.id == TtrpDiagnosticId.REC_010 && "context `c`" in it.message } shouldBe true
         }
 
-        "B7 (pending a ruling): `limit` keeps the key, per 06 A-5's op table" {
-            classOf("orders -> sort(value) -> limit(1) -> rows").contextClass shouldBe keyed
+        "B7 (D-133): a top-N over the candidates is set-level; `sort` alone and a `limit` over a lookup are not" {
+            val top = classOf("orders -> sort(value) -> limit(1) -> rows")
+            top.contextClass shouldBe set
+            top.lostKeyAt!! shouldContain "`limit(1)` keeps the first rows of all the candidates taken together"
+            classOfSql("SELECT o.order_number, o.value FROM orders o ORDER BY o.value DESC LIMIT 10")
+                .contextClass shouldBe set
+            classOf("orders -> sort(value) -> rows").contextClass shouldBe keyed
+            classOf(
+                "last_inv = load(er.entity.invoice) -> sort(due) -> limit(1)\n" +
+                    "orders -> join(right: last_inv, kind: left, on: left.customer = right.customer) -> rows",
+            ).contextClass shouldBe keyed
+        }
+
+        "B7 (D-133): the 10 largest of a run — batch only; an error once an event program runs it" {
+            val body =
+                """
+                key: order.order_number
+                candidates placed(out orders) target erp { load(er.entity.order) -> filter(state = "placed") -> orders }
+                context big_ones(in orders, out rows) target erp {
+                    orders -> sort(value) -> limit(10) -> select(order_number) -> calc(is_big = true) -> rows
+                }
+                decision verdict(in orders, in big_ones) {
+                    v = orders -> join(right: big_ones, kind: left, on: left.order_number = right.order_number)
+                               -> calc(is_big = coalesce(is_big, false))
+                    v -> switch {
+                        mode: exclusive
+                        hold_sales: is_big  because: "one of the largest orders"
+                        release:    true    because: "all checks passed"
+                    }
+                }
+                actions {
+                    verdict.hold_sales -> hold    { order: order_number, department: "Sales" }
+                    verdict.release    -> release { order: order_number }
+                }
+                """.trimIndent()
+            val batch = findings(body).single { it.id == TtrpDiagnosticId.REC_010 }
+            batch.severity shouldBe Severity.WARNING
+            batch.message shouldContain "context `big_ones` reads the candidates but `limit(10)`"
+            batch.message shouldContain "batch only"
+            // `probe_event_setlevel` runs `rec_010_event` per event: 4711 alone is always in its own top 10.
+            val event = findings("recipe: rec_010_event\n$body").single { it.id == TtrpDiagnosticId.REC_010 }
+            event.severity shouldBe Severity.ERROR
+            event.message shouldContain "program `probe_event_setlevel` runs it per event"
+        }
+
+        "B7 (D-133): at most 50 releases per run — `port: key` is refused, not one slot of 50 per key" {
+            val d =
+                findings(
+                    """
+                    recipe: rec_012
+                    key: order.order_number
+                    candidates placed(out orders) target erp { load(er.entity.order) -> filter(state = "placed") -> orders }
+                    context slots(in orders, out rows) target erp {
+                        orders -> sort(placed_date) -> limit(50) -> select(order_number) -> rows
+                    }
+                    decision verdict(in orders, in slots) {
+                        v = orders -> join(right: slots, kind: semi, on: left.order_number = right.order_number)
+                        v -> switch { release: true  because: "a release slot of the run" }
+                    }
+                    actions { verdict.release -> release { order: order_number } }
+                    """.trimIndent(),
+                )
+            d.first { it.id == TtrpDiagnosticId.REC_010 }.message shouldContain "`limit(50)`"
+            d.first { it.id == TtrpDiagnosticId.REC_012 }.message shouldContain "program `probe_key`"
         }
 
         // ---- majors ----------------------------------------------------------------------------------------
