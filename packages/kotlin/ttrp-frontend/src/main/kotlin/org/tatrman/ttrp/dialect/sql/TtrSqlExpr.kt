@@ -155,6 +155,10 @@ class TtrSqlExpr(
             is P.CasePrimaryContext -> caseExpr(ctx, ap)
             is P.CallPrimaryContext -> functionCall(ctx.functionCall(), ap)
             is P.ColPrimaryContext -> columnRef(ctx.columnRef(), ap)
+            // AU-core-P0: `:name` is a parameter / runtime binding (D-108) — the same IR node canonical builds.
+            is P.ParamPrimaryContext ->
+                org.tatrman.ttrp.expr
+                    .ParamRef(ctx.identifier().text, loc.of(ctx))
             is P.ParenPrimaryContext -> fold(ctx.expr(), ap)
             else -> error("unhandled primary: ${ctx::class.simpleName}")
         }
@@ -202,7 +206,7 @@ class TtrSqlExpr(
         ctx: P.ColumnRefContext,
         ap: Map<String, String>,
     ): ColumnRef {
-        val parts = ctx.identifier().map { it.text }
+        val parts = listOf(ctx.identifier().text) + ctx.namePart().map { it.text }
         return if (parts.size >= 2) {
             val qualifier = parts[parts.size - 2]
             ColumnRef(port = ap[qualifier], column = parts.last(), location = loc.of(ctx))

@@ -411,7 +411,8 @@ class TtrSqlDecomposer(
         }
 
     private fun fromItemName(fi: P.FromItemContext): Pair<String, String?> {
-        val name = fi.tableRef().identifier().joinToString(".") { it.text }
+        val ref = fi.tableRef()
+        val name = (listOf(ref.identifier().text) + ref.namePart().map { it.text }).joinToString(".")
         val alias = fi.alias?.text
         return name to alias
     }

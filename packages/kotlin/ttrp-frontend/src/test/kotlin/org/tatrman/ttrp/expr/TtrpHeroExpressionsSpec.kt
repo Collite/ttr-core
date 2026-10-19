@@ -179,5 +179,6 @@ private fun collectAggregates(
             e.elseExpr?.let { collectAggregates(it, into) }
         }
         is ColumnRef, is Literal, is MdPath -> Unit
+        is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr -> Unit
     }
 }

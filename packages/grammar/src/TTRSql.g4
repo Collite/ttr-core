@@ -51,7 +51,7 @@ selectItem
 
 fromClause      : FROM fromItem joinClause* ;
 fromItem        : tableRef (AS? alias=identifier)? ;
-tableRef        : identifier (DOT identifier)* ;            // in-port name or full qname
+tableRef        : identifier (DOT namePart)* ;              // in-port name or full qname
 
 joinClause      : joinKind? JOIN fromItem ON expr ;
 joinKind        : INNER | LEFT OUTER? | RIGHT OUTER? | FULL OUTER? | CROSS ;
@@ -91,6 +91,7 @@ primary
     | CAST LPAREN expr AS typeName RPAREN                   # castPrimary
     | CASE (WHEN expr THEN expr)+ (ELSE expr)? END          # casePrimary
     | functionCall                                          # callPrimary
+    | COLON identifier                                      # paramPrimary   // AU-core-P0: `:name` (D-108)
     | columnRef                                             # colPrimary
     | LPAREN expr RPAREN                                    # parenPrimary
     ;
@@ -100,7 +101,7 @@ functionCall
     : name=identifier LPAREN STAR RPAREN                                      # countStar
     | name=identifier LPAREN (DISTINCT? expr (COMMA expr)*)? RPAREN           # namedCall
     ;
-columnRef       : identifier (DOT identifier)* ;
+columnRef       : identifier (DOT namePart)* ;
 typeName        : identifier (LPAREN NUMBER (COMMA NUMBER)? RPAREN)? ;
 literal         : STRING | NUMBER | TRUE | FALSE | NULL ;
 
@@ -108,6 +109,17 @@ literal         : STRING | NUMBER | TRUE | FALSE | NULL ;
 // (the C2-b cut is small; hero column names — account_id, region, amount, … — are
 // not keywords). `FIRST`/`LAST` double as the NULLS placement words only.
 identifier      : IDENT ;
+
+// AU-core-P0: after a dot a clause keyword is a NAME (`er.entity.order`, `o.group`) — the PostgreSQL
+// rule (a qualified name's attribute is a ColLabel). The curated reject tokens (INSERT, OVER, TOP, …)
+// stay out: the reject scanner names them wherever they appear.
+namePart
+    : identifier
+    | ORDER | GROUP | BY | ALL | FIRST | LAST | VALUES | LIMIT | OFFSET | ASC | DESC | NULLS
+    | SELECT | FROM | WHERE | HAVING | JOIN | INNER | LEFT | RIGHT | FULL | CROSS | OUTER | ON | WITH
+    | UNION | INTERSECT | EXCEPT | AS | EXISTS | DISTINCT | AND | OR | NOT | IS | IN | BETWEEN
+    | CASE | WHEN | THEN | ELSE | END | CAST | NULL | TRUE | FALSE
+    ;
 
 // =============================================================================
 // Lexer — SQL-CLAUSE keywords only (the shared operator/keyword TABLE is NOT here)
@@ -186,6 +198,7 @@ NOLOCK      : 'nolock' ;
 
 // Operators & punctuation (multi-char before single-char for maximal munch).
 DCOLON      : '::' ;                 // reject 005 (::cast)
+COLON       : ':' ;                  // AU-core-P0: `:name` — a parameter / runtime binding
 NEQ         : '<>' ;
 NEQ2        : '!=' ;
 LTE         : '<=' ;

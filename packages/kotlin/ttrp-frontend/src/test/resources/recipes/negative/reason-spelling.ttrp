@@ -1,0 +1,11 @@
+// The retired `reason:` spelling (D-108: `because:`). It parses as a route named `reason` whose condition is
+// a string — the walker names it (TTRP-PRS-007) instead of letting a nonsense route through.
+recipe {
+    key: order.order_number
+    decision verdict(in orders) {
+        orders -> switch {
+            release: value > 0
+            reason:  "all checks passed"
+        }
+    }
+}

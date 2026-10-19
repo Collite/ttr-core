@@ -389,6 +389,7 @@ object Rules {
             is IsNull -> e.copy(expr = swapLeftRightPorts(e.expr))
             is Literal -> e
             is MdPath -> e // no port-qualified refs inside an MD path
+            is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr -> e // no port refs either
         }
 
     /** `not(coalesce(pred, false))` — 3VL-correct FALSE-port complement (NULL ⇒ false). */

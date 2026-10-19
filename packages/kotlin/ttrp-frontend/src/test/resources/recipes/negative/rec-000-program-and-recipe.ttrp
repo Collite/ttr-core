@@ -1,0 +1,11 @@
+// A `program` header beside a recipe: the header is TTRP-PRS-002 (TTR-P has no program header, S12);
+// the recipe itself still parses. TTRP-REC-000 (recipe + program) is the S1.1 checker's.
+program release
+uses world "hartland.worlds.demo"
+
+recipe {
+    key: order.order_number
+    candidates placed(out orders) target erp """sql
+        SELECT o.order_number FROM er.entity.order o
+    """
+}

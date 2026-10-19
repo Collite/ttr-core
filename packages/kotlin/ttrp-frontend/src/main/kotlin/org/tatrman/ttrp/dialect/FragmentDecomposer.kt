@@ -4,6 +4,8 @@ package org.tatrman.ttrp.dialect
 import org.tatrman.ttrp.ast.ContainerDecl
 import org.tatrman.ttrp.ast.FragmentBody
 import org.tatrman.ttrp.ast.PortKind
+import org.tatrman.ttrp.ast.RecipeDecl
+import org.tatrman.ttrp.ast.RoleContainer
 import org.tatrman.ttrp.ast.TtrpDocument
 import org.tatrman.ttrp.diagnostics.TtrpDiagnostic
 import org.tatrman.ttrp.dialect.b.TtrB
@@ -27,7 +29,16 @@ object FragmentDecomposer {
         val diags = mutableListOf<TtrpDiagnostic>()
         val statements =
             doc.statements.map { stmt ->
-                if (stmt is ContainerDecl && stmt.body is FragmentBody && stmt.body.decomposition == null) {
+                if (stmt is RecipeDecl) {
+                    // AU-core-P0: a recipe's role containers carry fragments like any container's.
+                    stmt.copy(
+                        members =
+                            stmt.members.map { m ->
+                                (m as? RoleContainer)?.let { decomposeRole(it, diags) }
+                                    ?: m
+                            },
+                    )
+                } else if (stmt is ContainerDecl && stmt.body is FragmentBody && stmt.body.decomposition == null) {
                     val body = stmt.body as FragmentBody
                     val decomp = decompose(stmt, body)
                     if (decomp != null) {
@@ -41,6 +52,19 @@ object FragmentDecomposer {
                 }
             }
         return Result(doc.copy(statements = statements), diags)
+    }
+
+    /** A role container's fragment body, decomposed through the container it is (a `target` form only). */
+    private fun decomposeRole(
+        role: RoleContainer,
+        diags: MutableList<TtrpDiagnostic>,
+    ): RoleContainer {
+        val body = role.body as? FragmentBody ?: return role
+        if (body.decomposition != null) return role
+        val decl = role.asContainer() ?: return role
+        val decomp = decompose(decl, body) ?: return role
+        diags += decomp.diagnostics
+        return role.copy(body = body.copy(decomposition = decomp))
     }
 
     private fun decompose(

@@ -1,0 +1,10 @@
+// `because:` takes a string. `because` is a soft keyword, so `because: 42` parses as a ROUTE named
+// `because` — the walker names the mistake (TTRP-PRS-007).
+recipe {
+    key: order.order_number
+    decision verdict(in orders) {
+        orders -> switch {
+            release: value > 0  because: 42
+        }
+    }
+}

@@ -4,7 +4,28 @@ package org.tatrman.ttrp.parser
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.Token
+import org.tatrman.ttrp.ast.ActionsBlock
 import org.tatrman.ttrp.ast.Arg
+import org.tatrman.ttrp.ast.AsOf
+import org.tatrman.ttrp.ast.DecisionDecl
+import org.tatrman.ttrp.ast.ElseRoute
+import org.tatrman.ttrp.ast.Grain
+import org.tatrman.ttrp.ast.IslandForm
+import org.tatrman.ttrp.ast.Name
+import org.tatrman.ttrp.ast.RecipeDecl
+import org.tatrman.ttrp.ast.RecipeMember
+import org.tatrman.ttrp.ast.RecipeProtocol
+import org.tatrman.ttrp.ast.RecipeRole
+import org.tatrman.ttrp.ast.RoleContainer
+import org.tatrman.ttrp.ast.Route
+import org.tatrman.ttrp.ast.RouteRef
+import org.tatrman.ttrp.ast.SwitchMode
+import org.tatrman.ttrp.ast.SwitchStmt
+import org.tatrman.ttrp.ast.Window
+import org.tatrman.ttrp.ast.WindowOver
+import org.tatrman.ttrp.ast.Wiring
+import org.tatrman.ttrp.ast.WiringArg
+import org.tatrman.ttrp.ast.WiringValue
 import org.tatrman.ttrp.ast.ArgValue
 import org.tatrman.ttrp.ast.AssignEntry
 import org.tatrman.ttrp.ast.Assignment
@@ -57,7 +78,11 @@ import org.tatrman.ttrp.expr.MdPathAtom
 import org.tatrman.ttrp.expr.MdPathComponent
 import org.tatrman.ttrp.expr.IsNull
 import org.tatrman.ttrp.expr.Literal
+import org.tatrman.ttrp.expr.DurationLiteral
+import org.tatrman.ttrp.expr.DurationParam
+import org.tatrman.ttrp.expr.DurationUnit
 import org.tatrman.ttrp.expr.LiteralValue
+import org.tatrman.ttrp.expr.ParamRef
 import org.tatrman.ttrp.expr.TtrpType
 import org.tatrman.ttrp.expr.catalog.FunctionCatalog
 import org.tatrman.ttrp.expr.catalog.FunctionKind
@@ -112,6 +137,7 @@ internal class TtrpWalker(
                 ctx.importDecl() != null -> importDecl(ctx.importDecl())
                 ctx.schemaDecl() != null -> schemaDecl(ctx.schemaDecl())
                 ctx.paramDecl() != null -> paramDecl(ctx.paramDecl())
+                ctx.recipeBlock() != null -> recipeBlock(ctx.recipeBlock())
                 ctx.containerDecl() != null -> containerDecl(ctx.containerDecl())
                 ctx.controlBlock() != null -> controlBlock(ctx.controlBlock())
                 ctx.programHeader() != null -> programHeader(ctx.programHeader())
@@ -393,7 +419,8 @@ internal class TtrpWalker(
 
     /** A config entry; null for one the parser only half-recovered (its syntax error is already reported). */
     private fun configEntry(ctx: TTRPParser.ConfigEntryContext): ConfigEntry? =
-        if (ctx.GROUP() != null) {
+        // `group by k, …` and the LD spelling `group_by: k, …` (AU-core-P0, D-108) are one entry.
+        if (ctx.GROUP() != null || ctx.GROUP_BY() != null) {
             GroupByEntry(keys = ctx.identifier().map { it.text }, location = loc(ctx))
         } else {
             val name = ctx.identifier(0)
@@ -515,6 +542,8 @@ internal class TtrpWalker(
 
     private fun primary(ctx: TTRPParser.PrimaryContext): Expression =
         when {
+            ctx.durationLiteral() != null -> durationLiteral(ctx.durationLiteral())
+            ctx.paramRef() != null -> ParamRef(ctx.paramRef().identifier().text, loc(ctx.paramRef()))
             ctx.literal() != null -> literal(ctx.literal())
             ctx.castExpr() != null -> castExpr(ctx.castExpr())
             ctx.caseExpr() != null -> caseExpr(ctx.caseExpr())
@@ -598,18 +627,37 @@ internal class TtrpWalker(
      */
     private fun functionCall(ctx: TTRPParser.FunctionCallContext): Expression {
         val name = ctx.identifier().text
-        val args = ctx.expr().map { expr(it) }
+        val fnArgs = ctx.fnArg()
+        val args = fnArgs.map { expr(it.expr()) }
+        // AU-core-P0: a call may name its arguments (`age(since: x)`); all-positional calls keep
+        // `argNames` empty, so every pre-recipe call is the node it always was.
+        val names = fnArgs.map { it.fnArgName()?.text }
+        val argNames = if (names.any { it != null }) names else emptyList()
         val distinct = ctx.DISTINCT() != null
+        // `days(:p)` / `working_days(:p)` — a duration whose amount is a parameter (17 §5).
+        DurationUnit.of(name)?.let { unit ->
+            val only = args.singleOrNull()
+            if (only is ParamRef && argNames.isEmpty() && !distinct) {
+                return DurationParam(unit, only.name, loc(ctx))
+            }
+        }
         val entries = catalog.resolve(name)
         val aggEntry = entries.firstOrNull { it.kind == FunctionKind.AGGREGATE }
         val scalarEntry = entries.firstOrNull { it.kind == FunctionKind.SCALAR }
         return when {
             aggEntry != null -> AggregateCall(aggEntry.id, args, distinct, loc(ctx))
             distinct -> AggregateCall(CatalogId(name), args, distinct = true, location = loc(ctx))
-            scalarEntry != null -> FunctionCall(scalarEntry.id, args, loc(ctx))
-            else -> FunctionCall(CatalogId(name), args, loc(ctx))
+            scalarEntry != null -> FunctionCall(scalarEntry.id, args, loc(ctx), argNames = argNames)
+            else -> FunctionCall(CatalogId(name), args, loc(ctx), argNames = argNames)
         }
     }
+
+    private fun durationLiteral(ctx: TTRPParser.DurationLiteralContext): DurationLiteral =
+        DurationLiteral(
+            amount = ctx.INT().text.toLong(),
+            unit = DurationUnit.of(ctx.durationUnit().text) ?: error("unhandled duration unit at ${loc(ctx)}"),
+            location = loc(ctx),
+        )
 
     private fun columnRef(ctx: TTRPParser.DottedRefContext): ColumnRef {
         val ref = dottedRef(ctx)
@@ -652,6 +700,343 @@ internal class TtrpWalker(
             .mapNotNull { (it as? org.antlr.v4.runtime.tree.TerminalNode)?.text }
             .filter { it in wanted }
 
+    // ---- the recipe block (AU-core-P0 · S0.1; AU ttr-core contracts §1) ----------------
+
+    private fun recipeBlock(ctx: TTRPParser.RecipeBlockContext): RecipeDecl {
+        var key = emptyList<Qname>()
+        var asOf: AsOf = AsOf.Now
+        var parameters = emptyList<Name>()
+        var document: String? = null
+        var protocol: RecipeProtocol? = null
+        var name: String? = null
+        for (h in ctx.recipeHeader()) {
+            when (h) {
+                is TTRPParser.RecipeKeyHeaderContext -> key = h.keyRef().qname().map { qname(it) }
+                is TTRPParser.RecipeAsOfHeaderContext ->
+                    asOf =
+                        when {
+                            h.STRING() != null -> AsOf.Instant(unquote(h.STRING().text))
+                            h.identifier()?.text == "now" -> AsOf.Now
+                            else -> {
+                                badValue(
+                                    "`as of:` is `now` or a literal instant, not `${h.identifier()?.text}`",
+                                    loc(h),
+                                )
+                                AsOf.Now
+                            }
+                        }
+                is TTRPParser.RecipeParametersHeaderContext ->
+                    parameters = h.identifier().map { Name(it.text, loc(it)) }
+                is TTRPParser.RecipeDocumentHeaderContext -> document = unquote(h.STRING().text)
+                is TTRPParser.RecipeProtocolHeaderContext -> {
+                    val v = h.identifier().text
+                    protocol = RecipeProtocol.of(v)
+                    if (protocol ==
+                        null
+                    ) {
+                        badValue("`protocol:` is `always` or `on_route`, not `$v`", loc(h.identifier()))
+                    }
+                }
+                is TTRPParser.RecipeNameHeaderContext -> name = h.identifier().text
+            }
+        }
+        return RecipeDecl(
+            key = key,
+            asOf = asOf,
+            parameters = parameters,
+            document = document,
+            protocol = protocol,
+            name = name,
+            members = ctx.recipeMember().mapNotNull { recipeMember(it) },
+            location = loc(ctx),
+        )
+    }
+
+    /** Null for a member the parser only half-recovered (its syntax error is already reported). */
+    private fun recipeMember(ctx: TTRPParser.RecipeMemberContext): RecipeMember? =
+        when {
+            ctx.roleContainer() != null -> roleContainer(ctx.roleContainer())
+            ctx.decisionBlock() != null ->
+                ctx.decisionBlock().takeIf { it.switchStmt() != null }?.let {
+                    decisionBlock(
+                        it,
+                    )
+                }
+            ctx.actionsBlock() != null -> actionsBlock(ctx.actionsBlock())
+            else -> null
+        }
+
+    private fun roleContainer(ctx: TTRPParser.RoleContainerContext): RoleContainer {
+        val role = if (ctx.role.type == TTRPParser.CANDIDATES) RecipeRole.CANDIDATES else RecipeRole.CONTEXT
+        val form = islandForm(ctx.islandForm())
+        val body: ContainerBody? =
+            when {
+                ctx.TAGGED_BLOCK() != null -> fragmentBody(ctx.TAGGED_BLOCK().symbol)
+                ctx.FROM() != null && ctx.STRING() != null -> fileFragmentBody(ctx.FROM().symbol, ctx.STRING().symbol)
+                ctx.LBRACE() != null && ctx.RBRACE() != null ->
+                    FlowBody(
+                        statements = ctx.statement().mapNotNull { statement(it) },
+                        location = span(ctx.LBRACE().symbol, ctx.RBRACE().symbol),
+                    )
+                else -> null
+            }
+        if (form is IslandForm.Target && body == null) {
+            diagnostics +=
+                TtrpDiagnostic(
+                    TtrpDiagnosticId.PRS_007,
+                    Severity.ERROR,
+                    "${role.keyword} `${ctx.identifier().text}` runs on `target ${form.target.text}` but has no body",
+                    loc(ctx),
+                    TtrpDiagnosticId.PRS_007.suggestedAlternative,
+                )
+        }
+        var retries: Int? = null
+        var onFailureOf: String? = null
+        for (attr in ctx.containerAttr()) {
+            when (attr) {
+                is TTRPParser.OnFailureAttrContext -> onFailureOf = attr.identifier().text
+                is TTRPParser.RetriesAttrContext -> retries = attr.INT().text.toIntOrNull()
+            }
+        }
+        return RoleContainer(
+            role = role,
+            name = ctx.identifier().text,
+            ports = ctx.portSig()?.portDecl()?.map { portDecl(it) } ?: emptyList(),
+            form = form,
+            window = ctx.windowClause()?.let { windowClause(it) },
+            body = body,
+            location = loc(ctx),
+            nameLocation = loc(ctx.identifier()),
+            retries = retries,
+            onFailureOf = onFailureOf,
+        )
+    }
+
+    private fun islandForm(ctx: TTRPParser.IslandFormContext): IslandForm =
+        when (ctx) {
+            is TTRPParser.TargetFormContext -> IslandForm.Target(qname(ctx.qname()), loc(ctx))
+            is TTRPParser.BuiltinFormContext ->
+                IslandForm.Builtin(qname(ctx.qname()), ctx.configBlock()?.let { configBlock(it) }, loc(ctx))
+            is TTRPParser.ForeignFormContext ->
+                IslandForm.Foreign(
+                    language = ctx.identifier(0).text,
+                    grain = grain(ctx.grain()),
+                    schema = ctx.identifier(1).text,
+                    location = loc(ctx),
+                )
+            is TTRPParser.CallFormContext ->
+                IslandForm.Call(qname(ctx.qname()), ctx.grain()?.let { grain(it) }, loc(ctx))
+            is TTRPParser.TurnFormContext ->
+                IslandForm.Turn(
+                    agent = qname(ctx.qname()),
+                    ask = unquote(ctx.STRING().text),
+                    answerSchema = ctx.identifier().text,
+                    location = loc(ctx),
+                )
+            else -> error("unhandled islandForm at ${loc(ctx)}")
+        }
+
+    private fun grain(ctx: TTRPParser.GrainContext): Grain = if (ctx.SET() != null) Grain.SET else Grain.PER_CANDIDATE
+
+    private fun windowClause(ctx: TTRPParser.WindowClauseContext): Window {
+        val spec = ctx.overSpec()
+        val unit = spec.identifier().text
+        val over: WindowOver? =
+            when {
+                spec.COLON() == null && unit in WINDOW_CALENDAR_UNITS -> WindowOver.Calendar(unit)
+                unit == "rows" && spec.INT() != null -> WindowOver.Rows(spec.INT().text.toInt())
+                unit == "gap" && spec.durationLiteral() != null ->
+                    WindowOver.Gap(
+                        durationLiteral(spec.durationLiteral()),
+                    )
+                else -> {
+                    badValue(
+                        "`over:` is `day`, `week`, `month`, `rows: <n>` or `gap: <duration>`, not `${spec.text}`",
+                        loc(spec),
+                    )
+                    null
+                }
+            }
+        return Window(by = ctx.identifier().map { Name(it.text, loc(it)) }, over = over, location = loc(ctx))
+    }
+
+    private fun decisionBlock(ctx: TTRPParser.DecisionBlockContext): DecisionDecl =
+        DecisionDecl(
+            name = ctx.identifier().text,
+            ports = ctx.portSig().portDecl().map { portDecl(it) },
+            statements = ctx.statement().mapNotNull { statement(it) },
+            switch = switchStmt(ctx.switchStmt()),
+            location = loc(ctx),
+            nameLocation = loc(ctx.identifier()),
+        )
+
+    private fun switchStmt(ctx: TTRPParser.SwitchStmtContext): SwitchStmt {
+        val mode =
+            ctx.identifier()?.let { m ->
+                SwitchMode.of(m.text).also {
+                    if (it == null) badValue("`mode:` is `exclusive` or `overlapping`, not `${m.text}`", loc(m))
+                }
+            }
+        return SwitchStmt(
+            input = dottedRef(ctx.dottedRef()),
+            mode = mode,
+            routes = ctx.route().mapNotNull { route(it) },
+            elseRoute = ctx.elseRoute()?.let { elseRoute(it) },
+            location = loc(ctx),
+        )
+    }
+
+    private fun route(ctx: TTRPParser.RouteContext): Route? {
+        val cond = ctx.expr() ?: return null
+        val (because, detail) = routeAttrs(ctx.routeAttr())
+        val condition = expr(cond)
+        val name = ctx.identifier().text
+        // The route attributes are soft keywords, so a malformed one (`because: 42`, `mode:` after the
+        // first route) parses as a ROUTE of that name — name the mistake instead.
+        if (name in ROUTE_ATTRIBUTE_WORDS) {
+            diagnostics +=
+                TtrpDiagnostic(
+                    TtrpDiagnosticId.PRS_007,
+                    Severity.ERROR,
+                    "`$name:` reads as a route named `$name` — `because:` takes a string, `detail:` context " +
+                        "names, and `mode:` comes first in the switch",
+                    loc(ctx),
+                    TtrpDiagnosticId.PRS_007.suggestedAlternative,
+                )
+        } else if (condition is Literal && condition.value is LiteralValue.Str) {
+            // `reason: "…"` (the pre-D-108 spelling) parses as a ROUTE named `reason` whose condition is a
+            // string — name it here rather than let it reach the checker as a nonsense route.
+            diagnostics +=
+                TtrpDiagnostic(
+                    TtrpDiagnosticId.PRS_007,
+                    Severity.ERROR,
+                    "route `${ctx.identifier().text}` has a string for a condition" +
+                        if (ctx.identifier().text == "reason") " — a route's explanation is `because:` (D-108)" else "",
+                    loc(ctx),
+                    TtrpDiagnosticId.PRS_007.suggestedAlternative,
+                )
+        }
+        return Route(
+            name = ctx.identifier().text,
+            condition = condition,
+            because = because,
+            detail = detail,
+            location = loc(ctx),
+            nameLocation = loc(ctx.identifier()),
+        )
+    }
+
+    private fun elseRoute(ctx: TTRPParser.ElseRouteContext): ElseRoute {
+        val (because, detail) = routeAttrs(ctx.routeAttr())
+        val target = ctx.identifier().text
+        return ElseRoute(
+            name = target.takeUnless { it == "none" },
+            because = because,
+            detail = detail,
+            location = loc(ctx),
+        )
+    }
+
+    private fun routeAttrs(attrs: List<TTRPParser.RouteAttrContext>): Pair<String?, List<Name>> {
+        var because: String? = null
+        val detail = mutableListOf<Name>()
+        for (a in attrs) {
+            when (a) {
+                is TTRPParser.BecauseAttrContext -> because = unquote(a.STRING().text)
+                is TTRPParser.DetailAttrContext -> a.identifier().forEach { detail += Name(it.text, loc(it)) }
+            }
+        }
+        return because to detail
+    }
+
+    private fun actionsBlock(ctx: TTRPParser.ActionsBlockContext): ActionsBlock =
+        ActionsBlock(wirings = ctx.wiring().mapNotNull { wiring(it) }, location = loc(ctx))
+
+    private fun wiring(ctx: TTRPParser.WiringContext): Wiring? {
+        val action = ctx.identifier() ?: return null
+        return Wiring(
+            routes =
+                ctx.routeRef().map {
+                    RouteRef(decision = it.identifier(0).text, route = it.identifier(1).text, location = loc(it))
+                },
+            action = action.text,
+            args = ctx.wiringArgs()?.let { wiringArgs(it) } ?: emptyList(),
+            whenCondition = ctx.expr()?.let { expr(it) },
+            location = loc(ctx),
+            actionLocation = loc(action),
+        )
+    }
+
+    private fun wiringArgs(ctx: TTRPParser.WiringArgsContext): List<WiringArg> =
+        ctx.wiringArg().mapNotNull {
+            wiringArg(it)
+        }
+
+    private fun wiringArg(ctx: TTRPParser.WiringArgContext): WiringArg? {
+        val values = ctx.wiringValue()
+        if (values.isEmpty()) return null
+        val value: WiringValue =
+            if (values.size == 1) {
+                wiringValue(values.single())
+            } else {
+                val items = values.map { (it as? TTRPParser.WiringExprContext)?.expr() }
+                if (items.any { it == null }) {
+                    diagnostics +=
+                        TtrpDiagnostic(
+                            TtrpDiagnosticId.PRS_007,
+                            Severity.ERROR,
+                            "wiring argument `${ctx.identifier().text}` mixes an action call into a list of values",
+                            loc(ctx),
+                            TtrpDiagnosticId.PRS_007.suggestedAlternative,
+                        )
+                }
+                WiringValue.Values(
+                    items.filterNotNull().map { expr(it) },
+                    span(values.first().start, values.last().stop),
+                )
+            }
+        return WiringArg(name = ctx.identifier().text, value = value, location = loc(ctx))
+    }
+
+    private fun wiringValue(ctx: TTRPParser.WiringValueContext): WiringValue =
+        when (ctx) {
+            is TTRPParser.WiringCallContext ->
+                WiringValue.Call(ctx.identifier().text, wiringArgs(ctx.wiringArgs()), loc(ctx))
+            is TTRPParser.WiringExprContext -> WiringValue.Expr(expr(ctx.expr()), loc(ctx))
+            else -> error("unhandled wiringValue at ${loc(ctx)}")
+        }
+
+    private fun badValue(
+        message: String,
+        at: SourceLocation,
+    ) {
+        diagnostics +=
+            TtrpDiagnostic(
+                TtrpDiagnosticId.PRS_006,
+                Severity.ERROR,
+                message,
+                at,
+                TtrpDiagnosticId.PRS_006.suggestedAlternative,
+            )
+    }
+
+    /** The span from one token's start to another's end (a brace-delimited body). */
+    private fun span(
+        start: Token,
+        stop: Token,
+    ): SourceLocation {
+        val (eLine, eCol) = offsetToLineCol(stop.stopIndex + 1)
+        return SourceLocation(
+            fileName,
+            start.line,
+            start.charPositionInLine,
+            eLine,
+            eCol,
+            start.startIndex,
+            stop.stopIndex + 1,
+        )
+    }
+
     // ---- trivia attach ----------------------------------------------------------
 
     /**
@@ -679,6 +1064,7 @@ internal class TtrpWalker(
             is ControlBlock -> stmt.copy(leadingTrivia = leading, trailingTrivia = trailing)
             is ContainerDecl -> stmt.copy(leadingTrivia = leading, trailingTrivia = trailing)
             is CubeletStmt -> stmt.copy(leadingTrivia = leading, trailingTrivia = trailing)
+            is RecipeDecl -> stmt.copy(leadingTrivia = leading, trailingTrivia = trailing)
         }
     }
 
@@ -786,6 +1172,11 @@ internal class TtrpWalker(
             }
         }
         return line to col
+    }
+
+    private companion object {
+        val WINDOW_CALENDAR_UNITS = setOf("day", "week", "month")
+        val ROUTE_ATTRIBUTE_WORDS = setOf("because", "detail", "mode")
     }
 
     private fun unquote(s: String): String =

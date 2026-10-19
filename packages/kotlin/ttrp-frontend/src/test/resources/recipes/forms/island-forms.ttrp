@@ -1,0 +1,54 @@
+// Every header and island form of AU contracts §1 that the 17 hero recipes do not use.
+uses world "hartland.worlds.demo"
+import hartland.*
+import hartland.automation.*
+
+recipe {
+    recipe:     forms_tour
+    key:        [sales_line.order_number, sales_line.line_no]
+    as of:      "2026-10-01T06:00:00+02:00"
+    parameters: [tolerance]
+    protocol:   on_route
+
+    candidates lines(out lines) target erp """sql
+        SELECT l.order_number, l.line_no, l.item FROM er.entity.sales_line l
+    """
+
+    // a Server capability with its config
+    context distance(in lines, out rows) builtin geo.distance { from = warehouse  to = customer }
+
+    // python, once per candidate, rows checked against a def schema
+    context scored(in lines, out rows) foreign python per candidate schema line_score """python
+score = 1
+"""
+
+    // a def service, called once for the set
+    context priced(in lines, out rows) call pricing.quote set
+
+    // a nondeterministic turn — the turn rule (REC-040) is S1.1's
+    context checked(in lines, out rows) turn agents.care ask "Is this line a duplicate?" answer duplicate_answer
+
+    // windows: calendar, rows, gap
+    context per_day(in lines, out rows) target erp window { by: item over: day } {
+        lines -> rows
+    }
+    context last_five(in lines, out rows) target erp window { by: item, order_number, over: rows: 5 } {
+        lines -> rows
+    }
+    context sessions(in lines, out rows) target erp window { by: item over: gap: 30 minutes } {
+        lines -> filter(placed_date >= :as_of - 30 days) -> rows
+    }
+
+    decision verdict(in lines, in scored) {
+        v = lines -> join(right: scored, kind: left, on: left.line_no = right.line_no)
+        v -> switch {
+            flag: score > :tolerance  because: "score {score}"  detail: scored
+            else: none
+        }
+    }
+
+    actions {
+        verdict.flag -> task { who: role.ops, about: line_no } when: score > 2
+        verdict.all  -> notify { who: role.ops, detail: scored }
+    }
+}

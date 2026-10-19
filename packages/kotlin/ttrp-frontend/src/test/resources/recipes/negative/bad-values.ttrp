@@ -1,0 +1,15 @@
+// Enumerated recipe values the grammar reads as names — each is TTRP-PRS-006.
+recipe {
+    key: order.order_number
+    as of: yesterday
+    protocol: never
+    context daily(in orders, out rows) target erp window { by: order_number over: fortnight } {
+        orders -> rows
+    }
+    decision verdict(in orders) {
+        orders -> switch {
+            mode: sometimes
+            release: value > 0
+        }
+    }
+}

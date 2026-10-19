@@ -140,6 +140,8 @@ object RejectElaboration {
                 // Expression), so no reject site can sit inside one. (Added when md-dotpath
                 // introduced MdPath.)
                 is ColumnRef, is Literal, is MdPath -> emptyList()
+                // AU-core-P0: `:name` bindings and durations are leaves too.
+                is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr -> emptyList()
             }
         // `here` first: a cast's own reject precedes any reject nested inside its operand (first-error).
         return here + nested

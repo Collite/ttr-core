@@ -1,9 +1,36 @@
 // TTR-P canonical grammar — the C3-converged canonical surface (P1 Stage 1.1).
-// @grammar-version: 0.3  (TTR-P spec version is an integer cut via docs/grammar-master/ — S6)
+// @grammar-version: 0.4  (TTR-P spec version is an integer cut via docs/grammar-master/ — S6)
 //   0.1 → 0.2 (PL-P2.S1, additive minor): runtime params (F-4-i) + on-failure
 //   islands / retries (F-4-iv/F-4-ii) — see docs/features/grammar-master/pl-grammar-work-items.md.
 //   0.2 → 0.3 (AG B5, additive minor): a container body may live in a file —
 //   `container x(…) target e from "rules/x.ttrb-cs"` (`from` is a SOFT keyword, still a name).
+//   0.3 → 0.4 (AU-core-P0 · S0.1, additive minor — the recipe block; the manifest's
+//   `ttrpVersion` 2 for a document that carries one): see the RECIPE section below.
+//     1. `recipe { headers… members… }` — one per document (TTRP-REC-000 is the S1.1
+//        check); headers `key:` · `as of:` · `parameters: [ … ]` · `document:` ·
+//        `protocol:` · `recipe: <name>` (a multi-skeleton document, AU contracts §6);
+//        members `candidates`/`context` role containers (an island form: `target` ·
+//        `builtin` · `foreign … per candidate | set schema` · `call` · `turn … ask …
+//        answer`, + an optional `window { by: … over: … }`), one `decision` whose body
+//        ends in a `switch` statement (routes · `mode:` · `else:` · `because:` ·
+//        `detail:`), and an `actions { }` wiring block (`verdict.route, … -> action
+//        { arg: value, … } when: <expr>`). D-25, D-19, D-28, D-31/D-102, D-108.
+//     2. Expressions gain a runtime/parameter binding `:name` (`:as_of` reserved) and a
+//        duration literal `30 days` / `2 working_days`; a function call may name its
+//        arguments (`age(since: x)`, `working_days(between: a, and: :as_of)` — `and` /
+//        `between` are legal argument NAMES). `days(:p)` is a call the walker folds to a
+//        duration (17 §5).
+//     3. `aggregate { group_by: k, … }` (the LD spelling, D-108 "LD wins") beside the
+//        existing `group by k`; config entries may be separated by commas.
+//     4. New tokens, ALL soft (also in `identifier`, so `key`, `mode`, `detail`, `days`,
+//        `context`, `set`, `call`, `ask`, `recipe` … stay usable as names — the WORLD
+//        precedent): RECIPE KEY PARAMETERS DOCUMENT PROTOCOL CANDIDATES CONTEXT DECISION
+//        ACTIONS BUILTIN_FORM FOREIGN PER CANDIDATE SET CALL TURN ASK ANSWER WINDOW OVER
+//        SWITCH MODE BECAUSE DETAIL GROUP_BY DAYS WORKING_DAYS WEEKS MONTHS MINUTES HOURS;
+//        punctuation LBRACK RBRACK. `builtin` is BUILTIN_FORM — BUILTIN is the `@run-date`
+//        sigil token. Enumerated VALUES (`mode: exclusive|overlapping`, `else: none`,
+//        `protocol: always|on_route`, `as of: now`, `over: day|week|month`) are plain
+//        identifiers checked by the walker, not tokens.
 //
 // Kotlin-only generation (G-b): this .g4 is read directly by the ANTLR Gradle
 // plugin in ttrp-frontend; there is no antlr-ng/TS target and no TextMate grammar.
@@ -38,6 +65,8 @@ statement
     | importDecl
     | schemaDecl                 // program-level `def schema <name> { col: type, … }` (D-c, Stage 1.3)
     | paramDecl                  // PL-P2.S1 (F-4-i): program-level runtime param `param <n>: <type> = <default>`
+    | recipeBlock                // AU-core-P0 (D-25): the recipe block — listed before bindingOrChain so a soft
+                                 // `recipe { … }` is the block, never an op-call with a config block
     | containerDecl
     | controlBlock
     | programHeader              // parses ONLY to name the S12 rejection (walker → TTRP-PRS-002)
@@ -84,9 +113,10 @@ arg             : (identifier COLON)? argValue ;        // named canonical; bare
                                                         // (TTRP-PRS-003/004), NOT the grammar.
 argValue        : RELATION qname | schemaLiteral | expr ;
 
-configBlock     : LBRACE configEntry* RBRACE ;
+configBlock     : LBRACE (configEntry COMMA?)* RBRACE ;
 configEntry
     : GROUP BY identifier (COMMA identifier)*
+    | GROUP_BY COLON identifier (COMMA identifier)*        // AU-core-P0: the LD spelling (D-108)
     | identifier ASSIGN expr
     ;
 
@@ -105,6 +135,64 @@ withClause      : WITH mdObject ;                                // keys (shape/
 mdObject        : LBRACE (mdObjectEntry (COMMA mdObjectEntry)*)? RBRACE ;
 mdObjectEntry   : identifier COLON mdObjectValue ;
 mdObjectValue   : qname | STRING | numericLiteral | TRUE | FALSE ;
+
+// ---- RECIPE (AU-core-P0 · S0.1; AU ttr-core contracts §1) -----------------------------
+// A recipe is a closed block of role containers + one decision + the action wiring. The
+// structure is grammar; every value the contract enumerates is a walker check (TTRP-PRS-006)
+// and every cross-reference (routes ↔ wiring, `:name` ↔ `parameters:`, actions) is the
+// S1.1 RecipeChecker's (TTRP-REC-*).
+recipeBlock     : RECIPE LBRACE recipeHeader* recipeMember* RBRACE ;
+recipeHeader
+    : KEY COLON keyRef                                          # recipeKeyHeader
+    | AS OF COLON (identifier | STRING)                         # recipeAsOfHeader       // now | a literal instant (replay)
+    | PARAMETERS COLON LBRACK (identifier (COMMA identifier)* COMMA?)? RBRACK   # recipeParametersHeader
+    | DOCUMENT COLON STRING                                     # recipeDocumentHeader
+    | PROTOCOL COLON identifier                                 # recipeProtocolHeader   // always | on_route (D-80)
+    | RECIPE COLON identifier                                   # recipeNameHeader       // contracts §6 multi-skeleton
+    ;
+keyRef          : qname | LBRACK qname (COMMA qname)* COMMA? RBRACK ;                  // composite key
+recipeMember    : roleContainer | decisionBlock | actionsBlock ;
+
+// A role container: the container header with an island FORM instead of a bare `target`
+// (D-19). A body is required for `target` (walker) and optional for the other forms.
+roleContainer
+    : role=(CANDIDATES | CONTEXT) identifier portSig? islandForm containerAttr* windowClause?
+      ( LBRACE statement* RBRACE | TAGGED_BLOCK | FROM STRING )?
+    ;
+islandForm
+    : TARGET qname                                              # targetForm
+    | BUILTIN_FORM qname configBlock?                           # builtinForm
+    | FOREIGN identifier grain SCHEMA identifier                # foreignForm            // `foreign python per candidate schema s`
+    | CALL qname grain?                                         # callForm               // a `def service`
+    | TURN qname ASK STRING ANSWER identifier                   # turnForm               // nondeterministic; answer = a def schema
+    ;
+grain           : PER CANDIDATE | SET ;
+windowClause    : WINDOW LBRACE BY COLON identifier (COMMA identifier)* COMMA? OVER COLON overSpec RBRACE ;
+overSpec        : identifier (COLON (INT | durationLiteral))? ;    // day | week | month | rows: N | gap: <duration>
+
+// The decision: ordinary statements, then exactly one `switch` statement (its routes are
+// the decision's outputs). `-> switch {` is a STATEMENT here, not the `switch` op of a chain.
+decisionBlock   : DECISION identifier portSig LBRACE statement* switchStmt RBRACE ;
+switchStmt      : dottedRef ARROW SWITCH LBRACE (MODE COLON identifier)? route* elseRoute? RBRACE ;
+route           : identifier COLON expr routeAttr* ;
+elseRoute       : ELSE COLON identifier routeAttr* ;             // a named default route, or `none` (no verdict row)
+routeAttr
+    : BECAUSE COLON STRING                                      # becauseAttr            // "{column}" fills from the row (D-108)
+    | DETAIL COLON identifier (COMMA identifier)*               # detailAttr             // context names attached per key
+    ;
+
+// The action wiring. A value is an expression (`order_number`, `role.sales`, `2 working_days`,
+// `working_days(:settlement)`), an action call (`on_due: hold { … }`) or a bare comma list
+// (`detail: shortfall, price_differences` — a new argument starts at `name:`).
+actionsBlock    : ACTIONS LBRACE wiring* RBRACE ;
+wiring          : routeRef (COMMA routeRef)* ARROW identifier wiringArgs? (WHEN COLON expr)? ;   // when: → a route split (17 §5)
+routeRef        : identifier DOT identifier ;                    // verdict.release · verdict.all
+wiringArgs      : LBRACE (wiringArg (COMMA wiringArg)* COMMA?)? RBRACE ;
+wiringArg       : identifier COLON wiringValue (COMMA wiringValue)* ;
+wiringValue     : identifier wiringArgs                         # wiringCall
+                | expr                                          # wiringExpr
+                ;
+// ------------------------------------------------------------------------------------
 
 containerDecl   : CONTAINER identifier portSig? TARGET qname containerAttr*
                   ( LBRACE statement* RBRACE | TAGGED_BLOCK | FROM STRING ) ;   // closed containers (C3-d-iii)
@@ -156,7 +244,9 @@ addExpr         : mulExpr ((PLUS | MINUS) mulExpr)* ;
 mulExpr         : unaryExpr ((STAR | SLASH) unaryExpr)* ;
 unaryExpr       : MINUS unaryExpr | primary ;
 primary
-    : literal
+    : durationLiteral                                       // AU-core-P0: `30 days` (before `literal`: INT + unit)
+    | literal
+    | paramRef                                              // AU-core-P0: `:name` — a parameter / runtime binding (D-108)
     | castExpr
     | caseExpr
     | functionCall
@@ -169,7 +259,12 @@ primary
     ;
 castExpr        : CAST LPAREN expr AS typeName RPAREN ;      // explicit cast only (B-T5)
 caseExpr        : CASE (WHEN expr THEN expr)+ (ELSE expr)? END ;
-functionCall    : identifier LPAREN (DISTINCT? expr (COMMA expr)*)? RPAREN ;  // distinct → AggregateCall only
+functionCall    : identifier LPAREN (DISTINCT? fnArg (COMMA fnArg)*)? RPAREN ;  // distinct → AggregateCall only
+fnArg           : (fnArgName COLON)? expr ;                  // AU-core-P0: named (`age(since: x)`) or positional
+fnArgName       : identifier | AND | OR | BETWEEN | NOT ;        // `working_days(between: a, and: :as_of)`
+paramRef        : COLON identifier ;                         // `:as_of` · `:tolerance`
+durationLiteral : INT durationUnit ;                         // `30 days` · `2 working_days` (`days(:p)` is a call)
+durationUnit    : DAYS | WORKING_DAYS | WEEKS | MONTHS | MINUTES | HOURS ;
 typeName        : identifier (LPAREN INT (COMMA INT)? RPAREN)? ;              // decimal(12,2) — S23 spellings
 literal         : STRING | CHAR_STRING | numericLiteral | TRUE | FALSE | NULL ;
 
@@ -207,7 +302,14 @@ pathAtom        : identifier | INT | STRING ;
 // clause is unambiguous by position (it only follows `target <qname>` on a container).
 // `param`/`failure`/`of`/`retries`/`absorbs` are hard keywords (no corpus collision).
 // `from` (AG B5) is soft too: it only opens a file-backed container body after `target <qname>`.
-identifier      : IDENT | IN | OUT | ERR | BY | SCHEMA | DISTINCT | ON | FROM ;
+// AU-core-P0: every recipe word is soft too (the TTR-M WORLD precedent) — `key`, `mode`,
+// `detail`, `context`, `set`, `days`, `recipe` … are ordinary column / port / op names.
+identifier      : IDENT | IN | OUT | ERR | BY | SCHEMA | DISTINCT | ON | FROM
+                | RECIPE | KEY | PARAMETERS | DOCUMENT | PROTOCOL | CANDIDATES | CONTEXT | DECISION
+                | ACTIONS | BUILTIN_FORM | FOREIGN | PER | CANDIDATE | SET | CALL | TURN | ASK | ANSWER
+                | WINDOW | OVER | SWITCH | MODE | BECAUSE | DETAIL | GROUP_BY
+                | DAYS | WORKING_DAYS | WEEKS | MONTHS | MINUTES | HOURS
+                ;
 idPart          : identifier | TRUE | FALSE | NULL ;
 
 // =============================================================================
@@ -245,6 +347,40 @@ OF          : 'of' ;
 RETRIES     : 'retries' ;
 ABSORBS     : 'absorbs' ;
 FROM        : 'from' ;
+
+// AU-core-P0 · S0.1 — the recipe block (all soft: also in `identifier`). Comments stay off
+// the token lines (the KeywordTable drift regex, S16).
+RECIPE       : 'recipe' ;
+KEY          : 'key' ;
+PARAMETERS   : 'parameters' ;
+DOCUMENT     : 'document' ;
+PROTOCOL     : 'protocol' ;
+CANDIDATES   : 'candidates' ;
+CONTEXT      : 'context' ;
+DECISION     : 'decision' ;
+ACTIONS      : 'actions' ;
+BUILTIN_FORM : 'builtin' ;
+FOREIGN      : 'foreign' ;
+PER          : 'per' ;
+CANDIDATE    : 'candidate' ;
+SET          : 'set' ;
+CALL         : 'call' ;
+TURN         : 'turn' ;
+ASK          : 'ask' ;
+ANSWER       : 'answer' ;
+WINDOW       : 'window' ;
+OVER         : 'over' ;
+SWITCH       : 'switch' ;
+MODE         : 'mode' ;
+BECAUSE      : 'because' ;
+DETAIL       : 'detail' ;
+GROUP_BY     : 'group_by' ;
+DAYS         : 'days' ;
+WORKING_DAYS : 'working_days' ;
+WEEKS        : 'weeks' ;
+MONTHS       : 'months' ;
+MINUTES      : 'minutes' ;
+HOURS        : 'hours' ;
 
 // Expression keywords.
 AND         : 'and' ;
@@ -285,6 +421,8 @@ LPAREN       : '(' ;
 RPAREN       : ')' ;
 LBRACE       : '{' ;
 RBRACE       : '}' ;
+LBRACK       : '[' ;
+RBRACK       : ']' ;
 COMMA        : ',' ;
 COLON        : ':' ;
 DOT          : '.' ;

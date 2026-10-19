@@ -67,6 +67,9 @@ class TtrpFormatter {
         val parsed = TtrpParser.parseString(source, uri)
         // Never reflow a document that failed to parse — round-tripping is only safe over a clean tree.
         if (parsed.diagnostics.any { it.severity == org.tatrman.ttrp.diagnostics.Severity.ERROR }) return source
+        // A recipe document is returned unchanged until the formatter learns the recipe block (the LSP's
+        // recipe awareness, AU-core-P3·S3.3) — rendering it with the statement rules below would drop it.
+        if (parsed.document.statements.any { it is org.tatrman.ttrp.ast.RecipeDecl }) return source
         val body = renderStatements(parsed.document.statements, indent = 0)
         return if (body.isEmpty()) "" else body + "\n"
     }

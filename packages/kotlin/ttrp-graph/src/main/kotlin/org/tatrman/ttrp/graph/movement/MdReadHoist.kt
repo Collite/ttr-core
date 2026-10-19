@@ -172,6 +172,7 @@ class MdReadHoist(
             is InList -> collectMdPaths(e.expr) + e.items.flatMap { collectMdPaths(it) }
             is IsNull -> collectMdPaths(e.expr)
             is ColumnRef, is Literal -> emptyList()
+            is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr -> emptyList()
         }
 
     companion object {
