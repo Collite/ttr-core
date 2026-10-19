@@ -1,0 +1,10 @@
+// expect: ttr/automation-unknown-reference — identity references resolve within their own world.
+package acme.worlds
+model world
+
+def world a {
+    def identity bot { principal: "svc-bot", credential: TTR_CONN_BOT }
+}
+def world b {
+    def deployment d { program: p, target: native, run_as: identity.bot }
+}

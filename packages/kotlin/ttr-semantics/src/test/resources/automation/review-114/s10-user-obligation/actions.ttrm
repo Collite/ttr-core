@@ -1,0 +1,8 @@
+package acme.automation
+model automation
+
+def action finish {
+    columns:    [def column id { type: obligation.id }]
+    transition: obligation.state -> done { from: pending }
+    sinks:      { native: obligation }
+}

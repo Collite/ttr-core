@@ -112,6 +112,7 @@ export type {
   WorldSchemaDef,
   WorldSchemaField,
   AttributeTransition,
+  PropertyNode,
   AutomationKind,
   AutoValue,
   AutoDurationValue,

@@ -1362,8 +1362,32 @@ class TtrWalker(
                 props.firstNotNullOfOrNull {
                     it.searchBlockProperty()?.let { s -> visitSearchBlock(s.searchBlock()) }
                 } ?: SearchHintsValue(),
-            // Grammar 0.16 — an automation role's free-form properties (resolve / delivery / members).
-            entries = props.mapNotNull { it.autoEntry()?.let { e -> visitAutoEntry(e) } },
+            // Grammar 0.16 — an automation role's typed properties (resolve / delivery / members), one
+            // ordered entry list (review-114 M5: typed, so a typo stays a parse error).
+            entries =
+                props.mapNotNull { p ->
+                    when {
+                        p.resolveProperty() != null ->
+                            AutoEntry(
+                                "resolve",
+                                visitAutoValue(p.resolveProperty().autoValue()),
+                                location(p.resolveProperty()),
+                            )
+                        p.deliveryProperty() != null ->
+                            AutoEntry(
+                                "delivery",
+                                visitAutoValue(p.deliveryProperty().autoValue()),
+                                location(p.deliveryProperty()),
+                            )
+                        p.membersProperty() != null ->
+                            AutoEntry(
+                                "members",
+                                visitAutoValue(p.membersProperty().autoValue()),
+                                location(p.membersProperty()),
+                            )
+                        else -> null
+                    }
+                },
         )
     }
 
@@ -1653,7 +1677,8 @@ class TtrWalker(
         ctx.autoList()?.let { l -> return AutoValue.ListV(l.autoValue().map { visitAutoValue(it) }, src) }
         ctx.literal()?.let { lit ->
             return when {
-                lit.NUMBER_LITERAL() != null -> AutoValue.Num(lit.NUMBER_LITERAL().text.toDouble(), src)
+                lit.NUMBER_LITERAL() != null ->
+                    AutoValue.Num(lit.NUMBER_LITERAL().text.toDouble(), src, lit.NUMBER_LITERAL().text)
                 lit.BOOLEAN_LITERAL() != null -> AutoValue.Bool(lit.BOOLEAN_LITERAL().text.toBoolean(), src)
                 lit.stringLiteralForm() != null -> {
                     val form = lit.stringLiteralForm()

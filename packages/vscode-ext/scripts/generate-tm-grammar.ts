@@ -258,6 +258,8 @@ export function tokenToScope(name: string, literal: string): string | null {
     case 'TRANSITIONS': return 'keyword.other.property.ttrm';
     case 'STATES': return 'keyword.other.property.ttrm';
     case 'SET': return 'keyword.other.property.ttrm';
+    case 'RESOLVE': return 'keyword.other.property.ttrm';
+    case 'DELIVERY': return 'keyword.other.property.ttrm';
     case 'ARROW': return 'punctuation.separator.ttrm';
     default: return null;
   }

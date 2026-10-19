@@ -1,0 +1,5 @@
+// expect: ttr/automation-duplicate-property — a free-form property written twice.
+package acme.automation
+model automation
+
+def program p3 { recipe: r, recipe: r, port: none, mode: batch }

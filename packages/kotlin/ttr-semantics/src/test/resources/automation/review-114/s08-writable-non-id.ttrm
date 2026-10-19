@@ -1,0 +1,8 @@
+// expect: ttr/automation-invalid-value — a writable item that is no entity, attribute or glob.
+package acme.worlds
+model world
+
+def world w {
+    def engine pg  { type: postgres }
+    def storage db { type: postgres, via: pg, writable: [order.state, 42] }
+}

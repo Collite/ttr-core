@@ -802,9 +802,11 @@ sealed interface AutoValue {
         override val source: SourceLocation,
     ) : AutoValue
 
+    /** A number; [text] is the number as written (parameter values feed the D-13 values fingerprint). */
     data class Num(
         val raw: Double,
         override val source: SourceLocation,
+        val text: String = raw.toString(),
     ) : AutoValue
 
     data class Bool(

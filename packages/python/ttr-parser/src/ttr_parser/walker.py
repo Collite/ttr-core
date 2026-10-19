@@ -983,10 +983,13 @@ def _visit_role(od: Any, name: str, source: SourceLocation, file: str, warnings:
         s = p.searchBlockProperty()
         if s is not None:
             search = _visit_search_block(s.searchBlock(), file)
-        # Grammar 0.16 — an automation role's free-form properties (resolve / delivery / members).
-        ae = p.autoEntry()
-        if ae is not None:
-            entries.append(_visit_auto_entry(ae, file))
+        # Grammar 0.16 — an automation role's typed properties (resolve / delivery / members), one
+        # ordered entry list (review-114 M5: typed, so a typo stays a parse error).
+        for role_key, role_prop in (("resolve", p.resolveProperty()), ("delivery", p.deliveryProperty()), ("members", p.membersProperty())):
+            if role_prop is not None:
+                entries.append(
+                    AutoEntry(key=role_key, value=_visit_auto_value(role_prop.autoValue(), file), source=make_source_location(role_prop, file))
+                )
     return RoleDef(
         name=name, source=source, description=description, description_localized=description_localized, tags=tags, label=label, search=search,
         entries=tuple(entries),
@@ -1287,7 +1290,7 @@ def _visit_auto_value(ctx: Any, file: str) -> AutoValue:
     lit = ctx.literal()
     if lit is not None:
         if lit.NUMBER_LITERAL() is not None:
-            return AutoNum(source=src, raw=_number_value(lit.NUMBER_LITERAL()))
+            return AutoNum(source=src, raw=_number_value(lit.NUMBER_LITERAL()), text=lit.NUMBER_LITERAL().getText())
         if lit.BOOLEAN_LITERAL() is not None:
             return AutoBool(source=src, raw=_bool_text(lit.BOOLEAN_LITERAL()) is True)
         slf = lit.stringLiteralForm()

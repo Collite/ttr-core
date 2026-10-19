@@ -278,7 +278,10 @@ data class AutomationRecipe(
 
 // ----- the automation world members (nested in `def world`; QualifiedName(WORLD, <world>, <name>)) -----
 
-/** Who a grant is for: a role, a user, a named identity, or anyone (`"*"`). */
+/**
+ * Who a grant is for: a role, a user (`user.<u>` — the rest of the path — or `user "<u>"` for a name an id cannot
+ * spell), a named identity, or anyone (`*` / `"*"`).
+ */
 sealed interface GrantWho {
     data class Role(
         val name: String,
@@ -324,8 +327,10 @@ data class WorldIdentity(
 }
 
 /**
- * `def grant { who, program, as }` (D-91) — unnamed, keyed by its triple; [qname] is synthetic
- * (`grant#<n>`, n = 1-based position in the world). [program] null = any (`*`). [runAs] is never
+ * `def grant { who, program, as }` (D-91) — unnamed, keyed by its triple; [qname] is synthetic (`grant#<n>`,
+ * n = 1-based position in the world). Loaded FAIL-CLOSED: a grant whose `who`, `program` or `as` is missing
+ * or malformed is not loaded at all (a load error says so) — so [who] and [runAs] are always set, and
+ * [program] is null only when the grant was written `program: *` (or `"*"`). [runAs] is never
  * [RunAsRef.Caller] (a caller needs no grant).
  */
 data class WorldGrant(
@@ -336,9 +341,9 @@ data class WorldGrant(
     override val tags: List<String> = emptyList(),
     override val sourceFile: String = "",
     override val binding: Binding = Binding.BoundReal,
-    val who: GrantWho? = null,
-    val program: String? = null,
-    val runAs: RunAsRef? = null,
+    val who: GrantWho,
+    val program: String?,
+    val runAs: RunAsRef,
     val sourceLocation: SourceLocation? = null,
 ) : ModelObject {
     override val kind: String = "grant"
@@ -356,7 +361,11 @@ sealed interface DeploymentTrigger {
     data object None : DeploymentTrigger
 }
 
-/** `def deployment <n> { program | process, target, run_as, trigger, … }` (D-107, D-92, D-94, D-106). */
+/**
+ * `def deployment <n> { program | process, target, run_as, trigger, … }` (D-107, D-92, D-94, D-106). Loaded
+ * FAIL-CLOSED: a deployment with a non-boolean flag, a missing/malformed `run_as` or `target`, or not exactly
+ * one of `program` / `process` is not loaded (a load error says so) — a flag keeps its default only when absent.
+ */
 data class WorldDeployment(
     override val internalId: String,
     override val qname: QualifiedName,
@@ -369,8 +378,8 @@ data class WorldDeployment(
     val program: String? = null,
     val process: String? = null,
     /** `native` or an executor of the world. */
-    val target: String? = null,
-    val runAs: RunAsRef? = null,
+    val target: String,
+    val runAs: RunAsRef,
     val trigger: DeploymentTrigger? = null,
     val dryRun: Boolean = false,
     val enabled: Boolean = true,

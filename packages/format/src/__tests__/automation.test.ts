@@ -43,25 +43,40 @@ describe('formatter — the automation model (0.16)', () => {
     });
   }
 
-  it('keeps every automation value form verbatim', () => {
-    const out = fmt(`model automation
-def action ask { columns: [def column who { type: role }], transition: order.state -> released { from: [placed, held] }, set: order.held_for = who, due: 2 working_days, on_due: hold { order: order_number }, program: *, resolve: keycloak_group "g" }`);
-    expect(out).toMatchInlineSnapshot(`
-      "model automation
+  it('keeps an automation def verbatim: every value form, source order, comments', () => {
+    const src = `model automation
 
-      def action ask {
-          columns: [
-              def column who { type: role }
-          ],
-          transition: order.state -> released { from: [placed, held] },
-          set: order.held_for = who,
-          due: 2 working_days,
-          on_due: hold { order: order_number },
-          program: *,
-          resolve: keycloak_group "g"
-      }
-      "
-    `);
+def action ask {
+    // the sinks first: authored order is kept (typed properties are not hoisted)
+    sinks: { native: task }
+    columns: [def column who { type: role }] // who answers
+    transition: order.state -> released { from: [placed, held] }
+    set: order.held_for = who
+    due: 2 working_days
+    on_due: hold { order: order_number }
+    program: *
+}
+`;
+    expect(fmt(src)).toBe(src);
+  });
+
+  it('keeps a trailing comment on `transitions:` and on `states:`', () => {
+    const src = `model er
+
+def entity order {
+    attributes: [
+        def attribute state {
+            type: text,
+            states: [placed, held], // the lifecycle
+            transitions: { placed: [held] } // held only from placed
+        }
+    ]
+}
+`;
+    const out = fmt(src);
+    expect(out).toContain('// the lifecycle');
+    expect(out).toContain('// held only from placed');
+    expect(fmt(out)).toBe(out);
   });
 
   it('keeps a world body verbatim', () => {

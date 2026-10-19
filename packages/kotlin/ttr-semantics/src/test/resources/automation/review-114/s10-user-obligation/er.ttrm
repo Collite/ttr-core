@@ -1,0 +1,7 @@
+// clean: the project's own `obligation` wins over the stdlib's (its states are its own).
+package acme
+model er
+
+def entity obligation {
+    attributes: [ def attribute id { type: text, isKey: true }, def attribute state { type: text, states: [pending, done] } ]
+}

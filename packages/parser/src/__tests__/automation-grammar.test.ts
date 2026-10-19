@@ -144,4 +144,37 @@ describe('grammar 0.16 — model automation', () => {
       parseString('model world\ndef world w { def grant g { who: role.ops } }', 'w.ttrm').errors.length,
     ).toBeGreaterThan(0);
   });
+
+  // review-114 M5 — the role's automation properties are TYPED: a typo is a parse error in any model.
+  it('rejects a role property typo and walks the typed automation role properties', () => {
+    expect(parseString('model cnc\ndef role r { lable: { en: "x" } }', 'r.ttrm').errors.length).toBeGreaterThan(0);
+    const { ast, errors } = parseString(
+      'model automation\ndef role r { resolve: keycloak_group "g", delivery: { email: "e" }, members: ["a"] }',
+      'r.ttrm',
+    );
+    expect(errors).toEqual([]);
+    const role = ast!.definitions[0] as RoleDef;
+    expect(role.entries!.map((e) => e.key)).toEqual(['resolve', 'delivery', 'members']);
+  });
+
+  // review-114 — a half-written automation property no longer wipes the document.
+  it('keeps the rest of the document when an automation property is half-written', () => {
+    for (const bad of [
+      'def action bad { transition: order.state -> }',
+      'def action bad { set: = col }',
+    ]) {
+      const r = parseString(`model automation\ndef parameter ok { type: int, value: 1 }\n${bad}\n`, 'x.ttrm');
+      expect(r.errors.some((e) => e.severity === 'error')).toBe(true);
+      expect(r.ast?.definitions.some((d) => d.name === 'ok'), bad).toBe(true);
+    }
+    const w = parseString('model world\ndef world w { def process p { steps: [ def step { program: x } ] } }', 'w.ttrm');
+    expect(w.errors.length).toBeGreaterThan(0);
+    expect(w.ast?.definitions[0]?.name).toBe('w');
+  });
+
+  // review-114 — a number keeps its text as written (parameter values feed the D-13 values fingerprint).
+  it('keeps the text of an automation number', () => {
+    const { ast } = parseString('model automation\ndef parameter share { type: decimal, value: 0.40 }', 's.ttrm');
+    expect(entry(ast!.definitions[0] as AutomationDef, 'value')).toMatchObject({ kind: 'number', value: 0.4, raw: '0.40' });
+  });
 });

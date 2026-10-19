@@ -327,7 +327,6 @@ class FileBasedSource(
         val rowSchemas = mutableMapOf<String, org.tatrman.ttr.metadata.model.RowSchemaRecord>()
         val worlds = mutableMapOf<QualifiedName, org.tatrman.ttr.metadata.model.World>()
         val automation = mutableMapOf<QualifiedName, org.tatrman.ttr.metadata.model.AutomationObject>()
-        var needsStdlib = false
 
         for (file in files) {
             val content = storage.read(file)
@@ -347,11 +346,6 @@ class FileBasedSource(
             // style, not a defect in the model"). Left in `errors` it would fail the load of
             // every estate still writing `nameAttribute:` — the exact behaviour change MS
             // promises silent estates will not see.
-            if (org.tatrman.ttr.parser.loader.AutomationStdlib
-                    .isNeededBy(listOf(pr))
-            ) {
-                needsStdlib = true
-            }
             val semanticsAnalysis = SemanticsAnalyzer.analyzeSemantics(pr.definitions)
             for (d in semanticsAnalysis.diagnostics) {
                 val issue =
@@ -491,7 +485,10 @@ class FileBasedSource(
                 // v4.1 world model (M2) — `def world` becomes typed world objects.
                 if (def is org.tatrman.ttr.parser.model.WorldDef) {
                     val pkg = declaredPackage ?: computedPackage
-                    val world = buildWorld(def, pkg, file.path)
+                    val world =
+                        buildWorld(def, pkg, file.path) { at, message ->
+                            errors += LoadWarning(sourceId, file.path, at.line, at.column, message)
+                        }
                     worlds[world.qname] = world
                     continue
                 }
@@ -543,19 +540,6 @@ class FileBasedSource(
         }
 
         resolveShortQueryTargets(mappings, queries, shortQueryTargets)
-
-        // Grammar 0.16 — the automation stdlib (`obligation`, `state_history`, `approvals`) joins a source that
-        // declares `model automation` or imports an `automation` package — implicitly, the stock-vocab
-        // precedent — unless the source carries a package `automation` of its own.
-        if (needsStdlib &&
-            loadedFiles.none { (it.declaredPackage ?: it.computedPackage) == AUTOMATION_STDLIB_PACKAGE }
-        ) {
-            val stdlib = AutomationBuilder.stdlibSnapshot(sourceId)
-            for ((qn, e) in stdlib.entities) entities.putIfAbsent(qn, e)
-            loadedFiles += stdlib.loadedFiles
-            errors += stdlib.errors
-            warnings += stdlib.warnings
-        }
 
         return SourceSnapshot(
             sourceId = sourceId,
@@ -635,6 +619,8 @@ class FileBasedSource(
         def: org.tatrman.ttr.parser.model.WorldDef,
         pkg: String,
         sourceFile: String,
+        /** Grammar 0.16 — a world member dropped fail-closed (a malformed grant / deployment) reports here. */
+        dropped: (SourceLocation, String) -> Unit,
     ): org.tatrman.ttr.metadata.model.World {
         val worldQn = qname("world", "", def.name, pkg)
 
@@ -715,8 +701,8 @@ class FileBasedSource(
             storages = storages,
             sourceLocation = def.source,
             identities = AutomationBuilder.identities(def, pkg, sourceFile),
-            grants = AutomationBuilder.grants(def, pkg, sourceFile),
-            deployments = AutomationBuilder.deployments(def, pkg, sourceFile),
+            grants = AutomationBuilder.grants(def, pkg, sourceFile, dropped),
+            deployments = AutomationBuilder.deployments(def, pkg, sourceFile, dropped),
             processes = AutomationBuilder.processes(def, pkg, sourceFile),
         )
     }
@@ -1584,7 +1570,10 @@ class FileBasedSource(
     ): QualifiedName = Reference.toQname(ref.path, defaultSchema, defaultNamespace)
 
     companion object {
-        /** Grammar 0.16 — the automation stdlib's package ([org.tatrman.ttr.parser.loader.AutomationStdlib]). */
+        /**
+         * Grammar 0.16 — the automation stdlib's package ([org.tatrman.ttr.parser.loader.AutomationStdlib]); the
+         * reconciler adds the stdlib once per project that declares `model automation` and has no such package.
+         */
         const val AUTOMATION_STDLIB_PACKAGE = "automation"
 
         // M1 de-proto: was `QualifiedName.newBuilder()…build()` (proto). Behaviour
@@ -1673,8 +1662,11 @@ object Reference {
             2 -> FileBasedSource.qname(defaultSchema, parts[0], parts[1])
             3 -> FileBasedSource.qname(parts[0], parts[1], parts[2])
             else ->
+                // `automation` is a tier of the model but never a reference's schema token: a package
+                // segment named `automation` (`plant.automation.order.state`) stays a name (review-114 B1).
                 if (org.tatrman.ttr.metadata.model
-                        .parseSchemaCode(parts[1]) != null
+                        .parseSchemaCode(parts[1])
+                        .let { it != null && it != org.tatrman.ttr.metadata.model.SchemaCode.AUTOMATION }
                 ) {
                     // package.schema.namespace.name (stock vocabulary)
                     FileBasedSource.qname(parts[1], parts[2], parts.drop(3).joinToString("."), parts[0])

@@ -175,6 +175,7 @@ class AutomationModelSpec :
                 model er
                 def entity order { attributes: [ def attribute order_number { type: text, isKey: true },
                     def attribute state { type: text, states: [placed, held], transitions: { placed: [held] } } ] }
+                def entity return_request_line { attributes: [ def attribute line_id { type: text, isKey: true } ] }
                 """.trimIndent(),
             )
             val r = reconcile(root)
@@ -187,7 +188,11 @@ class AutomationModelSpec :
                     .single()
             storage.writable shouldContainExactly listOf("order.state", "return_request_line", "acme_*")
             val state =
-                (r.model.schemas.getValue("er") as ErSchema).entities.values.single().attributes.single {
+                (
+                    r.model.schemas.getValue(
+                        "er",
+                    ) as ErSchema
+                ).entities.values.single { it.qname.name == "order" }.attributes.single {
                     it.qname.name ==
                         "order.state"
                 }
@@ -203,6 +208,152 @@ class AutomationModelSpec :
             obligation.attributes.single { it.qname.name == "obligation.state" }.states shouldContainExactly
                 listOf("open", "fulfilled", "overdue", "cancelled", "reopened")
             entities.values.map { it.qname.name }.containsAll(listOf("state_history", "approvals")) shouldBe true
+        }
+
+        // ----- review-114 -----
+
+        fun project(vararg files: Pair<String, String>): ReconciliationResult {
+            val root = Files.createTempDirectory("au-review")
+            for ((rel, content) in files) {
+                val p = root.resolve(rel)
+                Files.createDirectories(p.parent)
+                Files.writeString(p, content.trimIndent())
+            }
+            return reconcile(root)
+        }
+
+        val automationFile =
+            "acme/automation/a.ttrm" to
+                """
+                package acme.automation
+                model automation
+                def program p { recipe: r, port: none, mode: batch }
+                def role ops { resolve: keycloak_group "ops" }
+                """
+
+        "M4: a malformed grant is dropped with a load error — it never widens" {
+            val r =
+                project(
+                    automationFile,
+                    "acme/worlds/w.ttrm" to
+                        """
+                        package acme.worlds
+                        model world
+                        def world w {
+                            def grant { who: role.ops, program: "release", as: author }
+                            def grant { who: role.ops, as: author }
+                            def grant { who: user.jan.novak, program: *, as: author }
+                            def grant { who: *, program: "*", as: author }
+                            def grant { who: user "jan-novak@x", program: p, as: author }
+                        }
+                        """,
+                )
+            val world = (r.model.schemas.getValue("world") as WorldSchema).worlds.values.single()
+            world.grants.map { it.who } shouldContainExactly
+                listOf(GrantWho.User("jan.novak"), GrantWho.Anyone, GrantWho.User("jan-novak@x"))
+            world.grants.map { it.anyProgram } shouldContainExactly listOf(true, true, false)
+            r.errors.count { it.message.startsWith("ttr/automation-grant-dropped") } shouldBe 2
+        }
+
+        "M4: a deployment with a non-boolean flag is dropped with a load error" {
+            val r =
+                project(
+                    automationFile,
+                    "acme/worlds/w.ttrm" to
+                        """
+                        package acme.worlds
+                        model world
+                        def world w {
+                            def deployment off  { program: p, target: native, run_as: caller, enabled: "false" }
+                            def deployment dry  { program: p, target: native, run_as: caller, dry_run: "true" }
+                            def deployment obo  { program: p, target: native, run_as: caller, obo_only: "true" }
+                            def deployment good { program: p, target: native, run_as: caller }
+                        }
+                        """,
+                )
+            val world = (r.model.schemas.getValue("world") as WorldSchema).worlds.values.single()
+            world.deployments.map { it.qname.name } shouldContainExactly listOf("good")
+            world.deployment("good")!!.enabled shouldBe true
+            r.errors.count { it.message.startsWith("ttr/automation-deployment-dropped") } shouldBe 3
+            // the validator's reasons are on the load path too
+            r.errors.count {
+                it.sourceId == "automation-validator" &&
+                    it.message.startsWith("ttr/automation-invalid-value")
+            } shouldBe
+                3
+        }
+
+        "M4: automation validation errors are load errors" {
+            val r =
+                project(
+                    automationFile,
+                    "acme/automation/b.ttrm" to
+                        """
+                        package acme.automation
+                        model automation
+                        def program q { recipe: r, port: event, event: schema.nope, mode: on_event }
+                        """,
+                )
+            r.errors.map { it.message.substringBefore(':') } shouldContainExactly
+                listOf("ttr/automation-event-not-schema")
+        }
+
+        "M6: two sources with `model automation` get the stdlib once; an ER package named `plant.automation` none" {
+            fun source(
+                id: String,
+                pkg: String,
+            ): org.tatrman.ttr.metadata.source.SourceSnapshot {
+                val root = Files.createTempDirectory("au-src")
+                val dir = root.resolve(pkg.replace('.', '/'))
+                Files.createDirectories(dir)
+                Files.writeString(
+                    dir.resolve("a.ttrm"),
+                    "package $pkg\nmodel automation\ndef parameter t_$id { type: int, value: 1 }",
+                )
+                return FileBasedSource(id, 100, LocalFsStorage(id = id, rootPath = root)).load()
+            }
+            val two =
+                ModelReconciler(ModelDescriptor(id = "d", name = "d"))
+                    .reconcile(listOf(source("a", "x.automation"), source("b", "y.automation")))
+            two.errors shouldBe emptyList()
+            (two.model.schemas.getValue("er") as ErSchema).entities.keys.count { it.name == "obligation" } shouldBe 1
+
+            val er =
+                project(
+                    "plant/automation/m.ttrm" to
+                        """
+                        package plant.automation
+                        model er
+                        def entity machine { attributes: [ def attribute id { type: text, isKey: true } ] }
+                        """,
+                )
+            (er.model.schemas.getValue("er") as ErSchema).entities.keys.none { it.name == "obligation" } shouldBe true
+        }
+
+        "B1: a package segment named `automation` stays a package" {
+            org.tatrman.ttr.metadata.source.Reference
+                .toQname("plant.automation.order.state", "db", "dbo") shouldBe
+                FileBasedSource.qname("plant", "automation", "order.state")
+            val r =
+                project(
+                    "hartland/automation/events.ttrm" to
+                        """
+                        package hartland.automation
+                        model automation
+                        def schema line_received { columns: [def column line_id { type: text }] }
+                        def program on_line { recipe: r, port: event, event: schema.line_received, mode: on_event }
+                        """,
+                    "hartland/x/e.ttrm" to
+                        """
+                        package hartland.x
+                        import hartland.automation.*
+                        model er
+                        def entity e { attributes: [ def attribute id { type: text, isKey: true } ] }
+                        """,
+                )
+            r.errors shouldBe emptyList()
+            r.warnings.none { it.message.contains("unimported") || it.message.contains("unresolved") } shouldBe true
+            r.model.rowSchemas.keys shouldContainExactly listOf("hartland.automation.line_received")
         }
     })
 

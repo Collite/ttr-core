@@ -1,0 +1,6 @@
+// expect: ttr/automation-invalid-value ×2 — a negative and a fractional duration.
+package acme.automation
+model automation
+
+def action a1 { columns: [def column order { type: order.order_number }], sinks: { native: task }, due: -1 days }
+def action a2 { columns: [def column order { type: order.order_number }], sinks: { native: task }, due: 1.5 days }
