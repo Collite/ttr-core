@@ -1409,6 +1409,8 @@ export interface AutoEntry {
   key: string;
   value: AutoValue;
   source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
 }
 
 /** `transition: order.state -> released { from: [placed, held] }` / `-> {to}`. */
@@ -1422,6 +1424,8 @@ export interface AutoTransition {
   /** The `{ from: … }` guard (empty = no guard). */
   from: string[];
   source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
 }
 
 /** `set: order.held_for = department`. */
@@ -1429,6 +1433,8 @@ export interface AutoSet {
   attribute: string;
   column: string;
   source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
 }
 
 /** The shared automation body: typed common fields + the ordered free-form entries. */
