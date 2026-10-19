@@ -20,7 +20,9 @@ import org.tatrman.translator.framework.ModelRelation
  *     ⋈ kp` still resolves `kp ↔ dm` (contracts §2 amendment C-1, review-097 R1);
  *  3. exactly one remaining candidate → [Verdict.Resolved]; none → [Verdict.NoRelation]; two or more →
  *     [Verdict.Ambiguous]. No proximity tie-break — deterministic on (statement, model) only;
- *  4. a resolved relation with no `joinPairs` → [Verdict.WithoutPairs] (FK-bound; JoinerPhysical may fill it);
+ *  4. a resolved relation with no `joinPairs` → [Verdict.WithoutPairs] (FK-bound; JoinerPhysical may fill it),
+ *     unless a side is an entity stacked on a query JoinerPhysical cannot see a table through: then its pairs are
+ *     read from the FK through the column bindings ([RelationPairs.behindOpaqueSide], ttr-core#204);
  *  5. [Verdict.Resolved.pairs] carries ALL pairs (composite relations AND them), each already oriented
  *     left/right and reduced to the bare attribute name.
  *
@@ -104,10 +106,15 @@ object JoinPolicy {
             candidates.size > 1 -> Verdict.Ambiguous(leftNames, rightNames, candidates, emptySet())
             else -> {
                 val c = candidates.single()
-                if (c.relation.joinPairs.isEmpty()) {
+                // ttr-core#204 — an FK-only relation to a side the physical stage cannot see a table through is
+                // decided here, from the FK read through the column bindings; elsewhere it stays with the FK.
+                val relation =
+                    RelationPairs.behindOpaqueSide(model, c.relation)?.let { c.relation.copy(joinPairs = it) }
+                        ?: c.relation
+                if (relation.joinPairs.isEmpty()) {
                     Verdict.WithoutPairs(c.left, c.right, c.relation)
                 } else {
-                    Verdict.Resolved(c.left, c.right, c.relation, orientedPairs(c.relation, c.left.entity))
+                    Verdict.Resolved(c.left, c.right, relation, orientedPairs(relation, c.left.entity))
                 }
             }
         }

@@ -119,7 +119,20 @@ object JoinerPhysical {
 
         val left = collectTableScans(join.left)
         val right = collectTableScans(join.right)
-        if (left.isEmpty() || right.isEmpty()) return withChildren
+        if (left.isEmpty() || right.isEmpty()) {
+            // ttr-core#204 — a side that reaches its tables only through something other than Join / Filter /
+            // Project (an Aggregate: an entity stacked on a GROUP BY query) has no table to match an FK against.
+            // Reported with that side empty ("a derived table"); JoinerWarnings.merge keeps it only where the
+            // logical stage left the join to its FK, so it is never silently a Cartesian product.
+            warnings +=
+                JoinerWarning.NoRelation(
+                    left.firstOrNull()?.entity ?: QualifiedName.getDefaultInstance(),
+                    right.firstOrNull()?.entity ?: QualifiedName.getDefaultInstance(),
+                    left.map { it.entity },
+                    right.map { it.entity },
+                )
+            return withChildren
+        }
         val leftTables = left.map { it.entity }
         val rightTables = right.map { it.entity }
 

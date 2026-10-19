@@ -97,7 +97,7 @@ def relation shopper_revenue_household {
 - Entities can stack on queries over other stacked entities; a cycle is an error.
 - **Column rules do not reach through the query.** A column rule (`deny` or `mask`) on a column of an entity the body reads does not apply to the stacked entity, not even to an attribute computed from that column: with `sale.revenue` masked, `total_revenue` above is still served unmasked. A column rule sees the stacked entity as an ordinary entity, so put the rule on the stacked entity's attribute too. Row-level policies do reach through (below).
 
-Everything above the model sees a stacked entity as an ordinary entity — its roles, name attribute, aliases and relations work unchanged, and an agent asks over `shopper_revenue` without knowing a query is behind it. A logical query is read through its entity, never run on its own: an agent asks the stacked entity, not the query. Another saved query can read it by name, though ([below](#reading-another-saved-query)). The runtime inlines the query's body where the entity is read — there is no view and no materialized copy — so row-level policies on the entities the body reads still apply to a question asked through the stacked entity, as does a policy on the stacked entity itself.
+Everything above the model sees a stacked entity as an ordinary entity — its roles, name attribute, aliases and relations work unchanged, and an agent asks over `shopper_revenue` without knowing a query is behind it. An agent asks the stacked entity, not the logical query: a logical query is not itself an agent's pattern. Another saved query can read it by name ([below](#reading-another-saved-query)), and a program can run it on its own ([Running a saved query by name](#running-a-saved-query-by-name)). The runtime inlines the query's body where the entity is read — there is no view and no materialized copy — so row-level policies on the entities the body reads still apply to a question asked through the stacked entity, as does a policy on the stacked entity itself.
 
 A complete, loadable example — the tables, the entities and relations, the logical query and the entity stacked on it — is [`samples/2.1/logical-query`](../../../samples/2.1/logical-query/).
 
@@ -128,7 +128,7 @@ The name is `obj.<namespace>.<name>`:
 
 Its columns are the read query's output columns, with their types: `r.revenue` above is the `SUM(…) AS revenue` of `shopper_revenue`, a decimal.
 
-**Inlined when parsed.** When the metadata service parses the reader, it inlines the body of the query it reads, and the reader's stored plan carries that body. At run time nothing looks a saved query up: the translator, the row-level policies and an entity stacked on the reader all see an ordinary plan, whose scans are the scans of the inlined body. So a policy on `sale` applies to `big_shoppers` just as it does to `shopper_revenue`. The service parses the whole model again for each new version, so a change to `shopper_revenue` reaches `big_shoppers` at the next load.
+**Inlined, from the stored plan.** When the metadata service parses the reader, it inlines the body of the query it reads, and the reader's stored plan carries that body. When the reader's **text** is run (an agent's pattern, or SQL a program sends), the translator fills `obj.*` in the same way, from the stored plans of the queries the service has parsed. Either way the translator, the row-level policies and an entity stacked on the reader all see an ordinary plan, whose scans are the scans of the inlined body. So a policy on `sale` applies to `big_shoppers` just as it does to `shopper_revenue`. The service parses the whole model again for each new version, so a change to `shopper_revenue` reaches `big_shoppers` at the next load.
 
 **Lanes are checked after inlining.** A reference does not let a body cross lanes. A logical query may read a logical query, and a db query may read a db query. A logical query that reads a db query reads that query's tables, and is refused `lane_mismatch`, naming them. The same holds the other way round.
 
@@ -140,9 +140,43 @@ Its columns are the read query's output columns, with their types: `r.revenue` a
 - the query it reads declares parameters (`saved_query_parameters`). A body cannot pass values to the query it reads, so a parametrized query can only be run on its own. Logical queries take no parameters, so this concerns db queries only;
 - it is on a reference cycle, such as `a` reads `b` and `b` reads `a` (`query_reference_cycle`). Every query on the cycle is refused, and the message names the path.
 
-Questions asked at run time do not name saved queries. An agent asks the entity stacked on one. The editor does not yet resolve `obj.*` names inside a query's `sourceText`, so go-to-definition does not follow them.
+Any SQL run against the model may name a saved query this way, not only a saved query's body. The read query's tables are secured like any others. An agent still asks the entity stacked on a logical query, because the agent is told about entities. The editor does not yet resolve `obj.*` names inside a query's `sourceText`, so go-to-definition does not follow them.
 
-> Reading another saved query needs `ttr-translator` 0.12.1 or later, and a metadata service that parses saved queries in reference order and serves the earlier ones under `obj`. A service that does not reports the reference as `Object '<name>' not found within 'obj.query'`.
+### The read query is a temporary entity
+
+When a logical query reads another logical query, the read query is a **temporary entity**, just as the result of an SQL query is a temporary table. Its attributes are its output columns, and **its relations follow its columns**. A column that passes an entity's attribute through unchanged keeps that attribute's relations. The column can be selected as is, renamed, or used as a `GROUP BY` key. So a bare `JOIN` to the read query is conditioned like a join between two entities:
+
+```sql
+SELECT household.buy_potential, SUM(r.revenue) AS revenue
+FROM obj.query.shopper_revenue r JOIN household
+GROUP BY household.buy_potential
+```
+
+`shopper_revenue` groups by `shopper.current_household`, so `r.current_household` keeps the relation from `shopper` to `household`. The join becomes `r.current_household = household.household_id`.
+
+- **A relation is inherited only whole.** Every attribute it joins on, on that entity's side, must be passed through. One that is not passed through, or is passed through twice, inherits nothing.
+- **Relations bound to a foreign key are inherited too.** For a relation with `binding: { fk: … }` and no `join:` list, the attribute pairs are read from the key through both entities' bindings.
+- **Passing an entity's key through relates the read query to that entity.** `shopper_revenue` passes `shopper.shopper_id` through, so `FROM obj.query.shopper_revenue r JOIN shopper` joins on `r.shopper_id = shopper.shopper_id`.
+- **An aggregate or a computed column carries no relation.** `r.revenue` relates to nothing.
+- **Two possible relations are never guessed.** If two relations could join the sides, or none can, the join is not conditioned. It is reported (`JOIN_NO_RELATION`), and the metadata service refuses a saved query that contains such a join.
+- **Only the bare `JOIN` is conditioned this way.** A comma list or a `CROSS JOIN` with a read query stays unconditioned and is reported, as with any derived table. Write the `ON` there.
+- **A db query read by name stays a derived table.** Its joins are its author's SQL.
+
+The same reading of foreign keys conditions a join to an entity stacked on a query that groups its rows. For example, take a relation bound to a foreign key, between `sale` and an entity stacked on a query grouped by `shopper_id`. The join is conditioned on `shopper_id`. If no pair can be read, the join is reported at WARNING, never silently left a Cartesian product.
+
+> Reading another saved query needs `ttr-translator` 0.12.1 or later, and a metadata service that parses saved queries in reference order and serves the earlier ones under `obj`. A service that does not reports the reference as `Object '<name>' not found within 'obj.query'`. Running a reader's text needs a translate service that serves parsed saved queries under `obj` at run time. Temporary entities need `ttr-translator` 0.12.4.
+
+## Running a saved query by name
+
+A program can run any parsed saved query, logical or db, by its name. This covers an automation agent, a workflow, or a front end. The query service's `RunSavedQuery` takes the query's qualified name (`er.query.shopper_revenue`, `db.dbo.store_revenue`), the caller's context with any parameters bound by name, and an optional row window. It streams the rows back as `Run` does.
+
+- **It runs the stored plan.** The query's text is not parsed again, and a query it reads is already inlined.
+- **It is secured like any other run.** A logical query is mapped to tables as any question over entities is. The caller's roles, row-level policies and the row window apply exactly as for SQL the caller sends.
+- **Refusals carry codes.**
+  - `saved_query_not_found`: no saved query has that name.
+  - `saved_query_pending`: the query is still being parsed; retry shortly.
+  - `saved_query_parse_failed`: the query failed to parse; its own failure is carried along.
+  - `parameter_unbound`: a declared parameter has no value in the context.
 
 ## Procedures
 

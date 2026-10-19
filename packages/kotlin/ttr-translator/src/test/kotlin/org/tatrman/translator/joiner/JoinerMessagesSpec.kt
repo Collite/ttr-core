@@ -4,6 +4,7 @@ package org.tatrman.translator.joiner
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import org.tatrman.plan.v1.PlanNode
+import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.translator.framework.HartlandJoinModel
 import org.tatrman.translator.framework.HartlandJoinModel.er
 import org.tatrman.translator.framework.ModelRelation
@@ -136,5 +137,27 @@ class JoinerMessagesSpec :
             val logical = JoinerResult(plan, listOf(noRel), listOf(JoinOutcome(listOf(0, 0), noRel)))
             val physical = JoinerResult(plan, listOf(noFk), listOf(JoinOutcome(listOf(0, 1), noFk)))
             JoinerWarnings.merge(logical, physical) shouldBe listOf(noRel, noFk)
+        }
+
+        // ttr-core#204 — the physical carrier's "a side I cannot see a table through" (that side empty).
+        val blind =
+            JoinerWarning.NoRelation(
+                HartlandJoinModel.db("A"),
+                QualifiedName.getDefaultInstance(),
+                listOf(HartlandJoinModel.db("A")),
+                emptyList(),
+            )
+
+        "merge: left to its FK, and the physical carrier could not see into a side → the WARNING, not INFO" {
+            val logical = JoinerResult(plan, listOf(withoutPairs), listOf(JoinOutcome(listOf(0), withoutPairs)))
+            val physical = JoinerResult(plan, listOf(blind), listOf(JoinOutcome(listOf(0), blind)))
+            JoinerWarnings.merge(logical, physical) shouldBe listOf(blind)
+        }
+
+        "merge: a blind side anywhere else is not reported (a pure-DB derived table, a logical warning)" {
+            val physical = JoinerResult(plan, listOf(blind), listOf(JoinOutcome(listOf(0), blind)))
+            JoinerWarnings.merge(JoinerResult(plan), physical) shouldBe emptyList()
+            val logical = JoinerResult(plan, listOf(noRel), listOf(JoinOutcome(listOf(0), noRel)))
+            JoinerWarnings.merge(logical, physical) shouldBe listOf(noRel)
         }
     })

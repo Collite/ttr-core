@@ -22,6 +22,31 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   `days(n)` / `days(:p)` are durations. A world's automation executors (`extends: n8n_l1`, …) no longer fail the
   TTR-P world binding (`TTRP-WLD-005`).
 
+- **`ttr-translator`** ⚑ **stackable queries: a logical query read by another is a temporary entity** (LQ-T6, L-30).
+  In a logical body, `FROM obj.query.x r` (a logical query served under OBJ, as a metadata worker and now the
+  translate service serve them) is a side of a bare `JOIN` like an entity. Its attributes are the query's output
+  columns, and **its relations follow its columns**:
+  - a column that passes an entity attribute through unchanged (as is, renamed, or a `GROUP BY` key) keeps that
+    attribute's relations; a relation is inherited when every one of its attributes on that side is passed through;
+  - a relation bound only to its foreign key (no `join:` pairs) is inherited too: its pairs are read from the FK
+    through both entities' column bindings (a query-bound entity's through that query's column lineage);
+  - a column passing all of an entity's key attributes through relates the temporary entity to that entity on them
+    (`FROM obj.query.top_customers t JOIN customer`);
+  - an aggregate or computed column carries none.
+
+  So `SELECT shopper.last_name, r.revenue FROM obj.query.shopper_spend r JOIN shopper` is conditioned
+  `r.shopper_id = shopper.shopper_id`; it was `ON TRUE`, a Cartesian product with `JOIN_NO_RELATION`. Two candidate
+  relations stay unconditioned and warned, never a guess. Only the bare `JOIN` is decided this way: the comma list and
+  `CROSS JOIN` reach the wire carrier after UNFOLD has inlined the body, and stay `JOIN_NO_RELATION` as a derived
+  table does. A db query read by name stays a derived table. New internals: `ColumnLineage` (Calcite column origins
+  over a stored plan), `RelationPairs`, `TemporaryEntity`; no public signature changed.
+- **`ttr-translator`** — an FK-only relation to an entity stacked on a query whose tables sit behind an `Aggregate`
+  (ttr-core#204) is conditioned. `JoinPolicy` reads its pairs from the FK through the column bindings, where
+  `JoinerPhysical` could find no table to match the FK against and left the join a Cartesian product with only the
+  INFO `JOIN_RELATION_WITHOUT_PAIRS`. When no pairs can be read (the FK column is not a group key), the join is now
+  `JOIN_NO_RELATION` at WARNING, with that side rendered as a derived table, instead of silent. Everywhere else an
+  FK-only join is decided exactly as before: hartland, the investment model and the veles fixtures give byte-identical
+  stored plans, warnings and SQL.
 - **Grammar 0.15 → 0.16 — the automation model (AU-core-P0 · S0.2; `ttr-parser`, `ttr-writer`, `ttr-semantics`,
   `ttr-metadata`, the TS and Python parsers).** `model automation` with `def parameter` · `action` · `service` ·
   `approval` · `program` · `recipe` (one permissive body: typed properties first, then free-form entries whose

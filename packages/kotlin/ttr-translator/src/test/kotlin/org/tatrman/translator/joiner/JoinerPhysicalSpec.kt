@@ -310,7 +310,10 @@ class JoinerPhysicalSpec :
             eqNames(cond.function.operandsList[1]) shouldBe ("rok" to "rok")
         }
 
-        "narrowed descent: an Aggregate under a join side is not looked into — untouched, no warning" {
+        // ttr-core#204: it was silent here, so an FK-only join to an entity stacked on a GROUP BY query was served as a
+        // Cartesian product. The side is reported as a derived table; JoinerWarnings.merge surfaces it only where the
+        // logical carrier left the join to its FK (JoinerMessagesSpec, merge).
+        "narrowed descent: an Aggregate under a join side is not looked into — untouched, reported as a derived table" {
             val model = InMemoryModelHandle(tables = emptyList(), foreignKeys = listOf(customerToOrdersFk))
             val aggregated =
                 PlanNode
@@ -322,7 +325,9 @@ class JoinerPhysicalSpec :
                     ).build()
             val result = JoinerPhysical.apply(unconditionedJoin(dbScan(tableQname("customers")), aggregated), model)
             result.plan.join.hasCondition() shouldBe false
-            result.warnings.shouldBeEmpty()
+            val warning = result.warnings.single().shouldBeInstanceOf<JoinerWarning.NoRelation>()
+            warning.leftEntities shouldBe listOf(tableQname("customers"))
+            warning.rightEntities shouldBe emptyList()
         }
 
         "no FK: the warning carries the full side lists" {
