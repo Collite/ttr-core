@@ -1,5 +1,5 @@
-// Two recipe blocks in one document. It PARSES (two RecipeDecls) — refusing it is the S1.1 checker's
-// TTRP-REC-000 ("one recipe per file"), a semantic rule, not a syntax error.
+// Two recipe blocks in one document. It PARSES (two RecipeDecls); the second is TTRP-REC-000 ("one recipe
+// per file") — a parse-time check (AU-core-P1), since a second recipe stops the compile.
 uses world "hartland.worlds.demo"
 
 recipe {

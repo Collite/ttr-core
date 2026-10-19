@@ -109,6 +109,12 @@ class TtrpChecker(
          * Display node; the emitters project the display's rows to it.
          */
         val displaySchemas: Map<org.tatrman.ttrp.ast.SourceLocation, DisplaySchema> = emptyMap(),
+        /**
+         * AU-core-P1: the row schema every `load(...)` resolved to, keyed by the load **op**'s location (= the graph's
+         * Load node location) — model objects, stdlib entities and a recipe's own verdict entities alike. The recipe
+         * checker infers its rows from these.
+         */
+        val loadSchemas: Map<org.tatrman.ttrp.ast.SourceLocation, List<Column>> = emptyMap(),
     ) {
         val errors: List<TtrpDiagnostic> get() = diagnostics.filter { it.severity == Severity.ERROR }
     }
@@ -132,8 +138,10 @@ class TtrpChecker(
         diags += parsed.diagnostics
         // TTR-B action sentences become container OUT ports + program-level display wiring (AG B4).
         val doc =
-            org.tatrman.ttrp.dialect.b.FragmentActionWiring
-                .apply(parsed.document)
+            org.tatrman.ttrp.recipe.LdForms.desugar(
+                org.tatrman.ttrp.dialect.b.FragmentActionWiring
+                    .apply(parsed.document),
+            )
 
         // ---- world selection + resolution (WLD) ----
         val pin = doc.statements.filterIsInstance<UsesWorld>().firstOrNull()
@@ -167,7 +175,19 @@ class TtrpChecker(
         val rewrites = mutableListOf<ErRewrite>()
         val varSchema = mutableMapOf<String, List<Column>?>()
         val schemasByScope = mutableMapOf<String, MutableMap<String, List<Column>?>>()
-        val ctx = Ctx(world, imports, programSchemas, varSchema, schemasByScope, rewrites, diags)
+        val ctx =
+            Ctx(
+                world,
+                imports,
+                programSchemas,
+                varSchema,
+                schemasByScope,
+                rewrites,
+                diags,
+                recipeEntities =
+                    org.tatrman.ttrp.recipe.RecipeCatalog
+                        .ownEntities(doc, fileName, modelIndex),
+            )
 
         // ---- resolution + dataflow pass ----
         for (stmt in doc.statements) {
@@ -175,6 +195,12 @@ class TtrpChecker(
                 is ContainerDecl -> resolveContainer(stmt, ctx)
                 is Assignment -> assign(stmt.target, stmt.chain.elements, ctx, scope = "")
                 is ChainStmt -> evalChain(stmt.chain.elements, ctx, varSchema)
+                // AU-core-P1: a recipe's `target` role containers and its decision resolve like containers (the
+                // decision as a canonical body on the candidates' engine — its placement is the P2 compile's).
+                is org.tatrman.ttrp.ast.RecipeDecl ->
+                    org.tatrman.ttrp.recipe.RecipeContainers
+                        .of(stmt)
+                        .forEach { resolveContainer(it, ctx) }
                 else -> Unit
             }
         }
@@ -226,6 +252,7 @@ class TtrpChecker(
             memberFingerprint = snapshot?.fingerprint,
             loadSources = ctx.loadSources.toMap(),
             displaySchemas = displaySchemas,
+            loadSchemas = ctx.loadSchemas.toMap(),
         )
     }
 
@@ -253,9 +280,17 @@ class TtrpChecker(
         val inPortFeeds: Map<Pair<String, String>, Pair<String, String>> = emptyMap(),
         /** Display pass: every `display(...)` op met, with the row type flowing into it (null = unknown). */
         val displaySites: MutableList<DisplaySite>? = null,
+        /**
+         * AU-core-P1: the entities the document's recipe generates (`<recipe>_verdict`, …) — a recipe may read its
+         * own past verdicts before the P2 compile has written their catalog. Name → columns.
+         */
+        val recipeEntities: Map<String, List<Column>> = emptyMap(),
     ) {
         /** AG-P0: load-op location → the model object's physical source (see [Report.loadSources]). */
         val loadSources = LinkedHashMap<org.tatrman.ttrp.ast.SourceLocation, LoadSource>()
+
+        /** AU-core-P1: load-op location → the resolved row schema (see [Report.loadSchemas]). */
+        val loadSchemas = LinkedHashMap<org.tatrman.ttrp.ast.SourceLocation, List<Column>>()
 
         /** Record a name→schema binding both in the flat resolution map and its scope partition. */
         fun bindSchema(
@@ -405,7 +440,7 @@ class TtrpChecker(
         scope: MutableMap<String, List<Column>?>,
     ): List<Column>? =
         when (op.name) {
-            "load" -> resolveLoad(op, ctx, scope)
+            "load" -> resolveLoad(op, ctx, scope).also { cols -> if (cols != null) ctx.loadSchemas[op.location] = cols }
             "store" -> {
                 resolveStore(op, ctx)
                 null
@@ -570,6 +605,30 @@ class TtrpChecker(
             }
         }
 
+        // `er.entity.<name>` — the TTR-M reference spelling (the recipes', AU 17): the er entity named <name> the
+        // imports bring into scope, no package path needed (AU-core-P1).
+        if (parts.size == 3 && parts[0] == "er" && parts[1] == "entity") {
+            ctx.recipeEntities[parts[2]]?.let { return it }
+            // The automation stdlib (`obligation`, `state_history`, `approvals`) needs no import (a prelude).
+            val entities =
+                (modelIndex?.findEntities(parts[2], ctx.imports) ?: emptyList())
+                    .ifEmpty { modelIndex?.findStdlibEntities(parts[2]) ?: emptyList() }
+            when {
+                entities.size == 1 -> return loadModelObject(entities[0], loc, ctx, op.location)
+                entities.size > 1 ->
+                    ctx.diags +=
+                        diag(
+                            TtrpDiagnosticId.RES_002,
+                            "`${parts.joinToString(".")}` is ambiguous — ${entities.size} imported packages define it",
+                            loc,
+                        )
+                else ->
+                    ctx.diags +=
+                        diag(TtrpDiagnosticId.RES_001, "no er entity `${parts[2]}` in the imported packages", loc)
+            }
+            return null
+        }
+
         // Dotted head.member.
         val head = parts[0]
         val member = parts.drop(1).joinToString(".")
@@ -610,13 +669,16 @@ class TtrpChecker(
                 // er entity → db table via er2db (E-d early rewrite, mandatory provenance).
                 val binding = modelIndex!!.erToDb(obj.qname)
                 if (binding.dbQname == null) {
-                    ctx.diags +=
-                        diag(
-                            TtrpDiagnosticId.RES_005,
-                            "entity `${obj.qname.namespace}.${obj.qname.name}` has no er2db binding reachable" +
-                                (ctx.world?.let { " in world `${it.qname.`package`}.${it.qname.name}`" } ?: ""),
-                            loc,
-                        )
+                    // A stdlib entity is bound by the deploying world's automation storage, never by er2db.
+                    if (!modelIndex.isAutomationStdlib(obj)) {
+                        ctx.diags +=
+                            diag(
+                                TtrpDiagnosticId.RES_005,
+                                "entity `${obj.qname.namespace}.${obj.qname.name}` has no er2db binding reachable" +
+                                    (ctx.world?.let { " in world `${it.qname.`package`}.${it.qname.name}`" } ?: ""),
+                                loc,
+                            )
+                    }
                 } else {
                     ctx.rewrites +=
                         ErRewrite(

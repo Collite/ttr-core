@@ -135,6 +135,67 @@ class ModelIndex(
         imports: List<ImportScope>,
     ): Entity? = objects.filterIsInstance<Entity>().firstOrNull { it.qname.name == name && inScope(it, imports) }
 
+    /** Every er entity named [name], whatever its package (the recipe key's entity — `key:` names no import). */
+    fun entitiesNamed(name: String): List<Entity> = objects.filterIsInstance<Entity>().filter { it.qname.name == name }
+
+    /** Every er entity named [name] the imports bring into scope (an `er.entity.<name>` load). */
+    fun findEntities(
+        name: String,
+        imports: List<ImportScope>,
+    ): List<Entity> = objects.filterIsInstance<Entity>().filter { it.qname.name == name && inScope(it, imports) }
+
+    /**
+     * The automation stdlib's entity named [name] (`obligation`, `state_history`, `approvals` — ttr-metadata adds
+     * them, package `automation`, to a project that declares `model automation`). Recipes read them without an
+     * import, as a prelude; a project's own entity of the name, when imported, is found first.
+     */
+    fun findStdlibEntities(name: String): List<Entity> =
+        objects.filterIsInstance<Entity>().filter { it.qname.name == name && isAutomationStdlib(it) }
+
+    /** True for an object of the automation stdlib (its synthetic source root, ttr-metadata `stdlibSnapshot`). */
+    fun isAutomationStdlib(obj: ModelObject): Boolean = obj.sourceFile.startsWith(STDLIB_ROOT)
+
+    /**
+     * The automation objects (`def parameter · action · service · role · approval · program`) the imports bring into
+     * scope — a recipe's `import <pkg>.automation.*` (AU-core-P1). Package by source path, as for loadable objects.
+     */
+    fun automationInScope(imports: List<ImportScope>): List<org.tatrman.ttr.metadata.model.AutomationObject> =
+        objects
+            .filterIsInstance<org.tatrman.ttr.metadata.model.AutomationObject>()
+            .filter { o -> imports.any { imp -> pathInPackage(o, imp.pkg) } }
+
+    /** Every automation object of the model, imported or not — a `def program` names its recipe, not the reverse. */
+    fun automationAll(): List<org.tatrman.ttr.metadata.model.AutomationObject> =
+        objects.filterIsInstance<org.tatrman.ttr.metadata.model.AutomationObject>()
+
+    /**
+     * The er entity named [name] as a recipe sees it (AU-core-P1): the imports' first, then the automation stdlib's
+     * (a prelude). Never another package's entity of the same name.
+     */
+    fun entityInScope(
+        name: String,
+        imports: List<ImportScope>,
+    ): Entity? = findEntities(name, imports).firstOrNull() ?: findStdlibEntities(name).firstOrNull()
+
+    /** The calendars of the model — entities with an attribute whose `semantics { role: event_date }` (D-82). */
+    fun calendars(): List<Entity> = objects.filterIsInstance<Entity>().filter { isCalendar(it) }
+
+    /** Every db foreign key (`def fk`): an sk's road to the calendar when a relation carries no `join:` pairs. */
+    fun foreignKeys(): List<org.tatrman.ttr.metadata.model.DbForeignKey> =
+        objects.filterIsInstance<org.tatrman.ttr.metadata.model.DbForeignKey>()
+
+    /** Every relation of the model. */
+    fun allRelations(): List<Relation> = objects.filterIsInstance<Relation>()
+
+    /** Every relation with [entity] at either end (AU-core-P1: an sk's road to the calendar). */
+    fun relationsOf(entity: Entity): List<Relation> =
+        objects.filterIsInstance<Relation>().filter {
+            it.fromEntity.name == entity.qname.name || it.toEntity.name == entity.qname.name
+        }
+
+    /** True for the calendar — an entity with an attribute whose `semantics { role: event_date }` (D-82). */
+    fun isCalendar(entity: Entity): Boolean = entity.attributes.any { it.semantics?.role == "event_date" }
+
     /** Relations in import scope by simple name. */
     fun findRelations(
         name: String,
@@ -155,6 +216,9 @@ class ModelIndex(
     fun attributesOf(entity: Entity): List<Attribute> = entity.attributes
 
     companion object {
+        /** Where ttr-metadata roots the automation stdlib's one source file. */
+        private const val STDLIB_ROOT = "/automation-stdlib/"
+
         /**
          * Parse `import erp.er.*` → ImportScope(pkg="erp", tier=ER). Last segment as a tier when it is a schema code —
          * except `automation`: a recipe's `import hartland.automation.*` names the PACKAGE that holds the actions and

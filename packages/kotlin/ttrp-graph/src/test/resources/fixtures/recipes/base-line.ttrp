@@ -1,0 +1,24 @@
+// The recipe-checker specs' positive control for a return-line recipe (AU-core-P1) — checks clean.
+uses world "hartland.worlds.demo"
+import hartland.*
+import hartland.automation.*
+
+recipe {
+    key: return_request_line.line_id
+
+    candidates received(out lines) target erp """sql
+        SELECT l.line_id, l.quantity FROM er.entity.return_request_line l WHERE l.state = 'received'
+    """
+
+    decision way(in lines) {
+        lines -> switch {
+            mode: exclusive
+            reject: quantity = 0    because: "nothing to return"
+            else:   none
+        }
+    }
+
+    actions {
+        way.reject -> set_state { line: line_id, to: rejected }
+    }
+}

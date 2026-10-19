@@ -3,6 +3,7 @@ package org.tatrman.ttrp.cli
 
 import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.tatrman.ttr.metadata.fixtures.MetadataFixtures
@@ -47,9 +48,44 @@ class ExplainCommandSpec :
             out shouldContain "TTRP-RES-006"
         }
 
-        // AU-core-P0 · S0.1 T6: a recipe document explains as its skeleton from the parse alone (no world,
-        // no models — the graph-backed recipe section is AU-core-P2's).
-        "explain of a recipe document prints the recipe skeleton" {
+        // AU-core-P0 · S0.1 T6: a recipe document explains as its skeleton; AU-core-P1 adds the checker's section,
+        // run against the model (the hartland fixture model of ttrp-graph's recipe-checker specs).
+        val recipeModel: java.nio.file.Path =
+            run {
+                val rel =
+                    java.nio.file.Path
+                        .of("packages/kotlin/ttrp-graph/src/test/resources/fixtures/recipes/model")
+                var dir: java.nio.file.Path? =
+                    java.nio.file.Path
+                        .of("")
+                        .toAbsolutePath()
+                while (dir != null) {
+                    if (Files.isDirectory(dir.resolve(rel))) return@run dir.resolve(rel)
+                    dir = dir.parent
+                }
+                error("could not locate the recipe fixture model")
+            }
+
+        "explain of a recipe document prints the skeleton and the checker's section" {
+            val recipes = resolutionRoot.parent.resolve("recipes")
+            val lines = mutableListOf<String>()
+            val code =
+                TtrpCli.runExplain(
+                    recipes.resolve("release_order.ttrp"),
+                    { lines += it },
+                    modelsRootOverride = recipeModel,
+                )
+            val out = lines.joinToString("\n")
+            withClue(out) { code shouldBe 0 }
+            out shouldContain
+                "decision   verdict(in orders, in shortfall, in price_differences, in overdue)  switch v  overlapping"
+            out shouldContain "verdict.release_confirmed -> ask { who, about, action, due, on_due: hold }"
+            out shouldContain "checker · mode per-candidate · programs morning_release, release_on_placement"
+            out shouldContain "context shortfall          canonical  per-candidate"
+            out shouldContain "routes (overlapping): hold_sales, hold_ar, release_confirmed, release"
+        }
+
+        "explain of a recipe whose front half fails prints the skeleton and says the checker did not run" {
             val recipes = resolutionRoot.parent.resolve("recipes")
             val lines = mutableListOf<String>()
             val code =
@@ -58,10 +94,17 @@ class ExplainCommandSpec :
                         it
                 })
             val out = lines.joinToString("\n")
-            withClue(out) { code shouldBe 0 }
-            out shouldContain
-                "decision   verdict(in orders, in shortfall, in price_differences, in overdue)  switch v  overlapping"
-            out shouldContain "verdict.release_confirmed -> ask { who, about, action, due, on_due: hold }"
+            code shouldBe 1
+            out shouldContain "recipe · key order.order_number"
+            out shouldContain "checker · not run"
+        }
+
+        "check of a recipe runs the recipe checker" {
+            val recipes = resolutionRoot.parent.resolve("recipes")
+            val lines = mutableListOf<String>()
+            TtrpCli.runCheck(recipes.resolve("settle.ttrp"), { lines += it }, modelsRootOverride = recipeModel) shouldBe
+                0
+            lines.shouldBeEmpty()
         }
 
         "explain of a malformed recipe exits nonzero with its diagnostics" {
