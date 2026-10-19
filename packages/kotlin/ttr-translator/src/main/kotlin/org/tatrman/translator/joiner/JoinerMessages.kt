@@ -97,13 +97,28 @@ object JoinerWarnings {
         logical: JoinerResult,
         physical: JoinerResult,
     ): List<JoinerWarning> {
+        // ttr-core#204 — the physical carrier reports a side it cannot see a table through as `NoRelation` with that
+        // side empty. That is news only where the logical carrier left the join to its FK (INFO,
+        // RelationWithoutJoinPairs); anywhere else the join was the logical carrier's to report, or a pure-DB
+        // statement's derived table, as before.
+        val leftToForeignKey =
+            logical.outcomes
+                .filter { it.warning is JoinerWarning.RelationWithoutJoinPairs }
+                .map { it.joinPath }
+                .toSet()
+        val physicalOutcomes =
+            physical.outcomes.filter { o ->
+                val w = o.warning
+                !(w is JoinerWarning.NoRelation && (w.leftEntities.isEmpty() || w.rightEntities.isEmpty())) ||
+                    o.joinPath in leftToForeignKey
+            }
         val conditionedByPhysical =
-            physical.outcomes
+            physicalOutcomes
                 .filter { it.warning == null }
                 .map { it.joinPath }
                 .toSet()
         val warnedByPhysical =
-            physical.outcomes
+            physicalOutcomes
                 .filter { it.warning != null }
                 .map { it.joinPath }
                 .toSet()
@@ -121,7 +136,7 @@ object JoinerWarnings {
                 .filter { it.warning != null && it.warning !is JoinerWarning.RelationWithoutJoinPairs }
                 .map { it.joinPath }
                 .toSet()
-        val keptPhysical = physical.outcomes.mapNotNull { o -> o.warning?.takeIf { o.joinPath !in decidedByLogical } }
+        val keptPhysical = physicalOutcomes.mapNotNull { o -> o.warning?.takeIf { o.joinPath !in decidedByLogical } }
         return keptLogical + keptPhysical
     }
 }
