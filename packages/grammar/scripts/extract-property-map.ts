@@ -108,6 +108,12 @@ const typeMap: Record<string, string> = {
   semantics: 'semantics block',
   lexicon: 'lexicon block',
   binding: 'binding block or reference',
+  // 0.16 — the automation body's typed alternatives (the free-form entries are not advertised).
+  transition: 'state transition',
+  set: 'assignment',
+  // 0.16 — attribute lifecycle (D-67).
+  states: 'list of identifiers',
+  transitions: 'state transition map',
 };
 
 const allKinds = [
@@ -130,7 +136,24 @@ const allKinds = [
   'er2cncRole',
   // 0.14 — named row schema (`def schema`): description / tags / columns.
   'schema',
+  // 0.16 — the automation model: six kinds sharing ONE body rule (`autoProperty`).
+  'parameter',
+  'action',
+  'service',
+  'approval',
+  'program',
+  'recipe',
 ];
+
+// 0.16 — kinds whose property rule is not `<kind>Property` (the automation kinds share `autoProperty`).
+const KIND_RULE: Record<string, string> = {
+  parameter: 'autoProperty',
+  action: 'autoProperty',
+  service: 'autoProperty',
+  approval: 'autoProperty',
+  program: 'autoProperty',
+  recipe: 'autoProperty',
+};
 
 const searchSubProperties = extractProps('searchSubProperty');
 
@@ -149,7 +172,7 @@ output += 'export interface PropertyInfo {\n  name: string;\n  type: string;\n}\
 
 output += 'export const PROPERTY_MAP: Record<DefinitionKind, PropertyInfo[]> = {\n';
 for (const kind of allKinds) {
-  const props = extractProps(`${kind}Property`);
+  const props = extractProps(KIND_RULE[kind] ?? `${kind}Property`);
   const infos = props.map((p) => `{ name: '${p}', type: '${typeMap[p] ?? 'unknown'}' }`);
   output += `  ${kind}: [${infos.join(', ')}],\n`;
 }

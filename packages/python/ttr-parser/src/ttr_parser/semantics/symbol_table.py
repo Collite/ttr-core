@@ -127,6 +127,10 @@ class SymbolTable:
                 [(e.name, "engine") for e in definition.engines]
                 + [(e.name, "executor") for e in definition.executors]
                 + [(s.name, "storage") for s in definition.storages]
+                # 0.16 — the named automation members (grants are unnamed: no symbol).
+                + [(m.name, "identity") for m in definition.identities if m.name is not None]
+                + [(m.name, "deployment") for m in definition.deployments if m.name is not None]
+                + [(pr.name, "process") for pr in definition.processes]
             )
             for member_name, member_kind in members:
                 mq = build_canonical_key(package, namespace, definition.kind, [definition.name, member_name])

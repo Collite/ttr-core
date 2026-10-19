@@ -19,10 +19,10 @@ import { namespaceForKind, modelForKind } from './default-schema.js';
 // the Kotlin/Python parity name stay stable.
 export { modelForKind };
 
-/** The model type / layer. `query` folds into `db`; `cnc` is schema-less; `world` is v4.1. */
-export type ModelCode = 'db' | 'er' | 'md' | 'binding' | 'cnc' | 'world';
+/** The model type / layer. `query` folds into `db`; `cnc` is schema-less; `world` is v4.1; `automation` is 0.16. */
+export type ModelCode = 'db' | 'er' | 'md' | 'binding' | 'cnc' | 'world' | 'automation';
 
-export const MODEL_CODES: ReadonlySet<ModelCode> = new Set(['db', 'er', 'md', 'binding', 'cnc', 'world']);
+export const MODEL_CODES: ReadonlySet<ModelCode> = new Set(['db', 'er', 'md', 'binding', 'cnc', 'world', 'automation']);
 
 /**
  * The uniform, package-first canonical key. `schema` and `kind` may be absent

@@ -51,7 +51,7 @@ def kind_segment(kind: str) -> str:
 # v4.0 uniform key (← `qname.ts` modelForKind / namespaceForKind / buildCanonicalKey)
 # ---------------------------------------------------------------------------
 
-MODEL_CODES: frozenset[str] = frozenset({"db", "er", "md", "binding", "cnc", "world"})
+MODEL_CODES: frozenset[str] = frozenset({"db", "er", "md", "binding", "cnc", "world", "automation"})
 
 _MODEL_BY_KIND: dict[str, str] = {
     "entity": "er",
@@ -77,6 +77,16 @@ _MODEL_BY_KIND: dict[str, str] = {
     "executor": "world",
     "storage": "world",
     "worldSchema": "world",
+    # 0.16 — the automation world members nest in a world; the automation kinds are `automation`.
+    "identity": "world",
+    "deployment": "world",
+    "process": "world",
+    "parameter": "automation",
+    "action": "automation",
+    "service": "automation",
+    "approval": "automation",
+    "program": "automation",
+    "recipe": "automation",
 }
 
 
@@ -87,6 +97,9 @@ def model_for_kind(kind: str, declaring_model: str = "") -> str:
     → `er` (LQ L-1). Mirrors TS `modelForKind`."""
     if kind == "query" and declaring_model == "er":
         return "er"
+    # 0.16 — a `def role` in a `model automation` file is an automation role, not a cnc role.
+    if kind == "role" and declaring_model == "automation":
+        return "automation"
     return _MODEL_BY_KIND.get(kind, "db")
 
 

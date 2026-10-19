@@ -1,0 +1,75 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "entity",
+            "name": "order",
+            "properties": {
+                "attributes": [
+                    {
+                        "description": null,
+                        "kind": "attribute",
+                        "name": "order_number",
+                        "properties": {
+                            "isKey": true,
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "attribute",
+                        "name": "state",
+                        "properties": {
+                            "states": [
+                                "placed",
+                                "held",
+                                "released",
+                                "cancelled"
+                            ],
+                            "transitions": {
+                                "held": [
+                                    "released",
+                                    "cancelled"
+                                ],
+                                "placed": [
+                                    "held",
+                                    "released",
+                                    "cancelled"
+                                ]
+                            },
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "attribute",
+                        "name": "stage",
+                        "properties": {
+                            "states": [
+                                "new",
+                                "done"
+                            ],
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    }
+                ]
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": "acme",
+    "schemaDirective": {
+        "code": "er",
+        "namespace": null
+    }
+}

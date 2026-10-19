@@ -219,7 +219,18 @@ data class AttributeDef(
     val domainRef: Reference? = null,
     /** MD (v3.1) — `aggregation:` on a dimension attribute (e.g. `name { aggregation: latestValid }`). */
     val aggregation: AggregationSpec? = null,
+    /** Grammar 0.16 — `states: [placed, held, …]`, the attribute's lifecycle states (D-67); empty when absent. */
+    val states: List<String> = emptyList(),
+    /** Grammar 0.16 — `transitions: { placed: [held, …] }` (D-67), in authored order; empty ⇒ any. */
+    val transitions: List<AttributeTransition> = emptyList(),
 ) : Definition
+
+/** Grammar 0.16 — one `from: [to, …]` entry of an attribute's `transitions:` map. */
+data class AttributeTransition(
+    val from: String,
+    val to: List<String>,
+    val source: SourceLocation,
+)
 
 /**
  * v4.4 lexicon surface (RG-P4, RS-9) — inline `lexicon { … }` sugar. The canonical
@@ -339,6 +350,11 @@ data class RoleDef(
     val label: LocalizedStringValue? = null,
     /** `search { keywords {...} patterns [...] ... }`. Empty when absent. */
     val search: SearchHintsValue = SearchHintsValue(),
+    /**
+     * Grammar 0.16 — an automation role's free-form properties (`resolve: keycloak_group "…"`,
+     * `delivery: { … }`, `members: [ … ]`), in authored order. Empty for a cnc role.
+     */
+    val entries: List<AutoEntry> = emptyList(),
 ) : Definition
 
 /** `def er2cnc_role <name> { entity: er.X, role: cnc.role.fact }`. */
@@ -695,6 +711,14 @@ data class WorldDef(
     val engines: List<EngineDef> = emptyList(),
     val executors: List<ExecutorDef> = emptyList(),
     val storages: List<StorageDef> = emptyList(),
+    /** Grammar 0.16 — `def identity <id> { principal, credential }` service principals (D-90). */
+    val identities: List<WorldAutoMember> = emptyList(),
+    /** Grammar 0.16 — unnamed `def grant { who, program, as }` (D-91), in authored order. */
+    val grants: List<WorldAutoMember> = emptyList(),
+    /** Grammar 0.16 — `def deployment <id> { program|process, target, run_as, trigger, … }` (D-107). */
+    val deployments: List<WorldAutoMember> = emptyList(),
+    /** Grammar 0.16 — `def process <id> { instance, steps: [ def step … ] }` (D-39, D-86). */
+    val processes: List<ProcessDef> = emptyList(),
 ) : Definition
 
 /** `def engine <id> { … }` inside a world (D-d-α). */
@@ -760,6 +784,174 @@ data class WorldSchemaField(
     val type: String,
     val source: SourceLocation,
 )
+
+// ============================ 0.16 automation model ============================
+// `model automation` (AU-core-P0 S0.2): six def kinds share ONE permissive body ([AutoBody]) —
+// typed common fields + an ordered free-form entry list; the automation world members
+// (identity / grant / deployment / process step) reuse it. Values are carried structurally;
+// their meaning (AU ttr-core contracts §2–§3) is validated in ttr-semantics, never here.
+
+/** A free-form automation value (`autoValue`). Lists and objects recurse through it. */
+sealed interface AutoValue {
+    val source: SourceLocation
+
+    /** A string literal; [triple] = written as a triple-quoted string (dedented). */
+    data class Str(
+        val raw: String,
+        val triple: Boolean,
+        override val source: SourceLocation,
+    ) : AutoValue
+
+    data class Num(
+        val raw: Double,
+        override val source: SourceLocation,
+    ) : AutoValue
+
+    data class Bool(
+        val raw: Boolean,
+        override val source: SourceLocation,
+    ) : AutoValue
+
+    data class Null(
+        override val source: SourceLocation,
+    ) : AutoValue
+
+    /** A bare or dotted id (`none`, `role.ops`, `schema.line_received`). */
+    data class Id(
+        val ref: Reference,
+        val parts: List<String>,
+        override val source: SourceLocation,
+    ) : AutoValue
+
+    /** `2 working_days` — the unit is validated in semantics. */
+    data class Duration(
+        val amount: Double,
+        val unit: String,
+        override val source: SourceLocation,
+    ) : AutoValue
+
+    /** `schedule "06:00 Europe/Prague"` · `keycloak_group "hartland-sales"`. */
+    data class Tagged(
+        val tag: String,
+        val value: String,
+        override val source: SourceLocation,
+    ) : AutoValue
+
+    /** `hold { order: order_number }` — a call-shaped value. */
+    data class Call(
+        val name: String,
+        val entries: List<AutoEntry>,
+        override val source: SourceLocation,
+    ) : AutoValue
+
+    /** `*` — any (`program: *`). */
+    data class Star(
+        override val source: SourceLocation,
+    ) : AutoValue
+
+    data class Obj(
+        val entries: List<AutoEntry>,
+        override val source: SourceLocation,
+    ) : AutoValue {
+        /** The last value written under [key] (a later duplicate wins, the dump's rule). */
+        operator fun get(key: String): AutoValue? = entries.lastOrNull { it.key == key }?.value
+    }
+
+    data class ListV(
+        val items: List<AutoValue>,
+        override val source: SourceLocation,
+    ) : AutoValue
+}
+
+data class AutoEntry(
+    val key: String,
+    val value: AutoValue,
+    val source: SourceLocation,
+)
+
+/** `transition: order.state -> released { from: [placed, held] }` / `-> {to}`. */
+data class AutoTransition(
+    /** The attribute the transition writes (`order.state`). */
+    val attribute: String,
+    /** The target state, when written as a bare state. */
+    val to: String?,
+    /** The action column naming the state, when written as `{column}`. */
+    val toColumn: String?,
+    /** The `{ from: … }` guard; empty = no guard. */
+    val from: List<String>,
+    val source: SourceLocation,
+)
+
+/** `set: order.held_for = department`. */
+data class AutoSet(
+    val attribute: String,
+    val column: String,
+    val source: SourceLocation,
+)
+
+/** The shared automation body: typed common fields + the ordered free-form entries. */
+data class AutoBody(
+    val description: String? = null,
+    val descriptionLocalized: LocalizedStringValue = LocalizedStringValue(),
+    val tags: List<String> = emptyList(),
+    val label: LocalizedStringValue? = null,
+    val type: DataType? = null,
+    val columns: List<ColumnDef> = emptyList(),
+    val target: TargetValue? = null,
+    val transition: AutoTransition? = null,
+    val set: AutoSet? = null,
+    val entries: List<AutoEntry> = emptyList(),
+) {
+    /** The last value written under [key] (a later duplicate wins, the dump's rule). */
+    operator fun get(key: String): AutoValue? = entries.lastOrNull { it.key == key }?.value
+}
+
+/**
+ * Grammar 0.16 — `def parameter | action | service | approval | program | recipe <id> { … }`.
+ * [kind] is the def keyword. One class for the six kinds: they share one grammar body; the
+ * per-kind property contract is semantic (AutomationValidator).
+ */
+data class AutomationDef(
+    val kind: String,
+    override val name: String,
+    override val source: SourceLocation,
+    val body: AutoBody = AutoBody(),
+) : Definition {
+    override val description: String? get() = body.description
+    override val descriptionLocalized: LocalizedStringValue get() = body.descriptionLocalized
+    override val tags: List<String> get() = body.tags
+
+    companion object {
+        /** The six automation def keywords, in grammar order. */
+        val KINDS: List<String> = listOf("parameter", "action", "service", "approval", "program", "recipe")
+    }
+}
+
+/**
+ * Grammar 0.16 — an automation world member: `def identity <id>`, `def grant { … }` (unnamed:
+ * [name] is null, keyed by its who/program/as triple), `def deployment <id>`, or a process's
+ * `def step <id>`. [kind] is the def keyword.
+ */
+data class WorldAutoMember(
+    val kind: String,
+    val name: String?,
+    val source: SourceLocation,
+    val body: AutoBody = AutoBody(),
+)
+
+/** Grammar 0.16 — world `def process <id> { instance: …, steps: [ def step … ] }` (D-39, D-86). */
+data class ProcessDef(
+    val name: String,
+    val source: SourceLocation,
+    val description: String? = null,
+    val descriptionLocalized: LocalizedStringValue = LocalizedStringValue(),
+    val tags: List<String> = emptyList(),
+    val steps: List<WorldAutoMember> = emptyList(),
+    val entries: List<AutoEntry> = emptyList(),
+) {
+    /** The last value written under [key]. */
+    operator fun get(key: String): AutoValue? = entries.lastOrNull { it.key == key }?.value
+}
 
 /**
  * Parser-side carrier for `{ cs: "...", en: "..." }` blocks. No proto

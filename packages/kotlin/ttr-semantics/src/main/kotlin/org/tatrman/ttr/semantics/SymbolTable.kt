@@ -109,6 +109,10 @@ internal class DocumentSymbols(
             is WorldDef -> {
                 def.engines.forEach { addChild(entry, it.name, "engine", it.source) }
                 def.executors.forEach { addChild(entry, it.name, "executor", it.source) }
+                // 0.16 — the named automation members (grants are unnamed: keyed by their triple, no symbol).
+                def.identities.forEach { m -> m.name?.let { addChild(entry, it, "identity", m.source) } }
+                def.deployments.forEach { m -> m.name?.let { addChild(entry, it, "deployment", m.source) } }
+                def.processes.forEach { addChild(entry, it.name, "process", it.source) }
                 def.storages.forEach { s ->
                     addChild(entry, s.name, "storage", s.source)
                     s.schemas.forEach { sc ->

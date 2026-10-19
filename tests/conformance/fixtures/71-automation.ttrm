@@ -1,0 +1,51 @@
+// 0.16 — `model automation`: the six automation def kinds on one permissive body, every
+// automation value form (duration, tagged string, call-shaped value, `*`, nested
+// object/list), `transition:` (state / `{column}` / single + list guard) and `set:`.
+package acme.automation
+model automation
+
+def parameter tolerance  { type: decimal, value: 0.01, label: { en: "Price tolerance", cs: "Cenová tolerance" } }
+def parameter settlement { type: working_days, value: 5, description: "settlement window" }
+
+def action release {
+    columns:    [def column order { type: order.order_number }]
+    transition: order.state -> released { from: [placed, held] }
+    sinks:      { native: transition, n8n: door }
+    approval:   none
+    dry_run:    { en: "would release order {order}" }
+}
+def action hold {
+    columns:    [def column order { type: order.order_number }, def column department { type: text }]
+    set:        order.held_for = department
+    transition: order.state -> held { from: placed }
+    sinks:      { native: transition }
+}
+def action set_state {
+    columns:    [def column line { type: return_request_line.line_id }, def column to { type: text }]
+    transition: return_request_line.state -> {to}
+}
+def action ask {
+    columns:  [def column who { type: role }, def column action { type: action }, def column detail { type: rows, optional: true }]
+    approval: required
+    due:      2 working_days
+    on_due:   hold { order: order_number, department: "Sales" }
+    tags:     ["human"]
+}
+
+def service geocode { request: address_in, response: address_out, timeout: 30 seconds, budget: { per_run: 200 }, write: false, idempotency: row }
+
+def role sales { resolve: keycloak_group "acme-sales", delivery: { email: "sales@acme.example" }, label: { en: "Sales" } }
+def role auditors { members: ["ana", "bo"] }
+
+def approval values { by: role.sales, quorum: 2 }
+
+def program release_on_placement { recipe: release_order, port: key, mode: on_event, as_of: event, deliver: immediate,
+                                   budget: { sync: 30 seconds, batch: 10 minutes }, turn_budget: { per_run: 50, per_candidate: 2 },
+                                   overrides: { tolerance: 0.02 }, ask_due: 1 days, protocol: on_route }
+def program morning_release      { recipe: release_order, port: none, mode: batch, deliver: { digest: { by: who, per: day } },
+                                   schedule: "06:00 Europe/Prague" }
+
+def recipe release_order { key: order.order_number, parameters: [tolerance], candidates: placed_orders,
+                           contexts: [shortfall, overdue], decision: verdict, routes: [hold_sales, release],
+                           kinds: [sql], mode: per_candidate, document: "releasing-a-placed-order.md",
+                           fingerprints: { text: "sha256:aa", values: "sha256:bb" } }

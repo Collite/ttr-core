@@ -1,0 +1,676 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "parameter",
+            "name": "tolerance",
+            "properties": {
+                "entries": {
+                    "value": {
+                        "kind": "number",
+                        "value": 0.01
+                    }
+                },
+                "label": {
+                    "cs": "Cenová tolerance",
+                    "en": "Price tolerance"
+                },
+                "type": {
+                    "name": "decimal"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": "settlement window",
+            "kind": "parameter",
+            "name": "settlement",
+            "properties": {
+                "entries": {
+                    "value": {
+                        "kind": "number",
+                        "value": 5
+                    }
+                },
+                "type": {
+                    "name": "working_days"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "action",
+            "name": "release",
+            "properties": {
+                "columns": [
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "order",
+                        "properties": {
+                            "type": {
+                                "name": "order.order_number"
+                            }
+                        },
+                        "tags": []
+                    }
+                ],
+                "entries": {
+                    "approval": {
+                        "kind": "id",
+                        "parts": [
+                            "none"
+                        ],
+                        "path": "none"
+                    },
+                    "dry_run": {
+                        "entries": {
+                            "en": {
+                                "kind": "string",
+                                "value": "would release order {order}"
+                            }
+                        },
+                        "kind": "object"
+                    },
+                    "sinks": {
+                        "entries": {
+                            "n8n": {
+                                "kind": "id",
+                                "parts": [
+                                    "door"
+                                ],
+                                "path": "door"
+                            },
+                            "native": {
+                                "kind": "id",
+                                "parts": [
+                                    "transition"
+                                ],
+                                "path": "transition"
+                            }
+                        },
+                        "kind": "object"
+                    }
+                },
+                "transition": {
+                    "attribute": "order.state",
+                    "from": [
+                        "placed",
+                        "held"
+                    ],
+                    "to": "released"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "action",
+            "name": "hold",
+            "properties": {
+                "columns": [
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "order",
+                        "properties": {
+                            "type": {
+                                "name": "order.order_number"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "department",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    }
+                ],
+                "entries": {
+                    "sinks": {
+                        "entries": {
+                            "native": {
+                                "kind": "id",
+                                "parts": [
+                                    "transition"
+                                ],
+                                "path": "transition"
+                            }
+                        },
+                        "kind": "object"
+                    }
+                },
+                "set": {
+                    "attribute": "order.held_for",
+                    "column": "department"
+                },
+                "transition": {
+                    "attribute": "order.state",
+                    "from": [
+                        "placed"
+                    ],
+                    "to": "held"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "action",
+            "name": "set_state",
+            "properties": {
+                "columns": [
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "line",
+                        "properties": {
+                            "type": {
+                                "name": "return_request_line.line_id"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "to",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    }
+                ],
+                "transition": {
+                    "attribute": "return_request_line.state",
+                    "toColumn": "to"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "action",
+            "name": "ask",
+            "properties": {
+                "columns": [
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "who",
+                        "properties": {
+                            "type": {
+                                "name": "role"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "action",
+                        "properties": {
+                            "type": {
+                                "name": "action"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "detail",
+                        "properties": {
+                            "optional": true,
+                            "type": {
+                                "name": "rows"
+                            }
+                        },
+                        "tags": []
+                    }
+                ],
+                "entries": {
+                    "approval": {
+                        "kind": "id",
+                        "parts": [
+                            "required"
+                        ],
+                        "path": "required"
+                    },
+                    "due": {
+                        "amount": 2,
+                        "kind": "duration",
+                        "unit": "working_days"
+                    },
+                    "on_due": {
+                        "entries": {
+                            "department": {
+                                "kind": "string",
+                                "value": "Sales"
+                            },
+                            "order": {
+                                "kind": "id",
+                                "parts": [
+                                    "order_number"
+                                ],
+                                "path": "order_number"
+                            }
+                        },
+                        "kind": "call",
+                        "name": "hold"
+                    }
+                }
+            },
+            "tags": [
+                "human"
+            ]
+        },
+        {
+            "description": null,
+            "kind": "service",
+            "name": "geocode",
+            "properties": {
+                "entries": {
+                    "budget": {
+                        "entries": {
+                            "per_run": {
+                                "kind": "number",
+                                "value": 200
+                            }
+                        },
+                        "kind": "object"
+                    },
+                    "idempotency": {
+                        "kind": "id",
+                        "parts": [
+                            "row"
+                        ],
+                        "path": "row"
+                    },
+                    "request": {
+                        "kind": "id",
+                        "parts": [
+                            "address_in"
+                        ],
+                        "path": "address_in"
+                    },
+                    "response": {
+                        "kind": "id",
+                        "parts": [
+                            "address_out"
+                        ],
+                        "path": "address_out"
+                    },
+                    "timeout": {
+                        "amount": 30,
+                        "kind": "duration",
+                        "unit": "seconds"
+                    },
+                    "write": {
+                        "kind": "bool",
+                        "value": false
+                    }
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "role",
+            "name": "sales",
+            "properties": {
+                "entries": {
+                    "delivery": {
+                        "entries": {
+                            "email": {
+                                "kind": "string",
+                                "value": "sales@acme.example"
+                            }
+                        },
+                        "kind": "object"
+                    },
+                    "resolve": {
+                        "kind": "tagged",
+                        "tag": "keycloak_group",
+                        "value": "acme-sales"
+                    }
+                },
+                "label": {
+                    "en": "Sales"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "role",
+            "name": "auditors",
+            "properties": {
+                "entries": {
+                    "members": {
+                        "items": [
+                            {
+                                "kind": "string",
+                                "value": "ana"
+                            },
+                            {
+                                "kind": "string",
+                                "value": "bo"
+                            }
+                        ],
+                        "kind": "list"
+                    }
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "approval",
+            "name": "values",
+            "properties": {
+                "entries": {
+                    "by": {
+                        "kind": "id",
+                        "parts": [
+                            "role",
+                            "sales"
+                        ],
+                        "path": "role.sales"
+                    },
+                    "quorum": {
+                        "kind": "number",
+                        "value": 2
+                    }
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "program",
+            "name": "release_on_placement",
+            "properties": {
+                "entries": {
+                    "as_of": {
+                        "kind": "id",
+                        "parts": [
+                            "event"
+                        ],
+                        "path": "event"
+                    },
+                    "ask_due": {
+                        "amount": 1,
+                        "kind": "duration",
+                        "unit": "days"
+                    },
+                    "budget": {
+                        "entries": {
+                            "batch": {
+                                "amount": 10,
+                                "kind": "duration",
+                                "unit": "minutes"
+                            },
+                            "sync": {
+                                "amount": 30,
+                                "kind": "duration",
+                                "unit": "seconds"
+                            }
+                        },
+                        "kind": "object"
+                    },
+                    "deliver": {
+                        "kind": "id",
+                        "parts": [
+                            "immediate"
+                        ],
+                        "path": "immediate"
+                    },
+                    "mode": {
+                        "kind": "id",
+                        "parts": [
+                            "on_event"
+                        ],
+                        "path": "on_event"
+                    },
+                    "overrides": {
+                        "entries": {
+                            "tolerance": {
+                                "kind": "number",
+                                "value": 0.02
+                            }
+                        },
+                        "kind": "object"
+                    },
+                    "port": {
+                        "kind": "id",
+                        "parts": [
+                            "key"
+                        ],
+                        "path": "key"
+                    },
+                    "protocol": {
+                        "kind": "id",
+                        "parts": [
+                            "on_route"
+                        ],
+                        "path": "on_route"
+                    },
+                    "recipe": {
+                        "kind": "id",
+                        "parts": [
+                            "release_order"
+                        ],
+                        "path": "release_order"
+                    },
+                    "turn_budget": {
+                        "entries": {
+                            "per_candidate": {
+                                "kind": "number",
+                                "value": 2
+                            },
+                            "per_run": {
+                                "kind": "number",
+                                "value": 50
+                            }
+                        },
+                        "kind": "object"
+                    }
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "program",
+            "name": "morning_release",
+            "properties": {
+                "entries": {
+                    "deliver": {
+                        "entries": {
+                            "digest": {
+                                "entries": {
+                                    "by": {
+                                        "kind": "id",
+                                        "parts": [
+                                            "who"
+                                        ],
+                                        "path": "who"
+                                    },
+                                    "per": {
+                                        "kind": "id",
+                                        "parts": [
+                                            "day"
+                                        ],
+                                        "path": "day"
+                                    }
+                                },
+                                "kind": "object"
+                            }
+                        },
+                        "kind": "object"
+                    },
+                    "mode": {
+                        "kind": "id",
+                        "parts": [
+                            "batch"
+                        ],
+                        "path": "batch"
+                    },
+                    "port": {
+                        "kind": "id",
+                        "parts": [
+                            "none"
+                        ],
+                        "path": "none"
+                    },
+                    "recipe": {
+                        "kind": "id",
+                        "parts": [
+                            "release_order"
+                        ],
+                        "path": "release_order"
+                    },
+                    "schedule": {
+                        "kind": "string",
+                        "value": "06:00 Europe/Prague"
+                    }
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "recipe",
+            "name": "release_order",
+            "properties": {
+                "entries": {
+                    "candidates": {
+                        "kind": "id",
+                        "parts": [
+                            "placed_orders"
+                        ],
+                        "path": "placed_orders"
+                    },
+                    "contexts": {
+                        "items": [
+                            {
+                                "kind": "id",
+                                "parts": [
+                                    "shortfall"
+                                ],
+                                "path": "shortfall"
+                            },
+                            {
+                                "kind": "id",
+                                "parts": [
+                                    "overdue"
+                                ],
+                                "path": "overdue"
+                            }
+                        ],
+                        "kind": "list"
+                    },
+                    "decision": {
+                        "kind": "id",
+                        "parts": [
+                            "verdict"
+                        ],
+                        "path": "verdict"
+                    },
+                    "document": {
+                        "kind": "string",
+                        "value": "releasing-a-placed-order.md"
+                    },
+                    "fingerprints": {
+                        "entries": {
+                            "text": {
+                                "kind": "string",
+                                "value": "sha256:aa"
+                            },
+                            "values": {
+                                "kind": "string",
+                                "value": "sha256:bb"
+                            }
+                        },
+                        "kind": "object"
+                    },
+                    "key": {
+                        "kind": "id",
+                        "parts": [
+                            "order",
+                            "order_number"
+                        ],
+                        "path": "order.order_number"
+                    },
+                    "kinds": {
+                        "items": [
+                            {
+                                "kind": "id",
+                                "parts": [
+                                    "sql"
+                                ],
+                                "path": "sql"
+                            }
+                        ],
+                        "kind": "list"
+                    },
+                    "mode": {
+                        "kind": "id",
+                        "parts": [
+                            "per_candidate"
+                        ],
+                        "path": "per_candidate"
+                    },
+                    "parameters": {
+                        "items": [
+                            {
+                                "kind": "id",
+                                "parts": [
+                                    "tolerance"
+                                ],
+                                "path": "tolerance"
+                            }
+                        ],
+                        "kind": "list"
+                    },
+                    "routes": {
+                        "items": [
+                            {
+                                "kind": "id",
+                                "parts": [
+                                    "hold_sales"
+                                ],
+                                "path": "hold_sales"
+                            },
+                            {
+                                "kind": "id",
+                                "parts": [
+                                    "release"
+                                ],
+                                "path": "release"
+                            }
+                        ],
+                        "kind": "list"
+                    }
+                }
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": "acme.automation",
+    "schemaDirective": {
+        "code": "automation",
+        "namespace": null
+    }
+}

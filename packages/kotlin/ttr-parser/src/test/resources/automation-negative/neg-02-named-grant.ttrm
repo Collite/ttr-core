@@ -1,0 +1,7 @@
+// expect: syntax error — a grant is UNNAMED (keyed by its who/program/as triple, D-91).
+package acme.worlds
+model world
+
+def world demo {
+    def grant ops_any { who: role.ops, program: *, as: author }
+}
