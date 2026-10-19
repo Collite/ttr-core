@@ -28,6 +28,11 @@ import org.tatrman.translator.codec.sql.TopClauseExtractor
 object SavedQueryReferenceExtractor {
     /** [source] as a worker holds it: a trailing `;`, `TOP n`, table hints and `{name}` placeholders are accepted. */
     fun fromSource(source: String): List<QualifiedName> {
+        // A Calcite entry point like the parse: promote Calcite's literal charset to UTF-8 before any Calcite class
+        // loads. A metadata worker calls this before its first parse; without it Calcite froze ISO-8859-1 for the
+        // process and every later body with a literal outside Latin-1 failed. Idempotent; see CalciteCharset.
+        org.tatrman.translator.framework.CalciteCharset
+            .ensureUtf8()
         val terminated = source.trimEnd().removeSuffix(";").trimEnd()
         val cleaned = TableHintExtractor.extract(TopClauseExtractor.rewrite(terminated)).cleanedSql
         val placeholdersFree = PLACEHOLDER.replace(cleaned, "?")
