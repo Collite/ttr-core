@@ -56,6 +56,31 @@ class DisplaySchemaCheckSpec :
             }
             """.trimIndent() + "\n"
 
+        // AU-core-P0 review-114 B1: grammar 0.16 made `automation` a schema code; an import's trailing
+        // `automation` must still name the package (`import hartland.automation.*` in every recipe).
+        "a package named `x.automation` stays a package — its row schemas are in scope" {
+            val src =
+                """
+                uses world "shop.worlds.host"
+                import shop.orders.*
+                import shop.automation.*
+
+                container r(out due) target erp {
+                    o = load(orders)
+                    c = load(customer)
+                    due = join(left: o, right: c, type: inner, on: relation order_customer)
+                          -> calc { recipient = email } -> select(recipient, order_id)
+                }
+
+                r.due -> display(remind)
+                """.trimIndent() + "\n"
+            dsp(src).shouldBeEmpty()
+            ModelIndex.importScope(listOf("shop", "automation"), "shop.automation").let {
+                it.pkg shouldBe "shop.automation"
+                it.tier shouldBe null
+            }
+        }
+
         "rows matching the schema check clean — an absent optional column is fine" {
             val r = check(review() + "review.late -> display(notify)\n")
             r.errors.shouldBeEmpty()

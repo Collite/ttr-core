@@ -155,14 +155,19 @@ class ModelIndex(
     fun attributesOf(entity: Entity): List<Attribute> = entity.attributes
 
     companion object {
-        /** Parse `import erp.er.*` → ImportScope(pkg="erp", tier=ER). Last segment as a tier when it is a schema code. */
+        /**
+         * Parse `import erp.er.*` → ImportScope(pkg="erp", tier=ER). Last segment as a tier when it is a schema code —
+         * except `automation`: a recipe's `import hartland.automation.*` names the PACKAGE that holds the actions and
+         * parameters (and an `x.automation` package's ER objects and row schemas must stay in scope); the automation
+         * tier is never imported by its code (AU-core-P0 review-114 B1).
+         */
         fun importScope(
             qnameParts: List<String>,
             raw: String,
         ): ImportScope {
             if (qnameParts.size >= 2) {
                 val last = qnameParts.last()
-                val tier = parseSchemaCode(last)
+                val tier = parseSchemaCode(last)?.takeUnless { it == SchemaCode.AUTOMATION }
                 if (tier != null) {
                     return ImportScope(qnameParts.dropLast(1).joinToString("."), tier, raw)
                 }

@@ -15,11 +15,13 @@
 //        ends in a `switch` statement (routes · `mode:` · `else:` · `because:` ·
 //        `detail:`), and an `actions { }` wiring block (`verdict.route, … -> action
 //        { arg: value, … } when: <expr>`). D-25, D-19, D-28, D-31/D-102, D-108.
-//     2. Expressions gain a runtime/parameter binding `:name` (`:as_of` reserved) and a
-//        duration literal `30 days` / `2 working_days`; a function call may name its
-//        arguments (`age(since: x)`, `working_days(between: a, and: :as_of)` — `and` /
-//        `between` are legal argument NAMES). `days(:p)` is a call the walker folds to a
-//        duration (17 §5).
+//     2. Expressions gain a runtime/parameter binding `:name` (`:as_of` reserved); a
+//        function call may name its arguments (`age(since: x)`, `working_days(between: a,
+//        and: :as_of)` — `and` / `between` are legal argument NAMES; elsewhere a named
+//        argument is TTRP-PRS-008). In an expression a duration is a call the walker folds:
+//        `days(30)`, `days(:p)` (17 §5). The juxtaposed literal `30 days` / `2 working_days`
+//        is a WIRING value and a window's `gap:` only — in an expression it would merge a
+//        comma-less config entry `lead = 30` with a following `days = amount` (review-114 M1).
 //     3. `aggregate { group_by: k, … }` (the LD spelling, D-108 "LD wins") beside the
 //        existing `group by k`; config entries may be separated by commas.
 //     4. New tokens, ALL soft (also in `identifier`, so `key`, `mode`, `detail`, `days`,
@@ -190,6 +192,7 @@ routeRef        : identifier DOT identifier ;                    // verdict.rele
 wiringArgs      : LBRACE (wiringArg (COMMA wiringArg)* COMMA?)? RBRACE ;
 wiringArg       : identifier COLON wiringValue (COMMA wiringValue)* ;
 wiringValue     : identifier wiringArgs                         # wiringCall
+                | durationLiteral                               # wiringDuration   // `due: 2 working_days`
                 | expr                                          # wiringExpr
                 ;
 // ------------------------------------------------------------------------------------
@@ -244,8 +247,7 @@ addExpr         : mulExpr ((PLUS | MINUS) mulExpr)* ;
 mulExpr         : unaryExpr ((STAR | SLASH) unaryExpr)* ;
 unaryExpr       : MINUS unaryExpr | primary ;
 primary
-    : durationLiteral                                       // AU-core-P0: `30 days` (before `literal`: INT + unit)
-    | literal
+    : literal
     | paramRef                                              // AU-core-P0: `:name` — a parameter / runtime binding (D-108)
     | castExpr
     | caseExpr
@@ -263,7 +265,7 @@ functionCall    : identifier LPAREN (DISTINCT? fnArg (COMMA fnArg)*)? RPAREN ;  
 fnArg           : (fnArgName COLON)? expr ;                  // AU-core-P0: named (`age(since: x)`) or positional
 fnArgName       : identifier | AND | OR | BETWEEN | NOT ;        // `working_days(between: a, and: :as_of)`
 paramRef        : COLON identifier ;                         // `:as_of` · `:tolerance`
-durationLiteral : INT durationUnit ;                         // `30 days` · `2 working_days` (`days(:p)` is a call)
+durationLiteral : INT durationUnit ;                         // `30 days` · `2 working_days` — wiring + window only (M1)
 durationUnit    : DAYS | WORKING_DAYS | WEEKS | MONTHS | MINUTES | HOURS ;
 typeName        : identifier (LPAREN INT (COMMA INT)? RPAREN)? ;              // decimal(12,2) — S23 spellings
 literal         : STRING | CHAR_STRING | numericLiteral | TRUE | FALSE | NULL ;

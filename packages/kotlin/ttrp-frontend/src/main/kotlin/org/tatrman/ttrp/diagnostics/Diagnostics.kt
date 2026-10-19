@@ -105,6 +105,11 @@ enum class TtrpDiagnosticId(
         "a recipe's shape: `recipe { }` is top-level only, a `target` role container needs a body, and a wiring " +
             "argument holds one action call or a list of values (AU contracts §1)",
     ),
+    PRS_008(
+        "TTRP-PRS-008",
+        "named arguments belong to the recipe time functions (`age(since: …)`, `working_days(between: …, and: …)`, " +
+            "`within(…)`); call every other function positionally, each name once",
+    ),
     FRG_001("TTRP-FRG-001", "supported fragment dialects: sql, pandas, ttrb, ttrb-cs (C3-g/C4-f)"),
 
     // ---- Stage 6.3 bare-fragment programs (FRG) ----

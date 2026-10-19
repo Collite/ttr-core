@@ -89,6 +89,8 @@ data class RoleContainer(
     val nameLocation: SourceLocation = location,
     val retries: Int? = null,
     val onFailureOf: String? = null,
+    /** `on failure of x absorbs` — reserved, TTRP-FAIL-003 (the container precedent). */
+    val onFailureAbsorbs: Boolean = false,
 ) : RecipeMember {
     /**
      * The plain container this role container is, for a `target` form with a body — so the

@@ -192,9 +192,27 @@ internal object TtrpChecks {
         recipe: RecipeDecl,
         out: MutableList<TtrpDiagnostic>,
     ) {
+        val roleNames = recipe.roleContainers.map { it.name }.toSet()
         for (member in recipe.members) {
             when (member) {
                 is RoleContainer -> {
+                    // The container precedent (F-4-iv): `absorbs` is reserved; `on failure of` names an island of THIS recipe.
+                    if (member.onFailureAbsorbs) {
+                        out +=
+                            diag(
+                                TtrpDiagnosticId.FAIL_003,
+                                "`absorbs` on `${member.name}` is reserved",
+                                member.location,
+                            )
+                    }
+                    member.onFailureOf?.takeIf { it !in roleNames }?.let {
+                        out +=
+                            diag(
+                                TtrpDiagnosticId.FAIL_001,
+                                "`on failure of $it` on `${member.name}` names no container of this recipe",
+                                member.location,
+                            )
+                    }
                     val ports = member.ports.map { it.name }.toSet()
                     when (val body = member.body) {
                         // A `foreign` body is the foreign language (python), not a TTR fragment dialect.

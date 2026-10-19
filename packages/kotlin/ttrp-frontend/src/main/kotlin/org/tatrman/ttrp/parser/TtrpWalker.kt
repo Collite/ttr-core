@@ -542,8 +542,7 @@ internal class TtrpWalker(
 
     private fun primary(ctx: TTRPParser.PrimaryContext): Expression =
         when {
-            ctx.durationLiteral() != null -> durationLiteral(ctx.durationLiteral())
-            ctx.paramRef() != null -> ParamRef(ctx.paramRef().identifier().text, loc(ctx.paramRef()))
+            ctx.paramRef() != null -> paramRef(ctx.paramRef())
             ctx.literal() != null -> literal(ctx.literal())
             ctx.castExpr() != null -> castExpr(ctx.castExpr())
             ctx.caseExpr() != null -> caseExpr(ctx.caseExpr())
@@ -633,12 +632,43 @@ internal class TtrpWalker(
         // `argNames` empty, so every pre-recipe call is the node it always was.
         val names = fnArgs.map { it.fnArgName()?.text }
         val argNames = if (names.any { it != null }) names else emptyList()
+        // Only the recipe time functions define argument names; anywhere else a name would be dropped and the
+        // arguments bound by position — `substring(x, length: 1, start: 3)` swaps them (review-114 M2).
+        if (argNames.isNotEmpty()) {
+            val dup =
+                names
+                    .filterNotNull()
+                    .groupBy { it }
+                    .filterValues { it.size > 1 }
+                    .keys
+            if (name !in NAMED_ARGUMENT_FUNCTIONS || dup.isNotEmpty()) {
+                diagnostics +=
+                    TtrpDiagnostic(
+                        TtrpDiagnosticId.PRS_008,
+                        Severity.ERROR,
+                        if (dup.isNotEmpty()) {
+                            "`$name(…)` names `${dup.first()}` twice"
+                        } else {
+                            "`$name(…)` takes positional arguments — only ${NAMED_ARGUMENT_FUNCTIONS.joinToString(
+                                ", ",
+                            ) {
+                                "`$it`"
+                            }} take named ones"
+                        },
+                        loc(ctx),
+                        TtrpDiagnosticId.PRS_008.suggestedAlternative,
+                    )
+            }
+        }
         val distinct = ctx.DISTINCT() != null
-        // `days(:p)` / `working_days(:p)` — a duration whose amount is a parameter (17 §5).
+        // A duration in an expression is a call: `days(30)` / `days(:p)` (17 §5; the juxtaposed `30 days` is a
+        // wiring/window form only — review-114 M1).
         DurationUnit.of(name)?.let { unit ->
             val only = args.singleOrNull()
-            if (only is ParamRef && argNames.isEmpty() && !distinct) {
-                return DurationParam(unit, only.name, loc(ctx))
+            if (argNames.isEmpty() && !distinct) {
+                if (only is ParamRef) return DurationParam(unit, only.name, loc(ctx))
+                val amount = ((only as? Literal)?.value as? LiteralValue.Num)?.raw?.toLongOrNull()
+                if (amount != null) return DurationLiteral(amount, unit, loc(ctx))
             }
         }
         val entries = catalog.resolve(name)
@@ -652,9 +682,20 @@ internal class TtrpWalker(
         }
     }
 
+    /** `:name` — one word: `: name` with a space would read `key: :x` and `key: : x` alike (review-114). */
+    private fun paramRef(ctx: TTRPParser.ParamRefContext): ParamRef {
+        if (ctx.COLON().symbol.stopIndex + 1 != ctx.identifier().start.startIndex) {
+            shape("a binding is written `:${ctx.identifier().text}` — no space after the colon", loc(ctx))
+        }
+        return ParamRef(ctx.identifier().text, loc(ctx))
+    }
+
     private fun durationLiteral(ctx: TTRPParser.DurationLiteralContext): DurationLiteral =
         DurationLiteral(
-            amount = ctx.INT().text.toLong(),
+            amount =
+                ctx.INT().text.toLongOrNull() ?: 0L.also {
+                    badValue("the duration `${ctx.text}` is out of range", loc(ctx))
+                },
             unit = DurationUnit.of(ctx.durationUnit().text) ?: error("unhandled duration unit at ${loc(ctx)}"),
             location = loc(ctx),
         )
@@ -709,7 +750,19 @@ internal class TtrpWalker(
         var document: String? = null
         var protocol: RecipeProtocol? = null
         var name: String? = null
+        val seen = mutableSetOf<String>()
         for (h in ctx.recipeHeader()) {
+            val word = h.start.text
+            if (!seen.add(word)) {
+                diagnostics +=
+                    TtrpDiagnostic(
+                        TtrpDiagnosticId.PRS_007,
+                        Severity.ERROR,
+                        "the recipe header `$word` is written twice",
+                        loc(h),
+                        TtrpDiagnosticId.PRS_007.suggestedAlternative,
+                    )
+            }
             when (h) {
                 is TTRPParser.RecipeKeyHeaderContext -> key = h.keyRef().qname().map { qname(it) }
                 is TTRPParser.RecipeAsOfHeaderContext ->
@@ -717,6 +770,7 @@ internal class TtrpWalker(
                         when {
                             h.STRING() != null -> AsOf.Instant(unquote(h.STRING().text))
                             h.identifier()?.text == "now" -> AsOf.Now
+                            h.identifier() == null -> AsOf.Now // a syntax error, already reported
                             else -> {
                                 badValue(
                                     "`as of:` is `now` or a literal instant, not `${h.identifier()?.text}`",
@@ -725,8 +779,19 @@ internal class TtrpWalker(
                                 AsOf.Now
                             }
                         }
-                is TTRPParser.RecipeParametersHeaderContext ->
+                is TTRPParser.RecipeParametersHeaderContext -> {
                     parameters = h.identifier().map { Name(it.text, loc(it)) }
+                    parameters.filter { it.text == "as_of" }.forEach {
+                        diagnostics +=
+                            TtrpDiagnostic(
+                                TtrpDiagnosticId.PRS_007,
+                                Severity.ERROR,
+                                "`as_of` is reserved — `:as_of` is the run's instant, never a parameter",
+                                it.location,
+                                TtrpDiagnosticId.PRS_007.suggestedAlternative,
+                            )
+                    }
+                }
                 is TTRPParser.RecipeDocumentHeaderContext -> document = unquote(h.STRING().text)
                 is TTRPParser.RecipeProtocolHeaderContext -> {
                     val v = h.identifier().text
@@ -766,9 +831,11 @@ internal class TtrpWalker(
             else -> null
         }
 
-    private fun roleContainer(ctx: TTRPParser.RoleContainerContext): RoleContainer {
+    private fun roleContainer(ctx: TTRPParser.RoleContainerContext): RoleContainer? {
         val role = if (ctx.role.type == TTRPParser.CANDIDATES) RecipeRole.CANDIDATES else RecipeRole.CONTEXT
-        val form = islandForm(ctx.islandForm())
+        // A half-typed container is skipped, never the whole document (the LSP parses while the user types).
+        val form = islandForm(ctx.islandForm()) ?: return null
+        if (ctx.identifier() == null) return null
         val body: ContainerBody? =
             when {
                 ctx.TAGGED_BLOCK() != null -> fragmentBody(ctx.TAGGED_BLOCK().symbol)
@@ -792,9 +859,13 @@ internal class TtrpWalker(
         }
         var retries: Int? = null
         var onFailureOf: String? = null
+        var absorbs = false
         for (attr in ctx.containerAttr()) {
             when (attr) {
-                is TTRPParser.OnFailureAttrContext -> onFailureOf = attr.identifier().text
+                is TTRPParser.OnFailureAttrContext -> {
+                    onFailureOf = attr.identifier().text
+                    absorbs = attr.ABSORBS() != null
+                }
                 is TTRPParser.RetriesAttrContext -> retries = attr.INT().text.toIntOrNull()
             }
         }
@@ -809,10 +880,19 @@ internal class TtrpWalker(
             nameLocation = loc(ctx.identifier()),
             retries = retries,
             onFailureOf = onFailureOf,
+            onFailureAbsorbs = absorbs,
         )
     }
 
-    private fun islandForm(ctx: TTRPParser.IslandFormContext): IslandForm =
+    /** Null for a form the parser only half-recovered (its syntax error is already reported). */
+    private fun islandForm(ctx: TTRPParser.IslandFormContext?): IslandForm? =
+        if (ctx == null) {
+            null
+        } else {
+            islandFormOf(ctx)
+        }
+
+    private fun islandFormOf(ctx: TTRPParser.IslandFormContext): IslandForm? =
         when (ctx) {
             is TTRPParser.TargetFormContext -> IslandForm.Target(qname(ctx.qname()), loc(ctx))
             is TTRPParser.BuiltinFormContext ->
@@ -833,7 +913,7 @@ internal class TtrpWalker(
                     answerSchema = ctx.identifier().text,
                     location = loc(ctx),
                 )
-            else -> error("unhandled islandForm at ${loc(ctx)}")
+            else -> null
         }
 
     private fun grain(ctx: TTRPParser.GrainContext): Grain = if (ctx.SET() != null) Grain.SET else Grain.PER_CANDIDATE
@@ -844,7 +924,7 @@ internal class TtrpWalker(
         val over: WindowOver? =
             when {
                 spec.COLON() == null && unit in WINDOW_CALENDAR_UNITS -> WindowOver.Calendar(unit)
-                unit == "rows" && spec.INT() != null -> WindowOver.Rows(spec.INT().text.toInt())
+                unit == "rows" && spec.INT()?.text?.toIntOrNull() != null -> WindowOver.Rows(spec.INT().text.toInt())
                 unit == "gap" && spec.durationLiteral() != null ->
                     WindowOver.Gap(
                         durationLiteral(spec.durationLiteral()),
@@ -860,15 +940,20 @@ internal class TtrpWalker(
         return Window(by = ctx.identifier().map { Name(it.text, loc(it)) }, over = over, location = loc(ctx))
     }
 
-    private fun decisionBlock(ctx: TTRPParser.DecisionBlockContext): DecisionDecl =
-        DecisionDecl(
+    private fun decisionBlock(ctx: TTRPParser.DecisionBlockContext): DecisionDecl {
+        val ports = ctx.portSig().portDecl().map { portDecl(it) }
+        ports.filter { it.kind != PortKind.IN }.forEach {
+            shape("a decision declares `in` ports only — its outputs are the switch's routes", it.location)
+        }
+        return DecisionDecl(
             name = ctx.identifier().text,
-            ports = ctx.portSig().portDecl().map { portDecl(it) },
+            ports = ports,
             statements = ctx.statement().mapNotNull { statement(it) },
             switch = switchStmt(ctx.switchStmt()),
             location = loc(ctx),
             nameLocation = loc(ctx.identifier()),
         )
+    }
 
     private fun switchStmt(ctx: TTRPParser.SwitchStmtContext): SwitchStmt {
         val mode =
@@ -877,6 +962,7 @@ internal class TtrpWalker(
                     if (it == null) badValue("`mode:` is `exclusive` or `overlapping`, not `${m.text}`", loc(m))
                 }
             }
+        if (ctx.route().isEmpty()) shape("a switch needs at least one route (contracts §1 `route+`)", loc(ctx))
         return SwitchStmt(
             input = dottedRef(ctx.dottedRef()),
             mode = mode,
@@ -893,7 +979,9 @@ internal class TtrpWalker(
         val name = ctx.identifier().text
         // The route attributes are soft keywords, so a malformed one (`because: 42`, `mode:` after the
         // first route) parses as a ROUTE of that name — name the mistake instead.
-        if (name in ROUTE_ATTRIBUTE_WORDS) {
+        if (name in RESERVED_ROUTE_NAMES) {
+            shape("a route cannot be named `$name` — `.all` is every routed row, `none` is no route", loc(ctx))
+        } else if (name in ROUTE_ATTRIBUTE_WORDS) {
             diagnostics +=
                 TtrpDiagnostic(
                     TtrpDiagnosticId.PRS_007,
@@ -977,7 +1065,7 @@ internal class TtrpWalker(
         if (values.isEmpty()) return null
         val value: WiringValue =
             if (values.size == 1) {
-                wiringValue(values.single())
+                wiringValue(values.single()) ?: return null
             } else {
                 val items = values.map { (it as? TTRPParser.WiringExprContext)?.expr() }
                 if (items.any { it == null }) {
@@ -985,7 +1073,7 @@ internal class TtrpWalker(
                         TtrpDiagnostic(
                             TtrpDiagnosticId.PRS_007,
                             Severity.ERROR,
-                            "wiring argument `${ctx.identifier().text}` mixes an action call into a list of values",
+                            "wiring argument `${ctx.identifier().text}` mixes an action call or a duration into a list of values",
                             loc(ctx),
                             TtrpDiagnosticId.PRS_007.suggestedAlternative,
                         )
@@ -998,13 +1086,28 @@ internal class TtrpWalker(
         return WiringArg(name = ctx.identifier().text, value = value, location = loc(ctx))
     }
 
-    private fun wiringValue(ctx: TTRPParser.WiringValueContext): WiringValue =
+    private fun wiringValue(ctx: TTRPParser.WiringValueContext): WiringValue? =
         when (ctx) {
             is TTRPParser.WiringCallContext ->
                 WiringValue.Call(ctx.identifier().text, wiringArgs(ctx.wiringArgs()), loc(ctx))
+            is TTRPParser.WiringDurationContext -> WiringValue.Expr(durationLiteral(ctx.durationLiteral()), loc(ctx))
             is TTRPParser.WiringExprContext -> WiringValue.Expr(expr(ctx.expr()), loc(ctx))
-            else -> error("unhandled wiringValue at ${loc(ctx)}")
+            else -> null // half-recovered; its syntax error is already reported
         }
+
+    private fun shape(
+        message: String,
+        at: SourceLocation,
+    ) {
+        diagnostics +=
+            TtrpDiagnostic(
+                TtrpDiagnosticId.PRS_007,
+                Severity.ERROR,
+                message,
+                at,
+                TtrpDiagnosticId.PRS_007.suggestedAlternative,
+            )
+    }
 
     private fun badValue(
         message: String,
@@ -1177,6 +1280,10 @@ internal class TtrpWalker(
     private companion object {
         val WINDOW_CALENDAR_UNITS = setOf("day", "week", "month")
         val ROUTE_ATTRIBUTE_WORDS = setOf("because", "detail", "mode")
+        val RESERVED_ROUTE_NAMES = setOf("all", "none")
+
+        /** The recipe time functions (AU contracts §1, `06` A-6) — the only calls with named arguments. */
+        val NAMED_ARGUMENT_FUNCTIONS = setOf("age", "working_days", "within")
     }
 
     private fun unquote(s: String): String =

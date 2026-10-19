@@ -113,9 +113,14 @@ price_differences`) or another action (`on_due: hold { order: order_number }`). 
 
 ## Expressions in recipes
 
-- `:name` binds a parameter (`:tolerance`) or a value of the run (`:as_of`), in canonical bodies and in SQL alike.
-- A duration is `30 days`, `2 working_days`, `4 weeks`, `15 minutes` — or `days(:p)` when the amount is a parameter.
-- Function arguments may be named: `age(since: obligation.created_at)`, `working_days(between: due, and: :as_of)`.
+- `:name` binds a parameter (`:tolerance`) or a value of the run (`:as_of`), in canonical bodies and in SQL alike —
+  one word, no space after the colon.
+- A duration is written `2 working_days`, `30 days`, `4 weeks`, `15 minutes` as a **wiring value** (`due: 2
+  working_days`) or a window's `gap:`. **Inside an expression** it is a call: `:as_of - days(30)`, or `days(:p)` when
+  the amount is a parameter. (Two juxtaposed words would be ambiguous in a config block: `lead = 30` followed by
+  `days = amount`.)
+- The recipe's time functions take named arguments: `age(since: obligation.created_at)`,
+  `working_days(between: due, and: :as_of)`. Every other function is called positionally (`TTRP-PRS-008`).
 
 ## Words that stay names
 
@@ -127,5 +132,6 @@ place in the recipe block it is an ordinary name, so existing columns and variab
 | id | when |
 |---|---|
 | `TTRP-PRS-006` | a header or switch value outside the listed ones (`mode: sometimes`) |
-| `TTRP-PRS-007` | a nested recipe, a `target` role without a body, `because:`/`reason:` mistakes |
+| `TTRP-PRS-007` | a nested recipe, a `target` role without a body, `because:`/`reason:` mistakes, a header written twice, a switch without routes, a route named `all`/`none`, an `out` port on a decision |
+| `TTRP-PRS-008` | a named argument on a function that takes positional ones, or a name given twice |
 | `TTRP-REC-099` | `ttrp build` on a recipe — the recipe compile is not available yet |

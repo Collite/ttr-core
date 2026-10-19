@@ -36,7 +36,7 @@ score = 1
         lines -> rows
     }
     context sessions(in lines, out rows) target erp window { by: item over: gap: 30 minutes } {
-        lines -> filter(placed_date >= :as_of - 30 days) -> rows
+        lines -> filter(placed_date >= :as_of - days(30)) -> rows
     }
 
     decision verdict(in lines, in scored) {
