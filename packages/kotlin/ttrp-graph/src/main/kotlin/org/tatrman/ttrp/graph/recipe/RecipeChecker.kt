@@ -528,6 +528,7 @@ class RecipeChecker(
         row: Row?,
         rg: RecipeGraph,
         at: SourceLocation,
+        partial: Boolean = false,
     ) {
         val columns = action.columns.associateBy { it.name }
         for (a in args) {
@@ -548,7 +549,7 @@ class RecipeChecker(
             }
             checkType(action, col, a, row, rg)
         }
-        for (c in action.columns.filter { !it.optional }) {
+        for (c in action.columns.filter { !it.optional && !partial }) {
             if (args.none { it.name == c.name }) {
                 diags +=
                     err(
@@ -565,13 +566,14 @@ class RecipeChecker(
         call: WiringValue.Call,
         row: Row?,
         rg: RecipeGraph,
+        partial: Boolean = false,
     ) {
         val action = action(call.action)
         if (action == null) {
             diags += err(TtrpDiagnosticId.REC_001, "no action `${call.action}` in the imported packages", call.location)
             return
         }
-        checkArgs(action, call.args, row, rg, call.location)
+        checkArgs(action, call.args, row, rg, call.location, partial)
         checkTransition(action, call.args, row, call.location)
     }
 
@@ -628,8 +630,9 @@ class RecipeChecker(
             }
             "action" ->
                 when {
-                    // `action: start { process: "purchasing" }` — the action, with its arguments (H-3's ask).
-                    v is WiringValue.Call -> checkCall(v, row, rg)
+                    // `action: start { process: "purchasing" }` — the asked action, partly applied: the answer to
+                    // the ask completes it, so a column it leaves out is not missing (H-3's ask).
+                    v is WiringValue.Call -> checkCall(v, row, rg, partial = true)
                     ref == null || ref.port != null || action(ref.column) == null ->
                         mismatch("takes an action the imports define")
                 }

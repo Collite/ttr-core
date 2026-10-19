@@ -188,6 +188,23 @@ class RecipeCheckerSpec :
                 listOf(TtrpDiagnosticId.REC_070)
         }
 
+        "an ask's `action:` call is partly applied — the answer completes it; its own columns are still checked" {
+            val r =
+                RecipeFixtures.inline(
+                    """
+                    key: order.order_number
+                    candidates placed(out orders) target erp { load(er.entity.order) -> orders }
+                    decision v(in orders) { orders -> switch { go: value > 0  because: "x" } }
+                    actions {
+                        v.go -> ask { who: role.sales_manager, about: order_number, action: start { process: "purchasing" } }
+                        v.go -> ask { who: role.sales_manager, about: order_number, action: start { proces: "purchasing" } }
+                    }
+                    """,
+                )
+            RecipeFixtures.findings(r).map { it.message } shouldContainExactly
+                listOf("action `start` has no column `proces` (columns: process, rows)")
+        }
+
         "a call-valued `action:` and an `on_due:` call are checked as the actions they name" {
             val r =
                 RecipeFixtures.inline(

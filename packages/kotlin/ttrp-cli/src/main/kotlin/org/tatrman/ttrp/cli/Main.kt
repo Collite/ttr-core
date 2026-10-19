@@ -385,8 +385,8 @@ object TtrpCli {
             out("ttrp explain: no such file: $file")
             return 2
         }
-        // AU-core-P0: a recipe document explains as its skeleton, from the parse alone — the graph-backed
-        // recipe section (mode verdict, islands, bundle) comes with the recipe compile (AU-core-P2).
+        // A recipe document explains as its skeleton (AU-core-P0, from the parse) and the checker's section (AU-core-P1:
+        // the mode verdict, each context's class, the routes, every finding). The compiled islands come with P2.
         val parsed =
             org.tatrman.ttrp.parser.TtrpParser
                 .parseFile(abs)
@@ -394,6 +394,9 @@ object TtrpCli {
             parsed.document.statements
                 .filterIsInstance<org.tatrman.ttrp.ast.RecipeDecl>()
                 .firstOrNull()
+        val startDir = abs.parent ?: abs
+        val manifestResult = TtrpManifestReader.resolve(startDir)
+        val modelsRoot = modelsRootOverride ?: manifestResult.manifest.modelsRoot()
         if (recipe != null) {
             val errors = parsed.diagnostics.filter { it.severity == Severity.ERROR }
             if (errors.isNotEmpty()) {
@@ -404,11 +407,18 @@ object TtrpCli {
                 org.tatrman.ttrp.recipe.RecipeExplain
                     .render(recipe),
             )
-            return 0
+            val (model, findings) = checkRecipe(abs, manifestResult.manifest, modelsRoot)
+            if (model != null) {
+                out(
+                    org.tatrman.ttrp.graph.recipe.RecipeCheckExplain
+                        .render(model),
+                )
+            } else {
+                out("checker · not run — the world or the model did not resolve:")
+            }
+            findings.forEach { out(it.render()) }
+            return if (findings.any { it.severity == Severity.ERROR }) 1 else 0
         }
-        val startDir = abs.parent ?: abs
-        val manifestResult = TtrpManifestReader.resolve(startDir)
-        val modelsRoot = modelsRootOverride ?: manifestResult.manifest.modelsRoot()
         val output = TtrpPipeline(manifestResult.manifest, modelsRoot).explain(Files.readString(abs), abs.toString())
         if (!output.ok) {
             for (d in output.diagnostics
@@ -420,6 +430,23 @@ object TtrpCli {
         }
         out(output.text.trimEnd())
         return 0
+    }
+
+    /**
+     * The recipe checker over [file] (AU-core-P1): what it learned, and every finding in source order — all but
+     * TTRP-REC-099 (a recipe compiles to a bundle from AU-core-P2; checking it is not that).
+     */
+    private fun checkRecipe(
+        file: Path,
+        manifest: org.tatrman.ttrp.project.TtrpManifest,
+        modelsRoot: Path,
+    ): Pair<org.tatrman.ttrp.graph.recipe.RecipeModel?, List<org.tatrman.ttrp.diagnostics.TtrpDiagnostic>> {
+        val plan = TtrpPipeline(manifest, modelsRoot).plan(Files.readString(file), file.toString())
+        val findings =
+            plan.diagnostics
+                .filter { it.id != org.tatrman.ttrp.diagnostics.TtrpDiagnosticId.REC_099 }
+                .sortedWith(compareBy({ it.location.line }, { it.location.column }))
+        return plan.recipe to findings
     }
 
     fun runCheck(
@@ -435,10 +462,25 @@ object TtrpCli {
         val startDir = abs.parent ?: abs
         val manifestResult = TtrpManifestReader.resolve(startDir)
         val modelsRoot = modelsRootOverride ?: manifestResult.manifest.modelsRoot()
+        // A recipe is checked through the recipe checker (AU-core-P1), which runs over the built graph.
+        val source = Files.readString(abs)
+        if (source.contains("recipe") &&
+            org.tatrman.ttrp.parser.TtrpParser
+                .parseString(source, abs.toString())
+                .document.statements
+                .any { it is org.tatrman.ttrp.ast.RecipeDecl }
+        ) {
+            val findings = manifestResult.diagnostics + checkRecipe(abs, manifestResult.manifest, modelsRoot).second
+            for (d in findings) {
+                out(d.render())
+                d.suggestedAlternative?.let { out("  ↳ suggested: $it") }
+            }
+            return if (findings.any { it.severity == Severity.ERROR }) 1 else 0
+        }
         val checker = TtrpChecker(manifestResult.manifest, modelsRoot)
         val report =
             checker.check(
-                source = Files.readString(abs),
+                source = source,
                 fileName = abs.toString(),
                 manifestDiagnostics = manifestResult.diagnostics,
             )

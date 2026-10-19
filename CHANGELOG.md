@@ -6,6 +6,22 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **TTR-P — the recipe checker (AU-core-P1; `ttrp-frontend` · `ttrp-graph` · `ttrp-cli`).** A recipe is checked
+  against the world and the model: the role shape and wiring (`TTRP-REC-000`), the action wiring typed against
+  `def action` (`-001`…`-003`), the candidates' key (`-004`, `-005`), key lineage with each context's class (lookup /
+  per-candidate / set-level), the recipe's mode verdict and windows (`-010`…`-012`), parameters (`-020`, `-021`),
+  transitions against `states:` (`-030`), the turn rule (`-040`), snapshot measures (`-050`, a warning), writes in an
+  island (`-060`) and a decision with an island of its own (`-070`); time is typed — `:as_of`, durations and date
+  arithmetic, `working_days(between:, and:)`, `age(since:)`, and the `latest(by:, per:)` / `within(attr, last: … |
+  from: …, to: …)` ops. `ttrp explain` adds the checker's section to a recipe's skeleton; `ttrp check` runs the
+  checker on a recipe. `ttrp build` still refuses a recipe (`TTRP-REC-099`) until the recipe compile.
+  Also, for every TTR-P program: a load may name `er.entity.<name>` (the imported entity); the language design's
+  argument forms are read — `join(…, kind: left)`, an op as an argument (`right: load(…)`), `calc(a = e)`,
+  `select(c, x = e)` (they were parsed and silently dropped); in a TTR-SQL island a select item's `AS alias` names
+  its column (it was dropped), a qualifier of any table joined so far reads the next join's left side, and
+  `days(n)` / `days(:p)` are durations. A world's automation executors (`extends: n8n_l1`, …) no longer fail the
+  TTR-P world binding (`TTRP-WLD-005`).
+
 - **Grammar 0.15 → 0.16 — the automation model (AU-core-P0 · S0.2; `ttr-parser`, `ttr-writer`, `ttr-semantics`,
   `ttr-metadata`, the TS and Python parsers).** `model automation` with `def parameter` · `action` · `service` ·
   `approval` · `program` · `recipe` (one permissive body: typed properties first, then free-form entries whose
