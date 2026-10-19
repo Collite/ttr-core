@@ -6,6 +6,20 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **Grammar 0.15 → 0.16 — the automation model (AU-core-P0 · S0.2; `ttr-parser`, `ttr-writer`, `ttr-semantics`,
+  `ttr-metadata`, the TS and Python parsers).** `model automation` with `def parameter` · `action` · `service` ·
+  `approval` · `program` · `recipe` (one permissive body: typed properties first, then free-form entries whose
+  values add durations `2 working_days`, tagged strings `schedule "…"`, call-shaped values and `*`); `def role` gains
+  `resolve` / `delivery` / `members`; `transition: order.state -> held { from: placed }` and `set: a.b = column`; the
+  world gains `def identity`, unnamed `def grant`, `def deployment` and `def process … steps: [ def step … ]`;
+  attributes gain `states:` / `transitions:`. Additive — every 0.15 file parses unchanged and no conformance golden
+  moved; fixtures 71–74 added. `ttr-semantics`: `AutomationValidator` / `StatesValidator` (`ttr/automation-*`,
+  `ttr/states-*`), with a TS twin in `@tatrman/semantics` and LSP hover. **`ttr-metadata`**: a new tier
+  `SchemaCode.AUTOMATION` (`AutomationSchema` — parameters, actions, services, roles, approvals, programs, recipes as
+  typed objects), `World.identities / grants / deployments / processes`, `WorldStorage.writable`,
+  `Attribute.states / transitions`, and the shipped stdlib entities `automation.obligation`, `state_history`,
+  `approvals`, added to any source that declares `model automation` or imports an `automation` package. Manual:
+  [Automation](docs/manual/en/19-automation.md).
 - **TTR-P toolchain (`ttrp-frontend` · `-graph` · `-emit` · `-cli` · `ttrp-lsp`) — the recipe block (AU-core-P0 · S0.1).**
   TTR-P grammar 0.3 → 0.4 (additive): `recipe { key / as of / parameters / document / protocol }` with `candidates` /
   `context` role containers (island forms `target` · `builtin` · `foreign … per candidate | set schema` · `call` ·

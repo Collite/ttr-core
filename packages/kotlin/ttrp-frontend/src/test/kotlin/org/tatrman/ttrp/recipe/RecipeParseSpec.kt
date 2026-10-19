@@ -404,8 +404,15 @@ class RecipeParseSpec :
                 java.nio.file.Path
                     .of("")
                     .toAbsolutePath()
-            while (dir != null && !java.nio.file.Files.exists(dir.resolve("docs/manual/en/18-recipes.md"))) dir = dir.parent
-            val page = java.nio.file.Files.readString(dir!!.resolve("docs/manual/en/18-recipes.md"))
+            while (dir != null &&
+                !java.nio.file.Files
+                    .exists(dir.resolve("docs/manual/en/18-recipes.md"))
+            ) {
+                dir = dir.parent
+            }
+            val page =
+                java.nio.file.Files
+                    .readString(dir!!.resolve("docs/manual/en/18-recipes.md"))
             val example = Regex("```ttrp\n(.*?)```", RegexOption.DOT_MATCHES_ALL).find(page)!!.groupValues[1]
             val r = TtrpParser.parseString(example, "18-recipes.md")
             r.diagnostics.map { "${it.id.id} ${it.location.line}:${it.location.column} ${it.message}" }.shouldBeEmpty()
