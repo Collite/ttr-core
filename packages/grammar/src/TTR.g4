@@ -1,7 +1,7 @@
 // =============================================================================
 // TTR (Tatrman) grammar
 //
-// @grammar-version: 0.15
+// @grammar-version: 0.16
 //
 // Version scheme: X.Y — X is a breaking/major change, Y is additive
 // (syntactic sugar, new optional constructs, bug fixes). Bump the marker
@@ -268,6 +268,45 @@
 //   `MetadataRegistry.swap(…, layouts)`, `RegistrySnapshot` / `SourceSnapshot` /
 //   `TtrgGraph` gain fields) — a patch would let a 0.14-compiled jar meet them at run
 //   time — and the bundle's <major.minor> is this marker (publish.yml enforces it).
+//
+// Changes in 0.16 (additive — the automation model; AU-core-P0 S0.2, AU D-26/D-35/D-67/D-90/D-91/D-104/D-106/D-107):
+//   1. New model code `automation` (`model automation`): `modelCode` gains `| AUTOMATION`.
+//      Six new top-level def kinds share ONE permissive body, `autoBody`:
+//      `def parameter | action | service | approval | program | recipe <id> { … }`
+//      (`objectDefinition` gains six alternatives). `def recipe` is the GENERATED catalog
+//      object (the TTR-P compiler writes it; authored files never do) — admitted now so the
+//      catalog needs no second grammar window. The typed properties (contracts §2) are
+//      validated SEMANTICALLY, not here (the `enginePartProperty` precedent): typed alts
+//      first (description, tags, label, type, columns, target, transition, set), then the
+//      free-form `autoEntry` fallback.
+//   2. `autoValue` — the automation value forms, used ONLY inside automation bodies (the
+//      generic `value` is untouched): a duration literal `NUMBER_LITERAL id`
+//      (`2 working_days`, unit validated semantically), a tagged string `id string`
+//      (`schedule "06:00 Europe/Prague"`, `keycloak_group "hartland-sales"`), a call-shaped
+//      value `id { … }` (`on_due: hold { order: order_number }`), `*` (`program: *`),
+//      plus the literal / id / object / list forms (`autoObject`, `autoList` recurse
+//      through `autoValue`). `autoKey : id | TEXT` (`fingerprints: { text: … }`).
+//   3. `transitionProperty` — `transition: order.state -> released { from: [placed, held] }`
+//      or `-> {to}` (the state taken from an action column); `setProperty` —
+//      `set: order.held_for = department`. New token ARROW `'->'` (only here).
+//   4. `def role` (the cnc kind) gains the automation properties through the same
+//      free-form `autoEntry` fallback (`resolve: keycloak_group "…"`, `delivery: {…}`,
+//      `members: […]`); per-model validity is semantic.
+//   5. World members (nested in `def world`, the 4.1 precedent): `def identity <id>`,
+//      `def grant { … }` (UNNAMED — keyed by its who/program/as triple),
+//      `def deployment <id>` (all `autoBody`) and `def process <id> { instance: …,
+//      steps: [ def step <id> { … } … ] }` (`processBody`, `stepsProperty`).
+//      `writable:` on a storage needs no syntax — the storage `propertyEntry` already
+//      carries `writable: [order.state, "x*"]`.
+//   6. Attributes gain `states: [placed, held, …]` and `transitions: { placed: [held, …], … }`
+//      (`statesProperty`, `transitionsProperty`).
+//   7. New lexer tokens: AUTOMATION, PARAMETER, ACTION, SERVICE, APPROVAL, PROGRAM, RECIPE,
+//      IDENTITY, DEPLOYMENT, PROCESS, STEP, STEPS, TRANSITION, TRANSITIONS, STATES, SET,
+//      ARROW. Every new noun is added to `idPart` (the WORLD precedent: `action`,
+//      `process`, `set`, `program`, … stay usable as names, column names, keys and dotted
+//      ref parts); PARAMETERS joins `idPart` too (`def recipe … parameters: [a, b]`).
+//      ARROW is not an id.
+//   Additive: no existing 0.15 file changes meaning; every conformance golden is unchanged.
 // =============================================================================
 
 grammar TTR;
@@ -387,6 +426,7 @@ modelCode
   : DB | ER | BINDING | QUERY | CNC | MD      // MD (3.1) — multidimensional logical model
   | WORLD                                     // 4.1 — deployment world model (ttr-metadata M0)
   | LEXICON                                   // 4.4 — canonical vocabulary model (RG-P4, RS-9)
+  | AUTOMATION                                // 0.16 — the automation model (AU, D-26)
   ;
 
 definition
@@ -437,6 +477,13 @@ objectDefinition
   | TERM           id  lexiconEntryDef    // 4.4 — surface forms → target (RS-9)
   | PATTERN        id  lexiconEntryDef    // 4.4 — regex pattern → target
   | EXAMPLE        id  lexiconEntryDef    // 4.4 — example utterance → target
+  // ----- 0.16 automation model — one shared permissive body (`model automation`) -----
+  | PARAMETER      id  autoBody           // 0.16 — a recipe parameter (D-13: a value change is a re-approval)
+  | ACTION         id  autoBody           // 0.16 — an action: columns, sinks, transition, set (D-65)
+  | SERVICE        id  autoBody           // 0.16 — a request/response service (D-69)
+  | APPROVAL       id  autoBody           // 0.16 — an approval kind: by, quorum
+  | PROGRAM        id  autoBody           // 0.16 — recipe + port + mode (D-26)
+  | RECIPE         id  autoBody           // 0.16 — the GENERATED recipe catalog object (contracts §5.3)
   ;
 
 // ----- Object bodies -----
@@ -495,6 +542,10 @@ worldMember
   : DEF ENGINE   id engineDef
   | DEF EXECUTOR id executorDef
   | DEF STORAGE  id storageDef
+  | DEF IDENTITY   id autoBody                        // 0.16 — a service principal (D-90)
+  | DEF GRANT         autoBody                        // 0.16 — UNNAMED; keyed by its who/program/as triple (D-91)
+  | DEF DEPLOYMENT id autoBody                        // 0.16 — program|process × target × run_as (D-107)
+  | DEF PROCESS    id processBody                     // 0.16 — a stepped process instance (D-39, D-86)
   | worldProperty
   ;
 worldProperty    : descriptionProperty | tagsProperty | extendsProperty ;
@@ -524,6 +575,51 @@ viaProperty      : VIA      propSep? id ;             // storage reached via eng
 worldSchemaDef   : LBRACE (worldSchemaField (COMMA? worldSchemaField)* COMMA?)? RBRACE ;
 worldSchemaField : id propSep? dataType ;             // { customer: string, amount: decimal }
 
+// ----- 0.16 automation model (AU-core-P0 S0.2; contracts §2–§3) -----
+// One permissive body for every automation kind and the automation world members. Typed
+// alternatives FIRST (the `enginePartProperty` precedent), then the free-form `autoEntry`
+// fallback; per-kind required/optional properties, enums and references are validated in
+// semantics (ttr-semantics AutomationValidator / its TS twin) — the parser stays mechanical.
+autoBody         : LBRACE (autoProperty (COMMA? autoProperty)* COMMA?)? RBRACE ;
+autoProperty
+  : descriptionProperty | tagsProperty | labelProperty | typeProperty | columnsProperty | targetProperty
+  | transitionProperty | setProperty
+  | autoEntry
+  ;
+autoEntry        : autoKey propSep? autoValue ;
+autoKey          : id | TEXT ;                      // `fingerprints: { text: … }` (TEXT is a type keyword, not an idPart)
+// Alternative order matters for ANTLR's lowest-alt preference: the two-token forms first
+// (a duration `2 working_days`, a tagged string, a call-shaped value), then the one-token
+// forms. A literal followed by the NEXT comma-less entry's key (`{ value: 0.01 label: … }`)
+// is resolved by LL(*) lookahead (the key is followed by `:`), not taken as a duration.
+autoValue
+  : durationLiteral
+  | taggedValue
+  | callValue
+  | STAR                                            // `program: *` (any)
+  | autoObject
+  | autoList
+  | literal
+  | id
+  ;
+autoObject       : LBRACE (autoEntry (COMMA? autoEntry)* COMMA?)? RBRACE ;
+autoList         : LBRACK (autoValue (COMMA autoValue)*)? COMMA? RBRACK ;
+durationLiteral  : NUMBER_LITERAL id ;              // 2 working_days · 30 days · 15 minutes (unit is semantic)
+taggedValue      : id stringLiteralForm ;           // schedule "06:00 Europe/Prague" · keycloak_group "hartland-sales"
+callValue        : id autoObject ;                  // on_due: hold { order: order_number, department: "Sales" }
+// `transition: order.state -> released { from: [placed, held] }` / `-> {to}` (D-85: a
+// self-transition is implicit and silent — semantic, not here).
+transitionProperty : TRANSITION propSep? id ARROW transitionTarget transitionGuard? ;
+transitionTarget   : id | LBRACE id RBRACE ;        // a state, or `{column}` — the state named by an action column
+transitionGuard    : LBRACE FROM propSep? (listOfIds | id) RBRACE ;
+setProperty        : SET propSep? id EQUALS id ;    // set: order.held_for = department
+
+// `def process <id> { instance: …, steps: [ def step <id> { … } … ] }` (D-39, D-86).
+processBody      : LBRACE (processProperty (COMMA? processProperty)* COMMA?)? RBRACE ;
+processProperty  : descriptionProperty | tagsProperty | stepsProperty | autoEntry ;
+stepsProperty    : STEPS propSep? LBRACK (stepInline COMMA?)* RBRACK ;
+stepInline       : DEF STEP id autoBody ;
+
 // ----- Per-kind valid properties -----
 
 projectProperty          : descriptionProperty | tagsProperty | versionProperty ;
@@ -547,7 +643,8 @@ entityProperty           : descriptionProperty | tagsProperty | labelPluralPrope
 // v3.1: the shared attribute body gains MD-only `domain:` and `aggregation:`
 // props. All props are optional in the grammar; per-schema validity (md requires
 // `domain:` & forbids `type:`; er the reverse) is enforced in semantics.
-attributeProperty        : descriptionProperty | tagsProperty | typeProperty | isKeyProperty | optionalProperty | valueLabelsProperty | displayLabelProperty | searchBlockProperty | semanticsBlockProperty | lexiconBlockProperty | bindingProperty | domainRefProperty | aggregationProperty ;
+// 0.16 — `states:` / `transitions:` on an attribute (D-67); consistency is semantic (ttr/states-*).
+attributeProperty        : descriptionProperty | tagsProperty | typeProperty | isKeyProperty | optionalProperty | valueLabelsProperty | displayLabelProperty | searchBlockProperty | semanticsBlockProperty | lexiconBlockProperty | bindingProperty | domainRefProperty | aggregationProperty | statesProperty | transitionsProperty ;
 
 relationProperty         : descriptionProperty | tagsProperty | fromProperty | toProperty | cardinalityProperty | joinProperty | searchBlockProperty | bindingProperty ;
 
@@ -559,7 +656,9 @@ er2dbRelationProperty    : descriptionProperty | tagsProperty | relationProperty
 
 queryProperty            : descriptionProperty | tagsProperty | languageProperty | parametersProperty | sourceTextProperty | searchBlockProperty ;
 
-roleProperty             : descriptionProperty | tagsProperty | labelProperty | searchBlockProperty ;
+// 0.16 — `def role` in `model automation` (resolve / delivery / members) rides the free-form
+// `autoEntry` fallback; typed alts stay first. Per-model validity is semantic.
+roleProperty             : descriptionProperty | tagsProperty | labelProperty | searchBlockProperty | autoEntry ;
 
 er2cncRoleProperty       : descriptionProperty | tagsProperty | entityProperty_ | roleProperty_ ;
 
@@ -715,6 +814,10 @@ displayLabelProperty      : DISPLAY_LABEL     propSep? localizedString ;
 rolesProperty             : ROLES             propSep? listOfIds ;
 valueLabelsProperty       : VALUE_LABELS      propSep? valueLabelsBody ;
 roleProperty_             : ROLE              propSep? id ;
+// 0.16 — attribute lifecycle (D-67): `states: [placed, held]`, `transitions: { placed: [held] }`.
+statesProperty            : STATES            propSep? listOfIds ;
+transitionsProperty       : TRANSITIONS       propSep? LBRACE ( transitionEntry ( COMMA? transitionEntry )* COMMA? )? RBRACE ;
+transitionEntry           : id propSep? listOfIds ;
 
 // Search feature — `search { keywords {...} patterns [...] descriptions {...} examples [...] aliases [...] searchable: true, fuzzy: true }`
 searchBlockProperty       : SEARCH            propSep? searchBlock ;
@@ -1034,6 +1137,10 @@ idPart
   | MANAGEMENT | CHANGE_SEMANTICS | WRITEBACK                   // 0.10 — entry-declaration keywords stay usable as id fragments / object keys (EN-P1)
   | SECURITY | OWN | CLASSIFY | GRANT | MASK | ON               // v0.11 — security-block verbs/keywords stay usable as id fragments / object keys (WORLD precedent; TO already present above)
   | METHOD                                                      // v0.12 — `method` stays usable as an id fragment / object key (RV-P1.5; also makes `matchMethodValue`'s EXACT/TYPOS/TOKENS plain ids)
+  | AUTOMATION | PARAMETER | ACTION | SERVICE | APPROVAL | PROGRAM | RECIPE    // 0.16 — automation def nouns (WORLD precedent: usable as names / columns / keys)
+  | IDENTITY | DEPLOYMENT | PROCESS | STEP | STEPS                            // 0.16 — automation world members
+  | TRANSITION | TRANSITIONS | STATES | SET                                   // 0.16 — automation / lifecycle property keywords
+  | PARAMETERS                                                  // 0.16 — `def recipe … parameters: [a, b]` through the free-form entry
   // NOTE: EXTENDS/HOSTS/STAGING are intentionally NOT in idPart — see the 4.1
   // header note. Their strict-value properties are negative-fixture guarded, so
   // keeping them out makes a malformed value a hard parse error.
@@ -1133,6 +1240,25 @@ STORAGE          : 'storage' ;         // v4.1 — nested `def storage`
 EXTENDS          : 'extends' ;         // v4.1 — instance ⊕ type overlay ref
 HOSTS            : 'hosts' ;           // v4.1 — storage `hosts: [pkg]`
 STAGING          : 'staging' ;         // v4.1 — storage `staging: true`
+
+// 0.16 automation model (AU-core-P0 S0.2). Def-kind nouns, world members, property keywords.
+// Declared before IDENT so the keyword wins ties; every one is also in `idPart`.
+AUTOMATION       : 'automation' ;      // 0.16 — model code `model automation`
+PARAMETER        : 'parameter' ;       // 0.16 — `def parameter` (distinct from PARAMETERS; longest-match)
+ACTION           : 'action' ;          // 0.16 — `def action`; also the column type `action`
+SERVICE          : 'service' ;         // 0.16 — `def service`
+APPROVAL         : 'approval' ;        // 0.16 — `def approval`
+PROGRAM          : 'program' ;         // 0.16 — `def program`
+RECIPE           : 'recipe' ;          // 0.16 — `def recipe` (generated catalog)
+IDENTITY         : 'identity' ;        // 0.16 — world `def identity`
+DEPLOYMENT       : 'deployment' ;      // 0.16 — world `def deployment`
+PROCESS          : 'process' ;         // 0.16 — world `def process`
+STEPS            : 'steps' ;           // 0.16 — process `steps: [ … ]` (distinct from STEP; longest-match)
+STEP             : 'step' ;            // 0.16 — process `def step`
+TRANSITIONS      : 'transitions' ;     // 0.16 — attribute `transitions: { … }`
+TRANSITION       : 'transition' ;      // 0.16 — action `transition: a.b -> s`
+STATES           : 'states' ;          // 0.16 — attribute `states: [ … ]`
+SET              : 'set' ;             // 0.16 — action `set: a.b = c`
 
 MANAGEMENT       : 'management' ;       // 0.10 — table `management: data|canon` (EN-P1)
 CHANGE_SEMANTICS : 'changeSemantics' ;  // 0.10 — table `changeSemantics: scd1|scd2|ledger { … }`
@@ -1252,6 +1378,7 @@ DATAFRAME_DSL      : 'DATAFRAME_DSL' ;
 REL_NODE           : 'REL_NODE' ;
 
 // Punctuation / operators
+ARROW  : '->' ;      // 0.16 — `transition: a.b -> s` (automation bodies only)
 EQUALS : '=' ;       // property separator
 COLON  : ':' ;
 COMMA  : ',' ;

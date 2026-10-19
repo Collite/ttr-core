@@ -1,0 +1,8 @@
+// expect: ttr/automation-deployment-program-and-process — a deployment runs a program XOR a process.
+package acme.worlds
+model world
+
+def world w {
+    def process flow { instance: order.order_number, steps: [ def step s { program: p, port: key } ] }
+    def deployment both { program: p, process: flow, target: native, run_as: caller }
+}

@@ -1,0 +1,9 @@
+// expect: ttr/automation-malformed-property — `set:` is `<entity>.<attribute> = <column>`.
+package acme.automation
+model automation
+
+def action hold {
+    columns: [def column order { type: order.order_number }]
+    set:     order.held_for
+    sinks:   { native: transition }
+}

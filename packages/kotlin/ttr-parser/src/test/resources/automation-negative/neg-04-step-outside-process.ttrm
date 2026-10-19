@@ -1,0 +1,7 @@
+// expect: syntax error — `def step` exists only inside a process's `steps: [ … ]`.
+package acme.worlds
+model world
+
+def world demo {
+    def step decide { program: decide_on_request, port: key }
+}

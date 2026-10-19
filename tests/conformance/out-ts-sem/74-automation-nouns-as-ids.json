@@ -1,0 +1,23 @@
+{
+    "diagnostics": [],
+    "resolved": [],
+    "symbols": [
+        "acme.automation.db.dbo.table.process",
+        "acme.automation.db.dbo.table.process.action",
+        "acme.automation.db.dbo.table.process.approval",
+        "acme.automation.db.dbo.table.process.automation",
+        "acme.automation.db.dbo.table.process.deployment",
+        "acme.automation.db.dbo.table.process.identity",
+        "acme.automation.db.dbo.table.process.parameter",
+        "acme.automation.db.dbo.table.process.parameters",
+        "acme.automation.db.dbo.table.process.program",
+        "acme.automation.db.dbo.table.process.recipe",
+        "acme.automation.db.dbo.table.process.service",
+        "acme.automation.db.dbo.table.process.set",
+        "acme.automation.db.dbo.table.process.states",
+        "acme.automation.db.dbo.table.process.step",
+        "acme.automation.db.dbo.table.process.steps",
+        "acme.automation.db.dbo.table.process.transition",
+        "acme.automation.db.dbo.table.process.transitions"
+    ]
+}

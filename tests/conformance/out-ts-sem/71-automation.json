@@ -1,0 +1,19 @@
+{
+    "diagnostics": [],
+    "resolved": [],
+    "symbols": [
+        "acme.automation.automation.action.ask",
+        "acme.automation.automation.action.hold",
+        "acme.automation.automation.action.release",
+        "acme.automation.automation.action.set_state",
+        "acme.automation.automation.approval.values",
+        "acme.automation.automation.parameter.settlement",
+        "acme.automation.automation.parameter.tolerance",
+        "acme.automation.automation.program.morning_release",
+        "acme.automation.automation.program.release_on_placement",
+        "acme.automation.automation.recipe.release_order",
+        "acme.automation.automation.role.auditors",
+        "acme.automation.automation.role.sales",
+        "acme.automation.automation.service.geocode"
+    ]
+}

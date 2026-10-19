@@ -6,8 +6,17 @@ import { TTR_GRAMMAR_VERSION, PROPERTY_MAP } from '@tatrman/grammar';
 // the grammar prebuild) is what moves this constant; the assertion is the
 // reminder that the CHANGELOG entry + downstream proto/version sync move with it.
 describe('grammar version', () => {
-  it('is 0.15 (no syntax change since 0.14 — a toolchain cut; 0.14 added `def schema <name> { columns: [...] }`)', () => {
-    expect(TTR_GRAMMAR_VERSION).toBe('0.15');
+  it('is 0.16 (the automation model: `model automation`, the world members, `states:`)', () => {
+    expect(TTR_GRAMMAR_VERSION).toBe('0.16');
+  });
+
+  it('advertises the automation kinds on the one shared body (typed alternatives only)', () => {
+    for (const kind of ['parameter', 'action', 'service', 'approval', 'program', 'recipe'] as const) {
+      expect(PROPERTY_MAP[kind].map((p) => p.name)).toEqual([
+        'description', 'tags', 'label', 'type', 'columns', 'target', 'transition', 'set',
+      ]);
+    }
+    expect(PROPERTY_MAP.attribute.map((p) => p.name)).toEqual(expect.arrayContaining(['states', 'transitions']));
   });
 
   it('advertises the `def schema` properties: description, tags, columns', () => {

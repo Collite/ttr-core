@@ -97,6 +97,7 @@ import {
 } from './completion-property.js';
 import { buildDocumentSymbols } from './document-symbol.js';
 import { loadCompletionConfig, getCompletionConfig, invalidateCompletionConfig } from './config-completion.js';
+import { automationHoverLines } from './automation-hover.js';
 import { formatDocument, DEFAULT_FORMAT_CONFIG, type FormatConfig } from '@tatrman/format';
 import { lintDocument, lintProject, recommendedConfig, loadLintConfig, ruleForCode, type LintDiagnostic, type ResolvedLintConfig, type DocumentRuleContext } from '@tatrman/lint';
 import { refactorExtractDefToNewFile } from './code-actions.js';
@@ -1567,6 +1568,8 @@ export function createServerConnection(
         lines.push(desc.value);
       }
     }
+    // 0.16 — a parameter's value/label, an action's columns/sinks.
+    if (def) lines.push(...automationHoverLines(def));
     const fileBaseName = symbol.documentUri.split('/').pop() ?? symbol.documentUri;
     lines.push(`- **Defined at:** ${fileBaseName}:${symbol.source.line}`);
 

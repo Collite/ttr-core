@@ -1,0 +1,25 @@
+// The slice of the hartland ER model the automation fixtures read (design 17 §0) — just enough
+// for the automation validator to resolve the action columns, transitions, `set:` and `instance:`.
+package hartland
+model er
+
+def entity order {
+    attributes: [
+        def attribute order_number { type: text, isKey: true },
+        def attribute held_for     { type: text, optional: true },
+        def attribute state        { type: text, states: [placed, held, released, cancelled],
+                                     transitions: { placed: [held, released, cancelled], held: [released, cancelled] } }
+    ]
+}
+
+def entity customer {
+    attributes: [ def attribute customer_sk { type: int, isKey: true } ]
+}
+
+def entity return_request_line {
+    attributes: [
+        def attribute line_id { type: text, isKey: true },
+        def attribute way     { type: text, optional: true },
+        def attribute state   { type: text, states: [received, rejected, settling, awaiting_goods, goods_received, not_returned, closed] }
+    ]
+}

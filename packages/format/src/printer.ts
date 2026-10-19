@@ -113,6 +113,9 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
   const b = (x: boolean | undefined) => (x === undefined ? undefined : text(x ? 'true' : 'false'));
   const qstr = (x: string | undefined) => (x === undefined ? undefined : text(JSON.stringify(x)));
   const defList = (arr: Definition[] | undefined) => (arr && arr.length ? defListDoc(arr, ctx) : undefined);
+  // 0.16 — a typed automation property whose node spans `key: value`: keep the value verbatim.
+  const afterKey = (n: { source: SourceLocation } | undefined, key: string) =>
+    n ? verbatim(slice(ctx.source, n.source).replace(new RegExp(`^${key}\\s*[:=]?\\s*`), '')) : undefined;
 
   switch (def.kind) {
     case 'project':
@@ -161,6 +164,9 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
       add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
       add('type', v(def.type), def.type); add('isKey', b(def.isKey)); add('optional', b(def.optional));
       add('valueLabels', v(def.valueLabels), def.valueLabels); add('displayLabel', v(def.displayLabel), def.displayLabel); add('search', v(def.search), def.search); add('semantics', v(def.semantics), def.semantics); add('lexicon', v(def.lexicon), def.lexicon);
+      // 0.16 — lifecycle states (D-67).
+      add('states', def.states && strListDoc(def.states, false));
+      add('transitions', def.transitions && text(`{ ${def.transitions.map((t) => `${t.from}: [${t.to.join(', ')}]`).join(', ')} }`));
       break;
     case 'relation':
       add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
@@ -188,6 +194,23 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
     case 'role':
       add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
       add('label', v(def.label), def.label); add('search', v(def.search), def.search);
+      // 0.16 — an automation role's free-form properties, values verbatim in authored order.
+      for (const e of def.entries ?? []) add(e.key, v(e.value), e);
+      break;
+    // 0.16 — the automation kinds share one body: typed props, then the free-form entries
+    // (values verbatim, authored order).
+    case 'parameter':
+    case 'action':
+    case 'service':
+    case 'approval':
+    case 'program':
+    case 'recipe':
+      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('type', v(def.type), def.type); add('label', v(def.label), def.label);
+      add('columns', defList(def.columns)); add('target', v(def.target), def.target);
+      add('transition', afterKey(def.transition, 'transition'), def.transition);
+      add('set', afterKey(def.set, 'set'), def.set);
+      for (const e of def.entries) add(e.key, v(e.value), e);
       break;
     case 'er2cncRole':
       add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
@@ -274,12 +297,33 @@ function inlinePropsDoc(props: Prop[]): Doc {
 }
 
 /** True if rendering this def inline would swallow a `//` comment to end-of-line. */
+/**
+ * A value that always breaks (a def list) cannot sit in a one-line def: in 'preserve' mode the def
+ * must break too, else the output spans several lines and the next pass breaks it (not idempotent).
+ */
+function hasHardline(d: Doc): boolean {
+  switch (d.t) {
+    case 'hardline':
+      return true;
+    case 'concat':
+      return d.parts.some(hasHardline);
+    case 'indent':
+    case 'group':
+      return hasHardline(d.doc);
+    default:
+      return false;
+  }
+}
+
 function defHasComments(def: Definition, props: Prop[]): boolean {
   return hasTrailing(def) || props.some((pr) => hasTrailing(pr.node));
 }
 
 /** The def body without its own leading/trailing trivia (added by callers). */
 function formatDefCore(def: Definition, ctx: Ctx, topLevel: boolean): Doc {
+  // A world's nested members (engines … deployments, processes) have no canonical layout yet:
+  // keep the def verbatim rather than drop its body (it used to print `def world w {}`).
+  if (def.kind === 'world') return verbatim(slice(ctx.source, def.source));
   const props = propsOf(def, ctx);
   const header = `def ${kindKeyword(def.kind)} ${def.name} {`;
   if (props.length === 0) return text(`def ${kindKeyword(def.kind)} ${def.name} {}`);
@@ -306,7 +350,7 @@ function formatDefCore(def: Definition, ctx: Ctx, topLevel: boolean): Doc {
       ? true
       : ctx.config.separator === 'comma'
         ? false
-        : def.source.line !== def.source.endLine;
+        : def.source.line !== def.source.endLine || props.some((pr) => hasHardline(pr.value));
 
   if (!broken) {
     return concat([text(header), text(' '), inlinePropsDoc(props), text(' }')]);

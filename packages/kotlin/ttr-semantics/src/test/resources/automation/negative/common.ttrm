@@ -1,0 +1,7 @@
+// Shared by every negative scenario: one role, one program, one event schema.
+package acme.automation
+model automation
+
+def role ops    { resolve: keycloak_group "ops" }
+def program p   { recipe: r, port: none, mode: batch }
+def schema evt  { columns: [def column line_id { type: text }] }

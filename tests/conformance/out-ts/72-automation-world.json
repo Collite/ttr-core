@@ -1,0 +1,364 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "world",
+            "name": "demo",
+            "properties": {
+                "deployments": [
+                    {
+                        "entries": {
+                            "dry_run": {
+                                "kind": "bool",
+                                "value": false
+                            },
+                            "enabled": {
+                                "kind": "bool",
+                                "value": true
+                            },
+                            "program": {
+                                "kind": "id",
+                                "parts": [
+                                    "morning_release"
+                                ],
+                                "path": "morning_release"
+                            },
+                            "run_as": {
+                                "kind": "id",
+                                "parts": [
+                                    "identity",
+                                    "automation_decider"
+                                ],
+                                "path": "identity.automation_decider"
+                            },
+                            "trigger": {
+                                "kind": "tagged",
+                                "tag": "schedule",
+                                "value": "06:00 Europe/Prague"
+                            }
+                        },
+                        "kind": "deployment",
+                        "name": "release_native_morning",
+                        "target": "native"
+                    },
+                    {
+                        "entries": {
+                            "granularity": {
+                                "kind": "id",
+                                "parts": [
+                                    "parts"
+                                ],
+                                "path": "parts"
+                            },
+                            "program": {
+                                "kind": "id",
+                                "parts": [
+                                    "release_on_placement"
+                                ],
+                                "path": "release_on_placement"
+                            },
+                            "run_as": {
+                                "kind": "id",
+                                "parts": [
+                                    "caller"
+                                ],
+                                "path": "caller"
+                            }
+                        },
+                        "kind": "deployment",
+                        "name": "release_n8n",
+                        "target": "n8n"
+                    },
+                    {
+                        "entries": {
+                            "process": {
+                                "kind": "id",
+                                "parts": [
+                                    "return_line_flow"
+                                ],
+                                "path": "return_line_flow"
+                            },
+                            "run_as": {
+                                "kind": "id",
+                                "parts": [
+                                    "identity",
+                                    "automation_decider"
+                                ],
+                                "path": "identity.automation_decider"
+                            }
+                        },
+                        "kind": "deployment",
+                        "name": "returns_n8n",
+                        "target": "n8n"
+                    }
+                ],
+                "engines": [
+                    {
+                        "kind": "engine",
+                        "name": "erp_pg",
+                        "type": "postgres"
+                    }
+                ],
+                "executors": [
+                    {
+                        "extends": "n8n_l1",
+                        "kind": "executor",
+                        "manifest": {
+                            "connection": {
+                                "kind": "id",
+                                "parts": [
+                                    "n8n_acme"
+                                ],
+                                "path": "n8n_acme"
+                            },
+                            "url": {
+                                "kind": "string",
+                                "value": "https://n8n.acme.example"
+                            }
+                        },
+                        "name": "n8n"
+                    }
+                ],
+                "grants": [
+                    {
+                        "entries": {
+                            "as": {
+                                "kind": "id",
+                                "parts": [
+                                    "identity",
+                                    "automation_decider"
+                                ],
+                                "path": "identity.automation_decider"
+                            },
+                            "program": {
+                                "kind": "star"
+                            },
+                            "who": {
+                                "kind": "id",
+                                "parts": [
+                                    "role",
+                                    "ops"
+                                ],
+                                "path": "role.ops"
+                            }
+                        },
+                        "kind": "grant"
+                    },
+                    {
+                        "entries": {
+                            "as": {
+                                "kind": "id",
+                                "parts": [
+                                    "author"
+                                ],
+                                "path": "author"
+                            },
+                            "program": {
+                                "kind": "id",
+                                "parts": [
+                                    "release_on_placement"
+                                ],
+                                "path": "release_on_placement"
+                            },
+                            "who": {
+                                "kind": "string",
+                                "value": "*"
+                            }
+                        },
+                        "kind": "grant"
+                    }
+                ],
+                "identities": [
+                    {
+                        "entries": {
+                            "credential": {
+                                "kind": "id",
+                                "parts": [
+                                    "TTR_CONN_AUTOMATION_DECIDER"
+                                ],
+                                "path": "TTR_CONN_AUTOMATION_DECIDER"
+                            },
+                            "principal": {
+                                "kind": "string",
+                                "value": "svc-acme-automation"
+                            }
+                        },
+                        "kind": "identity",
+                        "name": "automation_decider"
+                    }
+                ],
+                "processes": [
+                    {
+                        "description": "one execution per return line",
+                        "entries": {
+                            "instance": {
+                                "kind": "id",
+                                "parts": [
+                                    "return_request_line",
+                                    "line_id"
+                                ],
+                                "path": "return_request_line.line_id"
+                            }
+                        },
+                        "kind": "process",
+                        "name": "return_line_flow",
+                        "steps": [
+                            {
+                                "entries": {
+                                    "port": {
+                                        "kind": "id",
+                                        "parts": [
+                                            "key"
+                                        ],
+                                        "path": "key"
+                                    },
+                                    "program": {
+                                        "kind": "id",
+                                        "parts": [
+                                            "decide_on_request"
+                                        ],
+                                        "path": "decide_on_request"
+                                    }
+                                },
+                                "kind": "step",
+                                "name": "decide"
+                            },
+                            {
+                                "entries": {
+                                    "after": {
+                                        "entries": {
+                                            "obligation": {
+                                                "kind": "id",
+                                                "parts": [
+                                                    "inbound"
+                                                ],
+                                                "path": "inbound"
+                                            },
+                                            "until": {
+                                                "items": [
+                                                    {
+                                                        "kind": "id",
+                                                        "parts": [
+                                                            "fulfilled"
+                                                        ],
+                                                        "path": "fulfilled"
+                                                    },
+                                                    {
+                                                        "kind": "id",
+                                                        "parts": [
+                                                            "due"
+                                                        ],
+                                                        "path": "due"
+                                                    },
+                                                    {
+                                                        "kind": "id",
+                                                        "parts": [
+                                                            "absent"
+                                                        ],
+                                                        "path": "absent"
+                                                    }
+                                                ],
+                                                "kind": "list"
+                                            }
+                                        },
+                                        "kind": "object"
+                                    },
+                                    "port": {
+                                        "kind": "id",
+                                        "parts": [
+                                            "key"
+                                        ],
+                                        "path": "key"
+                                    },
+                                    "program": {
+                                        "kind": "id",
+                                        "parts": [
+                                            "inbound_on_receipt"
+                                        ],
+                                        "path": "inbound_on_receipt"
+                                    }
+                                },
+                                "kind": "step",
+                                "name": "inbound"
+                            },
+                            {
+                                "entries": {
+                                    "after": {
+                                        "entries": {
+                                            "time": {
+                                                "amount": 30,
+                                                "kind": "duration",
+                                                "unit": "days"
+                                            }
+                                        },
+                                        "kind": "object"
+                                    },
+                                    "port": {
+                                        "kind": "id",
+                                        "parts": [
+                                            "keys"
+                                        ],
+                                        "path": "keys"
+                                    },
+                                    "program": {
+                                        "kind": "id",
+                                        "parts": [
+                                            "settle_on_document"
+                                        ],
+                                        "path": "settle_on_document"
+                                    }
+                                },
+                                "kind": "step",
+                                "name": "wait"
+                            }
+                        ]
+                    }
+                ],
+                "storages": [
+                    {
+                        "hosts": [
+                            "acme"
+                        ],
+                        "kind": "storage",
+                        "manifest": {
+                            "writable": {
+                                "items": [
+                                    {
+                                        "kind": "id",
+                                        "parts": [
+                                            "order",
+                                            "state"
+                                        ],
+                                        "path": "order.state"
+                                    },
+                                    {
+                                        "kind": "id",
+                                        "parts": [
+                                            "return_request_line"
+                                        ],
+                                        "path": "return_request_line"
+                                    },
+                                    {
+                                        "kind": "string",
+                                        "value": "acme_*"
+                                    }
+                                ],
+                                "kind": "list"
+                            }
+                        },
+                        "name": "erp_db",
+                        "type": "postgres",
+                        "via": "erp_pg"
+                    }
+                ]
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": "acme.worlds",
+    "schemaDirective": {
+        "code": "world",
+        "namespace": null
+    }
+}

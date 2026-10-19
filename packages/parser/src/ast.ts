@@ -682,6 +682,17 @@ export interface AttributeDef {
   aggregation?: AggregationSpec;
   /** MD — span-carrying view of `domainRef` (editor-only). */
   crossRefs?: CrossRef[];
+  /** 0.16 — `states: [placed, held, …]` (D-67): the attribute's lifecycle states. */
+  states?: string[];
+  /** 0.16 — `transitions: { placed: [held, …] }` (D-67), in authored order. Absent ⇒ any. */
+  transitions?: AttributeTransition[];
+}
+
+/** 0.16 — one `from: [to, …]` entry of an attribute's `transitions:` map. */
+export interface AttributeTransition {
+  from: string;
+  to: string[];
+  source: SourceLocation;
 }
 
 export interface RelationDef {
@@ -767,6 +778,11 @@ export interface RoleDef {
   tags?: string[];
   label?: LocalizedString;
   search?: SearchBlock;
+  /**
+   * 0.16 — the automation role's free-form properties (`resolve: keycloak_group "…"`,
+   * `delivery: { … }`, `members: [ … ]`), in authored order. Absent for a cnc role.
+   */
+  entries?: AutoEntry[];
 }
 
 export interface Er2cncRoleDef {
@@ -1136,7 +1152,8 @@ export type Definition =
   | Md2DbMapDef
   | Md2ErCubeletDef
   | WorldDef
-  | LexiconEntryDef;
+  | LexiconEntryDef
+  | AutomationDef;
 
 // ============================================================================
 // Document / parse result
@@ -1235,6 +1252,14 @@ export interface WorldDef {
   engines: EngineDef[];
   executors: ExecutorDef[];
   storages: StorageDef[];
+  /** 0.16 — `def identity <id> { principal, credential }` service principals (D-90). */
+  identities?: IdentityDef[];
+  /** 0.16 — unnamed `def grant { who, program, as }` (D-91), in authored order. */
+  grants?: GrantDef[];
+  /** 0.16 — `def deployment <id> { program|process, target, run_as, trigger, … }` (D-107). */
+  deployments?: DeploymentDef[];
+  /** 0.16 — `def process <id> { instance, steps: [ def step … ] }` (D-39, D-86). */
+  processes?: ProcessDef[];
 }
 
 /** `def engine <id> { … }` inside a world (D-d-α). */
@@ -1310,6 +1335,167 @@ export interface WorldSchemaField {
   name: string;
   /** Raw dataType text (e.g. `string`, `decimal`). */
   type: string;
+  source: SourceLocation;
+}
+
+// ============================================================================
+// 0.16 — the automation model (`model automation`; AU-core-P0 S0.2). Six def kinds
+// share one permissive body (`autoBody`): typed common fields + an ordered free-form
+// entry list. The automation world members (identity / grant / deployment / process)
+// reuse the body. Values are transported structurally; their meaning (contracts §2–§3)
+// is validated in semantics, never here.
+// ============================================================================
+
+export type AutomationKind = 'parameter' | 'action' | 'service' | 'approval' | 'program' | 'recipe';
+
+/** A free-form automation value (`autoValue`). Lists/objects recurse through it. */
+export type AutoValue =
+  | StringValue
+  | TripleStringValue
+  | NumberValue
+  | BoolValue
+  | NullValue
+  | IdValue
+  | AutoDurationValue
+  | AutoTaggedValue
+  | AutoCallValue
+  | AutoStarValue
+  | AutoObjectValue
+  | AutoListValue;
+
+/** `2 working_days` — a duration literal; the unit is validated in semantics. */
+export interface AutoDurationValue {
+  kind: 'duration';
+  amount: number;
+  unit: string;
+  source: SourceLocation;
+}
+
+/** `schedule "06:00 Europe/Prague"` · `keycloak_group "hartland-sales"` — a tagged string. */
+export interface AutoTaggedValue {
+  kind: 'tagged';
+  tag: string;
+  value: string;
+  source: SourceLocation;
+}
+
+/** `hold { order: order_number }` — a call-shaped value (an action reference with arguments). */
+export interface AutoCallValue {
+  kind: 'call';
+  name: string;
+  entries: AutoEntry[];
+  source: SourceLocation;
+}
+
+/** `*` — any (`program: *`). */
+export interface AutoStarValue {
+  kind: 'star';
+  source: SourceLocation;
+}
+
+export interface AutoObjectValue {
+  kind: 'autoObject';
+  entries: AutoEntry[];
+  source: SourceLocation;
+}
+
+export interface AutoListValue {
+  kind: 'autoList';
+  items: AutoValue[];
+  source: SourceLocation;
+}
+
+export interface AutoEntry {
+  key: string;
+  value: AutoValue;
+  source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
+}
+
+/** `transition: order.state -> released { from: [placed, held] }` / `-> {to}`. */
+export interface AutoTransition {
+  /** The attribute the transition writes (`order.state`). */
+  attribute: string;
+  /** The target state — set when written as a bare state. */
+  to?: string;
+  /** The action column naming the state — set when written as `{column}`. */
+  toColumn?: string;
+  /** The `{ from: … }` guard (empty = no guard). */
+  from: string[];
+  source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
+}
+
+/** `set: order.held_for = department`. */
+export interface AutoSet {
+  attribute: string;
+  column: string;
+  source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
+}
+
+/** The shared automation body: typed common fields + the ordered free-form entries. */
+export interface AutoBody {
+  description?: StringValue | TripleStringValue;
+  descriptionLocalized?: LocalizedString;
+  tags?: string[];
+  label?: LocalizedString;
+  type?: DataType;
+  columns?: ColumnDef[];
+  target?: ObjectValue | Reference;
+  transition?: AutoTransition;
+  set?: AutoSet;
+  entries: AutoEntry[];
+}
+
+/** `def parameter | action | service | approval | program | recipe <id> { … }`. */
+export interface AutomationDef extends AutoBody {
+  kind: AutomationKind;
+  name: string;
+  source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
+}
+
+/** World `def identity <id> { principal: …, credential: … }` (D-90). */
+export interface IdentityDef extends AutoBody {
+  kind: 'identity';
+  name: string;
+  source: SourceLocation;
+}
+
+/** World `def grant { who: …, program: …, as: … }` — unnamed, keyed by its triple (D-91). */
+export interface GrantDef extends AutoBody {
+  kind: 'grant';
+  source: SourceLocation;
+}
+
+/** World `def deployment <id> { … }` (D-107). */
+export interface DeploymentDef extends AutoBody {
+  kind: 'deployment';
+  name: string;
+  source: SourceLocation;
+}
+
+/** World `def process <id> { instance: …, steps: [ def step … ] }` (D-39, D-86). */
+export interface ProcessDef {
+  kind: 'process';
+  name: string;
+  source: SourceLocation;
+  description?: StringValue | TripleStringValue;
+  descriptionLocalized?: LocalizedString;
+  tags?: string[];
+  steps: StepDef[];
+  entries: AutoEntry[];
+}
+
+/** `def step <id> { program: …, port: …, after: { … } }` inside a process. */
+export interface StepDef extends AutoBody {
+  kind: 'step';
+  name: string;
   source: SourceLocation;
 }
 

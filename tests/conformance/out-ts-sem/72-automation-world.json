@@ -1,0 +1,15 @@
+{
+    "diagnostics": [],
+    "resolved": [],
+    "symbols": [
+        "acme.worlds.world.world.demo",
+        "acme.worlds.world.world.demo.automation_decider",
+        "acme.worlds.world.world.demo.erp_db",
+        "acme.worlds.world.world.demo.erp_pg",
+        "acme.worlds.world.world.demo.n8n",
+        "acme.worlds.world.world.demo.release_n8n",
+        "acme.worlds.world.world.demo.release_native_morning",
+        "acme.worlds.world.world.demo.return_line_flow",
+        "acme.worlds.world.world.demo.returns_n8n"
+    ]
+}
