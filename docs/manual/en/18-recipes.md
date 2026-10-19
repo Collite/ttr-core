@@ -155,12 +155,16 @@ its snapshot dates without `latest` first is the warning `TTRP-REC-050`.
 | per-candidate | every row it produces carries the key and comes from exactly one candidate | |
 | set-level | it reads the candidates but an op loses the key | needs a `window`, or runs in batch only |
 
-The key survives a `filter`, `calc`, `sort`, `limit`, `latest`/`within`; a `select`/projection that keeps the key
-column; an `aggregate` that groups by it; an `inner` join with the candidates on one side (a `left` or `semi` join with
-them on the left); and a join whose other side equates to the key — `on: left.order_number = right.order_number`, or
-`on: relation rel_order_line` from the key's entity to the many side. Joining candidate rows with candidate rows on
-the key is the same candidate; on anything else it is one candidate meeting another, and the context is set-level.
-The checker is conservative: what it cannot prove keyed is set-level, and its message names the op that lost the key.
+The key survives a `filter`, `calc`, `sort`, `limit`, `within`; a `latest` whose `per:` includes the key; a
+`select`/projection that keeps the key column; an `aggregate` that groups by it; a `union` whose inputs carry it at the
+same position. A join keeps it when the other side is a **lookup** (rows of the model, none built from the
+candidates): an `inner` join, a `left` or `semi` join with the candidates on the left, or a join whose other side
+equates to the key — `on: left.order_number = right.order_number`, or `on: relation rel_order_line` from the key's
+entity to the many side. Joining candidate rows with candidate rows on the key is the same candidate. Joining them
+with rows built from the candidates — an aggregate of them, a set-level context, or the candidates on anything but
+the key — is one candidate meeting the others, and the context is set-level. An `IN` or `EXISTS` subquery inside a
+larger SQL `WHERE` cannot be followed; restate it as a join. The checker is conservative: what it cannot prove keyed
+is set-level, and its message names the op that lost the key.
 
 A recipe whose contexts are all lookups or per-candidate is **per-candidate** — any program may run it, for one key or
 for all. A set-level context with a `window` makes it **set-level, windowed**; without one, **set-level, batch-only**.
@@ -170,8 +174,11 @@ for all. A set-level context with a `window` makes it **set-level, windowed**; w
 a value of the column's kind: `role.<name>` for a role, a context's name for rows, an action (or an action call) for an
 action, the column's attribute type otherwise — a text column takes any value; a bare name the rows do not carry is a
 symbol (`to: rejected`). Every route is wired. An action's `transition` must reach a state the attribute's `states:`
-lists, along its `transitions:`. A route whose condition reads an agent's answer (a `turn` context) may only fire an
-action with `approval: required`.
+lists, along its `transitions:`. A bare name the route's rows do not carry is read as a text (`to: rejected`); it is
+checked against the attribute's `states:` or value labels where the action writes one — elsewhere, quote texts. A
+column typed by an attribute (`order: order.order_number`) takes that attribute, or one the model's relations equate to
+it. A route decided on an agent's answer (a `turn` context, followed through every island) — or a wiring whose `when:`
+reads one — may only fire an action with `approval: required`, and no unapproved `on_due:`.
 
 ## Words that stay names
 

@@ -1,4 +1,4 @@
-// AU-core-P1 negative: a weekly window, and a daily batch program (`probe_weekly_batch`) → TTRP-REC-011.
+// AU-core-P1 negative: a weekly window, and a daily batch program (`probe_daily_batch`) → TTRP-REC-011.
 uses world "hartland.worlds.demo"
 import hartland.*
 import hartland.automation.*

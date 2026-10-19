@@ -85,7 +85,7 @@ class ExplainCommandSpec :
             out shouldContain "routes (overlapping): hold_sales, hold_ar, release_confirmed, release"
         }
 
-        "explain of a recipe whose world does not resolve prints the skeleton and says the checker did not run" {
+        "explain of a recipe whose front half fails prints the skeleton and says the checker did not run" {
             val recipes = resolutionRoot.parent.resolve("recipes")
             val lines = mutableListOf<String>()
             val code =

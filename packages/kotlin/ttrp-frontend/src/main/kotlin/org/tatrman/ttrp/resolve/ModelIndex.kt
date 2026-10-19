@@ -164,6 +164,29 @@ class ModelIndex(
             .filterIsInstance<org.tatrman.ttr.metadata.model.AutomationObject>()
             .filter { o -> imports.any { imp -> pathInPackage(o, imp.pkg) } }
 
+    /** Every automation object of the model, imported or not — a `def program` names its recipe, not the reverse. */
+    fun automationAll(): List<org.tatrman.ttr.metadata.model.AutomationObject> =
+        objects.filterIsInstance<org.tatrman.ttr.metadata.model.AutomationObject>()
+
+    /**
+     * The er entity named [name] as a recipe sees it (AU-core-P1): the imports' first, then the automation stdlib's
+     * (a prelude). Never another package's entity of the same name.
+     */
+    fun entityInScope(
+        name: String,
+        imports: List<ImportScope>,
+    ): Entity? = findEntities(name, imports).firstOrNull() ?: findStdlibEntities(name).firstOrNull()
+
+    /** The calendars of the model — entities with an attribute whose `semantics { role: event_date }` (D-82). */
+    fun calendars(): List<Entity> = objects.filterIsInstance<Entity>().filter { isCalendar(it) }
+
+    /** Every db foreign key (`def fk`): an sk's road to the calendar when a relation carries no `join:` pairs. */
+    fun foreignKeys(): List<org.tatrman.ttr.metadata.model.DbForeignKey> =
+        objects.filterIsInstance<org.tatrman.ttr.metadata.model.DbForeignKey>()
+
+    /** Every relation of the model. */
+    fun allRelations(): List<Relation> = objects.filterIsInstance<Relation>()
+
     /** Every relation with [entity] at either end (AU-core-P1: an sk's road to the calendar). */
     fun relationsOf(entity: Entity): List<Relation> =
         objects.filterIsInstance<Relation>().filter {

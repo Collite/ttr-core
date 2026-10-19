@@ -165,6 +165,11 @@ enum class TtrpDiagnosticId(
         "named arguments belong to the recipe time functions (`age(since: …)`, `working_days(between: …, and: …)`, " +
             "`within(…)`); call every other function positionally, each name once",
     ),
+    PRS_009(
+        "TTRP-PRS-009",
+        "write `calc(name = expression, …)` (or `calc { name = expression }`), and a join's kind once — `kind:` and " +
+            "`type:` are one argument",
+    ),
     FRG_001("TTRP-FRG-001", "supported fragment dialects: sql, pandas, ttrb, ttrb-cs (C3-g/C4-f)"),
 
     // ---- Stage 6.3 bare-fragment programs (FRG) ----

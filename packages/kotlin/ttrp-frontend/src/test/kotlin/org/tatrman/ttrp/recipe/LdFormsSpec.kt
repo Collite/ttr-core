@@ -54,6 +54,30 @@ class LdFormsSpec :
                 listOf("order_number", "short")
         }
 
+        "a hoisted variable never takes a name the document binds" {
+            val doc =
+                desugared(
+                    "_ld0 = load(er.entity.order)\nx = _ld0 -> join(right: load(er.entity.sales_line), kind: inner, on: relation r)",
+                )
+            (doc.statements[1] as Assignment).target shouldBe "_ld1"
+        }
+
+        "review-115 m9: an argument form the desugar does not read is TTRP-PRS-009, not dropped" {
+            fun ids(src: String) = TtrpParser.parseString(src + "\n", "f.ttrp").diagnostics.map { it.id.id }
+            ids("x = a -> calc(big = amount + 1, invoice_id > 3)") shouldContainExactly listOf("TTRP-PRS-009")
+            ids("x = a -> calc(big: amount + 1)") shouldContainExactly listOf("TTRP-PRS-009")
+            ids("x = a -> join(right: b, kind: left, type: inner, on: left.k = right.k)") shouldContainExactly
+                listOf("TTRP-PRS-009")
+            ids("x = a -> calc(big = amount + 1)") shouldContainExactly emptyList()
+        }
+
+        "review-115 m8: `latest` / `within` outside a recipe are refused at parse time (they compile with P2)" {
+            TtrpParser
+                .parseString("x = load(er.entity.order) -> within(placed_date, last: days(30))\n", "f.ttrp")
+                .diagnostics
+                .map { it.id.id } shouldContainExactly listOf("TTRP-REC-099")
+        }
+
         "a filter's `=` is a comparison, untouched" {
             ops("x = a -> filter(k = 1)").single().args.size shouldBe 1
         }

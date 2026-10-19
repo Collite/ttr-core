@@ -1,11 +1,17 @@
 // TEST-ONLY (AU-core-P1 recipe-checker specs) — not hartland's: programs that run the negative fixtures'
-// recipes (`recipe: rec_011` …) so the program-side checks (REC-010 on an event program, REC-011, REC-012)
-// have something to check against, and the answer schema of the turn-rule fixture.
+// recipes, so the program-side checks (REC-010 on an event program, REC-011, REC-012) have something to check
+// against, and the answer schema of the turn-rule fixture. The fixtures name their recipe with a `recipe:` header
+// — contracts §6 gives it to a multi-skeleton document; here it only lets one `.ttrp` file stand for a recipe
+// whose name a program can spell (a file name like `rec-011-batch-scope` is no id).
 package hartland.automation
 model automation
 
-def program probe_weekly_batch   { recipe: rec_011,       port: none, mode: batch,    as_of: run,   schedule: "06:00 Europe/Prague" }
+def program probe_daily_batch    { recipe: rec_011,       port: none, mode: batch,    as_of: run,   schedule: "06:00 Europe/Prague" }
 def program probe_key            { recipe: rec_012,       port: key,  mode: on_event, as_of: event }
 def program probe_event_setlevel { recipe: rec_010_event, port: none, mode: on_event, as_of: event }
 
 def schema care_answer { columns: [def column order_number { type: order.order_number }, def column approve { type: bool }] }
+
+// review-115 M5: an attribute-typed column whose attribute is a key reference (not the key itself) — a value of
+// another entity's reference to the same key fits; one to another key does not.
+def action probe_item { columns: [def column item { type: reorder_proposal.item }], sinks: { native: writer }, approval: none }

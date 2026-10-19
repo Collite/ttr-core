@@ -37,16 +37,49 @@ import org.tatrman.ttrp.expr.FunctionCall
  * is resolved.
  */
 object LdForms {
-    /** The hoisted variables' prefix — never an authored name (identifiers do not start with `_ld` by convention). */
+    /** The hoisted variables' prefix; a name the document already uses is skipped. */
     const val HOIST_PREFIX = "_ld"
 
     fun desugar(doc: TtrpDocument): TtrpDocument {
-        val run = Run()
+        val run = Run(names(doc.statements))
         return doc.copy(statements = run.statements(doc.statements))
     }
 
-    private class Run {
+    /** Every name the document binds — a hoisted variable must not take one. */
+    private fun names(stmts: List<Statement>): Set<String> =
+        stmts
+            .flatMap { s ->
+                when (s) {
+                    is Assignment -> listOf(s.target)
+                    is ContainerDecl ->
+                        listOf(s.name) +
+                            ((s.body as? FlowBody)?.let { names(it.statements) } ?: emptySet())
+                    is RecipeDecl ->
+                        s.members.flatMap { m ->
+                            when (m) {
+                                is RoleContainer ->
+                                    listOf(m.name) +
+                                        ((m.body as? FlowBody)?.let { names(it.statements) } ?: emptySet())
+                                is DecisionDecl -> listOf(m.name) + names(m.statements)
+                                else -> emptyList()
+                            }
+                        }
+                    else -> emptyList()
+                }
+            }.toSet()
+
+    private class Run(
+        private val taken: Set<String>,
+    ) {
         private var counter = 0
+
+        private fun fresh(): String {
+            var n: String
+            do {
+                n = "$HOIST_PREFIX${counter++}"
+            } while (n in taken)
+            return n
+        }
 
         fun statements(stmts: List<Statement>): List<Statement> = stmts.flatMap { statement(it) }
 
@@ -111,7 +144,7 @@ object LdForms {
         ): Arg {
             val call = (arg.value as? ExprArg)?.expr as? FunctionCall ?: return arg
             if (call.function.value != "load") return arg
-            val name = "$HOIST_PREFIX${counter++}"
+            val name = fresh()
             val load =
                 OpCall(
                     name = "load",

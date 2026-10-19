@@ -47,6 +47,9 @@ internal object TtrpChecks {
     private val DATE_PARAM_TYPES = setOf("date", "datetime")
     private const val RUN_DATE_BUILTIN = "run-date"
 
+    /** The recipe's time sugar ops (AU-core-P1; lowered at P2). */
+    private val TIME_SUGAR_OPS = setOf("latest", "within")
+
     /** Reserved synthesized-rejects column prefix (contracts §1 / RS-5). */
     private const val TTRP_PREFIX = "_ttrp_"
 
@@ -166,6 +169,7 @@ internal object TtrpChecks {
         enclosingPorts: Set<String>,
         out: MutableList<TtrpDiagnostic>,
         topLevel: Boolean = false,
+        inRecipe: Boolean = false,
     ) {
         for (stmt in statements) {
             when (stmt) {
@@ -194,10 +198,10 @@ internal object TtrpChecks {
                                 stmt.targetLocation,
                             )
                     }
-                    checkChain(stmt.chain, out)
+                    checkChain(stmt.chain, out, inRecipe)
                 }
 
-                is ChainStmt -> checkChain(stmt.chain, out)
+                is ChainStmt -> checkChain(stmt.chain, out, inRecipe)
 
                 is ContainerDecl -> {
                     when (val body = stmt.body) {
@@ -246,14 +250,14 @@ internal object TtrpChecks {
                                 if (body.tag == "sql") checkSqlReadOnly(member.name, body, out)
                             }
                         is FlowBody -> {
-                            checkStatements(body.statements, ports, out)
+                            checkStatements(body.statements, ports, out, inRecipe = true)
                             checkNoStore(member.name, body.statements, out)
                         }
                         null -> Unit
                     }
                 }
                 is DecisionDecl -> {
-                    checkStatements(member.statements, member.ports.map { it.name }.toSet(), out)
+                    checkStatements(member.statements, member.ports.map { it.name }.toSet(), out, inRecipe = true)
                     checkNoStore(member.name, member.statements, out)
                     // REC-070: the decision is a canonical body ending in its switch — no island of its own.
                     member.statements.filter { it is ContainerDecl || it is RecipeDecl }.forEach {
@@ -348,16 +352,53 @@ internal object TtrpChecks {
     private fun checkChain(
         chain: Chain,
         out: MutableList<TtrpDiagnostic>,
+        inRecipe: Boolean = false,
     ) {
         for (elem in chain.elements) {
-            if (elem is OpCall) checkOpCall(elem, out)
+            if (elem is OpCall) checkOpCall(elem, out, inRecipe)
         }
+    }
+
+    /** `name = expression` written as an argument — the form `calc(…)` takes (AU-core-P1, the LD forms). */
+    private fun isAssignment(arg: org.tatrman.ttrp.ast.Arg): Boolean {
+        if (arg.name != null) return false
+        val eq =
+            (arg.value as? org.tatrman.ttrp.ast.ExprArg)?.expr as? org.tatrman.ttrp.expr.FunctionCall ?: return false
+        return eq.function == org.tatrman.ttrp.expr.CatalogId.EQ &&
+            (eq.args.firstOrNull() as? org.tatrman.ttrp.expr.ColumnRef)?.port == null &&
+            eq.args.firstOrNull() is org.tatrman.ttrp.expr.ColumnRef
     }
 
     private fun checkOpCall(
         op: OpCall,
         out: MutableList<TtrpDiagnostic>,
+        inRecipe: Boolean = false,
     ) {
+        // The LD argument forms the resolver reads (AU-core-P1, review-115 m9): every `calc` argument is
+        // `name = expression`, a join names its kind once — anything else would be dropped without a word.
+        if (op.name == "calc") {
+            op.args.firstOrNull { !isAssignment(it) }?.let {
+                out +=
+                    diag(
+                        TtrpDiagnosticId.PRS_009,
+                        "`calc` reads `name = expression` arguments; this one is not",
+                        it.location,
+                    )
+            }
+        }
+        if (op.name == "join" && op.args.any { it.name == "kind" } && op.args.any { it.name == "type" }) {
+            out += diag(TtrpDiagnosticId.PRS_009, "`kind:` and `type:` on one join", op.location)
+        }
+        // The time sugar ops compile with the recipe compile (AU-core-P2): outside a recipe they would reach an
+        // emitter that cannot lower them (review-115 m8).
+        if (!inRecipe && op.name in TIME_SUGAR_OPS) {
+            out +=
+                diag(
+                    TtrpDiagnosticId.REC_099,
+                    "`${op.name}` is a recipe op — it compiles with the recipe compile (AU-core-P2)",
+                    op.location,
+                )
+        }
         // RJ-103 (RS-5): the `_ttrp_` prefix is reserved for synthesized rejects columns; a user
         // column declared (schema literal) or computed (calc/aggregate assignment) with it errors.
         op.config?.entries?.filterIsInstance<org.tatrman.ttrp.ast.AssignEntry>()?.forEach { e ->

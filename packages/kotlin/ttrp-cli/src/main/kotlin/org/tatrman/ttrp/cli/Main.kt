@@ -414,9 +414,12 @@ object TtrpCli {
                         .render(model),
                 )
             } else {
-                out("checker · not run — the world or the model did not resolve:")
+                out("checker · not run — the front half reported errors:")
             }
-            findings.forEach { out(it.render()) }
+            for (d in findings) {
+                out(d.render())
+                d.suggestedAlternative?.let { out("  ↳ suggested: $it") }
+            }
             return if (findings.any { it.severity == Severity.ERROR }) 1 else 0
         }
         val output = TtrpPipeline(manifestResult.manifest, modelsRoot).explain(Files.readString(abs), abs.toString())

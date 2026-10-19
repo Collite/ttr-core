@@ -8,7 +8,6 @@ import org.tatrman.ttr.metadata.model.AutomationParameter
 import org.tatrman.ttr.metadata.model.AutomationProgram
 import org.tatrman.ttr.metadata.model.AutomationRole
 import org.tatrman.ttr.metadata.model.AutomationService
-import org.tatrman.ttr.metadata.model.Entity
 import org.tatrman.ttr.metadata.model.Relation
 import org.tatrman.ttrp.ast.ImportDecl
 import org.tatrman.ttrp.ast.IslandForm
@@ -16,6 +15,7 @@ import org.tatrman.ttrp.ast.RecipeDecl
 import org.tatrman.ttrp.ast.RoleContainer
 import org.tatrman.ttrp.ast.RouteRef
 import org.tatrman.ttrp.ast.SourceLocation
+import org.tatrman.ttrp.ast.Wiring
 import org.tatrman.ttrp.ast.WiringArg
 import org.tatrman.ttrp.ast.WiringValue
 import org.tatrman.ttrp.diagnostics.Severity
@@ -24,6 +24,7 @@ import org.tatrman.ttrp.diagnostics.TtrpDiagnosticId
 import org.tatrman.ttrp.expr.CatalogId
 import org.tatrman.ttrp.expr.ColumnRef
 import org.tatrman.ttrp.expr.DurationExpr
+import org.tatrman.ttrp.expr.DurationUnit
 import org.tatrman.ttrp.expr.Expression
 import org.tatrman.ttrp.expr.FunctionCall
 import org.tatrman.ttrp.expr.InList
@@ -46,12 +47,19 @@ import org.tatrman.ttrp.resolve.ModelIndex
 import org.tatrman.ttrp.resolve.TtrpChecker
 
 /**
- * The recipe checker (AU-core-P1; AU contracts §4) — a pass over the built graph and the resolved model, after
- * `StructureValidator`: the role wiring (REC-000), the action wiring typed against `def action` (REC-001…003),
- * the candidates (REC-004/005), key lineage and the mode verdict (REC-010…012), parameters (REC-020/021),
- * transitions against `states:` (REC-030), the turn rule (REC-040) and the time typing ([RecipeTime], REC-050).
- * The document-level shape (one recipe, one candidates role, DML, the decision body) is checked at parse time
- * (`TtrpChecks`), where a DML island's TTRP-SQL-001 would otherwise stop the compile before this pass runs.
+ * The recipe checker (AU-core-P1; AU contracts §4): a pass over the built graph and the resolved model, run after
+ * `StructureValidator`. It checks:
+ * - the role shape and wiring (REC-000);
+ * - the action wiring, typed against `def action` (REC-001…003);
+ * - the candidates (REC-004 / 005);
+ * - key lineage and the mode verdict (REC-010…012);
+ * - parameters (REC-020 / 021);
+ * - transitions against `states:` (REC-030);
+ * - the turn rule (REC-040);
+ * - time typing ([RecipeTime], REC-050).
+ *
+ * The document-level shape (one recipe, DML, the decision body) is checked at parse time (`TtrpChecks`): a DML
+ * island's TTRP-SQL-001 stops the compile before this pass would run.
  */
 class RecipeChecker(
     private val report: TtrpChecker.Report,
@@ -81,17 +89,21 @@ class RecipeChecker(
                 .firstOrNull()
                 ?.parts
                 ?.let { if (it.size >= 2) it[it.size - 2] else null }
+        // A program names its recipe; the recipe imports nothing of it (review-115 M2) — so the whole model.
+        val programs =
+            model
+                ?.automationAll()
+                .orEmpty()
+                .filterIsInstance<AutomationProgram>()
+                .filter { it.recipe == name }
 
         val forms =
             rg.roles
-                .mapNotNull { (n, id) ->
-                    recipe.roleContainers.firstOrNull { it.name == n }?.let {
-                        id to
-                            it.form
-                    }
-                }.toMap()
+                .mapNotNull { (n, id) -> recipe.roleContainers.firstOrNull { it.name == n }?.let { id to it.form } }
+                .toMap()
         val opaqueOut: (Container) -> Row? = { c -> forms[c.id]?.let { declaredRow(it) } }
-        val rows = RecipeRows(graph, report.loadSchemas, opaqueOut)
+        val time = RecipeTime(report, build, rg, imports, programs)
+        val rows = RecipeRows(graph, report.loadSchemas, opaqueOut) { e, row -> time.scalarType(e, row) }
         val candidatesId = recipe.candidates.firstOrNull()?.let { rg.roles[it.name] }
         val lineage =
             KeyLineage(
@@ -107,11 +119,11 @@ class RecipeChecker(
             )
 
         checkShape(recipe)
+        checkIslandSchemas(recipe)
         checkRoleWiring(rg)
         val candidatesRow = candidatesId?.let { id -> container(id)?.let { outRow(rows, it) } }
         checkCandidates(recipe, rg, candidatesRow, keyColumns)
 
-        val programs = automation<AutomationProgram>().filter { it.recipe == name }
         val contexts = recipe.contexts.map { classify(it, rg, lineage) }
         val mode = modeOf(contexts)
         checkMode(recipe, contexts, mode, programs)
@@ -119,10 +131,24 @@ class RecipeChecker(
         checkDecisionLineage(rg, lineage, keyColumns)
 
         val routeRow = routeRows(rg, rows)
-        val turnFed = turnFedRoutes(recipe, rg, keyColumns)
-        checkWiring(recipe, rg, routeRow, turnFed)
+        val routeOrigin =
+            rg.switch?.let { rows.inputOrigin(it) }
+                ?: candidatesId?.takeIf { rg.decision == null }?.let { id ->
+                    container(id)?.let { outOrigin(rows, it) }
+                }
+                ?: emptyMap()
+        val turns =
+            rg.roles
+                .filter { (n, _) ->
+                    recipe.contexts.any { it.name == n && it.form is IslandForm.Turn }
+                }.values
+                .toSet()
+        val taint = TurnTaint(graph, rows, turns, keyColumns)
+        val turnFed = turnFedRoutes(recipe, rg, taint)
+        checkWiring(recipe, routeRow, routeOrigin, turnFed, rg.switch?.let { taint.input(it) }.orEmpty(), taint)
+        checkRouteAttributes(recipe, routeRow)
         checkParameters(recipe, rg, programs, keyColumns)
-        diags += RecipeTime(report, build, rg, rows, imports, name).check()
+        diags += time.check(rows)
 
         val sw = recipe.decisions.firstOrNull()?.switch
         val recipeModel =
@@ -138,16 +164,18 @@ class RecipeChecker(
                         RouteInfo(it.name, it.because, it.detail.map { d -> d.text }, it.name in turnFed)
                     } +
                         listOfNotNull(
-                            sw?.elseRoute?.name?.let {
-                                RouteInfo(
-                                    it,
-                                    sw.elseRoute!!.because,
-                                    sw.elseRoute!!.detail.map { d ->
-                                        d.text
-                                    },
-                                    false,
-                                    isElse = true,
-                                )
+                            sw?.elseRoute?.let { e ->
+                                e.name?.let { n ->
+                                    RouteInfo(
+                                        n,
+                                        e.because,
+                                        e.detail.map { d ->
+                                            d.text
+                                        },
+                                        n in turnFed,
+                                        isElse = true,
+                                    )
+                                }
                             },
                         ),
                 switchMode = sw?.mode?.spelling,
@@ -169,7 +197,13 @@ class RecipeChecker(
 
     // ---- roles -------------------------------------------------------------------------------------------
 
-    /** 06 §1.2: exactly one `candidates` (no `in` port), at most one `decision`, and the `actions` wiring. */
+    /**
+     * 06 §1.2's shape:
+     * - exactly one `candidates`, with no `in` port and one `out` (the one that carries the key);
+     * - at most one `decision`;
+     * - an `actions` block;
+     * - every role named once, and one out port per context.
+     */
     private fun checkShape(recipe: RecipeDecl) {
         when (recipe.candidates.size) {
             1 -> Unit
@@ -180,9 +214,56 @@ class RecipeChecker(
                         err(TtrpDiagnosticId.REC_000, "a second `candidates` island — a recipe has one", it.location)
                 }
         }
-        recipe.candidates.firstOrNull()?.ports?.firstOrNull { it.kind == org.tatrman.ttrp.ast.PortKind.IN }?.let {
+        recipe.candidates.firstOrNull()?.let { c ->
+            c.ports.firstOrNull { it.kind == org.tatrman.ttrp.ast.PortKind.IN }?.let {
+                diags +=
+                    err(
+                        TtrpDiagnosticId.REC_000,
+                        "the candidates read nothing of the recipe — no `in` port",
+                        it.location,
+                    )
+            }
+            c.ports.filter { it.kind == org.tatrman.ttrp.ast.PortKind.OUT }.drop(1).forEach {
+                diags +=
+                    err(
+                        TtrpDiagnosticId.REC_000,
+                        "a second `out` port on the candidates — one port carries the key; a computation over the " +
+                            "candidates is a `context`",
+                        it.location,
+                    )
+            }
+        }
+        recipe.contexts.forEach { c ->
+            c.ports.filter { it.kind == org.tatrman.ttrp.ast.PortKind.OUT }.drop(1).forEach {
+                diags +=
+                    err(
+                        TtrpDiagnosticId.REC_000,
+                        "context `${c.name}` has a second `out` port — a context has one",
+                        it.location,
+                    )
+            }
+        }
+        recipe.roleContainers.groupBy { it.name }.filterValues { it.size > 1 }.forEach { (n, cs) ->
+            cs.drop(1).forEach {
+                diags +=
+                    err(TtrpDiagnosticId.REC_000, "a second role container named `$n`", it.location)
+            }
+        }
+        val candidatesOut =
+            recipe.candidates.flatMap { c ->
+                c.ports
+                    .filter {
+                        it.kind ==
+                            org.tatrman.ttrp.ast.PortKind.OUT
+                    }.map { it.name }
+            }
+        recipe.contexts.filter { it.name in candidatesOut }.forEach {
             diags +=
-                err(TtrpDiagnosticId.REC_000, "the candidates read nothing of the recipe — no `in` port", it.location)
+                err(
+                    TtrpDiagnosticId.REC_000,
+                    "context `${it.name}` has the name of the candidates' out port",
+                    it.location,
+                )
         }
         recipe.decisions.drop(1).forEach {
             diags += err(TtrpDiagnosticId.REC_000, "a second `decision` — a recipe decides once", it.location)
@@ -194,6 +275,45 @@ class RecipeChecker(
                     "the recipe wires no actions — add an `actions { }` block",
                     recipe.location,
                 )
+        }
+    }
+
+    /** A `foreign … schema s`, `turn … answer s` or `call` service must resolve — an island's declared rows. */
+    private fun checkIslandSchemas(recipe: RecipeDecl) {
+        for (role in recipe.roleContainers) {
+            val f = role.form
+            val missing =
+                when (f) {
+                    is IslandForm.Foreign ->
+                        f.schema
+                            .takeIf {
+                                rowSchema(
+                                    it,
+                                ) == null
+                            }?.let { "no `def schema $it` in the imports" }
+                    is IslandForm.Turn ->
+                        f.answerSchema
+                            .takeIf {
+                                rowSchema(
+                                    it,
+                                ) == null
+                            }?.let { "no `def schema $it` in the imports for the answer" }
+                    is IslandForm.Call -> {
+                        val service =
+                            automation<AutomationService>().firstOrNull {
+                                it.qname.name ==
+                                    f.service.parts.last()
+                            }
+                        when {
+                            service == null -> "no `def service ${f.service.text}` in the imports"
+                            service.response != null && rowSchema(service.response!!) == null ->
+                                "service `${f.service.text}`'s response `${service.response}` is no `def schema` of the imports"
+                            else -> null
+                        }
+                    }
+                    else -> null
+                }
+            missing?.let { diags += err(TtrpDiagnosticId.RES_001, "`${role.name}`: $it", f.location) }
         }
     }
 
@@ -289,7 +409,8 @@ class RecipeChecker(
                 out.readsCandidates -> ContextClass.SET_LEVEL
                 else -> ContextClass.LOOKUP
             }
-        return ContextInfo(role.name, kind, cls, role.window, out.lostAt?.what, out.lostAt?.location)
+        val lost = out.lostAt.takeIf { cls == ContextClass.SET_LEVEL }
+        return ContextInfo(role.name, kind, cls, role.window, lost?.what, lost?.location)
     }
 
     private fun modeOf(contexts: List<ContextInfo>): RecipeMode {
@@ -307,7 +428,7 @@ class RecipeChecker(
         mode: RecipeMode,
         programs: List<AutomationProgram>,
     ) {
-        val eventPrograms = programs.filter { it.mode == "on_event" || it.port == "key" }
+        val perKey = programs.filter { it.mode == "on_event" || it.port == "key" || it.port == "keys" }
         for (ctx in contexts) {
             val role = recipe.contexts.first { it.name == ctx.name }
             when (ctx.contextClass) {
@@ -317,10 +438,11 @@ class RecipeChecker(
                         val why = ctx.lostKeyAt ?: "an op loses the key"
                         val base = "context `${ctx.name}` reads the candidates but $why → set-level"
                         diags +=
-                            if (eventPrograms.isNotEmpty()) {
+                            if (perKey.isNotEmpty()) {
                                 err(
                                     TtrpDiagnosticId.REC_010,
-                                    "$base, and program `${eventPrograms.first().qname.name}` runs it per event — " +
+                                    "$base, and program `${perKey.first().qname.name}` runs it per event or per " +
+                                        "key — " +
                                         "declare `window` or restate",
                                     loc,
                                 )
@@ -346,11 +468,17 @@ class RecipeChecker(
             }
         }
         if (mode != RecipeMode.PER_CANDIDATE) {
-            for (p in programs.filter { it.port == "key" }) {
+            // 06 A-5: a set-level recipe cannot run for one key, nor for an arbitrary set of keys (only an unwindowed
+            // one; a windowed recipe's key-set batch is REC-011's).
+            val refused =
+                programs.filter { it.port == "key" || (it.port == "keys" && mode == RecipeMode.SET_LEVEL_BATCH_ONLY) }
+            for (p in refused) {
                 diags +=
                     err(
                         TtrpDiagnosticId.REC_012,
-                        "program `${p.qname.name}` runs the recipe for one key (`port: key`), but the recipe is ${mode.spelling}",
+                        "program `${p.qname.name}` runs the recipe for " +
+                            "${if (p.port == "key") "one key" else "a set of keys"} " +
+                            "(`port: ${p.port}`), but the recipe is ${mode.spelling}",
                         recipe.location,
                     )
             }
@@ -391,19 +519,19 @@ class RecipeChecker(
         for (p in programs.filter { it.mode == "batch" }) {
             val period = schedulePeriod(p.schedule)
             val ok =
-                when (over) {
-                    is org.tatrman.ttrp.ast.WindowOver.Calendar ->
-                        period != null &&
-                            PERIODS.indexOf(period) >= PERIODS.indexOf(over.unit)
-                    else -> false
-                }
+                p.port != "keys" &&
+                    when (over) {
+                        is org.tatrman.ttrp.ast.WindowOver.Calendar ->
+                            period != null && PERIODS.indexOf(period) >= PERIODS.indexOf(over.unit)
+                        else -> false
+                    }
             if (!ok) {
                 diags +=
                     err(
                         TtrpDiagnosticId.REC_011,
-                        "batch program `${p.qname.name}` (schedule ${p.schedule ?: "none"}) does not cover whole " +
-                            "windows of " +
-                            "context `${ctx.name}`",
+                        "batch program `${p.qname.name}` (schedule " +
+                            "${p.schedule ?: "none"}${if (p.port == "keys") ", `port: keys`" else ""}) " +
+                            "does not cover whole windows of context `${ctx.name}`",
                         window.location,
                     )
             }
@@ -420,7 +548,7 @@ class RecipeChecker(
             else -> null
         }
 
-    /** T5: the decision joins per-candidate contexts on the key, and its switch reads keyed rows. */
+    /** T5: the decision's switch reads keyed rows — one per candidate, never one built from several. */
     private fun checkDecisionLineage(
         rg: RecipeGraph,
         lineage: KeyLineage,
@@ -443,12 +571,15 @@ class RecipeChecker(
 
     // ---- the action wiring (REC-001…003, REC-030, REC-040) -------------------------------------------------
 
+    /** The rows a route carries: the switch's input, or — for a decision-less recipe — the candidates'. */
     private fun routeRows(
         rg: RecipeGraph,
         rows: RecipeRows,
     ): Row? =
-        rg.switch?.let { rows.input(it) }
-            ?: rg.recipe.candidates
+        if (rg.switch != null) {
+            rows.input(rg.switch)
+        } else if (rg.decision == null) {
+            rg.recipe.candidates
                 .firstOrNull()
                 ?.let { rg.roles[it.name] }
                 ?.let {
@@ -456,16 +587,21 @@ class RecipeChecker(
                         it,
                     )
                 }?.let { outRow(rows, it) }
+        } else {
+            null
+        }
 
     private fun checkWiring(
         recipe: RecipeDecl,
-        rg: RecipeGraph,
         routeRow: Row?,
+        routeOrigin: Map<String, String>,
         turnFed: Set<String>,
+        switchTaint: Set<String>,
+        taint: TurnTaint,
     ) {
         val decision = recipe.decisions.firstOrNull()
         val sw = decision?.switch
-        val routeNames = sw?.routeNames.orEmpty()
+        val routeNames = if (decision == null) listOf(IDENTITY) else sw?.routeNames.orEmpty()
         val consumed = mutableSetOf<String>()
         for (w in recipe.wirings) {
             for (r in w.routes) {
@@ -489,23 +625,51 @@ class RecipeChecker(
                     err(TtrpDiagnosticId.REC_001, "no action `${w.action}` in the imported packages", w.actionLocation)
                 continue
             }
-            checkArgs(action, w.args, routeRow, rg, w.actionLocation)
+            val ctx = WiringContext(routeRow, routeOrigin)
+            checkArgs(action, w.args, ctx, w.actionLocation)
             checkTransition(action, w.args, routeRow, w.actionLocation)
-            val fed = w.routes.filter { it.isAll && turnFed.isNotEmpty() || it.route in turnFed }
-            if (fed.isNotEmpty() && action.approval != "required") {
-                diags +=
-                    err(
-                        TtrpDiagnosticId.REC_040,
-                        "route `${fed.first().route}` decides on an agent's answer and fires `${w.action}`, " +
-                            "which needs no approval",
-                        w.actionLocation,
-                    )
-            }
+            checkTurnRule(w, action, turnFed, switchTaint, taint)
         }
         for (r in routeNames - consumed) {
             val loc =
                 sw?.routes?.firstOrNull { it.name == r }?.nameLocation ?: sw?.elseRoute?.location ?: recipe.location
-            diags += err(TtrpDiagnosticId.REC_003, "route `$r` is wired to no action", loc)
+            val what = if (r == IDENTITY) "the recipe's identity verdict (`<candidates>.all`)" else "route `$r`"
+            diags += err(TtrpDiagnosticId.REC_003, "$what is wired to no action", loc)
+        }
+    }
+
+    /**
+     * REC-040 (D-32): a wiring decided on an agent's answer — its route's condition, the rows the route was chosen
+     * from, or its own `when:` — fires only actions that need approval, and no unapproved `on_due:` either.
+     */
+    private fun checkTurnRule(
+        w: Wiring,
+        action: AutomationAction,
+        turnFed: Set<String>,
+        switchTaint: Set<String>,
+        taint: TurnTaint,
+    ) {
+        val fedRoute = w.routes.firstOrNull { (it.isAll && turnFed.isNotEmpty()) || it.route in turnFed }
+        val fedWhen = w.whenCondition?.takeIf { taint.reads(it, switchTaint) }
+        if (fedRoute == null && fedWhen == null) return
+        val why =
+            fedRoute?.let { "route `${it.route}` decides on an agent's answer" }
+                ?: "its `when:` reads an agent's answer"
+        if (action.approval != "required") {
+            diags +=
+                err(TtrpDiagnosticId.REC_040, "$why and fires `${w.action}`, which needs no approval", w.actionLocation)
+        }
+        for (a in w.args.filter { it.name == "on_due" }) {
+            val call = a.value as? WiringValue.Call ?: continue
+            val onDue = action(call.action) ?: continue
+            if (onDue.approval != "required") {
+                diags +=
+                    err(
+                        TtrpDiagnosticId.REC_040,
+                        "$why, and its `on_due:` fires `${call.action}` unapproved when the ask runs out",
+                        a.location,
+                    )
+            }
         }
     }
 
@@ -522,11 +686,16 @@ class RecipeChecker(
             r.isAll && recipe.candidates.any { it.name == r.decision }
         }
 
+    /** What a wiring's values are read against: the route's rows and their provenance. */
+    private data class WiringContext(
+        val row: Row?,
+        val origin: Map<String, String>,
+    )
+
     private fun checkArgs(
         action: AutomationAction,
         args: List<WiringArg>,
-        row: Row?,
-        rg: RecipeGraph,
+        ctx: WiringContext,
         at: SourceLocation,
         partial: Boolean = false,
     ) {
@@ -535,7 +704,7 @@ class RecipeChecker(
             val col = columns[a.name]
             if (col == null) {
                 if (a.name in WIRING_PROPERTIES) {
-                    (a.value as? WiringValue.Call)?.let { call -> checkCall(call, row, rg) }
+                    (a.value as? WiringValue.Call)?.let { call -> checkCall(call, ctx) }
                     continue
                 }
                 diags +=
@@ -547,25 +716,20 @@ class RecipeChecker(
                     )
                 continue
             }
-            checkType(action, col, a, row, rg)
+            checkType(action, col, a, ctx)
         }
-        for (c in action.columns.filter { !it.optional && !partial }) {
+        if (partial) return
+        for (c in action.columns.filter { !it.optional }) {
             if (args.none { it.name == c.name }) {
-                diags +=
-                    err(
-                        TtrpDiagnosticId.REC_001,
-                        "action `${action.qname.name}` needs its column `${c.name}`",
-                        at,
-                    )
+                diags += err(TtrpDiagnosticId.REC_001, "action `${action.qname.name}` needs its column `${c.name}`", at)
             }
         }
     }
 
-    /** `on_due: hold { order: order_number, … }` — an action call nested in a wiring (D-98). */
+    /** An action call nested in a wiring — `on_due: hold { … }` (D-98), or an ask's `action: start { … }`. */
     private fun checkCall(
         call: WiringValue.Call,
-        row: Row?,
-        rg: RecipeGraph,
+        ctx: WiringContext,
         partial: Boolean = false,
     ) {
         val action = action(call.action)
@@ -573,37 +737,32 @@ class RecipeChecker(
             diags += err(TtrpDiagnosticId.REC_001, "no action `${call.action}` in the imported packages", call.location)
             return
         }
-        checkArgs(action, call.args, row, rg, call.location, partial)
-        checkTransition(action, call.args, row, call.location)
+        checkArgs(action, call.args, ctx, call.location, partial)
+        checkTransition(action, call.args, ctx.row, call.location)
     }
 
     private fun checkType(
         action: AutomationAction,
         col: AutomationColumn,
         arg: WiringArg,
-        row: Row?,
-        rg: RecipeGraph,
+        ctx: WiringContext,
     ) {
         val v = arg.value
         val expr = (v as? WiringValue.Expr)?.expression
         val ref = expr as? ColumnRef
+        val row = ctx.row
 
         fun mismatch(why: String) {
             diags +=
-                err(
-                    TtrpDiagnosticId.REC_002,
-                    "`${action.qname.name}.${col.name}` (${col.type}) $why",
-                    arg.location,
-                )
+                err(TtrpDiagnosticId.REC_002, "`${action.qname.name}.${col.name}` (${col.type}) $why", arg.location)
         }
         when (col.type) {
             "role" -> {
                 val role = ref?.takeIf { it.port == "role" }?.column
                 when {
                     role == null -> mismatch("takes a role, written `role.<name>`")
-                    automation<AutomationRole>().none {
-                        it.qname.name == role
-                    } -> mismatch("names `role.$role`, which no `def role` defines")
+                    automation<AutomationRole>().none { it.qname.name == role } ->
+                        mismatch("names `role.$role`, which no `def role` defines")
                 }
             }
             "rows" -> {
@@ -613,13 +772,9 @@ class RecipeChecker(
                         is WiringValue.Expr -> listOf(v.expression)
                         is WiringValue.Call -> emptyList()
                     }
-                val sources =
-                    rg.recipe.roleContainers
-                        .map { it.name }
-                        .toSet()
                 val bad =
                     items.filterNot {
-                        (it as? ColumnRef)?.let { r -> r.port == null && r.column in sources } ==
+                        (it as? ColumnRef)?.let { r -> r.port == null && r.column in roleNames } ==
                             true
                     }
                 if (items.isEmpty() ||
@@ -632,9 +787,12 @@ class RecipeChecker(
                 when {
                     // `action: start { process: "purchasing" }` — the asked action, partly applied: the answer to
                     // the ask completes it, so a column it leaves out is not missing (H-3's ask).
-                    v is WiringValue.Call -> checkCall(v, row, rg, partial = true)
-                    ref == null || ref.port != null || action(ref.column) == null ->
-                        mismatch("takes an action the imports define")
+                    v is WiringValue.Call -> checkCall(v, ctx, partial = true)
+                    ref == null ||
+                        ref.port != null ||
+                        action(
+                            ref.column,
+                        ) == null -> mismatch("takes an action the imports define")
                 }
             else -> {
                 if (v is WiringValue.Call || v is WiringValue.Values) {
@@ -647,17 +805,68 @@ class RecipeChecker(
                         expr is Literal -> literalType(expr.value)
                         expr is DurationExpr || (expr is FunctionCall && expr.function.name in DURATION_FUNCTIONS) ->
                             if (want.kind == TtrpType.Kind.TEMPORAL) return else TtrpType.Named("duration")
-                        ref != null && ref.port == null && row != null && ref.column in row -> row[ref.column]
+                        ref != null && ref.port == null && row != null && ref.column in row -> {
+                            // An attribute-typed column takes that attribute (or one an `on:` pair equates to it).
+                            if ('.' in col.type) {
+                                val src = ctx.origin[ref.column]
+                                if (src != null && !sameAttribute(src, col.type)) {
+                                    mismatch("takes `${col.type}`; `${ref.column}` is `$src`")
+                                    return
+                                }
+                            }
+                            row[ref.column]
+                        }
                         ref != null && ref.port == null && row != null && ref.column !in row -> {
-                            // A bare name the rows do not carry is a symbol (`to: rejected`, `kind: inbound`) — text only.
-                            if (want.kind == TtrpType.Kind.STRING) return
-                            mismatch("reads `${ref.column}`, which the route's rows do not carry")
+                            symbol(action, col, ref, row, ::mismatch)
                             return
                         }
                         else -> null
                     }
                 if (got != null && !compatible(want, got)) mismatch("gets a ${got.canonical} value")
             }
+        }
+    }
+
+    /**
+     * A bare name the route's rows do not carry is a **symbol** — 17 writes `to: rejected`, `kind: inbound`. A
+     * symbol is text only. It is checked against the vocabulary when the model has one:
+     * - a transition's target column → REC-030;
+     * - the column a `set:` writes → that attribute's `states:` / value labels.
+     * A symbol one edit away from a row column is more likely a misspelt column: a warning.
+     */
+    private fun symbol(
+        action: AutomationAction,
+        col: AutomationColumn,
+        ref: ColumnRef,
+        row: Row,
+        mismatch: (String) -> Unit,
+    ) {
+        val want = columnType(col.type)
+        if (want != null && want.kind != TtrpType.Kind.STRING) {
+            mismatch("reads `${ref.column}`, which the route's rows do not carry")
+            return
+        }
+        if (action.transition?.toColumn == col.name) return
+        val set = action.set?.takeIf { it.column == col.name }
+        val vocabulary =
+            set?.let { s -> attribute(s.attribute) }?.let { a -> a.states + a.valueLabels.keys }.orEmpty()
+        if (vocabulary.isNotEmpty()) {
+            if (ref.column !in vocabulary) {
+                mismatch(
+                    "is `${ref.column}`, which `${set!!.attribute}` does not list (${vocabulary.joinToString(", ")})",
+                )
+            }
+            return
+        }
+        row.keys.firstOrNull { editDistance(it, ref.column) <= 2 }?.let { near ->
+            diags +=
+                warn(
+                    TtrpDiagnosticId.REC_002,
+                    "`${action.qname.name}.${col.name}` reads `${ref.column}` as the text \"${ref.column}\" — " +
+                        "did you " +
+                        "mean the column `$near`? Quote a text: `\"${ref.column}\"`",
+                    ref.location,
+                )
         }
     }
 
@@ -673,8 +882,7 @@ class RecipeChecker(
         if (attr.states.isEmpty()) return
         val to =
             t.to ?: t.toColumn?.let { c ->
-                val v = (args.firstOrNull { it.name == c }?.value as? WiringValue.Expr)?.expression
-                when (v) {
+                when (val v = (args.firstOrNull { it.name == c }?.value as? WiringValue.Expr)?.expression) {
                     is ColumnRef -> v.column.takeIf { v.port == null && (row == null || it !in row) }
                     is Literal -> (v.value as? LiteralValue.Str)?.value
                     else -> null
@@ -713,39 +921,51 @@ class RecipeChecker(
         }
     }
 
-    /** The routes whose condition reads a column a `turn` island produced — transitively through the decision. */
+    /** The routes decided on an agent's answer: the switch's rows are turn-chosen, or the condition reads an answer. */
     private fun turnFedRoutes(
         recipe: RecipeDecl,
         rg: RecipeGraph,
-        keyColumns: List<String>,
+        taint: TurnTaint,
     ): Set<String> {
-        val turns = recipe.contexts.filter { it.form is IslandForm.Turn }
-        if (turns.isEmpty()) return emptySet()
-        val tainted = mutableSetOf<String>()
-        for (t in turns) declaredRow(t.form)?.keys?.let { tainted += it - keyColumns.toSet() }
-        val decision = rg.decision?.let { container(it) } ?: return emptySet()
-        for (id in decision.memberIds) {
-            when (val n = graph.nodes[id]) {
-                is org.tatrman.ttrp.graph.model.Calc ->
-                    n.assignments.forEach { a -> if (reads(a.value, tainted)) tainted += a.name }
-                is org.tatrman.ttrp.graph.model.Aggregate ->
-                    n.aggregations.forEach { a -> if (reads(a.value, tainted)) tainted += a.name }
-                is org.tatrman.ttrp.graph.model.Project ->
-                    n.columns.forEachIndexed { i, e -> if (reads(e, tainted)) n.aliasOf(i)?.let { tainted += it } }
-                else -> Unit
-            }
-        }
         val sw = recipe.decisions.firstOrNull()?.switch ?: return emptySet()
-        return sw.routes
-            .filter { reads(it.condition, tainted) }
-            .map { it.name }
-            .toSet()
+        val inp = rg.switch?.let { taint.input(it) }.orEmpty()
+        val fed =
+            sw.routes
+                .filter { taint.reads(it.condition, inp) }
+                .map { it.name }
+                .toMutableSet()
+        // The else route takes what no condition took — decided on the answer when any condition was.
+        sw.elseRoute?.name?.let { if (fed.isNotEmpty() || TurnTaint.ALL in inp) fed += it }
+        return fed
     }
 
-    private fun reads(
-        e: Expression,
-        cols: Set<String>,
-    ): Boolean = walk(e).any { it is ColumnRef && it.column in cols }
+    /** A route's `detail:` names a role container; a `because:` fill names a column of its rows or a parameter. */
+    private fun checkRouteAttributes(
+        recipe: RecipeDecl,
+        routeRow: Row?,
+    ) {
+        val sw = recipe.decisions.firstOrNull()?.switch ?: return
+        val attrs =
+            sw.routes.map { Triple(it.name, it.detail, it.because) } +
+                listOfNotNull(sw.elseRoute?.let { Triple(it.name ?: "else", it.detail, it.because) })
+        for ((route, detail, because) in attrs) {
+            detail.filter { it.text !in roleNames }.forEach {
+                diags +=
+                    err(TtrpDiagnosticId.REC_000, "route `$route`'s `detail: ${it.text}` names no context", it.location)
+            }
+            if (because == null || routeRow == null) continue
+            for (fill in FILL.findAll(because).map { it.groupValues[1] }) {
+                if (fill !in routeRow.keys && recipe.parameters.none { it.text == fill }) {
+                    diags +=
+                        err(
+                            TtrpDiagnosticId.REC_020,
+                            "route `$route`'s `because:` fills `{$fill}`, which is neither a column of its rows nor a parameter",
+                            sw.routes.firstOrNull { it.name == route }?.location ?: sw.location,
+                        )
+                }
+            }
+        }
+    }
 
     // ---- parameters (REC-020/021) --------------------------------------------------------------------------
 
@@ -829,10 +1049,19 @@ class RecipeChecker(
     private fun becauseFills(recipe: RecipeDecl): Set<String> {
         val sw = recipe.decisions.firstOrNull()?.switch ?: return emptySet()
         val texts = sw.routes.mapNotNull { it.because } + listOfNotNull(sw.elseRoute?.because)
-        return texts.flatMap { t -> Regex("\\{([A-Za-z_][A-Za-z0-9_]*)}").findAll(t).map { it.groupValues[1] } }.toSet()
+        return texts.flatMap { t -> FILL.findAll(t).map { it.groupValues[1] } }.toSet()
     }
 
     // ---- the model -----------------------------------------------------------------------------------------
+
+    private val roleNames: Set<String> by lazy {
+        build.recipe
+            ?.recipe
+            ?.roleContainers
+            ?.map { it.name }
+            ?.toSet()
+            .orEmpty()
+    }
 
     private inline fun <reified T> automation(): List<T> =
         model?.automationInScope(imports)?.filterIsInstance<T>().orEmpty()
@@ -843,30 +1072,53 @@ class RecipeChecker(
                 name
         }
 
-    /** `order.state` → the attribute (the entity found anywhere in the model, then the stdlib). */
+    /** `order.state` → the attribute of the entity the recipe sees by that name (imports, then the stdlib). */
     private fun attribute(path: String): Attribute? {
         val parts = path.split('.')
         if (parts.size != 2) return null
-        val entity = model?.entitiesNamed(parts[0])?.firstOrNull() ?: return null
+        val entity = model?.entityInScope(parts[0], imports) ?: return null
         return model.attributesOf(entity).firstOrNull { it.qname.name.substringAfterLast('.') == parts[1] }
-    }
-
-    private fun entityAttributeType(path: String): TtrpType? {
-        val parts = path.split('.')
-        if (parts.size != 2) return null
-        val entity: Entity = model?.entitiesNamed(parts[0])?.firstOrNull() ?: return null
-        return model.entityAttributes(entity).firstOrNull { it.first == parts[1] }?.let { TtrpType.parse(it.second) }
     }
 
     /** A `def column`'s type spelling as a type: a scalar, or an `<entity>.<attr>` reference's type. */
     private fun columnType(spelling: String): TtrpType? =
-        if ('.' in
-            spelling
-        ) {
-            entityAttributeType(spelling)
+        if ('.' in spelling) {
+            attribute(spelling)?.type?.let { TtrpType.parse(it) }
         } else {
             TtrpType.parse(spelling).takeUnless { it is TtrpType.Named }
         }
+
+    /**
+     * True when the attribute [src] is [want], or names the same thing: `on:` pairs of the model's relations connect
+     * them, directly (an FK and its key: `return_request.customer` → `customer.sk`) or through a shared key
+     * (`sales_line.item` → `item.sk` ← `reorder_proposal.item`).
+     */
+    private fun sameAttribute(
+        src: String,
+        want: String,
+    ): Boolean {
+        if (src == want) return true
+        val links = attributeLinks
+        val seen = mutableSetOf(src)
+        var frontier = setOf(src)
+        repeat(3) {
+            frontier = frontier.flatMap { links[it].orEmpty() }.filter { seen.add(it) }.toSet()
+            if (want in frontier) return true
+        }
+        return false
+    }
+
+    /** The model's `on:` pairs as an undirected graph of attributes (`entity.attribute`). */
+    private val attributeLinks: Map<String, Set<String>> by lazy {
+        val out = HashMap<String, MutableSet<String>>()
+        model?.allRelations().orEmpty().forEach { rel ->
+            rel.joinPairs.forEach { p ->
+                out.getOrPut(p.fromAttr.name) { mutableSetOf() } += p.toAttr.name
+                out.getOrPut(p.toAttr.name) { mutableSetOf() } += p.fromAttr.name
+            }
+        }
+        out
+    }
 
     private fun rowSchema(name: String): Row? =
         model
@@ -927,6 +1179,11 @@ class RecipeChecker(
         c: Container,
     ): Row? = outPort(c)?.let { rows.of(PortRef(c.id, it)) }
 
+    private fun outOrigin(
+        rows: RecipeRows,
+        c: Container,
+    ): Map<String, String>? = outPort(c)?.let { rows.origin(PortRef(c.id, it)) }
+
     private fun render(v: WiringValue): String =
         when (v) {
             is WiringValue.Expr ->
@@ -981,14 +1238,19 @@ class RecipeChecker(
         /** The run's instant — always bound (D-29); never a parameter. */
         const val AS_OF = "as_of"
 
+        /** The route of a decision-less recipe: every candidate (06 §1.2's identity verdict). */
+        private const val IDENTITY = "all"
+
         /** Wiring arguments that set an action's properties rather than a column (D-98, the `ask` grouping). */
         val WIRING_PROPERTIES = setOf("due", "on_due", "group_by")
 
-        val DURATION_FUNCTIONS = setOf("days", "working_days", "weeks", "months")
+        val DURATION_FUNCTIONS = DurationUnit.entries.map { it.spelling }.toSet()
 
         private val PERIODS = listOf("day", "week", "month")
 
-        /** Every expression of a node the checker reads for `:name` and taint. */
+        private val FILL = Regex("\\{([A-Za-z_][A-Za-z0-9_]*)}")
+
+        /** Every expression of a node the checker reads for `:name` and types. */
         fun nodeExpressions(n: org.tatrman.ttrp.graph.model.Node?): List<Expression> =
             when (n) {
                 is Filter -> listOfNotNull(n.predicate)
@@ -1025,5 +1287,23 @@ class RecipeChecker(
                     else -> Unit
                 }
             }
+
+        /** Levenshtein distance — a misspelt column's tell. */
+        fun editDistance(
+            a: String,
+            b: String,
+        ): Int {
+            val d = IntArray(b.length + 1) { it }
+            for (i in 1..a.length) {
+                var prev = d[0]
+                d[0] = i
+                for (j in 1..b.length) {
+                    val t = d[j]
+                    d[j] = minOf(d[j] + 1, d[j - 1] + 1, prev + if (a[i - 1] == b[j - 1]) 0 else 1)
+                    prev = t
+                }
+            }
+            return d[b.length]
+        }
     }
 }

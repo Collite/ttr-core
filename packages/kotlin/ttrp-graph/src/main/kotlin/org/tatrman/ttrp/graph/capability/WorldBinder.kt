@@ -57,7 +57,7 @@ class WorldBinder(
         for (x in world.executors) {
             // An automation executor (`extends: n8n_l1`, …) runs recipe programs, not TTR-P bundles: its type
             // manifest is the exporters' registry's (AU D-35), so the TTR-P binder leaves it unbound (AU-core-P1).
-            if (x.extendsRef in AUTOMATION_EXECUTOR_TYPES || x.type in AUTOMATION_EXECUTOR_TYPES) continue
+            if (x.extendsRef in AUTOMATION_EXECUTOR_TYPES) continue
             val m = matchExecution(x.type, x.extendsRef)
             if (m == null) {
                 diags +=

@@ -76,7 +76,8 @@ class RecipeCheckerSpec :
 
         "REC-002 — a column of the wrong type" {
             ids("rec-002-type.ttrp") shouldContainExactly listOf(TtrpDiagnosticId.REC_002)
-            message("rec-002-type.ttrp") shouldContain "`hold.order` (order.order_number) gets a string value"
+            message("rec-002-type.ttrp") shouldContain
+                "`hold.order` (order.order_number) takes `order.order_number`; `state` is `order.state`"
         }
 
         "REC-002 — a role, rows and an action column read their own kinds of value" {
@@ -142,7 +143,7 @@ class RecipeCheckerSpec :
 
         "REC-011 — a daily batch program over a weekly window" {
             ids("rec-011-batch-scope.ttrp") shouldContainExactly listOf(TtrpDiagnosticId.REC_011)
-            message("rec-011-batch-scope.ttrp") shouldContain "`probe_weekly_batch`"
+            message("rec-011-batch-scope.ttrp") shouldContain "`probe_daily_batch`"
         }
 
         "REC-012 — `port: key` on a set-level recipe" {
