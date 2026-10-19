@@ -51,7 +51,7 @@ selectItem
 
 fromClause      : FROM fromItem joinClause* ;
 fromItem        : tableRef (AS? alias=identifier)? ;
-tableRef        : identifier (DOT identifier)* ;            // in-port name or full qname
+tableRef        : identifier (DOT namePart)* ;              // in-port name or full qname
 
 joinClause      : joinKind? JOIN fromItem ON expr ;
 joinKind        : INNER | LEFT OUTER? | RIGHT OUTER? | FULL OUTER? | CROSS ;
@@ -91,6 +91,7 @@ primary
     | CAST LPAREN expr AS typeName RPAREN                   # castPrimary
     | CASE (WHEN expr THEN expr)+ (ELSE expr)? END          # casePrimary
     | functionCall                                          # callPrimary
+    | PARAM_REF                                             # paramPrimary   // AU-core-P0: `:name` (D-108)
     | columnRef                                             # colPrimary
     | LPAREN expr RPAREN                                    # parenPrimary
     ;
@@ -100,14 +101,25 @@ functionCall
     : name=identifier LPAREN STAR RPAREN                                      # countStar
     | name=identifier LPAREN (DISTINCT? expr (COMMA expr)*)? RPAREN           # namedCall
     ;
-columnRef       : identifier (DOT identifier)* ;
+columnRef       : identifier (DOT namePart)* ;
 typeName        : identifier (LPAREN NUMBER (COMMA NUMBER)? RPAREN)? ;
 literal         : STRING | NUMBER | TRUE | FALSE | NULL ;
 
 // Bare names are plain IDENTs. SQL-clause keywords stay reserved inside fragments
 // (the C2-b cut is small; hero column names — account_id, region, amount, … — are
 // not keywords). `FIRST`/`LAST` double as the NULLS placement words only.
-identifier      : IDENT ;
+identifier      : IDENT | QUOTED_IDENT ;                     // AU-core-P0 review-114 M3: `"Customer"` (SQL-004's own advice)
+
+// AU-core-P0: after a dot a clause keyword is a NAME (`er.entity.order`, `o.group`) — the PostgreSQL
+// rule (a qualified name's attribute is a ColLabel). The curated reject tokens (INSERT, OVER, TOP, …)
+// stay out: the reject scanner names them wherever they appear.
+namePart
+    : identifier
+    | ORDER | GROUP | BY | ALL | FIRST | LAST | VALUES | LIMIT | OFFSET | ASC | DESC | NULLS
+    | SELECT | FROM | WHERE | HAVING | JOIN | INNER | LEFT | RIGHT | FULL | CROSS | OUTER | ON | WITH
+    | UNION | INTERSECT | EXCEPT | AS | EXISTS | DISTINCT | AND | OR | NOT | IS | IN | BETWEEN
+    | CASE | WHEN | THEN | ELSE | END | CAST | NULL | TRUE | FALSE
+    ;
 
 // =============================================================================
 // Lexer — SQL-CLAUSE keywords only (the shared operator/keyword TABLE is NOT here)
@@ -186,6 +198,9 @@ NOLOCK      : 'nolock' ;
 
 // Operators & punctuation (multi-char before single-char for maximal munch).
 DCOLON      : '::' ;                 // reject 005 (::cast)
+// AU-core-P0: `:name` — a parameter / runtime binding, ONE token so a keyword is a legal name (`:limit`) and
+// `: p` (a lone colon) is unreadable. `::` stays DCOLON (longest match: `::` is two characters, `:x` needs a letter).
+PARAM_REF   : ':' [a-z_\u00C0-\u024F] [a-z0-9_\u00C0-\u024F]* ;
 NEQ         : '<>' ;
 NEQ2        : '!=' ;
 LTE         : '<=' ;
@@ -211,9 +226,13 @@ STRING        : '\'' ( ~['\r\n] | '\'\'' )* '\'' ;   // SQL single-quoted string
 
 LINE_COMMENT  : '--' ~[\r\n]* -> channel(HIDDEN) ;
 BLOCK_COMMENT : '/*' .*? '*/' -> channel(HIDDEN) ;
-WS            : [ \t\r\n]+ -> skip ;
+// AU-core-P0 review-114 M3: a BOM, a no-break space and a form feed are whitespace (the lexer used to DROP them
+// silently; an unreadable character is now the generic reject, so these must be read).
+WS            : [ \t\r\n\f\u00A0\uFEFF]+ -> skip ;
 
 NUMBER        : [0-9]+ ('.' [0-9]+)? ;
 // caseInsensitive folds A-Z into a-z (avoids the dup-range warning). \u00C0-\u024F = TTR.g4's identifier
 // range (Czech model names, `zásoba_na_skladě`) — identifiers are model names, never translated (AG C-23).
 IDENT         : [a-z_\u00C0-\u024F] [a-z0-9_\u00C0-\u024F]* ;
+// A double-quoted identifier, `""` inside for a quote (review-114 M3). The walker strips the quotes (TtrSqlNames).
+QUOTED_IDENT  : '"' ( ~["\r\n] | '""' )+ '"' ;

@@ -45,3 +45,13 @@ export async function loadStockVocabularies(names: string[]): Promise<Map<string
 
   return results;
 }
+
+/**
+ * Grammar 0.16 — the automation stdlib (`obligation`, `state_history`, `approvals`; package
+ * `automation`, `model er`), the twin of Kotlin `AutomationStdlib` (byte-identical source). Pass it to
+ * `validateAutomationProject` for a project that `automationStdlibNeeded`. Undefined when the
+ * resource cannot be located.
+ */
+export async function loadAutomationStdlib(): Promise<Document | undefined> {
+  return (await loadStockVocabularies(['automation-stdlib'])).get('automation-stdlib');
+}

@@ -494,6 +494,8 @@ class TtrpChecker(
             is org.tatrman.ttrp.expr.Literal -> emptyList()
             // MD dot-path is not a column ref; MD resolution is a separate pass (S3, R23).
             is org.tatrman.ttrp.expr.MdPath -> emptyList()
+            // AU-core-P0: a `:name` binding / a duration names no column.
+            is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr -> emptyList()
         }
 
     /** The single-input schema of an op: its bare source arg, else the chain predecessor. */

@@ -1,0 +1,32 @@
+// 0.16 — the automation world members nested in `def world`: `def identity`, unnamed
+// `def grant` (with `*`), `def deployment` (typed `target:`, a tagged `trigger:`), and
+// `def process` with `steps: [ def step … ]`; `writable:` on a storage rides the
+// existing free-form storage entry.
+package acme.worlds
+model world
+
+def world demo {
+    def engine erp_pg     { type: postgres }
+    def storage erp_db    { type: postgres, via: erp_pg, hosts: [acme], writable: [order.state, return_request_line, "acme_*"] }
+    def executor n8n      { extends: n8n_l1, url: "https://n8n.acme.example", connection: n8n_acme }
+
+    def identity automation_decider { principal: "svc-acme-automation", credential: TTR_CONN_AUTOMATION_DECIDER }
+
+    def grant { who: role.ops,   program: *,                    as: identity.automation_decider }
+    def grant { who: "*",        program: release_on_placement, as: author }
+
+    def deployment release_native_morning { program: morning_release, target: native, run_as: identity.automation_decider,
+                                            trigger: schedule "06:00 Europe/Prague", dry_run: false, enabled: true }
+    def deployment release_n8n            { program: release_on_placement, target: n8n, run_as: caller, granularity: parts }
+    def deployment returns_n8n            { process: return_line_flow, target: n8n, run_as: identity.automation_decider }
+
+    def process return_line_flow {
+        description: "one execution per return line"
+        instance: return_request_line.line_id
+        steps: [
+            def step decide  { program: decide_on_request,  port: key },
+            def step inbound { program: inbound_on_receipt, port: key, after: { obligation: inbound, until: [fulfilled, due, absent] } },
+            def step wait    { program: settle_on_document, port: keys, after: { time: 30 days } }
+        ]
+    }
+}

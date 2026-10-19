@@ -12,6 +12,44 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
+## 0.16 — 2026-10-19
+
+**Additive (the automation model — AU-core-P0 S0.2; AU D-26, D-35, D-67, D-90, D-91, D-104,
+D-106, D-107).** Every previously-valid `0.15` file parses unchanged and every conformance golden
+is byte-unchanged; every new noun stays usable as a name (all are in `idPart`).
+
+1. **`model automation`** (`modelCode` gains `AUTOMATION`) with six def kinds sharing ONE
+   permissive body, `autoBody`: `def parameter | action | service | approval | program | recipe
+   <id> { … }`. `def recipe` is the generated catalog object (the TTR-P compiler writes it) —
+   admitted now so the catalog needs no second grammar window. Typed alternatives first
+   (`description`, `tags`, `label`, `type`, `columns`, `target`, `transition`, `set`), then a
+   free-form entry; the per-kind property contract is semantic.
+2. **Automation values** (inside automation bodies only — the generic `value` is untouched): a
+   duration `2 working_days`, a tagged string `schedule "06:00 Europe/Prague"`, a call-shaped
+   value `hold { order: order_number }`, `*`, and nested objects/lists of these.
+3. **`transition: order.state -> released { from: [placed, held] }`** (or `-> {to}`, the state
+   named by an action column) and **`set: order.held_for = department`**. New token `->`.
+4. **`def role`** gains three TYPED automation properties (`resolve: keycloak_group "…"`,
+   `delivery: { … }`, `members: [ … ]` — automation values), not a free-form fallback, so a typo in
+   any role stays a parse error (review-114 M5); a role declared in a `model automation` file maps to
+   the `automation` model.
+5. **World members** nested in `def world`: `def identity <id>`, an unnamed `def grant { who,
+   program, as }`, `def deployment <id>`, `def process <id> { instance, steps: [ def step … ] }`.
+   `writable:` on a storage needs no syntax (the storage's free-form entry carries it).
+6. **`states:` / `transitions:`** on an attribute.
+7. **New tokens:** `AUTOMATION PARAMETER ACTION SERVICE APPROVAL PROGRAM RECIPE IDENTITY
+   DEPLOYMENT PROCESS STEP STEPS TRANSITION TRANSITIONS STATES SET RESOLVE DELIVERY` (all in `idPart`, with
+   `PARAMETERS`) and `ARROW`.
+8. **All three targets** (TS / Kotlin / Python) parse it (`AutomationDef` + `AutoBody`, the world
+   members, the attribute `states`/`transitions`); conformance fixtures 71–74 (`out-ts`,
+   `out-ts-sem`) are byte-identical across the three.
+
+**Spellings settled against the existing grammar (AU ttr-core contracts §1 "the existing rule's
+style wins"):** `model automation` (not `schema automation`); world objects nest in `def world`;
+`//` comments; `extends:` on an executor stays an id (`extends: n8n_l1`); `keycloak_group`;
+enum values with underscores (`on_event`, `on_route`, `per_candidate`); `until: [fulfilled, due,
+absent]`; `budget: { per_run: N }`.
+
 ## 0.15 — 2026-10-13
 
 **No syntax change.** `TTR.g4` below its header is byte-identical to `0.14`; every `0.14` file

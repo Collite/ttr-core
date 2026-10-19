@@ -1,0 +1,6 @@
+// A recipe block is document-level only (TTRP-PRS-007).
+container c(out rows) target erp {
+    recipe {
+        key: order.order_number
+    }
+}

@@ -168,7 +168,7 @@
       "patterns": [
         {
           "name": "keyword.other.schema.ttrm",
-          "match": "\\b(db|er|binding|cnc|md|query|world|lexicon)\\b"
+          "match": "\\b(db|er|binding|cnc|md|query|world|automation|lexicon)\\b"
         }
       ]
     },
@@ -176,7 +176,7 @@
       "patterns": [
         {
           "name": "keyword.other.kind.ttrm",
-          "match": "\\b(project|area|map|table|view|column|index|constraint|fk|procedure|entity|attribute|relation|er2db_entity|er2db_attribute|er2db_relation|role|er2cnc_role|drill_map|domain|dimension|hierarchy|measure|cubelet|md2db_cubelet|md2db_domain|md2db_map|md2er_cubelet|engine|executor|storage|term|pattern|example)\\b"
+          "match": "\\b(project|area|map|table|view|column|index|constraint|fk|procedure|entity|attribute|relation|er2db_entity|er2db_attribute|er2db_relation|role|er2cnc_role|drill_map|domain|dimension|hierarchy|measure|cubelet|md2db_cubelet|md2db_domain|md2db_map|md2er_cubelet|engine|executor|storage|parameter|action|service|approval|program|recipe|identity|deployment|process|step|term|pattern|example)\\b"
         }
       ]
     },
@@ -184,7 +184,7 @@
       "patterns": [
         {
           "name": "keyword.other.property.ttrm",
-          "match": "\\b(objects|layout|args|display|override|restrict|members|publish|kind|calc|key|hierarchies|levels|via|class|aggregation|validBy|grain|measures|shape|journaling|allocation|source|extends|hosts|staging|description|tags|version|primaryKey|columns|indices|constraints|attributes|parameters|resultColumns|definitionSql|type|optional|isKey|searchable|indexed|labelPlural|nameAttribute|codeAttribute|aliases|cardinality|join|target|whereFilter|language|sourceText|length|precision|label|name|direction|displayLabel|valueLabels|roles|search|semantics|keywords|patterns|descriptions|examples|fuzzy|method|for|forms|match|from|to)\\b"
+          "match": "\\b(objects|layout|args|display|override|restrict|members|publish|kind|calc|key|hierarchies|levels|via|class|aggregation|validBy|grain|measures|shape|journaling|allocation|source|extends|hosts|staging|steps|transitions|transition|states|set|resolve|delivery|description|tags|version|primaryKey|columns|indices|constraints|attributes|parameters|resultColumns|definitionSql|type|optional|isKey|searchable|indexed|labelPlural|nameAttribute|codeAttribute|aliases|cardinality|join|target|whereFilter|language|sourceText|length|precision|label|name|direction|displayLabel|valueLabels|roles|search|semantics|keywords|patterns|descriptions|examples|fuzzy|method|for|forms|match|from|to)\\b"
         }
       ]
     },

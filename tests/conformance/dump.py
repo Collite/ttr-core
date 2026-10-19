@@ -39,6 +39,23 @@ from typing import Any
 import ttr_parser
 from ttr_parser.model import (
     AreaDef,
+    AutoBody,
+    AutoBool,
+    AutoCall,
+    AutoDuration,
+    AutoEntry,
+    AutoId,
+    AutoList,
+    AutomationDef,
+    AutoNull,
+    AutoNum,
+    AutoObj,
+    AutoStar,
+    AutoStr,
+    AutoTagged,
+    AutoValue,
+    ProcessDef,
+    WorldAutoMember,
     SchemaDef,
     AttributeDef,
     SecurityBlock,
@@ -131,6 +148,13 @@ KIND_KEYWORD: dict[str, str] = {
     "term": "term",
     "pattern": "pattern",
     "example": "example",
+    # 0.16 — the automation kinds.
+    "parameter": "parameter",
+    "action": "action",
+    "service": "service",
+    "approval": "approval",
+    "program": "program",
+    "recipe": "recipe",
 }
 
 
@@ -302,6 +326,8 @@ def _properties(d: Definition) -> dict[str, Any]:
         return _world_props(d)
     if isinstance(d, (TermDef, PatternDef, ExampleDef)):
         return _lexicon_entry_props(d)
+    if isinstance(d, AutomationDef):
+        return _auto_body_props(d.body)
     return {}
 
 
@@ -440,6 +466,11 @@ def _attribute_props(d: AttributeDef) -> dict[str, Any]:
     _present(p, "lexicon", _lexicon(d.lexicon))
     if d.binding is not None:
         p["binding"] = _binding(d.binding)
+    # 0.16 — lifecycle states (present-only).
+    if d.states:
+        p["states"] = list(d.states)
+    if d.transitions:
+        p["transitions"] = {t.from_state: list(t.to) for t in d.transitions}
     return p
 
 
@@ -503,6 +534,9 @@ def _role_props(d: RoleDef) -> dict[str, Any]:
     p: dict[str, Any] = {}
     _present(p, "label", _localized(d.label))
     _present(p, "search", _search(d.search))
+    # 0.16 — an automation role's free-form entries (present-only).
+    if d.entries:
+        p["entries"] = _auto_entries(d.entries)
     return p
 
 
@@ -559,7 +593,100 @@ def _world_props(d: WorldDef) -> dict[str, Any]:
         p["executors"] = [_engine_part_tree(e) for e in d.executors]
     if d.storages:
         p["storages"] = [_storage_tree(s) for s in d.storages]
+    # 0.16 — the automation world members (present-only).
+    if d.identities:
+        p["identities"] = [_auto_member_tree(m) for m in d.identities]
+    if d.grants:
+        p["grants"] = [_auto_member_tree(m) for m in d.grants]
+    if d.deployments:
+        p["deployments"] = [_auto_member_tree(m) for m in d.deployments]
+    if d.processes:
+        p["processes"] = [_process_tree(pr) for pr in d.processes]
     return p
+
+
+# ----- 0.16 automation serialisers (present-only; shared shape with dump.ts / ConformanceDump.kt) -----
+
+
+def _auto_body_props(b: AutoBody) -> dict[str, Any]:
+    p: dict[str, Any] = {}
+    _present(p, "label", _localized(b.label))
+    if b.type is not None:
+        p["type"] = _data_type(b.type)
+    if b.columns:
+        p["columns"] = [_definition(c) for c in b.columns]
+    if b.target is not None:
+        p["target"] = _target(b.target)
+    if b.transition is not None:
+        t: dict[str, Any] = {"attribute": b.transition.attribute}
+        if b.transition.to is not None:
+            t["to"] = b.transition.to
+        if b.transition.to_column is not None:
+            t["toColumn"] = b.transition.to_column
+        if b.transition.from_states:
+            t["from"] = list(b.transition.from_states)
+        p["transition"] = t
+    if b.set is not None:
+        p["set"] = {"attribute": b.set.attribute, "column": b.set.column}
+    if b.entries:
+        p["entries"] = _auto_entries(b.entries)
+    return p
+
+
+def _auto_member_tree(m: WorldAutoMember) -> dict[str, Any]:
+    o: dict[str, Any] = {"kind": m.member_kind}
+    if m.name is not None:
+        o["name"] = m.name
+    if m.body.description is not None:
+        o["description"] = m.body.description
+    if m.body.tags:
+        o["tags"] = list(m.body.tags)
+    o.update(_auto_body_props(m.body))
+    return o
+
+
+def _process_tree(pr: ProcessDef) -> dict[str, Any]:
+    o: dict[str, Any] = {"kind": "process", "name": pr.name}
+    if pr.description is not None:
+        o["description"] = pr.description
+    if pr.tags:
+        o["tags"] = list(pr.tags)
+    if pr.steps:
+        o["steps"] = [_auto_member_tree(s) for s in pr.steps]
+    if pr.entries:
+        o["entries"] = _auto_entries(pr.entries)
+    return o
+
+
+def _auto_entries(entries: Iterable[AutoEntry]) -> dict[str, Any]:
+    """An entry list dumps as a key-sorted object; a later duplicate key wins."""
+    return {e.key: _av(e.value) for e in entries}
+
+
+def _av(v: AutoValue) -> dict[str, Any]:
+    if isinstance(v, AutoStr):
+        return {"kind": "tripleString" if v.triple else "string", "value": v.raw}
+    if isinstance(v, AutoNum):
+        return {"kind": "number", "value": _number(v.raw)}
+    if isinstance(v, AutoBool):
+        return {"kind": "bool", "value": v.raw}
+    if isinstance(v, AutoNull):
+        return {"kind": "null"}
+    if isinstance(v, AutoId):
+        return {"kind": "id", "parts": list(v.parts), "path": ".".join(v.parts)}
+    if isinstance(v, AutoDuration):
+        return {"amount": _number(v.amount), "kind": "duration", "unit": v.unit}
+    if isinstance(v, AutoTagged):
+        return {"kind": "tagged", "tag": v.tag, "value": v.value}
+    if isinstance(v, AutoCall):
+        return {"entries": _auto_entries(v.entries), "kind": "call", "name": v.name}
+    if isinstance(v, AutoStar):
+        return {"kind": "star"}
+    if isinstance(v, AutoObj):
+        return {"entries": _auto_entries(v.entries), "kind": "object"}
+    if isinstance(v, AutoList):
+        return {"items": [_av(i) for i in v.items], "kind": "list"}
+    raise ValueError(f"conformance: unknown AutoValue variant {type(v).__name__}")
 
 
 def _manifest_dump(m: Mapping[str, PropertyValue]) -> dict[str, Any]:

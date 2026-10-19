@@ -8,6 +8,7 @@ import org.tatrman.ttrp.diagnostics.TtrpDiagnosticId
 import org.tatrman.ttrp.expr.AggregateCall
 import org.tatrman.ttrp.expr.CaseWhen
 import org.tatrman.ttrp.expr.Cast
+import org.tatrman.ttrp.expr.DurationExpr
 import org.tatrman.ttrp.expr.ColumnRef
 import org.tatrman.ttrp.expr.Expression
 import org.tatrman.ttrp.expr.FunctionCall
@@ -15,6 +16,7 @@ import org.tatrman.ttrp.expr.InList
 import org.tatrman.ttrp.expr.IsNull
 import org.tatrman.ttrp.expr.Literal
 import org.tatrman.ttrp.expr.MdPath
+import org.tatrman.ttrp.expr.ParamRef
 
 /**
  * RJ-P1 / R-C2-b (contracts §9, `TTRP-RJ-104`): a volatile (impure) function may not appear in a
@@ -70,6 +72,8 @@ object RejectPurityCheck {
             // never nested Expressions, so no volatile function can sit in a reject-capable position
             // inside one. Treat it like ColumnRef/Literal. (Added when md-dotpath introduced MdPath.)
             is ColumnRef, is Literal, is MdPath -> Unit
+            // AU-core-P0: a `:name` binding and a duration are leaves too.
+            is ParamRef, is DurationExpr -> Unit
         }
     }
 

@@ -37,6 +37,11 @@ internal fun RegistrySnapshot.searchableObjects(): Sequence<IndexableObject> =
                     for (e in schema.entities.values) for (a in e.attributes) yield(a.toIndexable())
                 }
                 is CncSchema -> for (r in schema.roles.values) yield(r.toIndexable())
+                // Grammar 0.16 — automation objects are findable by name, description and label.
+                is org.tatrman.ttr.metadata.model.AutomationSchema ->
+                    for (o in schema.objects.values) {
+                        yield(IndexableObject(o.qname, o.kind, o.description, o.label, SearchHints.EMPTY))
+                    }
                 else -> {}
             }
         }

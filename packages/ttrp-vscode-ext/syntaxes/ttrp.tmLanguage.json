@@ -53,6 +53,10 @@
       "match": "\\b(group|by|in|and|or|not|is|between|cast|as|distinct)\\b"
     },
     {
+      "name": "keyword.control.recipe.ttrp",
+      "match": "\\b(recipe|candidates|context|decision|actions|builtin|foreign|turn|window|switch|because)\\b"
+    },
+    {
       "name": "constant.language.ttrp",
       "match": "\\b(null|true|false)\\b"
     },

@@ -122,7 +122,7 @@ export interface ResolvedManifest {
  * reserved-word list historically also includes `query`, which the canonical model-code
  * set omits. `world` is added here in lock-step with its addition to the canonical set.
  */
-const MODEL_CODES: ReadonlySet<string> = new Set(['db', 'er', 'md', 'binding', 'query', 'cnc', 'world']);
+const MODEL_CODES: ReadonlySet<string> = new Set(['db', 'er', 'md', 'binding', 'query', 'cnc', 'world', 'automation']);
 
 /** Kind keywords — a schema handle may not collide with these (D9). */
 const KIND_KEYWORDS: ReadonlySet<string> = new Set([
@@ -131,6 +131,8 @@ const KIND_KEYWORDS: ReadonlySet<string> = new Set([
   'query', 'role', 'er2cnc_role', 'drill_map', 'area',
   'domain', 'dimension', 'map', 'hierarchy', 'measure', 'cubelet',
   'md2db_cubelet', 'md2db_domain', 'md2db_map', 'md2er_cubelet',
+  // 0.16 — the automation kinds.
+  'parameter', 'action', 'service', 'approval', 'program', 'recipe',
 ]);
 
 const VALID_DIALECTS: ReadonlySet<string> = new Set(['tsql', 'postgres', 'duckdb', 'mysql', 'bigquery']);

@@ -59,7 +59,7 @@ class TtrSqlDecomposer(
     ): Result {
         val out = mutableListOf<Statement>()
         program.withClause()?.cte()?.forEach { cte ->
-            val name = cte.name.text
+            val name = sqlName(cte.name.text)
             val chain = decomposeQuery(cte.queryExpression())
             out += drainPre()
             out += assign(name, chain, loc.of(cte))
@@ -220,7 +220,7 @@ class TtrSqlDecomposer(
         for (item in list.selectItem()) {
             when (item) {
                 is P.StarAllContext -> cols += expandStar(null, item)
-                is P.StarQualifiedContext -> cols += expandStar(item.qualifier.text, item)
+                is P.StarQualifiedContext -> cols += expandStar(sqlName(item.qualifier.text), item)
                 is P.ExprItemContext -> {
                     val e = exprFolder.fold(item.expr(), ap)
                     cols += e
@@ -257,7 +257,9 @@ class TtrSqlDecomposer(
             if (item is P.ExprItemContext) {
                 val e = exprFolder.fold(item.expr(), ap)
                 if (containsAggregate(e)) {
-                    val name = item.alias?.text ?: (e as? AggregateCall)?.function?.name ?: "agg${entries.size}"
+                    val name =
+                        item.alias?.text?.let { sqlName(it) } ?: (e as? AggregateCall)?.function?.name
+                            ?: "agg${entries.size}"
                     entries += AssignEntry(name, e, loc.of(item))
                 }
             }
@@ -411,8 +413,9 @@ class TtrSqlDecomposer(
         }
 
     private fun fromItemName(fi: P.FromItemContext): Pair<String, String?> {
-        val name = fi.tableRef().identifier().joinToString(".") { it.text }
-        val alias = fi.alias?.text
+        val ref = fi.tableRef()
+        val name = (listOf(sqlName(ref.identifier().text)) + ref.namePart().map { sqlName(it.text) }).joinToString(".")
+        val alias = fi.alias?.text?.let { sqlName(it) }
         return name to alias
     }
 

@@ -68,6 +68,10 @@ object ExprRenderer {
             }
             is FunctionCall -> functionCall(expr)
             is MdPath -> expr.components.joinToString(".") { mdPathComponent(it) }
+            // AU-core-P0: the recipe's `:name` binding and the duration literal (contracts §1).
+            is org.tatrman.ttrp.expr.ParamRef -> ":${expr.name}"
+            is org.tatrman.ttrp.expr.DurationLiteral -> "${expr.amount} ${expr.unit.spelling}"
+            is org.tatrman.ttrp.expr.DurationParam -> "${expr.unit.spelling}(:${expr.param})"
         }
 
     private fun mdPathComponent(c: MdPathComponent): String =
@@ -100,8 +104,13 @@ object ExprRenderer {
         if (fc.function == CatalogId.NEG && fc.args.size == 1) {
             return "-${render(fc.args[0], precedence(fc))}"
         }
-        // Ordinary function.
-        return "${fc.function.name}(${fc.args.joinToString(", ") { render(it, 0) }})"
+        // Ordinary function — named arguments keep their names (`age(since: x)`).
+        val args =
+            fc.args.mapIndexed { i, a ->
+                val name = fc.argNames.getOrNull(i)
+                if (name != null) "$name: ${render(a, 0)}" else render(a, 0)
+            }
+        return "${fc.function.name}(${args.joinToString(", ")})"
     }
 
     private fun caseWhen(cw: CaseWhen): String =

@@ -48,6 +48,9 @@ export function defaultNamespaceForSchema(schemaCode: string): string {
  */
 export function modelForKind(kind: string, declaringModel?: string): ModelCode {
   if (kind === 'query' && declaringModel === 'er') return 'er';
+  // 0.16 — a `def role` declared in a `model automation` file is an automation role
+  // (resolve / delivery / members), not a cnc role; the directive moves no other kind.
+  if (kind === 'role' && declaringModel === 'automation') return 'automation';
   switch (kind) {
     case 'entity':
     case 'attribute':
@@ -78,7 +81,19 @@ export function modelForKind(kind: string, declaringModel?: string): ModelCode {
     case 'executor':
     case 'storage':
     case 'worldSchema':
+    // 0.16 — the automation world members (identity / deployment / process) nest in a world.
+    case 'identity':
+    case 'deployment':
+    case 'process':
       return 'world';
+    // 0.16 — the automation model kinds (`model automation`).
+    case 'parameter':
+    case 'action':
+    case 'service':
+    case 'approval':
+    case 'program':
+    case 'recipe':
+      return 'automation';
     // D14 — query + drillMap are db-layer objects (no separate `query` model).
     case 'query':
     case 'drillMap':

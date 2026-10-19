@@ -32,6 +32,14 @@ import type {
   ExecutorDef,
   StorageDef,
   WorldSchemaDef,
+  AutoBody,
+  AutoEntry,
+  AutoValue,
+  ProcessDef,
+  IdentityDef,
+  GrantDef,
+  DeploymentDef,
+  StepDef,
 } from '@tatrman/parser';
 
 type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
@@ -204,6 +212,13 @@ function propsOf(d: Definition): { [k: string]: Json } {
       set('semantics', semantics(d.semantics));
       set('lexicon', lexicon(d.lexicon));
       set('binding', d.binding ? binding(d.binding) : undefined);
+      // 0.16 — lifecycle states (present-only).
+      if (d.states?.length) p.states = d.states;
+      if (d.transitions?.length) {
+        const t: { [k: string]: Json } = {};
+        for (const e of d.transitions) t[e.from] = e.to;
+        p.transitions = t;
+      }
       break;
     case 'relation':
       if (d.from) p.from = pv(d.from);
@@ -235,6 +250,8 @@ function propsOf(d: Definition): { [k: string]: Json } {
     case 'role':
       set('label', loc(d.label));
       set('search', search(d.search));
+      // 0.16 — an automation role's free-form entries (present-only).
+      if (d.entries?.length) p.entries = autoEntries(d.entries);
       break;
     case 'er2cncRole':
       if (d.entity) p.entity = d.entity.path;
@@ -265,6 +282,20 @@ function propsOf(d: Definition): { [k: string]: Json } {
       if (d.engines.length) p.engines = d.engines.map(enginePartTree);
       if (d.executors.length) p.executors = d.executors.map(enginePartTree);
       if (d.storages.length) p.storages = d.storages.map(storageTree);
+      // 0.16 — the automation world members (present-only).
+      if (d.identities?.length) p.identities = d.identities.map(autoMemberTree);
+      if (d.grants?.length) p.grants = d.grants.map(autoMemberTree);
+      if (d.deployments?.length) p.deployments = d.deployments.map(autoMemberTree);
+      if (d.processes?.length) p.processes = d.processes.map(processTree);
+      break;
+    // 0.16 — the automation kinds share one body.
+    case 'parameter':
+    case 'action':
+    case 'service':
+    case 'approval':
+    case 'program':
+    case 'recipe':
+      Object.assign(p, autoBodyProps(d));
       break;
     case 'term':
     case 'pattern':
@@ -276,6 +307,82 @@ function propsOf(d: Definition): { [k: string]: Json } {
       break;
   }
   return p;
+}
+
+// ----- 0.16 automation serialisers (present-only; shared shape with ConformanceDump.kt / dump.py) -----
+
+function autoBodyProps(b: AutoBody): { [k: string]: Json } {
+  const p: { [k: string]: Json } = {};
+  const l = loc(b.label);
+  if (l !== undefined) p.label = l;
+  if (b.type) p.type = dataType(b.type);
+  if (b.columns?.length) p.columns = b.columns.map(defTree);
+  if (b.target) p.target = targetVal(b.target);
+  if (b.transition) {
+    const t: { [k: string]: Json } = { attribute: b.transition.attribute };
+    if (b.transition.to !== undefined) t.to = b.transition.to;
+    if (b.transition.toColumn !== undefined) t.toColumn = b.transition.toColumn;
+    if (b.transition.from.length) t.from = b.transition.from;
+    p.transition = t;
+  }
+  if (b.set) p.set = { attribute: b.set.attribute, column: b.set.column };
+  if (b.entries.length) p.entries = autoEntries(b.entries);
+  return p;
+}
+
+function autoMemberTree(m: IdentityDef | GrantDef | DeploymentDef | StepDef): Json {
+  const o: { [k: string]: Json } = { kind: m.kind };
+  if ('name' in m && m.name !== undefined) o.name = m.name;
+  const desc = descOf(m.description);
+  if (desc !== null) o.description = desc;
+  if (m.tags?.length) o.tags = m.tags;
+  return { ...o, ...autoBodyProps(m) };
+}
+
+function processTree(pr: ProcessDef): Json {
+  const o: { [k: string]: Json } = { kind: 'process', name: pr.name };
+  const desc = descOf(pr.description);
+  if (desc !== null) o.description = desc;
+  if (pr.tags?.length) o.tags = pr.tags;
+  if (pr.steps.length) o.steps = pr.steps.map(autoMemberTree);
+  if (pr.entries.length) o.entries = autoEntries(pr.entries);
+  return o;
+}
+
+/** An entry list dumps as a key-sorted object; a later duplicate key wins. */
+function autoEntries(entries: AutoEntry[]): { [k: string]: Json } {
+  const o: { [k: string]: Json } = {};
+  for (const e of entries) o[e.key] = av(e.value);
+  return o;
+}
+
+function av(v: AutoValue): Json {
+  switch (v.kind) {
+    case 'string':
+      return { kind: 'string', value: v.value };
+    case 'tripleString':
+      return { kind: 'tripleString', value: v.value };
+    case 'number':
+      return { kind: 'number', value: v.value };
+    case 'bool':
+      return { kind: 'bool', value: v.value };
+    case 'null':
+      return { kind: 'null' };
+    case 'id':
+      return { kind: 'id', parts: v.parts, path: v.path };
+    case 'duration':
+      return { kind: 'duration', amount: v.amount, unit: v.unit };
+    case 'tagged':
+      return { kind: 'tagged', tag: v.tag, value: v.value };
+    case 'call':
+      return { kind: 'call', name: v.name, entries: autoEntries(v.entries) };
+    case 'star':
+      return { kind: 'star' };
+    case 'autoObject':
+      return { kind: 'object', entries: autoEntries(v.entries) };
+    case 'autoList':
+      return { kind: 'list', items: v.items.map(av) };
+  }
 }
 
 // ----- world member serialisers (present-only flat objects; TTR-surface shape) -----

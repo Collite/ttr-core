@@ -385,6 +385,27 @@ object TtrpCli {
             out("ttrp explain: no such file: $file")
             return 2
         }
+        // AU-core-P0: a recipe document explains as its skeleton, from the parse alone — the graph-backed
+        // recipe section (mode verdict, islands, bundle) comes with the recipe compile (AU-core-P2).
+        val parsed =
+            org.tatrman.ttrp.parser.TtrpParser
+                .parseFile(abs)
+        val recipe =
+            parsed.document.statements
+                .filterIsInstance<org.tatrman.ttrp.ast.RecipeDecl>()
+                .firstOrNull()
+        if (recipe != null) {
+            val errors = parsed.diagnostics.filter { it.severity == Severity.ERROR }
+            if (errors.isNotEmpty()) {
+                errors.sortedWith(compareBy({ it.location.line }, { it.location.column })).forEach { out(it.render()) }
+                return 1
+            }
+            out(
+                org.tatrman.ttrp.recipe.RecipeExplain
+                    .render(recipe),
+            )
+            return 0
+        }
         val startDir = abs.parent ?: abs
         val manifestResult = TtrpManifestReader.resolve(startDir)
         val modelsRoot = modelsRootOverride ?: manifestResult.manifest.modelsRoot()

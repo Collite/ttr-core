@@ -21,6 +21,12 @@ import org.tatrman.ttr.parser.model.MdDomainDef
 import org.tatrman.ttr.parser.model.MdMapDef
 import org.tatrman.ttr.parser.model.MeasureDef
 import org.tatrman.ttr.parser.model.AttributeDef
+import org.tatrman.ttr.parser.model.AutoBody
+import org.tatrman.ttr.parser.model.AutoEntry
+import org.tatrman.ttr.parser.model.AutoValue
+import org.tatrman.ttr.parser.model.AutomationDef
+import org.tatrman.ttr.parser.model.ProcessDef
+import org.tatrman.ttr.parser.model.WorldAutoMember
 import org.tatrman.ttr.parser.model.BindingColumnBareId
 import org.tatrman.ttr.parser.model.BindingColumnEntry
 import org.tatrman.ttr.parser.model.BindingColumnObject
@@ -199,6 +205,7 @@ object ConformanceDump {
             is Md2erCubeletDef -> "md2er_cubelet"
             is WorldDef -> "world"
             is LexiconEntryDef -> d.entryKind
+            is AutomationDef -> d.kind
         }
 
     private fun propsOf(d: Definition): Map<String, JsonElement> {
@@ -269,6 +276,11 @@ object ConformanceDump {
                 d.semantics?.let { p["semantics"] = semantics(it) }
                 d.lexicon?.let { l -> lexicon(l)?.let { p["lexicon"] = it } }
                 d.binding?.let { p["binding"] = binding(it) }
+                // 0.16 — lifecycle states (present-only).
+                if (d.states.isNotEmpty()) p["states"] = strList(d.states)
+                if (d.transitions.isNotEmpty()) {
+                    p["transitions"] = obj(d.transitions.associate { it.from to (strList(it.to) as JsonElement) })
+                }
             }
             is RelationDef -> {
                 d.from?.let { p["from"] = pv(it) }
@@ -300,6 +312,8 @@ object ConformanceDump {
             is RoleDef -> {
                 d.label?.let { ls -> localized(ls)?.let { p["label"] = it } }
                 searchHints(d.search)?.let { p["search"] = it }
+                // 0.16 — an automation role's free-form entries (present-only).
+                if (d.entries.isNotEmpty()) p["entries"] = autoEntries(d.entries)
             }
             is Er2CncRoleDef -> {
                 d.entity?.let { p["entity"] = JsonPrimitive(it.path) }
@@ -365,7 +379,13 @@ object ConformanceDump {
                         )
                 }
                 if (d.storages.isNotEmpty()) p["storages"] = JsonArray(d.storages.map { storageTree(it) })
+                // 0.16 — the automation world members (present-only).
+                if (d.identities.isNotEmpty()) p["identities"] = JsonArray(d.identities.map { autoMemberTree(it) })
+                if (d.grants.isNotEmpty()) p["grants"] = JsonArray(d.grants.map { autoMemberTree(it) })
+                if (d.deployments.isNotEmpty()) p["deployments"] = JsonArray(d.deployments.map { autoMemberTree(it) })
+                if (d.processes.isNotEmpty()) p["processes"] = JsonArray(d.processes.map { processTree(it) })
             }
+            is AutomationDef -> p.putAll(autoBodyProps(d.body))
             is LexiconEntryDef -> {
                 d.target?.let { p["for"] = JsonPrimitive(it.path) }
                 if (d.forms.isNotEmpty()) p["forms"] = strList(d.forms)
@@ -375,6 +395,78 @@ object ConformanceDump {
         }
         return p
     }
+
+    // ----- 0.16 automation serialisers (present-only; shared shape with dump.ts / dump.py) -----
+
+    private fun autoBodyProps(b: AutoBody): Map<String, JsonElement> {
+        val p = linkedMapOf<String, JsonElement>()
+        b.label?.let { ls -> localized(ls)?.let { p["label"] = it } }
+        b.type?.let { p["type"] = dataType(it) }
+        if (b.columns.isNotEmpty()) p["columns"] = JsonArray(b.columns.map { defTree(it) })
+        b.target?.let { p["target"] = target(it) }
+        b.transition?.let { t ->
+            val m = linkedMapOf<String, JsonElement>("attribute" to JsonPrimitive(t.attribute))
+            t.to?.let { m["to"] = JsonPrimitive(it) }
+            t.toColumn?.let { m["toColumn"] = JsonPrimitive(it) }
+            if (t.from.isNotEmpty()) m["from"] = strList(t.from)
+            p["transition"] = obj(m)
+        }
+        b.set?.let { p["set"] = obj("attribute" to JsonPrimitive(it.attribute), "column" to JsonPrimitive(it.column)) }
+        if (b.entries.isNotEmpty()) p["entries"] = autoEntries(b.entries)
+        return p
+    }
+
+    private fun autoMemberTree(m: WorldAutoMember): JsonElement {
+        val o = linkedMapOf<String, JsonElement>("kind" to JsonPrimitive(m.kind))
+        m.name?.let { o["name"] = JsonPrimitive(it) }
+        m.body.description?.let { o["description"] = JsonPrimitive(it) }
+        if (m.body.tags.isNotEmpty()) o["tags"] = strList(m.body.tags)
+        o.putAll(autoBodyProps(m.body))
+        return obj(o)
+    }
+
+    private fun processTree(pr: ProcessDef): JsonElement {
+        val o = linkedMapOf<String, JsonElement>("kind" to JsonPrimitive("process"), "name" to JsonPrimitive(pr.name))
+        pr.description?.let { o["description"] = JsonPrimitive(it) }
+        if (pr.tags.isNotEmpty()) o["tags"] = strList(pr.tags)
+        if (pr.steps.isNotEmpty()) o["steps"] = JsonArray(pr.steps.map { autoMemberTree(it) })
+        if (pr.entries.isNotEmpty()) o["entries"] = autoEntries(pr.entries)
+        return obj(o)
+    }
+
+    /** An entry list dumps as a key-sorted object; a later duplicate key wins. */
+    private fun autoEntries(entries: List<AutoEntry>): JsonElement {
+        val m = linkedMapOf<String, JsonElement>()
+        for (e in entries) m[e.key] = av(e.value)
+        return obj(m)
+    }
+
+    private fun av(v: AutoValue): JsonElement =
+        when (v) {
+            is AutoValue.Str ->
+                obj(
+                    "kind" to JsonPrimitive(if (v.triple) "tripleString" else "string"),
+                    "value" to JsonPrimitive(v.raw),
+                )
+            is AutoValue.Num -> obj("kind" to JsonPrimitive("number"), "value" to num(v.raw))
+            is AutoValue.Bool -> obj("kind" to JsonPrimitive("bool"), "value" to JsonPrimitive(v.raw))
+            is AutoValue.Null -> obj("kind" to JsonPrimitive("null"))
+            is AutoValue.Id ->
+                obj("kind" to JsonPrimitive("id"), "parts" to strList(v.parts), "path" to JsonPrimitive(v.ref.path))
+            is AutoValue.Duration ->
+                obj("amount" to num(v.amount), "kind" to JsonPrimitive("duration"), "unit" to JsonPrimitive(v.unit))
+            is AutoValue.Tagged ->
+                obj("kind" to JsonPrimitive("tagged"), "tag" to JsonPrimitive(v.tag), "value" to JsonPrimitive(v.value))
+            is AutoValue.Call ->
+                obj(
+                    "entries" to autoEntries(v.entries),
+                    "kind" to JsonPrimitive("call"),
+                    "name" to JsonPrimitive(v.name),
+                )
+            is AutoValue.Star -> obj("kind" to JsonPrimitive("star"))
+            is AutoValue.Obj -> obj("entries" to autoEntries(v.entries), "kind" to JsonPrimitive("object"))
+            is AutoValue.ListV -> obj("items" to JsonArray(v.items.map { av(it) }), "kind" to JsonPrimitive("list"))
+        }
 
     /** v4.4 — inline `lexicon { … }` block; canonical shorthand keys, present-only. */
     private fun lexicon(l: LexiconBlock): JsonElement? {

@@ -1,0 +1,5 @@
+// A `target` role container must carry its body (TTRP-PRS-007).
+recipe {
+    key: order.order_number
+    candidates placed(out orders) target erp
+}

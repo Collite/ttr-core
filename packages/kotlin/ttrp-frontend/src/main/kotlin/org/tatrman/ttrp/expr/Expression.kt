@@ -157,12 +157,17 @@ sealed interface MdPathAtom {
     ) : MdPathAtom
 }
 
-/** A scalar function or operator call (operators are catalogue ids — B-T5). */
+/**
+ * A scalar function or operator call (operators are catalogue ids — B-T5). [argNames] is empty for an
+ * all-positional call (every call before AU-core-P0, and every operator); otherwise it is parallel to
+ * [args], `null` for a positional argument — `age(since: x)`, `working_days(between: a, and: :as_of)`.
+ */
 data class FunctionCall(
     val function: CatalogId,
     val args: List<Expression>,
     override val location: SourceLocation,
     override val type: TtrpType? = null,
+    val argNames: List<String?> = emptyList(),
 ) : Expression
 
 /**
@@ -206,3 +211,52 @@ data class IsNull(
     override val location: SourceLocation,
     override val type: TtrpType? = null,
 ) : Expression
+
+/**
+ * `:name` (AU-core-P0, D-108) — a recipe parameter (`:tolerance`, declared in the recipe's
+ * `parameters:` and a `def parameter`) or a runtime binding (`:as_of`, reserved; a port / event
+ * value). Which one is the S1.3 checker's question (TTRP-REC-020); the walker only records the name.
+ */
+data class ParamRef(
+    val name: String,
+    override val location: SourceLocation,
+    override val type: TtrpType? = null,
+) : Expression
+
+/** The units a duration is written in (AU contracts §1 `durationLiteral`). */
+enum class DurationUnit(
+    val spelling: String,
+) {
+    DAYS("days"),
+    WORKING_DAYS("working_days"),
+    WEEKS("weeks"),
+    MONTHS("months"),
+    MINUTES("minutes"),
+    HOURS("hours"),
+    ;
+
+    companion object {
+        fun of(spelling: String): DurationUnit? = entries.firstOrNull { it.spelling == spelling }
+    }
+}
+
+/** A duration (AU-core-P0, D-108): a literal amount or a parameter's value, in a [DurationUnit]. */
+sealed interface DurationExpr : Expression {
+    val unit: DurationUnit
+}
+
+/** `30 days` · `2 working_days`. */
+data class DurationLiteral(
+    val amount: Long,
+    override val unit: DurationUnit,
+    override val location: SourceLocation,
+    override val type: TtrpType? = null,
+) : DurationExpr
+
+/** `days(:inbound_reminder)` · `working_days(:settlement)` — the amount is a parameter's value (17 §5). */
+data class DurationParam(
+    override val unit: DurationUnit,
+    val param: String,
+    override val location: SourceLocation,
+    override val type: TtrpType? = null,
+) : DurationExpr

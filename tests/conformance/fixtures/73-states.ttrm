@@ -1,0 +1,12 @@
+// 0.16 — `states:` / `transitions:` on an attribute (D-67); `transitions:` optional.
+package acme
+model er
+
+def entity order {
+    attributes: [
+        def attribute order_number { type: text, isKey: true },
+        def attribute state  { type: text, states: [placed, held, released, cancelled],
+                               transitions: { placed: [held, released, cancelled], held: [released, cancelled] } },
+        def attribute stage  { type: text, states: [new, done] }
+    ]
+}

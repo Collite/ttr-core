@@ -47,6 +47,34 @@ class ExplainCommandSpec :
             out shouldContain "TTRP-RES-006"
         }
 
+        // AU-core-P0 · S0.1 T6: a recipe document explains as its skeleton from the parse alone (no world,
+        // no models — the graph-backed recipe section is AU-core-P2's).
+        "explain of a recipe document prints the recipe skeleton" {
+            val recipes = resolutionRoot.parent.resolve("recipes")
+            val lines = mutableListOf<String>()
+            val code =
+                TtrpCli.dispatch(arrayOf("explain", recipes.resolve("release_order.ttrp").toString()), {
+                    lines +=
+                        it
+                })
+            val out = lines.joinToString("\n")
+            withClue(out) { code shouldBe 0 }
+            out shouldContain
+                "decision   verdict(in orders, in shortfall, in price_differences, in overdue)  switch v  overlapping"
+            out shouldContain "verdict.release_confirmed -> ask { who, about, action, due, on_due: hold }"
+        }
+
+        "explain of a malformed recipe exits nonzero with its diagnostics" {
+            val recipes = resolutionRoot.parent.resolve("recipes")
+            val lines = mutableListOf<String>()
+            TtrpCli.dispatch(
+                arrayOf("explain", recipes.resolve("negative/bad-values.ttrp").toString()),
+                { lines += it },
+            ) shouldBe
+                1
+            lines.joinToString("\n") shouldContain "TTRP-PRS-006"
+        }
+
         "dispatch accepts explain and rejects an unknown subcommand" {
             val lines = mutableListOf<String>()
             TtrpCli.dispatch(arrayOf("build"), { lines += it }) shouldBe 2

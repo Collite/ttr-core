@@ -1,0 +1,26 @@
+// 0.16 — every automation noun stays usable as a name, a column, a key and a dotted ref
+// part (the WORLD precedent): none of them is reserved as anything but a def keyword.
+package acme.automation
+model db
+
+def table process {
+    columns: [
+        def column action     { type: text },
+        def column service    { type: text },
+        def column program    { type: text },
+        def column recipe     { type: text },
+        def column parameter  { type: text },
+        def column approval   { type: text },
+        def column identity   { type: text },
+        def column deployment { type: text },
+        def column step       { type: text },
+        def column steps      { type: int },
+        def column set        { type: text },
+        def column states     { type: text },
+        def column transition { type: text },
+        def column transitions { type: text },
+        def column automation { type: text },
+        def column parameters { type: text }
+    ]
+    primaryKey: [action, step]
+}

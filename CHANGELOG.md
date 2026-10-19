@@ -31,6 +31,33 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   `JOIN_NO_RELATION` at WARNING, with that side rendered as a derived table, instead of silent. Everywhere else an
   FK-only join is decided exactly as before: hartland, the investment model and the veles fixtures give byte-identical
   stored plans, warnings and SQL.
+- **Grammar 0.15 → 0.16 — the automation model (AU-core-P0 · S0.2; `ttr-parser`, `ttr-writer`, `ttr-semantics`,
+  `ttr-metadata`, the TS and Python parsers).** `model automation` with `def parameter` · `action` · `service` ·
+  `approval` · `program` · `recipe` (one permissive body: typed properties first, then free-form entries whose
+  values add durations `2 working_days`, tagged strings `schedule "…"`, call-shaped values and `*`); `def role` gains
+  `resolve` / `delivery` / `members`; `transition: order.state -> held { from: placed }` and `set: a.b = column`; the
+  world gains `def identity`, unnamed `def grant`, `def deployment` and `def process … steps: [ def step … ]`;
+  attributes gain `states:` / `transitions:`. Additive — every 0.15 file parses unchanged and no conformance golden
+  moved; fixtures 71–74 added. `ttr-semantics`: `AutomationValidator` / `StatesValidator` (`ttr/automation-*`,
+  `ttr/states-*`), with a TS twin in `@tatrman/semantics` and LSP hover. **`ttr-metadata`**: a new tier
+  `SchemaCode.AUTOMATION` (`AutomationSchema` — parameters, actions, services, roles, approvals, programs, recipes as
+  typed objects), `World.identities / grants / deployments / processes`, `WorldStorage.writable`,
+  `Attribute.states / transitions`, and the shipped stdlib entities `automation.obligation`, `state_history`,
+  `approvals`, added to any source that declares `model automation` or imports an `automation` package. Manual:
+  [Automation](docs/manual/en/19-automation.md).
+- **TTR-P toolchain (`ttrp-frontend` · `-graph` · `-emit` · `-cli` · `ttrp-lsp`) — the recipe block (AU-core-P0 · S0.1).**
+  TTR-P grammar 0.3 → 0.4 (additive): `recipe { key / as of / parameters / document / protocol }` with `candidates` /
+  `context` role containers (island forms `target` · `builtin` · `foreign … per candidate | set schema` · `call` ·
+  `turn … ask … answer`, an optional `window { by: over: }`), a `decision` ending in a `switch` statement (routes,
+  `mode:`, `else:`, `because:`, `detail:`) and an `actions { }` wiring block. Expressions gain `:name` bindings, the
+  duration literal (`30 days`, `days(:p)`) and named function arguments; `aggregate { group_by: k }` is accepted beside
+  `group by k`. Every new word is a soft keyword — existing names keep working. New AST (`ast/Recipe.kt`), new
+  expression nodes (`ParamRef`, `DurationLiteral`, `DurationParam`) and `FunctionCall.argNames` (empty for positional
+  calls). `ttrp explain` prints a recipe's skeleton; `ttrp build` refuses a recipe (`TTRP-REC-099`) until the recipe
+  compile lands. New diagnostics `TTRP-PRS-006` / `-007`. Manual: [Recipes](docs/manual/en/18-recipes.md).
+- **TTR-SQL fragments** — `:name` is a parameter binding (it was silently read as a column: the lexer dropped the
+  `:`); a clause keyword is a name after a dot (`er.entity.order`); any character the lexer cannot read is now the
+  generic reject instead of being dropped.
 
 - **`ttr-translator`** — `Translator.savedQueryReferences` (and `SavedQueryReferenceExtractor.fromSource` under it)
   now promotes Calcite's literal charset to UTF-8 first, like `parseToRelNode` and `unparseFromRelNode`. Calcite

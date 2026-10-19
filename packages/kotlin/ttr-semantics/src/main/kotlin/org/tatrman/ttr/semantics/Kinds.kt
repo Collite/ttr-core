@@ -3,6 +3,7 @@ package org.tatrman.ttr.semantics
 
 import org.tatrman.ttr.parser.model.AreaDef
 import org.tatrman.ttr.parser.model.AttributeDef
+import org.tatrman.ttr.parser.model.AutomationDef
 import org.tatrman.ttr.parser.model.ColumnDef
 import org.tatrman.ttr.parser.model.CubeletDef
 import org.tatrman.ttr.parser.model.Md2dbCubeletDef
@@ -80,6 +81,8 @@ fun kindOf(def: Definition): String =
         // v4.4 — a canonical lexicon entry keys on its keyword (`term`/`pattern`/
         // `example`), matching the TS `def.kind` discriminator.
         is LexiconEntryDef -> def.entryKind
+        // 0.16 — the automation kinds key on their def keyword (`parameter`, `action`, …).
+        is AutomationDef -> def.kind
     }
 
 /**
@@ -94,7 +97,11 @@ internal fun defaultSchemaForKind(
     declaringModel: String = "",
 ): String = modelForKind(kind, declaringModel)
 
-/** The reserved model codes (D14: no `query`; D15: `cnc` schema-less; `world` v4.1). */
+/**
+ * The model codes a reference may lead with (D14: no `query`; D15: `cnc` schema-less; `world` v4.1).
+ * `automation` (0.16) keys symbols but is not a reference prefix — the automation stdlib's package is
+ * named `automation` (review-114 B1). Mirrors TS `MODEL_CODES`.
+ */
 val MODEL_CODES = setOf("db", "er", "md", "binding", "cnc", "world")
 
 /**
@@ -112,6 +119,9 @@ fun modelForKind(
 ): String =
     if (kind == "query" && declaringModel == "er") {
         "er"
+    } else if (kind == "role" && declaringModel == "automation") {
+        // 0.16 — a `def role` in a `model automation` file is an automation role, not a cnc role.
+        "automation"
     } else {
         modelForKindOnly(kind)
     }
@@ -125,6 +135,9 @@ private fun modelForKindOnly(kind: String): String =
         "role", "er2cncRole" -> "cnc"
         "mdDomain", "dimension", "mdMap", "hierarchy", "measure", "cubelet" -> "md"
         "world", "engine", "executor", "storage", "worldSchema" -> "world"
+        // 0.16 — the automation world members nest in a world; the automation kinds are `automation`.
+        "identity", "deployment", "process" -> "world"
+        "parameter", "action", "service", "approval", "program", "recipe" -> "automation"
         else -> "db"
     }
 

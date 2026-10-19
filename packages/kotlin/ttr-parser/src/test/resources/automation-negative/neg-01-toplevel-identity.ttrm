@@ -1,0 +1,5 @@
+// expect: syntax error — `def identity` is a world member; it exists only nested in `def world`.
+package acme.worlds
+model world
+
+def identity automation_decider { principal: "svc", credential: TTR_CONN_X }

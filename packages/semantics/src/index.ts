@@ -26,6 +26,8 @@ export { DocumentSymbolTable } from './symbol-table.js';
 export type { SymbolEntry } from './symbol-table.js';
 export { validateWorldDocument } from './world-validate.js';
 export type { WorldDiagnostic, WorldDiagnosticCode } from './world-validate.js';
+export { validateAutomationProject, automationStdlibNeeded } from './automation-validate.js';
+export type { AutomationDiagnostic, AutomationSeverity } from './automation-validate.js';
 export { validateSecurityDocument } from './security-validate.js';
 export type { SecurityDiagnostic, SecurityDiagnosticCode } from './security-validate.js';
 export { effectiveMatchMethod, fuzzyDeprecationMessage, validateSearchMethods, DEFAULT_TYPOS_DISTANCE } from './search-method.js';

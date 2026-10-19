@@ -1,0 +1,200 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "table",
+            "name": "process",
+            "properties": {
+                "columns": [
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "action",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "service",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "program",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "recipe",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "parameter",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "approval",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "identity",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "deployment",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "step",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "steps",
+                        "properties": {
+                            "type": {
+                                "name": "int"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "set",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "states",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "transition",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "transitions",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "automation",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "parameters",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    }
+                ],
+                "primaryKey": [
+                    "action",
+                    "step"
+                ]
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": "acme.automation",
+    "schemaDirective": {
+        "code": "db",
+        "namespace": null
+    }
+}

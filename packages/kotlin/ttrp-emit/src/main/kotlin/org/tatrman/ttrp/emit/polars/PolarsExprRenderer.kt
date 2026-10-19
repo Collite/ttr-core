@@ -58,6 +58,13 @@ class PolarsExprRenderer(
                     detail = "MD dot-path reached Polars emit unstaged (no md-source hoist for this placement)",
                     location = e.location,
                 )
+            // AU-core-P0 parses `:name` bindings and durations; their lowering is AU-core-P2.
+            is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr ->
+                throw TtrpEmitException(
+                    EmitDiagnosticId.UNSUPPORTED_NODE,
+                    detail = "a recipe `:name` binding or duration is not lowered to Polars yet (AU-core-P2)",
+                    location = e.location,
+                )
         }
 
     /** Aggregate expression body, e.g. `pl.col("amount").sum().alias("total")` (alias added by caller). */

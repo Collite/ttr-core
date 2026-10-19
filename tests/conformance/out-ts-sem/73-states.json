@@ -1,0 +1,10 @@
+{
+    "diagnostics": [],
+    "resolved": [],
+    "symbols": [
+        "acme.er.entity.order",
+        "acme.er.entity.order.order_number",
+        "acme.er.entity.order.stage",
+        "acme.er.entity.order.state"
+    ]
+}

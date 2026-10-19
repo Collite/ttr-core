@@ -37,8 +37,27 @@ from antlr4.Token import CommonToken
 from .dedent import dedent_with_indent
 from .diagnostics import DiagnosticCode
 from .model import (
+    AUTOMATION_KINDS,
     AreaDef,
     AttributeDef,
+    AttributeTransition,
+    AutoBody,
+    AutoBool,
+    AutoCall,
+    AutoDuration,
+    AutoEntry,
+    AutoId,
+    AutoList,
+    AutomationDef,
+    AutoNull,
+    AutoNum,
+    AutoObj,
+    AutoSet,
+    AutoStar,
+    AutoStr,
+    AutoTagged,
+    AutoTransition,
+    AutoValue,
     BindingColumnBareId,
     BindingColumnEntry,
     BindingColumnObject,
@@ -78,6 +97,7 @@ from .model import (
     ParseWarning,
     PatternDef,
     ProcedureDef,
+    ProcessDef,
     ProjectDef,
     PropertyValue,
     QueryDef,
@@ -101,6 +121,7 @@ from .model import (
     TermDef,
     TripleStringValue,
     ViewDef,
+    WorldAutoMember,
     WorldDef,
     WorldSchemaDef,
     WorldSchemaField,
@@ -370,6 +391,7 @@ def _visit_model_directive(ctx: Any, file: str) -> ModelDirective:
         else "cnc" if code_ctx.CNC()
         else "world" if code_ctx.WORLD()
         else "lexicon" if code_ctx.LEXICON()
+        else "automation" if code_ctx.AUTOMATION()
         else ""
     )
     # v4.4: `MODEL modelCode (SCHEMA id)? (LOCALE id)?` — up to two id slots. In
@@ -443,7 +465,10 @@ def _visit_definition(ctx: Any, file: str, warnings: list[ParseWarning], errors:
     if od.SCHEMA() is not None:
         return _visit_schema(od, name, src, file, warnings, errors)
     if od.WORLD() is not None:
-        return _visit_world(od, name, src, file, warnings)
+        return _visit_world(od, name, src, file, warnings, errors)
+    # Grammar 0.16 — the automation kinds (`model automation`): one shared body.
+    if od.autoBody() is not None:
+        return _visit_automation(od, name, src, file, warnings, errors)
     # v4.4 lexicon kinds (model lexicon) — one shared body, kind tag distinguishes.
     if od.TERM() is not None:
         return _visit_lexicon_entry(od, "term", name, src, file)
@@ -944,6 +969,7 @@ def _visit_role(od: Any, name: str, source: SourceLocation, file: str, warnings:
     tags: tuple[str, ...] = ()
     label: LocalizedStringValue | None = None
     search = SearchHintsValue()
+    entries: list[AutoEntry] = []
     for p in props:
         d = p.descriptionProperty()
         if d is not None and description is None and description_localized is None:
@@ -957,7 +983,17 @@ def _visit_role(od: Any, name: str, source: SourceLocation, file: str, warnings:
         s = p.searchBlockProperty()
         if s is not None:
             search = _visit_search_block(s.searchBlock(), file)
-    return RoleDef(name=name, source=source, description=description, description_localized=description_localized, tags=tags, label=label, search=search)
+        # Grammar 0.16 — an automation role's typed properties (resolve / delivery / members), one
+        # ordered entry list (review-114 M5: typed, so a typo stays a parse error).
+        for role_key, role_prop in (("resolve", p.resolveProperty()), ("delivery", p.deliveryProperty()), ("members", p.membersProperty())):
+            if role_prop is not None:
+                entries.append(
+                    AutoEntry(key=role_key, value=_visit_auto_value(role_prop.autoValue(), file), source=make_source_location(role_prop, file))
+                )
+    return RoleDef(
+        name=name, source=source, description=description, description_localized=description_localized, tags=tags, label=label, search=search,
+        entries=tuple(entries),
+    )
 
 
 def _visit_er2cnc_role(od: Any, name: str, source: SourceLocation, file: str, warnings: list[ParseWarning]) -> Er2CncRoleDef:
@@ -1072,7 +1108,7 @@ def _visit_area(od: Any, name: str, source: SourceLocation, file: str, warnings:
 # ---------------------------------------------------------------------------
 
 
-def _visit_world(od: Any, name: str, source: SourceLocation, file: str, warnings: list[ParseWarning]) -> WorldDef:
+def _visit_world(od: Any, name: str, source: SourceLocation, file: str, warnings: list[ParseWarning], errors: list[ParseError]) -> WorldDef:
     description: str | None = None
     description_localized: LocalizedStringValue | None = None
     tags: tuple[str, ...] = ()
@@ -1080,6 +1116,10 @@ def _visit_world(od: Any, name: str, source: SourceLocation, file: str, warnings
     engines: list[EngineDef] = []
     executors: list[ExecutorDef] = []
     storages: list[StorageDef] = []
+    identities: list[WorldAutoMember] = []
+    grants: list[WorldAutoMember] = []
+    deployments: list[WorldAutoMember] = []
+    processes: list[ProcessDef] = []
     for m in od.worldDef().worldMember() or ():
         wp = m.worldProperty()
         if wp is not None:
@@ -1095,9 +1135,19 @@ def _visit_world(od: Any, name: str, source: SourceLocation, file: str, warnings
             if e is not None:
                 extends = _id_text(e.id_())
             continue
-        member_name = _id_text(m.id_())
         member_src = make_source_location(m, file)
-        if m.ENGINE() is not None:
+        # Grammar 0.16 — `def grant { … }` is unnamed (keyed by its who/program/as triple).
+        if m.GRANT() is not None:
+            grants.append(WorldAutoMember("grant", None, member_src, _visit_auto_body(m.autoBody().autoProperty(), file, warnings, errors)))
+            continue
+        member_name = _id_text(m.id_())
+        if m.IDENTITY() is not None:
+            identities.append(WorldAutoMember("identity", member_name, member_src, _visit_auto_body(m.autoBody().autoProperty(), file, warnings, errors)))
+        elif m.DEPLOYMENT() is not None:
+            deployments.append(WorldAutoMember("deployment", member_name, member_src, _visit_auto_body(m.autoBody().autoProperty(), file, warnings, errors)))
+        elif m.PROCESS() is not None:
+            processes.append(_visit_process(m.processBody(), member_name, member_src, file, warnings, errors))
+        elif m.ENGINE() is not None:
             engines.append(_visit_engine_part(m.engineDef().enginePartProperty(), "engine", member_name, member_src, file))
         elif m.EXECUTOR() is not None:
             eng = _visit_engine_part(m.executorDef().enginePartProperty(), "executor", member_name, member_src, file)
@@ -1112,6 +1162,174 @@ def _visit_world(od: Any, name: str, source: SourceLocation, file: str, warnings
     return WorldDef(
         name=name, source=source, description=description, description_localized=description_localized, tags=tags, extends=extends,
         engines=tuple(engines), executors=tuple(executors), storages=tuple(storages),
+        identities=tuple(identities), grants=tuple(grants), deployments=tuple(deployments), processes=tuple(processes),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Grammar 0.16 — the automation model (`model automation`; AU-core-P0 S0.2).
+# One permissive body for six def kinds and the automation world members; values
+# are carried structurally — their meaning is validated in semantics.
+# ---------------------------------------------------------------------------
+
+
+def _automation_kind(od: Any) -> str:
+    if od.PARAMETER() is not None:
+        return "parameter"
+    if od.ACTION() is not None:
+        return "action"
+    if od.SERVICE() is not None:
+        return "service"
+    if od.APPROVAL() is not None:
+        return "approval"
+    if od.PROGRAM() is not None:
+        return "program"
+    return "recipe"
+
+
+def _visit_automation(od: Any, name: str, source: SourceLocation, file: str, warnings: list[ParseWarning], errors: list[ParseError]) -> AutomationDef:
+    body = _visit_auto_body(od.autoBody().autoProperty(), file, warnings, errors)
+    cls = AUTOMATION_KINDS[_automation_kind(od)]
+    return cls(
+        name=name, source=source, description=body.description, description_localized=body.description_localized, tags=body.tags,
+        body=body,
+    )
+
+
+def _visit_auto_body(props: Any, file: str, warnings: list[ParseWarning], errors: list[ParseError]) -> AutoBody:
+    description: str | None = None
+    description_localized: LocalizedStringValue | None = None
+    tags: tuple[str, ...] = ()
+    label: LocalizedStringValue | None = None
+    dt: DataType | None = None
+    columns: tuple[ColumnDef, ...] = ()
+    target: TargetValue | None = None
+    transition: AutoTransition | None = None
+    set_: AutoSet | None = None
+    entries: list[AutoEntry] = []
+    for p in props or ():
+        d = p.descriptionProperty()
+        if d is not None:
+            description, description_localized = _visit_description(d, file)
+        t = p.tagsProperty()
+        if t is not None:
+            tags = _visit_list_of_strings(t.listOfStrings(), file)
+        lp = p.labelProperty()
+        if lp is not None:
+            label = _visit_localized_string(lp.localizedString(), file)
+        tp = p.typeProperty()
+        if tp is not None:
+            dt = _visit_data_type(tp.dataType(), file)
+        cp = p.columnsProperty()
+        if cp is not None:
+            columns = tuple(_visit_column_def_list(cp.columnDefList(), file, warnings, errors))
+        tg = p.targetProperty()
+        if tg is not None:
+            target = _visit_target_value(tg, file)
+        tr = p.transitionProperty()
+        if tr is not None:
+            transition = _visit_auto_transition(tr, file)
+        sp = p.setProperty()
+        if sp is not None:
+            set_ = AutoSet(attribute=_id_text(sp.id_(0)), column=_id_text(sp.id_(1)), source=make_source_location(sp, file))
+        ae = p.autoEntry()
+        if ae is not None:
+            entries.append(_visit_auto_entry(ae, file))
+    return AutoBody(
+        description=description, description_localized=description_localized, tags=tags, label=label, type=dt,
+        columns=columns, target=target, transition=transition, set=set_, entries=tuple(entries),
+    )
+
+
+def _visit_auto_transition(ctx: Any, file: str) -> AutoTransition:
+    to: str | None = None
+    to_column: str | None = None
+    target = ctx.transitionTarget()
+    if target is not None:
+        if target.LBRACE() is not None:
+            to_column = _id_text(target.id_())
+        else:
+            to = _id_text(target.id_())
+    from_states: tuple[str, ...] = ()
+    guard = ctx.transitionGuard()
+    if guard is not None:
+        if guard.listOfIds() is not None:
+            from_states = _visit_list_of_ids(guard.listOfIds(), file)
+        elif guard.id_() is not None:
+            from_states = (_id_text(guard.id_()),)
+    return AutoTransition(
+        attribute=_id_text(ctx.id_()), to=to, to_column=to_column, from_states=from_states, source=make_source_location(ctx, file),
+    )
+
+
+def _visit_auto_entry(ctx: Any, file: str) -> AutoEntry:
+    return AutoEntry(key=ctx.autoKey().getText(), value=_visit_auto_value(ctx.autoValue(), file), source=make_source_location(ctx, file))
+
+
+def _visit_auto_value(ctx: Any, file: str) -> AutoValue:
+    src = make_source_location(ctx, file)
+    dur = ctx.durationLiteral()
+    if dur is not None:
+        return AutoDuration(source=src, amount=_number_value(dur.NUMBER_LITERAL()), unit=_id_text(dur.id_()))
+    tagged = ctx.taggedValue()
+    if tagged is not None:
+        return AutoTagged(source=src, tag=_id_text(tagged.id_()), value=_visit_string_value(tagged.stringLiteralForm(), file))
+    call = ctx.callValue()
+    if call is not None:
+        return AutoCall(
+            source=src, name=_id_text(call.id_()), entries=tuple(_visit_auto_entry(e, file) for e in call.autoObject().autoEntry() or ()),
+        )
+    if ctx.STAR() is not None:
+        return AutoStar(source=src)
+    obj = ctx.autoObject()
+    if obj is not None:
+        return AutoObj(source=src, entries=tuple(_visit_auto_entry(e, file) for e in obj.autoEntry() or ()))
+    lst = ctx.autoList()
+    if lst is not None:
+        return AutoList(source=src, items=tuple(_visit_auto_value(v, file) for v in lst.autoValue() or ()))
+    lit = ctx.literal()
+    if lit is not None:
+        if lit.NUMBER_LITERAL() is not None:
+            return AutoNum(source=src, raw=_number_value(lit.NUMBER_LITERAL()), text=lit.NUMBER_LITERAL().getText())
+        if lit.BOOLEAN_LITERAL() is not None:
+            return AutoBool(source=src, raw=_bool_text(lit.BOOLEAN_LITERAL()) is True)
+        slf = lit.stringLiteralForm()
+        if slf is not None:
+            sv = _visit_string_literal_form(slf, file)
+            return AutoStr(source=src, raw=sv.raw, triple=isinstance(sv, TripleStringValue))
+        return AutoNull(source=src)
+    id_ = ctx.id_()
+    if id_ is not None:
+        parts = _id_parts(id_)
+        return AutoId(source=src, ref=Reference(path=".".join(parts), parts=parts, source=make_source_location(id_, file)), parts=parts)
+    return AutoNull(source=src)
+
+
+def _visit_process(ctx: Any, name: str, source: SourceLocation, file: str, warnings: list[ParseWarning], errors: list[ParseError]) -> ProcessDef:
+    description: str | None = None
+    description_localized: LocalizedStringValue | None = None
+    tags: tuple[str, ...] = ()
+    steps: list[WorldAutoMember] = []
+    entries: list[AutoEntry] = []
+    for p in ctx.processProperty() or ():
+        d = p.descriptionProperty()
+        if d is not None:
+            description, description_localized = _visit_description(d, file)
+        t = p.tagsProperty()
+        if t is not None:
+            tags = _visit_list_of_strings(t.listOfStrings(), file)
+        sp = p.stepsProperty()
+        if sp is not None:
+            for st in sp.stepInline() or ():
+                steps.append(
+                    WorldAutoMember("step", _id_text(st.id_()), make_source_location(st, file), _visit_auto_body(st.autoBody().autoProperty(), file, warnings, errors))
+                )
+        ae = p.autoEntry()
+        if ae is not None:
+            entries.append(_visit_auto_entry(ae, file))
+    return ProcessDef(
+        name=name, source=source, description=description, description_localized=description_localized, tags=tags,
+        steps=tuple(steps), entries=tuple(entries),
     )
 
 
@@ -1373,6 +1591,8 @@ def _visit_attribute_inline(ctx: Any, name: str, source: SourceLocation, file: s
     search = SearchHintsValue()
     semantics: SemanticsBlock | None = None
     binding: BindingProperty | None = None
+    states: tuple[str, ...] = ()
+    transitions: tuple[AttributeTransition, ...] = ()
     for p in props:
         d = p.descriptionProperty()
         if d is not None and description is None and description_localized is None:
@@ -1406,6 +1626,16 @@ def _visit_attribute_inline(ctx: Any, name: str, source: SourceLocation, file: s
         m = p.bindingProperty()
         if m is not None:
             binding = _visit_binding_property(m, file)
+        # Grammar 0.16 — lifecycle states (D-67).
+        stp = p.statesProperty()
+        if stp is not None:
+            states = _visit_list_of_ids(stp.listOfIds(), file)
+        trp = p.transitionsProperty()
+        if trp is not None:
+            transitions = tuple(
+                AttributeTransition(from_state=_id_text(e.id_()), to=_visit_list_of_ids(e.listOfIds(), file), source=make_source_location(e, file))
+                for e in trp.transitionEntry() or ()
+            )
     return AttributeDef(
         name=name, source=source, description=description, description_localized=description_localized, tags=tags,
         type=dt, is_key=is_key, optional=optional,
@@ -1414,6 +1644,7 @@ def _visit_attribute_inline(ctx: Any, name: str, source: SourceLocation, file: s
         display_label=display_label,
         search=search, semantics=semantics,
         lexicon=_inline_lexicon_of(props, file), binding=binding,
+        states=states, transitions=transitions,
     )
 
 

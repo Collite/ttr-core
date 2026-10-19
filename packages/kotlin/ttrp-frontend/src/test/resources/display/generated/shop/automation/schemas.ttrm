@@ -1,0 +1,10 @@
+package shop.automation
+
+// A package NAMED `automation` (AU-core-P0 review-114 B1): `import shop.automation.*` must reach its row
+// schemas — the trailing `automation` is the package's name, never the automation tier.
+def schema remind {
+    columns: [
+        def column recipient { type: text },
+        def column order_id  { type: int },
+    ]
+}

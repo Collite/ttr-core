@@ -151,6 +151,8 @@ class CapabilityChecker(
             is InList -> collectScalar(e.expr) + e.items.flatMap { collectScalar(it) }
             is IsNull -> collectScalar(e.expr)
             is ColumnRef, is Literal, is MdPath -> emptyList()
+            // AU-core-P0: `:name` bindings and durations call no function.
+            is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr -> emptyList()
         }
 
     private fun collectAgg(e: Expression): List<String> =
@@ -164,6 +166,8 @@ class CapabilityChecker(
             is InList -> collectAgg(e.expr) + e.items.flatMap { collectAgg(it) }
             is IsNull -> collectAgg(e.expr)
             is ColumnRef, is Literal, is MdPath -> emptyList()
+            // AU-core-P0: `:name` bindings and durations call no function.
+            is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr -> emptyList()
         }
 
     private fun info(
