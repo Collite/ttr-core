@@ -6,6 +6,13 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-translator`** — `Translator.savedQueryReferences` (and `SavedQueryReferenceExtractor.fromSource` under it)
+  now promotes Calcite's literal charset to UTF-8 first, like `parseToRelNode` and `unparseFromRelNode`. Calcite
+  freezes the charset when it first loads; a metadata worker calls this for every saved query before its first parse,
+  so on 0.12.1 Calcite stayed on ISO-8859-1 for the process and every later body with a literal outside Latin-1
+  (`'Poštovné'`) failed — `Failed to encode … in character set 'ISO-8859-1'`, or a validation error that names none of
+  it when the literal sits under the typed-placeholder retry. The test JVM pins `calcite.default.charset`, which hid
+  it: `SavedQueryReferencesCharsetSpec` runs the sequence in a JVM of its own.
 - **`ttr-concept`** (new module, **not published**) — the conceptual-model (cn) layer below the determinism
   frontier: `ConceptService` (statement validate/lower/explain · assertion validate/lower/explain ·
   `definitionRender(md|er)` · `materialize` · `hygieneReport`) as an **interface** with a `NotImplementedConceptService`
