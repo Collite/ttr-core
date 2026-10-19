@@ -424,6 +424,10 @@ data class Attribute(
      * when absent / diagnostics-carrying. From ttr-semantics' `ResolvedAttributeSemantics`.
      */
     val semantics: ResolvedAttributeSemantics? = null,
+    /** Grammar 0.16 — `states: [placed, held, …]` (D-67); empty when the attribute declares none. */
+    val states: List<String> = emptyList(),
+    /** Grammar 0.16 — `transitions: { placed: [held, …] }` (D-67), from-state → allowed targets; empty ⇒ any. */
+    val transitions: Map<String, List<String>> = emptyMap(),
 ) : ModelObject {
     override val kind: String = "attribute"
 }

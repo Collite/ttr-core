@@ -115,6 +115,10 @@ class ModelReconciler(
         val worldSchema =
             org.tatrman.ttr.metadata.model
                 .WorldSchema(worlds = worlds)
+        // Grammar 0.16 — the automation tier, merged by qname (same precedence).
+        val automationSchema =
+            org.tatrman.ttr.metadata.model
+                .AutomationSchema(objects = mergeMaps(sorted) { it.automation })
 
         val model =
             Model(
@@ -124,7 +128,14 @@ class ModelReconciler(
                         value = (sorted.joinToString("|") { it.version } + ":" + UUID.randomUUID().toString().take(8)),
                         swappedAt = Instant.now(),
                     ),
-                schemas = mapOf("db" to dbSchema, "er" to erSchema, "cnc" to cncSchema, "world" to worldSchema),
+                schemas =
+                    mapOf(
+                        "db" to dbSchema,
+                        "er" to erSchema,
+                        "cnc" to cncSchema,
+                        "world" to worldSchema,
+                        "automation" to automationSchema,
+                    ),
                 mappings = mappings,
                 queries = queries,
                 drillMaps = drillMaps,

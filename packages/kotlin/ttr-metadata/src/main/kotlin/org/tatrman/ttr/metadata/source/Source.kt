@@ -105,6 +105,8 @@ data class SourceSnapshot(
     val rowSchemas: Map<String, org.tatrman.ttr.metadata.model.RowSchemaRecord> = emptyMap(),
     /** v4.1 world model (M2) — `def world` objects, keyed by world qname. */
     val worlds: Map<QualifiedName, org.tatrman.ttr.metadata.model.World> = emptyMap(),
+    /** Grammar 0.16 — the automation tier (`model automation` objects + automation roles), keyed by qname. */
+    val automation: Map<QualifiedName, org.tatrman.ttr.metadata.model.AutomationObject> = emptyMap(),
     val warnings: List<LoadWarning> = emptyList(),
     val errors: List<LoadWarning> = emptyList(),
     /**
@@ -324,6 +326,8 @@ class FileBasedSource(
         val areas = mutableMapOf<String, AreaRecord>()
         val rowSchemas = mutableMapOf<String, org.tatrman.ttr.metadata.model.RowSchemaRecord>()
         val worlds = mutableMapOf<QualifiedName, org.tatrman.ttr.metadata.model.World>()
+        val automation = mutableMapOf<QualifiedName, org.tatrman.ttr.metadata.model.AutomationObject>()
+        var needsStdlib = false
 
         for (file in files) {
             val content = storage.read(file)
@@ -343,6 +347,11 @@ class FileBasedSource(
             // style, not a defect in the model"). Left in `errors` it would fail the load of
             // every estate still writing `nameAttribute:` — the exact behaviour change MS
             // promises silent estates will not see.
+            if (org.tatrman.ttr.parser.loader.AutomationStdlib
+                    .isNeededBy(listOf(pr))
+            ) {
+                needsStdlib = true
+            }
             val semanticsAnalysis = SemanticsAnalyzer.analyzeSemantics(pr.definitions)
             for (d in semanticsAnalysis.diagnostics) {
                 val issue =
@@ -486,6 +495,18 @@ class FileBasedSource(
                     worlds[world.qname] = world
                     continue
                 }
+                // Grammar 0.16 — the automation tier: the six automation kinds, and a `def role` declared in a
+                // `model automation` file (or carrying automation properties) — not a cnc role.
+                if (def is org.tatrman.ttr.parser.model.AutomationDef) {
+                    val obj = AutomationBuilder.automation(def, declaredPackage ?: computedPackage, file.path)
+                    automation[obj.qname] = obj
+                    continue
+                }
+                if (def is RoleDef && (schemaCode == "automation" || def.entries.isNotEmpty())) {
+                    val obj = AutomationBuilder.role(def, declaredPackage ?: computedPackage, file.path)
+                    automation[obj.qname] = obj
+                    continue
+                }
                 // Directive-less ⇒ derive (schema, namespace) per def kind; otherwise use
                 // the file-level directive values for every def (legacy behaviour).
                 val (defSchema, defNs) = if (directiveLess) schemaNamespaceForKind(def) else (schemaCode to namespace)
@@ -523,6 +544,19 @@ class FileBasedSource(
 
         resolveShortQueryTargets(mappings, queries, shortQueryTargets)
 
+        // Grammar 0.16 — the automation stdlib (`obligation`, `state_history`, `approvals`) joins a source that
+        // declares `model automation` or imports an `automation` package — implicitly, the stock-vocab
+        // precedent — unless the source carries a package `automation` of its own.
+        if (needsStdlib &&
+            loadedFiles.none { (it.declaredPackage ?: it.computedPackage) == AUTOMATION_STDLIB_PACKAGE }
+        ) {
+            val stdlib = AutomationBuilder.stdlibSnapshot(sourceId)
+            for ((qn, e) in stdlib.entities) entities.putIfAbsent(qn, e)
+            loadedFiles += stdlib.loadedFiles
+            errors += stdlib.errors
+            warnings += stdlib.warnings
+        }
+
         return SourceSnapshot(
             sourceId = sourceId,
             priority = priority,
@@ -540,6 +574,7 @@ class FileBasedSource(
             areas = areas,
             rowSchemas = rowSchemas,
             worlds = worlds,
+            automation = automation,
             warnings = warnings,
             errors = errors,
             loadedFiles = loadedFiles.toList(),
@@ -664,6 +699,7 @@ class FileBasedSource(
                         },
                     manifest = s.manifest,
                     sourceLocation = s.source,
+                    writable = AutomationBuilder.writable(s.manifest),
                 )
             }
         return org.tatrman.ttr.metadata.model.World(
@@ -678,6 +714,10 @@ class FileBasedSource(
             executors = executors,
             storages = storages,
             sourceLocation = def.source,
+            identities = AutomationBuilder.identities(def, pkg, sourceFile),
+            grants = AutomationBuilder.grants(def, pkg, sourceFile),
+            deployments = AutomationBuilder.deployments(def, pkg, sourceFile),
+            processes = AutomationBuilder.processes(def, pkg, sourceFile),
         )
     }
 
@@ -849,6 +889,8 @@ class FileBasedSource(
                                     valueLabels = a.valueLabels.mapValues { (_, v) -> v.toLocalizedText() },
                                     search = a.search.toSearchHints(),
                                     semantics = attrSemanticsOf(a.semantics, semanticsResolved),
+                                    states = a.states,
+                                    transitions = a.transitions.associate { t -> t.from to t.to },
                                 )
                             },
                         displayLabel = def.displayLabel.toLocalizedText(),
@@ -1542,6 +1584,9 @@ class FileBasedSource(
     ): QualifiedName = Reference.toQname(ref.path, defaultSchema, defaultNamespace)
 
     companion object {
+        /** Grammar 0.16 — the automation stdlib's package ([org.tatrman.ttr.parser.loader.AutomationStdlib]). */
+        const val AUTOMATION_STDLIB_PACKAGE = "automation"
+
         // M1 de-proto: was `QualifiedName.newBuilder()…build()` (proto). Behaviour
         // preserved — unknown schema-code token folds to UNSPECIFIED.
         fun qname(
