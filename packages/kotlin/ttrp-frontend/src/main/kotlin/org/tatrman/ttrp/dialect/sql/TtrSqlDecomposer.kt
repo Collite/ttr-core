@@ -131,16 +131,21 @@ class TtrSqlDecomposer(
             } else {
                 // Left-deep join chain. For a single join (the hero) no intermediate name is needed.
                 var leftName = operandRef(base.first, loc.of(from.fromItem()))
+                // Every table (and alias) joined so far is a column source of the NEXT join's left input — so a
+                // qualifier naming any of them reads `left` (AU-core-P1: only the first table's did, and a later
+                // `q.line_id` came out unqualified, ambiguous against a right side with the same column).
+                val joinedSoFar = (listOf(base.first) + listOfNotNull(base.second)).toMutableList()
                 for ((idx, jc) in joins.withIndex()) {
                     val rightItem = fromItemName(jc.fromItem())
                     noteExternal(rightItem.first)
                     val rightName = operandRef(rightItem.first, loc.of(jc.fromItem()))
                     val ap = mutableMapOf<String, String>()
                     // qualifiers for THIS join's ON: first operand → left, joined → right (C2-b-ii).
-                    ap[if (idx == 0) base.first else leftName] = "left"
-                    if (idx == 0) base.second?.let { ap[it] = "left" }
+                    joinedSoFar.forEach { ap[it] = "left" }
+                    ap[leftName] = "left"
                     ap[rightItem.first] = "right"
                     rightItem.second?.let { ap[it] = "right" }
+                    joinedSoFar.addAll(listOfNotNull(rightItem.first, rightItem.second))
                     val onExpr = exprFolder.fold(jc.expr(), ap)
                     val joinCall =
                         opCall(
@@ -216,18 +221,20 @@ class TtrSqlDecomposer(
         list: P.SelectListContext,
         ap: Map<String, String>,
     ): ChainElem {
-        val cols = mutableListOf<Expression>()
+        // A select item's `AS alias` names the projected column (AU-core-P1: it was dropped, so a computed column
+        // reached the graph unnamed); it rides as the argument's name, which the graph builder reads as the alias.
+        val cols = mutableListOf<Pair<String?, Expression>>()
         for (item in list.selectItem()) {
             when (item) {
-                is P.StarAllContext -> cols += expandStar(null, item)
-                is P.StarQualifiedContext -> cols += expandStar(sqlName(item.qualifier.text), item)
+                is P.StarAllContext -> cols += expandStar(null, item).map { null to it }
+                is P.StarQualifiedContext -> cols += expandStar(sqlName(item.qualifier.text), item).map { null to it }
                 is P.ExprItemContext -> {
                     val e = exprFolder.fold(item.expr(), ap)
-                    cols += e
+                    cols += item.alias?.text?.let { sqlName(it) } to e
                 }
             }
         }
-        return opCall("project", cols.map { namedArg(null, it, it.location) }, null, loc.of(list))
+        return opCall("project", cols.map { (alias, e) -> namedArg(alias, e, e.location) }, null, loc.of(list))
     }
 
     private fun expandStar(

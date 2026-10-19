@@ -74,15 +74,20 @@ class GraphBuilder {
     data class BuildResult(
         val graph: TtrpGraph,
         val diagnostics: List<TtrpDiagnostic>,
+        /** AU-core-P1: where the document's recipe landed in [graph] (null without a recipe). */
+        val recipe: org.tatrman.ttrp.graph.model.RecipeGraph? = null,
     )
 
     fun build(report: TtrpChecker.Report): BuildResult {
         val ctx = Ctx(report.rewrites, report.displaySchemas)
         val doc = report.document
 
-        // Pass 1: build containers (so cross-container refs resolve in pass 2).
+        // Pass 1: build containers (so cross-container refs resolve in pass 2). A recipe's members are
+        // containers too (AU-core-P1): the checker walks them; the bundle compile is P2's (REC-099 below).
+        var recipeGraph: org.tatrman.ttrp.graph.model.RecipeGraph? = null
         for (stmt in doc.statements) {
             if (stmt is ContainerDecl) ctx.buildContainer(stmt)
+            if (stmt is org.tatrman.ttrp.ast.RecipeDecl && recipeGraph == null) recipeGraph = ctx.buildRecipe(stmt)
         }
         // Pass 2: program-level wiring / leaves / control.
         for (stmt in doc.statements) {
@@ -137,6 +142,7 @@ class GraphBuilder {
                 logicalJoins = ctx.logicalJoins.toMap(),
             ),
             ctx.diags,
+            recipeGraph?.copy(relationJoins = ctx.relationJoins.toMap()),
         )
     }
 
@@ -151,6 +157,9 @@ class GraphBuilder {
 
         /** AG-P0: Join id → the logical-spelled relation join condition (see [TtrpGraph.logicalJoins]). */
         val logicalJoins = LinkedHashMap<String, org.tatrman.ttrp.expr.Expression>()
+
+        /** AU-core-P1: Join id → the relation its `on: relation <r>` names (the recipe checker's key lineage). */
+        val relationJoins = LinkedHashMap<String, String>()
         val containers = LinkedHashMap<String, Container>()
         val diags = mutableListOf<TtrpDiagnostic>()
 
@@ -170,7 +179,10 @@ class GraphBuilder {
 
         // ---- containers ----
 
-        fun buildContainer(decl: ContainerDecl) {
+        fun buildContainer(
+            decl: ContainerDecl,
+            switch: org.tatrman.ttrp.ast.SwitchStmt? = null,
+        ): String {
             val id = freshId()
             val declaredPorts = decl.ports.map { toPort(it.kind, it.name) }
             for (p in decl.ports) {
@@ -207,7 +219,7 @@ class GraphBuilder {
                 nodes[id] = container
                 containers[id] = container
                 topScope[decl.name] = PortRef(id, container.defaultOut() ?: PortNames.OUT)
-                return
+                return id
             }
 
             // Flow body (or decomposed fragment): scope seeded with the in-ports. A
@@ -244,6 +256,28 @@ class GraphBuilder {
                     else -> Unit
                 }
             }
+            // A recipe decision ends in its `switch` (AU-core-P1): one Switch node over the named input, its
+            // routes the decision container's OUT ports (the `else` route maps the switch's else port).
+            val routePorts = mutableListOf<Port>()
+            if (switch != null) {
+                val sid = freshId()
+                val cases = switch.routes.map { it.name to it.condition }
+                val elseName = switch.elseRoute?.name
+                nodes[sid] = Switch(sid, labelFor(null), switch.location, cases = cases, hasElse = elseName != null)
+                memberIds += sid
+                resolveRef(switch.input, scope)?.let {
+                    edges +=
+                        Edge(it, PortRef(sid, PortNames.IN), EdgeKind.DATA, switch.location)
+                }
+                for ((route, _) in cases) {
+                    routePorts += Port(route, PortKind.DATA, PortDirection.OUT)
+                    portMapping[route] = PortRef(sid, route)
+                }
+                if (elseName != null) {
+                    routePorts += Port(elseName, PortKind.DATA, PortDirection.OUT)
+                    portMapping[elseName] = PortRef(sid, PortNames.ELSE)
+                }
+            }
             // A decomposed fragment still records its raw interior (C2-f) for hover / round-trip.
             val fragmentSource = (body as? FragmentBody)?.let { FragmentSource(it.tag, it.sourceText) }
             // The single default DATA out maps to the final internal value when no explicit `<out> = …`
@@ -260,7 +294,7 @@ class GraphBuilder {
                     decl.location,
                     decl.target.parts.last(),
                     memberIds,
-                    ports,
+                    ports + routePorts,
                     portMapping,
                     fragmentSource,
                     onFailureOf = decl.onFailureOf,
@@ -269,6 +303,96 @@ class GraphBuilder {
             nodes[id] = container
             containers[id] = container
             topScope[decl.name] = PortRef(id, container.defaultOut() ?: PortNames.OUT)
+            return id
+        }
+
+        // ---- recipes (AU-core-P1) ----
+
+        /**
+         * A recipe's members as containers: a `target` role container through [buildContainer], any other island
+         * form opaque (its declared ports, no members — `builtin`/`foreign`/`call`/`turn` run outside the graph),
+         * the decision through [buildContainer] with its switch. Then the implicit role wiring: an `in p` port of a
+         * context or the decision takes the candidates' `out p`, else the default out of the role container
+         * named `p`. A port nothing feeds stays unwired — the recipe checker names it (REC-000).
+         */
+        fun buildRecipe(recipe: org.tatrman.ttrp.ast.RecipeDecl): org.tatrman.ttrp.graph.model.RecipeGraph {
+            val roles = LinkedHashMap<String, String>()
+            for (role in recipe.roleContainers) {
+                val decl = role.asContainer()
+                roles[role.name] = if (decl != null) buildContainer(decl) else opaqueRole(role)
+            }
+            var decisionId: String? = null
+            var switchId: String? = null
+            val engine =
+                org.tatrman.ttrp.recipe.RecipeContainers
+                    .decisionEngine(recipe)
+            val decision = recipe.decisions.firstOrNull()
+            if (decision != null && engine != null) {
+                decisionId =
+                    buildContainer(
+                        org.tatrman.ttrp.recipe.RecipeContainers
+                            .decision(decision, engine),
+                        decision.switch,
+                    )
+                // The switch is the decision container's last member (added after its statements).
+                switchId =
+                    containers[decisionId]!!
+                        .memberIds
+                        .lastOrNull()
+                        ?.takeIf { nodes[it] is Switch }
+            }
+            val consumers =
+                roles.values.mapNotNull { containers[it] } + listOfNotNull(decisionId?.let { containers[it] })
+            val candidates =
+                recipe.candidates
+                    .firstOrNull()
+                    ?.let { roles[it.name] }
+                    ?.let { containers[it] }
+            for (c in consumers) {
+                for (p in c.declaredPorts.filter { it.direction == PortDirection.IN && it.kind == PortKind.DATA }) {
+                    val from =
+                        candidates
+                            ?.takeIf { cand ->
+                                cand.id != c.id &&
+                                    cand.declaredPorts.any { it.direction == PortDirection.OUT && it.name == p.name }
+                            }?.let { PortRef(it.id, p.name) }
+                            ?: roles[p.name]?.takeIf { it != c.id }?.let { src ->
+                                containers[src]?.defaultOut()?.let { PortRef(src, it) }
+                            }
+                    if (from != null) edges += Edge(from, PortRef(c.id, p.name), EdgeKind.DATA, c.location)
+                }
+            }
+            return org.tatrman.ttrp.graph.model
+                .RecipeGraph(recipe, roles, decisionId, switchId, emptyMap())
+        }
+
+        private fun opaqueRole(role: org.tatrman.ttrp.ast.RoleContainer): String {
+            val id = freshId()
+            val form = role.form
+            val target =
+                when (form) {
+                    is org.tatrman.ttrp.ast.IslandForm.Target -> form.target.parts.last()
+                    is org.tatrman.ttrp.ast.IslandForm.Builtin -> "builtin"
+                    is org.tatrman.ttrp.ast.IslandForm.Foreign -> "foreign"
+                    is org.tatrman.ttrp.ast.IslandForm.Call -> "call"
+                    is org.tatrman.ttrp.ast.IslandForm.Turn -> "turn"
+                }
+            val container =
+                Container(
+                    id,
+                    role.name,
+                    role.location,
+                    target,
+                    emptyList(),
+                    role.ports.map { toPort(it.kind, it.name) },
+                    emptyMap(),
+                    onFailureOf = role.onFailureOf,
+                    retries = role.retries,
+                )
+            nodes[id] = container
+            containers[id] = container
+            topScope[role.name] = PortRef(id, container.defaultOut() ?: PortNames.OUT)
+            return id
         }
 
         // ---- chain evaluation ----
@@ -355,6 +479,9 @@ class GraphBuilder {
                     "switch" -> Switch(id, label, loc, cases = switchCases(op), hasElse = hasElse(op))
                     "join" -> {
                         logicalJoinCondition(op)?.let { logicalJoins[id] = it }
+                        (op.args.firstOrNull { it.name == "on" }?.value as? RelationArg)?.let {
+                            relationJoins[id] = it.qname.parts.last()
+                        }
                         Join(
                             id,
                             label,
@@ -379,11 +506,34 @@ class GraphBuilder {
                     "sort" -> Sort(id, label, loc, keys = columnArgs(op), provenance = prov)
                     "limit" -> Limit(id, label, loc, count = firstNumberArg(op))
                     "distinct" -> Distinct(id, label, loc)
-                    "project" -> Project(id, label, loc, columns = exprArgs(op), provenance = prov)
+                    // A named argument names its column (`project(total: a + b)`; a TTR-SQL `AS alias`).
+                    "project" ->
+                        Project(
+                            id,
+                            label,
+                            loc,
+                            columns = exprArgs(op),
+                            aliases =
+                                op.args
+                                    .filter { it.value is ExprArg }
+                                    .map { it.name }
+                                    .takeIf { names -> names.any { it != null } }
+                                    .orEmpty(),
+                            provenance = prov,
+                        )
                     "select" -> Select(id, label, loc, columns = columnArgs(op), provenance = prov)
                     "calc" -> Calc(id, label, loc, assignments = assignEntries(op), provenance = prov)
                     "values" -> Values(id, label, loc)
                     "pivot" -> Pivot(id, label, loc)
+                    in org.tatrman.ttrp.graph.model.TimeSugar.KINDS ->
+                        org.tatrman.ttrp.graph.model.TimeSugar(
+                            id,
+                            label,
+                            loc,
+                            kind = op.name,
+                            args = op.args.mapNotNull { a -> (a.value as? ExprArg)?.let { a.name to it.expr } },
+                            provenance = prov,
+                        )
                     else -> Project(id, label, loc)
                 }
             nodes[id] = node

@@ -290,6 +290,38 @@ data class Distinct(
     override fun ports() = unaryDataPorts()
 }
 
+/**
+ * AU-core-P1: a recipe time-sugar op — `latest(by: d, per: k, …)` (the last snapshot per key) or `within(attr,
+ * …)` (a period filter) — typed at P1 and lowered to the node set at P2 (D-33; the `date_dim` join for an sk).
+ * [args] are the op's arguments as written, `(name, value)`; a positional one continues the named one before it
+ * (`per: item, warehouse`).
+ */
+data class TimeSugar(
+    override val id: String,
+    override val label: String,
+    override val location: SourceLocation,
+    val kind: String,
+    val args: List<Pair<String?, Expression>> = emptyList(),
+    override val provenance: Provenance? = null,
+) : SugarNode {
+    override fun ports() = unaryDataPorts()
+
+    /** The columns named under [name], positional continuations included (`per: item, warehouse` → both). */
+    fun columnsOf(name: String): List<String> {
+        val out = mutableListOf<String>()
+        var current: String? = null
+        for ((n, e) in args) {
+            if (n != null) current = n
+            if (current == name) (e as? ColumnRef)?.let { out += it.column }
+        }
+        return out
+    }
+
+    companion object {
+        val KINDS = setOf("latest", "within")
+    }
+}
+
 // ---- movement / IO (T9) ----
 
 /** Physical → engine memory. A source: no data in-port. */

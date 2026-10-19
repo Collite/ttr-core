@@ -55,6 +55,9 @@ class WorldBinder(
         }
         val executors = LinkedHashMap<String, BoundExecutor>()
         for (x in world.executors) {
+            // An automation executor (`extends: n8n_l1`, …) runs recipe programs, not TTR-P bundles: its type
+            // manifest is the exporters' registry's (AU D-35), so the TTR-P binder leaves it unbound (AU-core-P1).
+            if (x.extendsRef in AUTOMATION_EXECUTOR_TYPES || x.type in AUTOMATION_EXECUTOR_TYPES) continue
             val m = matchExecution(x.type, x.extendsRef)
             if (m == null) {
                 diags +=
@@ -105,4 +108,10 @@ class WorldBinder(
         message: String,
         location: SourceLocation,
     ) = TtrpDiagnostic(id, Severity.ERROR, message, location)
+
+    companion object {
+        /** The automation executor types (AU exporters contracts §1, spelled as TTR-M ids). */
+        val AUTOMATION_EXECUTOR_TYPES =
+            setOf("native", "n8n_l1", "camunda_7", "camunda_8", "python_client", "python_offline", "sql_job")
+    }
 }

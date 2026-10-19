@@ -189,6 +189,22 @@ class TtrSqlExpr(
                 val name = ctx.name.text.lowercase()
                 val args = ctx.expr().map { fold(it, ap) }
                 val distinct = ctx.DISTINCT() != null
+                // A duration is a call here as in canonical TTR-P: `days(365)`, `days(:return_window)` (D-108,
+                // review-114 M1) — AU-core-P1, so `:as_of - days(365)` reads the same in a SQL island.
+                org.tatrman.ttrp.expr.DurationUnit.of(name)?.let { unit ->
+                    val only = args.singleOrNull()
+                    if (!distinct) {
+                        if (only is org.tatrman.ttrp.expr.ParamRef) {
+                            return org.tatrman.ttrp.expr
+                                .DurationParam(unit, only.name, loc.of(ctx))
+                        }
+                        val amount = ((only as? Literal)?.value as? LiteralValue.Num)?.raw?.toLongOrNull()
+                        if (amount != null) {
+                            return org.tatrman.ttrp.expr
+                                .DurationLiteral(amount, unit, loc.of(ctx))
+                        }
+                    }
+                }
                 val entries = catalog.resolve(name)
                 val aggEntry = entries.firstOrNull { it.kind == FunctionKind.AGGREGATE }
                 val scalarEntry = entries.firstOrNull { it.kind == FunctionKind.SCALAR }
