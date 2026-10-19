@@ -399,6 +399,19 @@ class RecipeParseSpec :
                 listOf("key", "mode", "call", "per")
         }
 
+        "the manual's recipe example (docs/manual/en/18-recipes.md) parses with no diagnostic" {
+            var dir: java.nio.file.Path? =
+                java.nio.file.Path
+                    .of("")
+                    .toAbsolutePath()
+            while (dir != null && !java.nio.file.Files.exists(dir.resolve("docs/manual/en/18-recipes.md"))) dir = dir.parent
+            val page = java.nio.file.Files.readString(dir!!.resolve("docs/manual/en/18-recipes.md"))
+            val example = Regex("```ttrp\n(.*?)```", RegexOption.DOT_MATCHES_ALL).find(page)!!.groupValues[1]
+            val r = TtrpParser.parseString(example, "18-recipes.md")
+            r.diagnostics.map { "${it.id.id} ${it.location.line}:${it.location.column} ${it.message}" }.shouldBeEmpty()
+            recipeOf(r).wirings shouldHaveSize 3
+        }
+
         // ---- the structural negatives ------------------------------------------------------------
 
         fun ids(path: String) = parse(path).diagnostics.map { it.id }

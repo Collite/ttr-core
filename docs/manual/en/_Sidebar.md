@@ -21,6 +21,9 @@
 - [Areas](16-areas.md)
 - [Agents](17-agents.md)
 
+**Automation**
+- [Recipes](18-recipes.md)
+
 **Tooling**
 - [VS Code experience](13-vscode.md)
 

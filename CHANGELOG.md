@@ -6,6 +6,20 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **TTR-P toolchain (`ttrp-frontend` · `-graph` · `-emit` · `-cli` · `ttrp-lsp`) — the recipe block (AU-core-P0 · S0.1).**
+  TTR-P grammar 0.3 → 0.4 (additive): `recipe { key / as of / parameters / document / protocol }` with `candidates` /
+  `context` role containers (island forms `target` · `builtin` · `foreign … per candidate | set schema` · `call` ·
+  `turn … ask … answer`, an optional `window { by: over: }`), a `decision` ending in a `switch` statement (routes,
+  `mode:`, `else:`, `because:`, `detail:`) and an `actions { }` wiring block. Expressions gain `:name` bindings, the
+  duration literal (`30 days`, `days(:p)`) and named function arguments; `aggregate { group_by: k }` is accepted beside
+  `group by k`. Every new word is a soft keyword — existing names keep working. New AST (`ast/Recipe.kt`), new
+  expression nodes (`ParamRef`, `DurationLiteral`, `DurationParam`) and `FunctionCall.argNames` (empty for positional
+  calls). `ttrp explain` prints a recipe's skeleton; `ttrp build` refuses a recipe (`TTRP-REC-099`) until the recipe
+  compile lands. New diagnostics `TTRP-PRS-006` / `-007`. Manual: [Recipes](docs/manual/en/18-recipes.md).
+- **TTR-SQL fragments** — `:name` is a parameter binding (it was silently read as a column: the lexer dropped the
+  `:`); a clause keyword is a name after a dot (`er.entity.order`); any character the lexer cannot read is now the
+  generic reject instead of being dropped.
+
 - **`ttr-concept`** (new module, **not published**) — the conceptual-model (cn) layer below the determinism
   frontier: `ConceptService` (statement validate/lower/explain · assertion validate/lower/explain ·
   `definitionRender(md|er)` · `materialize` · `hygieneReport`) as an **interface** with a `NotImplementedConceptService`
