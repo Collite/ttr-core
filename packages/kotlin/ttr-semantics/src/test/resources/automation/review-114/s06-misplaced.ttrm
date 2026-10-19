@@ -1,0 +1,5 @@
+// expect: ttr/automation-misplaced-property — a typed property the kind does not take.
+package acme.automation
+model automation
+
+def program p2 { recipe: r, port: none, mode: batch, transition: order.state -> held }

@@ -1,0 +1,7 @@
+// expect: ttr/states-unknown-state — `transitions:` names a state not in `states:`.
+package acme
+model er
+
+def entity thing {
+    attributes: [ def attribute st { type: text, states: [a, b], transitions: { a: [c] } } ]
+}

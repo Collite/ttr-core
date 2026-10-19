@@ -1,0 +1,8 @@
+// expect: ttr/automation-duplicate-grant — a grant is keyed by its who/program/as triple (D-91).
+package acme.worlds
+model world
+
+def world w {
+    def grant { who: role.ops, program: p, as: author }
+    def grant { who: role.ops, program: p, as: author }
+}

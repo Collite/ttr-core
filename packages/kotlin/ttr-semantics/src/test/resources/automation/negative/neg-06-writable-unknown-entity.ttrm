@@ -1,0 +1,8 @@
+// expect: ttr/automation-writable-unknown-entity — `writable:` names an entity the project lacks.
+package acme.worlds
+model world
+
+def world w {
+    def engine pg   { type: postgres }
+    def storage db  { type: postgres, via: pg, writable: [order.state, nope] }
+}

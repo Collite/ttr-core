@@ -1,0 +1,9 @@
+// expect: ttr/states-transition-not-allowed — `from:` contradicts the attribute's `transitions:`.
+package acme.automation
+model automation
+
+def action reopen {
+    columns:    [def column order { type: order.order_number }]
+    transition: order.state -> placed { from: released }
+    sinks:      { native: transition }
+}

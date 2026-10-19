@@ -1,0 +1,11 @@
+// Every recipe word stays an ordinary name outside a recipe (the WORLD precedent): columns, variables,
+// op args and config entries spelled `key`, `mode`, `detail`, `day`, `days`, `set`, `context`, `call`, …
+uses world "acme.worlds.dev"
+
+container c(in orders, out rows) target erp {
+    key = orders -> calc(day = 1)
+    mode = key -> filter(days > 3 and detail = "x" and context <> set)
+    call = mode -> calc { recipe = 1  window = 2  over = 3  ask = 4  answer = 5  turn = 6 }
+    per = call -> select(key, mode, detail, actions, decision, candidates, candidate, protocol, document)
+    per -> aggregate { group_by: parameters, because  minutes = count(hours), weeks = sum(months) } -> rows
+}

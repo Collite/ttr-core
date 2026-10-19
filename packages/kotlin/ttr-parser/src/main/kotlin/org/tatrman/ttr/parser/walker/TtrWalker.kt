@@ -41,6 +41,13 @@ import org.tatrman.ttr.parser.model.ChangeSemanticsDecl
 import org.tatrman.ttr.parser.model.ColumnDef
 import org.tatrman.ttr.parser.model.ConstraintDef
 import org.tatrman.ttr.parser.model.DataType
+import org.tatrman.ttr.parser.model.AttributeTransition
+import org.tatrman.ttr.parser.model.AutoBody
+import org.tatrman.ttr.parser.model.AutoEntry
+import org.tatrman.ttr.parser.model.AutoSet
+import org.tatrman.ttr.parser.model.AutoTransition
+import org.tatrman.ttr.parser.model.AutoValue
+import org.tatrman.ttr.parser.model.AutomationDef
 import org.tatrman.ttr.parser.model.Definition
 import org.tatrman.ttr.parser.model.DrillMapDef
 import org.tatrman.ttr.parser.model.EngineDef
@@ -57,6 +64,7 @@ import org.tatrman.ttr.parser.model.LocalizedStringListValue
 import org.tatrman.ttr.parser.model.LocalizedStringValue
 import org.tatrman.ttr.parser.model.ProjectDef
 import org.tatrman.ttr.parser.model.ProcedureDef
+import org.tatrman.ttr.parser.model.ProcessDef
 import org.tatrman.ttr.parser.model.PropertyValue
 import org.tatrman.ttr.parser.model.QueryDef
 import org.tatrman.ttr.parser.model.Reference
@@ -79,6 +87,7 @@ import org.tatrman.ttr.parser.model.TaggedBlockValue
 import org.tatrman.ttr.parser.model.TargetReferenceValue
 import org.tatrman.ttr.parser.model.TargetValue
 import org.tatrman.ttr.parser.model.ViewDef
+import org.tatrman.ttr.parser.model.WorldAutoMember
 import org.tatrman.ttr.parser.model.WorldDef
 import org.tatrman.ttr.parser.model.WorldSchemaDef
 import org.tatrman.ttr.parser.model.WorldSchemaField
@@ -321,6 +330,8 @@ class TtrWalker(
             od.TERM() != null -> visitLexiconEntry(od, "term")
             od.PATTERN() != null -> visitLexiconEntry(od, "pattern")
             od.EXAMPLE() != null -> visitLexiconEntry(od, "example")
+            // Grammar 0.16 — the automation kinds (`model automation`): one shared body.
+            od.autoBody() != null -> visitAutomation(od)
             else -> null
         }
     }
@@ -725,6 +736,19 @@ class TtrWalker(
                 props.firstNotNullOfOrNull {
                     it.aggregationProperty()?.let { a -> aggregationSpec(a.aggregationValue()) }
                 },
+            // Grammar 0.16 — lifecycle states (D-67).
+            states =
+                props
+                    .lastOrNull { it.statesProperty() != null }
+                    ?.statesProperty()
+                    ?.listOfIds()
+                    ?.id()
+                    ?.map { it.text }
+                    ?: emptyList(),
+            transitions =
+                props.lastOrNull { it.transitionsProperty() != null }?.transitionsProperty()?.transitionEntry()?.map {
+                    AttributeTransition(it.id().text, it.listOfIds().id().map { t -> t.text }, location(it))
+                } ?: emptyList(),
         )
     }
 
@@ -1338,6 +1362,32 @@ class TtrWalker(
                 props.firstNotNullOfOrNull {
                     it.searchBlockProperty()?.let { s -> visitSearchBlock(s.searchBlock()) }
                 } ?: SearchHintsValue(),
+            // Grammar 0.16 — an automation role's typed properties (resolve / delivery / members), one
+            // ordered entry list (review-114 M5: typed, so a typo stays a parse error).
+            entries =
+                props.mapNotNull { p ->
+                    when {
+                        p.resolveProperty() != null ->
+                            AutoEntry(
+                                "resolve",
+                                visitAutoValue(p.resolveProperty().autoValue()),
+                                location(p.resolveProperty()),
+                            )
+                        p.deliveryProperty() != null ->
+                            AutoEntry(
+                                "delivery",
+                                visitAutoValue(p.deliveryProperty().autoValue()),
+                                location(p.deliveryProperty()),
+                            )
+                        p.membersProperty() != null ->
+                            AutoEntry(
+                                "members",
+                                visitAutoValue(p.membersProperty().autoValue()),
+                                location(p.membersProperty()),
+                            )
+                        else -> null
+                    }
+                },
         )
     }
 
@@ -1458,6 +1508,10 @@ class TtrWalker(
         val engines = mutableListOf<EngineDef>()
         val executors = mutableListOf<ExecutorDef>()
         val storages = mutableListOf<StorageDef>()
+        val identities = mutableListOf<WorldAutoMember>()
+        val grants = mutableListOf<WorldAutoMember>()
+        val deployments = mutableListOf<WorldAutoMember>()
+        val processes = mutableListOf<ProcessDef>()
 
         for (m in members) {
             val wp = m.worldProperty()
@@ -1470,8 +1524,32 @@ class TtrWalker(
                 wp.extendsProperty()?.let { extends = it.id().text }
                 continue
             }
+            // Grammar 0.16 — `def grant { … }` is unnamed (keyed by its who/program/as triple).
+            if (m.GRANT() != null) {
+                grants.add(WorldAutoMember("grant", null, location(m), visitAutoBody(m.autoBody().autoProperty())))
+                continue
+            }
             val memberName = m.id().text
             when {
+                m.IDENTITY() != null ->
+                    identities.add(
+                        WorldAutoMember(
+                            "identity",
+                            memberName,
+                            location(m),
+                            visitAutoBody(m.autoBody().autoProperty()),
+                        ),
+                    )
+                m.DEPLOYMENT() != null ->
+                    deployments.add(
+                        WorldAutoMember(
+                            "deployment",
+                            memberName,
+                            location(m),
+                            visitAutoBody(m.autoBody().autoProperty()),
+                        ),
+                    )
+                m.PROCESS() != null -> processes.add(visitProcess(m.processBody(), memberName, location(m)))
                 m.ENGINE() != null ->
                     engines.add(
                         visitEngineDef(m.engineDef().enginePartProperty(), memberName, location(m)),
@@ -1506,7 +1584,149 @@ class TtrWalker(
             engines = engines,
             executors = executors,
             storages = storages,
+            identities = identities,
+            grants = grants,
+            deployments = deployments,
+            processes = processes,
         )
+    }
+
+    // ----- Grammar 0.16 — the automation model (`model automation`; AU-core-P0 S0.2) -----
+    // One permissive body for six def kinds and the automation world members; values are
+    // carried structurally — their meaning (contracts §2–§3) is validated in ttr-semantics.
+
+    private fun visitAutomation(od: TTRParser.ObjectDefinitionContext): AutomationDef {
+        val kind =
+            when {
+                od.PARAMETER() != null -> "parameter"
+                od.ACTION() != null -> "action"
+                od.SERVICE() != null -> "service"
+                od.APPROVAL() != null -> "approval"
+                od.PROGRAM() != null -> "program"
+                else -> "recipe"
+            }
+        return AutomationDef(kind, od.id().text, defSource(od), visitAutoBody(od.autoBody().autoProperty()))
+    }
+
+    private fun visitAutoBody(props: List<TTRParser.AutoPropertyContext>): AutoBody {
+        var body = AutoBody()
+        val entries = mutableListOf<AutoEntry>()
+        for (p in props) {
+            when {
+                p.descriptionProperty() != null ->
+                    body =
+                        body.copy(
+                            description = descriptionOf(p.descriptionProperty()),
+                            descriptionLocalized = descriptionLocalizedOf(p.descriptionProperty()),
+                        )
+                p.tagsProperty() != null -> body = body.copy(tags = stringList(p.tagsProperty().listOfStrings()))
+                p.labelProperty() != null ->
+                    body = body.copy(label = visitLocalizedString(p.labelProperty().localizedString()))
+                p.typeProperty() != null -> body = body.copy(type = dataType(p.typeProperty().dataType()))
+                p.columnsProperty() != null ->
+                    body = body.copy(columns = visitColumnDefList(p.columnsProperty().columnDefList()))
+                p.targetProperty() != null -> body = body.copy(target = visitTargetValue(p.targetProperty()))
+                p.transitionProperty() != null ->
+                    body = body.copy(transition = visitAutoTransition(p.transitionProperty()))
+                p.setProperty() != null ->
+                    body =
+                        body.copy(
+                            set =
+                                AutoSet(
+                                    p.setProperty().id(0).text,
+                                    p.setProperty().id(1).text,
+                                    location(p.setProperty()),
+                                ),
+                        )
+                p.autoEntry() != null -> entries.add(visitAutoEntry(p.autoEntry()))
+            }
+        }
+        return body.copy(entries = entries)
+    }
+
+    private fun visitAutoTransition(ctx: TTRParser.TransitionPropertyContext): AutoTransition {
+        val target = ctx.transitionTarget()
+        val guard = ctx.transitionGuard()
+        val from =
+            when {
+                guard == null -> emptyList()
+                guard.listOfIds() != null -> guard.listOfIds().id().map { it.text }
+                else -> listOf(guard.id().text)
+            }
+        return AutoTransition(
+            attribute = ctx.id().text,
+            to = target?.takeIf { it.LBRACE() == null }?.id()?.text,
+            toColumn = target?.takeIf { it.LBRACE() != null }?.id()?.text,
+            from = from,
+            source = location(ctx),
+        )
+    }
+
+    private fun visitAutoEntry(ctx: TTRParser.AutoEntryContext): AutoEntry =
+        AutoEntry(ctx.autoKey().text, visitAutoValue(ctx.autoValue()), location(ctx))
+
+    private fun visitAutoValue(ctx: TTRParser.AutoValueContext): AutoValue {
+        val src = location(ctx)
+        ctx.durationLiteral()?.let { return AutoValue.Duration(it.NUMBER_LITERAL().text.toDouble(), it.id().text, src) }
+        ctx.taggedValue()?.let { return AutoValue.Tagged(it.id().text, stringForm(it.stringLiteralForm()) ?: "", src) }
+        ctx.callValue()?.let { c ->
+            return AutoValue.Call(c.id().text, c.autoObject().autoEntry().map { visitAutoEntry(it) }, src)
+        }
+        if (ctx.STAR() != null) return AutoValue.Star(src)
+        ctx.autoObject()?.let { o -> return AutoValue.Obj(o.autoEntry().map { visitAutoEntry(it) }, src) }
+        ctx.autoList()?.let { l -> return AutoValue.ListV(l.autoValue().map { visitAutoValue(it) }, src) }
+        ctx.literal()?.let { lit ->
+            return when {
+                lit.NUMBER_LITERAL() != null ->
+                    AutoValue.Num(lit.NUMBER_LITERAL().text.toDouble(), src, lit.NUMBER_LITERAL().text)
+                lit.BOOLEAN_LITERAL() != null -> AutoValue.Bool(lit.BOOLEAN_LITERAL().text.toBoolean(), src)
+                lit.stringLiteralForm() != null -> {
+                    val form = lit.stringLiteralForm()
+                    val triple = form.STRING_LITERAL() == null
+                    AutoValue.Str(stringForm(form) ?: "", triple, src)
+                }
+                else -> AutoValue.Null(src)
+            }
+        }
+        ctx.id()?.let { id ->
+            val path = id.text
+            return AutoValue.Id(Reference(path, path.split("."), location(id)), path.split("."), src)
+        }
+        return AutoValue.Null(src)
+    }
+
+    private fun visitProcess(
+        ctx: TTRParser.ProcessBodyContext,
+        name: String,
+        source: SourceLocation,
+    ): ProcessDef {
+        var proc = ProcessDef(name = name, source = source)
+        val steps = mutableListOf<WorldAutoMember>()
+        val entries = mutableListOf<AutoEntry>()
+        for (p in ctx.processProperty()) {
+            when {
+                p.descriptionProperty() != null ->
+                    proc =
+                        proc.copy(
+                            description = descriptionOf(p.descriptionProperty()),
+                            descriptionLocalized = descriptionLocalizedOf(p.descriptionProperty()),
+                        )
+                p.tagsProperty() != null -> proc = proc.copy(tags = stringList(p.tagsProperty().listOfStrings()))
+                p.stepsProperty() != null ->
+                    p.stepsProperty().stepInline().forEach { st ->
+                        steps.add(
+                            WorldAutoMember(
+                                "step",
+                                st.id().text,
+                                location(st),
+                                visitAutoBody(st.autoBody().autoProperty()),
+                            ),
+                        )
+                    }
+                p.autoEntry() != null -> entries.add(visitAutoEntry(p.autoEntry()))
+            }
+        }
+        return proc.copy(steps = steps, entries = entries)
     }
 
     private fun visitEngineDef(

@@ -26,7 +26,7 @@ class TtrpKeywordTableSpec :
     StringSpec({
 
         // Structural punctuation tokens — the non-keyword literals the grammar needs.
-        val punctuation = setOf("(", ")", "{", "}", ",", ":", ".")
+        val punctuation = setOf("(", ")", "{", "}", "[", "]", ",", ":", ".")
 
         // Single-literal LEXER rules only: `NAME : 'literal' ;`. This excludes STRING /
         // CHAR_STRING / TAGGED_BLOCK / comments / WS / NUMBER / IDENT (multi-part bodies).
@@ -42,6 +42,8 @@ class TtrpKeywordTableSpec :
         "TTRP.g4 single-quoted literals equal the KeywordTable union (S16)" {
             val expected =
                 KeywordTable.statementKeywords +
+                    KeywordTable.recipeKeywords +
+                    KeywordTable.durationUnits +
                     KeywordTable.expressionKeywords +
                     (KeywordTable.reservedPorts - "rejects") +
                     KeywordTable.operators.keys +

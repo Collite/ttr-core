@@ -51,6 +51,8 @@ def kind_segment(kind: str) -> str:
 # v4.0 uniform key (← `qname.ts` modelForKind / namespaceForKind / buildCanonicalKey)
 # ---------------------------------------------------------------------------
 
+# `automation` (0.16) keys symbols but is not a reference prefix — the automation stdlib's package is
+# named `automation` (review-114 B1). Mirrors TS `MODEL_CODES`.
 MODEL_CODES: frozenset[str] = frozenset({"db", "er", "md", "binding", "cnc", "world"})
 
 _MODEL_BY_KIND: dict[str, str] = {
@@ -77,6 +79,16 @@ _MODEL_BY_KIND: dict[str, str] = {
     "executor": "world",
     "storage": "world",
     "worldSchema": "world",
+    # 0.16 — the automation world members nest in a world; the automation kinds are `automation`.
+    "identity": "world",
+    "deployment": "world",
+    "process": "world",
+    "parameter": "automation",
+    "action": "automation",
+    "service": "automation",
+    "approval": "automation",
+    "program": "automation",
+    "recipe": "automation",
 }
 
 
@@ -87,6 +99,9 @@ def model_for_kind(kind: str, declaring_model: str = "") -> str:
     → `er` (LQ L-1). Mirrors TS `modelForKind`."""
     if kind == "query" and declaring_model == "er":
         return "er"
+    # 0.16 — a `def role` in a `model automation` file is an automation role, not a cnc role.
+    if kind == "role" and declaring_model == "automation":
+        return "automation"
     return _MODEL_BY_KIND.get(kind, "db")
 
 

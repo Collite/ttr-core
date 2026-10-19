@@ -714,9 +714,9 @@ function resolveMemberSymbolDetail(
 function findDefByQname(
   uri: string,
   name: string,
-  // Accepts nested world-member kinds too (v4.1); they never match a top-level
-  // def, so lookups for them return null.
-  kind: Definition['kind'] | 'engine' | 'executor' | 'storage' | 'worldSchema',
+  // Accepts nested world-member kinds too (v4.1; the 0.16 automation members); they
+  // never match a top-level def, so lookups for them return null.
+  kind: Definition['kind'] | 'engine' | 'executor' | 'storage' | 'worldSchema' | 'identity' | 'deployment' | 'process',
   getDocument: (uri: string) => string | null,
   parseDocument: (content: string, uri: string) => { ast?: Document | null }
 ): Definition | null {

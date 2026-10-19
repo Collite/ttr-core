@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttrp.parser
 
+import org.tatrman.ttrp.ast.ActionsBlock
 import org.tatrman.ttrp.ast.Assignment
 import org.tatrman.ttrp.ast.Chain
 import org.tatrman.ttrp.ast.ChainStmt
@@ -8,12 +9,15 @@ import org.tatrman.ttrp.ast.ContainerDecl
 import org.tatrman.ttrp.ast.ControlBlock
 import org.tatrman.ttrp.ast.ControlDep
 import org.tatrman.ttrp.ast.ControlKind
+import org.tatrman.ttrp.ast.DecisionDecl
 import org.tatrman.ttrp.ast.FlowBody
 import org.tatrman.ttrp.ast.FragmentBody
 import org.tatrman.ttrp.ast.OpCall
 import org.tatrman.ttrp.ast.ParamDecl
 import org.tatrman.ttrp.ast.ParamDefault
 import org.tatrman.ttrp.ast.ProgramHeader
+import org.tatrman.ttrp.ast.RecipeDecl
+import org.tatrman.ttrp.ast.RoleContainer
 import org.tatrman.ttrp.ast.Statement
 import org.tatrman.ttrp.ast.TtrpDocument
 import org.tatrman.ttrp.diagnostics.Severity
@@ -48,7 +52,7 @@ internal object TtrpChecks {
 
     fun run(doc: TtrpDocument): List<TtrpDiagnostic> {
         val out = mutableListOf<TtrpDiagnostic>()
-        checkStatements(doc.statements, enclosingPorts = emptySet(), out)
+        checkStatements(doc.statements, enclosingPorts = emptySet(), out, topLevel = true)
         checkParams(doc.statements.filterIsInstance<ParamDecl>(), out)
         checkOnFailure(doc.statements.filterIsInstance<ContainerDecl>(), out)
         return out
@@ -137,9 +141,19 @@ internal object TtrpChecks {
         statements: List<Statement>,
         enclosingPorts: Set<String>,
         out: MutableList<TtrpDiagnostic>,
+        topLevel: Boolean = false,
     ) {
         for (stmt in statements) {
             when (stmt) {
+                // AU-core-P0: a recipe is a document-level block; its role containers and decision
+                // carry ordinary statements, checked like a container's (their ports in scope).
+                is RecipeDecl ->
+                    if (!topLevel) {
+                        out += diag(TtrpDiagnosticId.PRS_007, "a `recipe { }` block is top-level only", stmt.location)
+                    } else {
+                        checkRecipe(stmt, out)
+                    }
+
                 is ProgramHeader ->
                     out += diag(TtrpDiagnosticId.PRS_002, "`program` header is not part of TTR-P", stmt.location)
 
@@ -163,20 +177,7 @@ internal object TtrpChecks {
 
                 is ContainerDecl -> {
                     when (val body = stmt.body) {
-                        is FragmentBody ->
-                            // An empty tag is a file-backed body that failed to load (FRG-004/005, already reported).
-                            if (body.tag.isNotEmpty() &&
-                                body.tag !in setOf("sql", "pandas") &&
-                                org.tatrman.ttrp.dialect.b.TtrbSkin
-                                    .forTag(body.tag) == null
-                            ) {
-                                out +=
-                                    diag(
-                                        TtrpDiagnosticId.FRG_001,
-                                        "unknown fragment dialect `${body.tag}`",
-                                        body.location,
-                                    )
-                            }
+                        is FragmentBody -> checkFragmentTag(body, out)
                         is FlowBody ->
                             checkStatements(body.statements, stmt.ports.map { it.name }.toSet(), out)
                     }
@@ -184,6 +185,60 @@ internal object TtrpChecks {
 
                 else -> Unit
             }
+        }
+    }
+
+    private fun checkRecipe(
+        recipe: RecipeDecl,
+        out: MutableList<TtrpDiagnostic>,
+    ) {
+        val roleNames = recipe.roleContainers.map { it.name }.toSet()
+        for (member in recipe.members) {
+            when (member) {
+                is RoleContainer -> {
+                    // The container precedent (F-4-iv): `absorbs` is reserved; `on failure of` names an island of THIS recipe.
+                    if (member.onFailureAbsorbs) {
+                        out +=
+                            diag(
+                                TtrpDiagnosticId.FAIL_003,
+                                "`absorbs` on `${member.name}` is reserved",
+                                member.location,
+                            )
+                    }
+                    member.onFailureOf?.takeIf { it !in roleNames }?.let {
+                        out +=
+                            diag(
+                                TtrpDiagnosticId.FAIL_001,
+                                "`on failure of $it` on `${member.name}` names no container of this recipe",
+                                member.location,
+                            )
+                    }
+                    val ports = member.ports.map { it.name }.toSet()
+                    when (val body = member.body) {
+                        // A `foreign` body is the foreign language (python), not a TTR fragment dialect.
+                        is FragmentBody ->
+                            if (member.form is org.tatrman.ttrp.ast.IslandForm.Target) checkFragmentTag(body, out)
+                        is FlowBody -> checkStatements(body.statements, ports, out)
+                        null -> Unit
+                    }
+                }
+                is DecisionDecl -> checkStatements(member.statements, member.ports.map { it.name }.toSet(), out)
+                is ActionsBlock -> Unit
+            }
+        }
+    }
+
+    private fun checkFragmentTag(
+        body: FragmentBody,
+        out: MutableList<TtrpDiagnostic>,
+    ) {
+        // An empty tag is a file-backed body that failed to load (FRG-004/005, already reported).
+        if (body.tag.isNotEmpty() &&
+            body.tag !in setOf("sql", "pandas") &&
+            org.tatrman.ttrp.dialect.b.TtrbSkin
+                .forTag(body.tag) == null
+        ) {
+            out += diag(TtrpDiagnosticId.FRG_001, "unknown fragment dialect `${body.tag}`", body.location)
         }
     }
 

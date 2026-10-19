@@ -1,0 +1,17 @@
+// Two recipe blocks in one document. It PARSES (two RecipeDecls) — refusing it is the S1.1 checker's
+// TTRP-REC-000 ("one recipe per file"), a semantic rule, not a syntax error.
+uses world "hartland.worlds.demo"
+
+recipe {
+    key: order.order_number
+    candidates a(out orders) target erp """sql
+        SELECT o.order_number FROM er.entity.order o
+    """
+}
+
+recipe {
+    key: order.order_number
+    candidates b(out orders) target erp """sql
+        SELECT o.order_number FROM er.entity.order o
+    """
+}

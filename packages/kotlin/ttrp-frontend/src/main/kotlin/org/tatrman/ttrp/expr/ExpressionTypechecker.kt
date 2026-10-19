@@ -126,6 +126,8 @@ class ExpressionTypechecker(
     ): PathShape =
         when (e) {
             is Literal, is ColumnRef -> SCALAR
+            // AU-core-P0: a `:name` binding and a duration are scalar leaves (typed at S1.3).
+            is ParamRef, is DurationExpr -> SCALAR
             is MdPath -> ctx.mdResolutions.firstOrNull { it.location == e.location }?.shape ?: SCALAR
             is AggregateCall -> SCALAR
             is Cast -> shapeOf(e.expr, ctx)
@@ -178,6 +180,10 @@ class ExpressionTypechecker(
             is AggregateCall -> checkAggregate(e, ctx, aggAllowed, diags)
             is FunctionCall -> checkFunction(e, ctx, aggAllowed, diags)
             is MdPath -> resolveMdPath(e, ctx, diags)
+            // AU-core-P0: `:name` and durations are typed by the recipe checker (S1.3 — `:as_of`
+            // timestamp, a parameter by its `def parameter`, date ± duration). Until then they
+            // defer like a NULL operand, so a host expression (`:as_of - 30 days`) still checks.
+            is ParamRef, is DurationExpr -> null
         }
 
     /**

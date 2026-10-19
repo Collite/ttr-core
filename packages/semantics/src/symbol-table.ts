@@ -5,9 +5,10 @@ import type { ResolvedSemantics } from './semantics-block/model.js';
 
 export interface SymbolEntry {
   qname: string;
-  // Nested world members (engine/executor/storage/worldSchema) are not top-level
-  // Definition kinds but register as symbols under their world (v4.1).
-  kind: Definition['kind'] | 'engine' | 'executor' | 'storage' | 'worldSchema';
+  // Nested world members (engine/executor/storage/worldSchema, and from 0.16 the
+  // automation members identity/deployment/process) are not top-level Definition
+  // kinds but register as symbols under their world (v4.1).
+  kind: Definition['kind'] | 'engine' | 'executor' | 'storage' | 'worldSchema' | 'identity' | 'deployment' | 'process';
   name: string;
   source: SourceLocation;
   documentUri: string;
@@ -207,10 +208,18 @@ export class DocumentSymbolTable {
     // nesting; duplicates reuse the existing duplicate-definition diagnostic.
     if (def.kind === 'world') {
       const worldEntry = entry;
-      const members: Array<{ name: string; kind: 'engine' | 'executor' | 'storage'; source: SourceLocation }> = [
+      const members: Array<{
+        name: string;
+        kind: 'engine' | 'executor' | 'storage' | 'identity' | 'deployment' | 'process';
+        source: SourceLocation;
+      }> = [
         ...def.engines.map((e) => ({ name: e.name, kind: 'engine' as const, source: e.source })),
         ...def.executors.map((e) => ({ name: e.name, kind: 'executor' as const, source: e.source })),
         ...def.storages.map((s) => ({ name: s.name, kind: 'storage' as const, source: s.source })),
+        // 0.16 — the named automation members (grants are unnamed: keyed by their triple, no symbol).
+        ...(def.identities ?? []).map((m) => ({ name: m.name, kind: 'identity' as const, source: m.source })),
+        ...(def.deployments ?? []).map((m) => ({ name: m.name, kind: 'deployment' as const, source: m.source })),
+        ...(def.processes ?? []).map((m) => ({ name: m.name, kind: 'process' as const, source: m.source })),
       ];
       for (const m of members) {
         const mQname = this.makeQnameChild(worldEntry, m.name);

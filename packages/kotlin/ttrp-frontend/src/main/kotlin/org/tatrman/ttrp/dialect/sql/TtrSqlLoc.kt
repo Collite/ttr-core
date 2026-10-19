@@ -37,6 +37,22 @@ class TtrSqlLoc(
         )
     }
 
+    /** One character at a local line/column + char index (a lexer error has no token to point at). */
+    fun at(
+        localLine: Int,
+        localCol: Int,
+        index: Int,
+    ): SourceLocation =
+        SourceLocation(
+            file = interior.file,
+            line = line(localLine),
+            column = col(localLine, localCol),
+            endLine = line(localLine),
+            endColumn = col(localLine, localCol) + 1,
+            offsetStart = interior.offsetStart + index,
+            offsetEnd = interior.offsetStart + index + 1,
+        )
+
     fun of(ctx: ParserRuleContext): SourceLocation {
         val start = ctx.start ?: return interior
         val stop = ctx.stop ?: start

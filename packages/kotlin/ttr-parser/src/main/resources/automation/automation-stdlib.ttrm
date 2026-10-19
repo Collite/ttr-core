@@ -1,0 +1,56 @@
+// The automation stdlib (AU-core-P0 S0.2 T6; AU D-52, D-68, D-76, D-85): the three entities the
+// automation runtime writes and recipes read — shipped with the toolchain, never authored. Loaded
+// implicitly into a project that declares `model automation` or imports `<x>.automation.*`
+// (the stock CNC vocab precedent). Bound to the automation database by the deploying world.
+// One copy per runtime: this file and `packages/semantics/src/stock/automation-stdlib.ttrm` are
+// byte-identical (a spec asserts it).
+package automation
+model er
+
+def entity obligation {
+    description: "An expected follow-up the runtime tracks for a key: written by an `expect` action, fulfilled by a later run (D-68)."
+    attributes: [
+        def attribute id           { type: text, isKey: true },
+        def attribute recipe       { type: text },
+        def attribute run          { type: text },
+        def attribute entity       { type: text },
+        def attribute key          { type: text },
+        def attribute kind         { type: text },
+        def attribute due          { type: date },
+        def attribute state        { type: text, states: [open, fulfilled, overdue, cancelled, reopened] },
+        def attribute fulfilled_by { type: text, optional: true },
+        def attribute fulfilled_at { type: timestamp, optional: true },
+        def attribute created_at   { type: timestamp }
+    ]
+}
+
+def entity state_history {
+    description: "One row per state transition an action wrote (D-85: a self-transition writes none)."
+    attributes: [
+        def attribute id         { type: text, isKey: true },
+        def attribute entity     { type: text },
+        def attribute key        { type: text },
+        def attribute attribute  { type: text },
+        def attribute from_state { type: text, optional: true },
+        def attribute to_state   { type: text },
+        def attribute run        { type: text },
+        def attribute at         { type: timestamp },
+        def attribute by         { type: text }
+    ]
+}
+
+def entity approvals {
+    description: "Approvals of recipes, parameter values, programs and deployments (D-13), keyed by fingerprint."
+    attributes: [
+        def attribute id          { type: text, isKey: true },
+        def attribute object_kind { type: text },
+        def attribute object_name { type: text },
+        def attribute fp_text     { type: text },
+        def attribute fp_values   { type: text, optional: true },
+        def attribute kind        { type: text },
+        def attribute approver    { type: text },
+        def attribute at          { type: timestamp },
+        def attribute note        { type: text, optional: true },
+        def attribute status      { type: text }
+    ]
+}

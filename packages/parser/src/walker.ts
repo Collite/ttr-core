@@ -71,6 +71,15 @@ import {
   ExecutorDefContext,
   StorageDefContext,
   WorldSchemaDefContext,
+  ObjectDefinitionContext,
+  AutoBodyContext,
+  AutoPropertyContext,
+  AutoEntryContext,
+  AutoValueContext,
+  AutoObjectContext,
+  TransitionPropertyContext,
+  SetPropertyContext,
+  ProcessBodyContext,
   AttributePropertyContext,
   MdDomainDefContext,
   DimensionDefContext,
@@ -158,6 +167,19 @@ import type {
   StorageDef,
   WorldSchemaDef,
   WorldSchemaField,
+  AttributeTransition,
+  AutomationKind,
+  AutoValue,
+  AutoEntry,
+  AutoTransition,
+  AutoSet,
+  AutoBody,
+  AutomationDef,
+  IdentityDef,
+  GrantDef,
+  DeploymentDef,
+  ProcessDef,
+  StepDef,
   DrillArgEntry,
   BindingProperty,
   BindingColumnEntry,
@@ -412,6 +434,7 @@ function walkModelDirective(ctx: ModelDirectiveContext, file: string): ModelDire
   else if (modelCodeCtx.MD()) modelCode = 'md';
   else if (modelCodeCtx.WORLD()) modelCode = 'world';
   else if (modelCodeCtx.LEXICON()) modelCode = 'lexicon';
+  else if (modelCodeCtx.AUTOMATION()) modelCode = 'automation'; // 0.16
 
   // v4.4: `MODEL modelCode (SCHEMA id)? (LOCALE id)?` — two optional id slots.
   // Assign positionally by which of SCHEMA / LOCALE is present (ids stay in order).
@@ -543,7 +566,7 @@ function walkAreaDef(ctx: AreaDefContext, name: string, source: SourceLocation, 
 // are captured as raw text; free-form keys land in `manifest`.
 // ============================================================================
 
-function walkWorldDef(ctx: WorldDefContext, name: string, source: SourceLocation, file: string): WorldDef {
+function walkWorldDef(ctx: WorldDefContext, name: string, source: SourceLocation, file: string, errors: ParseError[]): WorldDef {
   let description: WorldDef['description'];
   let descriptionLocalized: WorldDef['descriptionLocalized'];
   let tags: string[] | undefined;
@@ -551,6 +574,10 @@ function walkWorldDef(ctx: WorldDefContext, name: string, source: SourceLocation
   const engines: EngineDef[] = [];
   const executors: ExecutorDef[] = [];
   const storages: StorageDef[] = [];
+  const identities: IdentityDef[] = [];
+  const grants: GrantDef[] = [];
+  const deployments: DeploymentDef[] = [];
+  const processes: ProcessDef[] = [];
 
   for (const m of ctx.worldMember()) {
     const wp = m.worldProperty();
@@ -563,16 +590,29 @@ function walkWorldDef(ctx: WorldDefContext, name: string, source: SourceLocation
       if (wp.extendsProperty()) extendsRef = wp.extendsProperty()!.id()!.getText();
       continue;
     }
-    const memberName = m.id()!.getText();
     const memberSource = makeSourceLocation(m, file);
+    // 0.16 — `def grant { … }` is unnamed (keyed by its who/program/as triple).
+    if (m.GRANT()) {
+      grants.push({ kind: 'grant', source: memberSource, ...walkAutoBody(m.autoBody()!.autoProperty(), file, errors) });
+      continue;
+    }
+    const memberName = m.id()!.getText();
     if (m.ENGINE())
       engines.push(walkEnginePartDef(m.engineDef()!, 'engine', memberName, memberSource, file) as EngineDef);
     else if (m.EXECUTOR())
       executors.push(walkEnginePartDef(m.executorDef()!, 'executor', memberName, memberSource, file) as ExecutorDef);
     else if (m.STORAGE()) storages.push(walkStorageDef(m.storageDef()!, memberName, memberSource, file));
+    else if (m.IDENTITY())
+      identities.push({ kind: 'identity', name: memberName, source: memberSource, ...walkAutoBody(m.autoBody()!.autoProperty(), file, errors) });
+    else if (m.DEPLOYMENT())
+      deployments.push({ kind: 'deployment', name: memberName, source: memberSource, ...walkAutoBody(m.autoBody()!.autoProperty(), file, errors) });
+    else if (m.PROCESS()) processes.push(walkProcessDef(m.processBody()!, memberName, memberSource, file, errors));
   }
 
-  return { kind: 'world', name, description, descriptionLocalized, tags, extends: extendsRef, engines, executors, storages, source };
+  return {
+    kind: 'world', name, description, descriptionLocalized, tags, extends: extendsRef, engines, executors, storages,
+    identities, grants, deployments, processes, source,
+  };
 }
 
 function walkEnginePartDef(
@@ -661,6 +701,159 @@ function walkWorldSchemaDef(
     fields.push({ name: f.id()!.getText(), type: f.dataType()!.getText(), source: makeSourceLocation(f, file) });
   }
   return { kind: 'worldSchema', name, fields, source };
+}
+
+// ============================================================================
+// 0.16 — the automation model (`model automation`; AU-core-P0 S0.2). One permissive
+// body for six def kinds and the automation world members; values are carried
+// structurally — contracts §2–§3 meaning is validated in @tatrman/semantics.
+// ============================================================================
+
+function automationKindOf(objDef: ObjectDefinitionContext): AutomationKind | undefined {
+  if (objDef.PARAMETER()) return 'parameter';
+  if (objDef.ACTION()) return 'action';
+  if (objDef.SERVICE()) return 'service';
+  if (objDef.APPROVAL()) return 'approval';
+  if (objDef.PROGRAM()) return 'program';
+  if (objDef.RECIPE()) return 'recipe';
+  return undefined;
+}
+
+function walkAutomationDef(
+  ctx: AutoBodyContext,
+  kind: AutomationKind,
+  name: string,
+  source: SourceLocation,
+  file: string,
+  errors: ParseError[],
+): AutomationDef {
+  return { kind, name, source, ...walkAutoBody(ctx.autoProperty(), file, errors) };
+}
+
+function walkAutoBody(props: AutoPropertyContext[], file: string, errors: ParseError[]): AutoBody {
+  const body: AutoBody = { entries: [] };
+  for (const p of props) {
+    if (p.descriptionProperty()) {
+      body.description = descriptionOf(p.descriptionProperty()!, file);
+      body.descriptionLocalized = descriptionLocalizedOf(p.descriptionProperty()!, file);
+    } else if (p.tagsProperty()) {
+      body.tags = walkListOfStrings(p.tagsProperty()!.listOfStrings()!, file);
+    } else if (p.labelProperty()) {
+      body.label = walkLocalizedString(p.labelProperty()!.localizedString()!, file);
+    } else if (p.typeProperty()) {
+      body.type = walkDataType(p.typeProperty()!.dataType()!, file);
+    } else if (p.columnsProperty()) {
+      body.columns = walkColumnDefList(p.columnsProperty()!.columnDefList()!, file, errors);
+    } else if (p.targetProperty()) {
+      body.target = walkTargetValue(p.targetProperty()!, file);
+    } else if (p.transitionProperty()) {
+      const t = walkAutoTransition(p.transitionProperty()!, file);
+      if (t) body.transition = t;
+    } else if (p.setProperty()) {
+      const st = walkAutoSet(p.setProperty()!, file);
+      if (st) body.set = st;
+    } else if (p.autoEntry()) {
+      const e = walkAutoEntry(p.autoEntry()!, file);
+      if (e) body.entries.push(e);
+    }
+  }
+  return body;
+}
+
+// The automation walkers tolerate the error-recovery holes a syntax error leaves (a missing id, a
+// missing value): the half-built property is dropped — its syntax error is already reported — and
+// the rest of the document survives (review-114: these used to wipe the whole AST).
+function walkAutoTransition(ctx: TransitionPropertyContext, file: string): AutoTransition | undefined {
+  const attribute = ctx.id();
+  if (!attribute) return undefined;
+  const t: AutoTransition = { attribute: attribute.getText(), from: [], source: makeSourceLocation(ctx, file) };
+  const target = ctx.transitionTarget();
+  const targetId = target?.id();
+  if (!target || !targetId) return undefined;
+  if (target.LBRACE()) t.toColumn = targetId.getText();
+  else t.to = targetId.getText();
+  const guard = ctx.transitionGuard();
+  if (guard) {
+    if (guard.listOfIds()) t.from = walkListOfIds(guard.listOfIds()!, file);
+    else if (guard.id()) t.from = [guard.id()!.getText()];
+  }
+  return t;
+}
+
+function walkAutoSet(ctx: SetPropertyContext, file: string): AutoSet | undefined {
+  const attribute = ctx.id(0);
+  const column = ctx.id(1);
+  if (!attribute || !column) return undefined;
+  return { attribute: attribute.getText(), column: column.getText(), source: makeSourceLocation(ctx, file) };
+}
+
+function walkAutoEntry(ctx: AutoEntryContext, file: string): AutoEntry | undefined {
+  const key = ctx.autoKey();
+  const value = ctx.autoValue();
+  if (!key || !value) return undefined;
+  return { key: key.getText(), value: walkAutoValue(value, file), source: makeSourceLocation(ctx, file) };
+}
+
+function walkAutoEntries(ctx: AutoObjectContext | null, file: string): AutoEntry[] {
+  return (ctx?.autoEntry() ?? []).flatMap((e) => walkAutoEntry(e, file) ?? []);
+}
+
+function walkAutoValue(ctx: AutoValueContext, file: string): AutoValue {
+  const source = makeSourceLocation(ctx, file);
+  const dur = ctx.durationLiteral();
+  if (dur?.NUMBER_LITERAL() && dur.id()) {
+    const raw = dur.NUMBER_LITERAL()!.getText();
+    return { kind: 'duration', amount: Number(raw), unit: dur.id()!.getText(), source };
+  }
+  const tagged = ctx.taggedValue();
+  if (tagged?.id() && tagged.stringLiteralForm()) {
+    const v = walkStringLiteralForm(tagged.stringLiteralForm()!, file);
+    return { kind: 'tagged', tag: tagged.id()!.getText(), value: v.value, source };
+  }
+  const call = ctx.callValue();
+  if (call?.id()) return { kind: 'call', name: call.id()!.getText(), entries: walkAutoEntries(call.autoObject(), file), source };
+  if (ctx.STAR()) return { kind: 'star', source };
+  if (ctx.autoObject()) return { kind: 'autoObject', entries: walkAutoEntries(ctx.autoObject()!, file), source };
+  const list = ctx.autoList();
+  if (list) return { kind: 'autoList', items: list.autoValue().map((v) => walkAutoValue(v, file)), source };
+  if (ctx.literal()) {
+    const lit = walkLiteral(ctx.literal()!, file);
+    // review-114: keep a number's text as written — parameter values feed the D-13 values fingerprint.
+    if (lit.kind === 'number') return { ...lit, raw: ctx.literal()!.NUMBER_LITERAL()!.getText() };
+    if (lit.kind === 'string' || lit.kind === 'tripleString' || lit.kind === 'bool' || lit.kind === 'null') return lit;
+    return { kind: 'null', source };
+  }
+  if (ctx.id()) return walkId(ctx.id()!, file);
+  return { kind: 'null', source };
+}
+
+function walkProcessDef(ctx: ProcessBodyContext, name: string, source: SourceLocation, file: string, errors: ParseError[]): ProcessDef {
+  const proc: ProcessDef = { kind: 'process', name, source, steps: [], entries: [] };
+  for (const p of ctx.processProperty()) {
+    if (p.descriptionProperty()) {
+      proc.description = descriptionOf(p.descriptionProperty()!, file);
+      proc.descriptionLocalized = descriptionLocalizedOf(p.descriptionProperty()!, file);
+    } else if (p.tagsProperty()) {
+      proc.tags = walkListOfStrings(p.tagsProperty()!.listOfStrings()!, file);
+    } else if (p.stepsProperty()) {
+      for (const st of p.stepsProperty()!.stepInline()) {
+        const stepName = st.id();
+        const stepBody = st.autoBody();
+        if (!stepName || !stepBody) continue; // a step with no name / body: its syntax error is reported
+        const step: StepDef = {
+          kind: 'step',
+          name: stepName.getText(),
+          source: makeSourceLocation(st, file),
+          ...walkAutoBody(stepBody.autoProperty(), file, errors),
+        };
+        proc.steps.push(step);
+      }
+    } else if (p.autoEntry()) {
+      const e = walkAutoEntry(p.autoEntry()!, file);
+      if (e) proc.entries.push(e);
+    }
+  }
+  return proc;
 }
 
 // ============================================================================
@@ -1320,7 +1513,10 @@ function walkDefinition(ctx: DefinitionContext, file: string, errors: ParseError
   if (objDef.DRILL_MAP()) return walkDrillMapDef(objDef.drillMapDef()!, name, source, file);
   if (objDef.AREA()) return walkAreaDef(objDef.areaDef()!, name, source, file);
   if (objDef.SCHEMA()) return walkSchemaDef(objDef.schemaDef()!, name, source, file, errors);
-  if (objDef.WORLD()) return walkWorldDef(objDef.worldDef()!, name, source, file);
+  if (objDef.WORLD()) return walkWorldDef(objDef.worldDef()!, name, source, file, errors);
+  // 0.16 automation kinds (model automation) — one shared body, kind tag distinguishes.
+  const autoKind = automationKindOf(objDef);
+  if (autoKind) return walkAutomationDef(objDef.autoBody()!, autoKind, name, source, file, errors);
   // v3.1 MD logical kinds
   if (objDef.DOMAIN()) return walkMdDomainDef(objDef.mdDomainDef()!, name, source, file);
   if (objDef.DIMENSION()) return walkDimensionDef(objDef.dimensionDef()!, name, source, file, errors);
@@ -2073,6 +2269,10 @@ function walkAttributeProperties(
   let binding: BindingProperty | undefined;
   let domainRef: string | undefined;
   let aggregation: AggregationSpec | undefined;
+  let states: string[] | undefined;
+  let transitions: AttributeTransition[] | undefined;
+  let statesNode: AttributeDef['statesNode'];
+  let transitionsNode: AttributeDef['transitionsNode'];
   const crossRefs: CrossRef[] = [];
 
   for (const p of props) {
@@ -2118,9 +2318,28 @@ function walkAttributeProperties(
     if (p.aggregationProperty()) {
       aggregation = walkAggregationValue(p.aggregationProperty()!.aggregationValue()!, file);
     }
+    // 0.16 — lifecycle states (D-67).
+    if (p.statesProperty()) {
+      const list = p.statesProperty()!.listOfIds();
+      if (list) states = walkListOfIds(list, file);
+      statesNode = { source: makeSourceLocation(p.statesProperty()!, file) };
+    }
+    if (p.transitionsProperty()) {
+      transitions = p.transitionsProperty()!.transitionEntry().flatMap((e) =>
+        e.id() && e.listOfIds()
+          ? [{ from: e.id().getText(), to: walkListOfIds(e.listOfIds()!, file), source: makeSourceLocation(e, file) }]
+          : [],
+      );
+      transitionsNode = { source: makeSourceLocation(p.transitionsProperty()!, file) };
+    }
   }
 
-  return { kind: 'attribute', name, source, description, descriptionLocalized, tags, type, isKey, optional, valueLabels, displayLabel, search, semantics, lexicon, binding, domainRef, aggregation, crossRefs: crossRefs.length ? crossRefs : undefined };
+  return {
+    kind: 'attribute', name, source, description, descriptionLocalized, tags, type, isKey, optional, valueLabels, displayLabel, search, semantics, lexicon, binding, domainRef, aggregation,
+    crossRefs: crossRefs.length ? crossRefs : undefined,
+    ...(states ? { states, statesNode } : {}),
+    ...(transitions ? { transitions, transitionsNode } : {}),
+  };
 }
 
 function walkAttributeDef(
@@ -2367,6 +2586,7 @@ function walkRoleDef(
   let tags: string[] | undefined;
   let label: LocalizedString | undefined;
   let search: SearchBlock | undefined;
+  const entries: AutoEntry[] = [];
 
   for (const p of ctx.roleProperty()) {
     if (p.descriptionProperty()) {
@@ -2382,9 +2602,17 @@ function walkRoleDef(
     if (p.searchBlockProperty()) {
       search = walkSearchBlock(p.searchBlockProperty()!.searchBlock()!, file);
     }
+    // 0.16 — an automation role's typed properties (resolve / delivery / members), walked into the
+    // one ordered entry list (review-114 M5: typed, so a typo stays a parse error).
+    const roleProp = p.resolveProperty() ?? p.deliveryProperty() ?? p.membersProperty();
+    const roleValue = roleProp?.autoValue();
+    if (roleProp && roleValue) {
+      const key = p.resolveProperty() ? 'resolve' : p.deliveryProperty() ? 'delivery' : 'members';
+      entries.push({ key, value: walkAutoValue(roleValue, file), source: makeSourceLocation(roleProp, file) });
+    }
   }
 
-  return { kind: 'role', name, source, description, descriptionLocalized, tags, label, search };
+  return { kind: 'role', name, source, description, descriptionLocalized, tags, label, search, ...(entries.length ? { entries } : {}) };
 }
 
 function walkEr2cncRoleDef(

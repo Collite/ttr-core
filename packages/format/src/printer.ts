@@ -113,7 +113,6 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
   const b = (x: boolean | undefined) => (x === undefined ? undefined : text(x ? 'true' : 'false'));
   const qstr = (x: string | undefined) => (x === undefined ? undefined : text(JSON.stringify(x)));
   const defList = (arr: Definition[] | undefined) => (arr && arr.length ? defListDoc(arr, ctx) : undefined);
-
   switch (def.kind) {
     case 'project':
       add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true)); add('version', qstr(def.version));
@@ -161,6 +160,13 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
       add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
       add('type', v(def.type), def.type); add('isKey', b(def.isKey)); add('optional', b(def.optional));
       add('valueLabels', v(def.valueLabels), def.valueLabels); add('displayLabel', v(def.displayLabel), def.displayLabel); add('search', v(def.search), def.search); add('semantics', v(def.semantics), def.semantics); add('lexicon', v(def.lexicon), def.lexicon);
+      // 0.16 — lifecycle states (D-67); the property nodes carry the comments written on them.
+      add('states', def.states && strListDoc(def.states, false), def.statesNode);
+      add(
+        'transitions',
+        def.transitions && text(`{ ${def.transitions.map((t) => `${t.from}: [${t.to.join(', ')}]`).join(', ')} }`),
+        def.transitionsNode,
+      );
       break;
     case 'relation':
       add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
@@ -274,12 +280,34 @@ function inlinePropsDoc(props: Prop[]): Doc {
 }
 
 /** True if rendering this def inline would swallow a `//` comment to end-of-line. */
+/**
+ * A value that always breaks (a def list) cannot sit in a one-line def: in 'preserve' mode the def
+ * must break too, else the output spans several lines and the next pass breaks it (not idempotent).
+ */
+function hasHardline(d: Doc): boolean {
+  switch (d.t) {
+    case 'hardline':
+      return true;
+    case 'concat':
+      return d.parts.some(hasHardline);
+    case 'indent':
+    case 'group':
+      return hasHardline(d.doc);
+    default:
+      return false;
+  }
+}
+
 function defHasComments(def: Definition, props: Prop[]): boolean {
   return hasTrailing(def) || props.some((pr) => hasTrailing(pr.node));
 }
 
 /** The def body without its own leading/trailing trivia (added by callers). */
 function formatDefCore(def: Definition, ctx: Ctx, topLevel: boolean): Doc {
+  // Kept VERBATIM — source order, every comment, every value form (review-114 M9): a world (its nested
+  // members have no canonical layout yet; it used to print `def world w {}`), the six automation kinds and
+  // an automation role (their free-form properties are in authored order, interleaved with the typed ones).
+  if (isVerbatimDef(def)) return verbatim(slice(ctx.source, def.source));
   const props = propsOf(def, ctx);
   const header = `def ${kindKeyword(def.kind)} ${def.name} {`;
   if (props.length === 0) return text(`def ${kindKeyword(def.kind)} ${def.name} {}`);
@@ -306,7 +334,7 @@ function formatDefCore(def: Definition, ctx: Ctx, topLevel: boolean): Doc {
       ? true
       : ctx.config.separator === 'comma'
         ? false
-        : def.source.line !== def.source.endLine;
+        : def.source.line !== def.source.endLine || props.some((pr) => hasHardline(pr.value));
 
   if (!broken) {
     return concat([text(header), text(' '), inlinePropsDoc(props), text(' }')]);
@@ -315,7 +343,20 @@ function formatDefCore(def: Definition, ctx: Ctx, topLevel: boolean): Doc {
   return concat([text(header), body]);
 }
 
+const VERBATIM_KINDS = new Set(['world', 'parameter', 'action', 'service', 'approval', 'program', 'recipe']);
+
+function isVerbatimDef(def: Definition): boolean {
+  return VERBATIM_KINDS.has(def.kind) || (def.kind === 'role' && (def.entries?.length ?? 0) > 0);
+}
+
 function formatDef(def: Definition, ctx: Ctx, topLevel: boolean): Doc {
+  if (isVerbatimDef(def)) {
+    // A comment inside the verbatim slice is already in it; re-emit only the ones outside the def.
+    const { offsetStart, offsetEnd } = def.source;
+    const outside = (t: Trivia) => t.source.offsetEnd <= offsetStart || t.source.offsetStart >= offsetEnd;
+    const node: TriviaNode = { leadingTrivia: def.leadingTrivia?.filter(outside), trailingTrivia: def.trailingTrivia?.filter(outside) };
+    return withTrivia(node, formatDefCore(def, ctx, topLevel));
+  }
   return withTrivia(def, formatDefCore(def, ctx, topLevel));
 }
 

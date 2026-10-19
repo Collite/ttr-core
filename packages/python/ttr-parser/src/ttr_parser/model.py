@@ -594,7 +594,20 @@ class AttributeDef(Definition):
     semantics: SemanticsBlock | None = None
     lexicon: LexiconBlock | None = None
     binding: BindingProperty | None = None
+    #: Grammar 0.16 — `states: [placed, held, …]`, the lifecycle states (D-67).
+    states: tuple[str, ...] = ()
+    #: Grammar 0.16 — `transitions: { placed: [held, …] }` (D-67), in authored order.
+    transitions: tuple[AttributeTransition, ...] = ()
     kind: ClassVar[str] = "attribute"
+
+
+@dataclass(frozen=True, slots=True)
+class AttributeTransition:
+    """Grammar 0.16 — one `from: [to, …]` entry of an attribute's `transitions:` map."""
+
+    from_state: str
+    to: tuple[str, ...]
+    source: SourceLocation
 
 
 # ----- Grounding Phase 1 semantics surface (grammar 4.2) -----
@@ -763,6 +776,9 @@ class QueryDef(Definition):
 class RoleDef(Definition):
     label: LocalizedStringValue | None = None
     search: SearchHintsValue = field(default_factory=SearchHintsValue)
+    #: Grammar 0.16 — an automation role's free-form properties (`resolve`, `delivery`,
+    #: `members`), in authored order. Empty for a cnc role.
+    entries: tuple[AutoEntry, ...] = ()
     kind: ClassVar[str] = "role"
 
 
@@ -913,7 +929,229 @@ class WorldDef(Definition):
     engines: tuple[EngineDef, ...] = ()
     executors: tuple[ExecutorDef, ...] = ()
     storages: tuple[StorageDef, ...] = ()
+    #: Grammar 0.16 — the automation world members (D-90, D-91, D-107, D-39).
+    identities: tuple[WorldAutoMember, ...] = ()
+    grants: tuple[WorldAutoMember, ...] = ()
+    deployments: tuple[WorldAutoMember, ...] = ()
+    processes: tuple[ProcessDef, ...] = ()
     kind: ClassVar[str] = "world"
+
+
+# ============================================================================
+# Grammar 0.16 — the automation model (`model automation`; AU-core-P0 S0.2). Six
+# def kinds share ONE permissive body (AutoBody): typed common fields + an ordered
+# free-form entry list; the automation world members reuse it. Values are carried
+# structurally — their meaning is validated in semantics, never here.
+# ============================================================================
+
+
+@dataclass(frozen=True, slots=True)
+class AutoValue:
+    """Common base for a free-form automation value (`autoValue`)."""
+
+    source: SourceLocation
+    kind: ClassVar[str] = "autoValue"
+
+
+@dataclass(frozen=True, slots=True)
+class AutoStr(AutoValue):
+    raw: str = ""
+    #: Written as a triple-quoted string (dedented).
+    triple: bool = False
+    kind: ClassVar[str] = "string"
+
+
+@dataclass(frozen=True, slots=True)
+class AutoNum(AutoValue):
+    raw: float = 0.0
+    #: The number as written (parameter values feed the D-13 values fingerprint).
+    text: str = ""
+    kind: ClassVar[str] = "number"
+
+
+@dataclass(frozen=True, slots=True)
+class AutoBool(AutoValue):
+    raw: bool = False
+    kind: ClassVar[str] = "bool"
+
+
+@dataclass(frozen=True, slots=True)
+class AutoNull(AutoValue):
+    kind: ClassVar[str] = "null"
+
+
+@dataclass(frozen=True, slots=True)
+class AutoId(AutoValue):
+    """A bare or dotted id (`none`, `role.ops`, `schema.line_received`)."""
+
+    ref: Reference | None = None
+    parts: tuple[str, ...] = ()
+    kind: ClassVar[str] = "id"
+
+
+@dataclass(frozen=True, slots=True)
+class AutoDuration(AutoValue):
+    """`2 working_days` — the unit is validated in semantics."""
+
+    amount: float = 0.0
+    unit: str = ""
+    kind: ClassVar[str] = "duration"
+
+
+@dataclass(frozen=True, slots=True)
+class AutoTagged(AutoValue):
+    """`schedule "06:00 Europe/Prague"` · `keycloak_group "hartland-sales"`."""
+
+    tag: str = ""
+    value: str = ""
+    kind: ClassVar[str] = "tagged"
+
+
+@dataclass(frozen=True, slots=True)
+class AutoCall(AutoValue):
+    """`hold { order: order_number }` — a call-shaped value."""
+
+    name: str = ""
+    entries: tuple[AutoEntry, ...] = ()
+    kind: ClassVar[str] = "call"
+
+
+@dataclass(frozen=True, slots=True)
+class AutoStar(AutoValue):
+    """`*` — any (`program: *`)."""
+
+    kind: ClassVar[str] = "star"
+
+
+@dataclass(frozen=True, slots=True)
+class AutoObj(AutoValue):
+    entries: tuple[AutoEntry, ...] = ()
+    kind: ClassVar[str] = "object"
+
+
+@dataclass(frozen=True, slots=True)
+class AutoList(AutoValue):
+    items: tuple[AutoValue, ...] = ()
+    kind: ClassVar[str] = "list"
+
+
+@dataclass(frozen=True, slots=True)
+class AutoEntry:
+    key: str
+    value: AutoValue
+    source: SourceLocation
+
+
+@dataclass(frozen=True, slots=True)
+class AutoTransition:
+    """`transition: order.state -> released { from: [placed, held] }` / `-> {to}`."""
+
+    attribute: str
+    to: str | None
+    to_column: str | None
+    from_states: tuple[str, ...]
+    source: SourceLocation
+
+
+@dataclass(frozen=True, slots=True)
+class AutoSet:
+    """`set: order.held_for = department`."""
+
+    attribute: str
+    column: str
+    source: SourceLocation
+
+
+@dataclass(frozen=True, slots=True)
+class AutoBody:
+    """The shared automation body: typed common fields + the ordered free-form entries."""
+
+    description: str | None = None
+    description_localized: LocalizedStringValue | None = None
+    tags: tuple[str, ...] = ()
+    label: LocalizedStringValue | None = None
+    type: DataType | None = None
+    columns: tuple[ColumnDef, ...] = ()
+    target: TargetValue | None = None
+    transition: AutoTransition | None = None
+    set: AutoSet | None = None
+    entries: tuple[AutoEntry, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class AutomationDef(Definition):
+    """Grammar 0.16 — the six automation kinds share one body; `kind` is the def keyword."""
+
+    body: AutoBody = field(default_factory=AutoBody)
+    kind: ClassVar[str] = "automation"
+
+
+@dataclass(frozen=True, slots=True)
+class AutomationParameterDef(AutomationDef):
+    kind: ClassVar[str] = "parameter"
+
+
+@dataclass(frozen=True, slots=True)
+class AutomationActionDef(AutomationDef):
+    kind: ClassVar[str] = "action"
+
+
+@dataclass(frozen=True, slots=True)
+class AutomationServiceDef(AutomationDef):
+    kind: ClassVar[str] = "service"
+
+
+@dataclass(frozen=True, slots=True)
+class AutomationApprovalDef(AutomationDef):
+    kind: ClassVar[str] = "approval"
+
+
+@dataclass(frozen=True, slots=True)
+class AutomationProgramDef(AutomationDef):
+    kind: ClassVar[str] = "program"
+
+
+@dataclass(frozen=True, slots=True)
+class AutomationRecipeDef(AutomationDef):
+    kind: ClassVar[str] = "recipe"
+
+
+#: The automation def keyword → its class.
+AUTOMATION_KINDS: Mapping[str, type[AutomationDef]] = MappingProxyType(
+    {
+        "parameter": AutomationParameterDef,
+        "action": AutomationActionDef,
+        "service": AutomationServiceDef,
+        "approval": AutomationApprovalDef,
+        "program": AutomationProgramDef,
+        "recipe": AutomationRecipeDef,
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class WorldAutoMember:
+    """Grammar 0.16 — `def identity <id>`, `def grant { … }` (unnamed), `def deployment <id>`,
+    or a process's `def step <id>`. `kind` is the def keyword (an instance field here)."""
+
+    member_kind: str
+    name: str | None
+    source: SourceLocation
+    body: AutoBody = field(default_factory=AutoBody)
+
+
+@dataclass(frozen=True, slots=True)
+class ProcessDef:
+    """Grammar 0.16 — world `def process <id> { instance: …, steps: [ def step … ] }`."""
+
+    name: str
+    source: SourceLocation
+    description: str | None = None
+    description_localized: LocalizedStringValue | None = None
+    tags: tuple[str, ...] = ()
+    steps: tuple[WorldAutoMember, ...] = ()
+    entries: tuple[AutoEntry, ...] = ()
+    kind: ClassVar[str] = "process"
 
 
 # ============================================================================

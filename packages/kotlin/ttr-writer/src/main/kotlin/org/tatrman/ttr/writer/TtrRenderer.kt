@@ -57,6 +57,12 @@ import org.tatrman.ttr.parser.model.TargetValue
 import org.tatrman.ttr.parser.model.ViewDef
 import org.tatrman.ttr.parser.model.WorldDef
 import org.tatrman.ttr.parser.model.WorldSchemaDef
+import org.tatrman.ttr.parser.model.AutoBody
+import org.tatrman.ttr.parser.model.AutoEntry
+import org.tatrman.ttr.parser.model.AutoValue
+import org.tatrman.ttr.parser.model.AutomationDef
+import org.tatrman.ttr.parser.model.ProcessDef
+import org.tatrman.ttr.parser.model.WorldAutoMember
 
 /**
  * Renders the typed model back to TTR text. Property ordering within a block is
@@ -85,6 +91,8 @@ object TtrRenderer {
             MeasureDef::class,
             CubeletDef::class,
             Md2dbCubeletDef::class,
+            // Grammar 0.16 — the automation kinds (one class; ordered by kind then name below).
+            AutomationDef::class,
         )
 
     /** Contract §3 — render definitions with an optional leading schema directive. */
@@ -149,7 +157,14 @@ object TtrRenderer {
         val grouped = definitions.filterNot { isMdLogicalDef(it) }.groupBy { it::class }
         val sortedGroups = grouped.entries.sortedBy { (kind, _) -> KIND_ORDER.indexOf(kind) }
         for ((_, defs) in sortedGroups) {
-            for (def in defs.sortedBy { it.name }) {
+            val ordered =
+                defs.sortedWith(
+                    compareBy<Definition>({
+                        (it as? AutomationDef)?.let { a -> AutomationDef.KINDS.indexOf(a.kind) }
+                            ?: 0
+                    }, { it.name }),
+                )
+            for (def in ordered) {
                 sb.appendLine(renderDef(def))
             }
         }
@@ -176,6 +191,7 @@ object TtrRenderer {
             is Er2CncRoleDef -> renderEr2CncRole(def)
             is AttributeDef -> renderAttribute(def)
             is WorldDef -> renderWorld(def)
+            is AutomationDef -> renderAutomation(def)
             // MD dot-path (S5C-B): the materialize-generated model + binding get real renderers.
             is MeasureDef -> renderMeasure(def)
             is CubeletDef -> renderCubelet(def)
@@ -227,9 +243,80 @@ object TtrRenderer {
             )
         }
         for (s in def.storages) sb.append(" ").append(renderStorage(s))
+        // Grammar 0.16 — the automation members, in parse order per kind.
+        for (m in def.identities) sb.append(" ").append(renderAutoMember(m))
+        for (m in def.grants) sb.append(" ").append(renderAutoMember(m))
+        for (m in def.deployments) sb.append(" ").append(renderAutoMember(m))
+        for (p in def.processes) sb.append(" ").append(renderProcess(p))
         sb.append(" }")
         return sb.toString()
     }
+
+    // ----- Grammar 0.16 — the automation model. Typed props first (stable order), then the
+    // free-form entries in authored order; deterministic, single-line per def.
+
+    private fun renderAutomation(def: AutomationDef): String =
+        "def ${def.kind} ${def.name} {${renderAutoBody(def.body)} }"
+
+    private fun renderAutoMember(m: WorldAutoMember): String {
+        val head = if (m.name == null) "def ${m.kind}" else "def ${m.kind} ${m.name}"
+        return "$head {${renderAutoBody(m.body)} }"
+    }
+
+    private fun renderProcess(p: ProcessDef): String {
+        val sb = StringBuilder("def process ${p.name} {")
+        renderDescriptionIfAny(p.description, p.descriptionLocalized)?.let { sb.append(it) }
+        renderTagsIfAny(p.tags)?.let { sb.append(" $it") }
+        for (e in p.entries) sb.append(" ${e.key}: ${renderAutoValue(e.value)},")
+        if (p.steps.isNotEmpty()) sb.append(" steps: [${p.steps.joinToString(", ") { renderAutoMember(it) }}],")
+        sb.append(" }")
+        return sb.toString()
+    }
+
+    private fun renderAutoBody(b: AutoBody): String {
+        val sb = StringBuilder()
+        b.type?.let { sb.append(" type: ${it.name},") }
+        b.label?.let { sb.append(" label: ${renderLocalizedString(it)},") }
+        renderDescriptionIfAny(b.description, b.descriptionLocalized)?.let { sb.append(it) }
+        renderTagsIfAny(b.tags)?.let { sb.append(" $it") }
+        if (b.columns.isNotEmpty()) sb.append(" columns: [${b.columns.joinToString(", ") { renderColumn(it) }}],")
+        b.target?.let { sb.append(" target: ${renderTargetValue(it)},") }
+        b.transition?.let { t ->
+            val to = t.toColumn?.let { "{$it}" } ?: t.to.orEmpty()
+            val guard = if (t.from.isEmpty()) "" else " { from: [${t.from.joinToString(", ")}] }"
+            sb.append(" transition: ${t.attribute} -> $to$guard,")
+        }
+        b.set?.let { sb.append(" set: ${it.attribute} = ${it.column},") }
+        for (e in b.entries) sb.append(" ${e.key}: ${renderAutoValue(e.value)},")
+        return sb.toString()
+    }
+
+    private fun renderAutoEntries(entries: List<AutoEntry>): String =
+        entries.joinToString(", ", prefix = "{ ", postfix = " }") { "${it.key}: ${renderAutoValue(it.value)}" }
+
+    private fun renderAutoValue(v: AutoValue): String =
+        when (v) {
+            is AutoValue.Str ->
+                if (v.triple &&
+                    !v.raw.contains("\"\"\"")
+                ) {
+                    "\"\"\"${v.raw}\"\"\""
+                } else {
+                    renderString(v.raw)
+                }
+            is AutoValue.Num -> renderNumber(v.raw)
+            is AutoValue.Bool -> v.raw.toString()
+            is AutoValue.Null -> "null"
+            is AutoValue.Id -> v.ref.path
+            is AutoValue.Duration -> "${renderNumber(v.amount)} ${v.unit}"
+            is AutoValue.Tagged -> "${v.tag} ${renderString(v.value)}"
+            is AutoValue.Call -> "${v.name} ${renderAutoEntries(v.entries)}"
+            is AutoValue.Star -> "*"
+            is AutoValue.Obj -> renderAutoEntries(v.entries)
+            is AutoValue.ListV -> v.items.joinToString(", ", prefix = "[", postfix = "]") { renderAutoValue(it) }
+        }
+
+    private fun renderNumber(d: Double): String = d.toBigDecimal().stripTrailingZeros().toPlainString()
 
     @Suppress("LongParameterList")
     private fun renderEnginePart(
@@ -312,6 +399,8 @@ object TtrRenderer {
         renderDescriptionIfAny(def.description, def.descriptionLocalized)?.let { sb.append(it) }
         renderTagsIfAny(def.tags)?.let { sb.append(" $it") }
         renderSearchHintsIfAny(def.search)?.let { sb.append(it) }
+        // Grammar 0.16 — an automation role's free-form properties, in authored order.
+        for (e in def.entries) sb.append(" ${e.key}: ${renderAutoValue(e.value)},")
         sb.append(" }")
         return sb.toString()
     }
@@ -409,6 +498,13 @@ object TtrRenderer {
             sb.append(" binding: ")
             sb.append(renderBinding(it))
             sb.append(",")
+        }
+        // Grammar 0.16 — lifecycle states (D-67).
+        if (def.states.isNotEmpty()) sb.append(" states: [${def.states.joinToString(", ")}],")
+        if (def.transitions.isNotEmpty()) {
+            sb.append(" transitions: { ")
+            sb.append(def.transitions.joinToString(", ") { "${it.from}: [${it.to.joinToString(", ")}]" })
+            sb.append(" },")
         }
         sb.append(" }")
         return sb.toString()

@@ -1,0 +1,5 @@
+// expect: ttr/automation-event-not-schema — `event:` names a `def schema` (D-104).
+package acme.automation
+model automation
+
+def program q { recipe: r, port: event, event: schema.nope, mode: on_event }

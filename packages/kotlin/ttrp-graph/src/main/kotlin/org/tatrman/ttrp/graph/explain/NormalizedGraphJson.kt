@@ -132,5 +132,8 @@ object NormalizedGraphJson {
             is InList -> "in${if (e.negated) "!n" else ""}(${expr(e.expr)};${e.items.joinToString(",") { expr(it) }})"
             is IsNull -> "isnull${if (e.negated) "!n" else ""}(${expr(e.expr)})"
             is MdPath -> "mdpath(${e.components.size})" // MD lowering is S4; opaque leaf for now
+            is org.tatrman.ttrp.expr.ParamRef -> "param(${e.name})"
+            is org.tatrman.ttrp.expr.DurationLiteral -> "duration(${e.amount} ${e.unit.spelling})"
+            is org.tatrman.ttrp.expr.DurationParam -> "duration(:${e.param} ${e.unit.spelling})"
         }
 }

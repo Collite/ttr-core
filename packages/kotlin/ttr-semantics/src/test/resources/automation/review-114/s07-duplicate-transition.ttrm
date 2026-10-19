@@ -1,0 +1,7 @@
+// expect: ttr/states-duplicate-transition — `transitions:` names a from-state twice.
+package acme
+model er
+
+def entity thing {
+    attributes: [ def attribute st { type: text, states: [a, b], transitions: { a: [b], a: [b] } } ]
+}

@@ -169,6 +169,10 @@ existing ai-platform `Definition.kt` plus the v2.0.0/v2.2 corrections below):
 | `Er2CncRoleDef` | `entity`, `role` |
 | `DrillMapDef` | `from`, `to`, `args`, `display`, `overrideAuto` (v2.2 grammar) |
 | `SchemaDef` | **grammar 0.14:** `columns: List<ColumnDef>` — a named row schema (`def schema <name> { description?, tags?, columns: [...] }`), each column a full `ColumnDef` (`type`, `optional`, …). Tier-neutral (`modelForKind` → `db`, the `area` precedent). Conformance kind `schema`; `properties.columns` dumped exactly like a view's. `ttr-metadata` surfaces it as `Model.rowSchemas` (keyed `<pkg>.<name>`, a `RowSchemaRecord` — not a `ModelObject`); TTR-P holds `display(<name>)` rows to it. |
+| `AutomationDef` | **grammar 0.16:** `kind` ∈ `parameter` · `action` · `service` · `approval` · `program` · `recipe` (`def recipe` is the generated catalog object), `name`, and the shared `AutoBody`: typed `description`, `tags`, `label`, `type`, `columns`, `target`, `transition: { attribute, to?, toColumn?, from[] }`, `set: { attribute, column }`, then the ordered free-form `entries: [{ key, value: AutoValue }]` — `AutoValue` = literal · ref · `duration { amount, unit }` · `tagged { tag, text }` (`schedule "…"`) · `call { name, object }` · `star` · object · list. Per-kind validity is semantic (`ttr/automation-*`); `modelForKind` → `automation`. |
+| `RoleDef` (0.16) | gains the free-form `entries` (`resolve: keycloak_group "…"`, `delivery`, `members`) — an automation role when the file is `model automation`. |
+| `WorldDef` (0.16) | gains `identities: IdentityDef[]`, `grants: GrantDef[]` (unnamed; keyed by who/program/as), `deployments: DeploymentDef[]` (all `AutoBody`) and `processes: ProcessDef[]` (`steps: StepDef[]`, each a named `AutoBody`). Not in the world fingerprint. |
+| `AttributeDef` (0.16) | gains `states: string[]` and `transitions: { [from]: string[] }` (`ttr/states-*`). |
 
 Full field signatures live in `AST-NAMING.md` — see that doc for the TS↔Kotlin
 type/field rename map.

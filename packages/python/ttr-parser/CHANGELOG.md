@@ -3,6 +3,17 @@
 All notable changes to `ttr-parser` (Python) are documented here. While
 `< 1.0.0`, minor bumps may introduce breaking changes (see each entry).
 
+## 0.16.0 — unreleased
+
+- **Grammar 0.16 (additive) — the automation model.** `model automation` with six def kinds on one
+  body: `AutomationDef` (subclasses `AutomationParameterDef` … `AutomationRecipeDef`, `kind` =
+  the def keyword) carrying an `AutoBody` (typed fields + ordered `entries: tuple[AutoEntry, ...]`
+  of `AutoValue`s: `AutoStr`, `AutoNum`, `AutoBool`, `AutoNull`, `AutoId`, `AutoDuration`,
+  `AutoTagged`, `AutoCall`, `AutoStar`, `AutoObj`, `AutoList`). `RoleDef.entries`; `WorldDef`
+  gains `identities`, `grants`, `deployments` (`WorldAutoMember`) and `processes` (`ProcessDef`);
+  `AttributeDef` gains `states` and `transitions`. `model_for_kind` maps the automation kinds to
+  `automation` and the world members to `world`. Conformance fixtures 71–74 byte-identical to TS.
+
 ## 0.14.0 — unreleased
 
 - **Grammar 0.14 (additive) — named row schemas (`def schema`).** A new top-level def kind

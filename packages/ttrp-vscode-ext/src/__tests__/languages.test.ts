@@ -54,3 +54,26 @@ describe('TTR-B languages', () => {
     expect(begin.test('"""ttrb-de')).toBe(false);
   });
 });
+
+// AU-core-P0 · S0.1 T5: the recipe block is coloured — its structural words only (they are soft keywords).
+describe('TTR-P recipe highlighting', () => {
+  const tm = JSON.parse(fs.readFileSync(path.join(root, 'syntaxes/ttrp.tmLanguage.json'), 'utf8')) as {
+    patterns: { name?: string; match?: string }[];
+  };
+  const recipe = tm.patterns.find((p) => p.name === 'keyword.control.recipe.ttrp');
+
+  it('colours the words that open a recipe member or a route attribute', () => {
+    expect(recipe).toBeDefined();
+    const re = new RegExp(recipe!.match!);
+    for (const w of ['recipe', 'candidates', 'context', 'decision', 'actions', 'switch', 'because', 'builtin']) {
+      expect(re.test(w)).toBe(true);
+    }
+  });
+
+  it('leaves the soft words that are common column names plain', () => {
+    const re = new RegExp(recipe!.match!);
+    for (const w of ['key', 'mode', 'set', 'call', 'detail', 'days', 'per']) {
+      expect(re.test(w)).toBe(false);
+    }
+  });
+});

@@ -1,0 +1,5 @@
+// expect: syntax error — `transition:` needs a target state (or `{column}`) after `->`.
+package acme.automation
+model automation
+
+def action release { transition: order.state -> }

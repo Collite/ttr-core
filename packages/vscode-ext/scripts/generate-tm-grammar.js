@@ -227,6 +227,28 @@ function tokenToScope(name, literal) {
         case 'FORMS': return 'keyword.other.property.ttrm';
         case 'MATCH': return 'keyword.other.property.ttrm';
         case 'LOCALE': return 'keyword.control.def.ttrm';
+        // 0.16 automation model (AU-core-P0 S0.2). AUTOMATION is a model code; the def
+        // nouns (incl. the world members) are kinds; the lifecycle / transition / set
+        // keywords are body properties; ARROW is the transition's punctuation.
+        case 'AUTOMATION': return 'keyword.other.schema.ttrm';
+        case 'PARAMETER': return 'keyword.other.kind.ttrm';
+        case 'ACTION': return 'keyword.other.kind.ttrm';
+        case 'SERVICE': return 'keyword.other.kind.ttrm';
+        case 'APPROVAL': return 'keyword.other.kind.ttrm';
+        case 'PROGRAM': return 'keyword.other.kind.ttrm';
+        case 'RECIPE': return 'keyword.other.kind.ttrm';
+        case 'IDENTITY': return 'keyword.other.kind.ttrm';
+        case 'DEPLOYMENT': return 'keyword.other.kind.ttrm';
+        case 'PROCESS': return 'keyword.other.kind.ttrm';
+        case 'STEP': return 'keyword.other.kind.ttrm';
+        case 'STEPS': return 'keyword.other.property.ttrm';
+        case 'TRANSITION': return 'keyword.other.property.ttrm';
+        case 'TRANSITIONS': return 'keyword.other.property.ttrm';
+        case 'STATES': return 'keyword.other.property.ttrm';
+        case 'SET': return 'keyword.other.property.ttrm';
+        case 'RESOLVE': return 'keyword.other.property.ttrm';
+        case 'DELIVERY': return 'keyword.other.property.ttrm';
+        case 'ARROW': return 'punctuation.separator.ttrm';
         default: return null;
     }
 }

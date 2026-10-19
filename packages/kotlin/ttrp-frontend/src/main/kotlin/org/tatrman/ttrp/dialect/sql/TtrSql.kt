@@ -41,6 +41,24 @@ object TtrSql {
 
         val lexer = TTRSqlLexer(CharStreams.fromString(sourceText))
         lexer.removeErrorListeners()
+        // A character the lexer cannot read used to be DROPPED silently — `:tolerance` read as a column
+        // `tolerance`. It is now the generic reject at its position (AU-core-P0).
+        var lexError: SourceLocation? = null
+        lexer.addErrorListener(
+            object : BaseErrorListener() {
+                override fun syntaxError(
+                    r: Recognizer<*, *>?,
+                    sym: Any?,
+                    line: Int,
+                    col: Int,
+                    msg: String,
+                    e: RecognitionException?,
+                ) {
+                    val index = (e as? org.antlr.v4.runtime.LexerNoViableAltException)?.startIndex ?: 0
+                    if (lexError == null) lexError = loc.at(line, col, index)
+                }
+            },
+        )
         val tokenStream = CommonTokenStream(lexer)
         tokenStream.fill()
         val defaultTokens = tokenStream.tokens.filter { it.channel == Token.DEFAULT_CHANNEL }
@@ -48,6 +66,10 @@ object TtrSql {
         // 1) Curated reject scan (named grammar rejects) — one primary diagnostic, wins over syntax noise.
         val reject = TtrSqlRejectScanner(rejectTable, loc).scan(defaultTokens)
         if (reject != null) return FragmentDecomposition(emptyList(), listOf(reject), emptyList())
+
+        lexError?.let {
+            return FragmentDecomposition(emptyList(), listOf(TtrSqlRejectScanner.generic(rejectTable, it)), emptyList())
+        }
 
         // 2) Parse.
         val parser = TTRSqlParser(tokenStream)

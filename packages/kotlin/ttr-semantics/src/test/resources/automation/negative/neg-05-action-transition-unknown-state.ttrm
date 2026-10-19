@@ -1,0 +1,9 @@
+// expect: ttr/states-unknown-state — an action transitions to a state the attribute lacks.
+package acme.automation
+model automation
+
+def action ship {
+    columns:    [def column order { type: order.order_number }]
+    transition: order.state -> shipped
+    sinks:      { native: transition }
+}

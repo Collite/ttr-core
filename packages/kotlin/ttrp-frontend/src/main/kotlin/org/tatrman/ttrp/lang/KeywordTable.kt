@@ -42,6 +42,43 @@ object KeywordTable {
             "from",
         )
 
+    /**
+     * AU-core-P0 · S0.1 — the recipe block's words (AU contracts §1). ALL soft: every one is also in the
+     * grammar's `identifier` rule, so `key`, `mode`, `detail`, `days`, `set`, `context` … stay ordinary
+     * column / port / op names (the TTR-M WORLD precedent). The duration units are [durationUnits].
+     */
+    val recipeKeywords =
+        setOf(
+            "recipe",
+            "key",
+            "parameters",
+            "document",
+            "protocol",
+            "candidates",
+            "context",
+            "decision",
+            "actions",
+            "builtin",
+            "foreign",
+            "per",
+            "candidate",
+            "set",
+            "call",
+            "turn",
+            "ask",
+            "answer",
+            "window",
+            "over",
+            "switch",
+            "mode",
+            "because",
+            "detail",
+            "group_by",
+        )
+
+    /** AU-core-P0 — the duration literal's units (`30 days`, `2 working_days`; `days(:p)` folds to one). */
+    val durationUnits = setOf("days", "working_days", "weeks", "months", "minutes", "hours")
+
     /** Words that appear only inside expressions (S9/B-T5). `null` is a literal-keyword; see [booleanLiterals]. */
     val expressionKeywords =
         setOf(

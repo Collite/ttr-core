@@ -26,6 +26,11 @@ data class WorldSchema(
                     yield(s)
                     yieldAll(s.schemas)
                 }
+                // Grammar 0.16 — the automation members.
+                yieldAll(w.identities)
+                yieldAll(w.grants)
+                yieldAll(w.deployments)
+                yieldAll(w.processes)
             }
         }
 }
@@ -43,8 +48,22 @@ data class World(
     val executors: List<WorldExecutor> = emptyList(),
     val storages: List<WorldStorage> = emptyList(),
     val sourceLocation: SourceLocation? = null,
+    /** Grammar 0.16 — `def identity` service principals (D-90). */
+    val identities: List<WorldIdentity> = emptyList(),
+    /** Grammar 0.16 — `def grant` rows (D-91), in authored order. */
+    val grants: List<WorldGrant> = emptyList(),
+    /** Grammar 0.16 — `def deployment` objects (D-107). */
+    val deployments: List<WorldDeployment> = emptyList(),
+    /** Grammar 0.16 — `def process` instances (D-39, D-86). */
+    val processes: List<WorldProcess> = emptyList(),
 ) : ModelObject {
     override val kind: String = "world"
+
+    fun identity(name: String): WorldIdentity? = identities.firstOrNull { it.qname.name == name }
+
+    fun deployment(name: String): WorldDeployment? = deployments.firstOrNull { it.qname.name == name }
+
+    fun process(name: String): WorldProcess? = processes.firstOrNull { it.qname.name == name }
 }
 
 data class WorldEngine(
@@ -97,6 +116,11 @@ data class WorldStorage(
     val schemas: List<WorldSchemaObject> = emptyList(),
     val manifest: Map<String, PropertyValue> = emptyMap(),
     val sourceLocation: SourceLocation? = null,
+    /**
+     * Grammar 0.16 — `writable: [ <entity> | <entity>.<attribute> | "<glob>" … ]` (D-65, D-76, D-79), read from
+     * the manifest entry (still present there): each item as written, a glob without its quotes.
+     */
+    val writable: List<String> = emptyList(),
 ) : ModelObject {
     override val kind: String = "storage"
 }

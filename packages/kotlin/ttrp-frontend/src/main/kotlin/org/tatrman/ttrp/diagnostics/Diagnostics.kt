@@ -86,6 +86,30 @@ enum class TtrpDiagnosticId(
         "TTRP-PRS-005",
         "this name is a reserved port name (in, out, err, rejects, true, false, else) — choose another (S10)",
     ),
+
+    // ---- AU-core-P0 · S0.1 — the recipe block's STRUCTURAL rejects (the walker / TtrpChecks). The
+    // semantic recipe checks (routes ↔ wiring, parameters, actions, key lineage) are TTRP-REC-*, S1.1. ----
+    PRS_006(
+        "TTRP-PRS-006",
+        "a recipe value the grammar reads as a name must be one the contract lists: `as of: now`, " +
+            "`protocol: always | on_route`, `mode: exclusive | overlapping`, " +
+            "`over: day | week | month | rows: N | gap: <duration>` (AU contracts §1)",
+    ),
+    REC_099(
+        "TTRP-REC-099",
+        "a recipe parses and is checked by the AU toolchain, but compiles to a bundle only from AU-core-P2 " +
+            "(the recipe bundle, AU contracts §5) — until then build its islands as a plain program",
+    ),
+    PRS_007(
+        "TTRP-PRS-007",
+        "a recipe's shape: `recipe { }` is top-level only, a `target` role container needs a body, and a wiring " +
+            "argument holds one action call or a list of values (AU contracts §1)",
+    ),
+    PRS_008(
+        "TTRP-PRS-008",
+        "named arguments belong to the recipe time functions (`age(since: …)`, `working_days(between: …, and: …)`, " +
+            "`within(…)`); call every other function positionally, each name once",
+    ),
     FRG_001("TTRP-FRG-001", "supported fragment dialects: sql, pandas, ttrb, ttrb-cs (C3-g/C4-f)"),
 
     // ---- Stage 6.3 bare-fragment programs (FRG) ----

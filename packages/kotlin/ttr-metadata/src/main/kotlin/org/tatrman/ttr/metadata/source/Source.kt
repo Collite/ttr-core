@@ -105,6 +105,8 @@ data class SourceSnapshot(
     val rowSchemas: Map<String, org.tatrman.ttr.metadata.model.RowSchemaRecord> = emptyMap(),
     /** v4.1 world model (M2) — `def world` objects, keyed by world qname. */
     val worlds: Map<QualifiedName, org.tatrman.ttr.metadata.model.World> = emptyMap(),
+    /** Grammar 0.16 — the automation tier (`model automation` objects + automation roles), keyed by qname. */
+    val automation: Map<QualifiedName, org.tatrman.ttr.metadata.model.AutomationObject> = emptyMap(),
     val warnings: List<LoadWarning> = emptyList(),
     val errors: List<LoadWarning> = emptyList(),
     /**
@@ -324,6 +326,7 @@ class FileBasedSource(
         val areas = mutableMapOf<String, AreaRecord>()
         val rowSchemas = mutableMapOf<String, org.tatrman.ttr.metadata.model.RowSchemaRecord>()
         val worlds = mutableMapOf<QualifiedName, org.tatrman.ttr.metadata.model.World>()
+        val automation = mutableMapOf<QualifiedName, org.tatrman.ttr.metadata.model.AutomationObject>()
 
         for (file in files) {
             val content = storage.read(file)
@@ -482,8 +485,23 @@ class FileBasedSource(
                 // v4.1 world model (M2) — `def world` becomes typed world objects.
                 if (def is org.tatrman.ttr.parser.model.WorldDef) {
                     val pkg = declaredPackage ?: computedPackage
-                    val world = buildWorld(def, pkg, file.path)
+                    val world =
+                        buildWorld(def, pkg, file.path) { at, message ->
+                            errors += LoadWarning(sourceId, file.path, at.line, at.column, message)
+                        }
                     worlds[world.qname] = world
+                    continue
+                }
+                // Grammar 0.16 — the automation tier: the six automation kinds, and a `def role` declared in a
+                // `model automation` file (or carrying automation properties) — not a cnc role.
+                if (def is org.tatrman.ttr.parser.model.AutomationDef) {
+                    val obj = AutomationBuilder.automation(def, declaredPackage ?: computedPackage, file.path)
+                    automation[obj.qname] = obj
+                    continue
+                }
+                if (def is RoleDef && (schemaCode == "automation" || def.entries.isNotEmpty())) {
+                    val obj = AutomationBuilder.role(def, declaredPackage ?: computedPackage, file.path)
+                    automation[obj.qname] = obj
                     continue
                 }
                 // Directive-less ⇒ derive (schema, namespace) per def kind; otherwise use
@@ -540,6 +558,7 @@ class FileBasedSource(
             areas = areas,
             rowSchemas = rowSchemas,
             worlds = worlds,
+            automation = automation,
             warnings = warnings,
             errors = errors,
             loadedFiles = loadedFiles.toList(),
@@ -600,6 +619,8 @@ class FileBasedSource(
         def: org.tatrman.ttr.parser.model.WorldDef,
         pkg: String,
         sourceFile: String,
+        /** Grammar 0.16 — a world member dropped fail-closed (a malformed grant / deployment) reports here. */
+        dropped: (SourceLocation, String) -> Unit,
     ): org.tatrman.ttr.metadata.model.World {
         val worldQn = qname("world", "", def.name, pkg)
 
@@ -664,6 +685,7 @@ class FileBasedSource(
                         },
                     manifest = s.manifest,
                     sourceLocation = s.source,
+                    writable = AutomationBuilder.writable(s.manifest),
                 )
             }
         return org.tatrman.ttr.metadata.model.World(
@@ -678,6 +700,10 @@ class FileBasedSource(
             executors = executors,
             storages = storages,
             sourceLocation = def.source,
+            identities = AutomationBuilder.identities(def, pkg, sourceFile),
+            grants = AutomationBuilder.grants(def, pkg, sourceFile, dropped),
+            deployments = AutomationBuilder.deployments(def, pkg, sourceFile, dropped),
+            processes = AutomationBuilder.processes(def, pkg, sourceFile),
         )
     }
 
@@ -849,6 +875,8 @@ class FileBasedSource(
                                     valueLabels = a.valueLabels.mapValues { (_, v) -> v.toLocalizedText() },
                                     search = a.search.toSearchHints(),
                                     semantics = attrSemanticsOf(a.semantics, semanticsResolved),
+                                    states = a.states,
+                                    transitions = a.transitions.associate { t -> t.from to t.to },
                                 )
                             },
                         displayLabel = def.displayLabel.toLocalizedText(),
@@ -1542,6 +1570,12 @@ class FileBasedSource(
     ): QualifiedName = Reference.toQname(ref.path, defaultSchema, defaultNamespace)
 
     companion object {
+        /**
+         * Grammar 0.16 — the automation stdlib's package ([org.tatrman.ttr.parser.loader.AutomationStdlib]); the
+         * reconciler adds the stdlib once per project that declares `model automation` and has no such package.
+         */
+        const val AUTOMATION_STDLIB_PACKAGE = "automation"
+
         // M1 de-proto: was `QualifiedName.newBuilder()…build()` (proto). Behaviour
         // preserved — unknown schema-code token folds to UNSPECIFIED.
         fun qname(
@@ -1628,8 +1662,11 @@ object Reference {
             2 -> FileBasedSource.qname(defaultSchema, parts[0], parts[1])
             3 -> FileBasedSource.qname(parts[0], parts[1], parts[2])
             else ->
+                // `automation` is a tier of the model but never a reference's schema token: a package
+                // segment named `automation` (`plant.automation.order.state`) stays a name (review-114 B1).
                 if (org.tatrman.ttr.metadata.model
-                        .parseSchemaCode(parts[1]) != null
+                        .parseSchemaCode(parts[1])
+                        .let { it != null && it != org.tatrman.ttr.metadata.model.SchemaCode.AUTOMATION }
                 ) {
                     // package.schema.namespace.name (stock vocabulary)
                     FileBasedSource.qname(parts[1], parts[2], parts.drop(3).joinToString("."), parts[0])

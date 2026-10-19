@@ -171,6 +171,175 @@ object TtrpAstDump {
                         },
                     )
                 }
+            is org.tatrman.ttrp.ast.RecipeDecl -> recipe(s)
+        }
+
+    // ---- the recipe block (AU-core-P0 · S0.1) ------------------------------------------------
+
+    private fun recipe(r: org.tatrman.ttrp.ast.RecipeDecl) =
+        obj("Recipe", r.location) {
+            put("key", jsonStrings(r.key.map { it.text }))
+            put(
+                "asOf",
+                when (val a = r.asOf) {
+                    is org.tatrman.ttrp.ast.AsOf.Now -> "now"
+                    is org.tatrman.ttrp.ast.AsOf.Instant -> a.text
+                },
+            )
+            put("parameters", jsonStrings(r.parameters.map { it.text }))
+            put("document", r.document?.let { JsonPrimitive(it) } ?: JsonNull)
+            if (r.protocol != null) put("protocol", r.protocol!!.spelling)
+            if (r.name != null) put("name", r.name)
+            put(
+                "members",
+                buildJsonArray {
+                    r.members.forEach {
+                        add(
+                            when (it) {
+                                is org.tatrman.ttrp.ast.RoleContainer -> roleContainer(it)
+                                is org.tatrman.ttrp.ast.DecisionDecl -> decision(it)
+                                is org.tatrman.ttrp.ast.ActionsBlock ->
+                                    obj("Actions", it.location) {
+                                        put("wirings", buildJsonArray { it.wirings.forEach { w -> add(wiring(w)) } })
+                                    }
+                            },
+                        )
+                    }
+                },
+            )
+        }
+
+    private fun roleContainer(c: org.tatrman.ttrp.ast.RoleContainer) =
+        obj("RoleContainer", c.location) {
+            put("role", c.role.keyword)
+            put("name", c.name)
+            put("ports", buildJsonArray { c.ports.forEach { add(portDecl(it)) } })
+            put("form", islandForm(c.form))
+            put(
+                "window",
+                c.window?.let { w ->
+                    obj("Window", w.location) {
+                        put("by", jsonStrings(w.by.map { it.text }))
+                        put(
+                            "over",
+                            when (val o = w.over) {
+                                null -> "?"
+                                is org.tatrman.ttrp.ast.WindowOver.Calendar -> o.unit
+                                is org.tatrman.ttrp.ast.WindowOver.Rows -> "rows:${o.count}"
+                                is org.tatrman.ttrp.ast.WindowOver.Gap ->
+                                    "gap:${o.duration.amount} ${o.duration.unit.spelling}"
+                            },
+                        )
+                    }
+                } ?: JsonNull,
+            )
+            put(
+                "body",
+                when (val b = c.body) {
+                    null -> JsonNull
+                    is FragmentBody ->
+                        obj("FragmentBody", b.location) {
+                            put("tag", b.tag)
+                            put("decomposed", b.decomposition != null)
+                        }
+                    is FlowBody ->
+                        obj("FlowBody", b.location) {
+                            put("statements", buildJsonArray { b.statements.forEach { add(statement(it)) } })
+                        }
+                },
+            )
+        }
+
+    private fun islandForm(f: org.tatrman.ttrp.ast.IslandForm): JsonElement =
+        when (f) {
+            is org.tatrman.ttrp.ast.IslandForm.Target -> obj("Target", f.location) { put("target", f.target.text) }
+            is org.tatrman.ttrp.ast.IslandForm.Builtin ->
+                obj("Builtin", f.location) {
+                    put("capability", f.capability.text)
+                    put("config", f.config?.let { configBlock(it) } ?: JsonNull)
+                }
+            is org.tatrman.ttrp.ast.IslandForm.Foreign ->
+                obj("Foreign", f.location) {
+                    put("language", f.language)
+                    put("grain", f.grain.name)
+                    put("schema", f.schema)
+                }
+            is org.tatrman.ttrp.ast.IslandForm.Call ->
+                obj("Call", f.location) {
+                    put("service", f.service.text)
+                    put("grain", f.grain?.name ?: "")
+                }
+            is org.tatrman.ttrp.ast.IslandForm.Turn ->
+                obj("Turn", f.location) {
+                    put("agent", f.agent.text)
+                    put("ask", f.ask)
+                    put("answer", f.answerSchema)
+                }
+        }
+
+    private fun decision(d: org.tatrman.ttrp.ast.DecisionDecl) =
+        obj("Decision", d.location) {
+            put("name", d.name)
+            put("ports", buildJsonArray { d.ports.forEach { add(portDecl(it)) } })
+            put("statements", buildJsonArray { d.statements.forEach { add(statement(it)) } })
+            put(
+                "switch",
+                obj("Switch", d.switch.location) {
+                    put("input", jsonStrings(d.switch.input.parts))
+                    put("mode", d.switch.mode?.spelling ?: "")
+                    put(
+                        "routes",
+                        buildJsonArray {
+                            d.switch.routes.forEach { r ->
+                                add(
+                                    obj("Route", r.location) {
+                                        put("name", r.name)
+                                        put("condition", expr(r.condition))
+                                        put("because", r.because?.let { JsonPrimitive(it) } ?: JsonNull)
+                                        put("detail", jsonStrings(r.detail.map { it.text }))
+                                    },
+                                )
+                            }
+                        },
+                    )
+                    put(
+                        "else",
+                        d.switch.elseRoute?.let { e ->
+                            obj("Else", e.location) {
+                                put("name", e.name ?: "none")
+                                put("because", e.because?.let { JsonPrimitive(it) } ?: JsonNull)
+                                put("detail", jsonStrings(e.detail.map { it.text }))
+                            }
+                        } ?: JsonNull,
+                    )
+                },
+            )
+        }
+
+    private fun wiring(w: org.tatrman.ttrp.ast.Wiring) =
+        obj("Wiring", w.location) {
+            put("routes", jsonStrings(w.routes.map { "${it.decision}.${it.route}" }))
+            put("action", w.action)
+            put("args", buildJsonArray { w.args.forEach { add(wiringArg(it)) } })
+            put("when", w.whenCondition?.let { expr(it) } ?: JsonNull)
+        }
+
+    private fun wiringArg(a: org.tatrman.ttrp.ast.WiringArg): JsonElement =
+        obj("WiringArg", a.location) {
+            put("name", a.name)
+            put(
+                "value",
+                when (val v = a.value) {
+                    is org.tatrman.ttrp.ast.WiringValue.Expr -> expr(v.expression)
+                    is org.tatrman.ttrp.ast.WiringValue.Values ->
+                        obj("Values", v.location) { put("items", buildJsonArray { v.items.forEach { add(expr(it)) } }) }
+                    is org.tatrman.ttrp.ast.WiringValue.Call ->
+                        obj("Call", v.location) {
+                            put("action", v.action)
+                            put("args", buildJsonArray { v.args.forEach { add(wiringArg(it)) } })
+                        }
+                },
+            )
         }
 
     private fun portDecl(p: PortDecl) =
@@ -301,6 +470,8 @@ object TtrpAstDump {
                 obj("FunctionCall", e.location) {
                     put("function", e.function.value)
                     put("args", buildJsonArray { e.args.forEach { add(expr(it)) } })
+                    // AU-core-P0 named arguments: only when present, so every pre-recipe snapshot is unchanged.
+                    if (e.argNames.isNotEmpty()) put("argNames", jsonStrings(e.argNames.map { it ?: "" }))
                 }
             is AggregateCall ->
                 obj("AggregateCall", e.location) {
@@ -340,6 +511,17 @@ object TtrpAstDump {
                 obj("IsNull", e.location) {
                     put("negated", e.negated)
                     put("expr", expr(e.expr))
+                }
+            is org.tatrman.ttrp.expr.ParamRef -> obj("ParamRef", e.location) { put("name", e.name) }
+            is org.tatrman.ttrp.expr.DurationLiteral ->
+                obj("Duration", e.location) {
+                    put("amount", e.amount)
+                    put("unit", e.unit.spelling)
+                }
+            is org.tatrman.ttrp.expr.DurationParam ->
+                obj("DurationParam", e.location) {
+                    put("param", e.param)
+                    put("unit", e.unit.spelling)
                 }
         }
 

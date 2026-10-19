@@ -514,6 +514,13 @@ class PlanNodeBuilder(
                     location = e.location,
                 )
             is MdPath -> mdPath(e)
+            // AU-core-P0 parses `:name` bindings and durations; their lowering is AU-core-P2.
+            is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr ->
+                throw TtrpEmitException(
+                    EmitDiagnosticId.UNSUPPORTED_NODE,
+                    detail = "a recipe `:name` binding or duration is not lowered to plan.v1 yet (AU-core-P2)",
+                    location = e.location,
+                )
         }
 
     /**

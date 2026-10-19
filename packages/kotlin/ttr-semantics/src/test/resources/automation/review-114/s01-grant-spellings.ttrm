@@ -1,0 +1,10 @@
+// clean: every contract spelling of `who:` and `program:` (`*`, "*", user.<dotted>, user "<name>").
+package acme.worlds
+model world
+
+def world w {
+    def grant { who: *,                   program: p,   as: author }
+    def grant { who: "*",                 program: "*", as: author }
+    def grant { who: user.jan.novak,      program: *,   as: author }
+    def grant { who: user "jan-novak@x",  program: p,   as: author }
+}

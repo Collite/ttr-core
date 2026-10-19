@@ -45,6 +45,12 @@ const DECLARATION_KEYWORDS = ['uses', 'world', 'import', 'container', 'def', 'ta
 const OPERATOR_KEYWORDS = ['and', 'or', 'not', 'is', 'between', 'in', 'group', 'by', 'as', 'distinct', 'cast'];
 const CASE_KEYWORDS = ['case', 'when', 'then', 'else', 'end'];
 const CONSTANT_KEYWORDS = ['null', 'true', 'false'];
+/**
+ * AU-core-P0: the recipe block's structural words. They are SOFT in the grammar (also names), so only
+ * the ones that open a recipe member or a route attribute are coloured — `key`, `mode`, `set`, `call`,
+ * `detail`, the duration units … are common column names and stay plain.
+ */
+const RECIPE_KEYWORDS = ['recipe', 'candidates', 'context', 'decision', 'actions', 'switch', 'because', 'window', 'builtin', 'foreign', 'turn'];
 function tokenToScope(name) {
     if (DECLARATION_KEYWORDS.includes(name.toLowerCase()))
         return 'keyword.control.declaration.ttrp';
@@ -56,6 +62,10 @@ function tokenToScope(name) {
         return 'constant.language.ttrp';
     if (OPERATOR_KEYWORDS.includes(name.toLowerCase()))
         return 'keyword.operator.word.ttrp';
+    if (RECIPE_KEYWORDS.includes(name.toLowerCase()))
+        return 'keyword.control.recipe.ttrp';
+    if (name === 'BUILTIN_FORM')
+        return 'keyword.control.recipe.ttrp';
     if (name === 'ARROW')
         return 'keyword.operator.arrow.ttrp';
     return null;
