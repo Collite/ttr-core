@@ -17,14 +17,17 @@ import path from 'node:path';
  * ~100 KB headroom for incremental growth, while a single parser import (≈+400–
  * 839 KB) trips it immediately. Adjust with the owner if the base legitimately
  * grows.
+ *
+ * Grammar 0.16 (AU-core-P0, 2026-10-19): the base reached ≈ 601 KB gz — the generated TTR parser grew by
+ * the automation model's rules, no SQL parser involved. Ceiling 640 KB: still far below a parser leak.
  */
-const CEILING_BYTES = 600 * 1024;
+const CEILING_BYTES = 640 * 1024;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const bundle = path.resolve(here, '../../dist/server-browser.js');
 
 describe('browser Worker bundle size (S0.3 / E11)', () => {
-  it('server-browser.js gzips under the 600 KB ceiling (no parser leak)', () => {
+  it('server-browser.js gzips under the 640 KB ceiling (no parser leak)', () => {
     if (!existsSync(bundle)) {
       throw new Error(
         `dist/server-browser.js missing — run \`pnpm --filter @tatrman/lsp build\` before this test`,
