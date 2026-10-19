@@ -964,6 +964,8 @@ class AutoStr(AutoValue):
 @dataclass(frozen=True, slots=True)
 class AutoNum(AutoValue):
     raw: float = 0.0
+    #: The number as written (parameter values feed the D-13 values fingerprint).
+    text: str = ""
     kind: ClassVar[str] = "number"
 
 

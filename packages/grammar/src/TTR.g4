@@ -289,9 +289,11 @@
 //   3. `transitionProperty` — `transition: order.state -> released { from: [placed, held] }`
 //      or `-> {to}` (the state taken from an action column); `setProperty` —
 //      `set: order.held_for = department`. New token ARROW `'->'` (only here).
-//   4. `def role` (the cnc kind) gains the automation properties through the same
-//      free-form `autoEntry` fallback (`resolve: keycloak_group "…"`, `delivery: {…}`,
-//      `members: […]`); per-model validity is semantic.
+//   4. `def role` (the cnc kind) gains three TYPED automation properties —
+//      `resolve: keycloak_group "…"`, `delivery: {…}`, `members: […]` (values are
+//      `autoValue`s) — so a typo in any role (`lable:`) is still a parse error (review-114
+//      M5: no free-form fallback on `def role`). New tokens RESOLVE, DELIVERY (MEMBERS
+//      exists). Per-model validity is semantic.
 //   5. World members (nested in `def world`, the 4.1 precedent): `def identity <id>`,
 //      `def grant { … }` (UNNAMED — keyed by its who/program/as triple),
 //      `def deployment <id>` (all `autoBody`) and `def process <id> { instance: …,
@@ -302,7 +304,7 @@
 //      (`statesProperty`, `transitionsProperty`).
 //   7. New lexer tokens: AUTOMATION, PARAMETER, ACTION, SERVICE, APPROVAL, PROGRAM, RECIPE,
 //      IDENTITY, DEPLOYMENT, PROCESS, STEP, STEPS, TRANSITION, TRANSITIONS, STATES, SET,
-//      ARROW. Every new noun is added to `idPart` (the WORLD precedent: `action`,
+//      RESOLVE, DELIVERY, ARROW. Every new noun is added to `idPart` (the WORLD precedent: `action`,
 //      `process`, `set`, `program`, … stay usable as names, column names, keys and dotted
 //      ref parts); PARAMETERS joins `idPart` too (`def recipe … parameters: [a, b]`).
 //      ARROW is not an id.
@@ -656,9 +658,13 @@ er2dbRelationProperty    : descriptionProperty | tagsProperty | relationProperty
 
 queryProperty            : descriptionProperty | tagsProperty | languageProperty | parametersProperty | sourceTextProperty | searchBlockProperty ;
 
-// 0.16 — `def role` in `model automation` (resolve / delivery / members) rides the free-form
-// `autoEntry` fallback; typed alts stay first. Per-model validity is semantic.
-roleProperty             : descriptionProperty | tagsProperty | labelProperty | searchBlockProperty | autoEntry ;
+// 0.16 — `def role` in `model automation` gains three TYPED properties (resolve / delivery /
+// members) with `autoValue` values — no free-form fallback, so a typo stays a parse error in
+// every model (review-114 M5). Per-model validity is semantic.
+roleProperty             : descriptionProperty | tagsProperty | labelProperty | searchBlockProperty | resolveProperty | deliveryProperty | membersProperty ;
+resolveProperty          : RESOLVE  propSep? autoValue ;   // resolve: keycloak_group "hartland-sales"
+deliveryProperty         : DELIVERY propSep? autoValue ;   // delivery: { email: "…" }
+membersProperty          : MEMBERS  propSep? autoValue ;   // members: ["ana", "bo"] (MEMBERS reused from MD)
 
 er2cncRoleProperty       : descriptionProperty | tagsProperty | entityProperty_ | roleProperty_ ;
 
@@ -1140,6 +1146,7 @@ idPart
   | AUTOMATION | PARAMETER | ACTION | SERVICE | APPROVAL | PROGRAM | RECIPE    // 0.16 — automation def nouns (WORLD precedent: usable as names / columns / keys)
   | IDENTITY | DEPLOYMENT | PROCESS | STEP | STEPS                            // 0.16 — automation world members
   | TRANSITION | TRANSITIONS | STATES | SET                                   // 0.16 — automation / lifecycle property keywords
+  | RESOLVE | DELIVERY                                                       // 0.16 — automation role property keywords
   | PARAMETERS                                                  // 0.16 — `def recipe … parameters: [a, b]` through the free-form entry
   // NOTE: EXTENDS/HOSTS/STAGING are intentionally NOT in idPart — see the 4.1
   // header note. Their strict-value properties are negative-fixture guarded, so
@@ -1259,6 +1266,8 @@ TRANSITIONS      : 'transitions' ;     // 0.16 — attribute `transitions: { …
 TRANSITION       : 'transition' ;      // 0.16 — action `transition: a.b -> s`
 STATES           : 'states' ;          // 0.16 — attribute `states: [ … ]`
 SET              : 'set' ;             // 0.16 — action `set: a.b = c`
+RESOLVE          : 'resolve' ;         // 0.16 — automation role `resolve: keycloak_group "…"`
+DELIVERY         : 'delivery' ;        // 0.16 — automation role `delivery: { … }`
 
 MANAGEMENT       : 'management' ;       // 0.10 — table `management: data|canon` (EN-P1)
 CHANGE_SEMANTICS : 'changeSemantics' ;  // 0.10 — table `changeSemantics: scd1|scd2|ledger { … }`

@@ -128,6 +128,32 @@ class AutomationParseSpec :
             attr.transitions.single().to shouldContainExactly listOf("held")
         }
 
+        "review-114 M5: a role property typo is a parse error; the typed automation role properties walk" {
+            TtrLoader.parseString("model cnc\ndef role r { lable: { en: \"x\" } }").ok shouldBe false
+            val r =
+                TtrLoader.parseString(
+                    "model automation\ndef role r { resolve: keycloak_group \"g\", delivery: { email: \"e\" }, members: [\"a\"] }",
+                )
+            r.errors shouldBe emptyList()
+            r.definitions
+                .filterIsInstance<RoleDef>()
+                .single()
+                .entries
+                .map { it.key } shouldContainExactly
+                listOf("resolve", "delivery", "members")
+        }
+
+        "review-114: an automation number keeps its text" {
+            val r = TtrLoader.parseString("model automation\ndef parameter share { type: decimal, value: 0.40 }")
+            val v =
+                r.definitions
+                    .filterIsInstance<AutomationDef>()
+                    .single()
+                    .body["value"] as AutoValue.Num
+            v.raw shouldBe 0.4
+            v.text shouldBe "0.40"
+        }
+
         // Table-driven parser-level rejects (automation-negative/*.ttrm).
         listOf(
             "neg-01-toplevel-identity.ttrm",

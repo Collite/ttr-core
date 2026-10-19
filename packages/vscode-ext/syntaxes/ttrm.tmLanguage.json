@@ -184,7 +184,7 @@
       "patterns": [
         {
           "name": "keyword.other.property.ttrm",
-          "match": "\\b(objects|layout|args|display|override|restrict|members|publish|kind|calc|key|hierarchies|levels|via|class|aggregation|validBy|grain|measures|shape|journaling|allocation|source|extends|hosts|staging|steps|transitions|transition|states|set|description|tags|version|primaryKey|columns|indices|constraints|attributes|parameters|resultColumns|definitionSql|type|optional|isKey|searchable|indexed|labelPlural|nameAttribute|codeAttribute|aliases|cardinality|join|target|whereFilter|language|sourceText|length|precision|label|name|direction|displayLabel|valueLabels|roles|search|semantics|keywords|patterns|descriptions|examples|fuzzy|method|for|forms|match|from|to)\\b"
+          "match": "\\b(objects|layout|args|display|override|restrict|members|publish|kind|calc|key|hierarchies|levels|via|class|aggregation|validBy|grain|measures|shape|journaling|allocation|source|extends|hosts|staging|steps|transitions|transition|states|set|resolve|delivery|description|tags|version|primaryKey|columns|indices|constraints|attributes|parameters|resultColumns|definitionSql|type|optional|isKey|searchable|indexed|labelPlural|nameAttribute|codeAttribute|aliases|cardinality|join|target|whereFilter|language|sourceText|length|precision|label|name|direction|displayLabel|valueLabels|roles|search|semantics|keywords|patterns|descriptions|examples|fuzzy|method|for|forms|match|from|to)\\b"
         }
       ]
     },

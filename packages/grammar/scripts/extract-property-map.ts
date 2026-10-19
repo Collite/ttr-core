@@ -113,6 +113,10 @@ const typeMap: Record<string, string> = {
   set: 'assignment',
   // 0.16 — attribute lifecycle (D-67).
   states: 'list of identifiers',
+  // 0.16 — the automation role's typed properties (review-114 M5).
+  resolve: 'role membership',
+  delivery: 'object',
+  members: 'list of strings',
   transitions: 'state transition map',
 };
 

@@ -51,7 +51,9 @@ def kind_segment(kind: str) -> str:
 # v4.0 uniform key (← `qname.ts` modelForKind / namespaceForKind / buildCanonicalKey)
 # ---------------------------------------------------------------------------
 
-MODEL_CODES: frozenset[str] = frozenset({"db", "er", "md", "binding", "cnc", "world", "automation"})
+# `automation` (0.16) keys symbols but is not a reference prefix — the automation stdlib's package is
+# named `automation` (review-114 B1). Mirrors TS `MODEL_CODES`.
+MODEL_CODES: frozenset[str] = frozenset({"db", "er", "md", "binding", "cnc", "world"})
 
 _MODEL_BY_KIND: dict[str, str] = {
     "entity": "er",

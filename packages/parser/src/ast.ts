@@ -83,6 +83,8 @@ export interface TaggedBlockValue {
 export interface NumberValue {
   kind: 'number';
   value: number;
+  /** 0.16 — the number as written (automation values only; parameter values feed the D-13 fingerprint). */
+  raw?: string;
   source: SourceLocation;
   leadingTrivia?: Trivia[];
   trailingTrivia?: Trivia[];
@@ -686,6 +688,16 @@ export interface AttributeDef {
   states?: string[];
   /** 0.16 — `transitions: { placed: [held, …] }` (D-67), in authored order. Absent ⇒ any. */
   transitions?: AttributeTransition[];
+  /** 0.16 — the `states:` / `transitions:` property spans (editor-only: comment trivia + formatting). */
+  statesNode?: PropertyNode;
+  transitionsNode?: PropertyNode;
+}
+
+/** A property's own span — `key: value` — carrying its comment trivia (editor-only). */
+export interface PropertyNode {
+  source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
 }
 
 /** 0.16 — one `from: [to, …]` entry of an attribute's `transitions:` map. */

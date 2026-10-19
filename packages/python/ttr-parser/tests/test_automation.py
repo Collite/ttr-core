@@ -135,3 +135,22 @@ def test_attribute_states_and_transitions() -> None:
 )
 def test_parser_rejects(name: str) -> None:
     assert _parse(f"automation-negative/{name}").errors != ()
+
+
+def test_role_property_typo_is_a_parse_error_and_typed_role_properties_walk() -> None:
+    """review-114 M5 — the role's automation properties are typed; a typo is a parse error."""
+    assert parse_string('model cnc\ndef role r { lable: { en: "x" } }', "r.ttrm").errors != ()
+    r = parse_string('model automation\ndef role r { resolve: keycloak_group "g", delivery: { email: "e" }, members: ["a"] }', "r.ttrm")
+    assert r.errors == ()
+    role = r.definitions[0]
+    assert isinstance(role, RoleDef)
+    assert [e.key for e in role.entries] == ["resolve", "delivery", "members"]
+
+
+def test_automation_number_keeps_its_text() -> None:
+    """review-114 — parameter values feed the D-13 values fingerprint: keep the number as written."""
+    r = parse_string("model automation\ndef parameter share { type: decimal, value: 0.40 }", "s.ttrm")
+    p = r.definitions[0]
+    assert isinstance(p, AutomationDef)
+    value = _entry(p.body.entries, "value")
+    assert isinstance(value, AutoNum) and value.raw == 0.4 and value.text == "0.40"
