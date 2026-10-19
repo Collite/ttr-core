@@ -38,7 +38,25 @@ class ModelReconciler(
     private val policy: ReconciliationPolicy = ReconciliationPolicy(),
 ) {
     fun reconcile(snapshots: List<SourceSnapshot>): ReconciliationResult {
-        val sorted = snapshots.sortedByDescending { it.priority }
+        // Grammar 0.16 — the automation stdlib joins the PROJECT once (review-114 M6: per source it doubled
+        // `obligation` across two sources), when some file declares `model automation` and no source carries a
+        // package `automation` of its own.
+        val withStdlib =
+            if (snapshots.any { s -> s.loadedFiles.any { it.schemaCode == "automation" } } &&
+                snapshots.none { s ->
+                    s.loadedFiles.any {
+                        (it.declaredPackage ?: it.computedPackage) ==
+                            org.tatrman.ttr.metadata.source.FileBasedSource.AUTOMATION_STDLIB_PACKAGE
+                    }
+                }
+            ) {
+                snapshots +
+                    org.tatrman.ttr.metadata.source.AutomationBuilder
+                        .stdlibSnapshot(STDLIB_SOURCE_ID)
+            } else {
+                snapshots
+            }
+        val sorted = withStdlib.sortedByDescending { it.priority }
         val warnings = mutableListOf<LoadWarning>()
         val errors = mutableListOf<LoadWarning>()
 
@@ -48,6 +66,9 @@ class ModelReconciler(
         }
 
         val referenceResult = runReferenceResolution(sorted)
+        // Grammar 0.16 — the automation contract (ttr-semantics AutomationValidator) on the load path: the
+        // automation service sees only the snapshot, so a contract violation must be a load issue.
+        validateAutomation(sorted, errors, warnings)
         // Resolution is diagnostic-only: ReferenceResolutionPass populates
         // warnings/errors for unimported/ambiguous refs but does NOT rewrite
         // stored qnames. Stored Er2CncRoleMapping.role qnames are already
@@ -302,6 +323,50 @@ class ModelReconciler(
         }
     }
 
+    /** Runs the automation validator over every loaded file; its errors and warnings become load issues. */
+    private fun validateAutomation(
+        sorted: List<SourceSnapshot>,
+        errors: MutableList<LoadWarning>,
+        warnings: MutableList<LoadWarning>,
+    ) {
+        val files = sorted.flatMap { it.loadedFiles }
+        val documents =
+            files.map { f ->
+                org.tatrman.ttr.parser.loader.ParseResult(
+                    definitions = f.definitions,
+                    modelDirective =
+                        f.schemaCode.takeIf { it.isNotEmpty() }?.let {
+                            org.tatrman.ttr.parser.model.ModelDirective(
+                                it,
+                                source = org.tatrman.ttr.parser.model.SourceLocation.UNKNOWN,
+                            )
+                        },
+                    errors = emptyList(),
+                    sourceFile = f.storageFile.path,
+                    packageName = f.declaredPackage,
+                    imports = f.imports,
+                )
+            }
+        val diagnostics =
+            org.tatrman.ttr.semantics.AutomationValidator
+                .validate(documents, includeStdlib = false)
+        for (d in diagnostics) {
+            val issue =
+                LoadWarning(
+                    AUTOMATION_VALIDATOR_ID,
+                    d.source.file,
+                    d.source.line,
+                    d.source.column,
+                    "${d.code}: ${d.message}",
+                )
+            when (d.severity) {
+                "error" -> errors += issue
+                "warning" -> warnings += issue
+                else -> {}
+            }
+        }
+    }
+
     private fun runReferenceResolution(
         sorted: List<SourceSnapshot>,
     ): org.tatrman.ttr.metadata.resolve.ResolutionResult {
@@ -323,6 +388,11 @@ class ModelReconciler(
         val schemaToken = if (token.isNotEmpty()) token else qn.namespace
         val packageSegment = if (qn.`package`.isNotEmpty()) "${qn.`package`}." else ""
         return "$packageSegment$schemaToken.${qn.namespace}.${qn.name}"
+    }
+
+    private companion object {
+        const val STDLIB_SOURCE_ID = "automation-stdlib"
+        const val AUTOMATION_VALIDATOR_ID = "automation-validator"
     }
 }
 

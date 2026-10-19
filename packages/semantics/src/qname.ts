@@ -22,7 +22,13 @@ export { modelForKind };
 /** The model type / layer. `query` folds into `db`; `cnc` is schema-less; `world` is v4.1; `automation` is 0.16. */
 export type ModelCode = 'db' | 'er' | 'md' | 'binding' | 'cnc' | 'world' | 'automation';
 
-export const MODEL_CODES: ReadonlySet<ModelCode> = new Set(['db', 'er', 'md', 'binding', 'cnc', 'world', 'automation']);
+/**
+ * The model codes a reference may lead with (`er.entity.x`). `automation` keys symbols
+ * (`<pkg>.automation.<kind>.<name>`) but is NOT a reference prefix: the automation stdlib's package is
+ * named `automation`, so `automation.obligation` / `import automation.*` must read as that package
+ * (review-114 B1). Automation references are resolved by name in the automation validator.
+ */
+export const MODEL_CODES: ReadonlySet<ModelCode> = new Set(['db', 'er', 'md', 'binding', 'cnc', 'world']);
 
 /**
  * The uniform, package-first canonical key. `schema` and `kind` may be absent

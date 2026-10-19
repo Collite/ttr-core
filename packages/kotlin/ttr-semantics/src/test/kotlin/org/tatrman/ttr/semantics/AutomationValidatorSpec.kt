@@ -69,6 +69,37 @@ class AutomationValidatorSpec :
             }
         }
 
+        // review-114 — the contract spellings, per-world references, the validator gaps, stdlib precedence.
+        listOf(
+            "s01-grant-spellings.ttrm" to emptyList(),
+            "s02-duplicate-member.ttrm" to listOf("ttr/automation-duplicate-member"),
+            "s03-identity-other-world.ttrm" to listOf("ttr/automation-unknown-reference"),
+            "s04-durations.ttrm" to listOf("ttr/automation-invalid-value", "ttr/automation-invalid-value"),
+            "s05-int-fraction.ttrm" to listOf("ttr/automation-invalid-value"),
+            "s06-misplaced.ttrm" to listOf("ttr/automation-misplaced-property"),
+            "s07-duplicate-transition.ttrm" to listOf("ttr/states-duplicate-transition"),
+            "s08-writable-non-id.ttrm" to listOf("ttr/automation-invalid-value"),
+            "s09-duplicate-property.ttrm" to listOf("ttr/automation-duplicate-property"),
+            "s10-user-obligation" to emptyList(),
+        ).forEach { (name, expected) ->
+            "review-114 $name fires exactly ${expected.ifEmpty { listOf("nothing") }.joinToString()}" {
+                val scenario = resource("automation/review-114/$name")
+                val files =
+                    if (Files.isDirectory(scenario)) {
+                        Files.list(scenario).use { s -> s.filter { it.toString().endsWith(".ttrm") }.sorted().toList() }
+                    } else {
+                        listOf(scenario)
+                    }
+                val project =
+                    listOf(
+                        parse(resource("automation/hartland-er-stub.ttrm")),
+                        parse(resource("automation/negative/common.ttrm")),
+                    ) + files.map { parse(it) }
+                val findings = AutomationValidator.validate(project).filter { it.severity != "info" }
+                findings.map { it.code } shouldContainExactlyInAnyOrder expected
+            }
+        }
+
         "the Kotlin and TS stdlib copies are byte-identical, and the stdlib parses clean" {
             val ts = Files.readString(locate("packages/semantics/src/stock").resolve("automation-stdlib.ttrm"))
             AutomationStdlib.source shouldBe ts

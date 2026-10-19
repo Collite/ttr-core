@@ -1,0 +1,5 @@
+// expect: ttr/automation-invalid-value — an `int` parameter with a fractional value.
+package acme.automation
+model automation
+
+def parameter n { type: int, value: 1.5 }

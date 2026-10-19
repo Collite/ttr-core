@@ -283,27 +283,32 @@ internal object AutomationBuilder {
             )
         }
 
+    /**
+     * The world's grants, FAIL-CLOSED (review-114 M4): a grant whose `who`, `program` or `as` is missing or
+     * malformed is dropped and [dropped] reports it — it never widens to "anyone" or "any program". The
+     * contract spellings: `who: role.<r> | user.<u> | user "<u>" | identity.<i> | * | "*"`,
+     * `program: <name> | * | "*"`, `as: author | identity.<n>`.
+     */
     fun grants(
         def: WorldDef,
         pkg: String,
         sourceFile: String,
+        dropped: (org.tatrman.ttr.parser.model.SourceLocation, String) -> Unit,
     ): List<WorldGrant> =
-        def.grants.mapIndexed { i, g ->
+        def.grants.mapIndexedNotNull { i, g ->
             val q = FileBasedSource.qname("world", def.name, "grant#${i + 1}", pkg)
-            val who =
-                when (val w = g.body["who"]) {
-                    is AutoValue.Str -> if (w.raw == "*") GrantWho.Anyone else null
-                    is AutoValue.Id ->
-                        w.parts.takeIf { it.size == 2 }?.let { (head, name) ->
-                            when (head) {
-                                "role" -> GrantWho.Role(name)
-                                "user" -> GrantWho.User(name)
-                                "identity" -> GrantWho.Identity(name)
-                                else -> null
-                            }
-                        }
-                    else -> null
-                }
+            val who = grantWho(g.body["who"])
+            val anyProgram = g.body["program"].let { it is AutoValue.Star || (it as? AutoValue.Str)?.raw == "*" }
+            val program = (g.body["program"] as? AutoValue.Id)?.ref?.path
+            val runAs = runAs(g.body["as"])?.takeIf { it != RunAsRef.Caller }
+            if (who == null || runAs == null || (!anyProgram && program == null)) {
+                dropped(
+                    g.source,
+                    "ttr/automation-grant-dropped: world '${def.name}' grant #${i + 1} has a missing or malformed " +
+                        "`who:`, `program:` or `as:` — not loaded (a grant never widens)",
+                )
+                return@mapIndexedNotNull null
+            }
             WorldGrant(
                 FileBasedSource.idFor("grant", q),
                 q,
@@ -312,21 +317,64 @@ internal object AutomationBuilder {
                 g.body.tags,
                 sourceFile,
                 who = who,
-                program = (g.body["program"] as? AutoValue.Id)?.ref?.path,
-                runAs = runAs(g.body["as"])?.takeIf { it != RunAsRef.Caller },
+                program = if (anyProgram) null else program,
+                runAs = runAs,
                 sourceLocation = g.source,
             )
         }
 
+    private fun grantWho(v: AutoValue?): GrantWho? =
+        when (v) {
+            is AutoValue.Star -> GrantWho.Anyone
+            is AutoValue.Str -> if (v.raw == "*") GrantWho.Anyone else null
+            // `user "<name>"` — a username an id cannot spell (`jan-novak`, `jan@x`).
+            is AutoValue.Tagged -> if (v.tag == "user" && v.value.isNotBlank()) GrantWho.User(v.value) else null
+            is AutoValue.Id ->
+                when {
+                    v.parts.size == 2 && v.parts[0] == "role" -> GrantWho.Role(v.parts[1])
+                    v.parts.size == 2 && v.parts[0] == "identity" -> GrantWho.Identity(v.parts[1])
+                    // `user.jan.novak` — the rest of the path is the username (review-114 M8)
+                    v.parts.size >= 2 && v.parts[0] == "user" -> GrantWho.User(v.parts.drop(1).joinToString("."))
+                    else -> null
+                }
+            else -> null
+        }
+
+    private val DEPLOYMENT_FLAGS =
+        listOf("dry_run", "enabled", "debug", "ungoverned", "allow_restricted_view", "approval_override", "obo_only")
+
+    /**
+     * The world's deployments, FAIL-CLOSED (review-114 M4): a deployment with a non-boolean flag (`enabled:
+     * "false"`), a missing or malformed `run_as:` or `target:`, or not exactly one of `program:` / `process:` is
+     * dropped and [dropped] reports it. A flag keeps its default only when it is absent.
+     */
     fun deployments(
         def: WorldDef,
         pkg: String,
         sourceFile: String,
+        dropped: (org.tatrman.ttr.parser.model.SourceLocation, String) -> Unit,
     ): List<WorldDeployment> =
         def.deployments.mapNotNull { d ->
             val name = d.name ?: return@mapNotNull null
             val b = d.body
             val q = FileBasedSource.qname("world", def.name, name, pkg)
+            val program = (b["program"] as? AutoValue.Id)?.ref?.path
+            val process = (b["process"] as? AutoValue.Id)?.ref?.path
+            val target = (b.target as? TargetReferenceValue)?.ref?.path
+            val runAs = runAs(b["run_as"])
+            val badFlags = DEPLOYMENT_FLAGS.filter { b[it] != null && b[it] !is AutoValue.Bool }
+            val problem =
+                when {
+                    badFlags.isNotEmpty() -> "non-boolean ${badFlags.joinToString { "`$it:`" }}"
+                    runAs == null -> "a missing or malformed `run_as:`"
+                    target == null -> "a missing or malformed `target:`"
+                    (program == null) == (process == null) -> "not exactly one of `program:` / `process:`"
+                    else -> null
+                }
+            if (problem != null) {
+                dropped(d.source, "ttr/automation-deployment-dropped: deployment '$name' has $problem — not loaded")
+                return@mapNotNull null
+            }
             WorldDeployment(
                 FileBasedSource.idFor("deployment", q),
                 q,
@@ -334,10 +382,10 @@ internal object AutomationBuilder {
                 b.descriptionLocalized.toLocalizedText(),
                 b.tags,
                 sourceFile,
-                program = text(b["program"]),
-                process = text(b["process"]),
-                target = (b.target as? TargetReferenceValue)?.ref?.path,
-                runAs = runAs(b["run_as"]),
+                program = program,
+                process = process,
+                target = target!!,
+                runAs = runAs!!,
                 trigger =
                     when (val t = b["trigger"]) {
                         is AutoValue.Tagged -> if (t.tag == "schedule") DeploymentTrigger.Schedule(t.value) else null

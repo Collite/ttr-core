@@ -97,8 +97,12 @@ internal fun defaultSchemaForKind(
     declaringModel: String = "",
 ): String = modelForKind(kind, declaringModel)
 
-/** The reserved model codes (D14: no `query`; D15: `cnc` schema-less; `world` v4.1; `automation` 0.16). */
-val MODEL_CODES = setOf("db", "er", "md", "binding", "cnc", "world", "automation")
+/**
+ * The model codes a reference may lead with (D14: no `query`; D15: `cnc` schema-less; `world` v4.1).
+ * `automation` (0.16) keys symbols but is not a reference prefix — the automation stdlib's package is
+ * named `automation` (review-114 B1). Mirrors TS `MODEL_CODES`.
+ */
+val MODEL_CODES = setOf("db", "er", "md", "binding", "cnc", "world")
 
 /**
  * Kind → model layer (D14/D15). Mirrors TS `modelForKind` (`qname.ts`).

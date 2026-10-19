@@ -1,0 +1,8 @@
+// expect: ttr/automation-duplicate-member — an identity named like the executor beside it.
+package acme.worlds
+model world
+
+def world w {
+    def executor n8n { extends: n8n_l1 }
+    def identity n8n { principal: "svc", credential: TTR_CONN_N8N }
+}

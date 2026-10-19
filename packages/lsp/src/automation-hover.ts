@@ -32,7 +32,7 @@ function actionLines(def: AutomationDef): string[] {
     return `\`${c.name}: ${t}${c.optional ? '?' : ''}\``;
   });
   if (columns.length) lines.push(`- **Columns:** ${columns.join(', ')}`);
-  const sinks = def.entries.find((e) => e.key === 'sinks')?.value;
+  const sinks = lastEntry(def, 'sinks');
   if (sinks?.kind === 'autoObject') {
     lines.push(`- **Sinks:** ${sinks.entries.map((e) => `${e.key} → ${render(e.value)}`).join(' · ')}`);
   }
@@ -40,8 +40,14 @@ function actionLines(def: AutomationDef): string[] {
 }
 
 function valueOf(def: AutomationDef, key: string): string | undefined {
-  const v = def.entries.find((e) => e.key === key)?.value;
+  const v = lastEntry(def, key);
   return v ? render(v) : undefined;
+}
+
+/** The last value written under [key] — the rule the validator, the dumps and the metadata use. */
+function lastEntry(def: AutomationDef, key: string): AutoValue | undefined {
+  for (let i = def.entries.length - 1; i >= 0; i--) if (def.entries[i].key === key) return def.entries[i].value;
+  return undefined;
 }
 
 function render(v: AutoValue): string {
