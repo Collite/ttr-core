@@ -18,9 +18,11 @@ import org.apache.calcite.sql.validate.SqlValidatorUtil
 import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.translator.framework.ModelHandle
+import org.tatrman.translator.framework.ModelRelation
 import org.tatrman.translator.joiner.JoinPolicy
 import org.tatrman.translator.joiner.JoinPolicy.SideRef
 import org.tatrman.translator.joiner.JoinPolicy.Verdict
+import org.tatrman.translator.joiner.TemporaryEntity
 import java.util.Locale
 
 /**
@@ -50,6 +52,11 @@ import java.util.Locale
  * A FROM item that is not an ER entity of [namespace] (a derived table, a DB table, `VALUES`) contributes
  * no entity to its side; the entity side alone then resolves nothing → `ON TRUE`. Never an error from here.
  *
+ * LQ-T6 (L-30): a logical query read by name (`obj.query.x`, bare or `AS r`) is a side too, a [TemporaryEntity]
+ * whose relations follow its columns; [JoinPolicy] decides with those relations added to the model's. The wire
+ * carrier runs after UNFOLD has inlined the body and cannot see it, so a temporary entity's join is decided here
+ * or not at all (⚑T6-2: the comma list and `CROSS JOIN` stay `JOIN_NO_RELATION`, as a derived table does).
+ *
  * Fresh instance per validation attempt (a `SqlShuttle` is cheap and not thread-safe to share);
  * [rewrittenJoins] tells the caller whether anything was touched (the `explain` `model_joins` stage).
  */
@@ -71,6 +78,9 @@ class ModelJoinRewriter(
 
     /** Depth of nested `visit(SqlCall)` frames — the outermost one is the statement root. */
     private var depth: Int = 0
+
+    /** LQ-T6 — the temporary entities this statement reads, by obj qname; null for a saved query that is not one. */
+    private val temporaryEntities = mutableMapOf<QualifiedName, TemporaryEntity?>()
 
     /** Case-insensitive (`Lex.MYSQL_ANSI`) lookup of the ER entities in [namespace] by bare name. */
     private val entitiesByName: Map<String, QualifiedName> by lazy {
@@ -97,7 +107,19 @@ class ModelJoinRewriter(
         val visited = super.visit(call) ?: return null
         val join = visited as? SqlJoin ?: return visited
         if (!isBare(join)) return visited
-        val verdict = JoinPolicy.resolve(model, collectEntityRefs(join.left), collectEntityRefs(join.right))
+        val left = collectEntityRefs(join.left)
+        val right = collectEntityRefs(join.right)
+        val inherited =
+            (left + right)
+                .map { it.entity }
+                .distinct()
+                .flatMap { temporaryEntities[it]?.relations.orEmpty() }
+        val verdict =
+            JoinPolicy.resolve(
+                if (inherited.isEmpty()) model else WithRelations(model, inherited),
+                left,
+                right,
+            )
         val pos = join.parserPosition
         val condition =
             when (verdict) {
@@ -130,12 +152,13 @@ class ModelJoinRewriter(
         when {
             node == null -> emptyList()
             node is SqlIdentifier ->
-                resolveEntity(node)?.let { listOf(SideRef(it, SqlValidatorUtil.alias(node) ?: node.names.last())) }
+                (resolveEntity(node) ?: resolveTemporaryEntity(node))
+                    ?.let { listOf(SideRef(it, SqlValidatorUtil.alias(node) ?: node.names.last())) }
                     ?: emptyList()
             node is SqlJoin -> collectEntityRefs(node.left) + collectEntityRefs(node.right)
             node is SqlBasicCall && node.kind == SqlKind.AS -> {
                 val target = node.operand<SqlNode>(0) as? SqlIdentifier
-                val entity = target?.let { resolveEntity(it) }
+                val entity = target?.let { resolveEntity(it) ?: resolveTemporaryEntity(it) }
                 val alias = SqlValidatorUtil.alias(node)
                 if (entity != null && alias != null) listOf(SideRef(entity, alias)) else emptyList()
             }
@@ -154,6 +177,27 @@ class ModelJoinRewriter(
             }
         if (!qualifiersMatch) return null
         return entitiesByName[names.last().lowercase(Locale.ROOT)]
+    }
+
+    /** `obj.<namespace>.<name>` naming a logical query the model serves → its obj qname; anything else → null. */
+    internal fun resolveTemporaryEntity(id: SqlIdentifier): QualifiedName? {
+        val names = id.names
+        if (names.size != 3 || !names[0].equals(OBJ_CATALOG, ignoreCase = true)) return null
+        val qname =
+            model
+                .savedQueries(SchemaCode.OBJ, names[1])
+                .keys
+                .firstOrNull { it.name.equals(names[2], ignoreCase = true) }
+                ?: return null
+        return qname.takeIf { temporaryEntities.getOrPut(it) { TemporaryEntity.of(model, it) } != null }
+    }
+
+    /** The model as [JoinPolicy] sees one join: its relations plus those the join's temporary entities inherit. */
+    private class WithRelations(
+        private val base: ModelHandle,
+        private val extra: List<ModelRelation>,
+    ) : ModelHandle by base {
+        override fun relations(): List<ModelRelation> = base.relations() + extra
     }
 
     private fun condition(
@@ -183,6 +227,9 @@ class ModelJoinRewriter(
 
         /** Calcite's catalog token for the ER schema (`TranslatorFramework.schemaCodeToToken(ER)`). */
         private const val ER_CATALOG = "er"
+
+        /** Calcite's catalog token for saved queries (`TranslatorFramework.schemaCodeToToken(OBJ)`). */
+        private const val OBJ_CATALOG = "obj"
 
         /** The join types Calcite refuses without a condition (`RESOURCE.joinRequiresCondition`). */
         private val REWRITTEN_JOIN_TYPES = setOf(JoinType.INNER, JoinType.LEFT, JoinType.RIGHT, JoinType.FULL)
