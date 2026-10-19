@@ -109,6 +109,11 @@ class TtrpPipeline(
          * re-parsing. Empty for a param-free program (byte-identical manifests).
          */
         val params: List<org.tatrman.ttrp.ast.ParamDecl> = emptyList(),
+        /**
+         * AU-core-P1: what the recipe checker learned about the document's recipe (roles, context classes, the mode
+         * verdict, routes, wiring) — null for a program without a recipe, or when the front half failed.
+         */
+        val recipe: org.tatrman.ttrp.graph.recipe.RecipeModel? = null,
     )
 
     /**
@@ -156,8 +161,16 @@ class TtrpPipeline(
         val retargeted = applyTargetOverrides(build.graph, targetOverrides)
         val structure = StructureValidator().validate(retargeted)
         diags += structure
+        // AU-core-P1: the recipe checker, over the built graph and the resolved model (AU contracts §4).
+        val recipe =
+            build.recipe?.let {
+                org.tatrman.ttrp.graph.recipe
+                    .RecipeChecker(report, build, fileName)
+                    .check()
+            }
+        recipe?.let { diags += it.diagnostics }
         if (diags.any { it.severity == Severity.ERROR }) {
-            return PlanResult(fileName, null, null, null, emptyList(), diags, ok = false)
+            return PlanResult(fileName, null, null, null, emptyList(), diags, ok = false, recipe = recipe?.model)
         }
 
         val norm: NormalizeResult = RewriteEngine(Rules.ALL, bound).normalize(retargeted)

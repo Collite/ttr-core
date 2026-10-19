@@ -1,0 +1,28 @@
+// AU-core-P1 negative: a route decided on an agent's answer fires `release` (approval: none) → TTRP-REC-040.
+uses world "hartland.worlds.demo"
+import hartland.*
+import hartland.automation.*
+
+recipe {
+    key: order.order_number
+
+    candidates placed(out orders) target erp """sql
+        SELECT o.order_number, o.value FROM er.entity.order o WHERE o.state = 'placed'
+    """
+
+    // an agent's answer, per candidate
+    context care(in orders, out rows) turn agents.care ask "Should this order be released?" answer care_answer
+
+    decision verdict(in orders, in care) {
+        v = orders -> join(right: care, kind: left, on: left.order_number = right.order_number)
+        v -> switch {
+            mode: exclusive
+            release: approve = true    because: "the agent approved"
+            else:    none
+        }
+    }
+
+    actions {
+        verdict.release -> release { order: order_number }
+    }
+}

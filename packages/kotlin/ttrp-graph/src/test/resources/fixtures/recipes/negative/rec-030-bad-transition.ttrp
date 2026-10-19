@@ -1,0 +1,24 @@
+// AU-core-P1 negative: `set_state { to: shipped }` — `shipped` is no state of return_request_line.state → TTRP-REC-030.
+uses world "hartland.worlds.demo"
+import hartland.*
+import hartland.automation.*
+
+recipe {
+    key: return_request_line.line_id
+
+    candidates received(out lines) target erp """sql
+        SELECT l.line_id, l.quantity FROM er.entity.return_request_line l WHERE l.state = 'received'
+    """
+
+    decision way(in lines) {
+        lines -> switch {
+            mode: exclusive
+            reject: quantity = 0    because: "nothing to return"
+            else:   none
+        }
+    }
+
+    actions {
+        way.reject -> set_state { line: line_id, to: shipped }
+    }
+}

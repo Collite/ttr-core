@@ -1,0 +1,53 @@
+// The recipe-checker fixture world (AU-core-P1): hartland's `model/worlds/demo.ttrm` (ttr-demo 2fd80d5) written
+// for grammar 0.16 — `writable:` on the storages (D-76, D-79) and the automation half of design 17 §2
+// (the ttr-parser automation fixture's members, nested in `def world demo`).
+package hartland.worlds
+model world
+
+def world demo {
+    description: "Hartland demo world — the ERP (the hartland warehouse, one per world) and the automation ledger."
+
+    def engine erp        { type: postgres }
+    def engine automation { type: postgres }
+
+    def storage erp_db        { type: postgres, via: erp, hosts: [hartland],
+                                writable: [order.state, order.held_for, return_request_line.state, return_request_line.way,
+                                           reorder_proposal, winback_mail] }
+    def storage automation_db { type: postgres, via: automation,
+                                writable: [obligation, state_history, "*_verdict", "*_verdict_detail", approvals] }
+    def storage stage         { type: local_dir, staging: true }
+
+    def identity automation_decider { principal: "svc-hartland-automation", credential: TTR_CONN_AUTOMATION_DECIDER }   // no policy narrows it; D-132
+    def executor n8n   { extends: n8n_l1,   url: "https://n8n.hartland.example",  connection: n8n_hartland }
+    def executor bpmn  { extends: camunda_8 }                                                     // file only (D-41)
+    def executor py    { extends: python_client }
+
+    def grant { who: role.ops,           program: *,                    as: identity.automation_decider }
+    def grant { who: role.sales_manager, program: release_on_placement, as: identity.automation_decider }   // "release 4711" from Hebe: a service run she instructs
+    def grant { who: role.process_owner, program: *,                    as: identity.automation_decider }   // debug runs "as the recipe runs" (D-93)
+
+    def deployment release_native_morning { program: morning_release,      target: native, run_as: identity.automation_decider, trigger: schedule "06:00 Europe/Prague" }
+    def deployment release_native_event   { program: release_on_placement, target: native, run_as: identity.automation_decider }
+    def deployment release_n8n            { program: release_on_placement, target: n8n,    run_as: identity.automation_decider, granularity: parts }
+    def deployment release_py             { program: release_on_placement, target: py,     run_as: identity.automation_decider }
+    def deployment release_bpmn           { program: release_on_placement, target: bpmn,   run_as: identity.automation_decider }
+
+    // H-2, orchestrator-free: six native deployments (on-event + batch per recipe)
+    def deployment decide_native_event    { program: decide_on_request,   target: native, run_as: identity.automation_decider }
+    def deployment decide_native_batch    { program: decide_catch_up,     target: native, run_as: identity.automation_decider, trigger: schedule "06:30 Europe/Prague" }
+    def deployment inbound_native_event   { program: inbound_on_receipt,  target: native, run_as: identity.automation_decider }
+    def deployment inbound_native_batch   { program: inbound_daily,       target: native, run_as: identity.automation_decider, trigger: schedule "07:00 Europe/Prague" }
+    def deployment settle_native_event    { program: settle_on_document,  target: native, run_as: identity.automation_decider }
+    def deployment settle_native_batch    { program: settle_daily,        target: native, run_as: identity.automation_decider, trigger: schedule "07:30 Europe/Prague" }
+
+    // H-2, orchestrated: one n8n execution per line, the engine owns the waiting (D-39, D-86)
+    def process return_line_flow {
+        instance: return_request_line.line_id
+        steps: [
+            def step decide   { program: decide_on_request,  port: key },
+            def step inbound  { program: inbound_on_receipt, port: key, after: { obligation: inbound, until: [fulfilled, due, absent] } },
+            def step settle   { program: settle_on_document, port: key, after: { obligation: [credit_note, payment, replacement], until: [fulfilled, due, absent] } }
+        ]
+    }
+    def deployment returns_n8n { process: return_line_flow, target: n8n, run_as: identity.automation_decider }
+}

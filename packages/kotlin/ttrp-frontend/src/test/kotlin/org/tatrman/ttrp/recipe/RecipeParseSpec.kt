@@ -423,14 +423,15 @@ class RecipeParseSpec :
 
         fun ids(path: String) = parse(path).diagnostics.map { it.id }
 
-        "two recipe blocks parse — refusing them is the S1.1 checker's TTRP-REC-000" {
+        "two recipe blocks parse — the second is TTRP-REC-000 (one recipe per file)" {
             val r = parse("negative/rec-000-two-blocks.ttrp")
-            r.diagnostics.shouldBeEmpty()
+            r.diagnostics.map { it.id } shouldContainExactly listOf(TtrpDiagnosticId.REC_000)
             r.document.statements.filterIsInstance<RecipeDecl>() shouldHaveSize 2
         }
 
-        "a program header beside a recipe is TTRP-PRS-002" {
-            ids("negative/rec-000-program-and-recipe.ttrp") shouldContainExactly listOf(TtrpDiagnosticId.PRS_002)
+        "a program header beside a recipe is TTRP-PRS-002, and TTRP-REC-000" {
+            ids("negative/rec-000-program-and-recipe.ttrp") shouldContainExactly
+                listOf(TtrpDiagnosticId.PRS_002, TtrpDiagnosticId.REC_000)
         }
 
         "`because:` takes a string — a malformed attribute reads as a route and is named, TTRP-PRS-007" {

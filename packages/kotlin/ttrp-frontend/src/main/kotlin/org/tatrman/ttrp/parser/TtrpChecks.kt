@@ -55,7 +55,31 @@ internal object TtrpChecks {
         checkStatements(doc.statements, enclosingPorts = emptySet(), out, topLevel = true)
         checkParams(doc.statements.filterIsInstance<ParamDecl>(), out)
         checkOnFailure(doc.statements.filterIsInstance<ContainerDecl>(), out)
+        checkRecipeDocument(doc, out)
         return out
+    }
+
+    /**
+     * AU-core-P1 (REC-000, document level): one recipe per file, and no `program` header beside it. Checked here,
+     * at parse time, because a second recipe or a header stops the compile before the recipe checker runs.
+     */
+    private fun checkRecipeDocument(
+        doc: TtrpDocument,
+        out: MutableList<TtrpDiagnostic>,
+    ) {
+        val recipes = doc.statements.filterIsInstance<RecipeDecl>()
+        if (recipes.isEmpty()) return
+        recipes.drop(1).forEach {
+            out += diag(TtrpDiagnosticId.REC_000, "a second `recipe` block — a document holds one recipe", it.location)
+        }
+        doc.statements.filterIsInstance<ProgramHeader>().forEach {
+            out +=
+                diag(
+                    TtrpDiagnosticId.REC_000,
+                    "a `program` header beside a recipe — a recipe is the document",
+                    it.location,
+                )
+        }
     }
 
     /** PL-P2.S1 (F-4-i): scalar-type, duplicate-name, and builtin-default validity. */
@@ -217,13 +241,82 @@ internal object TtrpChecks {
                     when (val body = member.body) {
                         // A `foreign` body is the foreign language (python), not a TTR fragment dialect.
                         is FragmentBody ->
-                            if (member.form is org.tatrman.ttrp.ast.IslandForm.Target) checkFragmentTag(body, out)
-                        is FlowBody -> checkStatements(body.statements, ports, out)
+                            if (member.form is org.tatrman.ttrp.ast.IslandForm.Target) {
+                                checkFragmentTag(body, out)
+                                if (body.tag == "sql") checkSqlReadOnly(member.name, body, out)
+                            }
+                        is FlowBody -> {
+                            checkStatements(body.statements, ports, out)
+                            checkNoStore(member.name, body.statements, out)
+                        }
                         null -> Unit
                     }
                 }
-                is DecisionDecl -> checkStatements(member.statements, member.ports.map { it.name }.toSet(), out)
+                is DecisionDecl -> {
+                    checkStatements(member.statements, member.ports.map { it.name }.toSet(), out)
+                    checkNoStore(member.name, member.statements, out)
+                    // REC-070: the decision is a canonical body ending in its switch — no island of its own.
+                    member.statements.filter { it is ContainerDecl || it is RecipeDecl }.forEach {
+                        out +=
+                            diag(
+                                TtrpDiagnosticId.REC_070,
+                                "decision `${member.name}` declares an island — a decision is canonical statements " +
+                                    "and its switch",
+                                it.location,
+                            )
+                    }
+                }
                 is ActionsBlock -> Unit
+            }
+        }
+    }
+
+    /**
+     * REC-060 (D-65): a recipe's SQL island only reads — actions write. TTR-SQL already refuses DML everywhere
+     * (TTRP-SQL-001); in a recipe the island also says why and what to do instead.
+     */
+    private fun checkSqlReadOnly(
+        role: String,
+        body: FragmentBody,
+        out: MutableList<TtrpDiagnostic>,
+    ) {
+        val lexer =
+            org.tatrman.ttrp.parser.generated.TTRSqlLexer(
+                org.antlr.v4.runtime.CharStreams
+                    .fromString(body.sourceText),
+            )
+        lexer.removeErrorListeners()
+        val dml =
+            setOf(
+                org.tatrman.ttrp.parser.generated.TTRSqlLexer.INSERT,
+                org.tatrman.ttrp.parser.generated.TTRSqlLexer.UPDATE,
+                org.tatrman.ttrp.parser.generated.TTRSqlLexer.DELETE,
+                org.tatrman.ttrp.parser.generated.TTRSqlLexer.MERGE,
+            )
+        val head = lexer.allTokens.firstOrNull { it.type in dml } ?: return
+        out +=
+            diag(
+                TtrpDiagnosticId.REC_060,
+                "island `$role` writes (`${head.text.uppercase()}`) — a recipe's islands only read",
+                body.location,
+            )
+    }
+
+    /** REC-060 for a canonical body: a `store` in a role container or the decision writes. */
+    private fun checkNoStore(
+        role: String,
+        statements: List<Statement>,
+        out: MutableList<TtrpDiagnostic>,
+    ) {
+        for (st in statements) {
+            val chain =
+                when (st) {
+                    is Assignment -> st.chain
+                    is ChainStmt -> st.chain
+                    else -> continue
+                }
+            chain.elements.filterIsInstance<OpCall>().filter { it.name == "store" }.forEach {
+                out += diag(TtrpDiagnosticId.REC_060, "`$role` stores rows — a recipe's islands only read", it.location)
             }
         }
     }

@@ -1,0 +1,40 @@
+// AU-core-P1 negative: a candidates ⋈ candidates join not on the key → set-level, no window, no program → TTRP-REC-010 (warning).
+uses world "hartland.worlds.demo"
+import hartland.*
+import hartland.automation.*
+
+recipe {
+    key:        order.order_number
+    parameters: [confirmation_threshold]
+
+    candidates placed(out orders) target erp """sql
+        SELECT o.order_number, o.customer, o.value, o.state FROM er.entity.order o WHERE o.state = 'placed'
+    """
+
+    context overdue(in orders, out rows) target erp """sql
+        SELECT o.order_number, i.invoice_id FROM orders o JOIN er.entity.invoice i ON i.customer = o.customer
+        WHERE i.status = 'open' AND i.due < :as_of
+    """
+
+    // the candidates joined with the candidates NOT on the key: one order's rows meet another's
+    context siblings(in orders, out rows) target erp """sql
+        SELECT a.order_number, b.order_number AS sibling FROM orders a JOIN orders b ON a.customer = b.customer
+    """
+
+    decision verdict(in orders, in overdue) {
+        n_due = overdue -> aggregate { group_by: order_number  n_due = count(invoice_id) }
+        v = orders -> join(right: n_due, kind: left, on: left.order_number = right.order_number)
+                   -> calc(n_due = coalesce(n_due, 0))
+        v -> switch {
+            mode: exclusive
+            hold_ar: n_due > 0                                because: "overdue invoices"   detail: overdue
+            release: value <= :confirmation_threshold         because: "all checks passed"
+        }
+    }
+
+    actions {
+        verdict.hold_ar -> hold    { order: order_number, department: "AR" }
+        verdict.hold_ar -> notify  { who: role.ar, detail: overdue }
+        verdict.release -> release { order: order_number }
+    }
+}

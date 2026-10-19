@@ -100,6 +100,61 @@ enum class TtrpDiagnosticId(
         "a recipe parses and is checked by the AU toolchain, but compiles to a bundle only from AU-core-P2 " +
             "(the recipe bundle, AU contracts §5) — until then build its islands as a plain program",
     ),
+
+    // ---- AU-core-P1 — the recipe checker (AU contracts §4): roles, wiring, parameters, key lineage, time ----
+    REC_000("TTRP-REC-000", "one recipe per file, and no `program` beside it"),
+    REC_001(
+        "TTRP-REC-001",
+        "wire an action the imports define, with the columns its `def action` lists — every required one, no other",
+    ),
+    REC_002(
+        "TTRP-REC-002",
+        "give the column a value of the action column's type — cast it, or pick the key attribute the action names",
+    ),
+    REC_003("TTRP-REC-003", "wire every route of the switch to an action, or route its rows to `else: none`"),
+    REC_004("TTRP-REC-004", "project the recipe's `key` from the candidates island"),
+    REC_005(
+        "TTRP-REC-005",
+        "filter the candidates by state, never by key — the program's `port:` selects single candidates (A-2)",
+    ),
+    REC_010(
+        "TTRP-REC-010",
+        "declare a `window { by: … over: … }` on the context, or restate it per candidate (keep the key, read " +
+            "the other rows from the model, not from the candidates)",
+    ),
+    REC_011(
+        "TTRP-REC-011",
+        "align the batch program's schedule with the window's `over:` so a run covers whole windows",
+    ),
+    REC_012(
+        "TTRP-REC-012",
+        "restate the recipe per candidate, or run it with `port: none` — a set-level recipe cannot run for one key",
+    ),
+    REC_020(
+        "TTRP-REC-020",
+        "add the name to `parameters:` (a `def parameter` of the imports), or run the recipe from a program whose " +
+            "port or event supplies it",
+    ),
+    REC_021("TTRP-REC-021", "import the package that defines the parameter, or drop it from `parameters:`"),
+    REC_030(
+        "TTRP-REC-030",
+        "move to a state the attribute's `states:` lists, along a transition its `transitions:` allows",
+    ),
+    REC_040(
+        "TTRP-REC-040",
+        "an agent's answer never acts alone — wire the route to an action with `approval: required`",
+    ),
+    REC_050(
+        "TTRP-REC-050",
+        "a snapshot measure does not add up across its snapshot dates — take `latest(by: …, per: …)` first, or " +
+            "group by the snapshot date",
+    ),
+    REC_060("TTRP-REC-060", "islands only read — actions write (D-65); remove the INSERT/UPDATE/DELETE/MERGE"),
+    REC_070(
+        "TTRP-REC-070",
+        "write the decision as a canonical body ending in a `switch`; SQL, foreign code, services and agents " +
+            "belong in a `context`",
+    ),
     PRS_007(
         "TTRP-PRS-007",
         "a recipe's shape: `recipe { }` is top-level only, a `target` role container needs a body, and a wiring " +

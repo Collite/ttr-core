@@ -1,0 +1,38 @@
+// AU-core-P1 negative: the decision declares an island of its own → TTRP-REC-070 (parse time).
+uses world "hartland.worlds.demo"
+import hartland.*
+import hartland.automation.*
+
+recipe {
+    key:        order.order_number
+    parameters: [confirmation_threshold]
+
+    candidates placed(out orders) target erp """sql
+        SELECT o.order_number, o.customer, o.value, o.state FROM er.entity.order o WHERE o.state = 'placed'
+    """
+
+    context overdue(in orders, out rows) target erp """sql
+        SELECT o.order_number, i.invoice_id FROM orders o JOIN er.entity.invoice i ON i.customer = o.customer
+        WHERE i.status = 'open' AND i.due < :as_of
+    """
+
+    decision verdict(in orders, in overdue) {
+        container extra(in overdue, out rows) target erp """sql
+            SELECT order_number FROM overdue
+        """
+        n_due = overdue -> aggregate { group_by: order_number  n_due = count(invoice_id) }
+        v = orders -> join(right: n_due, kind: left, on: left.order_number = right.order_number)
+                   -> calc(n_due = coalesce(n_due, 0))
+        v -> switch {
+            mode: exclusive
+            hold_ar: n_due > 0                                because: "overdue invoices"   detail: overdue
+            release: value <= :confirmation_threshold         because: "all checks passed"
+        }
+    }
+
+    actions {
+        verdict.hold_ar -> hold    { order: order_number, department: "AR" }
+        verdict.hold_ar -> notify  { who: role.ar, detail: overdue }
+        verdict.release -> release { order: order_number }
+    }
+}

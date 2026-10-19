@@ -1,0 +1,11 @@
+// TEST-ONLY (AU-core-P1 recipe-checker specs) — not hartland's: programs that run the negative fixtures'
+// recipes (`recipe: rec_011` …) so the program-side checks (REC-010 on an event program, REC-011, REC-012)
+// have something to check against, and the answer schema of the turn-rule fixture.
+package hartland.automation
+model automation
+
+def program probe_weekly_batch   { recipe: rec_011,       port: none, mode: batch,    as_of: run,   schedule: "06:00 Europe/Prague" }
+def program probe_key            { recipe: rec_012,       port: key,  mode: on_event, as_of: event }
+def program probe_event_setlevel { recipe: rec_010_event, port: none, mode: on_event, as_of: event }
+
+def schema care_answer { columns: [def column order_number { type: order.order_number }, def column approve { type: bool }] }

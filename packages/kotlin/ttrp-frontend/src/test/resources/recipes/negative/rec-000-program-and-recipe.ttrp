@@ -1,5 +1,5 @@
 // A `program` header beside a recipe: the header is TTRP-PRS-002 (TTR-P has no program header, S12);
-// the recipe itself still parses. TTRP-REC-000 (recipe + program) is the S1.1 checker's.
+// the recipe itself still parses; the header beside a recipe is also TTRP-REC-000 (AU-core-P1).
 program release
 uses world "hartland.worlds.demo"
 
