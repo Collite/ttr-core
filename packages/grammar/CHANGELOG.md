@@ -56,6 +56,30 @@ new noun stays usable as a name (all are in `idPart`).
 `participants`, `via` and `filter` ride the free-form entry (no tokens); the free-form key is never a typed key,
 so a malformed typed property fails at parse time; `type` and `precision` are legal keys inside a cn object.
 
+**Tooling (S1.4).**
+- **TextMate** (`ttrm.tmLanguage.json`): `cn` is a model code (and the `cn.` ref head), the concept def nouns
+  and the ten binding kinds are kinds (`def kind` too — `kind:` stays a property key), the cn keys, `concept`
+  and `default` / `sense_priority` are properties, `as` is an operator word. A `"""pl` block, and a string or
+  triple-string after `definition:` / `members:` / `filter:`, is an embedded `pl` expression (the TTRP
+  expression words, pinned against `ttrp.tmLanguage.json`). The generator's test now fails on any word token
+  without a scope — the regen gate could not see one (none of the 0.17 tokens was scoped at first).
+- **Formatter** — the cn layout. A concept body prints in one canonical order: `description · label · tags ·
+  sources · is_a · abstract · of · event · extent · grounds · hierarchy · involves · period · qualities ·
+  value_space · valued_state · definition · imprecision · basis · members · relations · lexicon`, then any other
+  key in source order. A binding prints `description · tags · kind | role | quality | event | phase | concept ·
+  target · period · hierarchy · participants · via · filter`, then the rest. The `concept { … }` sugar of an
+  entity or attribute prints without the `:` (the contracts' spelling), its stereotype ref first (`event:` only
+  when no `kind` / `role` / `quality` leads). `involves:` stays on one line up to three participants, one per
+  line past that; a binding's `participants:` prints one label per line; a free-form list of plain items prints
+  like `tags:` (`[a, b]`); every other value — and every expression block — prints exactly as written. A
+  comment the layout cannot place keeps the def verbatim.
+- **Formatter fixes on the way:** a def kind with no layout is now kept verbatim — the md model (`domain`,
+  `dimension`, `hierarchy`, `measure`, `cubelet`, `map`, `md2db_*`, `md2er_cubelet`), `drill_map` and the
+  world's `engine` / `executor` / `storage` printed as an empty `def X {}` (an md domain as the unparseable
+  `def mdDomain`); `model lexicon locale <id>` keeps its locale. Still dropped: ttr-core#212 (a table's
+  `management` / `changeSemantics` / `writeback`) and ttr-core#219 (an inline `binding:`, a localized
+  `description:` outside a cn body, `security { }` blocks).
+
 ## 0.16 — 2026-10-19
 
 **Additive (the automation model — AU-core-P0 S0.2; AU D-26, D-35, D-67, D-90, D-91, D-104,

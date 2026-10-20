@@ -9,10 +9,16 @@
       "include": "#comments"
     },
     {
+      "include": "#embedded-blocks"
+    },
+    {
       "include": "#strings"
     },
     {
       "include": "#numbers"
+    },
+    {
+      "include": "#def-kind"
     },
     {
       "include": "#keywords"
@@ -25,6 +31,134 @@
     }
   ],
   "repository": {
+    "embedded-blocks": {
+      "patterns": [
+        {
+          "name": "string.quoted.fenced.pl.ttrm",
+          "begin": "(\"\"\")(pl)(?=[ \\t]*\\r?$)",
+          "end": "\"\"\"",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.begin.ttrm"
+            },
+            "2": {
+              "name": "entity.name.tag.language.ttrm"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.ttrm"
+            }
+          },
+          "contentName": "meta.embedded.block.pl.ttrm",
+          "patterns": [
+            {
+              "include": "#pl-expression"
+            }
+          ]
+        },
+        {
+          "begin": "\\b(definition|members|filter)\\s*(:)?\\s*(\"\"\")(?![a-zA-Z][a-zA-Z0-9-]*[ \\t]*\\r?$)",
+          "end": "\"\"\"",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.other.property.ttrm"
+            },
+            "2": {
+              "name": "punctuation.separator.ttrm"
+            },
+            "3": {
+              "name": "string.quoted.fenced.pl.ttrm punctuation.definition.string.begin.ttrm"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "string.quoted.fenced.pl.ttrm punctuation.definition.string.end.ttrm"
+            }
+          },
+          "contentName": "meta.embedded.block.pl.ttrm",
+          "patterns": [
+            {
+              "include": "#pl-expression"
+            }
+          ]
+        },
+        {
+          "begin": "\\b(definition|members|filter)\\s*(:)?\\s*(\")(?!\"\")",
+          "end": "\"",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.other.property.ttrm"
+            },
+            "2": {
+              "name": "punctuation.separator.ttrm"
+            },
+            "3": {
+              "name": "string.quoted.double.ttrm punctuation.definition.string.begin.ttrm"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "string.quoted.double.ttrm punctuation.definition.string.end.ttrm"
+            }
+          },
+          "contentName": "meta.embedded.line.pl.ttrm",
+          "patterns": [
+            {
+              "name": "constant.character.escape.ttrm",
+              "match": "\\\\."
+            },
+            {
+              "include": "#pl-expression"
+            }
+          ]
+        }
+      ]
+    },
+    "pl-expression": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.ttrm",
+          "begin": "'",
+          "end": "'"
+        },
+        {
+          "name": "constant.numeric.ttrm",
+          "match": "\\b[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?\\b"
+        },
+        {
+          "name": "keyword.operator.word.ttrm",
+          "match": "\\b(group|by|in|and|or|not|is|between|cast|as|distinct)\\b"
+        },
+        {
+          "name": "keyword.control.conditional.ttrm",
+          "match": "\\b(case|when|then|else|end)\\b"
+        },
+        {
+          "name": "constant.language.ttrm",
+          "match": "\\b(null|true|false)\\b"
+        },
+        {
+          "name": "keyword.operator.ttrm",
+          "match": "<=|>=|<>|!=|=|<|>|\\+|-|\\*|/|%"
+        }
+      ]
+    },
+    "def-kind": {
+      "patterns": [
+        {
+          "match": "\\b(def)\\s+(kind)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.control.def.ttrm"
+            },
+            "2": {
+              "name": "keyword.other.kind.ttrm"
+            }
+          }
+        }
+      ]
+    },
     "comments": {
       "patterns": [
         {
@@ -94,6 +228,9 @@
         },
         {
           "include": "#keyword_other_property_ttrm"
+        },
+        {
+          "include": "#keyword_operator_word_ttrm"
         }
       ]
     },
@@ -168,7 +305,7 @@
       "patterns": [
         {
           "name": "keyword.other.schema.ttrm",
-          "match": "\\b(db|er|binding|cnc|md|query|world|automation|lexicon)\\b"
+          "match": "\\b(db|er|binding|cnc|md|query|world|automation|cn|lexicon)\\b"
         }
       ]
     },
@@ -176,7 +313,7 @@
       "patterns": [
         {
           "name": "keyword.other.kind.ttrm",
-          "match": "\\b(project|area|map|table|view|column|index|constraint|fk|procedure|entity|attribute|relation|er2db_entity|er2db_attribute|er2db_relation|role|er2cnc_role|drill_map|domain|dimension|hierarchy|measure|cubelet|md2db_cubelet|md2db_domain|md2db_map|md2er_cubelet|engine|executor|storage|parameter|action|service|approval|program|recipe|identity|deployment|process|step|term|pattern|example)\\b"
+          "match": "\\b(project|area|map|table|view|column|index|constraint|fk|procedure|entity|attribute|relation|er2db_entity|er2db_attribute|er2db_relation|role|er2cnc_role|drill_map|domain|dimension|hierarchy|measure|cubelet|md2db_cubelet|md2db_domain|md2db_map|md2er_cubelet|engine|executor|storage|parameter|action|service|approval|program|recipe|identity|deployment|process|step|event|phase|quality|relation_type|cn2md_kind|cn2md_role|cn2md_quality|cn2md_event|cn2er_kind|cn2er_role|cn2er_event|cn2er_quality|cn2er_phase|cn2db_concept|term|pattern|example)\\b"
         }
       ]
     },
@@ -184,7 +321,15 @@
       "patterns": [
         {
           "name": "keyword.other.property.ttrm",
-          "match": "\\b(objects|layout|args|display|override|restrict|members|publish|kind|calc|key|hierarchies|levels|via|class|aggregation|validBy|grain|measures|shape|journaling|allocation|source|extends|hosts|staging|steps|transitions|transition|states|set|resolve|delivery|description|tags|version|primaryKey|columns|indices|constraints|attributes|parameters|resultColumns|definitionSql|type|optional|isKey|searchable|indexed|labelPlural|nameAttribute|codeAttribute|aliases|cardinality|join|target|whereFilter|language|sourceText|length|precision|label|name|direction|displayLabel|valueLabels|roles|search|semantics|keywords|patterns|descriptions|examples|fuzzy|method|for|forms|match|from|to)\\b"
+          "match": "\\b(objects|layout|args|display|override|restrict|members|publish|kind|calc|key|hierarchies|levels|via|class|aggregation|validBy|grain|measures|shape|journaling|allocation|source|extends|hosts|staging|steps|transitions|transition|states|set|resolve|delivery|concept|involves|period|grounds|definition|value_space|extent|basis|default|sense_priority|description|tags|version|primaryKey|columns|indices|constraints|attributes|parameters|resultColumns|definitionSql|type|optional|isKey|searchable|indexed|labelPlural|nameAttribute|codeAttribute|aliases|cardinality|join|target|whereFilter|language|sourceText|length|precision|label|name|direction|displayLabel|valueLabels|roles|search|semantics|keywords|patterns|descriptions|examples|fuzzy|method|for|forms|match|from|to)\\b"
+        }
+      ]
+    },
+    "keyword_operator_word_ttrm": {
+      "patterns": [
+        {
+          "name": "keyword.operator.word.ttrm",
+          "match": "\\b(as)\\b"
         }
       ]
     },

@@ -1,5 +1,9 @@
 # CNC roles
 
+> **Deprecated in grammar 0.17.** `model cnc` and `roles:` still parse; a deprecation warning arrives with the
+> conceptual model's semantics, and a later major release removes them. There is nothing to migrate to — see
+> [Conceptual model (cn)](20-conceptual-model.md#cnc-is-deprecated).
+
 The `cnc` model is a small vocabulary of **roles** — `fact`, `dimension`, `master`, `transaction`, `structural`, `bridge` — that classify an entity by the part it plays in a data warehouse. Tagging entities with roles is how you tell analytics tooling "this is something you measure" versus "this is something you slice by." This page also gives a short primer on the dimensional-modeling ideas behind the names, since the SQL world rarely names them out loud.
 
 ## A two-minute primer

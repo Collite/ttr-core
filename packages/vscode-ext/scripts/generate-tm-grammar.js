@@ -4,8 +4,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.PL_CONSTANTS = exports.PL_CONDITIONAL_WORDS = exports.PL_OPERATOR_WORDS = void 0;
 exports.parseGrammar = parseGrammar;
 exports.tokenToScope = tokenToScope;
+exports.buildGrammar = buildGrammar;
 // SPDX-License-Identifier: Apache-2.0
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
@@ -249,12 +251,108 @@ function tokenToScope(name, literal) {
         case 'RESOLVE': return 'keyword.other.property.ttrm';
         case 'DELIVERY': return 'keyword.other.property.ttrm';
         case 'ARROW': return 'punctuation.separator.ttrm';
+        // 0.17 conceptual model (CN-P1 S1.4). CN is a model code (`model cn`) and the
+        // `cn.` ref head, like MD/ER; the concept def nouns and the ten binding kinds
+        // are kinds; the cn body keys, the `concept { }` sugar and the lexicon
+        // `default` / `sense_priority` are body properties. KIND stays a property
+        // (`kind: cn.Item`, md `kind:`) — `def kind` is scoped by the #def-kind rule.
+        // AS (`Warehouse as from`) is an operator word, the TTRP spelling.
+        case 'CN': return 'keyword.other.schema.ttrm';
+        case 'EVENT': return 'keyword.other.kind.ttrm';
+        case 'PHASE': return 'keyword.other.kind.ttrm';
+        case 'QUALITY': return 'keyword.other.kind.ttrm';
+        case 'RELATION_TYPE': return 'keyword.other.kind.ttrm';
+        case 'CN2MD_KIND': return 'keyword.other.kind.ttrm';
+        case 'CN2MD_ROLE': return 'keyword.other.kind.ttrm';
+        case 'CN2MD_QUALITY': return 'keyword.other.kind.ttrm';
+        case 'CN2MD_EVENT': return 'keyword.other.kind.ttrm';
+        case 'CN2ER_KIND': return 'keyword.other.kind.ttrm';
+        case 'CN2ER_ROLE': return 'keyword.other.kind.ttrm';
+        case 'CN2ER_EVENT': return 'keyword.other.kind.ttrm';
+        case 'CN2ER_QUALITY': return 'keyword.other.kind.ttrm';
+        case 'CN2ER_PHASE': return 'keyword.other.kind.ttrm';
+        case 'CN2DB_CONCEPT': return 'keyword.other.kind.ttrm';
+        case 'CONCEPT': return 'keyword.other.property.ttrm';
+        case 'INVOLVES': return 'keyword.other.property.ttrm';
+        case 'PERIOD': return 'keyword.other.property.ttrm';
+        case 'GROUNDS': return 'keyword.other.property.ttrm';
+        case 'DEFINITION': return 'keyword.other.property.ttrm';
+        case 'VALUE_SPACE': return 'keyword.other.property.ttrm';
+        case 'EXTENT': return 'keyword.other.property.ttrm';
+        case 'BASIS': return 'keyword.other.property.ttrm';
+        case 'DEFAULT': return 'keyword.other.property.ttrm';
+        case 'SENSE_PRIORITY': return 'keyword.other.property.ttrm';
+        case 'AS': return 'keyword.operator.word.ttrm';
         default: return null;
     }
 }
 function escapeRegex(s) {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+// 0.17 — the cn expression blocks (⚑CN-P5, CN-D28). `definition:` / `members:` (and a binding's
+// `filter:`) carry a TTRP expression, the `pl` language of EXPRESSION_TAG_REGISTRY — in any of the
+// three `embeddedBlock` forms. A `"""pl`-tagged block is an expression wherever it stands; an
+// untagged triple-string or a plain string is one only after those keys. Another tag after the key
+// (`"""sql`) is left to #strings. The body is the self-contained #pl-expression set (the TTR-M
+// extension does not depend on the TTR-P one), mirroring the TTRP grammar's expression words.
+const PL_FENCE_TAG = '(?=[ \\t]*\\r?$)';
+const EXPRESSION_KEY = '\\b(definition|members|filter)\\s*(:)?\\s*';
+const EMBEDDED_BLOCKS = {
+    patterns: [
+        {
+            name: 'string.quoted.fenced.pl.ttrm',
+            begin: '(""")(pl)' + PL_FENCE_TAG,
+            end: '"""',
+            beginCaptures: {
+                1: { name: 'punctuation.definition.string.begin.ttrm' },
+                2: { name: 'entity.name.tag.language.ttrm' },
+            },
+            endCaptures: { 0: { name: 'punctuation.definition.string.end.ttrm' } },
+            contentName: 'meta.embedded.block.pl.ttrm',
+            patterns: [{ include: '#pl-expression' }],
+        },
+        {
+            begin: EXPRESSION_KEY + '(""")(?![a-zA-Z][a-zA-Z0-9-]*[ \\t]*\\r?$)',
+            end: '"""',
+            beginCaptures: {
+                1: { name: 'keyword.other.property.ttrm' },
+                2: { name: 'punctuation.separator.ttrm' },
+                3: { name: 'string.quoted.fenced.pl.ttrm punctuation.definition.string.begin.ttrm' },
+            },
+            endCaptures: { 0: { name: 'string.quoted.fenced.pl.ttrm punctuation.definition.string.end.ttrm' } },
+            contentName: 'meta.embedded.block.pl.ttrm',
+            patterns: [{ include: '#pl-expression' }],
+        },
+        {
+            begin: EXPRESSION_KEY + '(")(?!"")',
+            end: '"',
+            beginCaptures: {
+                1: { name: 'keyword.other.property.ttrm' },
+                2: { name: 'punctuation.separator.ttrm' },
+                3: { name: 'string.quoted.double.ttrm punctuation.definition.string.begin.ttrm' },
+            },
+            endCaptures: { 0: { name: 'string.quoted.double.ttrm punctuation.definition.string.end.ttrm' } },
+            contentName: 'meta.embedded.line.pl.ttrm',
+            patterns: [{ name: 'constant.character.escape.ttrm', match: '\\\\.' }, { include: '#pl-expression' }],
+        },
+    ],
+};
+// The TTRP expression words, by the TTRP grammar's scopes (ttrp.tmLanguage.json: keyword.operator.word,
+// keyword.control.conditional, constant.language) with the .ttrm suffix. A test pins the sets against
+// the TTR-P grammar so the two cannot drift silently.
+exports.PL_OPERATOR_WORDS = ['group', 'by', 'in', 'and', 'or', 'not', 'is', 'between', 'cast', 'as', 'distinct'];
+exports.PL_CONDITIONAL_WORDS = ['case', 'when', 'then', 'else', 'end'];
+exports.PL_CONSTANTS = ['null', 'true', 'false'];
+const PL_EXPRESSION = {
+    patterns: [
+        { name: 'string.quoted.single.ttrm', begin: "'", end: "'" },
+        { name: 'constant.numeric.ttrm', match: '\\b[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?\\b' },
+        { name: 'keyword.operator.word.ttrm', match: '\\b(' + exports.PL_OPERATOR_WORDS.join('|') + ')\\b' },
+        { name: 'keyword.control.conditional.ttrm', match: '\\b(' + exports.PL_CONDITIONAL_WORDS.join('|') + ')\\b' },
+        { name: 'constant.language.ttrm', match: '\\b(' + exports.PL_CONSTANTS.join('|') + ')\\b' },
+        { name: 'keyword.operator.ttrm', match: '<=|>=|<>|!=|=|<|>|\\+|-|\\*|/|%' },
+    ],
+};
 function buildGrammar(tokens) {
     const byScope = new Map();
     const rules = [];
@@ -268,6 +366,7 @@ function buildGrammar(tokens) {
         'keyword.other.schema.ttrm': [],
         'keyword.other.kind.ttrm': [],
         'keyword.other.property.ttrm': [],
+        'keyword.operator.word.ttrm': [],
         'support.type.primitive.ttrm': [],
         'constant.language.ttrm': [],
         'constant.language.indextype.ttrm': [],
@@ -296,6 +395,7 @@ function buildGrammar(tokens) {
         'keyword.other.schema.ttrm',
         'keyword.other.kind.ttrm',
         'keyword.other.property.ttrm',
+        'keyword.operator.word.ttrm',
     ];
     // Non-keyword word scopes: primitive type names (text/int/…) and language
     // constants (true/false/null, index/constraint/query-lang enums). These were
@@ -323,13 +423,26 @@ function buildGrammar(tokens) {
         scopeName: 'source.ttrm',
         patterns: [
             { include: '#comments' },
+            { include: '#embedded-blocks' },
             { include: '#strings' },
             { include: '#numbers' },
+            { include: '#def-kind' },
             { include: '#keywords' },
             { include: '#literals' },
             { include: '#operators' },
         ],
         repository: {
+            'embedded-blocks': EMBEDDED_BLOCKS,
+            'pl-expression': PL_EXPRESSION,
+            'def-kind': {
+                patterns: [{
+                        match: '\\b(def)\\s+(kind)\\b',
+                        captures: {
+                            1: { name: 'keyword.control.def.ttrm' },
+                            2: { name: 'keyword.other.kind.ttrm' },
+                        },
+                    }],
+            },
             comments: {
                 patterns: [
                     { name: 'comment.line.double-slash.ttrm', match: '//.*$' },

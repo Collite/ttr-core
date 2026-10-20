@@ -1,0 +1,66 @@
+model er
+
+// The entities the concepts are grounded to. Relations carry `join:` pairs — an event's
+// participants (`bindings.ttrm`) are paths over them.
+
+def entity order { description: "A web order",
+    binding: { target: { table: db.dbo.table.web_order } },
+    attributes: [
+        def attribute order_number { type: int, isKey: true, binding: wo_order_number },
+        def attribute customer_id { type: int, binding: wo_customer_sk },
+        def attribute warehouse_id { type: int, optional: true, binding: wo_warehouse_sk },
+        def attribute placed_date { type: date, binding: wo_placed_date },
+        def attribute delivered_date { type: date, optional: true, binding: wo_delivered_date },
+        def attribute state { type: text, binding: wo_state },
+        def attribute order_value { type: decimal, binding: wo_order_value }
+    ]
+}
+
+def entity customer { description: "A customer",
+    semantics { name: last_name },
+    binding: { target: { table: db.dbo.table.customer } },
+    attributes: [
+        def attribute customer_id { type: int, isKey: true, binding: c_customer_sk },
+        def attribute last_name { type: text, optional: true, binding: c_last_name }
+    ]
+}
+
+def entity warehouse { description: "A distribution center",
+    semantics { name: warehouse_name },
+    binding: { target: { table: db.dbo.table.warehouse } },
+    attributes: [
+        def attribute warehouse_id { type: int, isKey: true, binding: w_warehouse_sk },
+        def attribute warehouse_name { type: text, binding: w_warehouse_name }
+    ]
+}
+
+def entity invoice { description: "An invoice",
+    binding: { target: { table: db.dbo.table.invoice } },
+    attributes: [
+        def attribute invoice_number { type: int, isKey: true, binding: inv_number },
+        def attribute order_number { type: int, binding: inv_order_number },
+        def attribute issued { type: date, binding: inv_issued },
+        def attribute due { type: date, binding: inv_due },
+        def attribute amount { type: decimal, binding: inv_amount },
+        def attribute paid { type: decimal, binding: inv_paid },
+        def attribute invoice_status { type: text, binding: inv_status }
+    ]
+}
+
+def relation order_customer { description: "An order is placed by a customer",
+    from: er.entity.order, to: er.entity.customer,
+    cardinality: { from: "0..*", to: "1" },
+    join: [{ from: er.entity.order.customer_id, to: er.entity.customer.customer_id }]
+}
+
+def relation order_warehouse { description: "An order is fulfilled by a distribution center",
+    from: er.entity.order, to: er.entity.warehouse,
+    cardinality: { from: "0..*", to: "0..1" },
+    join: [{ from: er.entity.order.warehouse_id, to: er.entity.warehouse.warehouse_id }]
+}
+
+def relation invoice_order { description: "An invoice bills an order",
+    from: er.entity.invoice, to: er.entity.order,
+    cardinality: { from: "0..1", to: "1" },
+    join: [{ from: er.entity.invoice.order_number, to: er.entity.order.order_number }]
+}

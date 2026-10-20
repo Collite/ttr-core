@@ -1,0 +1,143 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ttrm.tmLanguage.json — the 0.17 conceptual model > tokenizes 75-cn-concepts.ttrm (snapshot) 1`] = `
+"  8  package=keyword.control.package
+  9  model=keyword.control.def  cn=keyword.other.schema
+ 12  def=keyword.control.def  kind=keyword.other.kind
+ 13  description=keyword.other.property  "=string.quoted.double  A product the stores, the web shop and the marketplace sell.=string.quoted.double  "=string.quoted.double
+ 14  label=keyword.other.property  "=string.quoted.double  Product=string.quoted.double  "=string.quoted.double  "=string.quoted.double  Produkt=string.quoted.double  "=string.quoted.double
+ 15  "=string.quoted.double  doc://hartland/handbook#products=string.quoted.double  "=string.quoted.double
+ 16  grounds=keyword.other.property  md=keyword.other.schema
+ 18  lexicon=keyword.other.schema  "=string.quoted.double  product=string.quoted.double  "=string.quoted.double  "=string.quoted.double  item=string.quoted.double  "=string.quoted.double  "=string.quoted.double  SKU=string.quoted.double  "=string.quoted.double
+ 20  def=keyword.control.def  kind=keyword.other.kind
+ 21  label=keyword.other.property  "=string.quoted.double  Product category=string.quoted.double  "=string.quoted.double
+ 22  grounds=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+ 23  hierarchy=keyword.other.kind  er=keyword.other.schema  entity=keyword.other.kind
+ 25  def=keyword.control.def  kind=keyword.other.kind
+ 27  members=keyword.other.property  descendants(ProductCategory,=meta.embedded.block.pl  '=string.quoted.single  H10-H19=string.quoted.single  '=string.quoted.single  )=meta.embedded.block.pl
+ 28  label=keyword.other.property  "=string.quoted.double  Home and garden categories=string.quoted.double  "=string.quoted.double
+ 30  def=keyword.control.def  kind=keyword.other.kind  grounds=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+ 31  def=keyword.control.def  kind=keyword.other.kind  label=keyword.other.property  "=string.quoted.double  Distribution center=string.quoted.double  "=string.quoted.double  grounds=keyword.other.property  md=keyword.other.schema  tags=keyword.other.property  "=string.quoted.double  logistics=string.quoted.double  "=string.quoted.double
+ 32  def=keyword.control.def  kind=keyword.other.kind  label=keyword.other.property  "=string.quoted.double  Party=string.quoted.double  "=string.quoted.double
+ 33  def=keyword.control.def  kind=keyword.other.kind
+ 35  type=keyword.other.property  to=keyword.other.property
+ 39  def=keyword.control.def  role=keyword.other.kind
+ 41  event=keyword.other.kind
+ 42  label=keyword.other.property  "=string.quoted.double  Customer=string.quoted.double  "=string.quoted.double  "=string.quoted.double  Zákazník=string.quoted.double  "=string.quoted.double
+ 43  grounds=keyword.other.property  md=keyword.other.schema
+ 47  def=keyword.control.def  event=keyword.other.kind
+ 48  extent=keyword.other.property
+ 49  involves=keyword.other.property
+ 50  period=keyword.other.property
+ 51  grounds=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+ 54  def=keyword.control.def  event=keyword.other.kind
+ 55  extent=keyword.other.property
+ 56  involves=keyword.other.property  as=keyword.operator.word
+ 57  period=keyword.other.property
+ 60  def=keyword.control.def  event=keyword.other.kind
+ 61  involves=keyword.other.property
+ 62  period=keyword.other.property
+ 63  grounds=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+ 66  def=keyword.control.def  event=keyword.other.kind
+ 67  extent=keyword.other.property
+ 68  involves=keyword.other.property  as=keyword.operator.word  from=keyword.other.property  as=keyword.operator.word  to=keyword.other.property
+ 69  period=keyword.other.property  precision=keyword.other.property
+ 72  def=keyword.control.def  event=keyword.other.kind
+ 73  extent=keyword.other.property
+ 74  involves=keyword.other.property
+ 75  period=keyword.other.property
+ 79  def=keyword.control.def  quality=keyword.other.kind  label=keyword.other.property  "=string.quoted.double  Revenue=string.quoted.double  "=string.quoted.double  "=string.quoted.double  Tržby=string.quoted.double  "=string.quoted.double  grounds=keyword.other.property  md=keyword.other.schema
+ 80  def=keyword.control.def  quality=keyword.other.kind  value_space=keyword.other.property  grounds=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+ 81  def=keyword.control.def  quality=keyword.other.kind  true=constant.language  grounds=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+ 82  def=keyword.control.def  quality=keyword.other.kind  definition=keyword.other.property  amount=meta.embedded.line.pl  -=keyword.operator  paid=meta.embedded.line.pl
+ 83  def=keyword.control.def  quality=keyword.other.kind
+ 85  definition=keyword.other.property  pl=entity.name.tag.language
+ 86  this.period.at=meta.embedded.block.pl  -=keyword.operator  this.from.period.at=meta.embedded.block.pl
+ 91  def=keyword.control.def  phase=keyword.other.kind
+ 93  label=keyword.other.property  "=string.quoted.double  Pending order=string.quoted.double  "=string.quoted.double
+ 94  definition=keyword.other.property  state=meta.embedded.block.pl  in=keyword.operator.word  (=meta.embedded.block.pl  '=string.quoted.single  placed=string.quoted.single  '=string.quoted.single  ,=meta.embedded.block.pl  '=string.quoted.single  held=string.quoted.single  '=string.quoted.single  )=meta.embedded.block.pl
+ 96  def=keyword.control.def  phase=keyword.other.kind  definition=keyword.other.property  invoice_status=meta.embedded.block.pl  ==keyword.operator  '=string.quoted.single  open=string.quoted.single  '=string.quoted.single  and=keyword.operator.word  period.=meta.embedded.block.pl  end=keyword.control.conditional  <=keyword.operator  as_of=meta.embedded.block.pl
+ 97  def=keyword.control.def  phase=keyword.other.kind
+ 99  definition=keyword.other.property  exists Invoicing involving this=meta.embedded.block.pl  as=keyword.operator.word  customer where OverdueInvoice=meta.embedded.block.pl
+102  def=keyword.control.def  phase=keyword.other.kind  grounds=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+103  def=keyword.control.def  phase=keyword.other.kind  true=constant.language
+104  def=keyword.control.def  phase=keyword.other.kind
+107  basis=keyword.other.property
+108  definition=keyword.other.property  exists StockoutEpisode e involving this where e.period contains as_of=meta.embedded.block.pl
+112  def=keyword.control.def  relation_type=keyword.other.kind  description=keyword.other.property  "=string.quoted.double  A supplier supplies a distribution center.=string.quoted.double  "=string.quoted.double  label=keyword.other.property  "=string.quoted.double  supplies=string.quoted.double  "=string.quoted.double"
+`;
+
+exports[`ttrm.tmLanguage.json — the 0.17 conceptual model > tokenizes 76-cn-bindings.ttrm (snapshot) 1`] = `
+"  6  package=keyword.control.package
+  7  model=keyword.control.def  binding=keyword.other.schema
+ 10  def=keyword.control.def  cn2md_kind=keyword.other.kind  kind=keyword.other.property  cn=keyword.other.schema  target=keyword.other.property  md=keyword.other.schema
+ 11  def=keyword.control.def  cn2md_role=keyword.other.kind  role=keyword.other.kind  cn=keyword.other.schema  target=keyword.other.property  md=keyword.other.schema
+ 12  def=keyword.control.def  cn2md_quality=keyword.other.kind  quality=keyword.other.kind  cn=keyword.other.schema  target=keyword.other.property  md=keyword.other.schema
+ 13  def=keyword.control.def  cn2md_quality=keyword.other.kind  quality=keyword.other.kind  cn=keyword.other.schema  target=keyword.other.property  md=keyword.other.schema  description=keyword.other.property  "=string.quoted.double  an attribute, not a measure=string.quoted.double  "=string.quoted.double
+ 14  def=keyword.control.def  cn2md_event=keyword.other.kind  event=keyword.other.kind  cn=keyword.other.schema  target=keyword.other.property  md=keyword.other.schema
+ 17  def=keyword.control.def  cn2er_kind=keyword.other.kind
+ 18  kind=keyword.other.property  cn=keyword.other.schema
+ 19  target=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+ 20  hierarchy=keyword.other.kind  er=keyword.other.schema  entity=keyword.other.kind
+ 22  def=keyword.control.def  cn2er_kind=keyword.other.kind  kind=keyword.other.property  cn=keyword.other.schema  target=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+ 23  def=keyword.control.def  cn2er_role=keyword.other.kind  role=keyword.other.kind  cn=keyword.other.schema  target=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+ 24  def=keyword.control.def  cn2er_role=keyword.other.kind  role=keyword.other.kind  cn=keyword.other.schema  target=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind  via=keyword.other.property  er=keyword.other.schema  relation=keyword.other.kind
+ 25  def=keyword.control.def  cn2er_event=keyword.other.kind
+ 26  event=keyword.other.kind  cn=keyword.other.schema
+ 27  target=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+ 29  er=keyword.other.schema  relation=keyword.other.kind
+ 30  from=keyword.other.property  er=keyword.other.schema  relation=keyword.other.kind
+ 31  to=keyword.other.property  er=keyword.other.schema  relation=keyword.other.kind  er=keyword.other.schema  relation=keyword.other.kind
+ 33  period=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+ 35  def=keyword.control.def  cn2er_event=keyword.other.kind
+ 36  event=keyword.other.kind  cn=keyword.other.schema
+ 37  target=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+ 38  period=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind  er=keyword.other.schema  entity=keyword.other.kind
+ 40  def=keyword.control.def  cn2er_quality=keyword.other.kind  quality=keyword.other.kind  cn=keyword.other.schema  target=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+ 41  def=keyword.control.def  cn2er_quality=keyword.other.kind
+ 42  quality=keyword.other.kind  cn=keyword.other.schema
+ 43  target=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+ 44  filter=keyword.other.property  warehouse=meta.embedded.block.pl  ==keyword.operator  1=constant.numeric
+ 46  def=keyword.control.def  cn2er_phase=keyword.other.kind  phase=keyword.other.kind  cn=keyword.other.schema  target=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
+ 49  def=keyword.control.def  cn2db_concept=keyword.other.kind  concept=keyword.other.property  cn=keyword.other.schema  target=keyword.other.property  db=keyword.other.schema  tags=keyword.other.property  "=string.quoted.double  legacy=string.quoted.double  "=string.quoted.double"
+`;
+
+exports[`ttrm.tmLanguage.json — the 0.17 conceptual model > tokenizes 77-cn-sugar.ttrm (snapshot) 1`] = `
+"  5  package=keyword.control.package
+  7  def=keyword.control.def  cubelet=keyword.other.kind
+  8  grain=keyword.other.property
+  9  concept=keyword.other.property  event=keyword.other.kind  involves=keyword.other.property
+ 11  def=keyword.control.def  dimension=keyword.other.kind
+ 12  key=keyword.other.property
+ 13  concept=keyword.other.property  kind=keyword.other.property  label=keyword.other.property  "=string.quoted.double  Product=string.quoted.double  "=string.quoted.double
+ 15  def=keyword.control.def  domain=keyword.other.kind  type=keyword.other.property  text=support.type.primitive  concept=keyword.other.property  kind=keyword.other.property
+ 16  def=keyword.control.def  measure=keyword.other.kind  domain=keyword.other.kind  md=keyword.other.schema  aggregation=keyword.other.property  concept=keyword.other.property  quality=keyword.other.kind
+ 18  def=keyword.control.def  entity=keyword.other.kind
+ 19  attributes=keyword.other.property
+ 20  def=keyword.control.def  attribute=keyword.other.kind  type=keyword.other.property  int=support.type.primitive  isKey=keyword.other.property  true=constant.language
+ 21  def=keyword.control.def  attribute=keyword.other.kind  type=keyword.other.property  text=support.type.primitive  concept=keyword.other.property  quality=keyword.other.kind
+ 23  concept=keyword.other.property  kind=keyword.other.property
+ 25  def=keyword.control.def  entity=keyword.other.kind  concept=keyword.other.property  event=keyword.other.kind  period=keyword.other.property
+ 26  def=keyword.control.def  entity=keyword.other.kind  concept=keyword.other.property  role=keyword.other.kind  event=keyword.other.kind
+ 27  def=keyword.control.def  entity=keyword.other.kind
+ 28  attributes=keyword.other.property  def=keyword.control.def  attribute=keyword.other.kind  type=keyword.other.property  text=support.type.primitive  concept=keyword.other.property  kind=keyword.other.property"
+`;
+
+exports[`ttrm.tmLanguage.json — the 0.17 conceptual model > tokenizes 78-cn-lexicon.ttrm (snapshot) 1`] = `
+"  4  model=keyword.control.def  lexicon=keyword.other.schema  locale=keyword.control.def
+  6  def=keyword.control.def  term=keyword.other.kind
+  7  for=keyword.other.property  cn=keyword.other.schema
+  8  forms=keyword.other.property  "=string.quoted.double  customer=string.quoted.double  "=string.quoted.double  "=string.quoted.double  customers=string.quoted.double  "=string.quoted.double  "=string.quoted.double  client=string.quoted.double  "=string.quoted.double
+  9  default=keyword.other.property  true=constant.language
+ 11  def=keyword.control.def  term=keyword.other.kind  for=keyword.other.property  cn=keyword.other.schema  forms=keyword.other.property  "=string.quoted.double  debtor=string.quoted.double  "=string.quoted.double  "=string.quoted.double  customer with overdue invoices=string.quoted.double  "=string.quoted.double  sense_priority=keyword.other.property  2=constant.numeric
+ 12  def=keyword.control.def  term=keyword.other.kind
+ 13  description=keyword.other.property  "=string.quoted.double  a phase never takes the bare form (cn/phase-as-default)=string.quoted.double  "=string.quoted.double
+ 14  for=keyword.other.property  cn=keyword.other.schema
+ 15  forms=keyword.other.property  "=string.quoted.double  customer=string.quoted.double  "=string.quoted.double
+ 16  default=keyword.other.property  false=constant.language
+ 17  sense_priority=keyword.other.property  1=constant.numeric
+ 19  def=keyword.control.def  term=keyword.other.kind  for=keyword.other.property  cn=keyword.other.schema  forms=keyword.other.property  "=string.quoted.double  revenue=string.quoted.double  "=string.quoted.double  "=string.quoted.double  sales=string.quoted.double  "=string.quoted.double  default=keyword.other.property  true=constant.language  sense_priority=keyword.other.property  3=constant.numeric
+ 20  def=keyword.control.def  term=keyword.other.kind  for=keyword.other.property  cn=keyword.other.schema  forms=keyword.other.property  "=string.quoted.double  channel=string.quoted.double  "=string.quoted.double  "=string.quoted.double  sales channel=string.quoted.double  "=string.quoted.double
+ 21  def=keyword.control.def  term=keyword.other.kind  for=keyword.other.property  md=keyword.other.schema  forms=keyword.other.property  "=string.quoted.double  product=string.quoted.double  "=string.quoted.double
+ 22  def=keyword.control.def  example=keyword.other.kind  for=keyword.other.property  cn=keyword.other.schema  text=support.type.primitive  "=string.quoted.double  revenue on the web last month=string.quoted.double  "=string.quoted.double  default=keyword.other.property  true=constant.language  sense_priority=keyword.other.property  1=constant.numeric"
+`;

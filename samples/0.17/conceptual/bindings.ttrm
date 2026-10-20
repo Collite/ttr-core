@@ -1,0 +1,47 @@
+// One grounding per concept, all on the er face (this slice has no md model). An event's participants
+// are relation paths from its entity; the customer of an invoice is reached through its order.
+model binding
+
+def cn2er_kind warehouse_g { kind: cn.Warehouse, target: er.entity.warehouse }
+
+def cn2er_role customer_g { role: cn.Customer, target: er.entity.customer }
+
+def cn2er_event order_g {
+    event: cn.Order,
+    target: er.entity.order,
+    period: { start: er.entity.order.placed_date, end: er.entity.order.delivered_date },
+    participants: {
+        customer: [er.relation.order_customer],
+        fulfilling: [er.relation.order_warehouse]
+    }
+}
+
+def cn2er_event invoicing_g {
+    event: cn.Invoicing,
+    target: er.entity.invoice,
+    period: { start: er.entity.invoice.issued, end: er.entity.invoice.due },
+    participants: {
+        customer: [er.relation.invoice_order, er.relation.order_customer],
+        order: [er.relation.invoice_order]
+    }
+}
+
+def cn2er_quality warehouse_name_g { quality: cn.warehouse_name, target: er.entity.warehouse.warehouse_name }
+
+def cn2er_quality order_value_g { quality: cn.order_value, target: er.entity.order.order_value }
+
+def cn2er_quality state_g { quality: cn.state, target: er.entity.order.state }
+
+def cn2er_quality placed_date_g { quality: cn.placed_date, target: er.entity.order.placed_date }
+
+def cn2er_quality delivered_date_g { quality: cn.delivered_date, target: er.entity.order.delivered_date }
+
+def cn2er_quality issued_g { quality: cn.issued, target: er.entity.invoice.issued }
+
+def cn2er_quality due_g { quality: cn.due, target: er.entity.invoice.due }
+
+def cn2er_quality amount_g { quality: cn.amount, target: er.entity.invoice.amount }
+
+def cn2er_quality paid_g { quality: cn.paid, target: er.entity.invoice.paid }
+
+def cn2er_quality invoice_status_g { quality: cn.invoice_status, target: er.entity.invoice.invoice_status }

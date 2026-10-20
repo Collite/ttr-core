@@ -13,6 +13,7 @@
 - [Binding](08-mapping.md)
 - [CNC roles](09-cnc-roles.md)
 - [MD model](15-md-model.md)
+- [Conceptual model (cn)](20-conceptual-model.md)
 
 **Organizing models**
 - [Packages, imports, and areas](10-packages-and-imports.md)
