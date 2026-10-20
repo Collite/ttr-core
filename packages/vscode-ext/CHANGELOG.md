@@ -3,6 +3,22 @@
 All notable changes to the `collite.ttr-modeler-vsc` extension. Versions track
 the grammar/IDE-support line owned by the `tatrman` repo.
 
+## Unreleased
+
+Grammar 0.17 — the conceptual model (`model cn`).
+
+- **cn highlighting.** `cn` (and the `cn.` ref head), the concept def nouns (`kind`, `role`, `event`,
+  `quality`, `phase`, `relation_type`), the ten `cn2md_*` / `cn2er_*` / `cn2db_concept` binding kinds, the cn
+  keys (`involves`, `period`, `grounds`, `definition`, `value_space`, `extent`, `basis`, `concept`) and the
+  lexicon `default` / `sense_priority` color as keywords; `as` in `Warehouse as from` as an operator word.
+- **Expression blocks.** After `definition:`, `members:` or a binding's `filter:`, a `"""pl` block, an
+  untagged triple-string or a string highlights as an embedded `pl` expression (operators, words, literals,
+  comments) instead of a plain string; an apostrophe in a comment or an unclosed `/*` can no longer colour
+  the rest of the file.
+- **Formatting `model cn` / `model binding` files** lays them out canonically (see the grammar CHANGELOG
+  0.17); md files, `drill_map` and the world's `engine` / `executor` / `storage` are no longer emptied by
+  format-document, and `model lexicon locale <id>` keeps its locale.
+
 ## 0.9.9 — 2026-07-17
 
 Syntax-highlighting fixes for the TextMate grammar (no parser/LSP change).

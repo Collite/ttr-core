@@ -1,0 +1,13 @@
+[project]
+name = "hartland-0.17-conceptual"
+
+[language]
+preferred = "en"
+
+[schemas]
+declared = ["db", "er", "binding", "cn", "lexicon"]
+namespaces = { db = "dbo", er = "entity" }
+
+[lint]
+strict = false
+require-descriptions = false

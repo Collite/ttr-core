@@ -10,9 +10,10 @@ A *model* is a perspective on the data, selected with the `model` directive. Onl
 |---|---|---|
 | `db` | Physical database — tables, columns, keys, indexes, FKs, queries, procedures | yes (`dbo`, …) |
 | `er` | Conceptual — entities, attributes, relations, logical queries | no |
-| `binding` | Correspondence between `er` and `db` (`er2db_*`, `md2*`) | no |
-| `cnc` | Semantic roles (fact, dimension, …) | no |
+| `binding` | Correspondence between `er` and `db` (`er2db_*`, `md2*`), and the concepts' groundings (`cn2*`) | no |
+| `cnc` | Semantic roles (fact, dimension, …) — deprecated in grammar 0.17 | no |
 | `md` | Multidimensional logical model ([MD model](15-md-model.md)) | no |
+| `cn` | Conceptual model — kinds, roles, events, qualities, phases ([Conceptual model](20-conceptual-model.md)) | no |
 
 A file selects a model with `model <code> [schema <id>]` (the `schema` only for `db`). A `.ttrg` graph names its model with `model: <code>`. There is no separate `query` model — `def query` and `def procedure` are `db`-layer objects (grammar 4.0); a `def query` declared in a `model er` file is an `er`-layer [logical query](12-queries-and-procedures.md#logical-queries), `er.query.<name>`.
 
@@ -48,6 +49,8 @@ The two are mutually exclusive per file; mixing them is a `wrong-file-kind` erro
 | `er2cnc_role` | `binding`/`cnc` | `entity`, `role` |
 | `drill_map` | `db` | `from`, `to`, `args`, `display`, `override` |
 | `schema` | (any — tier-neutral) | `columns` (each a `def column` with `type`, `optional`) — a named row shape (grammar 0.14); TTR-P holds `display(<name>)` rows to it |
+| `kind` · `role` · `event` · `quality` · `phase` · `relation_type` | `cn` | one shared body — `of`, `is_a`, `grounds`, `involves`, `period`, `definition`, … (grammar 0.17, [Conceptual model](20-conceptual-model.md)); a `role` in a `cn` file is a concept role |
+| `cn2md_*` · `cn2er_*` · `cn2db_concept` | `binding` | the stereotype key (`kind:`, `role:`, …), `target`, and `period` / `participants` / `via` / `filter` / `hierarchy` |
 
 Every kind also accepts `description` and `tags`. Many `er`/`db` kinds also accept a `search { … }` block.
 

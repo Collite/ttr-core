@@ -142,6 +142,9 @@ export enum DiagnosticCode {
   // D7 fallback chain already degrades an unusable map to "".
   LocalizedDescriptionEmpty = 'ttr/localized-description-empty',        // `description: {}` — a map that names no locale
   LocalizedDescriptionMissingLocale = 'ttr/localized-description-missing-locale', // map omits the unit's declared `locale`
+  // 0.17 (CN-P1) — parse-level checks on a cn body. The `cn/*` slugs (cn contracts §7) are semantic, CN-P2.
+  DuplicateProperty = 'ttr/duplicate-property',                   // a cn body names one key twice — the first is read
+  ExpressionBlockRequired = 'ttr/expression-block-required',      // a binding's `filter:` that is not a string or block
 }
 
 export enum DiagnosticSeverity {

@@ -1,0 +1,20 @@
+{
+    "diagnostics": [
+        "ttr/required-property-missing",
+        "ttr/required-property-missing"
+    ],
+    "resolved": [],
+    "symbols": [
+        "hartland.concepts.er.entity.channel_sales",
+        "hartland.concepts.er.entity.channel_sales.channel",
+        "hartland.concepts.er.entity.customer",
+        "hartland.concepts.er.entity.invoice",
+        "hartland.concepts.er.entity.invoice.invoice_id",
+        "hartland.concepts.er.entity.invoice.status",
+        "hartland.concepts.er.entity.order",
+        "hartland.concepts.md.cubelet.storeReturns",
+        "hartland.concepts.md.dimension.Product",
+        "hartland.concepts.md.domain.ReasonCode",
+        "hartland.concepts.md.measure.returnAmount"
+    ]
+}

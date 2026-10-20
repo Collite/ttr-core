@@ -44,6 +44,23 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   model's relations could not condition. It stays on the join while the join has no condition. Proto3: a reader that
   does not know it ignores it, and an unmarked join serializes exactly as before.
 
+- **Grammar 0.16 → 0.17 — the conceptual model (CN-P1; `ttr-parser`, `ttr-semantics`, the TS and Python parsers).**
+  `model cn` with `def kind` · `event` · `quality` · `phase` · `relation_type` and the cn `def role` on one shared
+  body (typed `description`, `label`, `tags`, the stereotype refs, `grounds`, `involves` with `as`-labelled
+  participants, `period`, `extent`, `basis`, `value_space`, `definition` / `members` as expression blocks, inline
+  `lexicon`, then free-form properties in authored order); ten binding kinds under `model binding`
+  (`cn2md_kind | role | quality | event`, `cn2er_kind | role | event | quality | phase`, `cn2db_concept`); the
+  `concept { … }` sugar inside `cubelet`, `dimension`, `domain`, `measure`, `entity` and `attribute`; lexicon
+  entries gain `default:` and `sense_priority:` and take `for: cn.<X>`. Additive — every 0.16 file parses
+  unchanged and every conformance golden 01–74 is byte-unchanged; fixtures 75–79 added, zero drift on the three
+  targets. `ttr-parser` (Kotlin): `ConceptDef`, `ConceptBindingDef`, `ConceptSugar` (on entity,
+  attribute and the four md hosts), a sealed `ConceptProperty`, `EmbeddedBlock`; `LexiconEntryDef.default` /
+  `sensePriority`; codes `ttr/duplicate-property` (also a second `concept { }` on a host),
+  `ttr/expression-block-required`; `EmbeddedBlock.location()` counts code points and steps over a string
+  form's `escapes` (a backslash escapes any character there, a line break too). `ttr-semantics` carries the cn
+  defs through unchecked (the cn semantics, the typed model and `ttr-writer` support are CN-P2). `model cnc` and
+  `roles:` are deprecated (they parse unchanged). Tooling: TextMate highlighting and the formatter's cn layout
+  (see `packages/grammar/CHANGELOG.md` 0.17). Manual: [Conceptual model (cn)](docs/manual/en/20-conceptual-model.md).
 - **TTR-P — the recipe checker (AU-core-P1; `ttrp-frontend` · `ttrp-graph` · `ttrp-cli`).** A recipe is checked
   against the world and the model: the role shape and wiring (`TTRP-REC-000`), the action wiring typed against
   `def action` (`-001`…`-003`), the candidates' key (`-004`, `-005`), key lineage with each context's class (lookup /

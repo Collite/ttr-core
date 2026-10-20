@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-__all__ = ["TagEntry", "TAG_REGISTRY", "resolve_tag"]
+__all__ = ["EXPRESSION_TAG_REGISTRY", "TagEntry", "TAG_REGISTRY", "resolve_expression_tag", "resolve_tag"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,3 +67,15 @@ def resolve_tag(tag: str) -> TagEntry | None:
     parsed body is preserved, just not semantically tagged).
     """
     return TAG_REGISTRY.get(tag)
+
+
+# Grammar 0.17 (⚑CN-P5) — the languages an EXPRESSION block (`definition:`, `members:`,
+# a cn binding's `filter:`) may be tagged with: only TTR-P's expression language,
+# `"""pl`. A separate table from `TAG_REGISTRY`, which names the languages a
+# `sourceText` / `definitionSql` block holds. Mirrors the TS `EXPRESSION_TAG_REGISTRY`.
+EXPRESSION_TAG_REGISTRY: dict[str, str] = {"pl": "pl"}
+
+
+def resolve_expression_tag(tag: str) -> str | None:
+    """Resolve an expression-block tag to its language, or `None` (caller diagnoses)."""
+    return EXPRESSION_TAG_REGISTRY.get(tag)

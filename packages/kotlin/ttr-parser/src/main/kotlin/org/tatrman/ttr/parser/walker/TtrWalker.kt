@@ -2,8 +2,10 @@
 package org.tatrman.ttr.parser.walker
 
 import org.antlr.v4.runtime.ParserRuleContext
+import org.antlr.v4.runtime.tree.ParseTree
 import org.antlr.v4.runtime.tree.TerminalNode
 import org.tatrman.ttr.parser.diagnostics.DiagnosticCode
+import org.tatrman.ttr.parser.generated.TTRLexer
 import org.tatrman.ttr.parser.generated.TTRParser
 import org.tatrman.ttr.parser.loader.ParseError
 import org.tatrman.ttr.parser.loader.ParseWarning
@@ -39,6 +41,13 @@ import org.tatrman.ttr.parser.model.BindingPropertyBareId
 import org.tatrman.ttr.parser.model.BindingPropertyBlock
 import org.tatrman.ttr.parser.model.ChangeSemanticsDecl
 import org.tatrman.ttr.parser.model.ColumnDef
+import org.tatrman.ttr.parser.model.ConceptBindingDef
+import org.tatrman.ttr.parser.model.ConceptBody
+import org.tatrman.ttr.parser.model.ConceptDef
+import org.tatrman.ttr.parser.model.ConceptParticipant
+import org.tatrman.ttr.parser.model.ConceptProperty
+import org.tatrman.ttr.parser.model.ConceptSugar
+import org.tatrman.ttr.parser.model.EmbeddedBlock
 import org.tatrman.ttr.parser.model.ConstraintDef
 import org.tatrman.ttr.parser.model.DataType
 import org.tatrman.ttr.parser.model.AttributeTransition
@@ -121,8 +130,12 @@ class TtrWalker(
      */
     private val supportedLanguages = setOf("cs", "en", "de", "sk", "hu")
 
+    /** The file's `model` code — grammar 0.17 reads the one `def role` body by it (⚑CN-P6). */
+    private var modelCode: String? = null
+
     fun visitDocument(doc: TTRParser.DocumentContext): WalkResult {
         val schema = doc.modelDirective()?.let { visitModelDirective(it) }
+        modelCode = schema?.modelCode
         val defs = doc.definition().mapNotNull { visitDefinition(it) }
         val securityBlocks = doc.securityBlock().map { visitSecurityBlock(it) }
 
@@ -214,6 +227,22 @@ class TtrWalker(
         warnings += ParseWarning(file = fileLabel, line = source.line, column = source.column + 1, message = message)
     }
 
+    /** [err] at a walked node's [source] (its start — the position [err] reports for its context). */
+    private fun errAt(
+        source: SourceLocation,
+        code: DiagnosticCode,
+        message: String,
+    ) {
+        errors +=
+            ParseError(
+                file = fileLabel,
+                line = source.line,
+                column = source.column + 1,
+                message = "$code: $message",
+                code = code,
+            )
+    }
+
     private fun err(
         ctx: ParserRuleContext,
         code: DiagnosticCode,
@@ -266,6 +295,21 @@ class TtrWalker(
                     ?: emptyList(),
             match = props.firstNotNullOfOrNull { it.matchProperty()?.let { m -> stringForm(m.stringLiteralForm()) } },
             text = props.firstNotNullOfOrNull { it.textProperty()?.let { t -> stringForm(t.stringLiteralForm()) } },
+            // Grammar 0.17 — the cn default sense and its priority (cn contracts §1.5); their rules are semantic.
+            default =
+                props
+                    .lastOrNull { it.defaultProperty()?.BOOLEAN_LITERAL() != null }
+                    ?.defaultProperty()
+                    ?.BOOLEAN_LITERAL()
+                    ?.text
+                    ?.let { it == "true" },
+            sensePriority =
+                props
+                    .lastOrNull { it.sensePriorityProperty()?.NUMBER_LITERAL() != null }
+                    ?.sensePriorityProperty()
+                    ?.NUMBER_LITERAL()
+                    ?.text
+                    ?.toDouble(),
         )
     }
 
@@ -311,7 +355,8 @@ class TtrWalker(
             od.ER2DB_ATTRIBUTE() != null -> visitEr2dbAttribute(od)
             od.ER2DB_RELATION() != null -> visitEr2dbRelation(od)
             od.QUERY() != null -> visitQuery(od)
-            od.ROLE() != null -> visitRole(od)
+            // Grammar 0.17 (⚑CN-P6) — one `def role` production, read by the file's model.
+            od.ROLE() != null -> if (modelCode == "cn") visitConceptRole(od) else visitRole(od)
             od.ER2CNC_ROLE() != null -> visitEr2CncRole(od)
             od.DRILL_MAP() != null -> visitDrillMap(od)
             od.AREA() != null -> visitArea(od)
@@ -332,7 +377,10 @@ class TtrWalker(
             od.EXAMPLE() != null -> visitLexiconEntry(od, "example")
             // Grammar 0.16 — the automation kinds (`model automation`): one shared body.
             od.autoBody() != null -> visitAutomation(od)
-            else -> null
+            // Grammar 0.17 — the concept defs (`model cn`) and the cn bindings.
+            else ->
+                conceptStereotypeOf(od)?.let { visitConcept(od, it) }
+                    ?: conceptBindingKindOf(od)?.let { visitConceptBinding(od, it) }
         }
     }
 
@@ -670,6 +718,7 @@ class TtrWalker(
                 props.firstNotNullOfOrNull {
                     it.bindingProperty()?.let { m -> visitBindingProperty(m) }
                 },
+            concept = conceptSugarOf(props.map { it.conceptSugarProperty() }),
         )
     }
 
@@ -749,6 +798,7 @@ class TtrWalker(
                 props.lastOrNull { it.transitionsProperty() != null }?.transitionsProperty()?.transitionEntry()?.map {
                     AttributeTransition(it.id().text, it.listOfIds().id().map { t -> t.text }, location(it))
                 } ?: emptyList(),
+            concept = conceptSugarOf(props.map { it.conceptSugarProperty() }),
         )
     }
 
@@ -770,6 +820,7 @@ class TtrWalker(
             restrictMembers =
                 props.firstNotNullOfOrNull { it.restrictProperty()?.let { r -> restrictMembersOf(r.restrictBlock()) } }
                     ?: emptyList(),
+            concept = conceptSugarOf(props.map { it.conceptSugarProperty() }),
         )
     }
 
@@ -826,6 +877,7 @@ class TtrWalker(
             hierarchies =
                 props.firstNotNullOfOrNull { it.hierarchiesProperty()?.let { h -> idList(h.listOfIds()) } }
                     ?: emptyList(),
+            concept = conceptSugarOf(props.map { it.conceptSugarProperty() }),
         )
     }
 
@@ -896,6 +948,7 @@ class TtrWalker(
                     }
                 },
             validBy = props.firstNotNullOfOrNull { it.validByProperty()?.id()?.text },
+            concept = conceptSugarOf(props.map { it.conceptSugarProperty() }),
         )
 
     private fun visitCubelet(od: TTRParser.ObjectDefinitionContext): CubeletDef {
@@ -917,6 +970,7 @@ class TtrWalker(
             measures =
                 props.firstNotNullOfOrNull { it.measuresProperty()?.let { m -> cubeletMeasures(m.measuresValue()) } }
                     ?: emptyList(),
+            concept = conceptSugarOf(props.map { it.conceptSugarProperty() }),
         )
     }
 
@@ -1347,6 +1401,21 @@ class TtrWalker(
 
     private fun visitRole(od: TTRParser.ObjectDefinitionContext): RoleDef {
         val props = od.roleDef().roleProperty()
+        // Grammar 0.17 (⚑CN-P6) — the cn role's properties ride the one `roleProperty` production. Only a
+        // role outside `model cn` reaches here (a cn role is a [ConceptDef]), so they are rejected: a cnc /
+        // automation role keeps its 0.16 surface and a typo (`lable:`) is still a parse error (review-114 M5).
+        props.forEach { p ->
+            val cnOnly: ParserRuleContext =
+                p.cnEntry() ?: p.cnRefProperty() ?: p.groundsProperty() ?: p.lexiconBlockProperty()
+                    ?: return@forEach
+            val key = p.cnEntry()?.cnKey()?.text ?: cnOnly.getChild(0).text
+            err(
+                cnOnly,
+                DiagnosticCode.UnknownProperty,
+                "unknown role property '$key'${modelCode?.let { " in model $it" } ?: ""} — only a role in a " +
+                    "'model cn' file takes the concept properties",
+            )
+        }
         return RoleDef(
             name = od.id().text,
             source = defSource(od),
@@ -1590,6 +1659,469 @@ class TtrWalker(
             processes = processes,
         )
     }
+
+    // ----- Grammar 0.17 — the conceptual model (`model cn`; CN-P1, cn contracts §1) -----
+    // The concept defs, a cn `def role`, the cn bindings and the `concept { }` sugar read one way: every
+    // property, in authored order, to one [ConceptProperty] (its key as written, its span) — typed where
+    // the grammar types it, a free-form [ConceptProperty.Entry] otherwise. A repeated key is reported
+    // (`ttr/duplicate-property`); the first one is read. Mirrors the TS walker's cn section.
+
+    private fun conceptStereotypeOf(od: TTRParser.ObjectDefinitionContext): String? =
+        when {
+            od.KIND() != null -> "kind"
+            od.EVENT() != null -> "event"
+            od.PHASE() != null -> "phase"
+            od.QUALITY() != null -> "quality"
+            od.RELATION_TYPE() != null -> "relation_type"
+            else -> null
+        }
+
+    private fun conceptBindingKindOf(od: TTRParser.ObjectDefinitionContext): String? =
+        when {
+            od.CN2MD_KIND() != null -> "cn2md_kind"
+            od.CN2MD_ROLE() != null -> "cn2md_role"
+            od.CN2MD_QUALITY() != null -> "cn2md_quality"
+            od.CN2MD_EVENT() != null -> "cn2md_event"
+            od.CN2ER_KIND() != null -> "cn2er_kind"
+            od.CN2ER_ROLE() != null -> "cn2er_role"
+            od.CN2ER_EVENT() != null -> "cn2er_event"
+            od.CN2ER_QUALITY() != null -> "cn2er_quality"
+            od.CN2ER_PHASE() != null -> "cn2er_phase"
+            od.CN2DB_CONCEPT() != null -> "cn2db_concept"
+            else -> null
+        }
+
+    private fun visitConcept(
+        od: TTRParser.ObjectDefinitionContext,
+        stereotype: String,
+    ): ConceptDef? {
+        val name = od.id()?.text ?: return null
+        return ConceptDef(
+            stereotype,
+            name,
+            defSource(od),
+            visitConceptBody(od.cnBody()?.cnProperty().orEmpty(), "concept"),
+        )
+    }
+
+    /** A `def role` in a `model cn` file (⚑CN-P6): a concept of stereotype `role`. */
+    private fun visitConceptRole(od: TTRParser.ObjectDefinitionContext): ConceptDef? {
+        val name = od.id()?.text ?: return null
+        return ConceptDef("role", name, defSource(od), visitConceptBody(od.roleDef()?.roleProperty().orEmpty(), "role"))
+    }
+
+    private fun visitConceptBinding(
+        od: TTRParser.ObjectDefinitionContext,
+        bindingKind: String,
+    ): ConceptBindingDef? {
+        val name = od.id()?.text ?: return null
+        val props = od.cnBindingBody()?.cnBindingProperty().orEmpty()
+        return ConceptBindingDef(bindingKind, name, defSource(od), visitConceptBody(props, "binding"))
+    }
+
+    /**
+     * One `concept { }` per host (cn contracts §1.4): a second one is `ttr/duplicate-property` and the first
+     * is read — the cn body's rule, so CN-P2 and the formatter never meet a sugar the AST threw away.
+     */
+    private fun conceptSugarOf(props: List<TTRParser.ConceptSugarPropertyContext?>): ConceptSugar? {
+        val sugars = props.filterNotNull()
+        for (extra in sugars.drop(1)) {
+            errAt(
+                location(extra),
+                DiagnosticCode.DuplicateProperty,
+                "duplicate property 'concept' — the first one is read",
+            )
+        }
+        return sugars.firstOrNull()?.let { visitConceptSugar(it) }
+    }
+
+    private fun visitConceptSugar(ctx: TTRParser.ConceptSugarPropertyContext): ConceptSugar =
+        ConceptSugar(visitConceptBody(ctx.cnBody()?.cnProperty().orEmpty(), "concept"), location(ctx))
+
+    /**
+     * The cn body behind `cnBody`, `cnBindingBody` and — in a `model cn` file — `roleDef` (⚑CN-P6). Each
+     * property context has exactly one child, the property rule, so one reader serves all three. [host] is
+     * `concept`, `binding` or `role`; on a binding a free-form `filter:` is an expression block (A-CN-18).
+     */
+    private fun visitConceptBody(
+        props: List<ParserRuleContext>,
+        host: String,
+    ): ConceptBody {
+        val properties = mutableListOf<ConceptProperty>()
+        val seen = mutableSetOf<String>()
+        var body = ConceptBody()
+        for (p in props) {
+            val prop = visitConceptProperty(p.getChild(0), host) ?: continue
+            if (!seen.add(prop.key)) {
+                errAt(
+                    prop.source,
+                    DiagnosticCode.DuplicateProperty,
+                    "duplicate property '${prop.key}' — the first one is read",
+                )
+            } else {
+                when (prop) {
+                    is ConceptProperty.Description ->
+                        body =
+                            body.copy(
+                                description =
+                                    (prop.value as? PropertyValue.StringValue)?.raw
+                                        ?: (prop.value as? PropertyValue.TripleStringValue)?.raw,
+                                descriptionLocalized = prop.localized ?: LocalizedStringValue(),
+                            )
+                    is ConceptProperty.Label -> body = body.copy(label = prop.value)
+                    is ConceptProperty.Tags -> body = body.copy(tags = prop.value)
+                    else -> {}
+                }
+            }
+            properties += prop
+        }
+        return body.copy(properties = properties)
+    }
+
+    /** One cn property, or null when error recovery left it half-built (its syntax error is reported). */
+    @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
+    private fun visitConceptProperty(
+        c: ParseTree?,
+        host: String,
+    ): ConceptProperty? {
+        if (c !is ParserRuleContext) return null
+        val key = c.getChild(0)?.text ?: ""
+        val source = location(c)
+        return when (c) {
+            is TTRParser.DescriptionPropertyContext -> {
+                val value = c.stringLiteralForm()?.let { stringFormValue(it) }
+                val localized = c.localizedString()?.let { visitLocalizedString(it) }
+                if (value == null &&
+                    localized == null
+                ) {
+                    null
+                } else {
+                    ConceptProperty.Description(key, value, localized, source)
+                }
+            }
+            is TTRParser.LabelPropertyContext ->
+                c.localizedString()?.let { ConceptProperty.Label(key, visitLocalizedString(it), source) }
+            is TTRParser.TagsPropertyContext ->
+                c.listOfStrings()?.let {
+                    ConceptProperty.Tags(
+                        key,
+                        stringList(it),
+                        source,
+                    )
+                }
+            is TTRParser.CnRefPropertyContext -> referenceOf(c.id())?.let { ConceptProperty.Ref(key, it, source) }
+            is TTRParser.GroundsPropertyContext -> referenceOf(c.id())?.let { ConceptProperty.Grounds(key, it, source) }
+            is TTRParser.ValueSpacePropertyContext ->
+                referenceOf(c.id())?.let { ConceptProperty.ValueSpace(key, it, source) }
+            is TTRParser.InvolvesPropertyContext ->
+                ConceptProperty.Involves(
+                    key,
+                    c.participant().mapNotNull { pc ->
+                        referenceOf(pc.id(0))?.let { ref ->
+                            val label = if (pc.AS() != null) pc.id(1)?.text?.takeIf { it.isNotEmpty() } else null
+                            ConceptParticipant(ref, label, location(pc))
+                        }
+                    },
+                    source,
+                )
+            is TTRParser.PeriodPropertyContext ->
+                c.cnObject()?.let {
+                    ConceptProperty.Period(
+                        key,
+                        visitCnObject(it),
+                        source,
+                    )
+                }
+            is TTRParser.ExtentPropertyContext -> c.id()?.text?.let { ConceptProperty.Extent(key, it, source) }
+            is TTRParser.BasisPropertyContext -> c.id()?.text?.let { ConceptProperty.Basis(key, it, source) }
+            is TTRParser.DefinitionPropertyContext ->
+                expressionTokenOf(c.embeddedBlock())?.let { walkExpressionBlock(it, key) }?.let {
+                    ConceptProperty.DefinitionBlock(key, it, source)
+                }
+            is TTRParser.ConceptMembersPropertyContext ->
+                expressionTokenOf(c.embeddedBlock())?.let { walkExpressionBlock(it, key) }?.let {
+                    ConceptProperty.MembersBlock(key, it, source)
+                }
+            is TTRParser.LexiconBlockPropertyContext ->
+                c.object_()?.let { ConceptProperty.Lexicon(key, visitLexiconBlock(it), source) }
+            is TTRParser.TargetPropertyContext ->
+                if (c.object_() != null ||
+                    c.id() != null
+                ) {
+                    ConceptProperty.Target(key, visitTargetValue(c), source)
+                } else {
+                    null
+                }
+            is TTRParser.CnEntryContext -> {
+                val entryKey = c.cnKey()?.text
+                val valueCtx = c.cnValue()
+                if (entryKey == null || valueCtx == null) return null
+                // A binding's `filter:` is an expression block; anything else there is a mistake worth naming.
+                if (host == "binding" && entryKey == "filter") {
+                    val form = valueCtx.literal()?.stringLiteralForm()
+                    val token = form?.TAGGED_BLOCK_LITERAL() ?: form?.TRIPLE_STRING_LITERAL() ?: form?.STRING_LITERAL()
+                    token
+                        ?.let {
+                            walkExpressionBlock(
+                                it,
+                                entryKey,
+                            )
+                        }?.let { return ConceptProperty.FilterBlock(entryKey, it, source) }
+                    errAt(
+                        location(valueCtx),
+                        DiagnosticCode.ExpressionBlockRequired,
+                        "'filter:' takes an expression block — write it as \"\"\"…\"\"\" (optionally tagged \"\"\"pl)",
+                    )
+                }
+                ConceptProperty.Entry(entryKey, visitCnValue(valueCtx), source)
+            }
+            else -> {
+                // A cnc / automation role property on a concept role (review-114 M5, the other way round).
+                if (host == "role") {
+                    errAt(
+                        source,
+                        DiagnosticCode.UnknownProperty,
+                        "unknown role property '$key' in model cn — search, resolve, delivery and members belong to " +
+                            "a cnc or automation role",
+                    )
+                }
+                null
+            }
+        }
+    }
+
+    /** The literal token of an `embeddedBlock` (tagged, triple or plain), or null when recovery dropped it. */
+    private fun expressionTokenOf(ctx: TTRParser.EmbeddedBlockContext?): TerminalNode? =
+        ctx?.TAGGED_BLOCK_LITERAL() ?: ctx?.TRIPLE_STRING_LITERAL() ?: ctx?.STRING_LITERAL()
+
+    /** A `stringLiteralForm` as its carrier: a plain string, or a (dedented) triple-string. */
+    private fun stringFormValue(ctx: TTRParser.StringLiteralFormContext): PropertyValue? {
+        ctx.STRING_LITERAL()?.let { return PropertyValue.StringValue(stringLiteral(it), location(ctx)) }
+        val triple = ctx.TRIPLE_STRING_LITERAL() ?: ctx.TAGGED_BLOCK_LITERAL() ?: return null
+        return PropertyValue.TripleStringValue(tripleStringLiteral(triple), location(ctx))
+    }
+
+    private fun referenceOf(ctx: TTRParser.IdContext?): Reference? =
+        if (ctx == null || isConjured(ctx)) null else makeRef(ctx)
+
+    /** A token the error strategy invented to recover (`<missing IDENT>`) — never real input. */
+    private fun isConjured(ctx: ParserRuleContext): Boolean =
+        ctx.start == null || ctx.start.tokenIndex < 0 || ctx.text.startsWith("<missing ")
+
+    private fun visitCnValue(ctx: TTRParser.CnValueContext): PropertyValue {
+        ctx.cnObject()?.let { return visitCnObject(it) }
+        ctx.cnList()?.let { l -> return PropertyValue.ListValue(l.cnValue().map { visitCnValue(it) }, location(l)) }
+        ctx.literal()?.let { return visitLiteral(it) }
+        ctx.id()?.let { return idValue(it.text, it) }
+        return PropertyValue.NullValue(location(ctx))
+    }
+
+    /** A cn object value. Entries keep the TS walker's rule: a later duplicate key wins, silently. */
+    private fun visitCnObject(ctx: TTRParser.CnObjectContext): PropertyValue.ObjectValue {
+        val entries = LinkedHashMap<String, PropertyValue>()
+        for (e in ctx.cnObjectEntry()) {
+            val key = e.getChild(0)?.text ?: continue
+            val valueCtx = e.cnValue() ?: continue
+            entries[key] = visitCnValue(valueCtx)
+        }
+        return PropertyValue.ObjectValue(entries, location(ctx))
+    }
+
+    /**
+     * An expression block (⚑CN-P5) — the `definitionSql` peeling, with the text's place in the file kept
+     * exactly: [EmbeddedBlock.lineOffsets] holds where every line of the text starts once the dedent
+     * removed its indent. Only `pl` (or no tag) names the expression language; a SQL-family tag is an
+     * error, any other first-line word is read as text (the lexer cannot tell `"""exists␊…` from a tag).
+     * Mirrors the TS `walkExpressionBlock` position for position.
+     */
+    @Suppress("LongMethod")
+    private fun walkExpressionBlock(
+        token: TerminalNode,
+        key: String,
+    ): EmbeddedBlock? {
+        val sym = token.symbol
+        if (sym.tokenIndex < 0 || sym.startIndex < 0) return null // conjured by error recovery
+        val raw = sym.text ?: ""
+        val col = sym.charPositionInLine
+        val end = positionAfter(raw, sym.line, col)
+        val source = SourceLocation(fileLabel, sym.line, col, end.first, end.second, sym.startIndex, sym.stopIndex + 1)
+
+        if (sym.type == TTRLexer.STRING_LITERAL) {
+            // Each escape takes two characters of the file and one of `text`: `escapes` keeps where, so a
+            // position in `text` still maps onto the file.
+            val quoted = raw.substring(1, raw.length - 1)
+            val escapes = mutableListOf<Int>()
+            val text =
+                simpleEscape.replace(quoted) { m ->
+                    escapes += quoted.codePointCount(0, m.range.first) - escapes.size
+                    m.groupValues[1]
+                }
+            return blockOf(
+                "string",
+                text,
+                source,
+                sym.startIndex + 1,
+                sym.line,
+                col + 1,
+                0,
+                stringLineOffsets(text, escapes, sym.startIndex + 1),
+                escapes,
+            )
+        }
+
+        var inner = raw.substring(3, raw.length - 3)
+        var innerStart = sym.startIndex + 3
+        var form = "tripleString"
+        if (sym.type == TTRLexer.TAGGED_BLOCK_LITERAL) {
+            val opener = taggedOpener.find(inner)
+            val tag = opener?.groupValues?.get(1)
+            val tagLength = tag?.length ?: 0
+            val tagSource =
+                SourceLocation(
+                    fileLabel,
+                    sym.line,
+                    col + 3,
+                    sym.line,
+                    col + 3 + tagLength,
+                    sym.startIndex + 3,
+                    sym.startIndex + 3 + tagLength,
+                )
+            when {
+                opener != null && tag != null && resolveExpressionTag(tag) != null -> {
+                    inner = inner.substring(opener.value.length)
+                    innerStart += opener.value.length
+                    form = "tagged"
+                }
+                tag != null && resolveTag(tag) != null ->
+                    errAt(
+                        tagSource,
+                        DiagnosticCode.LanguageTagMismatch,
+                        "'$key:' holds a TTR-P expression — the '$tag' tag names another language (use \"\"\"pl or no tag)",
+                    )
+                tag != null ->
+                    warnAt(
+                        tagSource,
+                        "${DiagnosticCode.UnknownLanguageTag}: '$tag' on the opening line of '$key:' reads as a " +
+                            "language tag; the block is kept as plain text (start the expression on the next line, " +
+                            "or tag it \"\"\"pl)",
+                    )
+            }
+        }
+
+        // The dedent (contracts §2.9) drops a leading `\n`, then the common indent of the non-blank lines.
+        val leadingNewline = if (inner.startsWith("\n")) 1 else 0
+        val body = inner.substring(leadingNewline)
+        val dedented = Dedent.applyTextwrapDedentWithIndent(inner)
+        val indentWidth = dedented.indentWidth
+        val text = if (form == "tagged") dropOneTrailingNewline(dedented.value) else dedented.value
+
+        // Every raw line of `text`, its start offset in the file, indent removed (blank lines keep column 0).
+        val rawLines = body.split("\n")
+        val lineOffsets = mutableListOf<Int>()
+        var offset = innerStart + leadingNewline
+        for (i in text.split("\n").indices) {
+            val rawLine = rawLines.getOrElse(i) { "" }
+            lineOffsets += offset + (if (rawLine.isBlank()) 0 else indentWidth)
+            offset += codePoints(rawLine) + 1
+        }
+        val first = positionAfter(raw.substring(0, innerStart - sym.startIndex + leadingNewline), sym.line, col)
+        val firstColumn = first.second + (if (rawLines[0].isNotBlank()) indentWidth else 0)
+        return blockOf(form, text, source, lineOffsets[0], first.first, firstColumn, indentWidth, lineOffsets)
+    }
+
+    @Suppress("LongParameterList")
+    private fun blockOf(
+        form: String,
+        text: String,
+        source: SourceLocation,
+        textStart: Int,
+        line: Int,
+        column: Int,
+        indentWidth: Int,
+        lineOffsets: List<Int>,
+        escapes: List<Int> = emptyList(),
+    ): EmbeddedBlock {
+        val lines = text.split("\n")
+        val lastLine = lines.size - 1
+        val lastOffset = lineOffsets.getOrElse(lastLine) { textStart }
+        // Widths in code points — the unit of the parser's offsets and columns (and of a TTR-P position).
+        val lastStart = codePoints(text) - codePoints(lines[lastLine])
+        val lastWidth = codePoints(lines[lastLine]) + escapes.count { it >= lastStart }
+        val endColumn =
+            (
+                if (lastLine == 0) {
+                    column
+                } else if (lines[lastLine].isNotEmpty()) {
+                    indentWidth
+                } else {
+                    0
+                }
+            ) +
+                lastWidth
+        return EmbeddedBlock(
+            language = "pl",
+            form = form,
+            text = text,
+            textSource =
+                SourceLocation(
+                    source.file,
+                    line,
+                    column,
+                    line + lastLine,
+                    endColumn,
+                    textStart,
+                    lastOffset + lastWidth,
+                ),
+            lineOffsets = lineOffsets,
+            indentWidth = indentWidth,
+            source = source,
+            escapes = escapes,
+        )
+    }
+
+    /**
+     * Where each line of a string-form block's [text] starts in the file: its code-point index in [text], plus
+     * one for every escape before it (an escaped line break is what starts a second line).
+     */
+    private fun stringLineOffsets(
+        text: String,
+        escapes: List<Int>,
+        textStart: Int,
+    ): List<Int> {
+        var start = 0
+        return text.split("\n").map { line ->
+            val offset = textStart + start + escapes.count { it < start }
+            start += codePoints(line) + 1
+            offset
+        }
+    }
+
+    /** The number of code points in [s] — what ANTLR counts in offsets and columns (`length` counts UTF-16 units). */
+    private fun codePoints(s: String): Int = s.codePointCount(0, s.length)
+
+    /** The 1-based line and 0-based column (in code points) just past [text], which starts at [line]:[column]. */
+    private fun positionAfter(
+        text: String,
+        line: Int,
+        column: Int,
+    ): Pair<Int, Int> {
+        val parts = text.split("\n")
+        return if (parts.size ==
+            1
+        ) {
+            line to column + codePoints(text)
+        } else {
+            line + parts.size - 1 to codePoints(parts.last())
+        }
+    }
+
+    /** JS `/\r?\n$/` (no `m` flag): one trailing newline. Not a Java regex — its `$` also matches before a final `\n`. */
+    private fun dropOneTrailingNewline(s: String): String =
+        when {
+            s.endsWith("\r\n") -> s.dropLast(2)
+            s.endsWith("\n") -> s.dropLast(1)
+            else -> s
+        }
 
     // ----- Grammar 0.16 — the automation model (`model automation`; AU-core-P0 S0.2) -----
     // One permissive body for six def kinds and the automation world members; values are
@@ -2218,6 +2750,10 @@ class TtrWalker(
                 val form = ctx.stringLiteralForm()
                 if (form.TRIPLE_STRING_LITERAL() != null) {
                     PropertyValue.TripleStringValue(tripleStringLiteral(form.TRIPLE_STRING_LITERAL()), location(ctx))
+                } else if (form.TAGGED_BLOCK_LITERAL() != null) {
+                    // A `"""word␊…"""` outside sourceText / definitionSql is a plain triple-string (the TS
+                    // `walkStringLiteralForm`); the first-line word is text, not a tag.
+                    PropertyValue.TripleStringValue(tripleStringLiteral(form.TAGGED_BLOCK_LITERAL()), location(ctx))
                 } else {
                     PropertyValue.StringValue(stringLiteral(form.STRING_LITERAL()), location(ctx))
                 }
@@ -2411,6 +2947,12 @@ class TtrWalker(
         val inner = raw.substring(3, raw.length - 3)
         return Dedent.applyTextwrapDedent(inner)
     }
+
+    /**
+     * The expression-block unescape, as on TS and Python: `[\s\S]`, not `.` — the lexer admits a backslash before
+     * any character, a line break too, and the regex engines of the three targets disagree on what `.` matches.
+     */
+    private val simpleEscape = Regex("""\\([\s\S])""")
 
     /** The opening fence of a tagged block: `<tag>[ \t]*\r?\n` (the lexer guarantees it). */
     private val taggedOpener = Regex("^([A-Za-z][A-Za-z0-9-]*)([ \t]*\r?\n)")

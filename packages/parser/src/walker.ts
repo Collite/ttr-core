@@ -7,6 +7,9 @@ import {
   Recognizer,
   Token,
   ATNSimulator,
+  ParserRuleContext,
+  ParseTree,
+  TerminalNode,
 } from 'antlr4ng';
 import { TTRLexer } from './generated/TTRLexer.js';
 import {
@@ -107,6 +110,23 @@ import {
   WritebackReservationPropertyContext,
   SecurityBlockContext,
   SecurityStatementContext,
+  CnBodyContext,
+  CnBindingBodyContext,
+  ConceptSugarPropertyContext,
+  LabelPropertyContext,
+  TagsPropertyContext,
+  CnRefPropertyContext,
+  GroundsPropertyContext,
+  ValueSpacePropertyContext,
+  InvolvesPropertyContext,
+  PeriodPropertyContext,
+  ExtentPropertyContext,
+  BasisPropertyContext,
+  DefinitionPropertyContext,
+  ConceptMembersPropertyContext,
+  CnEntryContext,
+  CnValueContext,
+  CnObjectContext,
 } from './generated/TTRParser.js';
 import type {
   SourceLocation,
@@ -217,8 +237,17 @@ import type {
   LexiconBlock,
   ChangeSemanticsDecl,
   WritebackReservation,
+  ConceptStereotype,
+  ConceptBindingKind,
+  ConceptDef,
+  ConceptBindingDef,
+  ConceptSugar,
+  ConceptBody,
+  ConceptProperty,
+  ConceptRefKey,
+  EmbeddedBlock,
 } from './ast.js';
-import { resolveTag } from './tag-registry.js';
+import { resolveTag, resolveExpressionTag } from './tag-registry.js';
 import { DiagnosticCode } from './diagnostics.js';
 import { RecoveryReportingStrategy } from './recovery.js';
 import { attachTrivia } from './cst/attach.js';
@@ -241,9 +270,11 @@ class DiagnosticErrorListener implements ANTLRErrorListener {
     _e: RecognitionException | null
   ): void {
     const symbol = _offendingSymbol;
+    const ctx = _e?.ctx ?? (_recognizer as { context?: ParserRuleContext | null }).context ?? null;
+    const hint = cnSyntaxHint(ctx instanceof ParserRuleContext ? ctx : null);
     this.errors.push({
       code: DiagnosticCode.ParseError,
-      message: msg,
+      message: hint ? `${msg} — ${hint}` : msg,
       severity: 'error',
       source: {
         file: this.fileLabel,
@@ -260,6 +291,24 @@ class DiagnosticErrorListener implements ANTLRErrorListener {
   reportAmbiguity(): void {}
   reportAttemptingFullContext(): void {}
   reportContextSensitivity(): void {}
+}
+
+/**
+ * 0.17 — the form a cn property wants, named when its value is malformed (CN-P1 S1.2 T6): a bare
+ * `definition:` / `members:` value (⚑CN-P5 — an expression block) and an unbracketed `involves:`.
+ * The error is raised in the property's own rule context or in its `embeddedBlock` / `participant`.
+ */
+function cnSyntaxHint(ctx: ParserRuleContext | null): string | undefined {
+  for (let c: ParserRuleContext | null = ctx, depth = 0; c && depth < 3; c = c.parent, depth++) {
+    if (c instanceof DefinitionPropertyContext || c instanceof ConceptMembersPropertyContext) {
+      const key = c instanceof DefinitionPropertyContext ? 'definition' : 'members';
+      return `'${key}:' takes an expression block: """…""" (optionally tagged """pl)`;
+    }
+    if (c instanceof InvolvesPropertyContext) {
+      return `'involves:' takes a bracketed list: involves: [ Item, Warehouse as from ]`;
+    }
+  }
+  return undefined;
 }
 
 export function parseString(content: string, fileLabel = '<string>'): ParseResult {
@@ -333,8 +382,12 @@ function walkDocument(ctx: DocumentContext, file: string, syntaxErrors: ParseErr
   const graphCtx = ctx.graphBlock();
   const defContexts = ctx.definition();
 
+  // 0.17 — read before the definitions: one `def role` production serves cnc, automation and cn, and
+  // the walker reads its body by the file's model (⚑CN-P6).
+  const modelDirective = schemaCtx ? walkModelDirective(schemaCtx, file) : undefined;
+
   const definitions: Definition[] = defContexts.map((defCtx: DefinitionContext) =>
-    walkDefinition(defCtx, file, localErrors)
+    walkDefinition(defCtx, file, localErrors, modelDirective?.modelCode)
   );
 
   if (graphCtx && definitions.length > 0) {
@@ -357,8 +410,6 @@ function walkDocument(ctx: DocumentContext, file: string, syntaxErrors: ParseErr
 
   // v3.0: the `.ttrd` domain file-kind is gone — subject areas are now plain
   // `def area` definitions (see walkAreaDef) that coexist with other defs.
-
-  const modelDirective = schemaCtx ? walkModelDirective(schemaCtx, file) : undefined;
 
   // LQ (logical queries, L-2 / ruling LQ-5): a `def query` in a `model er` file is a
   // logical query over entities and takes no parameters — a parametrized query stays a
@@ -435,6 +486,7 @@ function walkModelDirective(ctx: ModelDirectiveContext, file: string): ModelDire
   else if (modelCodeCtx.WORLD()) modelCode = 'world';
   else if (modelCodeCtx.LEXICON()) modelCode = 'lexicon';
   else if (modelCodeCtx.AUTOMATION()) modelCode = 'automation'; // 0.16
+  else if (modelCodeCtx.CN()) modelCode = 'cn'; // 0.17
 
   // v4.4: `MODEL modelCode (SCHEMA id)? (LOCALE id)?` — two optional id slots.
   // Assign positionally by which of SCHEMA / LOCALE is present (ids stay in order).
@@ -857,11 +909,415 @@ function walkProcessDef(ctx: ProcessBodyContext, name: string, source: SourceLoc
 }
 
 // ============================================================================
+// 0.17 — the conceptual model (`model cn`; CN-P1 S1.2, cn contracts §1). The concept defs, a cn
+// `def role`, the cn bindings and the `concept { }` sugar read one way: every property, in authored
+// order, to one node (its key as written, its span) — typed where the grammar types it, a free-form
+// `entry` otherwise. A repeated key is reported (`ttr/duplicate-property`); the first one is read.
+// Meaning, legality per stereotype and references are CN-P2's.
+// ============================================================================
+
+const STEREOTYPE_OF_TOKEN: ReadonlyArray<[(o: ObjectDefinitionContext) => unknown, ConceptStereotype]> = [
+  [(o) => o.KIND(), 'kind'],
+  [(o) => o.EVENT(), 'event'],
+  [(o) => o.PHASE(), 'phase'],
+  [(o) => o.QUALITY(), 'quality'],
+  [(o) => o.RELATION_TYPE(), 'relation_type'],
+];
+
+const BINDING_KIND_OF_TOKEN: ReadonlyArray<[(o: ObjectDefinitionContext) => unknown, ConceptBindingKind]> = [
+  [(o) => o.CN2MD_KIND(), 'cn2md_kind'],
+  [(o) => o.CN2MD_ROLE(), 'cn2md_role'],
+  [(o) => o.CN2MD_QUALITY(), 'cn2md_quality'],
+  [(o) => o.CN2MD_EVENT(), 'cn2md_event'],
+  [(o) => o.CN2ER_KIND(), 'cn2er_kind'],
+  [(o) => o.CN2ER_ROLE(), 'cn2er_role'],
+  [(o) => o.CN2ER_EVENT(), 'cn2er_event'],
+  [(o) => o.CN2ER_QUALITY(), 'cn2er_quality'],
+  [(o) => o.CN2ER_PHASE(), 'cn2er_phase'],
+  [(o) => o.CN2DB_CONCEPT(), 'cn2db_concept'],
+];
+
+function conceptStereotypeOf(objDef: ObjectDefinitionContext): ConceptStereotype | undefined {
+  return STEREOTYPE_OF_TOKEN.find(([has]) => has(objDef))?.[1];
+}
+
+function conceptBindingKindOf(objDef: ObjectDefinitionContext): ConceptBindingKind | undefined {
+  return BINDING_KIND_OF_TOKEN.find(([has]) => has(objDef))?.[1];
+}
+
+function walkConceptDef(
+  ctx: CnBodyContext | null,
+  stereotype: ConceptStereotype,
+  name: string,
+  source: SourceLocation,
+  file: string,
+  errors: ParseError[],
+): ConceptDef {
+  return { kind: 'concept', stereotype, name, source, ...walkConceptBody(ctx?.cnProperty() ?? [], 'concept', file, errors) };
+}
+
+function walkConceptBindingDef(
+  ctx: CnBindingBodyContext | null,
+  bindingKind: ConceptBindingKind,
+  name: string,
+  source: SourceLocation,
+  file: string,
+  errors: ParseError[],
+): ConceptBindingDef {
+  return { kind: 'conceptBinding', bindingKind, name, source, ...walkConceptBody(ctx?.cnBindingProperty() ?? [], 'binding', file, errors) };
+}
+
+function walkConceptSugar(ctx: ConceptSugarPropertyContext, file: string, errors: ParseError[]): ConceptSugar {
+  return {
+    kind: 'conceptSugar',
+    source: makeSourceLocation(ctx, file),
+    ...walkConceptBody(ctx.cnBody()?.cnProperty() ?? [], 'concept', file, errors),
+  };
+}
+
+/**
+ * One `concept { }` per host (cn contracts §1.4): a second one is `ttr/duplicate-property` and the first
+ * is read — the cn body's rule, so CN-P2 and the formatter never meet a sugar the AST threw away.
+ */
+function conceptSugarOnce(
+  first: ConceptSugar | undefined,
+  ctx: ConceptSugarPropertyContext,
+  file: string,
+  errors: ParseError[],
+): ConceptSugar {
+  if (!first) return walkConceptSugar(ctx, file, errors);
+  errors.push({
+    code: DiagnosticCode.DuplicateProperty,
+    message: "duplicate property 'concept' — the first one is read",
+    severity: 'error',
+    source: makeSourceLocation(ctx, file),
+  });
+  return first;
+}
+
+/**
+ * The cn body behind `cnBody`, `cnBindingBody` and — in a `model cn` file — `roleDef` (⚑CN-P6). Each
+ * property context has exactly one child, the property rule, so one reader serves all three. On a
+ * binding a free-form `filter:` is the expression block of a valued state's series (A-CN-18).
+ */
+function walkConceptBody(
+  props: ParserRuleContext[],
+  host: 'concept' | 'binding' | 'role',
+  file: string,
+  errors: ParseError[],
+): ConceptBody {
+  const body: ConceptBody = { properties: [] };
+  const seen = new Set<string>();
+  for (const p of props) {
+    const prop = walkConceptProperty(p.getChild(0), host, file, errors);
+    if (!prop) continue;
+    if (seen.has(prop.key)) {
+      errors.push({
+        code: DiagnosticCode.DuplicateProperty,
+        message: `duplicate property '${prop.key}' — the first one is read`,
+        severity: 'error',
+        source: prop.source,
+      });
+    } else {
+      seen.add(prop.key);
+      if (prop.kind === 'description') {
+        if (prop.value.kind === 'localizedString') body.descriptionLocalized = prop.value;
+        else body.description = prop.value;
+      } else if (prop.kind === 'label') body.label = prop.value;
+      else if (prop.kind === 'tags') body.tags = prop.value;
+    }
+    body.properties.push(prop);
+  }
+  return body;
+}
+
+/** One cn property, or `undefined` when error recovery left it half-built (its syntax error is reported). */
+function walkConceptProperty(
+  c: ParseTree | null,
+  host: 'concept' | 'binding' | 'role',
+  file: string,
+  errors: ParseError[],
+): ConceptProperty | undefined {
+  if (!(c instanceof ParserRuleContext)) return undefined;
+  const key = c.getChild(0)?.getText() ?? '';
+  const source = makeSourceLocation(c, file);
+  if (c instanceof DescriptionPropertyContext) {
+    const value = descriptionOf(c, file) ?? descriptionLocalizedOf(c, file);
+    return value ? { kind: 'description', key, value, source } : undefined;
+  }
+  if (c instanceof LabelPropertyContext) {
+    const map = c.localizedString();
+    return map ? { kind: 'label', key, value: walkLocalizedString(map, file), source } : undefined;
+  }
+  if (c instanceof TagsPropertyContext) {
+    const list = c.listOfStrings();
+    return list ? { kind: 'tags', key, value: walkListOfStrings(list, file), source } : undefined;
+  }
+  if (c instanceof CnRefPropertyContext) {
+    const ref = referenceOf(c.id(), file);
+    return ref ? { kind: 'ref', key: key as ConceptRefKey, ref, source } : undefined;
+  }
+  if (c instanceof GroundsPropertyContext) {
+    const ref = referenceOf(c.id(), file);
+    return ref ? { kind: 'grounds', key, ref, source } : undefined;
+  }
+  if (c instanceof ValueSpacePropertyContext) {
+    const ref = referenceOf(c.id(), file);
+    return ref ? { kind: 'valueSpace', key, ref, source } : undefined;
+  }
+  if (c instanceof InvolvesPropertyContext) {
+    const participants = c.participant().flatMap((pc) => {
+      const ref = referenceOf(pc.id(0), file);
+      if (!ref) return [];
+      const label = pc.AS() ? pc.id(1)?.getText() : undefined;
+      return [{ ref, ...(label ? { label } : {}), source: makeSourceLocation(pc, file) }];
+    });
+    return { kind: 'involves', key, participants, source };
+  }
+  if (c instanceof PeriodPropertyContext) {
+    const obj = c.cnObject();
+    return obj ? { kind: 'period', key, value: walkCnObject(obj, file), source } : undefined;
+  }
+  if (c instanceof ExtentPropertyContext || c instanceof BasisPropertyContext) {
+    const id = c.id();
+    if (!id) return undefined;
+    return { kind: c instanceof ExtentPropertyContext ? 'extent' : 'basis', key, value: id.getText(), source };
+  }
+  if (c instanceof DefinitionPropertyContext || c instanceof ConceptMembersPropertyContext) {
+    const literal = c.embeddedBlock();
+    const token = literal?.TAGGED_BLOCK_LITERAL() ?? literal?.TRIPLE_STRING_LITERAL() ?? literal?.STRING_LITERAL();
+    const block = token ? walkExpressionBlock(token, key, file, errors) : undefined;
+    if (!block) return undefined;
+    return { kind: c instanceof DefinitionPropertyContext ? 'definition' : 'members', key, block, source };
+  }
+  if (c instanceof LexiconBlockPropertyContext) {
+    return c.object_() ? { kind: 'lexicon', key, block: walkLexiconBlock(c, file), source } : undefined;
+  }
+  if (c instanceof TargetPropertyContext) {
+    return c.object_() || c.id() ? { kind: 'target', key, value: walkTargetValue(c, file), source } : undefined;
+  }
+  if (c instanceof CnEntryContext) {
+    const entryKey = c.cnKey()?.getText();
+    const valueCtx = c.cnValue();
+    if (!entryKey || !valueCtx) return undefined;
+    // A binding's `filter:` is an expression block; anything else there is a mistake worth naming.
+    if (host === 'binding' && entryKey === 'filter') {
+      const form = valueCtx.literal()?.stringLiteralForm();
+      const token = form?.TAGGED_BLOCK_LITERAL() ?? form?.TRIPLE_STRING_LITERAL() ?? form?.STRING_LITERAL();
+      const block = token ? walkExpressionBlock(token, entryKey, file, errors) : undefined;
+      if (block) return { kind: 'filter', key: entryKey, block, source };
+      errors.push({
+        code: DiagnosticCode.ExpressionBlockRequired,
+        message: `'filter:' takes an expression block — write it as """…""" (optionally tagged """pl)`,
+        severity: 'error',
+        source: makeSourceLocation(valueCtx, file),
+      });
+    }
+    return { kind: 'entry', key: entryKey, value: walkCnValue(valueCtx, file), source };
+  }
+  // A cnc / automation role property on a concept role (review-114 M5, the other way round).
+  if (host === 'role') {
+    errors.push({
+      code: DiagnosticCode.UnknownProperty,
+      message: `unknown role property '${key}' in model cn — search, resolve, delivery and members belong to a cnc or automation role`,
+      severity: 'error',
+      source,
+    });
+  }
+  return undefined;
+}
+
+function referenceOf(ctx: IdContext | null, file: string): Reference | undefined {
+  if (!ctx || isConjured(ctx)) return undefined;
+  const { path, parts, source } = walkId(ctx, file);
+  return { path, parts, source };
+}
+
+/** A token the error strategy invented to recover (`<missing IDENT>`) — never real input. */
+function isConjured(ctx: ParserRuleContext): boolean {
+  return (ctx.start?.tokenIndex ?? -1) < 0 || ctx.getText().startsWith('<missing ');
+}
+
+function walkCnValue(ctx: CnValueContext, file: string): PropertyValue {
+  if (ctx.cnObject()) return walkCnObject(ctx.cnObject()!, file);
+  const list = ctx.cnList();
+  if (list) return { kind: 'list', items: list.cnValue().map((v) => walkCnValue(v, file)), source: makeSourceLocation(list, file) };
+  if (ctx.literal()) return walkLiteral(ctx.literal()!, file);
+  if (ctx.id()) return walkId(ctx.id()!, file);
+  return { kind: 'null', source: makeSourceLocation(ctx, file) };
+}
+
+function walkCnObject(ctx: CnObjectContext, file: string): ObjectValue {
+  const entries: ObjectEntry[] = [];
+  for (const e of ctx.cnObjectEntry()) {
+    const valueCtx = e.cnValue();
+    const key = e.getChild(0)?.getText();
+    if (!key || !valueCtx) continue;
+    entries.push({ key, value: walkCnValue(valueCtx, file), source: makeSourceLocation(e, file) });
+  }
+  return { kind: 'object', entries, source: makeSourceLocation(ctx, file) };
+}
+
+/**
+ * An expression block (⚑CN-P5, CN-D28) — the `definitionSql` peeling, with the text's place in the
+ * file kept exactly: `lineOffsets` holds where every line of `text` starts once the dedent removed
+ * its indent, so a diagnostic from the expression parser can point inside the block. Only `pl` (or
+ * no tag) names the expression language; a SQL-family tag is an error, any other first-line word is
+ * read as text (the lexer cannot tell `"""exists␊…` from a tag).
+ */
+function walkExpressionBlock(token: TerminalNode, key: string, file: string, errors: ParseError[]): EmbeddedBlock | undefined {
+  const sym = token.symbol;
+  if (sym.tokenIndex < 0 || sym.start < 0) return undefined; // conjured by error recovery
+  const raw = sym.text ?? '';
+  const source: SourceLocation = {
+    file,
+    line: sym.line,
+    column: sym.column,
+    ...endOf(raw, sym.line, sym.column),
+    offsetStart: sym.start,
+    offsetEnd: sym.stop + 1,
+  };
+
+  if (sym.type === TTRLexer.STRING_LITERAL) {
+    // Each escape takes two characters of the file and one of `text`: `escapes` keeps where, so a
+    // position in `text` still maps onto the file.
+    // `[\s\S]`, not `.`: the lexer admits a backslash before any character, a line break too, and the
+    // three regex engines disagree on what `.` matches.
+    const quoted = raw.slice(1, -1);
+    const escapes: number[] = [];
+    const text = quoted.replace(/\\([\s\S])/g, (_m, c: string, at: number) => {
+      escapes.push(codePoints(quoted.slice(0, at)) - escapes.length);
+      return c;
+    });
+    return blockOf('string', text, source, sym.start + 1, sym.line, sym.column + 1, 0, stringLineOffsets(text, escapes, sym.start + 1), escapes);
+  }
+
+  let inner = raw.slice(3, -3);
+  let innerStart = sym.start + 3;
+  let form: EmbeddedBlock['form'] = 'tripleString';
+  if (sym.type === TTRLexer.TAGGED_BLOCK_LITERAL) {
+    const opener = /^([A-Za-z][A-Za-z0-9-]*)([ \t]*\r?\n)/.exec(inner);
+    const tag = opener?.[1];
+    const tagSource: SourceLocation = {
+      file, line: sym.line, column: sym.column + 3, endLine: sym.line, endColumn: sym.column + 3 + (tag?.length ?? 0),
+      offsetStart: sym.start + 3, offsetEnd: sym.start + 3 + (tag?.length ?? 0),
+    };
+    if (opener && tag && resolveExpressionTag(tag)) {
+      inner = inner.slice(opener[0].length);
+      innerStart += opener[0].length;
+      form = 'tagged';
+    } else if (tag && resolveTag(tag)) {
+      errors.push({
+        code: DiagnosticCode.LanguageTagMismatch,
+        message: `'${key}:' holds a TTR-P expression — the '${tag}' tag names another language (use """pl or no tag)`,
+        severity: 'error',
+        source: tagSource,
+      });
+    } else if (tag) {
+      errors.push({
+        code: DiagnosticCode.UnknownLanguageTag,
+        message: `'${tag}' on the opening line of '${key}:' reads as a language tag; the block is kept as plain text (start the expression on the next line, or tag it """pl)`,
+        severity: 'warning',
+        source: tagSource,
+      });
+    }
+  }
+
+  // The dedent (contracts §2.9) drops a leading `\n`, then the common indent of the non-blank lines.
+  const leadingNewline = inner.startsWith('\n') ? 1 : 0;
+  const body = inner.slice(leadingNewline);
+  const { value, indentWidth } = dedentWithIndent(inner);
+  const text = form === 'tagged' ? value.replace(/\r?\n$/, '') : value;
+
+  // Every raw line of `text`, its start offset in the file, indent removed (blank lines keep column 0).
+  const rawLines = body.split('\n');
+  const lineOffsets: number[] = [];
+  let offset = innerStart + leadingNewline;
+  for (let i = 0; i < text.split('\n').length; i++) {
+    const rawLine = rawLines[i] ?? '';
+    lineOffsets.push(offset + (rawLine.trim().length === 0 ? 0 : indentWidth));
+    offset += codePoints(rawLine) + 1;
+  }
+  const first = positionAfter(raw.slice(0, innerStart - sym.start + leadingNewline), sym.line, sym.column);
+  return blockOf(form, text, source, lineOffsets[0], first.line, first.column + (rawLines[0]?.trim().length ? indentWidth : 0), indentWidth, lineOffsets);
+}
+
+function blockOf(
+  form: EmbeddedBlock['form'],
+  text: string,
+  source: SourceLocation,
+  textStart: number,
+  line: number,
+  column: number,
+  indentWidth: number,
+  lineOffsets: number[],
+  escapes: number[] = [],
+): EmbeddedBlock {
+  const lines = text.split('\n');
+  const lastLine = lines.length - 1;
+  const lastOffset = lineOffsets[lastLine] ?? textStart;
+  // Widths in code points — the unit of the parser's offsets and columns (and of a TTR-P position).
+  const lastStart = codePoints(text) - codePoints(lines[lastLine]);
+  const lastWidth = codePoints(lines[lastLine]) + escapes.filter((e) => e >= lastStart).length;
+  return {
+    kind: 'embeddedBlock',
+    language: 'pl',
+    form,
+    text,
+    textSource: {
+      file: source.file,
+      line,
+      column,
+      endLine: line + lastLine,
+      endColumn: (lastLine === 0 ? column : lines[lastLine].length ? indentWidth : 0) + lastWidth,
+      offsetStart: textStart,
+      offsetEnd: lastOffset + lastWidth,
+    },
+    lineOffsets,
+    indentWidth,
+    ...(escapes.length ? { escapes } : {}),
+    source,
+  };
+}
+
+/**
+ * Where each line of a string-form block's `text` starts in the file: its code-point index in `text`, plus
+ * one for every escape before it (an escaped line break is what starts a second line).
+ */
+function stringLineOffsets(text: string, escapes: number[], textStart: number): number[] {
+  const offsets: number[] = [];
+  let start = 0;
+  for (const line of text.split('\n')) {
+    offsets.push(textStart + start + escapes.filter((e) => e < start).length);
+    start += codePoints(line) + 1;
+  }
+  return offsets;
+}
+
+/** The number of code points in `s` — what ANTLR counts in offsets and columns (a JS length counts UTF-16 units). */
+function codePoints(s: string): number {
+  return [...s].length;
+}
+
+/** The 1-based line and 0-based column (in code points) just past `text`, which starts at `line`:`column`. */
+function positionAfter(text: string, line: number, column: number): { line: number; column: number } {
+  const parts = text.split('\n');
+  return parts.length === 1
+    ? { line, column: column + codePoints(text) }
+    : { line: line + parts.length - 1, column: codePoints(parts[parts.length - 1]) };
+}
+
+function endOf(raw: string, line: number, column: number): { endLine: number; endColumn: number } {
+  const end = positionAfter(raw, line, column);
+  return { endLine: end.line, endColumn: end.column };
+}
+
+// ============================================================================
 // v3.1 — MD (multidimensional) logical object walkers. Cross-references are kept
 // as opaque strings here; resolution and per-schema validity are Phase 2.
 // ============================================================================
 
-function walkMdDomainDef(ctx: MdDomainDefContext, name: string, source: SourceLocation, file: string): MdDomainDef {
+function walkMdDomainDef(ctx: MdDomainDefContext, name: string, source: SourceLocation, file: string, errors: ParseError[]): MdDomainDef {
   let description: StringValue | TripleStringValue | undefined;
   let descriptionLocalized: LocalizedString | undefined;
   let tags: string[] | undefined;
@@ -869,6 +1325,7 @@ function walkMdDomainDef(ctx: MdDomainDefContext, name: string, source: SourceLo
   let domainKind: string | undefined;
   let restrict: RestrictClause[] | undefined;
   let publishMembers: boolean | undefined;
+  let concept: ConceptSugar | undefined;
 
   for (const p of ctx.mdDomainProperty()) {
     if (p.descriptionProperty()) {
@@ -880,9 +1337,10 @@ function walkMdDomainDef(ctx: MdDomainDefContext, name: string, source: SourceLo
     if (p.kindProperty()) domainKind = p.kindProperty()!.id()!.getText();
     if (p.restrictProperty()) restrict = walkRestrictBlock(p.restrictProperty()!.restrictBlock()!, file);
     if (p.publishProperty()) publishMembers = true; // MD dot-path §1.4 — `publish: members`
+    if (p.conceptSugarProperty()) concept = conceptSugarOnce(concept, p.conceptSugarProperty()!, file, errors); // 0.17
   }
 
-  return { kind: 'mdDomain', name, source, description, descriptionLocalized, tags, type, domainKind, restrict, publishMembers };
+  return { kind: 'mdDomain', name, source, description, descriptionLocalized, tags, type, domainKind, restrict, publishMembers, ...(concept ? { concept } : {}) };
 }
 
 function walkRestrictBlock(ctx: RestrictBlockContext, file: string): RestrictClause[] {
@@ -925,6 +1383,7 @@ function walkDimensionDef(ctx: DimensionDefContext, name: string, source: Source
   let attributes: AttributeDef[] = [];
   let hierarchies: string[] | undefined;
   let lexicon: LexiconBlock | undefined;
+  let concept: ConceptSugar | undefined;
   const crossRefs: CrossRef[] = [];
 
   for (const p of ctx.dimensionProperty()) {
@@ -941,9 +1400,10 @@ function walkDimensionDef(ctx: DimensionDefContext, name: string, source: Source
       for (const r of refs) crossRefs.push({ role: 'hierarchy', path: r.path, source: r.source });
     }
     if (p.lexiconBlockProperty()) lexicon = walkLexiconBlock(p.lexiconBlockProperty()!, file);
+    if (p.conceptSugarProperty()) concept = conceptSugarOnce(concept, p.conceptSugarProperty()!, file, errors); // 0.17
   }
 
-  return { kind: 'dimension', name, source, description, descriptionLocalized, tags, key, attributes, hierarchies, lexicon, crossRefs: crossRefs.length ? crossRefs : undefined };
+  return { kind: 'dimension', name, source, description, descriptionLocalized, tags, key, attributes, hierarchies, lexicon, crossRefs: crossRefs.length ? crossRefs : undefined, ...(concept ? { concept } : {}) };
 }
 
 /** `from`/`to` accept a single id or a bracketed list of ids, each with its source span (for crossRefs). */
@@ -1064,7 +1524,7 @@ function walkLevelList(ctx: LevelListContext, file: string): HierarchyLevel[] {
   return out;
 }
 
-function walkMeasureDef(ctx: MeasureDefContext, name: string, source: SourceLocation, file: string): MeasureDef {
+function walkMeasureDef(ctx: MeasureDefContext, name: string, source: SourceLocation, file: string, errors: ParseError[]): MeasureDef {
   let description: StringValue | TripleStringValue | undefined;
   let descriptionLocalized: LocalizedString | undefined;
   let tags: string[] | undefined;
@@ -1073,6 +1533,7 @@ function walkMeasureDef(ctx: MeasureDefContext, name: string, source: SourceLoca
   let aggregation: AggregationSpec | undefined;
   let validBy: string | undefined;
   let lexicon: LexiconBlock | undefined;
+  let concept: ConceptSugar | undefined;
   const crossRefs: CrossRef[] = [];
 
   for (const p of ctx.measureProperty()) {
@@ -1090,9 +1551,10 @@ function walkMeasureDef(ctx: MeasureDefContext, name: string, source: SourceLoca
     if (p.aggregationProperty()) aggregation = walkAggregationValue(p.aggregationProperty()!.aggregationValue()!, file);
     if (p.validByProperty()) validBy = p.validByProperty()!.id()!.getText();
     if (p.lexiconBlockProperty()) lexicon = walkLexiconBlock(p.lexiconBlockProperty()!, file);
+    if (p.conceptSugarProperty()) concept = conceptSugarOnce(concept, p.conceptSugarProperty()!, file, errors); // 0.17
   }
 
-  return { kind: 'measure', name, source, description, descriptionLocalized, tags, domainRef, measureClass, aggregation, validBy, lexicon, crossRefs: crossRefs.length ? crossRefs : undefined };
+  return { kind: 'measure', name, source, description, descriptionLocalized, tags, domainRef, measureClass, aggregation, validBy, lexicon, crossRefs: crossRefs.length ? crossRefs : undefined, ...(concept ? { concept } : {}) };
 }
 
 function walkAggregationValue(ctx: AggregationValueContext, file: string): AggregationSpec {
@@ -1118,16 +1580,18 @@ function walkAggregationValue(ctx: AggregationValueContext, file: string): Aggre
   };
 }
 
-function walkCubeletDef(ctx: CubeletDefContext, name: string, source: SourceLocation, file: string): CubeletDef {
+function walkCubeletDef(ctx: CubeletDefContext, name: string, source: SourceLocation, file: string, errors: ParseError[]): CubeletDef {
   let description: StringValue | TripleStringValue | undefined;
   let descriptionLocalized: LocalizedString | undefined;
   let tags: string[] | undefined;
   let grain: string[] = [];
   let measures: (string | MeasureDef)[] = [];
   let lexicon: LexiconBlock | undefined;
+  let concept: ConceptSugar | undefined;
   const crossRefs: CrossRef[] = [];
 
   for (const p of ctx.cubeletProperty()) {
+    if (p.conceptSugarProperty()) concept = conceptSugarOnce(concept, p.conceptSugarProperty()!, file, errors); // 0.17
     if (p.lexiconBlockProperty()) lexicon = walkLexiconBlock(p.lexiconBlockProperty()!, file);
     if (p.descriptionProperty()) {
       description = descriptionOf(p.descriptionProperty()!, file);
@@ -1141,7 +1605,7 @@ function walkCubeletDef(ctx: CubeletDefContext, name: string, source: SourceLoca
     }
     if (p.measuresProperty()) {
       const mv = p.measuresProperty()!.measuresValue()!;
-      measures = walkMeasuresValue(mv, file);
+      measures = walkMeasuresValue(mv, file, errors);
       // string measure refs (the listOfIds form) carry resolvable spans.
       if (mv.listOfIds()) {
         for (const r of idsWithSources(mv.listOfIds()!, file)) {
@@ -1151,10 +1615,10 @@ function walkCubeletDef(ctx: CubeletDefContext, name: string, source: SourceLoca
     }
   }
 
-  return { kind: 'cubelet', name, source, description, descriptionLocalized, tags, grain, measures, lexicon, crossRefs: crossRefs.length ? crossRefs : undefined };
+  return { kind: 'cubelet', name, source, description, descriptionLocalized, tags, grain, measures, lexicon, crossRefs: crossRefs.length ? crossRefs : undefined, ...(concept ? { concept } : {}) };
 }
 
-function walkMeasuresValue(ctx: MeasuresValueContext, file: string): (string | MeasureDef)[] {
+function walkMeasuresValue(ctx: MeasuresValueContext, file: string, errors: ParseError[]): (string | MeasureDef)[] {
   if (ctx.listOfIds()) return walkListOfIds(ctx.listOfIds()!, file);
   const inline = ctx.measureInlineList();
   const out: (string | MeasureDef)[] = [];
@@ -1163,7 +1627,7 @@ function walkMeasuresValue(ctx: MeasuresValueContext, file: string): (string | M
     const defs = inline.measureDef();
     for (let i = 0; i < defs.length; i++) {
       const mName = ids[i]?.getText() ?? '';
-      out.push(walkMeasureDef(defs[i], mName, makeSourceLocation(defs[i], file), file));
+      out.push(walkMeasureDef(defs[i], mName, makeSourceLocation(defs[i], file), file, errors));
     }
   }
   return out;
@@ -1487,7 +1951,7 @@ function walkViewport(ctx: Object_Context, _file: string): GraphLayout['viewport
   return { zoom, panX, panY, displayMode };
 }
 
-function walkDefinition(ctx: DefinitionContext, file: string, errors: ParseError[]): Definition {
+function walkDefinition(ctx: DefinitionContext, file: string, errors: ParseError[], modelCode?: string): Definition {
   const objDef = ctx.objectDefinition();
   const nameCtx = objDef.id();
   const name = nameCtx ? nameCtx.getText() : '';
@@ -1508,7 +1972,13 @@ function walkDefinition(ctx: DefinitionContext, file: string, errors: ParseError
   if (objDef.ER2DB_ATTRIBUTE()) return walkEr2dbAttributeDef(objDef.er2dbAttributeDef()!, name, source, file);
   if (objDef.ER2DB_RELATION()) return walkEr2dbRelationDef(objDef.er2dbRelationDef()!, name, source, file);
   if (objDef.QUERY()) return walkQueryDef(objDef.queryDef()!, name, source, file, errors);
-  if (objDef.ROLE()) return walkRoleDef(objDef.roleDef()!, name, source, file);
+  if (objDef.ROLE()) {
+    // ⚑CN-P6 — one `def role` production; a `model cn` file reads it as a concept role.
+    if (modelCode === 'cn') {
+      return { kind: 'concept', stereotype: 'role', name, source, ...walkConceptBody(objDef.roleDef()?.roleProperty() ?? [], 'role', file, errors) };
+    }
+    return walkRoleDef(objDef.roleDef()!, name, source, file, errors, modelCode);
+  }
   if (objDef.ER2CNC_ROLE()) return walkEr2cncRoleDef(objDef.er2cncRoleDef()!, name, source, file);
   if (objDef.DRILL_MAP()) return walkDrillMapDef(objDef.drillMapDef()!, name, source, file);
   if (objDef.AREA()) return walkAreaDef(objDef.areaDef()!, name, source, file);
@@ -1518,12 +1988,12 @@ function walkDefinition(ctx: DefinitionContext, file: string, errors: ParseError
   const autoKind = automationKindOf(objDef);
   if (autoKind) return walkAutomationDef(objDef.autoBody()!, autoKind, name, source, file, errors);
   // v3.1 MD logical kinds
-  if (objDef.DOMAIN()) return walkMdDomainDef(objDef.mdDomainDef()!, name, source, file);
+  if (objDef.DOMAIN()) return walkMdDomainDef(objDef.mdDomainDef()!, name, source, file, errors);
   if (objDef.DIMENSION()) return walkDimensionDef(objDef.dimensionDef()!, name, source, file, errors);
   if (objDef.MAP()) return walkMdMapDef(objDef.mdMapDef()!, name, source, file);
   if (objDef.HIERARCHY()) return walkHierarchyDef(objDef.hierarchyDef()!, name, source, file);
-  if (objDef.MEASURE()) return walkMeasureDef(objDef.measureDef()!, name, source, file);
-  if (objDef.CUBELET()) return walkCubeletDef(objDef.cubeletDef()!, name, source, file);
+  if (objDef.MEASURE()) return walkMeasureDef(objDef.measureDef()!, name, source, file, errors);
+  if (objDef.CUBELET()) return walkCubeletDef(objDef.cubeletDef()!, name, source, file, errors);
   // v3.1 MD binding kinds (schema binding)
   if (objDef.MD2DB_CUBELET()) return walkMd2DbCubeletDef(objDef.md2dbCubeletDef()!, name, source, file);
   if (objDef.MD2DB_DOMAIN()) return walkMd2DbDomainDef(objDef.md2dbDomainDef()!, name, source, file);
@@ -1533,6 +2003,11 @@ function walkDefinition(ctx: DefinitionContext, file: string, errors: ParseError
   if (objDef.TERM()) return walkLexiconEntryDef(objDef.lexiconEntryDef()!, 'term', name, source, file);
   if (objDef.PATTERN()) return walkLexiconEntryDef(objDef.lexiconEntryDef()!, 'pattern', name, source, file);
   if (objDef.EXAMPLE()) return walkLexiconEntryDef(objDef.lexiconEntryDef()!, 'example', name, source, file);
+  // 0.17 cn kinds (model cn / model binding) — one shared body each, the stereotype / binding kind tags it.
+  const stereotype = conceptStereotypeOf(objDef);
+  if (stereotype) return walkConceptDef(objDef.cnBody(), stereotype, name, source, file, errors);
+  const bindingKind = conceptBindingKindOf(objDef);
+  if (bindingKind) return walkConceptBindingDef(objDef.cnBindingBody(), bindingKind, name, source, file, errors);
 
   return { kind: 'project', name, source } satisfies ProjectDef;
 }
@@ -2190,6 +2665,7 @@ function walkEntityDef(
   let semantics: SemanticsBlock | undefined;
   let lexicon: LexiconBlock | undefined;
   let binding: BindingProperty | undefined;
+  let concept: ConceptSugar | undefined;
 
   for (const p of ctx.entityProperty()) {
     if (p.descriptionProperty()) {
@@ -2236,9 +2712,12 @@ function walkEntityDef(
     if (p.bindingProperty()) {
       binding = walkBindingProperty(p.bindingProperty()!, file);
     }
+    if (p.conceptSugarProperty()) {
+      concept = conceptSugarOnce(concept, p.conceptSugarProperty()!, file, errors); // 0.17
+    }
   }
 
-  return { kind: 'entity', name, source, description, descriptionLocalized, tags, labelPlural, nameAttribute, codeAttribute, aliases, attributes, roles, displayLabel, search, semantics, lexicon, binding };
+  return { kind: 'entity', name, source, description, descriptionLocalized, tags, labelPlural, nameAttribute, codeAttribute, aliases, attributes, roles, displayLabel, search, semantics, lexicon, binding, ...(concept ? { concept } : {}) };
 }
 
 /**
@@ -2273,6 +2752,7 @@ function walkAttributeProperties(
   let transitions: AttributeTransition[] | undefined;
   let statesNode: AttributeDef['statesNode'];
   let transitionsNode: AttributeDef['transitionsNode'];
+  let concept: ConceptSugar | undefined;
   const crossRefs: CrossRef[] = [];
 
   for (const p of props) {
@@ -2332,6 +2812,7 @@ function walkAttributeProperties(
       );
       transitionsNode = { source: makeSourceLocation(p.transitionsProperty()!, file) };
     }
+    if (p.conceptSugarProperty()) concept = conceptSugarOnce(concept, p.conceptSugarProperty()!, file, errors); // 0.17
   }
 
   return {
@@ -2339,6 +2820,7 @@ function walkAttributeProperties(
     crossRefs: crossRefs.length ? crossRefs : undefined,
     ...(states ? { states, statesNode } : {}),
     ...(transitions ? { transitions, transitionsNode } : {}),
+    ...(concept ? { concept } : {}),
   };
 }
 
@@ -2579,7 +3061,9 @@ function walkRoleDef(
   ctx: RoleDefContext,
   name: string,
   source: SourceLocation,
-  file: string
+  file: string,
+  errors: ParseError[],
+  modelCode?: string,
 ): RoleDef {
   let description: StringValue | TripleStringValue | undefined;
   let descriptionLocalized: LocalizedString | undefined;
@@ -2589,6 +3073,20 @@ function walkRoleDef(
   const entries: AutoEntry[] = [];
 
   for (const p of ctx.roleProperty()) {
+    // 0.17 (⚑CN-P6) — the cn role's properties ride the one `roleProperty` production; a `model cn`
+    // role is walked as a concept (walkDefinition), so here they are rejected: a cnc / automation role
+    // keeps its 0.16 surface and a typo (`lable:`) is still a parse error (review-114 M5).
+    const cnOnly = p.cnEntry() ?? p.cnRefProperty() ?? p.groundsProperty() ?? p.lexiconBlockProperty();
+    if (cnOnly) {
+      const key = p.cnEntry()?.cnKey().getText() ?? cnOnly.getChild(0)?.getText() ?? '';
+      errors.push({
+        code: DiagnosticCode.UnknownProperty,
+        message: `unknown role property '${key}'${modelCode ? ` in model ${modelCode}` : ''} — only a role in a 'model cn' file takes the concept properties`,
+        severity: 'error',
+        source: makeSourceLocation(cnOnly, file),
+      });
+      continue;
+    }
     if (p.descriptionProperty()) {
       description = descriptionOf(p.descriptionProperty()!, file);
       descriptionLocalized = descriptionLocalizedOf(p.descriptionProperty()!, file);
@@ -3107,6 +3605,8 @@ function walkLexiconEntryDef(
   let forms: string[] | undefined;
   let match: string | undefined;
   let text: string | undefined;
+  let isDefault: boolean | undefined;
+  let sensePriority: number | undefined;
 
   for (const p of ctx.lexiconEntryProperty()) {
     if (p.descriptionProperty()) {
@@ -3122,9 +3622,18 @@ function walkLexiconEntryDef(
     if (p.formsProperty()) forms = walkListOfStrings(p.formsProperty()!.listOfStrings()!, file);
     if (p.matchProperty()) match = walkStringLiteralForm(p.matchProperty()!.stringLiteralForm()!, file).value;
     if (p.textProperty()) text = walkStringLiteralForm(p.textProperty()!.stringLiteralForm()!, file).value;
+    // 0.17 — the cn default sense and its priority (cn contracts §1.5); their rules are semantic.
+    const def = p.defaultProperty()?.BOOLEAN_LITERAL();
+    if (def) isDefault = def.getText() === 'true';
+    const priority = p.sensePriorityProperty()?.NUMBER_LITERAL();
+    if (priority) sensePriority = Number(priority.getText());
   }
 
-  return { kind, name, source, description, descriptionLocalized, tags, target, forms, match, text };
+  return {
+    kind, name, source, description, descriptionLocalized, tags, target, forms, match, text,
+    ...(isDefault !== undefined ? { default: isDefault } : {}),
+    ...(sensePriority !== undefined ? { sensePriority } : {}),
+  };
 }
 
 /**

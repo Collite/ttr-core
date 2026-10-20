@@ -59,6 +59,9 @@ class DiagnosticCode(Enum):
     DEPRECATED_LANGUAGE_PROPERTY = "ttr/deprecated-language-property"
     # LQ (logical queries, LQ-5) - a `def query` in a `model er` file takes no parameters.
     LOGICAL_QUERY_PARAMETERS = "ttr/logical-query-parameters"
+    # 0.17 (CN-P1) - parse-level checks on a cn body. The `cn/*` slugs (cn contracts §7) are semantic, CN-P2.
+    DUPLICATE_PROPERTY = "ttr/duplicate-property"  # a cn body names one key twice - the first is read
+    EXPRESSION_BLOCK_REQUIRED = "ttr/expression-block-required"  # a binding `filter:` that is not a string or block
 
     def __str__(self) -> str:
         return self.value

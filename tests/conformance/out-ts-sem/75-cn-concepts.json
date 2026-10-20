@@ -1,0 +1,31 @@
+{
+    "diagnostics": [],
+    "resolved": [],
+    "symbols": [
+        "hartland.concepts.db.dbo.concept.Channel",
+        "hartland.concepts.db.dbo.concept.Customer",
+        "hartland.concepts.db.dbo.concept.DebtorCustomer",
+        "hartland.concepts.db.dbo.concept.HomeCategory",
+        "hartland.concepts.db.dbo.concept.Invoicing",
+        "hartland.concepts.db.dbo.concept.Item",
+        "hartland.concepts.db.dbo.concept.Order",
+        "hartland.concepts.db.dbo.concept.OutOfStock",
+        "hartland.concepts.db.dbo.concept.OverdueInvoice",
+        "hartland.concepts.db.dbo.concept.Party",
+        "hartland.concepts.db.dbo.concept.PendingOrder",
+        "hartland.concepts.db.dbo.concept.PlacedOrder",
+        "hartland.concepts.db.dbo.concept.ProductCategory",
+        "hartland.concepts.db.dbo.concept.Sale",
+        "hartland.concepts.db.dbo.concept.StockCondition",
+        "hartland.concepts.db.dbo.concept.StockTransfer",
+        "hartland.concepts.db.dbo.concept.Supplier",
+        "hartland.concepts.db.dbo.concept.Warehouse",
+        "hartland.concepts.db.dbo.concept.WarehouseOutage",
+        "hartland.concepts.db.dbo.concept.category",
+        "hartland.concepts.db.dbo.concept.open_amount",
+        "hartland.concepts.db.dbo.concept.revenue",
+        "hartland.concepts.db.dbo.concept.stock_level",
+        "hartland.concepts.db.dbo.concept.supplies",
+        "hartland.concepts.db.dbo.concept.transfer_delay"
+    ]
+}

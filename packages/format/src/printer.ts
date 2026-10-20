@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type {
   Document, Definition, SourceLocation, ParameterDef, GraphBlock, Trivia,
+  ConceptBody, ConceptBindingDef, ConceptDef, ConceptParticipant, ConceptProperty, ConceptSugar, ListValue, ObjectValue,
 } from '@tatrman/parser';
 import { Doc, text, verbatim, concat, line, hardline, indent, group, join } from './ir.js';
 import { render } from './render.js';
@@ -22,6 +23,12 @@ export const DEFAULT_FORMAT_CONFIG: FormatConfig = {
 interface Ctx {
   source: string;
   config: FormatConfig;
+  /** Code-point offset (the parser's `offsetStart`/`offsetEnd`) → index into the UTF-16 `source`. */
+  u16: (offset: number) => number;
+  /** The inverse: UTF-16 index → code-point offset. */
+  cp: (index: number) => number;
+  /** The cn printer's comment ledger: trivia it re-emitted, and the source ranges it sliced verbatim. */
+  cn?: CnLedger;
 }
 
 /** Any node that may carry comment trivia (P0). */
@@ -30,13 +37,41 @@ interface TriviaNode {
   trailingTrivia?: Trivia[];
 }
 
-function slice(src: string, loc: SourceLocation): string {
-  return src.slice(loc.offsetStart, loc.offsetEnd);
+/**
+ * The parser's offsets count code points (ANTLR's char stream); a JS string indexes UTF-16 units. They
+ * part at the first character outside the BMP (an emoji in a label, a description, a comment), after
+ * which a slice by raw offsets cuts every value one unit early per such character. One table per
+ * document maps between the two; without an astral character both maps are the identity.
+ */
+function offsetMaps(source: string): Pick<Ctx, 'u16' | 'cp'> {
+  if (!/[\uD800-\uDFFF]/.test(source)) return { u16: (o) => o, cp: (i) => i };
+  const toU16: number[] = [];
+  const toCp: number[] = [];
+  let cp = 0;
+  for (let i = 0; i < source.length; cp++) {
+    toU16.push(i);
+    toCp[i] = cp;
+    const wide = (source.codePointAt(i) ?? 0) > 0xffff;
+    if (wide) toCp[i + 1] = cp;
+    i += wide ? 2 : 1;
+  }
+  toU16.push(source.length);
+  toCp[source.length] = cp;
+  return { u16: (o) => toU16[o] ?? source.length, cp: (i) => toCp[i] ?? cp };
+}
+
+/** The source text between two parser (code-point) offsets. */
+function sourceText(ctx: Ctx, start: number, end: number): string {
+  return ctx.source.slice(ctx.u16(start), ctx.u16(end));
+}
+
+function slice(ctx: Ctx, loc: SourceLocation): string {
+  return sourceText(ctx, loc.offsetStart, loc.offsetEnd);
 }
 
 /** Verbatim source text of any node that carries a `source` span. */
 function vsrc(ctx: Ctx, node: { source: SourceLocation }): Doc {
-  return verbatim(slice(ctx.source, node.source));
+  return verbatim(slice(ctx, node.source));
 }
 
 // --- comment trivia emission ------------------------------------------------
@@ -57,6 +92,20 @@ function trailingInline(node: TriviaNode | undefined): Doc {
 
 function hasTrailing(node: TriviaNode | undefined): boolean {
   return !!node?.trailingTrivia?.length;
+}
+
+/**
+ * The comments the parser hung on `node` as trailing that lie INSIDE its span — written before its
+ * closing brace. They print there, each on its own line; after the brace they would run into the
+ * node's own trailing comment (`} // before // after` re-parses as one comment).
+ */
+function closingTrivia(node: TriviaNode & { source: SourceLocation }): Trivia[] {
+  const { offsetStart, offsetEnd } = node.source;
+  return (node.trailingTrivia ?? []).filter((t) => t.source.offsetStart >= offsetStart && t.source.offsetEnd <= offsetEnd);
+}
+
+function closingDocs(trivia: Trivia[]): Doc {
+  return concat(trivia.flatMap((t) => [hardline, verbatim(t.text)]));
 }
 
 /** Wrap a Doc with the node's leading (above) and trailing (same-line) comments. */
@@ -85,7 +134,15 @@ function keyListDoc(arr: string[]): Doc {
   return strListDoc(arr, !arr.every((s) => BARE_IDENT.test(s)));
 }
 
-interface Prop { key: string; value: Doc; node?: TriviaNode }
+/**
+ * `sep` is what stands between key and value — `: ` except for the `concept { }` sugar. `atKey`: the
+ * node starts at the key (a cn property, the sugar), so its leading comments print above the property
+ * and re-attach there on the next parse. A typed value node starts after its key; a comment before it
+ * would move on every pass, so it is not re-emitted. `inline`: the value's form when its def prints on
+ * one line (a value that could break must not break inside an inline def — the next pass would read a
+ * multi-line def and lay it out differently).
+ */
+interface Prop { key: string; value: Doc; node?: TriviaNode; sep?: string; atKey?: boolean; inline?: Doc; comments?: boolean }
 
 // The AST stores camelCase kinds, but the grammar's `def` keyword is snake_case
 // for the mapping kinds.
@@ -155,6 +212,7 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
       add('labelPlural', qstr(def.labelPlural)); add('nameAttribute', v(def.nameAttribute), def.nameAttribute); add('codeAttribute', v(def.codeAttribute), def.codeAttribute);
       add('aliases', def.aliases && strListDoc(def.aliases, true)); add('attributes', defList(def.attributes));
       add('roles', def.roles && strListDoc(def.roles, false)); add('displayLabel', v(def.displayLabel), def.displayLabel); add('search', v(def.search), def.search); add('semantics', v(def.semantics), def.semantics); add('lexicon', v(def.lexicon), def.lexicon);
+      if (def.concept) p.push(conceptSugarProp(def.concept, ctx));
       break;
     case 'attribute':
       add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
@@ -167,6 +225,7 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
         def.transitions && text(`{ ${def.transitions.map((t) => `${t.from}: [${t.to.join(', ')}]`).join(', ')} }`),
         def.transitionsNode,
       );
+      if (def.concept) p.push(conceptSugarProp(def.concept, ctx));
       break;
     case 'relation':
       add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
@@ -220,6 +279,9 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
       add('forms', def.forms && strListDoc(def.forms, true));
       add('match', qstr(def.match));
       add('text', qstr(def.text));
+      // 0.17 — the cn default sense (cn contracts §1.5).
+      add('default', b(def.default));
+      add('sense_priority', def.sensePriority === undefined ? undefined : text(String(def.sensePriority)));
       break;
   }
   return p;
@@ -246,7 +308,7 @@ function defListDoc(defs: Definition[], ctx: Ctx): Doc {
     parts.push(...leadingDocs(d));
     parts.push(formatDefCore(d, ctx, false));
     if (!last) parts.push(text(','));
-    parts.push(trailingInline(d));
+    parts.push(trailingInline(outsideTrivia(d, d.source)));
     if (!last) parts.push(hardline);
   });
   return concat([
@@ -261,11 +323,13 @@ function propsDoc(props: Prop[], ctx: Ctx, broken: boolean): Doc {
   const align = ctx.config.alignKeys && broken;
   const maxKey = align ? Math.max(...props.map((pr) => pr.key.length)) : 0;
   const entry = (pr: Prop): Doc =>
-    concat([text(align ? `${pr.key}:`.padEnd(maxKey + 2) : `${pr.key}: `), pr.value]);
-  // Interleave manually so a value's trailing comment lands after the comma.
+    concat([text(pr.sep !== undefined ? `${pr.key}${pr.sep}` : align ? `${pr.key}:`.padEnd(maxKey + 2) : `${pr.key}: `), pr.value]);
+  // Interleave manually so a value's trailing comment lands after the comma; a leading comment of an
+  // `atKey` property goes on the lines above it.
   const parts: Doc[] = [];
   props.forEach((pr, i) => {
     const last = i === props.length - 1;
+    if (broken && pr.atKey) parts.push(...leadingDocs(pr.node));
     parts.push(entry(pr));
     if (!last) parts.push(text(','));
     parts.push(trailingInline(pr.node));
@@ -276,7 +340,7 @@ function propsDoc(props: Prop[], ctx: Ctx, broken: boolean): Doc {
 
 /** A def's properties on one line: `k: v, k2: v2`. */
 function inlinePropsDoc(props: Prop[]): Doc {
-  return join(props.map((pr) => concat([text(`${pr.key}: `), pr.value])), text(', '));
+  return join(props.map((pr) => concat([text(`${pr.key}${pr.sep ?? ': '}`), pr.inline ?? pr.value])), text(', '));
 }
 
 /** True if rendering this def inline would swallow a `//` comment to end-of-line. */
@@ -299,7 +363,7 @@ function hasHardline(d: Doc): boolean {
 }
 
 function defHasComments(def: Definition, props: Prop[]): boolean {
-  return hasTrailing(def) || props.some((pr) => hasTrailing(pr.node));
+  return hasTrailing(def) || props.some((pr) => pr.comments || hasTrailing(pr.node) || (!!pr.atKey && !!pr.node?.leadingTrivia?.length));
 }
 
 /** The def body without its own leading/trailing trivia (added by callers). */
@@ -307,16 +371,20 @@ function formatDefCore(def: Definition, ctx: Ctx, topLevel: boolean): Doc {
   // Kept VERBATIM — source order, every comment, every value form (review-114 M9): a world (its nested
   // members have no canonical layout yet; it used to print `def world w {}`), the six automation kinds and
   // an automation role (their free-form properties are in authored order, interleaved with the typed ones).
-  if (isVerbatimDef(def)) return verbatim(slice(ctx.source, def.source));
+  if (isVerbatimDef(def)) return verbatim(slice(ctx, def.source));
+  if (def.kind === 'concept' || def.kind === 'conceptBinding') return formatCnDef(def, ctx);
   const props = propsOf(def, ctx);
   const header = `def ${kindKeyword(def.kind)} ${def.name} {`;
-  if (props.length === 0) return text(`def ${kindKeyword(def.kind)} ${def.name} {}`);
+  const closing = closingDocs(closingTrivia(def));
+  if (props.length === 0) {
+    return closingTrivia(def).length ? concat([text(header), indent(closing), hardline, text('}')]) : text(`def ${kindKeyword(def.kind)} ${def.name} {}`);
+  }
 
   const commentsForceBreak = defHasComments(def, props);
 
   if (!topLevel) {
     if (commentsForceBreak) {
-      const body = concat([indent(concat([hardline, propsDoc(props, ctx, true)])), hardline, text('}')]);
+      const body = concat([indent(concat([hardline, propsDoc(props, ctx, true), closing])), hardline, text('}')]);
       return concat([text(header), body]);
     }
     // Nested defs are width-based: the group renders flat if it fits, else breaks.
@@ -324,40 +392,287 @@ function formatDefCore(def: Definition, ctx: Ctx, topLevel: boolean): Doc {
     return group(concat([text(header), body]));
   }
 
-  // Top-level layout is governed by the `separator` setting:
-  //   'newline'  → always one property per line
-  //   'comma'    → always a single line (forced inline, regardless of width)
-  //   'preserve' → break iff the original def spanned multiple lines
-  const broken = commentsForceBreak
-    ? true
-    : ctx.config.separator === 'newline'
-      ? true
-      : ctx.config.separator === 'comma'
-        ? false
-        : def.source.line !== def.source.endLine || props.some((pr) => hasHardline(pr.value));
+  const broken = topLevelBroken(def, ctx, commentsForceBreak, props.map((pr) => pr.value));
 
   if (!broken) {
     return concat([text(header), text(' '), inlinePropsDoc(props), text(' }')]);
   }
-  const body = concat([indent(concat([hardline, propsDoc(props, ctx, true)])), hardline, text('}')]);
+  const body = concat([indent(concat([hardline, propsDoc(props, ctx, true), closing])), hardline, text('}')]);
   return concat([text(header), body]);
 }
 
-const VERBATIM_KINDS = new Set(['world', 'parameter', 'action', 'service', 'approval', 'program', 'recipe']);
+/**
+ * Top-level layout is governed by the `separator` setting:
+ *   'newline'  → always one property per line
+ *   'comma'    → always a single line (forced inline, regardless of width)
+ *   'preserve' → break iff the original def spanned multiple lines
+ * Comments always break it.
+ */
+function topLevelBroken(def: Definition, ctx: Ctx, commentsForceBreak: boolean, values: Doc[]): boolean {
+  if (commentsForceBreak || ctx.config.separator === 'newline') return true;
+  if (ctx.config.separator === 'comma') return false;
+  return def.source.line !== def.source.endLine || values.some(hasHardline);
+}
+
+// The kinds `propsOf` lays out (plus the cn defs, laid out by `formatCnDef`). Every other kind is kept
+// VERBATIM: the md model (domain · dimension · hierarchy · measure · cubelet · map · md2db_* ·
+// md2er_cubelet), drill_map, the world's engine / executor / storage, a world, the six automation kinds
+// — none has a canonical layout, and printing one through `propsOf` emptied its body (`def dimension
+// Product {}`; an md domain even came back as the unparseable `def mdDomain …`).
+const LAID_OUT_KINDS = new Set([
+  'project', 'table', 'view', 'column', 'index', 'constraint', 'fk', 'procedure', 'entity', 'attribute',
+  'relation', 'er2dbEntity', 'er2dbAttribute', 'er2dbRelation', 'query', 'role', 'er2cncRole', 'schema',
+  'area', 'term', 'pattern', 'example', 'concept', 'conceptBinding',
+]);
 
 function isVerbatimDef(def: Definition): boolean {
-  return VERBATIM_KINDS.has(def.kind) || (def.kind === 'role' && (def.entries?.length ?? 0) > 0);
+  return !LAID_OUT_KINDS.has(def.kind) || (def.kind === 'role' && (def.entries?.length ?? 0) > 0);
+}
+
+// --- 0.17 the conceptual model (CN-P1 S1.4 T2) ---------------------------------------------------
+// A cn body (a concept def, the `concept { }` sugar, a cn binding) prints its properties in ONE
+// canonical order; a key the order does not list keeps its source order after the listed ones. Values
+// print as written (a verbatim slice of the source); an expression block (`definition:`, `members:`,
+// `filter:`) is never reflowed. `involves:` past three participants and a binding's `participants:`
+// break one per line. Every comment in the body is either re-emitted or inside a slice; when the
+// layout cannot place one, the def (or the sugar) is kept verbatim instead — never a lost comment.
+
+/** Concept defs and the sugar: identity, documentation, typing, grounding, shape, behaviour, the rest. */
+const CN_BODY_ORDER = [
+  'description', 'label', 'tags', 'sources',
+  'is_a', 'abstract', 'of', 'event',
+  'extent', 'grounds', 'hierarchy', 'involves', 'period',
+  'qualities', 'value_space', 'valued_state',
+  'definition', 'imprecision', 'basis', 'members',
+  'relations', 'lexicon',
+];
+/** The sugar's stereotype ref leads its body; `event:` only when no kind / role / quality does. */
+const CN_SUGAR_STEREOTYPES = ['kind', 'role', 'quality', 'phase', 'event'];
+/** Bindings, the mapping-def way (`er2db_entity`): documentation, the concept, its target, the path. */
+const CN_BINDING_ORDER = [
+  'description', 'tags',
+  'kind', 'role', 'quality', 'event', 'phase', 'concept',
+  'target', 'period', 'hierarchy', 'participants', 'via', 'filter',
+];
+/** `involves:` stays on one line up to this many participants. */
+const CN_INVOLVES_INLINE_MAX = 3;
+
+interface CnLedger {
+  emitted: Set<Trivia>;
+  slices: Array<[number, number]>;
+  /** The slices of the first pass: a comment inside one is printed by it, never re-emitted. */
+  sliced: (t: Trivia) => boolean;
+}
+
+function cnOrder(body: ConceptBody, order: string[]): ConceptProperty[] {
+  const rank = (p: ConceptProperty) => {
+    const i = order.indexOf(p.key);
+    return i === -1 ? order.length : i;
+  };
+  // Array.prototype.sort is stable: equal ranks (unlisted keys, a repeated key) keep source order.
+  return [...body.properties].sort((a, b) => rank(a) - rank(b));
+}
+
+/**
+ * Where a `key: value`'s value starts (`node` starts at its key): past the key, whitespace and one
+ * separator — `:` or `=`, both are `propSep`. A comment after the separator starts the value (it travels
+ * with it); one before it is skipped — it is then in no slice, so the ledger keeps the def verbatim
+ * rather than print a second separator after it. Returns a parser (code-point) offset.
+ */
+function cnValueStart(ctx: Ctx, node: { key: string; source: SourceLocation }): number {
+  const src = ctx.source;
+  const end = ctx.u16(node.source.offsetEnd);
+  let i = ctx.u16(node.source.offsetStart) + node.key.length;
+  let sep = false;
+  while (i < end) {
+    const c = src[i];
+    if (c === ' ' || c === '\t' || c === '\r' || c === '\n') i++;
+    else if ((c === ':' || c === '=') && !sep) { sep = true; i++; }
+    else if (!sep && (src.startsWith('//', i) || src.startsWith('/*', i))) {
+      const close = src.startsWith('//', i) ? src.indexOf('\n', i) : src.indexOf('*/', i) + 2;
+      i = close <= i ? end : Math.min(end, close);
+    } else break;
+  }
+  return ctx.cp(i);
+}
+
+/** A verbatim slice of the source, recorded in the ledger (a comment inside it is preserved). */
+function cnSlice(ctx: Ctx, start: number, end: number): Doc {
+  ctx.cn?.slices.push([start, end]);
+  return verbatim(sourceText(ctx, start, end));
+}
+
+/** `node`'s comments the layout re-emits (not inside a verbatim slice), recorded in the ledger. */
+function cnOwn(ctx: Ctx, node: TriviaNode): TriviaNode {
+  const ledger = ctx.cn;
+  if (!ledger) return node;
+  const keep = (ts: Trivia[] | undefined) => ts?.filter((t) => !ledger.sliced(t));
+  const own = { leadingTrivia: keep(node.leadingTrivia), trailingTrivia: keep(node.trailingTrivia) };
+  for (const t of [...(own.leadingTrivia ?? []), ...(own.trailingTrivia ?? [])]) ledger.emitted.add(t);
+  return own;
+}
+
+function hasTrivia(node: TriviaNode | undefined): boolean {
+  return !!node?.leadingTrivia?.length || !!node?.trailingTrivia?.length;
+}
+
+function participantDoc(pt: ConceptParticipant): Doc {
+  return text(pt.label === undefined ? pt.ref.path : `${pt.ref.path} as ${pt.label}`);
+}
+
+/** `[A, B as b, C]`, or one participant per line past three (or with a comment on one). */
+function involvesDoc(ctx: Ctx, participants: ConceptParticipant[]): Doc {
+  const broken = participants.length > CN_INVOLVES_INLINE_MAX || participants.some((pt) => hasTrivia(pt));
+  if (!broken) return concat([text('['), join(participants.map(participantDoc), text(', ')), text(']')]);
+  return bracketedLines(ctx, '[', ']', participants.map((pt) => ({ node: pt, doc: participantDoc(pt) })));
+}
+
+/** A binding's `participants: { label: [path], … }` — one label per line. */
+function participantsObjectDoc(ctx: Ctx, obj: ObjectValue): Doc {
+  if (obj.entries.length === 0) return text('{}');
+  return bracketedLines(ctx, '{', '}', obj.entries.map((e) => ({
+    node: e,
+    doc: concat([text(`${e.key}: `), cnSlice(ctx, cnValueStart(ctx, e), e.source.offsetEnd)]),
+  })));
+}
+
+/** `open` · one item per line (its comments around it) · `close`. */
+function bracketedLines(ctx: Ctx, open: string, close: string, items: Array<{ node: TriviaNode; doc: Doc }>): Doc {
+  const parts: Doc[] = [];
+  items.forEach(({ node, doc }, i) => {
+    const last = i === items.length - 1;
+    const own = cnOwn(ctx, node);
+    parts.push(...leadingDocs(own), doc);
+    if (!last) parts.push(text(','));
+    parts.push(trailingInline(own));
+    if (!last) parts.push(hardline);
+  });
+  return concat([text(open), indent(concat([hardline, concat(parts)])), hardline, text(close)]);
+}
+
+/** A list of plain items (ids, strings, numbers, booleans, no comments) prints like `tags:` — `[a, b]`. */
+function plainListDoc(ctx: Ctx, list: ListValue): Doc | undefined {
+  const plain = list.items.every((it) => PLAIN_ITEM_KINDS.has(it.kind) && !hasTrivia(it));
+  if (!plain || hasTrivia(list)) return undefined;
+  const items = list.items.map((it) => cnSlice(ctx, it.source.offsetStart, it.source.offsetEnd));
+  return concat([text('['), join(items, text(', ')), text(']')]);
+}
+const PLAIN_ITEM_KINDS = new Set(['id', 'string', 'number', 'bool', 'null']);
+
+function cnValueDoc(ctx: Ctx, prop: ConceptProperty): Doc {
+  if (prop.kind === 'involves') return involvesDoc(ctx, prop.participants);
+  if (prop.kind === 'entry' && prop.key === 'participants' && prop.value.kind === 'object') {
+    return participantsObjectDoc(ctx, prop.value);
+  }
+  if (prop.kind === 'entry' && prop.value.kind === 'list') {
+    const doc = plainListDoc(ctx, prop.value);
+    if (doc) return doc;
+  }
+  return cnSlice(ctx, cnValueStart(ctx, prop), prop.source.offsetEnd);
+}
+
+function cnProps(ctx: Ctx, properties: ConceptProperty[]): Prop[] {
+  return properties.map((pr) => {
+    const value = cnValueDoc(ctx, pr);
+    return { key: pr.key, value, node: cnOwn(ctx, pr), atKey: true };
+  });
+}
+
+/** Every comment the parser attached anywhere under `node`. */
+function triviaUnder(node: unknown, out: Trivia[] = []): Trivia[] {
+  if (node === null || typeof node !== 'object') return out;
+  if (Array.isArray(node)) {
+    for (const x of node) triviaUnder(x, out);
+    return out;
+  }
+  for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+    if (k === 'leadingTrivia' || k === 'trailingTrivia') out.push(...(v as Trivia[]));
+    else if (k !== 'source') triviaUnder(v, out);
+  }
+  return out;
+}
+
+/**
+ * Lay `properties` out; undefined when a comment would be lost. Two passes: the first finds where the
+ * verbatim slices fall, the second re-emits only the comments outside them — the parser may hand a
+ * comment inside one value to the property before it (in `a: x, b: <comment> y` it is `a`'s trailing
+ * one). Every comment under the body must then be re-emitted or sliced.
+ */
+function cnLayout(ctx: Ctx, body: ConceptBody, properties: ConceptProperty[]): Prop[] | undefined {
+  const outer = ctx.cn;
+  try {
+    ctx.cn = { emitted: new Set(), slices: [], sliced: () => false };
+    cnProps(ctx, properties);
+    const slices = ctx.cn.slices;
+    const sliced = (t: Trivia) => slices.some(([s, e]) => s <= t.source.offsetStart && t.source.offsetEnd <= e);
+    const ledger: CnLedger = { emitted: new Set(), slices: [], sliced };
+    ctx.cn = ledger;
+    const props = cnProps(ctx, properties);
+    return triviaUnder(body.properties).every((t) => ledger.emitted.has(t) || sliced(t)) ? props : undefined;
+  } finally {
+    ctx.cn = outer;
+  }
+}
+
+/** A concept def or a cn binding — always top-level (neither nests in a def list). */
+function formatCnDef(def: ConceptDef | ConceptBindingDef, ctx: Ctx): Doc {
+  const header = `def ${def.kind === 'concept' ? def.stereotype : def.bindingKind} ${def.name}`;
+  const order = def.kind === 'concept' ? CN_BODY_ORDER : CN_BINDING_ORDER;
+  const props = cnLayout(ctx, def, cnOrder(def, order));
+  if (!props) return verbatim(slice(ctx, def.source));
+  const closing = closingTrivia(def);
+  if (props.length === 0) return closing.length ? concat([text(`${header} {`), indent(closingDocs(closing)), hardline, text('}')]) : text(`${header} {}`);
+  const comments = hasTrailing(def) || props.some((pr) => hasTrivia(pr.node));
+  const broken = topLevelBroken(def, ctx, comments, props.map((pr) => pr.value));
+  return concat([text(`${header} `), cnBodyDoc(ctx, props, broken ? 'broken' : 'inline', closing)]);
+}
+
+/**
+ * `{ k: v, … }` — one per line (`broken`), one line (`inline`), or whichever fits the width (`fit`).
+ * `closing`: comments written before the closing brace (they force `broken`).
+ */
+function cnBodyDoc(ctx: Ctx, props: Prop[], mode: 'broken' | 'inline' | 'fit', closing: Trivia[] = []): Doc {
+  if (mode === 'broken' || closing.length) {
+    return concat([text('{'), indent(concat([hardline, propsDoc(props, ctx, true), closingDocs(closing)])), hardline, text('}')]);
+  }
+  if (mode === 'inline') return concat([text('{ '), inlinePropsDoc(props), text(' }')]);
+  return group(concat([text('{'), indent(concat([line, propsDoc(props, ctx, false)])), line, text('}')]));
+}
+
+/**
+ * The `concept { … }` sugar of an entity or attribute (cn contracts §1.4 — written without the `:`).
+ * Its stereotype ref leads, the rest in the cn body order; it breaks when it does not fit the width
+ * or carries a comment. A sugar whose comments the layout cannot place is kept verbatim.
+ */
+function conceptSugarProp(sugar: ConceptSugar, ctx: Ctx): Prop {
+  const stereotype = CN_SUGAR_STEREOTYPES.find((k) => sugar.properties.some((pr) => pr.key === k));
+  const order = stereotype ? [stereotype, ...CN_BODY_ORDER.filter((k) => k !== stereotype)] : CN_BODY_ORDER;
+  const props = cnLayout(ctx, sugar, cnOrder(sugar, order));
+  if (!props) {
+    // Verbatim from the `{`; the sugar's own comments are re-emitted only where they lie outside it.
+    const start = cnValueStart(ctx, { key: 'concept', source: sugar.source });
+    return { key: 'concept', sep: ' ', value: verbatim(sourceText(ctx, start, sugar.source.offsetEnd)), node: outsideTrivia(sugar, sugar.source), atKey: true, comments: true };
+  }
+  const node = outsideTrivia(sugar, sugar.source);
+  const closing = closingTrivia(sugar);
+  if (props.length === 0 && !closing.length) return { key: 'concept', sep: ' ', value: text('{}'), node, atKey: true };
+  if (closing.length || props.some((pr) => hasTrivia(pr.node))) {
+    // Comments inside the sugar break it, and — as any comment does — its host.
+    return { key: 'concept', sep: ' ', value: cnBodyDoc(ctx, props, 'broken', closing), node, atKey: true, comments: true };
+  }
+  // Width decides — unless the host prints on one line, where the sugar does too.
+  return { key: 'concept', sep: ' ', value: cnBodyDoc(ctx, props, 'fit'), inline: cnBodyDoc(ctx, props, 'inline'), node, atKey: true };
+}
+
+/** `node`'s comments that lie outside `span` (one inside a verbatim slice of `span` is already in it). */
+function outsideTrivia(node: TriviaNode, span: SourceLocation): TriviaNode {
+  const outside = (t: Trivia) => t.source.offsetEnd <= span.offsetStart || t.source.offsetStart >= span.offsetEnd;
+  return { leadingTrivia: node.leadingTrivia?.filter(outside), trailingTrivia: node.trailingTrivia?.filter(outside) };
 }
 
 function formatDef(def: Definition, ctx: Ctx, topLevel: boolean): Doc {
-  if (isVerbatimDef(def)) {
-    // A comment inside the verbatim slice is already in it; re-emit only the ones outside the def.
-    const { offsetStart, offsetEnd } = def.source;
-    const outside = (t: Trivia) => t.source.offsetEnd <= offsetStart || t.source.offsetStart >= offsetEnd;
-    const node: TriviaNode = { leadingTrivia: def.leadingTrivia?.filter(outside), trailingTrivia: def.trailingTrivia?.filter(outside) };
-    return withTrivia(node, formatDefCore(def, ctx, topLevel));
-  }
-  return withTrivia(def, formatDefCore(def, ctx, topLevel));
+  // The comments inside the def are in its verbatim slice, or printed before its closing brace.
+  return withTrivia(outsideTrivia(def, def.source), formatDefCore(def, ctx, topLevel));
 }
 
 function formatGraph(graph: GraphBlock): Doc {
@@ -408,7 +723,7 @@ function blockWithComments(node: TriviaNode, body: string): string {
 }
 
 export function formatDocument(ast: Document, source: string, config: FormatConfig = DEFAULT_FORMAT_CONFIG): string {
-  const ctx: Ctx = { source, config };
+  const ctx: Ctx = { source, config, ...offsetMaps(source) };
   const blocks: string[] = [];
 
   if (ast.packageDecl) blocks.push(blockWithComments(ast.packageDecl, `package ${ast.packageDecl.name}`));
@@ -417,7 +732,8 @@ export function formatDocument(ast: Document, source: string, config: FormatConf
   }
   if (ast.modelDirective) {
     const sd = ast.modelDirective;
-    blocks.push(blockWithComments(sd, `model ${sd.modelCode}${sd.schema ? ` schema ${sd.schema}` : ''}`));
+    // `locale` (v4.4) was dropped until 0.17 — a `model lexicon locale en` came back as `model lexicon`.
+    blocks.push(blockWithComments(sd, `model ${sd.modelCode}${sd.schema ? ` schema ${sd.schema}` : ''}${sd.locale ? ` locale ${sd.locale}` : ''}`));
   }
   if (ast.graph) {
     const rendered = render(formatGraph(ast.graph), { width: config.width, indentSpaces: config.indentSpaces });

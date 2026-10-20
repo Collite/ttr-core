@@ -12,6 +12,83 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
+## 0.17 — 2026-10-20
+
+**Additive (the conceptual model — CN-P1 S1.1; CN-D3…D8, D11, D17/D18, D20…D25, D28; A-CN-9/13/16/18/19).**
+Every previously-valid `0.16` file parses unchanged and every conformance golden (01–74) is byte-unchanged; every
+new noun stays usable as a name (all are in `idPart`).
+
+1. **`model cn`** (`modelCode` gains `CN`) with the concept def kinds `def kind | event | phase | quality |
+   relation_type <id> { … }` on ONE permissive body, `cnBody`: typed alternatives first (`description`,
+   `label`, `tags`, the stereotype refs `kind|role|quality|event|phase|concept:`, `grounds:`, `involves:`,
+   `period:`, `extent:`, `basis:`, `definition:`, `members:`, `value_space:`, inline `lexicon`), then a free-form
+   entry (`of`, `is_a`, `sources`, `qualities`, `relations`, `hierarchy`, `imprecision`, `valued_state`,
+   `abstract`, …). Which property is legal on which kind is semantic (CN-P2).
+2. **`def role`** stays one production shared by cnc, automation and cn (⚑CN-P6): it gains the cn role's
+   properties (`event:` — the defining event —, `grounds:`, `lexicon`, `of:`, `is_a:`, `qualities:`, …), and the
+   walker reads the body by the file's `model`. Outside `model cn` those properties are a `ttr/unknown-property`
+   parse error, so a typo in a cnc or an automation role is still rejected (review-114 M5).
+3. **Labelled participants:** `involves: [ Item, Warehouse as from, Warehouse as to ]` (new token `as`).
+   **Periods:** `period: { start: placed_date, end: delivered_date, end_open: open | unknown }` or
+   `period: { at: sold_date, precision: day }`.
+4. **`definition:` and `members:` are embedded blocks** (⚑CN-P5): a string, a triple-string or a `"""pl`-tagged
+   block, kept as text with its span — the TTRP expression grammar parses it (CN-P2). Write
+   `definition: """state in ('placed', 'held')"""`; a bare expression is a parse error.
+5. **Ten binding kinds** under `model binding` on one body: `def cn2md_kind | cn2md_role | cn2md_quality |
+   cn2md_event | cn2er_kind | cn2er_role | cn2er_event | cn2er_quality | cn2er_phase | cn2db_concept <id> {
+   … }` — the stereotype ref (`kind: cn.Item`), `target:`, `period:`, and free-form `hierarchy`, `participants`
+   (`{ label: [ er.relation.… ] }`), `via`, `filter` (a block).
+6. **`concept { … }` sugar** inside `cubelet`, `dimension`, `domain`, `measure`, `entity` and `attribute` — one per
+   host: a second is `ttr/duplicate-property` and the first is read (the cn body's rule).
+7. **Lexicon:** `term` / `pattern` / `example` take `default: <bool>` and `sense_priority: <number>`; `for:`
+   takes a `cn.<X>` ref.
+8. **New tokens:** `CN EVENT PHASE QUALITY RELATION_TYPE CONCEPT`, `CN2MD_KIND CN2MD_ROLE CN2MD_QUALITY
+   CN2MD_EVENT CN2ER_KIND CN2ER_ROLE CN2ER_EVENT CN2ER_QUALITY CN2ER_PHASE CN2DB_CONCEPT`, `INVOLVES PERIOD GROUNDS
+   DEFINITION VALUE_SPACE EXTENT BASIS AS`, `DEFAULT SENSE_PRIORITY` — all in `idPart`. `definitionSql`,
+   `cnc`, `as_of`, `qualities` lex as before.
+9. **`model cnc` / `roles:` are deprecated** (CN-D18, "no third mechanism"): they parse unchanged in 0.17;
+   `cn/cnc-deprecated` (a warning) arrives with CN-P2's semantics; removal is a later major. There is nothing
+   to migrate to — the classification is derived from the MD bindings and the `semantics { }` kinds.
+
+**Spellings settled against the cn contracts (S1.1):** the definition / members / filter values are blocks
+(⚑CN-P5); attribute refs are `er.entity.<e>.<a>` (A-CN-9); `default` is a NEW token (the contracts said
+"reused" — TTR.g4 had none) and `sense_priority` with it; `extent:` and `basis:` are typed (the contracts list
+`EXTENT`/`BASIS` as tokens); `is_a`, `of`, `relations`, `hierarchy`, `imprecision`, `valued_state`, `abstract`,
+`participants`, `via` and `filter` ride the free-form entry (no tokens); the free-form key is a plain identifier,
+never a keyword — so a malformed typed property fails at parse time, and so do top-level keys like `from:`, `to:`,
+`type:`, `name:`, `default:`; inside a nested cn object any `id` is a key, and `type` and `precision` too.
+
+**Tooling (S1.4).**
+- **TextMate** (`ttrm.tmLanguage.json`): `cn` is a model code (and the `cn.` ref head), the concept def nouns
+  and the ten binding kinds are kinds (`def kind` too — `kind:` stays a property key), the cn keys, `concept`
+  and `default` / `sense_priority` are properties, `as` is an operator word. After `definition:` / `members:` /
+  `filter:` (with `:` or `=`), a `"""pl` block, an untagged triple-string or a string is an embedded `pl`
+  expression (the TTRP expression words, pinned against `ttrp.tmLanguage.json`; its strings and `//` comments
+  stay on their line and a `/* */` comment stops at a quote, so an expression never colours the rest of the
+  file; a `"""pl` first line anywhere else is plain text). The generator's test now fails on any word token
+  without a scope — the regen gate could not see one (none of the 0.17 tokens was scoped at first).
+- **Formatter** — the cn layout. A concept body prints in one canonical order: `description · label · tags ·
+  sources · is_a · abstract · of · event · extent · grounds · hierarchy · involves · period · qualities ·
+  value_space · valued_state · definition · imprecision · basis · members · relations · lexicon`, then any other
+  key in source order. A binding prints `description · tags · kind | role | quality | event | phase | concept ·
+  target · period · hierarchy · participants · via · filter`, then the rest. The `concept { … }` sugar of an
+  entity or attribute prints without the `:` (the contracts' spelling), its stereotype ref first (`event:` only
+  when no `kind` / `role` / `quality` leads). `involves:` stays on one line up to three participants, one per
+  line past that; a binding's `participants:` prints one label per line; a free-form list of plain items prints
+  like `tags:` (`[a, b]`); every other value — and every expression block — prints exactly as written. A
+  comment the layout cannot place keeps the def verbatim.
+- **Formatter fixes on the way:** a def kind with no layout is now kept verbatim — the md model (`domain`,
+  `dimension`, `hierarchy`, `measure`, `cubelet`, `map`, `md2db_*`, `md2er_cubelet`), `drill_map` and the
+  world's `engine` / `executor` / `storage` printed as an empty `def X {}` (an md domain as the unparseable
+  `def mdDomain`); `model lexicon locale <id>` keeps its locale; a comment the parser hangs on a def — one before its
+  closing `}`, or one above a typed property — prints before the `}`, each on its own line (after the `}` they
+  merged with the def's own trailing comment into one; a comment above a typed property still moves to the def's
+  end — ttr-core#222); slices count the parser's code points, so
+  an emoji earlier in the file no longer cuts every later verbatim value one character short; `key = value` prints
+  as `key: value`. Still dropped: ttr-core#212 (a table's
+  `management` / `changeSemantics` / `writeback`) and ttr-core#219 (an inline `binding:`, a localized
+  `description:` outside a cn body, `security { }` blocks).
+
 ## 0.16 — 2026-10-19
 
 **Additive (the automation model — AU-core-P0 S0.2; AU D-26, D-35, D-67, D-90, D-91, D-104,

@@ -190,6 +190,8 @@ data class EntityDef(
     val lexicon: LexiconBlock? = null,
     /** v3.0 — inline `binding: { target: ..., columns: { ... } }` block; null when absent. */
     val binding: BindingProperty? = null,
+    /** Grammar 0.17 — the `concept { kind|role|event: … }` sugar; null when absent. */
+    val concept: ConceptSugar? = null,
 ) : Definition
 
 data class AttributeDef(
@@ -223,6 +225,8 @@ data class AttributeDef(
     val states: List<String> = emptyList(),
     /** Grammar 0.16 — `transitions: { placed: [held, …] }` (D-67), in authored order; empty ⇒ any. */
     val transitions: List<AttributeTransition> = emptyList(),
+    /** Grammar 0.17 — the `concept { quality: … }` sugar (er: also a value kind); null when absent. */
+    val concept: ConceptSugar? = null,
 ) : Definition
 
 /** Grammar 0.16 — one `from: [to, …]` entry of an attribute's `transitions:` map. */
@@ -260,6 +264,10 @@ data class LexiconEntryDef(
     val forms: List<String> = emptyList(),
     val match: String? = null,
     val text: String? = null,
+    /** Grammar 0.17 — `default: true|false`, a cn default sense (cn contracts §1.5); null when absent. */
+    val default: Boolean? = null,
+    /** Grammar 0.17 — `sense_priority: <n>` (higher wins); null when absent. */
+    val sensePriority: Double? = null,
 ) : Definition
 
 data class RelationDef(
@@ -452,6 +460,8 @@ data class MdDomainDef(
      * the resolver's connected member existence-check still goes through the catalog.
      */
     val restrictMembers: List<String> = emptyList(),
+    /** Grammar 0.17 — the `concept { kind|role: … }` sugar; null when absent. */
+    val concept: ConceptSugar? = null,
 ) : Definition
 
 /**
@@ -473,6 +483,8 @@ data class DimensionDef(
     val key: String? = null,
     val attributes: List<AttributeDef> = emptyList(),
     val hierarchies: List<Reference> = emptyList(),
+    /** Grammar 0.17 — the `concept { kind|role: … }` sugar; null when absent. */
+    val concept: ConceptSugar? = null,
 ) : Definition
 
 /** A calc-map reference: `truncToDay`, or `fiscalYearOfDate(fiscalYearStartMonth: 4)` (named args). */
@@ -526,6 +538,8 @@ data class MeasureDef(
     val measureClass: String? = null,
     val aggregation: AggregationSpec? = null,
     val validBy: String? = null,
+    /** Grammar 0.17 — the `concept { quality: … }` sugar; null when absent. */
+    val concept: ConceptSugar? = null,
 ) : Definition
 
 /** A cubelet measure: a ref to a standalone [MeasureDef], or an inline def. */
@@ -549,6 +563,8 @@ data class CubeletDef(
     /** Dotted `Dimension.attribute` grain refs (opaque; resolved in semantics). */
     val grain: List<Reference> = emptyList(),
     val measures: List<CubeletMeasure> = emptyList(),
+    /** Grammar 0.17 — the `concept { event: …, involves: [ … ] }` sugar; null when absent. */
+    val concept: ConceptSugar? = null,
 ) : Definition
 
 // ===== MD → physical binding defs (schema binding, contracts §2/§4) =====
@@ -953,6 +969,263 @@ data class ProcessDef(
 ) {
     /** The last value written under [key]. */
     operator fun get(key: String): AutoValue? = entries.lastOrNull { it.key == key }?.value
+}
+
+// ============================ 0.17 conceptual model ============================
+// `model cn` (CN-P1, cn contracts §1): the concept defs, a cn `def role` (⚑CN-P6), the ten cn bindings
+// and the `concept { }` sugar read one body — every property, in authored order, to one
+// [ConceptProperty] (its key as written, its span), typed where the grammar types it and a free-form
+// [ConceptProperty.Entry] otherwise. A repeated key is a `ttr/duplicate-property` error; the first is
+// read. Meaning, legality per stereotype and references are CN-P2's. Mirrors the TS twin (`ast.ts`).
+
+/**
+ * Grammar 0.17 — `def kind | role | event | phase | quality | relation_type <id> { … }`. One class for
+ * every stereotype (the [AutomationDef] precedent); a `def role` is a concept only in a `model cn` file.
+ */
+data class ConceptDef(
+    val stereotype: String,
+    override val name: String,
+    override val source: SourceLocation,
+    val body: ConceptBody = ConceptBody(),
+) : Definition {
+    override val description: String? get() = body.description
+    override val descriptionLocalized: LocalizedStringValue get() = body.descriptionLocalized
+    override val tags: List<String> get() = body.tags
+
+    companion object {
+        /** The concept stereotypes, in grammar order (`role` is the shared `def role`). */
+        val STEREOTYPES: List<String> = listOf("kind", "role", "event", "phase", "quality", "relation_type")
+    }
+}
+
+/** Grammar 0.17 — `def cn2md_* | cn2er_* | cn2db_concept <id> { … }`; [bindingKind] is the def keyword. */
+data class ConceptBindingDef(
+    val bindingKind: String,
+    override val name: String,
+    override val source: SourceLocation,
+    val body: ConceptBody = ConceptBody(),
+) : Definition {
+    override val description: String? get() = body.description
+    override val descriptionLocalized: LocalizedStringValue get() = body.descriptionLocalized
+    override val tags: List<String> get() = body.tags
+
+    companion object {
+        /** The ten cn binding keywords, in grammar order. */
+        val KINDS: List<String> =
+            listOf(
+                "cn2md_kind",
+                "cn2md_role",
+                "cn2md_quality",
+                "cn2md_event",
+                "cn2er_kind",
+                "cn2er_role",
+                "cn2er_event",
+                "cn2er_quality",
+                "cn2er_phase",
+                "cn2db_concept",
+            )
+    }
+}
+
+/** Grammar 0.17 — `concept { … }` inside an er or md def: that def's own concept (desugared in CN-P2). */
+data class ConceptSugar(
+    val body: ConceptBody,
+    /** The whole `concept { … }` property. */
+    val source: SourceLocation,
+)
+
+/**
+ * One cn body. [properties] keeps every property in authored order, repeats included; the convenience
+ * fields hold the FIRST `description` / `label` / `tags` (the one the walker reads).
+ */
+data class ConceptBody(
+    val properties: List<ConceptProperty> = emptyList(),
+    val description: String? = null,
+    val descriptionLocalized: LocalizedStringValue = LocalizedStringValue(),
+    val tags: List<String> = emptyList(),
+    val label: LocalizedStringValue? = null,
+) {
+    /** The first property written under [key] (the one the walker reads), or null. */
+    operator fun get(key: String): ConceptProperty? = properties.firstOrNull { it.key == key }
+
+    /** The first property of type [T], or null. */
+    inline fun <reified T : ConceptProperty> property(): T? = properties.firstNotNullOfOrNull { it as? T }
+
+    /** The stereotype ref written under [key] (`kind`, `role`, `quality`, `event`, `phase`, `concept`). */
+    fun ref(key: String): Reference? = (this[key] as? ConceptProperty.Ref)?.ref
+
+    /** The free-form value written under [key] (`of`, `is_a`, `participants`, …). */
+    fun entry(key: String): PropertyValue? = (this[key] as? ConceptProperty.Entry)?.value
+}
+
+/** One property of a cn body. [key] is the key as written; [source] spans the whole property. */
+sealed interface ConceptProperty {
+    val key: String
+    val source: SourceLocation
+
+    /** `description: "…"` / `"""…"""` ([value]) or `{ en: …, cs: … }` ([localized]). */
+    data class Description(
+        override val key: String,
+        val value: PropertyValue?,
+        val localized: LocalizedStringValue?,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    data class Label(
+        override val key: String,
+        val value: LocalizedStringValue,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    data class Tags(
+        override val key: String,
+        val value: List<String>,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    /** A stereotype ref — [key] is `kind | role | quality | event | phase | concept`. */
+    data class Ref(
+        override val key: String,
+        val ref: Reference,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    data class Grounds(
+        override val key: String,
+        val ref: Reference,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    /** `value_space: ProductCategory`. */
+    data class ValueSpace(
+        override val key: String,
+        val ref: Reference,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    data class Involves(
+        override val key: String,
+        val participants: List<ConceptParticipant>,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    data class Period(
+        override val key: String,
+        val value: PropertyValue.ObjectValue,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    data class Extent(
+        override val key: String,
+        val value: String,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    data class Basis(
+        override val key: String,
+        val value: String,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    /** `definition: """…"""` — an expression block (⚑CN-P5), parsed by the TTR-P expression grammar in P2. */
+    data class DefinitionBlock(
+        override val key: String,
+        val block: EmbeddedBlock,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    /** `members: """…"""` — an expression block. */
+    data class MembersBlock(
+        override val key: String,
+        val block: EmbeddedBlock,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    /** A binding's `filter: """…"""` — the expression block of a valued state's series (A-CN-18). */
+    data class FilterBlock(
+        override val key: String,
+        val block: EmbeddedBlock,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    data class Lexicon(
+        override val key: String,
+        val block: LexiconBlock,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    /** A binding's `target:` (an object or a bare reference). */
+    data class Target(
+        override val key: String,
+        val value: TargetValue,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    /** A free-form entry (`of`, `is_a`, `qualities`, `relations`, `hierarchy`, `via`, …), structural. */
+    data class Entry(
+        override val key: String,
+        val value: PropertyValue,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+}
+
+/** One `involves:` participant: a concept ref, optionally labelled (`Warehouse as from`). */
+data class ConceptParticipant(
+    val ref: Reference,
+    val label: String? = null,
+    val source: SourceLocation,
+)
+
+/**
+ * Grammar 0.17 (⚑CN-P5) — an expression block (`definition:`, `members:`, a binding's `filter:`): its
+ * text exactly as the expression parser reads it, plus where every line of it starts in the file.
+ * [form] is how it was written (`string` · `tripleString` · `tagged` with `"""pl`); [language] is
+ * always `pl`. [lineOffsets] holds the file offset of each line of [text] once the dedent removed its
+ * indent; [textSource] spans [text]. Mirrors the TS `EmbeddedBlock`.
+ */
+data class EmbeddedBlock(
+    val language: String = "pl",
+    val form: String,
+    val text: String,
+    val textSource: SourceLocation,
+    val lineOffsets: List<Int>,
+    val indentWidth: Int,
+    /** The whole literal, quotes included. */
+    val source: SourceLocation,
+    /**
+     * The string form only: the index in [text] of every character written escaped (two characters in
+     * the file, one in [text]). Positions count code points.
+     */
+    val escapes: List<Int> = emptyList(),
+) {
+    /**
+     * The file span of a position inside [text] — [line] 0-based within the block, [column] 0-based
+     * within that line of [text], both in code points. Mirrors the TS `embeddedBlockLocation`.
+     */
+    fun location(
+        line: Int,
+        column: Int,
+        length: Int = 1,
+    ): SourceLocation {
+        val l = line.coerceIn(0, lineOffsets.size - 1)
+        // A string-form block's escapes each take one more character of the file than of `text`: count the
+        // ones on this line before the column ([escapes] index the whole text, in code points).
+        val lineStart = text.split("\n").take(l).sumOf { it.codePointCount(0, it.length) + 1 }
+
+        fun shift(c: Int) = escapes.count { it >= lineStart && it < lineStart + c }
+        val base = if (l == 0) textSource.column else indentWidth
+        val start = column + shift(column)
+        val end = column + length + shift(column + length)
+        return SourceLocation(
+            file = source.file,
+            line = textSource.line + l,
+            column = base + start,
+            endLine = textSource.line + l,
+            endColumn = base + end,
+            offsetStart = lineOffsets[l] + start,
+            offsetEnd = lineOffsets[l] + end,
+        )
+    }
 }
 
 /**
