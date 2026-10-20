@@ -268,64 +268,107 @@ class BareJoinRefusalSpec :
             parse(sql, model = fkOnly).shouldBeInstanceOf<ParseResult.Success>().warnings.shouldBeEmpty()
         }
 
-        // A bare join its WHERE conditions is the author's join, written in the wrong clause: the condition moves into
-        // its ON, and the plan is the one the ON form gives.
-        fun sameAsOn(
-            where: String,
-            on: String,
+        // A bare join its WHERE conditions is the author's join, written in the wrong clause: it is not refused, and its
+        // plan and warnings are the ones the option off gives, on both pipelines. The plan is never changed.
+        fun sameAsWithout(
+            sql: String,
             model: ModelHandle = j.handle(),
+            whereConditions: Boolean = true,
         ) {
-            for (target in listOf(SchemaCode.DB, SchemaCode.ER)) {
-                val result = parse(where, target, model = model).shouldBeInstanceOf<ParseResult.Success>()
-                result.warnings.shouldBeEmpty()
-                marks(result.plan) shouldBe 0
-                result.plan shouldBe parse(on, target, model = model).shouldBeInstanceOf<ParseResult.Success>().plan
+            val off = parse(sql, refuse = false, model = model).shouldBeInstanceOf<ParseResult.Success>()
+            val on = parse(sql, model = model).shouldBeInstanceOf<ParseResult.Success>()
+            on.plan shouldBe off.plan
+            on.warnings shouldBe off.warnings
+            val erOff =
+                parse(sql, SchemaCode.ER, refuse = false, model = model).shouldBeInstanceOf<ParseResult.Success>()
+            val erOn = parse(sql, SchemaCode.ER, model = model).shouldBeInstanceOf<ParseResult.Success>()
+            if (whereConditions) {
+                // Unmarked on the ER plan too, so the re-entry has nothing to refuse.
+                erOn.plan shouldBe erOff.plan
+            } else {
+                // Still marked: the re-entry's physical stage conditions it, from the FK.
+                marks(erOn.plan) shouldBe 1
             }
+            erOn.warnings shouldBe erOff.warnings
+            dbHalf(erOn.plan, model).shouldBeInstanceOf<ParseResult.Success>().plan shouldBe
+                dbHalf(erOff.plan, model).shouldBeInstanceOf<ParseResult.Success>().plan
         }
 
-        "a bare JOIN its WHERE conditions is accepted: the condition moves into its ON, the rest stays in WHERE" {
-            sameAsOn(
+        "a bare JOIN its WHERE conditions is accepted, with the plan and warnings the option off gives" {
+            val sql =
                 "SELECT calendar.day_name, product.product_name FROM calendar JOIN product " +
-                    "WHERE calendar.date_id = product.product_id AND product.product_name = 'Electronics'",
-                "SELECT calendar.day_name, product.product_name FROM calendar JOIN product " +
-                    "ON calendar.date_id = product.product_id WHERE product.product_name = 'Electronics'",
-            )
+                    "WHERE calendar.date_id = product.product_id AND product.product_name = 'Electronics'"
+            sameAsWithout(sql)
+            // Still the joiners' warning, as without the option: that it is false here is ttr-core#218.
+            val warnings = parse(sql).shouldBeInstanceOf<ParseResult.Success>().warnings
+            warnings.single().shouldBeInstanceOf<JoinerWarning.NoRelation>()
         }
 
-        "a chain: each WHERE condition goes to the join whose two sides it reads" {
-            sameAsOn(
+        "a chain: each join is conditioned by the WHERE condition between its own two sides" {
+            sameAsWithout(
                 "SELECT calendar.day_name, promo.promo_name FROM calendar JOIN household JOIN promo " +
                     "WHERE calendar.date_id = household.household_id AND promo.promo_id = household.household_id",
-                "SELECT calendar.day_name, promo.promo_name FROM calendar " +
-                    "JOIN household ON calendar.date_id = household.household_id " +
-                    "JOIN promo ON promo.promo_id = household.household_id",
             )
         }
 
-        "a marked join on the right of another takes its condition at its own offset" {
-            sameAsOn(
+        "a chain whose WHERE conditions one join only is refused for the other" {
+            refused(
+                parse(
+                    "SELECT calendar.day_name, promo.promo_name FROM calendar JOIN household JOIN promo " +
+                        "WHERE calendar.date_id = household.household_id",
+                ),
+            ) shouldContain "entity.promo"
+        }
+
+        "a marked join on the right of another reads the WHERE condition at its own offset" {
+            sameAsWithout(
                 "SELECT product.product_name, calendar.day_name FROM product CROSS JOIN (calendar JOIN promo) " +
                     "WHERE calendar.date_id = promo.promo_id",
-                "SELECT product.product_name, calendar.day_name FROM product " +
-                    "CROSS JOIN (calendar JOIN promo ON calendar.date_id = promo.promo_id)",
             )
         }
 
         "a range condition in WHERE conditions the join too" {
-            sameAsOn(
+            sameAsWithout(
                 "SELECT calendar.day_name, promo.promo_name FROM calendar JOIN promo " +
                     "WHERE promo.promo_id BETWEEN calendar.date_id AND calendar.date_id + 7",
-                "SELECT calendar.day_name, promo.promo_name FROM calendar JOIN promo " +
-                    "ON promo.promo_id BETWEEN calendar.date_id AND calendar.date_id + 7",
             )
         }
 
-        "an FK-only relation conditioned in WHERE gets no foreign key stacked on the author's condition" {
-            sameAsOn(
+        "an FK-only relation conditioned in WHERE keeps its foreign key, as with the option off" {
+            sameAsWithout(
                 "SELECT product.product_name, sale.revenue FROM sale JOIN product WHERE sale.promo_id = product.product_id",
-                "SELECT product.product_name, sale.revenue FROM sale JOIN product ON sale.promo_id = product.product_id",
+                withoutPairs(listOf(j.saleProductFk)),
+            )
+            // Two FKs: the physical stage cannot pick one, and the WHERE condition is the join, as with the option off.
+            sameAsWithout(
+                "SELECT product.product_name, sale.revenue FROM sale JOIN product WHERE sale.promo_id = product.product_id",
                 withoutPairs(listOf(j.saleProductFk, secondSaleProductFk)),
             )
+        }
+
+        "a WHERE filter that reads both sides of an FK-only bare join keeps the foreign key" {
+            val sql = "SELECT product.product_name, sale.revenue FROM sale JOIN product WHERE "
+            val m = withoutPairs(listOf(j.saleProductFk))
+            sameAsWithout(sql + "product.product_name = 'x' OR sale.revenue > 100", m, whereConditions = false)
+            sameAsWithout(sql + "sale.revenue > product.product_id", m)
+        }
+
+        "a disjunction reading both sides does not condition the join: refused" {
+            refused(
+                parse(
+                    "SELECT calendar.day_name, product.product_name FROM calendar JOIN product " +
+                        "WHERE calendar.day_name = 'Monday' OR product.product_name = 'Electronics'",
+                ),
+            ) shouldBe unrelatedRefusal
+        }
+
+        "a <> between the sides does not condition the join: refused" {
+            refused(
+                parse(
+                    "SELECT calendar.day_name, product.product_name FROM calendar JOIN product " +
+                        "WHERE calendar.date_id <> product.product_id",
+                ),
+            ) shouldBe unrelatedRefusal
         }
 
         "a WHERE condition on one side only does not condition the join: refused" {
@@ -356,7 +399,7 @@ class BareJoinRefusalSpec :
             ) shouldBe unrelatedRefusal
         }
 
-        "a WHERE condition with a sub-query stays in WHERE, even across both sides: refused" {
+        "an IN sub-query reading both sides does not condition the join: refused" {
             refused(
                 parse(
                     "SELECT calendar.day_name, product.product_name FROM calendar JOIN product " +
