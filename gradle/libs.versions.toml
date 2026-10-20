@@ -38,6 +38,8 @@ tomlj = "1.1.1"
 clikt = "5.0.3"
 # ttrp-conform (Stage 3.4) — Arrow IPC reading (Java), matches the pyarrow 18.x emit line.
 arrow-java = "18.1.0"
+# ttrp-conform (AU-core-P2 · S2.4) — embedded DuckDB, the recipe statements' second engine (D-18/D-40).
+duckdb-jdbc = "1.5.6.0"
 # ttr-translator extraction arc (A1) — mirror kantheon's pins for behavior parity.
 calcite = "1.41.0"
 # Calcite-ext custom-parser codegen (fmpp + javacc) — ttr-translator only (decision D7).
@@ -109,6 +111,7 @@ protobuf-java-util = { module = "com.google.protobuf:protobuf-java-util", versio
 # ttr-import-schema (SV-P4·S3/S4).
 mssql-jdbc                 = { module = "com.microsoft.sqlserver:mssql-jdbc",              version.ref = "mssql-jdbc" }
 postgresql                 = { module = "org.postgresql:postgresql",                       version.ref = "pgsql" }
+duckdb-jdbc                = { module = "org.duckdb:duckdb_jdbc",                          version.ref = "duckdb-jdbc" }
 hikaricp                   = { module = "com.zaxxer:HikariCP",                             version.ref = "hikaricp" }
 snakeyaml                  = { module = "org.yaml:snakeyaml",                              version.ref = "snakeyaml" }
 # Testcontainers 2.x — DB modules moved to the `testcontainers-<db>` artifact prefix and

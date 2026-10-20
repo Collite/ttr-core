@@ -31,7 +31,9 @@ data class ConformReport(
  *
  * @param terminalSort true when the island's terminal node is Sort (parameter, never sniffed).
  * @param sortColumns the sort-key columns (prefix that must match order-sensitively under Sort).
- * @param tolerances per-column float64 absolute tolerance; a column absent here compares exactly.
+ * @param tolerances per-column float64 absolute tolerance; a column absent here compares exactly. A column with a
+ *   declared tolerance may also be `decimal` on one side and `float64` on the other (AU-core-P2 · S2.4: DuckDB divides
+ *   decimals in DOUBLE, Postgres in NUMERIC) — its fingerprint reads `number`, its cells compare within the tolerance.
  */
 class SevenPointComparator(
     private val terminalSort: Boolean = false,
@@ -166,10 +168,13 @@ class SevenPointComparator(
     // --- helpers ---
 
     private fun fingerprint(t: ConformTable): String {
-        val canon = t.columns.joinToString(";") { "${it.name}:${it.type}:${it.nullable}" }
+        val canon = t.columns.joinToString(";") { "${it.name}:${fingerprintType(it)}:${it.nullable}" }
         val d = MessageDigest.getInstance("SHA-256").digest(canon.toByteArray(Charsets.UTF_8))
         return "sha256:" + d.joinToString("") { "%02x".format(it) }
     }
+
+    private fun fingerprintType(c: ConformColumn): String =
+        if (c.name in tolerances && (c.type == "float64" || c.type.startsWith("decimal"))) "number" else c.type
 
     private fun rowComparator(t: ConformTable): Comparator<List<Any?>> =
         Comparator { a, b ->
@@ -208,6 +213,9 @@ class SevenPointComparator(
                 val tol = tolerances[column]
                 if (tol != null) kotlin.math.abs(a - b) <= tol else a == b
             }
+            // a declared tolerance spans decimal ⇄ float64 (the engine's own division), never a silent one
+            a is Number && b is Number && column in tolerances ->
+                kotlin.math.abs(a.toDouble() - b.toDouble()) <= tolerances.getValue(column)
             else -> a == b
         }
 }

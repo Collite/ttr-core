@@ -4,13 +4,17 @@
 
 -- Calendar 2025-09-01 … 2026-12-31: the TPC-DS day number as the sk, Saturday + Sunday the weekend, 2026-10-28 (a
 -- Czech holiday) a holiday — so the working days from 2026-10-25 to 2026-11-02 are 26, 27, 29, 30 Oct and 2 Nov.
+-- Spelled for Postgres and DuckDB alike (RecipeDuckDbSpec loads this same file): no TO_CHAR, no integer `/`.
 INSERT INTO date_dim (d_date_sk, d_date, d_year, d_moy, d_qoy, d_week_seq, d_day_name, d_holiday, d_weekend, d_working_day)
 SELECT (d - DATE '1900-01-02') + 2415022, d, EXTRACT(YEAR FROM d), EXTRACT(MONTH FROM d), EXTRACT(QUARTER FROM d),
-       (d - DATE '1900-01-02') / 7 + 1, TO_CHAR(d, 'FMDay'),
+       FLOOR((d - DATE '1900-01-02') / 7.0) + 1,
+       CASE EXTRACT(ISODOW FROM d) WHEN 1 THEN 'Monday' WHEN 2 THEN 'Tuesday' WHEN 3 THEN 'Wednesday'
+           WHEN 4 THEN 'Thursday' WHEN 5 THEN 'Friday' WHEN 6 THEN 'Saturday' ELSE 'Sunday' END,
        CASE WHEN d = DATE '2026-10-28' THEN 'Y' ELSE 'N' END,
        CASE WHEN EXTRACT(ISODOW FROM d) IN (6, 7) THEN 'Y' ELSE 'N' END,
        EXTRACT(ISODOW FROM d) NOT IN (6, 7) AND d <> DATE '2026-10-28'
-FROM generate_series(DATE '2025-09-01', DATE '2026-12-31', INTERVAL '1 day') AS g(day), LATERAL (SELECT g.day::date AS d) x;
+FROM (SELECT CAST(g.day AS DATE) AS d
+      FROM generate_series(DATE '2025-09-01', DATE '2026-12-31', INTERVAL '1 day') AS g(day)) x;
 
 -- Customers: 10 and 20 and 50, all served from distribution center 1.
 INSERT INTO customer (c_customer_sk, c_customer_id, c_birth_year, c_center_sk) VALUES

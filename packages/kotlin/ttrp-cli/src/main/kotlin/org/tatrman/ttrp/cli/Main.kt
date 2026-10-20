@@ -195,11 +195,17 @@ class CheckCommand : CliktCommand(name = "check") {
 /**
  * `ttrp conform <file>.ttrp [--tolerance <col>=<eps>...]` — builds the placement variants, runs each
  * bundle's `run.sh`, and compares `out/` displays under the Q9 seven-point procedure. Exits 0 all-
- * pass · 1 comparison failure · 2 invocation/pre-flight failure (mirrors the run contract).
+ * pass · 1 comparison failure · 2 invocation/pre-flight failure (mirrors the run contract). A recipe
+ * (AU-core-P2 · S2.4) conforms across `--engines` over `--fixture` scripts at `--as-of` ([RecipeConformCli]).
  */
 class ConformCommand : CliktCommand(name = "conform") {
     private val file by argument()
     private val tolerance by option("--tolerance", help = "per-column float64 tolerance, <col>=<eps>").multiple()
+    private val engines by option("--engines", help = "a recipe's engines, comma-separated: pg, duckdb").default(
+        "pg,duckdb",
+    )
+    private val fixture by option("--fixture", help = "a recipe's fixture script (SQL), loaded in order").multiple()
+    private val asOf by option("--as-of", help = "a recipe's :as_of, an ISO local date-time (2026-11-02T08:00)")
 
     override fun run() {
         val abs = Path.of(file).toAbsolutePath()
@@ -208,6 +214,27 @@ class ConformCommand : CliktCommand(name = "conform") {
             throw ProgramResult(2)
         }
         val manifestResult = TtrpManifestReader.resolve(abs.parent ?: abs)
+        val recipePlan =
+            TtrpPipeline(manifestResult.manifest, manifestResult.manifest.modelsRoot())
+                .plan(Files.readString(abs), abs.toString())
+                .takeIf { it.ok && it.recipe != null }
+        if (recipePlan != null) {
+            val instant =
+                asOf?.let { runCatching { java.time.LocalDateTime.parse(it) }.getOrNull() } ?: run {
+                    echo("ttrp conform: a recipe runs at an instant — pass --as-of 2026-11-02T08:00", err = true)
+                    throw ProgramResult(2)
+                }
+            throw ProgramResult(
+                RecipeConformCli.run(
+                    recipePlan,
+                    engines.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                    fixture.map { Path.of(it).toAbsolutePath() },
+                    instant,
+                    tolerances(),
+                    System.getenv().filterKeys { it.startsWith("TTR_CONN_") },
+                ) { echo(it) },
+            )
+        }
         val outDir = Files.createTempDirectory("ttrp-conform")
         val variants =
             PlacementVariants.build(
@@ -218,17 +245,18 @@ class ConformCommand : CliktCommand(name = "conform") {
                 outDir,
                 toolchainVersion = ToolchainVersion.current,
             )
-        val tolerances =
-            tolerance
-                .mapNotNull { spec ->
-                    val (c, e) = spec.split("=", limit = 2).let { it.getOrNull(0) to it.getOrNull(1) }
-                    if (c != null && e?.toDoubleOrNull() != null) c to e.toDouble() else null
-                }.toMap()
         val env = System.getenv().filterKeys { it.startsWith("TTR_CONN_") }
-        val outcome = ConformRunner(BundleInvoker(env), tolerances = tolerances).run(variants)
+        val outcome = ConformRunner(BundleInvoker(env), tolerances = tolerances()).run(variants)
         echo(outcome.summary())
         throw ProgramResult(outcome.exitCode)
     }
+
+    private fun tolerances(): Map<String, Double> =
+        tolerance
+            .mapNotNull { spec ->
+                val (c, e) = spec.split("=", limit = 2).let { it.getOrNull(0) to it.getOrNull(1) }
+                if (c != null && e?.toDoubleOrNull() != null) c to e.toDouble() else null
+            }.toMap()
 }
 
 /**
