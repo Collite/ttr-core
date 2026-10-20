@@ -39,6 +39,9 @@ _KIND_SEGMENT: dict[str, str] = {
     "er2db_relation": "er2dbRelation",
     "er2cnc_role": "er2cncRole",
     "drill_map": "drillMap",
+    # 0.17 — the cn bindings. Semantics has no `cn` model yet (CN-P2 S2.1): a concept and a cn binding
+    # key under the default model (`db`), as the TS and Kotlin twins do.
+    "concept_binding": "conceptBinding",
 }
 
 

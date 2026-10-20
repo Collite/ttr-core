@@ -1,0 +1,21 @@
+{
+    "diagnostics": [
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference"
+    ],
+    "resolved": [],
+    "symbols": [
+        "db.dbo.example.web_revenue",
+        "db.dbo.term.channel",
+        "db.dbo.term.customer",
+        "db.dbo.term.customer_phase",
+        "db.dbo.term.debtor",
+        "db.dbo.term.product",
+        "db.dbo.term.revenue"
+    ]
+}

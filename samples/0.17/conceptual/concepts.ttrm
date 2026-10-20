@@ -1,0 +1,73 @@
+// The concepts of Hartland's web orders: who orders, what an order and an invoice are, when an order
+// is pending, when an invoice is overdue and who is in debt. Each grounded concept is grounded once,
+// in `bindings.ttrm`; the defined ones carry their expression and are grounded through their bearer.
+model cn
+
+def kind Warehouse {
+    label: { en: "Distribution center", cs: "Distribuční centrum" },
+    qualities: [warehouse_name]
+}
+
+def role Customer {
+    label: { en: "Customer", cs: "Zákazník" },
+    event: Order
+}
+
+def event Order {
+    label: { en: "Order", cs: "Objednávka" },
+    extent: durative,
+    involves: [Customer, Warehouse as fulfilling],
+    period: { start: placed_date, end: delivered_date, end_open: open },
+    qualities: [order_value, state, placed_date, delivered_date]
+}
+
+def event Invoicing {
+    label: { en: "Invoice", cs: "Faktura" },
+    extent: durative,
+    involves: [Customer, Order],
+    period: { start: issued, end: due },
+    qualities: [amount, paid, open_amount, invoice_status]
+}
+
+// ---- qualities: grounded (bindings.ttrm) or defined ----
+def quality warehouse_name { of: Warehouse }
+
+def quality order_value { label: { en: "Order value", cs: "Hodnota objednávky" }, of: Order }
+
+def quality state { of: Order }
+
+def quality placed_date { of: Order }
+
+def quality delivered_date { of: Order }
+
+def quality issued { of: Invoicing }
+
+def quality due { of: Invoicing }
+
+def quality amount { of: Invoicing }
+
+def quality paid { of: Invoicing }
+
+def quality invoice_status { of: Invoicing }
+
+def quality open_amount { label: { en: "Open amount", cs: "Neuhrazená částka" }, of: Invoicing, definition: "amount - paid" }
+
+// ---- phases: conditions of an order, an invoice, a customer ----
+def phase PendingOrder {
+    label: { en: "Pending order", cs: "Nevyřízená objednávka" },
+    of: Order,
+    definition: """state in ('placed', 'held')"""
+}
+
+def phase OverdueInvoice {
+    label: { en: "Overdue invoice", cs: "Faktura po splatnosti" },
+    of: Invoicing,
+    definition: """invoice_status = 'open' and period.end < as_of"""
+}
+
+def phase DebtorCustomer {
+    label: { en: "Debtor", cs: "Dlužník" },
+    of: Customer,
+    definition: """exists Invoicing involving this as customer where OverdueInvoice""",
+    imprecision: certainly
+}

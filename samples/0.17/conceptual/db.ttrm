@@ -1,0 +1,46 @@
+model db schema dbo
+
+// The Hartland web-order slice the concepts in `concepts.ttrm` stand on (invented names): web orders,
+// the customers who place them, the distribution centers that fulfil them, and the invoices.
+
+def table web_order { description: "Web orders",
+    primaryKey: ["wo_order_number"],
+    columns: [
+        def column wo_order_number { type: int, isKey: true, description: "Order number" },
+        def column wo_customer_sk { type: int, indexed: true, description: "The customer who ordered" },
+        def column wo_warehouse_sk { type: int, optional: true, indexed: true, description: "The fulfilling distribution center" },
+        def column wo_placed_date { type: date, description: "Placed on" },
+        def column wo_delivered_date { type: date, optional: true, description: "Delivered on" },
+        def column wo_state { type: text, description: "placed | held | shipped | delivered" },
+        def column wo_order_value { type: decimal, description: "Order value" }
+    ]
+}
+
+def table customer { description: "Customers",
+    primaryKey: ["c_customer_sk"],
+    columns: [
+        def column c_customer_sk { type: int, isKey: true, description: "Customer key" },
+        def column c_last_name { type: text, optional: true, description: "Last name" }
+    ]
+}
+
+def table warehouse { description: "Distribution centers",
+    primaryKey: ["w_warehouse_sk"],
+    columns: [
+        def column w_warehouse_sk { type: int, isKey: true, description: "Distribution center key" },
+        def column w_warehouse_name { type: text, description: "Name" }
+    ]
+}
+
+def table invoice { description: "Invoices, one per web order",
+    primaryKey: ["inv_number"],
+    columns: [
+        def column inv_number { type: int, isKey: true, description: "Invoice number" },
+        def column inv_order_number { type: int, indexed: true, description: "The invoiced order" },
+        def column inv_issued { type: date, description: "Issued on" },
+        def column inv_due { type: date, description: "Due on" },
+        def column inv_amount { type: decimal, description: "Invoiced amount" },
+        def column inv_paid { type: decimal, description: "Paid so far" },
+        def column inv_status { type: text, description: "open | paid | cancelled" }
+    ]
+}

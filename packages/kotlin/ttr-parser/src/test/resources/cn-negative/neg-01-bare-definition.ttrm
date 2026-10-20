@@ -1,0 +1,3 @@
+// A phase `definition:` is an embedded block (⚑CN-P5) — a bare expression is a parse error.
+model cn
+def phase OverdueInvoice { of: Invoicing, definition: OverdueInvoice }

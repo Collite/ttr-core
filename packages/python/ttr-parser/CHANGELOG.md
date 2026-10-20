@@ -3,6 +3,33 @@
 All notable changes to `ttr-parser` (Python) are documented here. While
 `< 1.0.0`, minor bumps may introduce breaking changes (see each entry).
 
+## 0.17.0 — unreleased
+
+- **Grammar 0.17 (additive) — the conceptual model (CN-P1).** `model cn`: `ConceptDef` (`kind =
+  "concept"`, `stereotype` = `kind | role | event | phase | quality | relation_type`) and the ten cn
+  bindings as `ConceptBindingDef` (`kind = "concept_binding"`, `binding_kind` = the def keyword), both
+  carrying a `ConceptBody` — every property in authored order as a `ConceptProperty` (`key` as written,
+  `source`): `ConceptDescription`, `ConceptLabel`, `ConceptTags`, `ConceptRef`, `ConceptGrounds`,
+  `ConceptValueSpace`, `ConceptInvolves` (`ConceptParticipant`s, `label` for `X as y`), `ConceptPeriod`,
+  `ConceptExtent`, `ConceptBasis`, `ConceptDefinition` / `ConceptMembers` / `ConceptFilter` (an
+  `EmbeddedBlock` with `line_offsets` and `location()`, so an expression diagnostic lands in the file),
+  `ConceptLexicon`, `ConceptTarget` and the free-form `ConceptEntry`. A `def role` in a `model cn` file is a
+  concept role (⚑CN-P6); a cnc / automation role property on it is `ttr/unknown-property` (review-114 M5).
+  `EntityDef` / `AttributeDef` gain `concept: ConceptSugar | None`; `TermDef` / `PatternDef` /
+  `ExampleDef` gain `default` and `sense_priority`. New codes `ttr/duplicate-property` and
+  `ttr/expression-block-required`; `EXPRESSION_TAG_REGISTRY` (`pl`) beside the SQL `TAG_REGISTRY`.
+- **The md hosts of the sugar:** `MdDomainDef`, `DimensionDef`, `MeasureDef` and `CubeletDef` now parse
+  (identity, `description`, `tags` and `concept` only — the md model itself is not ported, so a
+  dimension's inline attributes and a cubelet's inline measures, and the `concept { }` on them, still
+  drop). `model md` now reads as `md` (it read as `""`).
+- One `concept { }` per host: a second is `ttr/duplicate-property` and the first is read. A string-form
+  `EmbeddedBlock` carries `escapes` (the `text` index of every escaped character) and `location()` steps
+  over them, so a position in an expression with `\"` still lands on the right file character. A
+  backslash escapes any character there, a line break too (as on TS and Kotlin); the line after an
+  escaped line break maps onto the file's next line. The sugar of a dimension's inline attribute and
+  of a cubelet's inline measure is walked for its diagnostics only.
+- Conformance fixtures 75–79 byte-identical to the TS golden (parse and semantics); 01–74 unchanged.
+
 ## 0.16.0 — unreleased
 
 - **Grammar 0.16 (additive) — the automation model.** `model automation` with six def kinds on one

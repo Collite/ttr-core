@@ -34,10 +34,13 @@ from typing import Any
 from antlr4 import ParserRuleContext, TerminalNode
 from antlr4.Token import CommonToken
 
+from ._generated.TTRLexer import TTRLexer
+from ._generated.TTRParser import TTRParser
 from .dedent import dedent_with_indent
 from .diagnostics import DiagnosticCode
 from .model import (
     AUTOMATION_KINDS,
+    CONCEPT_BINDING_KINDS,
     AreaDef,
     AttributeDef,
     AttributeTransition,
@@ -67,10 +70,35 @@ from .model import (
     BindingPropertyBlock,
     BoolValue,
     ColumnDef,
+    ConceptBasis,
+    ConceptBindingDef,
+    ConceptBody,
+    ConceptDef,
+    ConceptDefinition,
+    ConceptDescription,
+    ConceptEntry,
+    ConceptExtent,
+    ConceptFilter,
+    ConceptGrounds,
+    ConceptInvolves,
+    ConceptLabel,
+    ConceptLexicon,
+    ConceptMembers,
+    ConceptParticipant,
+    ConceptPeriod,
+    ConceptProperty,
+    ConceptRef,
+    ConceptSugar,
+    ConceptTags,
+    ConceptTarget,
+    ConceptValueSpace,
     ConstraintDef,
+    CubeletDef,
     DataType,
     Definition,
+    DimensionDef,
     DrillMapDef,
+    EmbeddedBlock,
     EngineDef,
     EntityDef,
     Er2CncRoleDef,
@@ -89,6 +117,8 @@ from .model import (
     LocalizedStringListValue,
     LocalizedStringValue,
     MatchMethodValue,
+    MdDomainDef,
+    MeasureDef,
     ModelDirective,
     NullValue,
     NumberValue,
@@ -126,7 +156,7 @@ from .model import (
     WorldSchemaDef,
     WorldSchemaField,
 )
-from .tag_registry import resolve_tag
+from .tag_registry import resolve_expression_tag, resolve_tag
 
 __all__ = ["WalkResult", "walk_document"]
 
@@ -346,7 +376,7 @@ def walk_document(doc: Any, file: str) -> WalkResult:
 
     definitions: list[Definition] = []
     for def_ctx in doc.definition() or ():
-        d = _visit_definition(def_ctx, file, warnings, errors)
+        d = _visit_definition(def_ctx, file, warnings, errors, model_directive.model_code if model_directive else None)
         if d is not None:
             definitions.append(d)
 
@@ -389,9 +419,11 @@ def _visit_model_directive(ctx: Any, file: str) -> ModelDirective:
         else "binding" if code_ctx.BINDING()
         else "query" if code_ctx.QUERY()
         else "cnc" if code_ctx.CNC()
+        else "md" if code_ctx.MD()
         else "world" if code_ctx.WORLD()
         else "lexicon" if code_ctx.LEXICON()
         else "automation" if code_ctx.AUTOMATION()
+        else "cn" if code_ctx.CN()
         else ""
     )
     # v4.4: `MODEL modelCode (SCHEMA id)? (LOCALE id)?` — up to two id slots. In
@@ -417,7 +449,9 @@ def _visit_model_directive(ctx: Any, file: str) -> ModelDirective:
 # ---------------------------------------------------------------------------
 
 
-def _visit_definition(ctx: Any, file: str, warnings: list[ParseWarning], errors: list[ParseError]) -> Definition | None:
+def _visit_definition(
+    ctx: Any, file: str, warnings: list[ParseWarning], errors: list[ParseError], model_code: str | None = None
+) -> Definition | None:
     od = ctx.objectDefinition()
     if od is None:
         return None
@@ -455,7 +489,10 @@ def _visit_definition(ctx: Any, file: str, warnings: list[ParseWarning], errors:
     if od.QUERY() is not None:
         return _visit_query(od, name, src, file, warnings, errors)
     if od.ROLE() is not None:
-        return _visit_role(od, name, src, file, warnings)
+        # Grammar 0.17 (⚑CN-P6) — one `def role` production, read by the file's model.
+        if model_code == "cn":
+            return _visit_concept_role(od, name, src, file, warnings, errors)
+        return _visit_role(od, name, src, file, warnings, errors, model_code)
     if od.ER2CNC_ROLE() is not None:
         return _visit_er2cnc_role(od, name, src, file, warnings)
     if od.DRILL_MAP() is not None:
@@ -476,6 +513,22 @@ def _visit_definition(ctx: Any, file: str, warnings: list[ParseWarning], errors:
         return _visit_lexicon_entry(od, "pattern", name, src, file)
     if od.EXAMPLE() is not None:
         return _visit_lexicon_entry(od, "example", name, src, file)
+    # Grammar 0.17 — the md hosts of the `concept { }` sugar (identity + `concept` only, see model.py).
+    if od.DOMAIN() is not None:
+        return _visit_md_host(MdDomainDef, od.mdDomainDef().mdDomainProperty(), name, src, file, warnings, errors)
+    if od.DIMENSION() is not None:
+        return _visit_md_host(DimensionDef, od.dimensionDef().dimensionProperty(), name, src, file, warnings, errors)
+    if od.MEASURE() is not None:
+        return _visit_md_host(MeasureDef, od.measureDef().measureProperty(), name, src, file, warnings, errors)
+    if od.CUBELET() is not None:
+        return _visit_md_host(CubeletDef, od.cubeletDef().cubeletProperty(), name, src, file, warnings, errors)
+    # Grammar 0.17 — the concept defs (`model cn`) and the cn bindings.
+    stereotype = _concept_stereotype_of(od)
+    if stereotype is not None:
+        return _visit_concept(od, stereotype, name, src, file, warnings, errors)
+    binding_kind = _concept_binding_kind_of(od)
+    if binding_kind is not None:
+        return _visit_concept_binding(od, binding_kind, name, src, file, warnings, errors)
     return None
 
 
@@ -489,6 +542,8 @@ def _visit_lexicon_entry(od: Any, kind: str, name: str, source: SourceLocation, 
     forms: tuple[str, ...] = ()
     match: str | None = None
     text: str | None = None
+    is_default: bool | None = None
+    sense_priority: float | None = None
     for p in od.lexiconEntryDef().lexiconEntryProperty():
         d = p.descriptionProperty()
         if d is not None and description is None and description_localized is None:
@@ -508,9 +563,16 @@ def _visit_lexicon_entry(od: Any, kind: str, name: str, source: SourceLocation, 
         tp = p.textProperty()
         if tp is not None:
             text = _visit_string_value(tp.stringLiteralForm(), file)
+        # Grammar 0.17 — the cn default sense and its priority (cn contracts §1.5); their rules are semantic.
+        dp = p.defaultProperty()
+        if dp is not None and dp.BOOLEAN_LITERAL() is not None:
+            is_default = _bool_text(dp.BOOLEAN_LITERAL())
+        sp = p.sensePriorityProperty()
+        if sp is not None and sp.NUMBER_LITERAL() is not None:
+            sense_priority = _number_value(sp.NUMBER_LITERAL())
     cls = {"term": TermDef, "pattern": PatternDef, "example": ExampleDef}[kind]
     return cls(name=name, source=source, description=description, description_localized=description_localized, tags=tags,
-              target=target, forms=forms, match=match, text=text)
+              target=target, forms=forms, match=match, text=text, default=is_default, sense_priority=sense_priority)
 
 
 def _visit_lexicon_block(ctx: Any, file: str) -> LexiconBlock:
@@ -785,6 +847,7 @@ def _visit_entity(od: Any, name: str, source: SourceLocation, file: str, warning
         code_attribute=code_attribute, aliases=aliases, attributes=attributes,
         roles=roles, display_label=display_label, search=search, semantics=semantics,
         lexicon=_inline_lexicon_of(props, file), binding=binding,
+        concept=_concept_sugar_of(props, file, warnings, errors),
     )
 
 
@@ -962,8 +1025,35 @@ def _visit_query(od: Any, name: str, source: SourceLocation, file: str, warnings
     )
 
 
-def _visit_role(od: Any, name: str, source: SourceLocation, file: str, warnings: list[ParseWarning]) -> RoleDef:
+def _visit_role(
+    od: Any,
+    name: str,
+    source: SourceLocation,
+    file: str,
+    warnings: list[ParseWarning],
+    errors: list[ParseError],
+    model_code: str | None,
+) -> RoleDef:
     props = od.roleDef().roleProperty()
+    # Grammar 0.17 (⚑CN-P6) — the cn role's properties ride the one `roleProperty` production. Only a role
+    # outside `model cn` reaches here (a cn role is a `ConceptDef`), so they are rejected: a cnc / automation
+    # role keeps its 0.16 surface and a typo (`lable:`) is still a parse error (review-114 M5).
+    for p in props:
+        cn_only = p.cnEntry() or p.cnRefProperty() or p.groundsProperty() or p.lexiconBlockProperty()
+        if cn_only is None:
+            continue
+        key = p.cnEntry().cnKey().getText() if p.cnEntry() is not None else cn_only.getChild(0).getText()
+        in_model = f" in model {model_code}" if model_code else ""
+        loc = _loc_of(cn_only, file)
+        errors.append(
+            ParseError(
+                file=file,
+                line=loc.line,
+                column=loc.column + 1,
+                message=f"unknown role property '{key}'{in_model} — only a role in a 'model cn' file takes the concept properties",
+                code=DiagnosticCode.UNKNOWN_PROPERTY,
+            )
+        )
     description: str | None = None
     description_localized: LocalizedStringValue | None = None
     tags: tuple[str, ...] = ()
@@ -1423,6 +1513,466 @@ def _visit_world_schema(ctx: Any, name: str, source: SourceLocation, file: str) 
 
 
 # ---------------------------------------------------------------------------
+# Grammar 0.17 — the conceptual model (`model cn`; CN-P1, cn contracts §1). The
+# concept defs, a cn `def role`, the cn bindings and the `concept { }` sugar read one
+# way: every property, in authored order, to one `ConceptProperty` (its key as
+# written, its span) — typed where the grammar types it, a free-form `ConceptEntry`
+# otherwise. A repeated key is reported (`ttr/duplicate-property`); the first one is
+# read. Mirrors the TS walker's cn section.
+# ---------------------------------------------------------------------------
+
+_STEREOTYPE_TOKENS: tuple[tuple[str, str], ...] = (
+    ("KIND", "kind"),
+    ("EVENT", "event"),
+    ("PHASE", "phase"),
+    ("QUALITY", "quality"),
+    ("RELATION_TYPE", "relation_type"),
+)
+
+
+def _concept_stereotype_of(od: Any) -> str | None:
+    return next((st for tok, st in _STEREOTYPE_TOKENS if getattr(od, tok)() is not None), None)
+
+
+def _concept_binding_kind_of(od: Any) -> str | None:
+    return next((k for k in CONCEPT_BINDING_KINDS if getattr(od, k.upper())() is not None), None)
+
+
+def _visit_concept(
+    od: Any, stereotype: str, name: str, source: SourceLocation, file: str, warnings: list[ParseWarning], errors: list[ParseError]
+) -> ConceptDef:
+    body_ctx = od.cnBody()
+    body = _visit_concept_body(body_ctx.cnProperty() if body_ctx is not None else [], "concept", file, warnings, errors)
+    return ConceptDef(
+        name=name, source=source, description=body.description, description_localized=body.description_localized, tags=body.tags,
+        stereotype=stereotype, body=body,
+    )
+
+
+def _visit_concept_role(
+    od: Any, name: str, source: SourceLocation, file: str, warnings: list[ParseWarning], errors: list[ParseError]
+) -> ConceptDef:
+    """A `def role` in a `model cn` file (⚑CN-P6): a concept of stereotype `role`."""
+    role_ctx = od.roleDef()
+    body = _visit_concept_body(role_ctx.roleProperty() if role_ctx is not None else [], "role", file, warnings, errors)
+    return ConceptDef(
+        name=name, source=source, description=body.description, description_localized=body.description_localized, tags=body.tags,
+        stereotype="role", body=body,
+    )
+
+
+def _visit_concept_binding(
+    od: Any, binding_kind: str, name: str, source: SourceLocation, file: str, warnings: list[ParseWarning], errors: list[ParseError]
+) -> ConceptBindingDef:
+    body_ctx = od.cnBindingBody()
+    body = _visit_concept_body(body_ctx.cnBindingProperty() if body_ctx is not None else [], "binding", file, warnings, errors)
+    return ConceptBindingDef(
+        name=name, source=source, description=body.description, description_localized=body.description_localized, tags=body.tags,
+        binding_kind=binding_kind, body=body,
+    )
+
+
+def _visit_md_host(
+    cls: type[MdDomainDef] | type[DimensionDef] | type[MeasureDef] | type[CubeletDef],
+    props: Any,
+    name: str,
+    source: SourceLocation,
+    file: str,
+    warnings: list[ParseWarning],
+    errors: list[ParseError],
+) -> Definition:
+    """An md def carrying the `concept { }` sugar: identity, description, tags and the sugar."""
+    description: str | None = None
+    description_localized: LocalizedStringValue | None = None
+    tags: tuple[str, ...] = ()
+    for p in props or ():
+        d = p.descriptionProperty()
+        if d is not None and description is None and description_localized is None:
+            description, description_localized = _visit_description(d, file)
+        t = p.tagsProperty()
+        if t is not None:
+            tags = _visit_list_of_strings(t.listOfStrings(), file)
+    _md_inline_sugar(props, file, warnings, errors)
+    return cls(
+        name=name, source=source, description=description, description_localized=description_localized, tags=tags,
+        concept=_concept_sugar_of(props, file, warnings, errors),
+    )
+
+
+def _md_inline_sugar(props: Any, file: str, warnings: list[ParseWarning], errors: list[ParseError]) -> None:
+    """A dimension's inline attributes and a cubelet's inline measures are not modelled here (the md
+    model is not ported), but their `concept { }` is walked for its diagnostics — a second one, an
+    error inside it — so the error set matches TS and Kotlin. The sugar itself is dropped."""
+    for p in props or ():
+        attrs_prop = getattr(p, "attributesProperty", lambda: None)()
+        if attrs_prop is not None:
+            for inline in attrs_prop.attributeDefList().attributeInline() or ():
+                _concept_sugar_of(inline.attributeDef().attributeProperty(), file, warnings, errors)
+        measures_prop = getattr(p, "measuresProperty", lambda: None)()
+        if measures_prop is not None:
+            inline_list = measures_prop.measuresValue().measureInlineList()
+            for measure in (inline_list.measureDef() if inline_list is not None else None) or ():
+                _concept_sugar_of(measure.measureProperty(), file, warnings, errors)
+
+
+def _concept_sugar_of(props: Any, file: str, warnings: list[ParseWarning], errors: list[ParseError]) -> ConceptSugar | None:
+    """The host's `concept { … }`. One per host (cn contracts §1.4): a second one is
+    `ttr/duplicate-property` and the first is read — the cn body's rule, so CN-P2 and the
+    formatter never meet a sugar the AST threw away."""
+    sugar: ConceptSugar | None = None
+    for p in props or ():
+        cs = p.conceptSugarProperty()
+        if cs is None:
+            continue
+        if sugar is not None:
+            at = make_source_location(cs, file)
+            errors.append(ParseError(
+                file=file,
+                line=at.line,
+                column=at.column + 1,
+                message="duplicate property 'concept' — the first one is read",
+                code=DiagnosticCode.DUPLICATE_PROPERTY,
+            ))
+            continue
+        body_ctx = cs.cnBody()
+        body = _visit_concept_body(body_ctx.cnProperty() if body_ctx is not None else [], "concept", file, warnings, errors)
+        sugar = ConceptSugar(body=body, source=make_source_location(cs, file))
+    return sugar
+
+
+def _visit_concept_body(
+    props: Any, host: str, file: str, warnings: list[ParseWarning], errors: list[ParseError]
+) -> ConceptBody:
+    """The cn body behind `cnBody`, `cnBindingBody` and — in a `model cn` file — `roleDef`
+    (⚑CN-P6). Each property context has exactly one child, the property rule, so one reader
+    serves all three. `host` is `concept`, `binding` or `role`; on a binding a free-form
+    `filter:` is an expression block (A-CN-18)."""
+    properties: list[ConceptProperty] = []
+    seen: set[str] = set()
+    description: str | None = None
+    description_localized: LocalizedStringValue | None = None
+    tags: tuple[str, ...] = ()
+    label: LocalizedStringValue | None = None
+    for p in props or ():
+        child = p.getChild(0) if p.getChildCount() > 0 else None
+        prop = _visit_concept_property(child, host, file, warnings, errors)
+        if prop is None:
+            continue
+        if prop.key in seen:
+            errors.append(ParseError(
+                file=file,
+                line=prop.source.line,
+                column=prop.source.column + 1,
+                message=f"duplicate property '{prop.key}' — the first one is read",
+                code=DiagnosticCode.DUPLICATE_PROPERTY,
+            ))
+        else:
+            seen.add(prop.key)
+            if isinstance(prop, ConceptDescription):
+                if prop.localized is not None:
+                    description_localized = prop.localized
+                elif prop.value is not None:
+                    description = prop.value.raw
+            elif isinstance(prop, ConceptLabel):
+                label = prop.value
+            elif isinstance(prop, ConceptTags):
+                tags = prop.value
+        properties.append(prop)
+    return ConceptBody(
+        properties=tuple(properties), description=description, description_localized=description_localized, tags=tags, label=label,
+    )
+
+
+def _visit_concept_property(  # noqa: C901, PLR0911, PLR0912 — one branch per cn property rule
+    c: Any, host: str, file: str, warnings: list[ParseWarning], errors: list[ParseError]
+) -> ConceptProperty | None:
+    """One cn property, or `None` when error recovery left it half-built (its syntax error is reported)."""
+    if not isinstance(c, ParserRuleContext):
+        return None
+    # `c` dispatches by its rule context (isinstance); the generated accessors are untyped, so they are
+    # called through `cx` (the module's `Any` convention for parse-tree contexts).
+    cx: Any = c
+    key = cx.getChild(0).getText() if cx.getChildCount() > 0 else ""
+    source = make_source_location(c, file)
+    if isinstance(c, TTRParser.DescriptionPropertyContext):
+        slf = cx.stringLiteralForm()
+        ls = cx.localizedString()
+        value = _visit_string_literal_form(slf, file) if slf is not None else None
+        localized = _visit_localized_string(ls, file) if ls is not None else None
+        if value is None and localized is None:
+            return None
+        return ConceptDescription(key, source, value=value, localized=localized)
+    if isinstance(c, TTRParser.LabelPropertyContext):
+        ls = cx.localizedString()
+        return ConceptLabel(key, source, value=_visit_localized_string(ls, file)) if ls is not None else None
+    if isinstance(c, TTRParser.TagsPropertyContext):
+        lst = cx.listOfStrings()
+        return ConceptTags(key, source, value=_visit_list_of_strings(lst, file)) if lst is not None else None
+    if isinstance(c, TTRParser.CnRefPropertyContext):
+        ref = _reference_of(cx.id_(), file)
+        return ConceptRef(key, source, ref=ref) if ref is not None else None
+    if isinstance(c, TTRParser.GroundsPropertyContext):
+        ref = _reference_of(cx.id_(), file)
+        return ConceptGrounds(key, source, ref=ref) if ref is not None else None
+    if isinstance(c, TTRParser.ValueSpacePropertyContext):
+        ref = _reference_of(cx.id_(), file)
+        return ConceptValueSpace(key, source, ref=ref) if ref is not None else None
+    if isinstance(c, TTRParser.InvolvesPropertyContext):
+        participants: list[ConceptParticipant] = []
+        for pc in cx.participant() or ():
+            ref = _reference_of(pc.id_(0), file)
+            if ref is None:
+                continue
+            label_ctx = pc.id_(1) if pc.AS() is not None else None
+            label = label_ctx.getText() if label_ctx is not None else None
+            participants.append(ConceptParticipant(ref=ref, source=make_source_location(pc, file), label=label or None))
+        return ConceptInvolves(key, source, participants=tuple(participants))
+    if isinstance(c, TTRParser.PeriodPropertyContext):
+        obj = cx.cnObject()
+        return ConceptPeriod(key, source, value=_visit_cn_object(obj, file)) if obj is not None else None
+    if isinstance(c, (TTRParser.ExtentPropertyContext, TTRParser.BasisPropertyContext)):
+        id_ctx = cx.id_()
+        if id_ctx is None:
+            return None
+        if isinstance(c, TTRParser.ExtentPropertyContext):
+            return ConceptExtent(key, source, value=id_ctx.getText())
+        return ConceptBasis(key, source, value=id_ctx.getText())
+    if isinstance(c, (TTRParser.DefinitionPropertyContext, TTRParser.ConceptMembersPropertyContext)):
+        token = _expression_token_of(cx.embeddedBlock())
+        block = _walk_expression_block(token, key, file, warnings, errors) if token is not None else None
+        if block is None:
+            return None
+        if isinstance(c, TTRParser.DefinitionPropertyContext):
+            return ConceptDefinition(key, source, block=block)
+        return ConceptMembers(key, source, block=block)
+    if isinstance(c, TTRParser.LexiconBlockPropertyContext):
+        return ConceptLexicon(key, source, block=_visit_lexicon_block(c, file)) if cx.object_() is not None else None
+    if isinstance(c, TTRParser.TargetPropertyContext):
+        if cx.object_() is None and cx.id_() is None:
+            return None
+        return ConceptTarget(key, source, value=_visit_target_value(c, file))
+    if isinstance(c, TTRParser.CnEntryContext):
+        key_ctx = cx.cnKey()
+        value_ctx = cx.cnValue()
+        if key_ctx is None or value_ctx is None:
+            return None
+        entry_key = key_ctx.getText()
+        # A binding's `filter:` is an expression block; anything else there is a mistake worth naming.
+        if host == "binding" and entry_key == "filter":
+            lit = value_ctx.literal()
+            form = lit.stringLiteralForm() if lit is not None else None
+            token = _expression_token_of(form)
+            block = _walk_expression_block(token, entry_key, file, warnings, errors) if token is not None else None
+            if block is not None:
+                return ConceptFilter(entry_key, source, block=block)
+            vloc = make_source_location(value_ctx, file)
+            errors.append(ParseError(
+                file=file,
+                line=vloc.line,
+                column=vloc.column + 1,
+                message="'filter:' takes an expression block — write it as \"\"\"…\"\"\" (optionally tagged \"\"\"pl)",
+                code=DiagnosticCode.EXPRESSION_BLOCK_REQUIRED,
+            ))
+        return ConceptEntry(entry_key, source, value=_visit_cn_value(value_ctx, file))
+    # A cnc / automation role property on a concept role (review-114 M5, the other way round).
+    if host == "role":
+        errors.append(ParseError(
+            file=file,
+            line=source.line,
+            column=source.column + 1,
+            message=f"unknown role property '{key}' in model cn — search, resolve, delivery and members belong to a cnc or automation role",
+            code=DiagnosticCode.UNKNOWN_PROPERTY,
+        ))
+    return None
+
+
+def _expression_token_of(ctx: Any) -> Any:
+    """The literal token of an `embeddedBlock` / `stringLiteralForm` (tagged, triple or plain), or None."""
+    if ctx is None:
+        return None
+    return ctx.TAGGED_BLOCK_LITERAL() or ctx.TRIPLE_STRING_LITERAL() or ctx.STRING_LITERAL()
+
+
+def _reference_of(ctx: Any, file: str) -> Reference | None:
+    if ctx is None or _is_conjured(ctx):
+        return None
+    return _build_reference(ctx, file)
+
+
+def _is_conjured(ctx: Any) -> bool:
+    """A token the error strategy invented to recover (`<missing IDENT>`) — never real input."""
+    start = getattr(ctx, "start", None)
+    return start is None or start.tokenIndex < 0 or (ctx.getText() or "").startswith("<missing ")
+
+
+def _visit_cn_value(ctx: Any, file: str) -> PropertyValue:
+    obj = ctx.cnObject()
+    if obj is not None:
+        return _visit_cn_object(obj, file)
+    lst = ctx.cnList()
+    if lst is not None:
+        return ListValue(items=tuple(_visit_cn_value(v, file) for v in lst.cnValue() or ()), source=make_source_location(lst, file))
+    lit = ctx.literal()
+    if lit is not None:
+        return _visit_literal(lit, file)
+    id_ctx = ctx.id_()
+    if id_ctx is not None:
+        return _visit_id(id_ctx, file)
+    return NullValue(source=make_source_location(ctx, file))
+
+
+def _visit_cn_object(ctx: Any, file: str) -> ObjectValue:
+    """A cn object value. Entries keep the TS walker's rule: a later duplicate key wins, silently."""
+    entries: dict[str, PropertyValue] = {}
+    for e in ctx.cnObjectEntry() or ():
+        value_ctx = e.cnValue()
+        if e.getChildCount() == 0 or value_ctx is None:
+            continue
+        entries[e.getChild(0).getText()] = _visit_cn_value(value_ctx, file)
+    return ObjectValue(entries=MappingProxyType(entries), source=make_source_location(ctx, file))
+
+
+def _drop_one_trailing_newline(s: str) -> str:
+    """JS `/\\r?\\n$/` (no `m` flag): one trailing newline. Not `re` — its `$` also matches before a final `\\n`."""
+    if s.endswith("\r\n"):
+        return s[:-2]
+    if s.endswith("\n"):
+        return s[:-1]
+    return s
+
+
+def _position_after(text: str, line: int, column: int) -> tuple[int, int]:
+    """The 1-based line and 0-based column just past `text`, which starts at `line`:`column`."""
+    parts = text.split("\n")
+    if len(parts) == 1:
+        return line, column + len(text)
+    return line + len(parts) - 1, len(parts[-1])
+
+
+def _walk_expression_block(  # noqa: PLR0913
+    token: Any, key: str, file: str, warnings: list[ParseWarning], errors: list[ParseError]
+) -> EmbeddedBlock | None:
+    """An expression block (⚑CN-P5) — the `definitionSql` peeling, with the text's place in the
+    file kept exactly: `line_offsets` holds where every line of the text starts once the dedent
+    removed its indent. Only `pl` (or no tag) names the expression language; a SQL-family tag is
+    an error, any other first-line word is read as text. Mirrors the TS `walkExpressionBlock`."""
+    sym = token.getSymbol()
+    if sym.tokenIndex < 0 or sym.start < 0:
+        return None  # conjured by error recovery
+    raw = sym.text or ""
+    col = sym.column
+    end_line, end_column = _position_after(raw, sym.line, col)
+    source = SourceLocation(file, sym.line, col, end_line, end_column, sym.start, sym.stop + 1)
+
+    if sym.type == TTRLexer.STRING_LITERAL:
+        # Each escape takes two characters of the file and one of `text`: `escapes` keeps where,
+        # so a position in `text` still maps onto the file.
+        quoted = raw[1:-1]
+        escapes: list[int] = []
+
+        def unescape(m: re.Match[str]) -> str:
+            escapes.append(m.start() - len(escapes))
+            return m.group(1)
+
+        # `[\s\S]`, not `.`: the lexer admits a backslash before any character, a line break too, and
+        # the regex engines of the three targets disagree on what `.` matches.
+        text = re.sub(r"\\([\s\S])", unescape, quoted)
+        string_offsets = _string_line_offsets(text, escapes, sym.start + 1)
+        return _block_of("string", text, source, sym.start + 1, sym.line, col + 1, 0, string_offsets, tuple(escapes))
+
+    inner = raw[3:-3]
+    inner_start = sym.start + 3
+    form = "tripleString"
+    if sym.type == TTRLexer.TAGGED_BLOCK_LITERAL:
+        opener = _TAGGED_HEADER_RE.match(inner)
+        tag = opener.group(1) if opener is not None else None
+        tag_len = len(tag) if tag else 0
+        tag_source = SourceLocation(file, sym.line, col + 3, sym.line, col + 3 + tag_len, sym.start + 3, sym.start + 3 + tag_len)
+        if opener is not None and tag and resolve_expression_tag(tag) is not None:
+            inner = inner[opener.end():]
+            inner_start += opener.end()
+            form = "tagged"
+        elif tag and resolve_tag(tag) is not None:
+            errors.append(ParseError(
+                file=file,
+                line=tag_source.line,
+                column=tag_source.column + 1,
+                message=f"'{key}:' holds a TTR-P expression — the '{tag}' tag names another language (use \"\"\"pl or no tag)",
+                code=DiagnosticCode.LANGUAGE_TAG_MISMATCH,
+            ))
+        elif tag:
+            warnings.append(ParseWarning(
+                file=file,
+                line=tag_source.line,
+                column=tag_source.column + 1,
+                message=(
+                    f"'{tag}' on the opening line of '{key}:' reads as a language tag; the block is kept as plain text "
+                    "(start the expression on the next line, or tag it \"\"\"pl)"
+                ),
+                code=DiagnosticCode.UNKNOWN_LANGUAGE_TAG,
+            ))
+
+    # The dedent (contracts §2.9) drops a leading `\n`, then the common indent of the non-blank lines.
+    leading_newline = 1 if inner.startswith("\n") else 0
+    body = inner[leading_newline:]
+    dedented = dedent_with_indent(inner)
+    indent_width = dedented.indent_width
+    text = _drop_one_trailing_newline(dedented.value) if form == "tagged" else dedented.value
+
+    # Every raw line of `text`, its start offset in the file, indent removed (blank lines keep column 0).
+    raw_lines = body.split("\n")
+    line_offsets: list[int] = []
+    offset = inner_start + leading_newline
+    for i in range(len(text.split("\n"))):
+        raw_line = raw_lines[i] if i < len(raw_lines) else ""
+        line_offsets.append(offset + (0 if raw_line.strip() == "" else indent_width))
+        offset += len(raw_line) + 1
+    first_line, first_column = _position_after(raw[: inner_start - sym.start + leading_newline], sym.line, col)
+    if raw_lines[0].strip() != "":
+        first_column += indent_width
+    return _block_of(form, text, source, line_offsets[0], first_line, first_column, indent_width, tuple(line_offsets))
+
+
+def _string_line_offsets(text: str, escapes: list[int], text_start: int) -> tuple[int, ...]:
+    """Where each line of a string-form block's `text` starts in the file: its index in `text`, plus
+    one for every escape before it (an escaped line break is what starts a second line)."""
+    offsets: list[int] = []
+    start = 0
+    for line in text.split("\n"):
+        offsets.append(text_start + start + sum(1 for e in escapes if e < start))
+        start += len(line) + 1
+    return tuple(offsets)
+
+
+def _block_of(  # noqa: PLR0913
+    form: str,
+    text: str,
+    source: SourceLocation,
+    text_start: int,
+    line: int,
+    column: int,
+    indent_width: int,
+    line_offsets: tuple[int, ...],
+    escapes: tuple[int, ...] = (),
+) -> EmbeddedBlock:
+    lines = text.split("\n")
+    last = len(lines) - 1
+    last_offset = line_offsets[last] if last < len(line_offsets) else text_start
+    last_start = len(text) - len(lines[last])
+    last_width = len(lines[last]) + sum(1 for e in escapes if e >= last_start)
+    end_column = (column if last == 0 else indent_width if lines[last] else 0) + last_width
+    return EmbeddedBlock(
+        form=form,
+        text=text,
+        text_source=SourceLocation(source.file, line, column, line + last, end_column, text_start, last_offset + last_width),
+        line_offsets=line_offsets,
+        indent_width=indent_width,
+        source=source,
+        escapes=escapes,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Inline def lists
 # ---------------------------------------------------------------------------
 
@@ -1645,6 +2195,7 @@ def _visit_attribute_inline(ctx: Any, name: str, source: SourceLocation, file: s
         search=search, semantics=semantics,
         lexicon=_inline_lexicon_of(props, file), binding=binding,
         states=states, transitions=transitions,
+        concept=_concept_sugar_of(props, file, warnings, errors),
     )
 
 

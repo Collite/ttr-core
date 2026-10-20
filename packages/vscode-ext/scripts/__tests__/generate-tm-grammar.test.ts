@@ -114,6 +114,48 @@ describe('TextMate grammar generator', () => {
     }
   });
 
+  // The regen gate (`regen-tmgrammar && git diff --exit-code`) cannot see a NEW keyword token the
+  // switch does not know: it falls to `default: null` and the output does not change. Found at 0.17
+  // (none of the cn tokens was scoped). Every word-literal token needs a scope now, or a place on this
+  // list — the gaps that predate the guard, each a follow-up of its own feature.
+  const UNSCOPED_BEFORE_THE_GUARD = new Set([
+    'TTRL', 'CANVAS',                                     // .ttrl layout sidecar (v4.3)
+    'MANAGEMENT', 'CHANGE_SEMANTICS', 'WRITEBACK',        // db table management (0.10, EN-P1)
+    'SECURITY', 'OWN', 'CLASSIFY', 'GRANT', 'MASK', 'ON', // security block (0.11, PL-P4)
+  ]);
+
+  it('every keyword token has a scope (or is a known pre-guard gap)', () => {
+    const unscoped = tokens
+      .filter(t => /^[A-Za-z_][A-Za-z0-9_]*$/.test(t.literal))
+      .filter(t => tokenToScope(t.name, t.literal) === null)
+      .map(t => t.name)
+      .filter(name => !UNSCOPED_BEFORE_THE_GUARD.has(name));
+    expect(unscoped).toEqual([]);
+  });
+
+  it('the pre-guard list holds only tokens still unscoped (shrinks as they are fixed)', () => {
+    for (const name of UNSCOPED_BEFORE_THE_GUARD) {
+      const t = tokens.find(x => x.name === name);
+      expect(t, `${name} is no longer in TTR.g4 — drop it from the list`).toBeDefined();
+      expect(tokenToScope(name, t!.literal), `${name} is scoped now — drop it from the list`).toBeNull();
+    }
+  });
+
+  it('0.17 cn tokens: model code, kinds, properties and the `as` operator word', () => {
+    expect(tokenToScope('CN', 'cn')).toBe('keyword.other.schema.ttrm');
+    for (const [name, literal] of [['EVENT', 'event'], ['PHASE', 'phase'], ['QUALITY', 'quality'],
+      ['RELATION_TYPE', 'relation_type'], ['CN2MD_KIND', 'cn2md_kind'], ['CN2ER_EVENT', 'cn2er_event'],
+      ['CN2DB_CONCEPT', 'cn2db_concept']]) {
+      expect(tokenToScope(name, literal), name).toBe('keyword.other.kind.ttrm');
+    }
+    for (const [name, literal] of [['CONCEPT', 'concept'], ['INVOLVES', 'involves'], ['PERIOD', 'period'],
+      ['GROUNDS', 'grounds'], ['DEFINITION', 'definition'], ['VALUE_SPACE', 'value_space'],
+      ['EXTENT', 'extent'], ['BASIS', 'basis'], ['DEFAULT', 'default'], ['SENSE_PRIORITY', 'sense_priority']]) {
+      expect(tokenToScope(name, literal), name).toBe('keyword.other.property.ttrm');
+    }
+    expect(tokenToScope('AS', 'as')).toBe('keyword.operator.word.ttrm');
+  });
+
   it('NULL_LITERAL is a language constant (grouped with true|false)', () => {
     expect(tokenToScope('NULL_LITERAL', 'null')).toBe('constant.language.ttrm');
     expect(tokenToScope('NULL_LITERAL', 'null')).toBe(tokenToScope('BOOLEAN_LITERAL', 'true'));

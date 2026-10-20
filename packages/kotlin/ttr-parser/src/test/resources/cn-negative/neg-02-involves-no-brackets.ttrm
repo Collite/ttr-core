@@ -1,0 +1,3 @@
+// `involves:` takes a bracketed participant list — a bare ref is a parse error.
+model cn
+def event Sale { involves: Customer, period: { at: sold_date } }

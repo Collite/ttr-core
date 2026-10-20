@@ -1,0 +1,44 @@
+// 0.17 — every cn token stays usable as a name, a column, an object key and a dotted ref part (the
+// WORLD / 0.16 precedent): none is reserved as anything but a keyword where the grammar expects one.
+package hartland.concepts
+model db schema dbo
+
+def table concept {
+    columns: [
+        def column cn             { type: text },
+        def column event          { type: text },
+        def column phase          { type: text },
+        def column quality        { type: text },
+        def column relation_type  { type: text },
+        def column concept        { type: text },
+        def column cn2md_kind     { type: text },
+        def column cn2md_role     { type: text },
+        def column cn2md_quality  { type: text },
+        def column cn2md_event    { type: text },
+        def column cn2er_kind     { type: text },
+        def column cn2er_role     { type: text },
+        def column cn2er_event    { type: text },
+        def column cn2er_quality  { type: text },
+        def column cn2er_phase    { type: text },
+        def column cn2db_concept  { type: text },
+        def column involves       { type: text },
+        def column period         { type: text },
+        def column grounds        { type: text },
+        def column definition     { type: text },
+        def column value_space    { type: text },
+        def column extent         { type: text },
+        def column basis          { type: text },
+        def column as             { type: text },
+        def column default        { type: text },
+        def column sense_priority { type: text }
+    ]
+    primaryKey: [event, period]
+    writeback: {
+        cn: 1, event: 2, phase: 3, quality: 4, relation_type: 5, concept: 6,
+        cn2md_kind: 7, cn2md_role: 8, cn2md_quality: 9, cn2md_event: 10, cn2er_kind: 11, cn2er_role: 12,
+        cn2er_event: 13, cn2er_quality: 14, cn2er_phase: 15, cn2db_concept: 16, involves: 17, period: 18,
+        grounds: 19, definition: 20, value_space: 21, extent: 22, basis: 23, as: 24,
+        default: 25, sense_priority: 26
+    }
+}
+def fk fk_concept_as { from: [db.dbo.concept.as], to: [db.dbo.cn.definition] }

@@ -1,0 +1,21 @@
+{
+    "diagnostics": [],
+    "resolved": [],
+    "symbols": [
+        "hartland.concepts.db.dbo.conceptBinding.brand_g",
+        "hartland.concepts.db.dbo.conceptBinding.buyer_g",
+        "hartland.concepts.db.dbo.conceptBinding.category_g",
+        "hartland.concepts.db.dbo.conceptBinding.channel_g",
+        "hartland.concepts.db.dbo.conceptBinding.customer_g",
+        "hartland.concepts.db.dbo.conceptBinding.item_g",
+        "hartland.concepts.db.dbo.conceptBinding.legacy_g",
+        "hartland.concepts.db.dbo.conceptBinding.order_g",
+        "hartland.concepts.db.dbo.conceptBinding.orderer_g",
+        "hartland.concepts.db.dbo.conceptBinding.placed_g",
+        "hartland.concepts.db.dbo.conceptBinding.return_g",
+        "hartland.concepts.db.dbo.conceptBinding.revenue_g",
+        "hartland.concepts.db.dbo.conceptBinding.state_g",
+        "hartland.concepts.db.dbo.conceptBinding.stock_g",
+        "hartland.concepts.db.dbo.conceptBinding.transfer_g"
+    ]
+}

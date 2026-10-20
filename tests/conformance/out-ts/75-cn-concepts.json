@@ -1,0 +1,780 @@
+{
+    "definitions": [
+        {
+            "description": "A product the stores, the web shop and the marketplace sell.",
+            "kind": "kind",
+            "name": "Item",
+            "properties": {
+                "grounds": "md.Product",
+                "label": {
+                    "cs": "Produkt",
+                    "en": "Product"
+                },
+                "lexicon": {
+                    "terms": [
+                        "product",
+                        "item",
+                        "SKU"
+                    ]
+                },
+                "qualities": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "category"
+                            ],
+                            "path": "category"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "brand"
+                            ],
+                            "path": "brand"
+                        }
+                    ],
+                    "kind": "list"
+                },
+                "sources": {
+                    "items": [
+                        {
+                            "kind": "string",
+                            "value": "doc://hartland/handbook#products"
+                        }
+                    ],
+                    "kind": "list"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "kind",
+            "name": "ProductCategory",
+            "properties": {
+                "grounds": "er.entity.category_code",
+                "hierarchy": {
+                    "entries": {
+                        "ancestor": {
+                            "kind": "id",
+                            "parts": [
+                                "ancestor_code"
+                            ],
+                            "path": "ancestor_code"
+                        },
+                        "closure": {
+                            "kind": "id",
+                            "parts": [
+                                "er",
+                                "entity",
+                                "category_closure"
+                            ],
+                            "path": "er.entity.category_closure"
+                        },
+                        "descendant": {
+                            "kind": "id",
+                            "parts": [
+                                "descendant_code"
+                            ],
+                            "path": "descendant_code"
+                        },
+                        "ranges": {
+                            "kind": "id",
+                            "parts": [
+                                "node"
+                            ],
+                            "path": "node"
+                        }
+                    },
+                    "kind": "object"
+                },
+                "label": {
+                    "en": "Product category"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "kind",
+            "name": "HomeCategory",
+            "properties": {
+                "is_a": {
+                    "kind": "id",
+                    "parts": [
+                        "ProductCategory"
+                    ],
+                    "path": "ProductCategory"
+                },
+                "label": {
+                    "en": "Home and garden categories"
+                },
+                "members": {
+                    "form": "tripleString",
+                    "language": "pl",
+                    "text": "descendants(ProductCategory, 'H10-H19')"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "kind",
+            "name": "Channel",
+            "properties": {
+                "grounds": "er.entity.channel_sales.channel"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "kind",
+            "name": "Warehouse",
+            "properties": {
+                "grounds": "md.DistributionCentre",
+                "label": {
+                    "en": "Distribution center"
+                }
+            },
+            "tags": [
+                "logistics"
+            ]
+        },
+        {
+            "description": null,
+            "kind": "kind",
+            "name": "Party",
+            "properties": {
+                "label": {
+                    "en": "Party"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "kind",
+            "name": "Supplier",
+            "properties": {
+                "is_a": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "Party"
+                            ],
+                            "path": "Party"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "Organization"
+                            ],
+                            "path": "Organization"
+                        }
+                    ],
+                    "kind": "list"
+                },
+                "relations": {
+                    "items": [
+                        {
+                            "entries": {
+                                "to": {
+                                    "kind": "id",
+                                    "parts": [
+                                        "Warehouse"
+                                    ],
+                                    "path": "Warehouse"
+                                },
+                                "type": {
+                                    "kind": "id",
+                                    "parts": [
+                                        "supplies"
+                                    ],
+                                    "path": "supplies"
+                                }
+                            },
+                            "kind": "object"
+                        }
+                    ],
+                    "kind": "list"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "role",
+            "name": "Customer",
+            "properties": {
+                "event": "Order",
+                "grounds": "md.Customer",
+                "label": {
+                    "cs": "Zákazník",
+                    "en": "Customer"
+                },
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Party"
+                    ],
+                    "path": "Party"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "event",
+            "name": "Sale",
+            "properties": {
+                "extent": "instantaneous",
+                "grounds": "er.entity.channel_sales",
+                "involves": [
+                    {
+                        "ref": "Customer"
+                    },
+                    {
+                        "ref": "Item"
+                    },
+                    {
+                        "ref": "Channel"
+                    }
+                ],
+                "period": {
+                    "entries": {
+                        "at": {
+                            "kind": "id",
+                            "parts": [
+                                "sold_date"
+                            ],
+                            "path": "sold_date"
+                        }
+                    },
+                    "kind": "object"
+                },
+                "qualities": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "revenue"
+                            ],
+                            "path": "revenue"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "quantity"
+                            ],
+                            "path": "quantity"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "sold_date"
+                            ],
+                            "path": "sold_date"
+                        }
+                    ],
+                    "kind": "list"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "event",
+            "name": "Order",
+            "properties": {
+                "extent": "durative",
+                "involves": [
+                    {
+                        "ref": "Customer"
+                    },
+                    {
+                        "label": "fulfilling",
+                        "ref": "Warehouse"
+                    }
+                ],
+                "period": {
+                    "entries": {
+                        "end": {
+                            "kind": "id",
+                            "parts": [
+                                "delivered_date"
+                            ],
+                            "path": "delivered_date"
+                        },
+                        "end_open": {
+                            "kind": "id",
+                            "parts": [
+                                "open"
+                            ],
+                            "path": "open"
+                        },
+                        "start": {
+                            "kind": "id",
+                            "parts": [
+                                "placed_date"
+                            ],
+                            "path": "placed_date"
+                        }
+                    },
+                    "kind": "object"
+                },
+                "qualities": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "order_value"
+                            ],
+                            "path": "order_value"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "state"
+                            ],
+                            "path": "state"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "placed_date"
+                            ],
+                            "path": "placed_date"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "delivered_date"
+                            ],
+                            "path": "delivered_date"
+                        }
+                    ],
+                    "kind": "list"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "event",
+            "name": "Invoicing",
+            "properties": {
+                "grounds": "er.entity.invoice",
+                "involves": [
+                    {
+                        "ref": "Customer"
+                    },
+                    {
+                        "ref": "Order"
+                    }
+                ],
+                "period": {
+                    "entries": {
+                        "end": {
+                            "kind": "id",
+                            "parts": [
+                                "due"
+                            ],
+                            "path": "due"
+                        },
+                        "start": {
+                            "kind": "id",
+                            "parts": [
+                                "issued"
+                            ],
+                            "path": "issued"
+                        }
+                    },
+                    "kind": "object"
+                },
+                "qualities": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "amount"
+                            ],
+                            "path": "amount"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "paid"
+                            ],
+                            "path": "paid"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "open_amount"
+                            ],
+                            "path": "open_amount"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "invoice_status"
+                            ],
+                            "path": "invoice_status"
+                        }
+                    ],
+                    "kind": "list"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "event",
+            "name": "StockTransfer",
+            "properties": {
+                "extent": "instantaneous",
+                "involves": [
+                    {
+                        "ref": "Item"
+                    },
+                    {
+                        "label": "from",
+                        "ref": "Warehouse"
+                    },
+                    {
+                        "label": "to",
+                        "ref": "Warehouse"
+                    }
+                ],
+                "period": {
+                    "entries": {
+                        "at": {
+                            "kind": "id",
+                            "parts": [
+                                "shipped_at"
+                            ],
+                            "path": "shipped_at"
+                        },
+                        "precision": {
+                            "kind": "id",
+                            "parts": [
+                                "day"
+                            ],
+                            "path": "day"
+                        }
+                    },
+                    "kind": "object"
+                },
+                "qualities": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "shipped_at"
+                            ],
+                            "path": "shipped_at"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "transfer_delay"
+                            ],
+                            "path": "transfer_delay"
+                        }
+                    ],
+                    "kind": "list"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "event",
+            "name": "WarehouseOutage",
+            "properties": {
+                "extent": "durative",
+                "involves": [
+                    {
+                        "ref": "Warehouse"
+                    }
+                ],
+                "period": {
+                    "entries": {
+                        "end": {
+                            "kind": "id",
+                            "parts": [
+                                "ended_at"
+                            ],
+                            "path": "ended_at"
+                        },
+                        "end_open": {
+                            "kind": "id",
+                            "parts": [
+                                "unknown"
+                            ],
+                            "path": "unknown"
+                        },
+                        "start": {
+                            "kind": "id",
+                            "parts": [
+                                "started_at"
+                            ],
+                            "path": "started_at"
+                        }
+                    },
+                    "kind": "object"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "quality",
+            "name": "revenue",
+            "properties": {
+                "grounds": "md.revenue",
+                "label": {
+                    "cs": "Tržby",
+                    "en": "Revenue"
+                },
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Sale"
+                    ],
+                    "path": "Sale"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "quality",
+            "name": "category",
+            "properties": {
+                "grounds": "er.entity.item.category",
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Item"
+                    ],
+                    "path": "Item"
+                },
+                "value_space": "ProductCategory"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "quality",
+            "name": "stock_level",
+            "properties": {
+                "grounds": "er.entity.inventory.quantity_on_hand",
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Item"
+                    ],
+                    "path": "Item"
+                },
+                "valued_state": {
+                    "kind": "bool",
+                    "value": true
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "quality",
+            "name": "open_amount",
+            "properties": {
+                "definition": {
+                    "form": "string",
+                    "language": "pl",
+                    "text": "amount - paid"
+                },
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Invoicing"
+                    ],
+                    "path": "Invoicing"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "quality",
+            "name": "transfer_delay",
+            "properties": {
+                "definition": {
+                    "form": "tagged",
+                    "language": "pl",
+                    "text": "this.period.at - this.from.period.at"
+                },
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "StockTransfer"
+                    ],
+                    "path": "StockTransfer"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "phase",
+            "name": "PendingOrder",
+            "properties": {
+                "definition": {
+                    "form": "tripleString",
+                    "language": "pl",
+                    "text": "state in ('placed', 'held')"
+                },
+                "label": {
+                    "en": "Pending order"
+                },
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Order"
+                    ],
+                    "path": "Order"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "phase",
+            "name": "OverdueInvoice",
+            "properties": {
+                "definition": {
+                    "form": "tripleString",
+                    "language": "pl",
+                    "text": "invoice_status = 'open' and period.end < as_of"
+                },
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Invoicing"
+                    ],
+                    "path": "Invoicing"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "phase",
+            "name": "DebtorCustomer",
+            "properties": {
+                "definition": {
+                    "form": "tripleString",
+                    "language": "pl",
+                    "text": "exists Invoicing involving this as customer where OverdueInvoice"
+                },
+                "imprecision": {
+                    "kind": "id",
+                    "parts": [
+                        "certainly"
+                    ],
+                    "path": "certainly"
+                },
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Customer"
+                    ],
+                    "path": "Customer"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "phase",
+            "name": "PlacedOrder",
+            "properties": {
+                "grounds": "er.entity.placed_order",
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Order"
+                    ],
+                    "path": "Order"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "phase",
+            "name": "StockCondition",
+            "properties": {
+                "abstract": {
+                    "kind": "bool",
+                    "value": true
+                },
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Item"
+                    ],
+                    "path": "Item"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "phase",
+            "name": "OutOfStock",
+            "properties": {
+                "basis": "current_state",
+                "definition": {
+                    "form": "tripleString",
+                    "language": "pl",
+                    "text": "exists StockoutEpisode e involving this where e.period contains as_of"
+                },
+                "is_a": {
+                    "kind": "id",
+                    "parts": [
+                        "StockCondition"
+                    ],
+                    "path": "StockCondition"
+                },
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Item"
+                    ],
+                    "path": "Item"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": "A supplier supplies a distribution center.",
+            "kind": "relation_type",
+            "name": "supplies",
+            "properties": {
+                "label": {
+                    "en": "supplies"
+                }
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": "hartland.concepts",
+    "schemaDirective": {
+        "code": "cn",
+        "namespace": null
+    }
+}

@@ -1,0 +1,16 @@
+// Česká slova pro tytéž koncepty (the Czech words for the same concepts).
+model lexicon locale cs
+
+def term zakaznik { for: cn.Customer, forms: ["zákazník", "zákazníci", "zákazníka", "zákazníků"], default: true }
+
+def term dluznik { for: cn.DebtorCustomer, forms: ["dlužník", "dlužníci", "dlužníka", "dlužníků"], sense_priority: 2 }
+
+def term objednavka { for: cn.Order, forms: ["objednávka", "objednávky", "objednávek"], default: true }
+
+def term nevyrizena_objednavka { for: cn.PendingOrder, forms: ["nevyřízená objednávka", "nevyřízené objednávky"] }
+
+def term faktura_po_splatnosti { for: cn.OverdueInvoice, forms: ["faktura po splatnosti", "faktury po splatnosti"] }
+
+def term neuhrazena_castka { for: cn.open_amount, forms: ["neuhrazená částka", "dlužná částka"] }
+
+def example dluznici_nevyrizene { for: cn.DebtorCustomer, text: "dlužníci s nevyřízenou objednávkou" }

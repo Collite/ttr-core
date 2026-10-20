@@ -4,7 +4,8 @@ import type { ParseResult } from './ast.js';
 
 export { parseString, parseFile } from './walker.js';
 export { DiagnosticCode } from './diagnostics.js';
-export { TAG_REGISTRY, resolveTag } from './tag-registry.js';
+export { TAG_REGISTRY, resolveTag, EXPRESSION_TAG_REGISTRY, resolveExpressionTag } from './tag-registry.js';
+export { conceptProperty, conceptRef, conceptEntry, embeddedBlockLocation } from './concept.js';
 export type { TagEntry } from './tag-registry.js';
 export { sqlPosToFile, fileToSqlOffset } from './sql-position.js';
 export type { SqlTokenPos } from './sql-position.js';
@@ -131,6 +132,33 @@ export type {
   DeploymentDef,
   ProcessDef,
   StepDef,
+  ConceptStereotype,
+  ConceptBindingKind,
+  ConceptRefKey,
+  ExpressionLanguage,
+  EmbeddedBlock,
+  ConceptParticipant,
+  ConceptDescriptionProperty,
+  ConceptLabelProperty,
+  ConceptTagsProperty,
+  ConceptRefProperty,
+  ConceptGroundsProperty,
+  ConceptInvolvesProperty,
+  ConceptPeriodProperty,
+  ConceptExtentProperty,
+  ConceptBasisProperty,
+  ConceptValueSpaceProperty,
+  ConceptDefinitionProperty,
+  ConceptMembersProperty,
+  ConceptFilterProperty,
+  ConceptLexiconProperty,
+  ConceptTargetProperty,
+  ConceptEntry,
+  ConceptProperty,
+  ConceptBody,
+  ConceptDef,
+  ConceptSugar,
+  ConceptBindingDef,
 } from './ast.js';
 
 export async function parseDirectory(rootPath: string, recursive = true): Promise<ParseResult[]> {

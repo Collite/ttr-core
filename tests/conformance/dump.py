@@ -78,7 +78,32 @@ from ttr_parser.model import (
     BindingPropertyBlock,
     BoolValue,
     ColumnDef,
+    ConceptBasis,
+    ConceptBindingDef,
+    ConceptBody,
+    ConceptDef,
+    ConceptDefinition,
+    ConceptDescription,
+    ConceptEntry,
+    ConceptExtent,
+    ConceptFilter,
+    ConceptGrounds,
+    ConceptInvolves,
+    ConceptLabel,
+    ConceptLexicon,
+    ConceptMembers,
+    ConceptPeriod,
+    ConceptRef,
+    ConceptSugar,
+    ConceptTags,
+    ConceptTarget,
+    ConceptValueSpace,
     ConstraintDef,
+    CubeletDef,
+    DimensionDef,
+    EmbeddedBlock,
+    MdDomainDef,
+    MeasureDef,
     DataType,
     Definition,
     DrillMapDef,
@@ -155,6 +180,11 @@ KIND_KEYWORD: dict[str, str] = {
     "approval": "approval",
     "program": "program",
     "recipe": "recipe",
+    # 0.17 — the md hosts of the `concept { }` sugar (the keyword, not the Python kind).
+    "md_domain": "domain",
+    "dimension": "dimension",
+    "measure": "measure",
+    "cubelet": "cubelet",
 }
 
 
@@ -254,7 +284,7 @@ def _import(i: ImportStatement) -> dict[str, Any]:
 
 def _definition(d: Definition) -> dict[str, Any]:
     out: dict[str, Any] = {
-        "kind": KIND_KEYWORD[d.kind],
+        "kind": _kind_keyword(d),
         "name": d.name,
         "description": _description(d.description),
         "tags": list(d.tags),
@@ -266,6 +296,15 @@ def _definition(d: Definition) -> dict[str, Any]:
     if dl is not None:
         out["descriptionLocalized"] = dl
     return out
+
+
+def _kind_keyword(d: Definition) -> str:
+    """The TTR keyword; 0.17 — a concept def dumps its stereotype, a cn binding its binding keyword."""
+    if isinstance(d, ConceptDef):
+        return d.stereotype
+    if isinstance(d, ConceptBindingDef):
+        return d.binding_kind
+    return KIND_KEYWORD[d.kind]
 
 
 def _description(desc: str | None) -> str | None:
@@ -328,6 +367,14 @@ def _properties(d: Definition) -> dict[str, Any]:
         return _lexicon_entry_props(d)
     if isinstance(d, AutomationDef):
         return _auto_body_props(d.body)
+    # 0.17 — the concept defs and the cn bindings share one body.
+    if isinstance(d, (ConceptDef, ConceptBindingDef)):
+        return _concept_props(d.body, with_common=False)
+    # 0.17 — the md hosts of the `concept { }` sugar dump no other property (the md kinds never did).
+    if isinstance(d, (MdDomainDef, DimensionDef, MeasureDef, CubeletDef)):
+        md: dict[str, Any] = {}
+        _set_concept(md, d.concept)
+        return md
     return {}
 
 
@@ -447,6 +494,7 @@ def _entity_props(d: EntityDef) -> dict[str, Any]:
     _present(p, "lexicon", _lexicon(d.lexicon))
     if d.binding is not None:
         p["binding"] = _binding(d.binding)
+    _set_concept(p, d.concept)
     return p
 
 
@@ -471,6 +519,7 @@ def _attribute_props(d: AttributeDef) -> dict[str, Any]:
         p["states"] = list(d.states)
     if d.transitions:
         p["transitions"] = {t.from_state: list(t.to) for t in d.transitions}
+    _set_concept(p, d.concept)
     return p
 
 
@@ -762,7 +811,70 @@ def _lexicon_entry_props(d: Any) -> dict[str, Any]:
         p["match"] = d.match
     if d.text is not None:
         p["text"] = d.text
+    # 0.17 — the cn default sense (present-only: `default: false` dumps like no `default:`).
+    if d.default:
+        p["default"] = True
+    if d.sense_priority is not None:
+        p["sense_priority"] = _number(d.sense_priority)
     return p
+
+
+# ----- 0.17 cn serialisers (present-only; shared shape with dump.ts / ConformanceDump.kt) -----
+
+
+def _concept_props(b: ConceptBody, with_common: bool) -> dict[str, Any]:
+    """A cn body as a key-sorted object keyed by the property as written (`value_space`,
+    `is_a`, `event`). The first of a repeated key wins (the walker reports the rest).
+    `with_common` adds `description` / `descriptionLocalized` / `tags`, which a def dumps
+    at its top level and the sugar has nowhere else."""
+    p: dict[str, Any] = {}
+    seen: set[str] = set()
+    for prop in b.properties:
+        if prop.key in seen:
+            continue
+        seen.add(prop.key)
+        if isinstance(prop, ConceptDescription):
+            if with_common:
+                if prop.localized is not None:
+                    p["descriptionLocalized"] = dict(prop.localized.by_language)
+                elif prop.value is not None:
+                    p["description"] = prop.value.raw
+        elif isinstance(prop, ConceptTags):
+            if with_common and prop.value:
+                p["tags"] = list(prop.value)
+        elif isinstance(prop, ConceptLabel):
+            _present(p, "label", _localized(prop.value))
+        elif isinstance(prop, (ConceptRef, ConceptGrounds, ConceptValueSpace)):
+            p[prop.key] = _ref_path(prop.ref)
+        elif isinstance(prop, ConceptInvolves):
+            p["involves"] = [
+                {"label": pt.label, "ref": _ref_path(pt.ref)} if pt.label else {"ref": _ref_path(pt.ref)}
+                for pt in prop.participants
+            ]
+        elif isinstance(prop, ConceptPeriod):
+            p["period"] = _pv(prop.value)
+        elif isinstance(prop, (ConceptExtent, ConceptBasis)):
+            p[prop.key] = prop.value
+        elif isinstance(prop, (ConceptDefinition, ConceptMembers, ConceptFilter)):
+            p[prop.key] = _expression_block(prop.block)
+        elif isinstance(prop, ConceptLexicon):
+            _present(p, "lexicon", _lexicon(prop.block))
+        elif isinstance(prop, ConceptTarget):
+            p["target"] = _target(prop.value)
+        elif isinstance(prop, ConceptEntry):
+            p[prop.key] = _pv(prop.value)
+    return p
+
+
+def _set_concept(p: dict[str, Any], s: ConceptSugar | None) -> None:
+    """The host's `concept { }` sugar — present when written, even empty (`concept {}` dumps `{}`)."""
+    if s is not None:
+        p["concept"] = _concept_props(s.body, with_common=True)
+
+
+def _expression_block(b: EmbeddedBlock) -> dict[str, Any]:
+    """An expression block: how it was written and its text (positions are never dumped)."""
+    return {"form": b.form, "language": b.language, "text": b.text}
 
 
 def _lexicon(l: LexiconBlock | None) -> dict[str, Any] | None:

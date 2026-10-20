@@ -1,0 +1,16 @@
+// The English words for the concepts. `customer` is a customer by default; `debtor` ranks the phase.
+model lexicon locale en
+
+def term customer { for: cn.Customer, forms: ["customer", "customers", "client"], default: true }
+
+def term debtor { for: cn.DebtorCustomer, forms: ["debtor", "debtors", "customer in debt"], sense_priority: 2 }
+
+def term order { for: cn.Order, forms: ["order", "orders", "web order"], default: true }
+
+def term pending_order { for: cn.PendingOrder, forms: ["pending order", "pending orders"] }
+
+def term overdue_invoice { for: cn.OverdueInvoice, forms: ["overdue invoice", "overdue invoices"] }
+
+def term open_amount { for: cn.open_amount, forms: ["open amount", "amount due"] }
+
+def example debtors_pending { for: cn.DebtorCustomer, text: "debtors with an order still pending" }

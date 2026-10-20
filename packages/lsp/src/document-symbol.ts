@@ -125,7 +125,7 @@ function buildDefSymbol(def: Definition, lines: string[]): DocumentSymbol {
     kind,
     range: toRange(def.source),
     selectionRange: nameRange(def, lines),
-    detail: `def ${def.kind}`,
+    detail: `def ${defKeyword(def)}`,
     children,
   };
 }
@@ -136,9 +136,16 @@ function buildNestedDefSymbol(def: Definition, subKind: SymbolKind, lines: strin
     kind: subKind,
     range: toRange(def.source),
     selectionRange: nameRange(def, lines),
-    detail: `def ${def.kind}`,
+    detail: `def ${defKeyword(def)}`,
     children: [],
   };
+}
+
+/** The def keyword as written — a concept def and a cn binding carry theirs beside a shared `kind` (0.17). */
+function defKeyword(def: Definition): string {
+  if (def.kind === 'concept') return def.stereotype;
+  if (def.kind === 'conceptBinding') return def.bindingKind;
+  return def.kind;
 }
 
 function symbolKindOfDef(kind: string): SymbolKind {

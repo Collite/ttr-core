@@ -1,0 +1,312 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "cn2md_kind",
+            "name": "item_g",
+            "properties": {
+                "kind": "cn.Item",
+                "target": "md.Product"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "cn2md_role",
+            "name": "customer_g",
+            "properties": {
+                "role": "cn.Customer",
+                "target": "md.Customer"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "cn2md_quality",
+            "name": "revenue_g",
+            "properties": {
+                "quality": "cn.revenue",
+                "target": "md.revenue"
+            },
+            "tags": []
+        },
+        {
+            "description": "an attribute, not a measure",
+            "kind": "cn2md_quality",
+            "name": "brand_g",
+            "properties": {
+                "quality": "cn.brand",
+                "target": "md.Product.brand"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "cn2md_event",
+            "name": "return_g",
+            "properties": {
+                "event": "cn.Return",
+                "target": "md.storeReturns"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "cn2er_kind",
+            "name": "category_g",
+            "properties": {
+                "hierarchy": {
+                    "entries": {
+                        "ancestor": {
+                            "kind": "id",
+                            "parts": [
+                                "ancestor_code"
+                            ],
+                            "path": "ancestor_code"
+                        },
+                        "closure": {
+                            "kind": "id",
+                            "parts": [
+                                "er",
+                                "entity",
+                                "category_closure"
+                            ],
+                            "path": "er.entity.category_closure"
+                        },
+                        "descendant": {
+                            "kind": "id",
+                            "parts": [
+                                "descendant_code"
+                            ],
+                            "path": "descendant_code"
+                        },
+                        "ranges": {
+                            "kind": "id",
+                            "parts": [
+                                "lexical"
+                            ],
+                            "path": "lexical"
+                        }
+                    },
+                    "kind": "object"
+                },
+                "kind": "cn.ProductCategory",
+                "target": "er.entity.category_code"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "cn2er_kind",
+            "name": "channel_g",
+            "properties": {
+                "kind": "cn.Channel",
+                "target": "er.entity.channel_sales.channel"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "cn2er_role",
+            "name": "buyer_g",
+            "properties": {
+                "role": "cn.Customer",
+                "target": "er.entity.customer"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "cn2er_role",
+            "name": "orderer_g",
+            "properties": {
+                "role": "cn.Orderer",
+                "target": "er.entity.party",
+                "via": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "er",
+                                "relation",
+                                "rel_order_customer"
+                            ],
+                            "path": "er.relation.rel_order_customer"
+                        }
+                    ],
+                    "kind": "list"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "cn2er_event",
+            "name": "transfer_g",
+            "properties": {
+                "event": "cn.StockTransfer",
+                "participants": {
+                    "entries": {
+                        "from": {
+                            "items": [
+                                {
+                                    "kind": "id",
+                                    "parts": [
+                                        "er",
+                                        "relation",
+                                        "rel_transfer_from"
+                                    ],
+                                    "path": "er.relation.rel_transfer_from"
+                                }
+                            ],
+                            "kind": "list"
+                        },
+                        "item": {
+                            "items": [
+                                {
+                                    "kind": "id",
+                                    "parts": [
+                                        "er",
+                                        "relation",
+                                        "rel_transfer_item"
+                                    ],
+                                    "path": "er.relation.rel_transfer_item"
+                                }
+                            ],
+                            "kind": "list"
+                        },
+                        "to": {
+                            "items": [
+                                {
+                                    "kind": "id",
+                                    "parts": [
+                                        "er",
+                                        "relation",
+                                        "rel_transfer_to"
+                                    ],
+                                    "path": "er.relation.rel_transfer_to"
+                                },
+                                {
+                                    "kind": "id",
+                                    "parts": [
+                                        "er",
+                                        "relation",
+                                        "rel_warehouse_region"
+                                    ],
+                                    "path": "er.relation.rel_warehouse_region"
+                                }
+                            ],
+                            "kind": "list"
+                        }
+                    },
+                    "kind": "object"
+                },
+                "period": {
+                    "entries": {
+                        "at": {
+                            "kind": "id",
+                            "parts": [
+                                "er",
+                                "entity",
+                                "stock_transfer",
+                                "shipped_at"
+                            ],
+                            "path": "er.entity.stock_transfer.shipped_at"
+                        }
+                    },
+                    "kind": "object"
+                },
+                "target": "er.entity.stock_transfer"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "cn2er_event",
+            "name": "order_g",
+            "properties": {
+                "event": "cn.Order",
+                "period": {
+                    "entries": {
+                        "end": {
+                            "kind": "id",
+                            "parts": [
+                                "er",
+                                "entity",
+                                "order",
+                                "delivered_date"
+                            ],
+                            "path": "er.entity.order.delivered_date"
+                        },
+                        "start": {
+                            "kind": "id",
+                            "parts": [
+                                "er",
+                                "entity",
+                                "order",
+                                "placed_date"
+                            ],
+                            "path": "er.entity.order.placed_date"
+                        }
+                    },
+                    "kind": "object"
+                },
+                "target": "er.entity.order"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "cn2er_quality",
+            "name": "state_g",
+            "properties": {
+                "quality": "cn.state",
+                "target": "er.entity.order.state"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "cn2er_quality",
+            "name": "stock_g",
+            "properties": {
+                "filter": {
+                    "form": "tripleString",
+                    "language": "pl",
+                    "text": "warehouse = 1"
+                },
+                "quality": "cn.stock_level",
+                "target": "er.entity.inventory.quantity_on_hand"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "cn2er_phase",
+            "name": "placed_g",
+            "properties": {
+                "phase": "cn.PlacedOrder",
+                "target": "er.entity.placed_order"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "cn2db_concept",
+            "name": "legacy_g",
+            "properties": {
+                "concept": "cn.LegacyStock",
+                "target": "db.dbo.legacy_stock"
+            },
+            "tags": [
+                "legacy"
+            ]
+        }
+    ],
+    "imports": [],
+    "package": "hartland.concepts",
+    "schemaDirective": {
+        "code": "binding",
+        "namespace": null
+    }
+}

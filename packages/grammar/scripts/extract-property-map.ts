@@ -34,6 +34,14 @@ const RULE_NAME_OVERRIDES: Record<string, string> = {
   semanticsBlock: 'semantics',
   lexiconBlock: 'lexicon',
   columnNamesList: 'columnNames',
+  // 0.17 — the cn rules whose name is not the key they carry. `cnRefProperty` is the stereotype-ref
+  // rule (`kind|role|quality|event|phase|concept:`); on a role — the only advertised kind carrying it —
+  // the one ref a role takes is its defining `event:`.
+  cnRef: 'event',
+  conceptSugar: 'concept',
+  conceptMembers: 'members',
+  valueSpace: 'value_space',
+  sensePriority: 'sense_priority',
 };
 
 function ruleToPropertyName(rule: string): string {
@@ -118,6 +126,18 @@ const typeMap: Record<string, string> = {
   delivery: 'object',
   members: 'list of strings',
   transitions: 'state transition map',
+  // 0.17 — the conceptual model (cn contracts §1).
+  event: 'reference',
+  grounds: 'reference',
+  concept: 'concept block',
+  involves: 'list of participants',
+  period: 'period',
+  extent: 'identifier',
+  basis: 'identifier',
+  definition: 'expression block',
+  value_space: 'reference',
+  default: 'boolean',
+  sense_priority: 'number',
 };
 
 const allKinds = [
@@ -147,6 +167,10 @@ const allKinds = [
   'approval',
   'program',
   'recipe',
+  // 0.17 — the conceptual model: the concept defs (every stereotype, a `model cn` role included) share
+  // `cnProperty`, the ten cn bindings `cnBindingProperty`; keyed by the AST kind.
+  'concept',
+  'conceptBinding',
 ];
 
 // 0.16 — kinds whose property rule is not `<kind>Property` (the automation kinds share `autoProperty`).
@@ -157,6 +181,18 @@ const KIND_RULE: Record<string, string> = {
   approval: 'autoProperty',
   program: 'autoProperty',
   recipe: 'autoProperty',
+  concept: 'cnProperty',
+  conceptBinding: 'cnBindingProperty',
+};
+
+// 0.17 — where a kind reads one rule differently from the name/type the shared maps give it: a cn
+// binding's stereotype-ref rule carries all six keys (`kind: cn.Item`, `phase: cn.PlacedOrder`, …,
+// `concept:` on cn2db_concept), and a concept's `members:` is an expression block, not the automation
+// role's list.
+const STEREOTYPE_REFS = ['kind', 'role', 'quality', 'event', 'phase', 'concept'];
+const KIND_OVERRIDES: Record<string, Record<string, { name: string; type: string }[]>> = {
+  concept: { members: [{ name: 'members', type: 'expression block' }] },
+  conceptBinding: { event: STEREOTYPE_REFS.map((name) => ({ name, type: 'reference' })) },
 };
 
 const searchSubProperties = extractProps('searchSubProperty');
@@ -176,8 +212,10 @@ output += 'export interface PropertyInfo {\n  name: string;\n  type: string;\n}\
 
 output += 'export const PROPERTY_MAP: Record<DefinitionKind, PropertyInfo[]> = {\n';
 for (const kind of allKinds) {
-  const props = extractProps(KIND_RULE[kind] ?? `${kind}Property`);
-  const infos = props.map((p) => `{ name: '${p}', type: '${typeMap[p] ?? 'unknown'}' }`);
+  const props = extractProps(KIND_RULE[kind] ?? `${kind}Property`).flatMap(
+    (p) => KIND_OVERRIDES[kind]?.[p] ?? [{ name: p, type: typeMap[p] ?? 'unknown' }],
+  );
+  const infos = props.map((p) => `{ name: '${p.name}', type: '${p.type}' }`);
   output += `  ${kind}: [${infos.join(', ')}],\n`;
 }
 output += '};\n\n';
