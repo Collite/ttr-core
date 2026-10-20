@@ -1592,10 +1592,27 @@ def _visit_md_host(
         t = p.tagsProperty()
         if t is not None:
             tags = _visit_list_of_strings(t.listOfStrings(), file)
+    _md_inline_sugar(props, file, warnings, errors)
     return cls(
         name=name, source=source, description=description, description_localized=description_localized, tags=tags,
         concept=_concept_sugar_of(props, file, warnings, errors),
     )
+
+
+def _md_inline_sugar(props: Any, file: str, warnings: list[ParseWarning], errors: list[ParseError]) -> None:
+    """A dimension's inline attributes and a cubelet's inline measures are not modelled here (the md
+    model is not ported), but their `concept { }` is walked for its diagnostics — a second one, an
+    error inside it — so the error set matches TS and Kotlin. The sugar itself is dropped."""
+    for p in props or ():
+        attrs_prop = getattr(p, "attributesProperty", lambda: None)()
+        if attrs_prop is not None:
+            for inline in attrs_prop.attributeDefList().attributeInline() or ():
+                _concept_sugar_of(inline.attributeDef().attributeProperty(), file, warnings, errors)
+        measures_prop = getattr(p, "measuresProperty", lambda: None)()
+        if measures_prop is not None:
+            inline_list = measures_prop.measuresValue().measureInlineList()
+            for measure in (inline_list.measureDef() if inline_list is not None else None) or ():
+                _concept_sugar_of(measure.measureProperty(), file, warnings, errors)
 
 
 def _concept_sugar_of(props: Any, file: str, warnings: list[ParseWarning], errors: list[ParseError]) -> ConceptSugar | None:
@@ -1857,8 +1874,11 @@ def _walk_expression_block(  # noqa: PLR0913
             escapes.append(m.start() - len(escapes))
             return m.group(1)
 
-        text = re.sub(r"\\(.)", unescape, quoted)
-        return _block_of("string", text, source, sym.start + 1, sym.line, col + 1, 0, (sym.start + 1,), tuple(escapes))
+        # `[\s\S]`, not `.`: the lexer admits a backslash before any character, a line break too, and
+        # the regex engines of the three targets disagree on what `.` matches.
+        text = re.sub(r"\\([\s\S])", unescape, quoted)
+        string_offsets = _string_line_offsets(text, escapes, sym.start + 1)
+        return _block_of("string", text, source, sym.start + 1, sym.line, col + 1, 0, string_offsets, tuple(escapes))
 
     inner = raw[3:-3]
     inner_start = sym.start + 3
@@ -1913,6 +1933,17 @@ def _walk_expression_block(  # noqa: PLR0913
     return _block_of(form, text, source, line_offsets[0], first_line, first_column, indent_width, tuple(line_offsets))
 
 
+def _string_line_offsets(text: str, escapes: list[int], text_start: int) -> tuple[int, ...]:
+    """Where each line of a string-form block's `text` starts in the file: its index in `text`, plus
+    one for every escape before it (an escaped line break is what starts a second line)."""
+    offsets: list[int] = []
+    start = 0
+    for line in text.split("\n"):
+        offsets.append(text_start + start + sum(1 for e in escapes if e < start))
+        start += len(line) + 1
+    return tuple(offsets)
+
+
 def _block_of(  # noqa: PLR0913
     form: str,
     text: str,
@@ -1927,7 +1958,8 @@ def _block_of(  # noqa: PLR0913
     lines = text.split("\n")
     last = len(lines) - 1
     last_offset = line_offsets[last] if last < len(line_offsets) else text_start
-    last_width = len(lines[last]) + len(escapes)
+    last_start = len(text) - len(lines[last])
+    last_width = len(lines[last]) + sum(1 for e in escapes if e >= last_start)
     end_column = (column if last == 0 else indent_width if lines[last] else 0) + last_width
     return EmbeddedBlock(
         form=form,

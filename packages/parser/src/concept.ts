@@ -45,8 +45,10 @@ export function embeddedBlockLocation(
   length = 1,
 ): SourceLocation {
   const l = Math.max(0, Math.min(line, block.lineOffsets.length - 1));
-  // A string-form block's escapes each take one more character of the file than of `text`.
-  const shift = (c: number) => (l === 0 ? (block.escapes ?? []).filter((e) => e < c).length : 0);
+  // A string-form block's escapes each take one more character of the file than of `text`: count the
+  // ones on this line before the column (`escapes` index the whole text, in code points).
+  const lineStart = block.text.split('\n').slice(0, l).reduce((n, s) => n + [...s].length + 1, 0);
+  const shift = (c: number) => (block.escapes ?? []).filter((e) => e >= lineStart && e < lineStart + c).length;
   const base = l === 0 ? block.textSource.column : block.indentWidth;
   const start = column + shift(column);
   const end = column + length + shift(column + length);

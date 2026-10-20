@@ -80,8 +80,10 @@ never a keyword — so a malformed typed property fails at parse time, and so do
 - **Formatter fixes on the way:** a def kind with no layout is now kept verbatim — the md model (`domain`,
   `dimension`, `hierarchy`, `measure`, `cubelet`, `map`, `md2db_*`, `md2er_cubelet`), `drill_map` and the
   world's `engine` / `executor` / `storage` printed as an empty `def X {}` (an md domain as the unparseable
-  `def mdDomain`); `model lexicon locale <id>` keeps its locale; a comment before a def's closing `}` stays there
-  (after the `}` it merged with the def's own trailing comment into one); slices count the parser's code points, so
+  `def mdDomain`); `model lexicon locale <id>` keeps its locale; a comment the parser hangs on a def — one before its
+  closing `}`, or one above a typed property — prints before the `}`, each on its own line (after the `}` they
+  merged with the def's own trailing comment into one; a comment above a typed property still moves to the def's
+  end — ttr-core#222); slices count the parser's code points, so
   an emoji earlier in the file no longer cuts every later verbatim value one character short; `key = value` prints
   as `key: value`. Still dropped: ttr-core#212 (a table's
   `management` / `changeSemantics` / `writeback`) and ttr-core#219 (an inline `binding:`, a localized

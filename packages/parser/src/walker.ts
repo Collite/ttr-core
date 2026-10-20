@@ -1181,13 +1181,15 @@ function walkExpressionBlock(token: TerminalNode, key: string, file: string, err
   if (sym.type === TTRLexer.STRING_LITERAL) {
     // Each escape takes two characters of the file and one of `text`: `escapes` keeps where, so a
     // position in `text` still maps onto the file.
+    // `[\s\S]`, not `.`: the lexer admits a backslash before any character, a line break too, and the
+    // three regex engines disagree on what `.` matches.
     const quoted = raw.slice(1, -1);
     const escapes: number[] = [];
-    const text = quoted.replace(/\\(.)/g, (_m, c: string, at: number) => {
+    const text = quoted.replace(/\\([\s\S])/g, (_m, c: string, at: number) => {
       escapes.push(codePoints(quoted.slice(0, at)) - escapes.length);
       return c;
     });
-    return blockOf('string', text, source, sym.start + 1, sym.line, sym.column + 1, 0, [sym.start + 1], escapes);
+    return blockOf('string', text, source, sym.start + 1, sym.line, sym.column + 1, 0, stringLineOffsets(text, escapes, sym.start + 1), escapes);
   }
 
   let inner = raw.slice(3, -3);
@@ -1255,7 +1257,8 @@ function blockOf(
   const lastLine = lines.length - 1;
   const lastOffset = lineOffsets[lastLine] ?? textStart;
   // Widths in code points — the unit of the parser's offsets and columns (and of a TTR-P position).
-  const lastWidth = codePoints(lines[lastLine]) + escapes.length;
+  const lastStart = codePoints(text) - codePoints(lines[lastLine]);
+  const lastWidth = codePoints(lines[lastLine]) + escapes.filter((e) => e >= lastStart).length;
   return {
     kind: 'embeddedBlock',
     language: 'pl',
@@ -1275,6 +1278,20 @@ function blockOf(
     ...(escapes.length ? { escapes } : {}),
     source,
   };
+}
+
+/**
+ * Where each line of a string-form block's `text` starts in the file: its code-point index in `text`, plus
+ * one for every escape before it (an escaped line break is what starts a second line).
+ */
+function stringLineOffsets(text: string, escapes: number[], textStart: number): number[] {
+  const offsets: number[] = [];
+  let start = 0;
+  for (const line of text.split('\n')) {
+    offsets.push(textStart + start + escapes.filter((e) => e < start).length);
+    start += codePoints(line) + 1;
+  }
+  return offsets;
 }
 
 /** The number of code points in `s` — what ANTLR counts in offsets and columns (a JS length counts UTF-16 units). */

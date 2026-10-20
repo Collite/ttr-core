@@ -40,8 +40,9 @@ function shape(src: string): unknown {
 
 describe('formatter — the conceptual model (0.17)', () => {
   // Every conformance fixture, 01–79: the old corpus and the cn one. 01–74 format byte-for-byte as
-  // before 0.17, but for the three the 0.17 fixes touch (18 `drill_map`, 59 comments before a `}`,
-  // 62 `locale`).
+  // before 0.17, but for the three the 0.17 fixes touch (18 `drill_map`; 59 — comments above a typed
+  // property, which the parser hangs on the def: they printed after its `}`, merged into one, and now
+  // print before it, each on its own line; 62 `locale`).
   const corpus = readdirSync(CONFORMANCE).filter((f) => f.endsWith('.ttrm')).sort();
   it('covers the whole corpus', () => {
     expect(corpus.length).toBeGreaterThanOrEqual(76);
@@ -254,6 +255,14 @@ def entity order {
     expect(fmt(cn)).toBe(cn);
     const entity = 'model er\n\ndef entity e {\n    description: "x"\n    // inside\n} // outside\n';
     expect(fmt(entity)).toBe(entity);
+  });
+
+  // review-118 L-2: a comment inside the sugar breaks its host, under every separator setting.
+  it('breaks the host of a sugar that carries a comment, even with `separator: comma`', () => {
+    const src = 'model er\n\ndef entity e {\n    concept {\n        kind: E\n        // the kind\n    }\n}\n';
+    const expected = 'model er\n\ndef entity e {\n    concept {\n        kind: E\n        // the kind\n    }\n}\n';
+    expect(fmt(src)).toBe(expected);
+    expect(fmt(src, { ...DEFAULT_FORMAT_CONFIG, separator: 'comma' })).toBe(expected);
   });
 
   it('prints a lexicon entry\'s `default:` and `sense_priority:`, and keeps the unit locale', () => {

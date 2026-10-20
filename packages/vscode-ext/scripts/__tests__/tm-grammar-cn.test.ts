@@ -184,7 +184,14 @@ describe('ttrm.tmLanguage.json — the 0.17 conceptual model', () => {
       '    plain text',
       '""" }',
       'def kind After { grounds: md.after }',
+      // review-118 M-1: an escaped quote inside a comment of the string form does not close the string.
+      'def phase X { of: Order, definition: "a = 1 // it\\"s" }',
+      'def phase Y { of: Order, definition: "a /* it\\"s */ = 1" }',
+      'def kind Last { grounds: md.last }',
     ].join('\n'));
+    expect(tokenIn(lines[13], '}').scopes).toEqual(['punctuation.section.braces.ttrm']);
+    expect(tokenIn(lines[14], '}').scopes).toEqual(['punctuation.section.braces.ttrm']);
+    expect(tokenIn(lines[15], 'grounds').scopes).toEqual(['keyword.other.property.ttrm']);
     expect(tokenIn(lines[2], 'definition').scopes).toContain('keyword.other.property.ttrm');
     expect(tokenIn(lines[2], 'pl').scopes).toContain('entity.name.tag.language.ttrm');
     expect(tokenIn(lines[3], "// the customer's hold").scopes).toContain('comment.line.double-slash.ttrm');

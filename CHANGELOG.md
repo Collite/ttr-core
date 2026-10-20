@@ -19,7 +19,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   attribute and the four md hosts), a sealed `ConceptProperty`, `EmbeddedBlock`; `LexiconEntryDef.default` /
   `sensePriority`; codes `ttr/duplicate-property` (also a second `concept { }` on a host),
   `ttr/expression-block-required`; `EmbeddedBlock.location()` counts code points and steps over a string
-  form's `escapes`. `ttr-semantics` carries the cn
+  form's `escapes` (a backslash escapes any character there, a line break too). `ttr-semantics` carries the cn
   defs through unchecked (the cn semantics, the typed model and `ttr-writer` support are CN-P2). `model cnc` and
   `roles:` are deprecated (they parse unchanged). Tooling: TextMate highlighting and the formatter's cn layout
   (see `packages/grammar/CHANGELOG.md` 0.17). Manual: [Conceptual model (cn)](docs/manual/en/20-conceptual-model.md).

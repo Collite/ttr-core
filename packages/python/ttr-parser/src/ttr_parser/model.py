@@ -1209,9 +1209,12 @@ class EmbeddedBlock:
         `column` 0-based within that line. Mirrors the TS `embeddedBlockLocation`."""
         ln = max(0, min(line, len(self.line_offsets) - 1))
 
+        # A string-form block's escapes each take one more character of the file than of `text`:
+        # count the ones on this line before the column (`escapes` index the whole text).
+        line_start = sum(len(s) + 1 for s in self.text.split("\n")[:ln])
+
         def shift(c: int) -> int:
-            # A string-form block's escapes each take one more character of the file than of `text`.
-            return sum(1 for e in self.escapes if e < c) if ln == 0 else 0
+            return sum(1 for e in self.escapes if line_start <= e < line_start + c)
 
         base = self.text_source.column if ln == 0 else self.indent_width
         start = column + shift(column)

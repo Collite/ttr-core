@@ -617,6 +617,37 @@ describe('cn walker — review-117 fixes', () => {
     expect(at(ASTRAL, z.offsetStart, z.offsetEnd)).toBe('\\"z\\"');
   });
 
+  // review-118 L-1: a backslash before a line break escapes it (the lexer admits it) — on all three
+  // targets alike, and the line after it maps onto the file's next line.
+  const ESC_NEWLINE = 'model cn\ndef quality P { of: X, definition: "a = 1 \\\nand b = 2" }';
+
+  it('reads an escaped line break into the text and maps the line after it (review-118 L-1)', () => {
+    const b = definitionOf(ESC_NEWLINE, 'P');
+    expect(b.text).toBe('a = 1 \nand b = 2');
+    expect(b.escapes).toEqual([6]);
+    expect(b.lineOffsets).toEqual([offsetOf(ESC_NEWLINE, 'a = 1'), offsetOf(ESC_NEWLINE, 'and b')]);
+    const and = embeddedBlockLocation(b, 1, 0, 3);
+    expect(at(ESC_NEWLINE, and.offsetStart, and.offsetEnd)).toBe('and');
+    expect([and.line, and.column]).toEqual([3, 0]);
+    expect(at(ESC_NEWLINE, b.textSource.offsetStart, b.textSource.offsetEnd)).toBe('a = 1 \\\nand b = 2');
+    expect([b.textSource.endLine, b.textSource.endColumn]).toEqual([3, 9]);
+    for (const [sep, name] of [['\r', 'CR'], [' ', 'LS'], ['\u0085', 'NEL']]) {
+      const src = `model cn\ndef quality P { of: X, definition: "a\\${sep}b" }`;
+      expect(definitionOf(src, 'P').text, name).toBe(`a${sep}b`);
+    }
+  });
+
+  it('reports a second `concept { }` on an md inline attribute and measure — as Python does (review-118 M-2)', () => {
+    const attr = 'model md\ndef dimension D { attributes: [ def attribute a { type: string, concept { quality: Q }, concept { quality: R } } ] }';
+    expect(parseString(attr, 'r.ttrm').errors.map((e) => [e.code, e.source.line, e.source.column])).toEqual([
+      [DiagnosticCode.DuplicateProperty, 2, 88],
+    ]);
+    const measure = 'model md\ndef cubelet C { measures: [ def measure m { concept { quality: Q }, concept { quality: R } } ] }';
+    expect(parseString(measure, 'r.ttrm').errors.map((e) => [e.code, e.source.line, e.source.column])).toEqual([
+      [DiagnosticCode.DuplicateProperty, 2, 68],
+    ]);
+  });
+
   it('reports a second `concept { }` on a host and reads the first (M-4)', () => {
     const src = 'model er\ndef entity e { concept { kind: A }, concept { event: B } }';
     const { ast, errors } = parseString(src, 'r.ttrm');

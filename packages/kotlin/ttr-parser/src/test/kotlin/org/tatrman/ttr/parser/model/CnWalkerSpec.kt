@@ -641,6 +641,45 @@ def quality P { of: X, definition: "a = \"held\" and b = 'c\\d'" }"""
             cpSlice(src, b.location(0, 16, 3)) shouldBe "\\\"z\\\""
         }
 
+        "review-118 L-1: reads an escaped line break into the text and maps the line after it" {
+            val src = "model cn\ndef quality P { of: X, definition: \"a = 1 \\\nand b = 2\" }"
+            val b = definitionBlock(src)
+            b.text shouldBe "a = 1 \nand b = 2"
+            b.escapes shouldContainExactly listOf(6)
+            b.lineOffsets shouldContainExactly listOf(45, 53)
+            val and = b.location(1, 0, 3)
+            Triple(and.line, and.column, cpSlice(src, and)) shouldBe Triple(3, 0, "and")
+            (b.textSource.offsetStart to b.textSource.offsetEnd) shouldBe (45 to 62)
+            (b.textSource.endLine to b.textSource.endColumn) shouldBe (3 to 9)
+            for (sep in listOf("\r", " ", "\u0085")) {
+                definitionBlock("model cn\ndef quality P { of: X, definition: \"a\\${sep}b\" }").text shouldBe
+                    "a${sep}b"
+            }
+        }
+
+        "review-118 M-2: reports a second `concept { }` on an md inline attribute and measure, as Python does" {
+            val attr =
+                "model md\ndef dimension D { attributes: [ def attribute a { type: string, concept { quality: Q }, " +
+                    "concept { quality: R } } ] }"
+            TtrLoader
+                .parseString(
+                    attr,
+                    "r.ttrm",
+                ).errors
+                .map { Triple(it.code, it.line, it.column) } shouldContainExactly
+                listOf(Triple(DiagnosticCode.DuplicateProperty, 2, 89))
+            val measure =
+                "model md\ndef cubelet C { measures: [ def measure m { concept { quality: Q }, " +
+                    "concept { quality: R } } ] }"
+            TtrLoader
+                .parseString(
+                    measure,
+                    "r.ttrm",
+                ).errors
+                .map { Triple(it.code, it.line, it.column) } shouldContainExactly
+                listOf(Triple(DiagnosticCode.DuplicateProperty, 2, 69))
+        }
+
         "review-117 M-4: reports a second `concept { }` on a host and reads the first" {
             val r =
                 TtrLoader.parseString(

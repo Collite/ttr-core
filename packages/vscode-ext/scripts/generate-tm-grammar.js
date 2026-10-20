@@ -323,7 +323,14 @@ const EMBEDDED_BLOCKS = {
             },
             endCaptures: { 0: { name: 'string.quoted.double.ttrm punctuation.definition.string.end.ttrm' } },
             contentName: 'meta.embedded.line.pl.ttrm',
-            patterns: [{ name: 'constant.character.escape.ttrm', match: '\\\\.' }, { include: '#pl-expression' }],
+            // Inside a TTR string `\x` is one escaped character, so a comment here steps over `\"` instead of
+            // stopping at it (the quote would close the string). Listed before #pl-expression's comments.
+            patterns: [
+                { name: 'constant.character.escape.ttrm', match: '\\\\.' },
+                { name: 'comment.line.double-slash.ttrm', match: '//(?:[^"\\\\\\r\\n]|\\\\.)*' },
+                { name: 'comment.block.ttrm', begin: '/\\*', end: '\\*/|(?=")', patterns: [{ match: '\\\\.' }] },
+                { include: '#pl-expression' },
+            ],
         },
     ],
 };

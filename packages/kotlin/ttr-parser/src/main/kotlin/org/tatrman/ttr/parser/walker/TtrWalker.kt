@@ -1964,7 +1964,7 @@ class TtrWalker(
                 sym.line,
                 col + 1,
                 0,
-                listOf(sym.startIndex + 1),
+                stringLineOffsets(text, escapes, sym.startIndex + 1),
                 escapes,
             )
         }
@@ -2045,7 +2045,8 @@ class TtrWalker(
         val lastLine = lines.size - 1
         val lastOffset = lineOffsets.getOrElse(lastLine) { textStart }
         // Widths in code points — the unit of the parser's offsets and columns (and of a TTR-P position).
-        val lastWidth = codePoints(lines[lastLine]) + escapes.size
+        val lastStart = codePoints(text) - codePoints(lines[lastLine])
+        val lastWidth = codePoints(lines[lastLine]) + escapes.count { it >= lastStart }
         val endColumn =
             (
                 if (lastLine == 0) {
@@ -2076,6 +2077,23 @@ class TtrWalker(
             source = source,
             escapes = escapes,
         )
+    }
+
+    /**
+     * Where each line of a string-form block's [text] starts in the file: its code-point index in [text], plus
+     * one for every escape before it (an escaped line break is what starts a second line).
+     */
+    private fun stringLineOffsets(
+        text: String,
+        escapes: List<Int>,
+        textStart: Int,
+    ): List<Int> {
+        var start = 0
+        return text.split("\n").map { line ->
+            val offset = textStart + start + escapes.count { it < start }
+            start += codePoints(line) + 1
+            offset
+        }
     }
 
     /** The number of code points in [s] — what ANTLR counts in offsets and columns (`length` counts UTF-16 units). */
@@ -2930,8 +2948,11 @@ class TtrWalker(
         return Dedent.applyTextwrapDedent(inner)
     }
 
-    /** The plain-string unescape the TS walker uses (`raw.slice(1, -1).replace(/\\(.)/g, '$1')`). */
-    private val simpleEscape = Regex("""\\(.)""")
+    /**
+     * The expression-block unescape, as on TS and Python: `[\s\S]`, not `.` — the lexer admits a backslash before
+     * any character, a line break too, and the regex engines of the three targets disagree on what `.` matches.
+     */
+    private val simpleEscape = Regex("""\\([\s\S])""")
 
     /** The opening fence of a tagged block: `<tag>[ \t]*\r?\n` (the lexer guarantees it). */
     private val taggedOpener = Regex("^([A-Za-z][A-Za-z0-9-]*)([ \t]*\r?\n)")

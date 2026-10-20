@@ -621,3 +621,28 @@ def test_review_117_l2_reads_a_to_string_first_line_as_text() -> None:
     assert isinstance(b, ConceptDefinition)
     assert (b.block.form, b.block.text) == ("tripleString", "toString\n  x\n")
     assert [w.code for w in r.warnings] == [DiagnosticCode.UNKNOWN_LANGUAGE_TAG]
+
+
+def test_review_118_l1_reads_an_escaped_line_break_and_maps_the_line_after_it() -> None:
+    src = 'model cn\ndef quality P { of: X, definition: "a = 1 \\\nand b = 2" }'
+    b = _block_named(src, "P")
+    assert b.text == "a = 1 \nand b = 2"
+    assert b.escapes == (6,)
+    assert b.line_offsets == (45, 53)
+    at = b.location(1, 0, 3)
+    assert (at.line, at.column, _slice(src, at)) == (3, 0, "and")
+    assert (b.text_source.offset_start, b.text_source.offset_end) == (45, 62)
+    assert (b.text_source.end_line, b.text_source.end_column) == (3, 9)
+    for sep in ("\r", " ", "\u0085"):
+        assert _block_named(f'model cn\ndef quality P {{ of: X, definition: "a\\{sep}b" }}', "P").text == f"a{sep}b"
+
+
+def test_review_118_m2_reports_a_second_concept_on_an_md_inline_attribute_and_measure() -> None:
+    # The md model is not ported, but the sugar of a dimension's inline attribute and of a cubelet's
+    # inline measure is walked for its diagnostics — the same error set as TS and Kotlin.
+    attr = "model md\ndef dimension D { attributes: [ def attribute a { type: string, concept { quality: Q }, concept { quality: R } } ] }"
+    r = parse_string(attr, "r.ttrm")
+    assert [(e.code, e.line, e.column) for e in r.errors] == [(DiagnosticCode.DUPLICATE_PROPERTY, 2, 89)]
+    measure = "model md\ndef cubelet C { measures: [ def measure m { concept { quality: Q }, concept { quality: R } } ] }"
+    r = parse_string(measure, "r.ttrm")
+    assert [(e.code, e.line, e.column) for e in r.errors] == [(DiagnosticCode.DUPLICATE_PROPERTY, 2, 69)]

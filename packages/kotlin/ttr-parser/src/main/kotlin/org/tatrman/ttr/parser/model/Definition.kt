@@ -1208,9 +1208,11 @@ data class EmbeddedBlock(
         length: Int = 1,
     ): SourceLocation {
         val l = line.coerceIn(0, lineOffsets.size - 1)
+        // A string-form block's escapes each take one more character of the file than of `text`: count the
+        // ones on this line before the column ([escapes] index the whole text, in code points).
+        val lineStart = text.split("\n").take(l).sumOf { it.codePointCount(0, it.length) + 1 }
 
-        // A string-form block's escapes each take one more character of the file than of `text`.
-        fun shift(c: Int) = if (l == 0) escapes.count { it < c } else 0
+        fun shift(c: Int) = escapes.count { it >= lineStart && it < lineStart + c }
         val base = if (l == 0) textSource.column else indentWidth
         val start = column + shift(column)
         val end = column + length + shift(column + length)

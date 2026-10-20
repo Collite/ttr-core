@@ -88,6 +88,20 @@
               "match": "\\\\."
             },
             {
+              "name": "comment.line.double-slash.ttrm",
+              "match": "//(?:[^\"\\\\\\r\\n]|\\\\.)*"
+            },
+            {
+              "name": "comment.block.ttrm",
+              "begin": "/\\*",
+              "end": "\\*/|(?=\")",
+              "patterns": [
+                {
+                  "match": "\\\\."
+                }
+              ]
+            },
+            {
               "include": "#pl-expression"
             }
           ]

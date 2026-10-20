@@ -142,7 +142,7 @@ function keyListDoc(arr: string[]): Doc {
  * one line (a value that could break must not break inside an inline def — the next pass would read a
  * multi-line def and lay it out differently).
  */
-interface Prop { key: string; value: Doc; node?: TriviaNode; sep?: string; atKey?: boolean; inline?: Doc }
+interface Prop { key: string; value: Doc; node?: TriviaNode; sep?: string; atKey?: boolean; inline?: Doc; comments?: boolean }
 
 // The AST stores camelCase kinds, but the grammar's `def` keyword is snake_case
 // for the mapping kinds.
@@ -363,7 +363,7 @@ function hasHardline(d: Doc): boolean {
 }
 
 function defHasComments(def: Definition, props: Prop[]): boolean {
-  return hasTrailing(def) || props.some((pr) => hasTrailing(pr.node) || (!!pr.atKey && !!pr.node?.leadingTrivia?.length));
+  return hasTrailing(def) || props.some((pr) => pr.comments || hasTrailing(pr.node) || (!!pr.atKey && !!pr.node?.leadingTrivia?.length));
 }
 
 /** The def body without its own leading/trailing trivia (added by callers). */
@@ -651,13 +651,14 @@ function conceptSugarProp(sugar: ConceptSugar, ctx: Ctx): Prop {
   if (!props) {
     // Verbatim from the `{`; the sugar's own comments are re-emitted only where they lie outside it.
     const start = cnValueStart(ctx, { key: 'concept', source: sugar.source });
-    return { key: 'concept', sep: ' ', value: verbatim(sourceText(ctx, start, sugar.source.offsetEnd)), node: outsideTrivia(sugar, sugar.source), atKey: true };
+    return { key: 'concept', sep: ' ', value: verbatim(sourceText(ctx, start, sugar.source.offsetEnd)), node: outsideTrivia(sugar, sugar.source), atKey: true, comments: true };
   }
   const node = outsideTrivia(sugar, sugar.source);
   const closing = closingTrivia(sugar);
   if (props.length === 0 && !closing.length) return { key: 'concept', sep: ' ', value: text('{}'), node, atKey: true };
   if (closing.length || props.some((pr) => hasTrivia(pr.node))) {
-    return { key: 'concept', sep: ' ', value: cnBodyDoc(ctx, props, 'broken', closing), node, atKey: true };
+    // Comments inside the sugar break it, and — as any comment does — its host.
+    return { key: 'concept', sep: ' ', value: cnBodyDoc(ctx, props, 'broken', closing), node, atKey: true, comments: true };
   }
   // Width decides — unless the host prints on one line, where the sugar does too.
   return { key: 'concept', sep: ' ', value: cnBodyDoc(ctx, props, 'fit'), inline: cnBodyDoc(ctx, props, 'inline'), node, atKey: true };
