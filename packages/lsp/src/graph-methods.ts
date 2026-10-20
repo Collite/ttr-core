@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { parseString, type Document, type Definition, type ObjectValue, type Reference } from '@tatrman/parser';
 import { computeGraphEdges, buildNodeForDef, buildMdContext, er2dbTargetDescription, type ModelGraphNode, type ModelGraphEdge } from './model-graph.js';
-import { findCyclesOn, buildCanonicalKey, type PackageGraph } from '@tatrman/semantics';
+import { findCyclesOn, buildCanonicalKey, keyKindOf, type PackageGraph } from '@tatrman/semantics';
 
 export interface GraphMetadata {
   uri: string;
@@ -73,7 +73,7 @@ function addDefAndChildren(
   packageName: string,
   declaringModel: string
 ): void {
-  const qname = buildCanonicalKey({ packageName, schemaId: namespace, kind: def.kind, parts: [def.name], declaringModel });
+  const qname = buildCanonicalKey({ packageName, schemaId: namespace, kind: keyKindOf(def), parts: [def.name], declaringModel });
   map.set(qname, { def, schemaCode, namespace, packageName });
 
   const children: Definition[] = [];

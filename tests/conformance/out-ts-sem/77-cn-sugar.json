@@ -1,7 +1,11 @@
 {
     "diagnostics": [
         "ttr/required-property-missing",
-        "ttr/required-property-missing"
+        "ttr/required-property-missing",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference"
     ],
     "resolved": [],
     "symbols": [

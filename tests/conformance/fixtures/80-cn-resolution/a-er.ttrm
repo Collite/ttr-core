@@ -1,0 +1,29 @@
+// 0.17 (CN-P2 S2.1) — a cn project across six files and two packages: every cn ref resolves, among
+// concepts only. The er face of Hartland's web orders; `b-md.ttrm` declares a dimension and a measure
+// that share their names with concepts (`Customer`, `revenue`) in the same package.
+package hartland.web
+model er
+
+def entity customer { attributes: [ def attribute customer_id { type: int, isKey: true } ] }
+def entity warehouse {
+    attributes: [ def attribute warehouse_id { type: int, isKey: true }, def attribute warehouse_name { type: text } ]
+}
+def entity order {
+    attributes: [
+        def attribute order_number   { type: int, isKey: true },
+        def attribute customer_id    { type: int },
+        def attribute warehouse_id   { type: int, optional: true },
+        def attribute placed_date    { type: date },
+        def attribute delivered_date { type: date, optional: true },
+        def attribute state          { type: text }
+    ]
+}
+def entity category_code { attributes: [ def attribute code { type: text, isKey: true } ] }
+def entity category_closure {
+    attributes: [
+        def attribute ancestor_code   { type: text, isKey: true },
+        def attribute descendant_code { type: text, isKey: true }
+    ]
+}
+def relation order_customer  { from: er.entity.order, to: er.entity.customer }
+def relation order_warehouse { from: er.entity.order, to: er.entity.warehouse }

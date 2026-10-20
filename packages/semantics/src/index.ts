@@ -17,7 +17,7 @@ export type {
 } from './sql-config.js';
 export { loadProjectFromOpenDocuments } from './project.js';
 export type { Project } from './project.js';
-export { qnameToKey, buildCanonicalKey, modelForKind, modelHasSchema, classifyReference, resolveReference, MODEL_CODES } from './qname.js';
+export { qnameToKey, buildCanonicalKey, modelForKind, modelHasSchema, classifyReference, resolveReference, MODEL_CODES, cnWireName } from './qname.js';
 export type {
   Qname, ModelCode, Vocab, PartialQname, RefSite, SymbolIndex,
   ResolvedReference, ReferenceDiagnostic, ReferenceDiagnosticCode,
@@ -40,7 +40,8 @@ export type { DeclaredVocabulary, DeclaredVocabularyEntry, DeclaredValue } from 
 export { ProjectSymbolTable } from './project-symbols.js';
 export { Resolver } from './resolver.js';
 export type { ResolutionResult, LexicalScope, ResolutionStep, ResolutionAttempt } from './resolver.js';
-export { collectReferences, collectAllReferences, nestedDefs } from './references.js';
+export { collectReferences, collectAllReferences, nestedDefs, isCnContextRef } from './references.js';
+export type { CnSlotReference } from './references.js';
 export { ReferenceIndex, enclosingQnameOf } from './reference-index.js';
 export type { ReferenceLocation } from './reference-index.js';
 export { PackageGraphBuilder, findCyclesOn } from './package-graph.js';
@@ -59,7 +60,7 @@ export {
   invalidPackageSegments,
 } from './derivation.js';
 export type { PackageMismatchKind } from './derivation.js';
-export { defaultSchemaForKind, defaultNamespaceForSchema, namespaceForKind } from './default-schema.js';
+export { defaultSchemaForKind, defaultNamespaceForSchema, namespaceForKind, keyKindOf } from './default-schema.js';
 export { resolveMdRef, underlyingDomainOf, mdCrossRefsOf } from './md-resolve.js';
 export { shapeSatisfied, validateCalcArgs } from './md-calc.js';
 export type { DomainShape, CalcArgProblem } from './md-calc.js';

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { DiagnosticCode } from '@tatrman/parser';
 import type { Document, SourceLocation, AttributeDef, LocalizedString } from '@tatrman/parser';
-import { desugarLexicon, foldForCollision, MODEL_CODES } from '@tatrman/semantics';
+import { cnWireName, desugarLexicon, foldForCollision, MODEL_CODES } from '@tatrman/semantics';
 import type { LexiconAnalysis } from '@tatrman/semantics';
 import type { Rule, DocumentRuleContext, ProjectRuleContext } from '../rule.js';
 
@@ -103,8 +103,11 @@ const ANCHOR_INDEX_KEY = 'mh:anchor-index';
  * Strip the package prefix off a canonical key so the ref reads the way the
  * lexicon archive (and a `for:` target) spells it: `hartland.er.entity.store`
  * becomes `er.entity.store`. The first segment that is a model code starts the path.
+ * A concept reads as its wire name, `cn.<Name>` (0.17).
  */
 function modelPathOf(qname: string): string {
+  const wire = cnWireName(qname);
+  if (wire) return wire;
   const parts = qname.split('.');
   const i = parts.findIndex((p) => (MODEL_CODES as ReadonlySet<string>).has(p));
   return i <= 0 ? qname : parts.slice(i).join('.');

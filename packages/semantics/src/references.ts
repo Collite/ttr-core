@@ -1,11 +1,36 @@
 // SPDX-License-Identifier: Apache-2.0
 import type {
+  ConceptBody,
+  ConceptRefKey,
+  ConceptSugar,
   Definition,
   Document,
+  IdValue,
   ImportDecl,
+  ObjectEntry,
   PropertyValue,
   Reference,
+  SourceLocation,
 } from '@tatrman/parser';
+
+/**
+ * 0.17 — a reference written in a cn slot (cn contracts §1.1–§1.4): `is_a`, `of`, a role's `event`,
+ * `involves`, `value_space`, `relations[].type` / `.to`, a binding's stereotype slot (`kind: cn.Item`)
+ * and its `participants:` keys, every slot of the `concept { }` sugar but the one that declares. It
+ * resolves among concepts only, `cn` the implied model head (`Resolver.resolveReference`).
+ *
+ * `soft` marks a bearer-local name — a concept's `qualities:` item or `period:` value: one that names
+ * a declared concept resolves to it; any other is an implicit quality of the bearer, never an
+ * unresolved reference.
+ */
+export interface CnSlotReference extends Reference {
+  cnContext: true;
+  soft?: true;
+}
+
+export function isCnContextRef(ref: Reference): ref is CnSlotReference {
+  return (ref as Partial<CnSlotReference>).cnContext === true;
+}
 
 /**
  * Returns all explicit `Reference` AST nodes attached to a definition.
@@ -68,11 +93,170 @@ export function collectReferences(def: Definition): Reference[] {
     case 'example':
       if (def.target) refs.push(def.target);
       break;
+    // 0.17 — the cn model: a concept def's and a binding's slots.
+    case 'concept':
+      collectConceptBodyRefs(def, 'def', refs);
+      break;
+    case 'conceptBinding':
+      collectConceptBodyRefs(def, 'binding', refs);
+      break;
     default:
       break;
   }
 
+  // 0.17 — the `concept { }` sugar on an md / er host.
+  const sugar = conceptSugarOf(def);
+  if (sugar) collectConceptBodyRefs(sugar, 'sugar', refs);
+
   return refs;
+}
+
+/** The `concept { }` sugar of a host def — a cubelet, dimension, domain, measure, entity or attribute. */
+export function conceptSugarOf(def: Definition): ConceptSugar | undefined {
+  switch (def.kind) {
+    case 'entity':
+    case 'attribute':
+    case 'dimension':
+    case 'mdDomain':
+    case 'measure':
+    case 'cubelet':
+      return def.concept;
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * The slot of a `concept { }` sugar that declares the concept — the stereotype slot. A role sugar
+ * also names its defining event (`{ role: Customer, event: Order }`), so `role:` wins; otherwise the
+ * first stereotype ref. Every other slot refers.
+ */
+export function sugarStereotypeKey(body: ConceptBody): ConceptRefKey | undefined {
+  let first: ConceptRefKey | undefined;
+  for (const p of body.properties) {
+    if (p.kind !== 'ref') continue;
+    if (p.key === 'role') return 'role';
+    first ??= p.key;
+  }
+  return first;
+}
+
+function cnRef(ref: Reference, soft = false): CnSlotReference {
+  const { path, parts, source } = ref;
+  return soft ? { path, parts, source, cnContext: true, soft: true } : { path, parts, source, cnContext: true };
+}
+
+function idRef(v: IdValue): Reference {
+  return { path: v.path, parts: v.parts, source: v.source };
+}
+
+/** The id values of a value that is one id or a list of them. */
+function idsOf(value: PropertyValue | undefined): IdValue[] {
+  if (!value) return [];
+  if (value.kind === 'id') return [value];
+  if (value.kind === 'list') return value.items.flatMap((item) => idsOf(item));
+  return [];
+}
+
+function entryOf(value: PropertyValue | undefined, key: string): ObjectEntry | undefined {
+  return value?.kind === 'object' ? value.entries.find((e) => e.key === key) : undefined;
+}
+
+/** The span of an object entry's key alone (`customer` in `customer: [...]`). */
+function keySource(entry: ObjectEntry): SourceLocation {
+  const s = entry.source;
+  return { ...s, endLine: s.line, endColumn: s.column + entry.key.length, offsetEnd: s.offsetStart + entry.key.length };
+}
+
+/** `period:` names its instants through `start` / `end` / `at`; `end_open` and `precision` are enums. */
+const PERIOD_INSTANTS: ReadonlySet<string> = new Set(['start', 'end', 'at']);
+
+/**
+ * The references of one cn body, in authored order. `mode` says whose body it is: a concept def
+ * (`period:` names the bearer's qualities), a binding (`period:` names er attributes, `participants:`
+ * keys name the event's labels) or the sugar (its stereotype slot declares, so it is no reference).
+ * Groundings and binding targets name an md / er / db element and resolve the generic way;
+ * `hierarchy:`'s `ancestor` / `descendant` are read relative to its `closure` entity.
+ */
+function collectConceptBodyRefs(body: ConceptBody, mode: 'def' | 'binding' | 'sugar', out: Reference[]): void {
+  const declaring = mode === 'sugar' ? sugarStereotypeKey(body) : undefined;
+  const eventRef = mode === 'binding'
+    ? body.properties.find((p) => p.kind === 'ref' && p.key === 'event')
+    : undefined;
+  for (const p of body.properties) {
+    switch (p.kind) {
+      case 'ref':
+        if (p.key !== declaring) out.push(cnRef(p.ref));
+        break;
+      case 'grounds':
+        out.push(p.ref);
+        break;
+      case 'valueSpace':
+        out.push(cnRef(p.ref));
+        break;
+      case 'involves':
+        for (const participant of p.participants) out.push(cnRef(participant.ref));
+        break;
+      case 'period':
+        for (const e of p.value.entries) {
+          if (!PERIOD_INSTANTS.has(e.key)) continue;
+          for (const id of idsOf(e.value)) out.push(mode === 'binding' ? idRef(id) : cnRef(idRef(id), true));
+        }
+        break;
+      case 'target':
+        if ('kind' in p.value) pushIdValueAsReference(p.value, out);
+        else out.push(p.value);
+        break;
+      case 'entry':
+        switch (p.key) {
+          case 'is_a':
+          case 'of':
+            for (const id of idsOf(p.value)) out.push(cnRef(idRef(id)));
+            break;
+          case 'qualities':
+            for (const id of idsOf(p.value)) out.push(cnRef(idRef(id), true));
+            break;
+          case 'relations':
+            if (p.value.kind === 'list') {
+              for (const item of p.value.items) {
+                for (const key of ['type', 'to']) {
+                  for (const id of idsOf(entryOf(item, key)?.value)) out.push(cnRef(idRef(id)));
+                }
+              }
+            }
+            break;
+          case 'hierarchy': {
+            const closure = idsOf(entryOf(p.value, 'closure')?.value)[0];
+            if (!closure) break;
+            out.push(idRef(closure));
+            for (const key of ['ancestor', 'descendant']) {
+              for (const id of idsOf(entryOf(p.value, key)?.value)) {
+                out.push({ path: `${closure.path}.${id.path}`, parts: [...closure.parts, ...id.parts], source: id.source });
+              }
+            }
+            break;
+          }
+          case 'participants':
+            if (mode !== 'binding' || p.value.kind !== 'object') break;
+            for (const e of p.value.entries) {
+              if (eventRef?.kind === 'ref') {
+                const ev = eventRef.ref;
+                out.push(cnRef({ path: `${ev.path}.${e.key}`, parts: [...ev.parts, e.key], source: keySource(e) }));
+              }
+              for (const id of idsOf(e.value)) out.push(idRef(id));
+            }
+            break;
+          case 'via':
+            for (const id of idsOf(p.value)) out.push(idRef(id));
+            break;
+          default:
+            break;
+        }
+        break;
+      default:
+        break;
+    }
+  }
 }
 
 function pushIdValueAsReference(

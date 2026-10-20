@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { DiagnosticCode } from '@tatrman/parser';
 import type { Document, Reference, Definition } from '@tatrman/parser';
-import { defaultSchemaForKind, enclosingQnameOf, packageOfImport, MODEL_CODES } from '@tatrman/semantics';
+import { defaultSchemaForKind, enclosingQnameOf, isCnContextRef, packageOfImport, MODEL_CODES } from '@tatrman/semantics';
 import type { Resolver } from '@tatrman/semantics';
 import { buildAddImportEdit, replaceRangeEdit } from '@tatrman/edit';
 import type { DocumentRuleContext, Rule } from '../rule.js';
@@ -25,12 +25,14 @@ function resolveAll(ctx: DocumentRuleContext): RefResolution[] {
   const out: RefResolution[] = [];
   for (const { ref, ownerDef } of ctx.refs) {
     // MD cross-references resolve against the MD namespaces (role-aware) in the
-    // `md-unknown-ref` rule, not the generic resolver — skip them here.
-    if (isMdKind((ownerDef as Definition).kind)) continue;
+    // `md-unknown-ref` rule, not the generic resolver — skip them here. A cn ref in
+    // an md host's `concept { }` sugar is not an MD cross-reference: it stays.
+    if (isMdKind((ownerDef as Definition).kind) && !isCnContextRef(ref)) continue;
     const schemaCode = directiveSchema ?? defaultSchemaForKind((ownerDef as Definition).kind);
     const enclosingQname = enclosingQnameOf(ownerDef, schemaCode, namespace, packageName);
+    // The ref itself: a cn slot's ref carries its context.
     const res = ctx.resolver.resolveReference(
-      { path: ref.path, parts: ref.parts },
+      ref,
       { schemaCode, namespace, enclosingQname, imports: ast.imports, packageName }
     );
     out.push({ ref, res });
@@ -48,6 +50,9 @@ const unresolvedReference: Rule = {
   check(ctx) {
     if (ctx.scope !== 'document') return;
     for (const { ref, res } of resolveAll(ctx)) {
+      // A soft cn ref (a bearer-local `qualities:` / `period:` name) that names no concept is an
+      // implicit quality, not a dangling reference.
+      if (isCnContextRef(ref) && ref.soft) continue;
       if (!res.resolved && res.reason !== 'ambiguous') {
         ctx.report({
           source: ref.source,
@@ -138,9 +143,9 @@ const unimportedReference: Rule = {
 };
 
 // D6 — the schema slot is db-only. A file whose `model` is a logical/binding
-// layer (er/md/cnc/binding) must not carry a `schema` directive; the directive's
+// layer (er/md/cnc/cn/binding) must not carry a `schema` directive; the directive's
 // schema id is meaningless there and is ignored by the symbol table.
-const SCHEMALESS_MODELS: ReadonlySet<string> = new Set(['er', 'md', 'cnc', 'binding']);
+const SCHEMALESS_MODELS: ReadonlySet<string> = new Set(['er', 'md', 'cnc', 'cn', 'binding']);
 
 const schemaOnLogicalModel: Rule = {
   id: 'schema-on-logical-model',
@@ -148,7 +153,7 @@ const schemaOnLogicalModel: Rule = {
   category: 'correctness',
   scope: 'document',
   defaultSeverity: 'warning',
-  docs: 'A `schema` directive targets an er/md/cnc/binding model, which has no schema slot (D6).',
+  docs: 'A `schema` directive targets an er/md/cnc/cn/binding model, which has no schema slot (D6).',
   check(ctx) {
     if (ctx.scope !== 'document') return;
     const d = ctx.ast.modelDirective;
@@ -181,6 +186,8 @@ const requireQualifiedRefs: Rule = {
       if (!res.resolved) continue;
       // Already model-qualified (`db.…`, `er.…`) → the author was explicit.
       if ((MODEL_CODES as ReadonlySet<string>).has(ref.parts[0])) continue;
+      // A cn slot names its model: the slot is the qualification.
+      if (isCnContextRef(ref)) continue;
       // Cross-package widening is the separate `unimported-reference` rule.
       if (res.symbol.packageName !== filePackage) continue;
       // Only a cross-model/schema match needs qualifying; same-model is fine.

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { Definition, Document, SourceLocation } from '@tatrman/parser';
 import { collectAllReferences } from './references.js';
-import { defaultSchemaForKind } from './default-schema.js';
+import { defaultSchemaForKind, keyKindOf } from './default-schema.js';
 import { buildCanonicalKey } from './qname.js';
 import type { Resolver } from './resolver.js';
 import { collectBindingReferences, collectBindingTargetReferences } from './mapping-references.js';
@@ -19,9 +19,10 @@ export function enclosingQnameOf(def: Definition, schemaCode: string, namespace:
     def.kind === 'entity' || def.kind === 'table' || def.kind === 'view' || def.kind === 'procedure' ||
     def.kind === 'relation' || def.kind === 'query' || def.kind === 'role' ||
     def.kind === 'er2dbEntity' || def.kind === 'er2dbAttribute' ||
-    def.kind === 'er2dbRelation' || def.kind === 'er2cncRole'
+    def.kind === 'er2dbRelation' || def.kind === 'er2cncRole' ||
+    def.kind === 'concept' || def.kind === 'conceptBinding'
   ) {
-    return buildCanonicalKey({ packageName, schemaId: namespace, kind: def.kind, parts: [def.name], declaringModel: schemaCode });
+    return buildCanonicalKey({ packageName, schemaId: namespace, kind: keyKindOf(def), parts: [def.name], declaringModel: schemaCode });
   }
   return undefined;
 }
@@ -65,8 +66,9 @@ export class ReferenceIndex {
       // effective schema is derived from the referring def's kind.
       const effSchema = schemaCode || defaultSchemaForKind(ownerDef.kind);
       const referrerQname = enclosingQnameOf(ownerDef, effSchema, namespace, packageName) ?? null;
+      // The ref itself, not a copy of its path: a cn slot's ref carries its context (`isCnContextRef`).
       const res = resolver.resolveReference(
-        { path: ref.path, parts: ref.parts },
+        ref,
         { schemaCode: effSchema, namespace, enclosingQname: referrerQname ?? undefined, packageName }
       );
       if (!res.resolved) continue;

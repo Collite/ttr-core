@@ -1,20 +1,35 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { SourceLocation, Document, Definition } from '@tatrman/parser';
+import type { SourceLocation, Document, Definition, ConceptStereotype, ConceptBindingKind } from '@tatrman/parser';
 import { buildCanonicalKey, modelForKind } from './qname.js';
+import { keyKindOf } from './default-schema.js';
 import type { ResolvedSemantics } from './semantics-block/model.js';
 
 export interface SymbolEntry {
   qname: string;
   // Nested world members (engine/executor/storage/worldSchema, and from 0.16 the
   // automation members identity/deployment/process) are not top-level Definition
-  // kinds but register as symbols under their world (v4.1).
-  kind: Definition['kind'] | 'engine' | 'executor' | 'storage' | 'worldSchema' | 'identity' | 'deployment' | 'process';
+  // kinds but register as symbols under their world (v4.1). An event's participant
+  // labels register under the event (0.17, `…cn.concept.Order.fulfilling`).
+  kind:
+    | Definition['kind']
+    | 'engine'
+    | 'executor'
+    | 'storage'
+    | 'worldSchema'
+    | 'identity'
+    | 'deployment'
+    | 'process'
+    | 'participant';
   name: string;
   source: SourceLocation;
   documentUri: string;
   parent?: string;
   packageName: string;
   schemaCode: string;
+  /** 0.17 — a concept's stereotype (`kind: 'concept'` only); every stereotype shares one namespace. */
+  stereotype?: ConceptStereotype;
+  /** 0.17 — a cn binding's keyword (`kind: 'conceptBinding'` only); its key's kind segment. */
+  bindingKind?: ConceptBindingKind;
   /**
    * For er2db_* symbols only: distinguishes explicit `def er2db_*` declarations
    * from symbols synthesized from inline `binding:` properties on def entity /
@@ -121,7 +136,7 @@ export class DocumentSymbolTable {
   }
 
   private addEntry(def: Definition, parentQname?: string): void {
-    const qnameStr = this.makeQname(def.kind, [def.name]);
+    const qnameStr = this.makeQname(keyKindOf(def), [def.name]);
 
     const entry: SymbolEntry = {
       qname: qnameStr,
@@ -137,6 +152,8 @@ export class DocumentSymbolTable {
     if (def.kind === 'er2dbEntity' || def.kind === 'er2dbAttribute' || def.kind === 'er2dbRelation') {
       entry.mappingSource = 'explicit';
     }
+    if (def.kind === 'concept') entry.stereotype = def.stereotype;
+    if (def.kind === 'conceptBinding') entry.bindingKind = def.bindingKind;
     // Grounding Phase 1: carry the raw `kind:` off an entity/table semantics block
     // so cross-document `period:` refs can be kind-checked from the symbol alone.
     if ((def.kind === 'entity' || def.kind === 'table') && def.semantics) {
@@ -253,6 +270,31 @@ export class DocumentSymbolTable {
             schemaCode: entry.schemaCode,
           });
         }
+      }
+    }
+
+    // 0.17 — an event's participants register by label (`Warehouse as fulfilling` → `fulfilling`;
+    // unlabelled → the concept name lower-cased, cn contracts §1.1), so a binding's `participants:`
+    // keys and a definition's `this.<label>` resolve. Two unlabelled participants of one concept
+    // share a key — `cn/involves-unlabelled-duplicate` (S2.3), not a duplicate definition.
+    if (def.kind === 'concept' && def.stereotype === 'event') {
+      for (const p of def.properties) {
+        if (p.kind !== 'involves') continue;
+        for (const participant of p.participants) {
+          const label = participant.label ?? participant.ref.parts[participant.ref.parts.length - 1].toLowerCase();
+          const pQname = this.makeQnameChild(entry, label);
+          this.entries.set(pQname, {
+            qname: pQname,
+            kind: 'participant',
+            name: label,
+            source: participant.source,
+            documentUri: this.documentUri,
+            parent: entry.qname,
+            packageName: this.packageName,
+            schemaCode: entry.schemaCode,
+          });
+        }
+        break;
       }
     }
 

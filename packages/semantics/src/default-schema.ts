@@ -25,6 +25,7 @@
  * kind (`binding.er2dbEntity.…`, relied on by the inline-mapping synthesizer), and
  * `cnc`/`query` files carry explicit namespaces in practice.
  */
+import type { Definition } from '@tatrman/parser';
 import type { ModelCode } from './qname.js';
 
 export function defaultNamespaceForSchema(schemaCode: string): string {
@@ -63,7 +64,22 @@ export function modelForKind(kind: string, declaringModel?: string): ModelCode {
     case 'md2dbDomain':
     case 'md2dbMap':
     case 'md2erCubelet':
+    // 0.17 — the cn bindings: `conceptBinding` is the def kind, the ten binding keywords key it.
+    case 'conceptBinding':
+    case 'cn2md_kind':
+    case 'cn2md_role':
+    case 'cn2md_quality':
+    case 'cn2md_event':
+    case 'cn2er_kind':
+    case 'cn2er_role':
+    case 'cn2er_event':
+    case 'cn2er_quality':
+    case 'cn2er_phase':
+    case 'cn2db_concept':
       return 'binding';
+    // 0.17 — every concept stereotype is one kind, `concept`, in model `cn` (CN-P2 S2.1).
+    case 'concept':
+      return 'cn';
     case 'role':
     case 'er2cncRole':
       return 'cnc';
@@ -113,6 +129,15 @@ export function modelForKind(kind: string, declaringModel?: string): ModelCode {
 
 /** @deprecated Use {@link modelForKind}. Kept as an alias for existing callers. */
 export const defaultSchemaForKind: (kind: string, declaringModel?: string) => ModelCode = modelForKind;
+
+/**
+ * The kind a def's canonical key is built from. Usually `def.kind`; a cn binding keys by its binding
+ * keyword (`<pkg>.binding.cn2er_event.<name>` — the `md2er_cubelet` precedent), not by the shared
+ * `conceptBinding` def kind. Every key builder (symbol table, reference index, LSP) goes through here.
+ */
+export function keyKindOf(def: Definition): string {
+  return def.kind === 'conceptBinding' ? def.bindingKind : def.kind;
+}
 
 /**
  * The symbol-table namespace segment for a def kind, where it differs from the

@@ -1,0 +1,8 @@
+// The `concept { }` sugar: the stereotype slot declares (S2.2 synthesizes it); the other slots are cn refs.
+package hartland.web
+
+def entity web_customer {
+    attributes: [ def attribute customer_id { type: int, isKey: true } ],
+    concept: { role: WebCustomer, event: Order }
+}
+def measure discount { domain: md.Money, aggregation: sum, concept { quality: discount_amount, of: Order } }

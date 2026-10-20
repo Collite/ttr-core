@@ -61,6 +61,7 @@ import {
   enclosingQnameOf,
   effectivePackage,
   buildCanonicalKey,
+  keyKindOf,
   synthesizeMappings,
   collectAllReferences,
   loadSqlConfig,
@@ -342,7 +343,7 @@ export function createServerConnection(
     const namespace = ast.modelDirective?.schema ?? '';
     // v4.0 uniform key: model/schema/kind come from the (owning) def's kind; a
     // member uses its enclosing def's kind, with the name path growing under it.
-    const kind = enclosing ? enclosing.kind : def.kind;
+    const kind = enclosing ? enclosing.kind : keyKindOf(def);
     const parts = enclosing ? [enclosing.name, def.name] : [def.name];
     // The raw directive (no presentation default): it moves only a `query` declared under
     // `model er` — a logical query, `er.query.<name>` (LQ L-1), as the symbol table keys it.
@@ -1380,7 +1381,7 @@ export function createServerConnection(
 
     if (found.kind === 'ref') {
       const res = resolver.resolveReference(
-        { path: found.ref.path, parts: found.ref.parts },
+        found.ref,
         { schemaCode, namespace, enclosingQname: enclosingQnameOf(found.from, schemaCode, namespace, effPkg(uri, ast)), packageName: effPkg(uri, ast) }
       );
       if (!res.resolved) return null;
@@ -1454,7 +1455,7 @@ export function createServerConnection(
     let targetQname: string | null = mappingTargetQname;
     if (!targetQname && found?.kind === 'ref') {
       const res = resolver.resolveReference(
-        { path: found.ref.path, parts: found.ref.parts },
+        found.ref,
         { schemaCode, namespace, enclosingQname: enclosingQnameOf(found.from, schemaCode, namespace, effPkg(uri, ast)), packageName: effPkg(uri, ast) }
       );
       if (res.resolved) targetQname = res.symbol.qname;
@@ -1547,7 +1548,7 @@ export function createServerConnection(
 
     if (found.kind === 'ref') {
       const res = resolver.resolveReference(
-        { path: found.ref.path, parts: found.ref.parts },
+        found.ref,
         { schemaCode, namespace, enclosingQname: enclosingQnameOf(found.from, schemaCode, namespace, effPkg(uri, ast)), packageName: effPkg(uri, ast) }
       );
       if (!res.resolved) return null;
@@ -1646,7 +1647,7 @@ export function createServerConnection(
       qname = qnameOf(found.def, ast, found.enclosing, uri);
     } else if (found.kind === 'ref') {
       const res = resolver.resolveReference(
-        { path: found.ref.path, parts: found.ref.parts },
+        found.ref,
         { schemaCode, namespace, enclosingQname: enclosingQnameOf(found.from, schemaCode, namespace, packageName), packageName }
       );
       if (res.resolved) qname = res.symbol.qname;
@@ -1718,7 +1719,7 @@ export function createServerConnection(
         targetQname = qnameOf(found.def, ast, found.enclosing, uri);
       } else if (found.kind === 'ref') {
         const res = resolver.resolveReference(
-          { path: found.ref.path, parts: found.ref.parts },
+          found.ref,
           { schemaCode, namespace, enclosingQname: enclosingQnameOf(found.from, schemaCode, namespace, packageName), packageName }
         );
         if (res.resolved) targetQname = res.symbol.qname;

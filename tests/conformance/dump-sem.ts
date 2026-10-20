@@ -112,8 +112,9 @@ export function dumpSemDocs(docs: SemDocInput[], stock: Map<string, Document>): 
   for (const m of metas) {
     for (const { ref, ownerDef } of collectAllReferences(m.ast)) {
       const enclosingQname = enclosingQnameOf(ownerDef, m.schemaCode, m.namespace, m.packageName);
+      // The ref itself: a cn slot's ref carries its context (0.17).
       const res = resolver.resolveReference(
-        { path: ref.path, parts: ref.parts },
+        ref,
         { schemaCode: m.schemaCode, namespace: m.namespace, enclosingQname, imports: m.ast.imports, packageName: m.packageName }
       );
       if (res.resolved) resolved.push(`${ref.path} => ${res.symbol.qname}`);
