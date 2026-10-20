@@ -1,0 +1,286 @@
+// SPDX-License-Identifier: Apache-2.0
+package org.tatrman.ttrp.bundle
+
+import org.tatrman.ttrp.emit.recipe.RecipeCatalogEmitter
+import org.tatrman.ttrp.emit.recipe.RecipeFingerprints
+import org.tatrman.ttrp.emit.recipe.RecipeStatement
+import org.tatrman.ttrp.emit.recipe.RecipeStatements
+import org.tatrman.ttrp.graph.TtrpPipeline
+import org.tatrman.ttrp.graph.capability.BoundWorld
+import org.tatrman.ttrp.graph.model.Load
+import org.tatrman.ttrp.graph.recipe.ContextClass
+import org.tatrman.ttrp.graph.recipe.RecipeModel
+import org.tatrman.ttrp.graph.recipe.SwitchLowering
+import java.nio.file.Files
+import java.nio.file.Path
+import java.security.MessageDigest
+
+/**
+ * Assembles a recipe's `<recipe>.bundle/` (AU-core-P2 · S2.3 T5; contracts §5.2) — what the Server's `/refresh` loads
+ * and its runner executes, island by island, through the door:
+ *
+ * ```
+ * manifest.json                       v3 (schemaVersion 3, ttrpVersion 2, the `recipe` object) — authoritative
+ * islands/<island>.<port>.sql         one statement per output, SQL over E-R (`schema: er`) — the decision's routes
+ *                                     `islands/<decision>.<route>.sql`, their detail `…<route>.<context>.sql`
+ * catalog/<recipe>.ttrm               the generated `def recipe` (model automation)
+ * catalog/<recipe>_verdict.ttrm       the verdict entities (model er)
+ * ```
+ *
+ * No launcher (the Server runs it), no transfers (one engine, the door), no README before P3 (S3.2 renders it).
+ * Every file's sha256 is in `files`; `manifest.json` is not (it cannot hold its own hash).
+ */
+class RecipeBundleAssembler(
+    private val toolchainVersion: String = "0.0.0-dev",
+) {
+    fun assemble(
+        plan: TtrpPipeline.PlanResult,
+        program: String,
+        outDir: Path,
+    ): BundleAssembler.BundleResult {
+        val model = requireNotNull(plan.recipe) { "$program holds no recipe" }
+        val bound = requireNotNull(plan.bound)
+        val graph = requireNotNull(plan.graph)
+        val exec = requireNotNull(plan.exec)
+        val bundleDir = outDir.resolve(model.name + ".bundle")
+        Files.createDirectories(bundleDir.resolve("islands"))
+        Files.createDirectories(bundleDir.resolve("catalog"))
+        val files = sortedMapOf<String, String>()
+
+        // --- statements, one per output, grouped by island ---
+        val statements = RecipeStatements.plan(plan)
+        val islands =
+            exec.islands.mapNotNull { island ->
+                val own = statements.filter { it.island == island.name }
+                if (own.isEmpty()) return@mapNotNull null
+                val outputs =
+                    own.map { s ->
+                        write(bundleDir, s.file, s.sql + "\n", files)
+                        IslandOutput(
+                            port = s.port,
+                            file = s.file,
+                            sha256 = files.getValue(s.file),
+                            columns = s.columns.map { OutputColumn(it.name, it.type) },
+                            params = s.params.ifEmpty { null },
+                            keyed = keyed(model, s),
+                        )
+                    }
+                IslandEntry(
+                    name = island.name,
+                    engine = island.engine,
+                    executor = NATIVE,
+                    invocation = SQL_TEXT,
+                    file = outputs.first().file,
+                    sha256 = outputs.first().sha256,
+                    connections = listOf(connEnv(island.engine)),
+                    params = outputs.flatMap { it.params.orEmpty() }.distinct().ifEmpty { null },
+                    outputs = outputs,
+                    schema = ER,
+                )
+            }
+
+        // --- the recipe object: fingerprints, the verdict schema, the generated catalog ---
+        val fingerprints = RecipeFingerprints.of(plan, model, model.protocol, model.asOf)
+        val keyTypes = keyTypes(model, statements)
+        val verdictColumns =
+            listOf(OutputColumn("run", "text"), OutputColumn("as_of", "timestamp")) +
+                model.keyColumns.zip(keyTypes).map { (k, t) -> OutputColumn(k, t) } +
+                listOf(
+                    OutputColumn(SwitchLowering.ROUTE, "text"),
+                    OutputColumn(SwitchLowering.VERDICT_REASON, "text"),
+                    OutputColumn("parameters_fp", "text"),
+                    OutputColumn("run_as", "text"),
+                    OutputColumn("written_at", "timestamp"),
+                )
+        val detailExtra =
+            statements
+                .filter { s ->
+                    model.routes.any { r -> r.detail.any { s.port == SwitchLowering.detailPort(r.name, it) } }
+                }.flatMap { s -> s.columns.map { it.name } }
+                .filter { it !in model.keyColumns && it != SwitchLowering.ROUTE && it != SwitchLowering.CONTEXT }
+                .distinct()
+                .sorted()
+        val detailColumns =
+            listOf(OutputColumn("run", "text")) +
+                model.keyColumns.zip(keyTypes).map { (k, t) -> OutputColumn(k, t) } +
+                listOf(
+                    OutputColumn(SwitchLowering.ROUTE, "text"),
+                    OutputColumn(SwitchLowering.CONTEXT, "text"),
+                    OutputColumn("row_no", "int"),
+                ) +
+                detailExtra.map { OutputColumn(it, "text") }
+        val catalog =
+            RecipeCatalogEmitter.emit(
+                model,
+                keyTypes,
+                verdictColumns,
+                detailColumns,
+                model.document,
+                fingerprints,
+            )
+        write(bundleDir, catalog.recipeFile, catalog.recipeText, files)
+        write(bundleDir, catalog.verdictFile, catalog.verdictText, files)
+
+        val recipe =
+            RecipeManifest(
+                name = model.name,
+                key = model.keyAttributes,
+                asOf = model.asOf,
+                document = model.document,
+                parameters = model.parameterDecls.map { RecipeParameter(it.name, it.type ?: "", it.value) },
+                bindings =
+                    listOf(RecipeBinding(RecipeStatements.AS_OF, "datetime", "run")) +
+                        model.derivedParams.map {
+                            RecipeBinding(
+                                it.name,
+                                "datetime",
+                                "derived",
+                                RecipeDerive(it.base, it.op, it.amount, it.unit),
+                            )
+                        },
+                roles =
+                    RecipeRoles(
+                        candidates = model.candidates,
+                        contexts = model.contexts.map { RecipeContext(it.name, it.contextClass.spelling, it.kind) },
+                        decision = model.decision,
+                        routes = model.routes.map { RecipeRoute(it.name, it.because, it.detail, it.turnFed) },
+                        switchMode = model.switchMode,
+                        elseRoute = model.routes.firstOrNull { it.isElse }?.name,
+                    ),
+                wiring = model.wirings.map { RecipeWiring(it.routes, it.action, it.columns, it.whenText) },
+                kinds =
+                    model.contexts
+                        .map { it.kind }
+                        .distinct()
+                        .sorted(),
+                mode = model.mode.spelling,
+                windows =
+                    model.contexts.mapNotNull { c ->
+                        c.window?.let { w -> RecipeWindow(c.name, w.by.map { it.text }, over(w)) }
+                    },
+                verdictSchema =
+                    VerdictSchema(
+                        entity = "${model.name}_verdict",
+                        columns = verdictColumns,
+                        detail = "${model.name}_verdict_detail",
+                        current = "${model.name}_verdict_current",
+                    ),
+                objectsRead = objectsRead(plan),
+                fingerprints = fingerprints,
+                protocol = model.protocol,
+            )
+
+        val manifest =
+            RunManifest(
+                schemaVersion = 3,
+                ttrpVersion = 2,
+                toolchain = "org.tatrman:ttrp:$toolchainVersion",
+                program = program.substringAfterLast('/'),
+                world = WorldRef(worldQname(bound), WorldFingerprint.of(bound.world)),
+                islands = islands,
+                transfers = emptyList(),
+                waves =
+                    exec.waves.map { wave ->
+                        wave.mapNotNull { id -> exec.islands.firstOrNull { it.id == id }?.name }
+                    },
+                connections = islands.flatMap { it.connections }.distinct().sorted(),
+                displays = emptyList(),
+                recipe = recipe,
+                files = files.toMap(),
+            )
+        Files.writeString(bundleDir.resolve("manifest.json"), manifest.toJson())
+        // no launcher: the Server runs the statements
+        return BundleAssembler.BundleResult(bundleDir, manifest, null)
+    }
+
+    /**
+     * A recipe output carries the key (AU-C-3: the runner filters it on the run's key) when its rows are per candidate:
+     * the candidates', a per-candidate context's, every route and every detail. A lookup or a set-level context's do not.
+     */
+    private fun keyed(
+        model: RecipeModel,
+        s: RecipeStatement,
+    ): Boolean {
+        val context = model.contexts.firstOrNull { it.name == s.island }
+        return when {
+            context != null -> context.contextClass == ContextClass.PER_CANDIDATE
+            else -> model.keyColumns.all { k -> s.columns.any { it.name == k } }
+        }
+    }
+
+    /** The key columns' types, from the candidates' statement (the key attribute's type), else text. */
+    private fun keyTypes(
+        model: RecipeModel,
+        statements: List<RecipeStatement>,
+    ): List<String> {
+        val candidates = statements.firstOrNull { it.island == model.candidates }
+        return model.keyColumns.map { k -> catalogType(candidates?.columns?.firstOrNull { it.name == k }?.type) }
+    }
+
+    /** An emitted column type as a TTR-M attribute type. */
+    private fun catalogType(t: String?): String =
+        when (t?.substringBefore('(')?.lowercase()) {
+            null, "text", "varchar", "char", "string" -> "text"
+            "int", "integer", "bigint", "smallint" -> "int"
+            "decimal", "numeric", "float", "double" -> "decimal"
+            "date" -> "date"
+            "timestamp", "datetime" -> "timestamp"
+            "bool", "boolean" -> "bool"
+            else -> "text"
+        }
+
+    /** The model objects the statements read (D-94): an entity as `er.entity.<name>`, a table by its qname. */
+    private fun objectsRead(plan: TtrpPipeline.PlanResult): List<String> {
+        val graph = plan.graph ?: return emptyList()
+        return graph.nodes.values
+            .filterIsInstance<Load>()
+            .mapNotNull { l ->
+                val src = graph.loadSources[l.id] ?: return@mapNotNull null
+                if (src.objectQname.startsWith(
+                        "er.",
+                    )
+                ) {
+                    "er.entity.${src.objectQname.substringAfterLast('.')}"
+                } else {
+                    src.objectQname
+                }
+            }.distinct()
+            .sorted()
+    }
+
+    private fun over(w: org.tatrman.ttrp.ast.Window): String =
+        when (val o = w.over) {
+            null -> ""
+            is org.tatrman.ttrp.ast.WindowOver.Calendar -> o.unit
+            is org.tatrman.ttrp.ast.WindowOver.Rows -> "rows ${o.count}"
+            is org.tatrman.ttrp.ast.WindowOver.Gap -> "gap ${o.duration.amount} ${o.duration.unit.spelling}"
+        }
+
+    private fun write(
+        dir: Path,
+        rel: String,
+        text: String,
+        files: MutableMap<String, String>,
+    ) {
+        val p = dir.resolve(rel)
+        Files.createDirectories(p.parent)
+        val bytes = text.toByteArray(Charsets.UTF_8)
+        Files.write(p, bytes)
+        files[rel] =
+            "sha256:" + MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+    }
+
+    private fun connEnv(engine: String): String = "TTR_CONN_" + engine.uppercase().replace(Regex("[^A-Z0-9]"), "_")
+
+    private fun worldQname(bound: BoundWorld): String =
+        bound.world.qname.let { q ->
+            val prefix = q.`package`.ifBlank { q.namespace }
+            if (prefix.isBlank()) q.name else "$prefix.${q.name}"
+        }
+
+    private companion object {
+        const val NATIVE = "native"
+        const val SQL_TEXT = "sql-text"
+        const val ER = "er"
+    }
+}

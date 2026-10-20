@@ -33,6 +33,14 @@ data class RecipeModel(
     val routeRow: Map<String, TtrpType?>? = null,
     /** AU-core-P2: the recipe's `parameters:` as their `def parameter`s declare them (manifest v3 `parameters`). */
     val parameterDecls: List<ParameterInfo> = emptyList(),
+    /** AU-core-P2: the `document:` the recipe was written from (manifest v3 `document`). */
+    val document: String? = null,
+    /** AU-core-P2: `as of:` — `now`, or a literal instant (a replay fixture). */
+    val asOf: String = "now",
+    /** AU-core-P2: `protocol:` — `always` (the default) or `on_route` (D-80). */
+    val protocol: String = "always",
+    /** AU-core-P2: the package of the `def program`s that run the recipe — its generated catalog's `<pkg>.generated`. */
+    val programPackage: String? = null,
     /** AU-core-P2: the `within` nodes whose column is a calendar sk (D-82) — the lowering joins the calendar. */
     val calendarSkWithins: Set<String> = emptySet(),
     /**
@@ -108,6 +116,9 @@ data class RouteInfo(
 data class WiringInfo(
     val routes: List<String>,
     val action: String,
+    /** The action's columns → the values wired to them, in TTR-P's spelling (a call with its arguments). */
     val columns: Map<String, String>,
     val whenCondition: Boolean,
+    /** AU-core-P2: the `when:` condition, in TTR-P's spelling (manifest v3 `wiring[].when`). */
+    val whenText: String? = null,
 )

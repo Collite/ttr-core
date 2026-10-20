@@ -186,6 +186,10 @@ class RecipeChecker(
                             w.action,
                             w.args.associate { it.name to render(it.value) },
                             w.whenCondition != null,
+                            w.whenCondition?.let {
+                                org.tatrman.ttrp.expr.ExprText
+                                    .render(it)
+                            },
                         )
                     },
                 parameters = recipe.parameters.map { it.text },
@@ -193,6 +197,19 @@ class RecipeChecker(
                 programs = programs.map { it.qname.name },
                 routeRow = routeRow,
                 calendarSkWithins = time.calendarSkWithins.toSet(),
+                programPackage =
+                    programs
+                        .firstOrNull()
+                        ?.qname
+                        ?.`package`
+                        ?.ifEmpty { null },
+                document = recipe.document,
+                asOf =
+                    when (val a = recipe.asOf) {
+                        org.tatrman.ttrp.ast.AsOf.Now -> "now"
+                        is org.tatrman.ttrp.ast.AsOf.Instant -> a.text
+                    },
+                protocol = recipe.protocol?.spelling ?: "always",
                 parameterDecls =
                     recipe.parameters.map { p ->
                         val decl = automation<AutomationParameter>().firstOrNull { it.qname.name == p.text }
@@ -1203,24 +1220,18 @@ class RecipeChecker(
             else -> null
         }
 
+    /** A wiring value in TTR-P's spelling, a call with its arguments (manifest v3 `wiring[].columns`). */
     private fun render(v: WiringValue): String =
         when (v) {
             is WiringValue.Expr ->
-                when (val e = v.expression) {
-                    is ColumnRef -> (e.port?.let { "$it." } ?: "") + e.column
-                    is Literal ->
-                        when (val l = e.value) {
-                            is LiteralValue.Str -> "\"${l.value}\""
-                            is LiteralValue.Num -> l.raw
-                            is LiteralValue.Bool -> l.value.toString()
-                            LiteralValue.Null -> "null"
-                        }
-                    is org.tatrman.ttrp.expr.DurationLiteral -> "${e.amount} ${e.unit.spelling}"
-                    is org.tatrman.ttrp.expr.DurationParam -> "${e.unit.spelling}(:${e.param})"
-                    else -> "…"
+                org.tatrman.ttrp.expr.ExprText
+                    .render(v.expression)
+            is WiringValue.Values ->
+                v.items.joinToString(", ") {
+                    org.tatrman.ttrp.expr.ExprText
+                        .render(it)
                 }
-            is WiringValue.Values -> v.items.joinToString(", ") { render(WiringValue.Expr(it, it.location)) }
-            is WiringValue.Call -> "${v.action} { … }"
+            is WiringValue.Call -> "${v.action} { ${v.args.joinToString(", ") { "${it.name}: ${render(it.value)}" }} }"
         }
 
     private fun literalType(v: LiteralValue): TtrpType? =

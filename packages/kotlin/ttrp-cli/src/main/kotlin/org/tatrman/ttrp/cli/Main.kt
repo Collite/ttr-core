@@ -63,6 +63,9 @@ class BuildCommand : CliktCommand(name = "build") {
     private val file by argument()
     private val out by option("--out").default(".")
 
+    // AU-core-P2 (contracts §9): the manifest + the compile's diagnostics as JSON on stdout — the hartland suites read it.
+    private val json by option("--json", help = "print the bundle's manifest and the diagnostics as JSON").flag()
+
     // PL-P1.S2: the connected-binding compile flags (contracts §3). --frozen is the CI default
     // (no network, fail on incomplete cache); --offline compiles from cache and records staleness.
     // PL-P1.S3: thread the resolved LockMode into the compile so BundleAssembler resolves via
@@ -127,6 +130,7 @@ class BuildCommand : CliktCommand(name = "build") {
                 )
                 throw ProgramResult(1)
             } catch (e: IllegalArgumentException) {
+                if (json) echo(BuildJson.failure(e.message ?: "build failed"))
                 echo(e.message ?: "build failed", err = true)
                 throw ProgramResult(1)
             } catch (e: org.tatrman.ttrp.emit.TtrpEmitException) {
@@ -136,7 +140,7 @@ class BuildCommand : CliktCommand(name = "build") {
                 e.suggestedAlternative?.let { echo("  ↳ suggested: $it", err = true) }
                 throw ProgramResult(1)
             }
-        echo(result.dir.toString())
+        if (json) echo(BuildJson.success(result)) else echo(result.dir.toString())
     }
 }
 
@@ -269,7 +273,10 @@ class EmitDeterminismCommand : CliktCommand(name = "emit-determinism") {
                         pipelineManifest = manifest.manifest,
                         modelsRoot = manifest.manifest.modelsRoot(),
                         outDir = tmp,
-                    ).emitRequest
+                    ).emitRequest ?: run {
+                    echo("ttrp emit-determinism: ${abs.fileName} is a recipe — its bundle has no launcher", err = true)
+                    throw ProgramResult(2)
+                }
             }
         val report = EmitDeterminismKit.check(emitPlugin, requests) { i -> files[i] }
         echo(report.render())
@@ -413,6 +420,15 @@ object TtrpCli {
                     org.tatrman.ttrp.graph.recipe.RecipeCheckExplain
                         .render(model),
                 )
+                // AU-core-P2 (S2.3 T6): what the build writes — the statements, the values the run binds, the fingerprints.
+                if (findings.none { it.severity == Severity.ERROR }) {
+                    val plan =
+                        TtrpPipeline(
+                            manifestResult.manifest,
+                            modelsRoot,
+                        ).plan(Files.readString(abs), abs.toString())
+                    if (plan.ok) out(recipeBundleSection(plan))
+                }
             } else {
                 out("checker · not run — the front half reported errors:")
             }
@@ -433,6 +449,24 @@ object TtrpCli {
         }
         out(output.text.trimEnd())
         return 0
+    }
+
+    /** The bundle section of a recipe's `ttrp explain` (AU-core-P2, S2.3 T6): statements, bindings, fingerprints. */
+    private fun recipeBundleSection(plan: TtrpPipeline.PlanResult): String {
+        val model = plan.recipe!!
+        val statements =
+            org.tatrman.ttrp.emit.recipe.RecipeStatements
+                .plan(plan)
+        val fp =
+            org.tatrman.ttrp.emit.recipe.RecipeFingerprints
+                .of(plan, model, model.protocol, model.asOf)
+        val bound =
+            listOf("as_of") + model.derivedParams.map { "${it.name} (${it.base} ${it.op} ${it.amount} ${it.unit})" }
+        return buildString {
+            appendLine("bundle · ${statements.size} statements (SQL over E-R) · verdict ${model.name}_verdict")
+            appendLine("  the run binds: ${bound.joinToString(", ")}")
+            appendLine("  fingerprints: text ${fp.text} · values ${fp.values} · labels ${fp.labels}")
+        }.trimEnd()
     }
 
     /**

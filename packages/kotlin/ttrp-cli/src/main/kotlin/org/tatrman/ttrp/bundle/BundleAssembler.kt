@@ -61,7 +61,10 @@ class BundleAssembler(
         val manifest: RunManifest,
         // PL-P5.S2 — the §8 EmitRequest handed to the emit plugin for this bundle. Exposed so the H-6
         // determinism kit (`ttrp emit-determinism`) can re-emit it through the plugin and byte-compare.
-        val emitRequest: EmitRequest,
+        // Null for a recipe bundle (AU-core-P2): no launcher — the Server runs its statements.
+        val emitRequest: EmitRequest?,
+        /** AU-core-P2: what the compile said beside the bundle (warnings, information) — `ttrp build --json` prints it. */
+        val diagnostics: List<org.tatrman.ttrp.diagnostics.TtrpDiagnostic> = emptyList(),
     )
 
     /**
@@ -113,6 +116,12 @@ class BundleAssembler(
         require(plan.ok && plan.graph != null && plan.exec != null && plan.bound != null) {
             "cannot build a bundle from a program with errors: " +
                 plan.diagnostics.filter { it.severity.name == "ERROR" }.joinToString { it.render() }
+        }
+        // AU-core-P2: a recipe builds into a recipe bundle (contracts §5.2) — its statements, manifest v3, the catalog.
+        if (plan.recipe != null) {
+            return RecipeBundleAssembler(
+                toolchainVersion,
+            ).assemble(plan, fileName, outDir).copy(diagnostics = plan.diagnostics)
         }
         // AG-P0 S5: fingerprint each host-generated model root the program compiled against.
         val modelRoots =

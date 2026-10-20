@@ -1,0 +1,862 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tatrman.org/schemas/ttrp/bundle-manifest/v3",
+  "title": "TTR-P recipe bundle manifest, v3 (AU-core-P2, contracts §5.1)",
+  "description": "A recipe bundle's manifest.json (AU contracts §5.1–§5.2): v2 + the `recipe` object, `schema` on an island (its statements' tier, `er`), `keyed` on an island output (a per-candidate output the runner filters on the run's key). Every other bundle stays v2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "ttrpVersion",
+    "toolchain",
+    "program",
+    "world",
+    "islands",
+    "transfers",
+    "waves",
+    "connections",
+    "displays",
+    "files",
+    "recipe"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "description": "v3 — a recipe bundle.",
+      "const": 3
+    },
+    "ttrpVersion": {
+      "description": "TTR-P 2 — the recipe block.",
+      "const": 2
+    },
+    "toolchain": {
+      "type": "string",
+      "pattern": "^org\\.tatrman:ttrp:.+$"
+    },
+    "program": {
+      "type": "string"
+    },
+    "world": {
+      "$ref": "#/$defs/worldRef"
+    },
+    "islands": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/island"
+      }
+    },
+    "transfers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/transfer"
+      }
+    },
+    "waves": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "params": {
+      "description": "F-4-i declared, typed params. The schema PERMITS these from day one; the toolchain EMITS them only from PL-P2 (grammar lands there).",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/param"
+      }
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "displays": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/display"
+      }
+    },
+    "lineage": {
+      "$ref": "#/$defs/lineage"
+    },
+    "rejectSites": {
+      "description": "Tatrman RJ extension (TTR-P contracts §7/§9): elaborated reject sites for the eighth (partition) conformance point. Optional; empty for programs with no wired rejects.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/rejectSite"
+      }
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "modelRoots": {
+      "description": "AG-P0 S5: content fingerprint of each [ttrp] extra-model-roots tree (a host-generated model) the program was compiled against; the host refuses a bundle whose fingerprint differs from the loaded model's.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "fingerprint"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "fingerprint": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    "recipe": {
+      "$ref": "#/$defs/recipe"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "worldRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "qname",
+        "fingerprint"
+      ],
+      "properties": {
+        "qname": {
+          "type": "string"
+        },
+        "fingerprint": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "island": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "engine",
+        "executor",
+        "invocation",
+        "file",
+        "sha256"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "engine": {
+          "type": "string"
+        },
+        "executor": {
+          "type": "string"
+        },
+        "invocation": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "retries": {
+          "description": "F-4 manifest-declared retry count (transient-class). Permitted from day one; emitted from PL-P2.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "onFailureOf": {
+          "description": "F-4-iv: when set, this island runs iff the named source island failed. Null/absent for ordinary islands.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "connections": {
+          "description": "Per-island connection refs (was bundle-global — H-5 least exposure).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "params": {
+          "description": "Params this island consumes.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outputs": {
+          "description": "AG-P0: a sql-text island's outputs — one self-contained statement per OUT port, run by the host's own SQL door. Absent for every other delivery.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/islandOutput"
+          }
+        },
+        "schema": {
+          "description": "The tier the island's statements name their sources in: `er` (SQL over E-R; the door translates).",
+          "enum": [
+            "er",
+            "db"
+          ]
+        }
+      }
+    },
+    "transfer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to",
+        "via",
+        "file",
+        "sha256"
+      ],
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "via": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "connections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "param": {
+      "description": "F-4-i: declared, typed, defaulted-or-required.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "required"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "string",
+            "int",
+            "decimal",
+            "date",
+            "datetime",
+            "bool"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "default": {
+          "type": "string"
+        }
+      }
+    },
+    "display": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "file"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        },
+        "source": {
+          "description": "AG-P0: the island OUT port feeding this display (sql-text bundles).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "island",
+            "port"
+          ],
+          "properties": {
+            "island": {
+              "type": "string"
+            },
+            "port": {
+              "type": "string"
+            }
+          }
+        },
+        "schema": {
+          "description": "Grammar 0.14: an action display's package-qualified `def schema` (omitted for an ordinary display).",
+          "type": "string"
+        },
+        "columns": {
+          "description": "Grammar 0.14: the action display's declared columns, in schema order.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "type"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "optional": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "rejectSite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "site",
+        "container",
+        "rejectsPort",
+        "processedPorts"
+      ],
+      "properties": {
+        "site": {
+          "type": "string"
+        },
+        "container": {
+          "type": "string"
+        },
+        "rejectsPort": {
+          "type": "string"
+        },
+        "processedPorts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "lineage": {
+      "description": "CQ-5 STATIC column lineage, compile-derived. Maps 1:1 onto the OpenLineage columnLineage facet (export mapping lives in Veles connectors, §18).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "columns"
+      ],
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/lineageColumn"
+          }
+        }
+      }
+    },
+    "lineageColumn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "output",
+        "inputs",
+        "transform"
+      ],
+      "properties": {
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "island",
+            "relation",
+            "column"
+          ],
+          "properties": {
+            "island": {
+              "type": "string"
+            },
+            "relation": {
+              "type": "string"
+            },
+            "column": {
+              "type": "string"
+            },
+            "materialized": {
+              "description": "Physical target qname the output column materializes to (the island's store(...) target); a catalog-shaped id a downstream catalog (OpenMetadata, §18) keys on. Omitted for display/in-memory-only outputs.",
+              "type": "string"
+            }
+          }
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "qname",
+              "column"
+            ],
+            "properties": {
+              "qname": {
+                "type": "string"
+              },
+              "column": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "transform": {
+          "description": "Transform-tag vocabulary (⚑, contracts §6): identity | expression | aggregate:<fn> | join-key | filter-only.",
+          "type": "string",
+          "pattern": "^(identity|expression|join-key|filter-only|aggregate:[A-Za-z_][A-Za-z0-9_]*)$"
+        }
+      }
+    },
+    "islandOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "port",
+        "file",
+        "sha256",
+        "columns"
+      ],
+      "properties": {
+        "port": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "type"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "params": {
+          "description": "Params the statement binds, as :name placeholders.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "keyed": {
+          "description": "The output's rows are per candidate: a run for one key filters it on the key (AU-C-3).",
+          "type": "boolean"
+        }
+      }
+    },
+    "recipeParameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "recipeBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "source"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "run",
+            "derived"
+          ]
+        },
+        "derive": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "base",
+            "op",
+            "amount",
+            "unit"
+          ],
+          "properties": {
+            "base": {
+              "type": "string"
+            },
+            "op": {
+              "enum": [
+                "minus",
+                "plus"
+              ]
+            },
+            "amount": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "recipeContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "class",
+        "kind"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "class": {
+          "enum": [
+            "lookup",
+            "per-candidate",
+            "set-level"
+          ]
+        },
+        "kind": {
+          "type": "string"
+        }
+      }
+    },
+    "recipeRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "because": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "detail": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "turnFed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "recipeWiring": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "routes",
+        "action",
+        "columns"
+      ],
+      "properties": {
+        "routes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "action": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "when": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "recipeWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context",
+        "by",
+        "over"
+      ],
+      "properties": {
+        "context": {
+          "type": "string"
+        },
+        "by": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "over": {
+          "type": "string"
+        }
+      }
+    },
+    "outputColumnRef": {
+      "$ref": "#/$defs/islandOutput/properties/columns/items"
+    },
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "key",
+        "asOf",
+        "parameters",
+        "bindings",
+        "roles",
+        "wiring",
+        "kinds",
+        "mode",
+        "verdictSchema",
+        "objectsRead",
+        "fingerprints",
+        "protocol"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "key": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "asOf": {
+          "type": "string"
+        },
+        "document": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recipeParameter"
+          }
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recipeBinding"
+          }
+        },
+        "roles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contexts",
+            "routes"
+          ],
+          "properties": {
+            "candidates": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "contexts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/recipeContext"
+              }
+            },
+            "decision": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "routes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/recipeRoute"
+              }
+            },
+            "switchMode": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "elseRoute": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "wiring": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recipeWiring"
+          }
+        },
+        "kinds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "mode": {
+          "enum": [
+            "per-candidate",
+            "set-level, windowed",
+            "set-level, batch-only"
+          ]
+        },
+        "windows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recipeWindow"
+          }
+        },
+        "verdictSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entity",
+            "columns",
+            "detail",
+            "current"
+          ],
+          "properties": {
+            "entity": {
+              "type": "string"
+            },
+            "columns": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/islandOutput/properties/columns/items"
+              }
+            },
+            "detail": {
+              "type": "string"
+            },
+            "current": {
+              "type": "string"
+            }
+          }
+        },
+        "objectsRead": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fingerprints": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text",
+            "values",
+            "labels"
+          ],
+          "properties": {
+            "text": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "values": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "labels": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          }
+        },
+        "protocol": {
+          "enum": [
+            "always",
+            "on_route"
+          ]
+        }
+      }
+    }
+  }
+}
