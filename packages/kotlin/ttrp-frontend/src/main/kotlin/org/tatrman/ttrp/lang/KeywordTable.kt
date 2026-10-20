@@ -76,6 +76,23 @@ object KeywordTable {
             "group_by",
         )
 
+    /**
+     * TTRP 0.5 (CN-P2 S2.6, CN-D29) — the conceptual-model definition forms (cn contracts §1.1 "The 0.5 spellings").
+     * ALL soft (also in `identifier`); a TTR-P document parses them and its typechecker refuses them (TTRP-CN-001).
+     */
+    val conceptKeywords =
+        setOf(
+            "exists",
+            "involving",
+            "where",
+            "this",
+            "at_or_before",
+            "before",
+            "contains",
+            "ended_before",
+            "overlaps",
+        )
+
     /** AU-core-P0 — the duration literal's units (`30 days`, `2 working_days`; `days(:p)` folds to one). */
     val durationUnits = setOf("days", "working_days", "weeks", "months", "minutes", "hours")
 

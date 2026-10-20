@@ -1,0 +1,15 @@
+// CN-P2 S2.6 — a valued state's series filter (A-CN-18) over the target entity's attributes, and one that names an
+// attribute the entity lacks.
+package hartland.defs
+model binding
+
+def cn2er_quality stock_count_g {
+    quality: cn.stock_count,
+    target: er.entity.inventory.quantity_on_hand,
+    filter: """reading = 'cycle_count'"""
+}
+def cn2er_quality stock_probe_g {
+    quality: cn.stock_probe,
+    target: er.entity.inventory.quantity_on_hand,
+    filter: """readout = 'probe'"""
+}

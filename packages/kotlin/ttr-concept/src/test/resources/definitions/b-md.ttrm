@@ -1,0 +1,7 @@
+// CN-P2 S2.6 — the md face: one dimension and one measure, no md2er (so what lands on md lands nowhere on er).
+package hartland.defs
+model md
+
+def dimension Patron { key: code, attributes: [ def attribute code { domain: md.Code, isKey: true } ] }
+def measure lifetime_value { domain: md.Money, aggregation: sum }
+def cubelet patron_value { grain: [Patron.code], measures: [lifetime_value] }

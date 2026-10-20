@@ -521,6 +521,13 @@ class PlanNodeBuilder(
                     detail = "a recipe `:name` binding or duration is not lowered to plan.v1 yet (AU-core-P2)",
                     location = e.location,
                 )
+            // TTRP 0.5: a cn definition form — refused at check (TTRP-CN-001); a program never emits one.
+            is org.tatrman.ttrp.expr.ConceptForm ->
+                throw TtrpEmitException(
+                    EmitDiagnosticId.UNSUPPORTED_NODE,
+                    detail = "a conceptual-model form belongs in a cn `definition:` (TTRP-CN-001)",
+                    location = e.location,
+                )
         }
 
     /**

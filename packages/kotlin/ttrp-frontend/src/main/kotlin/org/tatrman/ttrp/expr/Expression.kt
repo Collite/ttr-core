@@ -260,3 +260,96 @@ data class DurationParam(
     override val location: SourceLocation,
     override val type: TtrpType? = null,
 ) : DurationExpr
+
+// ---- the conceptual-model definition forms (TTRP 0.5, CN-D29 — cn contracts §1.1 "The 0.5 spellings") ----------
+
+/**
+ * A form only a cn `definition:` / `members:` / `filter:` block reads (CN-P2 S2.6). The grammar parses it anywhere —
+ * it stays target-neutral — and a TTR-P document's typechecker refuses it (`TTRP-CN-001`). One sealed family, so a
+ * consumer that never reads them (the emitters, the graph rules) answers them in one arm.
+ */
+sealed interface ConceptForm : Expression
+
+/** `Encounter` · `Encounter e1` — a concept an `exists` or a concept aggregate ranges over, with its variable. */
+data class ConceptBinding(
+    val concept: String,
+    val variable: String?,
+    val location: SourceLocation,
+)
+
+/** `this as customer` · `this.request.order` — a participant reached by its path ([ThisRef] or [ColumnRef]). */
+data class Participant(
+    val path: Expression,
+    val label: String?,
+    val location: SourceLocation,
+)
+
+/**
+ * `[not] exists Invoicing involving this as customer where OverdueInvoice` (DC-2 / DC-7 / DC-11). [where] is null
+ * for a bare existence (`not exists OrderLine involving this.request.order, this.item`).
+ */
+data class ExistsExpr(
+    val concepts: List<ConceptBinding>,
+    val involving: List<Participant>,
+    val where: Expression?,
+    val negated: Boolean,
+    override val location: SourceLocation,
+    override val type: TtrpType? = null,
+) : ConceptForm
+
+/**
+ * A concept aggregate (DC-4 / DC-9): `count(StoreVisit involving this) >= 4`, `sum(Sale involving this where …).revenue`,
+ * `latest(Inventory involving this.item, this.warehouse, by: as_of_date).quantity_on_hand`. [function] is the surface
+ * name (the cn checker knows which it reads); [member] is the quality path after the call.
+ */
+data class ConceptAggregate(
+    val function: String,
+    val concepts: List<ConceptBinding>,
+    val involving: List<Participant>,
+    val where: Expression?,
+    val namedArgs: List<Pair<String, Expression>>,
+    val member: List<String>,
+    override val location: SourceLocation,
+    override val type: TtrpType? = null,
+) : ConceptForm
+
+/** `this` — the concept a definition is of — and a path from it: `this.from.period.end` → `[from, period, end]`. */
+data class ThisRef(
+    val path: List<String>,
+    override val location: SourceLocation,
+    override val type: TtrpType? = null,
+) : ConceptForm
+
+/** `code [not] in descendants(Diagnosis, 'I20-I25')` (DC-1 / DC-8) — membership in what a call names. */
+data class InCall(
+    val expr: Expression,
+    val call: Expression,
+    val negated: Boolean,
+    override val location: SourceLocation,
+    override val type: TtrpType? = null,
+) : ConceptForm
+
+/** The DC-12 words, three-valued per the concept's `imprecision:` (AM-42); both renderers expand them (A-CN-14). */
+enum class TemporalOp(
+    val spelling: String,
+) {
+    AT_OR_BEFORE("at_or_before"),
+    BEFORE("before"),
+    CONTAINS("contains"),
+    ENDED_BEFORE("ended_before"),
+    OVERLAPS("overlaps"),
+    ;
+
+    companion object {
+        fun of(spelling: String): TemporalOp? = entries.firstOrNull { it.spelling == spelling }
+    }
+}
+
+/** `d.period.start at_or_before :as_of` · `e.period contains :as_of` · `s.period overlaps e.period` (DC-12). */
+data class TemporalPredicate(
+    val op: TemporalOp,
+    val lhs: Expression,
+    val rhs: Expression,
+    override val location: SourceLocation,
+    override val type: TtrpType? = null,
+) : ConceptForm

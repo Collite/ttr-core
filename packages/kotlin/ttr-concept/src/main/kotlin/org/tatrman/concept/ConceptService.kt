@@ -29,7 +29,7 @@ interface ConceptService {
      */
     fun statementValidate(s: Statement): List<Diagnostic>
 
-    /** Slots bound via cn2md, phases inlined transitively and rendered on md, `parameter()`/`as_of` bound → plan.v1. */
+    /** Slots bound via cn2md, phases inlined transitively and rendered on md, `:name` / `:as_of` bound → plan.v1. */
     fun statementLower(s: Statement): LowerResult
 
     /** From the statement: concept labels in [locale], phase definitions as prose, parameters named (R-cn-7). */
@@ -73,14 +73,6 @@ interface ConceptService {
 
     /** Per concept: the grounding grade, `via`, core/open, dangling groundings, retired codes, phase-as-default rows. */
     fun hygieneReport(): HygieneReport
-}
-
-/**
- * The resolved, snapshot-pinned cn model a [ConceptService] is built over: ttr-metadata's typed model with its md→er
- * hop facts (CN-P2 S2.5 binds this to the typed `CnModel`). A placeholder until then.
- */
-interface ResolvedCnModel {
-    val snapshotHash: String
 }
 
 /** The scaffold stand-in: every call refuses with the phase that builds it. */

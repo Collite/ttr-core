@@ -39,6 +39,7 @@ class TtrPandasEqSynonymSpec :
                 is IsNull -> "isnull(${structure(e.expr)})"
                 is MdPath -> "mdpath(${e.components.size})" // not produced by the pandas dialect
                 is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr -> "recipe-leaf" // nor these
+                is org.tatrman.ttrp.expr.ConceptForm -> "cn-form" // nor the cn definition forms
             }
 
         fun foldPandas(expr: String): Expression {

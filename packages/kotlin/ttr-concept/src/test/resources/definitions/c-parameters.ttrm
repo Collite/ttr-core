@@ -1,0 +1,5 @@
+// CN-P2 S2.6 — a `def parameter` a definition reads as `:tolerance` (A-CN-26).
+package hartland.defs
+model automation
+
+def parameter tolerance { type: decimal, value: 0.01 }

@@ -20,12 +20,17 @@ enum class ImprecisionMode { CERTAINLY, POSSIBLY }
 
 enum class Severity { ERROR, WARNING, ADVISORY, HYGIENE }
 
-/** One cn diagnostic (a `cn/…` slug, contracts §7): the slug, its grade, and the concept or slot it is about. */
+/**
+ * One cn diagnostic (a `cn/…` slug, contracts §7): the slug, its grade, the concept or slot it is about, and — for a
+ * definition-level finding (CN-P2 S2.6) — where in the `.ttrm` it is (a position inside a definition block is mapped
+ * through the block's source map).
+ */
 data class Diagnostic(
     val slug: String,
     val severity: Severity,
     val message: String = "",
     val subject: String = "",
+    val location: org.tatrman.ttr.parser.model.SourceLocation? = null,
 )
 
 /** Which binding a statement slot went through (`concept → binding def → md/er element`, with `via` for hops). */
@@ -45,7 +50,7 @@ data class LowerProvenance(
     val bindingPaths: List<BindingPath> = emptyList(),
     /** Phase definitions inlined, transitively (phase-in-phase, AM-26). */
     val inlinedDefinitions: List<String> = emptyList(),
-    /** `parameter()` name → the value bound from the world (R-cn-7). */
+    /** `:name` parameter → the value bound from the world (R-cn-7; `parameter()` before TTRP 0.5, A-CN-26). */
     val parametersBound: Map<String, String> = emptyMap(),
     /** The evaluation instant used (ISO-8601); empty = now. */
     val asOf: String = "",

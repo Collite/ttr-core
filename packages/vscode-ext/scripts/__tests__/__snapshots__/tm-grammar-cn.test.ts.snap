@@ -56,14 +56,14 @@ exports[`ttrm.tmLanguage.json — the 0.17 conceptual model > tokenizes 75-cn-co
  91  def=keyword.control.def  phase=keyword.other.kind
  93  label=keyword.other.property  "=string.quoted.double  Pending order=string.quoted.double  "=string.quoted.double
  94  definition=keyword.other.property  state=meta.embedded.block.pl  in=keyword.operator.word  (=meta.embedded.block.pl  'placed'=string.quoted.single  ,=meta.embedded.block.pl  'held'=string.quoted.single  )=meta.embedded.block.pl
- 96  def=keyword.control.def  phase=keyword.other.kind  definition=keyword.other.property  invoice_status=meta.embedded.block.pl  ==keyword.operator  'open'=string.quoted.single  and=keyword.operator.word  period.=meta.embedded.block.pl  end=keyword.control.conditional  <=keyword.operator  as_of=meta.embedded.block.pl
+ 96  def=keyword.control.def  phase=keyword.other.kind  definition=keyword.other.property  invoice_status=meta.embedded.block.pl  ==keyword.operator  'open'=string.quoted.single  and=keyword.operator.word  period.=meta.embedded.block.pl  end=keyword.control.conditional  <=keyword.operator  :as_of=meta.embedded.block.pl
  97  def=keyword.control.def  phase=keyword.other.kind
  99  definition=keyword.other.property  exists Invoicing involving this=meta.embedded.block.pl  as=keyword.operator.word  customer where OverdueInvoice=meta.embedded.block.pl
 102  def=keyword.control.def  phase=keyword.other.kind  grounds=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
 103  def=keyword.control.def  phase=keyword.other.kind  true=constant.language
 104  def=keyword.control.def  phase=keyword.other.kind
 107  basis=keyword.other.property
-108  definition=keyword.other.property  exists StockoutEpisode e involving this where e.period contains as_of=meta.embedded.block.pl
+108  definition=keyword.other.property  exists StockoutEpisode e involving this where e.period contains :as_of=meta.embedded.block.pl
 112  def=keyword.control.def  relation_type=keyword.other.kind  description=keyword.other.property  "=string.quoted.double  A supplier supplies a distribution center.=string.quoted.double  "=string.quoted.double  label=keyword.other.property  "=string.quoted.double  supplies=string.quoted.double  "=string.quoted.double"
 `;
 

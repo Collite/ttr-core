@@ -26,6 +26,10 @@ dependencies {
     // The typed model (`CnSchema`, CN-P2 S2.5) — api: `Via` and `GroundingGrade` live there and are in this module's
     // public types (aliases in Results.kt). Then the md lowering chain and the er renderer's dialects.
     api(project(":packages:kotlin:ttr-metadata"))
+    // TTRP 0.5 (CN-P2 S2.6, CN-D29): a `definition:` / `members:` / `filter:` block is a TTR-P expression; the parsed
+    // tree is in this module's public types (`CnDefinition.expression`). No cycle: ttrp-frontend depends on
+    // ttr-metadata, never on ttr-concept.
+    api(project(":packages:kotlin:ttrp-frontend"))
     implementation(project(":packages:kotlin:ttr-md-resolver"))
     implementation(project(":packages:kotlin:ttrp-emit"))
     implementation(project(":packages:kotlin:ttr-translator")) // dialects only (definition_render(er) targets)

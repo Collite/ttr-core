@@ -10,6 +10,7 @@ Four `TTR.g4` grammar surfaces are **reserved** by the PL-P0 S1 amendment batch.
 | 2 | `on-failure` island vocabulary (F-4-iv) | TTR-P | senior2 | **PL-P2**.S1 | additive minor |
 | 3 | K `extends`-platform-world (world composition) | TTR-M | senior2 | **PL-P1**.S4 | additive minor |
 | 4 | `security` block (H-1 reservation) | TTR-M | senior2 | **PL-P4**.S3 | additive minor |
+| 5 | the conceptual-model definition forms — `TTRP.g4` 0.4 → **0.5** (CN-D29) | TTR-P | senior2 | **CN-P2**.S2.6 | additive minor — **IMPLEMENTED** (§5) |
 
 The manifest **schema** already permits #1/#2 (see TTR-P [`contracts.md §5.1`](../ttr-p/architecture/contracts.md#manifest-v2)); these items cover the *grammar* that makes the toolchain **emit** them.
 
@@ -73,3 +74,18 @@ Invariants the reservation pins:
 - Verbatim role names legal; classification→role mapping is org policy data; **unknown roles fail closed at bundle build** (Perun, platform §19), advisory lint standalone (H-8).
 
 Consumed by: the MIT generator + Perun bundle pipeline (PL-P4).
+
+## 5. The conceptual-model definition forms — `TTRP.g4` 0.5 · **IMPLEMENTED (CN-P2 S2.6, 2026-10-20)**
+
+A cn `definition:` / `members:` / `filter:` block (TTR-M 0.17, an `embeddedBlock`) is parsed with the TTR-P
+expression grammar (CN-D28 ⚑CN-P5), so the forms it needs and TTR-P lacked join `TTRP.g4` as the additive 0.4 → 0.5
+cut (CN-D29: where 0.4 already spells a construct its spelling wins — `:as_of`, `:name`, `hours(24)`,
+`within(x, last: d)`, `<>`). Spelling table: `project/tatrman/features/conceptual/plan/contracts.md` §1.1 "The 0.5
+spellings" (A-CN-25…31). Surface: `[not] exists C [v] (, C [v])* involving p [as label] (, …)* [where e]`; the concept
+aggregate `count|sum|…(C [v] involving … [where …] (, name: e)*)` + `.quality`; `x [not] in <call>`; the temporal words
+`at_or_before before contains ended_before overlaps` infix at the comparison level; `this` (+ a path); `end` after a
+dot. New tokens, all soft: `EXISTS INVOLVING WHERE THIS AT_OR_BEFORE BEFORE CONTAINS ENDED_BEFORE OVERLAPS`. Every 0.4
+document parses to the same AST (proved over the repo's 230 `.ttrp` documents and the expression corpora). A TTR-P
+program's typechecker refuses the forms, `TTRP-CN-001`. With it, `standaloneExpr : expr EOF` — `parseExpression`
+anchors EOF (ttr-core#202). Kotlin only (`ttrp-frontend`); the parsed definitions live in `ttr-concept`.
+

@@ -103,7 +103,10 @@ error, not a free-form property.
 triple-string, or a `"""pl` block. The parser keeps the text exactly as written; the expression itself is TTR-P's
 expression language (see the [TTR-P expression reference](../../features/ttr-p/language-design.md#5-the-expression-sublanguage)).
 In a definition, `this` is the bearer, an event's participants are reached by their labels, a phase name is a
-predicate, and `as_of` is the instant the definition is evaluated at.
+predicate, `:as_of` is the instant the definition is evaluated at, and `:name` reads a `def parameter`. Durations
+and windows are spelled as in TTR-P (`hours(24)`, `within(sold_date, last: days(365))`); the conceptual forms —
+`exists … involving … where …`, `count(… involving …)`, `code in descendants(Kind, 'X')` and the temporal words
+`at_or_before`, `before`, `contains`, `ended_before`, `overlaps` — are TTR-P expression grammar 0.5.
 
 ```ttrm
 model cn
@@ -118,7 +121,7 @@ def quality transfer_delay {
 }
 
 def phase PendingOrder   { of: Order, definition: """state in ('placed', 'held')""" }
-def phase OverdueInvoice { of: Invoicing, definition: """invoice_status = 'open' and period.end < as_of""" }
+def phase OverdueInvoice { of: Invoicing, definition: """invoice_status = 'open' and period.end < :as_of""" }
 def phase DebtorCustomer {
     of: Customer,
     definition: """exists Invoicing involving this as customer where OverdueInvoice""",

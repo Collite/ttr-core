@@ -62,7 +62,7 @@ def phase PendingOrder {
 def phase OverdueInvoice {
     label: { en: "Overdue invoice", cs: "Faktura po splatnosti" },
     of: Invoicing,
-    definition: """invoice_status = 'open' and period.end < as_of"""
+    definition: """invoice_status = 'open' and period.end < :as_of"""
 }
 
 def phase DebtorCustomer {

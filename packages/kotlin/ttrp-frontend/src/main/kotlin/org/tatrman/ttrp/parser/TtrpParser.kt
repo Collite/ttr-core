@@ -88,8 +88,11 @@ object TtrpParser {
     /**
      * Parses a single standalone expression (the `expr` start rule) to the IR — the
      * expression-corpus entry point (the `golden.exprs` corpus and the single-line
-     * `expr/negative` fixtures). The `==` reject (EQ-001) and any syntax errors
-     * surface in [ExprParseResult.diagnostics].
+     * `expr/negative` fixtures) and the parser of a cn `definition:` / `members:` / `filter:`
+     * block (CN-D29). The `==` reject (EQ-001) and any syntax errors surface in
+     * [ExprParseResult.diagnostics]. The whole input is one expression: a tail after it is a
+     * `TTRP-PRS-001` (`standaloneExpr` anchors EOF — ttr-core#202; it used to be dropped silently,
+     * so `code in descendants(Kind, 'X')` "parsed" as `code`).
      */
     fun parseExpression(
         source: String,
@@ -106,9 +109,20 @@ object TtrpParser {
         parser.removeErrorListeners()
         parser.addErrorListener(listener)
 
-        val tree = parser.expr()
+        val tree = parser.standaloneExpr().expr()
         val walker = TtrpWalker(fileName, source, tokens, catalog)
-        val expr = walker.foldExpr(tree)
+        // As in [parseString]: a broken parse can leave recovery holes the walker does not expect — keep the
+        // syntax errors and fold to a NULL literal rather than crash on top of them.
+        val expr =
+            try {
+                walker.foldExpr(tree)
+            } catch (e: RuntimeException) {
+                if (syntax.isEmpty()) throw e
+                org.tatrman.ttrp.expr.Literal(
+                    org.tatrman.ttrp.expr.LiteralValue.Null,
+                    SourceLocation(fileName, 1, 0, 1, 0, 0, 0),
+                )
+            }
         return ExprParseResult(expression = expr, diagnostics = syntax + walker.diagnostics, source = source)
     }
 

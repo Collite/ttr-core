@@ -61,6 +61,26 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   defs through unchecked (the cn semantics, the typed model and `ttr-writer` support are CN-P2). `model cnc` and
   `roles:` are deprecated (they parse unchanged). Tooling: TextMate highlighting and the formatter's cn layout
   (see `packages/grammar/CHANGELOG.md` 0.17). Manual: [Conceptual model (cn)](docs/manual/en/20-conceptual-model.md).
+- **`TTRP.g4` 0.4 → 0.5 — the conceptual-model definition forms (CN-P2 S2.6, CN-D29; `ttrp-frontend`, Kotlin
+  only).** A cn `definition:` / `members:` / `filter:` block is a TTR-P expression; 0.5 adds what it needs and 0.4
+  lacked: `[not] exists C [v] (, C [v])* involving p [as label] … [where e]`, the concept aggregate `count(C involving
+  … [where …] (, name: e)*)` + `.quality`, `x [not] in <call>` (`code in descendants(Kind, 'X')`), the temporal words
+  `at_or_before before contains ended_before overlaps` (infix, comparison level), `this` (+ a path), and `end` after a
+  dot. New tokens, all soft (still names): `exists involving where this at_or_before before contains ended_before
+  overlaps`. Every 0.4 document parses to the same AST. The AST gains a sealed `ConceptForm` family (`ExistsExpr`,
+  `ConceptAggregate`, `ThisRef`, `InCall`, `TemporalPredicate`); in a TTR-P program the typechecker refuses each with
+  **`TTRP-CN-001`**, and the emitters treat them as `UNSUPPORTED_NODE`. Where 0.4 already spelled a construct the cn
+  spelling is TTR-P's: `:as_of`, `:name`, `hours(24)`, `within(x, last: d)`, `<>` (cn contracts §1.1 "The 0.5
+  spellings"). **`TtrpParser.parseExpression` reads the whole input** (`standaloneExpr : expr EOF`, ttr-core#202): a
+  tail after the expression is `TTRP-PRS-001` — it was dropped silently. The TTR-P formatter renders `<>` as `<>` (it
+  wrote `!=`, which does not lex).
+- **`ttr-concept`** (not published) — **`ResolvedCnModel(model, definitions, snapshotHash)`** replaces the placeholder:
+  the reconciled `Model`, every definition block parsed with `TTRP.g4` 0.5 and name-resolved (`CnDefinitions`: the
+  definition's reads — concepts, inlined definitions, `:name` parameters, `:as_of`, instant comparisons), and the
+  definition-level `cn/…` slugs (`definitionDiagnostics()`): `cn/definition-syntax`, `cn/definition-unknown-name`,
+  `cn/descendants-no-hierarchy` (new), `cn/definition-cycle`, `cn/definition-unresolved`,
+  `cn/definition-unreachable(md|er)`, `cn/basis-mismatch`, `cn/imprecise-comparison`. `Diagnostic` gains `location`.
+  The service bodies are still CN-P3.
 - **TTR-P — the recipe checker (AU-core-P1; `ttrp-frontend` · `ttrp-graph` · `ttrp-cli`).** A recipe is checked
   against the world and the model: the role shape and wiring (`TTRP-REC-000`), the action wiring typed against
   `def action` (`-001`…`-003`), the candidates' key (`-004`, `-005`), key lineage with each context's class (lookup /

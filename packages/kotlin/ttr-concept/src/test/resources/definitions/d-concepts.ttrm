@@ -1,0 +1,84 @@
+// CN-P2 S2.6 — the definition fixtures (T5 names, T6 slugs): every concept named after what it shows. The
+// grounded base first, then one phase per finding and its clean twin.
+package hartland.defs
+model cn
+
+// ---- the base ----
+def kind Party { }
+def role Customer { of: Party, event: Order, grounds: er.entity.customer }
+def role Patron   { of: Party, event: Order, grounds: md.Patron }
+def kind Item     { grounds: er.entity.item, qualities: [category] }
+def kind ProductCategory {
+    grounds: er.entity.category_code,
+    hierarchy: { closure: er.entity.category_closure, ancestor: ancestor_code, descendant: descendant_code }
+}
+def kind Brand { }
+def event Order {
+    involves: [ Customer ],
+    period: { start: placed_at, end: delivered_date, end_open: open },
+    grounds: er.entity.order,
+    qualities: [ state, placed_at, delivered_date ]
+}
+def event Invoicing {
+    involves: [ Customer, Order ],
+    period: { start: issued, end: due },
+    grounds: er.entity.invoice,
+    qualities: [ amount, paid, status ]
+}
+def event StockoutEpisode {
+    extent: durative,
+    involves: [ Item ],
+    period: { start: started_on, end: ended_on },
+    grounds: er.entity.stockout_episode
+}
+def event Delivery { involves: [ Order ], period: { at: delivered_in, precision: month }, qualities: [ delivered_in ] }
+def event Visit    { involves: [ Customer ], period: { at: visited_at } }
+def quality lifetime_value { of: Patron, grounds: md.lifetime_value }
+def quality open_amount    { of: Invoicing, definition: "amount - paid" }
+def quality stock_count    { of: Item, valued_state: true }
+def quality stock_probe    { of: Item, valued_state: true }
+
+// ---- T5: names that resolve ----
+def phase OverdueInvoice { of: Invoicing, definition: """status = 'open' and period.end < :as_of""" }
+def phase DebtorCustomer {
+    of: Customer,
+    definition: """exists Invoicing involving this as customer where OverdueInvoice and open_amount > 0"""
+}
+def phase PendingOrder   { of: Order, definition: """state in ('placed', 'held')""" }
+def kind HomeCategory    { is_a: ProductCategory, members: """descendants(ProductCategory, 'H10-H19')""" }
+def phase Mispriced      { of: Invoicing, definition: """abs(amount - paid) > :tolerance""" }
+
+// ---- T5: findings ----
+def phase BrokenSyntax   { of: Order, definition: """state = = 'held'""" }
+def phase EscapedSyntax  { of: Order, definition: "state = \"a\" )" }
+def phase TaggedSyntax   {
+    of: Order,
+    definition: """pl
+        state = 'held'
+        and placed_at )
+    """
+}
+def phase UnknownQuality { of: Order, definition: """colour = 'red'""" }
+def phase UnknownLabel   { of: Customer, definition: """exists Invoicing involving this as buyer""" }
+def phase UnknownConcept { of: Customer, definition: """exists Refund involving this""" }
+def phase UnknownParam   { of: Order, definition: """state = :mode""" }
+def kind FancyBrand      { is_a: Brand, members: """descendants(Brand, 'B1')""" }
+
+// ---- T6: cn/definition-cycle ----
+def phase Ping { of: Order, definition: """Pong""" }
+def phase Pong { of: Order, definition: """Ping""" }
+
+// ---- T6: cn/definition-unresolved, cn/definition-unreachable(md | er) ----
+def phase Frequent   { of: Customer, definition: """count(Visit involving this) >= 4""" }
+def phase BigSpender { of: Patron, definition: """lifetime_value > 1000""" }
+
+// ---- T6: cn/basis-mismatch ----
+def phase OutOfStock  { of: Item, basis: current_state, definition: """exists StockoutEpisode e involving this where e.period contains :as_of""" }
+def phase HadStockout { of: Item, basis: past_state,    definition: """exists StockoutEpisode e involving this where e.period contains :as_of""" }
+def phase EverStocked { of: Item, basis: occurrence,    definition: """exists StockoutEpisode e involving this where e.period.start at_or_before :as_of""" }
+def phase NoReading   { of: Item, basis: current_state, definition: """category = 'H10'""" }
+
+// ---- T6: cn/imprecise-comparison ----
+def phase LateDelivery      { of: Order, definition: """exists Delivery d involving this where d.period.at before :as_of""" }
+def phase LateDeliveryMaybe { of: Order, imprecision: possibly, definition: """exists Delivery d involving this where d.period.at before :as_of""" }
+def phase RecentOrder       { of: Order, definition: """period.start at_or_before :as_of""" }

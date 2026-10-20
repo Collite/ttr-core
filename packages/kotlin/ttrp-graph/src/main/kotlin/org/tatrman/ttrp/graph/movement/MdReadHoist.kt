@@ -173,6 +173,8 @@ class MdReadHoist(
             is IsNull -> collectMdPaths(e.expr)
             is ColumnRef, is Literal -> emptyList()
             is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr -> emptyList()
+            // TTRP 0.5: a cn definition form is refused at check (TTRP-CN-001) — it never reaches a graph.
+            is org.tatrman.ttrp.expr.ConceptForm -> emptyList()
         }
 
     companion object {

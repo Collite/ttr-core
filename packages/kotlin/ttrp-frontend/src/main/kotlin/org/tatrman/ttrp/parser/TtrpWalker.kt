@@ -70,8 +70,12 @@ import org.tatrman.ttrp.expr.CaseWhen
 import org.tatrman.ttrp.expr.Cast
 import org.tatrman.ttrp.expr.CatalogId
 import org.tatrman.ttrp.expr.ColumnRef
+import org.tatrman.ttrp.expr.ConceptAggregate
+import org.tatrman.ttrp.expr.ConceptBinding
+import org.tatrman.ttrp.expr.ExistsExpr
 import org.tatrman.ttrp.expr.Expression
 import org.tatrman.ttrp.expr.FunctionCall
+import org.tatrman.ttrp.expr.InCall
 import org.tatrman.ttrp.expr.InList
 import org.tatrman.ttrp.expr.MdPath
 import org.tatrman.ttrp.expr.MdPathAtom
@@ -83,6 +87,10 @@ import org.tatrman.ttrp.expr.DurationParam
 import org.tatrman.ttrp.expr.DurationUnit
 import org.tatrman.ttrp.expr.LiteralValue
 import org.tatrman.ttrp.expr.ParamRef
+import org.tatrman.ttrp.expr.Participant
+import org.tatrman.ttrp.expr.TemporalOp
+import org.tatrman.ttrp.expr.TemporalPredicate
+import org.tatrman.ttrp.expr.ThisRef
 import org.tatrman.ttrp.expr.TtrpType
 import org.tatrman.ttrp.expr.catalog.FunctionCatalog
 import org.tatrman.ttrp.expr.catalog.FunctionKind
@@ -455,7 +463,11 @@ internal class TtrpWalker(
 
     private fun notExpr(ctx: TTRPParser.NotExprContext): Expression =
         if (ctx.NOT() != null) {
-            FunctionCall(CatalogId.NOT, listOf(notExpr(ctx.notExpr())), loc(ctx))
+            // 0.5 (DC-11): `not exists …` is the negated existence itself, not `op.not` around it.
+            when (val inner = notExpr(ctx.notExpr())) {
+                is ExistsExpr -> inner.copy(negated = !inner.negated, location = loc(ctx))
+                else -> FunctionCall(CatalogId.NOT, listOf(inner), loc(ctx))
+            }
         } else {
             predicate(ctx.predicate())
         }
@@ -464,6 +476,16 @@ internal class TtrpWalker(
         val left = addExpr(ctx.addExpr(0))
         return when {
             ctx.IS() != null -> IsNull(left, negated = ctx.NOT() != null, location = loc(ctx))
+            // 0.5 (DC-1/8): `code in descendants(Kind, 'X')` — membership in what a call names.
+            ctx.IN() != null && ctx.functionCall() != null ->
+                InCall(left, functionCall(ctx.functionCall()), negated = ctx.NOT() != null, location = loc(ctx))
+            ctx.temporalOp() != null ->
+                TemporalPredicate(
+                    op = TemporalOp.of(ctx.temporalOp().text) ?: error("unhandled temporal word at ${loc(ctx)}"),
+                    lhs = left,
+                    rhs = addExpr(ctx.addExpr(1)),
+                    location = loc(ctx),
+                )
             ctx.IN() != null ->
                 InList(
                     expr = left,
@@ -546,11 +568,71 @@ internal class TtrpWalker(
             ctx.literal() != null -> literal(ctx.literal())
             ctx.castExpr() != null -> castExpr(ctx.castExpr())
             ctx.caseExpr() != null -> caseExpr(ctx.caseExpr())
+            ctx.existsExpr() != null -> existsExpr(ctx.existsExpr())
+            ctx.conceptAggregate() != null -> conceptAggregate(ctx.conceptAggregate())
             ctx.functionCall() != null -> functionCall(ctx.functionCall())
+            ctx.thisRef() != null -> thisRef(ctx.thisRef())
             ctx.dottedRef() != null -> columnRef(ctx.dottedRef())
             ctx.mdPath() != null -> mdPath(ctx.mdPath())
             else -> expr(ctx.expr()) // ( expr ) — parens are structural, dropped
         }
+
+    // --- the conceptual-model forms (0.5, CN-D29) — structural capture; a cn definition reads them, ttr-concept
+    // resolves them, a TTR-P document's typechecker refuses them (TTRP-CN-001) ------------------------------------
+    private fun existsExpr(ctx: TTRPParser.ExistsExprContext): ExistsExpr =
+        ExistsExpr(
+            concepts = ctx.conceptBinding().map { conceptBinding(it) },
+            involving = involving(ctx.involvingClause()),
+            where = ctx.expr()?.let { expr(it) },
+            negated = false,
+            location = loc(ctx),
+        )
+
+    private fun conceptAggregate(ctx: TTRPParser.ConceptAggregateContext): ConceptAggregate {
+        val named = ctx.namedArg().map { it.fnArgName().text to expr(it.expr()) }
+        named
+            .groupBy { it.first }
+            .filterValues { it.size > 1 }
+            .keys
+            .firstOrNull()
+            ?.let { dup ->
+                diagnostics +=
+                    TtrpDiagnostic(
+                        TtrpDiagnosticId.PRS_008,
+                        Severity.ERROR,
+                        "`${ctx.identifier().text}(…)` names `$dup` twice",
+                        loc(ctx),
+                        TtrpDiagnosticId.PRS_008.suggestedAlternative,
+                    )
+            }
+        return ConceptAggregate(
+            function = ctx.identifier().text,
+            concepts = ctx.conceptBinding().map { conceptBinding(it) },
+            involving = involving(ctx.involvingClause()),
+            where = ctx.expr()?.let { expr(it) },
+            namedArgs = named,
+            member = ctx.idPart().map { it.text },
+            location = loc(ctx),
+        )
+    }
+
+    private fun conceptBinding(ctx: TTRPParser.ConceptBindingContext): ConceptBinding =
+        ConceptBinding(
+            concept = ctx.identifier(0).text,
+            variable = ctx.identifier().getOrNull(1)?.text,
+            location = loc(ctx),
+        )
+
+    private fun involving(ctx: TTRPParser.InvolvingClauseContext): List<Participant> =
+        ctx.participant().map { p ->
+            Participant(
+                path = p.thisRef()?.let { thisRef(it) } ?: columnRef(p.dottedRef()),
+                label = p.identifier()?.text,
+                location = loc(p),
+            )
+        }
+
+    private fun thisRef(ctx: TTRPParser.ThisRefContext): ThisRef = ThisRef(ctx.idPart().map { it.text }, loc(ctx))
 
     // --- MD dot-path (contracts §1.2, D14) — structural capture; resolution is S2/S3 ------------
     private fun mdPath(ctx: TTRPParser.MdPathContext): MdPath =

@@ -1,5 +1,5 @@
 // TTR-P canonical grammar — the C3-converged canonical surface (P1 Stage 1.1).
-// @grammar-version: 0.4  (TTR-P spec version is an integer cut via docs/grammar-master/ — S6)
+// @grammar-version: 0.5  (TTR-P spec version is an integer cut via docs/grammar-master/ — S6)
 //   0.1 → 0.2 (PL-P2.S1, additive minor): runtime params (F-4-i) + on-failure
 //   islands / retries (F-4-iv/F-4-ii) — see docs/features/grammar-master/pl-grammar-work-items.md.
 //   0.2 → 0.3 (AG B5, additive minor): a container body may live in a file —
@@ -33,6 +33,21 @@
 //        sigil token. Enumerated VALUES (`mode: exclusive|overlapping`, `else: none`,
 //        `protocol: always|on_route`, `as of: now`, `over: day|week|month`) are plain
 //        identifiers checked by the walker, not tokens.
+//   0.4 → 0.5 (CN-P2 S2.6, CN-D29 — additive minor): the conceptual-model definition forms, so a cn
+//   `definition:` / `members:` / `filter:` block (TTR-M 0.17 `embeddedBlock`, ⚑CN-P5) parses with this
+//   expression grammar. Where 0.4 already spelled a construct its spelling is the cn one (`:as_of`, `:name`,
+//   `hours(24)`, `within(x, last: d)`, `<>`); only what it lacked is added — cn contracts §1.1 "The 0.5
+//   spellings", A-CN-25…31:
+//     1. `[not] exists C [v] (, C [v])* involving p [as label] (, …)* [where e]` (DC-2/7/11) and the
+//        concept aggregate `count(C [v] involving … [where …] (, name: e)*)` + `.quality…` (DC-4/9).
+//     2. `x [not] in <call>` beside `in (<list>)` — `code in descendants(Kind, 'X')` (DC-1/8).
+//     3. The temporal words, infix at the comparison level: `at_or_before before contains ended_before
+//        overlaps` (DC-12).
+//     4. `this` (+ a dotted path) is its own node; `end` is legal after a dot (`this.period.end`).
+//     5. New tokens, ALL soft (also in `identifier` — the 0.4 rule): EXISTS INVOLVING WHERE THIS
+//        AT_OR_BEFORE BEFORE CONTAINS ENDED_BEFORE OVERLAPS. Every 0.4 document parses to the same AST.
+//     6. The grammar stays target-neutral: a TTR-P document's typechecker refuses the forms (TTRP-CN-001).
+//     `standaloneExpr : expr EOF` is the standalone-expression entry (ttr-core#202 — a tail is an error).
 //
 // Kotlin-only generation (G-b): this .g4 is read directly by the ANTLR Gradle
 // plugin in ttrp-frontend; there is no antlr-ng/TS target and no TextMate grammar.
@@ -235,14 +250,18 @@ dottedRef       : identifier (DOT idPart)* ;
 // no backtracking — because `between addExpr AND addExpr` is a fixed shape ANTLR's
 // ALL(*) commits to before the higher `andExpr` loop can see the `and`.
 expr            : orExpr ;
+standaloneExpr  : expr EOF ;                                 // 0.5: `parseExpression`'s entry — a trailing tail is an error (ttr-core#202)
 orExpr          : andExpr (OR andExpr)* ;
 andExpr         : notExpr (AND notExpr)* ;
 notExpr         : NOT notExpr | predicate ;
 predicate       : addExpr ( (ASSIGN | EQEQ | NEQ | LT | LTE | GT | GTE) addExpr
                           | IS NOT? NULL
                           | NOT? IN LPAREN expr (COMMA expr)* RPAREN
+                          | NOT? IN functionCall                    // 0.5: `code in descendants(Kind, 'X')` (DC-1)
                           | BETWEEN addExpr AND addExpr
+                          | temporalOp addExpr                      // 0.5: `e.period contains :as_of` (DC-12)
                           )? ;
+temporalOp      : AT_OR_BEFORE | BEFORE | CONTAINS | ENDED_BEFORE | OVERLAPS ;
 addExpr         : mulExpr ((PLUS | MINUS) mulExpr)* ;
 mulExpr         : unaryExpr ((STAR | SLASH) unaryExpr)* ;
 unaryExpr       : MINUS unaryExpr | primary ;
@@ -251,7 +270,10 @@ primary
     | paramRef                                              // AU-core-P0: `:name` — a parameter / runtime binding (D-108)
     | castExpr
     | caseExpr
+    | existsExpr                                            // 0.5 (cn): before functionCall/dottedRef — `exists` is soft
+    | conceptAggregate                                      // 0.5 (cn): `count(Visit involving this)` — before functionCall
     | functionCall
+    | thisRef                                               // 0.5 (cn): `this`, `this.from.period.end` — before dottedRef
     | dottedRef                                             // column or port.column (C3-a-iv-4)
     | mdPath                                                // MD dot-path (D14) — LAST: only catches
                                                             // chains dottedRef can't (numeric/quoted/
@@ -265,6 +287,20 @@ functionCall    : identifier LPAREN (DISTINCT? fnArg (COMMA fnArg)*)? RPAREN ;  
 fnArg           : (fnArgName COLON)? expr ;                  // AU-core-P0: named (`age(since: x)`) or positional
 fnArgName       : identifier | AND | OR | BETWEEN | NOT ;        // `working_days(between: a, and: :as_of)`
 paramRef        : COLON identifier ;                         // `:as_of` · `:tolerance`
+
+// ---- the conceptual-model forms (0.5, CN-D29 — cn contracts §1.1 "The 0.5 spellings") --------------------------
+// Parsed here, target-neutral; a TTR-P document refuses them (TTRP-CN-001), a cn `definition:` / `members:` /
+// `filter:` block reads them. `where` is greedy: it takes the rest of the expression, so an `exists` followed by an
+// `or` is parenthesized. A concept aggregate's trailing arguments are NAMED (`by:`), so a participant list and an
+// argument never read alike.
+existsExpr       : EXISTS conceptBinding (COMMA conceptBinding)* involvingClause (WHERE expr)? ;
+conceptAggregate : identifier LPAREN conceptBinding (COMMA conceptBinding)* involvingClause (WHERE expr)?
+                   (COMMA namedArg)* RPAREN (DOT idPart)* ;  // `sum(Sale involving this).revenue` — a quality after
+conceptBinding   : identifier identifier? ;                  // `Encounter` · `Encounter e1`
+involvingClause  : INVOLVING participant (COMMA participant)* ;
+participant      : (thisRef | dottedRef) (AS identifier)? ;  // `this as customer` · `this.request.order`
+namedArg         : fnArgName COLON expr ;
+thisRef          : THIS (DOT idPart)* ;
 durationLiteral : INT durationUnit ;                         // `30 days` · `2 working_days` — wiring + window only (M1)
 durationUnit    : DAYS | WORKING_DAYS | WEEKS | MONTHS | MINUTES | HOURS ;
 typeName        : identifier (LPAREN INT (COMMA INT)? RPAREN)? ;              // decimal(12,2) — S23 spellings
@@ -311,8 +347,9 @@ identifier      : IDENT | IN | OUT | ERR | BY | SCHEMA | DISTINCT | ON | FROM
                 | ACTIONS | BUILTIN_FORM | FOREIGN | PER | CANDIDATE | SET | CALL | TURN | ASK | ANSWER
                 | WINDOW | OVER | SWITCH | MODE | BECAUSE | DETAIL | GROUP_BY
                 | DAYS | WORKING_DAYS | WEEKS | MONTHS | MINUTES | HOURS
+                | EXISTS | INVOLVING | WHERE | THIS | AT_OR_BEFORE | BEFORE | CONTAINS | ENDED_BEFORE | OVERLAPS   // 0.5 (cn)
                 ;
-idPart          : identifier | TRUE | FALSE | NULL ;
+idPart          : identifier | TRUE | FALSE | NULL | END ;   // 0.5: `end` after a dot — `this.period.end` (DC-6)
 
 // =============================================================================
 // Lexer
@@ -383,6 +420,18 @@ WEEKS        : 'weeks' ;
 MONTHS       : 'months' ;
 MINUTES      : 'minutes' ;
 HOURS        : 'hours' ;
+
+// 0.5 (CN-D29) — the conceptual-model forms (all soft: also in `identifier`). Comments stay off the token lines
+// (the KeywordTable drift regex, S16).
+EXISTS       : 'exists' ;
+INVOLVING    : 'involving' ;
+WHERE        : 'where' ;
+THIS         : 'this' ;
+AT_OR_BEFORE : 'at_or_before' ;
+BEFORE       : 'before' ;
+CONTAINS     : 'contains' ;
+ENDED_BEFORE : 'ended_before' ;
+OVERLAPS     : 'overlaps' ;
 
 // Expression keywords.
 AND         : 'and' ;
