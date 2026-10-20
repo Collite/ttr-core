@@ -1,0 +1,30 @@
+{
+    "diagnostics": [
+        "cn/cnc-deprecated",
+        "cn/cnc-deprecated"
+    ],
+    "resolved": [
+        "Purchase => hartland.stores.cn.concept.Purchase",
+        "Shop => hartland.stores.cn.concept.Shop",
+        "er.entity.sale => hartland.stores.er.entity.sale",
+        "er.entity.shopper => hartland.stores.er.entity.shopper",
+        "er.entity.store => hartland.stores.er.entity.store"
+    ],
+    "symbols": [
+        "hartland.stores.binding.cn2er_event.Purchase.grounds",
+        "hartland.stores.binding.cn2er_kind.Shop.grounds",
+        "hartland.stores.binding.cn2er_role.Shopper.grounds",
+        "hartland.stores.cn.concept.Purchase",
+        "hartland.stores.cn.concept.Purchase.shop",
+        "hartland.stores.cn.concept.Shop",
+        "hartland.stores.cn.concept.Shopper",
+        "hartland.stores.cnc.role.sales_fact",
+        "hartland.stores.er.entity.sale",
+        "hartland.stores.er.entity.sale.sale_id",
+        "hartland.stores.er.entity.sale.sold_date",
+        "hartland.stores.er.entity.shopper",
+        "hartland.stores.er.entity.shopper.shopper_id",
+        "hartland.stores.er.entity.store",
+        "hartland.stores.er.entity.store.store_id"
+    ]
+}

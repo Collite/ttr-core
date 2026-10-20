@@ -1,0 +1,53 @@
+{
+    "diagnostics": [
+        "cn/antirigid-supertype",
+        "cn/antirigid-supertype",
+        "cn/antirigid-supertype"
+    ],
+    "resolved": [
+        "Active => hartland.stores.cn.concept.Active",
+        "Business => hartland.stores.cn.concept.Business",
+        "Customer => hartland.stores.cn.concept.Customer",
+        "Customer => hartland.stores.cn.concept.Customer",
+        "LoyalCustomer => hartland.stores.cn.concept.LoyalCustomer",
+        "Party => hartland.stores.cn.concept.Party",
+        "Party => hartland.stores.cn.concept.Party",
+        "Party => hartland.stores.cn.concept.Party",
+        "Party => hartland.stores.cn.concept.Party",
+        "Purchase => hartland.stores.cn.concept.Purchase",
+        "er.entity.party => hartland.stores.er.entity.party",
+        "er.entity.party => hartland.stores.er.entity.party",
+        "er.entity.party => hartland.stores.er.entity.party",
+        "er.entity.party => hartland.stores.er.entity.party",
+        "er.entity.party => hartland.stores.er.entity.party",
+        "er.entity.party => hartland.stores.er.entity.party",
+        "er.entity.party => hartland.stores.er.entity.party",
+        "er.entity.sale => hartland.stores.er.entity.sale"
+    ],
+    "symbols": [
+        "hartland.stores.binding.cn2er_event.Purchase.grounds",
+        "hartland.stores.binding.cn2er_kind.ActiveParty.grounds",
+        "hartland.stores.binding.cn2er_kind.Business.grounds",
+        "hartland.stores.binding.cn2er_kind.LoyalCustomer.grounds",
+        "hartland.stores.binding.cn2er_kind.Party.grounds",
+        "hartland.stores.binding.cn2er_kind.SmallBusiness.grounds",
+        "hartland.stores.binding.cn2er_kind.VipCustomer.grounds",
+        "hartland.stores.binding.cn2er_role.Customer.grounds",
+        "hartland.stores.cn.concept.Active",
+        "hartland.stores.cn.concept.ActiveParty",
+        "hartland.stores.cn.concept.Business",
+        "hartland.stores.cn.concept.Customer",
+        "hartland.stores.cn.concept.LoyalCustomer",
+        "hartland.stores.cn.concept.Party",
+        "hartland.stores.cn.concept.Purchase",
+        "hartland.stores.cn.concept.Purchase.customer",
+        "hartland.stores.cn.concept.SmallBusiness",
+        "hartland.stores.cn.concept.VipCustomer",
+        "hartland.stores.er.entity.party",
+        "hartland.stores.er.entity.party.is_active",
+        "hartland.stores.er.entity.party.party_id",
+        "hartland.stores.er.entity.sale",
+        "hartland.stores.er.entity.sale.sale_id",
+        "hartland.stores.er.entity.sale.sold_date"
+    ]
+}

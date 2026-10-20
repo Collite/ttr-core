@@ -1,0 +1,35 @@
+{
+    "diagnostics": [
+        "ttr/required-property-missing",
+        "ttr/required-property-missing",
+        "ttr/required-property-missing"
+    ],
+    "resolved": [
+        "Item => hartland.stores.cn.concept.Item",
+        "Item => hartland.stores.cn.concept.Item",
+        "Item => hartland.stores.cn.concept.Item",
+        "er.entity.item => hartland.stores.er.entity.item",
+        "er.entity.item.color => hartland.stores.er.entity.item.color",
+        "er.entity.item.weight => hartland.stores.er.entity.item.weight"
+    ],
+    "symbols": [
+        "hartland.stores.binding.cn2er_kind.Item.grounds",
+        "hartland.stores.binding.cn2er_quality.color.grounds",
+        "hartland.stores.binding.cn2er_quality.pack_size.concept",
+        "hartland.stores.binding.cn2er_quality.size_code.concept",
+        "hartland.stores.binding.cn2er_quality.weight.grounds",
+        "hartland.stores.cn.concept.Heavy",
+        "hartland.stores.cn.concept.Item",
+        "hartland.stores.cn.concept.Light",
+        "hartland.stores.cn.concept.color",
+        "hartland.stores.cn.concept.pack_size",
+        "hartland.stores.cn.concept.size_code",
+        "hartland.stores.cn.concept.weight",
+        "hartland.stores.er.entity.item",
+        "hartland.stores.er.entity.item.color",
+        "hartland.stores.er.entity.item.pack_size",
+        "hartland.stores.er.entity.item.size_code",
+        "hartland.stores.er.entity.item.sku",
+        "hartland.stores.er.entity.item.weight"
+    ]
+}

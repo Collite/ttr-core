@@ -1,0 +1,20 @@
+package hartland.stores
+model cn
+
+def kind Item      { grounds: er.entity.item }
+def kind Warehouse { grounds: er.entity.warehouse }
+def event StockTransfer {
+    involves: [Item, Warehouse, Warehouse],
+    period: { at: shipped_at },
+    grounds: er.entity.transfer
+}
+def event Restock {
+    involves: [Item, Warehouse as from, Warehouse as to],
+    period: { at: shipped_at },
+    grounds: er.entity.transfer
+}
+def event Rebalance {
+    involves: [Warehouse, Warehouse as warehouse],
+    period: { at: shipped_at },
+    grounds: er.entity.transfer
+}

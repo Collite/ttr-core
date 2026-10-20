@@ -100,6 +100,15 @@ export class ProjectSymbolTable {
     )[0];
   }
 
+  /**
+   * How a document was upserted — its model directive code, namespace and effective package — or
+   * `undefined` for a document the table does not hold. A project rule reads a document's package here
+   * rather than re-deriving it (0.17, the cn checks).
+   */
+  documentContext(uri: string): { schemaCode: string; namespace: string; packageName: string } | undefined {
+    return this.byDocument.get(uri)?.context();
+  }
+
   allQnames(): string[] {
     return [...this.byQname.keys()];
   }

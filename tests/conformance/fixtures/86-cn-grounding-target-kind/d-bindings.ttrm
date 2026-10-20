@@ -1,0 +1,6 @@
+// Authored bindings: a quality on an entity, and a role binding that names a kind.
+package hartland.stores
+model binding
+
+def cn2er_quality amount_g         { quality: cn.amount, target: er.entity.order }
+def cn2md_role    category_as_role { role: cn.Category,  target: md.Product }

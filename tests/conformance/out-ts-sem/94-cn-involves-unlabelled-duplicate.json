@@ -1,0 +1,46 @@
+{
+    "diagnostics": [
+        "cn/involves-unlabelled-duplicate",
+        "cn/involves-unlabelled-duplicate"
+    ],
+    "resolved": [
+        "Item => hartland.stores.cn.concept.Item",
+        "Item => hartland.stores.cn.concept.Item",
+        "Warehouse => hartland.stores.cn.concept.Warehouse",
+        "Warehouse => hartland.stores.cn.concept.Warehouse",
+        "Warehouse => hartland.stores.cn.concept.Warehouse",
+        "Warehouse => hartland.stores.cn.concept.Warehouse",
+        "Warehouse => hartland.stores.cn.concept.Warehouse",
+        "Warehouse => hartland.stores.cn.concept.Warehouse",
+        "er.entity.item => hartland.stores.er.entity.item",
+        "er.entity.transfer => hartland.stores.er.entity.transfer",
+        "er.entity.transfer => hartland.stores.er.entity.transfer",
+        "er.entity.transfer => hartland.stores.er.entity.transfer",
+        "er.entity.warehouse => hartland.stores.er.entity.warehouse"
+    ],
+    "symbols": [
+        "hartland.stores.binding.cn2er_event.Rebalance.grounds",
+        "hartland.stores.binding.cn2er_event.Restock.grounds",
+        "hartland.stores.binding.cn2er_event.StockTransfer.grounds",
+        "hartland.stores.binding.cn2er_kind.Item.grounds",
+        "hartland.stores.binding.cn2er_kind.Warehouse.grounds",
+        "hartland.stores.cn.concept.Item",
+        "hartland.stores.cn.concept.Rebalance",
+        "hartland.stores.cn.concept.Rebalance.warehouse",
+        "hartland.stores.cn.concept.Restock",
+        "hartland.stores.cn.concept.Restock.from",
+        "hartland.stores.cn.concept.Restock.item",
+        "hartland.stores.cn.concept.Restock.to",
+        "hartland.stores.cn.concept.StockTransfer",
+        "hartland.stores.cn.concept.StockTransfer.item",
+        "hartland.stores.cn.concept.StockTransfer.warehouse",
+        "hartland.stores.cn.concept.Warehouse",
+        "hartland.stores.er.entity.item",
+        "hartland.stores.er.entity.item.sku",
+        "hartland.stores.er.entity.transfer",
+        "hartland.stores.er.entity.transfer.shipped_at",
+        "hartland.stores.er.entity.transfer.transfer_id",
+        "hartland.stores.er.entity.warehouse",
+        "hartland.stores.er.entity.warehouse.warehouse_code"
+    ]
+}

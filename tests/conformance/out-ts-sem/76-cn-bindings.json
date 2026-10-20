@@ -1,5 +1,6 @@
 {
     "diagnostics": [
+        "cn/db-grounding",
         "ttr/unresolved-reference",
         "ttr/unresolved-reference",
         "ttr/unresolved-reference",

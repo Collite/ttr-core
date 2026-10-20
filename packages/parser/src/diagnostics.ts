@@ -147,6 +147,21 @@ export enum DiagnosticCode {
   ExpressionBlockRequired = 'ttr/expression-block-required',      // a binding's `filter:` that is not a string or block
   // 0.17 (CN-P2) — the model-level `cn/*` slugs (cn contracts §7).
   CnDuplicateGrounding = 'cn/duplicate-grounding',                // a concept's second grounding, or sugar that restates a concept differently
+  CnGroundingTargetKind = 'cn/grounding-target-kind',             // a grounding's target is not what the stereotype × layer table allows
+  CnRoleNoEvent = 'cn/role-no-event',                             // a role without its defining event (CN-D6)
+  CnPhaseDoubleDefinition = 'cn/phase-double-definition',         // a phase both defined and grounded (AM-2)
+  CnPhaseNoDefinition = 'cn/phase-no-definition',                 // hygiene: a phase neither defined nor grounded
+  CnEventNoPeriod = 'cn/event-no-period',                         // hygiene: an event without `period:`
+  CnUngrounded = 'cn/ungrounded',                                 // hygiene: a concept with no grounding (P-1)
+  CnDbGrounding = 'cn/db-grounding',                              // advisory: a db grounding — documentation only
+  CnHierarchyShape = 'cn/hierarchy-shape',                        // a `hierarchy:` closure without its two attributes or a key
+  CnParticipantPathBroken = 'cn/participant-path-broken',         // a participant's relation path does not chain
+  CnInvolvesUnlabelledDuplicate = 'cn/involves-unlabelled-duplicate', // two participants of one event under one label
+  CnUnknownRelationType = 'cn/unknown-relation-type',             // an open-tier edge whose `type:` is no relation type
+  CnAntirigidSupertype = 'cn/antirigid-supertype',                // a kind whose `is_a` chain reaches a role or a phase
+  CnCncDeprecated = 'cn/cnc-deprecated',                          // `model cnc` / `roles:` — deprecated (cn contracts §1.6)
+  CnDuplicateDefaultSense = 'cn/duplicate-default-sense',         // two `default: true` for one bare form per locale
+  CnPhaseAsDefault = 'cn/phase-as-default',                       // `default: true` on a phase's term whose form names its bearer (AM-36)
 }
 
 export enum DiagnosticSeverity {

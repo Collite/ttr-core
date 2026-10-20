@@ -36,6 +36,10 @@ const VALID_CATEGORIES: ReadonlySet<string> = new Set<RuleCategory>([
   'areas',
   'graph',
   'style',
+  'md',
+  'semantics',
+  'lexicon',
+  'cn',
 ]);
 
 const RANK: Record<Severity, number> = { off: 0, info: 1, warning: 2, error: 3 };

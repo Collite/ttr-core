@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { RuleId, Severity } from './rule.js';
+import { CN_HYGIENE_RULE_IDS } from './rules/cn.js';
 
 export type PresetName = 'recommended' | 'strict' | 'all' | 'none';
 
@@ -20,7 +21,9 @@ export const PRESET_NAMES: ReadonlySet<string> = new Set<PresetName>([
 export function presetSeverity(preset: PresetName, ruleId: RuleId): Severity | undefined {
   switch (preset) {
     case 'recommended':
-      return ruleId === 'missing-description' ? 'off' : undefined;
+      // The cn hygiene slugs (cn contracts §7) are a report, not editor noise: off here, `info` (their
+      // default) under `strict`; `all` raises them to error like every other rule.
+      return ruleId === 'missing-description' || CN_HYGIENE_RULE_IDS.has(ruleId) ? 'off' : undefined;
     case 'strict':
       if (ruleId === 'missing-description') return 'warning';
       if (ruleId === 'unresolved-reference') return 'error';

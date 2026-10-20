@@ -36,7 +36,8 @@ export interface PlacedGrounding extends CnGrounding {
 export interface CnDiagnostic {
   code: DiagnosticCode;
   message: string;
-  severity: 'error' | 'warning';
+  /** The slug's grade (cn contracts §7): hygiene and advisory ones are `info`; lint config decides what is shown. */
+  severity: 'error' | 'warning' | 'info';
   uri: string;
   source: SourceLocation;
 }

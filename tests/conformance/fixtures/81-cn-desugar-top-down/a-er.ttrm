@@ -24,7 +24,16 @@ def entity sale {
         def attribute amount      { type: decimal }
     ]
 }
-def entity placed_order  { attributes: [ def attribute order_number { type: int, isKey: true } ] }
+// A phase grounds only to an entity stacked on a query (AM-2; `cn/grounding-target-kind` otherwise).
+def query placed_orders {
+    sourceText: """sql
+SELECT sale.sale_id AS order_number FROM sale
+"""
+}
+def entity placed_order {
+    binding: { target: { query: er.query.placed_orders } },
+    attributes: [ def attribute order_number { type: int, isKey: true } ]
+}
 def entity category_code { attributes: [ def attribute code { type: text, isKey: true } ] }
 def entity category_closure {
     attributes: [

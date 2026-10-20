@@ -1,0 +1,7 @@
+package hartland.stores
+model cn
+
+def kind Item             { grounds: er.entity.item }
+def phase Discontinued    { of: Item }
+def phase StockCondition  { of: Item, abstract: true }
+def phase OutOfStock      { of: Item, is_a: StockCondition, definition: """quantity_on_hand = 0""" }

@@ -1,0 +1,44 @@
+{
+    "diagnostics": [
+        "cn/duplicate-grounding",
+        "cn/duplicate-grounding",
+        "cn/duplicate-grounding"
+    ],
+    "resolved": [
+        "Buyer => hartland.stores.cn.concept.Buyer",
+        "Party => hartland.stores.cn.concept.Party",
+        "Purchase => hartland.stores.cn.concept.Purchase",
+        "Purchase => hartland.stores.cn.concept.Purchase",
+        "Shop => hartland.stores.cn.concept.Shop",
+        "cn.Party => hartland.stores.cn.concept.Party",
+        "er.entity.customer => hartland.stores.er.entity.customer",
+        "er.entity.party => hartland.stores.er.entity.party",
+        "er.entity.store => hartland.stores.er.entity.store"
+    ],
+    "symbols": [
+        "hartland.stores.binding.cn2er_event.Purchase.concept",
+        "hartland.stores.binding.cn2er_kind.Party.grounds",
+        "hartland.stores.binding.cn2er_kind.Shop.grounds",
+        "hartland.stores.binding.cn2er_kind.party_again",
+        "hartland.stores.binding.cn2er_quality.Channel.concept",
+        "hartland.stores.binding.cn2er_role.Buyer.concept",
+        "hartland.stores.cn.concept.Buyer",
+        "hartland.stores.cn.concept.Channel",
+        "hartland.stores.cn.concept.Party",
+        "hartland.stores.cn.concept.Purchase",
+        "hartland.stores.cn.concept.Purchase.buyer",
+        "hartland.stores.cn.concept.Purchase.shop",
+        "hartland.stores.cn.concept.Shop",
+        "hartland.stores.er.entity.customer",
+        "hartland.stores.er.entity.customer.customer_id",
+        "hartland.stores.er.entity.party",
+        "hartland.stores.er.entity.party.party_id",
+        "hartland.stores.er.entity.sale",
+        "hartland.stores.er.entity.sale.paid_date",
+        "hartland.stores.er.entity.sale.sale_id",
+        "hartland.stores.er.entity.sale.sold_date",
+        "hartland.stores.er.entity.store",
+        "hartland.stores.er.entity.store.channel",
+        "hartland.stores.er.entity.store.store_id"
+    ]
+}

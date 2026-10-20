@@ -19,5 +19,5 @@ def domain Brand { type: text, concept { kind: Brand } }
 def measure net_sales { domain: md.Money, aggregation: sum, concept { quality: net_sales, of: StoreSale } }
 def cubelet store_sales {
     grain: [Shopper.shopper_code, Product.sku],
-    concept { event: StoreSale, involves: [Shopper, Item] }
+    concept { event: StoreSale, involves: [Shopper, Item], period: { at: sold_date } }
 }

@@ -1,0 +1,26 @@
+{
+    "diagnostics": [
+        "cn/db-grounding",
+        "cn/db-grounding"
+    ],
+    "resolved": [
+        "cn.GiftCard => hartland.stores.cn.concept.GiftCard",
+        "db.dbo.gift_card => hartland.stores.db.dbo.table.gift_card",
+        "db.dbo.loyalty_card => hartland.stores.db.dbo.table.loyalty_card",
+        "er.entity.store => hartland.stores.er.entity.store"
+    ],
+    "symbols": [
+        "hartland.stores.binding.cn2db_concept.LoyaltyCard.grounds",
+        "hartland.stores.binding.cn2db_concept.gift_card_g",
+        "hartland.stores.binding.cn2er_kind.Store.grounds",
+        "hartland.stores.cn.concept.GiftCard",
+        "hartland.stores.cn.concept.LoyaltyCard",
+        "hartland.stores.cn.concept.Store",
+        "hartland.stores.db.dbo.table.gift_card",
+        "hartland.stores.db.dbo.table.gift_card.card_no",
+        "hartland.stores.db.dbo.table.loyalty_card",
+        "hartland.stores.db.dbo.table.loyalty_card.card_no",
+        "hartland.stores.er.entity.store",
+        "hartland.stores.er.entity.store.store_id"
+    ]
+}

@@ -28,7 +28,7 @@ def entity sale {
         def attribute sold_date   { type: date },
         def attribute amount      { type: decimal, concept { quality: amount, of: Purchase } }
     ],
-    concept { event: Purchase, involves: [Buyer, Shop], qualities: [amount] }
+    concept { event: Purchase, involves: [Buyer, Shop], qualities: [amount], period: { at: sold_date } }
 }
 def relation sale_store    { from: er.entity.sale, to: er.entity.store }
 def relation sale_customer { from: er.entity.sale, to: er.entity.customer }

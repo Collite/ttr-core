@@ -1,0 +1,8 @@
+package hartland.stores
+model cn
+
+def event Order { period: { start: placed_date, end: delivered_date }, grounds: er.entity.order }
+def phase PlacedOrder  { of: Order, definition: """state = 'placed'""", grounds: er.entity.order_in_state }
+def phase HeldOrder    { of: Order, definition: """state = 'held'""" }
+def phase OpenOrder    { of: Order, definition: """state = 'open'""" }
+def phase ShippedOrder { of: Order, grounds: er.entity.order_in_state }

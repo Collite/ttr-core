@@ -1,0 +1,4 @@
+package hartland.stores
+model md
+
+def dimension Region { key: region_code, attributes: [ def attribute region_code { domain: md.RegionCode, isKey: true } ] }

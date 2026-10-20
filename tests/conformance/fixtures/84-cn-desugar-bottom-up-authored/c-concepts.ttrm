@@ -6,11 +6,11 @@ def kind Party         { label: { en: "Party" } }
 def role Buyer         { of: Party, event: Purchase }
 def kind Shop          { }
 def kind Channel       { }
-def event Purchase     { involves: [Buyer, Shop], qualities: [amount] }
+def event Purchase     { involves: [Buyer, Shop], qualities: [amount], period: { at: sold_date } }
 def quality amount     { of: Purchase }
 def kind Item          { label: { en: "Product" } }
 def quality color      { of: Item }
 def role Shopper       { of: Party, event: StoreSale }
 def kind Brand         { }
 def quality net_sales  { of: StoreSale }
-def event StoreSale    { involves: [Shopper, Item] }
+def event StoreSale    { involves: [Shopper, Item], period: { at: sold_date } }

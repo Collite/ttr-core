@@ -53,6 +53,13 @@ export {
   type PlacedGrounding,
   type GroundingAnalysis,
 } from './cn/groundings.js';
+export {
+  validateCn,
+  cncDeprecations,
+  type CnConcept,
+  type CnValidation,
+  type StatedProperty,
+} from './cn/validate.js';
 export type { CanonicalLexiconEntry, LexiconAnalysis, LexiconDiagnostic } from './lexicon/model.js';
 export { serializeVocabularySnapshot, foldId } from './lexicon/snapshot.js';
 export { foldForCollision } from './lexicon/fold.js';

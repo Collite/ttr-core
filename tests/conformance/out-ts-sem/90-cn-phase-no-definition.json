@@ -1,0 +1,22 @@
+{
+    "diagnostics": [
+        "cn/phase-no-definition"
+    ],
+    "resolved": [
+        "Item => hartland.stores.cn.concept.Item",
+        "Item => hartland.stores.cn.concept.Item",
+        "Item => hartland.stores.cn.concept.Item",
+        "StockCondition => hartland.stores.cn.concept.StockCondition",
+        "er.entity.item => hartland.stores.er.entity.item"
+    ],
+    "symbols": [
+        "hartland.stores.binding.cn2er_kind.Item.grounds",
+        "hartland.stores.cn.concept.Discontinued",
+        "hartland.stores.cn.concept.Item",
+        "hartland.stores.cn.concept.OutOfStock",
+        "hartland.stores.cn.concept.StockCondition",
+        "hartland.stores.er.entity.item",
+        "hartland.stores.er.entity.item.quantity_on_hand",
+        "hartland.stores.er.entity.item.sku"
+    ]
+}

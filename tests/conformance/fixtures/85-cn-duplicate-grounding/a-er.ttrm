@@ -1,0 +1,29 @@
+// 0.17 (CN-P2 S2.3) — `cn/duplicate-grounding` (error, cn contracts §1.2, §1.4; CN-D12 strict).
+// Expected (sem): cn/duplicate-grounding ×3 —
+//   · `party_again` in `c-bindings.ttrm`: a second grounding of `Party` (its `grounds:` is the first);
+//   · `period:` in `sale`'s block: `Purchase`'s cn def states another period;
+//   · `quality:` in `channel`'s block: `Channel` is a kind, not a quality.
+// Near-misses (no diagnostic): `Shop` grounded once; `customer`'s block names `Buyer`, which a cn def
+// declares, and restates its event unchanged — the block only grounds it.
+package hartland.stores
+model er
+
+def entity party    { attributes: [ def attribute party_id { type: int, isKey: true } ] }
+def entity customer {
+    attributes: [ def attribute customer_id { type: int, isKey: true } ],
+    concept { role: Buyer, event: Purchase }
+}
+def entity store {
+    attributes: [
+        def attribute store_id { type: int, isKey: true },
+        def attribute channel  { type: text, concept { quality: Channel } }
+    ]
+}
+def entity sale {
+    attributes: [
+        def attribute sale_id   { type: int, isKey: true },
+        def attribute sold_date { type: date },
+        def attribute paid_date { type: date }
+    ],
+    concept { event: Purchase, period: { at: paid_date } }
+}

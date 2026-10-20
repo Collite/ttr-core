@@ -1,0 +1,6 @@
+package hartland.stores
+model cn
+
+def kind Shop       { grounds: er.entity.store }
+def event Purchase  { involves: [Shop], period: { at: sold_date }, grounds: er.entity.sale }
+def role Shopper    { event: Purchase, grounds: er.entity.shopper }

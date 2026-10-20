@@ -1,0 +1,16 @@
+// 0.17 (CN-P2 S2.3) — a quality's and a phase's bearer is required (cn contracts §1.1): a missing
+// `of:` is the generic `ttr/required-property-missing` (rule `concept-bearer-missing`), no cn slug.
+// Expected (sem): ttr/required-property-missing ×3 — `weight` and `Heavy` (cn defs) and `size_code`
+// (declared by `item`'s attribute block). Near-misses: `color`, `Light` and `pack_size` name a bearer.
+package hartland.stores
+model er
+
+def entity item {
+    attributes: [
+        def attribute sku       { type: text, isKey: true },
+        def attribute weight    { type: decimal },
+        def attribute color     { type: text },
+        def attribute size_code { type: text, concept { quality: size_code } },
+        def attribute pack_size { type: int, concept { quality: pack_size, of: Item } }
+    ]
+}

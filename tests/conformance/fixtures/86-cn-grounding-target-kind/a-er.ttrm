@@ -1,0 +1,41 @@
+// 0.17 (CN-P2 S2.3) — `cn/grounding-target-kind` (error): a grounding's target is not what the
+// stereotype × layer table allows (cn contracts §1.2, design `09` §2) — one case per kind of mismatch.
+// Expected (sem): cn/grounding-target-kind ×7 —
+//   · `Brand { grounds: md.net_sales }`        — an md kind grounds to a dimension or a domain, not a measure;
+//   · `ReturnLine { grounds: md.Product }`     — an md event grounds to a cubelet;
+//   · `amount_g`                               — an er quality grounds to an er attribute, not an entity;
+//   · `HeldOrder { grounds: er.entity.order }` — a phase grounds only to a query-backed (stacked) entity (AM-2);
+//   · `BigBasket { grounds: md.store_sales }`  — a phase has no md grounding (no binding kind);
+//   · `supplies { grounds: … }`                — a relation type is open tier and never grounds;
+//   · `category_as_role`                       — `cn2md_role` names `Category`, a kind.
+// Also cn/phase-no-definition ×1 (hygiene): `BigBasket`'s md `grounds:` grounds nothing, and it has no definition.
+// Near-misses: a kind on a dimension and on a domain, a quality on a measure and on an md attribute, an
+// event on a cubelet, an er kind on an entity and on an attribute (a value kind), a role and an event on
+// entities, a phase on an entity stacked on a query.
+package hartland.stores
+model er
+
+def entity party    { attributes: [ def attribute party_id { type: int, isKey: true } ] }
+def entity store {
+    attributes: [
+        def attribute store_id { type: int, isKey: true },
+        def attribute channel  { type: text }
+    ]
+}
+def entity order {
+    attributes: [
+        def attribute order_number { type: int, isKey: true },
+        def attribute state        { type: text },
+        def attribute amount       { type: decimal },
+        def attribute placed_date  { type: date }
+    ]
+}
+def query placed_orders {
+    sourceText: """sql
+SELECT order.order_number FROM order WHERE order.state = 'placed'
+"""
+}
+def entity placed_order {
+    binding: { target: { query: er.query.placed_orders } },
+    attributes: [ def attribute order_number { type: int, isKey: true } ]
+}

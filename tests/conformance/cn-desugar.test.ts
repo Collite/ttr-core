@@ -89,7 +89,8 @@ describe('CN-P2 S2.2 — both sugars desugar to the binding an author would writ
 
   it.each(PAIRS.flat())('%s: clean, every concept grounded exactly once', (dir) => {
     const p = projects.get(dir)!;
-    expect(p.sem.diagnostics).toEqual([]);
+    // The top-down pair grounds one concept to db: advisory `cn/db-grounding` (S2.3), nothing else.
+    expect(p.sem.diagnostics).toEqual(PAIRS[0].includes(dir) ? ['cn/db-grounding'] : []);
     expect(p.analysis.diagnostics).toEqual([]);
     const concepts = p.symbols.all().filter((e) => e.kind === 'concept').map((e) => e.qname).sort();
     expect(Object.keys(canonical(p)).sort()).toEqual(concepts);

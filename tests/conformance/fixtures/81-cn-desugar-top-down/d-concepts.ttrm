@@ -7,7 +7,7 @@ model cn
 def kind Item          { label: { en: "Product" }, grounds: md.Product }
 def kind Brand         { grounds: md.Brand }
 def role Shopper       { of: Party, event: StoreSale, grounds: md.Shopper }
-def event StoreSale    { involves: [Shopper, Item], grounds: md.store_sales }
+def event StoreSale    { involves: [Shopper, Item], period: { at: sold_date }, grounds: md.store_sales }
 def quality net_sales  { of: StoreSale, grounds: md.net_sales }
 def quality color      { of: Item, grounds: md.Product.color }
 
@@ -20,7 +20,7 @@ def kind ProductCategory {
     hierarchy: { closure: er.entity.category_closure, ancestor: ancestor_code, descendant: descendant_code }
 }
 def role Buyer         { of: Party, event: Purchase, grounds: er.entity.customer }
-def event Purchase     { involves: [Buyer, Shop], qualities: [amount], grounds: er.entity.sale }
+def event Purchase     { involves: [Buyer, Shop], qualities: [amount], period: { at: sold_date }, grounds: er.entity.sale }
 def quality amount     { of: Purchase, grounds: er.entity.sale.amount }
 def phase PlacedOrder  { of: Purchase, grounds: er.entity.placed_order }
 

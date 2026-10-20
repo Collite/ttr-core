@@ -1,0 +1,14 @@
+// 0.17 (CN-P2 S2.3) — `cn/phase-as-default` (warning, AM-36): `default: true` on a term for a phase
+// while one of its forms also names a concept up the phase's `of:` chain — a bare term never
+// defaults to a phase. A lexicon rule — outside the portable subset: the sem dump does not show it;
+// `packages/lint/src/__tests__/cn-rules.test.ts` reads this fixture.
+// Expected (lint): cn/phase-as-default ×2 — `debtor` ("customer" names `Customer`, its bearer) and
+// `debtor_party` ("party" names `Party`, the bearer's bearer). Near-misses: `lapsed` (no bearer
+// shares "lapsed"), `lapsed_party` ("party" names `Party`, but no `default:`).
+package hartland.stores
+model er
+
+def entity partner { attributes: [ def attribute partner_id { type: int, isKey: true }, def attribute last_seen { type: date } ] }
+def entity sale {
+    attributes: [ def attribute sale_id { type: int, isKey: true }, def attribute sold_date { type: date } ]
+}

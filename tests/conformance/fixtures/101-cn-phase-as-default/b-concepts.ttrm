@@ -1,0 +1,8 @@
+package hartland.stores
+model cn
+
+def kind Party      { grounds: er.entity.partner }
+def event Purchase  { involves: [Customer], period: { at: sold_date }, grounds: er.entity.sale }
+def role Customer   { of: Party, event: Purchase, grounds: er.entity.partner }
+def phase DebtorCustomer { of: Customer, definition: """open_amount > 0""" }
+def phase LapsedParty    { of: Party, definition: """last_seen < as_of""" }

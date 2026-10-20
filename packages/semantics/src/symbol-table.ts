@@ -411,6 +411,11 @@ export class DocumentSymbolTable {
     return Array.from(this.entries.values());
   }
 
+  /** What the table was built with: the file's model directive code, namespace and effective package. */
+  context(): { schemaCode: string; namespace: string; packageName: string } {
+    return { schemaCode: this.schemaCode, namespace: this.namespace, packageName: this.packageName };
+  }
+
   inDocument(): SymbolEntry[] {
     return this.all();
   }

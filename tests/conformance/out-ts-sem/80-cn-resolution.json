@@ -1,5 +1,10 @@
 {
-    "diagnostics": [],
+    "diagnostics": [
+        "cn/ungrounded",
+        "cn/ungrounded",
+        "cn/ungrounded",
+        "cn/ungrounded"
+    ],
     "resolved": [
         "Customer => hartland.web.cn.concept.Customer",
         "Item => hartland.web.cn.concept.Item",

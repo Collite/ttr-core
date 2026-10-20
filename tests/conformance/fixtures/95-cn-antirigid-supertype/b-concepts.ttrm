@@ -1,0 +1,12 @@
+package hartland.stores
+model cn
+
+def kind Party          { grounds: er.entity.party }
+def event Purchase      { involves: [Customer], period: { at: sold_date }, grounds: er.entity.sale }
+def role Customer       { of: Party, event: Purchase, grounds: er.entity.party }
+def phase Active        { of: Party, definition: """is_active""" }
+def kind LoyalCustomer  { is_a: Customer, grounds: er.entity.party }
+def kind VipCustomer    { is_a: LoyalCustomer, grounds: er.entity.party }
+def kind ActiveParty    { is_a: [Party, Active], grounds: er.entity.party }
+def kind Business       { is_a: Party, grounds: er.entity.party }
+def kind SmallBusiness  { is_a: Business, grounds: er.entity.party }

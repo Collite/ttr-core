@@ -1,0 +1,40 @@
+{
+    "diagnostics": [],
+    "resolved": [
+        "Customer => hartland.stores.cn.concept.Customer",
+        "Party => hartland.stores.cn.concept.Party",
+        "Party => hartland.stores.cn.concept.Party",
+        "Purchase => hartland.stores.cn.concept.Purchase",
+        "Purchase => hartland.stores.cn.concept.Purchase",
+        "cn.Customer => hartland.stores.cn.concept.Customer",
+        "cn.Shopper => hartland.stores.cn.concept.Shopper",
+        "cn.Shopper => hartland.stores.cn.concept.Shopper",
+        "cn.Shopper => hartland.stores.cn.concept.Shopper",
+        "er.entity.partner => hartland.stores.er.entity.partner",
+        "er.entity.partner => hartland.stores.er.entity.partner",
+        "er.entity.sale => hartland.stores.er.entity.sale",
+        "er.entity.web_account => hartland.stores.er.entity.web_account"
+    ],
+    "symbols": [
+        "hartland.stores.binding.cn2er_event.Purchase.grounds",
+        "hartland.stores.binding.cn2er_kind.Party.grounds",
+        "hartland.stores.binding.cn2er_role.Customer.grounds",
+        "hartland.stores.binding.cn2er_role.Shopper.grounds",
+        "hartland.stores.cn.concept.Customer",
+        "hartland.stores.cn.concept.Party",
+        "hartland.stores.cn.concept.Purchase",
+        "hartland.stores.cn.concept.Purchase.customer",
+        "hartland.stores.cn.concept.Shopper",
+        "hartland.stores.db.dbo.term.buyer",
+        "hartland.stores.db.dbo.term.customer_default",
+        "hartland.stores.db.dbo.term.shopper_default",
+        "hartland.stores.db.dbo.term.zakaznik",
+        "hartland.stores.er.entity.partner",
+        "hartland.stores.er.entity.partner.partner_id",
+        "hartland.stores.er.entity.sale",
+        "hartland.stores.er.entity.sale.sale_id",
+        "hartland.stores.er.entity.sale.sold_date",
+        "hartland.stores.er.entity.web_account",
+        "hartland.stores.er.entity.web_account.account_id"
+    ]
+}

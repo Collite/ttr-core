@@ -1,0 +1,4 @@
+package hartland.stores
+model er
+
+def entity store { attributes: [ def attribute store_id { type: int, isKey: true } ] }

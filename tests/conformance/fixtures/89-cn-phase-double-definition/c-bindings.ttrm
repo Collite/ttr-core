@@ -1,0 +1,4 @@
+package hartland.stores
+model binding
+
+def cn2er_phase held_g { phase: cn.HeldOrder, target: er.entity.order_in_state }

@@ -1,0 +1,9 @@
+package hartland.stores
+model er
+
+def entity sale {
+    roles: [fact],
+    attributes: [ def attribute sale_id { type: int, isKey: true }, def attribute sold_date { type: date } ]
+}
+def entity store   { attributes: [ def attribute store_id { type: int, isKey: true } ] }
+def entity shopper { attributes: [ def attribute shopper_id { type: int, isKey: true } ] }

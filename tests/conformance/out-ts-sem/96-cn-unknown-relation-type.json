@@ -1,0 +1,33 @@
+{
+    "diagnostics": [
+        "cn/unknown-relation-type",
+        "cn/unknown-relation-type",
+        "ttr/unresolved-reference"
+    ],
+    "resolved": [
+        "Warehouse => hartland.stores.cn.concept.Warehouse",
+        "Warehouse => hartland.stores.cn.concept.Warehouse",
+        "Warehouse => hartland.stores.cn.concept.Warehouse",
+        "Warehouse => hartland.stores.cn.concept.Warehouse",
+        "er.entity.party => hartland.stores.er.entity.party",
+        "er.entity.party => hartland.stores.er.entity.party",
+        "er.entity.party => hartland.stores.er.entity.party",
+        "er.entity.warehouse => hartland.stores.er.entity.warehouse",
+        "supplies => hartland.stores.cn.concept.supplies"
+    ],
+    "symbols": [
+        "hartland.stores.binding.cn2er_kind.Broker.grounds",
+        "hartland.stores.binding.cn2er_kind.Carrier.grounds",
+        "hartland.stores.binding.cn2er_kind.Supplier.grounds",
+        "hartland.stores.binding.cn2er_kind.Warehouse.grounds",
+        "hartland.stores.cn.concept.Broker",
+        "hartland.stores.cn.concept.Carrier",
+        "hartland.stores.cn.concept.Supplier",
+        "hartland.stores.cn.concept.Warehouse",
+        "hartland.stores.cn.concept.supplies",
+        "hartland.stores.er.entity.party",
+        "hartland.stores.er.entity.party.party_id",
+        "hartland.stores.er.entity.warehouse",
+        "hartland.stores.er.entity.warehouse.warehouse_code"
+    ]
+}

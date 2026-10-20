@@ -1,0 +1,20 @@
+// 0.17 (CN-P2 S2.3) — `cn/antirigid-supertype` (warning, OntoUML, CN-D8): a kind whose `is_a` chain
+// reaches a role or a phase — a rigid concept cannot specialize an anti-rigid one.
+// Expected (sem): cn/antirigid-supertype ×3 — `LoyalCustomer` (is_a a role), `ActiveParty` (is_a a
+// phase) and `VipCustomer` (through `LoyalCustomer`). Near-misses: `Business` and `SmallBusiness`
+// (kinds all the way up).
+package hartland.stores
+model er
+
+def entity party {
+    attributes: [
+        def attribute party_id   { type: int, isKey: true },
+        def attribute is_active  { type: boolean }
+    ]
+}
+def entity sale {
+    attributes: [
+        def attribute sale_id   { type: int, isKey: true },
+        def attribute sold_date { type: date }
+    ]
+}

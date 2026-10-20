@@ -1,5 +1,7 @@
 {
-    "diagnostics": [],
+    "diagnostics": [
+        "cn/db-grounding"
+    ],
     "resolved": [
         "Buyer => hartland.stores.cn.concept.Buyer",
         "Item => hartland.stores.cn.concept.Item",
@@ -111,6 +113,7 @@
         "hartland.stores.er.entity.store",
         "hartland.stores.er.entity.store.channel",
         "hartland.stores.er.entity.store.store_id",
+        "hartland.stores.er.query.placed_orders",
         "hartland.stores.er.relation.sale_customer",
         "hartland.stores.er.relation.sale_store",
         "hartland.stores.md.cubelet.store_sales",

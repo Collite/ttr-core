@@ -1,5 +1,7 @@
 {
-    "diagnostics": [],
+    "diagnostics": [
+        "cn/cnc-deprecated"
+    ],
     "resolved": [],
     "symbols": [
         "cnc.role.analytic_fact"

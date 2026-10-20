@@ -54,7 +54,30 @@ const PORTABLE_RULE_IDS = new Set([
   'wildcard-with-no-matches',
   'duplicate-definition',
   'duplicate-mapping',
+  // 0.17 (CN-P2 S2.3) — the model-level cn checks (cn contracts §7); Kotlin and Python emit them
+  // unconditionally (S2.4). The lexicon pair (`cn-duplicate-default-sense`, `cn-phase-as-default`)
+  // and the definition-level slugs (Kotlin, S2.6) are not portable.
+  'cn-duplicate-grounding',
+  'cn-grounding-target-kind',
+  'cn-role-no-event',
+  'concept-bearer-missing',
+  'cn-phase-double-definition',
+  'cn-phase-no-definition',
+  'cn-event-no-period',
+  'cn-ungrounded',
+  'cn-db-grounding',
+  'cn-hierarchy-shape',
+  'cn-participant-path-broken',
+  'cn-involves-unlabelled-duplicate',
+  'cn-unknown-relation-type',
+  'cn-antirigid-supertype',
+  'cn-cnc-deprecated',
 ]);
+/**
+ * The cn hygiene slugs are off in `recommended` (an editor shows them only on request), but they are
+ * part of the portable subset: the dump switches them on, as the Kotlin and Python dumps emit them.
+ */
+const CN_HYGIENE_ON = { 'cn-ungrounded': 'info', 'cn-phase-no-definition': 'info', 'cn-event-no-period': 'info' } as const;
 const PORTABLE_RULES = [...RULES.values()].filter((r) => PORTABLE_RULE_IDS.has(r.id));
 
 export interface SemDump {
@@ -103,7 +126,7 @@ export function dumpSemDocs(docs: SemDocInput[], stock: Map<string, Document>): 
 
   const resolver = new Resolver(symbols);
   const deps = { manifest: resolveManifest(undefined, ''), symbols, resolver };
-  const config = recommendedConfig();
+  const config = recommendedConfig({ overrides: { ...CN_HYGIENE_ON } });
   const projectDocs = new Map(metas.map((m) => [m.uri, m.ast]));
   const packageGraph = new PackageGraphBuilder(symbols, projectDocs).build();
 

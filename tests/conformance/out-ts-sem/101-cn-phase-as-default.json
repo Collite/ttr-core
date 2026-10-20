@@ -1,0 +1,42 @@
+{
+    "diagnostics": [],
+    "resolved": [
+        "Customer => hartland.stores.cn.concept.Customer",
+        "Customer => hartland.stores.cn.concept.Customer",
+        "Party => hartland.stores.cn.concept.Party",
+        "Party => hartland.stores.cn.concept.Party",
+        "Purchase => hartland.stores.cn.concept.Purchase",
+        "cn.Customer => hartland.stores.cn.concept.Customer",
+        "cn.DebtorCustomer => hartland.stores.cn.concept.DebtorCustomer",
+        "cn.DebtorCustomer => hartland.stores.cn.concept.DebtorCustomer",
+        "cn.LapsedParty => hartland.stores.cn.concept.LapsedParty",
+        "cn.LapsedParty => hartland.stores.cn.concept.LapsedParty",
+        "cn.Party => hartland.stores.cn.concept.Party",
+        "er.entity.partner => hartland.stores.er.entity.partner",
+        "er.entity.partner => hartland.stores.er.entity.partner",
+        "er.entity.sale => hartland.stores.er.entity.sale"
+    ],
+    "symbols": [
+        "hartland.stores.binding.cn2er_event.Purchase.grounds",
+        "hartland.stores.binding.cn2er_kind.Party.grounds",
+        "hartland.stores.binding.cn2er_role.Customer.grounds",
+        "hartland.stores.cn.concept.Customer",
+        "hartland.stores.cn.concept.DebtorCustomer",
+        "hartland.stores.cn.concept.LapsedParty",
+        "hartland.stores.cn.concept.Party",
+        "hartland.stores.cn.concept.Purchase",
+        "hartland.stores.cn.concept.Purchase.customer",
+        "hartland.stores.db.dbo.term.customer",
+        "hartland.stores.db.dbo.term.debtor",
+        "hartland.stores.db.dbo.term.debtor_party",
+        "hartland.stores.db.dbo.term.lapsed",
+        "hartland.stores.db.dbo.term.lapsed_party",
+        "hartland.stores.db.dbo.term.party",
+        "hartland.stores.er.entity.partner",
+        "hartland.stores.er.entity.partner.last_seen",
+        "hartland.stores.er.entity.partner.partner_id",
+        "hartland.stores.er.entity.sale",
+        "hartland.stores.er.entity.sale.sale_id",
+        "hartland.stores.er.entity.sale.sold_date"
+    ]
+}

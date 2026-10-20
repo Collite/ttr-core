@@ -14,6 +14,7 @@ const VALID_CATEGORIES: RuleCategory[] = [
   'md',
   'semantics',
   'lexicon',
+  'cn',
 ];
 const VALID_SEVERITIES = new Set(['error', 'warning', 'info']);
 
@@ -29,10 +30,10 @@ describe('rule registry', () => {
     for (const rule of RULES.values()) {
       expect(VALID_CATEGORIES).toContain(rule.category);
       expect(VALID_SEVERITIES.has(rule.defaultSeverity)).toBe(true);
-      // Rule codes are namespaced: ttr/* (core), md/* and the one er/* MD code,
-      // plus the stable TTR-SEM-2xx grounding family (grammar 4.2 — these are the
-      // cross-repo wire codes mirrored by ai-platform's proto enums).
-      expect(/^(ttr|md|er)\/|^TTR-SEM-\d{3}$/.test(rule.code)).toBe(true);
+      // Rule codes are namespaced: ttr/* (core), md/* and the one er/* MD code, cn/* (0.17,
+      // the conceptual model), plus the stable TTR-SEM-2xx grounding family (grammar 4.2 —
+      // these are the cross-repo wire codes mirrored by ai-platform's proto enums).
+      expect(/^(ttr|md|er|cn)\/|^TTR-SEM-\d{3}$/.test(rule.code)).toBe(true);
     }
   });
 

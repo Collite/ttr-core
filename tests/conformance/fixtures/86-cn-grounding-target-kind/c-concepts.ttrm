@@ -1,0 +1,23 @@
+// The concepts and their `grounds:`.
+package hartland.stores
+model cn
+
+def kind Item         { grounds: md.Product }
+def kind ItemSize     { grounds: md.Size }
+def kind Category     { label: { en: "Product category" } }
+def kind Brand        { grounds: md.net_sales }
+def quality net_sales { of: StoreSale, grounds: md.net_sales }
+def quality color     { of: Item, grounds: md.Product.color }
+def event StoreSale   { involves: [Item], period: { at: sold_date }, grounds: md.store_sales }
+def event ReturnLine  { involves: [Item], period: { at: returned_date }, grounds: md.Product }
+
+def kind Party        { grounds: er.entity.party }
+def kind Channel      { grounds: er.entity.store.channel }
+def role Buyer        { of: Party, event: Order, grounds: er.entity.party }
+def event Order       { involves: [Buyer], period: { at: placed_date }, grounds: er.entity.order }
+def quality amount    { of: Order }
+def phase PlacedOrder { of: Order, grounds: er.entity.placed_order }
+def phase HeldOrder   { of: Order, grounds: er.entity.order }
+def phase BigBasket   { of: StoreSale, grounds: md.store_sales }
+
+def relation_type supplies { grounds: er.entity.store }

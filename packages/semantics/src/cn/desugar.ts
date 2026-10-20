@@ -94,6 +94,11 @@ export interface CnGrounding {
    * `cn/grounding-target-kind` reports it (S2.3).
    */
   bindingKind?: ConceptBindingKind;
+  /**
+   * The stereotype a `grounds:` (its concept def's) or a `concept { }` block (its declaring slot's)
+   * states; unset on an authored binding, whose binding kind says it.
+   */
+  stereotype?: ConceptStereotype;
   /** The authored binding's name, or {@link synthesizedBindingName}. */
   name: string;
   conceptName?: string;
@@ -201,6 +206,7 @@ export function desugarConcepts(doc: Document, packageName = doc.packageDecl?.na
       groundings.push({
         origin: 'grounds',
         bindingKind: layer ? bindingKindFor(def.stereotype, layer) : undefined,
+        stereotype: def.stereotype,
         name: synthesizedBindingName(def.name, 'grounds'),
         conceptName: def.name,
         target: grounds.ref,
@@ -219,6 +225,7 @@ export function desugarConcepts(doc: Document, packageName = doc.packageDecl?.na
       groundings.push({
         origin: 'sugar',
         bindingKind: bindingKindFor(concept.stereotype, layer),
+        stereotype: concept.stereotype,
         name: synthesizedBindingName(concept.name, 'sugar'),
         conceptName: concept.name,
         targetKey: key,

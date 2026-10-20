@@ -1,0 +1,7 @@
+package hartland.stores
+model cn
+
+def kind Party       { grounds: er.entity.party }
+def event StoreVisit { involves: [Party], period: { at: visited_at }, grounds: er.entity.store_visit }
+def role Visitor     { of: Party, grounds: er.entity.party }
+def role Guest       { of: Party, event: StoreVisit, grounds: er.entity.party }

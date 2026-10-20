@@ -1,0 +1,13 @@
+// 0.17 (CN-P2 S2.3) — `cn/duplicate-default-sense` (error, cn contracts §1.5): at most one
+// `default: true` per bare form per locale per model. A lexicon rule — outside the portable subset:
+// the sem dump does not show it; `packages/lint/src/__tests__/cn-rules.test.ts` reads this fixture.
+// Expected (lint): cn/duplicate-default-sense ×1 — `shopper_default` (en "customer", after
+// `customer_default`). Near-misses: `zakaznik` (the same form, locale cs), `buyer` (no `default:`).
+package hartland.stores
+model er
+
+def entity partner { attributes: [ def attribute partner_id { type: int, isKey: true } ] }
+def entity web_account { attributes: [ def attribute account_id { type: int, isKey: true } ] }
+def entity sale {
+    attributes: [ def attribute sale_id { type: int, isKey: true }, def attribute sold_date { type: date } ]
+}
