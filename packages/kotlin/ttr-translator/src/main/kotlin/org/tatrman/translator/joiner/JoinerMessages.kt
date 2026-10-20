@@ -78,7 +78,9 @@ object JoinerMessages {
 
     /**
      * The refusal's text for one join: why neither carrier conditioned it, from what each reported on that join
-     * ([logical] names the entities the author wrote, [physical] the tables), and the two ways out.
+     * ([logical] names the entities the author wrote, [physical] the tables), and the way out: the ON. It offers no
+     * `CROSS JOIN`: the text reaches an LLM's repair round, and a model told a `CROSS JOIN` will do turns a forgotten ON
+     * into the warned Cartesian product this refusal exists to stop.
      */
     fun refusal(
         logical: JoinerWarning?,
@@ -105,8 +107,7 @@ object JoinerMessages {
                     }
                 else -> reason(logical)
             }
-        return "a JOIN without ON that the model cannot condition: $why; write the ON, " +
-            "or CROSS JOIN if every pairing is meant"
+        return "a JOIN without ON that the model cannot condition: $why; write the ON"
     }
 
     private fun noRelationOrKey(

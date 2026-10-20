@@ -98,7 +98,7 @@ class BareJoinRefusalSpec :
         val unrelated = "SELECT calendar.day_name, product.product_name FROM calendar JOIN product"
         val unrelatedRefusal =
             "a JOIN without ON that the model cannot condition: no relation or foreign key joins " +
-                "entity.calendar and entity.product; write the ON, or CROSS JOIN if every pairing is meant"
+                "entity.calendar and entity.product; write the ON"
 
         "a bare JOIN between unrelated entities is refused on the DB target, naming the sides" {
             refused(parse(unrelated)) shouldBe unrelatedRefusal
@@ -190,8 +190,7 @@ class BareJoinRefusalSpec :
             val m = withoutPairs(listOf(j.saleProductFk, secondSaleProductFk))
             val expected =
                 "a JOIN without ON that the model cannot condition: relation sale → product declares no join pairs, " +
-                    "and more than one foreign key could join dbo.store_sales and dbo.item; write the ON, " +
-                    "or CROSS JOIN if every pairing is meant"
+                    "and more than one foreign key could join dbo.store_sales and dbo.item; write the ON"
             refused(parse(sql, model = m)) shouldBe expected
             val erHalf = parse(sql, SchemaCode.ER, model = m).shouldBeInstanceOf<ParseResult.Success>()
             refused(dbHalf(erHalf.plan, m)) shouldBe expected

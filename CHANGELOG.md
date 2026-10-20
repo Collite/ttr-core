@@ -9,8 +9,9 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - **`ttr-translator`** — **`refuseUnconditionedBareJoins`** (new option on `Translator.parseToRelNode`, `translate`
   and `explain`, default `false`; ttr-server#232). Set, a SQL statement whose **bare** join (`JOIN` with no `ON`) stays a
   Cartesian product is refused as `join_unconditioned` (`JoinerMessages.UNCONDITIONED`). The message names the join's
-  sides and why, from what each joiner found on that join, and gives both ways out: `… no relation or foreign key joins
-  entity.calendar and entity.product; write the ON, or CROSS JOIN if every pairing is meant`.
+  sides and why, from what each joiner found on that join, and the way out: `… no relation or foreign key joins
+  entity.calendar and entity.product; write the ON`. It does not offer `CROSS JOIN`: the text reaches an LLM's repair
+  round, which would turn the forgotten `ON` into the warned Cartesian product.
   - A bare join stays a Cartesian product when the model's relations cannot condition it (none, more than one, an entity
     repeated across it, or one relation with no join pairs, Hartland's FK-only shape) **and** the physical stage cannot
     condition it from a table foreign key either. So a join a table FK completes is not refused, and neither is a
