@@ -34,31 +34,7 @@
     "embedded-blocks": {
       "patterns": [
         {
-          "name": "string.quoted.fenced.pl.ttrm",
-          "begin": "(\"\"\")(pl)(?=[ \\t]*\\r?$)",
-          "end": "\"\"\"",
-          "beginCaptures": {
-            "1": {
-              "name": "punctuation.definition.string.begin.ttrm"
-            },
-            "2": {
-              "name": "entity.name.tag.language.ttrm"
-            }
-          },
-          "endCaptures": {
-            "0": {
-              "name": "punctuation.definition.string.end.ttrm"
-            }
-          },
-          "contentName": "meta.embedded.block.pl.ttrm",
-          "patterns": [
-            {
-              "include": "#pl-expression"
-            }
-          ]
-        },
-        {
-          "begin": "\\b(definition|members|filter)\\s*(:)?\\s*(\"\"\")(?![a-zA-Z][a-zA-Z0-9-]*[ \\t]*\\r?$)",
+          "begin": "\\b(definition|members|filter)\\s*([:=])?\\s*(\"\"\")(?:(pl)(?=[ \\t]*\\r?$)|(?![a-zA-Z][a-zA-Z0-9-]*[ \\t]*\\r?$))",
           "end": "\"\"\"",
           "beginCaptures": {
             "1": {
@@ -69,6 +45,9 @@
             },
             "3": {
               "name": "string.quoted.fenced.pl.ttrm punctuation.definition.string.begin.ttrm"
+            },
+            "4": {
+              "name": "string.quoted.fenced.pl.ttrm entity.name.tag.language.ttrm"
             }
           },
           "endCaptures": {
@@ -84,7 +63,7 @@
           ]
         },
         {
-          "begin": "\\b(definition|members|filter)\\s*(:)?\\s*(\")(?!\"\")",
+          "begin": "\\b(definition|members|filter)\\s*([:=])?\\s*(\")(?!\"\")",
           "end": "\"",
           "beginCaptures": {
             "1": {
@@ -118,9 +97,21 @@
     "pl-expression": {
       "patterns": [
         {
+          "name": "comment.line.double-slash.ttrm",
+          "match": "//[^\"\\r\\n]*"
+        },
+        {
+          "name": "comment.block.ttrm",
+          "begin": "/\\*",
+          "end": "\\*/|(?=\")"
+        },
+        {
           "name": "string.quoted.single.ttrm",
-          "begin": "'",
-          "end": "'"
+          "match": "'[^'\\r\\n]*'"
+        },
+        {
+          "name": "string.quoted.double.ttrm",
+          "match": "\"(?!\"\")[^\"\\r\\n]*\""
         },
         {
           "name": "constant.numeric.ttrm",

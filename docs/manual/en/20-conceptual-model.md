@@ -7,7 +7,9 @@ concepts; the bindings tell them where the data is.
 
 > **Grammar 0.17 — reference only.** This page documents the syntax. The cn semantics — which property is legal on
 > which kind, the `cn/*` diagnostics, the desugaring of the `concept { }` sugar and of `grounds:`, reference
-> checking — arrive with the next release. Until then a cn file parses and is carried through, but nothing checks it.
+> checking — arrive with the next release. Until then a cn file parses and is carried through unchecked, and a lexicon
+> entry's `for: cn.<X>` is reported as an unresolved reference (`ttr/unresolved-reference` — a warning, an error under
+> the `strict` lint preset).
 
 | where | what |
 |---|---|
@@ -88,9 +90,12 @@ that model, and the cn properties are an error there.
 | `relations` | `[ { type: <relation_type>, to: <concept> } ]` | open-tier relations |
 | `lexicon` | `{ terms: […] }` | the inline lexicon shorthand, targeting the concept |
 
-Any other `key: value` parses as a free-form property (a literal, a name, a list or an object). The keys above that
-the grammar types — `definition`, `members`, `grounds`, `involves`, `period`, `extent`, `basis`, `value_space`,
-`event` — must carry their typed value: `definition: OverdueInvoice` is a parse error, not a free-form property.
+Any other `key: value` whose key is a plain name parses as a free-form property (a literal, a name, a list or an
+object). The key cannot be a TTR keyword: `from:`, `to:`, `type:`, `name:`, `key:`, `source:`, `default:` and the like
+are parse errors at the top of a concept body (inside a nested object such as a `relations:` entry, `type:` and `to:`
+are fine). The keys above that the grammar types — `definition`, `members`, `grounds`, `involves`, `period`,
+`extent`, `basis`, `value_space`, `event` — must carry their typed value: `definition: OverdueInvoice` is a parse
+error, not a free-form property.
 
 ## Definitions are expression blocks
 
@@ -201,7 +206,7 @@ An md or er def can declare its own concept in place — the binding is implied 
 |---|---|
 | `cubelet` | an event |
 | `dimension` · `domain` | a kind or a role |
-| `measure` | a quality |
+| `measure` · md `attribute` | a quality |
 | `entity` | a kind, a role or an event |
 | er `attribute` | a quality, or a value kind |
 

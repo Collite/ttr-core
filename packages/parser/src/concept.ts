@@ -45,15 +45,18 @@ export function embeddedBlockLocation(
   length = 1,
 ): SourceLocation {
   const l = Math.max(0, Math.min(line, block.lineOffsets.length - 1));
-  const startColumn = (l === 0 ? block.textSource.column : block.indentWidth) + column;
-  const offsetStart = block.lineOffsets[l] + column;
+  // A string-form block's escapes each take one more character of the file than of `text`.
+  const shift = (c: number) => (l === 0 ? (block.escapes ?? []).filter((e) => e < c).length : 0);
+  const base = l === 0 ? block.textSource.column : block.indentWidth;
+  const start = column + shift(column);
+  const end = column + length + shift(column + length);
   return {
     file: block.source.file,
     line: block.textSource.line + l,
-    column: startColumn,
+    column: base + start,
     endLine: block.textSource.line + l,
-    endColumn: startColumn + length,
-    offsetStart,
-    offsetEnd: offsetStart + length,
+    endColumn: base + end,
+    offsetStart: block.lineOffsets[l] + start,
+    offsetEnd: block.lineOffsets[l] + end,
   };
 }

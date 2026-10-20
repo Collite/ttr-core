@@ -1581,6 +1581,11 @@ export interface EmbeddedBlock {
   lineOffsets: number[];
   /** The indent the dedent removed from each line of `text` after the first. */
   indentWidth: number;
+  /**
+   * The string form only, when it has escapes: the index in `text` of every character written
+   * escaped (two characters in the file, one in `text`). Positions count code points.
+   */
+  escapes?: number[];
   /** The whole literal. */
   source: SourceLocation;
   leadingTrivia?: Trivia[];

@@ -474,11 +474,11 @@ describe('cn walker — diagnostics and recovery (T6)', () => {
   });
 
   it('flags a binding `filter:` that is not a block', () => {
-    const { ast, errors } = parseString('model binding\ndef cn2er_quality q { quality: cn.x, target: er.entity.o.v, filter: analyte }', 'f.ttrm');
+    const { ast, errors } = parseString('model binding\ndef cn2er_quality q { quality: cn.x, target: er.entity.o.v, filter: warehouse }', 'f.ttrm');
     expect(errors.map((e) => [e.code, e.severity])).toEqual([[DiagnosticCode.ExpressionBlockRequired, 'error']]);
     const q = ast!.definitions[0] as ConceptBindingDef;
     expect(keys(q)).toEqual(['quality', 'target', 'filter']);
-    expect(conceptEntry(q, 'filter')?.value).toMatchObject({ kind: 'id', path: 'analyte' });
+    expect(conceptEntry(q, 'filter')?.value).toMatchObject({ kind: 'id', path: 'warehouse' });
   });
 
   it('recovers past an unknown binding kind', () => {
@@ -556,5 +556,81 @@ describe('cn walker — lossless read and shared error positions (S1.3 T4)', () 
     const negative = readFileSync(join(CN, '..', 'cn-negative', name), 'utf-8');
     const first = parseString(negative, name).errors.find((e) => e.code === DiagnosticCode.ParseError)!;
     expect([first.source.line, first.source.column]).toEqual([line, column]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------
+// review-117 — the source map counts code points and steps over escapes (M-3, L-1), a second
+// `concept { }` is a duplicate property (M-4), a tag is an own key of its table (L-2). The Kotlin and
+// Python suites assert the same numbers.
+// ---------------------------------------------------------------------------------------------------
+
+describe('cn walker — review-117 fixes', () => {
+  const definitionOf = (src: string, name: string): EmbeddedBlock => {
+    const { ast } = parseString(src, 'r.ttrm');
+    return conceptProperty(concept(ast!.definitions, name), 'definition')!.block;
+  };
+  /** The file text between two parser offsets — they count code points, a JS string UTF-16 units. */
+  const at = (src: string, start: number, end: number) => [...src].slice(start, end).join('');
+  /** The parser offset (code points) of the first `needle` in `src`. */
+  const offsetOf = (src: string, needle: string) => [...src.slice(0, src.indexOf(needle))].length;
+
+  const ESCAPES = 'model cn\ndef quality P { of: X, definition: "a = \\"held\\" and b = \'c\\\\d\'" }';
+
+  it('maps every character of a string-form block with escapes onto the file (M-3)', () => {
+    const b = definitionOf(ESCAPES, 'P');
+    expect(b.text).toBe('a = "held" and b = \'c\\d\'');
+    expect(b.escapes).toEqual([4, 9, 21]);
+    for (let i = 0; i < [...b.text].length; i++) {
+      const loc = embeddedBlockLocation(b, 0, i);
+      const written = at(ESCAPES, loc.offsetStart, loc.offsetEnd);
+      expect(written, `text[${i}]`).toBe(b.escapes!.includes(i) ? `\\${[...b.text][i]}` : [...b.text][i]);
+    }
+    expect(at(ESCAPES, b.textSource.offsetStart, b.textSource.offsetEnd)).toBe('a = \\"held\\" and b = \'c\\\\d\'');
+    const b2 = embeddedBlockLocation(b, 0, 15, 1); // `b`, after two escapes
+    expect([b2.offsetStart, b2.column]).toEqual([ESCAPES.indexOf('b = '), ESCAPES.indexOf('b = ') - ESCAPES.indexOf('\n') - 1]);
+  });
+
+  const ASTRAL = [
+    'model cn',
+    'def phase A {',
+    '    of: Order,',
+    '    definition: """',
+    "    name = '😀😀' and",
+    '    total > 10',
+    '  """',
+    '}',
+    'def phase B { of: Order, definition: "x = \'😀\' and y = \\"z\\"" }',
+  ].join('\n');
+
+  it('counts code points in a block after a character outside the BMP (L-1)', () => {
+    const a = definitionOf(ASTRAL, 'A');
+    const total = embeddedBlockLocation(a, 1, 0, 5);
+    expect(at(ASTRAL, total.offsetStart, total.offsetEnd)).toBe('total');
+    // Three lines: the text ends with the newline before the closing fence.
+    expect(a.lineOffsets).toEqual([offsetOf(ASTRAL, "name = '"), offsetOf(ASTRAL, 'total'), offsetOf(ASTRAL, '  """')]);
+    expect(at(ASTRAL, a.textSource.offsetStart, a.textSource.offsetEnd)).toBe("name = '😀😀' and\n    total > 10\n");
+    const b = definitionOf(ASTRAL, 'B');
+    const y = embeddedBlockLocation(b, 0, 12, 1);
+    expect(at(ASTRAL, y.offsetStart, y.offsetEnd)).toBe('y');
+    const z = embeddedBlockLocation(b, 0, 16, 3); // `"z"` — two escapes inside the span
+    expect(at(ASTRAL, z.offsetStart, z.offsetEnd)).toBe('\\"z\\"');
+  });
+
+  it('reports a second `concept { }` on a host and reads the first (M-4)', () => {
+    const src = 'model er\ndef entity e { concept { kind: A }, concept { event: B } }';
+    const { ast, errors } = parseString(src, 'r.ttrm');
+    expect(errors.map((e) => [e.code, e.source.line, e.source.column])).toEqual([
+      [DiagnosticCode.DuplicateProperty, 2, src.lastIndexOf('concept') - src.indexOf('\n') - 1],
+    ]);
+    const e = ast!.definitions[0] as EntityDef;
+    expect(conceptRef(e.concept!, 'kind')?.ref.path).toBe('A');
+  });
+
+  it('reads `"""toString` as text, not as a tag Object.prototype happens to have (L-2)', () => {
+    const { ast, errors } = parseString('model cn\ndef phase P { definition: """toString\n  x\n""" }', 'r.ttrm');
+    const b = conceptProperty(concept(ast!.definitions, 'P'), 'definition')!.block;
+    expect(b).toMatchObject({ form: 'tripleString', text: 'toString\n  x\n' });
+    expect(errors.map((e) => e.code)).toEqual([DiagnosticCode.UnknownLanguageTag]);
   });
 });

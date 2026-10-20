@@ -291,33 +291,23 @@ function escapeRegex(s) {
 }
 // 0.17 — the cn expression blocks (⚑CN-P5, CN-D28). `definition:` / `members:` (and a binding's
 // `filter:`) carry a TTRP expression, the `pl` language of EXPRESSION_TAG_REGISTRY — in any of the
-// three `embeddedBlock` forms. A `"""pl`-tagged block is an expression wherever it stands; an
-// untagged triple-string or a plain string is one only after those keys. Another tag after the key
-// (`"""sql`) is left to #strings. The body is the self-contained #pl-expression set (the TTR-M
-// extension does not depend on the TTR-P one), mirroring the TTRP grammar's expression words.
-const PL_FENCE_TAG = '(?=[ \\t]*\\r?$)';
-const EXPRESSION_KEY = '\\b(definition|members|filter)\\s*(:)?\\s*';
+// three `embeddedBlock` forms: a `"""pl` block, an untagged triple-string, a plain string. Only after
+// those keys (with `:` or `=`, both `propSep`) — a `"""pl` first line elsewhere (a description) is
+// text. Another tag after the key (`"""sql`) is left to #strings. The body is the self-contained
+// #pl-expression set (the TTR-M extension does not depend on the TTR-P one), mirroring the TTRP
+// grammar's expression words; every region in it is one line or closes at the fence, so an
+// expression can never colour the rest of the file.
+const EXPRESSION_KEY = '\\b(definition|members|filter)\\s*([:=])?\\s*';
 const EMBEDDED_BLOCKS = {
     patterns: [
         {
-            name: 'string.quoted.fenced.pl.ttrm',
-            begin: '(""")(pl)' + PL_FENCE_TAG,
-            end: '"""',
-            beginCaptures: {
-                1: { name: 'punctuation.definition.string.begin.ttrm' },
-                2: { name: 'entity.name.tag.language.ttrm' },
-            },
-            endCaptures: { 0: { name: 'punctuation.definition.string.end.ttrm' } },
-            contentName: 'meta.embedded.block.pl.ttrm',
-            patterns: [{ include: '#pl-expression' }],
-        },
-        {
-            begin: EXPRESSION_KEY + '(""")(?![a-zA-Z][a-zA-Z0-9-]*[ \\t]*\\r?$)',
+            begin: EXPRESSION_KEY + '(""")(?:(pl)(?=[ \\t]*\\r?$)|(?![a-zA-Z][a-zA-Z0-9-]*[ \\t]*\\r?$))',
             end: '"""',
             beginCaptures: {
                 1: { name: 'keyword.other.property.ttrm' },
                 2: { name: 'punctuation.separator.ttrm' },
                 3: { name: 'string.quoted.fenced.pl.ttrm punctuation.definition.string.begin.ttrm' },
+                4: { name: 'string.quoted.fenced.pl.ttrm entity.name.tag.language.ttrm' },
             },
             endCaptures: { 0: { name: 'string.quoted.fenced.pl.ttrm punctuation.definition.string.end.ttrm' } },
             contentName: 'meta.embedded.block.pl.ttrm',
@@ -343,9 +333,15 @@ const EMBEDDED_BLOCKS = {
 exports.PL_OPERATOR_WORDS = ['group', 'by', 'in', 'and', 'or', 'not', 'is', 'between', 'cast', 'as', 'distinct'];
 exports.PL_CONDITIONAL_WORDS = ['case', 'when', 'then', 'else', 'end'];
 exports.PL_CONSTANTS = ['null', 'true', 'false'];
+// TTRP's strings (`'…'`, `"…"`) and `//` comments cannot span a line; a `/* … */` comment can. No rule
+// here may swallow the enclosing block's closing `"""` or string's closing `"`: a comment stops at
+// the first `"` (a quote inside a comment ends its colouring early — cosmetic, never a runaway).
 const PL_EXPRESSION = {
     patterns: [
-        { name: 'string.quoted.single.ttrm', begin: "'", end: "'" },
+        { name: 'comment.line.double-slash.ttrm', match: '//[^"\\r\\n]*' },
+        { name: 'comment.block.ttrm', begin: '/\\*', end: '\\*/|(?=")' },
+        { name: 'string.quoted.single.ttrm', match: "'[^'\\r\\n]*'" },
+        { name: 'string.quoted.double.ttrm', match: '"(?!"")[^"\\r\\n]*"' },
         { name: 'constant.numeric.ttrm', match: '\\b[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?\\b' },
         { name: 'keyword.operator.word.ttrm', match: '\\b(' + exports.PL_OPERATOR_WORDS.join('|') + ')\\b' },
         { name: 'keyword.control.conditional.ttrm', match: '\\b(' + exports.PL_CONDITIONAL_WORDS.join('|') + ')\\b' },

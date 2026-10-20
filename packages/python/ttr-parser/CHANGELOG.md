@@ -19,8 +19,12 @@ All notable changes to `ttr-parser` (Python) are documented here. While
   `ExampleDef` gain `default` and `sense_priority`. New codes `ttr/duplicate-property` and
   `ttr/expression-block-required`; `EXPRESSION_TAG_REGISTRY` (`pl`) beside the SQL `TAG_REGISTRY`.
 - **The md hosts of the sugar:** `MdDomainDef`, `DimensionDef`, `MeasureDef` and `CubeletDef` now parse
-  (identity, `description`, `tags` and `concept` only — the md model itself is not ported). `model md`
-  now reads as `md` (it read as `""`).
+  (identity, `description`, `tags` and `concept` only — the md model itself is not ported, so a
+  dimension's inline attributes and a cubelet's inline measures, and the `concept { }` on them, still
+  drop). `model md` now reads as `md` (it read as `""`).
+- One `concept { }` per host: a second is `ttr/duplicate-property` and the first is read. A string-form
+  `EmbeddedBlock` carries `escapes` (the `text` index of every escaped character) and `location()` steps
+  over them, so a position in an expression with `\"` still lands on the right file character.
 - Conformance fixtures 75–79 byte-identical to the TS golden (parse and semantics); 01–74 unchanged.
 
 ## 0.16.0 — unreleased

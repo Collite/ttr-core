@@ -23,6 +23,10 @@ export const DEFAULT_FORMAT_CONFIG: FormatConfig = {
 interface Ctx {
   source: string;
   config: FormatConfig;
+  /** Code-point offset (the parser's `offsetStart`/`offsetEnd`) → index into the UTF-16 `source`. */
+  u16: (offset: number) => number;
+  /** The inverse: UTF-16 index → code-point offset. */
+  cp: (index: number) => number;
   /** The cn printer's comment ledger: trivia it re-emitted, and the source ranges it sliced verbatim. */
   cn?: CnLedger;
 }
@@ -33,13 +37,41 @@ interface TriviaNode {
   trailingTrivia?: Trivia[];
 }
 
-function slice(src: string, loc: SourceLocation): string {
-  return src.slice(loc.offsetStart, loc.offsetEnd);
+/**
+ * The parser's offsets count code points (ANTLR's char stream); a JS string indexes UTF-16 units. They
+ * part at the first character outside the BMP (an emoji in a label, a description, a comment), after
+ * which a slice by raw offsets cuts every value one unit early per such character. One table per
+ * document maps between the two; without an astral character both maps are the identity.
+ */
+function offsetMaps(source: string): Pick<Ctx, 'u16' | 'cp'> {
+  if (!/[\uD800-\uDFFF]/.test(source)) return { u16: (o) => o, cp: (i) => i };
+  const toU16: number[] = [];
+  const toCp: number[] = [];
+  let cp = 0;
+  for (let i = 0; i < source.length; cp++) {
+    toU16.push(i);
+    toCp[i] = cp;
+    const wide = (source.codePointAt(i) ?? 0) > 0xffff;
+    if (wide) toCp[i + 1] = cp;
+    i += wide ? 2 : 1;
+  }
+  toU16.push(source.length);
+  toCp[source.length] = cp;
+  return { u16: (o) => toU16[o] ?? source.length, cp: (i) => toCp[i] ?? cp };
+}
+
+/** The source text between two parser (code-point) offsets. */
+function sourceText(ctx: Ctx, start: number, end: number): string {
+  return ctx.source.slice(ctx.u16(start), ctx.u16(end));
+}
+
+function slice(ctx: Ctx, loc: SourceLocation): string {
+  return sourceText(ctx, loc.offsetStart, loc.offsetEnd);
 }
 
 /** Verbatim source text of any node that carries a `source` span. */
 function vsrc(ctx: Ctx, node: { source: SourceLocation }): Doc {
-  return verbatim(slice(ctx.source, node.source));
+  return verbatim(slice(ctx, node.source));
 }
 
 // --- comment trivia emission ------------------------------------------------
@@ -60,6 +92,20 @@ function trailingInline(node: TriviaNode | undefined): Doc {
 
 function hasTrailing(node: TriviaNode | undefined): boolean {
   return !!node?.trailingTrivia?.length;
+}
+
+/**
+ * The comments the parser hung on `node` as trailing that lie INSIDE its span — written before its
+ * closing brace. They print there, each on its own line; after the brace they would run into the
+ * node's own trailing comment (`} // before // after` re-parses as one comment).
+ */
+function closingTrivia(node: TriviaNode & { source: SourceLocation }): Trivia[] {
+  const { offsetStart, offsetEnd } = node.source;
+  return (node.trailingTrivia ?? []).filter((t) => t.source.offsetStart >= offsetStart && t.source.offsetEnd <= offsetEnd);
+}
+
+function closingDocs(trivia: Trivia[]): Doc {
+  return concat(trivia.flatMap((t) => [hardline, verbatim(t.text)]));
 }
 
 /** Wrap a Doc with the node's leading (above) and trailing (same-line) comments. */
@@ -92,9 +138,11 @@ function keyListDoc(arr: string[]): Doc {
  * `sep` is what stands between key and value — `: ` except for the `concept { }` sugar. `atKey`: the
  * node starts at the key (a cn property, the sugar), so its leading comments print above the property
  * and re-attach there on the next parse. A typed value node starts after its key; a comment before it
- * would move on every pass, so it is not re-emitted.
+ * would move on every pass, so it is not re-emitted. `inline`: the value's form when its def prints on
+ * one line (a value that could break must not break inside an inline def — the next pass would read a
+ * multi-line def and lay it out differently).
  */
-interface Prop { key: string; value: Doc; node?: TriviaNode; sep?: string; atKey?: boolean }
+interface Prop { key: string; value: Doc; node?: TriviaNode; sep?: string; atKey?: boolean; inline?: Doc }
 
 // The AST stores camelCase kinds, but the grammar's `def` keyword is snake_case
 // for the mapping kinds.
@@ -260,7 +308,7 @@ function defListDoc(defs: Definition[], ctx: Ctx): Doc {
     parts.push(...leadingDocs(d));
     parts.push(formatDefCore(d, ctx, false));
     if (!last) parts.push(text(','));
-    parts.push(trailingInline(d));
+    parts.push(trailingInline(outsideTrivia(d, d.source)));
     if (!last) parts.push(hardline);
   });
   return concat([
@@ -292,7 +340,7 @@ function propsDoc(props: Prop[], ctx: Ctx, broken: boolean): Doc {
 
 /** A def's properties on one line: `k: v, k2: v2`. */
 function inlinePropsDoc(props: Prop[]): Doc {
-  return join(props.map((pr) => concat([text(`${pr.key}${pr.sep ?? ': '}`), pr.value])), text(', '));
+  return join(props.map((pr) => concat([text(`${pr.key}${pr.sep ?? ': '}`), pr.inline ?? pr.value])), text(', '));
 }
 
 /** True if rendering this def inline would swallow a `//` comment to end-of-line. */
@@ -323,17 +371,20 @@ function formatDefCore(def: Definition, ctx: Ctx, topLevel: boolean): Doc {
   // Kept VERBATIM — source order, every comment, every value form (review-114 M9): a world (its nested
   // members have no canonical layout yet; it used to print `def world w {}`), the six automation kinds and
   // an automation role (their free-form properties are in authored order, interleaved with the typed ones).
-  if (isVerbatimDef(def)) return verbatim(slice(ctx.source, def.source));
+  if (isVerbatimDef(def)) return verbatim(slice(ctx, def.source));
   if (def.kind === 'concept' || def.kind === 'conceptBinding') return formatCnDef(def, ctx);
   const props = propsOf(def, ctx);
   const header = `def ${kindKeyword(def.kind)} ${def.name} {`;
-  if (props.length === 0) return text(`def ${kindKeyword(def.kind)} ${def.name} {}`);
+  const closing = closingDocs(closingTrivia(def));
+  if (props.length === 0) {
+    return closingTrivia(def).length ? concat([text(header), indent(closing), hardline, text('}')]) : text(`def ${kindKeyword(def.kind)} ${def.name} {}`);
+  }
 
   const commentsForceBreak = defHasComments(def, props);
 
   if (!topLevel) {
     if (commentsForceBreak) {
-      const body = concat([indent(concat([hardline, propsDoc(props, ctx, true)])), hardline, text('}')]);
+      const body = concat([indent(concat([hardline, propsDoc(props, ctx, true), closing])), hardline, text('}')]);
       return concat([text(header), body]);
     }
     // Nested defs are width-based: the group renders flat if it fits, else breaks.
@@ -346,7 +397,7 @@ function formatDefCore(def: Definition, ctx: Ctx, topLevel: boolean): Doc {
   if (!broken) {
     return concat([text(header), text(' '), inlinePropsDoc(props), text(' }')]);
   }
-  const body = concat([indent(concat([hardline, propsDoc(props, ctx, true)])), hardline, text('}')]);
+  const body = concat([indent(concat([hardline, propsDoc(props, ctx, true), closing])), hardline, text('}')]);
   return concat([text(header), body]);
 }
 
@@ -423,31 +474,32 @@ function cnOrder(body: ConceptBody, order: string[]): ConceptProperty[] {
 }
 
 /**
- * Where a `key: value`'s value starts (`node` starts at its key): past the key, whitespace and one `:`.
- * A comment after the `:` starts the value (it travels with it); one before the `:` is skipped — it
- * is then in no slice, so the ledger keeps the def verbatim rather than print a second `:` after it.
+ * Where a `key: value`'s value starts (`node` starts at its key): past the key, whitespace and one
+ * separator — `:` or `=`, both are `propSep`. A comment after the separator starts the value (it travels
+ * with it); one before it is skipped — it is then in no slice, so the ledger keeps the def verbatim
+ * rather than print a second separator after it. Returns a parser (code-point) offset.
  */
 function cnValueStart(ctx: Ctx, node: { key: string; source: SourceLocation }): number {
   const src = ctx.source;
-  const end = node.source.offsetEnd;
-  let i = node.source.offsetStart + node.key.length;
-  let colon = false;
+  const end = ctx.u16(node.source.offsetEnd);
+  let i = ctx.u16(node.source.offsetStart) + node.key.length;
+  let sep = false;
   while (i < end) {
     const c = src[i];
     if (c === ' ' || c === '\t' || c === '\r' || c === '\n') i++;
-    else if (c === ':' && !colon) { colon = true; i++; }
-    else if (!colon && (src.startsWith('//', i) || src.startsWith('/*', i))) {
+    else if ((c === ':' || c === '=') && !sep) { sep = true; i++; }
+    else if (!sep && (src.startsWith('//', i) || src.startsWith('/*', i))) {
       const close = src.startsWith('//', i) ? src.indexOf('\n', i) : src.indexOf('*/', i) + 2;
       i = close <= i ? end : Math.min(end, close);
     } else break;
   }
-  return i;
+  return ctx.cp(i);
 }
 
 /** A verbatim slice of the source, recorded in the ledger (a comment inside it is preserved). */
 function cnSlice(ctx: Ctx, start: number, end: number): Doc {
   ctx.cn?.slices.push([start, end]);
-  return verbatim(ctx.source.slice(start, end));
+  return verbatim(sourceText(ctx, start, end));
 }
 
 /** `node`'s comments the layout re-emits (not inside a verbatim slice), recorded in the ledger. */
@@ -567,17 +619,23 @@ function formatCnDef(def: ConceptDef | ConceptBindingDef, ctx: Ctx): Doc {
   const header = `def ${def.kind === 'concept' ? def.stereotype : def.bindingKind} ${def.name}`;
   const order = def.kind === 'concept' ? CN_BODY_ORDER : CN_BINDING_ORDER;
   const props = cnLayout(ctx, def, cnOrder(def, order));
-  if (!props) return verbatim(slice(ctx.source, def.source));
-  if (props.length === 0) return text(`${header} {}`);
+  if (!props) return verbatim(slice(ctx, def.source));
+  const closing = closingTrivia(def);
+  if (props.length === 0) return closing.length ? concat([text(`${header} {`), indent(closingDocs(closing)), hardline, text('}')]) : text(`${header} {}`);
   const comments = hasTrailing(def) || props.some((pr) => hasTrivia(pr.node));
   const broken = topLevelBroken(def, ctx, comments, props.map((pr) => pr.value));
-  return concat([text(`${header} `), cnBodyDoc(ctx, props, broken ? 'broken' : 'inline')]);
+  return concat([text(`${header} `), cnBodyDoc(ctx, props, broken ? 'broken' : 'inline', closing)]);
 }
 
-/** `{ k: v, … }` — one per line (`broken`), one line (`inline`), or whichever fits the width (`fit`). */
-function cnBodyDoc(ctx: Ctx, props: Prop[], mode: 'broken' | 'inline' | 'fit'): Doc {
+/**
+ * `{ k: v, … }` — one per line (`broken`), one line (`inline`), or whichever fits the width (`fit`).
+ * `closing`: comments written before the closing brace (they force `broken`).
+ */
+function cnBodyDoc(ctx: Ctx, props: Prop[], mode: 'broken' | 'inline' | 'fit', closing: Trivia[] = []): Doc {
+  if (mode === 'broken' || closing.length) {
+    return concat([text('{'), indent(concat([hardline, propsDoc(props, ctx, true), closingDocs(closing)])), hardline, text('}')]);
+  }
   if (mode === 'inline') return concat([text('{ '), inlinePropsDoc(props), text(' }')]);
-  if (mode === 'broken') return concat([text('{'), indent(concat([hardline, propsDoc(props, ctx, true)])), hardline, text('}')]);
   return group(concat([text('{'), indent(concat([line, propsDoc(props, ctx, false)])), line, text('}')]));
 }
 
@@ -593,12 +651,16 @@ function conceptSugarProp(sugar: ConceptSugar, ctx: Ctx): Prop {
   if (!props) {
     // Verbatim from the `{`; the sugar's own comments are re-emitted only where they lie outside it.
     const start = cnValueStart(ctx, { key: 'concept', source: sugar.source });
-    return { key: 'concept', sep: ' ', value: verbatim(ctx.source.slice(start, sugar.source.offsetEnd)), node: outsideTrivia(sugar, sugar.source), atKey: true };
+    return { key: 'concept', sep: ' ', value: verbatim(sourceText(ctx, start, sugar.source.offsetEnd)), node: outsideTrivia(sugar, sugar.source), atKey: true };
   }
-  const value = props.length === 0
-    ? text('{}')
-    : cnBodyDoc(ctx, props, props.some((pr) => hasTrivia(pr.node)) ? 'broken' : 'fit');
-  return { key: 'concept', sep: ' ', value, node: sugar, atKey: true };
+  const node = outsideTrivia(sugar, sugar.source);
+  const closing = closingTrivia(sugar);
+  if (props.length === 0 && !closing.length) return { key: 'concept', sep: ' ', value: text('{}'), node, atKey: true };
+  if (closing.length || props.some((pr) => hasTrivia(pr.node))) {
+    return { key: 'concept', sep: ' ', value: cnBodyDoc(ctx, props, 'broken', closing), node, atKey: true };
+  }
+  // Width decides — unless the host prints on one line, where the sugar does too.
+  return { key: 'concept', sep: ' ', value: cnBodyDoc(ctx, props, 'fit'), inline: cnBodyDoc(ctx, props, 'inline'), node, atKey: true };
 }
 
 /** `node`'s comments that lie outside `span` (one inside a verbatim slice of `span` is already in it). */
@@ -608,9 +670,8 @@ function outsideTrivia(node: TriviaNode, span: SourceLocation): TriviaNode {
 }
 
 function formatDef(def: Definition, ctx: Ctx, topLevel: boolean): Doc {
-  const core = formatDefCore(def, ctx, topLevel);
-  // A def kept verbatim (no layout, or a cn def whose comments the layout cannot place) is one slice.
-  return withTrivia(core.t === 'verbatim' ? outsideTrivia(def, def.source) : def, core);
+  // The comments inside the def are in its verbatim slice, or printed before its closing brace.
+  return withTrivia(outsideTrivia(def, def.source), formatDefCore(def, ctx, topLevel));
 }
 
 function formatGraph(graph: GraphBlock): Doc {
@@ -661,7 +722,7 @@ function blockWithComments(node: TriviaNode, body: string): string {
 }
 
 export function formatDocument(ast: Document, source: string, config: FormatConfig = DEFAULT_FORMAT_CONFIG): string {
-  const ctx: Ctx = { source, config };
+  const ctx: Ctx = { source, config, ...offsetMaps(source) };
   const blocks: string[] = [];
 
   if (ast.packageDecl) blocks.push(blockWithComments(ast.packageDecl, `package ${ast.packageDecl.name}`));

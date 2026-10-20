@@ -1199,22 +1199,31 @@ class EmbeddedBlock:
     #: The whole literal, quotes included.
     source: SourceLocation
     language: str = "pl"
+    #: The string form only: the index in `text` of every character written escaped (two
+    #: characters in the file, one in `text`).
+    escapes: tuple[int, ...] = ()
     kind: ClassVar[str] = "embeddedBlock"
 
     def location(self, line: int, column: int, length: int = 1) -> SourceLocation:
         """The file span of a position inside `text` — `line` 0-based within the block,
         `column` 0-based within that line. Mirrors the TS `embeddedBlockLocation`."""
         ln = max(0, min(line, len(self.line_offsets) - 1))
-        start_column = (self.text_source.column if ln == 0 else self.indent_width) + column
-        offset_start = self.line_offsets[ln] + column
+
+        def shift(c: int) -> int:
+            # A string-form block's escapes each take one more character of the file than of `text`.
+            return sum(1 for e in self.escapes if e < c) if ln == 0 else 0
+
+        base = self.text_source.column if ln == 0 else self.indent_width
+        start = column + shift(column)
+        end = column + length + shift(column + length)
         return SourceLocation(
             file=self.source.file,
             line=self.text_source.line + ln,
-            column=start_column,
+            column=base + start,
             end_line=self.text_source.line + ln,
-            end_column=start_column + length,
-            offset_start=offset_start,
-            offset_end=offset_start + length,
+            end_column=base + end,
+            offset_start=self.line_offsets[ln] + start,
+            offset_end=self.line_offsets[ln] + end,
         )
 
 

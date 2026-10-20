@@ -128,8 +128,7 @@ describe('ttrm.tmLanguage.json — the 0.17 conceptual model', () => {
     const open = lineOf(f75, 'definition: """pl');
     expect(tokenIn(open, 'pl').scopes).toContain('entity.name.tag.language.ttrm');
     const body = lineOf(f75, 'this.period.at - this.from.period.at');
-    expect(tokenIn(body, '-').scopes).toEqual(
-      ['string.quoted.fenced.pl.ttrm', 'meta.embedded.block.pl.ttrm', 'keyword.operator.ttrm']);
+    expect(tokenIn(body, '-').scopes).toEqual(['meta.embedded.block.pl.ttrm', 'keyword.operator.ttrm']);
     // The block closes: the next def is back at top level.
     const after = lineOf(f75, 'def phase PendingOrder');
     expect(tokenIn(after, 'def').scopes).toEqual(['keyword.control.def.ttrm']);
@@ -141,9 +140,9 @@ describe('ttrm.tmLanguage.json — the 0.17 conceptual model', () => {
     expect(tokenIn(pending, 'definition').scopes).toContain('keyword.other.property.ttrm');
     expect(tokenIn(pending, 'in').scopes).toContain('meta.embedded.block.pl.ttrm');
     expect(tokenIn(pending, 'in').scopes).toContain('keyword.operator.word.ttrm');
-    expect(tokenIn(pending, 'placed').scopes).toContain('string.quoted.single.ttrm');
+    expect(tokenIn(pending, "'placed'").scopes).toContain('string.quoted.single.ttrm');
     const members = lineOf(f75, 'members: """descendants');
-    expect(tokenIn(members, 'H10-H19').scopes).toContain('meta.embedded.block.pl.ttrm');
+    expect(tokenIn(members, "'H10-H19'").scopes).toContain('meta.embedded.block.pl.ttrm');
     const filter = lineOf(fixture('76-cn-bindings.ttrm'), 'filter: """warehouse = 1"""');
     expect(tokenIn(filter, '1').scopes).toEqual(['meta.embedded.block.pl.ttrm', 'constant.numeric.ttrm']);
   });
@@ -166,6 +165,34 @@ describe('ttrm.tmLanguage.json — the 0.17 conceptual model', () => {
     expect(lines[2][0].scopes).toEqual(['string.quoted.triple.ttrm']);
     expect(lines[4].find(t => t.text.includes('state'))?.scopes).toEqual(['string.quoted.triple.ttrm']);
     expect(tokenIn(lines[5], '}').scopes).toEqual(['punctuation.section.braces.ttrm']);
+  });
+
+  // review-117 M-2: nothing inside an expression may run past its block — a quote in a comment, an
+  // unclosed comment, a `"""pl` first line outside the three keys.
+  it('never lets an expression region run past its block', () => {
+    const lines = tokenize([
+      'model cn',
+      'def phase H {',
+      '  definition = """pl',
+      "    state = 'held'   // the customer's hold",
+      '    and a = 1 /* open',
+      '  """',
+      '}',
+      'def quality q { definition: "a /* open b", of: X }',
+      'def quality r { definition: "a // tail", grounds: md.r }',
+      'def entity e { description: """pl',
+      '    plain text',
+      '""" }',
+      'def kind After { grounds: md.after }',
+    ].join('\n'));
+    expect(tokenIn(lines[2], 'definition').scopes).toContain('keyword.other.property.ttrm');
+    expect(tokenIn(lines[2], 'pl').scopes).toContain('entity.name.tag.language.ttrm');
+    expect(tokenIn(lines[3], "// the customer's hold").scopes).toContain('comment.line.double-slash.ttrm');
+    expect(tokenIn(lines[6], '}').scopes).toEqual(['punctuation.section.braces.ttrm']);
+    expect(tokenIn(lines[7], 'of').scopes).toEqual([]);
+    expect(tokenIn(lines[8], 'grounds').scopes).toEqual(['keyword.other.property.ttrm']);
+    expect(tokenIn(lines[10], 'plain text').scopes).toEqual(['string.quoted.triple.ttrm']);
+    expect(tokenIn(lines[12], 'grounds').scopes).toEqual(['keyword.other.property.ttrm']);
   });
 
   it('pl expression words match the TTR-P grammar (no silent drift)', () => {

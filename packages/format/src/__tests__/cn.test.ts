@@ -40,7 +40,8 @@ function shape(src: string): unknown {
 
 describe('formatter — the conceptual model (0.17)', () => {
   // Every conformance fixture, 01–79: the old corpus and the cn one. 01–74 format byte-for-byte as
-  // before 0.17, but for the two the 0.17 fixes touch (18 `drill_map`, 62 `locale`).
+  // before 0.17, but for the three the 0.17 fixes touch (18 `drill_map`, 59 comments before a `}`,
+  // 62 `locale`).
   const corpus = readdirSync(CONFORMANCE).filter((f) => f.endsWith('.ttrm')).sort();
   it('covers the whole corpus', () => {
     expect(corpus.length).toBeGreaterThanOrEqual(76);
@@ -218,6 +219,42 @@ def entity order {
       expect(fmt(src)).toBe(src);
     });
   }
+
+  // review-117 H-1: `propSep` is `:` or `=`; a sliced value must not keep the `=`.
+  it('normalises `key = value` to `key: value` in a cn body, a binding and the sugar', () => {
+    expect(fmt('model cn\n\ndef kind K { of = Thing, definition = """x = 1""", period = { at: d } }\n'))
+      .toBe('model cn\n\ndef kind K { of: Thing, period: { at: d }, definition: """x = 1""" }\n');
+    expect(fmt('model binding\n\ndef cn2er_event g { event = cn.E, target: er.entity.e, participants = { a = [er.relation.r] } }\n'))
+      .toBe('model binding\n\ndef cn2er_event g {\n    event: cn.E,\n    target: er.entity.e,\n    participants: {\n        a: [er.relation.r]\n    }\n}\n');
+    expect(fmt('model er\n\ndef entity o { concept = { event = Order } }\n')).toBe('model er\n\ndef entity o { concept { event: Order } }\n');
+  });
+
+  // review-117 H-2: the parser's offsets count code points; an emoji before a def shifted every slice.
+  it('slices correctly after a character outside the BMP', () => {
+    const cn = 'model cn\n\ndef kind Cart { label: { en: "🛒 Cart" } }\n\ndef kind Item { of: Thing, grounds: md.Product, qualities: [weight] }\n';
+    expect(fmt(cn)).toBe(cn);
+    const md = 'model md\n\n// 🛒 web orders\ndef domain Money { type: decimal }\n';
+    expect(fmt(md)).toBe(md);
+    const block = 'model cn\n\ndef phase B { of: Order, definition: """x = \'😀\' and y = 1""" }\n';
+    expect(fmt(block)).toBe(block);
+    const typed = 'model db schema dbo\n\ndef table t { description: "🛒 carts", columns: [def column id { type: int }] }\n';
+    expect(fmt(typed)).toContain('description: "🛒 carts"');
+  });
+
+  // review-117 M-1: a sugar that could break must not break inside a one-line host.
+  it('keeps a one-line host on one line, its sugar too, however wide', () => {
+    const src = 'model er\n\ndef entity e { concept { kind: Short, label: { en: "A much longer label to push this line past the width limit of one hundred" } } }\n';
+    expect(fmt(src)).toBe(src);
+  });
+
+  // review-117 L-9(a): a comment before a def's `}` stays there — after the `}` it merged with the def's
+  // own trailing comment into one.
+  it('keeps a comment written before a closing brace inside the def', () => {
+    const cn = 'model cn\n\ndef kind K {\n    grounds: md.K\n    // before the brace\n} // after the brace\n';
+    expect(fmt(cn)).toBe(cn);
+    const entity = 'model er\n\ndef entity e {\n    description: "x"\n    // inside\n} // outside\n';
+    expect(fmt(entity)).toBe(entity);
+  });
 
   it('prints a lexicon entry\'s `default:` and `sense_priority:`, and keeps the unit locale', () => {
     const out = fmt('model lexicon locale en\n\ndef term t { for: cn.Customer, forms: ["customer"], default: true, sense_priority: 2 }\n');

@@ -14,7 +14,7 @@ exports[`ttrm.tmLanguage.json — the 0.17 conceptual model > tokenizes 75-cn-co
  22  grounds=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
  23  hierarchy=keyword.other.kind  er=keyword.other.schema  entity=keyword.other.kind
  25  def=keyword.control.def  kind=keyword.other.kind
- 27  members=keyword.other.property  descendants(ProductCategory,=meta.embedded.block.pl  '=string.quoted.single  H10-H19=string.quoted.single  '=string.quoted.single  )=meta.embedded.block.pl
+ 27  members=keyword.other.property  descendants(ProductCategory,=meta.embedded.block.pl  'H10-H19'=string.quoted.single  )=meta.embedded.block.pl
  28  label=keyword.other.property  "=string.quoted.double  Home and garden categories=string.quoted.double  "=string.quoted.double
  30  def=keyword.control.def  kind=keyword.other.kind  grounds=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind
  31  def=keyword.control.def  kind=keyword.other.kind  label=keyword.other.property  "=string.quoted.double  Distribution center=string.quoted.double  "=string.quoted.double  grounds=keyword.other.property  md=keyword.other.schema  tags=keyword.other.property  "=string.quoted.double  logistics=string.quoted.double  "=string.quoted.double
@@ -55,8 +55,8 @@ exports[`ttrm.tmLanguage.json — the 0.17 conceptual model > tokenizes 75-cn-co
  86  this.period.at=meta.embedded.block.pl  -=keyword.operator  this.from.period.at=meta.embedded.block.pl
  91  def=keyword.control.def  phase=keyword.other.kind
  93  label=keyword.other.property  "=string.quoted.double  Pending order=string.quoted.double  "=string.quoted.double
- 94  definition=keyword.other.property  state=meta.embedded.block.pl  in=keyword.operator.word  (=meta.embedded.block.pl  '=string.quoted.single  placed=string.quoted.single  '=string.quoted.single  ,=meta.embedded.block.pl  '=string.quoted.single  held=string.quoted.single  '=string.quoted.single  )=meta.embedded.block.pl
- 96  def=keyword.control.def  phase=keyword.other.kind  definition=keyword.other.property  invoice_status=meta.embedded.block.pl  ==keyword.operator  '=string.quoted.single  open=string.quoted.single  '=string.quoted.single  and=keyword.operator.word  period.=meta.embedded.block.pl  end=keyword.control.conditional  <=keyword.operator  as_of=meta.embedded.block.pl
+ 94  definition=keyword.other.property  state=meta.embedded.block.pl  in=keyword.operator.word  (=meta.embedded.block.pl  'placed'=string.quoted.single  ,=meta.embedded.block.pl  'held'=string.quoted.single  )=meta.embedded.block.pl
+ 96  def=keyword.control.def  phase=keyword.other.kind  definition=keyword.other.property  invoice_status=meta.embedded.block.pl  ==keyword.operator  'open'=string.quoted.single  and=keyword.operator.word  period.=meta.embedded.block.pl  end=keyword.control.conditional  <=keyword.operator  as_of=meta.embedded.block.pl
  97  def=keyword.control.def  phase=keyword.other.kind
  99  definition=keyword.other.property  exists Invoicing involving this=meta.embedded.block.pl  as=keyword.operator.word  customer where OverdueInvoice=meta.embedded.block.pl
 102  def=keyword.control.def  phase=keyword.other.kind  grounds=keyword.other.property  er=keyword.other.schema  entity=keyword.other.kind

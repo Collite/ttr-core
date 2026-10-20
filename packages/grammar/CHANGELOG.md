@@ -38,7 +38,8 @@ new noun stays usable as a name (all are in `idPart`).
    cn2md_event | cn2er_kind | cn2er_role | cn2er_event | cn2er_quality | cn2er_phase | cn2db_concept <id> {
    … }` — the stereotype ref (`kind: cn.Item`), `target:`, `period:`, and free-form `hierarchy`, `participants`
    (`{ label: [ er.relation.… ] }`), `via`, `filter` (a block).
-6. **`concept { … }` sugar** inside `cubelet`, `dimension`, `domain`, `measure`, `entity` and `attribute`.
+6. **`concept { … }` sugar** inside `cubelet`, `dimension`, `domain`, `measure`, `entity` and `attribute` — one per
+   host: a second is `ttr/duplicate-property` and the first is read (the cn body's rule).
 7. **Lexicon:** `term` / `pattern` / `example` take `default: <bool>` and `sense_priority: <number>`; `for:`
    takes a `cn.<X>` ref.
 8. **New tokens:** `CN EVENT PHASE QUALITY RELATION_TYPE CONCEPT`, `CN2MD_KIND CN2MD_ROLE CN2MD_QUALITY
@@ -53,15 +54,18 @@ new noun stays usable as a name (all are in `idPart`).
 (⚑CN-P5); attribute refs are `er.entity.<e>.<a>` (A-CN-9); `default` is a NEW token (the contracts said
 "reused" — TTR.g4 had none) and `sense_priority` with it; `extent:` and `basis:` are typed (the contracts list
 `EXTENT`/`BASIS` as tokens); `is_a`, `of`, `relations`, `hierarchy`, `imprecision`, `valued_state`, `abstract`,
-`participants`, `via` and `filter` ride the free-form entry (no tokens); the free-form key is never a typed key,
-so a malformed typed property fails at parse time; `type` and `precision` are legal keys inside a cn object.
+`participants`, `via` and `filter` ride the free-form entry (no tokens); the free-form key is a plain identifier,
+never a keyword — so a malformed typed property fails at parse time, and so do top-level keys like `from:`, `to:`,
+`type:`, `name:`, `default:`; inside a nested cn object any `id` is a key, and `type` and `precision` too.
 
 **Tooling (S1.4).**
 - **TextMate** (`ttrm.tmLanguage.json`): `cn` is a model code (and the `cn.` ref head), the concept def nouns
   and the ten binding kinds are kinds (`def kind` too — `kind:` stays a property key), the cn keys, `concept`
-  and `default` / `sense_priority` are properties, `as` is an operator word. A `"""pl` block, and a string or
-  triple-string after `definition:` / `members:` / `filter:`, is an embedded `pl` expression (the TTRP
-  expression words, pinned against `ttrp.tmLanguage.json`). The generator's test now fails on any word token
+  and `default` / `sense_priority` are properties, `as` is an operator word. After `definition:` / `members:` /
+  `filter:` (with `:` or `=`), a `"""pl` block, an untagged triple-string or a string is an embedded `pl`
+  expression (the TTRP expression words, pinned against `ttrp.tmLanguage.json`; its strings and `//` comments
+  stay on their line and a `/* */` comment stops at a quote, so an expression never colours the rest of the
+  file; a `"""pl` first line anywhere else is plain text). The generator's test now fails on any word token
   without a scope — the regen gate could not see one (none of the 0.17 tokens was scoped at first).
 - **Formatter** — the cn layout. A concept body prints in one canonical order: `description · label · tags ·
   sources · is_a · abstract · of · event · extent · grounds · hierarchy · involves · period · qualities ·
@@ -76,7 +80,10 @@ so a malformed typed property fails at parse time; `type` and `precision` are le
 - **Formatter fixes on the way:** a def kind with no layout is now kept verbatim — the md model (`domain`,
   `dimension`, `hierarchy`, `measure`, `cubelet`, `map`, `md2db_*`, `md2er_cubelet`), `drill_map` and the
   world's `engine` / `executor` / `storage` printed as an empty `def X {}` (an md domain as the unparseable
-  `def mdDomain`); `model lexicon locale <id>` keeps its locale. Still dropped: ttr-core#212 (a table's
+  `def mdDomain`); `model lexicon locale <id>` keeps its locale; a comment before a def's closing `}` stays there
+  (after the `}` it merged with the def's own trailing comment into one); slices count the parser's code points, so
+  an emoji earlier in the file no longer cuts every later verbatim value one character short; `key = value` prints
+  as `key: value`. Still dropped: ttr-core#212 (a table's
   `management` / `changeSemantics` / `writeback`) and ttr-core#219 (an inline `binding:`, a localized
   `description:` outside a cn body, `security { }` blocks).
 

@@ -1599,14 +1599,27 @@ def _visit_md_host(
 
 
 def _concept_sugar_of(props: Any, file: str, warnings: list[ParseWarning], errors: list[ParseError]) -> ConceptSugar | None:
-    """The host's `concept { … }` — every occurrence is walked (its diagnostics reported), the last kept."""
+    """The host's `concept { … }`. One per host (cn contracts §1.4): a second one is
+    `ttr/duplicate-property` and the first is read — the cn body's rule, so CN-P2 and the
+    formatter never meet a sugar the AST threw away."""
     sugar: ConceptSugar | None = None
     for p in props or ():
         cs = p.conceptSugarProperty()
-        if cs is not None:
-            body_ctx = cs.cnBody()
-            body = _visit_concept_body(body_ctx.cnProperty() if body_ctx is not None else [], "concept", file, warnings, errors)
-            sugar = ConceptSugar(body=body, source=make_source_location(cs, file))
+        if cs is None:
+            continue
+        if sugar is not None:
+            at = make_source_location(cs, file)
+            errors.append(ParseError(
+                file=file,
+                line=at.line,
+                column=at.column + 1,
+                message="duplicate property 'concept' — the first one is read",
+                code=DiagnosticCode.DUPLICATE_PROPERTY,
+            ))
+            continue
+        body_ctx = cs.cnBody()
+        body = _visit_concept_body(body_ctx.cnProperty() if body_ctx is not None else [], "concept", file, warnings, errors)
+        sugar = ConceptSugar(body=body, source=make_source_location(cs, file))
     return sugar
 
 
@@ -1835,8 +1848,17 @@ def _walk_expression_block(  # noqa: PLR0913
     source = SourceLocation(file, sym.line, col, end_line, end_column, sym.start, sym.stop + 1)
 
     if sym.type == TTRLexer.STRING_LITERAL:
-        text = re.sub(r"\\(.)", r"\1", raw[1:-1])
-        return _block_of("string", text, source, sym.start + 1, sym.line, col + 1, 0, (sym.start + 1,))
+        # Each escape takes two characters of the file and one of `text`: `escapes` keeps where,
+        # so a position in `text` still maps onto the file.
+        quoted = raw[1:-1]
+        escapes: list[int] = []
+
+        def unescape(m: re.Match[str]) -> str:
+            escapes.append(m.start() - len(escapes))
+            return m.group(1)
+
+        text = re.sub(r"\\(.)", unescape, quoted)
+        return _block_of("string", text, source, sym.start + 1, sym.line, col + 1, 0, (sym.start + 1,), tuple(escapes))
 
     inner = raw[3:-3]
     inner_start = sym.start + 3
@@ -1900,18 +1922,21 @@ def _block_of(  # noqa: PLR0913
     column: int,
     indent_width: int,
     line_offsets: tuple[int, ...],
+    escapes: tuple[int, ...] = (),
 ) -> EmbeddedBlock:
     lines = text.split("\n")
     last = len(lines) - 1
     last_offset = line_offsets[last] if last < len(line_offsets) else text_start
-    end_column = (column if last == 0 else indent_width if lines[last] else 0) + len(lines[last])
+    last_width = len(lines[last]) + len(escapes)
+    end_column = (column if last == 0 else indent_width if lines[last] else 0) + last_width
     return EmbeddedBlock(
         form=form,
         text=text,
-        text_source=SourceLocation(source.file, line, column, line + last, end_column, text_start, last_offset + len(lines[last])),
+        text_source=SourceLocation(source.file, line, column, line + last, end_column, text_start, last_offset + last_width),
         line_offsets=line_offsets,
         indent_width=indent_width,
         source=source,
+        escapes=escapes,
     )
 
 

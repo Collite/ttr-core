@@ -1192,10 +1192,15 @@ data class EmbeddedBlock(
     val indentWidth: Int,
     /** The whole literal, quotes included. */
     val source: SourceLocation,
+    /**
+     * The string form only: the index in [text] of every character written escaped (two characters in
+     * the file, one in [text]). Positions count code points.
+     */
+    val escapes: List<Int> = emptyList(),
 ) {
     /**
      * The file span of a position inside [text] — [line] 0-based within the block, [column] 0-based
-     * within that line of [text]. Mirrors the TS `embeddedBlockLocation`.
+     * within that line of [text], both in code points. Mirrors the TS `embeddedBlockLocation`.
      */
     fun location(
         line: Int,
@@ -1203,16 +1208,20 @@ data class EmbeddedBlock(
         length: Int = 1,
     ): SourceLocation {
         val l = line.coerceIn(0, lineOffsets.size - 1)
-        val startColumn = (if (l == 0) textSource.column else indentWidth) + column
-        val offsetStart = lineOffsets[l] + column
+
+        // A string-form block's escapes each take one more character of the file than of `text`.
+        fun shift(c: Int) = if (l == 0) escapes.count { it < c } else 0
+        val base = if (l == 0) textSource.column else indentWidth
+        val start = column + shift(column)
+        val end = column + length + shift(column + length)
         return SourceLocation(
             file = source.file,
             line = textSource.line + l,
-            column = startColumn,
+            column = base + start,
             endLine = textSource.line + l,
-            endColumn = startColumn + length,
-            offsetStart = offsetStart,
-            offsetEnd = offsetStart + length,
+            endColumn = base + end,
+            offsetStart = lineOffsets[l] + start,
+            offsetEnd = lineOffsets[l] + end,
         )
     }
 }

@@ -557,7 +557,7 @@ class CnWalkerSpec :
         "T6: flags a binding `filter:` that is not a block" {
             val r =
                 TtrLoader.parseString(
-                    "model binding\ndef cn2er_quality q { quality: cn.x, target: er.entity.o.v, filter: analyte }",
+                    "model binding\ndef cn2er_quality q { quality: cn.x, target: er.entity.o.v, filter: warehouse }",
                     "f.ttrm",
                 )
             r.errors.map { it.code } shouldContainExactly listOf(DiagnosticCode.ExpressionBlockRequired)
@@ -590,6 +590,73 @@ class CnWalkerSpec :
                     .shouldNotBeNull()
                     .isNotEmpty() shouldBe true
             }
+        }
+
+        // ---------------------------------------------------------------------------------------------
+        // review-117 — the source map counts code points and steps over escapes (M-3, L-1), a second
+        // `concept { }` is a duplicate property (M-4), a tag is an own key of its table (L-2). The same
+        // numbers as the TS and Python suites.
+        // ---------------------------------------------------------------------------------------------
+
+        "review-117 M-3: maps every character of a string-form block with escapes onto the file" {
+            val src = """model cn
+def quality P { of: X, definition: "a = \"held\" and b = 'c\\d'" }"""
+            val b = definitionBlock(src)
+            b.text shouldBe "a = \"held\" and b = 'c\\d'"
+            b.escapes shouldContainExactly listOf(4, 9, 21)
+            for (i in b.text.indices) {
+                val written = cpSlice(src, b.location(0, i))
+                written shouldBe (if (i in b.escapes) "\\" + b.text[i] else b.text[i].toString())
+            }
+            b.textSource.offsetStart to b.textSource.offsetEnd shouldBe (45 to 72)
+            val at = b.location(0, 15)
+            Triple(at.offsetStart, at.column, cpSlice(src, at)) shouldBe Triple(62, 53, "b")
+        }
+
+        "review-117 L-1: counts code points in a block after a character outside the BMP" {
+            val src =
+                listOf(
+                    "model cn",
+                    "def phase A {",
+                    "    of: Order,",
+                    "    definition: \"\"\"",
+                    "    name = '😀😀' and",
+                    "    total > 10",
+                    "  \"\"\"",
+                    "}",
+                    "def phase B { of: Order, definition: \"x = '😀' and y = \\\"z\\\"\" }",
+                ).joinToString("\n")
+            val defs = parse(src, "r.ttrm").definitions
+            val a = concept(defs, "A").body.property<ConceptProperty.DefinitionBlock>()!!.block
+            a.lineOffsets shouldContainExactly listOf(62, 82, 93)
+            (a.textSource.offsetStart to a.textSource.offsetEnd) shouldBe (62 to 93)
+            (a.textSource.endLine to a.textSource.endColumn) shouldBe (7 to 0)
+            cpSlice(src, a.location(1, 0, 5)) shouldBe "total"
+            val b = concept(defs, "B").body.property<ConceptProperty.DefinitionBlock>()!!.block
+            b.escapes shouldContainExactly listOf(16, 18)
+            (b.textSource.offsetStart to b.textSource.offsetEnd) shouldBe (139 to 160)
+            (b.textSource.column to b.textSource.endColumn) shouldBe (38 to 59)
+            val y = b.location(0, 12)
+            Triple(y.offsetStart, y.column, cpSlice(src, y)) shouldBe Triple(151, 50, "y")
+            cpSlice(src, b.location(0, 16, 3)) shouldBe "\\\"z\\\""
+        }
+
+        "review-117 M-4: reports a second `concept { }` on a host and reads the first" {
+            val r =
+                TtrLoader.parseString(
+                    "model er\ndef entity e { concept { kind: A }, concept { event: B } }",
+                    "r.ttrm",
+                )
+            r.errors.map { Triple(it.code, it.line, it.column) } shouldContainExactly
+                listOf(Triple(DiagnosticCode.DuplicateProperty, 2, 37))
+            r.errors.single().message shouldContain "'concept'"
+        }
+
+        "review-117 L-2: reads a `\"\"\"toString` first line as text, not as a tag" {
+            val r = parse("model cn\ndef phase P { definition: \"\"\"toString\n  x\n\"\"\" }", "r.ttrm")
+            val b = (r.definitions.single() as ConceptDef).body.property<ConceptProperty.DefinitionBlock>()!!.block
+            (b.form to b.text) shouldBe ("tripleString" to "toString\n  x\n")
+            r.warnings.single().message shouldStartWith DiagnosticCode.UnknownLanguageTag.id
         }
     })
 
@@ -642,3 +709,9 @@ private fun positionOf(
     val before = src.substring(0, offset).split("\n")
     return before.size to before.last().length
 }
+
+/** The file text a source span covers — its offsets count code points, a Kotlin string UTF-16 units. */
+private fun cpSlice(
+    src: String,
+    at: SourceLocation,
+): String = src.substring(src.offsetByCodePoints(0, at.offsetStart), src.offsetByCodePoints(0, at.offsetEnd))

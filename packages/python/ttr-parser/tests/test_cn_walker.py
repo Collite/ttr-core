@@ -529,7 +529,7 @@ def test_t4_negative_first_syntax_error_position(name: str, line: int, column: i
 
 
 def test_t6_flags_a_binding_filter_that_is_not_a_block() -> None:
-    r = parse_string("model binding\ndef cn2er_quality q { quality: cn.x, target: er.entity.o.v, filter: analyte }", "f.ttrm")
+    r = parse_string("model binding\ndef cn2er_quality q { quality: cn.x, target: er.entity.o.v, filter: warehouse }", "f.ttrm")
     assert [e.code for e in r.errors] == [DiagnosticCode.EXPRESSION_BLOCK_REQUIRED]
 
 
@@ -550,3 +550,74 @@ def test_t6_recovers_past_an_unknown_binding_kind() -> None:
 )
 def test_t6_survives_a_missing_body_and_a_conjured_token(src: str) -> None:
     assert parse_string(src, "m.ttrm").errors != ()
+
+
+# ---------------------------------------------------------------------------------------------------
+# review-117 — the source map counts code points and steps over escapes (M-3, L-1), a second
+# `concept { }` is a duplicate property (M-4), a tag is an own key of its table (L-2). The same
+# numbers as the TS and Kotlin suites.
+# ---------------------------------------------------------------------------------------------------
+
+_ESCAPES = "model cn\ndef quality P { of: X, definition: \"a = \\\"held\\\" and b = 'c\\\\d'\" }"
+_ASTRAL = "\n".join([
+    "model cn",
+    "def phase A {",
+    "    of: Order,",
+    '    definition: """',
+    "    name = '😀😀' and",
+    "    total > 10",
+    '  """',
+    "}",
+    "def phase B { of: Order, definition: \"x = '😀' and y = \\\"z\\\"\" }",
+])
+
+
+def _block_named(src: str, name: str) -> EmbeddedBlock:
+    r = parse_string(src, "r.ttrm")
+    assert r.errors == ()
+    prop = _prop(_concept(r.definitions, name).body, ConceptDefinition)
+    assert isinstance(prop, ConceptDefinition)
+    return prop.block
+
+
+def test_review_117_m3_maps_every_character_of_a_string_block_with_escapes() -> None:
+    b = _block_named(_ESCAPES, "P")
+    assert b.text == "a = \"held\" and b = 'c\\d'"
+    assert b.escapes == (4, 9, 21)
+    for i, ch in enumerate(b.text):
+        written = _slice(_ESCAPES, b.location(0, i))
+        assert written == ("\\" + ch if i in b.escapes else ch), i
+    assert (b.text_source.offset_start, b.text_source.offset_end) == (45, 72)
+    at = b.location(0, 15)
+    assert (at.offset_start, at.column, _slice(_ESCAPES, at)) == (62, 53, "b")
+
+
+def test_review_117_l1_counts_code_points_after_a_character_outside_the_bmp() -> None:
+    a = _block_named(_ASTRAL, "A")
+    assert a.line_offsets == (62, 82, 93)
+    assert (a.text_source.offset_start, a.text_source.offset_end) == (62, 93)
+    assert (a.text_source.end_line, a.text_source.end_column) == (7, 0)
+    assert _slice(_ASTRAL, a.location(1, 0, 5)) == "total"
+    b = _block_named(_ASTRAL, "B")
+    assert b.escapes == (16, 18)
+    assert (b.text_source.offset_start, b.text_source.offset_end) == (139, 160)
+    assert (b.text_source.column, b.text_source.end_column) == (38, 59)
+    y = b.location(0, 12)
+    assert (y.offset_start, y.column, _slice(_ASTRAL, y)) == (151, 50, "y")
+    assert _slice(_ASTRAL, b.location(0, 16, 3)) == '\\"z\\"'
+
+
+def test_review_117_m4_reports_a_second_concept_sugar_and_reads_the_first() -> None:
+    r = parse_string("model er\ndef entity e { concept { kind: A }, concept { event: B } }", "r.ttrm")
+    assert [(e.code, e.line, e.column) for e in r.errors] == [(DiagnosticCode.DUPLICATE_PROPERTY, 2, 37)]
+    assert "'concept'" in r.errors[0].message
+
+
+def test_review_117_l2_reads_a_to_string_first_line_as_text() -> None:
+    r = parse_string('model cn\ndef phase P { definition: """toString\n  x\n""" }', "r.ttrm")
+    d = r.definitions[0]
+    assert isinstance(d, ConceptDef)
+    b = _prop(d.body, ConceptDefinition)
+    assert isinstance(b, ConceptDefinition)
+    assert (b.block.form, b.block.text) == ("tripleString", "toString\n  x\n")
+    assert [w.code for w in r.warnings] == [DiagnosticCode.UNKNOWN_LANGUAGE_TAG]

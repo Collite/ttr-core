@@ -40,7 +40,8 @@ export const TAG_REGISTRY: Record<string, TagEntry> = {
 
 /** Resolve a tag to its registry entry, or `undefined` if unknown (caller diagnoses). */
 export function resolveTag(tag: string): TagEntry | undefined {
-  return TAG_REGISTRY[tag];
+  // Own keys only: a block opening with the word `toString` must not find Object.prototype.toString.
+  return Object.hasOwn(TAG_REGISTRY, tag) ? TAG_REGISTRY[tag] : undefined;
 }
 
 /**
@@ -54,5 +55,5 @@ export const EXPRESSION_TAG_REGISTRY: Record<string, ExpressionLanguage> = {
 
 /** Resolve an expression-block tag, or `undefined` if it is not one (caller diagnoses). */
 export function resolveExpressionTag(tag: string): ExpressionLanguage | undefined {
-  return EXPRESSION_TAG_REGISTRY[tag];
+  return Object.hasOwn(EXPRESSION_TAG_REGISTRY, tag) ? EXPRESSION_TAG_REGISTRY[tag] : undefined;
 }

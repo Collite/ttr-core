@@ -976,6 +976,26 @@ function walkConceptSugar(ctx: ConceptSugarPropertyContext, file: string, errors
 }
 
 /**
+ * One `concept { }` per host (cn contracts §1.4): a second one is `ttr/duplicate-property` and the first
+ * is read — the cn body's rule, so CN-P2 and the formatter never meet a sugar the AST threw away.
+ */
+function conceptSugarOnce(
+  first: ConceptSugar | undefined,
+  ctx: ConceptSugarPropertyContext,
+  file: string,
+  errors: ParseError[],
+): ConceptSugar {
+  if (!first) return walkConceptSugar(ctx, file, errors);
+  errors.push({
+    code: DiagnosticCode.DuplicateProperty,
+    message: "duplicate property 'concept' — the first one is read",
+    severity: 'error',
+    source: makeSourceLocation(ctx, file),
+  });
+  return first;
+}
+
+/**
  * The cn body behind `cnBody`, `cnBindingBody` and — in a `model cn` file — `roleDef` (⚑CN-P6). Each
  * property context has exactly one child, the property rule, so one reader serves all three. On a
  * binding a free-form `filter:` is the expression block of a valued state's series (A-CN-18).
@@ -1159,8 +1179,15 @@ function walkExpressionBlock(token: TerminalNode, key: string, file: string, err
   };
 
   if (sym.type === TTRLexer.STRING_LITERAL) {
-    const text = raw.slice(1, -1).replace(/\\(.)/g, '$1');
-    return blockOf('string', text, source, sym.start + 1, sym.line, sym.column + 1, 0, [sym.start + 1]);
+    // Each escape takes two characters of the file and one of `text`: `escapes` keeps where, so a
+    // position in `text` still maps onto the file.
+    const quoted = raw.slice(1, -1);
+    const escapes: number[] = [];
+    const text = quoted.replace(/\\(.)/g, (_m, c: string, at: number) => {
+      escapes.push(codePoints(quoted.slice(0, at)) - escapes.length);
+      return c;
+    });
+    return blockOf('string', text, source, sym.start + 1, sym.line, sym.column + 1, 0, [sym.start + 1], escapes);
   }
 
   let inner = raw.slice(3, -3);
@@ -1207,7 +1234,7 @@ function walkExpressionBlock(token: TerminalNode, key: string, file: string, err
   for (let i = 0; i < text.split('\n').length; i++) {
     const rawLine = rawLines[i] ?? '';
     lineOffsets.push(offset + (rawLine.trim().length === 0 ? 0 : indentWidth));
-    offset += rawLine.length + 1;
+    offset += codePoints(rawLine) + 1;
   }
   const first = positionAfter(raw.slice(0, innerStart - sym.start + leadingNewline), sym.line, sym.column);
   return blockOf(form, text, source, lineOffsets[0], first.line, first.column + (rawLines[0]?.trim().length ? indentWidth : 0), indentWidth, lineOffsets);
@@ -1222,10 +1249,13 @@ function blockOf(
   column: number,
   indentWidth: number,
   lineOffsets: number[],
+  escapes: number[] = [],
 ): EmbeddedBlock {
   const lines = text.split('\n');
   const lastLine = lines.length - 1;
   const lastOffset = lineOffsets[lastLine] ?? textStart;
+  // Widths in code points — the unit of the parser's offsets and columns (and of a TTR-P position).
+  const lastWidth = codePoints(lines[lastLine]) + escapes.length;
   return {
     kind: 'embeddedBlock',
     language: 'pl',
@@ -1236,22 +1266,28 @@ function blockOf(
       line,
       column,
       endLine: line + lastLine,
-      endColumn: (lastLine === 0 ? column : lines[lastLine].length ? indentWidth : 0) + lines[lastLine].length,
+      endColumn: (lastLine === 0 ? column : lines[lastLine].length ? indentWidth : 0) + lastWidth,
       offsetStart: textStart,
-      offsetEnd: lastOffset + lines[lastLine].length,
+      offsetEnd: lastOffset + lastWidth,
     },
     lineOffsets,
     indentWidth,
+    ...(escapes.length ? { escapes } : {}),
     source,
   };
 }
 
-/** The 1-based line and 0-based column just past `text`, which starts at `line`:`column`. */
+/** The number of code points in `s` — what ANTLR counts in offsets and columns (a JS length counts UTF-16 units). */
+function codePoints(s: string): number {
+  return [...s].length;
+}
+
+/** The 1-based line and 0-based column (in code points) just past `text`, which starts at `line`:`column`. */
 function positionAfter(text: string, line: number, column: number): { line: number; column: number } {
   const parts = text.split('\n');
   return parts.length === 1
-    ? { line, column: column + text.length }
-    : { line: line + parts.length - 1, column: parts[parts.length - 1].length };
+    ? { line, column: column + codePoints(text) }
+    : { line: line + parts.length - 1, column: codePoints(parts[parts.length - 1]) };
 }
 
 function endOf(raw: string, line: number, column: number): { endLine: number; endColumn: number } {
@@ -1284,7 +1320,7 @@ function walkMdDomainDef(ctx: MdDomainDefContext, name: string, source: SourceLo
     if (p.kindProperty()) domainKind = p.kindProperty()!.id()!.getText();
     if (p.restrictProperty()) restrict = walkRestrictBlock(p.restrictProperty()!.restrictBlock()!, file);
     if (p.publishProperty()) publishMembers = true; // MD dot-path §1.4 — `publish: members`
-    if (p.conceptSugarProperty()) concept = walkConceptSugar(p.conceptSugarProperty()!, file, errors); // 0.17
+    if (p.conceptSugarProperty()) concept = conceptSugarOnce(concept, p.conceptSugarProperty()!, file, errors); // 0.17
   }
 
   return { kind: 'mdDomain', name, source, description, descriptionLocalized, tags, type, domainKind, restrict, publishMembers, ...(concept ? { concept } : {}) };
@@ -1347,7 +1383,7 @@ function walkDimensionDef(ctx: DimensionDefContext, name: string, source: Source
       for (const r of refs) crossRefs.push({ role: 'hierarchy', path: r.path, source: r.source });
     }
     if (p.lexiconBlockProperty()) lexicon = walkLexiconBlock(p.lexiconBlockProperty()!, file);
-    if (p.conceptSugarProperty()) concept = walkConceptSugar(p.conceptSugarProperty()!, file, errors); // 0.17
+    if (p.conceptSugarProperty()) concept = conceptSugarOnce(concept, p.conceptSugarProperty()!, file, errors); // 0.17
   }
 
   return { kind: 'dimension', name, source, description, descriptionLocalized, tags, key, attributes, hierarchies, lexicon, crossRefs: crossRefs.length ? crossRefs : undefined, ...(concept ? { concept } : {}) };
@@ -1498,7 +1534,7 @@ function walkMeasureDef(ctx: MeasureDefContext, name: string, source: SourceLoca
     if (p.aggregationProperty()) aggregation = walkAggregationValue(p.aggregationProperty()!.aggregationValue()!, file);
     if (p.validByProperty()) validBy = p.validByProperty()!.id()!.getText();
     if (p.lexiconBlockProperty()) lexicon = walkLexiconBlock(p.lexiconBlockProperty()!, file);
-    if (p.conceptSugarProperty()) concept = walkConceptSugar(p.conceptSugarProperty()!, file, errors); // 0.17
+    if (p.conceptSugarProperty()) concept = conceptSugarOnce(concept, p.conceptSugarProperty()!, file, errors); // 0.17
   }
 
   return { kind: 'measure', name, source, description, descriptionLocalized, tags, domainRef, measureClass, aggregation, validBy, lexicon, crossRefs: crossRefs.length ? crossRefs : undefined, ...(concept ? { concept } : {}) };
@@ -1538,7 +1574,7 @@ function walkCubeletDef(ctx: CubeletDefContext, name: string, source: SourceLoca
   const crossRefs: CrossRef[] = [];
 
   for (const p of ctx.cubeletProperty()) {
-    if (p.conceptSugarProperty()) concept = walkConceptSugar(p.conceptSugarProperty()!, file, errors); // 0.17
+    if (p.conceptSugarProperty()) concept = conceptSugarOnce(concept, p.conceptSugarProperty()!, file, errors); // 0.17
     if (p.lexiconBlockProperty()) lexicon = walkLexiconBlock(p.lexiconBlockProperty()!, file);
     if (p.descriptionProperty()) {
       description = descriptionOf(p.descriptionProperty()!, file);
@@ -2660,7 +2696,7 @@ function walkEntityDef(
       binding = walkBindingProperty(p.bindingProperty()!, file);
     }
     if (p.conceptSugarProperty()) {
-      concept = walkConceptSugar(p.conceptSugarProperty()!, file, errors); // 0.17
+      concept = conceptSugarOnce(concept, p.conceptSugarProperty()!, file, errors); // 0.17
     }
   }
 
@@ -2759,7 +2795,7 @@ function walkAttributeProperties(
       );
       transitionsNode = { source: makeSourceLocation(p.transitionsProperty()!, file) };
     }
-    if (p.conceptSugarProperty()) concept = walkConceptSugar(p.conceptSugarProperty()!, file, errors); // 0.17
+    if (p.conceptSugarProperty()) concept = conceptSugarOnce(concept, p.conceptSugarProperty()!, file, errors); // 0.17
   }
 
   return {

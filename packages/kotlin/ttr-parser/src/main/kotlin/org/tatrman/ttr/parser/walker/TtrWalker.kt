@@ -1719,9 +1719,21 @@ class TtrWalker(
         return ConceptBindingDef(bindingKind, name, defSource(od), visitConceptBody(props, "binding"))
     }
 
-    /** The host's `concept { … }` — every occurrence is walked (its diagnostics reported), the last one kept. */
-    private fun conceptSugarOf(props: List<TTRParser.ConceptSugarPropertyContext?>): ConceptSugar? =
-        props.filterNotNull().map { visitConceptSugar(it) }.lastOrNull()
+    /**
+     * One `concept { }` per host (cn contracts §1.4): a second one is `ttr/duplicate-property` and the first
+     * is read — the cn body's rule, so CN-P2 and the formatter never meet a sugar the AST threw away.
+     */
+    private fun conceptSugarOf(props: List<TTRParser.ConceptSugarPropertyContext?>): ConceptSugar? {
+        val sugars = props.filterNotNull()
+        for (extra in sugars.drop(1)) {
+            errAt(
+                location(extra),
+                DiagnosticCode.DuplicateProperty,
+                "duplicate property 'concept' — the first one is read",
+            )
+        }
+        return sugars.firstOrNull()?.let { visitConceptSugar(it) }
+    }
 
     private fun visitConceptSugar(ctx: TTRParser.ConceptSugarPropertyContext): ConceptSugar =
         ConceptSugar(visitConceptBody(ctx.cnBody()?.cnProperty().orEmpty(), "concept"), location(ctx))
@@ -1935,8 +1947,26 @@ class TtrWalker(
         val source = SourceLocation(fileLabel, sym.line, col, end.first, end.second, sym.startIndex, sym.stopIndex + 1)
 
         if (sym.type == TTRLexer.STRING_LITERAL) {
-            val text = raw.substring(1, raw.length - 1).replace(simpleEscape, "$1")
-            return blockOf("string", text, source, sym.startIndex + 1, sym.line, col + 1, 0, listOf(sym.startIndex + 1))
+            // Each escape takes two characters of the file and one of `text`: `escapes` keeps where, so a
+            // position in `text` still maps onto the file.
+            val quoted = raw.substring(1, raw.length - 1)
+            val escapes = mutableListOf<Int>()
+            val text =
+                simpleEscape.replace(quoted) { m ->
+                    escapes += quoted.codePointCount(0, m.range.first) - escapes.size
+                    m.groupValues[1]
+                }
+            return blockOf(
+                "string",
+                text,
+                source,
+                sym.startIndex + 1,
+                sym.line,
+                col + 1,
+                0,
+                listOf(sym.startIndex + 1),
+                escapes,
+            )
         }
 
         var inner = raw.substring(3, raw.length - 3)
@@ -1992,7 +2022,7 @@ class TtrWalker(
         for (i in text.split("\n").indices) {
             val rawLine = rawLines.getOrElse(i) { "" }
             lineOffsets += offset + (if (rawLine.isBlank()) 0 else indentWidth)
-            offset += rawLine.length + 1
+            offset += codePoints(rawLine) + 1
         }
         val first = positionAfter(raw.substring(0, innerStart - sym.startIndex + leadingNewline), sym.line, col)
         val firstColumn = first.second + (if (rawLines[0].isNotBlank()) indentWidth else 0)
@@ -2009,10 +2039,13 @@ class TtrWalker(
         column: Int,
         indentWidth: Int,
         lineOffsets: List<Int>,
+        escapes: List<Int> = emptyList(),
     ): EmbeddedBlock {
         val lines = text.split("\n")
         val lastLine = lines.size - 1
         val lastOffset = lineOffsets.getOrElse(lastLine) { textStart }
+        // Widths in code points — the unit of the parser's offsets and columns (and of a TTR-P position).
+        val lastWidth = codePoints(lines[lastLine]) + escapes.size
         val endColumn =
             (
                 if (lastLine == 0) {
@@ -2023,7 +2056,7 @@ class TtrWalker(
                     0
                 }
             ) +
-                lines[lastLine].length
+                lastWidth
         return EmbeddedBlock(
             language = "pl",
             form = form,
@@ -2036,22 +2069,32 @@ class TtrWalker(
                     line + lastLine,
                     endColumn,
                     textStart,
-                    lastOffset + lines[lastLine].length,
+                    lastOffset + lastWidth,
                 ),
             lineOffsets = lineOffsets,
             indentWidth = indentWidth,
             source = source,
+            escapes = escapes,
         )
     }
 
-    /** The 1-based line and 0-based column just past [text], which starts at [line]:[column]. */
+    /** The number of code points in [s] — what ANTLR counts in offsets and columns (`length` counts UTF-16 units). */
+    private fun codePoints(s: String): Int = s.codePointCount(0, s.length)
+
+    /** The 1-based line and 0-based column (in code points) just past [text], which starts at [line]:[column]. */
     private fun positionAfter(
         text: String,
         line: Int,
         column: Int,
     ): Pair<Int, Int> {
         val parts = text.split("\n")
-        return if (parts.size == 1) line to column + text.length else line + parts.size - 1 to parts.last().length
+        return if (parts.size ==
+            1
+        ) {
+            line to column + codePoints(text)
+        } else {
+            line + parts.size - 1 to codePoints(parts.last())
+        }
     }
 
     /** JS `/\r?\n$/` (no `m` flag): one trailing newline. Not a Java regex — its `$` also matches before a final `\n`. */

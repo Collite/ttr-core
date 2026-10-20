@@ -731,10 +731,13 @@ definitionProperty     : DEFINITION  propSep? embeddedBlock ;
 conceptMembersProperty : MEMBERS     propSep? embeddedBlock ;
 valueSpaceProperty     : VALUE_SPACE propSep? id ;
 
-// The free-form entry. Its KEY is a bare word that is NOT one of the typed cn keys above, so a malformed
-// typed property (`definition: OverdueInvoice` — a bare value where a block is required) is a parse
-// error rather than a silently-accepted free-form entry. HIERARCHY and VIA are pre-0.17 tokens cn uses as
-// free-form keys (`hierarchy: { closure: … }`, `via: [ er.relation.… ]`).
+// The free-form entry. Its KEY is a plain identifier (IDENT), never a keyword, so a malformed typed
+// property (`definition: OverdueInvoice` — a bare value where a block is required) is a parse error
+// rather than a silently-accepted free-form entry. That also leaves out every OTHER TTR keyword: `from`,
+// `to`, `type`, `name`, `key`, `source`, `default`, `cardinality`, … are not free-form keys at the top
+// of a cn body. Inside a nested object a key is any `id` (every `idPart` word — `to`, `from`, `name`,
+// `default` …, not `cardinality`) or `type` / `precision`. HIERARCHY and VIA are the two pre-0.17 tokens
+// admitted as free-form keys (`hierarchy: { closure: … }`, `via: [ … ]`).
 cnEntry          : cnKey propSep? cnValue ;
 cnKey            : IDENT | HIERARCHY | VIA ;
 cnValue          : cnObject | cnList | literal | id ;
