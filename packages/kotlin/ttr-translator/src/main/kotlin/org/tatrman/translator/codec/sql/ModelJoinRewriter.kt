@@ -19,6 +19,7 @@ import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.translator.framework.ModelHandle
 import org.tatrman.translator.framework.ModelRelation
+import org.tatrman.translator.joiner.BareJoin
 import org.tatrman.translator.joiner.JoinPolicy
 import org.tatrman.translator.joiner.JoinPolicy.SideRef
 import org.tatrman.translator.joiner.JoinPolicy.Verdict
@@ -46,8 +47,9 @@ import java.util.Locale
  * ([SqlValidatorUtil.alias]); the synthesised condition is `<lAlias>.<lAttr> = <rAlias>.<rAttr>`, `AND`-ed
  * over every pair of the relation (⚑MJ-7). Any other verdict → `ON TRUE`: the encoder drops an always-true
  * condition and the wire carrier reports the join (NoRelation / Ambiguous) — this rewriter records
- * **nothing**, so the two-half pipeline and REL_NODE re-entry never see duplicate diagnostics
- * (architecture §2.2).
+ * **no diagnostic**, so the two-half pipeline and REL_NODE re-entry never see duplicate diagnostics
+ * (architecture §2.2). It does note each such join as [unconditioned] (ttr-server#232): a caller that asks for it
+ * has the parse refused when the join stays a Cartesian product after the physical stage too.
  *
  * A FROM item that is not an ER entity of [namespace] (a derived table, a DB table, `VALUES`) contributes
  * no entity to its side; the entity side alone then resolves nothing → `ON TRUE`. Never an error from here.
@@ -75,6 +77,16 @@ class ModelJoinRewriter(
      */
     var lastRewrittenSql: String? = null
         private set
+
+    /**
+     * ttr-server#232 — the bare joins this instance left `ON TRUE` because the model could not condition them (no
+     * relation, or more than one), in post-order. Recorded always and decided by the caller: the translator refuses
+     * a parse on one only when asked to, and only if the physical stage did not condition it either.
+     */
+    val unconditioned: List<BareJoin>
+        get() = unconditionedJoins
+
+    private val unconditionedJoins = mutableListOf<BareJoin>()
 
     /** Depth of nested `visit(SqlCall)` frames — the outermost one is the statement root. */
     private var depth: Int = 0
@@ -126,6 +138,9 @@ class ModelJoinRewriter(
                 is Verdict.Resolved -> condition(verdict, pos)
                 else -> SqlLiteral.createBoolean(true, pos)
             }
+        if (verdict is Verdict.NoRelation || verdict is Verdict.Ambiguous) {
+            unconditionedJoins += BareJoin(onTheWire(left), onTheWire(right))
+        }
         rewrittenJoins++
         return SqlJoin(
             pos,
@@ -137,6 +152,10 @@ class ModelJoinRewriter(
             condition,
         )
     }
+
+    /** A side's entities as the wire carrier sees them: a temporary entity is its inlined body there, no entity. */
+    private fun onTheWire(side: List<SideRef<String>>): List<QualifiedName> =
+        side.map { it.entity }.filter { it !in temporaryEntities }
 
     private fun isBare(join: SqlJoin): Boolean =
         !join.isNatural &&

@@ -6,6 +6,22 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-translator`** — **`refuseUnconditionedBareJoins`** (new option on `Translator.parseToRelNode` and `translate`,
+  default `false`; ttr-server#232). Set, a SQL statement whose **bare** join (`JOIN` with no `ON`) stays a Cartesian
+  product is refused as `join_unconditioned` (`JoinerMessages.UNCONDITIONED`). The message names the sides and the
+  reason, and gives both ways out: `… no relation or foreign key joins entity.calendar and entity.product; write the
+  ON, or CROSS JOIN if every pairing is meant`.
+  - A bare join stays a Cartesian product when the model declares no relation for it, or more than one, or an entity
+    repeats across it (a self-join), **and** the physical stage cannot condition it from a table foreign key either.
+    So a join a table FK completes is not refused, and neither is a derived table whose table an FK reaches. A CTE
+    over a `UNION`, which the joiners cannot see into, is refused.
+  - The verdict is the one the plan runs with: on a `DB` target the merged one, and on an `ER` target (the first call
+    of a two-half pipeline) the physical stage is run on the side to decide it.
+  - The comma list and `CROSS JOIN` are the author's own Cartesian products and keep their `JOIN_NO_RELATION`
+    warning. The same goes for REL_NODE re-entry, which does not re-read the text.
+  - Unset, nothing changes: the join is a Cartesian product with its warning, byte for byte as before.
+  - `ModelJoinRewriter.unconditioned` lists the bare joins the SQL carrier left `ON TRUE` (new `joiner.BareJoin`).
+
 - **TTR-P — the recipe checker (AU-core-P1; `ttrp-frontend` · `ttrp-graph` · `ttrp-cli`).** A recipe is checked
   against the world and the model: the role shape and wiring (`TTRP-REC-000`), the action wiring typed against
   `def action` (`-001`…`-003`), the candidates' key (`-004`, `-005`), key lineage with each context's class (lookup /

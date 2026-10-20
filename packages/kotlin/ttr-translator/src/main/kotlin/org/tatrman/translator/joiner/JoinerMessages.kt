@@ -62,6 +62,26 @@ object JoinerMessages {
                     "${warning.side.name.lowercase()} side; Cartesian product preserved — write the ON"
         }
 
+    /**
+     * ttr-server#232 — the code of a parse refused because a bare `JOIN` stayed a Cartesian product
+     * (`Translator.parseToRelNode(refuseUnconditionedBareJoins = true)`). Lower case, like the translator's other
+     * failure codes; the `JOIN_*` codes above are warnings.
+     */
+    const val UNCONDITIONED = "join_unconditioned"
+
+    /** The refusal's text: which join, why the model could not condition it, and the two ways out. */
+    fun refusal(warning: JoinerWarning): String {
+        val why =
+            when (warning) {
+                is JoinerWarning.NoRelation ->
+                    "no relation or foreign key joins ${names(warning.leftEntities)} and " +
+                        names(warning.rightEntities)
+                else -> text(warning).removeSuffix("; write the ON")
+            }
+        return "a JOIN without ON that the model cannot condition: $why; write the ON, " +
+            "or CROSS JOIN if every pairing is meant"
+    }
+
     private fun name(q: QualifiedName): String = if (q.namespace.isEmpty()) q.name else "${q.namespace}.${q.name}"
 
     /** An empty side is a derived table the wire carrier does not look into (review-097 R2). */

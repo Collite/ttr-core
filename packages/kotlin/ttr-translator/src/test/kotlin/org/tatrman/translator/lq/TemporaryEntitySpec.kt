@@ -107,6 +107,33 @@ class TemporaryEntitySpec :
             result.warnings.single().shouldBeInstanceOf<JoinerWarning.NoRelation>()
         }
 
+        // ttr-server#232 — asked to, the translator refuses a reader's bare JOIN the model cannot condition; the CROSS
+        // JOIN form stays the author's own, warned Cartesian product, and a conditioned reader is untouched.
+        "refuseUnconditionedBareJoins: a reader's bare JOIN that stays a Cartesian product is refused" {
+            fun parsed(sql: String) =
+                Translator(FkOnlyStack.model).parseToRelNode(
+                    sql,
+                    Language.SQL,
+                    targetSchema = SchemaCode.ER,
+                    sourceSchema = SchemaCode.ER,
+                    refuseUnconditionedBareJoins = true,
+                )
+            val bare =
+                parsed("SELECT shopper.last_name, r.revenue FROM obj.query.top_buyer AS r JOIN shopper")
+                    .shouldBeInstanceOf<ParseResult.Failure>()
+            bare.code shouldBe "join_unconditioned"
+            bare.message shouldContain "no relation or foreign key joins a derived table and entity.shopper"
+            parsed("SELECT shopper.last_name, r.revenue FROM obj.query.top_buyer AS r CROSS JOIN shopper")
+                .shouldBeInstanceOf<ParseResult.Success>()
+                .warnings
+                .single()
+                .shouldBeInstanceOf<JoinerWarning.NoRelation>()
+            parsed("SELECT shopper.last_name, r.revenue FROM obj.query.shopper_spend AS r JOIN shopper")
+                .shouldBeInstanceOf<ParseResult.Success>()
+                .warnings
+                .shouldBeEmpty()
+        }
+
         "⚑T6-1 — a temporary entity that passes an entity's key through relates to that entity on it" {
             val result = parse("SELECT shopper.birth_country FROM obj.query.local_shoppers AS t JOIN shopper")
             joined(result) shouldContain "ON t.shopper_id = shopper.shopper_id"

@@ -30,6 +30,43 @@ data class JoinOutcome(
 )
 
 /**
+ * ttr-server#232 — a **bare** join (`JOIN` with no `ON`) the SQL carrier `ModelJoinRewriter` could not condition
+ * from the model's relations (none, or more than one) and left `ON TRUE`: the ER entities of each side, as the wire
+ * carrier will see them. A side with no entity (a derived table) is empty, and so is a temporary entity's
+ * contribution, which the wire carrier sees only as its inlined body.
+ *
+ * The SQL carrier knows a join was written bare; only the wire carriers know whether it stayed a Cartesian product,
+ * since `JoinerPhysical` may still condition it from a table foreign key. [refusedBy] joins the two.
+ */
+data class BareJoin(
+    val left: List<QualifiedName>,
+    val right: List<QualifiedName>,
+) {
+    /**
+     * The final verdict ([JoinerWarnings.merge]) that leaves this join a Cartesian product, or null: a
+     * [JoinerWarning.NoRelation] or [JoinerWarning.AmbiguousRelations] on exactly these sides, entity for entity.
+     * A verdict on other sides, a join the physical stage conditioned, or a side the carriers saw differently
+     * finds nothing, and the join keeps its warning as before.
+     */
+    fun refusedBy(verdict: List<JoinerWarning>): JoinerWarning? =
+        verdict.firstOrNull { w ->
+            when (w) {
+                is JoinerWarning.NoRelation -> sameSides(w.leftEntities, w.rightEntities)
+                is JoinerWarning.AmbiguousRelations -> sameSides(w.leftEntities, w.rightEntities)
+                else -> false
+            }
+        }
+
+    private fun sameSides(
+        l: List<QualifiedName>,
+        r: List<QualifiedName>,
+    ): Boolean = sorted(l) == sorted(left) && sorted(r) == sorted(right)
+
+    private fun sorted(qs: List<QualifiedName>): List<String> =
+        qs.map { "${it.schemaCode.number}:${it.namespace}.${it.name}" }.sorted()
+}
+
+/**
  * What EXPAND_JOINS could not condition and why. Codes and texts: `JoinerMessages` (MJ-P3; the cz names
  * `JOIN_NO_RELATION` / `JOIN_AMBIGUOUS_RELATIONS` / `JOIN_RELATION_WITHOUT_PAIRS` / `JOIN_KEY_NAME_COLLISION`
  * that Golem demotes on — ⚑MJ-5).
