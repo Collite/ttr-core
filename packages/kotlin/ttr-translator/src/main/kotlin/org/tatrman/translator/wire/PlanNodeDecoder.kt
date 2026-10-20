@@ -15,6 +15,7 @@ import org.tatrman.plan.v1.UnionNode
 import org.tatrman.plan.v1.ValuesNode
 import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.core.JoinRelType
+import org.apache.calcite.rel.hint.Hintable
 import org.apache.calcite.rex.RexNode
 import org.apache.calcite.sql.SqlAggFunction
 import org.apache.calcite.rel.RelCollations
@@ -226,6 +227,8 @@ object PlanNodeDecoder {
             builder.join(type, cond)
         } else {
             builder.join(type, builder.literal(true))
+            // ttr-server#232 — the mark of a bare join rides the decoded Join as a hint; the encoder restores it.
+            if (join.conditionRequired && builder.peek() is Hintable) builder.hints(ConditionRequiredHint.of())
         }
     }
 

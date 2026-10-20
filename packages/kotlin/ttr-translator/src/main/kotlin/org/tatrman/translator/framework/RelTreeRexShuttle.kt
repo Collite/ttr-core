@@ -22,8 +22,11 @@ abstract class RelTreeRexShuttle : RexShuttle() {
     fun rewrite(rel: RelNode): RelNode {
         val newInputs = rel.inputs.map { rewrite(it) }
         val withInputs = if (newInputs == rel.inputs) rel else rel.copy(rel.traitSet, newInputs)
-        return withInputs.accept(this)
+        return visitRel(withInputs.accept(this))
     }
+
+    /** Each node once its inputs and its own expressions are rewritten: override it to change the node itself. */
+    protected open fun visitRel(rel: RelNode): RelNode = rel
 
     override fun visitSubQuery(subQuery: RexSubQuery): RexNode {
         val visited = super.visitSubQuery(subQuery) as RexSubQuery

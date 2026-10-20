@@ -52,3 +52,19 @@ def test_project_expanded_from_roundtrip() -> None:
     assert parsed == node
     assert parsed.project.HasField("expanded_from")
     assert not plan_pb2.ProjectNode().HasField("expanded_from")
+
+
+def test_join_condition_required_roundtrip() -> None:
+    """ttr-server#232 - `JoinNode.condition_required`, the mark of a bare JOIN the model could not condition."""
+    from org.tatrman.plan.v1 import plan_pb2
+
+    node = plan_pb2.PlanNode()
+    node.join.left.scan.object.name = "calendar"
+    node.join.right.scan.object.name = "product"
+    node.join.join_type = plan_pb2.JoinType.INNER
+    node.join.condition_required = True
+
+    parsed = plan_pb2.PlanNode.FromString(node.SerializeToString())
+    assert parsed == node
+    assert parsed.join.condition_required
+    assert not plan_pb2.JoinNode().condition_required

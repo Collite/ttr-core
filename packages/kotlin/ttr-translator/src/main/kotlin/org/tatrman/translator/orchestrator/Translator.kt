@@ -8,6 +8,7 @@ import org.tatrman.translate.v1.SqlDialect as SqlDialectProto
 import org.tatrman.translator.codec.dfdsl.DfDslCodec
 import org.tatrman.translator.codec.dfdsl.DfDslParseException
 import org.tatrman.translator.codec.dfdsl.DfDslUnparseException
+import org.tatrman.translator.codec.sql.BareJoinMarker
 import org.tatrman.translator.codec.sql.RelToSqlUnparser
 import org.tatrman.translator.codec.sql.ModelJoinRewriter
 import org.tatrman.translator.codec.sql.SqlValidator
@@ -26,9 +27,7 @@ import org.tatrman.translator.detect.SchemaDecision
 import org.tatrman.translator.detect.SchemaDetector
 import org.tatrman.translator.framework.ModelHandle
 import org.tatrman.translator.framework.TranslatorFramework
-import org.tatrman.translator.joiner.BareJoin
 import org.tatrman.translator.joiner.JoinerMessages
-import org.tatrman.translator.joiner.JoinerWarning
 import org.tatrman.translator.joiner.JoinerLogical
 import org.tatrman.translator.joiner.JoinerPhysical
 import org.tatrman.translator.params.ParameterBridge
@@ -107,13 +106,17 @@ class Translator(
      *   two-half pipeline); with a `DB` target MAP_TO_PHYSICAL inlines the bodies anyway and the option is a
      *   no-op. Default `false`: byte-identical to today. See [org.tatrman.translator.schema.ExpandLogicalBodies].
      * @param refuseUnconditionedBareJoins ttr-server#232 — refuse a SQL statement with a **bare** join (`JOIN` with no
-     *   `ON`) that stays a Cartesian product: the model declares no relation for it (or more than one), and the physical
-     *   stage cannot condition it from a table foreign key either. Failure `join_unconditioned`
-     *   ([org.tatrman.translator.joiner.JoinerMessages.UNCONDITIONED]), naming the sides. The comma list and
-     *   `CROSS JOIN` are the author's own Cartesian products and keep their warning; so does a bare join the physical
-     *   stage conditions. With a `ER` target (the first call of the two-half pipeline) the physical stage is run on
-     *   the side to decide. SQL only (REL_NODE re-entry never re-reads the text). Default `false`: the join stays a
-     *   Cartesian product with its `JOIN_NO_RELATION` / `JOIN_AMBIGUOUS_RELATIONS` warning, byte-identical to today.
+     *   `ON`) that stays a Cartesian product: the model's relations cannot condition it (none, more than one, or one
+     *   with no join pairs), and the physical stage cannot condition it from a table foreign key either. Failure
+     *   `join_unconditioned` ([org.tatrman.translator.joiner.JoinerMessages.UNCONDITIONED]), naming the join's sides
+     *   and why. The comma list and `CROSS JOIN` are the author's own Cartesian products and keep their warning; so
+     *   does a bare join the physical stage conditions. A bare INNER join its WHERE conditions (a condition reading
+     *   both of its sides) is the author's join: the condition moves into its ON ([BareJoinMarker.lift]). The SQL
+     *   carrier marks each bare join it leaves unconditioned
+     *   (`JoinNode.condition_required`) and the refusal is decided per join where the physical stage runs: on this
+     *   call for a `DB` target; for an `ER` target (the first call of the two-half pipeline) the plan carries the mark,
+     *   and the REL_NODE re-entry refuses on it — whatever its own value of this option, which only SQL reads. Default
+     *   `false`: no mark, and the join stays a Cartesian product with its `JOIN_*` warning, byte-identical to today.
      *
      * `@JvmOverloads` keeps the explicit-argument 0.11.x JVM signatures (callers that pass every argument, e.g.
      * Java). A Kotlin caller compiled against 0.11.x that omitted a defaulted argument goes through the
@@ -289,9 +292,11 @@ class Translator(
         sourceLanguage: Language,
         targetLanguage: Language = Language.SQL,
         targetDialect: SqlDialectProto = SqlDialectProto.MSSQL,
+        refuseUnconditionedBareJoins: Boolean = false,
     ): ExplainResult {
         val stages = mutableListOf<StageArtifact>()
-        val parse = parseToRelNode(source, sourceLanguage)
+        val parse =
+            parseToRelNode(source, sourceLanguage, refuseUnconditionedBareJoins = refuseUnconditionedBareJoins)
         stages += stage("parse_and_to_rel", parse.toString())
         // MJ — what the engine actually joined (contracts §4): the statement after ModelJoinRewriter, or a
         // marker when no bare join was there to condition (also for non-SQL sources and REL_NODE re-entry).
@@ -449,7 +454,11 @@ class Translator(
         // rewriter per attempt (a SqlShuttle is single-use); `lastRewrittenSql` feeds the DEBUG log and the
         // `explain` stage whether the validation then succeeds or not.
         fun preValidation(schema: SchemaCode): List<ModelJoinRewriter> =
-            if (schema == SchemaCode.ER) listOf(ModelJoinRewriter(model, "entity")) else emptyList()
+            if (schema == SchemaCode.ER) {
+                listOf(ModelJoinRewriter(model, "entity", markUnconditioned = refuseUnconditionedBareJoins))
+            } else {
+                emptyList()
+            }
 
         fun attempt(
             schema: SchemaCode,
@@ -460,7 +469,7 @@ class Translator(
             val result = SqlValidator.validateAndConvert(framework.newPlanner(), sql, rewriters)
             val modelJoinsSql = rewriters.firstNotNullOfOrNull { it.lastRewrittenSql }
             if (modelJoinsSql != null) log.debug("Model joins rewrote SQL: $modelJoinsSql")
-            return Attempt(result, framework, modelJoinsSql, rewriters.flatMap { it.unconditioned })
+            return Attempt(result, framework, modelJoinsSql)
         }
 
         fun validateAgainst(schema: SchemaCode): Attempt {
@@ -478,7 +487,7 @@ class Translator(
             }
         }
 
-        var (validated, validatedFramework, modelJoinsSql, bareJoins) = validateAgainst(catalogSchema)
+        var (validated, validatedFramework, modelJoinsSql) = validateAgainst(catalogSchema)
         // Schema auto-correction. When the caller left `source_schema` UNSPECIFIED and content
         // detection was inconclusive, we validated against the `targetSchema` guess; a failure there
         // may just mean the source's tables live in the OTHER catalog (e.g. query-runner's pass-1
@@ -488,7 +497,7 @@ class Translator(
         // the author's SQL rather than reporting a misleading wrong-catalog "object not found".
         if (validated is ValidateResult.Failure && autoCorrectEligible) {
             for (alt in SchemaDetector.CONSIDERED.filter { it != catalogSchema }) {
-                val (altResult, altFramework, altModelJoinsSql, altBareJoins) = validateAgainst(alt)
+                val (altResult, altFramework, altModelJoinsSql) = validateAgainst(alt)
                 if (altResult is ValidateResult.Success) {
                     log.info(
                         "source_schema was inconclusive; auto-corrected catalog to {} after {} validation failed",
@@ -498,7 +507,6 @@ class Translator(
                     validated = altResult
                     validatedFramework = altFramework
                     modelJoinsSql = altModelJoinsSql
-                    bareJoins = altBareJoins
                     break
                 }
             }
@@ -507,16 +515,17 @@ class Translator(
         return when (val v = validated) {
             is ValidateResult.Failure -> ParseResult.Failure(v.error.code, v.error.message, modelJoinsSql)
             is ValidateResult.Success -> {
+                // ttr-server#232 — the SQL carrier's marks move onto their joins as hints before any rel pass.
+                val rel = if (refuseUnconditionedBareJoins) BareJoinMarker.lift(v.rel) else v.rel
                 val r =
                     runFrontHalfStages(
-                        v.rel,
+                        rel,
                         validatedFramework,
                         targetSchema,
                         prepared,
                         hintsByTable = hintsByTable,
                         expandLogicalBodies = expandLogicalBodies,
                         strictLane = if (strictLane) sourceSchema else null,
-                        bareJoins = if (refuseUnconditionedBareJoins) bareJoins else emptyList(),
                     )
                 when (r) {
                     is ParseResult.Success -> r.copy(modelJoinsSql = modelJoinsSql)
@@ -654,8 +663,6 @@ class Translator(
         val result: ValidateResult,
         val framework: TranslatorFramework,
         val modelJoinsSql: String?,
-        /** ttr-server#232 — the bare joins the SQL carrier left `ON TRUE` in this attempt. */
-        val bareJoins: List<BareJoin>,
     )
 
     /**
@@ -694,6 +701,8 @@ class Translator(
      *       Blocking failures: `entity_unmapped`, `mapping_kind_not_supported`.
      *   6. **EXPAND_JOINS-physical** — only when `targetSchema = DB`. Insert FK-based conditions
      *       between physical TableScans; "don't double-join" leaves logical-stage conditions intact.
+     *       A join still marked `condition_required` and unconditioned after it refuses the parse as
+     *       `join_unconditioned` (ttr-server#232; the mark exists only when a SQL parse asked for it).
      *   4b. **EXPAND_LOGICAL_BODIES** (LQ, opt-in) — only when `targetSchema = ER` and
      *       `expandLogicalBodies`: entities stacked on logical queries are expanded in place under a stamped
      *       boundary Project (L-8). Blocking failure: `entity_query_mapping_cycle`.
@@ -716,7 +725,6 @@ class Translator(
         hintsByTable: Map<String, List<TableHintSpec>> = emptyMap(),
         expandLogicalBodies: Boolean = false,
         strictLane: SchemaCode? = null,
-        bareJoins: List<BareJoin> = emptyList(),
     ): ParseResult =
         try {
             // NX-A: decorrelate correlated `[NOT] EXISTS` / `IN` sub-queries before encode. A
@@ -791,19 +799,14 @@ class Translator(
                     }
                 val physical = JoinerPhysical.apply(plan, model)
                 plan = physical.plan
+                // ttr-server#232 — a bare join the SQL carrier marked (on this call, or on the ER half this REL_NODE
+                // re-entry continues) that neither carrier conditioned: refused, not run as a Cartesian product.
+                org.tatrman.translator.joiner.JoinerWarnings
+                    .unconditioned(plan, logical, physical)
+                    ?.let { return ParseResult.Failure(JoinerMessages.UNCONDITIONED, it) }
                 warnings =
                     org.tatrman.translator.joiner.JoinerWarnings
                         .merge(logical, physical)
-            }
-
-            // ttr-server#232 — refuse a bare join that stayed a Cartesian product, on the final verdict. An ER target
-            // stops before the physical stage, which may still condition the join from a table FK: it is run on the
-            // side, for the verdict only. A plan MAP_TO_PHYSICAL cannot map leaves the decision to the DB half, which
-            // fails on that plan anyway.
-            if (bareJoins.isNotEmpty()) {
-                val physicalRan = targetSchema == SchemaCode.DB || targetSchema == SchemaCode.SCHEMA_CODE_UNSPECIFIED
-                val verdict = if (physicalRan) warnings else physicalVerdict(logical)
-                verdict?.let { unconditionedBareJoin(bareJoins, it) }?.let { return it }
             }
 
             ParseResult.Success(plan = plan, warnings = warnings)
@@ -811,24 +814,6 @@ class Translator(
             frontHalfFailure(targetSchema, ex)
         } catch (ex: AssertionError) {
             frontHalfFailure(targetSchema, ex) // an engine assertion — see the class KDoc
-        }
-
-    /** ttr-server#232 — the joiners' final verdict on [logical]'s plan had the physical stage run: what a DB half sees. */
-    private fun physicalVerdict(logical: org.tatrman.translator.joiner.JoinerResult): List<JoinerWarning>? =
-        when (val mapped = MapToPhysical.apply(logical.plan, model)) {
-            is MapToPhysicalResult.Success ->
-                org.tatrman.translator.joiner.JoinerWarnings
-                    .merge(logical, JoinerPhysical.apply(mapped.plan, model))
-            is MapToPhysicalResult.Failure -> null
-        }
-
-    /** ttr-server#232 — the refusal for the first of [bareJoins] that [verdict] leaves a Cartesian product, if any. */
-    private fun unconditionedBareJoin(
-        bareJoins: List<BareJoin>,
-        verdict: List<JoinerWarning>,
-    ): ParseResult.Failure? =
-        bareJoins.firstNotNullOfOrNull { it.refusedBy(verdict) }?.let { w ->
-            ParseResult.Failure(JoinerMessages.UNCONDITIONED, JoinerMessages.refusal(w))
         }
 
     private fun frontHalfFailure(

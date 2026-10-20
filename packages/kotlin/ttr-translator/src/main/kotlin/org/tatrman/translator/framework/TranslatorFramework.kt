@@ -11,6 +11,7 @@ import org.apache.calcite.plan.Contexts
 import org.apache.calcite.schema.SchemaPlus
 import org.apache.calcite.sql.parser.SqlParser
 import org.apache.calcite.sql.validate.SqlValidator
+import org.apache.calcite.sql2rel.SqlToRelConverter
 import org.apache.calcite.tools.FrameworkConfig
 import org.apache.calcite.tools.Frameworks
 import org.apache.calcite.tools.Planner
@@ -93,7 +94,11 @@ class TranslatorFramework(
                 SqlValidator.Config.DEFAULT
                     .withDefaultNullCollation(NullCollation.LOW)
                     .withTypeCoercionFactory(TsqlTypeCoercion.FACTORY),
-            ).context(
+            )
+            // The TTR stamps that ride Calcite as hints (`condition_required`, `expanded_from`) must be known to the
+            // cluster, or a correlated sub-query's decorrelation fails on them: [TtrHintStrategies].
+            .sqlToRelConverterConfig(SqlToRelConverter.config().withHintStrategyTable(TtrHintStrategies.TABLE))
+            .context(
                 Contexts.of(
                     CalciteConnectionConfig.DEFAULT.set(
                         CalciteConnectionProperty.DEFAULT_NULL_COLLATION,
@@ -123,7 +128,8 @@ class TranslatorFramework(
     /**
      * Hand back a fresh [RelBuilder] anchored to the framework's root schema.
      */
-    fun newRelBuilder(): RelBuilder = RelBuilder.create(frameworkConfig)
+    fun newRelBuilder(): RelBuilder =
+        RelBuilder.create(frameworkConfig).also { it.cluster.hintStrategies = TtrHintStrategies.TABLE }
 
     companion object {
         val DEFAULT_SCHEMA_CODE = SchemaCode.DB

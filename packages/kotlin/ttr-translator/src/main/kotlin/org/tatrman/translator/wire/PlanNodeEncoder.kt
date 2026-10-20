@@ -345,6 +345,9 @@ object PlanNodeEncoder {
                     rexBuilder = rel.cluster.rexBuilder,
                 )
             builder.setCondition(Expressions.encode(rel.condition, ctx))
+        } else if (ConditionRequiredHint.isOn(rel.hints)) {
+            // ttr-server#232 — a bare join still unconditioned keeps its mark on the wire.
+            builder.setConditionRequired(true)
         }
         return PlanNode.newBuilder().setJoin(builder).build()
     }

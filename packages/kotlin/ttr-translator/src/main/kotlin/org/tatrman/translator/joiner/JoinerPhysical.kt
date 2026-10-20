@@ -396,6 +396,11 @@ object JoinerPhysical {
     ): PlanNode =
         plan
             .toBuilder()
-            .setJoin(plan.join.toBuilder().setCondition(condition))
-            .build()
+            // ttr-server#232 — a conditioned join requires nothing more.
+            .setJoin(
+                plan.join
+                    .toBuilder()
+                    .setCondition(condition)
+                    .clearConditionRequired(),
+            ).build()
 }
