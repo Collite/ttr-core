@@ -172,8 +172,29 @@ class TtrpPipeline(
         if (diags.any { it.severity == Severity.ERROR }) {
             return PlanResult(fileName, null, null, null, emptyList(), diags, ok = false, recipe = recipe?.model)
         }
+        // AU-core-P2: a checked recipe's switch lowers to the node set (routes, verdict columns, detail) before
+        // normalize, so every engine and emitter sees filters, calcs and joins. The authored graph keeps the switch.
+        var compiled = retargeted
+        var recipeModel = recipe?.model
+        if (recipeModel != null && build.recipe != null) {
+            val switched =
+                org.tatrman.ttrp.graph.recipe.SwitchLowering
+                    .lower(retargeted, build.recipe, recipeModel)
+            diags += switched.diagnostics
+            // The time sugar (S2.2): latest / within / working_days / age and `:as_of ± duration` to the node set.
+            val sugared =
+                org.tatrman.ttrp.graph.recipe
+                    .SugarLowering(build.recipe, recipeModel, report.modelIndex)
+                    .lower(switched.graph)
+            diags += sugared.diagnostics
+            recipeModel = recipeModel.copy(derivedParams = sugared.derived)
+            if (diags.any { it.severity == Severity.ERROR }) {
+                return PlanResult(fileName, null, null, null, emptyList(), diags, ok = false, recipe = recipeModel)
+            }
+            compiled = sugared.graph
+        }
 
-        val norm: NormalizeResult = RewriteEngine(Rules.ALL, bound).normalize(retargeted)
+        val norm: NormalizeResult = RewriteEngine(Rules.ALL, bound).normalize(compiled)
         // RJ-P1 elaboration authoring diagnostics (dead-wire RJ-101; fail-closed RJ-107 unsupported
         // reject type + RJ-108 reject-capable join ON — RJ-P5 review).
         diags += norm.diagnostics
@@ -214,6 +235,7 @@ class TtrpPipeline(
             mdAsof = report.mdAsof,
             memberFingerprint = report.memberFingerprint,
             params = report.document.statements.filterIsInstance<org.tatrman.ttrp.ast.ParamDecl>(),
+            recipe = recipeModel,
         )
     }
 

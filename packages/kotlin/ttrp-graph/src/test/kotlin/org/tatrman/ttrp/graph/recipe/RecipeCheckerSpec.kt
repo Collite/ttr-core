@@ -28,8 +28,9 @@ class RecipeCheckerSpec :
                         r,
                     ).map { "${it.id.id} ${it.location.line}:${it.location.column} ${it.message}" }
                     .shouldBeEmpty()
-                // until AU-core-P2 a recipe is checked, never built
-                r.diagnostics.map { it.id } shouldContainExactly listOf(TtrpDiagnosticId.REC_099)
+                // AU-core-P2: a checked recipe compiles — the plan is whole, nothing said
+                r.diagnostics.shouldBeEmpty()
+                r.ok shouldBe true
                 r.recipe!!.mode shouldBe RecipeMode.PER_CANDIDATE
             }
         }

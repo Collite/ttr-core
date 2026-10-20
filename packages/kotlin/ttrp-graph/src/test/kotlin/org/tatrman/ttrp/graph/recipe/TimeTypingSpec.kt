@@ -94,7 +94,11 @@ class TimeTypingSpec :
                 "orders -> calc(age_days = :as_of - placed_date) -> filter(age_days > :return_window) -> rows",
                 "[return_window]",
             ).shouldBeEmpty()
-            findings("orders -> filter(placed_date < :as_of - days(2 * value)) -> rows").shouldBeEmpty()
+            // AU-core-P2: typed, but not compiled — the door computes no date arithmetic, and a duration from a
+            // column cannot become a bound value (only `:as_of - days(n)` / `- :param` do)
+            findings("orders -> filter(placed_date < :as_of - days(2 * value)) -> rows")
+                .map { it.message }
+                .single() shouldContain "date arithmetic is lowered on a bound value only"
         }
 
         "`latest(by:, per:)` on inventory keeps its row; its columns must be the input's" {

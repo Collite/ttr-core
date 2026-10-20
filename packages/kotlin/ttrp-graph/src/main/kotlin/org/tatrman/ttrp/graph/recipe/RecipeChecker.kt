@@ -124,7 +124,7 @@ class RecipeChecker(
         val candidatesRow = candidatesId?.let { id -> container(id)?.let { outRow(rows, it) } }
         checkCandidates(recipe, rg, candidatesRow, keyColumns)
 
-        val contexts = recipe.contexts.map { classify(it, rg, lineage) }
+        val contexts = recipe.contexts.map { classify(it, rg, lineage, rows) }
         val mode = modeOf(contexts)
         checkMode(recipe, contexts, mode, programs)
         checkWindowBy(recipe, rg, rows, keyColumns)
@@ -191,6 +191,13 @@ class RecipeChecker(
                 parameters = recipe.parameters.map { it.text },
                 mode = mode,
                 programs = programs.map { it.qname.name },
+                routeRow = routeRow,
+                calendarSkWithins = time.calendarSkWithins.toSet(),
+                parameterDecls =
+                    recipe.parameters.map { p ->
+                        val decl = automation<AutomationParameter>().firstOrNull { it.qname.name == p.text }
+                        ParameterInfo(p.text, decl?.type, decl?.value?.let { autoValueText(it) })
+                    },
             )
         return Result(recipeModel, diags.toList())
     }
@@ -388,6 +395,7 @@ class RecipeChecker(
         role: RoleContainer,
         rg: RecipeGraph,
         lineage: KeyLineage,
+        rows: RecipeRows,
     ): ContextInfo {
         val kind =
             when (val f = role.form) {
@@ -410,7 +418,7 @@ class RecipeChecker(
                 else -> ContextClass.LOOKUP
             }
         val lost = out.lostAt.takeIf { cls == ContextClass.SET_LEVEL }
-        return ContextInfo(role.name, kind, cls, role.window, lost?.what, lost?.location)
+        return ContextInfo(role.name, kind, cls, role.window, lost?.what, lost?.location, c?.let { outRow(rows, it) })
     }
 
     private fun modeOf(contexts: List<ContextInfo>): RecipeMode {
@@ -1184,6 +1192,17 @@ class RecipeChecker(
         c: Container,
     ): Map<String, String>? = outPort(c)?.let { rows.origin(PortRef(c.id, it)) }
 
+    /** A `def parameter`'s value as written — what manifest v3 records and the `values` fingerprint hashes (D-13). */
+    private fun autoValueText(v: org.tatrman.ttr.parser.model.AutoValue): String? =
+        when (v) {
+            is org.tatrman.ttr.parser.model.AutoValue.Str -> v.raw
+            is org.tatrman.ttr.parser.model.AutoValue.Num -> v.text
+            is org.tatrman.ttr.parser.model.AutoValue.Bool -> v.raw.toString()
+            is org.tatrman.ttr.parser.model.AutoValue.Duration -> "${v.amount.toLong()} ${v.unit}"
+            is org.tatrman.ttr.parser.model.AutoValue.Id -> v.parts.joinToString(".")
+            else -> null
+        }
+
     private fun render(v: WiringValue): String =
         when (v) {
             is WiringValue.Expr ->
@@ -1248,7 +1267,8 @@ class RecipeChecker(
 
         private val PERIODS = listOf("day", "week", "month")
 
-        private val FILL = Regex("\\{([A-Za-z_][A-Za-z0-9_]*)}")
+        /** A `because:` fill — `{column}` or `{parameter}` (D-108); shared with the switch lowering (AU-core-P2). */
+        internal val FILL = Regex("\\{([A-Za-z_][A-Za-z0-9_]*)}")
 
         /** Every expression of a node the checker reads for `:name` and types. */
         fun nodeExpressions(n: org.tatrman.ttrp.graph.model.Node?): List<Expression> =

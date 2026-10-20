@@ -608,7 +608,19 @@ class TtrpChecker(
         // `er.entity.<name>` — the TTR-M reference spelling (the recipes', AU 17): the er entity named <name> the
         // imports bring into scope, no package path needed (AU-core-P1).
         if (parts.size == 3 && parts[0] == "er" && parts[1] == "entity") {
-            ctx.recipeEntities[parts[2]]?.let { return it }
+            ctx.recipeEntities[parts[2]]?.let { cols ->
+                // A recipe's own verdict entity (06 A-11): the world's automation storage holds it (AU-core-P2).
+                ctx.loadSources[op.location] =
+                    LoadSourceResolver.unbound(
+                        parts.joinToString("."),
+                        parts[2],
+                        cols.map {
+                            it.name to
+                                spelling(it.type)
+                        },
+                    )
+                return cols
+            }
             // The automation stdlib (`obligation`, `state_history`, `approvals`) needs no import (a prelude).
             val entities =
                 (modelIndex?.findEntities(parts[2], ctx.imports) ?: emptyList())
@@ -785,9 +797,40 @@ class TtrpChecker(
                 diag(TtrpDiagnosticId.RES_004, "no relation named `$name` between the joined entities", rel.location)
             return
         }
-        val leftEntity = leftVar?.let { ctx.varEntity[it] }
-        val rightEntity = rightVar?.let { ctx.varEntity[it] }
-        if (leftEntity != null && rightEntity != null) {
+        var leftEntity = leftVar?.let { ctx.varEntity[it] }
+        var rightEntity = rightVar?.let { ctx.varEntity[it] }
+        // AU-core-P2: a side that is no loaded entity — a chain's input, a container's port (`orders -> join(right:
+        // load(er.entity.sales_line), on: relation rel_order_line)`) — is the relation's other endpoint; its rows carry
+        // that entity's attributes by their logical names. Without one known side the join cannot be conditioned.
+        var portSide: String? = null
+        if ((leftEntity == null) != (rightEntity == null)) {
+            val known = (leftEntity ?: rightEntity)!!
+            val other =
+                relations
+                    .firstOrNull { known.qname.name == it.fromEntity.name || known.qname.name == it.toEntity.name }
+                    ?.let { r -> if (r.fromEntity.name == known.qname.name) r.toEntity else r.fromEntity }
+                    ?.let { q -> modelIndex?.entityInScope(q.name.substringAfterLast('.'), ctx.imports) }
+            if (other != null && other.qname.name != known.qname.name) {
+                if (leftEntity == null) {
+                    leftEntity = other
+                    portSide = "left"
+                } else {
+                    rightEntity = other
+                    portSide = "right"
+                }
+            }
+        }
+        if (leftEntity == null || rightEntity == null) {
+            ctx.diags +=
+                diag(
+                    TtrpDiagnosticId.RES_004,
+                    "`on: relation $name` cannot be conditioned: neither joined side is an entity the relation names " +
+                        "(load one side, or write the `on:` condition)",
+                    rel.location,
+                )
+            return
+        }
+        run {
             val endpoints = setOf(leftEntity.qname.name, rightEntity.qname.name)
             val match =
                 relations.firstOrNull {
@@ -804,7 +847,7 @@ class TtrpChecker(
                     )
                 return
             }
-            synthesizeJoinCondition(match, leftEntity, rightEntity, rel, ctx)
+            synthesizeJoinCondition(match, leftEntity, rightEntity, rel, ctx, portSide)
         }
     }
 
@@ -823,6 +866,8 @@ class TtrpChecker(
         rightEntity: Entity,
         rel: RelationArg,
         ctx: Ctx,
+        /** The side whose rows are a port's (AU-core-P2): its columns are the logical attribute names. */
+        portSide: String? = null,
     ) {
         val name = match.qname.name
 
@@ -869,8 +914,16 @@ class TtrpChecker(
                     )
                 return
             }
-            val fromColName = fromCol.name.substringAfterLast('.')
-            val toColName = toCol.name.substringAfterLast('.')
+            val fromColName =
+                if (fromPort ==
+                    portSide
+                ) {
+                    pair.fromAttr.name.substringAfterLast('.')
+                } else {
+                    fromCol.name.substringAfterLast('.')
+                }
+            val toColName =
+                if (toPort == portSide) pair.toAttr.name.substringAfterLast('.') else toCol.name.substringAfterLast('.')
             eqs +=
                 org.tatrman.ttrp.expr.FunctionCall(
                     function = org.tatrman.ttrp.expr.CatalogId.EQ,
@@ -1317,3 +1370,11 @@ class ResolvedSchemaSource(
 ) : SchemaSource {
     override fun schemaFor(ref: DottedRef): List<Column>? = varSchema[ref.parts.joinToString(".")]
 }
+
+/** A column type as a model attribute spells it (`int`, `text`, …) — a load source's type (AU-core-P2). */
+private fun spelling(t: TtrpType): String =
+    when (t) {
+        is TtrpType.Integer -> "int"
+        is TtrpType.Str -> "text"
+        else -> t.canonical
+    }

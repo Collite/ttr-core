@@ -83,7 +83,7 @@ class GraphBuilder {
         val doc = report.document
 
         // Pass 1: build containers (so cross-container refs resolve in pass 2). A recipe's members are
-        // containers too (AU-core-P1): the checker walks them; the bundle compile is P2's (REC-099 below).
+        // containers too (AU-core-P1): the checker walks them, the recipe compile lowers them (AU-core-P2).
         var recipeGraph: org.tatrman.ttrp.graph.model.RecipeGraph? = null
         for (stmt in doc.statements) {
             if (stmt is ContainerDecl) ctx.buildContainer(stmt)
@@ -101,16 +101,6 @@ class GraphBuilder {
                 // but the graph→bundle pipeline does not yet execute MD writes — the plan is built and
                 // lowered only via the conformance harness. Warn at the drop point so a `+=`/`:=`/`-=`
                 // in a real `.ttrp` is not silently omitted from the bundle with no signal at all.
-                // AU-core-P0 parses the recipe block; its compile to a recipe bundle is AU-core-P2. Refuse
-                // rather than build an empty bundle that silently omits the whole recipe.
-                is org.tatrman.ttrp.ast.RecipeDecl ->
-                    ctx.diags +=
-                        TtrpDiagnostic(
-                            TtrpDiagnosticId.REC_099,
-                            Severity.ERROR,
-                            "the recipe block is parsed but not yet compiled to a bundle (AU-core-P2)",
-                            stmt.location,
-                        )
                 is CubeletStmt ->
                     ctx.diags +=
                         TtrpDiagnostic(

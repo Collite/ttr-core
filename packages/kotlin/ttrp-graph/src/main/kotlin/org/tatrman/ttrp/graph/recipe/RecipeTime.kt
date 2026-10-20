@@ -106,6 +106,12 @@ class RecipeTime(
 ) {
     private val diags = mutableListOf<TtrpDiagnostic>()
 
+    /**
+     * AU-core-P2: the `within` nodes whose column is an int sk the model leads to the calendar (D-82) — the sugar
+     * lowering joins the calendar for them, and filters the column itself for a date.
+     */
+    val calendarSkWithins = mutableSetOf<String>()
+
     /** Null while typing a row's columns: nothing is reported then. */
     private var sink: MutableList<TtrpDiagnostic>? = diags
     private val model = report.modelIndex
@@ -546,6 +552,11 @@ class RecipeTime(
         }
         if (attr != null) {
             val t = column(row, attr.column, node, "within") ?: return
+            if (t.kind == TtrpType.Kind.NUMERIC &&
+                isDate(RecipeType.Scalar(t), attr, origin)
+            ) {
+                calendarSkWithins += node.id
+            }
             if (!isDate(RecipeType.Scalar(t), attr, origin)) {
                 err(
                     TtrpDiagnosticId.TYP_001,

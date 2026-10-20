@@ -27,7 +27,8 @@
     "agg.sum", "agg.avg", "agg.min", "agg.max", "agg.count",
     "fn.coalesce", "fn.abs", "fn.round", "fn.length", "fn.lower", "fn.upper", "fn.substring",
     "fn.regexp_match",
-    "fn.period_start", "fn.period_end", "fn.geo_distance_m"
+    "fn.period_start", "fn.period_end", "fn.geo_distance_m",
+    "op.concat", "nullif"
   ],
   "rejects": {
     "produces": true,
