@@ -46,8 +46,10 @@ import java.util.Locale
  * ([SqlValidatorUtil.alias]); the synthesised condition is `<lAlias>.<lAttr> = <rAlias>.<rAttr>`, `AND`-ed
  * over every pair of the relation (⚑MJ-7). Any other verdict → `ON TRUE`: the encoder drops an always-true
  * condition and the wire carrier reports the join (NoRelation / Ambiguous) — this rewriter records
- * **nothing**, so the two-half pipeline and REL_NODE re-entry never see duplicate diagnostics
- * (architecture §2.2).
+ * **no diagnostic**, so the two-half pipeline and REL_NODE re-entry never see duplicate diagnostics
+ * (architecture §2.2). With [markUnconditioned] (ttr-server#232) it writes [BareJoinMarker] instead of `TRUE`: the
+ * join reaches the wire as `condition_required`, and the translator refuses the plan if the join is still a
+ * Cartesian product after the physical stage.
  *
  * A FROM item that is not an ER entity of [namespace] (a derived table, a DB table, `VALUES`) contributes
  * no entity to its side; the entity side alone then resolves nothing → `ON TRUE`. Never an error from here.
@@ -63,6 +65,7 @@ import java.util.Locale
 class ModelJoinRewriter(
     private val model: ModelHandle,
     private val namespace: String,
+    private val markUnconditioned: Boolean = false,
 ) : SqlShuttle() {
     /** Number of bare joins this instance rewrote (conditioned or `ON TRUE`). */
     var rewrittenJoins: Int = 0
@@ -124,7 +127,7 @@ class ModelJoinRewriter(
         val condition =
             when (verdict) {
                 is Verdict.Resolved -> condition(verdict, pos)
-                else -> SqlLiteral.createBoolean(true, pos)
+                else -> if (markUnconditioned) BareJoinMarker.call(pos) else SqlLiteral.createBoolean(true, pos)
             }
         rewrittenJoins++
         return SqlJoin(

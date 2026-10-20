@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.translator.joiner
 
+import org.tatrman.plan.v1.PlanNode
 import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.translator.framework.ModelRelation
 
@@ -32,34 +33,94 @@ object JoinerMessages {
             else -> Severity.WARNING
         }
 
-    fun text(warning: JoinerWarning): String =
+    fun text(warning: JoinerWarning): String = "${reason(warning)}; ${fallback(warning)}"
+
+    /** What the carrier found: the first half of [text]. */
+    private fun reason(warning: JoinerWarning): String =
         when (warning) {
             is JoinerWarning.NoRelation ->
-                "no declared relation between ${names(warning.leftEntities)} and ${names(warning.rightEntities)}; " +
-                    "Cartesian product preserved"
+                "no declared relation between ${names(warning.leftEntities)} and ${names(warning.rightEntities)}"
             is JoinerWarning.AmbiguousRelations ->
                 when {
                     warning.repeated.isNotEmpty() ->
-                        "entity ${warning.repeated.joinToString {
-                            name(
-                                it,
-                            )
-                        }} appears more than once in the join; write the ON"
+                        "entity ${warning.repeated.joinToString { name(it) }} appears more than once in the join"
                     warning.candidateRelations.isEmpty() ->
                         "more than one foreign key could join ${names(warning.leftEntities)} and " +
-                            "${names(warning.rightEntities)}; write the ON"
-                    else ->
+                            names(warning.rightEntities)
+                    else -> {
+                        val candidates = warning.candidateRelations.joinToString { relation(it) }
                         "${warning.candidateRelations.size} relations could join ${names(warning.leftEntities)} and " +
-                            "${names(
-                                warning.rightEntities,
-                            )}: ${warning.candidateRelations.joinToString { relation(it) }}; " +
-                            "write the ON"
+                            "${names(warning.rightEntities)}: $candidates"
+                    }
                 }
             is JoinerWarning.RelationWithoutJoinPairs ->
-                "relation ${relation(warning.relation)} declares no join pairs; left to its foreign key"
+                "relation ${relation(warning.relation)} declares no join pairs"
             is JoinerWarning.KeyNameCollision ->
                 "join key ${warning.attribute} exists on more than one entity of the " +
-                    "${warning.side.name.lowercase()} side; Cartesian product preserved — write the ON"
+                    "${warning.side.name.lowercase()} side"
+        }
+
+    /** What became of the join: the second half of [text]. */
+    private fun fallback(warning: JoinerWarning): String =
+        when (warning) {
+            is JoinerWarning.NoRelation -> "Cartesian product preserved"
+            is JoinerWarning.AmbiguousRelations -> "write the ON"
+            is JoinerWarning.RelationWithoutJoinPairs -> "left to its foreign key"
+            is JoinerWarning.KeyNameCollision -> "Cartesian product preserved — write the ON"
+        }
+
+    /**
+     * ttr-server#232 — the code of a parse refused because a bare `JOIN` stayed a Cartesian product
+     * (`Translator.parseToRelNode(refuseUnconditionedBareJoins = true)`). Lower case, like the translator's other
+     * failure codes; the `JOIN_*` codes above are warnings.
+     */
+    const val UNCONDITIONED = "join_unconditioned"
+
+    /**
+     * The refusal's text for one join: why neither carrier conditioned it, from what each reported on that join
+     * ([logical] names the entities the author wrote, [physical] the tables), and the way out: the ON. It offers no
+     * `CROSS JOIN`: the text reaches an LLM's repair round, and a model told a `CROSS JOIN` will do turns a forgotten ON
+     * into the warned Cartesian product this refusal exists to stop.
+     */
+    fun refusal(
+        logical: JoinerWarning?,
+        physical: JoinerWarning?,
+    ): String {
+        val why =
+            when (logical) {
+                is JoinerWarning.NoRelation ->
+                    if (physical == null || physical is JoinerWarning.NoRelation) {
+                        noRelationOrKey(logical.leftEntities, logical.rightEntities)
+                    } else {
+                        "no relation joins ${names(logical.leftEntities)} and ${names(logical.rightEntities)}, and " +
+                            physicalReason(physical)
+                    }
+                // Left to the foreign key, which did not condition it either: both halves of the story.
+                is JoinerWarning.RelationWithoutJoinPairs ->
+                    reason(logical) + (physical?.let { ", and ${physicalReason(it)}" } ?: "")
+                // The logical carrier did not decide the join (a side with no entity it can see): the physical one did.
+                null ->
+                    when (physical) {
+                        is JoinerWarning.NoRelation -> noRelationOrKey(physical.leftEntities, physical.rightEntities)
+                        null -> "the model has no relation or foreign key for it"
+                        else -> reason(physical)
+                    }
+                else -> reason(logical)
+            }
+        return "a JOIN without ON that the model cannot condition: $why; write the ON"
+    }
+
+    private fun noRelationOrKey(
+        left: List<QualifiedName>,
+        right: List<QualifiedName>,
+    ): String = "no relation or foreign key joins ${names(left)} and ${names(right)}"
+
+    /** A table-level reason: a physical `NoRelation` is about foreign keys, not declared relations. */
+    private fun physicalReason(warning: JoinerWarning): String =
+        when (warning) {
+            is JoinerWarning.NoRelation ->
+                "no foreign key joins ${names(warning.leftEntities)} and ${names(warning.rightEntities)}"
+            else -> reason(warning)
         }
 
     private fun name(q: QualifiedName): String = if (q.namespace.isEmpty()) q.name else "${q.namespace}.${q.name}"
@@ -138,5 +199,41 @@ object JoinerWarnings {
                 .toSet()
         val keptPhysical = physicalOutcomes.mapNotNull { o -> o.warning?.takeIf { o.joinPath !in decidedByLogical } }
         return keptLogical + keptPhysical
+    }
+
+    /**
+     * ttr-server#232 — the refusal text for the first join of [plan] (the physical stage's result) that is still marked
+     * `condition_required` and has no condition, or null when there is none. The mark is the SQL carrier's, left on
+     * this call or on the ER half before it, so the decision is per join: no other join's verdict can refuse it or
+     * excuse it. The text is built from what each carrier reported on that join ([JoinerMessages.refusal]).
+     */
+    fun unconditioned(
+        plan: PlanNode,
+        logical: JoinerResult,
+        physical: JoinerResult,
+    ): String? {
+        val path = firstUnconditioned(plan, emptyList()) ?: return null
+
+        fun on(result: JoinerResult) = result.outcomes.firstOrNull { it.joinPath == path }?.warning
+        return JoinerMessages.refusal(on(logical), on(physical))
+    }
+
+    /** Post-order, child ordinals as [JoinerPlanWalker.rewriteChildren] visits them: the joiners' [JoinOutcome.joinPath]. */
+    private fun firstUnconditioned(
+        plan: PlanNode,
+        path: List<Int>,
+    ): List<Int>? {
+        var child = 0
+        var found: List<Int>? = null
+        JoinerPlanWalker.rewriteChildren(plan) { c ->
+            val childPath = path + child++
+            if (found == null) found = firstUnconditioned(c, childPath)
+            c
+        }
+        if (found != null) return found
+        val join = plan.join
+        return path.takeIf {
+            plan.nodeCase == PlanNode.NodeCase.JOIN && join.conditionRequired && !join.hasCondition()
+        }
     }
 }

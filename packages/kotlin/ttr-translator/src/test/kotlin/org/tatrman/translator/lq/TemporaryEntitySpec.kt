@@ -107,6 +107,41 @@ class TemporaryEntitySpec :
             result.warnings.single().shouldBeInstanceOf<JoinerWarning.NoRelation>()
         }
 
+        // ttr-server#232 — asked to, the translator marks a reader's bare JOIN the model cannot condition, and refuses
+        // it where the physical stage leaves it a Cartesian product: the single DB call, or the REL_NODE re-entry that
+        // finishes the ER half. The CROSS JOIN form stays the author's own, warned Cartesian product, and a conditioned
+        // reader is untouched.
+        "refuseUnconditionedBareJoins: a reader's bare JOIN that stays a Cartesian product is refused" {
+            fun parsed(
+                sql: String,
+                target: SchemaCode = SchemaCode.DB,
+            ) = Translator(FkOnlyStack.model).parseToRelNode(
+                sql,
+                Language.SQL,
+                targetSchema = target,
+                sourceSchema = SchemaCode.ER,
+                refuseUnconditionedBareJoins = true,
+            )
+            val bareSql = "SELECT shopper.last_name, r.revenue FROM obj.query.top_buyer AS r JOIN shopper"
+            val bare = parsed(bareSql).shouldBeInstanceOf<ParseResult.Failure>()
+            bare.code shouldBe "join_unconditioned"
+            bare.message shouldContain "no relation or foreign key joins a derived table and entity.shopper"
+            val erHalf = parsed(bareSql, SchemaCode.ER).shouldBeInstanceOf<ParseResult.Success>()
+            Translator(FkOnlyStack.model)
+                .parseToRelNode(String(erHalf.plan.toByteArray(), Charsets.ISO_8859_1), Language.REL_NODE)
+                .shouldBeInstanceOf<ParseResult.Failure>()
+                .message shouldBe bare.message
+            parsed("SELECT shopper.last_name, r.revenue FROM obj.query.top_buyer AS r CROSS JOIN shopper")
+                .shouldBeInstanceOf<ParseResult.Success>()
+                .warnings
+                .single()
+                .shouldBeInstanceOf<JoinerWarning.NoRelation>()
+            parsed("SELECT shopper.last_name, r.revenue FROM obj.query.shopper_spend AS r JOIN shopper")
+                .shouldBeInstanceOf<ParseResult.Success>()
+                .warnings
+                .shouldBeEmpty()
+        }
+
         "⚑T6-1 — a temporary entity that passes an entity's key through relates to that entity on it" {
             val result = parse("SELECT shopper.birth_country FROM obj.query.local_shoppers AS t JOIN shopper")
             joined(result) shouldContain "ON t.shopper_id = shopper.shopper_id"

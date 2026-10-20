@@ -6,6 +6,44 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-translator`** — **`refuseUnconditionedBareJoins`** (new option on `Translator.parseToRelNode`, `translate`
+  and `explain`, default `false`; ttr-server#232). Set, a SQL statement whose **bare** join (`JOIN` with no `ON`) stays a
+  Cartesian product is refused as `join_unconditioned` (`JoinerMessages.UNCONDITIONED`). The message names the join's
+  sides and why, from what each joiner found on that join, and the way out: `… no relation or foreign key joins
+  entity.calendar and entity.product; write the ON`. It does not offer `CROSS JOIN`: the text reaches an LLM's repair
+  round, which would turn the forgotten `ON` into the warned Cartesian product.
+  - A bare join stays a Cartesian product when the model's relations cannot condition it (none, more than one, an entity
+    repeated across it, or one relation with no join pairs, Hartland's FK-only shape) **and** the physical stage cannot
+    condition it from a table foreign key either. So a join a table FK completes is not refused, and neither is a
+    derived table whose table an FK reaches. A bare join between two derived tables (CTEs, aggregates, a `UNION`),
+    which the joiners cannot see into, is refused.
+  - **Decided per join.** The SQL carrier marks each bare join it leaves unconditioned (`JoinNode.condition_required`,
+    below); the stage that conditions a marked join clears the mark; a join still marked and unconditioned after the
+    physical stage refuses the parse. No other join's verdict can refuse it or excuse it: an author's `CROSS JOIN` with
+    the same sides elsewhere in the statement no longer matters.
+  - **Where the physical stage runs.** On a `DB` target that is the same call. On an `ER` target (the first call of the
+    two-half pipeline) the plan comes back marked, with its warnings, and the REL_NODE re-entry refuses it, with no
+    option needed on that call: the mark is the request. A plan parsed without the option carries no mark, so its
+    re-entry refuses nothing.
+  - The comma list and `CROSS JOIN` are the author's own Cartesian products: never marked, and they keep their
+    `JOIN_NO_RELATION` warning.
+  - **A bare `JOIN` its WHERE conditions is accepted** (`FROM a JOIN b WHERE a.x = b.y`): the author wrote the
+    condition, in the wrong clause. Each top-level `AND` condition that reads both sides of a marked INNER join, and
+    nothing outside it, moves into that join's `ON` (the lowest such join in a chain), so the plan is the one the `ON`
+    form gives: no refusal, no warning, and no relation or foreign key stacked on the author's condition. A bare
+    `LEFT`/`RIGHT`/`FULL JOIN` is still refused that way, because a WHERE condition on both of its sides drops the
+    rows the outer join keeps, so the author meant `ON`. A condition with a sub-query stays in WHERE. Without the
+    option nothing moves.
+  - Unset, nothing changes: no mark, and the join is a Cartesian product with its warning, byte for byte as before.
+  - The two plan stamps that ride Calcite as hints (`condition_required` on a Join, `expanded_from` on a Project) are now
+    registered with every cluster the translator builds (`TtrHintStrategies`), each un-inheritable. Calcite propagates
+    hints when it decorrelates a sub-query and asserts every name is known, so a stamped plan with a correlated
+    sub-query failed to parse (`hint … must be present`; an NPE without `-ea`).
+- **`ttr-plan-proto`** — **`JoinNode.condition_required = 5`** (bool; reserved range now 6 to 9; ttr-server#232). Set only
+  by the translator, and only on a SQL parse asked to refuse unconditioned bare joins: a `JOIN` without `ON` that the
+  model's relations could not condition. It stays on the join while the join has no condition. Proto3: a reader that
+  does not know it ignores it, and an unmarked join serializes exactly as before.
+
 - **Grammar 0.16 → 0.17 — the conceptual model (CN-P1; `ttr-parser`, `ttr-semantics`, the TS and Python parsers).**
   `model cn` with `def kind` · `event` · `quality` · `phase` · `relation_type` and the cn `def role` on one shared
   body (typed `description`, `label`, `tags`, the stereotype refs, `grounds`, `involves` with `as`-labelled

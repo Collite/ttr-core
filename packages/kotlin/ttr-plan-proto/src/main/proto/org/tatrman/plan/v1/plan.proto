@@ -151,7 +151,13 @@ message JoinNode {
   PlanNode right = 2;
   JoinType join_type = 3;
   Expression condition = 4;
-  reserved 5 to 9;
+  // ttr-server#232. Set ONLY by the translator, and only when a SQL parse was asked to refuse unconditioned bare
+  // joins (`refuseUnconditionedBareJoins`): a `JOIN` written without `ON` that the model's relations could not
+  // condition. It stays on the join while the join has no `condition`; the stage that conditions it clears it. A
+  // translator whose physical stage ends with such a join still unconditioned refuses the plan
+  // (`join_unconditioned`) instead of leaving a Cartesian product. Never set on a comma list or a `CROSS JOIN`.
+  bool condition_required = 5;
+  reserved 6 to 9;
 }
 
 enum JoinType {
