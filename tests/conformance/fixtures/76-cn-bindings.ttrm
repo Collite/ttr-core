@@ -1,0 +1,49 @@
+// 0.17 — `model binding`: the ten cn binding kinds (cn contracts §1.2) — the md face
+// (`cn2md_kind | role | quality | event`), the er face (`cn2er_kind` with `hierarchy`, `cn2er_role`
+// own-entity and base + `via` path, `cn2er_event` with labelled `participants` paths and a `period`,
+// `cn2er_quality` with the series `filter`, `cn2er_phase` onto a stacked entity) and the doc-grade
+// `cn2db_concept`. Attribute refs are spelled `er.entity.<e>.<a>` (A-CN-9).
+package hartland.concepts
+model binding
+
+// ---- md face: what analysts aggregate ----
+def cn2md_kind    item_g     { kind: cn.Item,         target: md.Product }
+def cn2md_role    customer_g { role: cn.Customer,     target: md.Customer }
+def cn2md_quality revenue_g  { quality: cn.revenue,   target: md.revenue }
+def cn2md_quality brand_g    { quality: cn.brand,     target: md.Product.brand, description: "an attribute, not a measure" }
+def cn2md_event   return_g   { event: cn.Return,      target: md.storeReturns }
+
+// ---- er face: the base ----
+def cn2er_kind category_g {
+    kind: cn.ProductCategory,
+    target: er.entity.category_code,
+    hierarchy: { closure: er.entity.category_closure, ancestor: ancestor_code, descendant: descendant_code, ranges: lexical }
+}
+def cn2er_kind channel_g { kind: cn.Channel, target: er.entity.channel_sales.channel }
+def cn2er_role buyer_g   { role: cn.Customer, target: er.entity.customer }
+def cn2er_role orderer_g { role: cn.Orderer,  target: er.entity.party, via: [er.relation.rel_order_customer] }
+def cn2er_event transfer_g {
+    event: cn.StockTransfer,
+    target: er.entity.stock_transfer,
+    participants: {
+        item: [er.relation.rel_transfer_item],
+        from: [er.relation.rel_transfer_from],
+        to:   [er.relation.rel_transfer_to, er.relation.rel_warehouse_region],
+    },
+    period: { at: er.entity.stock_transfer.shipped_at }
+}
+def cn2er_event order_g {
+    event: cn.Order
+    target: er.entity.order
+    period: { start: er.entity.order.placed_date, end: er.entity.order.delivered_date }
+}
+def cn2er_quality state_g { quality: cn.state, target: er.entity.order.state }
+def cn2er_quality stock_g {
+    quality: cn.stock_level,
+    target: er.entity.inventory.quantity_on_hand,
+    filter: """warehouse = 1"""
+}
+def cn2er_phase placed_g { phase: cn.PlacedOrder, target: er.entity.placed_order }
+
+// ---- db face: doc-grade only ----
+def cn2db_concept legacy_g { concept: cn.LegacyStock, target: db.dbo.legacy_stock, tags: ["legacy"] }

@@ -34,6 +34,14 @@ const RULE_NAME_OVERRIDES: Record<string, string> = {
   semanticsBlock: 'semantics',
   lexiconBlock: 'lexicon',
   columnNamesList: 'columnNames',
+  // 0.17 — the cn rules whose name is not the key they carry. `cnRefProperty` is the stereotype-ref
+  // rule (`kind|role|quality|event|phase|concept:`); on a role — the only advertised kind carrying it —
+  // the one ref a role takes is its defining `event:`.
+  cnRef: 'event',
+  conceptSugar: 'concept',
+  conceptMembers: 'members',
+  valueSpace: 'value_space',
+  sensePriority: 'sense_priority',
 };
 
 function ruleToPropertyName(rule: string): string {
@@ -118,6 +126,18 @@ const typeMap: Record<string, string> = {
   delivery: 'object',
   members: 'list of strings',
   transitions: 'state transition map',
+  // 0.17 — the conceptual model (cn contracts §1).
+  event: 'reference',
+  grounds: 'reference',
+  concept: 'concept block',
+  involves: 'list of participants',
+  period: 'period',
+  extent: 'identifier',
+  basis: 'identifier',
+  definition: 'expression block',
+  value_space: 'reference',
+  default: 'boolean',
+  sense_priority: 'number',
 };
 
 const allKinds = [

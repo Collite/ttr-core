@@ -1,0 +1,112 @@
+// 0.17 — `model cn`: every concept def kind (kind · role · event · quality · phase · relation_type) with
+// every property of the cn contracts §1.1 — `is_a` (one ref and a list), `grounds`, the grounding's
+// `hierarchy { closure, ancestor, descendant, ranges }`, `members`, `qualities`, `extent`, labelled
+// `involves` (`as`), `period { start, end, end_open }` / `{ at, precision }`, `value_space`,
+// `valued_state`, `definition` (a plain, a triple and a `pl`-tagged block), `imprecision`, `basis`,
+// `abstract`, `sources`, inline `lexicon`, and the open tier (`relations` + `def relation_type`).
+// Hartland names; the ones Hartland lacks (category codes, stock transfers) are invented.
+package hartland.concepts
+model cn
+
+// ---- kinds ----
+def kind Item {
+    description: "A product the stores, the web shop and the marketplace sell.",
+    label: { en: "Product", cs: "Produkt" },
+    sources: ["doc://hartland/handbook#products"],
+    grounds: md.Product,
+    qualities: [category, brand],
+    lexicon: { terms: ["product", "item", "SKU"] }
+}
+def kind ProductCategory {
+    label: { en: "Product category" }
+    grounds: er.entity.category_code
+    hierarchy: { closure: er.entity.category_closure, ancestor: ancestor_code, descendant: descendant_code, ranges: node }
+}
+def kind HomeCategory {
+    is_a: ProductCategory,
+    members: """descendants(ProductCategory, 'H10-H19')""",
+    label: { en: "Home and garden categories" },
+}
+def kind Channel   { grounds: er.entity.channel_sales.channel }
+def kind Warehouse { label: { en: "Distribution center" }, grounds: md.DistributionCentre, tags: ["logistics"] }
+def kind Party     { label: { en: "Party" } }
+def kind Supplier {
+    is_a: [Party, Organization],
+    relations: [ { type: supplies, to: Warehouse } ]
+}
+
+// ---- roles ----
+def role Customer {
+    of: Party,
+    event: Order,
+    label: { en: "Customer", cs: "Zákazník" },
+    grounds: md.Customer
+}
+
+// ---- events ----
+def event Sale {
+    extent: instantaneous,
+    involves: [ Customer, Item, Channel ],
+    period: { at: sold_date },
+    grounds: er.entity.channel_sales,
+    qualities: [ revenue, quantity, sold_date ]
+}
+def event Order {
+    extent: durative,
+    involves: [ Customer, Warehouse as fulfilling ],
+    period: { start: placed_date, end: delivered_date, end_open: open },
+    qualities: [ order_value, state, placed_date, delivered_date ]
+}
+def event Invoicing {
+    involves: [ Customer, Order ],
+    period: { start: issued, end: due },
+    grounds: er.entity.invoice,
+    qualities: [ amount, paid, open_amount, invoice_status ]
+}
+def event StockTransfer {
+    extent: instantaneous,
+    involves: [ Item, Warehouse as from, Warehouse as to, ],
+    period: { at: shipped_at, precision: day },
+    qualities: [ shipped_at, transfer_delay ]
+}
+def event WarehouseOutage {
+    extent: durative
+    involves: [ Warehouse ]
+    period: { start: started_at, end: ended_at, end_open: unknown }
+}
+
+// ---- qualities: grounded, valued over time, defined ----
+def quality revenue        { of: Sale, label: { en: "Revenue", cs: "Tržby" }, grounds: md.revenue }
+def quality category       { of: Item, value_space: ProductCategory, grounds: er.entity.item.category }
+def quality stock_level    { of: Item, valued_state: true, grounds: er.entity.inventory.quantity_on_hand }
+def quality open_amount    { of: Invoicing, definition: "amount - paid" }
+def quality transfer_delay {
+    of: StockTransfer,
+    definition: """pl
+        this.period.at - this.from.period.at
+    """
+}
+
+// ---- phases: defined, stacked, conditions with a basis ----
+def phase PendingOrder {
+    of: Order,
+    label: { en: "Pending order" },
+    definition: """state in ('placed', 'held')"""
+}
+def phase OverdueInvoice { of: Invoicing, definition: """invoice_status = 'open' and period.end < as_of""" }
+def phase DebtorCustomer {
+    of: Customer,
+    definition: """exists Invoicing involving this as customer where OverdueInvoice""",
+    imprecision: certainly
+}
+def phase PlacedOrder   { of: Order, grounds: er.entity.placed_order }
+def phase StockCondition { of: Item, abstract: true }
+def phase OutOfStock {
+    of: Item,
+    is_a: StockCondition,
+    basis: current_state,
+    definition: """exists StockoutEpisode e involving this where e.period contains as_of"""
+}
+
+// ---- the open tier ----
+def relation_type supplies { description: "A supplier supplies a distribution center.", label: { en: "supplies" } }

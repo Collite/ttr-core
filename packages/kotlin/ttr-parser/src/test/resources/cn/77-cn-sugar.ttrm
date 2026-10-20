@@ -1,0 +1,29 @@
+// 0.17 — the bottom-up `concept { … }` sugar (cn contracts §1.4) in every legal md and er host: cubelet
+// (event), dimension and domain (kind | role), measure (quality), entity (kind | role | event), er
+// attribute (quality | value kind). With and without the `:`. No `model` directive — each def keeps its
+// own model by kind.
+package hartland.concepts
+
+def cubelet storeReturns {
+    grain: [Customer.code, Product.code],
+    concept { event: Return, involves: [Customer, Item, ReturnReason] }
+}
+def dimension Product {
+    key: sku,
+    concept: { kind: Item, label: { en: "Product" } }
+}
+def domain ReasonCode { type: text, concept { kind: ReturnReason } }
+def measure returnAmount { domain: md.Money, aggregation: sum, concept { quality: return_amount } }
+
+def entity invoice {
+    attributes: [
+        def attribute invoice_id { type: int, isKey: true },
+        def attribute status     { type: text, concept { quality: invoice_status } }
+    ],
+    concept { kind: Invoice }
+}
+def entity order    { concept { event: Order, period: { start: placed_date, end: delivered_date } } }
+def entity customer { concept: { role: Customer, event: Order } }
+def entity channel_sales {
+    attributes: [ def attribute channel { type: text, concept { kind: Channel } } ]
+}

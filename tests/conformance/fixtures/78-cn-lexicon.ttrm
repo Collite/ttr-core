@@ -1,0 +1,22 @@
+// 0.17 — lexicon entries that target concepts (cn contracts §1.5): `for: cn.X`, `default: true`,
+// `sense_priority: <int>` on `def term` and `def example`, beside an element term. (The inline
+// `lexicon { }` sugar on a concept def is in fixture 75, `def kind Item`.)
+model lexicon locale en
+
+def term customer {
+    for: cn.Customer,
+    forms: ["customer", "customers", "client"],
+    default: true
+}
+def term debtor { for: cn.DebtorCustomer, forms: ["debtor", "customer with overdue invoices"], sense_priority: 2 }
+def term customer_phase {
+    description: "a phase never takes the bare form (cn/phase-as-default)",
+    for: cn.DebtorCustomer,
+    forms: ["customer"]
+    default: false
+    sense_priority: 1
+}
+def term revenue  { for: cn.revenue, forms: ["revenue", "sales"], default: true, sense_priority: 3 }
+def term channel  { for: cn.Channel, forms: ["channel", "sales channel"] }
+def term product  { for: md.Product, forms: ["product"] }
+def example web_revenue { for: cn.WebSale, text: "revenue on the web last month", default: true, sense_priority: 1 }

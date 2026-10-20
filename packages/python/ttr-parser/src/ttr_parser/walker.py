@@ -346,7 +346,7 @@ def walk_document(doc: Any, file: str) -> WalkResult:
 
     definitions: list[Definition] = []
     for def_ctx in doc.definition() or ():
-        d = _visit_definition(def_ctx, file, warnings, errors)
+        d = _visit_definition(def_ctx, file, warnings, errors, model_directive.model_code if model_directive else None)
         if d is not None:
             definitions.append(d)
 
@@ -392,6 +392,7 @@ def _visit_model_directive(ctx: Any, file: str) -> ModelDirective:
         else "world" if code_ctx.WORLD()
         else "lexicon" if code_ctx.LEXICON()
         else "automation" if code_ctx.AUTOMATION()
+        else "cn" if code_ctx.CN()
         else ""
     )
     # v4.4: `MODEL modelCode (SCHEMA id)? (LOCALE id)?` — up to two id slots. In
@@ -417,7 +418,9 @@ def _visit_model_directive(ctx: Any, file: str) -> ModelDirective:
 # ---------------------------------------------------------------------------
 
 
-def _visit_definition(ctx: Any, file: str, warnings: list[ParseWarning], errors: list[ParseError]) -> Definition | None:
+def _visit_definition(
+    ctx: Any, file: str, warnings: list[ParseWarning], errors: list[ParseError], model_code: str | None = None
+) -> Definition | None:
     od = ctx.objectDefinition()
     if od is None:
         return None
@@ -455,7 +458,7 @@ def _visit_definition(ctx: Any, file: str, warnings: list[ParseWarning], errors:
     if od.QUERY() is not None:
         return _visit_query(od, name, src, file, warnings, errors)
     if od.ROLE() is not None:
-        return _visit_role(od, name, src, file, warnings)
+        return _visit_role(od, name, src, file, warnings, errors, model_code)
     if od.ER2CNC_ROLE() is not None:
         return _visit_er2cnc_role(od, name, src, file, warnings)
     if od.DRILL_MAP() is not None:
@@ -962,8 +965,36 @@ def _visit_query(od: Any, name: str, source: SourceLocation, file: str, warnings
     )
 
 
-def _visit_role(od: Any, name: str, source: SourceLocation, file: str, warnings: list[ParseWarning]) -> RoleDef:
+def _visit_role(
+    od: Any,
+    name: str,
+    source: SourceLocation,
+    file: str,
+    warnings: list[ParseWarning],
+    errors: list[ParseError],
+    model_code: str | None,
+) -> RoleDef:
     props = od.roleDef().roleProperty()
+    # Grammar 0.17 (⚑CN-P6) — the cn role's properties ride the one `roleProperty` production; outside
+    # `model cn` they are rejected here, so a cnc / automation role keeps its 0.16 surface and a typo
+    # (`lable:`) is still a parse error (review-114 M5).
+    if model_code != "cn":
+        for p in props:
+            cn_only = p.cnEntry() or p.cnRefProperty() or p.groundsProperty() or p.lexiconBlockProperty()
+            if cn_only is None:
+                continue
+            key = p.cnEntry().cnKey().getText() if p.cnEntry() is not None else cn_only.getChild(0).getText()
+            in_model = f" in model {model_code}" if model_code else ""
+            loc = _loc_of(cn_only, file)
+            errors.append(
+                ParseError(
+                    file=file,
+                    line=loc.line,
+                    column=loc.column + 1,
+                    message=f"unknown role property '{key}'{in_model} — only a role in a 'model cn' file takes the concept properties",
+                    code=DiagnosticCode.UNKNOWN_PROPERTY,
+                )
+            )
     description: str | None = None
     description_localized: LocalizedStringValue | None = None
     tags: tuple[str, ...] = ()

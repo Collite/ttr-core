@@ -1,0 +1,3 @@
+// A member-restricted kind's `members:` is an embedded block — a bare list is a parse error.
+model cn
+def kind HomeCategory { is_a: ProductCategory, members: ["H10", "H11"] }

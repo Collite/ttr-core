@@ -6,8 +6,8 @@ import { TTR_GRAMMAR_VERSION, PROPERTY_MAP } from '@tatrman/grammar';
 // the grammar prebuild) is what moves this constant; the assertion is the
 // reminder that the CHANGELOG entry + downstream proto/version sync move with it.
 describe('grammar version', () => {
-  it('is 0.16 (the automation model: `model automation`, the world members, `states:`)', () => {
-    expect(TTR_GRAMMAR_VERSION).toBe('0.16');
+  it('is 0.17 (the conceptual model: `model cn`, the concept kinds, the cn bindings, `concept { }`)', () => {
+    expect(TTR_GRAMMAR_VERSION).toBe('0.17');
   });
 
   it('advertises the automation kinds on the one shared body (typed alternatives only)', () => {
@@ -17,6 +17,16 @@ describe('grammar version', () => {
       ]);
     }
     expect(PROPERTY_MAP.attribute.map((p) => p.name)).toEqual(expect.arrayContaining(['states', 'transitions']));
+  });
+
+  it('advertises the cn role properties and the `concept { }` sugar on the er hosts (0.17)', () => {
+    expect(PROPERTY_MAP.role.map((p) => p.name)).toEqual([
+      'description', 'tags', 'label', 'search', 'resolve', 'delivery', 'members', 'event', 'grounds', 'lexicon',
+    ]);
+    // The md kinds are not in the property map (they never were); entity and attribute are.
+    for (const kind of ['entity', 'attribute'] as const) {
+      expect(PROPERTY_MAP[kind].find((p) => p.name === 'concept')?.type, kind).toBe('concept block');
+    }
   });
 
   it('advertises the `def schema` properties: description, tags, columns', () => {

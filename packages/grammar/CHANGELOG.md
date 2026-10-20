@@ -12,6 +12,50 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
+## 0.17 — 2026-10-20
+
+**Additive (the conceptual model — CN-P1 S1.1; CN-D3…D8, D11, D17/D18, D20…D25, D28; A-CN-9/13/16/18/19).**
+Every previously-valid `0.16` file parses unchanged and every conformance golden (01–74) is byte-unchanged; every
+new noun stays usable as a name (all are in `idPart`).
+
+1. **`model cn`** (`modelCode` gains `CN`) with the concept def kinds `def kind | event | phase | quality |
+   relation_type <id> { … }` on ONE permissive body, `cnBody`: typed alternatives first (`description`,
+   `label`, `tags`, the stereotype refs `kind|role|quality|event|phase|concept:`, `grounds:`, `involves:`,
+   `period:`, `extent:`, `basis:`, `definition:`, `members:`, `value_space:`, inline `lexicon`), then a free-form
+   entry (`of`, `is_a`, `sources`, `qualities`, `relations`, `hierarchy`, `imprecision`, `valued_state`,
+   `abstract`, …). Which property is legal on which kind is semantic (CN-P2).
+2. **`def role`** stays one production shared by cnc, automation and cn (⚑CN-P6): it gains the cn role's
+   properties (`event:` — the defining event —, `grounds:`, `lexicon`, `of:`, `is_a:`, `qualities:`, …), and the
+   walker reads the body by the file's `model`. Outside `model cn` those properties are a `ttr/unknown-property`
+   parse error, so a typo in a cnc or an automation role is still rejected (review-114 M5).
+3. **Labelled participants:** `involves: [ Item, Warehouse as from, Warehouse as to ]` (new token `as`).
+   **Periods:** `period: { start: placed_date, end: delivered_date, end_open: open | unknown }` or
+   `period: { at: sold_date, precision: day }`.
+4. **`definition:` and `members:` are embedded blocks** (⚑CN-P5): a string, a triple-string or a `"""pl`-tagged
+   block, kept as text with its span — the TTRP expression grammar parses it (CN-P2). Write
+   `definition: """state in ('placed', 'held')"""`; a bare expression is a parse error.
+5. **Ten binding kinds** under `model binding` on one body: `def cn2md_kind | cn2md_role | cn2md_quality |
+   cn2md_event | cn2er_kind | cn2er_role | cn2er_event | cn2er_quality | cn2er_phase | cn2db_concept <id> {
+   … }` — the stereotype ref (`kind: cn.Item`), `target:`, `period:`, and free-form `hierarchy`, `participants`
+   (`{ label: [ er.relation.… ] }`), `via`, `filter` (a block).
+6. **`concept { … }` sugar** inside `cubelet`, `dimension`, `domain`, `measure`, `entity` and `attribute`.
+7. **Lexicon:** `term` / `pattern` / `example` take `default: <bool>` and `sense_priority: <number>`; `for:`
+   takes a `cn.<X>` ref.
+8. **New tokens:** `CN EVENT PHASE QUALITY RELATION_TYPE CONCEPT`, `CN2MD_KIND CN2MD_ROLE CN2MD_QUALITY
+   CN2MD_EVENT CN2ER_KIND CN2ER_ROLE CN2ER_EVENT CN2ER_QUALITY CN2ER_PHASE CN2DB_CONCEPT`, `INVOLVES PERIOD GROUNDS
+   DEFINITION VALUE_SPACE EXTENT BASIS AS`, `DEFAULT SENSE_PRIORITY` — all in `idPart`. `definitionSql`,
+   `cnc`, `as_of`, `qualities` lex as before.
+9. **`model cnc` / `roles:` are deprecated** (CN-D18, "no third mechanism"): they parse unchanged in 0.17;
+   `cn/cnc-deprecated` (a warning) arrives with CN-P2's semantics; removal is a later major. There is nothing
+   to migrate to — the classification is derived from the MD bindings and the `semantics { }` kinds.
+
+**Spellings settled against the cn contracts (S1.1):** the definition / members / filter values are blocks
+(⚑CN-P5); attribute refs are `er.entity.<e>.<a>` (A-CN-9); `default` is a NEW token (the contracts said
+"reused" — TTR.g4 had none) and `sense_priority` with it; `extent:` and `basis:` are typed (the contracts list
+`EXTENT`/`BASIS` as tokens); `is_a`, `of`, `relations`, `hierarchy`, `imprecision`, `valued_state`, `abstract`,
+`participants`, `via` and `filter` ride the free-form entry (no tokens); the free-form key is never a typed key,
+so a malformed typed property fails at parse time; `type` and `precision` are legal keys inside a cn object.
+
 ## 0.16 — 2026-10-19
 
 **Additive (the automation model — AU-core-P0 S0.2; AU D-26, D-35, D-67, D-90, D-91, D-104,

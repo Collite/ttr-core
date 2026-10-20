@@ -333,8 +333,12 @@ function walkDocument(ctx: DocumentContext, file: string, syntaxErrors: ParseErr
   const graphCtx = ctx.graphBlock();
   const defContexts = ctx.definition();
 
+  // 0.17 — read before the definitions: one `def role` production serves cnc, automation and cn, and
+  // the walker reads its body by the file's model (⚑CN-P6).
+  const modelDirective = schemaCtx ? walkModelDirective(schemaCtx, file) : undefined;
+
   const definitions: Definition[] = defContexts.map((defCtx: DefinitionContext) =>
-    walkDefinition(defCtx, file, localErrors)
+    walkDefinition(defCtx, file, localErrors, modelDirective?.modelCode)
   );
 
   if (graphCtx && definitions.length > 0) {
@@ -357,8 +361,6 @@ function walkDocument(ctx: DocumentContext, file: string, syntaxErrors: ParseErr
 
   // v3.0: the `.ttrd` domain file-kind is gone — subject areas are now plain
   // `def area` definitions (see walkAreaDef) that coexist with other defs.
-
-  const modelDirective = schemaCtx ? walkModelDirective(schemaCtx, file) : undefined;
 
   // LQ (logical queries, L-2 / ruling LQ-5): a `def query` in a `model er` file is a
   // logical query over entities and takes no parameters — a parametrized query stays a
@@ -435,6 +437,7 @@ function walkModelDirective(ctx: ModelDirectiveContext, file: string): ModelDire
   else if (modelCodeCtx.WORLD()) modelCode = 'world';
   else if (modelCodeCtx.LEXICON()) modelCode = 'lexicon';
   else if (modelCodeCtx.AUTOMATION()) modelCode = 'automation'; // 0.16
+  else if (modelCodeCtx.CN()) modelCode = 'cn'; // 0.17
 
   // v4.4: `MODEL modelCode (SCHEMA id)? (LOCALE id)?` — two optional id slots.
   // Assign positionally by which of SCHEMA / LOCALE is present (ids stay in order).
@@ -1487,7 +1490,7 @@ function walkViewport(ctx: Object_Context, _file: string): GraphLayout['viewport
   return { zoom, panX, panY, displayMode };
 }
 
-function walkDefinition(ctx: DefinitionContext, file: string, errors: ParseError[]): Definition {
+function walkDefinition(ctx: DefinitionContext, file: string, errors: ParseError[], modelCode?: string): Definition {
   const objDef = ctx.objectDefinition();
   const nameCtx = objDef.id();
   const name = nameCtx ? nameCtx.getText() : '';
@@ -1508,7 +1511,7 @@ function walkDefinition(ctx: DefinitionContext, file: string, errors: ParseError
   if (objDef.ER2DB_ATTRIBUTE()) return walkEr2dbAttributeDef(objDef.er2dbAttributeDef()!, name, source, file);
   if (objDef.ER2DB_RELATION()) return walkEr2dbRelationDef(objDef.er2dbRelationDef()!, name, source, file);
   if (objDef.QUERY()) return walkQueryDef(objDef.queryDef()!, name, source, file, errors);
-  if (objDef.ROLE()) return walkRoleDef(objDef.roleDef()!, name, source, file);
+  if (objDef.ROLE()) return walkRoleDef(objDef.roleDef()!, name, source, file, errors, modelCode);
   if (objDef.ER2CNC_ROLE()) return walkEr2cncRoleDef(objDef.er2cncRoleDef()!, name, source, file);
   if (objDef.DRILL_MAP()) return walkDrillMapDef(objDef.drillMapDef()!, name, source, file);
   if (objDef.AREA()) return walkAreaDef(objDef.areaDef()!, name, source, file);
@@ -2579,7 +2582,9 @@ function walkRoleDef(
   ctx: RoleDefContext,
   name: string,
   source: SourceLocation,
-  file: string
+  file: string,
+  errors: ParseError[],
+  modelCode?: string,
 ): RoleDef {
   let description: StringValue | TripleStringValue | undefined;
   let descriptionLocalized: LocalizedString | undefined;
@@ -2589,6 +2594,20 @@ function walkRoleDef(
   const entries: AutoEntry[] = [];
 
   for (const p of ctx.roleProperty()) {
+    // 0.17 (⚑CN-P6) — the cn role's properties ride the one `roleProperty` production; outside
+    // `model cn` they are rejected here, so a cnc / automation role keeps its 0.16 surface and a typo
+    // (`lable:`) is still a parse error (review-114 M5).
+    const cnOnly = p.cnEntry() ?? p.cnRefProperty() ?? p.groundsProperty() ?? p.lexiconBlockProperty();
+    if (cnOnly && modelCode !== 'cn') {
+      const key = p.cnEntry()?.cnKey().getText() ?? cnOnly.getChild(0)?.getText() ?? '';
+      errors.push({
+        code: DiagnosticCode.UnknownProperty,
+        message: `unknown role property '${key}'${modelCode ? ` in model ${modelCode}` : ''} — only a role in a 'model cn' file takes the concept properties`,
+        severity: 'error',
+        source: makeSourceLocation(cnOnly, file),
+      });
+      continue;
+    }
     if (p.descriptionProperty()) {
       description = descriptionOf(p.descriptionProperty()!, file);
       descriptionLocalized = descriptionLocalizedOf(p.descriptionProperty()!, file);

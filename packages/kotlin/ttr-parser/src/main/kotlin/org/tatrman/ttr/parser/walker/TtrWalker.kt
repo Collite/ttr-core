@@ -121,8 +121,12 @@ class TtrWalker(
      */
     private val supportedLanguages = setOf("cs", "en", "de", "sk", "hu")
 
+    /** The file's `model` code — grammar 0.17 reads the one `def role` body by it (⚑CN-P6). */
+    private var modelCode: String? = null
+
     fun visitDocument(doc: TTRParser.DocumentContext): WalkResult {
         val schema = doc.modelDirective()?.let { visitModelDirective(it) }
+        modelCode = schema?.modelCode
         val defs = doc.definition().mapNotNull { visitDefinition(it) }
         val securityBlocks = doc.securityBlock().map { visitSecurityBlock(it) }
 
@@ -1347,6 +1351,23 @@ class TtrWalker(
 
     private fun visitRole(od: TTRParser.ObjectDefinitionContext): RoleDef {
         val props = od.roleDef().roleProperty()
+        // Grammar 0.17 (⚑CN-P6) — the cn role's properties ride the one `roleProperty` production;
+        // outside `model cn` they are rejected here, so a cnc / automation role keeps its 0.16 surface
+        // and a typo (`lable:`) is still a parse error (review-114 M5).
+        if (modelCode != "cn") {
+            props.forEach { p ->
+                val cnOnly: ParserRuleContext =
+                    p.cnEntry() ?: p.cnRefProperty() ?: p.groundsProperty() ?: p.lexiconBlockProperty()
+                        ?: return@forEach
+                val key = p.cnEntry()?.cnKey()?.text ?: cnOnly.getChild(0).text
+                err(
+                    cnOnly,
+                    DiagnosticCode.UnknownProperty,
+                    "unknown role property '$key'${modelCode?.let { " in model $it" } ?: ""} — only a role in a " +
+                        "'model cn' file takes the concept properties",
+                )
+            }
+        }
         return RoleDef(
             name = od.id().text,
             source = defSource(od),

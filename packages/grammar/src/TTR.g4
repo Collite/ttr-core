@@ -1,7 +1,7 @@
 // =============================================================================
 // TTR (Tatrman) grammar
 //
-// @grammar-version: 0.16
+// @grammar-version: 0.17
 //
 // Version scheme: X.Y — X is a breaking/major change, Y is additive
 // (syntactic sugar, new optional constructs, bug fixes). Bump the marker
@@ -309,6 +309,54 @@
 //      ref parts); PARAMETERS joins `idPart` too (`def recipe … parameters: [a, b]`).
 //      ARROW is not an id.
 //   Additive: no existing 0.15 file changes meaning; every conformance golden is unchanged.
+//
+// Changes in 0.17 (additive — the conceptual model; CN-P1 S1.1, cn contracts §1, CN-D3…D8/D11/D17/D18/
+// D20…D25/D28, A-CN-9/13/16/18/19):
+//   1. New model code `cn` (`model cn`): `modelCode` gains `| CN`. Four new top-level def kinds share ONE
+//      permissive body, `cnBody`: `def kind | event | phase | quality | relation_type <id> { … }`
+//      (`objectDefinition` gains five alternatives — KIND is reused from MD).
+//   2. `def role` stays ONE production (`ROLE id roleDef`) shared by cnc, automation and cn (⚑CN-P6,
+//      CN-D28): `roleProperty` is widened with the cn role's typed properties (`event:`, `grounds:`,
+//      inline `lexicon`) and the cn free-form entry. The grammar stays target-neutral, so the WALKER reads
+//      the body by the file's `model` directive — and keeps review-114 M5 there: outside `model cn` a cn
+//      property on a role is a `ttr/unknown-property` parse error, so a typo (`lable:`) in a cnc or an
+//      automation role is still rejected.
+//   3. `cnBody`: typed alternatives FIRST for every cn key that is a token — `description`, `label`,
+//      `tags`, the stereotype refs `kind|role|quality|event|phase|concept: <ref>` (`cnRefProperty`),
+//      `grounds: <ref>`, `involves: [ Item, Warehouse as from ]` (`participant : id (AS id)?` — labelled
+//      participants, AM-19), `period: { start, end, end_open } | { at, precision }`, `extent: <id>`,
+//      `basis: <id>`, `definition: <block>`, `members: <block>`, `value_space: <ref>`, inline `lexicon` —
+//      then the free-form `cnEntry` (`of`, `is_a`, `sources`, `qualities`, `relations`, `hierarchy`,
+//      `imprecision`, `valued_state`, `abstract`, …). The free-form KEY is `IDENT | HIERARCHY | VIA`,
+//      never a typed key, so a malformed typed property (`definition: OverdueInvoice`) is a parse error,
+//      not a silently-accepted free-form entry. Free-form values (`cnValue`) are literals, ids, lists and
+//      objects; a nested object key may also be `type` or `precision` (`relations: [ { type: supplies,
+//      to: Demand } ]`, `period: { at: sold_at, precision: day }`).
+//   4. `definition:` and `members:` are `embeddedBlock`s (⚑CN-P5, CN-D28) — a string, a triple-string or a
+//      `"""pl`-tagged block, the `definitionSql` / `sourceText` precedent. TTR.g4 keeps the text and its
+//      span; the expression is the TTRP expression grammar's (`TTRP.g4 expr`, `parseExpression` with the
+//      EOF anchor of ttr-core#202), parsed by semantics in CN-P2. The session docs' bare spelling
+//      (`definition: state = 'held'`) is written `definition: """state = 'held'"""`.
+//   5. Ten binding kinds under `model binding`, one token each (the MD2ER_* precedent), sharing ONE body,
+//      `cnBindingBody`: `def cn2md_kind | cn2md_role | cn2md_quality | cn2md_event | cn2er_kind |
+//      cn2er_role | cn2er_event | cn2er_quality | cn2er_phase | cn2db_concept <id> { … }` — the stereotype
+//      ref, `target:` (the existing `targetProperty`), `period:`, then the free-form entry (`hierarchy`,
+//      `participants: { label: [ er.relation.… ] }`, `via: [ … ]`, `filter: <block>`). The stereotype ↔
+//      target-type table is semantic.
+//   6. `concept { … }` (`conceptSugarProperty : CONCEPT propSep? cnBody`) inside `cubelet`, `dimension`,
+//      `domain`, `measure`, `entity` and `attribute` (er and md) — the bottom-up sugar (cn contracts §1.4).
+//   7. Lexicon entries (`term` / `pattern` / `example`) gain typed `default: <bool>` and
+//      `sense_priority: <number>` (the 4.4 rule: new *Property alts, not a free-form fallback); `for:`
+//      takes a `cn.<X>` ref like any dotted id.
+//   8. New lexer tokens: CN EVENT PHASE QUALITY RELATION_TYPE CONCEPT, the ten CN2MD_* / CN2ER_* /
+//      CN2DB_CONCEPT, INVOLVES PERIOD GROUNDS DEFINITION VALUE_SPACE EXTENT BASIS AS, DEFAULT SENSE_PRIORITY.
+//      EVERY ONE is in `idPart` (the WORLD precedent: `event`, `period`, `quality`, `default`, `as` stay
+//      usable as names, columns, object keys and dotted ref parts; `cn.Item` refs need CN there).
+//      Longest match: `definitionSql` stays DEFINITION_SQL, `cnc` stays CNC, `relation_type` beats
+//      RELATION, `as_of` / `qualities` / `definitions` stay IDENTs.
+//   9. `model cnc` and `roles:` parse unchanged (deprecated by CN-D18 — "no third mechanism";
+//      `cn/cnc-deprecated` arrives with CN-P2's semantics; removal is a later major).
+//   Additive: no existing 0.16 file changes meaning; every conformance golden 01–74 is byte-unchanged.
 // =============================================================================
 
 grammar TTR;
@@ -429,6 +477,7 @@ modelCode
   | WORLD                                     // 4.1 — deployment world model (ttr-metadata M0)
   | LEXICON                                   // 4.4 — canonical vocabulary model (RG-P4, RS-9)
   | AUTOMATION                                // 0.16 — the automation model (AU, D-26)
+  | CN                                        // 0.17 — the conceptual model (CN-P1, CN-D17)
   ;
 
 definition
@@ -451,7 +500,7 @@ objectDefinition
   | ER2DB_ATTRIBUTE id er2dbAttributeDef
   | ER2DB_RELATION id  er2dbRelationDef
   | QUERY          id  queryDef
-  | ROLE           id  roleDef            // Phase 2.2 — cnc.role.*
+  | ROLE           id  roleDef            // Phase 2.2 — cnc.role.*; 0.16 automation role; 0.17 cn role (one production — the walker reads the body by the file's `model`, ⚑CN-P6)
   | ER2CNC_ROLE    id  er2cncRoleDef      // Phase 2.2 — er2cnc_role.*
   | DRILL_MAP      id  drillMapDef        // v2.2 — drill mapping between two patterns
   | AREA           id  areaDef            // v3.0 — subject area (replaces the .ttrd domain block)
@@ -486,6 +535,24 @@ objectDefinition
   | APPROVAL       id  autoBody           // 0.16 — an approval kind: by, quorum
   | PROGRAM        id  autoBody           // 0.16 — recipe + port + mode (D-26)
   | RECIPE         id  autoBody           // 0.16 — the GENERATED recipe catalog object (contracts §5.3)
+  // ----- 0.17 cn model — concept def kinds (`model cn`); one shared permissive body -----
+  // `def role` is NOT here: it stays the one ROLE alternative above (⚑CN-P6, CN-D28).
+  | KIND           id  cnBody             // 0.17 — rigid things; may bind a vocabulary (KIND token reused from MD)
+  | EVENT          id  cnBody             // 0.17 — occurrences: labelled `involves`, a `period:`, an `extent:`
+  | PHASE          id  cnBody             // 0.17 — anti-rigid: a `definition:` OR a grounding to a stacked entity
+  | QUALITY        id  cnBody             // 0.17 — characterisation: grounded OR defined; `value_space:`
+  | RELATION_TYPE  id  cnBody             // 0.17 — open-tier relation types (`relations: [ { type: … } ]`)
+  // ----- 0.17 cn bindings (`model binding`) — one token per kind (the MD2ER_* precedent) -----
+  | CN2MD_KIND     id  cnBindingBody      // 0.17 — kind → md dimension
+  | CN2MD_ROLE     id  cnBindingBody      // 0.17 — role → md dimension
+  | CN2MD_QUALITY  id  cnBindingBody      // 0.17 — quality → md measure | attribute
+  | CN2MD_EVENT    id  cnBindingBody      // 0.17 — event → md cubelet
+  | CN2ER_KIND     id  cnBindingBody      // 0.17 — kind → er entity | attribute (value kind); `hierarchy:`
+  | CN2ER_ROLE     id  cnBindingBody      // 0.17 — role → own entity, or base + `via:` path
+  | CN2ER_EVENT    id  cnBindingBody      // 0.17 — event → entity; `participants:` label → relation path; `period:`
+  | CN2ER_QUALITY  id  cnBindingBody      // 0.17 — quality → attribute; `filter:` (a valued state's series)
+  | CN2ER_PHASE    id  cnBindingBody      // 0.17 — phase → query-backed (stacked) entity only
+  | CN2DB_CONCEPT  id  cnBindingBody      // 0.17 — doc-grade db grounding (advisory)
   ;
 
 // ----- Object bodies -----
@@ -532,11 +599,17 @@ lexiconEntryDef  : LBRACE (lexiconEntryProperty (COMMA? lexiconEntryProperty)* C
 lexiconEntryProperty
   : descriptionProperty | tagsProperty
   | forProperty | formsProperty | matchProperty | textProperty
+  | defaultProperty | sensePriorityProperty           // 0.17 — cn default senses (cn contracts §1.5)
   ;
-forProperty   : FOR   propSep? id ;               // target ref (er/db/md) — resolved in semantics
+forProperty   : FOR   propSep? id ;               // target ref (er/db/md; 0.17 cn) — resolved in semantics
 formsProperty : FORMS propSep? listOfStrings ;    // term surface forms
 matchProperty : MATCH propSep? stringLiteralForm ;// pattern regex
 textProperty  : TEXT  propSep? stringLiteralForm ;// example utterance (TEXT token reused)
+// 0.17 — `default: true` (the default sense of a bare term; ≤1 per form and locale, never a phase —
+// cn/duplicate-default-sense, cn/phase-as-default) and `sense_priority: 2` (higher wins). Typed alts per
+// the note above (no free-form fallback on a lexicon entry); the rules are semantic.
+defaultProperty       : DEFAULT        propSep? BOOLEAN_LITERAL ;
+sensePriorityProperty : SENSE_PRIORITY propSep? NUMBER_LITERAL ;
 
 // ----- v4.1 world model (ttr-metadata M0; D-d-α, D-d-i, D-f, T6) -----
 worldDef         : LBRACE (worldMember (COMMA? worldMember)* COMMA?)? RBRACE ;
@@ -622,6 +695,72 @@ processProperty  : descriptionProperty | tagsProperty | stepsProperty | autoEntr
 stepsProperty    : STEPS propSep? LBRACK (stepInline COMMA?)* RBRACK ;
 stepInline       : DEF STEP id autoBody ;
 
+// ----- 0.17 cn model (CN-P1 S1.1; cn contracts §1) -----
+// One permissive body for `def kind | event | phase | quality | relation_type`, the `concept { }` sugar
+// and (through `roleProperty`) a cn `def role`. Typed alternatives FIRST — every cn key that is a token
+// — then the free-form `cnEntry` (the `autoBody` precedent). Which property is legal on which kind,
+// required properties, enums and references are SEMANTIC (CN-P2); the parser stays mechanical.
+cnBody           : LBRACE (cnProperty (COMMA? cnProperty)* COMMA?)? RBRACE ;
+cnProperty
+  : descriptionProperty | labelProperty | tagsProperty
+  | cnRefProperty                     // event: Order (a role's defining event) · kind: Invoice (the sugar's stereotype)
+  | groundsProperty                   // grounds: md.Customer | er.entity.invoice | er.entity.channel_sales.channel
+  | involvesProperty                  // involves: [ Item, Warehouse as from, Warehouse as to ]
+  | periodProperty                    // period: { start: placed_date, end: delivered_date, end_open: open } | { at: sold_date }
+  | extentProperty                    // extent: instantaneous | durative
+  | basisProperty                     // basis: occurrence | current_state | past_state
+  | definitionProperty                // definition: """state in ('placed', 'held')"""  (an embeddedBlock, ⚑CN-P5)
+  | conceptMembersProperty            // members: """descendants(ProductCategory, 'H10-H19')"""  (an embeddedBlock)
+  | valueSpaceProperty                // value_space: ProductCategory
+  | lexiconBlockProperty              // lexicon { terms: [ … ] } — the 4.4 inline sugar, a cn.* target
+  | cnEntry                           // of · is_a · sources · qualities · relations · hierarchy · imprecision · valued_state · abstract
+  ;
+// The stereotype-ref keys: a cn role's `event:`, the sugar's `kind:`/`role:`/`quality:`/`event:` and a
+// binding's `kind:`/`role:`/`quality:`/`event:`/`phase:`/`concept:` — one rule, the key is the token.
+cnRefProperty          : ( KIND | ROLE | QUALITY | EVENT | PHASE | CONCEPT ) propSep? id ;
+groundsProperty        : GROUNDS     propSep? id ;
+involvesProperty       : INVOLVES    propSep? LBRACK participant ( COMMA participant )* COMMA? RBRACK ;
+participant            : id ( AS id )? ;                      // a concept ref, optionally labelled: `Warehouse as from`
+periodProperty         : PERIOD      propSep? cnObject ;
+extentProperty         : EXTENT      propSep? id ;
+basisProperty          : BASIS       propSep? id ;
+// `definition:` / `members:` (and the binding's free-form `filter:`) carry an expression the TTRP
+// expression grammar parses (CN-D28 ⚑CN-P5) — the `definitionSql` / `sourceText` precedent: TTR.g4 keeps
+// the block text and its span, never the expression. A bare (non-block) value is a parse error.
+definitionProperty     : DEFINITION  propSep? embeddedBlock ;
+conceptMembersProperty : MEMBERS     propSep? embeddedBlock ;
+valueSpaceProperty     : VALUE_SPACE propSep? id ;
+
+// The free-form entry. Its KEY is a bare word that is NOT one of the typed cn keys above, so a malformed
+// typed property (`definition: OverdueInvoice` — a bare value where a block is required) is a parse
+// error rather than a silently-accepted free-form entry. HIERARCHY and VIA are pre-0.17 tokens cn uses as
+// free-form keys (`hierarchy: { closure: … }`, `via: [ er.relation.… ]`).
+cnEntry          : cnKey propSep? cnValue ;
+cnKey            : IDENT | HIERARCHY | VIA ;
+cnValue          : cnObject | cnList | literal | id ;
+cnObject         : LBRACE (cnObjectEntry (COMMA? cnObjectEntry)* COMMA?)? RBRACE ;
+// Nested keys are any word, plus the two type keywords cn spells as keys: `relations: [ { type: supplies,
+// to: Demand } ]` (cn contracts §1.3) and `period: { at: sold_at, precision: day }` (AM-19).
+cnObjectEntry    : ( id | DATA_TYPE | PRECISION ) propSep? cnValue ;
+cnList           : LBRACK (cnValue (COMMA cnValue)*)? COMMA? RBRACK ;
+
+// `def cn2md_* | cn2er_* | cn2db_concept <id> { … }` — one permissive body for the ten binding kinds (the
+// `md2erCubeletDef` precedent): the stereotype ref (`kind: cn.Item`), `target:`, `period:`, then the
+// free-form entry (`hierarchy`, `participants`, `via`, `filter`). The stereotype ↔ target-type table is
+// semantic (cn/grounding-target-kind).
+cnBindingBody    : LBRACE (cnBindingProperty (COMMA? cnBindingProperty)* COMMA?)? RBRACE ;
+cnBindingProperty
+  : descriptionProperty | tagsProperty
+  | cnRefProperty                     // kind: | role: | quality: | event: | phase: | concept: cn.<X>
+  | targetProperty                    // target: md.Product | er.entity.category_code | er.entity.order.value | db.dbo.x
+  | periodProperty                    // cn2er_event — period: { at: er.entity.transfer.shipped_at }
+  | cnEntry                           // hierarchy · participants · via · filter
+  ;
+
+// `concept { … }` — the bottom-up sugar inside an md or er def (cn contracts §1.4): the def's own concept.
+// Desugars (CN-P2) to a concept def + the matching cn2md_*/cn2er_* binding; one per def is semantic.
+conceptSugarProperty   : CONCEPT propSep? cnBody ;
+
 // ----- Per-kind valid properties -----
 
 projectProperty          : descriptionProperty | tagsProperty | versionProperty ;
@@ -640,13 +779,13 @@ fkProperty               : descriptionProperty | tagsProperty | fromProperty | t
 
 procedureProperty        : descriptionProperty | tagsProperty | parametersProperty | resultColumnsProperty ;
 
-entityProperty           : descriptionProperty | tagsProperty | labelPluralProperty | nameAttributeProperty | codeAttributeProperty | aliasesProperty | attributesProperty | rolesProperty | displayLabelProperty | searchBlockProperty | semanticsBlockProperty | lexiconBlockProperty | bindingProperty ;
+entityProperty           : descriptionProperty | tagsProperty | labelPluralProperty | nameAttributeProperty | codeAttributeProperty | aliasesProperty | attributesProperty | rolesProperty | displayLabelProperty | searchBlockProperty | semanticsBlockProperty | lexiconBlockProperty | bindingProperty | conceptSugarProperty ;   // 0.17 — `concept { kind|role|event: … }`
 
 // v3.1: the shared attribute body gains MD-only `domain:` and `aggregation:`
 // props. All props are optional in the grammar; per-schema validity (md requires
 // `domain:` & forbids `type:`; er the reverse) is enforced in semantics.
 // 0.16 — `states:` / `transitions:` on an attribute (D-67); consistency is semantic (ttr/states-*).
-attributeProperty        : descriptionProperty | tagsProperty | typeProperty | isKeyProperty | optionalProperty | valueLabelsProperty | displayLabelProperty | searchBlockProperty | semanticsBlockProperty | lexiconBlockProperty | bindingProperty | domainRefProperty | aggregationProperty | statesProperty | transitionsProperty ;
+attributeProperty        : descriptionProperty | tagsProperty | typeProperty | isKeyProperty | optionalProperty | valueLabelsProperty | displayLabelProperty | searchBlockProperty | semanticsBlockProperty | lexiconBlockProperty | bindingProperty | domainRefProperty | aggregationProperty | statesProperty | transitionsProperty | conceptSugarProperty ;   // 0.17 — `concept { quality: … }` (er: also a value kind)
 
 relationProperty         : descriptionProperty | tagsProperty | fromProperty | toProperty | cardinalityProperty | joinProperty | searchBlockProperty | bindingProperty ;
 
@@ -659,9 +798,14 @@ er2dbRelationProperty    : descriptionProperty | tagsProperty | relationProperty
 queryProperty            : descriptionProperty | tagsProperty | languageProperty | parametersProperty | sourceTextProperty | searchBlockProperty ;
 
 // 0.16 — `def role` in `model automation` gains three TYPED properties (resolve / delivery /
-// members) with `autoValue` values — no free-form fallback, so a typo stays a parse error in
-// every model (review-114 M5). Per-model validity is semantic.
-roleProperty             : descriptionProperty | tagsProperty | labelProperty | searchBlockProperty | resolveProperty | deliveryProperty | membersProperty ;
+// members) with `autoValue` values. Per-model validity is semantic.
+// 0.17 — ONE production for the cnc, automation and cn role (⚑CN-P6, CN-D28): the cn role's typed
+// properties (`event:` — the defining event —, `grounds:`, inline `lexicon`) and the cn free-form entry
+// (`of:`, `is_a:`, `qualities:`, `sources:`, `relations:`). The WALKER reads the body by the file's
+// `model` directive and keeps review-114 M5 there: outside `model cn` a free-form entry is a parse error,
+// so a typo (`lable:`) in a cnc or automation role is still rejected.
+roleProperty             : descriptionProperty | tagsProperty | labelProperty | searchBlockProperty | resolveProperty | deliveryProperty | membersProperty
+                         | cnRefProperty | groundsProperty | lexiconBlockProperty | cnEntry ;
 resolveProperty          : RESOLVE  propSep? autoValue ;   // resolve: keycloak_group "hartland-sales"
 deliveryProperty         : DELIVERY propSep? autoValue ;   // delivery: { email: "…" }
 membersProperty          : MEMBERS  propSep? autoValue ;   // members: ["ana", "bo"] (MEMBERS reused from MD)
@@ -689,12 +833,12 @@ areaEntitiesProperty     : ENTITIES propSep? LBRACK ( id (COMMA id)* )? COMMA? R
 // literal). `attributes`/`measures` reuse ATTRIBUTES/MEASURES. The grammar is a
 // permissive superset; value-set / reference / shape validity is semantic.
 
-mdDomainProperty     : descriptionProperty | tagsProperty | typeProperty | kindProperty | restrictProperty | publishProperty ;
-dimensionProperty    : descriptionProperty | tagsProperty | keyProperty | attributesProperty | hierarchiesProperty | lexiconBlockProperty ;
+mdDomainProperty     : descriptionProperty | tagsProperty | typeProperty | kindProperty | restrictProperty | publishProperty | conceptSugarProperty ;   // 0.17 — `concept { kind|role: … }`
+dimensionProperty    : descriptionProperty | tagsProperty | keyProperty | attributesProperty | hierarchiesProperty | lexiconBlockProperty | conceptSugarProperty ;   // 0.17 — `concept { kind|role: … }`
 mdMapProperty        : descriptionProperty | tagsProperty | fromProperty | toProperty | cardinalityProperty | calcProperty ;
 hierarchyProperty    : descriptionProperty | tagsProperty | dimensionRefProperty | levelsProperty ;
-measureProperty      : descriptionProperty | tagsProperty | domainRefProperty | classProperty | aggregationProperty | validByProperty | lexiconBlockProperty ;
-cubeletProperty      : descriptionProperty | tagsProperty | grainProperty | measuresProperty | lexiconBlockProperty ;
+measureProperty      : descriptionProperty | tagsProperty | domainRefProperty | classProperty | aggregationProperty | validByProperty | lexiconBlockProperty | conceptSugarProperty ;   // 0.17 — `concept { quality: … }`
+cubeletProperty      : descriptionProperty | tagsProperty | grainProperty | measuresProperty | lexiconBlockProperty | conceptSugarProperty ;   // 0.17 — `concept { event: …, involves: [ … ] }`
 
 md2dbCubeletProperty : descriptionProperty | tagsProperty | cubeletRefProperty | targetProperty | shapeProperty | attributesMapProperty | measuresMapProperty | journalingProperty | allocationProperty ;
 md2dbDomainProperty  : descriptionProperty | tagsProperty | domainRefProperty | sourceProperty ;
@@ -1148,6 +1292,12 @@ idPart
   | TRANSITION | TRANSITIONS | STATES | SET                                   // 0.16 — automation / lifecycle property keywords
   | RESOLVE | DELIVERY                                                       // 0.16 — automation role property keywords
   | PARAMETERS                                                  // 0.16 — `def recipe … parameters: [a, b]` through the free-form entry
+  | CN | EVENT | PHASE | QUALITY | RELATION_TYPE | CONCEPT                   // 0.17 — cn model code, def nouns, the sugar keyword (`cn.Item` refs need CN here)
+  | CN2MD_KIND | CN2MD_ROLE | CN2MD_QUALITY | CN2MD_EVENT                    // 0.17 — cn binding kinds (the MD2ER_* precedent)
+  | CN2ER_KIND | CN2ER_ROLE | CN2ER_EVENT | CN2ER_QUALITY | CN2ER_PHASE | CN2DB_CONCEPT
+  | INVOLVES | PERIOD | GROUNDS | DEFINITION | VALUE_SPACE | EXTENT | BASIS   // 0.17 — cn property keywords
+  | AS                                                                       // 0.17 — `involves: [ Warehouse as from ]`; stays a name
+  | DEFAULT | SENSE_PRIORITY                                                 // 0.17 — lexicon entry keywords
   // NOTE: EXTENDS/HOSTS/STAGING are intentionally NOT in idPart — see the 4.1
   // header note. Their strict-value properties are negative-fixture guarded, so
   // keeping them out makes a malformed value a hard parse error.
@@ -1268,6 +1418,38 @@ STATES           : 'states' ;          // 0.16 — attribute `states: [ … ]`
 SET              : 'set' ;             // 0.16 — action `set: a.b = c`
 RESOLVE          : 'resolve' ;         // 0.16 — automation role `resolve: keycloak_group "…"`
 DELIVERY         : 'delivery' ;        // 0.16 — automation role `delivery: { … }`
+
+// 0.17 cn model (CN-P1 S1.1; cn contracts §1). Model code, def-kind nouns, binding kinds, property
+// keywords. Declared before IDENT so the keyword wins ties; every one is also in `idPart` (`event`,
+// `period`, `quality`, `default`, `as` … stay usable as names, keys and dotted ref parts). Longest match:
+// `definitionSql` stays DEFINITION_SQL, `cnc` stays CNC, `relation_type` beats RELATION, and `as_of`,
+// `qualities`, `definitions`, `periods`, `events` stay IDENTs.
+CN               : 'cn' ;              // 0.17 — model code `model cn`; the `cn.` ref head
+EVENT            : 'event' ;           // 0.17 — `def event`; also a role's / binding's `event:` key
+PHASE            : 'phase' ;           // 0.17 — `def phase`; also a binding's `phase:` key
+QUALITY          : 'quality' ;         // 0.17 — `def quality`; also a binding's `quality:` key
+RELATION_TYPE    : 'relation_type' ;   // 0.17 — `def relation_type` (open tier)
+CONCEPT          : 'concept' ;         // 0.17 — `concept { … }` sugar; cn2db_concept's `concept:` key
+CN2MD_KIND       : 'cn2md_kind' ;      // 0.17
+CN2MD_ROLE       : 'cn2md_role' ;      // 0.17
+CN2MD_QUALITY    : 'cn2md_quality' ;   // 0.17
+CN2MD_EVENT      : 'cn2md_event' ;     // 0.17
+CN2ER_KIND       : 'cn2er_kind' ;      // 0.17
+CN2ER_ROLE       : 'cn2er_role' ;      // 0.17
+CN2ER_EVENT      : 'cn2er_event' ;     // 0.17
+CN2ER_QUALITY    : 'cn2er_quality' ;   // 0.17
+CN2ER_PHASE      : 'cn2er_phase' ;     // 0.17
+CN2DB_CONCEPT    : 'cn2db_concept' ;   // 0.17
+INVOLVES         : 'involves' ;        // 0.17 — `involves: [ … ]`
+PERIOD           : 'period' ;          // 0.17 — `period: { … }`
+GROUNDS          : 'grounds' ;         // 0.17 — `grounds: <ref>`
+DEFINITION       : 'definition' ;      // 0.17 — `definition: """…"""` (distinct from DEFINITION_SQL; longest-match)
+VALUE_SPACE      : 'value_space' ;     // 0.17 — `value_space: <kind>`
+EXTENT           : 'extent' ;          // 0.17 — `extent: instantaneous | durative`
+BASIS            : 'basis' ;           // 0.17 — `basis: occurrence | current_state | past_state`
+AS               : 'as' ;              // 0.17 — `involves: [ Warehouse as from ]` (TTR.g4's own; TTRSql has another)
+DEFAULT          : 'default' ;         // 0.17 — lexicon `default: true`
+SENSE_PRIORITY   : 'sense_priority' ;  // 0.17 — lexicon `sense_priority: 2`
 
 MANAGEMENT       : 'management' ;       // 0.10 — table `management: data|canon` (EN-P1)
 CHANGE_SEMANTICS : 'changeSemantics' ;  // 0.10 — table `changeSemantics: scd1|scd2|ledger { … }`
