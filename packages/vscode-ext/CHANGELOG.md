@@ -5,6 +5,18 @@ the grammar/IDE-support line owned by the `tatrman` repo.
 
 ## Unreleased
 
+Grammar 0.17.1 — the cn semantics in the editor.
+
+- **Checked.** cn references resolve (bare in a cn slot, or with the `cn.` head, among concepts only), `grounds:` and
+  `concept { }` desugar to bindings, and the model-level `cn/*` diagnostics show as you type (lint category `cn`;
+  the hygiene ones off under `recommended`). Goto, find-references and rename work across concept defs, bindings,
+  the sugar and lexicon `for:` — a rename keeps an unlabelled participant's label, written out (`Buyer as customer`).
+- **Hover on a concept** shows its stereotype, label, grounding and grade (where it lands on the er layer: directly,
+  through the md → er hop, inherited from its bearer, or the `md/er-unmapped` reason).
+- **"TTR: Concept hygiene report"** — a new command: the conceptual model's hygiene report (grades, groundings, the
+  hop, open tier, dangling groundings, redundant terms, phase-as-default) as a markdown preview. Definition blocks are
+  checked by `ttr cn hygiene`, not in the editor.
+
 Grammar 0.17 — the conceptual model (`model cn`).
 
 - **cn highlighting.** `cn` (and the `cn.` ref head), the concept def nouns (`kind`, `role`, `event`,

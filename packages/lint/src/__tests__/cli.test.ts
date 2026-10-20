@@ -65,3 +65,56 @@ describe('modeler-lint CLI', () => {
     expect(parsed[0]).toHaveProperty('range');
   });
 });
+
+// CN-P2 S2.7 T4 — the cn rules through the CLI: `--rule` runs one cn rule, `--explain` names its
+// category, and `.ttrlint.toml` `[categories] cn` switches the family (cn contracts §7).
+describe('modeler-lint CLI — the cn category', () => {
+  let root: string;
+  const write = (rel: string, text: string) => {
+    mkdirSync(join(root, rel, '..'), { recursive: true });
+    writeFileSync(join(root, rel), text);
+  };
+
+  beforeAll(() => {
+    root = mkdtempSync(join(tmpdir(), 'modeler-lint-cn-'));
+    write('modeler.toml', `[project]\nname = "t"\n`);
+    write(
+      'hartland/stores/a-er.ttrm',
+      `package hartland.stores\nmodel er\ndef entity shopper { attributes: [ def attribute shopper_id { type: int, isKey: true } ] }\n`,
+    );
+    write(
+      'hartland/stores/b-cn.ttrm',
+      `package hartland.stores\nmodel cn\ndef kind Shopper { grounds: er.entity.shopper }\ndef role Visitor { of: Shopper, grounds: er.entity.shopper }\n`,
+    );
+    write(
+      'hartland/stores/c-binding.ttrm',
+      `package hartland.stores\nmodel binding\ndef cn2er_kind shopper_again { kind: cn.Shopper, target: er.entity.shopper }\n`,
+    );
+  });
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  const ruleIds = (stdout: string) => (JSON.parse(stdout) as Array<{ ruleId: string }>).map((d) => d.ruleId).sort();
+
+  it('reports the cn errors (a second grounding, a role with no event)', () => {
+    const r = runCli([root, '--format', 'json', '--fail-on', 'none']);
+    expect(ruleIds(r.stdout)).toEqual(expect.arrayContaining(['cn-duplicate-grounding', 'cn-role-no-event']));
+  });
+
+  it('--rule runs one cn rule', () => {
+    const r = runCli([root, '--format', 'json', '--fail-on', 'none', '--rule', 'cn-duplicate-grounding']);
+    expect(ruleIds(r.stdout)).toEqual(['cn-duplicate-grounding']);
+  });
+
+  it('--explain prints a cn rule with its category and default', () => {
+    const r = runCli(['--explain', 'cn-phase-as-default', root]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('cn-phase-as-default [cn, default warning]');
+  });
+
+  it('[categories] cn = "off" in .ttrlint.toml silences the family', () => {
+    write('.ttrlint.toml', `[categories]\ncn = "off"\n`);
+    const r = runCli([root, '--format', 'json', '--fail-on', 'none']);
+    expect(ruleIds(r.stdout).filter((id) => id.startsWith('cn-'))).toEqual([]);
+    rmSync(join(root, '.ttrlint.toml'));
+  });
+});

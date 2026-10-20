@@ -225,6 +225,14 @@ test-py module="":
 conformance:
     pnpm --filter @tatrman/integration-tests run conformance
 
+# ── Conceptual model (cn) ───────────────────────────────────────────────────────
+
+# The cn hygiene report over a model dir — `ttr cn hygiene` run from the repo until `ttr-concept` first publishes
+# (CN-P3 S3.1). The dir is relative to the repo root; flags pass through, e.g.
+# `just cn-hygiene tests/conformance/cn-hygiene --format json --fail-on error`.
+cn-hygiene dir *flags:
+    ./gradlew -q --console=plain :packages:kotlin:ttr-concept:run --args="cn hygiene {{dir}} {{flags}}"
+
 # ── Grammar regeneration ────────────────────────────────────────────────────────
 
 # Regenerate the TS parser from TTR.g4, then the TextMate grammar. See CLAUDE.md

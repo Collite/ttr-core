@@ -60,6 +60,19 @@ export {
   type CnValidation,
   type StatedProperty,
 } from './cn/validate.js';
+export {
+  cnHygieneReport,
+  renderCnHygieneMarkdown,
+  elementRefOf,
+  ExplicitMdErHop,
+  EDITOR_DEFINITIONS_NOTE,
+  RETIRED_CODES_NOTE,
+  type CnHygieneReport,
+  type ConceptHygieneRow,
+  type GroundingGrade,
+  type HopAnswer,
+  type HopSlug,
+} from './cn/hygiene.js';
 export type { CanonicalLexiconEntry, LexiconAnalysis, LexiconDiagnostic } from './lexicon/model.js';
 export { serializeVocabularySnapshot, foldId } from './lexicon/snapshot.js';
 export { foldForCollision } from './lexicon/fold.js';

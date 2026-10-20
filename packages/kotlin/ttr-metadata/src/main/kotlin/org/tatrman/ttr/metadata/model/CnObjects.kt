@@ -47,6 +47,12 @@ data class CnSchema(
      * until P4 S4.2 registers them.
      */
     val vocabularyVersions: Map<String, String> = emptyMap(),
+    /**
+     * The canonical lexicon entries whose `for:` names an md or er element, by element ref, in document order (CN-P2
+     * S2.7) — what the hygiene report sets beside a concept's own terms: a form on both the concept and an element
+     * that lifts to it is a redundant duplicate (the C-Δ1 γ union).
+     */
+    val elementTerms: Map<String, List<LexiconLink>> = emptyMap(),
 ) : SchemaContents {
     override val schemaCode: String = "cn"
 
@@ -157,6 +163,12 @@ data class Concept(
     val grade: GroundingGrade = GroundingGrade.UNGROUNDED,
     /** The bearer whose landing a defined phase inherits (contracts §1.2); null when the landing is its own. */
     val landingFrom: QualifiedName? = null,
+    /**
+     * The hop's answer for this concept's own md grounding ([MdErHop]; the hygiene report's hop column, CN-P2 S2.7):
+     * the er landing and its rule, or `md/er-unmapped` / `md/er-ambiguous` and why. Null for any other grounding,
+     * an inherited landing, and an md target that does not resolve.
+     */
+    val hop: HopResult? = null,
     val sourceLocation: SourceLocation? = null,
 ) : ModelObject {
     override val kind: String = "concept"

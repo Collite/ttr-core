@@ -151,6 +151,10 @@ class ModelReconciler(
                     sorted.fold(emptyMap()) { acc, s ->
                         acc + s.cn.vocabularyVersions.filterKeys { it !in acc }
                     },
+                elementTerms =
+                    sorted.fold(emptyMap()) { acc, s ->
+                        acc + s.cn.elementTerms.filterKeys { it !in acc }
+                    },
             )
 
         val model =

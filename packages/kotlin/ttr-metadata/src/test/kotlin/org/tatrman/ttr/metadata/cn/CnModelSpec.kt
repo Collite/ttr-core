@@ -435,5 +435,8 @@ class CnModelSpec :
                 .sumOf { it.lexiconLinks.size } shouldBe 6
             // `vocabularyVersions` is present and empty until P4 S4.2 (Q15-5)
             lex.cn.vocabularyVersions shouldBe emptyMap()
+            // S2.7 — `for: md.Product` is an element term, kept by element ref for the hygiene report's redundant terms
+            lex.cn.elementTerms.mapValues { (_, links) -> links.map { it.name to it.forms } } shouldBe
+                mapOf("md.dimension.Product" to listOf("product" to listOf("product")))
         }
     })

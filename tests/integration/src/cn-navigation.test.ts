@@ -9,7 +9,9 @@ import { createServerConnection } from '@tatrman/lsp/server';
  * `participants:` key (to the event's label), from a `concept { }` sugar slot and from a lexicon
  * `for:`; find-references on a concept lists its bindings, sugar, lexicon and `is_a` users; hover
  * names the concept. A complete project carries no unresolved reference. S2.2 T6: a concept a
- * `concept { }` block declares is reached at the block.
+ * `concept { }` block declares is reached at the block. S2.7 T4: hover carries the concept's hygiene row
+ * (stereotype, label, grounding, grade); rename reaches every cn ref, sugar slot, binding and lexicon
+ * `for:`, and keeps an unlabelled participant's label written out.
  */
 function createPairedConnection(): { client: lsp.Connection; server: lsp.Connection } {
   const a = new PassThrough({ objectMode: true });
@@ -206,5 +208,63 @@ describe('CN-P2 S2.1 — navigation over the conceptual model', () => {
     const text = hover && typeof hover.contents === 'object' && 'value' in hover.contents ? hover.contents.value : '';
     expect(text).toContain('hartland.web.cn.concept.Order');
     expect(text).toContain('(concept)');
+  });
+
+  // ---- CN-P2 S2.7 T4 ----------------------------------------------------------------------------
+
+  async function hoverText(uri: string, position: lsp.Position): Promise<string> {
+    const hover = (await client.sendRequest('textDocument/hover', { textDocument: { uri }, position })) as lsp.Hover | null;
+    return hover && typeof hover.contents === 'object' && 'value' in hover.contents ? hover.contents.value : '';
+  }
+
+  it('hover on a concept: its stereotype, label, grounding and grade (the hygiene row)', async () => {
+    const customer = await hoverText(BINDINGS, at(BINDINGS, 'cn.Customer', 4));
+    expect(customer).toContain('- **Stereotype:** role');
+    expect(customer).toContain('- **Grounding:** `er.entity.customer` *(cn2er_role)*');
+    expect(customer).toContain('- **Grade:** er-grounded — lands on `er.entity.customer`');
+    const warehouse = await hoverText(CONCEPTS, at(CONCEPTS, 'Warehouse as fulfilling', 2));
+    expect(warehouse).toContain('- **Stereotype:** kind');
+    expect(warehouse).toContain('- **Label:** en: Distribution center');
+    expect(warehouse).toContain('- **Grade:** ungrounded');
+    expect(warehouse).not.toContain('**Grounding:**');
+  });
+
+  /** A rename's edits as `file:line:col text`, sorted. */
+  async function rename(uri: string, position: lsp.Position, newName: string): Promise<string[]> {
+    const edit = (await client.sendRequest('textDocument/rename', { textDocument: { uri }, position, newName })) as lsp.WorkspaceEdit;
+    return (edit.documentChanges ?? [])
+      .flatMap((c) => ('edits' in c ? c.edits.map((e) => `${c.textDocument.uri.split('/').pop()}:${e.range.start.line}:${e.range.start.character} ${e.newText}`) : []))
+      .sort();
+  }
+
+  it('rename a concept: the def, its cn refs, a sugar slot, a binding (the `cn.` head kept) and a lexicon `for:`', async () => {
+    const pos = (uri: string, needle: string, delta: number) => {
+      const p = at(uri, needle, delta);
+      return `${uri.split('/').pop()}:${p.line}:${p.character}`;
+    };
+    expect(await rename(CONCEPTS, at(CONCEPTS, 'def event Order', 10), 'Purchase')).toEqual(
+      [
+        `${pos(CONCEPTS, 'def event Order', 10)} Purchase`,
+        `${pos(CONCEPTS, 'event: Order', 7)} Purchase`,
+        `${pos(CONCEPTS, 'of: Order', 4)} Purchase`,
+        `${pos(ER, 'event: Order', 7)} Purchase`,
+        `${pos(BINDINGS, 'cn.Order', 0)} cn.Purchase`,
+        `${pos(LEXICON, 'cn.Order', 0)} cn.Purchase`,
+      ].sort(),
+    );
+  });
+
+  it('rename keeps a participant label the binding reads: `involves: [Customer]` → `Buyer as customer`', async () => {
+    const edits = await rename(CONCEPTS, at(CONCEPTS, 'def role Customer', 9), 'Buyer');
+    expect(edits).toContain(`concepts.ttrm:${lineOf(CONCEPTS, 'involves: [Customer')}:15 Buyer as customer`);
+    // the binding's `participants: { customer: … }` key still names the label — nothing to edit there
+    expect(edits.filter((e) => e.startsWith('bindings.ttrm'))).toEqual([`bindings.ttrm:${lineOf(BINDINGS, 'cn.Customer')}:34 cn.Buyer`]);
+    // a labelled participant keeps its own label: renaming Warehouse touches only the ref
+    expect(await rename(CONCEPTS, at(CONCEPTS, 'def kind Warehouse', 9), 'Depot')).toEqual(
+      [
+        `concepts.ttrm:${lineOf(CONCEPTS, 'def kind Warehouse')}:9 Depot`,
+        `concepts.ttrm:${lineOf(CONCEPTS, 'Warehouse as fulfilling')}:${at(CONCEPTS, 'Warehouse as fulfilling').character} Depot`,
+      ].sort(),
+    );
   });
 });

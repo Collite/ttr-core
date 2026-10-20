@@ -61,6 +61,27 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   defs through unchecked (the cn semantics, the typed model and `ttr-writer` support are CN-P2). `model cnc` and
   `roles:` are deprecated (they parse unchanged). Tooling: TextMate highlighting and the formatter's cn layout
   (see `packages/grammar/CHANGELOG.md` 0.17). Manual: [Conceptual model (cn)](docs/manual/en/20-conceptual-model.md).
+- **Grammar 0.17.1 — the cn semantics (CN-P2; code only, `TTR.g4` stays 0.17).** What CN-P1 carried through
+  unchecked is now resolved, desugared and checked, the same on TS, Kotlin and Python (conformance `out-ts-sem` 01–101
+  zero drift on three targets):
+  - **`ttr-semantics`** — `cn` is a model code: a concept keys `<pkg>.cn.concept.<Name>`, an event's participant
+    labels are its children (a bare participant's label is its concept's name lower-cased). A reference from a cn slot,
+    or written with the `cn.` head, resolves **among concepts only**; an element reference never reaches a concept, so
+    no existing reference moves. `grounds:` and `concept { }` desugar to canonical bindings (`<Concept>.grounds`,
+    `<Concept>.concept`); **one grounding per concept** — a second is `cn/duplicate-grounding`, the first is read.
+    The model-level `cn/*` slugs (contracts §7): `duplicate-grounding`, `grounding-target-kind`, `role-no-event`,
+    `phase-double-definition`, `hierarchy-shape`, `participant-path-broken`, `involves-unlabelled-duplicate`,
+    `unknown-relation-type`, `antirigid-supertype`, `db-grounding`, `ungrounded`, `phase-no-definition`,
+    `event-no-period`, `cnc-deprecated`, and `ttr/required-property-missing` for a bearer-less quality or phase (the
+    lexicon pair `duplicate-default-sense` / `phase-as-default` is TS-only).
+  - **`ttr-writer`** — `TtrRenderer` writes concept defs, the cn bindings and the `concept { }` sugar in the
+    formatter's layout; expression blocks re-parse byte-exact.
+  - **`ttr-metadata`** — the typed tier `CnSchema` (`SchemaCode.CN`, library-only): every concept with what the
+    project states of it, its one grounding, where it lands on the er layer (`erTarget`, `via` DIRECT | MD_HOP,
+    `grade`; a defined phase inherits its bearer's), the md → er hop seam (`MdErHop`; P2 fills it from explicit
+    `md2er_cubelet`: `ExplicitMdErHop`, else `md/er-unmapped` / `md/er-ambiguous`), the reverse index
+    (`liftsTo`), lexicon links, open-tier relation types. S2.7 adds `Concept.hop` (the hop's answer for the concept's
+    own md grounding) and `CnSchema.elementTerms` (canonical lexicon terms on md / er elements, by ref).
 - **`TTRP.g4` 0.4 → 0.5 — the conceptual-model definition forms (CN-P2 S2.6, CN-D29; `ttrp-frontend`, Kotlin
   only).** A cn `definition:` / `members:` / `filter:` block is a TTR-P expression; 0.5 adds what it needs and 0.4
   lacked: `[not] exists C [v] (, C [v])* involving p [as label] … [where e]`, the concept aggregate `count(C involving
@@ -80,7 +101,13 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   definition-level `cn/…` slugs (`definitionDiagnostics()`): `cn/definition-syntax`, `cn/definition-unknown-name`,
   `cn/descendants-no-hierarchy` (new), `cn/definition-cycle`, `cn/definition-unresolved`,
   `cn/definition-unreachable(md|er)`, `cn/basis-mismatch`, `cn/imprecise-comparison`. `Diagnostic` gains `location`.
-  The service bodies are still CN-P3.
+  **The hygiene report v2** (S2.7, contracts §7): `CnConceptService(model).hygieneReport()` — per concept its grade,
+  `via`, grounding and the hop column, its landing, core vs open (the free-form keys and `relations:` edges listed),
+  dangling grounding refs, redundant term duplicates (a form a concept's term shares with a term on an element that
+  lifts to it), phase-as-default rows and retired codes (none until vocabulary versions register) — then the
+  definition-level findings; `HygieneRender` renders it as JSON and as markdown. **`ttr cn hygiene <dir>
+  [--format text|json] [--fail-on error|warning]`** (an `application` entry point; `just cn-hygiene <dir>` runs it
+  from the repo until the module publishes). The other service families are still CN-P3.
 - **TTR-P — the recipe checker (AU-core-P1; `ttrp-frontend` · `ttrp-graph` · `ttrp-cli`).** A recipe is checked
   against the world and the model: the role shape and wiring (`TTRP-REC-000`), the action wiring typed against
   `def action` (`-001`…`-003`), the candidates' key (`-004`, `-005`), key lineage with each context's class (lookup /

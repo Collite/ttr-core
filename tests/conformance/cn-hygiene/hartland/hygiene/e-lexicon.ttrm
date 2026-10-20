@@ -1,0 +1,8 @@
+package hartland.hygiene
+model lexicon locale en
+
+def term shopper         { for: cn.Shopper,         forms: ["shopper", "customer"] }
+def term shopper_entity  { for: er.entity.shopper,  forms: ["Shopper"] }
+def term sale            { for: cn.Sale,            forms: ["sale"] }
+def term sales_cubelet   { for: md.sales,           forms: ["sales", "sale"] }
+def term frequent        { for: cn.FrequentShopper, forms: ["regular", "shopper"], default: true }

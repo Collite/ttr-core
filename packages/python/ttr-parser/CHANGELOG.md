@@ -3,6 +3,18 @@
 All notable changes to `ttr-parser` (Python) are documented here. While
 `< 1.0.0`, minor bumps may introduce breaking changes (see each entry).
 
+## 0.17.1 — unreleased
+
+- **The cn semantics (CN-P2 S2.4; code only).** `ttr_parser.semantics` resolves, desugars and checks the conceptual
+  model as the TS and Kotlin twins do (conformance `out-ts-sem` 01–101 byte-identical): `cn` is a model code; a
+  concept keys `<pkg>.cn.concept.<Name>`, a binding by its keyword, an event's participant labels as children; a cn
+  slot or a `cn.`-headed ref resolves among concepts only, an element ref never reaches a concept. `grounds:` and
+  `concept { }` desugar to canonical groundings (`<Concept>.grounds` / `<Concept>.concept`), one per concept (the
+  merge rule), and the 14 portable `cn/*` slugs plus `concept-bearer-missing` (`semantics.cn.validate_cn`, run by the
+  project validator); `cn/cnc-deprecated` per document. `db.dbo.cn.x` names a column `cn` (a model code is stripped
+  after the package only when none led). The md hosts gain the identity-level cross-references the cn fixtures
+  exercise (no md model).
+
 ## 0.17.0 — unreleased
 
 - **Grammar 0.17 (additive) — the conceptual model (CN-P1).** `model cn`: `ConceptDef` (`kind =

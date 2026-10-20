@@ -20,6 +20,7 @@ import {
   CompletionItemKind,
   type CodeAction,
   type CompletionItem,
+  type TextDocumentEdit,
 } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import fuzzysort from 'fuzzysort';
@@ -77,6 +78,12 @@ import {
   resolveMdRef,
   mdCrossRefsOf,
   calcNames,
+  cnHygieneReport,
+  renderCnHygieneMarkdown,
+  validateCn,
+  type CnDocument,
+  type CnHygieneReport,
+  type CnValidation,
   type ResolvedManifest,
   type PackageGraph,
   type SqlConfig,
@@ -99,6 +106,7 @@ import {
 import { buildDocumentSymbols } from './document-symbol.js';
 import { loadCompletionConfig, getCompletionConfig, invalidateCompletionConfig } from './config-completion.js';
 import { automationHoverLines } from './automation-hover.js';
+import { conceptHoverLines } from './concept-hover.js';
 import { formatDocument, DEFAULT_FORMAT_CONFIG, type FormatConfig } from '@tatrman/format';
 import { lintDocument, lintProject, recommendedConfig, loadLintConfig, ruleForCode, type LintDiagnostic, type ResolvedLintConfig, type DocumentRuleContext } from '@tatrman/lint';
 import { refactorExtractDefToNewFile } from './code-actions.js';
@@ -274,6 +282,9 @@ export function createServerConnection(
   // Project-wide index of resolved embedded-SQL refs → `db` symbol qname (§4.3).
   const sqlRefIndex = new SqlReferenceIndex();
   let packageGraph: PackageGraph | null = null;
+  // CN-P2 S2.7 — the project's cn analysis (the validation and the hygiene report), read by
+  // `modeler/getCnHygiene` and the concept hover; dropped whenever the symbol table changes.
+  let cnCache: { validation: CnValidation; report: CnHygieneReport } | null = null;
   let supportsConfiguration = false;
   // Resolved `.ttrlint.toml` config, cached and refreshed asynchronously
   // (publishDiagnostics is sync). Starts at the legacy-aware recommended config.
@@ -577,6 +588,7 @@ export function createServerConnection(
     resolver = new Resolver(projectSymbols, '', () => manifest);
     if (projectRoot) manifest.projectRoot = projectRoot;
     packageGraph = null;
+    cnCache = null;
   }
 
   function getPackageGraph(): PackageGraph {
@@ -738,6 +750,27 @@ export function createServerConnection(
     });
   }
 
+  function cnProject(): { validation: CnValidation; report: CnHygieneReport } {
+    if (cnCache) return cnCache;
+    const texts = new Map<string, string>(diskDocs);
+    for (const d of documents.all()) texts.set(d.uri, d.getText());
+    const docs: CnDocument[] = [];
+    for (const [uri, text] of texts) {
+      if (!uri.endsWith('.ttrm')) continue;
+      const ast = parseDocument(text, uri);
+      if (!ast) continue;
+      const context = projectSymbols.documentContext(uri) ?? {
+        schemaCode: ast.modelDirective?.modelCode ?? '',
+        namespace: ast.modelDirective?.schema ?? '',
+        packageName: effPkg(uri, ast),
+      };
+      docs.push({ uri, ast, ...context });
+    }
+    const validation = validateCn(docs, resolver);
+    cnCache = { validation, report: cnHygieneReport(docs, resolver, validation) };
+    return cnCache;
+  }
+
   function getProjectDocuments(): Map<string, Document> {
     const docs = new Map<string, Document>();
     for (const u of documents.keys()) {
@@ -767,6 +800,7 @@ export function createServerConnection(
   }
 
   function updateSymbolTable(uri: string, content: string): void {
+    cnCache = null;
     const result = parseString(content, uri);
     if (!result.ast) return;
     // '' (no directive) ⇒ the semantics layer derives the schema per definition
@@ -832,6 +866,7 @@ export function createServerConnection(
     }
 
     packageGraph = null;
+    cnCache = null;
   }
 
   documents.onDidOpen(async (event: TextDocumentChangeEvent<TextDocument>) => {
@@ -870,6 +905,7 @@ export function createServerConnection(
       sqlRefIndex.removeDocument(uri);
     }
     packageGraph = null;
+    cnCache = null;
   });
 
   documents.onDidSave(() => {
@@ -1017,6 +1053,7 @@ export function createServerConnection(
 
     if (touched) {
       packageGraph = null;
+    cnCache = null;
       // Cross-file resolution changed; re-publish diagnostics for open docs.
       for (const doc of documents.all()) {
         publishDiagnostics(doc.uri, doc.getText());
@@ -1026,6 +1063,14 @@ export function createServerConnection(
   connection.onRequest('modeler/reloadLintConfig', async () => {
     await refreshLintConfig();
     return { reloaded: true };
+  });
+
+  // CN-P2 S2.7 T3 — the editor's cn hygiene report (cn contracts §7) over the whole project: the open buffers
+  // (authoritative) and every scanned file. The definition-level findings are `ttr cn hygiene`'s (CN-D29); the
+  // markdown's last section says so. The VS Code command "TTR: Concept hygiene report" previews `markdown`.
+  connection.onRequest('modeler/getCnHygiene', (): { report: CnHygieneReport; markdown: string } => {
+    const { report } = cnProject();
+    return { report, markdown: renderCnHygieneMarkdown(report) };
   });
 
   connection.onRequest('modeler/getProjectInfo', async (params: { textDocument: { uri: string } }) => {
@@ -1571,6 +1616,11 @@ export function createServerConnection(
     }
     // 0.16 — a parameter's value/label, an action's columns/sinks.
     if (def) lines.push(...automationHoverLines(def));
+    // 0.17 (CN-P2 S2.7 T4) — a concept: its stereotype, label, grounding and grade (the hygiene row).
+    if (symbol.kind === 'concept') {
+      const { validation, report } = cnProject();
+      lines.push(...conceptHoverLines(validation.concepts.get(symbol.qname), report, symbol.qname));
+    }
     const fileBaseName = symbol.documentUri.split('/').pop() ?? symbol.documentUri;
     lines.push(`- **Defined at:** ${fileBaseName}:${symbol.source.line}`);
 
@@ -1742,8 +1792,42 @@ export function createServerConnection(
     }
 
     // TTR-side edit (def + references + imports + .ttrg) plus in-SQL usages.
-    return buildSymbolRenameWithSql(targetQname, symbol, newBareName, doc.getText());
+    const edit = buildSymbolRenameWithSql(targetQname, symbol, newBareName, doc.getText());
+    if (symbol.kind === 'concept') keepParticipantLabels(edit, targetQname, newBareName);
+    return edit;
   });
+
+  /**
+   * 0.17 (CN-P2 S2.7 T4) — a concept an event `involves:` unlabelled names its participant by the default label,
+   * its name lower-cased; a binding's `participants:` key and a definition's `this.<label>` read that label, and a
+   * definition block is out of the editor's reach (CN-D29). So a rename keeps the label, written out:
+   * `involves: [Customer]` → `involves: [Buyer as customer]`.
+   */
+  function keepParticipantLabels(edit: WorkspaceEdit, conceptKey: string, newBareName: string): void {
+    const changes = (edit.documentChanges ?? []).filter((c): c is TextDocumentEdit => 'edits' in c);
+    for (const c of cnProject().validation.concepts.values()) {
+      const involves = c.properties.find((s) => s.property.kind === 'involves');
+      if (involves?.property.kind !== 'involves') continue;
+      const doc = involves.doc;
+      for (const p of involves.property.participants) {
+        if (p.label !== undefined) continue;
+        const label = p.ref.parts[p.ref.parts.length - 1].toLowerCase();
+        if (label === newBareName.toLowerCase()) continue;
+        const r = resolver.resolveReference(
+          { ...p.ref, cnContext: true },
+          { schemaCode: doc.schemaCode, namespace: doc.namespace, imports: doc.ast.imports, packageName: doc.packageName },
+        );
+        if (!r.resolved || r.symbol.qname !== conceptKey) continue;
+        const at = sourceLocationToRange(p.ref.source).start;
+        for (const change of changes) {
+          if (change.textDocument.uri !== doc.uri) continue;
+          for (const e of change.edits) {
+            if (e.range.start.line === at.line && e.range.start.character === at.character) e.newText += ` as ${label}`;
+          }
+        }
+      }
+    }
+  }
 
   connection.onWorkspaceSymbol((params) => {
     const query = params.query ?? '';

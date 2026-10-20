@@ -780,6 +780,24 @@ the whole node re-places to a capable engine (section 9.3) — never a mid-expre
 nasty seam (T5-b). Typing is static and starts coarse (`text | int | float | bool | datetime`), with room to layer
 refinement types (`int{1..12}`) later.
 
+### 5.5 The conceptual forms (grammar 0.5)
+
+TTR-M's conceptual model (`model cn`, the [manual's chapter 20](../../manual/en/20-conceptual-model.md)) writes its
+definitions — a phase's or defined quality's `definition:`, a sub-kind's `members:`, a binding's `filter:` — in this
+expression language. Grammar 0.5 adds the forms they need, additively (every 0.4 expression parses to the same tree):
+
+- **existence** — `exists Invoicing i involving this as customer where OverdueInvoice`, `not exists …`;
+- **concept aggregates** — `count(Visit involving this) >= 4`, `latest(Reading involving this, by: period.at).level`;
+- **membership in a call** — `code in descendants(ProductCategory, 'H10')`, `not in …`;
+- **temporal comparisons** — `e.period contains :as_of`, `at_or_before`, `before`, `ended_before`, `overlaps`;
+- **`this`**, and `end` after a dot (`this.period.end`).
+
+They are a model's language, not a program's: a TTR-P program that uses one is refused with **`TTRP-CN-001`**. The
+nine words (`exists`, `involving`, `where`, `this`, `at_or_before`, `before`, `contains`, `ended_before`, `overlaps`)
+are soft keywords — still usable as column names. A definition otherwise uses the spellings TTR-P already has:
+`:as_of` and `:name` parameters, durations as calls (`days(365)`), windows as `within(x, last: d)` /
+`within(x, from: a, to: b)`, `<>` for inequality.
+
 ---
 
 ## 6. Data-model binding and the world
@@ -1384,7 +1402,7 @@ propagation across engines is v2 (Argos territory).
 ## 11. Diagnostics
 
 Diagnostics are a designed, user-facing surface, not an afterthought. Every one has a **stable named id** of the form
-`TTRP-<AREA>-<NNN>` (areas include `EQ`, `SQL`, `PD`, `B`, `CTL`, `CAP`, `MOV`, `SCH`, `WLD`, `RLS`), and every
+`TTRP-<AREA>-<NNN>` (areas include `EQ`, `SQL`, `PD`, `B`, `CTL`, `CAP`, `MOV`, `SCH`, `WLD`, `RLS`, `CN`), and every
 *rejected* form carries a **suggested alternative** (contracts §8). A few representative ones:
 
 - `TTRP-EQ-001` — `==` used outside TTR-pandas → "use `=`".
@@ -1401,6 +1419,8 @@ Diagnostics are a designed, user-facing surface, not an afterthought. Every one 
   skin's language and a suggested correct sentence — e.g. `TTRP-B-104` a malformed e-mail sentence suggests the full
   `Pošli e-mail …` / `Send an e-mail …` shape, `TTRP-B-109` a keyword used as a name (`jako a`), `TTRP-B-006` a
   sentence in the other skin's language. Table: [`ttrb/ROSTER.md` §5](ttrb/ROSTER.md#5-diagnostics-ttrp-b-reject-tables-per-skin).
+- the conceptual forms (section 5.5, area `CN`) — `TTRP-CN-001` an `exists`, a concept aggregate, `in <call>`, a
+  temporal word or `this` in a program → "a conceptual model's definition form — write it in a `model cn` definition".
 
 The per-dialect reject tables are **versioned test fixtures** — they are simultaneously the compiler's conformance
 tests *and* the assist layer's repair vocabulary (section 12). One table, two consumers.

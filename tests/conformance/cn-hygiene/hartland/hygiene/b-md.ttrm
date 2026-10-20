@@ -1,0 +1,12 @@
+package hartland.hygiene
+model md
+
+def domain Code  { type: text }
+def domain Money { type: decimal }
+def dimension Shopper { key: code, attributes: [ def attribute code { domain: md.Code, isKey: true } ] }
+def dimension Store   { key: code, attributes: [ def attribute code { domain: md.Code, isKey: true } ] }
+def measure net_sales { domain: md.Money, aggregation: sum }
+def cubelet sales { grain: [Shopper.code, Store.code], measures: [net_sales] }
+
+// The hop for `sales` only: the cubelet lands on `er.entity.sale`; `Store` has no er counterpart.
+def md2er_cubelet sales_er { cubelet: md.sales, target: er.entity.sale, attributes: { Shopper.code: shopper_id } }

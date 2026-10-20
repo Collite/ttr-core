@@ -17,7 +17,7 @@ import org.tatrman.statement.v1.Statement
  * Every function is a pure function of the resolved, snapshot-pinned model it was built over ([ResolvedCnModel]):
  * no LLM, no server call, no I/O mid-lower (architecture §7). CN-P0 S0.4 pins the SHAPE only —
  * [ConceptServiceContractSpec] asserts the method names and arities, so a rename at CN-P3 shows up as a test change,
- * not as drift. Every body is CN-P3 ([NotImplementedConceptService]).
+ * not as drift. Every body is CN-P3 ([NotImplementedConceptService]) but [hygieneReport] ([CnConceptService], S2.7).
  */
 interface ConceptService {
     // --- statements (read) ---
@@ -73,6 +73,16 @@ interface ConceptService {
 
     /** Per concept: the grounding grade, `via`, core/open, dangling groundings, retired codes, phase-as-default rows. */
     fun hygieneReport(): HygieneReport
+}
+
+/**
+ * The service over a [ResolvedCnModel] (cn contracts §3). CN-P2 S2.7 pulls [hygieneReport] forward — model-only, no
+ * consumer ([CnHygiene]); every other family is CN-P3 and refuses as the scaffold does.
+ */
+class CnConceptService(
+    private val model: ResolvedCnModel,
+) : ConceptService by NotImplementedConceptService() {
+    override fun hygieneReport(): HygieneReport = CnHygiene.report(model)
 }
 
 /** The scaffold stand-in: every call refuses with the phase that builds it. */

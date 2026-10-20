@@ -18,6 +18,7 @@ import org.tatrman.ttr.metadata.model.GroundingLayer
 import org.tatrman.ttr.metadata.model.GroundingPeriod
 import org.tatrman.ttr.metadata.model.HierarchyRanges
 import org.tatrman.ttr.metadata.model.Imprecision
+import org.tatrman.ttr.metadata.model.HopResult
 import org.tatrman.ttr.metadata.model.LexiconLink
 import org.tatrman.ttr.metadata.model.LexiconOrigin
 import org.tatrman.ttr.metadata.model.LocalizedText
@@ -106,6 +107,7 @@ private data class Landing(
     val via: Via? = null,
     val grade: GroundingGrade = GroundingGrade.UNGROUNDED,
     val from: QualifiedName? = null,
+    val hop: HopResult? = null,
 )
 
 /** The stock keys a concept's free-form entries may carry (CN-D7) — every other key is the open tier. */
@@ -124,7 +126,14 @@ private class CnTierBuilder(
     private val concepts: Map<String, CnConcept> = validation.concepts
     private val landings = mutableMapOf<String, Landing>()
     private val visiting = mutableSetOf<String>()
-    private val lexicon: Map<String, List<LexiconLink>> = canonicalLexicon()
+    private val lexicon: Map<String, List<LexiconLink>>
+    private val elementTerms: Map<String, List<LexiconLink>>
+
+    init {
+        val (concepts, elements) = canonicalLexicon()
+        lexicon = concepts
+        elementTerms = elements
+    }
 
     fun build(): CnBuild {
         val bindings = linkedMapOf<QualifiedName, Grounding>()
@@ -143,7 +152,7 @@ private class CnTierBuilder(
             val concept = concept(c, bindings)
             out.putIfAbsent(concept.qname, concept)
         }
-        return CnBuild(CnSchema(out, bindings, relationTypes), validation.diagnostics)
+        return CnBuild(CnSchema(out, bindings, relationTypes, elementTerms = elementTerms), validation.diagnostics)
     }
 
     // --- resolution ---------------------------------------------------------------------------------------------
@@ -245,6 +254,7 @@ private class CnTierBuilder(
             via = landing.via,
             grade = landing.grade,
             landingFrom = landing.from,
+            hop = landing.hop,
             sourceLocation = c.source,
         )
     }
@@ -345,7 +355,7 @@ private class CnTierBuilder(
                 (v as? PropertyValue.IdValue)?.let { resolve(it.ref.path, it.parts, d, cn = true) }?.takeIf {
                     it.kind == "concept"
                 } ?: return Landing()
-            return landingOf(bearer.qname).copy(from = cnName(bearer))
+            return landingOf(bearer.qname).copy(from = cnName(bearer), hop = null)
         }
         val target = placed.targetSymbol
         return when (layerOf(placed.grounding.bindingKind!!)) {
@@ -358,8 +368,9 @@ private class CnTierBuilder(
             GroundingLayer.MD -> {
                 val md = target?.let(::elementRefOf) ?: return Landing(null, Via.MD_HOP, HOP_MISSING)
                 val bearer = if (c.stereotype == "quality") bearerEntity(c) else null
-                val er = hop.erTargetOf(md, bearer).erTarget
-                Landing(er, Via.MD_HOP, if (er != null) GroundingGrade.MD_GROUNDED else HOP_MISSING)
+                val answer = hop.erTargetOf(md, bearer)
+                val er = answer.erTarget
+                Landing(er, Via.MD_HOP, if (er != null) GroundingGrade.MD_GROUNDED else HOP_MISSING, hop = answer)
             }
             GroundingLayer.DB -> Landing()
         }
@@ -485,15 +496,33 @@ private class CnTierBuilder(
 
     // --- T6: lexicon links --------------------------------------------------------------------------------------
 
-    /** Every canonical lexicon entry whose `for:` names a concept, by concept key, in document order. */
-    private fun canonicalLexicon(): Map<String, List<LexiconLink>> {
+    /**
+     * Every canonical lexicon entry whose `for:` names a concept, by concept key — and (S2.7) every one naming an md or
+     * er element, by element ref ([CnSchema.elementTerms]); both in document order.
+     */
+    private fun canonicalLexicon(): Pair<Map<String, List<LexiconLink>>, Map<String, List<LexiconLink>>> {
         val out = linkedMapOf<String, MutableList<LexiconLink>>()
+        val elements = linkedMapOf<String, MutableList<LexiconLink>>()
         for (doc in docs) {
             for (def in doc.definitions) {
                 if (def !is LexiconEntryDef) continue
                 val target = def.target ?: continue
-                val sym = resolve(target.path, target.parts, doc)?.takeIf { it.kind == "concept" } ?: continue
-                out.getOrPut(sym.qname) { mutableListOf() } +=
+                val sym = resolve(target.path, target.parts, doc) ?: continue
+                val key =
+                    when {
+                        sym.kind == "concept" -> sym.qname
+                        sym.schemaCode == "md" || sym.schemaCode == "er" -> null
+                        else -> continue
+                    }
+                val into =
+                    if (key !=
+                        null
+                    ) {
+                        out.getOrPut(key) { mutableListOf() }
+                    } else {
+                        elements.getOrPut(elementRefOf(sym)) { mutableListOf() }
+                    }
+                into +=
                     LexiconLink(
                         entryKind = def.entryKind,
                         name = def.name,
@@ -509,7 +538,7 @@ private class CnTierBuilder(
                     )
             }
         }
-        return out
+        return out to elements
     }
 
     /**

@@ -57,6 +57,14 @@ class CnHopSpec :
             hop.erTargetOf("md.dimension.Product.color").diagnostic shouldBe HopResult.UNMAPPED
         }
 
+        "the builder keeps the hop's answer on an md-grounded concept — the hygiene report's hop column (S2.7)" {
+            val cn = project.cn
+            cn.byName("WebSale")!!.hop shouldBe HopResult("er.entity.web_sale", HopVia.EXPLICIT)
+            cn.byName("Item")!!.hop!!.diagnostic shouldBe HopResult.UNMAPPED
+            // a defined phase inherits its bearer's landing, not its hop; an er grounding has none
+            cn.byName("BigWebSale")!!.hop.shouldBeNull()
+        }
+
         "the seam is pluggable: the builder reads whatever hop it is given" {
             val derived =
                 object : MdErHop {
