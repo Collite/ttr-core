@@ -14,7 +14,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..model import (
+    AttributeDef,
+    ConceptBindingDef,
+    ConceptBody,
+    ConceptDef,
+    ConceptEntry,
+    ConceptGrounds,
+    ConceptInvolves,
+    ConceptPeriod,
+    ConceptRef,
+    ConceptTarget,
+    ConceptValueSpace,
+    CubeletDef,
     Definition,
+    DimensionDef,
     EntityDef,
     Er2CncRoleDef,
     Er2DbAttributeDef,
@@ -25,6 +38,7 @@ from ..model import (
     IdValue,
     ImportStatement,
     ListValue,
+    MeasureDef,
     ObjectValue,
     PatternDef,
     ProcedureDef,
@@ -33,18 +47,28 @@ from ..model import (
     RelationDef,
     SourceLocation,
     TableDef,
+    TargetObjectValue,
+    TargetReferenceValue,
     TermDef,
     ViewDef,
 )
+from .cn.desugar import concept_sugar_of, sugar_stereotype_key
 from .default_schema import build_canonical_key, kind_segment
 
 
 @dataclass(frozen=True, slots=True)
 class CollectedRef:
+    """One collected reference. 0.17: `cn_context` marks a reference written in a cn slot (cn contracts
+    §1.1-§1.4) - it resolves among concepts only; `soft` marks a bearer-local name (a concept's
+    `qualities:` item or `period:` value) - one that names no concept is an implicit quality, never an
+    unresolved reference. Mirrors the TS `CnSlotReference`."""
+
     path: str
     parts: tuple[str, ...]
     source: SourceLocation
     owner_def: Definition
+    cn_context: bool = False
+    soft: bool = False
 
 
 def nested_defs(definition: Definition) -> tuple[Definition, ...]:
@@ -57,6 +81,9 @@ def nested_defs(definition: Definition) -> tuple[Definition, ...]:
         return definition.columns
     if isinstance(definition, ProcedureDef):
         return definition.result_columns
+    if isinstance(definition, DimensionDef):
+        # Inline MD attributes carry their own `domain:` cross-references (TS parity).
+        return definition.attributes
     return ()
 
 
@@ -108,6 +135,130 @@ def _collect_into(
     elif isinstance(definition, (TermDef, PatternDef, ExampleDef)):
         if definition.target is not None:
             out.append(_ref_of(definition.target, owner))
+    # v3.1 MD - the cross-references the TS walker collects as `crossRefs` (domain / hierarchy / grain /
+    # measure), read off the identity-level fields the Python md hosts carry.
+    elif isinstance(definition, AttributeDef):
+        if definition.domain_ref is not None:
+            out.append(_ref_of(definition.domain_ref, owner))
+    elif isinstance(definition, DimensionDef):
+        out.extend(_ref_of(r, owner) for r in definition.hierarchies)
+    elif isinstance(definition, MeasureDef):
+        if definition.domain_ref is not None:
+            out.append(_ref_of(definition.domain_ref, owner))
+    elif isinstance(definition, CubeletDef):
+        out.extend(_ref_of(r, owner) for r in (*definition.grain, *definition.measure_refs))
+    # 0.17 - the cn model: a concept def's and a binding's slots.
+    elif isinstance(definition, ConceptDef):
+        _collect_concept_body(definition.body, "def", owner, out)
+    elif isinstance(definition, ConceptBindingDef):
+        _collect_concept_body(definition.body, "binding", owner, out)
+    # 0.17 - the `concept { }` sugar on an md / er host.
+    sugar = concept_sugar_of(definition)
+    if sugar is not None:
+        _collect_concept_body(sugar.body, "sugar", owner, out)
+
+
+#: `period:` names its instants through `start` / `end` / `at`; `end_open` and `precision` are enums.
+_PERIOD_INSTANTS = frozenset({"start", "end", "at"})
+
+
+def ids_of(value: PropertyValue | None) -> list[IdValue]:
+    """The id values of a value that is one id or a list of them."""
+    if isinstance(value, IdValue):
+        return [value]
+    if isinstance(value, ListValue):
+        return [i for item in value.items for i in ids_of(item)]
+    return []
+
+
+def entry_of(value: PropertyValue | None, key: str) -> PropertyValue | None:
+    """The value under `key` of an object value, or None."""
+    return value.entries.get(key) if isinstance(value, ObjectValue) else None
+
+
+def id_path(v: IdValue) -> str:
+    return v.ref.path if v.ref is not None else ".".join(v.parts)
+
+
+def _collect_concept_body(body: ConceptBody, mode: str, owner: Definition, out: list[CollectedRef]) -> None:
+    """The references of one cn body, in authored order. `mode` says whose body it is: a concept def
+    (`period:` names the bearer's qualities), a binding (`period:` names er attributes, `participants:`
+    keys name the event's labels) or the sugar (its stereotype slot declares - no reference). Groundings
+    and binding targets resolve the generic way; `hierarchy:`'s `ancestor` / `descendant` are read
+    relative to its `closure` entity. Mirrors TS `collectConceptBodyRefs`."""
+
+    def cn(path: str, parts: tuple[str, ...], source: SourceLocation, soft: bool = False) -> None:
+        out.append(CollectedRef(path, parts, source, owner, cn_context=True, soft=soft))
+
+    def plain(v: IdValue) -> None:
+        out.append(CollectedRef(id_path(v), v.parts, v.source, owner))
+
+    declaring = sugar_stereotype_key(body) if mode == "sugar" else None
+    event_ref = (
+        next((p for p in body.properties if isinstance(p, ConceptRef) and p.key == "event"), None)
+        if mode == "binding"
+        else None
+    )
+    for p in body.properties:
+        if isinstance(p, ConceptRef):
+            if p.key != declaring:
+                cn(p.ref.path, p.ref.parts, p.ref.source)
+        elif isinstance(p, ConceptGrounds):
+            out.append(_ref_of(p.ref, owner))
+        elif isinstance(p, ConceptValueSpace):
+            cn(p.ref.path, p.ref.parts, p.ref.source)
+        elif isinstance(p, ConceptInvolves):
+            for participant in p.participants:
+                cn(participant.ref.path, participant.ref.parts, participant.ref.source)
+        elif isinstance(p, ConceptPeriod):
+            for key, value in p.value.entries.items():
+                if key not in _PERIOD_INSTANTS:
+                    continue
+                for v in ids_of(value):
+                    if mode == "binding":
+                        plain(v)
+                    else:
+                        cn(id_path(v), v.parts, v.source, soft=True)
+        elif isinstance(p, ConceptTarget):
+            if isinstance(p.value, TargetReferenceValue) and p.value.ref is not None:
+                out.append(_ref_of(p.value.ref, owner))
+            elif isinstance(p.value, TargetObjectValue):
+                _push_id_value(p.value.obj, owner, out)
+        elif isinstance(p, ConceptEntry):
+            if p.key in ("is_a", "of"):
+                for v in ids_of(p.value):
+                    cn(id_path(v), v.parts, v.source)
+            elif p.key == "qualities":
+                for v in ids_of(p.value):
+                    cn(id_path(v), v.parts, v.source, soft=True)
+            elif p.key == "relations" and isinstance(p.value, ListValue):
+                for item in p.value.items:
+                    for key in ("type", "to"):
+                        for v in ids_of(entry_of(item, key)):
+                            cn(id_path(v), v.parts, v.source)
+            elif p.key == "hierarchy":
+                closures = ids_of(entry_of(p.value, "closure"))
+                if not closures:
+                    continue
+                closure = closures[0]
+                plain(closure)
+                for key in ("ancestor", "descendant"):
+                    for v in ids_of(entry_of(p.value, key)):
+                        out.append(
+                            CollectedRef(
+                                f"{id_path(closure)}.{id_path(v)}", (*closure.parts, *v.parts), v.source, owner
+                            )
+                        )
+            elif p.key == "participants" and mode == "binding" and isinstance(p.value, ObjectValue):
+                for key, value in p.value.entries.items():
+                    if event_ref is not None:
+                        ev = event_ref.ref
+                        cn(f"{ev.path}.{key}", (*ev.parts, key), value.source)
+                    for v in ids_of(value):
+                        plain(v)
+            elif p.key == "via":
+                for v in ids_of(p.value):
+                    plain(v)
 
 
 def _push_id_value(

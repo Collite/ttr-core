@@ -14,6 +14,8 @@ lives in `symbol_table._kind_segment`, not here.
 
 from __future__ import annotations
 
+from ..model import ConceptBindingDef, Definition
+
 
 def default_namespace_for_schema(schema_code: str) -> str:
     """`db` → `dbo`; every other schema → '' (caller keeps the per-kind fallback)."""
@@ -39,8 +41,7 @@ _KIND_SEGMENT: dict[str, str] = {
     "er2db_relation": "er2dbRelation",
     "er2cnc_role": "er2cncRole",
     "drill_map": "drillMap",
-    # 0.17 — the cn bindings. Semantics has no `cn` model yet (CN-P2 S2.1): a concept and a cn binding
-    # key under the default model (`db`), as the TS and Kotlin twins do.
+    # 0.17 — the cn bindings' def kind (a binding keys by its keyword: `key_kind_of`).
     "concept_binding": "conceptBinding",
 }
 
@@ -50,13 +51,22 @@ def kind_segment(kind: str) -> str:
     return _KIND_SEGMENT.get(kind, kind)
 
 
+def key_kind_of(definition: Definition) -> str:
+    """The kind a def's canonical key is built from: its `kind`, except a cn binding, which keys by its
+    binding keyword (`<pkg>.binding.cn2er_event.<name>` — the `md2er_cubelet` precedent). Mirrors TS
+    `keyKindOf`."""
+    if isinstance(definition, ConceptBindingDef):
+        return definition.binding_kind
+    return definition.kind
+
+
 # ---------------------------------------------------------------------------
 # v4.0 uniform key (← `qname.ts` modelForKind / namespaceForKind / buildCanonicalKey)
 # ---------------------------------------------------------------------------
 
 # `automation` (0.16) keys symbols but is not a reference prefix — the automation stdlib's package is
 # named `automation` (review-114 B1). Mirrors TS `MODEL_CODES`.
-MODEL_CODES: frozenset[str] = frozenset({"db", "er", "md", "binding", "cnc", "world"})
+MODEL_CODES: frozenset[str] = frozenset({"db", "er", "md", "binding", "cnc", "world", "cn"})
 
 _MODEL_BY_KIND: dict[str, str] = {
     "entity": "er",
@@ -69,6 +79,20 @@ _MODEL_BY_KIND: dict[str, str] = {
     "md2db_domain": "binding",
     "md2db_map": "binding",
     "md2er_cubelet": "binding",
+    # 0.17 — the cn bindings: `concept_binding` is the def kind, the ten binding keywords key it.
+    "concept_binding": "binding",
+    "cn2md_kind": "binding",
+    "cn2md_role": "binding",
+    "cn2md_quality": "binding",
+    "cn2md_event": "binding",
+    "cn2er_kind": "binding",
+    "cn2er_role": "binding",
+    "cn2er_event": "binding",
+    "cn2er_quality": "binding",
+    "cn2er_phase": "binding",
+    "cn2db_concept": "binding",
+    # 0.17 — every concept stereotype is one kind, `concept`, in the schema-less model `cn` (CN-P2 S2.1).
+    "concept": "cn",
     "role": "cnc",
     "er2cnc_role": "cnc",
     "md_domain": "md",

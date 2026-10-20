@@ -1,0 +1,46 @@
+package hartland.stores
+model cn
+
+def kind HomeItem {
+    is_a: Item,
+    members: """pl
+descendants(Item, 'H10-H19')
+"""
+}
+def kind Item { description: { en: "A product.", cs: "Produkt." }, sources: ["doc://hartland/handbook#products"], is_a: Party, grounds: er.entity.item, hierarchy: { closure: er.entity.category_closure, ancestor: ancestor_code, descendant: descendant_code }, qualities: [category, brand], relations: [{ type: supplies, to: Warehouse }], lexicon: { terms: ["product", "item"] } }
+def kind Party { label: { en: "Party", cs: "Strana" }, tags: ["core"], abstract: true }
+def kind Warehouse {}
+def role Customer { of: Party, event: Order, grounds: er.entity.customer }
+def event Order { extent: durative, grounds: er.entity.order, involves: [Customer, Warehouse as fulfilling], period: { start: placed_date, end: delivered_date, end_open: open } }
+def event Transfer {
+    involves: [
+        Item,
+        Warehouse as from,
+        Warehouse as to,
+        Customer as requester
+    ],
+    period: { at: shipped_at }
+}
+def phase Pending {
+    of: Order,
+    definition: """
+state in ('placed', 'held')
+"""
+}
+def quality category { of: Item, value_space: Party, valued_state: true, imprecision: { unit: day } }
+def quality open_amount { of: Order, definition: "amount - paid", basis: current_state, custom_key: 3 }
+def relation_type supplies { description: "One party supplies another." }
+def cn2md_kind item_g { tags: ["md"], kind: cn.Item, target: md.Product }
+def cn2er_kind category_g { kind: ProductCategory, target: er.entity.category_code, hierarchy: { closure: er.entity.category_closure, ancestor: ancestor_code, descendant: descendant_code } }
+def cn2er_event order_g {
+    description: "The order grounding.",
+    event: Order,
+    target: er.entity.order,
+    period: { start: er.entity.order.placed_date },
+    participants: {
+        customer: [order_customer],
+        fulfilling: [order_warehouse]
+    }
+}
+def cn2er_quality state_g { quality: state, target: er.entity.order.state, filter: "state = 'held'" }
+def cn2db_concept legacy_g { concept: Warehouse, target: { table: db.dbo.warehouse }, via: [r1, r2] }

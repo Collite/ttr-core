@@ -102,6 +102,22 @@ class Unresolved:
 ResolutionResult = Resolved | Unresolved
 
 
+def _is_cn_symbol(e: SymbolEntry) -> bool:
+    """A concept or one of its participant labels (model `cn`, 0.17)."""
+    return e.schema_code == "cn"
+
+
+def _is_hidden_from_elements(e: SymbolEntry) -> bool:
+    """What an element reference never reaches: the cn model, and the bindings the cn desugar
+    synthesized - named `<Concept>.grounds` / `<Concept>.concept`, they would match a bare name by suffix."""
+    return _is_cn_symbol(e) or e.cn_origin is not None
+
+
+def _cn_key(pkg: str, parts: list[str] | tuple[str, ...]) -> str:
+    """The canonical key of a concept (or `<Name>.<label>`) in `pkg`: `<pkg>.cn.concept.<parts>`."""
+    return (f"{pkg}." if pkg else "") + ".".join(["cn", "concept", *parts])
+
+
 class Resolver:
     def __init__(self, symbols: SymbolTable) -> None:
         self._symbols = symbols
@@ -110,10 +126,31 @@ class Resolver:
         """Direct symbol-table lookup by fully-qualified name."""
         return self._symbols.get(qname)
 
+    # -- 0.17: concepts are reachable only from a cn slot or the `cn.` head (CN-P2 S2.1) --
+
+    def _element(self, qname: str) -> SymbolEntry | None:
+        e = self._symbols.get(qname)
+        return None if e is None or _is_hidden_from_elements(e) else e
+
+    def _elements_by_package(self, pkg: str) -> tuple[SymbolEntry, ...]:
+        return tuple(e for e in self._symbols.get_by_package(pkg) if not _is_hidden_from_elements(e))
+
+    def _elements_by_suffix(self, suffix: str) -> tuple[SymbolEntry, ...]:
+        return tuple(e for e in self._symbols.get_by_suffix(suffix) if not _is_hidden_from_elements(e))
+
+    def _cn_symbol(self, key: str) -> SymbolEntry | None:
+        e = self._symbols.get(key)
+        return e if e is not None and _is_cn_symbol(e) else None
+
     def resolve_reference(
-        self, ref: str, context: ResolutionContext
+        self, ref: str, context: ResolutionContext, *, cn_context: bool = False
     ) -> ResolutionResult:
+        """Resolve a dotted reference. `cn_context` marks a reference from a cn slot
+        (`CollectedRef.cn_context`): it - and any `cn.`-headed reference - resolves among concepts only."""
         path = ref
+        parts = path.split(".")
+        if cn_context or (len(parts) > 1 and parts[0] == "cn"):
+            return self._resolve_cn(parts, context)
         tried: list[ResolutionAttempt] = []
 
         enclosing_candidate = (
@@ -122,7 +159,7 @@ class Resolver:
 
         # Step 1 — lexical scope.
         if enclosing_candidate is not None:
-            symbol = self._symbols.get(enclosing_candidate)
+            symbol = self._element(enclosing_candidate)
             if symbol is not None:
                 return Resolved(symbol, "lexical")
             tried.append(
@@ -132,7 +169,7 @@ class Resolver:
         # Step 2 — same-package: direct `schema.ns.name`, then package sibling.
         full_qname = f"{context.schema_code}.{context.namespace}.{path}"
         if full_qname != context.enclosing_qname:
-            symbol = self._symbols.get(full_qname)
+            symbol = self._element(full_qname)
             if symbol is not None:
                 return Resolved(symbol, "same-package")
             tried.append(
@@ -140,7 +177,7 @@ class Resolver:
             )
 
         if context.package_name:
-            for entry in self._symbols.get_by_package(context.package_name):
+            for entry in self._elements_by_package(context.package_name):
                 if entry.name == path:
                     candidate = entry.qname.value
                     if candidate not in (enclosing_candidate, full_qname):
@@ -152,7 +189,7 @@ class Resolver:
                 if imp.wildcard:
                     continue
                 if imp.target.endswith(f".{path}"):
-                    symbol = self._symbols.get(imp.target)
+                    symbol = self._element(imp.target)
                     if symbol is not None:
                         return Resolved(symbol, "named-import")
 
@@ -160,7 +197,7 @@ class Resolver:
             for imp in context.imports:
                 if not imp.wildcard:
                     continue
-                for entry in self._symbols.get_by_package(imp.target):
+                for entry in self._elements_by_package(imp.target):
                     if entry.name == path and entry.qname.value != full_qname:
                         if not any(
                             w.qname.value == entry.qname.value for w in wildcard_matches
@@ -184,7 +221,7 @@ class Resolver:
         # Step 5 — auto-import (stock cnc roles, keyed cnc.role.* — D15).
         cnc_qname = f"cnc.role.{path}"
         if cnc_qname not in (full_qname, context.enclosing_qname):
-            symbol = self._symbols.get(cnc_qname)
+            symbol = self._element(cnc_qname)
             if symbol is not None:
                 return Resolved(symbol, "auto-import")
             tried.append(ResolutionAttempt("auto-import", cnc_qname, "unknown-symbol"))
@@ -198,7 +235,7 @@ class Resolver:
         for cand in forms:
             seen: set[str] = set()
             unique_matches = []
-            for e in self._symbols.get_by_suffix(cand):
+            for e in self._elements_by_suffix(cand):
                 if e.qname.value in (full_qname, cnc_qname) or e.qname.value in seen:
                     continue
                 seen.add(e.qname.value)
@@ -209,6 +246,70 @@ class Resolver:
                 )
                 return Resolved(unique_matches[0], "fully-qualified")
 
+        return Unresolved("not-found", tuple(tried))
+
+    def _resolve_cn(self, written: list[str], context: ResolutionContext) -> ResolutionResult:
+        """0.17 - a reference from a cn slot, or one written with the `cn.` head, resolves among concepts
+        only: `<pkg>.cn.concept.<Name>`, or an event's participant label `<Name>.<label>`. The steps mirror
+        the element ones - package-qualified, same package, named import, wildcard import, then a unique
+        match across the project. It never falls back to an element. Mirrors TS `Resolver.resolveCn`."""
+        tried: list[ResolutionAttempt] = []
+        parts = written[1:] if len(written) > 1 and written[0] == "cn" else written
+
+        def lookup(step: ResolutionStep, key: str) -> SymbolEntry | None:
+            symbol = self._cn_symbol(key)
+            tried.append(ResolutionAttempt(step, key, None if symbol is not None else "unknown-symbol"))
+            return symbol
+
+        # Package-qualified (`hartland.core.Party`): a known package prefix that leaves a name.
+        packages = self._symbols.packages()
+        for i in range(len(parts) - 1, 0, -1):
+            pkg = ".".join(parts[:i])
+            if pkg not in packages:
+                continue
+            symbol = lookup("fully-qualified", _cn_key(pkg, parts[i:]))
+            if symbol is not None:
+                return Resolved(symbol, "fully-qualified")
+
+        symbol = lookup("same-package", _cn_key(context.package_name, parts))
+        if symbol is not None:
+            return Resolved(symbol, "same-package")
+
+        for imp in context.imports:
+            if imp.wildcard:
+                continue
+            segs = imp.target.split(".")
+            if len(segs) < 2 or segs[-1] != parts[0]:
+                continue
+            symbol = lookup("named-import", _cn_key(".".join(segs[:-1]), parts))
+            if symbol is not None:
+                return Resolved(symbol, "named-import")
+
+        wildcard: list[SymbolEntry] = []
+        for imp in context.imports:
+            if not imp.wildcard:
+                continue
+            m = self._cn_symbol(_cn_key(imp.target, parts))
+            if m is not None and all(w.qname.value != m.qname.value for w in wildcard):
+                wildcard.append(m)
+        if len(wildcard) > 1:
+            tried.extend(ResolutionAttempt("wildcard-import", m.qname.value, "ambiguous") for m in wildcard)
+            return Unresolved("ambiguous", tuple(tried), tuple(wildcard))
+        if len(wildcard) == 1:
+            tried.append(ResolutionAttempt("wildcard-import", wildcard[0].qname.value))
+            return Resolved(wildcard[0], "wildcard-import")
+
+        anywhere: list[SymbolEntry] = []
+        for e in self._symbols.get_by_suffix(_cn_key("", parts)):
+            if not _is_cn_symbol(e) or any(a.qname.value == e.qname.value for a in anywhere):
+                continue
+            anywhere.append(self._cn_symbol(e.qname.value) or e)
+        if len(anywhere) == 1:
+            tried.append(ResolutionAttempt("fully-qualified", anywhere[0].qname.value))
+            return Resolved(anywhere[0], "fully-qualified")
+        if len(anywhere) > 1:
+            tried.extend(ResolutionAttempt("fully-qualified", m.qname.value, "ambiguous") for m in anywhere)
+            return Unresolved("ambiguous", tuple(tried), tuple(anywhere))
         return Unresolved("not-found", tuple(tried))
 
     def _classified_tail(self, path: str) -> str:
@@ -225,8 +326,10 @@ class Resolver:
                 if k + 1 < len(parts):
                     schemas.add(parts[k + 1])
         i = 0
+        model = schema = False
         if i < len(segs) and segs[i] in MODEL_CODES:
             i += 1
+            model = True
         best = -1
         for j in range(i, len(segs)):
             if ".".join(segs[i : j + 1]) in packages:
@@ -235,10 +338,13 @@ class Resolver:
             i = best + 1
         if i < len(segs) and segs[i] in schemas:
             i += 1
-        if i < len(segs) and segs[i] in MODEL_CODES:
+            schema = True
+        # The model may also follow the package (`pkg.er.entity.x`) - only when none led (TS
+        # `classifyReference`; since 0.17 `cn` is a model code, and `db.dbo.cn.x` names a column `cn`).
+        if not model and i < len(segs) and segs[i] in MODEL_CODES:
             i += 1
         # schema may follow the post-package model (`pkg.db.dbo.x`).
-        if i < len(segs) and segs[i] in schemas:
+        if not schema and i < len(segs) and segs[i] in schemas:
             i += 1
         if i < len(segs) and segs[i] in _KIND_KEYWORDS:
             i += 1

@@ -85,11 +85,18 @@ fun kindOf(def: Definition): String =
         is LexiconEntryDef -> def.entryKind
         // 0.16 — the automation kinds key on their def keyword (`parameter`, `action`, …).
         is AutomationDef -> def.kind
-        // 0.17 — the conceptual model. Mirrors the TS `def.kind` discriminator; semantics has no `cn` model
-        // yet, so both key under the default model (`db`) until CN-P2 S2.1 (the TS goldens agree).
+        // 0.17 — the conceptual model. Mirrors the TS `def.kind` discriminator: every concept stereotype is
+        // one kind, `concept` (model `cn`); a cn binding keys by its binding keyword ([keyKindOf]).
         is ConceptDef -> "concept"
         is ConceptBindingDef -> "conceptBinding"
     }
+
+/**
+ * The kind a def's canonical key is built from. Usually [kindOf]; a cn binding keys by its binding keyword
+ * (`<pkg>.binding.cn2er_event.<name>` — the `md2er_cubelet` precedent), not by the shared `conceptBinding`
+ * def kind. Every key builder goes through here. Mirrors TS `keyKindOf` (`default-schema.ts`).
+ */
+fun keyKindOf(def: Definition): String = if (def is ConceptBindingDef) def.bindingKind else kindOf(def)
 
 /**
  * @deprecated Alias of [modelForKind] — the single kind→model source of truth
@@ -104,11 +111,11 @@ internal fun defaultSchemaForKind(
 ): String = modelForKind(kind, declaringModel)
 
 /**
- * The model codes a reference may lead with (D14: no `query`; D15: `cnc` schema-less; `world` v4.1).
+ * The model codes a reference may lead with (D14: no `query`; D15: `cnc` schema-less; `world` v4.1; `cn` 0.17).
  * `automation` (0.16) keys symbols but is not a reference prefix — the automation stdlib's package is
  * named `automation` (review-114 B1). Mirrors TS `MODEL_CODES`.
  */
-val MODEL_CODES = setOf("db", "er", "md", "binding", "cnc", "world")
+val MODEL_CODES = setOf("db", "er", "md", "binding", "cnc", "world", "cn")
 
 /**
  * Kind → model layer (D14/D15). Mirrors TS `modelForKind` (`qname.ts`).
@@ -137,7 +144,12 @@ private fun modelForKindOnly(kind: String): String =
         "entity", "attribute", "relation" -> "er"
         "er2dbEntity", "er2dbAttribute", "er2dbRelation",
         "md2dbCubelet", "md2dbDomain", "md2dbMap", "md2erCubelet",
+        // 0.17 — the cn bindings: `conceptBinding` is the def kind, the ten binding keywords key it.
+        "conceptBinding", "cn2md_kind", "cn2md_role", "cn2md_quality", "cn2md_event",
+        "cn2er_kind", "cn2er_role", "cn2er_event", "cn2er_quality", "cn2er_phase", "cn2db_concept",
         -> "binding"
+        // 0.17 — every concept stereotype is one kind, `concept`, in the schema-less model `cn` (CN-P2 S2.1).
+        "concept" -> "cn"
         "role", "er2cncRole" -> "cnc"
         "mdDomain", "dimension", "mdMap", "hierarchy", "measure", "cubelet" -> "md"
         "world", "engine", "executor", "storage", "worldSchema" -> "world"

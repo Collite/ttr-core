@@ -602,6 +602,9 @@ class AttributeDef(Definition):
     transitions: tuple[AttributeTransition, ...] = ()
     #: Grammar 0.17 — the `concept { quality: … }` sugar (er: also a value kind).
     concept: ConceptSugar | None = None
+    #: MD (v3.1) — `domain: md.X`, the domain an md attribute ranges over; None for an er attribute.
+    #: Identity-level: read for reference collection (CN-P2 S2.4), not an md model.
+    domain_ref: Reference | None = None
     kind: ClassVar[str] = "attribute"
 
 
@@ -1425,8 +1428,10 @@ class ConceptBindingDef(Definition):
 
 
 # The md hosts of the `concept { }` sugar. The Python port carries no md model — the TS and
-# Kotlin md fields (type, restrict, grain, measures, …) are not ported, and the conformance
-# dump compares none of them; these four carry identity and the 0.17 `concept` sugar.
+# Kotlin md fields (type, restrict, aggregation, inline measures, …) are not ported, and the
+# conformance dump compares none of them; these four carry identity, the 0.17 `concept` sugar
+# and (CN-P2 S2.4) the identity-level references the semantics layer collects: a dimension's
+# attributes and hierarchies, a measure's domain, a cubelet's grain and measure refs.
 
 
 @dataclass(frozen=True, slots=True)
@@ -1438,18 +1443,26 @@ class MdDomainDef(Definition):
 @dataclass(frozen=True, slots=True)
 class DimensionDef(Definition):
     concept: ConceptSugar | None = None
+    #: The inline `def attribute` items (each with its `domain:` and `concept { }`).
+    attributes: tuple[AttributeDef, ...] = ()
+    hierarchies: tuple[Reference, ...] = ()
     kind: ClassVar[str] = "dimension"
 
 
 @dataclass(frozen=True, slots=True)
 class MeasureDef(Definition):
     concept: ConceptSugar | None = None
+    domain_ref: Reference | None = None
     kind: ClassVar[str] = "measure"
 
 
 @dataclass(frozen=True, slots=True)
 class CubeletDef(Definition):
     concept: ConceptSugar | None = None
+    #: `grain: [Dimension.attribute, …]`.
+    grain: tuple[Reference, ...] = ()
+    #: `measures: [refs]` — the ref form only; inline measure defs are not modelled.
+    measure_refs: tuple[Reference, ...] = ()
     kind: ClassVar[str] = "cubelet"
 
 

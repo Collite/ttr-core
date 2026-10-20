@@ -62,6 +62,22 @@ class DiagnosticCode(Enum):
     # 0.17 (CN-P1) - parse-level checks on a cn body. The `cn/*` slugs (cn contracts §7) are semantic, CN-P2.
     DUPLICATE_PROPERTY = "ttr/duplicate-property"  # a cn body names one key twice - the first is read
     EXPRESSION_BLOCK_REQUIRED = "ttr/expression-block-required"  # a binding `filter:` that is not a string or block
+    # 0.17 (CN-P2) - the model-level `cn/*` slugs (cn contracts §7), the portable ones. The lexicon pair
+    # (`cn/duplicate-default-sense`, `cn/phase-as-default`) is TS-only; the definition-level slugs are Kotlin's.
+    CN_DUPLICATE_GROUNDING = "cn/duplicate-grounding"  # a concept's second grounding, or sugar restating a concept
+    CN_GROUNDING_TARGET_KIND = "cn/grounding-target-kind"  # a target the stereotype x layer table does not allow
+    CN_ROLE_NO_EVENT = "cn/role-no-event"  # a role without its defining event (CN-D6)
+    CN_PHASE_DOUBLE_DEFINITION = "cn/phase-double-definition"  # a phase both defined and grounded (AM-2)
+    CN_PHASE_NO_DEFINITION = "cn/phase-no-definition"  # hygiene: a phase neither defined nor grounded
+    CN_EVENT_NO_PERIOD = "cn/event-no-period"  # hygiene: an event without `period:`
+    CN_UNGROUNDED = "cn/ungrounded"  # hygiene: a concept with no grounding (P-1)
+    CN_DB_GROUNDING = "cn/db-grounding"  # advisory: a db grounding - documentation only
+    CN_HIERARCHY_SHAPE = "cn/hierarchy-shape"  # a `hierarchy:` closure without its two attributes or a key
+    CN_PARTICIPANT_PATH_BROKEN = "cn/participant-path-broken"  # a participant's relation path does not chain
+    CN_INVOLVES_UNLABELLED_DUPLICATE = "cn/involves-unlabelled-duplicate"  # two participants of one event, one label
+    CN_UNKNOWN_RELATION_TYPE = "cn/unknown-relation-type"  # an open-tier edge whose `type:` is no relation type
+    CN_ANTIRIGID_SUPERTYPE = "cn/antirigid-supertype"  # a kind whose `is_a` chain reaches a role or a phase
+    CN_CNC_DEPRECATED = "cn/cnc-deprecated"  # `model cnc` / `roles:` - deprecated (cn contracts §1.6)
 
     def __str__(self) -> str:
         return self.value

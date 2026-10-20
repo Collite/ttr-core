@@ -1581,10 +1581,13 @@ def _visit_md_host(
     warnings: list[ParseWarning],
     errors: list[ParseError],
 ) -> Definition:
-    """An md def carrying the `concept { }` sugar: identity, description, tags and the sugar."""
+    """An md def carrying the `concept { }` sugar: identity, description, tags, the sugar and (CN-P2 S2.4)
+    the identity-level references — a dimension's attributes and hierarchies, a measure's domain, a
+    cubelet's grain and measure refs."""
     description: str | None = None
     description_localized: LocalizedStringValue | None = None
     tags: tuple[str, ...] = ()
+    refs: dict[str, Any] = {}
     for p in props or ():
         d = p.descriptionProperty()
         if d is not None and description is None and description_localized is None:
@@ -1592,22 +1595,37 @@ def _visit_md_host(
         t = p.tagsProperty()
         if t is not None:
             tags = _visit_list_of_strings(t.listOfStrings(), file)
+        if cls is DimensionDef:
+            ap = p.attributesProperty()
+            if ap is not None:
+                refs["attributes"] = tuple(_visit_attribute_def_list(ap.attributeDefList(), file, warnings, errors))
+            hp = p.hierarchiesProperty()
+            if hp is not None:
+                refs["hierarchies"] = tuple(_visit_list_of_ids_as_refs(hp.listOfIds(), file))
+        elif cls is MeasureDef:
+            dp = p.domainRefProperty()
+            if dp is not None:
+                refs["domain_ref"] = _reference_of(dp.id_(), file)
+        elif cls is CubeletDef:
+            gp = p.grainProperty()
+            if gp is not None:
+                refs["grain"] = tuple(_visit_list_of_ids_as_refs(gp.listOfIds(), file))
+            mp = p.measuresProperty()
+            if mp is not None and mp.measuresValue().listOfIds() is not None:
+                refs["measure_refs"] = tuple(_visit_list_of_ids_as_refs(mp.measuresValue().listOfIds(), file))
     _md_inline_sugar(props, file, warnings, errors)
     return cls(
         name=name, source=source, description=description, description_localized=description_localized, tags=tags,
-        concept=_concept_sugar_of(props, file, warnings, errors),
+        concept=_concept_sugar_of(props, file, warnings, errors), **refs,
     )
 
 
 def _md_inline_sugar(props: Any, file: str, warnings: list[ParseWarning], errors: list[ParseError]) -> None:
-    """A dimension's inline attributes and a cubelet's inline measures are not modelled here (the md
-    model is not ported), but their `concept { }` is walked for its diagnostics — a second one, an
-    error inside it — so the error set matches TS and Kotlin. The sugar itself is dropped."""
+    """A cubelet's inline measures are not modelled here (the md model is not ported), but their
+    `concept { }` is walked for its diagnostics — a second one, an error inside it — so the error set
+    matches TS and Kotlin. The sugar itself is dropped. (A dimension's inline attributes are walked
+    whole, with their sugar, by `_visit_md_host`.)"""
     for p in props or ():
-        attrs_prop = getattr(p, "attributesProperty", lambda: None)()
-        if attrs_prop is not None:
-            for inline in attrs_prop.attributeDefList().attributeInline() or ():
-                _concept_sugar_of(inline.attributeDef().attributeProperty(), file, warnings, errors)
         measures_prop = getattr(p, "measuresProperty", lambda: None)()
         if measures_prop is not None:
             inline_list = measures_prop.measuresValue().measureInlineList()
@@ -2143,7 +2161,12 @@ def _visit_attribute_inline(ctx: Any, name: str, source: SourceLocation, file: s
     binding: BindingProperty | None = None
     states: tuple[str, ...] = ()
     transitions: tuple[AttributeTransition, ...] = ()
+    domain_ref: Reference | None = None
     for p in props:
+        # MD (v3.1) — `domain: md.X` on an md attribute (identity-level, for reference collection).
+        drp = p.domainRefProperty()
+        if drp is not None:
+            domain_ref = _reference_of(drp.id_(), file)
         d = p.descriptionProperty()
         if d is not None and description is None and description_localized is None:
             description, description_localized = _visit_description(d, file)
@@ -2196,6 +2219,7 @@ def _visit_attribute_inline(ctx: Any, name: str, source: SourceLocation, file: s
         lexicon=_inline_lexicon_of(props, file), binding=binding,
         states=states, transitions=transitions,
         concept=_concept_sugar_of(props, file, warnings, errors),
+        domain_ref=domain_ref,
     )
 
 
