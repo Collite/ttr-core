@@ -29,6 +29,18 @@ describe('grammar version', () => {
     }
   });
 
+  it('advertises the concept body and the cn binding body under their AST kinds (0.17)', () => {
+    expect(PROPERTY_MAP.concept.map((p) => p.name)).toEqual([
+      'description', 'label', 'tags', 'event', 'grounds', 'involves', 'period', 'extent', 'basis', 'definition', 'members',
+      'value_space', 'lexicon',
+    ]);
+    expect(PROPERTY_MAP.concept.find((p) => p.name === 'members')?.type).toBe('expression block');
+    expect(PROPERTY_MAP.conceptBinding.map((p) => p.name)).toEqual([
+      'description', 'tags', 'kind', 'role', 'quality', 'event', 'phase', 'concept', 'target', 'period',
+    ]);
+    expect(PROPERTY_MAP.conceptBinding.find((p) => p.name === 'concept')?.type).toBe('reference');
+  });
+
   it('advertises the `def schema` properties: description, tags, columns', () => {
     expect(PROPERTY_MAP.schema.map((p) => p.name)).toEqual(['description', 'tags', 'columns']);
     expect(PROPERTY_MAP.schema.find((p) => p.name === 'columns')!.type).toBe('list of column definitions');

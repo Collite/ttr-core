@@ -220,6 +220,9 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
       add('forms', def.forms && strListDoc(def.forms, true));
       add('match', qstr(def.match));
       add('text', qstr(def.text));
+      // 0.17 — the cn default sense (cn contracts §1.5).
+      add('default', b(def.default));
+      add('sense_priority', def.sensePriority === undefined ? undefined : text(String(def.sensePriority)));
       break;
   }
   return p;
@@ -343,10 +346,16 @@ function formatDefCore(def: Definition, ctx: Ctx, topLevel: boolean): Doc {
   return concat([text(header), body]);
 }
 
-const VERBATIM_KINDS = new Set(['world', 'parameter', 'action', 'service', 'approval', 'program', 'recipe']);
+// 0.17 — the cn defs and any def carrying the `concept { }` sugar stay verbatim too, until the cn
+// layout lands (CN-P1 S1.4 T2): without it the printer drops their bodies.
+const VERBATIM_KINDS = new Set(['world', 'parameter', 'action', 'service', 'approval', 'program', 'recipe', 'concept', 'conceptBinding']);
 
 function isVerbatimDef(def: Definition): boolean {
-  return VERBATIM_KINDS.has(def.kind) || (def.kind === 'role' && (def.entries?.length ?? 0) > 0);
+  return (
+    VERBATIM_KINDS.has(def.kind) ||
+    (def.kind === 'role' && (def.entries?.length ?? 0) > 0) ||
+    ('concept' in def && def.concept !== undefined)
+  );
 }
 
 function formatDef(def: Definition, ctx: Ctx, topLevel: boolean): Doc {

@@ -40,6 +40,9 @@ import type {
   GrantDef,
   DeploymentDef,
   StepDef,
+  ConceptBody,
+  ConceptSugar,
+  EmbeddedBlock,
 } from '@tatrman/parser';
 
 type Json = string | number | boolean | null | Json[] | { [k: string]: Json };
@@ -108,7 +111,8 @@ function securityStatementTree(s: SecurityStatement): Json {
 
 function defTree(d: Definition): Json {
   const out: { [k: string]: Json } = {
-    kind: KIND_KEYWORD[d.kind] ?? d.kind,
+    // 0.17 — a concept def dumps its stereotype keyword, a cn binding its binding keyword.
+    kind: d.kind === 'concept' ? d.stereotype : d.kind === 'conceptBinding' ? d.bindingKind : KIND_KEYWORD[d.kind] ?? d.kind,
     name: d.name,
     description: descOf((d as { description?: PropertyValue }).description),
     tags: (d as { tags?: string[] }).tags ?? [],
@@ -201,6 +205,7 @@ function propsOf(d: Definition): { [k: string]: Json } {
       set('semantics', semantics(d.semantics));
       set('lexicon', lexicon(d.lexicon));
       set('binding', d.binding ? binding(d.binding) : undefined);
+      set('concept', conceptSugar(d.concept));
       break;
     case 'attribute':
       if (d.type) p.type = dataType(d.type);
@@ -219,6 +224,7 @@ function propsOf(d: Definition): { [k: string]: Json } {
         for (const e of d.transitions) t[e.from] = e.to;
         p.transitions = t;
       }
+      set('concept', conceptSugar(d.concept));
       break;
     case 'relation':
       if (d.from) p.from = pv(d.from);
@@ -304,9 +310,98 @@ function propsOf(d: Definition): { [k: string]: Json } {
       if (d.forms?.length) p.forms = d.forms;
       if (d.match !== undefined) p.match = d.match;
       if (d.text !== undefined) p.text = d.text;
+      // 0.17 — the cn default sense (present-only: `default: false` dumps like no `default:`).
+      if (d.default) p.default = true;
+      if (d.sensePriority !== undefined) p.sense_priority = d.sensePriority;
+      break;
+    // 0.17 — the md hosts of the `concept { }` sugar. The md kinds dump no other property (they never
+    // did); `concept` is present-only, so every pre-0.17 md fixture dumps unchanged.
+    case 'cubelet':
+    case 'dimension':
+    case 'mdDomain':
+    case 'measure':
+      set('concept', conceptSugar(d.concept));
+      break;
+    // 0.17 — the concept defs and the cn bindings share one body.
+    case 'concept':
+    case 'conceptBinding':
+      Object.assign(p, conceptProps(d, false));
       break;
   }
   return p;
+}
+
+// ----- 0.17 cn serialisers (present-only; shared shape with ConformanceDump.kt / dump.py) -----
+
+/**
+ * A cn body as a key-sorted object keyed by the property as written (`value_space`, `is_a`, `event`).
+ * The first of a repeated key wins (the walker reports the rest). `withCommon` adds `description` /
+ * `descriptionLocalized` / `tags`, which a def dumps at its top level and the sugar has nowhere else.
+ */
+function conceptProps(b: ConceptBody, withCommon: boolean): { [k: string]: Json } {
+  const p: { [k: string]: Json } = {};
+  const seen = new Set<string>();
+  for (const prop of b.properties) {
+    if (seen.has(prop.key)) continue;
+    seen.add(prop.key);
+    switch (prop.kind) {
+      case 'description':
+        if (withCommon) {
+          if (prop.value.kind === 'localizedString') p.descriptionLocalized = { ...prop.value.entries };
+          else p.description = prop.value.value;
+        }
+        break;
+      case 'tags':
+        if (withCommon && prop.value.length) p.tags = prop.value;
+        break;
+      case 'label': {
+        const l = loc(prop.value);
+        if (l !== undefined) p.label = l;
+        break;
+      }
+      case 'ref':
+      case 'grounds':
+      case 'valueSpace':
+        p[prop.key] = prop.ref.path;
+        break;
+      case 'involves':
+        p.involves = prop.participants.map((pt) => (pt.label ? { label: pt.label, ref: pt.ref.path } : { ref: pt.ref.path }));
+        break;
+      case 'period':
+        p.period = pv(prop.value);
+        break;
+      case 'extent':
+      case 'basis':
+        p[prop.key] = prop.value;
+        break;
+      case 'definition':
+      case 'members':
+      case 'filter':
+        p[prop.key] = expressionBlock(prop.block);
+        break;
+      case 'lexicon': {
+        const l = lexicon(prop.block);
+        if (l !== undefined) p.lexicon = l;
+        break;
+      }
+      case 'target':
+        p.target = targetVal(prop.value);
+        break;
+      case 'entry':
+        p[prop.key] = pv(prop.value);
+        break;
+    }
+  }
+  return p;
+}
+
+function conceptSugar(s: ConceptSugar | undefined): Json | undefined {
+  return s ? conceptProps(s, true) : undefined;
+}
+
+/** An expression block: how it was written and its text (positions are impl-specific, never dumped). */
+function expressionBlock(b: EmbeddedBlock): Json {
+  return { form: b.form, language: b.language, text: b.text };
 }
 
 // ----- 0.16 automation serialisers (present-only; shared shape with ConformanceDump.kt / dump.py) -----

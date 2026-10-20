@@ -444,6 +444,10 @@ export interface LexiconEntryDef {
   match?: string;
   /** `text: "..."` — an example utterance. */
   text?: string;
+  /** 0.17 — `default: true`: the default sense of a bare form (cn contracts §1.5). */
+  default?: boolean;
+  /** 0.17 — `sense_priority: <int>`: higher wins (cn contracts §1.5). */
+  sensePriority?: number;
 }
 
 /**
@@ -654,6 +658,8 @@ export interface EntityDef {
   /** Inline `lexicon { … }` sugar (v4.4) — desugars to canonical `term` entries. */
   lexicon?: LexiconBlock;
   binding?: BindingProperty;
+  /** 0.17 — `concept { kind | role | event: … }`, the entity's own concept (cn contracts §1.4). */
+  concept?: ConceptSugar;
 }
 
 export interface AttributeDef {
@@ -691,6 +697,8 @@ export interface AttributeDef {
   /** 0.16 — the `states:` / `transitions:` property spans (editor-only: comment trivia + formatting). */
   statesNode?: PropertyNode;
   transitionsNode?: PropertyNode;
+  /** 0.17 — `concept { quality: … }` (er: also a value kind), the attribute's own concept (cn contracts §1.4). */
+  concept?: ConceptSugar;
 }
 
 /** A property's own span — `key: value` — carrying its comment trivia (editor-only). */
@@ -884,6 +892,8 @@ export interface MdDomainDef {
    * `publishClause` production once S0-B lands the grammar.
    */
   publishMembers?: boolean;
+  /** 0.17 — `concept { kind | role: … }`, the def's own concept (cn contracts §1.4). */
+  concept?: ConceptSugar;
 }
 
 export interface RestrictClause {
@@ -925,6 +935,8 @@ export interface DimensionDef {
   crossRefs?: CrossRef[];
   /** Inline `lexicon { … }` sugar (v4.4) — desugars to canonical `term` entries. */
   lexicon?: LexiconBlock;
+  /** 0.17 — `concept { kind | role: … }`, the def's own concept (cn contracts §1.4). */
+  concept?: ConceptSugar;
 }
 
 export interface MdMapDef {
@@ -1002,6 +1014,8 @@ export interface MeasureDef {
   crossRefs?: CrossRef[];
   /** Inline `lexicon { … }` sugar (v4.4) — desugars to canonical `term` entries. */
   lexicon?: LexiconBlock;
+  /** 0.17 — `concept { quality: … }`, the measure's own concept (cn contracts §1.4). */
+  concept?: ConceptSugar;
 }
 
 export interface AggregationSpec {
@@ -1029,6 +1043,8 @@ export interface CubeletDef {
   crossRefs?: CrossRef[];
   /** Inline `lexicon { … }` sugar (v4.4) — desugars to canonical `term` entries. */
   lexicon?: LexiconBlock;
+  /** 0.17 — `concept { event: …, involves: [ … ] }`, the cubelet's own concept (cn contracts §1.4). */
+  concept?: ConceptSugar;
 }
 
 // ============================================================================
@@ -1165,7 +1181,9 @@ export type Definition =
   | Md2ErCubeletDef
   | WorldDef
   | LexiconEntryDef
-  | AutomationDef;
+  | AutomationDef
+  | ConceptDef
+  | ConceptBindingDef;
 
 // ============================================================================
 // Document / parse result
@@ -1509,6 +1527,222 @@ export interface StepDef extends AutoBody {
   kind: 'step';
   name: string;
   source: SourceLocation;
+}
+
+// ============================================================================
+// 0.17 — the conceptual model (`model cn`; CN-P1 S1.2, cn contracts §1). The concept defs, the
+// `concept { }` sugar and the cn bindings share one body shape: every property in authored order,
+// one node each (its key as written, its span, its comment trivia) — typed where the grammar
+// types it, a free-form `entry` otherwise. Which property is legal where, required properties,
+// enums and references are semantic (CN-P2); the parser stays mechanical.
+// ============================================================================
+
+/**
+ * The concept stereotypes — the def keyword of a concept def. A `def role` in a `model cn` file is
+ * a concept role (⚑CN-P6: one `roleDef` production; the walker reads it by the file's model).
+ */
+export type ConceptStereotype = 'kind' | 'role' | 'event' | 'phase' | 'quality' | 'relation_type';
+
+/** The ten cn binding kinds (`model binding`) — one grounding per concept (cn contracts §1.2). */
+export type ConceptBindingKind =
+  | 'cn2md_kind'
+  | 'cn2md_role'
+  | 'cn2md_quality'
+  | 'cn2md_event'
+  | 'cn2er_kind'
+  | 'cn2er_role'
+  | 'cn2er_event'
+  | 'cn2er_quality'
+  | 'cn2er_phase'
+  | 'cn2db_concept';
+
+/** The stereotype-ref keys (`event: Order` on a role · `kind: Invoice` in the sugar · `kind: cn.Item` on a binding). */
+export type ConceptRefKey = 'kind' | 'role' | 'quality' | 'event' | 'phase' | 'concept';
+
+/** The expression languages an {@link EmbeddedBlock} may carry — TTR-P's expression grammar (`pl`). */
+export type ExpressionLanguage = 'pl';
+
+/**
+ * An expression block — the value of `definition:` / `members:` and of a binding's `filter:`
+ * (⚑CN-P5, CN-D28). The parser keeps the text and its exact place in the file; the expression is
+ * parsed by TTR-P (`parseExpression`) in the semantics layer, never here. `text` follows the
+ * `definitionSql` rules: a `"…"` string is unescaped, a `"""…"""` block is dedented, a `"""pl␊…"""`
+ * block has its tag peeled, is dedented and loses exactly one closing newline.
+ */
+export interface EmbeddedBlock {
+  kind: 'embeddedBlock';
+  language: ExpressionLanguage;
+  /** How it was written: `"…"`, `"""…"""` or `"""pl␊…"""`. */
+  form: 'string' | 'tripleString' | 'tagged';
+  text: string;
+  /** Where `text` sits in the file: from its first character to one past its last. */
+  textSource: SourceLocation;
+  /** File offset of the first character of every line of `text` (the dedent removed the indent before it). */
+  lineOffsets: number[];
+  /** The indent the dedent removed from each line of `text` after the first. */
+  indentWidth: number;
+  /** The whole literal. */
+  source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
+}
+
+/** One `involves:` participant — a concept ref, optionally labelled (`Warehouse as from`). */
+export interface ConceptParticipant {
+  ref: Reference;
+  label?: string;
+  source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
+}
+
+interface ConceptPropertyBase {
+  /** The key as written (`value_space`, `event`, `is_a`, …) — the formatter's handle. */
+  key: string;
+  /** The whole `key: value` property. */
+  source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
+}
+
+export interface ConceptDescriptionProperty extends ConceptPropertyBase {
+  kind: 'description';
+  value: StringValue | TripleStringValue | LocalizedString;
+}
+export interface ConceptLabelProperty extends ConceptPropertyBase {
+  kind: 'label';
+  value: LocalizedString;
+}
+export interface ConceptTagsProperty extends ConceptPropertyBase {
+  kind: 'tags';
+  value: string[];
+}
+/** A stereotype ref — `key` says which (`event`, `kind`, …). */
+export interface ConceptRefProperty extends ConceptPropertyBase {
+  kind: 'ref';
+  key: ConceptRefKey;
+  ref: Reference;
+}
+export interface ConceptGroundsProperty extends ConceptPropertyBase {
+  kind: 'grounds';
+  ref: Reference;
+}
+export interface ConceptInvolvesProperty extends ConceptPropertyBase {
+  kind: 'involves';
+  participants: ConceptParticipant[];
+}
+/** `period: { start: …, end: …, end_open: … }` | `{ at: …, precision: … }` — kept structural. */
+export interface ConceptPeriodProperty extends ConceptPropertyBase {
+  kind: 'period';
+  value: ObjectValue;
+}
+export interface ConceptExtentProperty extends ConceptPropertyBase {
+  kind: 'extent';
+  value: string;
+}
+export interface ConceptBasisProperty extends ConceptPropertyBase {
+  kind: 'basis';
+  value: string;
+}
+export interface ConceptValueSpaceProperty extends ConceptPropertyBase {
+  kind: 'valueSpace';
+  ref: Reference;
+}
+/** `definition:` — a defined quality's or phase's expression. */
+export interface ConceptDefinitionProperty extends ConceptPropertyBase {
+  kind: 'definition';
+  block: EmbeddedBlock;
+}
+/** `members:` — a member-restricted sub-kind's expression. */
+export interface ConceptMembersProperty extends ConceptPropertyBase {
+  kind: 'members';
+  block: EmbeddedBlock;
+}
+/** A binding's `filter:` — the series selector of a valued state (A-CN-18). */
+export interface ConceptFilterProperty extends ConceptPropertyBase {
+  kind: 'filter';
+  block: EmbeddedBlock;
+}
+/** The inline `lexicon { … }` sugar (the 4.4 mechanism; a `cn.*` target). */
+export interface ConceptLexiconProperty extends ConceptPropertyBase {
+  kind: 'lexicon';
+  block: LexiconBlock;
+}
+/** A binding's `target:`. */
+export interface ConceptTargetProperty extends ConceptPropertyBase {
+  kind: 'target';
+  value: ObjectValue | Reference;
+}
+/**
+ * A free-form property — `of`, `is_a`, `sources`, `qualities`, `relations`, `hierarchy`,
+ * `imprecision`, `valued_state`, `abstract`, a binding's `participants` / `via`, … — with its value
+ * kept structural (an object stays an object, a list a list).
+ */
+export interface ConceptEntry extends ConceptPropertyBase {
+  kind: 'entry';
+  value: PropertyValue;
+}
+
+export type ConceptProperty =
+  | ConceptDescriptionProperty
+  | ConceptLabelProperty
+  | ConceptTagsProperty
+  | ConceptRefProperty
+  | ConceptGroundsProperty
+  | ConceptInvolvesProperty
+  | ConceptPeriodProperty
+  | ConceptExtentProperty
+  | ConceptBasisProperty
+  | ConceptValueSpaceProperty
+  | ConceptDefinitionProperty
+  | ConceptMembersProperty
+  | ConceptFilterProperty
+  | ConceptLexiconProperty
+  | ConceptTargetProperty
+  | ConceptEntry;
+
+/**
+ * The shared cn body. `properties` holds every property in authored order — a repeated key stays in
+ * the list (the walker reports it; the accessors in `concept.ts` read the first). `description`,
+ * `descriptionLocalized`, `tags` and `label` repeat the first such property's value, the way every
+ * other def carries them.
+ */
+export interface ConceptBody {
+  properties: ConceptProperty[];
+  description?: StringValue | TripleStringValue;
+  descriptionLocalized?: LocalizedString;
+  tags?: string[];
+  label?: LocalizedString;
+}
+
+/** `def kind | role | event | phase | quality | relation_type <id> { … }` in a `model cn` file. */
+export interface ConceptDef extends ConceptBody {
+  /** One discriminator for every stereotype — `kind: 'role'` is the cnc / automation {@link RoleDef}. */
+  kind: 'concept';
+  stereotype: ConceptStereotype;
+  name: string;
+  source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
+}
+
+/** `concept { … }` inside a cubelet, dimension, domain, measure, entity or attribute (cn contracts §1.4). */
+export interface ConceptSugar extends ConceptBody {
+  kind: 'conceptSugar';
+  /** The whole `concept { … }` property. */
+  source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
+}
+
+/** `def cn2md_* | cn2er_* | cn2db_concept <id> { … }` in a `model binding` file. */
+export interface ConceptBindingDef extends ConceptBody {
+  kind: 'conceptBinding';
+  bindingKind: ConceptBindingKind;
+  name: string;
+  source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
 }
 
 export interface Document {

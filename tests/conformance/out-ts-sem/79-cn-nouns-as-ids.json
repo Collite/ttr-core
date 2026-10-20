@@ -1,0 +1,38 @@
+{
+    "diagnostics": [
+        "ttr/unresolved-reference"
+    ],
+    "resolved": [
+        "db.dbo.concept.as => hartland.concepts.db.dbo.table.concept.as"
+    ],
+    "symbols": [
+        "hartland.concepts.db.dbo.fk.fk_concept_as",
+        "hartland.concepts.db.dbo.table.concept",
+        "hartland.concepts.db.dbo.table.concept.as",
+        "hartland.concepts.db.dbo.table.concept.basis",
+        "hartland.concepts.db.dbo.table.concept.cn",
+        "hartland.concepts.db.dbo.table.concept.cn2db_concept",
+        "hartland.concepts.db.dbo.table.concept.cn2er_event",
+        "hartland.concepts.db.dbo.table.concept.cn2er_kind",
+        "hartland.concepts.db.dbo.table.concept.cn2er_phase",
+        "hartland.concepts.db.dbo.table.concept.cn2er_quality",
+        "hartland.concepts.db.dbo.table.concept.cn2er_role",
+        "hartland.concepts.db.dbo.table.concept.cn2md_event",
+        "hartland.concepts.db.dbo.table.concept.cn2md_kind",
+        "hartland.concepts.db.dbo.table.concept.cn2md_quality",
+        "hartland.concepts.db.dbo.table.concept.cn2md_role",
+        "hartland.concepts.db.dbo.table.concept.concept",
+        "hartland.concepts.db.dbo.table.concept.default",
+        "hartland.concepts.db.dbo.table.concept.definition",
+        "hartland.concepts.db.dbo.table.concept.event",
+        "hartland.concepts.db.dbo.table.concept.extent",
+        "hartland.concepts.db.dbo.table.concept.grounds",
+        "hartland.concepts.db.dbo.table.concept.involves",
+        "hartland.concepts.db.dbo.table.concept.period",
+        "hartland.concepts.db.dbo.table.concept.phase",
+        "hartland.concepts.db.dbo.table.concept.quality",
+        "hartland.concepts.db.dbo.table.concept.relation_type",
+        "hartland.concepts.db.dbo.table.concept.sense_priority",
+        "hartland.concepts.db.dbo.table.concept.value_space"
+    ]
+}

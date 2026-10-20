@@ -1,0 +1,170 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "cubelet",
+            "name": "storeReturns",
+            "properties": {
+                "concept": {
+                    "event": "Return",
+                    "involves": [
+                        {
+                            "ref": "Customer"
+                        },
+                        {
+                            "ref": "Item"
+                        },
+                        {
+                            "ref": "ReturnReason"
+                        }
+                    ]
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "dimension",
+            "name": "Product",
+            "properties": {
+                "concept": {
+                    "kind": "Item",
+                    "label": {
+                        "en": "Product"
+                    }
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "mdDomain",
+            "name": "ReasonCode",
+            "properties": {
+                "concept": {
+                    "kind": "ReturnReason"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "measure",
+            "name": "returnAmount",
+            "properties": {
+                "concept": {
+                    "quality": "return_amount"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "entity",
+            "name": "invoice",
+            "properties": {
+                "attributes": [
+                    {
+                        "description": null,
+                        "kind": "attribute",
+                        "name": "invoice_id",
+                        "properties": {
+                            "isKey": true,
+                            "type": {
+                                "name": "int"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "attribute",
+                        "name": "status",
+                        "properties": {
+                            "concept": {
+                                "quality": "invoice_status"
+                            },
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    }
+                ],
+                "concept": {
+                    "kind": "Invoice"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "entity",
+            "name": "order",
+            "properties": {
+                "concept": {
+                    "event": "Order",
+                    "period": {
+                        "entries": {
+                            "end": {
+                                "kind": "id",
+                                "parts": [
+                                    "delivered_date"
+                                ],
+                                "path": "delivered_date"
+                            },
+                            "start": {
+                                "kind": "id",
+                                "parts": [
+                                    "placed_date"
+                                ],
+                                "path": "placed_date"
+                            }
+                        },
+                        "kind": "object"
+                    }
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "entity",
+            "name": "customer",
+            "properties": {
+                "concept": {
+                    "event": "Order",
+                    "role": "Customer"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "entity",
+            "name": "channel_sales",
+            "properties": {
+                "attributes": [
+                    {
+                        "description": null,
+                        "kind": "attribute",
+                        "name": "channel",
+                        "properties": {
+                            "concept": {
+                                "kind": "Channel"
+                            },
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    }
+                ]
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": "hartland.concepts",
+    "schemaDirective": null
+}

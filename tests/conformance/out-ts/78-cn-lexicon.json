@@ -1,0 +1,105 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "term",
+            "name": "customer",
+            "properties": {
+                "default": true,
+                "for": "cn.Customer",
+                "forms": [
+                    "customer",
+                    "customers",
+                    "client"
+                ]
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "term",
+            "name": "debtor",
+            "properties": {
+                "for": "cn.DebtorCustomer",
+                "forms": [
+                    "debtor",
+                    "customer with overdue invoices"
+                ],
+                "sense_priority": 2
+            },
+            "tags": []
+        },
+        {
+            "description": "a phase never takes the bare form (cn/phase-as-default)",
+            "kind": "term",
+            "name": "customer_phase",
+            "properties": {
+                "for": "cn.DebtorCustomer",
+                "forms": [
+                    "customer"
+                ],
+                "sense_priority": 1
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "term",
+            "name": "revenue",
+            "properties": {
+                "default": true,
+                "for": "cn.revenue",
+                "forms": [
+                    "revenue",
+                    "sales"
+                ],
+                "sense_priority": 3
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "term",
+            "name": "channel",
+            "properties": {
+                "for": "cn.Channel",
+                "forms": [
+                    "channel",
+                    "sales channel"
+                ]
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "term",
+            "name": "product",
+            "properties": {
+                "for": "md.Product",
+                "forms": [
+                    "product"
+                ]
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "example",
+            "name": "web_revenue",
+            "properties": {
+                "default": true,
+                "for": "cn.WebSale",
+                "sense_priority": 1,
+                "text": "revenue on the web last month"
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": null,
+    "schemaDirective": {
+        "code": "lexicon",
+        "locale": "en",
+        "namespace": null
+    }
+}
