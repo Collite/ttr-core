@@ -28,6 +28,7 @@ object RecipeConformCli {
         asOf: LocalDateTime,
         tolerances: Map<String, Double>,
         env: Map<String, String>,
+        numericDeltas: Map<String, Double> = emptyMap(),
         echo: (String) -> Unit,
     ): Int {
         if (fixtures.isEmpty()) {
@@ -52,7 +53,7 @@ object RecipeConformCli {
                         }
                     }
             }
-            val conform = RecipeConform(tolerances)
+            val conform = RecipeConform(tolerances, numericDeltas)
             val runs = opened.map { conform.runOn(it, plan, asOf) }
             if (runs.size == 1) {
                 val run = runs.single()

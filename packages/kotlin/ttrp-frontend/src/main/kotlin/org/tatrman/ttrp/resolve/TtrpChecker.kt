@@ -777,7 +777,7 @@ class TtrpChecker(
         val onArg = op.args.firstOrNull { it.name == "on" }
         val rel = onArg?.value as? RelationArg
         if (rel != null) {
-            resolveRelation(rel, left, right, ctx)
+            resolveRelation(rel, left, right, ctx, portRows = { v -> v?.let { scope[it] } })
         }
         val leftCols = left?.let { scope[it] }
         val rightCols = right?.let { scope[it] }
@@ -789,6 +789,8 @@ class TtrpChecker(
         leftVar: String?,
         rightVar: String?,
         ctx: Ctx,
+        /** A side's rows by its variable, when the scope knows them (review-119 m5: the port side's columns). */
+        portRows: (String?) -> List<Column>? = { null },
     ) {
         val name = rel.qname.parts.last()
         val relations = modelIndex?.findRelations(name, ctx.imports) ?: emptyList()
@@ -846,6 +848,29 @@ class TtrpChecker(
                         rel.location,
                     )
                 return
+            }
+            // The port side's rows must carry the attributes the relation joins on (review-119 m5) — else they are
+            // not the relation's other entity, and the condition would read whatever column has the name.
+            if (portSide != null) {
+                val cols = portRows(if (portSide == "left") leftVar else rightVar)?.map { it.name }?.toSet()
+                val portEntity = (if (portSide == "left") leftEntity else rightEntity).qname.name
+                val attrs =
+                    match.joinPairs.map { p ->
+                        (if (match.fromEntity.name == portEntity) p.fromAttr else p.toAttr).name.substringAfterLast('.')
+                    }
+                val missing = attrs.filter { cols != null && it !in cols }
+                if (missing.isNotEmpty()) {
+                    ctx.diags +=
+                        diag(
+                            TtrpDiagnosticId.RES_004,
+                            "`on: relation $name` joins the $portSide rows as `${portEntity.substringAfterLast(
+                                '.',
+                            )}`, " +
+                                "but they carry no `${missing.joinToString("`, `")}` — write the `on:` condition",
+                            rel.location,
+                        )
+                    return
+                }
             }
             synthesizeJoinCondition(match, leftEntity, rightEntity, rel, ctx, portSide)
         }

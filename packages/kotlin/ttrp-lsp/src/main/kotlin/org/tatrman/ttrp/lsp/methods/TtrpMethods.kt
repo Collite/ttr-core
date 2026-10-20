@@ -220,7 +220,15 @@ class TtrpMethods(
             // time — the pipeline's), each finding named by the recipe block it sits in.
             val diagnostics =
                 if (recipe != null) {
-                    TtrpPipeline(ctx.manifest, ctx.modelsRoot).plan(text, fileNameOf(uri)).diagnostics
+                    val plan = TtrpPipeline(ctx.manifest, ctx.modelsRoot).plan(text, fileNameOf(uri))
+                    // and what the build would refuse — an island that does not compile (review-119 M5)
+                    plan.diagnostics +
+                        if (plan.ok) {
+                            org.tatrman.ttrp.bundle.RecipeBundleCheck
+                                .check(plan)
+                        } else {
+                            emptyList()
+                        }
                 } else {
                     report.diagnostics
                 }

@@ -174,7 +174,8 @@ object AuthoringContextBuilder {
                     add(
                         JsonObject().apply {
                             addProperty("name", it.qname.name)
-                            addNullable("type", it.type)
+                            // an executor declared by `extends:` is of that type (n8n_l1, camunda_8 — review-119 m2)
+                            addNullable("type", it.type ?: it.extendsRef)
                             addNullable("version", it.version)
                         },
                     )
@@ -581,8 +582,10 @@ object AuthoringContextBuilder {
                     "an optional `window { by: …, over: … }`), one `decision <name>(in …)` ending in " +
                     "`<row> -> switch { mode: exclusive | overlapping, <route>: <condition> because: \"…{column}…\" " +
                     "detail: <context>, …, else: <route> | none }`, and `actions { <decision>.<route>, … -> " +
-                    "<action> { column: value, … } when <condition> }`. `:as_of` is the run's instant; `:name` a " +
-                    "parameter; durations `30 days`, `2 working_days`, `days(:param)`.",
+                    "<action> { column: value, … } when: <condition> }`. `:as_of` is the run's instant; `:name` a " +
+                    "parameter. A duration is `30 days` / `2 working_days` in a header or a wiring value, and " +
+                    "`days(30)` / `days(:param)` in an expression (`:as_of - days(30)`); the door does no other date " +
+                    "arithmetic — count days with `age(since: …)` / `working_days(between: …, and: …)` in a calc.",
             )
             add("roles", strings(listOf("candidates", "context", "decision")))
             add("islandForms", strings(listOf("target", "builtin", "foreign", "call", "turn")))

@@ -52,14 +52,7 @@ object RecipeCatalogEmitter {
                 append("    contexts: ${list(model.contexts.map { it.name })},\n")
                 model.decision?.let { append("    decision: $it,\n") }
                 append("    routes: ${list(model.routes.map { it.name })},\n")
-                append(
-                    "    kinds: ${list(
-                        model.contexts
-                            .map { it.kind }
-                            .distinct()
-                            .map { str(it) },
-                    )},\n",
-                )
+                append("    kinds: ${list(model.kinds.map { str(it) })},\n")
                 append("    mode: ${str(model.mode.spelling)},\n")
                 document?.let { append("    document: ${str(it)},\n") }
                 append(

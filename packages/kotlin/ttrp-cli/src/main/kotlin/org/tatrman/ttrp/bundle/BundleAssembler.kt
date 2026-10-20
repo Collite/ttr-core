@@ -56,6 +56,17 @@ class BundleAssembler(
     // to target Kestra/Airflow (PL-P5.S3/S4). Core still writes manifest.json / islands / transfers / schemas.
     private val emitPlugin: TtrEmitPlugin = EmitPluginLoader.builtin("bash"),
 ) {
+    /**
+     * The build refused: the program (or a recipe island) has errors — every diagnostic of the compile, so `ttrp
+     * build --json` prints them structured (review-119 M8). An [IllegalArgumentException], as `require` threw before.
+     */
+    class BundleRefused(
+        val diagnostics: List<org.tatrman.ttrp.diagnostics.TtrpDiagnostic>,
+    ) : IllegalArgumentException(
+            "cannot build a bundle from a program with errors: " +
+                diagnostics.filter { it.severity.name == "ERROR" }.joinToString { it.render() },
+        )
+
     data class BundleResult(
         val dir: Path,
         val manifest: RunManifest,
@@ -113,12 +124,14 @@ class BundleAssembler(
                 modelsRoot,
                 memberCatalog = memberCatalog,
             ).plan(source, fileName, targetOverrides)
-        require(plan.ok && plan.graph != null && plan.exec != null && plan.bound != null) {
-            "cannot build a bundle from a program with errors: " +
-                plan.diagnostics.filter { it.severity.name == "ERROR" }.joinToString { it.render() }
+        if (!(plan.ok && plan.graph != null && plan.exec != null && plan.bound != null)) {
+            throw BundleRefused(plan.diagnostics)
         }
         // AU-core-P2: a recipe builds into a recipe bundle (contracts §5.2) — its statements, manifest v3, the catalog.
         if (plan.recipe != null) {
+            // every island compiled first: what does not, refused as diagnostics (review-119 M5/M8), not one exception
+            val refused = RecipeBundleCheck.check(plan)
+            if (refused.isNotEmpty()) throw BundleRefused(plan.diagnostics + refused)
             return RecipeBundleAssembler(
                 toolchainVersion,
             ).assemble(plan, fileName, outDir).copy(diagnostics = plan.diagnostics)

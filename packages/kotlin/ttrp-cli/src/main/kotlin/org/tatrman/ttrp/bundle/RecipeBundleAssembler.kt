@@ -97,7 +97,8 @@ class RecipeBundleAssembler(
                 .filter { s ->
                     model.routes.any { r -> r.detail.any { s.port == SwitchLowering.detailPort(r.name, it) } }
                 }.flatMap { s -> s.columns.map { it.name } }
-                .filter { it !in model.keyColumns && it != SwitchLowering.ROUTE && it != SwitchLowering.CONTEXT }
+                // the detail entity's own columns win: a context's `run` / `row_no` is not stored twice (review-119 m4)
+                .filter { it !in model.keyColumns && it !in DETAIL_OWN }
                 .distinct()
                 .sorted()
         val detailColumns =
@@ -145,14 +146,10 @@ class RecipeBundleAssembler(
                         decision = model.decision,
                         routes = model.routes.map { RecipeRoute(it.name, it.because, it.detail, it.turnFed) },
                         switchMode = model.switchMode,
-                        elseRoute = model.routes.firstOrNull { it.isElse }?.name,
+                        elseRoute = model.routes.firstOrNull { it.isElse }?.name ?: "none".takeIf { model.elseNone },
                     ),
                 wiring = model.wirings.map { RecipeWiring(it.routes, it.action, it.columns, it.whenText) },
-                kinds =
-                    model.contexts
-                        .map { it.kind }
-                        .distinct()
-                        .sorted(),
+                kinds = model.kinds,
                 mode = model.mode.spelling,
                 windows =
                     model.contexts.mapNotNull { c ->
@@ -194,18 +191,18 @@ class RecipeBundleAssembler(
     }
 
     /**
-     * A recipe output carries the key (AU-C-3: the runner filters it on the run's key) when its rows are per candidate:
-     * the candidates', a per-candidate context's, every route and every detail. A lookup or a set-level context's do not.
+     * A recipe output carries the key (AU-C-3: the runner filters it on the run's key) when its rows are per candidate
+     * — the candidates', a per-candidate context's, every route and every detail — and it has every key column by
+     * name (the checker refuses a per-candidate output without them, REC-004). A lookup or a set-level context's
+     * rows are not keyed.
      */
     private fun keyed(
         model: RecipeModel,
         s: RecipeStatement,
     ): Boolean {
+        val carries = model.keyColumns.all { k -> s.columns.any { it.name == k } }
         val context = model.contexts.firstOrNull { it.name == s.island }
-        return when {
-            context != null -> context.contextClass == ContextClass.PER_CANDIDATE
-            else -> model.keyColumns.all { k -> s.columns.any { it.name == k } }
-        }
+        return carries && (context == null || context.contextClass == ContextClass.PER_CANDIDATE)
     }
 
     /** The key columns' types, from the candidates' statement (the key attribute's type), else text. */
@@ -279,6 +276,8 @@ class RecipeBundleAssembler(
         }
 
     private companion object {
+        /** The columns `<recipe>_verdict_detail` writes itself (besides the key). */
+        val DETAIL_OWN = setOf("run", SwitchLowering.ROUTE, SwitchLowering.CONTEXT, "row_no")
         const val NATIVE = "native"
         const val SQL_TEXT = "sql-text"
         const val ER = "er"

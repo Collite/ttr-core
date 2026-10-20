@@ -155,6 +155,13 @@ enum class TtrpDiagnosticId(
         "write the decision as a canonical body ending in a `switch`; SQL, foreign code, services and agents " +
             "belong in a `context`",
     ),
+
+    // ---- AU-core-P2 — the recipe compile (review-119 M5): what `ttrp build` refuses, `check` and validate say ----
+    REC_080(
+        "TTRP-REC-080",
+        "the island's output does not compile to a statement the door runs — restate it with what the message " +
+            "names (a column the row carries, a whole-WHERE `IN`/`EXISTS`, a `target` island)",
+    ),
     PRS_007(
         "TTRP-PRS-007",
         "a recipe's shape: `recipe { }` is top-level only, a `target` role container needs a body, and a wiring " +

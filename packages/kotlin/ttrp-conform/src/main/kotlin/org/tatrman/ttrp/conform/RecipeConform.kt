@@ -298,6 +298,11 @@ class PostgresRecipeEngine(
  */
 class RecipeConform(
     private val tolerances: Map<String, Double> = emptyMap(),
+    /**
+     * Declared engine numeric deltas, `<output>/<column>` (one output) or `<column>` (every output) → tolerance — the
+     * columns one engine computes in DECIMAL and another in DOUBLE ([SevenPointComparator]'s `numericDeltas`).
+     */
+    private val numericDeltas: Map<String, Double> = emptyMap(),
 ) {
     /** One engine's run: every output (`island.port`) read, or the statement and the engine's refusal. */
     data class EngineRun(
@@ -336,8 +341,12 @@ class RecipeConform(
         }
         val reference = runs.first()
         val reports = linkedMapOf<String, ConformReport>()
-        val comparator = SevenPointComparator(tolerances = tolerances)
         for ((out, table) in reference.outputs) {
+            val deltas =
+                numericDeltas
+                    .filterKeys { '/' !in it || it.substringBefore('/') == out }
+                    .mapKeys { it.key.substringAfter('/') }
+            val comparator = SevenPointComparator(tolerances = tolerances, numericDeltas = deltas)
             for (other in runs.drop(1)) {
                 val theirs =
                     other.outputs[out]

@@ -12,7 +12,8 @@ import org.tatrman.ttrp.diagnostics.TtrpDiagnostic
 
 /**
  * `ttrp build --json` (AU-core-P2, contracts §9): `{ "bundle": <dir>, "manifest": <manifest.json>, "diagnostics": [ … ] }`
- * on success; `{ "error": <message> }` when the build refuses (its errors are in the message, as on stderr).
+ * on success; `{ "diagnostics": [ … ] }` when the build refuses — every diagnostic of the compile, an emit failure as
+ * one with its TTRP-EMT id (review-119 M8). A diagnostic is `{ id, severity, message, file, line, column }`.
  */
 object BuildJson {
     private val pretty = Json { prettyPrint = true }
@@ -27,8 +28,34 @@ object BuildJson {
             },
         )
 
-    fun failure(message: String): String =
-        pretty.encodeToString(JsonObject.serializer(), buildJsonObject { put("error", message) })
+    fun failure(diagnostics: List<TtrpDiagnostic>): String =
+        pretty.encodeToString(
+            JsonObject.serializer(),
+            buildJsonObject { put("diagnostics", JsonArray(diagnostics.map { diagnostic(it) })) },
+        )
+
+    /** An emit failure (no checker id): its TTRP-EMT code, at its location when it has one. */
+    fun failure(e: org.tatrman.ttrp.emit.TtrpEmitException): String =
+        pretty.encodeToString(
+            JsonObject.serializer(),
+            buildJsonObject {
+                put(
+                    "diagnostics",
+                    JsonArray(
+                        listOf(
+                            buildJsonObject {
+                                put("id", e.id.code)
+                                put("severity", "ERROR")
+                                put("message", e.message ?: e.detail)
+                                put("file", JsonPrimitive(e.location?.file))
+                                put("line", JsonPrimitive(e.location?.line))
+                                put("column", JsonPrimitive(e.location?.column))
+                            },
+                        ),
+                    ),
+                )
+            },
+        )
 
     private fun diagnostic(d: TtrpDiagnostic) =
         buildJsonObject {

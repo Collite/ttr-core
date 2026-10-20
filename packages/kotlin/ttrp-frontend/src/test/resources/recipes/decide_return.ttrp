@@ -1,8 +1,6 @@
 // decide_return.ttrp — derived from handling-a-return-request.md §Deciding
 // AU-core-P0 shared fixture: AU design `17` §4.1, verbatim but for the TTR-P comment marker (`#` → `//`).
-// F2: `return_share` is restated without scalar subqueries (TTR-SQL has none, TTRP-SQL-006) — see there. Its share is
-// rounded to 2 places (AU-core-P2 · S2.4): `because:` prints it, and an unrounded ratio prints an engine's own digits
-// (Postgres NUMERIC 20, DuckDB DOUBLE 16).
+// F2: `return_share` is restated without scalar subqueries (TTR-SQL has none, TTRP-SQL-006) — see there.
 // F3 (AU-core-P1 S1.3 T7): 17's `:as_of - 365` is `:as_of - days(365)` — an integer next to a date is read as
 // days with a warning; a duration in an expression is a call.
 uses world "hartland.worlds.demo"
@@ -50,7 +48,7 @@ recipe {
             WHERE  s.sold_date >= :as_of - days(365)
             GROUP  BY s.customer
         )
-        SELECT q.line_id, ROUND(COALESCE(r.returned_value, 0) / NULLIF(b.bought_value, 0), 2) AS share
+        SELECT q.line_id, COALESCE(r.returned_value, 0) / NULLIF(b.bought_value, 0) AS share
         FROM   lines q
         LEFT JOIN returned r ON r.customer = q.customer
         LEFT JOIN bought   b ON b.customer = q.customer

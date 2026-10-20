@@ -14,7 +14,7 @@ import java.net.URI
  * the keys [RecipePlanted] holds — the switch lowering, the detail joins, `latest`, the calendar counts and the derived
  * `:as_of` values, against the data. Then the same recipe on embedded DuckDB, every output compared with Postgres's
  * on the seven points ([RecipeConform]): DuckDB is Postgres-equal — but for a decimal ratio, which DuckDB divides in
- * DOUBLE (no exact decimal division), held to the declared [RecipePlanted.TOLERANCES].
+ * DOUBLE (no exact decimal division), held to the declared [RecipePlanted.NUMERIC_DELTAS].
  *
  * Gated by `TTRP_CONFORM_PG=1`; the server from `TTR_CONN_ERP_PG` (`postgresql://user:pass@host:port/db`), else the
  * local ttrp-pg container (`spike.pg.*`, localhost:55432). It creates and drops its own database.
@@ -53,7 +53,7 @@ class RecipeLivePgSpec :
 
             test("$recipe: DuckDB equals Postgres on every output (the seven points)").config(enabled = enabled) {
                 val plan = RecipePlanted.plan(recipe)
-                val conform = RecipeConform(RecipePlanted.TOLERANCES)
+                val conform = RecipeConform(numericDeltas = RecipePlanted.NUMERIC_DELTAS)
                 val outcome =
                     conform.compare(
                         listOf(

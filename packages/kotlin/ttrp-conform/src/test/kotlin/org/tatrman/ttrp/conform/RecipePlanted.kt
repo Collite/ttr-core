@@ -20,11 +20,11 @@ object RecipePlanted {
     val RECIPES = listOf("release_order.ttrp", "decide_return.ttrp", "monitor_inbound.ttrp", "settle.ttrp")
 
     /**
-     * The declared engine deltas: decide_return's `return_share.share` is a decimal ÷ decimal, which Postgres keeps in
-     * NUMERIC (20 digits) and DuckDB computes in DOUBLE — equal to 1e-12, the route it feeds (`share > :abuse_share`)
-     * the same on both.
+     * The declared engine deltas: decide_return's `share` is a decimal ÷ decimal, which Postgres keeps in NUMERIC (20
+     * digits) and DuckDB computes in DOUBLE — equal to 1e-12, in `return_share.rows` and every route's rows that carry
+     * it; the route it feeds (`share > :abuse_share`) and its `because:` text (4 places, ⚑AU-C-9) are the same on both.
      */
-    val TOLERANCES = mapOf("share" to 1e-12)
+    val NUMERIC_DELTAS = mapOf("share" to 1e-12)
 
     private fun locate(rel: String): Path {
         var dir: Path? = Path.of("").toAbsolutePath()
@@ -99,7 +99,8 @@ object RecipePlanted {
                 r.getValue("verdict.hold_ar").single()["route"] shouldBe "hold_ar"
             }
             "decide_return.ttrp" -> {
-                keys(r["way.reject_not_ours"], "line_id") shouldContainExactlyInAnyOrder listOf(903)
+                // 907: order 11 is delivered and its customer's, but carries no item 103 (review-119 B1)
+                keys(r["way.reject_not_ours"], "line_id") shouldContainExactlyInAnyOrder listOf(903, 907)
                 keys(r["way.reject_late"], "line_id") shouldContainExactlyInAnyOrder listOf(902)
                 keys(r["way.reject_abuse"], "line_id") shouldContainExactlyInAnyOrder listOf(906)
                 keys(r["way.to_customer_care"], "line_id") shouldContainExactlyInAnyOrder listOf(905)

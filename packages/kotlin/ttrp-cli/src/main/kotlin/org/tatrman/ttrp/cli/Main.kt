@@ -129,13 +129,18 @@ class BuildCommand : CliktCommand(name = "build") {
                     err = true,
                 )
                 throw ProgramResult(1)
+            } catch (e: BundleAssembler.BundleRefused) {
+                if (json) echo(BuildJson.failure(e.diagnostics))
+                echo(e.message ?: "build failed", err = true)
+                throw ProgramResult(1)
             } catch (e: IllegalArgumentException) {
-                if (json) echo(BuildJson.failure(e.message ?: "build failed"))
+                if (json) echo(BuildJson.failure(emptyList()))
                 echo(e.message ?: "build failed", err = true)
                 throw ProgramResult(1)
             } catch (e: org.tatrman.ttrp.emit.TtrpEmitException) {
                 // An emit-time failure (a node an engine cannot run, a translator refusal) is a diagnostic,
                 // not a crash: print the TTRP-EMT line (+ its suggestion) and exit 1.
+                if (json) echo(BuildJson.failure(e))
                 echo(e.message ?: "build failed", err = true)
                 e.suggestedAlternative?.let { echo("  ↳ suggested: $it", err = true) }
                 throw ProgramResult(1)
@@ -206,6 +211,10 @@ class ConformCommand : CliktCommand(name = "conform") {
     )
     private val fixture by option("--fixture", help = "a recipe's fixture script (SQL), loaded in order").multiple()
     private val asOf by option("--as-of", help = "a recipe's :as_of, an ISO local date-time (2026-11-02T08:00)")
+    private val engineDelta by option(
+        "--engine-delta",
+        help = "a recipe column one engine computes in DECIMAL and another in DOUBLE, [<output>/]<col>=<eps>",
+    ).multiple()
 
     override fun run() {
         val abs = Path.of(file).toAbsolutePath()
@@ -214,10 +223,18 @@ class ConformCommand : CliktCommand(name = "conform") {
             throw ProgramResult(2)
         }
         val manifestResult = TtrpManifestReader.resolve(abs.parent ?: abs)
-        val recipePlan =
-            TtrpPipeline(manifestResult.manifest, manifestResult.manifest.modelsRoot())
-                .plan(Files.readString(abs), abs.toString())
-                .takeIf { it.ok && it.recipe != null }
+        val source = Files.readString(abs)
+        val planned =
+            TtrpPipeline(
+                manifestResult.manifest,
+                manifestResult.manifest.modelsRoot(),
+            ).plan(source, abs.toString())
+        // a recipe with errors reports them — never the placement-variant path (review-119 m11)
+        if (!planned.ok && (planned.recipe != null || RECIPE_BLOCK.containsMatchIn(source))) {
+            planned.diagnostics.filter { it.severity.name == "ERROR" }.forEach { echo(it.render(), err = true) }
+            throw ProgramResult(2)
+        }
+        val recipePlan = planned.takeIf { it.ok && it.recipe != null }
         if (recipePlan != null) {
             val instant =
                 asOf?.let { runCatching { java.time.LocalDateTime.parse(it) }.getOrNull() } ?: run {
@@ -232,6 +249,7 @@ class ConformCommand : CliktCommand(name = "conform") {
                     instant,
                     tolerances(),
                     System.getenv().filterKeys { it.startsWith("TTR_CONN_") },
+                    numericDeltas = pairs(engineDelta),
                 ) { echo(it) },
             )
         }
@@ -251,12 +269,18 @@ class ConformCommand : CliktCommand(name = "conform") {
         throw ProgramResult(outcome.exitCode)
     }
 
-    private fun tolerances(): Map<String, Double> =
-        tolerance
+    private fun tolerances(): Map<String, Double> = pairs(tolerance)
+
+    private fun pairs(specs: List<String>): Map<String, Double> =
+        specs
             .mapNotNull { spec ->
                 val (c, e) = spec.split("=", limit = 2).let { it.getOrNull(0) to it.getOrNull(1) }
                 if (c != null && e?.toDoubleOrNull() != null) c to e.toDouble() else null
             }.toMap()
+
+    private companion object {
+        val RECIPE_BLOCK = Regex("""(?m)^\s*recipe\s*\{""")
+    }
 }
 
 /**
@@ -497,14 +521,24 @@ object TtrpCli {
         }.trimEnd()
     }
 
-    /** The recipe checker over [file] (AU-core-P1): what it learned, and every finding in source order. */
+    /**
+     * The recipe checker over [file] (AU-core-P1): what it learned, and every finding in source order — with what the
+     * build would refuse (an island that does not compile, review-119 M5).
+     */
     private fun checkRecipe(
         file: Path,
         manifest: org.tatrman.ttrp.project.TtrpManifest,
         modelsRoot: Path,
     ): Pair<org.tatrman.ttrp.graph.recipe.RecipeModel?, List<org.tatrman.ttrp.diagnostics.TtrpDiagnostic>> {
         val plan = TtrpPipeline(manifest, modelsRoot).plan(Files.readString(file), file.toString())
-        val findings = plan.diagnostics.sortedWith(compareBy({ it.location.line }, { it.location.column }))
+        val refused =
+            if (plan.ok) {
+                org.tatrman.ttrp.bundle.RecipeBundleCheck
+                    .check(plan)
+            } else {
+                emptyList()
+            }
+        val findings = (plan.diagnostics + refused).sortedWith(compareBy({ it.location.line }, { it.location.column }))
         return plan.recipe to findings
     }
 

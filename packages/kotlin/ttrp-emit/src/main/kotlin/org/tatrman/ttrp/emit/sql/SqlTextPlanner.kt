@@ -68,6 +68,8 @@ class SqlTextPlanner(
      * helper columns (a calendar count, a latest marker) are projected away at the statement's end.
      */
     private val dropSynthesized: Boolean = false,
+    /** AU-core-P2: a text = integer equality compares the integer as text ([SqlGraphEmitter]'s `textKeys`). */
+    private val textKeys: Boolean = false,
 ) {
     private data class Built(
         val plan: PlanNode,
@@ -203,8 +205,13 @@ class SqlTextPlanner(
                 ?.takeUnless { fragmentsAsMembers && container.memberIds.isNotEmpty() }
                 ?.let { frag -> return@getOrPut fragmentSource(container, port, frag.sourceText) }
             val chain =
-                SqlGraphEmitter(graph, world, sqlText = true, fragmentsAsMembers = fragmentsAsMembers)
-                    .plansByOutput(container)[port]
+                SqlGraphEmitter(
+                    graph,
+                    world,
+                    sqlText = true,
+                    fragmentsAsMembers = fragmentsAsMembers,
+                    textKeys = textKeys,
+                ).plansByOutput(container)[port]
                     ?: throw TtrpEmitException(
                         EmitDiagnosticId.UNSUPPORTED_NODE,
                         detail = "island '${container.label}' has no emittable OUT port '$port'",

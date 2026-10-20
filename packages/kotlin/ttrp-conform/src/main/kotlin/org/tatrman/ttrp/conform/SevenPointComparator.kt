@@ -31,14 +31,17 @@ data class ConformReport(
  *
  * @param terminalSort true when the island's terminal node is Sort (parameter, never sniffed).
  * @param sortColumns the sort-key columns (prefix that must match order-sensitively under Sort).
- * @param tolerances per-column float64 absolute tolerance; a column absent here compares exactly. A column with a
- *   declared tolerance may also be `decimal` on one side and `float64` on the other (AU-core-P2 · S2.4: DuckDB divides
- *   decimals in DOUBLE, Postgres in NUMERIC) — its fingerprint reads `number`, its cells compare within the tolerance.
+ * @param tolerances per-column float64 absolute tolerance; a column absent here compares exactly.
+ * @param numericDeltas the declared engine numeric deltas (AU-core-P2 · S2.4; review-119 m9): a column here may be
+ *   `decimal` on one side and `float64` on the other — DuckDB divides decimals in DOUBLE, Postgres in NUMERIC — its
+ *   fingerprint reads `number` and its cells compare within the given tolerance; point 4 reports each. Separate from
+ *   [tolerances], which never waive a type.
  */
 class SevenPointComparator(
     private val terminalSort: Boolean = false,
     private val sortColumns: List<String> = emptyList(),
     private val tolerances: Map<String, Double> = emptyMap(),
+    private val numericDeltas: Map<String, Double> = emptyMap(),
 ) {
     fun compare(
         left: ConformTable,
@@ -131,11 +134,13 @@ class SevenPointComparator(
         // Decimal columns are always exact (checked in row compare via BigDecimal.compareTo); this
         // point additionally records the no-silent-epsilon rule for float64.
         val detail =
-            if (untoleranced.isEmpty()) {
-                "decimals exact; float64 tolerances: $tolerances"
-            } else {
-                "float64 exact (no declared tolerance): $untoleranced"
-            }
+            (
+                if (untoleranced.isEmpty()) {
+                    "decimals exact; float64 tolerances: $tolerances"
+                } else {
+                    "float64 exact (no declared tolerance): $untoleranced"
+                }
+            ) + if (numericDeltas.isEmpty()) "" else "; declared engine deltas (decimal ⇄ float64): $numericDeltas"
         return PointResult(4, "numerics", true, detail)
     }
 
@@ -174,7 +179,7 @@ class SevenPointComparator(
     }
 
     private fun fingerprintType(c: ConformColumn): String =
-        if (c.name in tolerances && (c.type == "float64" || c.type.startsWith("decimal"))) "number" else c.type
+        if (c.name in numericDeltas && (c.type == "float64" || c.type.startsWith("decimal"))) "number" else c.type
 
     private fun rowComparator(t: ConformTable): Comparator<List<Any?>> =
         Comparator { a, b ->
@@ -213,9 +218,9 @@ class SevenPointComparator(
                 val tol = tolerances[column]
                 if (tol != null) kotlin.math.abs(a - b) <= tol else a == b
             }
-            // a declared tolerance spans decimal ⇄ float64 (the engine's own division), never a silent one
-            a is Number && b is Number && column in tolerances ->
-                kotlin.math.abs(a.toDouble() - b.toDouble()) <= tolerances.getValue(column)
+            // a declared engine delta spans decimal ⇄ float64 (the engine's own division), never a silent one
+            a is Number && b is Number && column in numericDeltas ->
+                kotlin.math.abs(a.toDouble() - b.toDouble()) <= numericDeltas.getValue(column)
             else -> a == b
         }
 }

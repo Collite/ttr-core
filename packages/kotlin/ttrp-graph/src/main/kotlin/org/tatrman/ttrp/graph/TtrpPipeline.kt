@@ -187,7 +187,7 @@ class TtrpPipeline(
                     .SugarLowering(build.recipe, recipeModel, report.modelIndex)
                     .lower(switched.graph)
             diags += sugared.diagnostics
-            recipeModel = recipeModel.copy(derivedParams = sugared.derived)
+            recipeModel = recipeModel.copy(derivedParams = sugared.derived, reasonNodes = switched.reasonNodes)
             if (diags.any { it.severity == Severity.ERROR }) {
                 return PlanResult(fileName, null, null, null, emptyList(), diags, ok = false, recipe = recipeModel)
             }

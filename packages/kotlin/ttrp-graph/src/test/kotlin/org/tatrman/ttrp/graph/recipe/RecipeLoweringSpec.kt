@@ -7,11 +7,13 @@ import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldStartWith
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.tatrman.ttrp.ast.SourceLocation
 import org.tatrman.ttrp.diagnostics.Severity
 import org.tatrman.ttrp.diagnostics.TtrpDiagnosticId
+import org.tatrman.ttrp.expr.CaseWhen
 import org.tatrman.ttrp.expr.Cast
 import org.tatrman.ttrp.expr.ColumnRef
 import org.tatrman.ttrp.expr.FunctionCall
@@ -125,16 +127,31 @@ class RecipeLoweringSpec :
             (SwitchLowering.reason("all checks passed", emptyMap(), at) as Literal).value shouldBe
                 LiteralValue.Str("all checks passed")
             val row = mapOf("reason" to TtrpType.Str, "share" to TtrpType.Decimal())
-            val e = SwitchLowering.reason("{reason}: {share} over {abuse_share}", row, at)
+            val e =
+                SwitchLowering.reason(
+                    "{reason}: {share} over {abuse_share}",
+                    row,
+                    at,
+                    mapOf(
+                        "abuse_share" to TtrpType.Decimal(),
+                    ),
+                )
             val leaves = NodeExpressions.walk(e)
             leaves.filterIsInstance<FunctionCall>().count { it.function == SwitchLowering.CONCAT } shouldBe 4
-            // `reason` is text — read as is; `share` is cast; `abuse_share` is no column — the parameter, cast
-            leaves.filterIsInstance<Cast>().map {
-                (it.expr as? ColumnRef)?.column ?: (it.expr as ParamRef).name
-            } shouldContainExactlyInAnyOrder
-                listOf("share", "abuse_share")
-            leaves.filterIsInstance<ColumnRef>().map { it.column } shouldContainExactlyInAnyOrder
+            // every fill: NULL reads as empty (a CASE, review-119 M2)
+            leaves.filterIsInstance<CaseWhen>().size shouldBe 3
+            // `reason` is text — read as is; `share` and the parameter `abuse_share` are decimals — at 4 places, then
+            // text (the same digits on every engine, review-119 M3)
+            val toText = leaves.filterIsInstance<Cast>().filter { it.target == TtrpType.Str }
+            toText.map { (it.expr as Cast).target } shouldContainExactlyInAnyOrder
+                listOf(TtrpType.Decimal(38, 4), TtrpType.Decimal(38, 4))
+            leaves.filterIsInstance<ColumnRef>().map { it.column }.distinct() shouldContainExactlyInAnyOrder
                 listOf("reason", "share")
+            // a declared scale is kept; an integer or a date is cast as is
+            (SwitchLowering.fillText(ColumnRef(null, "v", at), TtrpType.Decimal(12, 2), at) as Cast).expr shouldBe
+                Cast(ColumnRef(null, "v", at), TtrpType.Decimal(38, 2), at)
+            (SwitchLowering.fillText(ColumnRef(null, "n", at), TtrpType.Integer, at) as Cast).expr shouldBe
+                ColumnRef(null, "n", at)
         }
 
         "a `route` column in the decision's rows is refused — the name is the verdict's" {
@@ -178,7 +195,7 @@ class RecipeLoweringSpec :
                 )
         }
 
-        "`latest(by:, per:)` → max per group + a semi join of the rows back" {
+        "`latest(by:, per:)` → max per group + a semi join of the rows back, a NULL `per:` its own group" {
             val r = context("load(er.entity.inventory) -> latest(by: as_of_date, per: item, warehouse) -> rows")
             r.ok shouldBe true
             val g = r.graph!!
@@ -189,7 +206,12 @@ class RecipeLoweringSpec :
                 g.nodes.values
                     .filterIsInstance<Aggregate>()
                     .single { it.id.endsWith("~max") }
-            max.groupBy shouldContainExactly listOf("item", "warehouse")
+            // each `per:` column groups as a never-NULL text key (review-119 M6), computed once on the input rows
+            max.groupBy.size shouldBe 2
+            max.groupBy.forEach { it shouldStartWith "_ttrp_g_" }
+            g.nodes.values
+                .filterIsInstance<org.tatrman.ttrp.graph.model.Project>()
+                .any { p -> max.groupBy.all { it in p.aliases } } shouldBe true
             g.nodes.values
                 .filterIsInstance<Join>()
                 .single { it.type == JoinType.SEMI }

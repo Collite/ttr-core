@@ -83,7 +83,9 @@ INSERT INTO warehouse_outage (wo_warehouse_sk, wo_from_date, wo_to_date, wo_reas
 -- 901 refund_no_return (order 11, delivered 2026-10-20, damaged, 10.00 < 15) · 902 reject_late (order 12, delivered
 -- 2026-09-01, before 2026-10-03) · 903 reject_not_ours (order 99 does not exist) · 904 refund_after_return (an
 -- exchange for 103, of which center 1 has 0) · 905 to_customer_care (request 805 is worth 600 > 500; customer 10
--- returned 670 of 2 197 bought this year — 0.30) · 906 reject_abuse (customer 20 returns 20 of 29 bought — 0.69).
+-- returned 670 of 2 197 bought this year — 0.30) · 906 reject_abuse (customer 20 returns 20 of 29 bought — 0.69) ·
+-- 907 reject_not_ours (order 11 exists and was delivered, but carries no item 103 — the LEFT JOIN's right key is NULL,
+-- review-119 B1).
 INSERT INTO return_request (rr_request_number, rr_customer_sk, rr_order_number, rr_channel, rr_requested_date, rr_state) VALUES
     (801, 10, 11, 'web', DATE '2026-10-25', 'received'),
     (802, 10, 12, 'web', DATE '2026-10-25', 'received'),
@@ -91,6 +93,7 @@ INSERT INTO return_request (rr_request_number, rr_customer_sk, rr_order_number, 
     (804, 10, 11, 'web', DATE '2026-10-26', 'received'),
     (805, 10, 11, 'web', DATE '2026-10-27', 'received'),
     (806, 20, 14, 'web', DATE '2026-10-28', 'received'),
+    (807, 10, 11, 'web', DATE '2026-10-28', 'received'),
     (811, 10, 11, 'web', DATE '2026-10-05', 'decided'),
     (812, 10, 11, 'web', DATE '2026-10-01', 'decided'),
     (813, 10, 11, 'web', DATE '2026-10-05', 'decided'),
@@ -107,6 +110,7 @@ INSERT INTO return_request_line (rl_line_id, rl_request_number, rl_line_no, rl_i
     (904, 804, 1, 102, 2, 20.00, 'wrong_size', 'exchange', 103, 'received', NULL, 10),
     (905, 805, 1, 101, 60, 10.00, 'wrong_size', 'refund', NULL, 'received', NULL, 10),
     (906, 806, 1, 101, 2, 10.00, 'wrong_size', 'refund', NULL, 'received', NULL, 20),
+    (907, 807, 1, 103, 1, 10.00, 'wrong_size', 'refund', NULL, 'received', NULL, 10),
     -- monitor_inbound (R2b): awaiting the goods back, each with an open `inbound` obligation (below)
     (911, 811, 1, 101, 1, 10.00, 'wrong_size', 'refund', NULL, 'awaiting_goods', 'refund_after_return', 10),
     (912, 812, 1, 101, 1, 10.00, 'wrong_size', 'refund', NULL, 'awaiting_goods', 'refund_after_return', 10),

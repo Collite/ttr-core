@@ -8,6 +8,7 @@ import org.tatrman.ttrp.diagnostics.TtrpDiagnostic
 import org.tatrman.ttrp.diagnostics.TtrpDiagnosticId
 import org.tatrman.ttrp.expr.CaseWhen
 import org.tatrman.ttrp.expr.Cast
+import org.tatrman.ttrp.expr.IsNull
 import org.tatrman.ttrp.expr.CatalogId
 import org.tatrman.ttrp.expr.ColumnRef
 import org.tatrman.ttrp.expr.Expression
@@ -66,6 +67,8 @@ object SwitchLowering {
     data class Result(
         val graph: TtrpGraph,
         val diagnostics: List<TtrpDiagnostic>,
+        /** The route calcs carrying `verdict_reason` (node ids) — [RecipeModel.reasonNodes]. */
+        val reasonNodes: Set<String> = emptySet(),
     )
 
     fun lower(
@@ -84,6 +87,7 @@ object SwitchLowering {
             graph.edges.firstOrNull { it.kind == EdgeKind.DATA && it.to == PortRef(swId, PortNames.IN) }?.from
                 ?: return Result(graph, emptyList())
         val row = model.routeRow.orEmpty()
+        val paramTypes = model.parameterDecls.associate { it.name to parameterType(it.type) }
         val loc = sw.location
         val diags = mutableListOf<TtrpDiagnostic>()
         for (reserved in listOf(ROUTE, VERDICT_REASON).filter { it in row }) {
@@ -93,6 +97,7 @@ object SwitchLowering {
 
         var g = graph
         val portMap = LinkedHashMap<String, PortRef>()
+        val reasonNodes = LinkedHashSet<String>()
         val exclusive = stmt.mode == SwitchMode.EXCLUSIVE
 
         // exclusive: the CASE ladder writes `route` once; each route filters on it.
@@ -133,10 +138,11 @@ object SwitchLowering {
             val verdict =
                 listOfNotNull(
                     Aggregation(ROUTE, str(name, loc)).takeUnless { exclusive },
-                    Aggregation(VERDICT_REASON, reason(because, row, loc)),
+                    Aggregation(VERDICT_REASON, reason(because, row, loc, paramTypes)),
                 )
             g = GraphOps.addNode(g, Filter(filterId, "${sw.label}~$name~filter", loc, predicate), decisionId)
             g = GraphOps.addNode(g, Calc(calcId, "${sw.label}~$name", loc, verdict), decisionId)
+            reasonNodes += calcId
             g =
                 GraphOps.addEdges(
                     g,
@@ -212,18 +218,20 @@ object SwitchLowering {
                 nodes = LinkedHashMap(g.nodes).apply { put(decisionId, updated) },
                 containers = LinkedHashMap(g.containers).apply { put(decisionId, updated) },
             )
-        return Result(g, diags)
+        return Result(g, diags, reasonNodes)
     }
 
     /**
      * The `because:` text as an expression: literal pieces and `{fill}`s concatenated, a fill read from the route's
-     * row when it has the column, else the parameter of that name; each fill cast to text, NULL read as empty. No
-     * `because:` gives a NULL `verdict_reason`.
+     * row when it has the column, else the parameter of that name ([paramTypes] their types); each fill as its
+     * [fillText], NULL read as empty — `CASE WHEN x IS NULL THEN '' ELSE … END` (review-119 M2: a COALESCE around a
+     * CAST is simplified away on the emit path, and `… || NULL` is NULL). No `because:` gives a NULL `verdict_reason`.
      */
     fun reason(
         because: String?,
         row: Map<String, TtrpType?>,
         loc: SourceLocation,
+        paramTypes: Map<String, TtrpType?> = emptyMap(),
     ): Expression {
         if (because == null) return Cast(Literal(LiteralValue.Null, loc), TtrpType.Str, loc)
         val pieces = mutableListOf<Expression>()
@@ -232,13 +240,51 @@ object SwitchLowering {
             if (m.range.first > at) pieces += str(because.substring(at, m.range.first), loc)
             val fill = m.groupValues[1]
             val value: Expression = if (fill in row) ColumnRef(null, fill, loc) else ParamRef(fill, loc)
-            val text = if (fill in row && row[fill] == TtrpType.Str) value else Cast(value, TtrpType.Str, loc)
-            pieces += FunctionCall(COALESCE, listOf(text, str("", loc)), loc)
+            val type = if (fill in row) row[fill] else paramTypes[fill]
+            pieces += CaseWhen(listOf(IsNull(value, false, loc) to str("", loc)), fillText(value, type, loc), loc)
             at = m.range.last + 1
         }
         if (at < because.length || pieces.isEmpty()) pieces += str(because.substring(at), loc)
         return pieces.reduce { a, b -> FunctionCall(CONCAT, listOf(a, b), loc) }
     }
+
+    /** The places a decimal (of no declared scale) or a float prints with in a `because:` fill (⚑AU-C-9). */
+    const val FILL_SCALE = 4
+
+    /**
+     * A fill's text, the same on every engine (review-119 M3, ⚑AU-C-9): text as is; a decimal at its declared scale
+     * (else [FILL_SCALE] places) and a float at [FILL_SCALE] — an engine prints a quotient's digits its own way
+     * (Postgres NUMERIC 20, DuckDB DOUBLE 16); an integer, a date, a timestamp, a boolean cast to text.
+     */
+    fun fillText(
+        value: Expression,
+        type: TtrpType?,
+        loc: SourceLocation,
+    ): Expression =
+        when (type) {
+            TtrpType.Str -> value
+            is TtrpType.Decimal ->
+                Cast(
+                    Cast(value, TtrpType.Decimal(38, type.scale ?: FILL_SCALE), loc),
+                    TtrpType.Str,
+                    loc,
+                )
+            TtrpType.Float, TtrpType.Double, TtrpType.Number ->
+                Cast(Cast(value, TtrpType.Decimal(38, FILL_SCALE), loc), TtrpType.Str, loc)
+            else -> Cast(value, TtrpType.Str, loc)
+        }
+
+    /** A `def parameter`'s type as the type its `:name` binds. */
+    private fun parameterType(type: String?): TtrpType? =
+        when (type?.lowercase()) {
+            "decimal" -> TtrpType.Decimal()
+            "int", "integer", "days", "working_days" -> TtrpType.Integer
+            "text" -> TtrpType.Str
+            "date" -> TtrpType.Date
+            "timestamp", "datetime" -> TtrpType.Timestamp
+            "bool", "boolean" -> TtrpType.Bool
+            else -> null
+        }
 
     /** `concat` (`||`) — the catalogue's string concatenation (AU-core-P2: a `because:` text). */
     val CONCAT = CatalogId("op.concat")

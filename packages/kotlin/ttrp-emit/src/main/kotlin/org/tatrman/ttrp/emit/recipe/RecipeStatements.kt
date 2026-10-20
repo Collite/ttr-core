@@ -88,6 +88,7 @@ object RecipeStatements {
                 fragmentsAsMembers = true,
                 tier = tier,
                 dropSynthesized = true,
+                textKeys = true,
             )
         return container.declaredPorts
             .filter { it.direction == PortDirection.OUT && it.kind == PortKind.DATA && it.name != "rejects" }
@@ -95,6 +96,30 @@ object RecipeStatements {
                 val out = planner.emit(container, port.name)
                 RecipeStatement(island.name, port.name, out.sql, out.columns, out.params)
             }
+    }
+
+    /**
+     * Every island planned on its own, the ones whose planning fails with why — island name → the emit failure
+     * (review-119 M5: `check` and `ttrp/validate` refuse what [plan] refuses, island by island).
+     */
+    fun failures(
+        plan: TtrpPipeline.PlanResult,
+        skip: Set<String> = emptySet(),
+    ): Map<String, org.tatrman.ttrp.emit.TtrpEmitException> {
+        val graph = plan.graph ?: return emptyMap()
+        val exec = plan.exec ?: return emptyMap()
+        val bound = plan.bound ?: return emptyMap()
+        val model = plan.recipe ?: return emptyMap()
+        val params = params(model, graph)
+        val out = LinkedHashMap<String, org.tatrman.ttrp.emit.TtrpEmitException>()
+        for (island in exec.islands.filter { it.name !in skip }) {
+            try {
+                islandStatements(island, graph, bound, params, SqlTier.ER, null)
+            } catch (e: org.tatrman.ttrp.emit.TtrpEmitException) {
+                out[island.name] = e
+            }
+        }
+        return out
     }
 
     /**

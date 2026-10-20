@@ -15,13 +15,16 @@
     ],
     "executors": [
       {
-        "name": "n8n"
+        "name": "n8n",
+        "type": "n8n_l1"
       },
       {
-        "name": "bpmn"
+        "name": "bpmn",
+        "type": "camunda_8"
       },
       {
-        "name": "py"
+        "name": "py",
+        "type": "python_client"
       }
     ],
     "storages": [
@@ -3078,7 +3081,7 @@
     }
   },
   "recipeGrammar": {
-    "statementSummary": "one `recipe { … }` per document, no `program` beside it: headers `key:` (an entity attribute, or a list for a composite key), `as of: now`, `parameters: [ … ]` (each a `def parameter` of the imports), `document:`, `protocol: always | on_route`; then one `candidates` island, any `context` islands (`target <engine>` + a body, or `builtin` / `foreign` / `call` / `turn`, an optional `window { by: …, over: … }`), one `decision <name>(in …)` ending in `<row> -> switch { mode: exclusive | overlapping, <route>: <condition> because: \"…{column}…\" detail: <context>, …, else: <route> | none }`, and `actions { <decision>.<route>, … -> <action> { column: value, … } when <condition> }`. `:as_of` is the run's instant; `:name` a parameter; durations `30 days`, `2 working_days`, `days(:param)`.",
+    "statementSummary": "one `recipe { … }` per document, no `program` beside it: headers `key:` (an entity attribute, or a list for a composite key), `as of: now`, `parameters: [ … ]` (each a `def parameter` of the imports), `document:`, `protocol: always | on_route`; then one `candidates` island, any `context` islands (`target <engine>` + a body, or `builtin` / `foreign` / `call` / `turn`, an optional `window { by: …, over: … }`), one `decision <name>(in …)` ending in `<row> -> switch { mode: exclusive | overlapping, <route>: <condition> because: \"…{column}…\" detail: <context>, …, else: <route> | none }`, and `actions { <decision>.<route>, … -> <action> { column: value, … } when: <condition> }`. `:as_of` is the run's instant; `:name` a parameter. A duration is `30 days` / `2 working_days` in a header or a wiring value, and `days(30)` / `days(:param)` in an expression (`:as_of - days(30)`); the door does no other date arithmetic — count days with `age(since: …)` / `working_days(between: …, and: …)` in a calc.",
     "roles": [
       "candidates",
       "context",
@@ -3181,6 +3184,10 @@
       {
         "id": "TTRP-REC-070",
         "suggestedAlternative": "write the decision as a canonical body ending in a `switch`; SQL, foreign code, services and agents belong in a `context`"
+      },
+      {
+        "id": "TTRP-REC-080",
+        "suggestedAlternative": "the island's output does not compile to a statement the door runs — restate it with what the message names (a column the row carries, a whole-WHERE `IN`/`EXISTS`, a `target` island)"
       }
     ]
   },
@@ -3373,6 +3380,11 @@
       "id": "TTRP-REC-070",
       "area": "REC",
       "suggestedAlternative": "write the decision as a canonical body ending in a `switch`; SQL, foreign code, services and agents belong in a `context`"
+    },
+    {
+      "id": "TTRP-REC-080",
+      "area": "REC",
+      "suggestedAlternative": "the island's output does not compile to a statement the door runs — restate it with what the message names (a column the row carries, a whole-WHERE `IN`/`EXISTS`, a `target` island)"
     },
     {
       "id": "TTRP-PRS-007",

@@ -91,22 +91,20 @@ class SugarLowering(
             }
         }
         g = g.copy(logicalJoins = g.logicalJoins.mapValues { (id, e) -> if (id in members) derive(e) else e })
-        // A bound date minus a date column in a calc (`:as_of - placed_date`) is the days between — the calendar
-        // count `age(since: placed_date, and: :as_of)` (the door subtracts no dates).
+        // A bound date minus a date column (`:as_of - placed_date`) in a calc, a projection (a TTR-SQL SELECT) or a
+        // filter is the days between — the calendar count `age(since: placed_date, and: :as_of)` (the door
+        // subtracts no dates; review-119 M1).
         for (id in members) {
-            val c = g.nodes[id] as? Calc ?: continue
-            g =
-                GraphOps.swapNode(
-                    g,
-                    id,
-                    c.copy(assignments = c.assignments.map { it.copy(value = daysBetween(it.value)) }),
-                )
+            val n = g.nodes[id] ?: continue
+            if (n is Calc || n is Project || n is Filter) {
+                g = GraphOps.swapNode(g, id, NodeExpressions.map(n) { daysBetween(it) })
+            }
         }
         // 2. The sugar ops.
         for (id in members) {
             when (val n = g.nodes[id]) {
                 is TimeSugar -> if (n.kind == "latest") latest(n) else within(n)
-                is Calc -> calendarCounts(n)
+                is Calc, is Project, is Filter -> calendarCounts(n)
                 else -> Unit
             }
         }
@@ -127,7 +125,24 @@ class SugarLowering(
                         diags +=
                             error(
                                 TtrpDiagnosticId.FN_002,
-                                "`${e.function.name}(…)` is lowered in a `calc` only — compute it there first",
+                                "`${e.function.name}(…)` is lowered in a `calc`, a `select` or a `filter` only — " +
+                                    "compute it there first",
+                                e.location,
+                            )
+                    // date arithmetic the lowering could not turn into a count or a derived value (review-119 M1)
+                    e is FunctionCall &&
+                        (e.function == CatalogId.SUB || e.function == CatalogId.ADD) &&
+                        e.location in model.dateArithmetic ->
+                        diags +=
+                            error(
+                                TtrpDiagnosticId.TYP_001,
+                                if (model.dateArithmetic[e.location] == RecipeTime.DATES) {
+                                    "the door subtracts no dates — count the days with `age(since: <earlier>, and: " +
+                                        "<later>)` in a calc (a bound date minus a column is lowered so)"
+                                } else {
+                                    "the door adds no days to a column — compare the column with a derived bound " +
+                                        "date instead (`placed_date >= :as_of - days(30)`)"
+                                },
                                 e.location,
                             )
                 }
@@ -149,17 +164,28 @@ class SugarLowering(
                     else -> return@rewrite null
                 }
             val base = call.args.getOrNull(0) as? ParamRef ?: return@rewrite null
-            val (amount, unit) = duration(call.args.getOrNull(1) ?: return@rewrite null) ?: return@rewrite null
+            val operand = call.args.getOrNull(1) ?: return@rewrite null
+            // an integer the typer read as days next to a bound date (`:as_of - 365`, with its warning) is `days(365)`
+            val days =
+                ((operand as? Literal)?.value as? LiteralValue.Num)
+                    ?.raw
+                    ?.takeIf { model.dateArithmetic[call.location] == RecipeTime.DAYS && it.all(Char::isDigit) }
+                    ?.let { it to DurationUnit.DAYS.spelling }
+            val (amount, unit) = duration(operand) ?: days ?: return@rewrite null
             val name = "${base.name}_${op}_${amount}_$unit"
             derived.getOrPut(name) { DerivedParam(name, base.name, op, amount, unit) }
             ParamRef(name, call.location)
         }
 
-    /** `:p - col`, `p` a bound date (`:as_of`, a derived one, a `date` parameter) → `age(since: col, and: :p)`. */
+    /**
+     * `:p - col`, `p` a bound date (`:as_of`, a derived one, a `date` parameter) and `col` a date (the typer's
+     * [RecipeModel.dateArithmetic]) → `age(since: col, and: :p)`.
+     */
     private fun daysBetween(e: Expression): Expression =
         NodeExpressions.rewrite(e) { x ->
             val call = x as? FunctionCall ?: return@rewrite null
             if (call.function != CatalogId.SUB) return@rewrite null
+            if (model.dateArithmetic[call.location] != RecipeTime.DATES) return@rewrite null
             val p = call.args.getOrNull(0) as? ParamRef ?: return@rewrite null
             val col = call.args.getOrNull(1) as? ColumnRef ?: return@rewrite null
             val date =
@@ -193,11 +219,56 @@ class SugarLowering(
     // ---- latest ---------------------------------------------------------------------------------------------
 
     private fun latest(n: TimeSugar) {
-        val by = n.columnsOf("by").singleOrNull() ?: return badArgs(n)
-        val per = n.columnsOf("per")
+        val byRef = n.refsOf("by").singleOrNull() ?: return badArgs(n)
+        val perRefs = n.refsOf("per")
         val loc = n.location
-        val src = feed(n.id) ?: return
+        val (names, src) = bare(n, listOf(byRef) + perRefs, PortNames.IN) ?: return
+        val by = names.getValue(key(byRef))
         val container = GraphOps.containerIdOf(g, n.id)
+        // A `per:` value may be NULL — GROUP BY keeps its group, an equality never matches it — so each `per:` column
+        // groups and joins back as a text key that is never NULL (`'n'`, or `'v' || value`) — an equi-join still
+        // (review-119 M6). One engine computes both sides, so its own text of a value is the same on both.
+        val per =
+            if (perRefs.isEmpty()) {
+                emptyList()
+            } else {
+                val keyCalc = "${n.id}~group"
+                val keys =
+                    perRefs.mapIndexed { i, r ->
+                        val col = ColumnRef(null, names.getValue(key(r)), loc)
+                        Aggregation(
+                            "_ttrp_g_${token(n.id)}_$i",
+                            CaseWhen(
+                                listOf(IsNull(col, false, loc) to Literal(LiteralValue.Str("n"), loc)),
+                                FunctionCall(
+                                    CONCAT,
+                                    listOf(
+                                        Literal(LiteralValue.Str("v"), loc),
+                                        org.tatrman.ttrp.expr
+                                            .Cast(col, org.tatrman.ttrp.expr.TtrpType.Str, loc),
+                                    ),
+                                    loc,
+                                ),
+                                loc,
+                            ),
+                        )
+                    }
+                add(Calc(keyCalc, "${n.label}~group", loc, keys), container)
+                g =
+                    g.copy(
+                        edges =
+                            g.edges.map {
+                                if (it.to == PortRef(n.id, PortNames.IN) && it.from == src) {
+                                    it.copy(from = PortRef(keyCalc, PortNames.OUT))
+                                } else {
+                                    it
+                                }
+                            },
+                    )
+                edges(src to PortRef(keyCalc, PortNames.IN))
+                keys.map { it.name }
+            }
+        val grouped = if (per.isEmpty()) src else PortRef("${n.id}~group", PortNames.OUT)
         val m = "_ttrp_latest_${token(n.id)}"
         val aggId = "${n.id}~max"
         add(
@@ -219,7 +290,7 @@ class SugarLowering(
             )
         g = GraphOps.swapNode(g, n.id, Join(n.id, n.label, loc, JoinType.SEMI, on, provenance = n.provenance))
         retargetIn(n.id, PortNames.IN, PortNames.LEFT)
-        edges(src to PortRef(aggId, PortNames.IN), PortRef(aggId, PortNames.OUT) to PortRef(n.id, PortNames.RIGHT))
+        edges(grouped to PortRef(aggId, PortNames.IN), PortRef(aggId, PortNames.OUT) to PortRef(n.id, PortNames.RIGHT))
     }
 
     // ---- within ---------------------------------------------------------------------------------------------
@@ -246,6 +317,8 @@ class SugarLowering(
         }
         // An sk of the calendar: the rows whose day is in range, by the sk (the row itself unchanged).
         val cal = calendar(n) ?: return
+        val (names, _) = bare(n, listOf(column), PortNames.IN) ?: return
+        val sk = names.getValue(key(column))
         val container = GraphOps.containerIdOf(g, n.id)
         val t = token(n.id)
         val days = calendarDays(n, cal, t, working = false, withSk = true) ?: return
@@ -261,7 +334,7 @@ class SugarLowering(
             container,
         )
         edges(days to PortRef(inRange, PortNames.IN))
-        val on = eq(side(PortNames.LEFT, column.column, loc), side(PortNames.RIGHT, "_ttrp_sk_$t", loc), loc)
+        val on = eq(side(PortNames.LEFT, sk, loc), side(PortNames.RIGHT, "_ttrp_sk_$t", loc), loc)
         g = GraphOps.swapNode(g, n.id, Join(n.id, n.label, loc, JoinType.SEMI, on, provenance = n.provenance))
         retargetIn(n.id, PortNames.IN, PortNames.LEFT)
         edges(PortRef(inRange, PortNames.OUT) to PortRef(n.id, PortNames.RIGHT))
@@ -269,10 +342,12 @@ class SugarLowering(
 
     // ---- working_days / age ---------------------------------------------------------------------------------
 
-    private fun calendarCounts(c: Calc) {
+    /** `working_days(…)` / `age(…)` in [c] — a calc, a projection or a filter — as calendar counts joined in. */
+    private fun calendarCounts(c: Node) {
         val calls =
-            c.assignments
-                .flatMap { a -> NodeExpressions.walk(a.value).filterIsInstance<FunctionCall>() }
+            NodeExpressions
+                .of(c)
+                .flatMap { NodeExpressions.walk(it).filterIsInstance<FunctionCall>() }
                 .filter {
                     it.function.name in
                         CALENDAR_FUNCTIONS
@@ -280,7 +355,13 @@ class SugarLowering(
         if (calls.isEmpty()) return
         val cal = calendar(c) ?: return
         val container = GraphOps.containerIdOf(g, c.id)
-        var head = feed(c.id) ?: return
+        // Every column argument as a name the calc's input carries — a qualified one (`cp.valid_from`) under a fresh
+        // name, computed once (review-119 B2) — and every count's pairs read that input, not the previous count's
+        // joins (m6).
+        val columnArgs =
+            calls.flatMap { fn -> fn.args.filterIsInstance<ColumnRef>() }.distinctBy { key(it) }
+        val (names, base) = bare(c, columnArgs, PortNames.IN) ?: return
+        var head = base
         val replaced = HashMap<FunctionCall, Expression>()
         for ((i, fn) in calls.withIndex()) {
             val loc = fn.location
@@ -304,16 +385,16 @@ class SugarLowering(
                     )
                 return
             }
-            val keys = listOf(a, b).filterIsInstance<ColumnRef>().map { it.column }.distinct()
+            val keys = listOf(a, b).filterIsInstance<ColumnRef>().map { names.getValue(key(it)) }.distinct()
             if (keys.isEmpty()) return badCall(fn)
             val t = "${token(c.id)}_$i"
             val pairs = "${c.id}~cal$i~pairs"
             add(Aggregate(pairs, "${c.label}~cal$i~pairs", loc, groupBy = keys), container)
-            edges(head to PortRef(pairs, PortNames.IN))
+            edges(base to PortRef(pairs, PortNames.IN))
             val days = calendarDays(c, cal, t, working, withSk = false) ?: return
             val d = side(PortNames.RIGHT, "_ttrp_d_$t", loc)
 
-            fun bound(e: Expression) = if (e is ColumnRef) side(PortNames.LEFT, e.column, loc) else e
+            fun bound(e: Expression) = if (e is ColumnRef) side(PortNames.LEFT, names.getValue(key(e)), loc) else e
             val join = "${c.id}~cal$i~join"
             add(
                 Join(
@@ -379,12 +460,15 @@ class SugarLowering(
             edges(head to PortRef(back, PortNames.LEFT), PortRef(ren, PortNames.OUT) to PortRef(back, PortNames.RIGHT))
             head = PortRef(back, PortNames.OUT)
             val missing =
-                listOf(a, b).map { IsNull(it, false, loc) }.reduce<Expression, Expression> {
-                    x,
-                    y,
-                    ->
-                    call(CatalogId.OR, x, y, loc)
-                }
+                listOf(a, b)
+                    .map { if (it is ColumnRef) ColumnRef(null, names.getValue(key(it)), loc) else it }
+                    .map { IsNull(it, false, loc) }
+                    .reduce<Expression, Expression> {
+                        x,
+                        y,
+                        ->
+                        call(CatalogId.OR, x, y, loc)
+                    }
             replaced[fn] =
                 CaseWhen(
                     listOf(missing to Literal(LiteralValue.Null, loc)),
@@ -396,18 +480,14 @@ class SugarLowering(
                     loc,
                 )
         }
-        // The calc reads the joined rows now.
+        // The node reads the joined rows now.
         g = g.copy(edges = g.edges.map { if (it.to == PortRef(c.id, PortNames.IN)) it.copy(from = head) else it })
+        val current = g.nodes.getValue(c.id)
         g =
             GraphOps.swapNode(
                 g,
                 c.id,
-                c.copy(
-                    assignments =
-                        c.assignments.map { a ->
-                            a.copy(value = NodeExpressions.rewrite(a.value) { replaced[it] })
-                        },
-                ),
+                NodeExpressions.map(current) { e -> NodeExpressions.rewrite(e) { replaced[it] } },
             )
     }
 
@@ -515,6 +595,54 @@ class SugarLowering(
         return PortRef(wd, PortNames.OUT)
     }
 
+    // ---- qualified arguments --------------------------------------------------------------------------------
+
+    /** A column reference's identity for [bare]'s map: its qualifier and its name. */
+    private fun key(r: ColumnRef) = "${r.port ?: ""}.${r.column}"
+
+    /**
+     * [refs] as names the rows entering [at]'s [port] carry. A bare name is itself — after a join, the left side's
+     * column, as everywhere in TTR-P. A qualified reference (`cp.valid_from`) is computed first under a fresh
+     * `_ttrp_a_` name in a calc spliced in before [at] (the emitter resolves the qualifier there, on the row it
+     * names), so the lowering never mistakes it for the left side's column of the same name (review-119 B2). The
+     * names by [key], and the port now feeding [at].
+     */
+    private fun bare(
+        at: Node,
+        refs: List<ColumnRef>,
+        port: String,
+    ): Pair<Map<String, String>, PortRef>? {
+        val src = g.edges.firstOrNull { it.kind == EdgeKind.DATA && it.to == PortRef(at.id, port) }?.from ?: return null
+        val qualified = refs.filter { it.port != null }.distinctBy { key(it) }
+        val names = HashMap<String, String>()
+        refs.filter { it.port == null }.forEach { names[key(it)] = it.column }
+        if (qualified.isEmpty()) return names to src
+        val t = token(at.id)
+        val calcId = "${at.id}~args"
+        val assignments =
+            qualified.mapIndexed { i, r ->
+                val name = "_ttrp_a_${t}_$i"
+                names[key(r)] = name
+                Aggregation(name, r)
+            }
+        add(Calc(calcId, "${at.label}~args", at.location, assignments), GraphOps.containerIdOf(g, at.id))
+        g =
+            g.copy(
+                edges =
+                    g.edges.map {
+                        if (it.to == PortRef(at.id, port) &&
+                            it.from == src
+                        ) {
+                            it.copy(from = PortRef(calcId, PortNames.OUT))
+                        } else {
+                            it
+                        }
+                    },
+            )
+        edges(src to PortRef(calcId, PortNames.IN))
+        return names to PortRef(calcId, PortNames.OUT)
+    }
+
     // ---- graph edits ----------------------------------------------------------------------------------------
 
     private fun add(
@@ -580,6 +708,7 @@ class SugarLowering(
         private val MAX = CatalogId("agg.max")
         private val COUNT = CatalogId("agg.count")
         private val COALESCE = CatalogId("fn.coalesce")
+        private val CONCAT = CatalogId("op.concat")
 
         /** A node id as a column-name fragment (`n21~x` → `n21_x`). */
         private fun token(id: String) = id.replace(Regex("[^A-Za-z0-9_]"), "_")

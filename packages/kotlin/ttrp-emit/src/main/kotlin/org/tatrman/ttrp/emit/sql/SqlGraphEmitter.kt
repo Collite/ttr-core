@@ -67,6 +67,12 @@ class SqlGraphEmitter(
      * keeps the AG-P0 rule: an authored fragment runs as written.
      */
     private val fragmentsAsMembers: Boolean = false,
+    /**
+     * AU-core-P2 (a recipe's statements only): an equality of a text column with an INTEGER column compares the
+     * integer as text — the automation stdlib's `obligation.key` is text, an entity's key a number. Off (the default)
+     * leaves every comparison as written: an ordinary program's SQL never changes (review-119 B5).
+     */
+    private val textKeys: Boolean = false,
 ) {
     /** The fragment [c] runs as written — none when [fragmentsAsMembers] and [c] decomposed into members. */
     private fun verbatim(c: Container) =
@@ -127,17 +133,27 @@ class SqlGraphEmitter(
 
     // --- qualified references (AU-core-P2) --------------------------------------------
 
-    /** `(qualifier, column)` of every qualified reference the container's nodes make (`out_.warehouse`). */
-    private var qualifiedRefs: Set<Pair<String, String>> = emptySet()
+    /**
+     * Per node, `(qualifier, column)` of every qualified reference it makes (`out_.warehouse`) — a decomposed TTR-SQL
+     * reference by its table operand ([TtrpGraph.refOperands]: `s.item` after a join is spelled `left.item` but reads
+     * `s`), so a later `s.item IS NULL` keeps the LEFT join's right key it reads (review-119 B1).
+     */
+    private var qualifiedRefs: Map<String, Set<Pair<String, String>>> = emptyMap()
 
-    private fun qualifiedRefsOf(members: List<Node>): Set<Pair<String, String>> =
-        members
-            .flatMap { NodeExpressions.of(it) }
-            .flatMap { NodeExpressions.walk(it) }
-            .filterIsInstance<ColumnRef>()
-            .mapNotNull { r ->
-                r.port?.takeIf { it != PortNames.LEFT && it != PortNames.RIGHT }?.let { it to r.column }
-            }.toSet()
+    private fun qualifiedRefsOf(members: List<Node>): Map<String, Set<Pair<String, String>>> =
+        members.associate { n ->
+            n.id to
+                NodeExpressions
+                    .of(n)
+                    .flatMap { NodeExpressions.walk(it) }
+                    .filterIsInstance<ColumnRef>()
+                    .mapNotNull { r ->
+                        val q =
+                            graph.refOperands[r.location]
+                                ?: r.port?.takeIf { it != PortNames.LEFT && it != PortNames.RIGHT }
+                        q?.let { it to r.column }
+                    }.toSet()
+        }
 
     /** [n] as an [EmitNode]: its qualified references resolved against its input rows, a join's kept keys. */
     private fun emitNode(
@@ -223,11 +239,23 @@ class SqlGraphEmitter(
         }
 
     /**
-     * An equality of a text column with a number column (`ob.key = l.line_id`: the automation stdlib's `key` is text,
-     * an entity's key a number) compares the number as text — `CAST(l.line_id AS VARCHAR) = ob.key` — as its author
-     * would write it; the other way would cast every key of every entity to a number (AU-core-P2).
+     * With [textKeys] (a recipe's statements): an equality of a text column with an integer column (`ob.key =
+     * l.line_id`: the automation stdlib's `key` is text, an entity's key a number) compares the integer as text —
+     * `CAST(l.line_id AS VARCHAR) = ob.key` — as its author would write it; the other way would cast every key of
+     * every entity to a number (AU-core-P2). A decimal or a float is never cast: its text differs per engine.
      */
     private fun coerceKeys(
+        e: org.tatrman.ttrp.expr.Expression,
+        left: List<EmitColumn>,
+        right: List<EmitColumn>,
+    ): org.tatrman.ttrp.expr.Expression =
+        if (!textKeys) {
+            e
+        } else {
+            coerceTextKeys(e, left, right)
+        }
+
+    private fun coerceTextKeys(
         e: org.tatrman.ttrp.expr.Expression,
         left: List<EmitColumn>,
         right: List<EmitColumn>,
@@ -257,17 +285,26 @@ class SqlGraphEmitter(
     private fun isText(t: String) = t.substringBefore('(').lowercase() in setOf("text", "varchar", "char", "string")
 
     private fun isNumber(t: String) =
-        t.substringBefore('(').lowercase() in
-            setOf("int", "integer", "bigint", "smallint", "decimal", "numeric", "float", "double")
+        t.substringBefore('(').lowercase() in setOf("int", "integer", "bigint", "smallint")
 
-    /** The right equi-key columns of [join] a qualified reference reads — the join keeps them (by their names). */
+    /**
+     * The right equi-key columns of [join] a qualified reference reads after it — in any other node; the join's own
+     * condition reads its keys before the join — the join keeps them (by their names). After a LEFT join the right key
+     * is NULL where the left one is not, so `s.item IS NULL` must read the right one.
+     */
     private fun joinKeep(
         join: Join,
         right: List<EmitColumn>,
     ): Set<String> {
         val keys = join.on?.let { JoinDedup.rightEquiKeys(it) }.orEmpty()
+        val readAfter =
+            qualifiedRefs
+                .filterKeys { it != join.id }
+                .values
+                .flatten()
+                .toSet()
         return right
-            .filter { c -> c.name in keys && c.qualifiers.any { (it to c.base) in qualifiedRefs } }
+            .filter { c -> c.name in keys && c.qualifiers.any { (it to c.base) in readAfter } }
             .map { it.name }
             .toSet()
     }
@@ -424,8 +461,13 @@ class SqlGraphEmitter(
             if (verbatim(producer) != null) {
                 stagingSchema(port, container)
             } else {
-                SqlGraphEmitter(graph, world, sqlText = true, fragmentsAsMembers = fragmentsAsMembers)
-                    .plansByOutput(producer)[feed.from.port]
+                SqlGraphEmitter(
+                    graph,
+                    world,
+                    sqlText = true,
+                    fragmentsAsMembers = fragmentsAsMembers,
+                    textKeys = textKeys,
+                ).plansByOutput(producer)[feed.from.port]
                     ?.lastOrNull()
                     ?.outputColumns
                     ?: throw TtrpEmitException(

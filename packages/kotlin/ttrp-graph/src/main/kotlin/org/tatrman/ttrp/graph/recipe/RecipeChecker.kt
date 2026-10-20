@@ -131,6 +131,7 @@ class RecipeChecker(
         checkDecisionLineage(rg, lineage, keyColumns)
 
         val routeRow = routeRows(rg, rows)
+        checkKeyCarried(recipe, rg, rows, contexts, routeRow, keyColumns)
         val routeOrigin =
             rg.switch?.let { rows.inputOrigin(it) }
                 ?: candidatesId?.takeIf { rg.decision == null }?.let { id ->
@@ -197,6 +198,20 @@ class RecipeChecker(
                 programs = programs.map { it.qname.name },
                 routeRow = routeRow,
                 calendarSkWithins = time.calendarSkWithins.toSet(),
+                dateArithmetic = time.dateArithmetic.toMap(),
+                elseNone = sw?.elseRoute?.let { it.name == null } ?: false,
+                kinds =
+                    recipe.roleContainers
+                        .map {
+                            when (it.form) {
+                                is IslandForm.Target -> "sql"
+                                is IslandForm.Builtin -> "builtin"
+                                is IslandForm.Foreign -> "foreign"
+                                is IslandForm.Call -> "call"
+                                is IslandForm.Turn -> "turn"
+                            }
+                        }.distinct()
+                        .sorted(),
                 programPackage =
                     programs
                         .firstOrNull()
@@ -215,6 +230,13 @@ class RecipeChecker(
                         val decl = automation<AutomationParameter>().firstOrNull { it.qname.name == p.text }
                         ParameterInfo(p.text, decl?.type, decl?.value?.let { autoValueText(it) })
                     },
+                dryRuns =
+                    recipe.wirings
+                        .map { it.action }
+                        .distinct()
+                        .mapNotNull { a -> action(a)?.let { a to it.dryRun.byLanguage } }
+                        .filter { it.second.isNotEmpty() }
+                        .toMap(),
             )
         return Result(recipeModel, diags.toList())
     }
@@ -356,6 +378,50 @@ class RecipeChecker(
                         )
                 }
             }
+        }
+    }
+
+    // ---- the key on every keyed output (REC-004, review-119 B4) ------------------------------------------
+
+    /**
+     * A per-candidate context's rows and the routes' rows are filtered on the run's key by the runner (D-135,
+     * AU-C-3), so each carries every key column under its own name — key lineage follows a rename (`order_number AS
+     * onum` stays per candidate), the runner's filter does not.
+     */
+    private fun checkKeyCarried(
+        recipe: RecipeDecl,
+        rg: RecipeGraph,
+        rows: RecipeRows,
+        contexts: List<ContextInfo>,
+        routeRow: Row?,
+        keyColumns: List<String>,
+    ) {
+        for (info in contexts.filter { it.contextClass == ContextClass.PER_CANDIDATE }) {
+            val role = recipe.contexts.firstOrNull { it.name == info.name } ?: continue
+            val row = rg.roles[info.name]?.let { container(it) }?.let { outRow(rows, it) } ?: continue
+            val missing = keyColumns.filter { it !in row.keys }
+            if (missing.isNotEmpty()) {
+                diags +=
+                    err(
+                        TtrpDiagnosticId.REC_004,
+                        "the context `${info.name}` is per candidate but its rows do not carry the key " +
+                            "`${missing.joinToString(", ")}` under that name — the runner filters them on it",
+                        role.location,
+                    )
+            }
+        }
+        val decision = recipe.decisions.firstOrNull() ?: return
+        val missing = keyColumns.filter { routeRow != null && it !in routeRow.keys }
+        if (missing.isNotEmpty()) {
+            diags +=
+                err(
+                    TtrpDiagnosticId.REC_004,
+                    "the rows entering `${decision.name}`'s switch do not carry the key `${missing.joinToString(
+                        ", ",
+                    )}` " +
+                        "under that name — every route's rows must",
+                    decision.location,
+                )
         }
     }
 
@@ -1215,7 +1281,9 @@ class RecipeChecker(
             is org.tatrman.ttr.parser.model.AutoValue.Str -> v.raw
             is org.tatrman.ttr.parser.model.AutoValue.Num -> v.text
             is org.tatrman.ttr.parser.model.AutoValue.Bool -> v.raw.toString()
-            is org.tatrman.ttr.parser.model.AutoValue.Duration -> "${v.amount.toLong()} ${v.unit}"
+            // the amount as written (`2.5 days` stays 2.5 — review-119 m7)
+            is org.tatrman.ttr.parser.model.AutoValue.Duration ->
+                (if (v.amount % 1.0 == 0.0) v.amount.toLong().toString() else v.amount.toString()) + " ${v.unit}"
             is org.tatrman.ttr.parser.model.AutoValue.Id -> v.parts.joinToString(".")
             else -> null
         }

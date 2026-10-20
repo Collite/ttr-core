@@ -4,6 +4,7 @@ package org.tatrman.ttrp.graph.recipe
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.tatrman.ttrp.diagnostics.Severity
@@ -485,7 +486,11 @@ class Review115Spec :
                         "actions { v.go -> release { order: order_number } }",
                 ).filter { it.id == TtrpDiagnosticId.TYP_001 }
             ctx("orders -> filter(placed_date > :as_of - 1.5) -> rows").single().severity shouldBe Severity.ERROR
-            ctx("orders -> filter(placed_date < 365 + placed_date) -> rows").single().severity shouldBe Severity.WARNING
+            // read as days (the warning) — and a column plus days the door cannot run (review-119 M1: the error)
+            ctx(
+                "orders -> filter(placed_date < 365 + placed_date) -> rows",
+            ).map { it.severity } shouldContainExactlyInAnyOrder
+                listOf(Severity.WARNING, Severity.ERROR)
             ctx("orders -> filter(placed_date > :as_of - (days(1) + minutes(5))) -> rows").single().severity shouldBe
                 Severity.ERROR
         }

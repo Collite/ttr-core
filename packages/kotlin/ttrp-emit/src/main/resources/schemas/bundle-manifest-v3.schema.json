@@ -148,7 +148,8 @@
         "executor",
         "invocation",
         "file",
-        "sha256"
+        "sha256",
+        "schema"
       ],
       "properties": {
         "name": {
@@ -449,7 +450,8 @@
         "port",
         "file",
         "sha256",
-        "columns"
+        "columns",
+        "keyed"
       ],
       "properties": {
         "port": {
@@ -523,6 +525,18 @@
         "type",
         "source"
       ],
+      "if": {
+        "properties": {
+          "source": {
+            "const": "derived"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "derive"
+        ]
+      },
       "properties": {
         "name": {
           "type": "string"
@@ -762,6 +776,7 @@
               ]
             },
             "elseRoute": {
+              "description": "The route an else takes; \"none\" for `else: none` (no verdict row); null without an else.",
               "type": [
                 "string",
                 "null"
@@ -778,7 +793,13 @@
         "kinds": {
           "type": "array",
           "items": {
-            "type": "string"
+            "enum": [
+              "sql",
+              "builtin",
+              "foreign",
+              "call",
+              "turn"
+            ]
           }
         },
         "mode": {

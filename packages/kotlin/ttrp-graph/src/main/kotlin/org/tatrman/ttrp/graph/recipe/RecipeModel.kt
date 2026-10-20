@@ -48,6 +48,23 @@ data class RecipeModel(
      * the door has no date arithmetic, so the runner computes each and binds it (manifest v3 `params[].derive`).
      */
     val derivedParams: List<DerivedParam> = emptyList(),
+    /**
+     * AU-core-P2: the route calcs the switch lowering wrote (node ids) — the only nodes whose `verdict_reason` is a
+     * `because:` text, masked out of the `text` fingerprint (review-119 B3: never by the column's name).
+     */
+    val reasonNodes: Set<String> = emptySet(),
+    /** AU-core-P2: each wired action's `dry_run:` text, language → text (the `labels` fingerprint, D-125). */
+    val dryRuns: Map<String, Map<String, String>> = emptyMap(),
+    /**
+     * AU-core-P2: the island kinds the recipe uses — the candidates' and every context's — in the exporters' five
+     * (`sql`, `builtin`, `foreign`, `call`, `turn`; a canonical body is `sql`), sorted (06 A-9, contracts §5.1;
+     * review-119 M4). The manifest and the generated catalog print this one list.
+     */
+    val kinds: List<String> = emptyList(),
+    /** AU-core-P2: the switch ends `else: none` — its untaken rows get no verdict row (manifest `elseRoute: "none"`). */
+    val elseNone: Boolean = false,
+    /** AU-core-P2: every `+`/`-` with a date operand, by location — [RecipeTime.dateArithmetic]. */
+    val dateArithmetic: Map<org.tatrman.ttrp.ast.SourceLocation, String> = emptyMap(),
 )
 
 /**
