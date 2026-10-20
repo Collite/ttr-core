@@ -103,7 +103,7 @@ object TtrSql {
         // 3) Decompose.
         val result = TtrSqlDecomposer(loc, TtrpParser.catalog, schemas).decompose(tree, outPort)
         diags += orderedLimitCheck(result.statements)
-        return FragmentDecomposition(result.statements, diags, result.derivedInPorts)
+        return FragmentDecomposition(result.statements, diags, result.derivedInPorts, refOperands = result.refOperands)
     }
 
     /**

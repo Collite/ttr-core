@@ -51,13 +51,20 @@ object RecipeStatements {
     /** The reserved `:as_of` (06 A-6): the instant the run binds — a timestamp. */
     const val AS_OF = "as_of"
 
-    fun plan(plan: TtrpPipeline.PlanResult): List<RecipeStatement> {
+    /**
+     * Every output's statement. [tier] [SqlTier.ER] is the bundle's (the door translates it); [SqlTier.DB] renders the
+     * same plan over the physical tables — what a test runs on a database of the model's shape.
+     */
+    fun plan(
+        plan: TtrpPipeline.PlanResult,
+        tier: SqlTier = SqlTier.ER,
+    ): List<RecipeStatement> {
         val graph = requireNotNull(plan.graph) { "a recipe compiles only from a checked plan" }
         val exec = requireNotNull(plan.exec)
         val bound = requireNotNull(plan.bound)
         val model = requireNotNull(plan.recipe) { "${plan.fileName} holds no recipe" }
         val params = params(model, graph)
-        return exec.islands.flatMap { island -> islandStatements(island, graph, bound, params) }
+        return exec.islands.flatMap { island -> islandStatements(island, graph, bound, params, tier) }
     }
 
     private fun islandStatements(
@@ -65,6 +72,7 @@ object RecipeStatements {
         graph: TtrpGraph,
         bound: org.tatrman.ttrp.graph.capability.BoundWorld,
         params: Map<String, PlanParam>,
+        tier: SqlTier,
     ): List<RecipeStatement> {
         val container = graph.containers.getValue(island.id)
         val planner =
@@ -74,7 +82,7 @@ object RecipeStatements {
                 SqlIslandEmitter(bound).dialect(island),
                 params,
                 fragmentsAsMembers = true,
-                tier = SqlTier.ER,
+                tier = tier,
                 dropSynthesized = true,
             )
         return container.declaredPorts

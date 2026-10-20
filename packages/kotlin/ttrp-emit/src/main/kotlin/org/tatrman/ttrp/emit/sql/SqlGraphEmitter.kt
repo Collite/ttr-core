@@ -165,42 +165,50 @@ class SqlGraphEmitter(
         n: Node,
         ins: List<List<EmitColumn>>,
     ): Node {
-        fun find(
-            q: String,
-            c: String,
-            cols: List<EmitColumn>,
-        ) = cols.lastOrNull { it.base == c && q in it.qualifiers }
         val joined = n is Join && ins.size == 2
         val flat = ins.flatten()
         // A projected plain column keeps its authored name when the reference resolves to a renamed one.
         if (n is Project) {
-            val resolved =
-                n.columns.map { c ->
-                    val r = c as? ColumnRef
-                    val q = r?.port?.takeIf { it != PortNames.LEFT && it != PortNames.RIGHT }
-                    if (r != null &&
-                        q != null
-                    ) {
-                        find(q, r.column, flat)?.let { ColumnRef(null, it.name, r.location, r.type) } ?: c
-                    } else {
-                        c
-                    }
-                }
+            val resolved = n.columns.map { c -> (c as? ColumnRef)?.let { resolveRef(it, flat) } ?: c }
             val aliases = n.columns.indices.map { i -> n.aliases.getOrNull(i) ?: (n.columns[i] as? ColumnRef)?.column }
-            return NodeExpressions.map(n.copy(columns = resolved, aliases = aliases)) { e -> qualifyRefs(e, flat) }
-        }
-        return NodeExpressions.map(n) { e ->
-            NodeExpressions.rewrite(e) { x ->
-                val r = x as? ColumnRef ?: return@rewrite null
-                val q = r.port?.takeIf { it != PortNames.LEFT && it != PortNames.RIGHT } ?: return@rewrite null
-                if (joined) {
-                    find(q, r.column, ins[0])?.let { ColumnRef(PortNames.LEFT, it.name, r.location, r.type) }
-                        ?: find(q, r.column, ins[1])?.let { ColumnRef(PortNames.RIGHT, it.name, r.location, r.type) }
-                } else {
-                    find(q, r.column, flat)?.let { ColumnRef(null, it.name, r.location, r.type) }
-                }
+            return NodeExpressions.map(n.copy(columns = resolved, aliases = aliases)) { e ->
+                coerceKeys(qualifyRefs(e, flat), flat, flat)
             }
         }
+        return NodeExpressions.map(n) { e ->
+            if (!joined) return@map coerceKeys(qualifyRefs(e, flat), flat, flat)
+            val resolved =
+                NodeExpressions.rewrite(e) { x ->
+                    val r = x as? ColumnRef ?: return@rewrite null
+                    val q = r.port ?: return@rewrite null
+                    // In a join's condition `left.`/`right.` are its own sides — the plan builder places them.
+                    if (q == PortNames.LEFT || q == PortNames.RIGHT) return@rewrite null
+                    find(q, r.column, ins[0])?.let { ColumnRef(PortNames.LEFT, it.name, r.location, r.type) }
+                        ?: find(q, r.column, ins[1])?.let { ColumnRef(PortNames.RIGHT, it.name, r.location, r.type) }
+                }
+            coerceKeys(resolved, ins[0], ins[1])
+        }
+    }
+
+    /** The latest column of [cols] the qualifier [q] names under the name [c]. */
+    private fun find(
+        q: String,
+        c: String,
+        cols: List<EmitColumn>,
+    ) = cols.lastOrNull { it.base == c && q in it.qualifiers }
+
+    /**
+     * [r] resolved in [cols] when it is qualified and a column answers to it (`left.`/`right.` after a join too) — a
+     * decomposed TTR-SQL reference by the operand its table qualifier named first ([TtrpGraph.refOperands]: `l.state`
+     * and `r.state` both read `left.state`).
+     */
+    private fun resolveRef(
+        r: ColumnRef,
+        cols: List<EmitColumn>,
+    ): ColumnRef? {
+        val q = r.port ?: return null
+        val c = graph.refOperands[r.location]?.let { find(it, r.column, cols) } ?: find(q, r.column, cols)
+        return c?.let { ColumnRef(null, it.name, r.location, r.type) }
     }
 
     /** [e]'s qualified references resolved in [cols] (the latest column the qualifier names). */
@@ -209,17 +217,48 @@ class SqlGraphEmitter(
         cols: List<EmitColumn>,
     ): org.tatrman.ttrp.expr.Expression =
         NodeExpressions.rewrite(e) { x ->
-            val r = x as? ColumnRef ?: return@rewrite null
-            val q = r.port?.takeIf { it != PortNames.LEFT && it != PortNames.RIGHT } ?: return@rewrite null
-            cols.lastOrNull { it.base == r.column && q in it.qualifiers }?.let {
-                ColumnRef(
-                    null,
-                    it.name,
-                    r.location,
-                    r.type,
-                )
+            (x as? ColumnRef)?.let {
+                resolveRef(it, cols)
             }
         }
+
+    /**
+     * An equality of a text column with a number column (`ob.key = l.line_id`: the automation stdlib's `key` is text,
+     * an entity's key a number) compares the number as text — `CAST(l.line_id AS VARCHAR) = ob.key` — as its author
+     * would write it; the other way would cast every key of every entity to a number (AU-core-P2).
+     */
+    private fun coerceKeys(
+        e: org.tatrman.ttrp.expr.Expression,
+        left: List<EmitColumn>,
+        right: List<EmitColumn>,
+    ): org.tatrman.ttrp.expr.Expression =
+        NodeExpressions.rewrite(e) { x ->
+            val call = x as? FunctionCall ?: return@rewrite null
+            if (call.function.name != "eq" && call.function.name != "neq") return@rewrite null
+            val (a, b) = call.args.takeIf { it.size == 2 } ?: return@rewrite null
+
+            fun typeOf(c: org.tatrman.ttrp.expr.Expression): String? {
+                val r = c as? ColumnRef ?: return null
+                val side = if (r.port == PortNames.RIGHT) right else left
+                return (side.lastOrNull { it.name == r.column } ?: (left + right).lastOrNull { it.name == r.column })
+                    ?.type
+            }
+            val ta = typeOf(a) ?: return@rewrite null
+            val tb = typeOf(b) ?: return@rewrite null
+
+            fun text(c: org.tatrman.ttrp.expr.Expression) = Cast(c, org.tatrman.ttrp.expr.TtrpType.Str, c.location)
+            when {
+                isText(ta) && isNumber(tb) -> call.copy(args = listOf(a, text(b)))
+                isNumber(ta) && isText(tb) -> call.copy(args = listOf(text(a), b))
+                else -> null
+            }
+        }
+
+    private fun isText(t: String) = t.substringBefore('(').lowercase() in setOf("text", "varchar", "char", "string")
+
+    private fun isNumber(t: String) =
+        t.substringBefore('(').lowercase() in
+            setOf("int", "integer", "bigint", "smallint", "decimal", "numeric", "float", "double")
 
     /** The right equi-key columns of [join] a qualified reference reads — the join keeps them (by their names). */
     private fun joinKeep(
@@ -448,6 +487,12 @@ class SqlGraphEmitter(
             }
         }
 
+    /** [cols] tagged as the [tag] side of a join — whatever side of an earlier join they were forgotten. */
+    private fun sided(
+        cols: List<EmitColumn>,
+        tag: String,
+    ) = cols.map { it.copy(qualifiers = it.qualifiers - PortNames.LEFT - PortNames.RIGHT + tag) }
+
     private fun joinColumns(
         node: Join,
         ins: List<List<EmitColumn>>,
@@ -459,10 +504,12 @@ class SqlGraphEmitter(
         if (node.type == org.tatrman.ttrp.graph.model.JoinType.SEMI ||
             node.type == org.tatrman.ttrp.graph.model.JoinType.ANTI
         ) {
-            return left
+            return sided(left, PortNames.LEFT)
         }
         val rightKeys = node.on?.let { JoinDedup.rightEquiKeys(it) }.orEmpty()
-        val all = left + right
+        // Each side's columns are `left.`/`right.` to the nodes after the join (a decomposed fragment's `cp.price`
+        // reaches them as `left.price`) — the side of THIS join, an earlier join's side forgotten.
+        val all = sided(left, PortNames.LEFT) + sided(right, PortNames.RIGHT)
         // The same survivors, names and order the plan builder projects ([PlanNodeBuilder]) — a repeated right
         // name made unique, a right key kept when a qualified reference reads it (AU-core-P2).
         return JoinDedup

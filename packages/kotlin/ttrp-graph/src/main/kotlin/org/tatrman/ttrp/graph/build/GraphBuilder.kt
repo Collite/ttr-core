@@ -130,6 +130,7 @@ class GraphBuilder {
                 mdResolutions = report.mdResolutions.associateBy { it.location },
                 loadSources = loadSources,
                 logicalJoins = ctx.logicalJoins.toMap(),
+                refOperands = ctx.refOperands.toMap(),
             ),
             ctx.diags,
             recipeGraph?.copy(relationJoins = ctx.relationJoins.toMap()),
@@ -150,6 +151,9 @@ class GraphBuilder {
 
         /** AU-core-P1: Join id → the relation its `on: relation <r>` names (the recipe checker's key lineage). */
         val relationJoins = LinkedHashMap<String, String>()
+
+        /** AU-core-P2: a decomposed fragment's post-join column references → their operands (TtrpGraph.refOperands). */
+        val refOperands = LinkedHashMap<SourceLocation, String>()
         val containers = LinkedHashMap<String, Container>()
         val diags = mutableListOf<TtrpDiagnostic>()
 
@@ -188,7 +192,8 @@ class GraphBuilder {
             val flowStatements: List<org.tatrman.ttrp.ast.Statement>? =
                 when {
                     body is FlowBody -> body.statements
-                    body is FragmentBody && body.decomposition != null -> body.decomposition!!.statements
+                    body is FragmentBody && body.decomposition != null ->
+                        body.decomposition!!.also { refOperands.putAll(it.refOperands) }.statements
                     else -> null
                 }
             if (flowStatements == null && body is FragmentBody) {

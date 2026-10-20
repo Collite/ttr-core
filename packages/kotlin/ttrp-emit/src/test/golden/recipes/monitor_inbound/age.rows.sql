@@ -1,0 +1,22 @@
+SELECT "t2"."line_id", CASE WHEN "t2"."created_at" IS NULL THEN NULL ELSE COALESCE("t10"."_ttrp_n_n15_0", 0) END AS "days_open"
+FROM (SELECT "t1"."line_id", "t1"."request_number", "t1"."item", "t1"."quantity", "t1"."way", "t1"."customer", "t1"."obligation_id", "t1"."due", "t1"."obligation_state", "obligation0"."recipe", "obligation0"."run", "obligation0"."entity", "obligation0"."key", "obligation0"."kind", "obligation0"."due" AS "due0", "obligation0"."state", "obligation0"."fulfilled_by", "obligation0"."fulfilled_at", "obligation0"."created_at"
+        FROM (SELECT "t"."line_id", "t"."request_number", "t"."item", "t"."quantity", "t"."way", "t"."customer0" AS "customer", "obligation"."id" AS "obligation_id", "obligation"."due", "obligation"."state" AS "obligation_state"
+                FROM (SELECT "return_request_line"."line_id", "return_request_line"."request_number", "return_request_line"."line_no", "return_request_line"."item", "return_request_line"."quantity", "return_request_line"."unit_price", "return_request_line"."reason", "return_request_line"."requested_resolution", "return_request_line"."requested_variant", "return_request_line"."state", "return_request_line"."way", "return_request_line"."customer", "return_request"."customer" AS "customer0", "return_request"."order_number", "return_request"."channel", "return_request"."requested_date", "return_request"."state" AS "state0"
+                        FROM "return_request_line"
+                            INNER JOIN "return_request" ON "return_request_line"."request_number" = "return_request"."request_number") AS "t"
+                    INNER JOIN "obligation" ON "obligation"."entity" = 'return_request_line' AND "obligation"."key" = CAST("t"."line_id" AS VARCHAR) AND "obligation"."kind" = 'inbound' AND "obligation"."state" IN ('open', 'overdue', 'reopened')
+                WHERE "t"."state" = 'awaiting_goods') AS "t1"
+            INNER JOIN "obligation" AS "obligation0" ON "t1"."obligation_id" = "obligation0"."id") AS "t2"
+    LEFT JOIN (SELECT "t7"."created_at" AS "_ttrp_k_n15_0_created_at", COUNT("t8"."_ttrp_d_n15_0") AS "_ttrp_n_n15_0"
+        FROM (SELECT "obligation2"."created_at"
+                FROM (SELECT "t3"."line_id", "t3"."request_number", "t3"."item", "t3"."quantity", "t3"."way", "t3"."customer0" AS "customer", "obligation1"."id" AS "obligation_id", "obligation1"."due", "obligation1"."state" AS "obligation_state"
+                        FROM (SELECT "return_request_line0"."line_id", "return_request_line0"."request_number", "return_request_line0"."line_no", "return_request_line0"."item", "return_request_line0"."quantity", "return_request_line0"."unit_price", "return_request_line0"."reason", "return_request_line0"."requested_resolution", "return_request_line0"."requested_variant", "return_request_line0"."state", "return_request_line0"."way", "return_request_line0"."customer", "return_request0"."customer" AS "customer0", "return_request0"."order_number", "return_request0"."channel", "return_request0"."requested_date", "return_request0"."state" AS "state0"
+                                FROM "return_request_line" AS "return_request_line0"
+                                    INNER JOIN "return_request" AS "return_request0" ON "return_request_line0"."request_number" = "return_request0"."request_number") AS "t3"
+                            INNER JOIN "obligation" AS "obligation1" ON "obligation1"."entity" = 'return_request_line' AND "obligation1"."key" = CAST("t3"."line_id" AS VARCHAR) AND "obligation1"."kind" = 'inbound' AND "obligation1"."state" IN ('open', 'overdue', 'reopened')
+                        WHERE "t3"."state" = 'awaiting_goods') AS "t5"
+                    INNER JOIN "obligation" AS "obligation2" ON "t5"."obligation_id" = "obligation2"."id"
+                GROUP BY "obligation2"."created_at") AS "t7"
+            INNER JOIN (SELECT "cal_date" AS "_ttrp_d_n15_0"
+                FROM "date_dim") AS "t8" ON "t7"."created_at" < "t8"."_ttrp_d_n15_0" AND "t8"."_ttrp_d_n15_0" <= :as_of
+        GROUP BY "t7"."created_at") AS "t10" ON "t2"."created_at" = "t10"."_ttrp_k_n15_0_created_at"
