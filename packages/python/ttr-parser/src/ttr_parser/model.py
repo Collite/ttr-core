@@ -572,6 +572,8 @@ class EntityDef(Definition):
     semantics: SemanticsBlock | None = None
     lexicon: LexiconBlock | None = None
     binding: BindingProperty | None = None
+    #: Grammar 0.17 — the `concept { kind|role|event: … }` sugar.
+    concept: ConceptSugar | None = None
     kind: ClassVar[str] = "entity"
 
 
@@ -598,6 +600,8 @@ class AttributeDef(Definition):
     states: tuple[str, ...] = ()
     #: Grammar 0.16 — `transitions: { placed: [held, …] }` (D-67), in authored order.
     transitions: tuple[AttributeTransition, ...] = ()
+    #: Grammar 0.17 — the `concept { quality: … }` sugar (er: also a value kind).
+    concept: ConceptSugar | None = None
     kind: ClassVar[str] = "attribute"
 
 
@@ -691,6 +695,10 @@ class TermDef(Definition):
     forms: tuple[str, ...] = ()
     match: str | None = None
     text: str | None = None
+    #: Grammar 0.17 — `default: true|false`, a cn default sense (cn contracts §1.5).
+    default: bool | None = None
+    #: Grammar 0.17 — `sense_priority: <n>` (higher wins).
+    sense_priority: float | None = None
     kind: ClassVar[str] = "term"
 
 
@@ -702,6 +710,10 @@ class PatternDef(Definition):
     forms: tuple[str, ...] = ()
     match: str | None = None
     text: str | None = None
+    #: Grammar 0.17 — `default: true|false`, a cn default sense (cn contracts §1.5).
+    default: bool | None = None
+    #: Grammar 0.17 — `sense_priority: <n>` (higher wins).
+    sense_priority: float | None = None
     kind: ClassVar[str] = "pattern"
 
 
@@ -713,6 +725,10 @@ class ExampleDef(Definition):
     forms: tuple[str, ...] = ()
     match: str | None = None
     text: str | None = None
+    #: Grammar 0.17 — `default: true|false`, a cn default sense (cn contracts §1.5).
+    default: bool | None = None
+    #: Grammar 0.17 — `sense_priority: <n>` (higher wins).
+    sense_priority: float | None = None
     kind: ClassVar[str] = "example"
 
 
@@ -1152,6 +1168,277 @@ class ProcessDef:
     steps: tuple[WorldAutoMember, ...] = ()
     entries: tuple[AutoEntry, ...] = ()
     kind: ClassVar[str] = "process"
+
+
+# ============================================================================
+# Grammar 0.17 — the conceptual model (`model cn`; CN-P1, cn contracts §1). The
+# concept defs, a cn `def role` (⚑CN-P6), the ten cn bindings and the `concept { }`
+# sugar read one body: every property, in authored order, to one `ConceptProperty`
+# (its key as written, its span) — typed where the grammar types it, a free-form
+# `ConceptEntry` otherwise. A repeated key is a `ttr/duplicate-property` error; the
+# first is read. Meaning and legality per stereotype are the semantics layer's.
+# Mirrors the TS `ast.ts` and the Kotlin `Definition.kt`.
+# ============================================================================
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddedBlock:
+    """An expression block (⚑CN-P5) — `definition:`, `members:`, a binding's `filter:`.
+
+    `text` is exactly what the expression parser reads; `line_offsets` holds the file
+    offset where every line of it starts once the dedent removed its indent, so a
+    diagnostic about the expression can point into the `.ttrm`. `form` is how it was
+    written (`string` · `tripleString` · `tagged`); `language` is always `pl`.
+    """
+
+    form: str
+    text: str
+    text_source: SourceLocation
+    line_offsets: tuple[int, ...]
+    indent_width: int
+    #: The whole literal, quotes included.
+    source: SourceLocation
+    language: str = "pl"
+    kind: ClassVar[str] = "embeddedBlock"
+
+    def location(self, line: int, column: int, length: int = 1) -> SourceLocation:
+        """The file span of a position inside `text` — `line` 0-based within the block,
+        `column` 0-based within that line. Mirrors the TS `embeddedBlockLocation`."""
+        ln = max(0, min(line, len(self.line_offsets) - 1))
+        start_column = (self.text_source.column if ln == 0 else self.indent_width) + column
+        offset_start = self.line_offsets[ln] + column
+        return SourceLocation(
+            file=self.source.file,
+            line=self.text_source.line + ln,
+            column=start_column,
+            end_line=self.text_source.line + ln,
+            end_column=start_column + length,
+            offset_start=offset_start,
+            offset_end=offset_start + length,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ConceptParticipant:
+    """One `involves:` participant: a concept ref, optionally labelled (`Warehouse as from`)."""
+
+    ref: Reference
+    source: SourceLocation
+    label: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ConceptProperty:
+    """One property of a cn body. `key` is the key as written; `source` spans the property."""
+
+    key: str
+    source: SourceLocation
+    kind: ClassVar[str] = "conceptProperty"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptDescription(ConceptProperty):
+    """`description:` as a plain or triple-quoted string (`value`) or `{ en: …, cs: … }` (`localized`)."""
+
+    value: StringValue | TripleStringValue | None = None
+    localized: LocalizedStringValue | None = None
+    kind: ClassVar[str] = "description"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptLabel(ConceptProperty):
+    value: LocalizedStringValue
+    kind: ClassVar[str] = "label"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptTags(ConceptProperty):
+    value: tuple[str, ...]
+    kind: ClassVar[str] = "tags"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptRef(ConceptProperty):
+    """A stereotype ref — `key` is `kind | role | quality | event | phase | concept`."""
+
+    ref: Reference
+    kind: ClassVar[str] = "ref"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptGrounds(ConceptProperty):
+    ref: Reference
+    kind: ClassVar[str] = "grounds"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptValueSpace(ConceptProperty):
+    """`value_space: ProductCategory`."""
+
+    ref: Reference
+    kind: ClassVar[str] = "valueSpace"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptInvolves(ConceptProperty):
+    participants: tuple[ConceptParticipant, ...]
+    kind: ClassVar[str] = "involves"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptPeriod(ConceptProperty):
+    value: ObjectValue
+    kind: ClassVar[str] = "period"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptExtent(ConceptProperty):
+    value: str
+    kind: ClassVar[str] = "extent"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptBasis(ConceptProperty):
+    value: str
+    kind: ClassVar[str] = "basis"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptDefinition(ConceptProperty):
+    """`definition:` — an expression block, parsed by the TTR-P expression grammar in CN-P2."""
+
+    block: EmbeddedBlock
+    kind: ClassVar[str] = "definition"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptMembers(ConceptProperty):
+    block: EmbeddedBlock
+    kind: ClassVar[str] = "members"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptFilter(ConceptProperty):
+    """A binding's `filter:` — the expression block of a valued state's series."""
+
+    block: EmbeddedBlock
+    kind: ClassVar[str] = "filter"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptLexicon(ConceptProperty):
+    block: LexiconBlock
+    kind: ClassVar[str] = "lexicon"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptTarget(ConceptProperty):
+    """A binding's `target:` (an object or a bare reference)."""
+
+    value: TargetValue
+    kind: ClassVar[str] = "target"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptEntry(ConceptProperty):
+    """A free-form entry (`of`, `is_a`, `qualities`, `relations`, `hierarchy`, `via`, …)."""
+
+    value: PropertyValue
+    kind: ClassVar[str] = "entry"
+
+
+@dataclass(frozen=True, slots=True)
+class ConceptBody:
+    """One cn body. `properties` keeps every property in authored order, repeats included;
+    the convenience fields hold the FIRST `description` / `label` / `tags` (the one read)."""
+
+    properties: tuple[ConceptProperty, ...] = ()
+    description: str | None = None
+    description_localized: LocalizedStringValue | None = None
+    tags: tuple[str, ...] = ()
+    label: LocalizedStringValue | None = None
+
+    def get(self, key: str) -> ConceptProperty | None:
+        """The first property written under `key` (the one the walker reads)."""
+        return next((p for p in self.properties if p.key == key), None)
+
+    def ref(self, key: str) -> Reference | None:
+        """The stereotype ref under `key` (`kind`, `role`, `quality`, `event`, `phase`, `concept`)."""
+        p = self.get(key)
+        return p.ref if isinstance(p, ConceptRef) else None
+
+    def entry(self, key: str) -> PropertyValue | None:
+        """The free-form value under `key` (`of`, `is_a`, `participants`, …)."""
+        p = self.get(key)
+        return p.value if isinstance(p, ConceptEntry) else None
+
+
+@dataclass(frozen=True, slots=True)
+class ConceptSugar:
+    """`concept { … }` inside an er or md def: that def's own concept (desugared in CN-P2)."""
+
+    body: ConceptBody
+    #: The whole `concept { … }` property.
+    source: SourceLocation
+
+
+#: The concept stereotypes, in grammar order (`role` is the shared `def role`).
+CONCEPT_STEREOTYPES: tuple[str, ...] = ("kind", "role", "event", "phase", "quality", "relation_type")
+
+#: The ten cn binding keywords, in grammar order.
+CONCEPT_BINDING_KINDS: tuple[str, ...] = (
+    "cn2md_kind", "cn2md_role", "cn2md_quality", "cn2md_event",
+    "cn2er_kind", "cn2er_role", "cn2er_event", "cn2er_quality", "cn2er_phase",
+    "cn2db_concept",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ConceptDef(Definition):
+    """`def kind | role | event | phase | quality | relation_type <id> { … }` — one class for
+    every stereotype; a `def role` is a concept only in a `model cn` file."""
+
+    stereotype: str = "kind"
+    body: ConceptBody = field(default_factory=ConceptBody)
+    kind: ClassVar[str] = "concept"
+
+
+@dataclass(frozen=True, slots=True)
+class ConceptBindingDef(Definition):
+    """`def cn2md_* | cn2er_* | cn2db_concept <id> { … }`; `binding_kind` is the def keyword."""
+
+    binding_kind: str = "cn2md_kind"
+    body: ConceptBody = field(default_factory=ConceptBody)
+    kind: ClassVar[str] = "concept_binding"
+
+
+# The md hosts of the `concept { }` sugar. The Python port carries no md model — the TS and
+# Kotlin md fields (type, restrict, grain, measures, …) are not ported, and the conformance
+# dump compares none of them; these four carry identity and the 0.17 `concept` sugar.
+
+
+@dataclass(frozen=True, slots=True)
+class MdDomainDef(Definition):
+    concept: ConceptSugar | None = None
+    kind: ClassVar[str] = "md_domain"
+
+
+@dataclass(frozen=True, slots=True)
+class DimensionDef(Definition):
+    concept: ConceptSugar | None = None
+    kind: ClassVar[str] = "dimension"
+
+
+@dataclass(frozen=True, slots=True)
+class MeasureDef(Definition):
+    concept: ConceptSugar | None = None
+    kind: ClassVar[str] = "measure"
+
+
+@dataclass(frozen=True, slots=True)
+class CubeletDef(Definition):
+    concept: ConceptSugar | None = None
+    kind: ClassVar[str] = "cubelet"
 
 
 # ============================================================================

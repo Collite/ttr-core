@@ -5,6 +5,8 @@ import org.tatrman.ttr.parser.model.AreaDef
 import org.tatrman.ttr.parser.model.AttributeDef
 import org.tatrman.ttr.parser.model.AutomationDef
 import org.tatrman.ttr.parser.model.ColumnDef
+import org.tatrman.ttr.parser.model.ConceptBindingDef
+import org.tatrman.ttr.parser.model.ConceptDef
 import org.tatrman.ttr.parser.model.CubeletDef
 import org.tatrman.ttr.parser.model.Md2dbCubeletDef
 import org.tatrman.ttr.parser.model.Md2dbDomainDef
@@ -83,6 +85,10 @@ fun kindOf(def: Definition): String =
         is LexiconEntryDef -> def.entryKind
         // 0.16 — the automation kinds key on their def keyword (`parameter`, `action`, …).
         is AutomationDef -> def.kind
+        // 0.17 — the conceptual model. Mirrors the TS `def.kind` discriminator; semantics has no `cn` model
+        // yet, so both key under the default model (`db`) until CN-P2 S2.1 (the TS goldens agree).
+        is ConceptDef -> "concept"
+        is ConceptBindingDef -> "conceptBinding"
     }
 
 /**

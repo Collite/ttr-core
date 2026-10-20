@@ -44,3 +44,14 @@ val TAG_REGISTRY: Map<String, TagEntry> =
 
 /** Resolve a tag to its registry entry, or `null` if unknown (caller diagnoses). */
 fun resolveTag(tag: String): TagEntry? = TAG_REGISTRY[tag]
+
+/**
+ * Grammar 0.17 (⚑CN-P5) — the languages an EXPRESSION block (`definition:`, `members:`, a cn binding's
+ * `filter:`) may be tagged with: only TTR-P's expression language, `"""pl`. A separate table from
+ * [TAG_REGISTRY], which names the languages a `sourceText` / `definitionSql` block holds. Mirrors the TS
+ * `EXPRESSION_TAG_REGISTRY`.
+ */
+val EXPRESSION_TAG_REGISTRY: Map<String, String> = mapOf("pl" to "pl")
+
+/** Resolve an expression-block tag to its language, or `null` if it names none (caller diagnoses). */
+fun resolveExpressionTag(tag: String): String? = EXPRESSION_TAG_REGISTRY[tag]

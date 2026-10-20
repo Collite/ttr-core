@@ -34,6 +34,12 @@ import org.tatrman.ttr.parser.model.BindingProperty
 import org.tatrman.ttr.parser.model.BindingPropertyBareId
 import org.tatrman.ttr.parser.model.BindingPropertyBlock
 import org.tatrman.ttr.parser.model.ColumnDef
+import org.tatrman.ttr.parser.model.ConceptBindingDef
+import org.tatrman.ttr.parser.model.ConceptBody
+import org.tatrman.ttr.parser.model.ConceptDef
+import org.tatrman.ttr.parser.model.ConceptProperty
+import org.tatrman.ttr.parser.model.ConceptSugar
+import org.tatrman.ttr.parser.model.EmbeddedBlock
 import org.tatrman.ttr.parser.model.ConstraintDef
 import org.tatrman.ttr.parser.model.DataType
 import org.tatrman.ttr.parser.model.Definition
@@ -206,6 +212,9 @@ object ConformanceDump {
             is WorldDef -> "world"
             is LexiconEntryDef -> d.entryKind
             is AutomationDef -> d.kind
+            // 0.17 — a concept def dumps its stereotype keyword, a cn binding its binding keyword.
+            is ConceptDef -> d.stereotype
+            is ConceptBindingDef -> d.bindingKind
         }
 
     private fun propsOf(d: Definition): Map<String, JsonElement> {
@@ -265,6 +274,7 @@ object ConformanceDump {
                 d.semantics?.let { p["semantics"] = semantics(it) }
                 d.lexicon?.let { l -> lexicon(l)?.let { p["lexicon"] = it } }
                 d.binding?.let { p["binding"] = binding(it) }
+                conceptSugar(d.concept)?.let { p["concept"] = it }
             }
             is AttributeDef -> {
                 d.type?.let { p["type"] = dataType(it) }
@@ -281,6 +291,7 @@ object ConformanceDump {
                 if (d.transitions.isNotEmpty()) {
                     p["transitions"] = obj(d.transitions.associate { it.from to (strList(it.to) as JsonElement) })
                 }
+                conceptSugar(d.concept)?.let { p["concept"] = it }
             }
             is RelationDef -> {
                 d.from?.let { p["from"] = pv(it) }
@@ -338,9 +349,13 @@ object ConformanceDump {
             }
             // MD (v3.1) logical + md2db binding defs are not in the cross-target conformance corpus
             // yet (S8) — their parser-port coverage lives in MdDefParseSpec / Md2dbDefParseSpec.
-            // Emit identity only; no props compared.
-            is MdDomainDef, is DimensionDef, is MdMapDef, is HierarchyDef, is MeasureDef, is CubeletDef,
-            is Md2dbCubeletDef, is Md2dbDomainDef, is Md2dbMapDef, is Md2erCubeletDef,
+            // Emit identity only; no props compared — except 0.17's `concept { }` sugar on the md hosts
+            // (present-only, so a pre-0.17 md def dumps unchanged).
+            is MdDomainDef -> conceptSugar(d.concept)?.let { p["concept"] = it }
+            is DimensionDef -> conceptSugar(d.concept)?.let { p["concept"] = it }
+            is MeasureDef -> conceptSugar(d.concept)?.let { p["concept"] = it }
+            is CubeletDef -> conceptSugar(d.concept)?.let { p["concept"] = it }
+            is MdMapDef, is HierarchyDef, is Md2dbCubeletDef, is Md2dbDomainDef, is Md2dbMapDef, is Md2erCubeletDef,
             -> {}
             is WorldDef -> {
                 d.extends?.let { p["extends"] = JsonPrimitive(it) }
@@ -391,10 +406,83 @@ object ConformanceDump {
                 if (d.forms.isNotEmpty()) p["forms"] = strList(d.forms)
                 d.match?.let { p["match"] = JsonPrimitive(it) }
                 d.text?.let { p["text"] = JsonPrimitive(it) }
+                // 0.17 — the cn default sense (present-only: `default: false` dumps like no `default:`).
+                if (d.default == true) p["default"] = JsonPrimitive(true)
+                d.sensePriority?.let { p["sense_priority"] = num(it) }
+            }
+            // 0.17 — the concept defs and the cn bindings share one body.
+            is ConceptDef -> p.putAll(conceptProps(d.body, withCommon = false))
+            is ConceptBindingDef -> p.putAll(conceptProps(d.body, withCommon = false))
+        }
+        return p
+    }
+
+    // ----- 0.17 cn serialisers (present-only; shared shape with dump.ts / dump.py) -----
+
+    /**
+     * A cn body as a key-sorted object keyed by the property as written (`value_space`, `is_a`, `event`).
+     * The first of a repeated key wins (the walker reports the rest). [withCommon] adds `description` /
+     * `descriptionLocalized` / `tags`, which a def dumps at its top level and the sugar has nowhere else.
+     */
+    @Suppress("CyclomaticComplexMethod")
+    private fun conceptProps(
+        b: ConceptBody,
+        withCommon: Boolean,
+    ): Map<String, JsonElement> {
+        val p = linkedMapOf<String, JsonElement>()
+        val seen = mutableSetOf<String>()
+        for (prop in b.properties) {
+            if (!seen.add(prop.key)) continue
+            when (prop) {
+                is ConceptProperty.Description ->
+                    if (withCommon) {
+                        val loc = prop.localized
+                        when {
+                            loc != null ->
+                                p["descriptionLocalized"] =
+                                    obj(loc.byLanguage.mapValues { JsonPrimitive(it.value) })
+                            prop.value is PropertyValue.StringValue -> p["description"] = JsonPrimitive(prop.value.raw)
+                            prop.value is PropertyValue.TripleStringValue ->
+                                p["description"] =
+                                    JsonPrimitive(prop.value.raw)
+                        }
+                    }
+                is ConceptProperty.Tags -> if (withCommon && prop.value.isNotEmpty()) p["tags"] = strList(prop.value)
+                is ConceptProperty.Label -> localized(prop.value)?.let { p["label"] = it }
+                is ConceptProperty.Ref -> p[prop.key] = JsonPrimitive(prop.ref.path)
+                is ConceptProperty.Grounds -> p[prop.key] = JsonPrimitive(prop.ref.path)
+                is ConceptProperty.ValueSpace -> p[prop.key] = JsonPrimitive(prop.ref.path)
+                is ConceptProperty.Involves ->
+                    p["involves"] =
+                        JsonArray(
+                            prop.participants.map { pt ->
+                                val label = pt.label
+                                if (!label.isNullOrEmpty()) {
+                                    obj("label" to JsonPrimitive(label), "ref" to JsonPrimitive(pt.ref.path))
+                                } else {
+                                    obj("ref" to JsonPrimitive(pt.ref.path))
+                                }
+                            },
+                        )
+                is ConceptProperty.Period -> p["period"] = pv(prop.value)
+                is ConceptProperty.Extent -> p[prop.key] = JsonPrimitive(prop.value)
+                is ConceptProperty.Basis -> p[prop.key] = JsonPrimitive(prop.value)
+                is ConceptProperty.DefinitionBlock -> p[prop.key] = expressionBlock(prop.block)
+                is ConceptProperty.MembersBlock -> p[prop.key] = expressionBlock(prop.block)
+                is ConceptProperty.FilterBlock -> p[prop.key] = expressionBlock(prop.block)
+                is ConceptProperty.Lexicon -> lexicon(prop.block)?.let { p["lexicon"] = it }
+                is ConceptProperty.Target -> p["target"] = target(prop.value)
+                is ConceptProperty.Entry -> p[prop.key] = pv(prop.value)
             }
         }
         return p
     }
+
+    private fun conceptSugar(s: ConceptSugar?): JsonElement? = s?.let { obj(conceptProps(it.body, withCommon = true)) }
+
+    /** An expression block: how it was written and its text (positions are impl-specific, never dumped). */
+    private fun expressionBlock(b: EmbeddedBlock): JsonElement =
+        obj("form" to JsonPrimitive(b.form), "language" to JsonPrimitive(b.language), "text" to JsonPrimitive(b.text))
 
     // ----- 0.16 automation serialisers (present-only; shared shape with dump.ts / dump.py) -----
 

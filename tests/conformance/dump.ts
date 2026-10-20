@@ -68,6 +68,14 @@ const KIND_KEYWORD: Record<string, string> = {
   drillMap: 'drill_map',
   world: 'world',
   schema: 'schema',
+  // The md kinds whose AST discriminator is not their keyword (0.17: fixture 77 is the first md def in
+  // the corpus — the Kotlin dump already wrote the keyword).
+  mdDomain: 'domain',
+  mdMap: 'map',
+  md2dbCubelet: 'md2db_cubelet',
+  md2dbDomain: 'md2db_domain',
+  md2dbMap: 'md2db_map',
+  md2erCubelet: 'md2er_cubelet',
 };
 
 export function dump(result: ParseResult): string {

@@ -7,7 +7,9 @@ import { conceptEntry, conceptProperty, conceptRef, embeddedBlockLocation } from
 import { DiagnosticCode } from '../diagnostics.js';
 import type {
   ConceptBindingDef,
+  ConceptBody,
   ConceptDef,
+  ConceptSugar,
   CubeletDef,
   Definition,
   DimensionDef,
@@ -504,5 +506,55 @@ describe('cn walker — diagnostics and recovery (T6)', () => {
       expect(ast, src).toBeDefined();
       expect(ast!.definitions.length, src).toBe(1);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------
+// S1.3 T4 — the read is lossless, and the cn rejects fail at the same place on all three targets
+// (the Kotlin `CnWalkerSpec` and the Python `test_cn_walker.py` assert the same table, 1-based columns)
+// ---------------------------------------------------------------------------------------------------
+
+describe('cn walker — lossless read and shared error positions (S1.3 T4)', () => {
+  const bodies = (defs: Definition[]): ConceptBody[] =>
+    defs.flatMap((d): ConceptBody[] => {
+      if (d.kind === 'concept' || d.kind === 'conceptBinding') return [d];
+      if (d.kind === 'entity') return [d.concept, ...(d.attributes ?? []).map((a) => a.concept)].filter((s): s is ConceptSugar => s !== undefined);
+      if (d.kind === 'cubelet' || d.kind === 'dimension' || d.kind === 'mdDomain' || d.kind === 'measure') return d.concept ? [d.concept] : [];
+      return [];
+    });
+
+  it.each(['75-cn-concepts.ttrm', '76-cn-bindings.ttrm', '77-cn-sugar.ttrm'])(
+    'every cn property of %s spans source text that starts with its key, and no separator',
+    (name) => {
+      const src = fixture(name);
+      for (const p of bodies(parseFixture(name).definitions).flatMap((b) => b.properties)) {
+        const text = src.slice(p.source.offsetStart, p.source.offsetEnd);
+        expect(text.startsWith(p.key), p.key).toBe(true);
+        expect(text.trimEnd().endsWith(','), p.key).toBe(false);
+      }
+    },
+  );
+
+  it('keeps participant labels and a block tag in their spans; a trailing comma is dropped', () => {
+    const src = fixture('75-cn-concepts.ttrm');
+    const defs = parseFixture('75-cn-concepts.ttrm').definitions;
+    const parts = conceptProperty(concept(defs, 'StockTransfer'), 'involves')!.participants;
+    expect(parts.map((p) => src.slice(p.source.offsetStart, p.source.offsetEnd))).toEqual(['Item', 'Warehouse as from', 'Warehouse as to']);
+    const delay = conceptProperty(concept(defs, 'transfer_delay'), 'definition')!.block;
+    expect(src.slice(delay.source.offsetStart, delay.source.offsetEnd).startsWith('"""pl')).toBe(true);
+    const home = concept(defs, 'HomeCategory');
+    const last = home.properties[home.properties.length - 1].source;
+    expect(src.slice(last.offsetStart, last.offsetEnd)).toBe('label: { en: "Home and garden categories" }');
+  });
+
+  it.each([
+    ['neg-01-bare-definition.ttrm', 3, 54],
+    ['neg-02-involves-no-brackets.ttrm', 3, 27],
+    ['neg-03-bare-members.ttrm', 3, 56],
+    ['neg-04-unlabelled-as.ttrm', 3, 76],
+  ])('%s reports its first syntax error at %i:%i (0-based column) on all three targets', (name, line, column) => {
+    const negative = readFileSync(join(CN, '..', 'cn-negative', name), 'utf-8');
+    const first = parseString(negative, name).errors.find((e) => e.code === DiagnosticCode.ParseError)!;
+    expect([first.source.line, first.source.column]).toEqual([line, column]);
   });
 });
