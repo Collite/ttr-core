@@ -497,20 +497,14 @@ object TtrpCli {
         }.trimEnd()
     }
 
-    /**
-     * The recipe checker over [file] (AU-core-P1): what it learned, and every finding in source order — all but
-     * TTRP-REC-099 (a recipe compiles to a bundle from AU-core-P2; checking it is not that).
-     */
+    /** The recipe checker over [file] (AU-core-P1): what it learned, and every finding in source order. */
     private fun checkRecipe(
         file: Path,
         manifest: org.tatrman.ttrp.project.TtrpManifest,
         modelsRoot: Path,
     ): Pair<org.tatrman.ttrp.graph.recipe.RecipeModel?, List<org.tatrman.ttrp.diagnostics.TtrpDiagnostic>> {
         val plan = TtrpPipeline(manifest, modelsRoot).plan(Files.readString(file), file.toString())
-        val findings =
-            plan.diagnostics
-                .filter { it.id != org.tatrman.ttrp.diagnostics.TtrpDiagnosticId.REC_099 }
-                .sortedWith(compareBy({ it.location.line }, { it.location.column }))
+        val findings = plan.diagnostics.sortedWith(compareBy({ it.location.line }, { it.location.column }))
         return plan.recipe to findings
     }
 

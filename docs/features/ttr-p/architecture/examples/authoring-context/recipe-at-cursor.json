@@ -1,0 +1,4106 @@
+{
+  "version": 2,
+  "world": {
+    "qname": "hartland.worlds.demo",
+    "fingerprint": "sha256:e6ed5c4a3be8aa1fc00c13fb32f873e77c478b13ed24f6721a6a70b52904dbd9",
+    "engines": [
+      {
+        "name": "erp",
+        "type": "postgres"
+      },
+      {
+        "name": "automation",
+        "type": "postgres"
+      }
+    ],
+    "executors": [
+      {
+        "name": "n8n"
+      },
+      {
+        "name": "bpmn"
+      },
+      {
+        "name": "py"
+      }
+    ],
+    "storages": [
+      {
+        "name": "erp_db",
+        "staging": false,
+        "rls": false
+      },
+      {
+        "name": "automation_db",
+        "staging": false,
+        "rls": false
+      },
+      {
+        "name": "stage",
+        "staging": true,
+        "rls": false
+      }
+    ],
+    "staging": "stage",
+    "writable": [
+      {
+        "storage": "erp_db",
+        "items": [
+          "order.state",
+          "order.held_for",
+          "return_request_line.state",
+          "return_request_line.way",
+          "reorder_proposal",
+          "winback_mail"
+        ]
+      },
+      {
+        "storage": "automation_db",
+        "items": [
+          "obligation",
+          "state_history",
+          "*_verdict",
+          "*_verdict_detail",
+          "approvals"
+        ]
+      }
+    ]
+  },
+  "capabilities": {
+    "engines": [
+      {
+        "engine": "erp",
+        "type": "postgres",
+        "rejects": true,
+        "nodes": [
+          "Aggregate",
+          "Except",
+          "Filter",
+          "Index",
+          "Intersect",
+          "Join",
+          "Limit",
+          "Load",
+          "Pivot",
+          "Project",
+          "Sort",
+          "Store",
+          "Union",
+          "Values"
+        ],
+        "functions": [
+          "agg.avg",
+          "agg.count",
+          "agg.max",
+          "agg.min",
+          "agg.sum",
+          "fn.abs",
+          "fn.coalesce",
+          "fn.geo_distance_m",
+          "fn.length",
+          "fn.lower",
+          "fn.period_end",
+          "fn.period_start",
+          "fn.regexp_match",
+          "fn.round",
+          "fn.substring",
+          "fn.upper",
+          "nullif",
+          "op.add",
+          "op.and",
+          "op.concat",
+          "op.div",
+          "op.eq",
+          "op.gt",
+          "op.gte",
+          "op.lt",
+          "op.lte",
+          "op.mul",
+          "op.neg",
+          "op.neq",
+          "op.not",
+          "op.or",
+          "op.sub"
+        ]
+      },
+      {
+        "engine": "automation",
+        "type": "postgres",
+        "rejects": true,
+        "nodes": [
+          "Aggregate",
+          "Except",
+          "Filter",
+          "Index",
+          "Intersect",
+          "Join",
+          "Limit",
+          "Load",
+          "Pivot",
+          "Project",
+          "Sort",
+          "Store",
+          "Union",
+          "Values"
+        ],
+        "functions": [
+          "agg.avg",
+          "agg.count",
+          "agg.max",
+          "agg.min",
+          "agg.sum",
+          "fn.abs",
+          "fn.coalesce",
+          "fn.geo_distance_m",
+          "fn.length",
+          "fn.lower",
+          "fn.period_end",
+          "fn.period_start",
+          "fn.regexp_match",
+          "fn.round",
+          "fn.substring",
+          "fn.upper",
+          "nullif",
+          "op.add",
+          "op.and",
+          "op.concat",
+          "op.div",
+          "op.eq",
+          "op.gt",
+          "op.gte",
+          "op.lt",
+          "op.lte",
+          "op.mul",
+          "op.neg",
+          "op.neq",
+          "op.not",
+          "op.or",
+          "op.sub"
+        ]
+      }
+    ]
+  },
+  "modelObjects": [
+    {
+      "name": "db.dbo.date_dim",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "d_date_sk",
+          "type": "int"
+        },
+        {
+          "name": "d_date",
+          "type": "date"
+        },
+        {
+          "name": "d_year",
+          "type": "int"
+        },
+        {
+          "name": "d_moy",
+          "type": "int"
+        },
+        {
+          "name": "d_qoy",
+          "type": "int"
+        },
+        {
+          "name": "d_week_seq",
+          "type": "int"
+        },
+        {
+          "name": "d_day_name",
+          "type": "char"
+        },
+        {
+          "name": "d_holiday",
+          "type": "char"
+        },
+        {
+          "name": "d_weekend",
+          "type": "char"
+        },
+        {
+          "name": "d_working_day",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.item",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "i_item_sk",
+          "type": "int"
+        },
+        {
+          "name": "i_item_id",
+          "type": "char"
+        },
+        {
+          "name": "i_product_name",
+          "type": "char"
+        },
+        {
+          "name": "i_brand",
+          "type": "char"
+        },
+        {
+          "name": "i_class",
+          "type": "char"
+        },
+        {
+          "name": "i_category",
+          "type": "char"
+        },
+        {
+          "name": "i_manufact",
+          "type": "char"
+        },
+        {
+          "name": "i_size",
+          "type": "char"
+        },
+        {
+          "name": "i_container",
+          "type": "char"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.customer",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "c_customer_sk",
+          "type": "int"
+        },
+        {
+          "name": "c_customer_id",
+          "type": "char"
+        },
+        {
+          "name": "c_current_addr_sk",
+          "type": "int"
+        },
+        {
+          "name": "c_current_cdemo_sk",
+          "type": "int"
+        },
+        {
+          "name": "c_current_hdemo_sk",
+          "type": "int"
+        },
+        {
+          "name": "c_birth_year",
+          "type": "int"
+        },
+        {
+          "name": "c_center_sk",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.customer_address",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "ca_address_sk",
+          "type": "int"
+        },
+        {
+          "name": "ca_address_id",
+          "type": "char"
+        },
+        {
+          "name": "ca_city",
+          "type": "varchar"
+        },
+        {
+          "name": "ca_county",
+          "type": "varchar"
+        },
+        {
+          "name": "ca_state",
+          "type": "char"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.customer_demographics",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "cd_demo_sk",
+          "type": "int"
+        },
+        {
+          "name": "cd_gender",
+          "type": "char"
+        },
+        {
+          "name": "cd_marital_status",
+          "type": "char"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.household_demographics",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "hd_demo_sk",
+          "type": "int"
+        },
+        {
+          "name": "hd_income_band_sk",
+          "type": "int"
+        },
+        {
+          "name": "hd_buy_potential",
+          "type": "char"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.income_band",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "ib_income_band_sk",
+          "type": "int"
+        },
+        {
+          "name": "ib_lower_bound",
+          "type": "int"
+        },
+        {
+          "name": "ib_upper_bound",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.store",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "s_store_sk",
+          "type": "int"
+        },
+        {
+          "name": "s_store_id",
+          "type": "char"
+        },
+        {
+          "name": "s_store_name",
+          "type": "varchar"
+        },
+        {
+          "name": "s_city",
+          "type": "varchar"
+        },
+        {
+          "name": "s_state",
+          "type": "char"
+        },
+        {
+          "name": "s_rec_start_date",
+          "type": "date"
+        },
+        {
+          "name": "s_rec_end_date",
+          "type": "date"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.warehouse",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "w_warehouse_sk",
+          "type": "int"
+        },
+        {
+          "name": "w_warehouse_id",
+          "type": "char"
+        },
+        {
+          "name": "w_warehouse_name",
+          "type": "varchar"
+        },
+        {
+          "name": "w_city",
+          "type": "varchar"
+        },
+        {
+          "name": "w_state",
+          "type": "char"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.promotion",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "p_promo_sk",
+          "type": "int"
+        },
+        {
+          "name": "p_promo_id",
+          "type": "char"
+        },
+        {
+          "name": "p_promo_name",
+          "type": "char"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.reason",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "r_reason_sk",
+          "type": "int"
+        },
+        {
+          "name": "r_reason_id",
+          "type": "char"
+        },
+        {
+          "name": "r_reason_desc",
+          "type": "char"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.call_center",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "cc_call_center_sk",
+          "type": "int"
+        },
+        {
+          "name": "cc_call_center_id",
+          "type": "char"
+        },
+        {
+          "name": "cc_name",
+          "type": "varchar"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.store_sales",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "ss_sold_date_sk",
+          "type": "int"
+        },
+        {
+          "name": "ss_item_sk",
+          "type": "int"
+        },
+        {
+          "name": "ss_customer_sk",
+          "type": "int"
+        },
+        {
+          "name": "ss_addr_sk",
+          "type": "int"
+        },
+        {
+          "name": "ss_store_sk",
+          "type": "int"
+        },
+        {
+          "name": "ss_promo_sk",
+          "type": "int"
+        },
+        {
+          "name": "ss_ticket_number",
+          "type": "int"
+        },
+        {
+          "name": "ss_quantity",
+          "type": "int"
+        },
+        {
+          "name": "ss_ext_sales_price",
+          "type": "decimal"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.web_sales",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "ws_sold_date_sk",
+          "type": "int"
+        },
+        {
+          "name": "ws_item_sk",
+          "type": "int"
+        },
+        {
+          "name": "ws_bill_customer_sk",
+          "type": "int"
+        },
+        {
+          "name": "ws_bill_addr_sk",
+          "type": "int"
+        },
+        {
+          "name": "ws_warehouse_sk",
+          "type": "int"
+        },
+        {
+          "name": "ws_promo_sk",
+          "type": "int"
+        },
+        {
+          "name": "ws_order_number",
+          "type": "int"
+        },
+        {
+          "name": "ws_quantity",
+          "type": "int"
+        },
+        {
+          "name": "ws_ext_sales_price",
+          "type": "decimal"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.catalog_sales",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "cs_sold_date_sk",
+          "type": "int"
+        },
+        {
+          "name": "cs_item_sk",
+          "type": "int"
+        },
+        {
+          "name": "cs_bill_customer_sk",
+          "type": "int"
+        },
+        {
+          "name": "cs_bill_addr_sk",
+          "type": "int"
+        },
+        {
+          "name": "cs_call_center_sk",
+          "type": "int"
+        },
+        {
+          "name": "cs_warehouse_sk",
+          "type": "int"
+        },
+        {
+          "name": "cs_promo_sk",
+          "type": "int"
+        },
+        {
+          "name": "cs_order_number",
+          "type": "int"
+        },
+        {
+          "name": "cs_quantity",
+          "type": "int"
+        },
+        {
+          "name": "cs_ext_sales_price",
+          "type": "decimal"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.store_returns",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "sr_returned_date_sk",
+          "type": "int"
+        },
+        {
+          "name": "sr_item_sk",
+          "type": "int"
+        },
+        {
+          "name": "sr_customer_sk",
+          "type": "int"
+        },
+        {
+          "name": "sr_store_sk",
+          "type": "int"
+        },
+        {
+          "name": "sr_reason_sk",
+          "type": "int"
+        },
+        {
+          "name": "sr_ticket_number",
+          "type": "int"
+        },
+        {
+          "name": "sr_return_quantity",
+          "type": "int"
+        },
+        {
+          "name": "sr_return_amt",
+          "type": "decimal"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.web_returns",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "wr_returned_date_sk",
+          "type": "int"
+        },
+        {
+          "name": "wr_item_sk",
+          "type": "int"
+        },
+        {
+          "name": "wr_returning_customer_sk",
+          "type": "int"
+        },
+        {
+          "name": "wr_reason_sk",
+          "type": "int"
+        },
+        {
+          "name": "wr_order_number",
+          "type": "int"
+        },
+        {
+          "name": "wr_return_quantity",
+          "type": "int"
+        },
+        {
+          "name": "wr_return_amt",
+          "type": "decimal"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.catalog_returns",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "cr_returned_date_sk",
+          "type": "int"
+        },
+        {
+          "name": "cr_item_sk",
+          "type": "int"
+        },
+        {
+          "name": "cr_returning_customer_sk",
+          "type": "int"
+        },
+        {
+          "name": "cr_reason_sk",
+          "type": "int"
+        },
+        {
+          "name": "cr_warehouse_sk",
+          "type": "int"
+        },
+        {
+          "name": "cr_order_number",
+          "type": "int"
+        },
+        {
+          "name": "cr_return_quantity",
+          "type": "int"
+        },
+        {
+          "name": "cr_return_amount",
+          "type": "decimal"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.inventory",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "inv_date_sk",
+          "type": "int"
+        },
+        {
+          "name": "inv_item_sk",
+          "type": "int"
+        },
+        {
+          "name": "inv_warehouse_sk",
+          "type": "int"
+        },
+        {
+          "name": "inv_quantity_on_hand",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.sales_order",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "so_order_number",
+          "type": "int"
+        },
+        {
+          "name": "so_channel",
+          "type": "varchar"
+        },
+        {
+          "name": "so_customer_sk",
+          "type": "int"
+        },
+        {
+          "name": "so_placed_date",
+          "type": "date"
+        },
+        {
+          "name": "so_delivered_date",
+          "type": "date"
+        },
+        {
+          "name": "so_warehouse_sk",
+          "type": "int"
+        },
+        {
+          "name": "so_value",
+          "type": "decimal"
+        },
+        {
+          "name": "so_state",
+          "type": "varchar"
+        },
+        {
+          "name": "so_held_for",
+          "type": "varchar"
+        },
+        {
+          "name": "so_placed_by",
+          "type": "varchar"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.sales_line",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "sl_order_number",
+          "type": "int"
+        },
+        {
+          "name": "sl_line_no",
+          "type": "int"
+        },
+        {
+          "name": "sl_item_sk",
+          "type": "int"
+        },
+        {
+          "name": "sl_quantity",
+          "type": "int"
+        },
+        {
+          "name": "sl_unit_price",
+          "type": "decimal"
+        },
+        {
+          "name": "sl_ext_sales_price",
+          "type": "decimal"
+        },
+        {
+          "name": "sl_warehouse_sk",
+          "type": "int"
+        },
+        {
+          "name": "sl_sold_date",
+          "type": "date"
+        },
+        {
+          "name": "sl_customer_sk",
+          "type": "int"
+        },
+        {
+          "name": "sl_channel",
+          "type": "varchar"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.price_list",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "pl_item_sk",
+          "type": "int"
+        },
+        {
+          "name": "pl_channel",
+          "type": "varchar"
+        },
+        {
+          "name": "pl_valid_from",
+          "type": "date"
+        },
+        {
+          "name": "pl_price",
+          "type": "decimal"
+        },
+        {
+          "name": "pl_valid_to",
+          "type": "date"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.customer_price",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "cp_item_sk",
+          "type": "int"
+        },
+        {
+          "name": "cp_customer_sk",
+          "type": "int"
+        },
+        {
+          "name": "cp_valid_from",
+          "type": "date"
+        },
+        {
+          "name": "cp_price",
+          "type": "decimal"
+        },
+        {
+          "name": "cp_valid_to",
+          "type": "date"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.invoice",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "inv_invoice_id",
+          "type": "int"
+        },
+        {
+          "name": "inv_customer_sk",
+          "type": "int"
+        },
+        {
+          "name": "inv_order_number",
+          "type": "int"
+        },
+        {
+          "name": "inv_issued",
+          "type": "date"
+        },
+        {
+          "name": "inv_due",
+          "type": "date"
+        },
+        {
+          "name": "inv_amount",
+          "type": "decimal"
+        },
+        {
+          "name": "inv_paid",
+          "type": "decimal"
+        },
+        {
+          "name": "inv_status",
+          "type": "varchar"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.warehouse_outage",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "wo_warehouse_sk",
+          "type": "int"
+        },
+        {
+          "name": "wo_from_date",
+          "type": "date"
+        },
+        {
+          "name": "wo_to_date",
+          "type": "date"
+        },
+        {
+          "name": "wo_reason",
+          "type": "varchar"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.reorder_proposal",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "rp_proposal_id",
+          "type": "int"
+        },
+        {
+          "name": "rp_run",
+          "type": "varchar"
+        },
+        {
+          "name": "rp_item_sk",
+          "type": "int"
+        },
+        {
+          "name": "rp_warehouse_sk",
+          "type": "int"
+        },
+        {
+          "name": "rp_on_hand",
+          "type": "int"
+        },
+        {
+          "name": "rp_weekly_demand",
+          "type": "decimal"
+        },
+        {
+          "name": "rp_proposed_qty",
+          "type": "int"
+        },
+        {
+          "name": "rp_state",
+          "type": "varchar"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.winback_mail",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "wm_customer_sk",
+          "type": "int"
+        },
+        {
+          "name": "wm_quarter",
+          "type": "varchar"
+        },
+        {
+          "name": "wm_offer",
+          "type": "varchar"
+        },
+        {
+          "name": "wm_run",
+          "type": "varchar"
+        },
+        {
+          "name": "wm_mailed_at",
+          "type": "timestamp"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.return_request_hdr",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "rr_request_number",
+          "type": "int"
+        },
+        {
+          "name": "rr_customer_sk",
+          "type": "int"
+        },
+        {
+          "name": "rr_order_number",
+          "type": "int"
+        },
+        {
+          "name": "rr_channel",
+          "type": "varchar"
+        },
+        {
+          "name": "rr_requested_date",
+          "type": "date"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.return_request_line",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "rl_line_id",
+          "type": "int"
+        },
+        {
+          "name": "rl_request_number",
+          "type": "int"
+        },
+        {
+          "name": "rl_line_no",
+          "type": "int"
+        },
+        {
+          "name": "rl_item_sk",
+          "type": "int"
+        },
+        {
+          "name": "rl_quantity",
+          "type": "int"
+        },
+        {
+          "name": "rl_unit_price",
+          "type": "decimal"
+        },
+        {
+          "name": "rl_reason",
+          "type": "varchar"
+        },
+        {
+          "name": "rl_requested_resolution",
+          "type": "varchar"
+        },
+        {
+          "name": "rl_requested_variant_sk",
+          "type": "int"
+        },
+        {
+          "name": "rl_state",
+          "type": "varchar"
+        },
+        {
+          "name": "rl_way",
+          "type": "varchar"
+        },
+        {
+          "name": "rl_customer_sk",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.return_receipt",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "rc_receipt_id",
+          "type": "int"
+        },
+        {
+          "name": "rc_line_id",
+          "type": "int"
+        },
+        {
+          "name": "rc_received_date",
+          "type": "date"
+        },
+        {
+          "name": "rc_item_sk",
+          "type": "int"
+        },
+        {
+          "name": "rc_quantity",
+          "type": "int"
+        },
+        {
+          "name": "rc_condition",
+          "type": "varchar"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.credit_note",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "cn_credit_note_id",
+          "type": "int"
+        },
+        {
+          "name": "cn_line_id",
+          "type": "int"
+        },
+        {
+          "name": "cn_customer_sk",
+          "type": "int"
+        },
+        {
+          "name": "cn_issued_date",
+          "type": "date"
+        },
+        {
+          "name": "cn_amount",
+          "type": "decimal"
+        },
+        {
+          "name": "cn_status",
+          "type": "varchar"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.refund_payment",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "rp_payment_id",
+          "type": "int"
+        },
+        {
+          "name": "rp_credit_note_id",
+          "type": "int"
+        },
+        {
+          "name": "rp_paid_date",
+          "type": "date"
+        },
+        {
+          "name": "rp_amount",
+          "type": "decimal"
+        }
+      ]
+    },
+    {
+      "name": "db.dbo.replacement_shipment",
+      "kind": "table",
+      "schema": [
+        {
+          "name": "rs_shipment_id",
+          "type": "int"
+        },
+        {
+          "name": "rs_line_id",
+          "type": "int"
+        },
+        {
+          "name": "rs_item_sk",
+          "type": "int"
+        },
+        {
+          "name": "rs_quantity",
+          "type": "int"
+        },
+        {
+          "name": "rs_shipped_date",
+          "type": "date"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.date_dim",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "sk",
+          "type": "int"
+        },
+        {
+          "name": "cal_date",
+          "type": "date"
+        },
+        {
+          "name": "year",
+          "type": "int"
+        },
+        {
+          "name": "month",
+          "type": "int"
+        },
+        {
+          "name": "quarter",
+          "type": "int"
+        },
+        {
+          "name": "week_seq",
+          "type": "int"
+        },
+        {
+          "name": "day_name",
+          "type": "text"
+        },
+        {
+          "name": "holiday",
+          "type": "char"
+        },
+        {
+          "name": "weekend",
+          "type": "char"
+        },
+        {
+          "name": "working_day",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.item",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "sk",
+          "type": "int"
+        },
+        {
+          "name": "item_id",
+          "type": "text"
+        },
+        {
+          "name": "product_name",
+          "type": "text"
+        },
+        {
+          "name": "brand",
+          "type": "text"
+        },
+        {
+          "name": "class",
+          "type": "text"
+        },
+        {
+          "name": "category",
+          "type": "text"
+        },
+        {
+          "name": "manufact",
+          "type": "text"
+        },
+        {
+          "name": "size",
+          "type": "text"
+        },
+        {
+          "name": "container",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.promotion",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "sk",
+          "type": "int"
+        },
+        {
+          "name": "promo_id",
+          "type": "text"
+        },
+        {
+          "name": "promo_name",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.call_center",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "sk",
+          "type": "int"
+        },
+        {
+          "name": "call_center_id",
+          "type": "text"
+        },
+        {
+          "name": "name",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.customer_revenue",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "sk",
+          "type": "int"
+        },
+        {
+          "name": "customer_id",
+          "type": "text"
+        },
+        {
+          "name": "hdemo",
+          "type": "int"
+        },
+        {
+          "name": "birth_year",
+          "type": "int"
+        },
+        {
+          "name": "revenue",
+          "type": "decimal"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.inventory",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "as_of_date",
+          "type": "int"
+        },
+        {
+          "name": "item",
+          "type": "int"
+        },
+        {
+          "name": "warehouse",
+          "type": "int"
+        },
+        {
+          "name": "quantity_on_hand",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.warehouse",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "sk",
+          "type": "int"
+        },
+        {
+          "name": "warehouse_id",
+          "type": "text"
+        },
+        {
+          "name": "warehouse_name",
+          "type": "text"
+        },
+        {
+          "name": "city",
+          "type": "text"
+        },
+        {
+          "name": "state",
+          "type": "char"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.order",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "order_number",
+          "type": "int"
+        },
+        {
+          "name": "channel",
+          "type": "text"
+        },
+        {
+          "name": "customer",
+          "type": "int"
+        },
+        {
+          "name": "placed_date",
+          "type": "date"
+        },
+        {
+          "name": "delivered_date",
+          "type": "date"
+        },
+        {
+          "name": "fulfilling_warehouse",
+          "type": "int"
+        },
+        {
+          "name": "value",
+          "type": "decimal"
+        },
+        {
+          "name": "state",
+          "type": "text"
+        },
+        {
+          "name": "held_for",
+          "type": "text"
+        },
+        {
+          "name": "placed_by",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.sales_line",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "order_number",
+          "type": "int"
+        },
+        {
+          "name": "line_no",
+          "type": "int"
+        },
+        {
+          "name": "item",
+          "type": "int"
+        },
+        {
+          "name": "quantity",
+          "type": "int"
+        },
+        {
+          "name": "unit_price",
+          "type": "decimal"
+        },
+        {
+          "name": "ext_sales_price",
+          "type": "decimal"
+        },
+        {
+          "name": "warehouse",
+          "type": "int"
+        },
+        {
+          "name": "sold_date",
+          "type": "date"
+        },
+        {
+          "name": "customer",
+          "type": "int"
+        },
+        {
+          "name": "channel",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.price_list",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "item",
+          "type": "int"
+        },
+        {
+          "name": "channel",
+          "type": "text"
+        },
+        {
+          "name": "valid_from",
+          "type": "date"
+        },
+        {
+          "name": "price",
+          "type": "decimal"
+        },
+        {
+          "name": "valid_to",
+          "type": "date"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.customer_price",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "item",
+          "type": "int"
+        },
+        {
+          "name": "customer",
+          "type": "int"
+        },
+        {
+          "name": "valid_from",
+          "type": "date"
+        },
+        {
+          "name": "price",
+          "type": "decimal"
+        },
+        {
+          "name": "valid_to",
+          "type": "date"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.invoice",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "invoice_id",
+          "type": "int"
+        },
+        {
+          "name": "customer",
+          "type": "int"
+        },
+        {
+          "name": "order_number",
+          "type": "int"
+        },
+        {
+          "name": "issued",
+          "type": "date"
+        },
+        {
+          "name": "due",
+          "type": "date"
+        },
+        {
+          "name": "amount",
+          "type": "decimal"
+        },
+        {
+          "name": "paid",
+          "type": "decimal"
+        },
+        {
+          "name": "status",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.warehouse_outage",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "warehouse",
+          "type": "int"
+        },
+        {
+          "name": "from_date",
+          "type": "date"
+        },
+        {
+          "name": "to_date",
+          "type": "date"
+        },
+        {
+          "name": "reason",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.customer",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "sk",
+          "type": "int"
+        },
+        {
+          "name": "customer_id",
+          "type": "text"
+        },
+        {
+          "name": "addr",
+          "type": "int"
+        },
+        {
+          "name": "cdemo",
+          "type": "int"
+        },
+        {
+          "name": "hdemo",
+          "type": "int"
+        },
+        {
+          "name": "birth_year",
+          "type": "int"
+        },
+        {
+          "name": "center",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.customer_address",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "sk",
+          "type": "int"
+        },
+        {
+          "name": "address_id",
+          "type": "text"
+        },
+        {
+          "name": "city",
+          "type": "text"
+        },
+        {
+          "name": "county",
+          "type": "text"
+        },
+        {
+          "name": "state",
+          "type": "char"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.customer_demographics",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "sk",
+          "type": "int"
+        },
+        {
+          "name": "gender",
+          "type": "char"
+        },
+        {
+          "name": "marital_status",
+          "type": "char"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.household_demographics",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "sk",
+          "type": "int"
+        },
+        {
+          "name": "income_band",
+          "type": "int"
+        },
+        {
+          "name": "buy_potential",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.income_band",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "sk",
+          "type": "int"
+        },
+        {
+          "name": "lower_bound",
+          "type": "int"
+        },
+        {
+          "name": "upper_bound",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.store",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "sk",
+          "type": "int"
+        },
+        {
+          "name": "store_id",
+          "type": "text"
+        },
+        {
+          "name": "store_name",
+          "type": "text"
+        },
+        {
+          "name": "city",
+          "type": "text"
+        },
+        {
+          "name": "state",
+          "type": "char"
+        },
+        {
+          "name": "rec_start_date",
+          "type": "date"
+        },
+        {
+          "name": "rec_end_date",
+          "type": "date"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.reorder_proposal",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "proposal_id",
+          "type": "int"
+        },
+        {
+          "name": "run",
+          "type": "text"
+        },
+        {
+          "name": "item",
+          "type": "int"
+        },
+        {
+          "name": "warehouse",
+          "type": "int"
+        },
+        {
+          "name": "on_hand",
+          "type": "int"
+        },
+        {
+          "name": "weekly_demand",
+          "type": "decimal"
+        },
+        {
+          "name": "proposed_qty",
+          "type": "int"
+        },
+        {
+          "name": "state",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.winback_mail",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "customer",
+          "type": "int"
+        },
+        {
+          "name": "quarter",
+          "type": "text"
+        },
+        {
+          "name": "offer",
+          "type": "text"
+        },
+        {
+          "name": "run",
+          "type": "text"
+        },
+        {
+          "name": "mailed_at",
+          "type": "timestamp"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.return_request",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "request_number",
+          "type": "int"
+        },
+        {
+          "name": "customer",
+          "type": "int"
+        },
+        {
+          "name": "order_number",
+          "type": "int"
+        },
+        {
+          "name": "channel",
+          "type": "text"
+        },
+        {
+          "name": "requested_date",
+          "type": "date"
+        },
+        {
+          "name": "state",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.return_request_line",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "line_id",
+          "type": "int"
+        },
+        {
+          "name": "request_number",
+          "type": "int"
+        },
+        {
+          "name": "line_no",
+          "type": "int"
+        },
+        {
+          "name": "item",
+          "type": "int"
+        },
+        {
+          "name": "quantity",
+          "type": "int"
+        },
+        {
+          "name": "unit_price",
+          "type": "decimal"
+        },
+        {
+          "name": "reason",
+          "type": "text"
+        },
+        {
+          "name": "requested_resolution",
+          "type": "text"
+        },
+        {
+          "name": "requested_variant",
+          "type": "int"
+        },
+        {
+          "name": "state",
+          "type": "text"
+        },
+        {
+          "name": "way",
+          "type": "text"
+        },
+        {
+          "name": "customer",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.return_receipt",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "receipt_id",
+          "type": "int"
+        },
+        {
+          "name": "line_id",
+          "type": "int"
+        },
+        {
+          "name": "received_date",
+          "type": "date"
+        },
+        {
+          "name": "item",
+          "type": "int"
+        },
+        {
+          "name": "quantity",
+          "type": "int"
+        },
+        {
+          "name": "condition",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.credit_note",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "credit_note_id",
+          "type": "int"
+        },
+        {
+          "name": "line_id",
+          "type": "int"
+        },
+        {
+          "name": "customer",
+          "type": "int"
+        },
+        {
+          "name": "issued_date",
+          "type": "date"
+        },
+        {
+          "name": "amount",
+          "type": "decimal"
+        },
+        {
+          "name": "status",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.refund_payment",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "payment_id",
+          "type": "int"
+        },
+        {
+          "name": "credit_note_id",
+          "type": "int"
+        },
+        {
+          "name": "paid_date",
+          "type": "date"
+        },
+        {
+          "name": "amount",
+          "type": "decimal"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.replacement_shipment",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "shipment_id",
+          "type": "int"
+        },
+        {
+          "name": "line_id",
+          "type": "int"
+        },
+        {
+          "name": "item",
+          "type": "int"
+        },
+        {
+          "name": "quantity",
+          "type": "int"
+        },
+        {
+          "name": "shipped_date",
+          "type": "date"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.document_flow",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "pred_kind",
+          "type": "text"
+        },
+        {
+          "name": "pred_id",
+          "type": "int"
+        },
+        {
+          "name": "succ_kind",
+          "type": "text"
+        },
+        {
+          "name": "succ_id",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.store_returns",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "item",
+          "type": "int"
+        },
+        {
+          "name": "ticket_number",
+          "type": "int"
+        },
+        {
+          "name": "returned_date",
+          "type": "int"
+        },
+        {
+          "name": "customer",
+          "type": "int"
+        },
+        {
+          "name": "store",
+          "type": "int"
+        },
+        {
+          "name": "reason",
+          "type": "int"
+        },
+        {
+          "name": "return_quantity",
+          "type": "int"
+        },
+        {
+          "name": "return_amt",
+          "type": "decimal"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.web_returns",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "item",
+          "type": "int"
+        },
+        {
+          "name": "order_number",
+          "type": "int"
+        },
+        {
+          "name": "returned_date",
+          "type": "int"
+        },
+        {
+          "name": "customer",
+          "type": "int"
+        },
+        {
+          "name": "reason",
+          "type": "int"
+        },
+        {
+          "name": "return_quantity",
+          "type": "int"
+        },
+        {
+          "name": "return_amt",
+          "type": "decimal"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.catalog_returns",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "item",
+          "type": "int"
+        },
+        {
+          "name": "order_number",
+          "type": "int"
+        },
+        {
+          "name": "returned_date",
+          "type": "int"
+        },
+        {
+          "name": "customer",
+          "type": "int"
+        },
+        {
+          "name": "reason",
+          "type": "int"
+        },
+        {
+          "name": "warehouse",
+          "type": "int"
+        },
+        {
+          "name": "return_quantity",
+          "type": "int"
+        },
+        {
+          "name": "return_amt",
+          "type": "decimal"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.reason",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "sk",
+          "type": "int"
+        },
+        {
+          "name": "reason_id",
+          "type": "text"
+        },
+        {
+          "name": "reason_desc",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.store_sales",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "item",
+          "type": "int"
+        },
+        {
+          "name": "ticket_number",
+          "type": "int"
+        },
+        {
+          "name": "sold_date",
+          "type": "int"
+        },
+        {
+          "name": "customer",
+          "type": "int"
+        },
+        {
+          "name": "addr",
+          "type": "int"
+        },
+        {
+          "name": "store",
+          "type": "int"
+        },
+        {
+          "name": "promo",
+          "type": "int"
+        },
+        {
+          "name": "quantity",
+          "type": "int"
+        },
+        {
+          "name": "ext_sales_price",
+          "type": "decimal"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.web_sales",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "item",
+          "type": "int"
+        },
+        {
+          "name": "order_number",
+          "type": "int"
+        },
+        {
+          "name": "sold_date",
+          "type": "int"
+        },
+        {
+          "name": "customer",
+          "type": "int"
+        },
+        {
+          "name": "addr",
+          "type": "int"
+        },
+        {
+          "name": "warehouse",
+          "type": "int"
+        },
+        {
+          "name": "promo",
+          "type": "int"
+        },
+        {
+          "name": "quantity",
+          "type": "int"
+        },
+        {
+          "name": "ext_sales_price",
+          "type": "decimal"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.catalog_sales",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "item",
+          "type": "int"
+        },
+        {
+          "name": "order_number",
+          "type": "int"
+        },
+        {
+          "name": "sold_date",
+          "type": "int"
+        },
+        {
+          "name": "customer",
+          "type": "int"
+        },
+        {
+          "name": "addr",
+          "type": "int"
+        },
+        {
+          "name": "call_center",
+          "type": "int"
+        },
+        {
+          "name": "warehouse",
+          "type": "int"
+        },
+        {
+          "name": "promo",
+          "type": "int"
+        },
+        {
+          "name": "quantity",
+          "type": "int"
+        },
+        {
+          "name": "ext_sales_price",
+          "type": "decimal"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.channel_sales",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "channel",
+          "type": "text"
+        },
+        {
+          "name": "sold_date",
+          "type": "int"
+        },
+        {
+          "name": "item",
+          "type": "int"
+        },
+        {
+          "name": "customer",
+          "type": "int"
+        },
+        {
+          "name": "quantity",
+          "type": "int"
+        },
+        {
+          "name": "ext_sales_price",
+          "type": "decimal"
+        },
+        {
+          "name": "warehouse",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.obligation",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "id",
+          "type": "text"
+        },
+        {
+          "name": "recipe",
+          "type": "text"
+        },
+        {
+          "name": "run",
+          "type": "text"
+        },
+        {
+          "name": "entity",
+          "type": "text"
+        },
+        {
+          "name": "key",
+          "type": "text"
+        },
+        {
+          "name": "kind",
+          "type": "text"
+        },
+        {
+          "name": "due",
+          "type": "date"
+        },
+        {
+          "name": "state",
+          "type": "text"
+        },
+        {
+          "name": "fulfilled_by",
+          "type": "text"
+        },
+        {
+          "name": "fulfilled_at",
+          "type": "timestamp"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.state_history",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "id",
+          "type": "text"
+        },
+        {
+          "name": "entity",
+          "type": "text"
+        },
+        {
+          "name": "key",
+          "type": "text"
+        },
+        {
+          "name": "attribute",
+          "type": "text"
+        },
+        {
+          "name": "from_state",
+          "type": "text"
+        },
+        {
+          "name": "to_state",
+          "type": "text"
+        },
+        {
+          "name": "run",
+          "type": "text"
+        },
+        {
+          "name": "at",
+          "type": "timestamp"
+        },
+        {
+          "name": "by",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "name": "er.entity.approvals",
+      "kind": "entity",
+      "schema": [
+        {
+          "name": "id",
+          "type": "text"
+        },
+        {
+          "name": "object_kind",
+          "type": "text"
+        },
+        {
+          "name": "object_name",
+          "type": "text"
+        },
+        {
+          "name": "fp_text",
+          "type": "text"
+        },
+        {
+          "name": "fp_values",
+          "type": "text"
+        },
+        {
+          "name": "kind",
+          "type": "text"
+        },
+        {
+          "name": "approver",
+          "type": "text"
+        },
+        {
+          "name": "at",
+          "type": "timestamp"
+        },
+        {
+          "name": "note",
+          "type": "text"
+        },
+        {
+          "name": "status",
+          "type": "text"
+        }
+      ]
+    }
+  ],
+  "automationObjects": [
+    {
+      "kind": "action",
+      "name": "ask",
+      "columns": [
+        {
+          "name": "who",
+          "type": "role"
+        },
+        {
+          "name": "about",
+          "type": "text"
+        },
+        {
+          "name": "action",
+          "type": "action"
+        },
+        {
+          "name": "detail",
+          "type": "rows",
+          "optional": true
+        }
+      ],
+      "sinks": {
+        "camunda": "user task",
+        "hebe": "task",
+        "n8n": "door",
+        "native": "task"
+      },
+      "approval": "required"
+    },
+    {
+      "kind": "action",
+      "name": "expect",
+      "columns": [
+        {
+          "name": "line",
+          "type": "return_request_line.line_id"
+        },
+        {
+          "name": "kind",
+          "type": "text"
+        },
+        {
+          "name": "due",
+          "type": "date"
+        }
+      ],
+      "sinks": {
+        "native": "obligation"
+      },
+      "approval": "none"
+    },
+    {
+      "kind": "action",
+      "name": "fulfil",
+      "columns": [
+        {
+          "name": "line",
+          "type": "return_request_line.line_id"
+        },
+        {
+          "name": "kind",
+          "type": "text"
+        },
+        {
+          "name": "to",
+          "type": "text"
+        }
+      ],
+      "sinks": {
+        "native": "obligation"
+      },
+      "transition": "obligation.state → :to",
+      "approval": "none"
+    },
+    {
+      "kind": "action",
+      "name": "hold",
+      "columns": [
+        {
+          "name": "order",
+          "type": "order.order_number"
+        },
+        {
+          "name": "department",
+          "type": "text"
+        }
+      ],
+      "sinks": {
+        "camunda": "door",
+        "n8n": "door",
+        "native": "transition"
+      },
+      "transition": "order.state → held from placed",
+      "approval": "none"
+    },
+    {
+      "kind": "action",
+      "name": "notify",
+      "columns": [
+        {
+          "name": "who",
+          "type": "role"
+        },
+        {
+          "name": "detail",
+          "type": "rows"
+        },
+        {
+          "name": "template",
+          "type": "text",
+          "optional": true
+        }
+      ],
+      "sinks": {
+        "camunda": "send task",
+        "hebe": "message",
+        "n8n": "n8n-nodes-base.emailSend",
+        "native": "deliver"
+      },
+      "approval": "none"
+    },
+    {
+      "kind": "action",
+      "name": "notify_customer",
+      "columns": [
+        {
+          "name": "customer",
+          "type": "customer.sk"
+        },
+        {
+          "name": "template",
+          "type": "text"
+        }
+      ],
+      "sinks": {
+        "n8n": "n8n-nodes-base.emailSend",
+        "native": "deliver"
+      },
+      "approval": "none"
+    },
+    {
+      "kind": "action",
+      "name": "probe_item",
+      "columns": [
+        {
+          "name": "item",
+          "type": "reorder_proposal.item"
+        }
+      ],
+      "sinks": {
+        "native": "writer"
+      },
+      "approval": "none"
+    },
+    {
+      "kind": "action",
+      "name": "release",
+      "columns": [
+        {
+          "name": "order",
+          "type": "order.order_number"
+        }
+      ],
+      "sinks": {
+        "camunda": "door",
+        "n8n": "door",
+        "native": "transition"
+      },
+      "transition": "order.state → released from placed, held",
+      "approval": "none"
+    },
+    {
+      "kind": "action",
+      "name": "set_state",
+      "columns": [
+        {
+          "name": "line",
+          "type": "return_request_line.line_id"
+        },
+        {
+          "name": "to",
+          "type": "text"
+        },
+        {
+          "name": "way",
+          "type": "text",
+          "optional": true
+        }
+      ],
+      "sinks": {
+        "camunda": "door",
+        "n8n": "door",
+        "native": "transition"
+      },
+      "transition": "return_request_line.state → :to",
+      "approval": "none"
+    },
+    {
+      "kind": "action",
+      "name": "start",
+      "columns": [
+        {
+          "name": "process",
+          "type": "text"
+        },
+        {
+          "name": "rows",
+          "type": "rows"
+        }
+      ],
+      "sinks": {
+        "n8n": "n8n-nodes-base.httpRequest",
+        "native": "start"
+      },
+      "approval": "none"
+    },
+    {
+      "kind": "action",
+      "name": "task",
+      "columns": [
+        {
+          "name": "who",
+          "type": "role"
+        },
+        {
+          "name": "about",
+          "type": "text"
+        },
+        {
+          "name": "detail",
+          "type": "rows",
+          "optional": true
+        }
+      ],
+      "sinks": {
+        "hebe": "task",
+        "n8n": "door",
+        "native": "task"
+      },
+      "approval": "none"
+    },
+    {
+      "kind": "parameter",
+      "name": "abuse_share",
+      "type": "decimal",
+      "value": "0.40"
+    },
+    {
+      "kind": "parameter",
+      "name": "care_threshold",
+      "type": "decimal",
+      "value": "500"
+    },
+    {
+      "kind": "parameter",
+      "name": "confirmation_threshold",
+      "label": "Confirmation threshold",
+      "type": "decimal",
+      "value": "50000"
+    },
+    {
+      "kind": "parameter",
+      "name": "inbound_close",
+      "type": "days",
+      "value": "30"
+    },
+    {
+      "kind": "parameter",
+      "name": "inbound_reminder",
+      "type": "days",
+      "value": "14"
+    },
+    {
+      "kind": "parameter",
+      "name": "return_window",
+      "type": "days",
+      "value": "30"
+    },
+    {
+      "kind": "parameter",
+      "name": "settlement",
+      "type": "working_days",
+      "value": "5"
+    },
+    {
+      "kind": "parameter",
+      "name": "small_value",
+      "type": "decimal",
+      "value": "15"
+    },
+    {
+      "kind": "parameter",
+      "name": "tolerance",
+      "label": "Price tolerance",
+      "type": "decimal",
+      "value": "0.01"
+    },
+    {
+      "kind": "role",
+      "name": "ar"
+    },
+    {
+      "kind": "role",
+      "name": "customer_care"
+    },
+    {
+      "kind": "role",
+      "name": "finance"
+    },
+    {
+      "kind": "role",
+      "name": "logistics"
+    },
+    {
+      "kind": "role",
+      "name": "ops"
+    },
+    {
+      "kind": "role",
+      "name": "process_owner"
+    },
+    {
+      "kind": "role",
+      "name": "sales"
+    },
+    {
+      "kind": "role",
+      "name": "sales_manager"
+    },
+    {
+      "kind": "schema",
+      "name": "care_answer",
+      "columns": [
+        {
+          "name": "order_number",
+          "type": "order.order_number"
+        },
+        {
+          "name": "approve",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "kind": "schema",
+      "name": "line_received",
+      "columns": [
+        {
+          "name": "line_id",
+          "type": "return_request_line.line_id"
+        }
+      ]
+    },
+    {
+      "kind": "schema",
+      "name": "receipt_posted",
+      "columns": [
+        {
+          "name": "line_id",
+          "type": "return_request_line.line_id"
+        }
+      ]
+    },
+    {
+      "kind": "schema",
+      "name": "settlement_posted",
+      "columns": [
+        {
+          "name": "line_id",
+          "type": "return_request_line.line_id"
+        }
+      ]
+    }
+  ],
+  "scope": {
+    "imports": [
+      "hartland.*",
+      "hartland.automation.*"
+    ],
+    "variables": [],
+    "portsAtCursor": [
+      "orders",
+      "rows"
+    ],
+    "insertionTarget": {
+      "dialect": "sql",
+      "containerName": "price_differences",
+      "targetEngine": "erp"
+    }
+  },
+  "recipe": {
+    "key": [
+      "order.order_number"
+    ],
+    "parameters": [
+      "tolerance",
+      "confirmation_threshold"
+    ],
+    "roles": [
+      {
+        "name": "placed_orders",
+        "role": "candidates",
+        "form": "target"
+      },
+      {
+        "name": "shortfall",
+        "role": "context",
+        "form": "target",
+        "class": "per-candidate"
+      },
+      {
+        "name": "price_differences",
+        "role": "context",
+        "form": "target",
+        "class": "per-candidate"
+      },
+      {
+        "name": "overdue",
+        "role": "context",
+        "form": "target",
+        "class": "per-candidate"
+      },
+      {
+        "name": "verdict",
+        "role": "decision",
+        "routes": [
+          "hold_sales",
+          "hold_ar",
+          "release_confirmed",
+          "release"
+        ]
+      }
+    ],
+    "mode": "per-candidate"
+  },
+  "grammar": {
+    "specVersion": 1,
+    "statementSummary": "chains (`a -> filter(…) -> sort(…)`) + SSA assignment, freely mixed; `=` is the one equality (`==` only in TTR-pandas, S9); multi-in named-only; union list-form (S11).",
+    "dialectRosters": {
+      "ttrp": [
+        "load",
+        "store",
+        "transfer",
+        "display",
+        "join",
+        "aggregate",
+        "union",
+        "branch",
+        "filter",
+        "sort",
+        "distinct",
+        "limit",
+        "sample",
+        "head",
+        "tail",
+        "project",
+        "select",
+        "calc",
+        "switch",
+        "values",
+        "intersect",
+        "except",
+        "pivot"
+      ],
+      "sql": [
+        "with",
+        "select",
+        "distinct",
+        "from",
+        "join",
+        "where",
+        "group by",
+        "having",
+        "order by",
+        "limit",
+        "union",
+        "intersect",
+        "except",
+        "values"
+      ],
+      "pandas": [
+        "select",
+        "calc",
+        "filter",
+        "join",
+        "aggregate",
+        "sort",
+        "union",
+        "limit",
+        "load",
+        "store",
+        "display"
+      ],
+      "ttrb": [
+        "Load",
+        "Keep/Take/Select",
+        "Filter",
+        "Remove/Delete",
+        "Rename",
+        "Convert/Retype",
+        "Create/Compute/Calculate",
+        "Summarize",
+        "Join",
+        "Sort",
+        "Combine/Append/Union",
+        "Store",
+        "Show/Display",
+        "If",
+        "Count",
+        "Attach",
+        "Send",
+        "Set",
+        "Call"
+      ],
+      "ttrb-cs": [
+        "Načti",
+        "Ponech/Vezmi/Vyber",
+        "Filtruj",
+        "Odstraň/Smaž",
+        "Přejmenuj",
+        "Převeď/Přetypuj",
+        "Vytvoř/Spočti/Vypočítej",
+        "Shrň",
+        "Spoj",
+        "Seřaď",
+        "Sluč/Přidej/Sjednoť",
+        "Ulož",
+        "Ukaž/Vypiš",
+        "Když",
+        "Spočítej",
+        "Připoj",
+        "Pošli",
+        "Nastav",
+        "Pojmenuj"
+      ]
+    },
+    "entryVerbs": [
+      {
+        "id": "entry.insert-rows",
+        "name": "insert-rows",
+        "params": [
+          "TARGET",
+          "ROWS"
+        ]
+      },
+      {
+        "id": "entry.update-rows",
+        "name": "update-rows",
+        "params": [
+          "TARGET",
+          "KEYED_ROWS"
+        ]
+      },
+      {
+        "id": "entry.effective-date-change",
+        "name": "effective-date-change",
+        "params": [
+          "TARGET",
+          "KEYED_ROWS",
+          "EFFECTIVE_DATE"
+        ],
+        "requiresSemantics": [
+          "scd2"
+        ]
+      },
+      {
+        "id": "entry.reverse-and-replace",
+        "name": "reverse-and-replace",
+        "params": [
+          "TARGET",
+          "KEYED_ROWS"
+        ],
+        "requiresSemantics": [
+          "ledger"
+        ]
+      },
+      {
+        "id": "entry.delete-rows",
+        "name": "delete-rows",
+        "params": [
+          "TARGET",
+          "KEYED_ROWS"
+        ]
+      },
+      {
+        "id": "entry.reject-row",
+        "name": "reject-row",
+        "params": [
+          "KEY",
+          "CODE",
+          "DETAIL"
+        ]
+      }
+    ],
+    "callFn": {
+      "form": "call-fn(\"<plugin-id>\", args…)",
+      "idKind": "string-literal",
+      "purity": "a `pure`-certified canon-function only (TTRP-EN-005)",
+      "resolution": "deploy-time against the manifest §15 registry; the pinned {id, version} is recorded in the entry record and honoured on replay (TTRP-EN-006 on a malformed or unresolvable call)"
+    }
+  },
+  "recipeGrammar": {
+    "statementSummary": "one `recipe { … }` per document, no `program` beside it: headers `key:` (an entity attribute, or a list for a composite key), `as of: now`, `parameters: [ … ]` (each a `def parameter` of the imports), `document:`, `protocol: always | on_route`; then one `candidates` island, any `context` islands (`target <engine>` + a body, or `builtin` / `foreign` / `call` / `turn`, an optional `window { by: …, over: … }`), one `decision <name>(in …)` ending in `<row> -> switch { mode: exclusive | overlapping, <route>: <condition> because: \"…{column}…\" detail: <context>, …, else: <route> | none }`, and `actions { <decision>.<route>, … -> <action> { column: value, … } when <condition> }`. `:as_of` is the run's instant; `:name` a parameter; durations `30 days`, `2 working_days`, `days(:param)`.",
+    "roles": [
+      "candidates",
+      "context",
+      "decision"
+    ],
+    "islandForms": [
+      "target",
+      "builtin",
+      "foreign",
+      "call",
+      "turn"
+    ],
+    "switchModes": [
+      "exclusive",
+      "overlapping"
+    ],
+    "routeAttributes": [
+      "because",
+      "detail"
+    ],
+    "timeOps": [
+      "latest",
+      "within",
+      "working_days",
+      "age"
+    ],
+    "durationUnits": [
+      "days",
+      "working_days",
+      "weeks",
+      "months",
+      "hours",
+      "minutes"
+    ],
+    "diagnostics": [
+      {
+        "id": "TTRP-REC-099",
+        "suggestedAlternative": "the time sugar (`latest`, `within`, `working_days`, `age`) compiles with a recipe — move the op into a recipe's island, or spell it with the base ops"
+      },
+      {
+        "id": "TTRP-REC-000",
+        "suggestedAlternative": "one recipe per file, and no `program` beside it"
+      },
+      {
+        "id": "TTRP-REC-001",
+        "suggestedAlternative": "wire an action the imports define, with the columns its `def action` lists — every required one, no other"
+      },
+      {
+        "id": "TTRP-REC-002",
+        "suggestedAlternative": "give the column a value of the action column's type — cast it, or pick the key attribute the action names"
+      },
+      {
+        "id": "TTRP-REC-003",
+        "suggestedAlternative": "wire every route of the switch to an action, or route its rows to `else: none`"
+      },
+      {
+        "id": "TTRP-REC-004",
+        "suggestedAlternative": "project the recipe's `key` from the candidates island"
+      },
+      {
+        "id": "TTRP-REC-005",
+        "suggestedAlternative": "filter the candidates by state, never by key — the program's `port:` selects single candidates (A-2)"
+      },
+      {
+        "id": "TTRP-REC-010",
+        "suggestedAlternative": "declare a `window { by: … over: … }` on the context, or restate it per candidate (keep the key, read the other rows from the model, not from the candidates)"
+      },
+      {
+        "id": "TTRP-REC-011",
+        "suggestedAlternative": "align the batch program's schedule with the window's `over:` so a run covers whole windows"
+      },
+      {
+        "id": "TTRP-REC-012",
+        "suggestedAlternative": "restate the recipe per candidate, or run it with `port: none` — a set-level recipe cannot run for one key"
+      },
+      {
+        "id": "TTRP-REC-020",
+        "suggestedAlternative": "add the name to `parameters:` (a `def parameter` of the imports), or run the recipe from a program whose port or event supplies it"
+      },
+      {
+        "id": "TTRP-REC-021",
+        "suggestedAlternative": "import the package that defines the parameter, or drop it from `parameters:`"
+      },
+      {
+        "id": "TTRP-REC-030",
+        "suggestedAlternative": "move to a state the attribute's `states:` lists, along a transition its `transitions:` allows"
+      },
+      {
+        "id": "TTRP-REC-040",
+        "suggestedAlternative": "an agent's answer never acts alone — wire the route to an action with `approval: required`"
+      },
+      {
+        "id": "TTRP-REC-050",
+        "suggestedAlternative": "a snapshot measure does not add up across its snapshot dates — take `latest(by: …, per: …)` first, or group by the snapshot date"
+      },
+      {
+        "id": "TTRP-REC-060",
+        "suggestedAlternative": "islands only read — actions write (D-65); remove the INSERT/UPDATE/DELETE/MERGE"
+      },
+      {
+        "id": "TTRP-REC-070",
+        "suggestedAlternative": "write the decision as a canonical body ending in a `switch`; SQL, foreign code, services and agents belong in a `context`"
+      }
+    ]
+  },
+  "diagnostics": [
+    {
+      "id": "TTRP-EQ-001",
+      "area": "EQ",
+      "suggestedAlternative": "use `=` — it is the one equality operator; `==` is only a TTR-pandas synonym (S9)"
+    },
+    {
+      "id": "TTRP-CTL-001",
+      "area": "CTL",
+      "suggestedAlternative": "`finishes with` (FF) is reserved and not available in v1; use `after` (FS) or `with` (SS) (F-b)"
+    },
+    {
+      "id": "TTRP-CTL-002",
+      "area": "CTL",
+      "suggestedAlternative": "the graph must be acyclic (B-T2); break the cycle among the named nodes"
+    },
+    {
+      "id": "TTRP-CTL-003",
+      "area": "CTL",
+      "suggestedAlternative": "a data in-port takes exactly one edge (B-T2, no implicit union); use `union(a, b)` to merge"
+    },
+    {
+      "id": "TTRP-CTL-004",
+      "area": "CTL",
+      "suggestedAlternative": "cross-container `err` (signal) is not supported in v1 (F-d-i); consume `err` inside the island or rely on fail-fast; `rejects` (data) may cross"
+    },
+    {
+      "id": "TTRP-CTL-005",
+      "area": "CTL",
+      "suggestedAlternative": "`display` is a sink-only leaf (Q11); read from the node feeding it instead"
+    },
+    {
+      "id": "TTRP-CTL-006",
+      "area": "CTL",
+      "suggestedAlternative": "this is a reserved port name (in, out, err, rejects, true, false, else) — rename the declared port (S10)"
+    },
+    {
+      "id": "TTRP-RJ-101",
+      "area": "RJ",
+      "suggestedAlternative": "this node can never reject — remove the `rejects` wire (the stream is always empty; R-A2-α)"
+    },
+    {
+      "id": "TTRP-RJ-102",
+      "area": "RJ",
+      "suggestedAlternative": "the rejects cluster was moved off this engine because it cannot produce rejects (knob=escalate)"
+    },
+    {
+      "id": "TTRP-RJ-103",
+      "area": "RJ",
+      "suggestedAlternative": "the `_ttrp_` column prefix is reserved for synthesized rejects columns — rename this column (RS-5)"
+    },
+    {
+      "id": "TTRP-RJ-104",
+      "area": "RJ",
+      "suggestedAlternative": "a volatile (impure) function cannot appear in a reject-capable position (R-C2-b)"
+    },
+    {
+      "id": "TTRP-RJ-105",
+      "area": "RJ",
+      "suggestedAlternative": "this ON expression spans both inputs — its rejects fall back to the pair schema (R-B3-β)"
+    },
+    {
+      "id": "TTRP-RJ-106",
+      "area": "RJ",
+      "suggestedAlternative": "this engine cannot produce rejects; set `[ttrp] rejects-in-sql = escalate` to move the cluster to a capable engine, or bind a rejects-capable engine (contracts §3/§4)"
+    },
+    {
+      "id": "TTRP-RJ-107",
+      "area": "RJ",
+      "suggestedAlternative": "only `cast(x as int)` (text->int64) and `op.div` produce rejects in v1; this reject-capable type is not yet supported — remove the `rejects` wire, or change the target type (contracts §2 v1 roster)"
+    },
+    {
+      "id": "TTRP-RJ-108",
+      "area": "RJ",
+      "suggestedAlternative": "reject-capable expressions in a join `on:` do not produce rejects in v1 — move the `cast`/`op.div` into a `calc` before the join and wire `rejects` there (contracts §5)"
+    },
+    {
+      "id": "TTRP-PRS-001",
+      "area": "PRS"
+    },
+    {
+      "id": "TTRP-PRS-002",
+      "area": "PRS",
+      "suggestedAlternative": "TTR-P has no `program` header — identity is the filename; delete this line (S12)"
+    },
+    {
+      "id": "TTRP-PRS-003",
+      "area": "PRS",
+      "suggestedAlternative": "multi-input ops take named inputs only: join(left: …, right: …) (C3-c)"
+    },
+    {
+      "id": "TTRP-PRS-004",
+      "area": "PRS",
+      "suggestedAlternative": "union takes the list form: union(a, b, c) (S11)"
+    },
+    {
+      "id": "TTRP-PRS-005",
+      "area": "PRS",
+      "suggestedAlternative": "this name is a reserved port name (in, out, err, rejects, true, false, else) — choose another (S10)"
+    },
+    {
+      "id": "TTRP-PRS-006",
+      "area": "PRS",
+      "suggestedAlternative": "a recipe value the grammar reads as a name must be one the contract lists: `as of: now`, `protocol: always | on_route`, `mode: exclusive | overlapping`, `over: day | week | month | rows: N | gap: <duration>` (AU contracts §1)"
+    },
+    {
+      "id": "TTRP-REC-099",
+      "area": "REC",
+      "suggestedAlternative": "the time sugar (`latest`, `within`, `working_days`, `age`) compiles with a recipe — move the op into a recipe's island, or spell it with the base ops"
+    },
+    {
+      "id": "TTRP-REC-000",
+      "area": "REC",
+      "suggestedAlternative": "one recipe per file, and no `program` beside it"
+    },
+    {
+      "id": "TTRP-REC-001",
+      "area": "REC",
+      "suggestedAlternative": "wire an action the imports define, with the columns its `def action` lists — every required one, no other"
+    },
+    {
+      "id": "TTRP-REC-002",
+      "area": "REC",
+      "suggestedAlternative": "give the column a value of the action column's type — cast it, or pick the key attribute the action names"
+    },
+    {
+      "id": "TTRP-REC-003",
+      "area": "REC",
+      "suggestedAlternative": "wire every route of the switch to an action, or route its rows to `else: none`"
+    },
+    {
+      "id": "TTRP-REC-004",
+      "area": "REC",
+      "suggestedAlternative": "project the recipe's `key` from the candidates island"
+    },
+    {
+      "id": "TTRP-REC-005",
+      "area": "REC",
+      "suggestedAlternative": "filter the candidates by state, never by key — the program's `port:` selects single candidates (A-2)"
+    },
+    {
+      "id": "TTRP-REC-010",
+      "area": "REC",
+      "suggestedAlternative": "declare a `window { by: … over: … }` on the context, or restate it per candidate (keep the key, read the other rows from the model, not from the candidates)"
+    },
+    {
+      "id": "TTRP-REC-011",
+      "area": "REC",
+      "suggestedAlternative": "align the batch program's schedule with the window's `over:` so a run covers whole windows"
+    },
+    {
+      "id": "TTRP-REC-012",
+      "area": "REC",
+      "suggestedAlternative": "restate the recipe per candidate, or run it with `port: none` — a set-level recipe cannot run for one key"
+    },
+    {
+      "id": "TTRP-REC-020",
+      "area": "REC",
+      "suggestedAlternative": "add the name to `parameters:` (a `def parameter` of the imports), or run the recipe from a program whose port or event supplies it"
+    },
+    {
+      "id": "TTRP-REC-021",
+      "area": "REC",
+      "suggestedAlternative": "import the package that defines the parameter, or drop it from `parameters:`"
+    },
+    {
+      "id": "TTRP-REC-030",
+      "area": "REC",
+      "suggestedAlternative": "move to a state the attribute's `states:` lists, along a transition its `transitions:` allows"
+    },
+    {
+      "id": "TTRP-REC-040",
+      "area": "REC",
+      "suggestedAlternative": "an agent's answer never acts alone — wire the route to an action with `approval: required`"
+    },
+    {
+      "id": "TTRP-REC-050",
+      "area": "REC",
+      "suggestedAlternative": "a snapshot measure does not add up across its snapshot dates — take `latest(by: …, per: …)` first, or group by the snapshot date"
+    },
+    {
+      "id": "TTRP-REC-060",
+      "area": "REC",
+      "suggestedAlternative": "islands only read — actions write (D-65); remove the INSERT/UPDATE/DELETE/MERGE"
+    },
+    {
+      "id": "TTRP-REC-070",
+      "area": "REC",
+      "suggestedAlternative": "write the decision as a canonical body ending in a `switch`; SQL, foreign code, services and agents belong in a `context`"
+    },
+    {
+      "id": "TTRP-PRS-007",
+      "area": "PRS",
+      "suggestedAlternative": "a recipe's shape: `recipe { }` is top-level only, a `target` role container needs a body, and a wiring argument holds one action call or a list of values (AU contracts §1)"
+    },
+    {
+      "id": "TTRP-PRS-008",
+      "area": "PRS",
+      "suggestedAlternative": "named arguments belong to the recipe time functions (`age(since: …)`, `working_days(between: …, and: …)`, `within(…)`); call every other function positionally, each name once"
+    },
+    {
+      "id": "TTRP-PRS-009",
+      "area": "PRS",
+      "suggestedAlternative": "write `calc(name = expression, …)` (or `calc { name = expression }`), and a join's kind once — `kind:` and `type:` are one argument"
+    },
+    {
+      "id": "TTRP-FRG-001",
+      "area": "FRG",
+      "suggestedAlternative": "supported fragment dialects: sql, pandas, ttrb, ttrb-cs (C3-g/C4-f)"
+    },
+    {
+      "id": "TTRP-FRG-002",
+      "area": "FRG",
+      "suggestedAlternative": "no dialect marker: use the .ttr.sql / .ttr.py extension or a first-line `-- ttr: dialect=…` comment (contracts §1)"
+    },
+    {
+      "id": "TTRP-FRG-003",
+      "area": "FRG",
+      "suggestedAlternative": "a bare-fragment program needs [ttrp] bare-target (and bare-shell) — no fallback guessing (P2)"
+    },
+    {
+      "id": "TTRP-FRG-004",
+      "area": "FRG",
+      "suggestedAlternative": "check the path — it is relative to the program file (and the program must be saved to a file)"
+    },
+    {
+      "id": "TTRP-FRG-005",
+      "area": "FRG",
+      "suggestedAlternative": "name the fragment file .ttrb / .ttrb-cs / .ttr.sql / .ttr.py, or start it with a `# ttr: dialect=…` line"
+    },
+    {
+      "id": "TTRP-SQL-001",
+      "area": "SQL",
+      "suggestedAlternative": "TTR-SQL is read-only; writes go through canonical `store` (A3)"
+    },
+    {
+      "id": "TTRP-SQL-002",
+      "area": "SQL",
+      "suggestedAlternative": "use LIMIT n"
+    },
+    {
+      "id": "TTRP-SQL-003",
+      "area": "SQL",
+      "suggestedAlternative": "generic SQL only — remove the hint"
+    },
+    {
+      "id": "TTRP-SQL-004",
+      "area": "SQL",
+      "suggestedAlternative": "use double quotes"
+    },
+    {
+      "id": "TTRP-SQL-005",
+      "area": "SQL",
+      "suggestedAlternative": "use CAST(x AS type)"
+    },
+    {
+      "id": "TTRP-SQL-006",
+      "area": "SQL",
+      "suggestedAlternative": "no subquery expressions; EXISTS/IN in WHERE are the only subquery forms"
+    },
+    {
+      "id": "TTRP-SQL-007",
+      "area": "SQL",
+      "suggestedAlternative": "window functions are v2"
+    },
+    {
+      "id": "TTRP-SQL-008",
+      "area": "SQL",
+      "suggestedAlternative": "TTR-SQL is one query expression"
+    },
+    {
+      "id": "TTRP-SQL-009",
+      "area": "SQL",
+      "suggestedAlternative": "one query expression per fragment"
+    },
+    {
+      "id": "TTRP-SQL-010",
+      "area": "SQL",
+      "suggestedAlternative": "the fragment's final SELECT is the container's default out port"
+    },
+    {
+      "id": "TTRP-SQL-011",
+      "area": "SQL",
+      "suggestedAlternative": "author this in canonical TTR-P (PIVOT is canonical-only in v1)"
+    },
+    {
+      "id": "TTRP-SQL-012",
+      "area": "SQL",
+      "suggestedAlternative": "lift it into a WITH cte — CTE names become SSA labels"
+    },
+    {
+      "id": "TTRP-SQL-013",
+      "area": "SQL",
+      "suggestedAlternative": "spell the ON condition explicitly"
+    },
+    {
+      "id": "TTRP-SQL-014",
+      "area": "SQL",
+      "suggestedAlternative": "add ORDER BY before LIMIT (deterministic results, A4/Q9)"
+    },
+    {
+      "id": "TTRP-SQL-015",
+      "area": "SQL"
+    },
+    {
+      "id": "TTRP-PD-001",
+      "area": "PD",
+      "suggestedAlternative": "not in the TTR-pandas method roster: select calc filter join aggregate sort union limit load store display"
+    },
+    {
+      "id": "TTRP-PD-002",
+      "area": "PD",
+      "suggestedAlternative": "no lambdas — write the expression directly in filter/calc (expressions are grammar, not API)"
+    },
+    {
+      "id": "TTRP-PD-003",
+      "area": "PD",
+      "suggestedAlternative": "use load()/store() — IO beyond load() is canonical-land"
+    },
+    {
+      "id": "TTRP-PD-004",
+      "area": "PD",
+      "suggestedAlternative": "use .filter(amount > 0)"
+    },
+    {
+      "id": "TTRP-PD-005",
+      "area": "PD",
+      "suggestedAlternative": "TTR-pandas has no control flow — statements are assignment + chain"
+    },
+    {
+      "id": "TTRP-PD-006",
+      "area": "PD",
+      "suggestedAlternative": "no index — tables are relational; use filter/select"
+    },
+    {
+      "id": "TTRP-PD-007",
+      "area": "PD",
+      "suggestedAlternative": "write the bare column name"
+    },
+    {
+      "id": "TTRP-PD-008",
+      "area": "PD",
+      "suggestedAlternative": "single default-out in fragments — branch in a canonical container"
+    },
+    {
+      "id": "TTRP-PD-009",
+      "area": "PD",
+      "suggestedAlternative": "add .sort() before .limit() (deterministic results, A4/Q9)"
+    },
+    {
+      "id": "TTRP-PD-010",
+      "area": "PD"
+    },
+    {
+      "id": "TTRP-B-001",
+      "area": "B",
+      "suggestedAlternative": "To ask the host for a change: Set <attribute> of <entity> with key <key> to <value> with reason \"<reason>\"."
+    },
+    {
+      "id": "TTRP-B-002",
+      "area": "B",
+      "suggestedAlternative": "Combine that with <name>. / Store that to <model-ref>."
+    },
+    {
+      "id": "TTRP-B-003",
+      "area": "B",
+      "suggestedAlternative": "Model changes belong in TTR-M; data writes are Store: Store that to <model-ref>."
+    },
+    {
+      "id": "TTRP-B-004",
+      "area": "B",
+      "suggestedAlternative": "Start the sentence with a roster verb, e.g. Keep only the rows where <condition>."
+    },
+    {
+      "id": "TTRP-B-005",
+      "area": "B",
+      "suggestedAlternative": "# a comment"
+    },
+    {
+      "id": "TTRP-B-006",
+      "area": "B",
+      "suggestedAlternative": "Mark the fragment with the sentence's language (`\"\"\"ttrb-cs`) or use this skin's roster."
+    },
+    {
+      "id": "TTRP-B-007",
+      "area": "B",
+      "suggestedAlternative": "Use a listed verbose form or the canonical operator."
+    },
+    {
+      "id": "TTRP-B-008",
+      "area": "B",
+      "suggestedAlternative": "Author the Pivot node in canonical TTR-P."
+    },
+    {
+      "id": "TTRP-B-101",
+      "area": "B",
+      "suggestedAlternative": "Remove the character, or put the text in quotes."
+    },
+    {
+      "id": "TTRP-B-102",
+      "area": "B",
+      "suggestedAlternative": "If <condition>:  — then the block's sentences on the next lines, indented."
+    },
+    {
+      "id": "TTRP-B-103",
+      "area": "B",
+      "suggestedAlternative": "Indent every sentence of a block by the same amount."
+    },
+    {
+      "id": "TTRP-B-104",
+      "area": "B",
+      "suggestedAlternative": "Send an e-mail to <recipient> with subject \"<subject>\", template \"<template>\", key <key> [and attachments <a>, <b>]."
+    },
+    {
+      "id": "TTRP-B-105",
+      "area": "B",
+      "suggestedAlternative": "Set <attribute> of <entity> with key <key> to <value> with reason \"<reason>\"."
+    },
+    {
+      "id": "TTRP-B-106",
+      "area": "B",
+      "suggestedAlternative": "Create a manual task for <recipient> \"<title>\" with description \"<description>\"."
+    },
+    {
+      "id": "TTRP-B-107",
+      "area": "B",
+      "suggestedAlternative": "Count the rows of <table> as <name>."
+    },
+    {
+      "id": "TTRP-B-108",
+      "area": "B",
+      "suggestedAlternative": "Attach <table> to the result."
+    },
+    {
+      "id": "TTRP-B-109",
+      "area": "B",
+      "suggestedAlternative": "Choose another name — a keyword cannot name a column, a table or a result."
+    },
+    {
+      "id": "TTRP-B-110",
+      "area": "B",
+      "suggestedAlternative": "Join the conditions with `and` in one block: If <a> and <b>:"
+    },
+    {
+      "id": "TTRP-B-111",
+      "area": "B",
+      "suggestedAlternative": "Send that to output <port>."
+    },
+    {
+      "id": "TTRP-B-112",
+      "area": "B",
+      "suggestedAlternative": "Declare the port in the container header — container <name>(…, out <port>) …"
+    },
+    {
+      "id": "TTRP-B-113",
+      "area": "B",
+      "suggestedAlternative": "Name it and use the name — Call that <name>. — continue from it with `that`, or send it to an output."
+    },
+    {
+      "id": "TTRP-FN-001",
+      "area": "FN",
+      "suggestedAlternative": "unknown function — check the spelling against the builtin roster; known aliases suggest their canonical (T5-c)"
+    },
+    {
+      "id": "TTRP-FN-002",
+      "area": "FN",
+      "suggestedAlternative": "check the call's arity and argument types against the catalogue signature (T5-c)"
+    },
+    {
+      "id": "TTRP-AGG-001",
+      "area": "AGG",
+      "suggestedAlternative": "aggregate functions are only legal inside aggregate(…) / aggregate { … } (B-T5)"
+    },
+    {
+      "id": "TTRP-EXP-001",
+      "area": "EXP",
+      "suggestedAlternative": "only input columns are in scope inside op expressions — variables never resolve here (C3-a-iv)"
+    },
+    {
+      "id": "TTRP-TYP-001",
+      "area": "TYP",
+      "suggestedAlternative": "add an explicit cast(x as <type>) — there is no implicit coercion across type kinds (B-T5/Q9-4)"
+    },
+    {
+      "id": "TTRP-TYP-002",
+      "area": "TYP",
+      "suggestedAlternative": "no cast rule for this type pair — this coercion is undefined; there is no legal cast (B-T5)"
+    },
+    {
+      "id": "TTRP-WLD-001",
+      "area": "WLD",
+      "suggestedAlternative": "select a world: set `world = \"…\"` under [ttrp] in modeler.toml, or pin one with `uses world \"…\"` (contracts §2)"
+    },
+    {
+      "id": "TTRP-WLD-002",
+      "area": "WLD",
+      "suggestedAlternative": "check the world qname against the model repo's `def world` declarations (S22)"
+    },
+    {
+      "id": "TTRP-WLD-003",
+      "area": "WLD",
+      "suggestedAlternative": "name a `def world` — this qname is a different kind of object (D-d)"
+    },
+    {
+      "id": "TTRP-WLD-004",
+      "area": "WLD",
+      "suggestedAlternative": "exactly one storage may declare `staging: true` in a world (D-f); remove the extra one"
+    },
+    {
+      "id": "TTRP-RES-001",
+      "area": "RES",
+      "suggestedAlternative": "no object of the expected kind by that name — add an `import`, use the full qname, or check the world (D-b)"
+    },
+    {
+      "id": "TTRP-RES-002",
+      "area": "RES",
+      "suggestedAlternative": "the name is exported by more than one import — qualify it with its full qname (C2-d/D-b, no first-wins)"
+    },
+    {
+      "id": "TTRP-RES-003",
+      "area": "RES",
+      "suggestedAlternative": "`target` takes an engine instance — use a `def engine` declared in the world (D-b position typing)"
+    },
+    {
+      "id": "TTRP-RES-004",
+      "area": "RES",
+      "suggestedAlternative": "name a `def relation` declared between the two joined entities (D-a sub-2)"
+    },
+    {
+      "id": "TTRP-RES-005",
+      "area": "RES",
+      "suggestedAlternative": "bind it in the model (er2db) or reference the db object directly — no er2db binding is reachable (E-d)"
+    },
+    {
+      "id": "TTRP-RES-006",
+      "area": "RES",
+      "suggestedAlternative": "the import path resolves to no package — check the package name against the model repo (D-b)"
+    },
+    {
+      "id": "TTRP-SCH-001",
+      "area": "SCH",
+      "suggestedAlternative": "only one schema is allowed at each level — remove the duplicate declaration (D-c same-level conflict)"
+    },
+    {
+      "id": "TTRP-SCH-002",
+      "area": "SCH",
+      "suggestedAlternative": "declare a schema: inline `schema: { … }`, a program `def schema`, or on the storage in the world (schema-on-read is banned, T7)"
+    },
+    {
+      "id": "TTRP-SCH-003",
+      "area": "SCH",
+      "suggestedAlternative": "use a TTR db-schema type (S23): int/integer, decimal, string/text/char/varchar, bool/boolean, float, double, number, date, timestamp, datetime, object, list"
+    },
+    {
+      "id": "TTRP-CFG-001",
+      "area": "CFG",
+      "suggestedAlternative": "check the allowed values for this [ttrp] key (contracts §2)"
+    },
+    {
+      "id": "TTRP-CFG-002",
+      "area": "CFG",
+      "suggestedAlternative": "unknown [ttrp] key — check the spelling against the contracts §2 key roster"
+    },
+    {
+      "id": "TTRP-MOV-001",
+      "area": "MOV",
+      "suggestedAlternative": "`store` takes a storage — use a `def storage` declared in the world (D-b position typing)"
+    },
+    {
+      "id": "TTRP-WLD-005",
+      "area": "WLD",
+      "suggestedAlternative": "unknown engine type — no shipped capability manifest matches; shipped types: postgres-16, polars, bash (T6)"
+    },
+    {
+      "id": "TTRP-WLD-006",
+      "area": "WLD",
+      "suggestedAlternative": "no staging declared: mark one storage `staging: true` in the world, or set `[ttrp] staging` (D-f, contracts §2)"
+    },
+    {
+      "id": "TTRP-WLD-007",
+      "area": "WLD",
+      "suggestedAlternative": "no invocation binding for this (data engine, executor) pair — the executor manifest supports: pg, polars, display (F-c)"
+    },
+    {
+      "id": "TTRP-CAP-001",
+      "area": "CAP",
+      "suggestedAlternative": "node kind is not native on this engine — Stage 2.3 lowers it or re-places it (informational)"
+    },
+    {
+      "id": "TTRP-CAP-002",
+      "area": "CAP",
+      "suggestedAlternative": "function is not in this engine's supported set — Stage 2.3 lowers it or re-places the node (informational)"
+    },
+    {
+      "id": "TTRP-CAP-003",
+      "area": "CAP",
+      "suggestedAlternative": "node re-placed to a capable engine (function unsupported); target it explicitly or set `[ttrp] split-policy = error` (T5-b)"
+    },
+    {
+      "id": "TTRP-CAP-005",
+      "area": "CAP",
+      "suggestedAlternative": "no engine in the world supports this function — bind it, rewrite it, or add a capable engine (T5-b)"
+    },
+    {
+      "id": "TTRP-CAP-101",
+      "area": "CAP"
+    },
+    {
+      "id": "TTRP-CAP-102",
+      "area": "CAP"
+    },
+    {
+      "id": "TTRP-CAP-201",
+      "area": "CAP",
+      "suggestedAlternative": "this world's executor does not support runtime `param`s (F-4-i) — deploy to a platform (tatrman) executor, or remove the params"
+    },
+    {
+      "id": "TTRP-CAP-202",
+      "area": "CAP",
+      "suggestedAlternative": "this world's executor does not support `on failure of` islands (F-4-iv) — deploy to a platform (tatrman) executor, or remove the on-failure container"
+    },
+    {
+      "id": "TTRP-CAP-203",
+      "area": "CAP",
+      "suggestedAlternative": "this world's executor does not support per-island `retries` (F-4-ii) — deploy to a platform (tatrman) executor, or remove the retries attribute"
+    },
+    {
+      "id": "TTRP-CAP-204",
+      "area": "CAP",
+      "suggestedAlternative": "this world's executor is read-only and does not allow `store` — route the rows to a `display`, or deploy to an executor that writes (bash / tatrman)"
+    },
+    {
+      "id": "TTRP-MOV-002",
+      "area": "MOV",
+      "suggestedAlternative": "cannot stage between these engines via the staging storage — one side cannot read/write it (T6-e); pick a reachable `via`"
+    },
+    {
+      "id": "TTRP-MOV-003",
+      "area": "MOV",
+      "suggestedAlternative": "data leaves an `rls: true` storage — verify this egress is intended, or set `[ttrp] rls-egress = error` (Q8)"
+    },
+    {
+      "id": "TTRP-MOV-004",
+      "area": "MOV",
+      "suggestedAlternative": "this engine has no read relation to the loaded storage — load it in a container targeting a capable engine (T6-e)"
+    },
+    {
+      "id": "TTRP-LAY-001",
+      "area": "LAY",
+      "suggestedAlternative": "layout entries no longer match the graph (SSA chain changed or nodes removed) — reset or re-place them (C1-c-i)"
+    },
+    {
+      "id": "TTRP-LAY-002",
+      "area": "LAY",
+      "suggestedAlternative": "the `.ttrl` sidecar failed to parse — fix or delete it; the canvas falls back to auto-layout"
+    },
+    {
+      "id": "TTRP-LAY-003",
+      "area": "LAY",
+      "suggestedAlternative": "the `.ttrl` sidecar references a canvas that is not in the graph — remove the stale canvas block"
+    },
+    {
+      "id": "TTRP-EDIT-001",
+      "area": "EDIT",
+      "suggestedAlternative": "stale document version — re-pull the graph and replay the edits against the current version (C1-d-iii)"
+    },
+    {
+      "id": "TTRP-EDIT-002",
+      "area": "EDIT",
+      "suggestedAlternative": "canvas-edit refusal — a fragment interior / derived container (edit the fragment as text; C2-f, C1-b-iv), or a node removal that would orphan live outputs (the refusal names the dependents; FO-A1 §1)"
+    },
+    {
+      "id": "TTRP-EDIT-003",
+      "area": "EDIT",
+      "suggestedAlternative": "unknown or unsupported graph-edit op — use the closed β vocabulary (C1-d-i); everything else is a text edit"
+    },
+    {
+      "id": "TTRP-EDIT-004",
+      "area": "EDIT",
+      "suggestedAlternative": "invalid edit target (unknown ζ / container, or an occupied single-in port) — no partial edits are applied (C1-d)"
+    },
+    {
+      "id": "TTRP-MD-001",
+      "area": "MD"
+    },
+    {
+      "id": "TTRP-MD-002",
+      "area": "MD"
+    },
+    {
+      "id": "TTRP-MD-003",
+      "area": "MD",
+      "suggestedAlternative": "the path is ambiguous — pick one of the listed canonical forms, or add a qualifier"
+    },
+    {
+      "id": "TTRP-MD-004",
+      "area": "MD",
+      "suggestedAlternative": "bind the `*`/set/range to an attribute with a qualified pair (e.g. `month.*`)"
+    },
+    {
+      "id": "TTRP-MD-005",
+      "area": "MD",
+      "suggestedAlternative": "a path carries at most one measure (D12) — split into two expressions"
+    },
+    {
+      "id": "TTRP-MD-006",
+      "area": "MD",
+      "suggestedAlternative": "collapse the repeated attribute into a `{a, b}` member set (D15)"
+    },
+    {
+      "id": "TTRP-MD-007",
+      "area": "MD",
+      "suggestedAlternative": "qualify the bare member as `dim.member` — bare members need a live catalog (D18)"
+    },
+    {
+      "id": "TTRP-MD-008",
+      "area": "MD",
+      "suggestedAlternative": "collapse the free dimension with an explicit agg token, or compare in a non-scalar position (R17)"
+    },
+    {
+      "id": "TTRP-MD-009",
+      "area": "MD",
+      "suggestedAlternative": "pin, restrict, or `dim.*` every grain dimension, and name the measure — the LHS is strict (R19)"
+    },
+    {
+      "id": "TTRP-MD-010",
+      "area": "MD",
+      "suggestedAlternative": "declare an allocation strategy on the binding for the spread dimension (R21)"
+    },
+    {
+      "id": "TTRP-MD-011",
+      "area": "MD",
+      "suggestedAlternative": "check the member against the domain's published catalog (D13)"
+    },
+    {
+      "id": "TTRP-MD-012",
+      "area": "MD",
+      "suggestedAlternative": "rename the input column, or qualify the path (`dim.member`), so a drilling MD chain is not shadowed by a same-named column — it cannot be that column (R23)"
+    },
+    {
+      "id": "TTRP-MD-013",
+      "area": "MD"
+    },
+    {
+      "id": "TTRP-MD-014",
+      "area": "MD",
+      "suggestedAlternative": "shorten the path — the resolver hit its search bound on this input (R8)"
+    },
+    {
+      "id": "TTRP-EN-001",
+      "area": "EN",
+      "suggestedAlternative": "the batch does not match the target table's md shape — check the named column, its type, or the key/values usage for the op (contracts §5)"
+    },
+    {
+      "id": "TTRP-EN-002",
+      "area": "EN",
+      "suggestedAlternative": "this verb does not match the target's declared change-semantics (e.g. `effective-date-change` needs an scd2 target, `reverse-and-replace` a ledger target) (contracts §4/§9)"
+    },
+    {
+      "id": "TTRP-EN-003",
+      "area": "EN",
+      "suggestedAlternative": "the declared change-semantics is missing a required role column (scd2 needs valid-from/valid-to; ledger needs reversal-link) — declare it in the md table (contracts §2)"
+    },
+    {
+      "id": "TTRP-EN-004",
+      "area": "EN",
+      "suggestedAlternative": "a hard delete is not emittable for a ledger/scd2 target — use `delete-rows` (soft-close for scd2, pure reversal for ledger); §12 remains the server gate (contracts §4)"
+    },
+    {
+      "id": "TTRP-EN-005",
+      "area": "EN",
+      "suggestedAlternative": "an apply program is pure — no flow constructs (load/store/display) and no foreign call except `call-fn(...)` to a `pure`-certified canon-function (contracts §6, P-3)"
+    },
+    {
+      "id": "TTRP-EN-006",
+      "area": "EN",
+      "suggestedAlternative": "a `call-fn` is malformed or unresolvable — check the string-literal id, the arg count/types against the canon-function signature, and that a registered version satisfies the constraint (contracts §6)"
+    },
+    {
+      "id": "TTRP-EN-007",
+      "area": "EN",
+      "suggestedAlternative": "the apply program's target table has no md model resolution — check the `<table>` in the program name and the imported package (contracts §1)"
+    },
+    {
+      "id": "TTRP-MD-015",
+      "area": "MD",
+      "suggestedAlternative": "fix the `with` clause: every key must be known and match the existing binding (R26/R27)"
+    },
+    {
+      "id": "TTRP-MD-016",
+      "area": "MD",
+      "suggestedAlternative": "drop the measure/agg token — a `-=` deletes by key and ignores values (R29)"
+    },
+    {
+      "id": "TTRP-MD-017",
+      "area": "MD",
+      "suggestedAlternative": "`-=` is not defined on a diff-journaled cubelet — deltas can't be deleted (R29)"
+    },
+    {
+      "id": "TTRP-MD-018",
+      "area": "MD",
+      "suggestedAlternative": "add the technical-column role the journaling mode needs to the backing table (R30)"
+    },
+    {
+      "id": "TTRP-MD-019",
+      "area": "MD",
+      "suggestedAlternative": "a write needs a bound target cubelet — a virtual or unbound cubelet has no backing table (§5)"
+    },
+    {
+      "id": "TTRP-MD-020",
+      "area": "MD",
+      "suggestedAlternative": "use a bare-identifier target for `:=`/`-=` — cubelet statements need a name, not a slice (R24)"
+    },
+    {
+      "id": "TTRP-MD-021",
+      "area": "MD",
+      "suggestedAlternative": "`+=`/`-=` needs an existing target — create it first with `=`/`:=` (R24)"
+    },
+    {
+      "id": "TTRP-MD-022",
+      "area": "MD",
+      "suggestedAlternative": "the script variable shadows a model cubelet of the same name — rename to avoid confusion (R25)"
+    },
+    {
+      "id": "TTRP-MD-023",
+      "area": "MD",
+      "suggestedAlternative": "match the RHS grain/measures to the target cubelet — no silent reshape (R26/R28)"
+    },
+    {
+      "id": "TTRP-MD-024",
+      "area": "MD",
+      "suggestedAlternative": "MD write statements are checked but not yet executed by the compile pipeline (S5C deferral)"
+    },
+    {
+      "id": "TTRP-LCK-001",
+      "area": "LCK",
+      "suggestedAlternative": "`ttr.lock` is missing or unparseable where a connected binding is configured — run `ttr fetch`"
+    },
+    {
+      "id": "TTRP-LCK-002",
+      "area": "LCK",
+      "suggestedAlternative": "`--frozen`: a pinned archive is absent from the cache — run `ttr fetch` and commit the lock diff"
+    },
+    {
+      "id": "TTRP-LCK-003",
+      "area": "LCK",
+      "suggestedAlternative": "`--offline`: compiling from cache; staleness is recorded in the compile record"
+    },
+    {
+      "id": "TTRP-LCK-004",
+      "area": "LCK",
+      "suggestedAlternative": "the lock pins a platform world whose declared `extends` target contradicts it (K) — reconcile the worlds"
+    },
+    {
+      "id": "TTRP-STA-001",
+      "area": "STA",
+      "suggestedAlternative": "stats entry discarded: object schema hash mismatch — the object degrades to the static cost model"
+    },
+    {
+      "id": "TTRP-IMP-001",
+      "area": "IMP",
+      "suggestedAlternative": "import-schema qname collision after mangling — add a rename mapping entry (never auto-suffixed)"
+    },
+    {
+      "id": "TTRP-PARAM-001",
+      "area": "PARAM",
+      "suggestedAlternative": "a runtime param must be a scalar type: string, int, decimal, date, datetime, or bool (F-4-i)"
+    },
+    {
+      "id": "TTRP-PARAM-002",
+      "area": "PARAM",
+      "suggestedAlternative": "duplicate param name — each `param` is declared once per program (F-4-i)"
+    },
+    {
+      "id": "TTRP-PARAM-003",
+      "area": "PARAM",
+      "suggestedAlternative": "`@run-date` is the only builtin default and applies to a `date`/`datetime` param — use a literal default for other types (F-4-i)"
+    },
+    {
+      "id": "TTRP-FAIL-001",
+      "area": "FAIL",
+      "suggestedAlternative": "`on failure of` names an unknown island — reference a container declared in this program (F-4-iv)"
+    },
+    {
+      "id": "TTRP-FAIL-002",
+      "area": "FAIL",
+      "suggestedAlternative": "an on-failure island cannot depend on itself (directly or transitively) — break the on-failure cycle (F-4-iv)"
+    },
+    {
+      "id": "TTRP-FAIL-003",
+      "area": "FAIL",
+      "suggestedAlternative": "`absorbs` is reserved (F-4-iv γ) and unavailable in v1 — a handled failure still ends the run non-success; drop `absorbs`"
+    },
+    {
+      "id": "TTRP-DSP-001",
+      "area": "DSP",
+      "suggestedAlternative": "the action display's schema requires this column — produce it (e.g. `calc { <col> = … }`) before the display, or mark it `optional: true` in the schema"
+    },
+    {
+      "id": "TTRP-DSP-002",
+      "area": "DSP",
+      "suggestedAlternative": "the column's type is not assignable to the schema's — assignable is the same type, int → decimal/float, or any scalar → text; convert it with `cast(x as <type>)` before the display"
+    },
+    {
+      "id": "TTRP-DSP-003",
+      "area": "DSP",
+      "suggestedAlternative": "the column is not in the action display's schema and is dropped from the display's output — `select` the schema's columns to silence this"
+    },
+    {
+      "id": "TTRP-DSP-004",
+      "area": "DSP",
+      "suggestedAlternative": "only an action display (a declared row schema in an imported package) may take several sources — rename the displays, or declare `def schema <name>` in a TTR-M package and import it"
+    },
+    {
+      "id": "TTRP-DSP-005",
+      "area": "DSP",
+      "suggestedAlternative": "an action display's column must be a scalar every engine can produce — declare it as text, int, bigint, smallint, decimal (precision ≤ 38), float, bool, date, time, datetime or timestamp"
+    }
+  ]
+}

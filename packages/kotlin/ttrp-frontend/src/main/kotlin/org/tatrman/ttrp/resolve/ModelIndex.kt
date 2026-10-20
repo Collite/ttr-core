@@ -89,6 +89,16 @@ class ModelIndex(
                     }
             }.sortedBy { it.qualifiedName }
 
+    /** Every row schema an import brings into scope (the [findRowSchemas] rule, any name), by qualified name. */
+    fun rowSchemasInScope(imports: List<ImportScope>): List<RowSchemaRecord> =
+        rowSchemas
+            .filter { rs ->
+                imports.any { imp ->
+                    (imp.tier == null || imp.tier == SchemaCode.DB) &&
+                        (fileInPackage(rs.sourceFile, imp.pkg) || rs.pkg == imp.pkg)
+                }
+            }.sortedBy { it.qualifiedName }
+
     private fun inScope(
         obj: ModelObject,
         imports: List<ImportScope>,

@@ -97,8 +97,8 @@ enum class TtrpDiagnosticId(
     ),
     REC_099(
         "TTRP-REC-099",
-        "a recipe parses and is checked by the AU toolchain, but compiles to a bundle only from AU-core-P2 " +
-            "(the recipe bundle, AU contracts §5) — until then build its islands as a plain program",
+        "the time sugar (`latest`, `within`, `working_days`, `age`) compiles with a recipe — move the op into a " +
+            "recipe's island, or spell it with the base ops",
     ),
 
     // ---- AU-core-P1 — the recipe checker (AU contracts §4): roles, wiring, parameters, key lineage, time ----
