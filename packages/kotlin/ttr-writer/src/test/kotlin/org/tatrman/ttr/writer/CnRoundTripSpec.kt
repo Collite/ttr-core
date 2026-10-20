@@ -123,6 +123,23 @@ class CnRoundTripSpec :
             text shouldBe golden()
         }
 
+        "an inline lexicon block keeps its sense fields (cn contracts §1.5)" {
+            val (r, text) =
+                roundTrip(
+                    "model cn\ndef kind Item { lexicon: { terms: [\"product\"], default: true, sense_priority: 2 } }",
+                )
+            text shouldContain "lexicon: { terms: [\"product\"], default: true, sense_priority: 2 }"
+            val block =
+                r.definitions
+                    .filterIsInstance<ConceptDef>()
+                    .single()
+                    .body
+                    .property<ConceptProperty.Lexicon>()!!
+                    .block
+            block.default shouldBe true
+            block.sensePriority shouldBe 2.0
+        }
+
         "the golden is what the writer renders from its source" {
             TtrRenderer.render(TtrLoader.parseString(GOLDEN_SOURCE)) shouldBe golden()
         }

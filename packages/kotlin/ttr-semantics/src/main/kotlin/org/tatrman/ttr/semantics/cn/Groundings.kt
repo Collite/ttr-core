@@ -101,7 +101,7 @@ fun propertyFingerprint(p: ConceptProperty): String =
                         p.block.patterns,
                         p.block.examples,
                     ).joinToString("|") { it.joinToString(",") },
-                )
+                ).append('|').append(p.block.default).append('|').append(p.block.sensePriority)
             is ConceptProperty.Target ->
                 when (val v = p.value) {
                     is TargetReferenceValue -> append("ref:").append(refPath(v.ref.path))

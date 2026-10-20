@@ -63,6 +63,15 @@ class ConceptServiceContractSpec :
             for (call in calls) shouldThrow<UnsupportedOperationException> { call() }.message shouldBe "CN-P3"
         }
 
+        test("Via and GroundingGrade are the typed model's (ttr-metadata since CN-P2 S2.5), aliased here") {
+            Via.MD_HOP shouldBe org.tatrman.ttr.metadata.model.Via.MD_HOP
+            Via.entries.map { it.name } shouldBe listOf("DIRECT", "MD_HOP")
+            GroundingGrade.entries.map { it.name } shouldBe
+                listOf("UNGROUNDED", "ER_GROUNDED", "MD_GROUNDED", "MD_GROUNDED_HOP_MISSING")
+            ConceptHygiene("cn.Customer").grade shouldBe GroundingGrade.UNGROUNDED
+            BindingPath("measures[0]", "cn.revenue").via shouldBe Via.DIRECT
+        }
+
         test("every §3 data class constructs empty-safe (defaults only)") {
             LowerResult().provenance.imprecisionMode shouldBe ImprecisionMode.CERTAINLY
             Rendering().text shouldBe ""

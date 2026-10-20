@@ -1,0 +1,13 @@
+// The md face fixtures 75 and 76 target (`CnModelSpec`): a dimension per md-grounded kind and role, a measure, a
+// cubelet. No `md2er_*` — every md grounding's hop is missing (the explicit hop is `CnHopSpec`'s).
+package hartland.concepts
+model md
+
+def dimension Product {
+    key: sku,
+    attributes: [ def attribute sku { domain: md.Sku, isKey: true }, def attribute brand { domain: md.Brand } ]
+}
+def dimension Customer           { key: code, attributes: [ def attribute code { domain: md.Code, isKey: true } ] }
+def dimension DistributionCentre { key: dc, attributes: [ def attribute dc { domain: md.Code, isKey: true } ] }
+def measure revenue { domain: md.Money, aggregation: sum }
+def cubelet storeReturns { grain: [Customer.code, Product.sku] }

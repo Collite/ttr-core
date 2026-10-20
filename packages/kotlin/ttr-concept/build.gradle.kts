@@ -23,8 +23,9 @@ tasks.test {
 dependencies {
     // api: the `statement.v1` / `assertion.v1` / `concept.v1` messages are in ConceptService's signatures.
     api(project(":packages:kotlin:ttr-plan-proto"))
-    // The typed model (CnModel lands in CN-P2 S2.5), the md lowering chain, and the er renderer's dialects.
-    implementation(project(":packages:kotlin:ttr-metadata"))
+    // The typed model (`CnSchema`, CN-P2 S2.5) — api: `Via` and `GroundingGrade` live there and are in this module's
+    // public types (aliases in Results.kt). Then the md lowering chain and the er renderer's dialects.
+    api(project(":packages:kotlin:ttr-metadata"))
     implementation(project(":packages:kotlin:ttr-md-resolver"))
     implementation(project(":packages:kotlin:ttrp-emit"))
     implementation(project(":packages:kotlin:ttr-translator")) // dialects only (definition_render(er) targets)

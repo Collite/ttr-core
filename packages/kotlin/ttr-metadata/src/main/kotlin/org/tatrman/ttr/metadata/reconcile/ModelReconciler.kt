@@ -140,6 +140,18 @@ class ModelReconciler(
         val automationSchema =
             org.tatrman.ttr.metadata.model
                 .AutomationSchema(objects = mergeMaps(sorted) { it.automation })
+        // Grammar 0.17 — the conceptual tier, each source's built over its own files (a source is a project), merged
+        // by qname (same precedence); the reverse index is derived from the merged concepts.
+        val cnSchema =
+            org.tatrman.ttr.metadata.model.CnSchema(
+                concepts = mergeMaps(sorted) { it.cn.concepts },
+                bindings = mergeMaps(sorted) { it.cn.bindings },
+                relationTypes = mergeMaps(sorted) { it.cn.relationTypes },
+                vocabularyVersions =
+                    sorted.fold(emptyMap()) { acc, s ->
+                        acc + s.cn.vocabularyVersions.filterKeys { it !in acc }
+                    },
+            )
 
         val model =
             Model(
@@ -156,6 +168,7 @@ class ModelReconciler(
                         "cnc" to cncSchema,
                         "world" to worldSchema,
                         "automation" to automationSchema,
+                        "cn" to cnSchema,
                     ),
                 mappings = mappings,
                 queries = queries,

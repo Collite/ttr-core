@@ -9,8 +9,11 @@ import org.tatrman.plan.v1.PlanNode
 /** The layer a definition renders on (⚑CN-13: one definition syntax, two renderers). */
 enum class Layer { MD, ER }
 
-/** How a concept's ER landing was reached (AM-15): its own cn2er grounding, or its md grounding through the hop. */
-enum class Via { DIRECT, MD_HOP }
+/**
+ * How a concept's ER landing was reached (AM-15): its own cn2er grounding, or its md grounding through the hop. The
+ * typed model carries it, so it lives in `ttr-metadata` since CN-P2 S2.5; this alias keeps the §3 spelling.
+ */
+typealias Via = org.tatrman.ttr.metadata.model.Via
 
 /** The three-valued reading a definition compares instants with (AM-42); default `CERTAINLY`. */
 enum class ImprecisionMode { CERTAINLY, POSSIBLY }
@@ -105,8 +108,8 @@ data class ModelText(
     val files: Map<String, String> = emptyMap(),
 )
 
-/** The hygiene grades of S-6 v2. */
-enum class GroundingGrade { UNGROUNDED, ER_GROUNDED, MD_GROUNDED, MD_GROUNDED_HOP_MISSING }
+/** The hygiene grades of S-6 v2 — computed by the typed model, so in `ttr-metadata` since CN-P2 S2.5 (alias). */
+typealias GroundingGrade = org.tatrman.ttr.metadata.model.GroundingGrade
 
 data class ConceptHygiene(
     val qname: String,

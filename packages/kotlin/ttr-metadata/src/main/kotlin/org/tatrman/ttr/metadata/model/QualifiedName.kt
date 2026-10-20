@@ -13,9 +13,9 @@ package org.tatrman.ttr.metadata.model
  * WORLD is library-only (M2) — the proto SchemaCode (frozen, MD7) has no world
  * tier because the metadata service never did world resolution; M4's proto conversion drops it.
  * AUTOMATION (grammar 0.16) is library-only too — the automation tier is read by the automation
- * service, never sent over the metadata wire.
+ * service, never sent over the metadata wire. So is CN (grammar 0.17, the conceptual tier — CN-P2 S2.5).
  */
-enum class SchemaCode { UNSPECIFIED, DB, ER, CNC, WS, OBJ, WORLD, AUTOMATION }
+enum class SchemaCode { UNSPECIFIED, DB, ER, CNC, WS, OBJ, WORLD, AUTOMATION, CN }
 
 /**
  * Parse a schema-code token (`"db"`, `"er"`, `"cnc"`, `"ws"`, `"obj"`) into a
@@ -31,6 +31,7 @@ fun parseSchemaCode(code: String): SchemaCode? =
         "obj" -> SchemaCode.OBJ
         "world" -> SchemaCode.WORLD
         "automation" -> SchemaCode.AUTOMATION
+        "cn" -> SchemaCode.CN
         "schema_code_unspecified" -> SchemaCode.UNSPECIFIED
         else -> null
     }
@@ -48,6 +49,7 @@ fun schemaCodeToToken(sc: SchemaCode): String =
         SchemaCode.OBJ -> "obj"
         SchemaCode.WORLD -> "world"
         SchemaCode.AUTOMATION -> "automation"
+        SchemaCode.CN -> "cn"
         SchemaCode.UNSPECIFIED -> ""
     }
 

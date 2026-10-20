@@ -1255,7 +1255,11 @@ object TtrRenderer {
         val parts =
             listOf("terms" to b.terms, "patterns" to b.patterns, "examples" to b.examples)
                 .filter { it.second.isNotEmpty() }
-                .map { (k, items) -> "$k: [${items.joinToString(", ") { renderString(it) }}]" }
+                .map { (k, items) -> "$k: [${items.joinToString(", ") { renderString(it) }}]" } +
+                listOfNotNull(
+                    b.default?.let { "default: $it" },
+                    b.sensePriority?.let { "sense_priority: ${renderNumber(it)}" },
+                )
         return if (parts.isEmpty()) "{}" else "{ ${parts.joinToString(", ")} }"
     }
 
