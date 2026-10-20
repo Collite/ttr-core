@@ -96,6 +96,15 @@ function isCnSymbol(e: SymbolEntry): boolean {
   return e.schemaCode === 'cn';
 }
 
+/**
+ * What an element reference never reaches: the cn model, and the bindings the cn desugar
+ * synthesized (S2.2) — named `<Concept>.grounds` / `<Concept>.concept`, they would otherwise match a
+ * bare name by suffix.
+ */
+function isHiddenFromElements(e: SymbolEntry): boolean {
+  return isCnSymbol(e) || e.cnOrigin !== undefined;
+}
+
 /** The canonical key of a concept (or `<Name>.<label>`) in `pkg`: `<pkg>.cn.concept.<parts>`. */
 function cnKey(pkg: string, parts: string[]): string {
   return (pkg ? `${pkg}.` : '') + ['cn', 'concept', ...parts].join('.');
@@ -150,11 +159,17 @@ export class Resolver {
   private readonly elements = {
     get: (qname: string): SymbolEntry | undefined => {
       const e = this.symbols.get(qname);
-      return e && !isCnSymbol(e) ? e : undefined;
+      return e && !isHiddenFromElements(e) ? e : undefined;
     },
-    getByPackage: (pkg: string): SymbolEntry[] => this.symbols.getByPackage(pkg).filter((e) => !isCnSymbol(e)),
-    getBySuffix: (suffix: string): SymbolEntry[] => this.symbols.getBySuffix(suffix).filter((e) => !isCnSymbol(e)),
+    getByPackage: (pkg: string): SymbolEntry[] => this.symbols.getByPackage(pkg).filter((e) => !isHiddenFromElements(e)),
+    getBySuffix: (suffix: string): SymbolEntry[] => this.symbols.getBySuffix(suffix).filter((e) => !isHiddenFromElements(e)),
   };
+
+  /** The concept (or participant label) a key reads as (`ProjectSymbolTable.get`: authored first). */
+  private cnSymbol(key: string): SymbolEntry | undefined {
+    const e = this.symbols.get(key);
+    return e && isCnSymbol(e) ? e : undefined;
+  }
 
   private currentManifest(): ResolvedManifest | undefined {
     return typeof this.manifestSource === 'function' ? this.manifestSource() : this.manifestSource;
@@ -430,8 +445,8 @@ export class Resolver {
     const parts = ref.parts.length > 1 && ref.parts[0] === 'cn' ? ref.parts.slice(1) : ref.parts;
     const lookup = (step: ResolutionStep, key: string): SymbolEntry | undefined => {
       tried.push(attempt(step, key));
-      const symbol = this.symbols.get(key);
-      if (symbol && isCnSymbol(symbol)) return symbol;
+      const symbol = this.cnSymbol(key);
+      if (symbol) return symbol;
       tried[tried.length - 1].reason = 'unknown-symbol';
       return undefined;
     };
@@ -461,8 +476,8 @@ export class Resolver {
     const wildcardMatches = dedupeBy(
       (context.imports ?? [])
         .filter((imp) => imp.wildcard)
-        .map((imp) => this.symbols.get(cnKey(imp.target, parts)))
-        .filter((e): e is SymbolEntry => e !== undefined && isCnSymbol(e)),
+        .map((imp) => this.cnSymbol(cnKey(imp.target, parts)))
+        .filter((e): e is SymbolEntry => e !== undefined),
       (e) => e.qname,
     );
     if (wildcardMatches.length > 1) {
@@ -475,7 +490,8 @@ export class Resolver {
     }
 
     const suffix = cnKey('', parts);
-    const anywhere = dedupeBy(this.symbols.getBySuffix(suffix).filter(isCnSymbol), (e) => e.qname);
+    const anywhere = dedupeBy(this.symbols.getBySuffix(suffix).filter(isCnSymbol), (e) => e.qname)
+      .map((e) => this.cnSymbol(e.qname) ?? e);
     if (anywhere.length === 1) {
       tried.push(attempt('fully-qualified', anywhere[0].qname));
       return { resolved: true, symbol: anywhere[0], viaStep: 'fully-qualified' };

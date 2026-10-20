@@ -1,0 +1,17 @@
+// One authored binding per block of `83-cn-desugar-bottom-up/`.
+package hartland.stores
+model binding
+
+def cn2er_kind    party_g      { kind: cn.Party,        target: er.entity.party }
+def cn2er_role    buyer_g      { role: cn.Buyer,        target: er.entity.customer }
+def cn2er_kind    shop_g       { kind: cn.Shop,         target: er.entity.store }
+def cn2er_kind    channel_g    { kind: cn.Channel,      target: er.entity.store.channel }
+def cn2er_event   purchase_g   { event: cn.Purchase,    target: er.entity.sale }
+def cn2er_quality amount_g     { quality: cn.amount,    target: er.entity.sale.amount }
+
+def cn2md_kind    item_g       { kind: cn.Item,         target: md.Product }
+def cn2md_quality color_g      { quality: cn.color,     target: md.Product.color }
+def cn2md_role    shopper_g    { role: cn.Shopper,      target: md.Shopper }
+def cn2md_kind    brand_g      { kind: cn.Brand,        target: md.Brand }
+def cn2md_quality net_sales_g  { quality: cn.net_sales, target: md.net_sales }
+def cn2md_event   store_sale_g { event: cn.StoreSale,   target: md.store_sales }

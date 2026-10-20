@@ -1,0 +1,28 @@
+// The concepts, each grounded by its own `grounds:`. `hierarchy:` rides onto the synthesized
+// `cn2er_kind` (Q15-1).
+package hartland.stores
+model cn
+
+// md
+def kind Item          { label: { en: "Product" }, grounds: md.Product }
+def kind Brand         { grounds: md.Brand }
+def role Shopper       { of: Party, event: StoreSale, grounds: md.Shopper }
+def event StoreSale    { involves: [Shopper, Item], grounds: md.store_sales }
+def quality net_sales  { of: StoreSale, grounds: md.net_sales }
+def quality color      { of: Item, grounds: md.Product.color }
+
+// er
+def kind Party         { label: { en: "Party" }, grounds: er.entity.party }
+def kind Shop          { grounds: er.entity.store }
+def kind Channel       { grounds: er.entity.store.channel }
+def kind ProductCategory {
+    grounds: er.entity.category_code,
+    hierarchy: { closure: er.entity.category_closure, ancestor: ancestor_code, descendant: descendant_code }
+}
+def role Buyer         { of: Party, event: Purchase, grounds: er.entity.customer }
+def event Purchase     { involves: [Buyer, Shop], qualities: [amount], grounds: er.entity.sale }
+def quality amount     { of: Purchase, grounds: er.entity.sale.amount }
+def phase PlacedOrder  { of: Purchase, grounds: er.entity.placed_order }
+
+// db
+def kind LoyaltyCard   { grounds: db.dbo.loyalty_card }

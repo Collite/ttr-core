@@ -33,6 +33,26 @@ export type { SecurityDiagnostic, SecurityDiagnosticCode } from './security-vali
 export { effectiveMatchMethod, fuzzyDeprecationMessage, validateSearchMethods, DEFAULT_TYPOS_DISTANCE } from './search-method.js';
 export type { EffectiveMatchMethod, MatchMethodName, SearchMethodDiagnostic } from './search-method.js';
 export { desugarLexicon } from './lexicon/desugar.js';
+export {
+  desugarConcepts,
+  bindingKindFor,
+  bindingConceptKey,
+  layerOf,
+  synthesizedBindingName,
+  type CnLayer,
+  type CnGrounding,
+  type SugarConcept,
+  type ConceptDesugar,
+} from './cn/desugar.js';
+export {
+  analyzeGroundings,
+  conceptKeyOf,
+  propertyFingerprint,
+  type CnDocument,
+  type CnDiagnostic,
+  type PlacedGrounding,
+  type GroundingAnalysis,
+} from './cn/groundings.js';
 export type { CanonicalLexiconEntry, LexiconAnalysis, LexiconDiagnostic } from './lexicon/model.js';
 export { serializeVocabularySnapshot, foldId } from './lexicon/snapshot.js';
 export { foldForCollision } from './lexicon/fold.js';

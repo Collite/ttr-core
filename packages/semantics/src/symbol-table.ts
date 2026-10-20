@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { SourceLocation, Document, Definition, ConceptStereotype, ConceptBindingKind } from '@tatrman/parser';
+import type { SourceLocation, Document, Definition, ConceptStereotype, ConceptBindingKind, ConceptProperty } from '@tatrman/parser';
 import { buildCanonicalKey, modelForKind } from './qname.js';
 import { keyKindOf } from './default-schema.js';
+import { desugarConcepts } from './cn/desugar.js';
 import type { ResolvedSemantics } from './semantics-block/model.js';
 
 export interface SymbolEntry {
@@ -30,6 +31,12 @@ export interface SymbolEntry {
   stereotype?: ConceptStereotype;
   /** 0.17 — a cn binding's keyword (`kind: 'conceptBinding'` only); its key's kind segment. */
   bindingKind?: ConceptBindingKind;
+  /**
+   * 0.17 — set on what the cn desugar synthesized (CN-P2 S2.2): a concept a `concept { }` block
+   * declares (and its participant labels), or the binding a `grounds:` / `concept { }` stands for.
+   * Element references never reach these; an authored concept of the same key is preferred.
+   */
+  cnOrigin?: 'grounds' | 'sugar';
   /**
    * For er2db_* symbols only: distinguishes explicit `def er2db_*` declarations
    * from symbols synthesized from inline `binding:` properties on def entity /
@@ -104,6 +111,75 @@ export class DocumentSymbolTable {
 
     for (const def of ast.definitions) {
       this.addEntry(def);
+    }
+    this.addDesugared(ast);
+  }
+
+  /**
+   * 0.17 — the concepts this document's `concept { }` blocks declare and the bindings its `grounds:`
+   * and `concept { }` stand for (`cn/desugar.ts`). A synthesized symbol never replaces one the
+   * document declares: an authored concept of the same name is the concept the block grounds.
+   */
+  private addDesugared(ast: Document): void {
+    const { concepts, groundings } = desugarConcepts(ast, this.packageName);
+    for (const c of concepts) {
+      const entry: SymbolEntry = {
+        qname: this.makeQname('concept', [c.name]),
+        kind: 'concept',
+        name: c.name,
+        source: c.declaring.source,
+        documentUri: this.documentUri,
+        packageName: this.packageName,
+        schemaCode: 'cn',
+        stereotype: c.stereotype,
+        cnOrigin: 'sugar',
+      };
+      if (this.entries.has(entry.qname)) continue;
+      this.entries.set(entry.qname, entry);
+      if (c.stereotype === 'event') this.addParticipants(entry, c.body.properties, 'sugar');
+    }
+    for (const g of groundings) {
+      if (g.origin === 'binding' || !g.bindingKind) continue;
+      const qname = this.makeQname(g.bindingKind, g.name.split('.'));
+      if (this.entries.has(qname)) continue;
+      this.entries.set(qname, {
+        qname,
+        kind: 'conceptBinding',
+        name: g.name,
+        source: g.source,
+        documentUri: this.documentUri,
+        packageName: this.packageName,
+        schemaCode: 'binding',
+        bindingKind: g.bindingKind,
+        cnOrigin: g.origin,
+      });
+    }
+  }
+
+  /**
+   * 0.17 — an event's participants register by label (`Warehouse as fulfilling` → `fulfilling`;
+   * unlabelled → the concept name lower-cased, cn contracts §1.1), so a binding's `participants:`
+   * keys and a definition's `this.<label>` resolve. Two unlabelled participants of one concept
+   * share a key — `cn/involves-unlabelled-duplicate` (S2.3), not a duplicate definition.
+   */
+  private addParticipants(event: SymbolEntry, properties: ConceptProperty[], cnOrigin?: 'sugar'): void {
+    const involves = properties.find((p) => p.kind === 'involves');
+    if (involves?.kind !== 'involves') return;
+    for (const participant of involves.participants) {
+      const label = participant.label ?? participant.ref.parts[participant.ref.parts.length - 1].toLowerCase();
+      const pQname = this.makeQnameChild(event, label);
+      if (cnOrigin && this.entries.has(pQname)) continue;
+      this.entries.set(pQname, {
+        qname: pQname,
+        kind: 'participant',
+        name: label,
+        source: participant.source,
+        documentUri: this.documentUri,
+        parent: event.qname,
+        packageName: this.packageName,
+        schemaCode: event.schemaCode,
+        ...(cnOrigin ? { cnOrigin } : {}),
+      });
     }
   }
 
@@ -273,30 +349,7 @@ export class DocumentSymbolTable {
       }
     }
 
-    // 0.17 — an event's participants register by label (`Warehouse as fulfilling` → `fulfilling`;
-    // unlabelled → the concept name lower-cased, cn contracts §1.1), so a binding's `participants:`
-    // keys and a definition's `this.<label>` resolve. Two unlabelled participants of one concept
-    // share a key — `cn/involves-unlabelled-duplicate` (S2.3), not a duplicate definition.
-    if (def.kind === 'concept' && def.stereotype === 'event') {
-      for (const p of def.properties) {
-        if (p.kind !== 'involves') continue;
-        for (const participant of p.participants) {
-          const label = participant.label ?? participant.ref.parts[participant.ref.parts.length - 1].toLowerCase();
-          const pQname = this.makeQnameChild(entry, label);
-          this.entries.set(pQname, {
-            qname: pQname,
-            kind: 'participant',
-            name: label,
-            source: participant.source,
-            documentUri: this.documentUri,
-            parent: entry.qname,
-            packageName: this.packageName,
-            schemaCode: entry.schemaCode,
-          });
-        }
-        break;
-      }
-    }
+    if (def.kind === 'concept' && def.stereotype === 'event') this.addParticipants(entry, def.properties);
 
     if (def.kind === 'table' && def.columns) {
       const tableEntry = entry;

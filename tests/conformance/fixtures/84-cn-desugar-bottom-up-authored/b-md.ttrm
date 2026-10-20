@@ -1,0 +1,12 @@
+// The md hosts, without their blocks.
+package hartland.stores
+model md
+
+def dimension Product {
+    key: sku,
+    attributes: [ def attribute sku { domain: md.Sku, isKey: true }, def attribute color { domain: md.Color } ]
+}
+def dimension Shopper { key: shopper_code, attributes: [ def attribute shopper_code { domain: md.ShopperCode, isKey: true } ] }
+def domain Brand { type: text }
+def measure net_sales { domain: md.Money, aggregation: sum }
+def cubelet store_sales { grain: [Shopper.shopper_code, Product.sku] }

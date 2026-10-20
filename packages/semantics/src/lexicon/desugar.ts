@@ -8,15 +8,20 @@
 // target is normal), so the conflict signal is an exact-duplicate surface form,
 // not a duplicate definition.
 
-import type { Definition, Document, LexiconBlock, LexiconEntryDef, SourceLocation } from '@tatrman/parser';
-import { DiagnosticCode } from '@tatrman/parser';
+import type { ConceptDef, Definition, Document, LexiconBlock, LexiconEntryDef, SourceLocation } from '@tatrman/parser';
+import { conceptProperty, DiagnosticCode } from '@tatrman/parser';
 import { modelForKind, namespaceForKind, defaultNamespaceForSchema } from '../default-schema.js';
+import { desugarConcepts } from '../cn/desugar.js';
 import type { CanonicalLexiconEntry, LexiconAnalysis, LexiconDiagnostic } from './model.js';
 
 const LEXICON_ENTRY_KINDS = new Set(['term', 'pattern', 'example']);
 
-/** The dotted target path an inline `lexicon{}` block resolves to (its carrier). */
+/**
+ * The dotted target path an inline `lexicon{}` block resolves to (its carrier). A concept's is its
+ * wire name `cn.<Name>` — what a canonical `def term { for: cn.<Name> }` writes (0.17).
+ */
 function inlineTargetPath(def: Definition & { name: string }): string {
+  if (def.kind === 'concept') return `cn.${def.name}`;
   const model = modelForKind(def.kind);
   const ns = namespaceForKind(def.kind) || defaultNamespaceForSchema(model) || def.kind;
   return `${model}.${ns}.${def.name}`;
@@ -70,7 +75,9 @@ function collectCarrierVocab(
   diagnostics: LexiconDiagnostic[],
 ): void {
   const c = carrier as unknown as InlineCarrier & LegacyCarrier;
-  if (c.lexicon) collectInline(name, target, c.lexicon, entries);
+  // 0.17 — a concept def keeps its `lexicon { }` in its ordered property list.
+  const lexicon = c.lexicon ?? (carrier.kind === 'concept' ? conceptProperty(carrier as ConceptDef, 'lexicon')?.block : undefined);
+  if (lexicon) collectInline(name, target, lexicon, entries);
   if (!isLexiconModel) collectLegacy(kind, name, target, c, source, entries, diagnostics);
 }
 
@@ -122,6 +129,15 @@ export function desugarLexicon(doc: Document): LexiconAnalysis {
     // `valueLabels` (A4-β) already descends into nested attributes on its own.
     if (!isLexiconModel) {
       collectValueLabels(def, entries);
+    }
+  }
+
+  // 0.17 — a `concept { }` block's `lexicon { }` names the concept it declares (`cn.<Name>`), not
+  // its md / er host (whose own `lexicon { }` stays the host's).
+  if (!isLexiconModel) {
+    for (const c of desugarConcepts(doc).concepts) {
+      const block = conceptProperty(c.body, 'lexicon')?.block;
+      if (block) collectInline(c.name, `cn.${c.name}`, block, entries);
     }
   }
 
@@ -338,14 +354,32 @@ function collectCanonical(
     forms: def.forms,
     match: def.match,
     text: def.text,
+    ...senseOf(def.default, def.sensePriority),
     origin: 'canonical',
     source: def.source,
   });
 }
 
+/** The 0.17 sense fields, only those written (cn contracts §1.5). */
+function senseOf(isDefault: boolean | undefined, sensePriority: number | undefined): Pick<CanonicalLexiconEntry, 'default' | 'sensePriority'> {
+  return {
+    ...(isDefault !== undefined ? { default: isDefault } : {}),
+    ...(sensePriority !== undefined ? { sensePriority } : {}),
+  };
+}
+
+/** The sense fields an inline `lexicon { }` block writes beside its shorthands (`default: true`, `sense_priority: 2`). */
+function inlineSense(block: LexiconBlock): Pick<CanonicalLexiconEntry, 'default' | 'sensePriority'> {
+  const entry = (key: string) => block.object.entries.find((e) => e.key === key)?.value;
+  const d = entry('default');
+  const p = entry('sense_priority');
+  return senseOf(d?.kind === 'bool' ? d.value : undefined, p?.kind === 'number' ? p.value : undefined);
+}
+
 function collectInline(name: string, target: string, block: LexiconBlock, entries: CanonicalLexiconEntry[]): void {
   // Inline entries default to the base/deployment locale (RS-11) — locale left
   // undefined; the loader resolves it against the deployment default.
+  const sense = inlineSense(block);
   if (block.terms && block.terms.length > 0) {
     entries.push({
       entryKind: 'term',
@@ -353,6 +387,7 @@ function collectInline(name: string, target: string, block: LexiconBlock, entrie
       target,
       locale: undefined,
       forms: block.terms,
+      ...sense,
       origin: 'inline',
       source: block.source,
     });
@@ -375,6 +410,7 @@ function collectInline(name: string, target: string, block: LexiconBlock, entrie
       target,
       locale: undefined,
       text: example,
+      ...sense,
       origin: 'inline',
       source: block.source,
     });

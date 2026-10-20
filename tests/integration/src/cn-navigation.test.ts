@@ -8,7 +8,8 @@ import { createServerConnection } from '@tatrman/lsp/server';
  * CN-P2 S2.1 T5 — navigation over the conceptual model: goto from a `cn.`-headed binding slot, from a
  * `participants:` key (to the event's label), from a `concept { }` sugar slot and from a lexicon
  * `for:`; find-references on a concept lists its bindings, sugar, lexicon and `is_a` users; hover
- * names the concept. A complete project carries no unresolved reference.
+ * names the concept. A complete project carries no unresolved reference. S2.2 T6: a concept a
+ * `concept { }` block declares is reached at the block.
  */
 function createPairedConnection(): { client: lsp.Connection; server: lsp.Connection } {
   const a = new PassThrough({ objectMode: true });
@@ -71,6 +72,7 @@ def cn2er_event order_g {
   [`${ROOT}/lexicon.ttrm`]: `package hartland.web
 model lexicon locale en
 def term order { for: cn.Order, forms: ["order", "orders"] }
+def term web_buyer { for: cn.WebBuyer, forms: ["web buyer"] }
 `,
 };
 
@@ -182,6 +184,18 @@ describe('CN-P2 S2.1 — navigation over the conceptual model', () => {
     expect(partyRefs.map((r) => r.range.start.line).sort()).toEqual(
       [lineOf(CONCEPTS, 'is_a: Party'), lineOf(CONCEPTS, 'of: Party')].sort(),
     );
+  });
+
+  it('goto to a concept a `concept { }` block declares lands on the block (CN-P2 S2.2)', async () => {
+    const loc = await definition(LEXICON, at(LEXICON, 'cn.WebBuyer', 3));
+    expect(loc?.uri).toBe(ER);
+    expect(loc?.range.start).toEqual(at(ER, 'role: WebBuyer'));
+    const hover = (await client.sendRequest('textDocument/hover', {
+      textDocument: { uri: LEXICON },
+      position: at(LEXICON, 'cn.WebBuyer', 3),
+    })) as lsp.Hover | null;
+    const text = hover && typeof hover.contents === 'object' && 'value' in hover.contents ? hover.contents.value : '';
+    expect(text).toContain('hartland.web.cn.concept.WebBuyer');
   });
 
   it('hover on a cn ref names the concept', async () => {

@@ -1,0 +1,24 @@
+// 0.17 (CN-P2 S2.2) — `83-cn-desugar-bottom-up/` with cn defs and authored bindings in place of the
+// `concept { }` blocks.
+package hartland.stores
+model er
+
+def entity party    { attributes: [ def attribute party_id { type: int, isKey: true } ] }
+def entity customer { attributes: [ def attribute customer_id { type: int, isKey: true } ] }
+def entity store {
+    attributes: [
+        def attribute store_id { type: int, isKey: true },
+        def attribute channel  { type: text }
+    ]
+}
+def entity sale {
+    attributes: [
+        def attribute sale_id     { type: int, isKey: true },
+        def attribute store_id    { type: int },
+        def attribute customer_id { type: int },
+        def attribute sold_date   { type: date },
+        def attribute amount      { type: decimal }
+    ]
+}
+def relation sale_store    { from: er.entity.sale, to: er.entity.store }
+def relation sale_customer { from: er.entity.sale, to: er.entity.customer }

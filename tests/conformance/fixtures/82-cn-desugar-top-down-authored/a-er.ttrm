@@ -1,0 +1,32 @@
+// 0.17 (CN-P2 S2.2) — `81-cn-desugar-top-down/` with authored bindings in place of `grounds:` (the
+// er, md and db faces are the same).
+package hartland.stores
+model er
+
+def entity party    { attributes: [ def attribute party_id { type: int, isKey: true } ] }
+def entity customer { attributes: [ def attribute customer_id { type: int, isKey: true } ] }
+def entity store {
+    attributes: [
+        def attribute store_id { type: int, isKey: true },
+        def attribute channel  { type: text }
+    ]
+}
+def entity sale {
+    attributes: [
+        def attribute sale_id     { type: int, isKey: true },
+        def attribute store_id    { type: int },
+        def attribute customer_id { type: int },
+        def attribute sold_date   { type: date },
+        def attribute amount      { type: decimal }
+    ]
+}
+def entity placed_order  { attributes: [ def attribute order_number { type: int, isKey: true } ] }
+def entity category_code { attributes: [ def attribute code { type: text, isKey: true } ] }
+def entity category_closure {
+    attributes: [
+        def attribute ancestor_code   { type: text, isKey: true },
+        def attribute descendant_code { type: text, isKey: true }
+    ]
+}
+def relation sale_store    { from: er.entity.sale, to: er.entity.store }
+def relation sale_customer { from: er.entity.sale, to: er.entity.customer }

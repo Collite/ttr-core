@@ -1,0 +1,7 @@
+// Two concepts the er blocks also name: the cn def says what they are, the block only grounds them.
+// `Buyer`'s block restates `event: Purchase` — the same value, so no conflict.
+package hartland.stores
+model cn
+
+def kind Party { label: { en: "Party" } }
+def role Buyer { of: Party, event: Purchase }

@@ -29,6 +29,13 @@ export interface CanonicalLexiconEntry {
   match?: string;
   /** `example` — utterance. */
   text?: string;
+  /**
+   * 0.17 — `default: true`: the default sense of a bare form (cn contracts §1.5; ≤ 1 per bare term per
+   * locale, `cn/duplicate-default-sense`). On an inline entry, written in the `lexicon { }` block.
+   */
+  default?: boolean;
+  /** 0.17 — `sense_priority: <int>`: higher wins (cn contracts §1.5, step 4 of the resolution order). */
+  sensePriority?: number;
   /** How the entry was declared (the `mappingSource` precedent). `legacy` =
    * migrated from a deprecated `search{}` / entity `aliases` form (RS-32);
    * `valueLabels` = member vocabulary from a coded attribute (A4-β). */

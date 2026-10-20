@@ -145,6 +145,8 @@ export enum DiagnosticCode {
   // 0.17 (CN-P1) — parse-level checks on a cn body. The `cn/*` slugs (cn contracts §7) are semantic, CN-P2.
   DuplicateProperty = 'ttr/duplicate-property',                   // a cn body names one key twice — the first is read
   ExpressionBlockRequired = 'ttr/expression-block-required',      // a binding's `filter:` that is not a string or block
+  // 0.17 (CN-P2) — the model-level `cn/*` slugs (cn contracts §7).
+  CnDuplicateGrounding = 'cn/duplicate-grounding',                // a concept's second grounding, or sugar that restates a concept differently
 }
 
 export enum DiagnosticSeverity {

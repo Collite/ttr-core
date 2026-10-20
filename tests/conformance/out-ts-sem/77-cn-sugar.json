@@ -1,14 +1,36 @@
 {
     "diagnostics": [
         "ttr/required-property-missing",
-        "ttr/required-property-missing",
-        "ttr/unresolved-reference",
-        "ttr/unresolved-reference",
-        "ttr/unresolved-reference",
-        "ttr/unresolved-reference"
+        "ttr/required-property-missing"
     ],
-    "resolved": [],
+    "resolved": [
+        "Customer => hartland.concepts.cn.concept.Customer",
+        "Item => hartland.concepts.cn.concept.Item",
+        "Order => hartland.concepts.cn.concept.Order",
+        "ReturnReason => hartland.concepts.cn.concept.ReturnReason"
+    ],
     "symbols": [
+        "hartland.concepts.binding.cn2er_event.Order.concept",
+        "hartland.concepts.binding.cn2er_kind.Channel.concept",
+        "hartland.concepts.binding.cn2er_kind.Invoice.concept",
+        "hartland.concepts.binding.cn2er_quality.invoice_status.concept",
+        "hartland.concepts.binding.cn2er_role.Customer.concept",
+        "hartland.concepts.binding.cn2md_event.Return.concept",
+        "hartland.concepts.binding.cn2md_kind.Item.concept",
+        "hartland.concepts.binding.cn2md_kind.ReturnReason.concept",
+        "hartland.concepts.binding.cn2md_quality.return_amount.concept",
+        "hartland.concepts.cn.concept.Channel",
+        "hartland.concepts.cn.concept.Customer",
+        "hartland.concepts.cn.concept.Invoice",
+        "hartland.concepts.cn.concept.Item",
+        "hartland.concepts.cn.concept.Order",
+        "hartland.concepts.cn.concept.Return",
+        "hartland.concepts.cn.concept.Return.customer",
+        "hartland.concepts.cn.concept.Return.item",
+        "hartland.concepts.cn.concept.Return.returnreason",
+        "hartland.concepts.cn.concept.ReturnReason",
+        "hartland.concepts.cn.concept.invoice_status",
+        "hartland.concepts.cn.concept.return_amount",
         "hartland.concepts.er.entity.channel_sales",
         "hartland.concepts.er.entity.channel_sales.channel",
         "hartland.concepts.er.entity.customer",

@@ -1,0 +1,5 @@
+// The db face: a legacy table only documentation reaches (`cn2db_concept`).
+package hartland.stores
+model db schema dbo
+
+def table loyalty_card { columns: [ def column card_no { type: text, isKey: true } ] }
