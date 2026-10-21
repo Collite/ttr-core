@@ -130,11 +130,11 @@ class BundleAssembler(
         // AU-core-P2: a recipe builds into a recipe bundle (contracts §5.2) — its statements, manifest v3, the catalog.
         if (plan.recipe != null) {
             // every island compiled first: what does not, refused as diagnostics (review-119 M5/M8), not one exception
-            val refused = RecipeBundleCheck.check(plan)
-            if (refused.isNotEmpty()) throw BundleRefused(plan.diagnostics + refused)
+            val inspection = RecipeBundleCheck.inspect(plan)
+            if (inspection.diagnostics.isNotEmpty()) throw BundleRefused(plan.diagnostics + inspection.diagnostics)
             return RecipeBundleAssembler(
                 toolchainVersion,
-            ).assemble(plan, fileName, outDir).copy(diagnostics = plan.diagnostics)
+            ).assemble(plan, fileName, outDir, inspection.statements).copy(diagnostics = plan.diagnostics)
         }
         // AG-P0 S5: fingerprint each host-generated model root the program compiled against.
         val modelRoots =
@@ -624,8 +624,8 @@ class BundleAssembler(
             engine = island.engine,
             executor = executor,
             invocation = SQL_TEXT,
-            file = first.file,
-            sha256 = first.sha256,
+            file = requireNotNull(first.file),
+            sha256 = requireNotNull(first.sha256),
             connections = listOf(connEnv(island.engine)),
             retries = island.retries,
             onFailureOf = island.onFailureOf,

@@ -38,8 +38,10 @@ data class RecipeStatement(
     val sql: String,
     val columns: List<EmitColumn>,
     val params: List<String>,
+    val parts: List<RecipePart> = emptyList(),
+    val storage: String? = null,
 ) {
-    val file: String get() = "islands/$island.$port.sql"
+    val file: String get() = "islands/$island.$port" + if (parts.isEmpty()) ".sql" else ".duckdb.sql"
 }
 
 /**
@@ -61,13 +63,17 @@ object RecipeStatements {
         plan: TtrpPipeline.PlanResult,
         tier: SqlTier = SqlTier.ER,
         dialect: SqlDialect? = null,
+        splitStorage: Boolean = tier == SqlTier.ER,
     ): List<RecipeStatement> {
         val graph = requireNotNull(plan.graph) { "a recipe compiles only from a checked plan" }
         val exec = requireNotNull(plan.exec)
         val bound = requireNotNull(plan.bound)
         val model = requireNotNull(plan.recipe) { "${plan.fileName} holds no recipe" }
         val params = params(model, graph)
-        return exec.islands.flatMap { island -> islandStatements(island, graph, bound, params, tier, dialect) }
+        val cache = HashMap<Pair<String, org.tatrman.plan.v1.PlanNode>, RecipePart>()
+        return exec.islands.flatMap { island ->
+            islandStatements(island, graph, bound, params, tier, dialect, splitStorage, cache)
+        }
     }
 
     private fun islandStatements(
@@ -77,6 +83,8 @@ object RecipeStatements {
         params: Map<String, PlanParam>,
         tier: SqlTier,
         dialect: SqlDialect?,
+        splitStorage: Boolean = tier == SqlTier.ER,
+        cache: MutableMap<Pair<String, org.tatrman.plan.v1.PlanNode>, RecipePart> = HashMap(),
     ): List<RecipeStatement> {
         val container = graph.containers.getValue(island.id)
         val planner =
@@ -89,12 +97,23 @@ object RecipeStatements {
                 tier = tier,
                 dropSynthesized = true,
                 textKeys = true,
+                cutStorage = splitStorage,
+                partDialect = dialect,
+                partCache = cache,
             )
         return container.declaredPorts
             .filter { it.direction == PortDirection.OUT && it.kind == PortKind.DATA && it.name != "rejects" }
             .map { port ->
                 val out = planner.emit(container, port.name)
-                RecipeStatement(island.name, port.name, out.sql, out.columns, out.params)
+                RecipeStatement(
+                    island.name,
+                    port.name,
+                    out.sql,
+                    out.columns,
+                    out.params,
+                    planner.parts.values.toList(),
+                    planner.storage,
+                )
             }
     }
 
@@ -102,24 +121,37 @@ object RecipeStatements {
      * Every island planned on its own, the ones whose planning fails with why — island name → the emit failure
      * (review-119 M5: `check` and `ttrp/validate` refuse what [plan] refuses, island by island).
      */
+    data class Compilation(
+        val statements: List<RecipeStatement>,
+        val failures: Map<String, org.tatrman.ttrp.emit.TtrpEmitException>,
+    )
+
     fun failures(
         plan: TtrpPipeline.PlanResult,
         skip: Set<String> = emptySet(),
-    ): Map<String, org.tatrman.ttrp.emit.TtrpEmitException> {
-        val graph = plan.graph ?: return emptyMap()
-        val exec = plan.exec ?: return emptyMap()
-        val bound = plan.bound ?: return emptyMap()
-        val model = plan.recipe ?: return emptyMap()
+    ): Map<String, org.tatrman.ttrp.emit.TtrpEmitException> = compile(plan, skip).failures
+
+    /** Retain successfully compiled statements so validation and bundling share the same rendering. */
+    fun compile(
+        plan: TtrpPipeline.PlanResult,
+        skip: Set<String> = emptySet(),
+    ): Compilation {
+        val graph = plan.graph ?: return Compilation(emptyList(), emptyMap())
+        val exec = plan.exec ?: return Compilation(emptyList(), emptyMap())
+        val bound = plan.bound ?: return Compilation(emptyList(), emptyMap())
+        val model = plan.recipe ?: return Compilation(emptyList(), emptyMap())
         val params = params(model, graph)
         val out = LinkedHashMap<String, org.tatrman.ttrp.emit.TtrpEmitException>()
+        val statements = mutableListOf<RecipeStatement>()
+        val cache = HashMap<Pair<String, org.tatrman.plan.v1.PlanNode>, RecipePart>()
         for (island in exec.islands.filter { it.name !in skip }) {
             try {
-                islandStatements(island, graph, bound, params, SqlTier.ER, null)
+                statements += islandStatements(island, graph, bound, params, SqlTier.ER, null, cache = cache)
             } catch (e: org.tatrman.ttrp.emit.TtrpEmitException) {
                 out[island.name] = e
             }
         }
-        return out
+        return Compilation(statements, out)
     }
 
     /**

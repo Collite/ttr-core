@@ -37,6 +37,7 @@ class RecipeBundleAssembler(
         plan: TtrpPipeline.PlanResult,
         program: String,
         outDir: Path,
+        statements: List<RecipeStatement> = RecipeStatements.plan(plan),
     ): BundleAssembler.BundleResult {
         val model = requireNotNull(plan.recipe) { "$program holds no recipe" }
         val bound = requireNotNull(plan.bound)
@@ -48,7 +49,28 @@ class RecipeBundleAssembler(
         val files = sortedMapOf<String, String>()
 
         // --- statements, one per output, grouped by island ---
-        val statements = RecipeStatements.plan(plan)
+        val parts =
+            statements
+                .flatMap { it.parts }
+                .groupBy { it.name }
+                .map { (_, copies) ->
+                    val p = copies.first()
+                    require(
+                        copies.all { it.storage == p.storage && it.sql == p.sql },
+                    ) { "part hash collision: ${p.name}" }
+                    write(bundleDir, p.file, p.sql + "\n", files)
+                    RecipePartEntry(
+                        p.name,
+                        p.storage,
+                        p.engine,
+                        p.file,
+                        files.getValue(p.file),
+                        p.columns.map { OutputColumn(it.name, it.type) },
+                        p.params,
+                        model.keyColumns.all { k -> p.columns.any { it.name == k } } &&
+                            statements.filter { s -> s.parts.any { it.name == p.name } }.all { keyed(model, it) },
+                    )
+                }.sortedBy { it.name }
         val islands =
             exec.islands.mapNotNull { island ->
                 val own = statements.filter { it.island == island.name }
@@ -63,19 +85,40 @@ class RecipeBundleAssembler(
                             columns = s.columns.map { OutputColumn(it.name, it.type) },
                             params = s.params.ifEmpty { null },
                             keyed = keyed(model, s),
+                            storage = s.storage.takeIf { s.parts.isEmpty() },
+                            combine =
+                                s.parts.takeIf { it.isNotEmpty() }?.let { ps ->
+                                    RecipeCombine(
+                                        s.file,
+                                        files.getValue(s.file),
+                                        ps.map { it.name }.distinct(),
+                                        s.params,
+                                    )
+                                },
                         )
                     }
                 IslandEntry(
                     name = island.name,
-                    engine = island.engine,
+                    engine = if (own.first().parts.isNotEmpty()) "duckdb" else island.engine,
                     executor = NATIVE,
-                    invocation = SQL_TEXT,
-                    file = outputs.first().file,
-                    sha256 = outputs.first().sha256,
-                    connections = listOf(connEnv(island.engine)),
+                    invocation = if (own.first().parts.isNotEmpty()) "duckdb" else SQL_TEXT,
+                    file = own.first().file,
+                    sha256 = files.getValue(own.first().file),
+                    connections =
+                        own
+                            .flatMap { s ->
+                                if (s.parts.isEmpty()) {
+                                    val engine =
+                                        bound.storages.firstOrNull { it.qname.name == s.storage }?.via ?: island.engine
+                                    listOf(connEnv(engine))
+                                } else {
+                                    s.parts.map { connEnv(it.engine) }
+                                }
+                            }.distinct()
+                            .sorted(),
                     params = outputs.flatMap { it.params.orEmpty() }.distinct().ifEmpty { null },
                     outputs = outputs,
-                    schema = ER,
+                    schema = if (own.first().parts.isNotEmpty()) "db" else ER,
                 )
             }
 
@@ -165,6 +208,7 @@ class RecipeBundleAssembler(
                 objectsRead = objectsRead(plan),
                 fingerprints = fingerprints,
                 protocol = model.protocol,
+                parts = parts.ifEmpty { null },
             )
 
         val manifest =

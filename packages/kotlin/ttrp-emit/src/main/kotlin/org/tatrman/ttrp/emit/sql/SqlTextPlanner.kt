@@ -18,6 +18,16 @@ import org.tatrman.ttrp.emit.EmitDiagnosticId
 import org.tatrman.ttrp.emit.TtrpEmitException
 import org.tatrman.ttrp.emit.core.DisplayTypes
 import org.tatrman.ttrp.graph.capability.BoundWorld
+import org.tatrman.ttrp.expr.ColumnRef
+import org.tatrman.ttrp.expr.Expression
+import org.tatrman.ttrp.expr.FunctionCall
+import org.tatrman.ttrp.expr.CatalogId
+import org.tatrman.ttrp.graph.model.Filter
+import org.tatrman.ttrp.graph.model.Join
+import org.tatrman.ttrp.graph.model.JoinType
+import org.tatrman.ttrp.graph.model.Node
+import org.tatrman.ttrp.graph.model.NodeExpressions
+import org.tatrman.ttrp.graph.model.Project
 import org.tatrman.ttrp.graph.model.Container
 import org.tatrman.ttrp.graph.model.TtrpGraph
 import org.tatrman.ttrp.resolve.DisplaySchema
@@ -70,11 +80,25 @@ class SqlTextPlanner(
     private val dropSynthesized: Boolean = false,
     /** AU-core-P2: a text = integer equality compares the integer as text ([SqlGraphEmitter]'s `textKeys`). */
     private val textKeys: Boolean = false,
+    /** S2.5: cut at storage boundaries; ordinary programs and DB-tier oracles keep their old plan. */
+    private val cutStorage: Boolean = false,
+    private val partDialect: SqlDialect? = null,
+    /** Shared by the outputs of one compilation; source storage, dialect and inline definitions are fixed. */
+    private val partCache: MutableMap<Pair<String, PlanNode>, org.tatrman.ttrp.emit.recipe.RecipePart> = HashMap(),
 ) {
     private data class Built(
         val plan: PlanNode,
         val columns: List<EmitColumn>,
+        val storages: Set<String> = emptySet(),
+        val combined: Boolean = false,
+        val node: Node? = null,
+        val inputs: List<Built> = emptyList(),
+        val joinKeep: Set<String> = emptySet(),
     )
+
+    val parts = linkedMapOf<String, org.tatrman.ttrp.emit.recipe.RecipePart>()
+    var storage: String? = null
+        private set
 
     private val tables = LinkedHashMap<Pair<String, String>, LinkedHashMap<String, String>>()
     private val inlineSql = LinkedHashMap<String, String>()
@@ -93,9 +117,25 @@ class SqlTextPlanner(
         projection: DisplaySchema? = null,
     ): SqlTextOutput {
         val built = build(container, port, projection)
+        storage = built.storages.singleOrNull()
+        val target =
+            when {
+                built.combined -> SqlDialect.DUCKDB
+                cutStorage && storage != null && partDialect == null -> storageDialect(requireNotNull(storage))
+                else -> dialect
+            }
+        return render(built, port, target, container.label)
+    }
+
+    private fun render(
+        built: Built,
+        port: String,
+        target: SqlDialect,
+        label: String,
+    ): SqlTextOutput {
         val model = modelTables()
-        val facade = TranslatorFacade(IslandModelHandle(model), dialect)
-        val (raw, order) = facade.unparseNamed(built.plan, params.mapValues { it.value.typeTag }, container.label)
+        val facade = TranslatorFacade(IslandModelHandle(model), target)
+        val (raw, order) = facade.unparseNamed(built.plan, params.mapValues { it.value.typeTag }, label)
         val named = SqlTextRender.namePlaceholders(raw, order)
         val inlined = SqlTextRender.inlineSources(named, INLINE_NS, inlineSql)
         // The door dialect (F-AG-17): the host's SQL door parses the statement back with default quoting
@@ -121,9 +161,12 @@ class SqlTextPlanner(
         port: String,
         projection: DisplaySchema?,
     ): Built {
+        parts.clear()
         tables.clear()
         inlineSql.clear()
-        val portPlan = output(container, port, HashMap()).let { if (dropSynthesized) withoutSynthesized(it) else it }
+        val full = output(container, port, HashMap())
+        val cut = if (cutStorage) cut(pushPredicates(full), container.label) else full
+        val portPlan = cut.let { if (dropSynthesized) withoutSynthesized(it) else it }
         return projection?.let { project(portPlan, it, container, port) } ?: portPlan
     }
 
@@ -140,7 +183,7 @@ class SqlTextPlanner(
                     .setAlias(c.name),
             )
         }
-        return Built(PlanNode.newBuilder().setProject(project).build(), kept)
+        return built.copy(plan = PlanNode.newBuilder().setProject(project).build(), columns = kept)
     }
 
     private fun modelTables(): List<ModelTable> =
@@ -191,7 +234,7 @@ class SqlTextPlanner(
                 project.addExpressions(NamedExpression.newBuilder().setExpression(cast).setAlias(c.name))
                 EmitColumn(c.name, c.spelling)
             }
-        return Built(PlanNode.newBuilder().setProject(project).build(), columns)
+        return built.copy(plan = PlanNode.newBuilder().setProject(project).build(), columns = columns)
     }
 
     /** The plan of [container]'s OUT [port] — its node chain over model scans and upstream outputs. */
@@ -219,7 +262,9 @@ class SqlTextPlanner(
                     )
             val built = HashMap<String, Built>()
             for (en in chain) {
-                val ins = en.inputs.map { input(it, built, memo, container) }
+                val original = en.inputs.map { input(it, built, memo, container) }
+                val storages = original.flatMap { it.storages }.toSet()
+                val ins = original
                 val body =
                     PlanNodeBuilder(params = params, existenceAsJoin = true).body(
                         en.node,
@@ -229,7 +274,8 @@ class SqlTextPlanner(
                         },
                         en.joinKeep,
                     )
-                built[en.node.id] = Built(body, en.outputColumns)
+                built[en.node.id] =
+                    Built(body, en.outputColumns, storages, node = en.node, inputs = ins, joinKeep = en.joinKeep)
             }
             built.getValue(chain.last().node.id)
         }
@@ -261,11 +307,12 @@ class SqlTextPlanner(
      */
     private fun modelScan(m: EmitInput.Model): Built {
         val src = m.source
+        val storage = src.storage?.let { setOf(it) }.orEmpty()
         if (tier == SqlTier.ER || src.unbound) {
             val name = if (tier == SqlTier.ER) src.objectQname.substringAfterLast('.') else src.name
             val registered = tables.getOrPut(ENTITY_NS to name) { LinkedHashMap() }
             src.columns.forEach { registered.putIfAbsent(it.name, it.type) }
-            return Built(scan(ENTITY_NS, name, src.columns.map { it.name }.distinct()), m.columns)
+            return Built(scan(ENTITY_NS, name, src.columns.map { it.name }.distinct()), m.columns, storage)
         }
         val inline = src.sql
         val ns = if (inline != null) INLINE_NS else TABLE_NS
@@ -283,7 +330,234 @@ class SqlTextPlanner(
                     .setAlias(c.name),
             )
         }
-        return Built(PlanNode.newBuilder().setProject(project).build(), m.columns)
+        return Built(PlanNode.newBuilder().setProject(project).build(), m.columns, storage)
+    }
+
+    private fun storageEngine(storage: String): String =
+        world.storages.singleOrNull { it.qname.name == storage }?.via ?: throw TtrpEmitException(
+            EmitDiagnosticId.UNSUPPORTED_NODE,
+            detail = "storage `$storage` needs a via engine",
+        )
+
+    /** Rebuild a relational node after rewriting its inputs, preserving its declared output shape. */
+    private fun rebuild(
+        source: Built,
+        inputs: List<Built>,
+        node: Node = requireNotNull(source.node),
+    ): Built {
+        val plan =
+            PlanNodeBuilder(params = params, existenceAsJoin = true).body(
+                node,
+                inputs.map { it.plan },
+                inputs.map { it.columns.map { c -> c.name } },
+                source.joinKeep,
+            )
+        return source.copy(
+            plan = plan,
+            inputs = inputs,
+            node = node,
+            storages = inputs.flatMap { it.storages }.toSet(),
+            combined = inputs.any { it.combined },
+        )
+    }
+
+    private fun conjuncts(e: Expression): List<Expression> =
+        if (e is FunctionCall && e.function == CatalogId.AND) e.args.flatMap { conjuncts(it) } else listOf(e)
+
+    private fun refs(e: Expression): List<ColumnRef> = NodeExpressions.walk(e).filterIsInstance<ColumnRef>()
+
+    /** Push filters before cutting: shared parts then contain the maximal safe source sub-plan. */
+    private fun pushPredicates(source: Built): Built {
+        if (source.node == null) return source
+        var current = rebuild(source, source.inputs.map { pushPredicates(it) })
+        val node = current.node
+        if (node is Join && node.on != null && current.storages.size > 1) {
+            val inputs = current.inputs.toMutableList()
+            for (predicate in conjuncts(requireNotNull(node.on))) {
+                val columns = refs(predicate)
+                val side =
+                    columns
+                        .map { r ->
+                            when (r.port) {
+                                "left" -> 0
+                                "right" -> 1
+                                else ->
+                                    inputs.indices.singleOrNull { i ->
+                                        inputs[i].columns.any { it.name == r.column }
+                                    }
+                            }
+                        }.distinct()
+                        .singleOrNull()
+                val safe =
+                    when (node.type) {
+                        JoinType.INNER, JoinType.CROSS, JoinType.SEMI -> side != null
+                        JoinType.LEFT, JoinType.ANTI -> side == 1
+                        JoinType.RIGHT -> side == 0
+                        else -> false
+                    }
+                if (columns.isNotEmpty() && side != null && safe) {
+                    val local = NodeExpressions.rewrite(predicate) { e -> (e as? ColumnRef)?.copy(port = null) }
+                    inputs[side] = pushFilter(inputs[side], local)
+                }
+            }
+            // Keep the original ON shape for key deduplication. Redundant pushed conjuncts are harmless.
+            current = rebuild(current, inputs)
+        }
+        if (node is Filter && node.predicate != null && current.storages.size > 1) {
+            var input = current.inputs.single()
+            for (predicate in conjuncts(requireNotNull(node.predicate))) input = pushFilter(input, predicate)
+            return input
+        }
+        return current
+    }
+
+    private fun pushFilter(
+        source: Built,
+        predicate: Expression,
+    ): Built {
+        val node = source.node
+        if (source.storages.size > 1 && node is Project) {
+            val mapping =
+                node.columns
+                    .mapIndexedNotNull { i, e ->
+                        (e as? ColumnRef)?.let { (node.aliasOf(i) ?: it.column) to it }
+                    }.toMap()
+            val columns = refs(predicate)
+            if (columns.all {
+                    it.column in mapping ||
+                        (
+                            node.passthrough &&
+                                source.inputs
+                                    .single()
+                                    .columns
+                                    .any { c -> c.name == it.column } &&
+                                node.columns.indices.none { i -> node.aliasOf(i) == it.column }
+                        )
+                }
+            ) {
+                val local =
+                    NodeExpressions.rewrite(predicate) { e ->
+                        (e as? ColumnRef)?.let { mapping[it.column]?.copy(location = it.location) }
+                    }
+                return rebuild(source, listOf(pushFilter(source.inputs.single(), local)))
+            }
+        }
+        if (source.storages.size > 1 && node is Filter) {
+            return rebuild(source, listOf(pushFilter(source.inputs.single(), predicate)))
+        }
+        if (source.storages.size > 1 && node is Join && source.inputs.size == 2) {
+            val left = source.inputs[0].columns.map { it.name }
+            val right = source.inputs[1].columns.map { it.name }
+            val keys = node.on?.let { JoinDedup.rightEquiKeys(it) }.orEmpty()
+            val survivors = JoinDedup.survivors(left, right, keys, source.joinKeep)
+            val mapping =
+                survivors.associate { (ordinal, name) ->
+                    name to (if (ordinal < left.size) 0 to left[ordinal] else 1 to right[ordinal - left.size])
+                }
+            val columns = refs(predicate)
+            val side = columns.map { mapping[it.column]?.first }.distinct().singleOrNull()
+            val safe =
+                when (node.type) {
+                    JoinType.INNER, JoinType.CROSS -> side != null
+                    JoinType.LEFT, JoinType.SEMI, JoinType.ANTI -> side == 0
+                    JoinType.RIGHT -> side == 1
+                    else -> false
+                }
+            if (columns.isNotEmpty() && side != null && safe) {
+                val local =
+                    NodeExpressions.rewrite(predicate) { e ->
+                        (e as? ColumnRef)?.let {
+                            mapping[it.column]?.let { (_, name) ->
+                                it.copy(column = name, port = null)
+                            }
+                        }
+                    }
+                val inputs = source.inputs.toMutableList()
+                inputs[side] = pushFilter(inputs[side], local)
+                return rebuild(source, inputs)
+            }
+        }
+        val filter = Filter("part-filter", "part-filter", predicate.location, predicate)
+        val plan =
+            PlanNodeBuilder(params = params).body(
+                filter,
+                listOf(source.plan),
+                listOf(source.columns.map { it.name }),
+            )
+        return Built(plan, source.columns, source.storages, node = filter, inputs = listOf(source))
+    }
+
+    private fun cut(
+        source: Built,
+        label: String,
+    ): Built {
+        if (source.storages.size <= 1) return source
+        val inputs =
+            source.inputs.map { input ->
+                when {
+                    input.storages.size == 1 -> part(input, label)
+                    input.storages.isEmpty() -> throw TtrpEmitException(
+                        EmitDiagnosticId.UNSUPPORTED_NODE,
+                        detail = "cross-storage input has no storage",
+                        island = label,
+                        location = source.node?.location,
+                    )
+                    else -> cut(input, label)
+                }
+            }
+        return rebuild(source, inputs).copy(combined = true)
+    }
+
+    private fun storageDialect(storage: String): SqlDialect {
+        val engine = storageEngine(storage)
+        val resolved =
+            world.engines[engine]?.engine ?: throw TtrpEmitException(
+                EmitDiagnosticId.UNSUPPORTED_NODE,
+                detail = "storage `$storage` has no bound engine `$engine`",
+            )
+        return DialectRegistry.forEngine(resolved.type ?: "postgres", resolved.version)
+    }
+
+    /** Replace a maximal single-storage input with its content-addressed table in the combine. */
+    private fun part(
+        source: Built,
+        label: String,
+    ): Built {
+        val storage = source.storages.single()
+        val engine = storageEngine(storage)
+        val part =
+            partCache.getOrPut(storage to source.plan) {
+                val target = storageDialect(storage)
+                val rendered = render(source, "", partDialect ?: target, label)
+                // A named projection fixes the part's shape even when Calcite collapses the inner scan to SELECT *.
+                val names = source.columns.joinToString(", ") { "\"" + it.name.replace("\"", "\"\"") + "\"" }
+                val statement =
+                    rendered.copy(
+                        sql = "SELECT $names\nFROM (\n${rendered.sql.prependIndent("  ")}\n) AS \"_ttrp_part\"",
+                    )
+                val digest = java.security.MessageDigest.getInstance("SHA-256")
+                // Storage is part of identity: identical SQL on two databases is two different reads.
+                val hash =
+                    digest
+                        .digest(
+                            (storage + "\n" + statement.sql).toByteArray(),
+                        ).joinToString("") { "%02x".format(it) }
+                val name = "p_" + hash.take(8)
+                org.tatrman.ttrp.emit.recipe.RecipePart(
+                    name,
+                    storage,
+                    engine,
+                    statement.sql,
+                    source.columns.map { EmitColumn(it.name, it.type) },
+                    statement.params,
+                )
+            }
+        val name = part.name
+        val prior = parts.putIfAbsent(name, part)
+        require(prior == null || prior == part) { "part hash collision: $name: $prior versus $part" }
+        val registered = tables.getOrPut(TABLE_NS to name) { LinkedHashMap() }
+        source.columns.forEach { registered[it.name] = it.type }
+        return Built(scan(TABLE_NS, name, source.columns.map { it.name }), source.columns, source.storages, true)
     }
 
     /** An opaque `"""sql` fragment producer: its verbatim text as an inline source, typed by the world schema. */
@@ -292,6 +566,14 @@ class SqlTextPlanner(
         port: String,
         text: String,
     ): Built {
+        if (cutStorage) {
+            throw TtrpEmitException(
+                EmitDiagnosticId.UNSUPPORTED_NODE,
+                detail = "fragment `${container.label}` has no resolved storage; decompose its source reads",
+                island = container.label,
+                location = container.location,
+            )
+        }
         val name = "${container.label}__$port"
         val cols =
             world.world.storages

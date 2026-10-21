@@ -149,14 +149,76 @@ object JdbcStatements {
         conn: Connection,
         sql: String,
         bound: Map<String, Any?>,
-    ): ConformTable {
+    ): ConformTable = withRows(conn, sql, bound) { table(it) }
+
+    internal fun <T> withRows(
+        conn: Connection,
+        sql: String,
+        bound: Map<String, Any?>,
+        read: (ResultSet) -> T,
+    ): T {
         val (text, names) = positional(sql)
         conn.prepareStatement(text).use { ps ->
             names.forEachIndexed { i, n ->
                 require(n in bound) { "nothing binds :$n" }
                 ps.setObject(i + 1, bound[n])
             }
-            ps.executeQuery().use { return table(it) }
+            ps.executeQuery().use { return read(it) }
+        }
+    }
+
+    /** DuckDB's staging type follows the source's type name as well as its JDBC code. */
+    internal fun copyType(
+        md: java.sql.ResultSetMetaData,
+        i: Int,
+    ): String {
+        val name = md.getColumnTypeName(i).uppercase()
+        if (name in setOf("HUGEINT", "UHUGEINT", "UBIGINT", "UINTEGER", "USMALLINT", "UTINYINT")) return name
+        if (zoned(md, i)) return "TIMESTAMPTZ"
+        return when (kind(md.getColumnType(i), name)) {
+            "int64" -> "BIGINT"
+            "decimal" -> {
+                val p = md.getPrecision(i)
+                val precision = if (p <= 0) 38 else p.coerceAtMost(38)
+                val scale = if (p <= 0) 18 else md.getScale(i).coerceIn(0, precision)
+                "DECIMAL($precision,$scale)"
+            }
+            "float64" -> "DOUBLE"
+            "bool" -> "BOOLEAN"
+            "date32" -> "DATE"
+            "timestamp(microsecond,UTC)" -> "TIMESTAMP"
+            else -> "VARCHAR"
+        }
+    }
+
+    private fun zoned(
+        md: java.sql.ResultSetMetaData,
+        i: Int,
+    ): Boolean =
+        md.getColumnType(i) == Types.TIMESTAMP_WITH_TIMEZONE ||
+            md.getColumnTypeName(i).uppercase() in setOf("TIMESTAMPTZ", "TIMESTAMP WITH TIME ZONE")
+
+    internal fun copyCell(
+        rs: ResultSet,
+        i: Int,
+    ): Any? {
+        val md = rs.metaData
+        if (zoned(md, i)) return rs.getObject(i, java.time.OffsetDateTime::class.java)
+        return when (kind(md.getColumnType(i), md.getColumnTypeName(i))) {
+            "int64", "decimal" -> rs.getBigDecimal(i)
+            "utf8" ->
+                rs.getString(i)?.let {
+                    if (md.getColumnType(i) in
+                        listOf(Types.CHAR, Types.NCHAR)
+                    ) {
+                        it.trimEnd(' ')
+                    } else {
+                        it
+                    }
+                }
+            "date32" -> rs.getObject(i, LocalDate::class.java)
+            "timestamp(microsecond,UTC)" -> rs.getObject(i, LocalDateTime::class.java)
+            else -> rs.getObject(i)
         }
     }
 
@@ -224,8 +286,13 @@ object JdbcStatements {
                 "bool" -> rs.getBoolean(i)
                 "date32" -> rs.getObject(i, LocalDate::class.java)?.toEpochDay()
                 "timestamp(microsecond,UTC)" ->
-                    rs.getObject(i, LocalDateTime::class.java)?.let {
-                        val instant = it.toInstant(ZoneOffset.UTC)
+                    (
+                        if (zoned(rs.metaData, i)) {
+                            rs.getObject(i, java.time.OffsetDateTime::class.java)?.toInstant()
+                        } else {
+                            rs.getObject(i, LocalDateTime::class.java)?.toInstant(ZoneOffset.UTC)
+                        }
+                    )?.let { instant ->
                         instant.epochSecond * 1_000_000 + instant.nano / 1_000
                     }
                 else -> rs.getObject(i)?.toString()
@@ -247,13 +314,26 @@ interface RecipeEngine : AutoCloseable {
 /** Embedded DuckDB, in memory (D-18/D-40: the native runner's second engine) — [fixtures] run in order. */
 class DuckDbRecipeEngine(
     fixtures: List<String>,
+    attachment: String? = null,
 ) : RecipeEngine {
     override val name = "duckdb"
     override val dialect = SqlDialect.DUCKDB
     override val connection: Connection = DriverManager.getConnection("jdbc:duckdb:")
 
     init {
-        fixtures.forEach { JdbcStatements.load(connection, it) }
+        try {
+            if (attachment != null) {
+                val name = "\"" + attachment.replace("\"", "\"\"") + "\""
+                connection.createStatement().use {
+                    it.execute("ATTACH ':memory:' AS $name")
+                    it.execute("USE $name")
+                }
+            }
+            fixtures.forEach { JdbcStatements.load(connection, it) }
+        } catch (e: Exception) {
+            connection.close()
+            throw e
+        }
     }
 
     override fun close() = connection.close()
@@ -331,6 +411,13 @@ class RecipeConform(
         }
         return EngineRun(engine.name, statements, outputs, failures)
     }
+
+    /** S2.5: each part is read once on its storage; only its rows reach the embedded combine engine. */
+    fun runAcross(
+        engines: Map<String, RecipeEngine>,
+        plan: TtrpPipeline.PlanResult,
+        asOf: LocalDateTime,
+    ): EngineRun = RecipeCrossStorage.run(engines, plan, asOf)
 
     /** Exit 0 every output agrees · 1 an output differs · 2 a statement failed on an engine. */
     fun compare(runs: List<EngineRun>): ConformOutcome {

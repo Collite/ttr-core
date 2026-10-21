@@ -448,10 +448,10 @@
       "additionalProperties": false,
       "required": [
         "port",
-        "file",
-        "sha256",
         "columns",
-        "keyed"
+        "keyed",
+        "file",
+        "sha256"
       ],
       "properties": {
         "port": {
@@ -492,6 +492,12 @@
         "keyed": {
           "description": "The output's rows are per candidate: a run for one key filters it on the key (AU-C-3).",
           "type": "boolean"
+        },
+        "combine": {
+          "$ref": "#/$defs/recipeCombine"
+        },
+        "storage": {
+          "type": "string"
         }
       }
     },
@@ -876,6 +882,112 @@
             "always",
             "on_route"
           ]
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recipePart"
+          }
+        }
+      }
+    },
+    "recipeCombine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "sha256",
+        "parts",
+        "params"
+      ],
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "parts": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "params": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "engine": {
+          "const": "duckdb"
+        },
+        "dialect": {
+          "const": "duckdb"
+        }
+      }
+    },
+    "recipePart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "storage",
+        "engine",
+        "file",
+        "sha256",
+        "columns",
+        "params",
+        "keyed"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^p_[0-9a-f]{8}$"
+        },
+        "storage": {
+          "type": "string"
+        },
+        "engine": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "type"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "params": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "keyed": {
+          "type": "boolean"
         }
       }
     }

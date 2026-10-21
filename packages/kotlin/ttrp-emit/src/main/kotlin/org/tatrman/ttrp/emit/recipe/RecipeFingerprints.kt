@@ -21,7 +21,7 @@ import java.security.MessageDigest
  *   [NormalizedGraphJson] writes it (canonical: no node ids, no source locations — whitespace and comments never
  *   reach it); one line per wiring, `routes|action|column=value,…|when`, columns sorted; one line per windowed
  *   context, sorted, `window=<context>|by=a,b|over=<over>`; the lines `key=…`, `as_of=…`, `mode=…`, `protocol=…`;
- *   then every statement, sorted by `island.port`, as `island.port` + `\n` + its text. The `verdict_reason` the
+ *   then every SQL artifact (direct output, part, combine), sorted by path, as `path` + `\n` + its text. The `verdict_reason` the
  *   switch lowering wrote ([RecipeModel.reasonNodes] — those nodes only, never a column of that name elsewhere) is the
  *   placeholder `{}` in the graph the json and the statements are taken from — a `because:` is explanation, not
  *   logic. Parameter values never reach it (statements bind them).
@@ -64,10 +64,13 @@ object RecipeFingerprints {
         text.append("as_of=${esc(asOf)}\n")
         text.append("mode=${model.mode.spelling}\n")
         text.append("protocol=${esc(protocol)}\n")
-        RecipeStatements
-            .plan(plan.copy(graph = masked))
-            .sortedBy { "${it.island}.${it.port}" }
-            .forEach { s -> text.append("${s.island}.${s.port}\n${s.sql}\n") }
+        val statements = RecipeStatements.plan(plan.copy(graph = masked))
+        val sqlFiles = linkedMapOf<String, String>()
+        statements.forEach { s ->
+            sqlFiles[s.file] = s.sql
+            s.parts.forEach { p -> sqlFiles[p.file] = p.sql }
+        }
+        sqlFiles.toSortedMap().forEach { (file, sql) -> text.append("$file\n$sql\n") }
 
         val values = StringBuilder("ttrp-recipe-values/1\n")
         model.parameterDecls.sortedBy { it.name }.forEach { p ->

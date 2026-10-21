@@ -21,10 +21,17 @@ import org.tatrman.ttrp.graph.TtrpPipeline
 object RecipeBundleCheck {
     private val BUNDLED = setOf("sql", "canonical")
 
-    fun check(plan: TtrpPipeline.PlanResult): List<TtrpDiagnostic> {
-        val model = plan.recipe ?: return emptyList()
-        val graph = plan.graph ?: return emptyList()
-        val exec = plan.exec ?: return emptyList()
+    data class Inspection(
+        val diagnostics: List<TtrpDiagnostic>,
+        val statements: List<org.tatrman.ttrp.emit.recipe.RecipeStatement>,
+    )
+
+    fun check(plan: TtrpPipeline.PlanResult): List<TtrpDiagnostic> = inspect(plan).diagnostics
+
+    fun inspect(plan: TtrpPipeline.PlanResult): Inspection {
+        val model = plan.recipe ?: return Inspection(emptyList(), emptyList())
+        val graph = plan.graph ?: return Inspection(emptyList(), emptyList())
+        val exec = plan.exec ?: return Inspection(emptyList(), emptyList())
         val located = { island: String ->
             exec.islands.firstOrNull { it.name == island }?.let { graph.containers[it.id]?.location }
         }
@@ -54,7 +61,8 @@ object RecipeBundleCheck {
                         .filter { it != i.name }
                         .toSet()
             }
-        val failures = RecipeStatements.failures(plan, skip = unbundled.map { it.name }.toSet())
+        val compiled = RecipeStatements.compile(plan, skip = unbundled.map { it.name }.toSet())
+        val failures = compiled.failures
         val broken = failures.keys + unbundled.map { it.name }
 
         fun upstreamBroken(
@@ -70,6 +78,6 @@ object RecipeBundleCheck {
                     e.location ?: located(island) ?: continue,
                 )
         }
-        return out
+        return Inspection(out, compiled.statements)
     }
 }

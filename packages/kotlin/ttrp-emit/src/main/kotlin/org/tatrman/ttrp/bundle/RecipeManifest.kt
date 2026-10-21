@@ -39,6 +39,7 @@ data class RecipeManifest(
     val fingerprints: RecipeFingerprints,
     /** `always` · `on_route` (D-80; a program may override). */
     val protocol: String,
+    val parts: List<RecipePartEntry>? = null,
 )
 
 @Serializable

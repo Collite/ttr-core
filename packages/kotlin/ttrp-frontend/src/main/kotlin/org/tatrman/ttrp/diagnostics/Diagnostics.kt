@@ -162,6 +162,7 @@ enum class TtrpDiagnosticId(
         "the island's output does not compile to a statement the door runs — restate it with what the message " +
             "names (a column the row carries, a whole-WHERE `IN`/`EXISTS`, a `target` island)",
     ),
+    REC_090("TTRP-REC-090", "place the entity on exactly one storage: er2db/hosts, or writable for an unbound entity"),
     PRS_007(
         "TTRP-PRS-007",
         "a recipe's shape: `recipe { }` is top-level only, a `target` role container needs a body, and a wiring " +

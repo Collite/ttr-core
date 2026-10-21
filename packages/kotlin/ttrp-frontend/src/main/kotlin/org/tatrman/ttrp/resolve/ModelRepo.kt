@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttrp.resolve
 
-import org.tatrman.ttr.metadata.MetadataLoader
+import org.tatrman.ttr.metadata.reconcile.ModelReconciler
+import org.tatrman.ttr.metadata.model.ModelDescriptor
+import org.tatrman.ttr.metadata.layout.LayoutResolver
 import org.tatrman.ttr.metadata.graph.ModelGraph
 import org.tatrman.ttr.metadata.registry.RegistrySnapshot
 import org.tatrman.ttr.metadata.source.FileBasedSource
@@ -26,7 +28,12 @@ object ModelRepo {
     fun snapshotOf(
         modelsRoot: Path,
         extraRoots: List<Path> = emptyList(),
-    ): RegistrySnapshot? {
+    ): RegistrySnapshot? = indexOf(modelsRoot, extraRoots)?.snapshot
+
+    fun indexOf(
+        modelsRoot: Path,
+        extraRoots: List<Path> = emptyList(),
+    ): ModelIndex? {
         val roots = (listOf(modelsRoot) + extraRoots).filter { Files.isDirectory(it) }
         if (roots.isEmpty()) return null
         val sources =
@@ -42,12 +49,17 @@ object ModelRepo {
                     storage = LocalFsStorage(id = id, rootPath = realRoot),
                 )
             }
-        val model = MetadataLoader(sources).load().model ?: return null
-        return RegistrySnapshot(
-            model = model,
-            graph = ModelGraph.build(model),
-            swappedAt = Instant.EPOCH,
-            warnings = emptyList(),
-        )
+        return runCatching {
+            val snapshots = sources.map { it.load() }
+            val model = ModelReconciler(ModelDescriptor(id = "model", name = "model")).reconcile(snapshots).model
+            val snapshot =
+                RegistrySnapshot(
+                    model = model,
+                    graph = ModelGraph.build(model),
+                    swappedAt = Instant.EPOCH,
+                    warnings = emptyList(),
+                )
+            ModelIndex(snapshot, LayoutResolver.packagesFrom(snapshots))
+        }.getOrNull()
     }
 }

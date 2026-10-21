@@ -42,6 +42,83 @@ class RecipeConformCliTest :
 
         fun ttrp() = TtrpCommand().subcommands(ConformCommand())
 
+        test("review-121: scratch database names are lowercase, bounded and collision resistant") {
+            val names =
+                listOf("_0_ERP_db", "_0_erp_db", "_0_" + "a".repeat(100), "_0_" + "a".repeat(99) + "b")
+                    .map { RecipeConformCli.databaseName(1234, it) }
+            names.distinct().size shouldBe 4
+            names.forEach { name ->
+                (name.length <= 63) shouldBe true
+                Regex("[a-z0-9_]+").matches(name) shouldBe true
+            }
+        }
+        test("review-121: equals in an ordinary fixture path is not a storage prefix") {
+            RecipeConformCli.scopedFixture("/data/run=2/sample.sql") shouldBe false
+            RecipeConformCli.scopedFixture("./run=2.sql") shouldBe false
+            RecipeConformCli.scopedFixture("erp_db=/data/run=2/sample.sql") shouldBe true
+            val equalDir = Files.createDirectories(project.resolve("run=2"))
+            Files.copy(sample.resolve("schema.sql"), equalDir.resolve("schema.sql"))
+            val args = "--fixture ${equalDir.resolve("schema.sql")} --fixture ${sample.resolve("sample.sql")}"
+            ttrp().test("conform $recipe --engines duckdb $args --as-of 2026-11-02T08:00").statusCode shouldBe 0
+        }
+        test("scoped fixtures: separate storage databases, all outputs compared") {
+            val args = "--fixture erp_db=${sample.resolve(
+                "erp.sql",
+            )} --fixture automation_db=${sample.resolve("automation.sql")}"
+            val r = ttrp().test("conform $recipe --engines duckdb,duckdb $args --as-of 2026-11-02T08:00")
+            io.kotest.assertions.withClue(r.stdout + r.stderr) { r.statusCode shouldBe 0 }
+            r.stdout shouldContain "every output agrees on duckdb-parts, duckdb-parts"
+        }
+        test("scoped fixtures reject a missing storage before running") {
+            val r =
+                ttrp().test(
+                    "conform $recipe --engines duckdb --fixture erp_db=${sample.resolve(
+                        "erp.sql",
+                    )} --as-of 2026-11-02T08:00",
+                )
+            r.statusCode shouldBe 2
+            r.stdout shouldContain "fixtures must name exactly"
+        }
+        test("explain names parts and storage and the DuckDB combine") {
+            val r = TtrpCommand().subcommands(ExplainCommand()).test("explain $recipe")
+            r.statusCode shouldBe 0
+            r.stdout shouldContain "storage automation_db"
+            r.stdout shouldContain "storage erp_db"
+            r.stdout shouldContain "DuckDB"
+        }
+
+        test("scoped pg,duckdb fixtures exercise the runner path through the CLI").config(
+            enabled =
+                System.getenv("TTRP_CONFORM_PG") == "1",
+        ) {
+            val plan =
+                org.tatrman.ttrp.graph
+                    .TtrpPipeline(
+                        org.tatrman.ttrp.project
+                            .TtrpManifest(world = "hartland.worlds.demo", manifestDir = fixtures),
+                        fixtures.resolve("model"),
+                    ).plan(Files.readString(recipe), recipe.toString())
+            val messages = mutableListOf<String>()
+            val url = System.getenv("TTR_CONN_ERP_PG") ?: "postgresql://postgres:ttrp@localhost:55432/postgres"
+            val status =
+                RecipeConformCli.run(
+                    plan,
+                    listOf("pg", "duckdb"),
+                    emptyList(),
+                    java.time.LocalDateTime.of(2026, 11, 2, 8, 0),
+                    emptyMap(),
+                    mapOf("TTR_CONN_ERP" to url, "TTR_CONN_AUTOMATION" to url),
+                    storageFixtures =
+                        mapOf(
+                            "erp_db" to listOf(sample.resolve("erp.sql")),
+                            "automation_db" to listOf(sample.resolve("automation.sql")),
+                        ),
+                    echo = messages::add,
+                )
+            io.kotest.assertions.withClue(messages.joinToString("\n")) { status shouldBe 0 }
+            messages.joinToString() shouldContain "pg-parts, duckdb-parts"
+        }
+
         test("one engine: every statement runs on DuckDB, each output's rows counted") {
             val r = ttrp().test("conform $recipe --engines duckdb $fixtureArgs --as-of 2026-11-02T08:00")
             r.statusCode shouldBe 0

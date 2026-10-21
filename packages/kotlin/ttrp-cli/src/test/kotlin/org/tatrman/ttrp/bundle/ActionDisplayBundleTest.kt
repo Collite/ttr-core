@@ -139,7 +139,7 @@ class ActionDisplayBundleTest :
                     val r = build(p)
                     r.manifest.islands.flatMap { it.outputs.orEmpty() }.map { o ->
                         golden(
-                            p.removeSuffix(".ttrp") + "/" + o.file.removePrefix("islands/"),
+                            p.removeSuffix(".ttrp") + "/" + requireNotNull(o.file).removePrefix("islands/"),
                             Files.readString(r.dir.resolve(o.file)),
                         )
                     }
