@@ -104,14 +104,18 @@ def _info(code: DiagnosticCode, message: str, source: SourceLocation) -> Validat
     return ValidationDiagnostic(code, DiagnosticSeverity.INFORMATION, source, message)
 
 
-def _imported_package_of(symbol: SymbolEntry) -> str:
-    """The package part of an import that reaches `symbol`: the key less its name, as an element's
-    named import is written. 0.17: a concept - or an event's participant label under it - is imported
-    by package and name (`import hartland.core.Customer`), so it reads the symbol's package. Mirrors
-    the TS `importedPackageOf`."""
-    if symbol.schema_code == "cn":
-        return symbol.package_name
-    return symbol.qname.value.rsplit(".", 1)[0]
+def _imported_target_of(symbol: SymbolEntry) -> str:
+    """What an import that reaches `symbol` is matched by: for an element the key less its name, as an
+    element's named import is written (compared by its package part). 0.17: a concept - or an event's
+    participant label under it - is imported by package and name (`import hartland.core.Customer`), so
+    it is that whole target: one used concept import never covers another of the same package
+    (review-120 F12). Mirrors the TS `importedTargetOf`."""
+    if symbol.schema_code != "cn":
+        return symbol.qname.value.rsplit(".", 1)[0]
+    prefix = f"{symbol.package_name}.cn.concept." if symbol.package_name else "cn.concept."
+    local = symbol.qname.value[len(prefix):] if symbol.qname.value.startswith(prefix) else symbol.qname.value
+    concept = local.split(".")[0]
+    return f"{symbol.package_name}.{concept}" if symbol.package_name else concept
 
 
 class Validator:
@@ -443,12 +447,12 @@ class Validator:
                 "named-import",
                 "wildcard-import",
             ):
-                used.add(_imported_package_of(res.symbol))
+                used.add(_imported_target_of(res.symbol))
 
         for imp in doc.imports:
             if not imp.wildcard:
                 pkg = package_of_import(imp)
-                if pkg and pkg not in used:
+                if pkg and pkg not in used and imp.target not in used:
                     out.append(
                         _warn(
                             DiagnosticCode.UNUSED_IMPORT,

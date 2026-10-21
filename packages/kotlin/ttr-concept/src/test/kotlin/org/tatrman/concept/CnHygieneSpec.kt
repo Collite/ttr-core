@@ -98,7 +98,11 @@ class CnHygieneSpec :
             HygieneRender.md("_x_") shouldBe "\\_x\\_"
             HygieneRender.md("loyalty_programme") shouldBe "loyalty_programme"
             HygieneRender.md("`a|b` [c] <d> ~e~ \\") shouldBe "\\`a\\|b\\` \\[c\\] \\<d\\> \\~e\\~ \\\\"
-            HygieneRender.md("návštěva_ř") shouldBe "návštěva_ř"
+            HygieneRender.md("é_é") shouldBe "é_é"
+            // review-120 F20: a name wrapped in `_`, an entity, a line break
+            HygieneRender.md("cn._Hidden_") shouldBe "cn.\\_Hidden\\_"
+            HygieneRender.md("&lt;b") shouldBe "\\&lt;b"
+            HygieneRender.md("a\nb") shouldBe "a b"
         }
 
         "a nested list in a participant path is read through, as TS does: the dangling ref is reported (L-6)" {
@@ -171,6 +175,21 @@ class CnHygieneSpec :
 
         "ttr cn hygiene on a path that is not a directory: usage, exit 2" {
             ttr().test("cn hygiene ${golden.resolve("expected.md")}").statusCode shouldBe 2
+        }
+
+        "a model on the deprecated roles: [fact] loads clean: the stock cnc roles ride along (review-120 F3)" {
+            val root = Files.createTempDirectory("cn-roles")
+            val pkg = Files.createDirectories(root.resolve("hartland/sales"))
+            Files.writeString(
+                pkg.resolve("a-er.ttrm"),
+                "package hartland.sales\nmodel er\n\n" +
+                    "def entity sale { roles: [fact], attributes: [ def attribute sale_id { type: int, isKey: true } ] }\n",
+            )
+            Files.writeString(
+                pkg.resolve("b-cn.ttrm"),
+                "package hartland.sales\nmodel cn\n\ndef kind Sale { grounds: er.entity.sale }\n",
+            )
+            runTtr(listOf("cn", "hygiene", "$root", "--fail-on", "error")) shouldBe 0
         }
 
         "the ttr exit code: a usage error is 2, never the 1 of findings at --fail-on (review-119 M-8)" {

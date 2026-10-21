@@ -8,6 +8,7 @@ import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.tatrman.ttrp.DeclaredSchemaSource
 import org.tatrman.ttrp.TtrpFrontend
@@ -340,5 +341,16 @@ class TtrpConceptFormsSpec :
                 .parseString("f = filter(s, d before e)", "cn.ttrp")
                 .diagnostics
                 .map { it.id } shouldContainExactly listOf(TtrpDiagnosticId.CN_001)
+        }
+
+        "the cn-comparison hint: only for a binding after the word, never in a definition (review-120 F16)" {
+            val hint = "is a cn definition's comparison"
+            // a config key `before: 1` in a document: a plain syntax error
+            TtrpParser
+                .parseString("b = a -> aggregate { before: 1 }", "cn.ttrp")
+                .diagnostics
+                .forEach { it.message shouldNotContain hint }
+            // in a definition the comparison is the language: no TTR-P-program advice
+            TtrpParser.parseExpression("before :as_of").diagnostics.forEach { it.message shouldNotContain hint }
         }
     })

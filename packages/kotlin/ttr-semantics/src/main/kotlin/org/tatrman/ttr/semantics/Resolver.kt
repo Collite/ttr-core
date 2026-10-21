@@ -183,10 +183,16 @@ class Resolver(
         // form, then the classified tail — the trailing name path with leading
         // model/package/schema/kind segments stripped — so a reference naming a
         // slot the v4.0 key now carries explicitly (`db.dbo.Orders` →
-        // `…db.dbo.table.Orders`) still resolves by suffix.
+        // `…db.dbo.table.Orders`) still resolves by suffix. An exact key wins
+        // ahead of the suffix match (TS: `er.entity.store` is the root package's).
         val tail = classifiedTail(ref.path)
         val forms = if (tail.isNotEmpty() && tail != ref.path) listOf(ref.path, tail) else listOf(ref.path)
         for (cand in forms) {
+            val exact = elementGet(cand)
+            if (exact != null && exact.qname != fullQname && exact.qname != cncQname) {
+                tried += ResolutionAttempt(ResolutionStep.FullyQualified, exact.qname)
+                return ResolutionResult.Resolved(exact, ResolutionStep.FullyQualified)
+            }
             val uniqueMatches =
                 elementsBySuffix(cand)
                     .filter { it.qname != fullQname && it.qname != cncQname }
@@ -199,9 +205,11 @@ class Resolver(
 
         // Step 7 — the slot-filling fallback (TS `slotResolveReference`, qname-redesign §5; ttr-core#228): read the
         // reference into its slots and look for its name path in the reference's package and model (its kind too,
-        // when written), then in its model, then anywhere. The first scope with one candidate wins; a scope with
-        // several is ambiguous. So `er.entity.store` in `hartland.west` names west's `store` beside `hartland.east`'s
-        // (D10 "current package first"), and `md.revenue` the md measure beside a lexicon term `revenue`.
+        // when written; for db its schema — written, else the file's), then in its model, then anywhere. The first
+        // scope with one candidate wins; a scope with several is ambiguous. So `er.entity.store` in `hartland.west`
+        // names west's `store` beside `hartland.east`'s (D10 "current package first"), `md.revenue` the md measure
+        // beside a lexicon term `revenue`, and `db.Orders.x` in a `schema dbo` file dbo's `Orders`. TS also reads the
+        // manifest's package and project default schema; this resolver has no manifest.
         val vocab = vocab()
         val written = classify(ref.path, vocab)
         val keyed =
@@ -211,9 +219,10 @@ class Resolver(
                 .map { it to classify(it.qname, vocab) }
                 .filter { (_, slots) -> slots.tail == written.tail }
         val pkg = written.pkg ?: context.packageName ?: ""
+        val schema = if (written.model == "db") written.schema ?: context.namespace.ifEmpty { null } else null
         val inModel = { slots: Slots -> written.model == null || slots.model == written.model }
         val inPackage = { slots: Slots ->
-            inModel(slots) && (slots.pkg ?: "") == pkg && (written.schema == null || slots.schema == written.schema)
+            inModel(slots) && (slots.pkg ?: "") == pkg && (schema == null || slots.schema == schema)
         }
         val scopes =
             listOf<(Slots) -> Boolean>(
@@ -356,14 +365,21 @@ class Resolver(
         val schemas: Set<String>,
     )
 
+    /** [vocab] for a [SymbolTable.version] — a whole-table scan, so once per change, not per reference. */
+    private var vocabCache: Pair<Int, Vocab>? = null
+
     private fun vocab(): Vocab {
+        val version = symbols.version
+        vocabCache?.let { (v, vocab) -> if (v == version) return vocab }
         val schemas = mutableSetOf("dbo")
         for (q in symbols.allQnames()) {
             val parts = q.split('.')
             val i = parts.indexOf("db")
             if (i >= 0 && i + 1 < parts.size) schemas += parts[i + 1]
         }
-        return Vocab(symbols.listPackages().filter { it.isNotEmpty() }.toSet(), schemas)
+        return Vocab(symbols.listPackages().filter { it.isNotEmpty() }.toSet(), schemas).also {
+            vocabCache = version to it
+        }
     }
 
     /** A dotted reference (or a canonical key) read into its slots; [tail] is the trailing name path. */

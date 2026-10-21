@@ -133,6 +133,8 @@ def _cn_key(pkg: str, parts: list[str] | tuple[str, ...]) -> str:
 class Resolver:
     def __init__(self, symbols: SymbolTable) -> None:
         self._symbols = symbols
+        #: `_vocab` for a symbol-table version - a whole-table scan, so once per change
+        self._vocab_cache: tuple[int, tuple[set[str], set[str]]] | None = None
 
     def get_symbol(self, qname: str) -> SymbolEntry | None:
         """Direct symbol-table lookup by fully-qualified name."""
@@ -241,10 +243,16 @@ class Resolver:
         # Step 6 — fully-qualified: the written form, then the classified tail —
         # the trailing name path with leading model/package/schema/kind segments
         # stripped — so a reference naming a slot the v4.0 key now carries
-        # explicitly (`db.dbo.Orders` → `…db.dbo.table.Orders`) resolves by suffix.
+        # explicitly (`db.dbo.Orders` → `…db.dbo.table.Orders`) resolves by suffix. An
+        # exact key wins ahead of the suffix match (TS: `er.entity.store` is the root
+        # package's).
         tail = self._classified_tail(path)
         forms = [path, tail] if tail and tail != path else [path]
         for cand in forms:
+            exact = self._element(cand)
+            if exact is not None and exact.qname.value not in (full_qname, cnc_qname):
+                tried.append(ResolutionAttempt("fully-qualified", exact.qname.value))
+                return Resolved(exact, "fully-qualified")
             seen: set[str] = set()
             unique_matches = []
             for e in self._elements_by_suffix(cand):
@@ -260,10 +268,13 @@ class Resolver:
 
         # Step 7 — the slot-filling fallback (TS `slotResolveReference`, qname-redesign §5;
         # ttr-core#228): read the reference into its slots and look for its name path in the
-        # reference's package and model (its kind too, when written), then in its model, then
-        # anywhere. The first scope with one candidate wins; a scope with several is ambiguous.
-        # So `er.entity.store` in `hartland.west` names west's `store` beside `hartland.east`'s
-        # (D10 "current package first"), and `md.revenue` the md measure beside a lexicon term.
+        # reference's package and model (its kind too, when written; for db its schema -
+        # written, else the file's), then in its model, then anywhere. The first scope with one
+        # candidate wins; a scope with several is ambiguous. So `er.entity.store` in
+        # `hartland.west` names west's `store` beside `hartland.east`'s (D10 "current package
+        # first"), `md.revenue` the md measure beside a lexicon term, and `db.Orders.x` in a
+        # `schema dbo` file dbo's `Orders`. TS also reads the manifest's default schemas; this
+        # resolver has no manifest.
         vocab = self._vocab()
         written = self._classify(path, vocab)
         keyed: dict[str, tuple[SymbolEntry, _Slots]] = {}
@@ -274,6 +285,7 @@ class Resolver:
             if slots.tail == written.tail:
                 keyed[e.qname.value] = (e, slots)
         pkg = written.package or context.package_name or ""
+        schema = (written.schema or context.namespace or None) if written.model == "db" else None
 
         def in_model(s: _Slots) -> bool:
             return written.model is None or s.model == written.model
@@ -282,7 +294,7 @@ class Resolver:
             return (
                 in_model(s)
                 and (s.package or "") == pkg
-                and (written.schema is None or s.schema == written.schema)
+                and (schema is None or s.schema == schema)
             )
 
         scopes = (
@@ -369,6 +381,9 @@ class Resolver:
 
     def _vocab(self) -> tuple[set[str], set[str]]:
         """The project's packages and db schemas - what `_classify` reads a dotted path against."""
+        version = self._symbols.version
+        if self._vocab_cache is not None and self._vocab_cache[0] == version:
+            return self._vocab_cache[1]
         all_entries = self._symbols.get_all()
         packages = {e.package_name for e in all_entries if e.package_name}
         schemas = {"dbo"}
@@ -378,6 +393,7 @@ class Resolver:
                 k = parts.index("db")
                 if k + 1 < len(parts):
                     schemas.add(parts[k + 1])
+        self._vocab_cache = (version, (packages, schemas))
         return packages, schemas
 
     def _classify(self, path: str, vocab: tuple[set[str], set[str]] | None = None) -> _Slots:

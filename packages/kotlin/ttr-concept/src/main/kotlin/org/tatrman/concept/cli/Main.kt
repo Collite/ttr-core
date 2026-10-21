@@ -20,6 +20,7 @@ import org.tatrman.concept.ResolvedCnModel
 import org.tatrman.concept.Severity
 import org.tatrman.ttr.metadata.model.ModelDescriptor
 import org.tatrman.ttr.metadata.reconcile.ModelReconciler
+import org.tatrman.ttr.metadata.source.BuiltinStockSource
 import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
 import java.nio.file.Files
@@ -34,7 +35,7 @@ fun main(args: Array<String>): Unit = exitProcess(runTtr(args.toList()))
 /**
  * Run [ttr] on [args] and answer the exit code. Clikt exits 1 on a usage error (an unknown flag or value, a missing
  * argument or subcommand); the cn contracts (§7) pin 2, so a mistyped flag in CI never reads as "findings at
- * `--fail-on`".
+ * `--fail-on`". A model that cannot be read (an unreadable file) is 2 as well, with one line on stderr.
  */
 fun runTtr(args: List<String>): Int {
     val command = ttr()
@@ -42,8 +43,17 @@ fun runTtr(args: List<String>): Int {
         command.parse(args)
         0
     } catch (e: CliktError) {
-        command.echoFormattedHelp(e)
-        if (e is UsageError || (e is PrintHelpMessage && e.error)) 2 else e.statusCode
+        if (e is PrintHelpMessage && e.error) {
+            // a missing subcommand: the help is the error message, so it goes where errors go
+            command.getFormattedHelp(e)?.let { System.err.println(it) }
+            2
+        } else {
+            command.echoFormattedHelp(e)
+            if (e is UsageError) 2 else e.statusCode
+        }
+    } catch (e: Exception) {
+        System.err.println("ttr: the model could not be read — ${e::class.simpleName}: ${e.message}")
+        2
     }
 }
 
@@ -68,7 +78,8 @@ class CnCommand : CliktCommand(name = "cn") {
  *
  * Exit: 0 — the report printed, and nothing at or above `--fail-on` (no `--fail-on`: always 0) · 1 — a finding at or
  * above `--fail-on`: an error is a load error, a dangling grounding or an error-grade definition finding; a warning
- * a phase-as-default row, a retired code or a warning-grade definition finding · 2 — usage.
+ * a phase-as-default row, a retired code or a warning-grade definition finding · 2 — usage, or the model could not be
+ * read.
  */
 class CnHygieneCommand : CliktCommand(name = "hygiene") {
     override fun help(context: Context) = "Report the conceptual model's hygiene: groundings, hop, terms, definitions."
@@ -87,9 +98,11 @@ class CnHygieneCommand : CliktCommand(name = "hygiene") {
             throw ProgramResult(2)
         }
         val snapshot = FileBasedSource("cn", 100, LocalFsStorage(id = "cn", rootPath = root)).load()
+        // The stock `cnc.role.*` vocabulary rides ahead of the model, as at the metadata service's boot — without it
+        // every `roles: [fact]` is a load error (`ttr/unimported-reference`) the editor never shows.
         val reconciled =
             ModelReconciler(ModelDescriptor(id = "cn-hygiene", name = root.fileName?.toString() ?: "model"))
-                .reconcile(listOf(snapshot))
+                .reconcile(listOf(BuiltinStockSource().load(), snapshot))
         val loadErrors = (snapshot.errors + reconciled.errors).distinct()
         loadErrors.forEach { echo("ttr cn hygiene: ${it.file}:${it.line}: ${it.message}", err = true) }
 

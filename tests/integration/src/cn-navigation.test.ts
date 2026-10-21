@@ -471,4 +471,90 @@ describe('CN-P2 review-119 — rename, the sugar declaring slot, labels and name
       ].sort(),
     );
   });
+
+  it('review-120 F13: a concept reached through a named import is coloured importedSymbol', async () => {
+    const res = (await client.sendRequest('textDocument/semanticTokens/full', { textDocument: { uri: IMPORTS119 } })) as {
+      data: number[];
+    };
+    const want = at119(IMPORTS119, 'is_a: Supplier', 6);
+    let line = 0;
+    let char = 0;
+    let type: number | undefined;
+    for (let i = 0; i < res.data.length; i += 5) {
+      line += res.data[i];
+      char = res.data[i] === 0 ? char + res.data[i + 1] : res.data[i + 1];
+      if (line === want.line && char === want.character) type = res.data[i + 3];
+    }
+    expect(type).toBe(10); // importedSymbol, not 12 (unimportedReference)
+  });
+});
+
+// ---- CN-P2 review-120 F2 — a label rename a definition block reads is refused (CN-D29) ----
+
+const ROOT120 = 'file:///cnnav120';
+const CONCEPTS120 = `${ROOT120}/concepts.ttrm`;
+const BINDINGS120 = `${ROOT120}/bindings.ttrm`;
+const FILES120: Record<string, string> = {
+  [CONCEPTS120]: `package hartland.web
+model cn
+def kind Customer { label: { en: "Customer" } }
+def kind Store { qualities: [region] }
+def kind Warehouse { label: { en: "Warehouse" } }
+def event Order { involves: [Customer, Store as seller, Warehouse as fulfilling], period: { at: placed_on } }
+def quality order_reach { of: Order, definition: """this.seller.region""" }
+def phase LoyalCustomer { of: Customer, definition: """exists Order involving this as customer""" }
+`,
+  [BINDINGS120]: `package hartland.web
+model binding
+def cn2er_event order_g { event: cn.Order, target: er.entity.web_order, participants: { customer: [er.relation.order_customer], fulfilling: [er.relation.order_wh] } }
+`,
+};
+
+describe('CN-P2 review-120 F2 — a participant label a definition reads is not renamed', () => {
+  let client: lsp.Connection;
+  let server: lsp.Connection;
+  const at120 = (uri: string, needle: string, delta = 0) => posIn(FILES120, uri, needle, delta);
+
+  beforeAll(async () => {
+    const p = createPairedConnection();
+    client = p.client;
+    server = p.server;
+    createServerConnection(server);
+    await client.sendRequest('initialize', {
+      processId: null,
+      rootUri: ROOT120,
+      workspaceFolders: [{ uri: ROOT120, name: 'cnnav120' }],
+      capabilities: {},
+    });
+    client.sendNotification('initialized', {});
+    for (const [uri, text] of Object.entries(FILES120)) {
+      client.sendNotification('textDocument/didOpen', { textDocument: { uri, languageId: 'ttr', version: 1, text } });
+    }
+    await sleep(500);
+  });
+  afterAll(() => {
+    client.dispose();
+    server.dispose();
+  });
+
+  const rename = (uri: string, position: lsp.Position, newName: string) =>
+    client.sendRequest('textDocument/rename', { textDocument: { uri }, position, newName }) as Promise<lsp.WorkspaceEdit>;
+
+  it('refuses a written label a definition reads as `this.<label>`, naming the definition', async () => {
+    await expect(rename(CONCEPTS120, at120(CONCEPTS120, 'as seller', 3), 'vendor')).rejects.toThrow(
+      /Cannot rename label 'seller': the definition of 'order_reach' \(concepts\.ttrm:7\) reads it \(`this\.seller`\)/,
+    );
+  });
+
+  it('refuses a default label a definition reads as `involving … as <label>`', async () => {
+    // `Customer` is written bare, so its label is the default `customer`; the binding's key reaches the label symbol
+    const refused = rename(BINDINGS120, at120(BINDINGS120, 'customer:', 2), 'client');
+    await expect(refused).rejects.toThrow(/Cannot rename label 'customer'.*`as customer`/);
+  });
+
+  it('renames a label no definition reads — the label and its `participants:` key', async () => {
+    const edit = await rename(BINDINGS120, at120(BINDINGS120, 'fulfilling:', 2), 'source');
+    const edits = (edit.documentChanges ?? []).flatMap((c) => ('edits' in c ? c.edits.map((e) => e.newText) : []));
+    expect(edits).toEqual(['source', 'source']);
+  });
 });

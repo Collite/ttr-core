@@ -386,12 +386,17 @@ class Validator(
     }
 
     /**
-     * The package part of an import that reaches [symbol]: the key less its name, as an element's named import is
-     * written. 0.17: a concept — or an event's participant label under it — is imported by package and name
-     * (`import hartland.core.Customer`), so it reads the symbol's package. Mirrors TS `importedPackageOf`.
+     * What an import that reaches [symbol] is matched by: for an element the key less its name, as an element's named
+     * import is written (compared by its package part). 0.17: a concept — or an event's participant label under it —
+     * is imported by package and name (`import hartland.core.Customer`), so it is that whole target: one used concept
+     * import never covers another of the same package (review-120 F12). Mirrors TS `importedTargetOf`.
      */
-    private fun importedPackageOf(symbol: SymbolEntry): String =
-        if (symbol.schemaCode == "cn") symbol.packageName else symbol.qname.substringBeforeLast('.')
+    private fun importedTargetOf(symbol: SymbolEntry): String {
+        if (symbol.schemaCode != "cn") return symbol.qname.substringBeforeLast('.')
+        val head = if (symbol.packageName.isEmpty()) "cn.concept." else "${symbol.packageName}.cn.concept."
+        val concept = symbol.qname.removePrefix(head).substringBefore('.')
+        return if (symbol.packageName.isEmpty()) concept else "${symbol.packageName}.$concept"
+    }
 
     fun validateImports(doc: SemanticDocument): List<ValidationDiagnostic> {
         val diagnostics = mutableListOf<ValidationDiagnostic>()
@@ -435,14 +440,14 @@ class Validator(
             if (res is ResolutionResult.Resolved &&
                 (res.viaStep == ResolutionStep.NamedImport || res.viaStep == ResolutionStep.WildcardImport)
             ) {
-                usedTargets += importedPackageOf(res.symbol)
+                usedTargets += importedTargetOf(res.symbol)
             }
         }
 
         for (imp in doc.imports) {
             if (!imp.wildcard) {
                 val pkg = packageOfImport(imp)
-                if (pkg.isNotEmpty() && pkg !in usedTargets) {
+                if (pkg.isNotEmpty() && pkg !in usedTargets && imp.target !in usedTargets) {
                     diagnostics +=
                         diag(
                             DiagnosticCode.UnusedImport,

@@ -1,9 +1,12 @@
 // Both named imports are used, from cn slots only (`of:`, `involves:`): neither is `ttr/unused-import`.
 // `Store` is in both imported packages; the named import picks `hartland.core`'s, ahead of the
-// wildcard (no `ttr/ambiguous-reference`) — so removing it as unused would break the model.
+// wildcard (no `ttr/ambiguous-reference`) — so removing it as unused would break the model. A third
+// import of the same package, `hartland.core.Supplier`, names a concept nothing reads (core declares none):
+// it IS `ttr/unused-import` — a used import never covers another of its package (review-120 F12).
 package hartland.web
 import hartland.core.Party
 import hartland.core.Store
+import hartland.core.Supplier
 import hartland.outlet.*
 model cn
 

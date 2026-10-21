@@ -77,6 +77,8 @@ class SymbolTable:
     def __init__(self) -> None:
         self._by_document: dict[str, list[SymbolEntry]] = {}
         self._by_qname: dict[str, list[SymbolEntry]] = {}
+        #: bumped on every document change - what a reader caching a view of the whole table keys on
+        self.version = 0
 
     # -- mutation -----------------------------------------------------------
 
@@ -85,6 +87,7 @@ class SymbolTable:
     ) -> None:
         if uri in self._by_document:
             self.remove_document(uri)
+        self.version += 1
 
         directive = result.model_directive
         namespace = (directive.schema if directive else "") or ""
@@ -105,6 +108,7 @@ class SymbolTable:
         entries = self._by_document.pop(uri, None)
         if not entries:
             return
+        self.version += 1
         for entry in entries:
             existing = self._by_qname.get(entry.qname.value)
             if existing is None:

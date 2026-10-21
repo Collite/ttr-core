@@ -58,13 +58,17 @@ const duplicateImport: Rule = {
 };
 
 /**
- * The package part of an import that reaches `symbol`: the key less its name, as an element's named
- * import is written (`import <pkg>.er.entity.<name>`). 0.17: a concept — or an event's participant
- * label under it — is imported by package and name (`import hartland.core.Customer`), so it reads the
- * symbol's package (review-119 M-7).
+ * What an import that reaches `symbol` is matched by: for an element the key less its name, as an
+ * element's named import is written (`import <pkg>.er.entity.<name>` — compared by its package part).
+ * 0.17: a concept — or an event's participant label under it — is imported by package and name
+ * (`import hartland.core.Customer`), so it is that whole target: one used concept import never covers
+ * another of the same package (review-119 M-7, review-120 F12).
  */
-function importedPackageOf(symbol: SymbolEntry): string {
-  return symbol.schemaCode === 'cn' ? symbol.packageName : symbol.qname.slice(0, symbol.qname.lastIndexOf('.'));
+function importedTargetOf(symbol: SymbolEntry): string {
+  if (symbol.schemaCode !== 'cn') return symbol.qname.slice(0, symbol.qname.lastIndexOf('.'));
+  const local = symbol.qname.slice((symbol.packageName ? `${symbol.packageName}.` : '').length + 'cn.concept.'.length);
+  const concept = local.split('.')[0];
+  return symbol.packageName ? `${symbol.packageName}.${concept}` : concept;
 }
 
 /** Targets actually used by a resolved reference (named- or wildcard-import). */
@@ -80,7 +84,7 @@ function usedTargets(ctx: DocumentRuleContext): Set<string> {
     // The ref itself: a cn slot's ref carries its context (0.17), so it resolves among concepts.
     const res = ctx.resolver.resolveReference(ref, { schemaCode, namespace, imports, packageName });
     if (res.resolved && (res.viaStep === 'named-import' || res.viaStep === 'wildcard-import')) {
-      used.add(importedPackageOf(res.symbol));
+      used.add(importedTargetOf(res.symbol));
     }
   }
   return used;
@@ -100,7 +104,7 @@ const unusedImport: Rule = {
     for (const imp of ctx.ast.imports ?? []) {
       if (imp.wildcard) continue;
       const pkg = packageOfImport(imp);
-      if (pkg && !used.has(pkg)) {
+      if (pkg && !used.has(pkg) && !used.has(imp.target)) {
         ctx.report({ source: imp.source, message: `Import '${imp.target}' is not referenced` });
       }
     }

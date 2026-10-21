@@ -286,6 +286,10 @@ class SymbolTable {
     private val byDocument = LinkedHashMap<String, DocumentSymbols>()
     private val byQname = LinkedHashMap<String, MutableList<SymbolEntry>>()
 
+    /** Bumped on every document change — what a reader caching a view of the whole table keys on. */
+    var version: Int = 0
+        private set
+
     /**
      * Insert (or replace) a document's symbols.
      *
@@ -305,6 +309,7 @@ class SymbolTable {
         packageName: String = "",
     ) {
         if (byDocument.containsKey(uri)) removeDocument(uri)
+        version++
         val table = DocumentSymbols(uri, definitions, schemaCode, namespace, packageName)
         byDocument[uri] = table
         for (entry in table.all()) {
@@ -314,6 +319,7 @@ class SymbolTable {
 
     fun removeDocument(uri: String) {
         val table = byDocument[uri] ?: return
+        version++
         for (entry in table.all()) {
             val list = byQname[entry.qname] ?: continue
             list.removeAll { it.documentUri == uri }

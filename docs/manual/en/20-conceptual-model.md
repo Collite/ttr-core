@@ -120,7 +120,9 @@ lexicon term or an er element shares the name.
 **Participant labels.** `Warehouse as fulfilling` is labelled `fulfilling`; a participant written bare is labelled by
 its concept's name, lower-cased (`Customer` → `customer`). A binding's `participants:` keys and a definition's
 `this.<label>` read the label. Renaming a concept in the editor keeps such a label by writing it out:
-`involves: [Customer]` becomes `involves: [Buyer as customer]`.
+`involves: [Customer]` becomes `involves: [Buyer as customer]`. Renaming a label edits it and the `participants:`
+keys; the editor refuses it while a definition block reads the label (`this.seller`, `as customer`), since it does
+not rewrite definitions — edit those first.
 
 ## Definitions are expression blocks
 
@@ -132,8 +134,10 @@ predicate, `:as_of` is the instant the definition is evaluated at, and `:name` r
 and windows are spelled as in TTR-P (`hours(24)`, `within(sold_date, last: days(365))`); the conceptual forms —
 `exists … involving … where …`, `count(… involving …)`, `code in descendants(Kind, 'X')` and the temporal words
 `at_or_before`, `before`, `contains`, `ended_before`, `overlaps` — are TTR-P expression grammar 0.5. They belong to
-definitions: a TTR-P program refuses them wherever they stand (`TTRP-CN-001`). The words stay usable as names in TTR-P,
-except `this`, which always reads as the bearer — a column named `this` is refused too.
+definitions: a TTR-P program refuses them wherever they stand (`TTRP-CN-001`) — except a temporal word followed by
+`:`, which a program reads as a route or a key, so `x before :as_of` there is a syntax error (`TTRP-PRS-001`, with a
+hint) rather than a cn form. The words stay usable as names in TTR-P, except `this`, which always reads as the bearer —
+a column named `this` is refused too.
 
 ```ttrm
 model cn
@@ -354,8 +358,10 @@ Each `cn/*` diagnostic fires in one of three places:
 - **editor** — the language server and `modeler-lint`, as you type (lint category `cn` in `.ttrlint.toml`; the hygiene
   ones are off under the `recommended` preset and `info` under `strict`);
 - **`ttr cn hygiene`** — the checks on definition blocks, and the [hygiene report](#the-hygiene-report). It also
-  loads the model the way the editor checks it: an error-grade *editor* finding is printed to stderr as a load error
-  and fails `--fail-on error`; the editor's warnings and hygiene findings it does not print;
+  prints the model's load errors to stderr and fails `--fail-on error` on them: the error-grade model checks of the
+  Kotlin toolchain — the editor's error rows but the lexicon pair (`cn/duplicate-default-sense` is the editor's
+  alone) — and loading errors such as a file whose `package` does not match its directory. Warnings and hygiene
+  findings it does not print;
 - **consumer** *(a later release)* — the tools that read the model at run time will refuse a statement, an assertion
   or a recipe with it.
 
@@ -429,8 +435,9 @@ ttr cn hygiene <model-dir> [--format text|json] [--fail-on error|warning]
 
 `--format json` prints the same as data. Exit 0 — the report printed and nothing at or above `--fail-on` (without it,
 always 0); 1 — a finding at or above it (an error: a load error, a dangling grounding ref or an error-grade definition
-finding; a warning: a phase-as-default row, a retired code or a warning-grade definition finding); 2 — usage. In this
-release the command runs from the ttr-core repository: `just cn-hygiene <model-dir> [flags]`.
+finding; a warning: a phase-as-default row, a retired code or a warning-grade definition finding); 2 — usage, or a
+model that cannot be read. In this release the command runs from the ttr-core repository:
+`just cn-hygiene <model-dir> [flags]`.
 
 ```
 # Concept hygiene

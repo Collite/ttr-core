@@ -43,3 +43,42 @@ export function labelSource(p: ConceptParticipant): SourceLocation | undefined {
   const s = p.source;
   return { ...s, line: s.endLine, column: s.endColumn - p.label.length, offsetStart: s.offsetEnd - p.label.length };
 }
+
+/** A definition block that reads a participant label — what a label rename cannot follow (CN-D29). */
+export interface LabelRead {
+  /** The concept or binding whose block it is. */
+  owner: string;
+  source: SourceLocation;
+  /** The words that read the label, as written (`this.seller`, `as customer`). */
+  text: string;
+}
+
+/**
+ * Every `definition:` / `members:` / `filter:` block of a document that reads `label` as a participant
+ * label — `this.<label>` or `as <label>` (review-120 F2). The editor does not parse those blocks, so this is
+ * a word-level scan: a block that names another event's label of the same name counts too, and the rename
+ * is refused rather than left to break a definition only `ttr cn hygiene` would report.
+ */
+export function definitionLabelReads(ast: Document, label: string): LabelRead[] {
+  const re = new RegExp(`\\bthis\\s*\\.\\s*${label}\\b|\\bas\\s+${label}\\b`);
+  const out: LabelRead[] = [];
+  const scan = (properties: readonly ConceptProperty[], owner: string) => {
+    for (const p of properties) {
+      if (p.kind !== 'definition' && p.kind !== 'members' && p.kind !== 'filter') continue;
+      const m = re.exec(p.block.text);
+      if (m) out.push({ owner, source: p.source, text: m[0].replace(/\s+/g, ' ') });
+    }
+  };
+  for (const def of ast.definitions) {
+    if (def.kind === 'concept' || def.kind === 'conceptBinding') {
+      scan(def.properties, def.name);
+      continue;
+    }
+    for (const host of [def, ...nestedDefs(def)] as Definition[]) {
+      const sugar = conceptSugarOf(host);
+      const declaring = sugarDeclaringRef(host);
+      if (sugar) scan(sugar.properties, declaring ? declaring.parts[declaring.parts.length - 1] : ((host as { name?: string }).name ?? ''));
+    }
+  }
+  return out;
+}

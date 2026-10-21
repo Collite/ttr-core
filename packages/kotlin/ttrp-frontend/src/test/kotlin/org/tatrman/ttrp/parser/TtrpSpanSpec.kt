@@ -4,6 +4,8 @@ package org.tatrman.ttrp.parser
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import org.tatrman.ttrp.ast.ContainerDecl
+import org.tatrman.ttrp.ast.FragmentBody
 import org.tatrman.ttrp.diagnostics.TtrpDiagnosticId
 import org.tatrman.ttrp.expr.ColumnRef
 import org.tatrman.ttrp.expr.FunctionCall
@@ -28,6 +30,18 @@ class TtrpSpanSpec :
             val sum = TtrpParser.parseExpression("'😀' + colour").expression
             val colour = sum.shouldBeInstanceOf<FunctionCall>().args[1].shouldBeInstanceOf<ColumnRef>()
             (colour.location.column to colour.location.endColumn) shouldBe (6 to 12)
+        }
+
+        "a fragment body with astral characters ends at its closing quotes (review-120 F15)" {
+            val src =
+                "uses world \"hartland.worlds.demo\"\n" +
+                    "container a target erp_pg \"\"\"sql\n    -- 😀 a comment 😀😀\n    select 1\n\"\"\"\na -> display\n"
+            val body =
+                TtrpParser
+                    .parseString(src, "frag.ttrp")
+                    .document.statements
+                    .firstNotNullOf { (it as? ContainerDecl)?.body as? FragmentBody }
+            with(body.interiorLocation) { (endLine to endColumn) shouldBe (5 to 0) }
         }
 
         "a syntax error at the end of the input is an empty span" {

@@ -1,0 +1,5 @@
+// The grounding, from a third package.
+package hartland.north
+model cn
+
+def kind Store { grounds: er.entity.store }

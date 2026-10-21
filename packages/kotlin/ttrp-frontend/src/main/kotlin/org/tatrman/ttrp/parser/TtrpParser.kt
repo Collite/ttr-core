@@ -4,7 +4,6 @@ package org.tatrman.ttrp.parser
 import org.antlr.v4.runtime.BaseErrorListener
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
-import org.antlr.v4.runtime.Parser
 import org.antlr.v4.runtime.RecognitionException
 import org.antlr.v4.runtime.Recognizer
 import org.antlr.v4.runtime.Token
@@ -163,7 +162,9 @@ object TtrpParser {
                 } else {
                     SourceLocation(fileName, line, charPositionInLine, line, charPositionInLine + 1, -1, -1)
                 }
-            val hint = (recognizer as? Parser)?.let { temporalHint(it.inputStream, token) }
+            // a document only: in a cn definition the comparison is the language (review-120 F16)
+            val hint =
+                (recognizer as? TTRPParser)?.takeUnless { it.cnDefinition }?.let { temporalHint(it.inputStream, token) }
             out +=
                 TtrpDiagnostic(
                     id = TtrpDiagnosticId.PRS_001,
@@ -175,7 +176,9 @@ object TtrpParser {
 
         /**
          * 0.5 (review-119 M-2): in a document a temporal word followed by `:` is a route or a config key, never the cn
-         * infix (TTRP.g4 `temporalInfix()`), so `x before :as_of` in a program fails to parse — say what it was.
+         * infix (TTRP.g4 `temporalInfix()`), so `x before :as_of` in a program fails to parse — say what it was. Only
+         * where the `:` is written as a binding (`:as_of`, no space after it); `before: 1`, a key, gets no hint
+         * (review-120 F16).
          */
         private fun temporalHint(
             stream: TokenStream,
@@ -195,12 +198,16 @@ object TtrpParser {
                 }
                 return null
             }
-            val word =
-                when {
-                    token.type in TEMPORAL_WORDS && near(token.tokenIndex, 1)?.type == TTRPLexer.COLON -> token
-                    token.type == TTRPLexer.COLON -> near(token.tokenIndex, -1)?.takeIf { it.type in TEMPORAL_WORDS }
+            val colon =
+                when (token.type) {
+                    in TEMPORAL_WORDS -> near(token.tokenIndex, 1)?.takeIf { it.type == TTRPLexer.COLON }
+                    TTRPLexer.COLON -> token
                     else -> null
                 } ?: return null
+            val word = near(colon.tokenIndex, -1)?.takeIf { it.type in TEMPORAL_WORDS } ?: return null
+            // `:as_of` — a binding: the name follows the colon with nothing between
+            val bound = near(colon.tokenIndex, 1)?.takeIf { it.startIndex == colon.stopIndex + 1 } ?: return null
+            if (bound.text.firstOrNull()?.let { it.isLetter() || it == '_' } != true) return null
             return "`${word.text} :…` is a cn definition's comparison (TTRP-CN-001); a TTR-P program compares the " +
                 "instants (`<`, `<=`)"
         }

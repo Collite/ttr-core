@@ -314,8 +314,9 @@ internal class TtrpWalker(
         val interiorEnd = body.length - 3 // strip the closing """
         val sourceText =
             if (firstNl in 0 until interiorEnd) body.substring(interiorStart, interiorEnd) else ""
-        val absStart = token.startIndex + interiorStart
-        val absEnd = token.startIndex + interiorEnd
+        // ANTLR's startIndex counts code points; the body's indices are UTF-16 (review-120 F15).
+        val absStart = token.startIndex + body.codePointCount(0, interiorStart.coerceIn(0, body.length))
+        val absEnd = token.startIndex + body.codePointCount(0, interiorEnd.coerceIn(0, body.length))
         val (sLine, sCol) = offsetToLineCol(absStart)
         val (eLine, eCol) = offsetToLineCol(absEnd)
         val interiorLocation =

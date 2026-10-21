@@ -448,7 +448,7 @@ MONTHS       : 'months' ;
 MINUTES      : 'minutes' ;
 HOURS        : 'hours' ;
 
-// 0.5 (CN-D29) — the conceptual-model forms (all soft: also in `identifier`). Comments stay off the token lines
+// 0.5 (CN-D29) — the conceptual-model forms (all in `identifier`; eight soft, `this` not). Comments stay off the token lines
 // (the KeywordTable drift regex, S16).
 EXISTS       : 'exists' ;
 INVOLVING    : 'involving' ;

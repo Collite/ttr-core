@@ -110,7 +110,7 @@ import { buildDocumentSymbols } from './document-symbol.js';
 import { loadCompletionConfig, getCompletionConfig, invalidateCompletionConfig } from './config-completion.js';
 import { automationHoverLines } from './automation-hover.js';
 import { conceptHoverLines } from './concept-hover.js';
-import { labelSource, participantsOf } from './concept-rename.js';
+import { definitionLabelReads, labelSource, participantsOf, type LabelRead } from './concept-rename.js';
 import { formatDocument, DEFAULT_FORMAT_CONFIG, type FormatConfig } from '@tatrman/format';
 import { lintDocument, lintProject, recommendedConfig, loadLintConfig, ruleForCode, type LintDiagnostic, type ResolvedLintConfig, type DocumentRuleContext } from '@tatrman/lint';
 import { refactorExtractDefToNewFile } from './code-actions.js';
@@ -1809,8 +1809,18 @@ export function createServerConnection(
       throw new ResponseError(ErrorCodes.InvalidParams, `Cannot rename to '${newBareName}': a symbol with that name already exists (${conflictCheck[0].qname}).`);
     }
 
-    // 0.17 — a participant label: its own edit (the label, the `participants:` keys that read it).
-    if (symbol.kind === 'participant') return buildParticipantRename(symbol, newBareName);
+    // 0.17 — a participant label: its own edit (the label, the `participants:` keys that read it). A definition
+    // block that reads the label is out of the editor's reach (CN-D29), so such a rename is refused (review-120 F2).
+    if (symbol.kind === 'participant') {
+      const read = labelReads(symbol.name)[0];
+      if (read) {
+        throw new ResponseError(
+          ErrorCodes.InvalidParams,
+          `Cannot rename label '${symbol.name}': the definition of '${read.owner}' (${read.uri.split('/').pop()}:${read.source.line}) reads it (\`${read.text}\`), and the editor does not rewrite definition blocks. Edit the definition first, then rename.`,
+        );
+      }
+      return buildParticipantRename(symbol, newBareName);
+    }
 
     // TTR-side edit (def + references + imports + .ttrg) plus in-SQL usages.
     const edit = buildSymbolRenameWithSql(targetQname, symbol, newBareName, doc.getText());
@@ -1839,11 +1849,24 @@ export function createServerConnection(
     return sameName.filter((e) => e.kind !== 'concept' && e.kind !== 'participant');
   }
 
+  /** Every definition block in the project (open buffers over the scanned files) that reads `label`. */
+  function labelReads(label: string): Array<LabelRead & { uri: string }> {
+    const texts = new Map<string, string>(diskDocs);
+    for (const d of documents.all()) texts.set(d.uri, d.getText());
+    const out: Array<LabelRead & { uri: string }> = [];
+    for (const [uri, text] of texts) {
+      if (!uri.endsWith('.ttrm')) continue;
+      const ast = parseDocument(text, uri);
+      if (ast) for (const r of definitionLabelReads(ast, label)) out.push({ ...r, uri });
+    }
+    return out;
+  }
+
   /**
    * 0.17 (review-119 M-5) — rename an event's participant label: a written label's span, or ` as <new>`
    * after a default-labelled participant, and every binding `participants:` key that reads it. The
    * participant ref names the concept the event involves; it is never edited. A definition's
-   * `this.<label>` is out of the editor's reach (CN-D29) — `ttr cn hygiene` reports what no longer resolves.
+   * `this.<label>` is out of the editor's reach (CN-D29): the caller refuses the rename when one reads it.
    */
   function buildParticipantRename(symbol: SymbolEntry, newName: string): WorkspaceEdit {
     const changes = new Map<string, TextEdit[]>();
@@ -2227,7 +2250,14 @@ export function createServerConnection(
     const currentPkg = ast.packageDecl?.name ?? '';
     const imports = ast.imports ?? [];
     for (const refLoc of refIndex.getForDocument(uri)) {
-      const targetPkg = projectSymbols.get(refLoc.targetQname)?.packageName ?? '';
+      const target = projectSymbols.get(refLoc.targetQname);
+      const targetPkg = target?.packageName ?? '';
+      // 0.17 — a concept (or a participant label under it) is imported by package and name
+      // (`import hartland.core.Customer`), not by its key (review-120 F13).
+      const namedTarget =
+        target?.schemaCode === 'cn' && targetPkg
+          ? `${targetPkg}.${refLoc.targetQname.slice(`${targetPkg}.cn.concept.`.length).split('.')[0]}`
+          : refLoc.targetQname;
       let type: number;
       if (targetPkg === currentPkg) {
         type = 11; // localSymbol
@@ -2235,7 +2265,7 @@ export function createServerConnection(
         // Imported if a named import targets this exact symbol, or a wildcard
         // import targets its package.
         const imported = imports.some((imp) =>
-          (!imp.wildcard && imp.target === refLoc.targetQname) || (imp.wildcard && imp.target === targetPkg));
+          (!imp.wildcard && imp.target === namedTarget) || (imp.wildcard && imp.target === targetPkg));
         type = imported ? 10 : 12; // importedSymbol : unimportedReference
       }
       const s = refLoc.source;

@@ -52,7 +52,7 @@ message Participant {
   org.tatrman.concept.v1.MemberRef member = 3;
 }
 
-// Clinical "modifiers" (certainty, laterality, …) are qualities too.
+// Qualifiers an assertion carries (a certainty, a channel, …) are qualities too.
 message QualityValue {
   org.tatrman.concept.v1.ConceptRef quality = 1;
   org.tatrman.concept.v1.Value value = 2;

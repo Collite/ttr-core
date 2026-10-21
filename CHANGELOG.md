@@ -74,13 +74,16 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
     `unknown-relation-type`, `antirigid-supertype`, `db-grounding`, `ungrounded`, `phase-no-definition`,
     `event-no-period`, `cnc-deprecated`, and `ttr/required-property-missing` for a bearer-less quality or phase (the
     lexicon pair `duplicate-default-sense` / `phase-as-default` is TS-only).
-  - **Resolution: the slot-filling fallback on Kotlin and Python (ttr-core#228).** After the project-wide unique match,
+  - **Resolution: the slot-filling fallback on Kotlin and Python (ttr-core#228).** The project-wide step tries a
+    written form as an exact key first (`er.entity.store` is the root package's `store`, whose key it is); after it,
     `Resolver.resolveReference` reads a reference into its slots and looks for its name path in the reference's package
-    and model (its kind too, when written), then in its model, then anywhere — TS's `slotResolveReference`. So
-    `grounds: er.entity.store` in `hartland.west` names west's `store` beside `hartland.east`'s (D10 "current package
-    first"), and `md.revenue` names the md measure beside a lexicon term `revenue`; a scope with several candidates is
-    `ttr/ambiguous-reference`. Before, both stayed unresolved on Kotlin and Python while TS resolved them, and the cn
-    tier read the gap as a dangling grounding. Fixtures 102 and 106.
+    and model (its kind too, when written; for `db` its schema — written, else the file's), then in its model, then
+    anywhere, as TS's `slotResolveReference` does. So `grounds: er.entity.store` in `hartland.west` names west's
+    `store` beside `hartland.east`'s (D10 "current package first"), `md.revenue` names the md measure beside a lexicon
+    term `revenue`, and `db.Orders.cust_id` in a `schema dbo` file names dbo's table beside `archive`'s; a scope with
+    several candidates is `ttr/ambiguous-reference`. Before, these stayed unresolved on Kotlin and Python while TS
+    resolved them, and the cn tier read the gap as a dangling grounding. TS also reads the manifest's package and
+    project default schema (`modeler.toml`), which Kotlin and Python have no notion of. Fixtures 102, 106, 107, 108.
   - **The sugar merge rule reads a property's meaning alike on the three runtimes.** An object's entries in any order
     say the same (`period: { end:, start: }` = `{ start:, end: }`); a `lexicon { }` block is compared by its five known
     keys, each form quoted (`["red,blue"]` ≠ `["red", "blue"]`). Fixture 103.
@@ -131,7 +134,9 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   [--format text|json] [--fail-on error|warning]`** (an `application` entry point; `just cn-hygiene <dir>` runs it
   from the repo until the module publishes). The other service families are still CN-P3. A usage error (an unknown
   flag or value, a missing argument) exits **2**, as the contract pins — clikt's own 1 read as "findings at
-  `--fail-on`"; `just cn-hygiene` runs the installed distribution, so the exit code and a path with spaces survive.
+  `--fail-on`" — and so does a model that cannot be read (one line on stderr, no stack trace); `just cn-hygiene`
+  runs the installed distribution with the arguments as given, so the exit code and any path survive. The stock
+  `cnc.role.*` vocabulary loads with the model, so a deprecated `roles: [fact]` is no load error.
   The markdown escapes authored text (term forms, open-tier entries); a nested list in a participant or `via:` path
   is read through, as TS reads it. A window reads `:as_of`: `within(x, last: d)` counts as `x <= :as_of` in the
   `basis:` table (`x >= :as_of - d` beside it), `within(x, from:, to:)` as its two comparisons; `age(since:)` reads

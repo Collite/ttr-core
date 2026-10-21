@@ -51,7 +51,11 @@ describe('cn hygiene report — the editor half of the golden (CN-P2 S2.7)', () 
     expect(mdEscape('_x_')).toBe('\\_x\\_');
     expect(mdEscape('loyalty_programme')).toBe('loyalty_programme');
     expect(mdEscape('`a|b` [c] <d> ~e~ \\')).toBe('\\`a\\|b\\` \\[c\\] \\<d\\> \\~e\\~ \\\\');
-    expect(mdEscape('návštěva_ř')).toBe('návštěva_ř');
+    expect(mdEscape('é_é')).toBe('é_é');
+    // review-120 F20: a name wrapped in `_`, an entity, a line break
+    expect(mdEscape('cn._Hidden_')).toBe('cn.\\_Hidden\\_');
+    expect(mdEscape('&lt;b')).toBe('\\&lt;b');
+    expect(mdEscape('a\nb')).toBe('a b');
   });
 
   it('a project with no concepts: an empty report', () => {

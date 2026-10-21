@@ -1,0 +1,9 @@
+// review-120 F1 — a db reference written without its schema names the file's schema first: `db.Orders.cust_id`
+// in a `schema dbo` file is dbo's `Orders`, though `archive` declares an `Orders` too (TS's slot-filling reads the
+// header schema; Kotlin and Python match it).
+package hartland.shop
+model db schema dbo
+
+def table Orders { columns: [ def column order_id { type: int, isKey: true }, def column cust_id { type: int } ] }
+def table Customers { columns: [ def column id { type: int, isKey: true } ] }
+def fk fk_orders_cust { from: [db.Orders.cust_id], to: [db.Customers.id] }

@@ -20,7 +20,9 @@ Grammar 0.17.1 — the cn semantics in the editor.
 - **Rename on cn, corrected.** A `concept { }` block that names a concept a cn def declares is a reference to it:
   goto, hover, find-references and rename reach it, and a rename no longer detaches its grounding. A participant label
   renames on its own — the written label (`Store as seller`), or ` as <new>` after a default one, plus the
-  `participants:` keys that read it — never the participant; F2 on a label no longer renames the event. A `concept { }`
+  `participants:` keys that read it — never the participant; F2 on a label no longer renames the event. A label a
+  definition block reads (`this.seller`, `as customer`) is not renamed: the editor says which definition, since it
+  does not rewrite definitions. A `concept { }`
   block's declaring name renames its concept, and a concept rename follows `import <pkg>.<Name>`. The conflict check
   stays in the target's namespace: concepts against the package's concepts, labels against the event's labels,
   elements never against cn symbols (`cn.Customer` and `md.Customer` never meet). Hover, goto and rename resolve

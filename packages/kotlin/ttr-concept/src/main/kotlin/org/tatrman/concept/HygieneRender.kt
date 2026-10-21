@@ -184,13 +184,13 @@ object HygieneRender {
                 cs.forEach { c ->
                     val cells =
                         listOf(
-                            c.qname,
+                            md(c.qname),
                             c.stereotype,
                             grade(c.grade),
                             via(c.via) ?: DASH,
-                            c.grounding?.let { it.target ?: "unresolved (${it.bindingKind})" } ?: DASH,
-                            c.hop?.let { "${it.mdElement} → ${it.erTarget ?: it.slug ?: "?"}" } ?: DASH,
-                            (c.erTarget ?: DASH) + (c.landingFrom?.let { " (← $it)" } ?: ""),
+                            c.grounding?.let { g -> g.target?.let(::md) ?: "unresolved (${g.bindingKind})" } ?: DASH,
+                            c.hop?.let { "${md(it.mdElement)} → ${md(it.erTarget ?: it.slug ?: "?")}" } ?: DASH,
+                            (c.erTarget?.let(::md) ?: DASH) + (c.landingFrom?.let { " (← ${md(it)})" } ?: ""),
                             (c.openEntries + c.relations).joinToString(", ") { md(it) }.ifEmpty { DASH },
                         )
                     appendLine(cells.joinToString(" | ", "| ", " |"))
@@ -202,15 +202,15 @@ object HygieneRender {
             section(
                 "Dangling groundings",
                 cs.flatMap { c ->
-                    c.danglingGroundings.map { "${c.qname} — `${it.binding}`: ${it.ref}" }
+                    c.danglingGroundings.map { "${md(c.qname)} — `${it.binding}`: ${md(it.ref)}" }
                 },
             )
             section(
                 "Redundant term duplicates",
                 cs.flatMap { c ->
                     c.redundantTerms.map {
-                        "${c.qname} — \"${md(it.form)}\" (${it.locale ?: "base"}): " +
-                            "term `${it.conceptEntry}`, and term `${it.elementEntry}` on ${it.element}"
+                        "${md(c.qname)} — \"${md(it.form)}\" (${it.locale ?: "base"}): " +
+                            "term `${it.conceptEntry}`, and term `${it.elementEntry}` on ${md(it.element)}"
                     }
                 },
             )
@@ -218,15 +218,15 @@ object HygieneRender {
                 "Phase as default sense",
                 cs.flatMap { c ->
                     c.phaseAsDefault.map {
-                        "${c.qname} — term `${it.entry}` defaults \"${md(it.form)}\" to the phase, but " +
-                            "\"${md(it.form)}\" also names ${it.alsoNames} up its `of:` chain (cn/phase-as-default)"
+                        "${md(c.qname)} — term `${it.entry}` defaults \"${md(it.form)}\" to the phase, but " +
+                            "\"${md(it.form)}\" also names ${md(it.alsoNames)} up its `of:` chain (cn/phase-as-default)"
                     }
                 },
             )
             appendLine()
             appendLine("## Retired codes")
             appendLine()
-            val retired = cs.flatMap { c -> c.retiredCodes.map { "- ${c.qname} — $it" } }
+            val retired = cs.flatMap { c -> c.retiredCodes.map { "- ${md(c.qname)} — $it" } }
             if (retired.isEmpty()) appendLine("None — ${HygieneReport.RETIRED_CODES_NOTE.substringBefore(" — none")}.")
             retired.forEach(::appendLine)
         }
@@ -243,14 +243,19 @@ object HygieneRender {
     }
 
     /**
-     * Authored text (a term form, an open-tier entry or relation) escaped for markdown: a character that would render
-     * as emphasis, code, a link or a table-cell break in an editor preview gets a backslash. An underscore inside a
-     * word stays (`loyalty_programme`) — CommonMark never reads it as emphasis. TS `mdEscape` is the twin.
+     * Authored text (a name, a ref, a term form, an open-tier entry or relation) escaped for markdown: a character that
+     * would render as emphasis, code, a link, an entity or a table-cell break in an editor preview gets a backslash,
+     * and a line break is a space (it would end the row or the list item). An underscore inside a word stays
+     * (`loyalty_programme`) — CommonMark never reads it as emphasis. TS `mdEscape` is the twin.
      */
     internal fun md(s: String): String =
         buildString {
             s.forEachIndexed { i, ch ->
                 val inWord = ch == '_' && s.getOrNull(i - 1).isWordChar() && s.getOrNull(i + 1).isWordChar()
+                if (ch == '\n' || ch == '\r') {
+                    append(' ')
+                    return@forEachIndexed
+                }
                 if (ch in MD_SPECIAL && !inWord) append('\\')
                 append(ch)
             }
@@ -258,7 +263,7 @@ object HygieneRender {
 
     private fun Char?.isWordChar() = this != null && isLetterOrDigit()
 
-    private const val MD_SPECIAL = "\\`*_[]<>|~"
+    private const val MD_SPECIAL = "\\`*_[]<>|~&"
 
     private const val DASH = "—"
 
