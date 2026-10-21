@@ -84,8 +84,10 @@ cut (CN-D29: where 0.4 already spells a construct its spelling wins — `:as_of`
 spellings" (A-CN-25…31). Surface: `[not] exists C [v] (, C [v])* involving p [as label] (, …)* [where e]`; the concept
 aggregate `count|sum|…(C [v] involving … [where …] (, name: e)*)` + `.quality`; `x [not] in <call>`; the temporal words
 `at_or_before before contains ended_before overlaps` infix at the comparison level; `this` (+ a path); `end` after a
-dot. New tokens, all soft: `EXISTS INVOLVING WHERE THIS AT_OR_BEFORE BEFORE CONTAINS ENDED_BEFORE OVERLAPS`. Every 0.4
-document parses to the same AST (proved over the repo's 230 `.ttrp` documents and the expression corpora). A TTR-P
-program's typechecker refuses the forms, `TTRP-CN-001`. With it, `standaloneExpr : expr EOF` — `parseExpression`
+dot. New tokens `EXISTS INVOLVING WHERE THIS AT_OR_BEFORE BEFORE CONTAINS ENDED_BEFORE OVERLAPS`, all in `identifier`;
+eight are soft, `THIS` is not (a 0.4 column named `this` is now `TTRP-CN-001`). Every other 0.4 document parses to the
+same AST (proved over the repo's 230 `.ttrp` documents and the expression corpora) — a temporal word followed by `:` in
+a document stays a route or key (`temporalInfix()`). A TTR-P document refuses the forms wherever they sit,
+`TTRP-CN-001`. With it, `standaloneExpr : expr EOF` — `parseExpression`
 anchors EOF (ttr-core#202). Kotlin only (`ttrp-frontend`); the parsed definitions live in `ttr-concept`.
 

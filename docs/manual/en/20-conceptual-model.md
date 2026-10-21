@@ -131,7 +131,9 @@ In a definition, `this` is the bearer, an event's participants are reached by th
 predicate, `:as_of` is the instant the definition is evaluated at, and `:name` reads a `def parameter`. Durations
 and windows are spelled as in TTR-P (`hours(24)`, `within(sold_date, last: days(365))`); the conceptual forms —
 `exists … involving … where …`, `count(… involving …)`, `code in descendants(Kind, 'X')` and the temporal words
-`at_or_before`, `before`, `contains`, `ended_before`, `overlaps` — are TTR-P expression grammar 0.5.
+`at_or_before`, `before`, `contains`, `ended_before`, `overlaps` — are TTR-P expression grammar 0.5. They belong to
+definitions: a TTR-P program refuses them wherever they stand (`TTRP-CN-001`). The words stay usable as names in TTR-P,
+except `this`, which always reads as the bearer — a column named `this` is refused too.
 
 ```ttrm
 model cn
@@ -405,6 +407,9 @@ has that shape (`<`, `<=`, `before` and `at_or_before` count alike; `:as_of >` m
 | `occurrence` | an occurrence happened at or before *t* | `e.period.start` / `e.period.at` / `e.period` *before* `:as_of` |
 | `current_state` | an episode contains *t* | `e.period contains :as_of` |
 | `past_state` | an episode ended before *t* | `e.period ended_before :as_of`, `e.period.end` *before* `:as_of` |
+
+A window counts as the comparisons it stands for: `within(x, last: d)` is `x >= :as_of - d and x <= :as_of`, so
+`within(o.period.start, last: days(365))` matches `occurrence`; `within(x, from: a, to: b)` is `x >= a and x <= b`.
 
 **Granularity.** An instant's granularity is its event's `period: { precision }`, else its attribute's type (a `date`
 is a day, a timestamp a second); `:as_of` is a day. Unknown on either side — no finding.

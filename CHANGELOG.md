@@ -104,10 +104,15 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   lacked: `[not] exists C [v] (, C [v])* involving p [as label] … [where e]`, the concept aggregate `count(C involving
   … [where …] (, name: e)*)` + `.quality`, `x [not] in <call>` (`code in descendants(Kind, 'X')`), the temporal words
   `at_or_before before contains ended_before overlaps` (infix, comparison level), `this` (+ a path), and `end` after a
-  dot. New tokens, all soft (still names): `exists involving where this at_or_before before contains ended_before
-  overlaps`. Every 0.4 document parses to the same AST. The AST gains a sealed `ConceptForm` family (`ExistsExpr`,
-  `ConceptAggregate`, `ThisRef`, `InCall`, `TemporalPredicate`); in a TTR-P program the typechecker refuses each with
-  **`TTRP-CN-001`**, and the emitters treat them as `UNSUPPORTED_NODE`. Where 0.4 already spelled a construct the cn
+  dot. New tokens: `exists involving where this at_or_before before contains ended_before overlaps`; eight stay soft
+  (still names), `this` does not. In a TTR-P document a temporal word followed by `:` is a route or a config key as in
+  0.4 (`before: is_early`), never the comparison. Every 0.4 document parses to the same AST, except a column named
+  `this`. The AST gains a sealed `ConceptForm` family (`ExistsExpr`, `ConceptAggregate`, `ThisRef`, `InCall`,
+  `TemporalPredicate`); a TTR-P document refuses each wherever it sits (a chain op, a recipe route, a decision
+  statement, a wiring `when:`) with **`TTRP-CN-001`**, and the emitters treat them as `UNSUPPORTED_NODE`.
+  **Migration:** a TTR-P program with a column named `this` now fails `TTRP-CN-001` — rename the column (`this` always
+  reads as the cn `this`). TTR-P spans count code points (a span after an astral character on an earlier line ended
+  one column short); a syntax error at the end of the input is an empty span. Where 0.4 already spelled a construct the cn
   spelling is TTR-P's: `:as_of`, `:name`, `hours(24)`, `within(x, last: d)`, `<>` (cn contracts §1.1 "The 0.5
   spellings"). **`TtrpParser.parseExpression` reads the whole input** (`standaloneExpr : expr EOF`, ttr-core#202): a
   tail after the expression is `TTRP-PRS-001` — it was dropped silently. The TTR-P formatter renders `<>` as `<>` (it
@@ -128,7 +133,9 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   flag or value, a missing argument) exits **2**, as the contract pins — clikt's own 1 read as "findings at
   `--fail-on`"; `just cn-hygiene` runs the installed distribution, so the exit code and a path with spaces survive.
   The markdown escapes authored text (term forms, open-tier entries); a nested list in a participant or `via:` path
-  is read through, as TS reads it.
+  is read through, as TS reads it. A window reads `:as_of`: `within(x, last: d)` counts as `x <= :as_of` in the
+  `basis:` table (`x >= :as_of - d` beside it), `within(x, from:, to:)` as its two comparisons; `age(since:)` reads
+  `:as_of`.
 - **TTR-P — the recipe checker (AU-core-P1; `ttrp-frontend` · `ttrp-graph` · `ttrp-cli`).** A recipe is checked
   against the world and the model: the role shape and wiring (`TTRP-REC-000`), the action wiring typed against
   `def action` (`-001`…`-003`), the candidates' key (`-004`, `-005`), key lineage with each context's class (lookup /
