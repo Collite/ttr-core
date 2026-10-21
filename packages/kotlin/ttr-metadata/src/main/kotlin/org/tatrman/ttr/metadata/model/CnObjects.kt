@@ -100,7 +100,7 @@ enum class Imprecision { CERTAINLY, POSSIBLY }
 /** A condition's basis (AM-44, D-T7). */
 enum class Basis { OCCURRENCE, CURRENT_STATE, PAST_STATE }
 
-/** A closure's ranges (A-CN-13): a block code `I20-I25` is a closure NODE (the default), or a LEXICAL `BETWEEN`. */
+/** A closure's ranges (A-CN-13): a block code `H10-H19` is a closure NODE (the default), or a LEXICAL `BETWEEN`. */
 enum class HierarchyRanges { NODE, LEXICAL }
 
 /**

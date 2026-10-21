@@ -175,7 +175,7 @@ class CnFramesJsonRoundTripSpec :
                 .setOrderLimit(orderLimit)
                 .setCompare(compare)
                 .setSnapshotHash("sha256:00")
-                .setLocale("cs")
+                .setLocale("en")
                 .setAsOf(day)
                 .build()
 
@@ -187,13 +187,13 @@ class CnFramesJsonRoundTripSpec :
                 .setSourceRef("doc://d-1#p3")
                 .setRunId("run-7")
                 .setConfidence(confidence)
-                .setVerbatim("přeložen z JIP")
+                .setVerbatim("moved from the east warehouse")
                 .build()
         val participant =
             Participant
                 .newBuilder()
                 .setLabel("from")
-                .setConcept(ConceptRef.newBuilder().setQname("cn.Encounter"))
+                .setConcept(ConceptRef.newBuilder().setQname("cn.Warehouse"))
                 .setMember(member)
                 .build()
         val qualityValue =
@@ -202,7 +202,7 @@ class CnFramesJsonRoundTripSpec :
                 .setQuality(ConceptRef.newBuilder().setQname("cn.transfer_delay"))
                 .setValue(Value.newBuilder().setIntValue(90))
                 .setUnit("min")
-                .setVerbatim("90 minut")
+                .setVerbatim("90 minutes")
                 .build()
         val known = KeyValues.newBuilder().putValues("transfer_id", "T-1").build()
         val assertion =
@@ -216,7 +216,7 @@ class CnFramesJsonRoundTripSpec :
                 .setAssertedAsOf(day)
                 .setProvenance(provenance)
                 .setSnapshotHash("sha256:01")
-                .setLocale("cs")
+                .setLocale("en")
                 .addDerivedFrom("a-0")
                 .build()
 

@@ -47,7 +47,7 @@ message KeyValues {
 }
 
 message Participant {
-  string label = 1;                                     // an involves label of the event ("from", "to", "patient")
+  string label = 1;                                     // an involves label of the event ("from", "to", "customer")
   org.tatrman.concept.v1.ConceptRef concept = 2;
   org.tatrman.concept.v1.MemberRef member = 3;
 }

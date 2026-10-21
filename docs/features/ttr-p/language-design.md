@@ -784,7 +784,8 @@ refinement types (`int{1..12}`) later.
 
 TTR-M's conceptual model (`model cn`, the [manual's chapter 20](../../manual/en/20-conceptual-model.md)) writes its
 definitions — a phase's or defined quality's `definition:`, a sub-kind's `members:`, a binding's `filter:` — in this
-expression language. Grammar 0.5 adds the forms they need, additively (every 0.4 expression parses to the same tree):
+expression language. Grammar 0.5 adds the forms they need, additively — every 0.4 document parses to the same tree,
+except a column named `this` (below):
 
 - **existence** — `exists Invoicing i involving this as customer where OverdueInvoice`, `not exists …`;
 - **concept aggregates** — `count(Visit involving this) >= 4`, `latest(Reading involving this, by: period.at).level`;
@@ -792,9 +793,13 @@ expression language. Grammar 0.5 adds the forms they need, additively (every 0.4
 - **temporal comparisons** — `e.period contains :as_of`, `at_or_before`, `before`, `ended_before`, `overlaps`;
 - **`this`**, and `end` after a dot (`this.period.end`).
 
-They are a model's language, not a program's: a TTR-P program that uses one is refused with **`TTRP-CN-001`**. The
-nine words (`exists`, `involving`, `where`, `this`, `at_or_before`, `before`, `contains`, `ended_before`, `overlaps`)
-are soft keywords — still usable as column names. A definition otherwise uses the spellings TTR-P already has:
+They are a model's language, not a program's: a TTR-P program that uses one — in a chain op, a recipe route, a
+decision statement or a wiring `when:` — is refused with **`TTRP-CN-001`**. Eight of the nine words (`exists`,
+`involving`, `where`, `at_or_before`, `before`, `contains`, `ended_before`, `overlaps`) are soft keywords — still
+usable as column names, calc targets and route names. `this` is not: in an expression it always reads as the cn
+`this`, so a column named `this` is `TTRP-CN-001` (rename the column). A temporal word followed by `:` in a program
+is a recipe route or a config key, as in 0.4 (`before: is_early`), never the comparison — so a program's
+`x before :as_of` is a syntax error, not `TTRP-CN-001`. A definition otherwise uses the spellings TTR-P already has:
 `:as_of` and `:name` parameters, durations as calls (`days(365)`), windows as `within(x, last: d)` /
 `within(x, from: a, to: b)`, `<>` for inequality.
 
@@ -1420,7 +1425,8 @@ Diagnostics are a designed, user-facing surface, not an afterthought. Every one 
   `Pošli e-mail …` / `Send an e-mail …` shape, `TTRP-B-109` a keyword used as a name (`jako a`), `TTRP-B-006` a
   sentence in the other skin's language. Table: [`ttrb/ROSTER.md` §5](ttrb/ROSTER.md#5-diagnostics-ttrp-b-reject-tables-per-skin).
 - the conceptual forms (section 5.5, area `CN`) — `TTRP-CN-001` an `exists`, a concept aggregate, `in <call>`, a
-  temporal word or `this` in a program → "a conceptual model's definition form — write it in a `model cn` definition".
+  temporal word or `this` anywhere in a program → "`` `exists` outside a cn `definition:` ``" (the form it found),
+  suggesting "in a TTR-P program write the join, the filter or the comparison it stands for".
 
 The per-dialect reject tables are **versioned test fixtures** — they are simultaneously the compiler's conformance
 tests *and* the assist layer's repair vocabulary (section 12). One table, two consumers.

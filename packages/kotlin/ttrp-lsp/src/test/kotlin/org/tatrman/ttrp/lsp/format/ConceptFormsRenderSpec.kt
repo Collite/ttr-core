@@ -23,10 +23,10 @@ class ConceptFormsRenderSpec :
             listOf(
                 "exists Invoicing involving this as customer where OverdueInvoice",
                 "not exists OrderLine involving this.request.order, this.item",
-                "exists Encounter e1, Encounter e2 involving this as patient where e1 <> e2",
+                "exists Visit v1, Visit v2 involving this as customer where v1 <> v2",
                 "count(StoreVisit involving this) >= 4",
                 "latest(Inventory involving this.item, this.warehouse, by: as_of_date).quantity_on_hand",
-                "code not in descendants(Diagnosis, \"I21\")",
+                "category not in descendants(ProductCategory, \"H12\")",
                 "e.period contains :as_of",
                 "this.period.at - this.from.period.end",
                 "(exists A involving this where x = 1) or y = 2",

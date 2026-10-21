@@ -78,7 +78,8 @@ object KeywordTable {
 
     /**
      * TTRP 0.5 (CN-P2 S2.6, CN-D29) — the conceptual-model definition forms (cn contracts §1.1 "The 0.5 spellings").
-     * ALL soft (also in `identifier`); a TTR-P document parses them and its typechecker refuses them (TTRP-CN-001).
+     * All in `identifier`; eight are soft — `this` is not: in an expression it always reads as the cn `this`. A TTR-P
+     * document parses the forms and refuses them wherever they sit (TTRP-CN-001).
      */
     val conceptKeywords =
         setOf(

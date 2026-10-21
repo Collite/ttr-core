@@ -11,15 +11,19 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.tatrman.ttrp.DeclaredSchemaSource
 import org.tatrman.ttrp.TtrpFrontend
+import org.tatrman.ttrp.ast.DecisionDecl
+import org.tatrman.ttrp.ast.RecipeDecl
 import org.tatrman.ttrp.diagnostics.Severity
 import org.tatrman.ttrp.diagnostics.TtrpDiagnosticId
+import org.tatrman.ttrp.parser.Fixtures
 import org.tatrman.ttrp.parser.TtrpParser
 
 /**
  * TTRP 0.5 (CN-P2 S2.6 T3/T4, CN-D29): the conceptual-model definition forms — cn contracts §1.1 "The 0.5 spellings"
  * (A-CN-25…31). Each form parses to its node; the TTR-P spellings a definition reuses (`:as_of`, `:name`, `hours(24)`,
- * `within(…, last:)`, `<>`) stay what they are; the negatives are syntax errors; and in a TTR-P program every form is
- * refused by the typechecker (`TTRP-CN-001`) — the grammar stays target-neutral, the context decides.
+ * `within(…, last:)`, `<>`) stay what they are; the negatives are syntax errors; and in a TTR-P document every form is
+ * refused wherever it sits (`TTRP-CN-001`) — the grammar stays target-neutral, the context decides. A recipe route
+ * named like a temporal word stays a route (review-119 M-2).
  */
 class TtrpConceptFormsSpec :
     StringSpec({
@@ -63,10 +67,10 @@ class TtrpConceptFormsSpec :
         "named event variables, `<>` and durations as calls (DC-7, A-CN-27/29)" {
             val e =
                 parse(
-                    "exists Encounter e1, Encounter e2 involving this as patient " +
-                        "where e1 <> e2 and e2.period.start - e1.period.end between days(0) and days(30)",
+                    "exists Visit v1, Visit v2 involving this as customer " +
+                        "where v1 <> v2 and v2.period.start - v1.period.end between days(0) and days(30)",
                 ).shouldBeInstanceOf<ExistsExpr>()
-            e.concepts.map { it.concept to it.variable } shouldBe listOf("Encounter" to "e1", "Encounter" to "e2")
+            e.concepts.map { it.concept to it.variable } shouldBe listOf("Visit" to "v1", "Visit" to "v2")
             val and = e.where.shouldBeInstanceOf<FunctionCall>()
             and.function shouldBe CatalogId.AND
             and.args[0].shouldBeInstanceOf<FunctionCall>().function shouldBe CatalogId.NEQ
@@ -116,12 +120,14 @@ class TtrpConceptFormsSpec :
         }
 
         "hierarchy membership: `in <call>` beside `in (<list>)`; members: is a call (DC-1, DC-8)" {
-            val inCall = parse("code in descendants(Diagnosis, 'I20-I25')").shouldBeInstanceOf<InCall>()
+            val inCall = parse("category in descendants(ProductCategory, 'H10-H19')").shouldBeInstanceOf<InCall>()
             inCall.negated shouldBe false
             inCall.call
                 .shouldBeInstanceOf<FunctionCall>()
                 .function.name shouldBe "descendants"
-            parse("code not in descendants(Diagnosis, 'I21')").shouldBeInstanceOf<InCall>().negated shouldBe true
+            parse("category not in descendants(ProductCategory, 'H12')")
+                .shouldBeInstanceOf<InCall>()
+                .negated shouldBe true
             parse("state in ('placed', 'held')").shouldBeInstanceOf<InList>()
             parse("descendants(ProductCategory, 'H10-H19')").shouldBeInstanceOf<FunctionCall>()
         }
@@ -227,7 +233,7 @@ class TtrpConceptFormsSpec :
             } shouldBe emptyList()
         }
 
-        "in a TTR-P program each form is refused by the typechecker: TTRP-CN-001" {
+        "in a TTR-P program each form is refused once: TTRP-CN-001" {
             val schema =
                 DeclaredSchemaSource(
                     mapOf(
@@ -250,5 +256,89 @@ class TtrpConceptFormsSpec :
                 errs.map { it.id } shouldContainExactly listOf(TtrpDiagnosticId.CN_001)
                 errs.single().message shouldContain named
             }
+        }
+
+        // ---- review-119 M-1: a form is refused wherever it sits in a recipe, not only in a chain op ----
+
+        fun recipe(
+            fixture: String,
+            from: String,
+            to: String,
+        ): String {
+            val text = Fixtures.read("/recipes/$fixture")
+            text shouldContain from
+            return text.replace(from, to)
+        }
+
+        fun recipeErrors(source: String) =
+            TtrpParser.parseString(source, "cn.ttrp").diagnostics.filter { it.severity == Severity.ERROR }
+
+        "in a recipe each form is refused where it sits: a route, a decision statement, a wiring `when:`" {
+            listOf(
+                recipe("release_order.ttrp", "hold_ar:           n_due > 0", "hold_ar: exists Order involving this")
+                    to "`exists`",
+                recipe("release_order.ttrp", "hold_ar:           n_due > 0", "hold_ar: this.n_due > 0") to "`this`",
+                recipe("release_order.ttrp", "hold_ar:           n_due > 0", "hold_ar: n_due in descendants(K, 'X')")
+                    to "`in <call>`",
+                recipe("release_order.ttrp", "hold_ar:           n_due > 0", "hold_ar: n_due before due") to
+                    "`before`",
+                recipe("release_order.ttrp", "n_due   = count(invoice_id)", "n_due = count(Invoice involving this)") to
+                    "`count(<concept> involving …)`",
+                recipe("monitor_inbound.ttrp", "when: way = \"exchange\"", "when: way overlaps window") to "`overlaps`",
+            ).forEach { (source, named) ->
+                val errs = recipeErrors(source)
+                errs.map { it.id } shouldContainExactly listOf(TtrpDiagnosticId.CN_001)
+                errs.single().message shouldContain named
+            }
+            // a form inside a form is the outer one's: one diagnostic, at the `exists`
+            val nested =
+                recipe(
+                    "release_order.ttrp",
+                    "hold_ar:           n_due > 0",
+                    "hold_ar: not exists Order o involving this where this.n_due before o.due",
+                )
+            recipeErrors(nested).single().message shouldContain "`not exists`"
+        }
+
+        // ---- review-119 M-2: 0.4's juxtaposed routes keep their AST ----
+
+        fun routes(source: String): List<String> {
+            val r = TtrpParser.parseString(source, "routes.ttrp")
+            r.diagnostics.shouldBeEmpty()
+            val decision =
+                r.document.statements
+                    .filterIsInstance<RecipeDecl>()
+                    .single()
+                    .members
+                    .filterIsInstance<DecisionDecl>()
+                    .single()
+            return decision.switch.routes.map { it.name }
+        }
+
+        "a route named like a temporal word after a condition with no comparison stays a route" {
+            val release =
+                "and value <= :confirmation_threshold\n" +
+                    "                               because: \"all checks passed\""
+            for (word in listOf("before", "contains", "overlaps", "at_or_before", "ended_before")) {
+                for (spelling in listOf("$word: is_early", "$word:is_early", "$word : is_early")) {
+                    routes(recipe("release_order.ttrp", release, "and is_clear\n            $spelling")) shouldBe
+                        listOf("hold_sales", "hold_ar", "release_confirmed", "release", word)
+                }
+            }
+            // 0.4 read `before :as_of` after `hold_ar: n_due` as a route `before` too
+            routes(recipe("release_order.ttrp", "hold_ar:           n_due > 0", "hold_ar: n_due\n before :as_of"))
+                .let { it.take(3) shouldBe listOf("hold_sales", "hold_ar", "before") }
+        }
+
+        "a temporal word before `:` is the infix in a definition, never in a document" {
+            parse("o.period.start at_or_before :as_of").shouldBeInstanceOf<TemporalPredicate>()
+            val doc = TtrpParser.parseString("f = filter(s, d before :as_of)", "cn.ttrp")
+            doc.diagnostics.first().id shouldBe TtrpDiagnosticId.PRS_001
+            doc.diagnostics.first().message shouldContain "`before :…` is a cn definition's comparison (TTRP-CN-001)"
+            // without the colon the document reads the infix — and refuses it
+            TtrpParser
+                .parseString("f = filter(s, d before e)", "cn.ttrp")
+                .diagnostics
+                .map { it.id } shouldContainExactly listOf(TtrpDiagnosticId.CN_001)
         }
     })

@@ -44,9 +44,13 @@
 //     3. The temporal words, infix at the comparison level: `at_or_before before contains ended_before
 //        overlaps` (DC-12).
 //     4. `this` (+ a dotted path) is its own node; `end` is legal after a dot (`this.period.end`).
-//     5. New tokens, ALL soft (also in `identifier` — the 0.4 rule): EXISTS INVOLVING WHERE THIS
-//        AT_OR_BEFORE BEFORE CONTAINS ENDED_BEFORE OVERLAPS. Every 0.4 document parses to the same AST.
-//     6. The grammar stays target-neutral: a TTR-P document's typechecker refuses the forms (TTRP-CN-001).
+//     5. New tokens, all in `identifier`: EXISTS INVOLVING WHERE THIS AT_OR_BEFORE BEFORE CONTAINS ENDED_BEFORE
+//        OVERLAPS. Eight are soft — still usable as column names and calc targets. `this` is not: in an expression
+//        it always reads as the cn `this`, so a 0.4 column named `this` is now TTRP-CN-001 (review-119 M-3; rename
+//        the column). Every other 0.4 document parses to the same AST — a temporal word followed by `:` (a route or
+//        a config key) stays what 0.4 read, see `predicate`.
+//     6. The grammar stays target-neutral: a TTR-P document refuses the forms wherever they sit (TTRP-CN-001,
+//        reported by the document parse); a standalone expression (`cnDefinition`) reads them.
 //     `standaloneExpr : expr EOF` is the standalone-expression entry (ttr-core#202 — a tail is an error).
 //
 // Kotlin-only generation (G-b): this .g4 is read directly by the ANTLR Gradle
@@ -70,6 +74,23 @@
 //     identifier/idPart fragments; reservation is a WALKER check (S10 → PRS-005).
 
 grammar TTRP;
+
+// 0.5 (review-119 M-2): the one parser mode. `TtrpParser.parseExpression` (a cn `definition:` / `members:` /
+// `filter:` block, the expression corpus) sets `cnDefinition`; a document parse leaves it false. It gates ONE arm,
+// the temporal infix of `predicate` — see there. Java, because this grammar has the one (Kotlin/JVM) target.
+@parser::members {
+    /** True while a standalone expression is parsed (a cn definition block); false for a TTR-P document. */
+    public boolean cnDefinition = false;
+
+    /**
+     * Whether the temporal word ahead (`before`, `contains`, …) is the 0.5 infix. In a document it is not when a
+     * `:` follows it: there the word is a recipe route or a config key (`before: is_early`, `before :as_of`), which
+     * 0.4 parsed so — never the infix, whatever the spacing. A definition has no routes; the infix always reads.
+     */
+    public boolean temporalInfix() {
+        return cnDefinition || _input.LA(2) != COLON;
+    }
+}
 
 // =============================================================================
 // Parser
@@ -259,8 +280,14 @@ predicate       : addExpr ( (ASSIGN | EQEQ | NEQ | LT | LTE | GT | GTE) addExpr
                           | NOT? IN LPAREN expr (COMMA expr)* RPAREN
                           | NOT? IN functionCall                    // 0.5: `code in descendants(Kind, 'X')` (DC-1)
                           | BETWEEN addExpr AND addExpr
-                          | temporalOp addExpr                      // 0.5: `e.period contains :as_of` (DC-12)
+                          | {temporalInfix()}? temporalOp addExpr   // 0.5: `e.period contains :as_of` (DC-12)
                           )? ;
+// The temporal infix and a recipe `switch`: routes are juxtaposed (`route : identifier COLON expr`), so after a
+// condition with no comparison (`release: … and is_clear`) a route named `before` / `contains` / `overlaps` /
+// `at_or_before` / `ended_before` would otherwise be read as `is_clear before :is_early` — ALL(*) takes the
+// optional arm (review-119 M-2). `temporalInfix()` keeps the arm off in a document wherever a `:` follows the word,
+// so every 0.4 document keeps its AST; in a document the infix is TTRP-CN-001 anyway, and a definition never has a
+// route.
 temporalOp      : AT_OR_BEFORE | BEFORE | CONTAINS | ENDED_BEFORE | OVERLAPS ;
 addExpr         : mulExpr ((PLUS | MINUS) mulExpr)* ;
 mulExpr         : unaryExpr ((STAR | SLASH) unaryExpr)* ;
@@ -296,7 +323,7 @@ paramRef        : COLON identifier ;                         // `:as_of` · `:to
 existsExpr       : EXISTS conceptBinding (COMMA conceptBinding)* involvingClause (WHERE expr)? ;
 conceptAggregate : identifier LPAREN conceptBinding (COMMA conceptBinding)* involvingClause (WHERE expr)?
                    (COMMA namedArg)* RPAREN (DOT idPart)* ;  // `sum(Sale involving this).revenue` — a quality after
-conceptBinding   : identifier identifier? ;                  // `Encounter` · `Encounter e1`
+conceptBinding   : identifier identifier? ;                  // `Visit` · `Visit v1`
 involvingClause  : INVOLVING participant (COMMA participant)* ;
 participant      : (thisRef | dottedRef) (AS identifier)? ;  // `this as customer` · `this.request.order`
 namedArg         : fnArgName COLON expr ;

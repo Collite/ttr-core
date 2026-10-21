@@ -23,6 +23,12 @@ import org.tatrman.ttrp.ast.TtrpDocument
 import org.tatrman.ttrp.diagnostics.Severity
 import org.tatrman.ttrp.diagnostics.TtrpDiagnostic
 import org.tatrman.ttrp.diagnostics.TtrpDiagnosticId
+import org.tatrman.ttrp.expr.ConceptAggregate
+import org.tatrman.ttrp.expr.ConceptForm
+import org.tatrman.ttrp.expr.ExistsExpr
+import org.tatrman.ttrp.expr.InCall
+import org.tatrman.ttrp.expr.TemporalPredicate
+import org.tatrman.ttrp.expr.ThisRef
 
 /**
  * The Stage 1.1 STRUCTURAL named-reject pass (contracts §8): PRS/CTL/FRG. Runs in
@@ -52,6 +58,34 @@ internal object TtrpChecks {
 
     /** Reserved synthesized-rejects column prefix (contracts §1 / RS-5). */
     private const val TTRP_PREFIX = "_ttrp_"
+
+    /**
+     * TTRP 0.5 (CN-D29): a cn definition form in a TTR-P document is refused wherever it sits — a chain op, a recipe
+     * `switch` route, a decision statement, a wiring `when:` (review-119 M-1: the typechecker sees only the chain ops).
+     * One `TTRP-CN-001` per outermost form; a form inside another (`this` in an `exists`) is the outer one's.
+     */
+    fun refuseConceptForms(forms: List<ConceptForm>): List<TtrpDiagnostic> {
+        val spans = forms.distinctBy { it.location.offsetStart to it.location.offsetEnd }
+        return spans
+            .filter { f ->
+                spans.none { g ->
+                    g !== f &&
+                        g.location.offsetStart <= f.location.offsetStart &&
+                        f.location.offsetEnd <= g.location.offsetEnd
+                }
+            }.sortedBy { it.location.offsetStart }
+            .map { diag(TtrpDiagnosticId.CN_001, "${conceptFormName(it)} outside a cn `definition:`", it.location) }
+    }
+
+    /** How a refused form is named in its `TTRP-CN-001`. */
+    fun conceptFormName(e: ConceptForm): String =
+        when (e) {
+            is ExistsExpr -> if (e.negated) "`not exists`" else "`exists`"
+            is ConceptAggregate -> "`${e.function}(<concept> involving …)`"
+            is ThisRef -> "`this`"
+            is InCall -> "`in <call>`"
+            is TemporalPredicate -> "`${e.op.spelling}`"
+        }
 
     fun run(doc: TtrpDocument): List<TtrpDiagnostic> {
         val out = mutableListOf<TtrpDiagnostic>()

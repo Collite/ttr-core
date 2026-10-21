@@ -82,3 +82,18 @@ def phase NoReading   { of: Item, basis: current_state, definition: """category 
 def phase LateDelivery      { of: Order, definition: """exists Delivery d involving this where d.period.at before :as_of""" }
 def phase LateDeliveryMaybe { of: Order, imprecision: possibly, definition: """exists Delivery d involving this where d.period.at before :as_of""" }
 def phase RecentOrder       { of: Order, definition: """period.start at_or_before :as_of""" }
+
+// ---- review-119 M-4: a window reads `:as_of` and stands for its comparisons; `age(since:)` reads `:as_of` ----
+def phase RecentBuyer  { of: Customer, basis: occurrence, definition: """exists Order o involving this where within(o.period.start, last: days(365))""" }
+def phase BoundedBuyer { of: Customer, basis: occurrence, definition: """exists Order o involving this where within(o.period.start, from: :as_of - days(365), to: :as_of)""" }
+def phase AgedOrder    { of: Order, basis: occurrence, definition: """age(since: placed_at) > 30""" }
+
+// ---- review-119 L-1: a span after an astral character on an earlier line; a syntax error at the block's end ----
+def phase AstralNote {
+    of: Order,
+    definition: """
+        state = 'held' // 😀 note
+        and colour = 'red'
+    """
+}
+def phase EofSyntax { of: Order, definition: """state =""" }

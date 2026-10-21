@@ -185,21 +185,10 @@ class ExpressionTypechecker(
             // timestamp, a parameter by its `def parameter`, date ± duration). Until then they
             // defer like a NULL operand, so a host expression (`:as_of - 30 days`) still checks.
             is ParamRef, is DurationExpr -> null
-            // TTRP 0.5 (CN-D29): a cn definition form — never read in a TTR-P document. Refused at the form; its
-            // sub-expressions are not typed (they name concepts and labels, not columns).
-            is ConceptForm -> {
-                diags += diag(TtrpDiagnosticId.CN_001, "${conceptFormName(e)} outside a cn `definition:`", e.location)
-                null
-            }
-        }
-
-    private fun conceptFormName(e: ConceptForm): String =
-        when (e) {
-            is ExistsExpr -> if (e.negated) "`not exists`" else "`exists`"
-            is ConceptAggregate -> "`${e.function}(<concept> involving …)`"
-            is ThisRef -> "`this`"
-            is InCall -> "`in <call>`"
-            is TemporalPredicate -> "`${e.op.spelling}`"
+            // TTRP 0.5 (CN-D29): a cn definition form — never read in a TTR-P document. The document parse refuses
+            // it wherever it sits (TTRP-CN-001, `TtrpChecks.refuseConceptForms`); its sub-expressions are not typed
+            // (they name concepts and labels, not columns).
+            is ConceptForm -> null
         }
 
     /**

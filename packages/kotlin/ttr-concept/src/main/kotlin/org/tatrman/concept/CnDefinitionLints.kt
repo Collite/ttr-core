@@ -224,7 +224,7 @@ object CnDefinitionLints {
         if (declared in shapes) return null
         val found =
             if (shapes.isEmpty()) {
-                if (closure.any { it.reads.asOf }) "no reading of `:as_of` the basis table knows" else "no `:as_of`"
+                if (closure.any { it.reads.asOf }) "`:as_of` in none of the table's shapes" else "no `:as_of`"
             } else {
                 shapes.joinToString(" and ") { "`${it.name.lowercase()}`" }
             }

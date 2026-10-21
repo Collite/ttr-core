@@ -63,8 +63,8 @@ class CnDefinitionLintsSpec :
             Case(
                 CnDefinitionLints.BASIS_MISMATCH,
                 Severity.ERROR,
-                listOf("HadStockout", "NoReading"),
-                listOf("OutOfStock", "EverStocked"),
+                listOf("HadStockout", "NoReading", "AgedOrder"),
+                listOf("OutOfStock", "EverStocked", "RecentBuyer", "BoundedBuyer"),
                 "`basis: past_state`",
             ),
             Case(
@@ -91,6 +91,9 @@ class CnDefinitionLintsSpec :
             CnDefinitionLints.BASIS_SHAPES.keys shouldBe Basis.entries.toSet()
             on("NoReading", CnDefinitionLints.BASIS_MISMATCH).single().message shouldContain "reads no `:as_of`"
             on("HadStockout", CnDefinitionLints.BASIS_MISMATCH).single().message shouldContain "reads `current_state`"
+            // `age(since:)` reads `:as_of`, in no shape of the table (review-119 M-4)
+            on("AgedOrder", CnDefinitionLints.BASIS_MISMATCH).single().message shouldContain
+                "the definition reads `:as_of` in none of the table's shapes"
         }
 
         "the granularity of an instant: `period: { precision }`, else its attribute's type; `:as_of` is a day" {

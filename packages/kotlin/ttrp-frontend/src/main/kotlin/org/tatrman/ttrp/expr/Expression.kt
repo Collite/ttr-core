@@ -265,12 +265,12 @@ data class DurationParam(
 
 /**
  * A form only a cn `definition:` / `members:` / `filter:` block reads (CN-P2 S2.6). The grammar parses it anywhere —
- * it stays target-neutral — and a TTR-P document's typechecker refuses it (`TTRP-CN-001`). One sealed family, so a
+ * it stays target-neutral — and a TTR-P document refuses it wherever it sits (`TTRP-CN-001`). One sealed family, so a
  * consumer that never reads them (the emitters, the graph rules) answers them in one arm.
  */
 sealed interface ConceptForm : Expression
 
-/** `Encounter` · `Encounter e1` — a concept an `exists` or a concept aggregate ranges over, with its variable. */
+/** `Visit` · `Visit v1` — a concept an `exists` or a concept aggregate ranges over, with its variable. */
 data class ConceptBinding(
     val concept: String,
     val variable: String?,
@@ -320,7 +320,7 @@ data class ThisRef(
     override val type: TtrpType? = null,
 ) : ConceptForm
 
-/** `code [not] in descendants(Diagnosis, 'I20-I25')` (DC-1 / DC-8) — membership in what a call names. */
+/** `category [not] in descendants(ProductCategory, 'H10-H19')` (DC-1 / DC-8) — membership in what a call names. */
 data class InCall(
     val expr: Expression,
     val call: Expression,

@@ -134,6 +134,38 @@ class CnDefinitionsSpec :
             def("BrokenSyntax").expression shouldBe null
         }
 
+        "a window reads `:as_of` and the comparisons it stands for; `age(since:)` reads `:as_of` (review-119 M-4)" {
+            // `within(x, last: d)` is `x >= :as_of - d and x <= :as_of` (AU 06 A-6)
+            def("RecentBuyer").reads.let {
+                it.asOf shouldBe true
+                it.comparisons.map { c -> c.op to c.rhs } shouldContainExactly
+                    listOf(">=" to null, "<=" to InstantTerm.AsOf)
+                it.comparisons.forEach { c -> (c.lhs as InstantTerm.PeriodBound).bound shouldBe "start" }
+            }
+            // `within(x, from: a, to: b)` is `x >= a and x <= b`
+            def("BoundedBuyer").reads.comparisons.map { it.op to it.rhs } shouldContainExactly
+                listOf(">=" to null, "<=" to InstantTerm.AsOf)
+            def("AgedOrder").reads.asOf shouldBe true
+            listOf("RecentBuyer", "BoundedBuyer", "AgedOrder").forEach { def(it).diagnostics.shouldBeEmpty() }
+        }
+
+        "a span after an astral character on an earlier line; a syntax error at the end is empty (review-119 L-1)" {
+            fun lineOf(marker: String) = fixtureText.indexOfFirst { marker in it }
+
+            val cl = lineOf("and colour = 'red'")
+            def("AstralNote").diagnostics.single().location.shouldNotBeNull().let {
+                it.line shouldBe cl + 1
+                it.column shouldBe fixtureText[cl].indexOf("colour")
+                it.endColumn shouldBe it.column + "colour".length
+            }
+            val el = lineOf("def phase EofSyntax")
+            def("EofSyntax").diagnostics.single().location.shouldNotBeNull().let {
+                it.line shouldBe el + 1
+                it.column shouldBe fixtureText[el].lastIndexOf("\"\"\"")
+                it.endColumn shouldBe it.column
+            }
+        }
+
         "names the scope lacks: cn/definition-unknown-name; a kind with no hierarchy: cn/descendants-no-hierarchy" {
             listOf(
                 Triple(

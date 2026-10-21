@@ -404,11 +404,12 @@ internal class DefinitionResolver(
 
         fun reads() = DefinitionReads(concepts.toSet(), definitions.toSet(), params.toSet(), asOf, comparisons.toList())
 
+        /** A TTR-P span (code points) in the `.ttrm`; an empty one (a syntax error at the block's end) stays empty. */
         fun at(loc: ExprLocation): SourceLocation =
             block.location(
                 loc.line - 1,
                 loc.column,
-                if (loc.endLine == loc.line) maxOf(1, loc.endColumn - loc.column) else 1,
+                if (loc.endLine == loc.line) maxOf(0, loc.endColumn - loc.column) else 1,
             )
 
         fun report(
@@ -591,8 +592,36 @@ internal class DefinitionResolver(
                 e.args.forEach { visit(it, scope) }
                 return unknown("no function `$name`", e.location)
             }
-            e.args.forEach { visit(it, scope) }
+            val values = e.args.map { visit(it, scope) }
+            when (name) {
+                "within" -> window(e, values)
+                // `age(since: t)` is the days from `t` to `:as_of` (AU 06 A-6: `calc(:as_of - t)`) — it reads `:as_of`.
+                "age" -> asOf = true
+            }
             return Value.Opaque
+        }
+
+        /**
+         * A window reads as the comparisons it stands for (AU 06 A-6, the recipe's lowering; contracts §7):
+         * `within(x, last: d)` is `x >= :as_of - d and x <= :as_of` — it reads `:as_of`, and `x <= :as_of` is the
+         * comparison the basis table knows; `within(x, from: a, to: b)` is `x >= a and x <= b`.
+         */
+        private fun window(
+            e: FunctionCall,
+            values: List<Value>,
+        ) {
+            val names = e.argNames
+            val x = values.getOrNull(names.indexOf(null)) ?: return
+
+            fun named(n: String): Value? = values.getOrNull(names.indexOf(n))
+            if ("last" in names) {
+                asOf = true
+                compare(">=", x, Value.Opaque, e.location)
+                compare("<=", x, Value.AsOf, e.location)
+                return
+            }
+            named("from")?.let { compare(">=", x, it, e.location) }
+            named("to")?.let { compare("<=", x, it, e.location) }
         }
 
         /** `descendants(<Kind>, '<code>')` (DC-1 / DC-8): a kind with a `hierarchy:` grounding, and a code. */
