@@ -106,6 +106,19 @@ class RecipeTime(
 ) {
     private val diags = mutableListOf<TtrpDiagnostic>()
 
+    /**
+     * AU-core-P2: the `within` nodes whose column is an int sk the model leads to the calendar (D-82) — the sugar
+     * lowering joins the calendar for them, and filters the column itself for a date.
+     */
+    val calendarSkWithins = mutableSetOf<String>()
+
+    /**
+     * AU-core-P2 (review-119 M1): every `+`/`-` with a date operand, by location — `dates` for a date − date, `days`
+     * for a date ± an integer number of days. The door does no date arithmetic: the sugar lowering turns the ones it
+     * can into calendar counts or derived bindings and refuses the rest.
+     */
+    val dateArithmetic = mutableMapOf<org.tatrman.ttrp.ast.SourceLocation, String>()
+
     /** Null while typing a row's columns: nothing is reported then. */
     private var sink: MutableList<TtrpDiagnostic>? = diags
     private val model = report.modelIndex
@@ -285,7 +298,7 @@ class RecipeTime(
                         }
                         RecipeType.Duration(DurationUnit.of(e.function.name)!!)
                     }
-                    "coalesce", "abs", "round", "greatest", "least" ->
+                    "coalesce", "abs", "round", "greatest", "least", "nullif" ->
                         args.firstOrNull { it != RecipeType.UNKNOWN }
                             ?: RecipeType.UNKNOWN
                     else -> {
@@ -362,6 +375,8 @@ class RecipeTime(
         if (ta == null || tb == null) return RecipeType.UNKNOWN
         val aTemporal = ta.kind == TtrpType.Kind.TEMPORAL
         val bTemporal = tb.kind == TtrpType.Kind.TEMPORAL
+        if (aTemporal && bTemporal) dateArithmetic[e.location] = DATES
+        if (aTemporal != bTemporal) dateArithmetic[e.location] = DAYS
         return when {
             aTemporal && bTemporal ->
                 if (sub) {
@@ -546,6 +561,11 @@ class RecipeTime(
         }
         if (attr != null) {
             val t = column(row, attr.column, node, "within") ?: return
+            if (t.kind == TtrpType.Kind.NUMERIC &&
+                isDate(RecipeType.Scalar(t), attr, origin)
+            ) {
+                calendarSkWithins += node.id
+            }
             if (!isDate(RecipeType.Scalar(t), attr, origin)) {
                 err(
                     TtrpDiagnosticId.TYP_001,
@@ -735,9 +755,15 @@ class RecipeTime(
         sink?.add(TtrpDiagnostic(id, Severity.WARNING, message, loc))
     }
 
-    private companion object {
-        const val MAX_TRACE = 200
+    companion object {
+        private const val MAX_TRACE = 200
 
-        val DURATION_UNITS = DurationUnit.entries.map { it.spelling }.toSet()
+        private val DURATION_UNITS = DurationUnit.entries.map { it.spelling }.toSet()
+
+        /** A [dateArithmetic] kind: date − date. */
+        const val DATES = "dates"
+
+        /** A [dateArithmetic] kind: a date ± an integer number of days. */
+        const val DAYS = "days"
     }
 }

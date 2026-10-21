@@ -56,6 +56,15 @@ data class ResolvedStorage(
     val sourceLocation: SourceLocation? = null,
 )
 
+/**
+ * Grammar 0.16 — the storage's `writable: [ <entity> | <entity>.<attribute> | "<glob>" … ]` (D-65, D-76, D-79), read
+ * from the resolved (overlay-merged) manifest: each item as written, a glob without its quotes.
+ */
+val ResolvedStorage.writable: List<String>
+    get() =
+        org.tatrman.ttr.metadata.source.AutomationBuilder
+            .writable(manifest)
+
 /** A world-declared named schema on a storage (D-c world tier). */
 data class ResolvedStorageSchema(
     val qname: QualifiedName,

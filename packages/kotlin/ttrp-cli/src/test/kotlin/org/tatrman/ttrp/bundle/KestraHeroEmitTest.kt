@@ -64,7 +64,7 @@ class KestraHeroEmitTest :
         }
 
         test("emit-determinism PASSES for the kestra plugin over the hero request (Q-6 gate)") {
-            val req = buildHero(Files.createTempDirectory("ttrp-kestra-det")).emitRequest
+            val req = buildHero(Files.createTempDirectory("ttrp-kestra-det")).emitRequest!!
             val report = EmitDeterminismKit.check(EmitPluginLoader.builtin("kestra"), listOf(req, req))
             report.deterministic.shouldBeTrue()
             report.render() shouldContain "PASS"

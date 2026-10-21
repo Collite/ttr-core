@@ -269,6 +269,13 @@ data class FragmentDecomposition(
     val actionOutputs: List<ActionOutput> = emptyList(),
     /** TTR-B output sentences (B7): the OUT ports `Send that to output <port>` wrote, in order. */
     val outputPorts: List<String> = emptyList(),
+    /**
+     * AU-core-P2 (TTR-SQL): a column reference after a join chain, by its location → the operand its table qualifier
+     * named (`l.state` → `_sq0`, the variable `l`'s table is loaded into; `q.line_id` → the in-port `lines`). The
+     * reference itself reads `left.state` — the join's side — and so does `r.state`; the emitter tells them apart by
+     * this. Empty without joins.
+     */
+    val refOperands: Map<SourceLocation, String> = emptyMap(),
 )
 
 /** One TTR-B action's output: the container OUT [port] and the action display [display] it feeds. */

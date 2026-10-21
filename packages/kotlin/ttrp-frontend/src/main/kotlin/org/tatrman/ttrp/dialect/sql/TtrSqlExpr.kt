@@ -29,6 +29,13 @@ class TtrSqlExpr(
     private val loc: TtrSqlLoc,
     private val catalog: FunctionCatalog,
 ) {
+    /**
+     * AU-core-P2: the table qualifier each folded qualified column was written with (`l.state` → `l`), by the
+     * column's location — the decomposer maps it to the operand after a join chain, where `l.state` and `r.state`
+     * both fold to `left.state` ([org.tatrman.ttrp.ast.FragmentDecomposition.refOperands]).
+     */
+    val qualifiers = LinkedHashMap<org.tatrman.ttrp.ast.SourceLocation, String>()
+
     /** [aliasPort]: table-alias → join port (`left`/`right`) for ON-condition scope; empty ⇒ strip qualifier. */
     fun fold(
         ctx: P.ExprContext,
@@ -225,6 +232,7 @@ class TtrSqlExpr(
         val parts = listOf(sqlName(ctx.identifier().text)) + ctx.namePart().map { sqlName(it.text) }
         return if (parts.size >= 2) {
             val qualifier = parts[parts.size - 2]
+            qualifiers[loc.of(ctx)] = qualifier
             ColumnRef(port = ap[qualifier], column = parts.last(), location = loc.of(ctx))
         } else {
             ColumnRef(port = null, column = parts.last(), location = loc.of(ctx))

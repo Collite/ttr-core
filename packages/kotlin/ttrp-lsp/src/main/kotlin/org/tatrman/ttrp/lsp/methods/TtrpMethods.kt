@@ -7,6 +7,10 @@ import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError
 import org.tatrman.ttrp.bundle.BundleAssembler
 import org.tatrman.ttrp.diagnostics.TtrpDiagnostic
+import org.tatrman.ttrp.ast.ActionsBlock
+import org.tatrman.ttrp.ast.DecisionDecl
+import org.tatrman.ttrp.ast.RecipeDecl
+import org.tatrman.ttrp.ast.RoleContainer
 import org.tatrman.ttrp.graph.TtrpPipeline
 import org.tatrman.ttrp.lsp.docs.DocumentStore
 import org.tatrman.ttrp.lsp.docs.OpenDocument
@@ -208,8 +212,50 @@ class TtrpMethods(
                     )
             val ctx = projects.resolve(uri)
             val report = TtrpChecker(ctx.manifest, ctx.modelsRoot).check(text, fileNameOf(uri))
-            ValidateResult(report.diagnostics.map { toValidateDiagnostic(it) })
+            val recipe =
+                report.document.statements
+                    .filterIsInstance<RecipeDecl>()
+                    .firstOrNull()
+            // AU-core-P2 · S2.4 T5: a recipe validates through the whole recipe checker (roles, wiring, key lineage,
+            // time — the pipeline's), each finding named by the recipe block it sits in.
+            val diagnostics =
+                if (recipe != null) {
+                    val plan = TtrpPipeline(ctx.manifest, ctx.modelsRoot).plan(text, fileNameOf(uri))
+                    // and what the build would refuse — an island that does not compile (review-119 M5)
+                    plan.diagnostics +
+                        if (plan.ok) {
+                            org.tatrman.ttrp.bundle.RecipeBundleCheck
+                                .check(plan)
+                        } else {
+                            emptyList()
+                        }
+                } else {
+                    report.diagnostics
+                }
+            ValidateResult(diagnostics.map { toValidateDiagnostic(it, recipe?.let { r -> blockOf(r, it.location) }) })
         }
+
+    /**
+     * The recipe block [loc] sits in: a role container's or the decision's name, `actions`, or `recipe` for a header
+     * (`key:`, `parameters:` …); null outside the recipe.
+     */
+    private fun blockOf(
+        recipe: RecipeDecl,
+        loc: org.tatrman.ttrp.ast.SourceLocation,
+    ): String? {
+        fun inside(outer: org.tatrman.ttrp.ast.SourceLocation) =
+            outer.offsetStart <= loc.offsetStart &&
+                loc.offsetEnd <= outer.offsetEnd &&
+                outer.offsetEnd > outer.offsetStart
+        if (!inside(recipe.location)) return null
+        return recipe.members.firstOrNull { inside(it.location) }?.let { m ->
+            when (m) {
+                is RoleContainer -> m.name
+                is DecisionDecl -> m.name
+                is ActionsBlock -> "actions"
+            }
+        } ?: "recipe"
+    }
 
     fun authoringContext(params: AuthoringContextParams): CompletableFuture<AuthoringContextResult> =
         CompletableFuture.supplyAsync {
@@ -218,7 +264,12 @@ class TtrpMethods(
             val resolveUri = uri ?: "<memory>"
             val ctx = projects.resolve(resolveUri)
             val report = TtrpChecker(ctx.manifest, ctx.modelsRoot).check(text, fileNameOf(resolveUri))
-            AuthoringContextResult(AuthoringContextBuilder.build(report, params.position))
+            // v2: a cursor inside a recipe gets the checker's verdict (context classes, the mode) — the pipeline's.
+            val recipe =
+                params.position
+                    ?.let { AuthoringContextBuilder.recipeAt(report, it) }
+                    ?.let { TtrpPipeline(ctx.manifest, ctx.modelsRoot).plan(text, fileNameOf(resolveUri)).recipe }
+            AuthoringContextResult(AuthoringContextBuilder.build(report, params.position, recipe))
         }
 
     // ---- helpers ----
@@ -281,7 +332,10 @@ class TtrpMethods(
         message: String,
     ) = ResponseErrorException(ResponseError(code, message, null))
 
-    private fun toValidateDiagnostic(d: TtrpDiagnostic): ValidateDiagnostic =
+    private fun toValidateDiagnostic(
+        d: TtrpDiagnostic,
+        block: String? = null,
+    ): ValidateDiagnostic =
         ValidateDiagnostic(
             code = d.id.id,
             severity = d.severity.name.lowercase(),
@@ -291,6 +345,7 @@ class TtrpMethods(
             column = d.location.column,
             endLine = d.location.endLine,
             endColumn = d.location.endColumn,
+            block = block,
         )
 
     private fun fileNameOf(uri: String): String = runCatching { Path.of(URI(uri)).toString() }.getOrNull() ?: uri

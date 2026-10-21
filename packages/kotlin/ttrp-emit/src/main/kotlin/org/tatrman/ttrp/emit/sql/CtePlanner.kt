@@ -33,6 +33,13 @@ import org.tatrman.ttrp.graph.model.Switch
 data class EmitColumn(
     val name: String,
     val type: String,
+    /**
+     * AU-core-P2: the names that qualify this column in an expression — its entity, and the variable or IN port it
+     * came from (`out_.warehouse`, `customer.center`). A qualified reference resolves through them.
+     */
+    val qualifiers: Set<String> = emptySet(),
+    /** The column's name as written, before a join made it unique (`quantity_on_hand0` → `quantity_on_hand`). */
+    val base: String = name,
 )
 
 /** Where a node's input comes from: a real base table, or an upstream node's CTE. */
@@ -81,6 +88,8 @@ data class EmitNode(
     val node: Node,
     val inputs: List<EmitInput>,
     val outputColumns: List<EmitColumn>,
+    /** AU-core-P2: for a join, the right equi-key columns its output keeps — a qualified reference reads them. */
+    val joinKeep: Set<String> = emptySet(),
 )
 
 /**
@@ -131,7 +140,11 @@ class CtePlanner(
             // node still routes through the translator.
             rawProjectBody(en, cteById, guarded) ?: run {
                 val inputs = en.inputs.map { scanFor(it, cteById) }
-                val raw = f.unparse(PlanNodeBuilder(mdLowering, mdResolutions).body(en.node, inputs), islandName)
+                val raw =
+                    f.unparse(
+                        PlanNodeBuilder(mdLowering, mdResolutions).body(en.node, inputs, joinKeep = en.joinKeep),
+                        islandName,
+                    )
                 stripCteNamespace(raw)
             }
         }

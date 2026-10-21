@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://tatrman.org/schemas/ttrp/authoring-context/v1",
-  "title": "TTR-P authoring-context bundle (v1)",
-  "description": "Deterministic, prompt-ready serialization of a TTR-P document's authoring context (contracts \u00a77, C4-d/S8). Returned by ttrp/authoringContext; consumed by assist hosts + agents, paired with ttrp/validate in a generate\u2192validate\u2192repair loop. Every object is closed. The schema is FINAL; some content grows in later phases (capability node/function rosters, model objects, TTR-SQL/TTR-B grammar rosters, TTR-B diagnostics) \u2014 the fields are present now with the shapes pinned here.",
+  "$id": "https://tatrman.org/schemas/ttrp/authoring-context/v2",
+  "title": "TTR-P authoring-context bundle (v2)",
+  "description": "Deterministic, prompt-ready serialization of a TTR-P document's authoring context (contracts \u00a77, C4-d/S8). Returned by ttrp/authoringContext; consumed by assist hosts + agents, paired with ttrp/validate in a generate\u2192validate\u2192repair loop. Every object is closed. The schema is FINAL; some content grows in later phases (capability node/function rosters, model objects, TTR-SQL/TTR-B grammar rosters, TTR-B diagnostics) \u2014 the fields are present now with the shapes pinned here. v2 (AU-core-P2 \u00b7 S2.4, AU contracts \u00a78) is additive \u2014 a v1 instance stays valid: recipeGrammar, automationObjects, world.writable, recipe (the recipe at the cursor).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -15,7 +15,10 @@
   ],
   "properties": {
     "version": {
-      "const": 1
+      "enum": [
+        1,
+        2
+      ]
     },
     "world": {
       "type": "object",
@@ -78,6 +81,29 @@
             "string",
             "null"
           ]
+        },
+        "writable": {
+          "type": "array",
+          "description": "v2: what a recipe's actions may write, per storage that declares `writable:` (D-65, D-76, D-79) \u2014 an entity, an entity.attribute, or a glob, as written.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "storage",
+              "items"
+            ],
+            "properties": {
+              "storage": {
+                "type": "string"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -148,6 +174,215 @@
             "type": "array",
             "items": {
               "$ref": "#/$defs/column"
+            }
+          }
+        }
+      }
+    },
+    "automationObjects": {
+      "type": "array",
+      "description": "v2: the automation objects the imports bring into scope \u2014 def parameter (type, value), def action (columns, sinks, transition, approval), def role, def service (request/response schemas) \u2014 and the row schemas (def schema), sorted by kind then name.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "name"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "parameter",
+              "action",
+              "role",
+              "service",
+              "schema"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "type"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "optional": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "sinks": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "transition": {
+            "type": "string"
+          },
+          "approval": {
+            "type": "string"
+          },
+          "request": {
+            "type": "string"
+          },
+          "response": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "recipe": {
+      "type": "object",
+      "description": "v2: the recipe the cursor is in (present only then) \u2014 as written so far, with each context's class and the mode verdict once the recipe checker reaches them.",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "parameters",
+        "roles"
+      ],
+      "properties": {
+        "key": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "role"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "candidates",
+                  "context",
+                  "decision"
+                ]
+              },
+              "form": {
+                "type": "string",
+                "enum": [
+                  "target",
+                  "builtin",
+                  "foreign",
+                  "call",
+                  "turn"
+                ]
+              },
+              "class": {
+                "type": "string",
+                "enum": [
+                  "lookup",
+                  "per-candidate",
+                  "set-level"
+                ]
+              },
+              "routes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "per-candidate",
+            "set-level, windowed",
+            "set-level, batch-only"
+          ]
+        }
+      }
+    },
+    "recipeGrammar": {
+      "type": "object",
+      "description": "v2: the recipe block (AU contracts \u00a71) for assist \u2014 its statement summary, roles, island forms, switch parts, time vocabulary and the REC rows (the recipe checker's repair vocabulary; DOC rows join with AU-core-P3).",
+      "additionalProperties": false,
+      "required": [
+        "statementSummary",
+        "diagnostics"
+      ],
+      "properties": {
+        "statementSummary": {
+          "type": "string"
+        },
+        "roles": {
+          "$ref": "#/$defs/strings"
+        },
+        "islandForms": {
+          "$ref": "#/$defs/strings"
+        },
+        "switchModes": {
+          "$ref": "#/$defs/strings"
+        },
+        "routeAttributes": {
+          "$ref": "#/$defs/strings"
+        },
+        "timeOps": {
+          "$ref": "#/$defs/strings"
+        },
+        "durationUnits": {
+          "$ref": "#/$defs/strings"
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "suggestedAlternative": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
             }
           }
         }
@@ -369,6 +604,12 @@
     }
   },
   "$defs": {
+    "strings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "instance": {
       "type": "object",
       "additionalProperties": false,

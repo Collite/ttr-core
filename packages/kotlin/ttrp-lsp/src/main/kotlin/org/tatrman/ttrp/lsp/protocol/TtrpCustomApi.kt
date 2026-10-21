@@ -109,6 +109,11 @@ data class ValidateDiagnostic(
     val column: Int,
     val endLine: Int,
     val endColumn: Int,
+    /**
+     * AU-core-P2 · S2.4: the recipe block the finding sits in — a role container's or the decision's name, `actions`,
+     * or `recipe` for a header; absent outside a recipe (the generate→validate→repair loop repairs block by block).
+     */
+    val block: String? = null,
 )
 
 data class ValidateResult(

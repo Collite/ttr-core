@@ -306,6 +306,17 @@ data class TimeSugar(
 ) : SugarNode {
     override fun ports() = unaryDataPorts()
 
+    /** The column references written under the argument [name] (`per: item, stock.warehouse`), qualifiers kept. */
+    fun refsOf(name: String): List<ColumnRef> {
+        val out = mutableListOf<ColumnRef>()
+        var current: String? = null
+        for ((n, e) in args) {
+            if (n != null) current = n
+            if (current == name) (e as? ColumnRef)?.let { out += it }
+        }
+        return out
+    }
+
     /** The columns named under [name], positional continuations included (`per: item, warehouse` → both). */
     fun columnsOf(name: String): List<String> {
         val out = mutableListOf<String>()

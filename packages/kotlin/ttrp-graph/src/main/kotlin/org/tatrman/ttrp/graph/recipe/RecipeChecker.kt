@@ -35,8 +35,10 @@ import org.tatrman.ttrp.expr.TtrpType
 import org.tatrman.ttrp.graph.build.GraphBuilder
 import org.tatrman.ttrp.graph.model.Container
 import org.tatrman.ttrp.graph.model.Filter
+import org.tatrman.ttrp.graph.model.NodeExpressions
 import org.tatrman.ttrp.graph.model.PortDirection
 import org.tatrman.ttrp.graph.model.PortKind
+import org.tatrman.ttrp.graph.model.PortNames
 import org.tatrman.ttrp.graph.model.PortRef
 import org.tatrman.ttrp.graph.model.RecipeGraph
 import org.tatrman.ttrp.graph.model.Switch
@@ -124,13 +126,15 @@ class RecipeChecker(
         val candidatesRow = candidatesId?.let { id -> container(id)?.let { outRow(rows, it) } }
         checkCandidates(recipe, rg, candidatesRow, keyColumns)
 
-        val contexts = recipe.contexts.map { classify(it, rg, lineage) }
+        val contexts = recipe.contexts.map { classify(it, rg, lineage, rows) }
         val mode = modeOf(contexts)
         checkMode(recipe, contexts, mode, programs)
         checkWindowBy(recipe, rg, rows, keyColumns)
         checkDecisionLineage(rg, lineage, keyColumns)
 
         val routeRow = routeRows(rg, rows)
+        checkKeyCarried(recipe, rg, rows, contexts, routeRow, keyColumns)
+        checkRelationJoins(rg, rows)
         val routeOrigin =
             rg.switch?.let { rows.inputOrigin(it) }
                 ?: candidatesId?.takeIf { rg.decision == null }?.let { id ->
@@ -186,11 +190,56 @@ class RecipeChecker(
                             w.action,
                             w.args.associate { it.name to render(it.value) },
                             w.whenCondition != null,
+                            w.whenCondition?.let {
+                                org.tatrman.ttrp.expr.ExprText
+                                    .render(it)
+                            },
                         )
                     },
                 parameters = recipe.parameters.map { it.text },
                 mode = mode,
                 programs = programs.map { it.qname.name },
+                routeRow = routeRow,
+                calendarSkWithins = time.calendarSkWithins.toSet(),
+                dateArithmetic = time.dateArithmetic.toMap(),
+                elseNone = sw?.elseRoute?.let { it.name == null } ?: false,
+                kinds =
+                    recipe.roleContainers
+                        .map {
+                            when (it.form) {
+                                is IslandForm.Target -> "sql"
+                                is IslandForm.Builtin -> "builtin"
+                                is IslandForm.Foreign -> "foreign"
+                                is IslandForm.Call -> "call"
+                                is IslandForm.Turn -> "turn"
+                            }
+                        }.distinct()
+                        .sorted(),
+                programPackage =
+                    programs
+                        .firstOrNull()
+                        ?.qname
+                        ?.`package`
+                        ?.ifEmpty { null },
+                document = recipe.document,
+                asOf =
+                    when (val a = recipe.asOf) {
+                        org.tatrman.ttrp.ast.AsOf.Now -> "now"
+                        is org.tatrman.ttrp.ast.AsOf.Instant -> a.text
+                    },
+                protocol = recipe.protocol?.spelling ?: "always",
+                parameterDecls =
+                    recipe.parameters.map { p ->
+                        val decl = automation<AutomationParameter>().firstOrNull { it.qname.name == p.text }
+                        ParameterInfo(p.text, decl?.type, decl?.value?.let { autoValueText(it) })
+                    },
+                dryRuns =
+                    recipe.wirings
+                        .map { it.action }
+                        .distinct()
+                        .mapNotNull { a -> action(a)?.let { a to it.dryRun.byLanguage } }
+                        .filter { it.second.isNotEmpty() }
+                        .toMap(),
             )
         return Result(recipeModel, diags.toList())
     }
@@ -335,6 +384,92 @@ class RecipeChecker(
         }
     }
 
+    // ---- the key on every keyed output (REC-004, review-119 B4) ------------------------------------------
+
+    /**
+     * A per-candidate context's rows and the routes' rows are filtered on the run's key by the runner (D-135,
+     * AU-C-3), so each carries every key column under its own name — key lineage follows a rename (`order_number AS
+     * onum` stays per candidate), the runner's filter does not.
+     */
+    private fun checkKeyCarried(
+        recipe: RecipeDecl,
+        rg: RecipeGraph,
+        rows: RecipeRows,
+        contexts: List<ContextInfo>,
+        routeRow: Row?,
+        keyColumns: List<String>,
+    ) {
+        for (info in contexts.filter { it.contextClass == ContextClass.PER_CANDIDATE }) {
+            val role = recipe.contexts.firstOrNull { it.name == info.name } ?: continue
+            val row = rg.roles[info.name]?.let { container(it) }?.let { outRow(rows, it) } ?: continue
+            val missing = keyColumns.filter { it !in row.keys }
+            if (missing.isNotEmpty()) {
+                diags +=
+                    err(
+                        TtrpDiagnosticId.REC_004,
+                        "the context `${info.name}` is per candidate but its rows do not carry the key " +
+                            "`${missing.joinToString(", ")}` under that name — the runner filters them on it",
+                        role.location,
+                    )
+            }
+        }
+        val decision = recipe.decisions.firstOrNull() ?: return
+        val missing = keyColumns.filter { routeRow != null && it !in routeRow.keys }
+        if (missing.isNotEmpty()) {
+            diags +=
+                err(
+                    TtrpDiagnosticId.REC_004,
+                    "the rows entering `${decision.name}`'s switch do not carry the key `${missing.joinToString(
+                        ", ",
+                    )}` " +
+                        "under that name — every route's rows must",
+                    decision.location,
+                )
+        }
+    }
+
+    // ---- `on: relation R` over a port's rows (RES-004, review-119 m5) -----------------------------------------
+
+    /**
+     * A join whose condition is inferred from a relation reads the relation's attribute names on the side a port
+     * feeds (the other side is a `load` of the entity, read by its bound columns), so that side's rows must carry
+     * them — else the condition names a column no row has. The front half cannot tell: it does not know a role's
+     * input rows. Only the names are checked, not that the rows ARE the relation's entity: 17's return lines carry
+     * the request's `customer` for `rel_line_customer`.
+     */
+    private fun checkRelationJoins(
+        rg: RecipeGraph,
+        rows: RecipeRows,
+    ) {
+        for ((joinId, relation) in rg.relationJoins) {
+            val join = graph.nodes[joinId] as? org.tatrman.ttrp.graph.model.Join ?: continue
+            val on = join.on ?: continue
+            for (side in listOf(PortNames.LEFT, PortNames.RIGHT)) {
+                val feed = rows.feed(PortRef(joinId, side)) ?: continue
+                if (graph.nodes[feed.nodeId] is org.tatrman.ttrp.graph.model.Load) continue
+                val row = rows.of(feed) ?: continue
+                val missing =
+                    NodeExpressions
+                        .walk(on)
+                        .filterIsInstance<ColumnRef>()
+                        .filter { it.port == side && it.column !in row.keys }
+                        .map { it.column }
+                        .distinct()
+                if (missing.isNotEmpty()) {
+                    diags +=
+                        err(
+                            TtrpDiagnosticId.RES_004,
+                            "`on: relation $relation` joins on `${missing.joinToString(
+                                "`, `",
+                            )}`, which the $side rows " +
+                                "do not carry — they are not that relation's rows; write the `on:` condition",
+                            join.location,
+                        )
+                }
+            }
+        }
+    }
+
     // ---- candidates (REC-004 compile half, REC-005) ------------------------------------------------------
 
     private fun checkCandidates(
@@ -388,6 +523,7 @@ class RecipeChecker(
         role: RoleContainer,
         rg: RecipeGraph,
         lineage: KeyLineage,
+        rows: RecipeRows,
     ): ContextInfo {
         val kind =
             when (val f = role.form) {
@@ -410,7 +546,7 @@ class RecipeChecker(
                 else -> ContextClass.LOOKUP
             }
         val lost = out.lostAt.takeIf { cls == ContextClass.SET_LEVEL }
-        return ContextInfo(role.name, kind, cls, role.window, lost?.what, lost?.location)
+        return ContextInfo(role.name, kind, cls, role.window, lost?.what, lost?.location, c?.let { outRow(rows, it) })
     }
 
     private fun modeOf(contexts: List<ContextInfo>): RecipeMode {
@@ -1184,24 +1320,31 @@ class RecipeChecker(
         c: Container,
     ): Map<String, String>? = outPort(c)?.let { rows.origin(PortRef(c.id, it)) }
 
+    /** A `def parameter`'s value as written — what manifest v3 records and the `values` fingerprint hashes (D-13). */
+    private fun autoValueText(v: org.tatrman.ttr.parser.model.AutoValue): String? =
+        when (v) {
+            is org.tatrman.ttr.parser.model.AutoValue.Str -> v.raw
+            is org.tatrman.ttr.parser.model.AutoValue.Num -> v.text
+            is org.tatrman.ttr.parser.model.AutoValue.Bool -> v.raw.toString()
+            // the amount as written (`2.5 days` stays 2.5 — review-119 m7)
+            is org.tatrman.ttr.parser.model.AutoValue.Duration ->
+                (if (v.amount % 1.0 == 0.0) v.amount.toLong().toString() else v.amount.toString()) + " ${v.unit}"
+            is org.tatrman.ttr.parser.model.AutoValue.Id -> v.parts.joinToString(".")
+            else -> null
+        }
+
+    /** A wiring value in TTR-P's spelling, a call with its arguments (manifest v3 `wiring[].columns`). */
     private fun render(v: WiringValue): String =
         when (v) {
             is WiringValue.Expr ->
-                when (val e = v.expression) {
-                    is ColumnRef -> (e.port?.let { "$it." } ?: "") + e.column
-                    is Literal ->
-                        when (val l = e.value) {
-                            is LiteralValue.Str -> "\"${l.value}\""
-                            is LiteralValue.Num -> l.raw
-                            is LiteralValue.Bool -> l.value.toString()
-                            LiteralValue.Null -> "null"
-                        }
-                    is org.tatrman.ttrp.expr.DurationLiteral -> "${e.amount} ${e.unit.spelling}"
-                    is org.tatrman.ttrp.expr.DurationParam -> "${e.unit.spelling}(:${e.param})"
-                    else -> "…"
+                org.tatrman.ttrp.expr.ExprText
+                    .render(v.expression)
+            is WiringValue.Values ->
+                v.items.joinToString(", ") {
+                    org.tatrman.ttrp.expr.ExprText
+                        .render(it)
                 }
-            is WiringValue.Values -> v.items.joinToString(", ") { render(WiringValue.Expr(it, it.location)) }
-            is WiringValue.Call -> "${v.action} { … }"
+            is WiringValue.Call -> "${v.action} { ${v.args.joinToString(", ") { "${it.name}: ${render(it.value)}" }} }"
         }
 
     private fun literalType(v: LiteralValue): TtrpType? =
@@ -1248,7 +1391,8 @@ class RecipeChecker(
 
         private val PERIODS = listOf("day", "week", "month")
 
-        private val FILL = Regex("\\{([A-Za-z_][A-Za-z0-9_]*)}")
+        /** A `because:` fill — `{column}` or `{parameter}` (D-108); shared with the switch lowering (AU-core-P2). */
+        internal val FILL = Regex("\\{([A-Za-z_][A-Za-z0-9_]*)}")
 
         /** Every expression of a node the checker reads for `:name` and types. */
         fun nodeExpressions(n: org.tatrman.ttrp.graph.model.Node?): List<Expression> =

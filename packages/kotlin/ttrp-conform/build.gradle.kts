@@ -41,6 +41,8 @@ dependencies {
     // RJ-P0 divergence spike only (tag `Spike`, off by default): JDBC to the live ttrp-pg +
     // YAML corpus loader. Test scope — never leaks into the published conform artifact.
     testImplementation(libs.postgresql)
+    // AU-core-P2 · S2.4 — the recipe statements' second engine, embedded (RecipeDuckDbSpec; RecipeConform is JDBC-only).
+    testRuntimeOnly(libs.duckdb.jdbc)
     testImplementation(libs.snakeyaml)
     // MD dot-path S5-B write round-trip (tag `Spike`, off by default): lower an assignment to a
     // StoreNode (ttrp-emit) + unparse to DML (ttr-translator) + MD fixtures, then execute on live PG.

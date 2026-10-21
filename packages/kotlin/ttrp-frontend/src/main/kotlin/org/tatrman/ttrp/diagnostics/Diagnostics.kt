@@ -97,8 +97,8 @@ enum class TtrpDiagnosticId(
     ),
     REC_099(
         "TTRP-REC-099",
-        "a recipe parses and is checked by the AU toolchain, but compiles to a bundle only from AU-core-P2 " +
-            "(the recipe bundle, AU contracts §5) — until then build its islands as a plain program",
+        "the time sugar (`latest`, `within`, `working_days`, `age`) compiles with a recipe — move the op into a " +
+            "recipe's island, or spell it with the base ops",
     ),
 
     // ---- AU-core-P1 — the recipe checker (AU contracts §4): roles, wiring, parameters, key lineage, time ----
@@ -154,6 +154,13 @@ enum class TtrpDiagnosticId(
         "TTRP-REC-070",
         "write the decision as a canonical body ending in a `switch`; SQL, foreign code, services and agents " +
             "belong in a `context`",
+    ),
+
+    // ---- AU-core-P2 — the recipe compile (review-119 M5): what `ttrp build` refuses, `check` and validate say ----
+    REC_080(
+        "TTRP-REC-080",
+        "the island's output does not compile to a statement the door runs — restate it with what the message " +
+            "names (a column the row carries, a whole-WHERE `IN`/`EXISTS`, a `target` island)",
     ),
     PRS_007(
         "TTRP-PRS-007",
