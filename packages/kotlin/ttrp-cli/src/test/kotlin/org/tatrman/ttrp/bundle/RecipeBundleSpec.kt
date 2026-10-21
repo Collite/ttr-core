@@ -4,6 +4,7 @@ package org.tatrman.ttrp.bundle
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
@@ -11,6 +12,7 @@ import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldMatch
 import io.kotest.matchers.string.shouldStartWith
 import org.tatrman.ttr.metadata.model.ModelDescriptor
@@ -217,8 +219,96 @@ class RecipeBundleSpec :
             RecipeFingerprints.of(changed, changed.recipe!!, "always", "now").text shouldNotBe fp.text
         }
 
+        "fingerprints: a window is logic, and so is a context's own `verdict_reason` (review-119 B3)" {
+            val head =
+                "uses world \"hartland.worlds.demo\"\nimport hartland.*\nimport hartland.automation.*\nrecipe {\n" +
+                    "key: order.order_number\n" +
+                    "candidates placed(out orders) target erp \"\"\"sql\n" +
+                    "SELECT o.order_number, o.customer, o.channel, o.value FROM er.entity.order o\n\"\"\"\n"
+            val tail =
+                "decision v(in orders, in c) { orders -> switch { go: value > 0  because: \"x\" } }\n" +
+                    "actions { v.go -> release { order: order_number } }\n}\n"
+
+            fun text(context: String): String {
+                // not `release_order.ttrp`: its `port: key` program would refuse a windowed recipe (REC-012)
+                val p = TtrpPipeline(manifest, fixtures.resolve("model")).plan("$head$context\n$tail", "fp_probe.ttrp")
+                withClue(p.diagnostics.joinToString("\n")) { p.ok shouldBe true }
+                return RecipeFingerprints.of(p, p.recipe!!, "always", "now").text
+            }
+
+            fun windowed(window: String) =
+                text(
+                    "context c(in orders, out rows) target erp window { $window } {\n" +
+                        "orders -> aggregate { group_by: customer  n = count(order_number) } -> rows\n}",
+                )
+            val day = windowed("by: customer over: day")
+            windowed("by: customer over: week") shouldNotBe day
+            windowed("by: customer over: rows: 5") shouldNotBe day
+            windowed("by: customer over: day") shouldBe day
+
+            // the name `verdict_reason` is reserved on the switch's input row only — a context's own is its logic
+            fun ownReason(threshold: String) =
+                text(
+                    "context c(in orders, out rows) target erp {\n" +
+                        "orders -> calc(verdict_reason = (value > $threshold)) -> filter(verdict_reason) " +
+                        "-> select(order_number) -> rows\n}",
+                )
+            ownReason("1000000") shouldNotBe ownReason("100")
+        }
+
+        "kinds: one sorted list in manifest and catalog; `else: none` is \"none\" (review-119 M4, m3)" {
+            for (f in listOf("release_order.ttrp", "decide_return.ttrp", "monitor_inbound.ttrp", "settle.ttrp")) {
+                val r = build(f)
+                r.manifest.recipe!!.kinds shouldContainExactly listOf("sql")
+                Files.readString(r.dir.resolve("catalog/${f.removeSuffix(".ttrp")}.ttrm")) shouldContain
+                    "kinds: [\"sql\"]"
+            }
+            build("monitor_inbound.ttrp")
+                .manifest.recipe!!
+                .roles.elseRoute shouldBe "none"
+            build("decide_return.ttrp")
+                .manifest.recipe!!
+                .roles.elseRoute shouldBe "refund_after_return"
+            build("settle.ttrp")
+                .manifest.recipe!!
+                .roles.elseRoute shouldBe null
+        }
+
+        "the detail entity's own columns win over a detail context's `run` / `row_no` (review-119 m4)" {
+            val base = Files.readString(fixtures.resolve("base-order.ttrp"))
+            val src =
+                base.replace(
+                    "SELECT o.order_number, i.invoice_id FROM orders o",
+                    "SELECT o.order_number, i.invoice_id, i.issued AS run, i.amount AS row_no FROM orders o",
+                )
+            (src != base) shouldBe true
+            val r = build("detail_probe.ttrp", src)
+            val catalog = Files.readString(r.dir.resolve("catalog/detail_probe_verdict.ttrm"))
+            val detail = catalog.substringAfter("def entity detail_probe_verdict_detail").substringBefore("def entity")
+            val attrs = Regex("""def attribute (\w+)""").findAll(detail).map { it.groupValues[1] }.toList()
+            attrs shouldBe attrs.distinct()
+            attrs shouldContain "invoice_id"
+            attrs.count { it == "run" } shouldBe 1
+            attrs.count { it == "row_no" } shouldBe 1
+        }
+
+        "a `dry_run:` text moves `labels` only (review-119 m7, D-125)" {
+            val base = plan(source("release_order.ttrp"))
+            val fp = RecipeFingerprints.of(base, base.recipe!!, "always", "now")
+            base.recipe!!.dryRuns.keys shouldContain "release"
+            val reworded =
+                base.recipe!!.copy(
+                    dryRuns = base.recipe!!.dryRuns.mapValues { (_, t) -> t.mapValues { "${it.value}!" } },
+                )
+            RecipeFingerprints.of(base, reworded, "always", "now").let {
+                it.text shouldBe fp.text
+                it.values shouldBe fp.values
+                it.labels shouldNotBe fp.labels
+            }
+        }
+
         "a build is deterministic: two builds write the same bytes" {
-            for (f in listOf("release_order.ttrp", "settle.ttrp")) {
+            for (f in listOf("release_order.ttrp", "decide_return.ttrp", "monitor_inbound.ttrp", "settle.ttrp")) {
                 val a = build(f)
                 val b = build(f)
                 a.manifest.files shouldBe b.manifest.files

@@ -234,6 +234,16 @@ class ConformCommand : CliktCommand(name = "conform") {
             planned.diagnostics.filter { it.severity.name == "ERROR" }.forEach { echo(it.render(), err = true) }
             throw ProgramResult(2)
         }
+        // … and so does one whose islands do not compile (`ttrp check`'s REC-080, review-119 M5)
+        if (planned.ok && planned.recipe != null) {
+            val refused =
+                org.tatrman.ttrp.bundle.RecipeBundleCheck
+                    .check(planned)
+            if (refused.isNotEmpty()) {
+                refused.forEach { echo(it.render(), err = true) }
+                throw ProgramResult(2)
+            }
+        }
         val recipePlan = planned.takeIf { it.ok && it.recipe != null }
         if (recipePlan != null) {
             val instant =

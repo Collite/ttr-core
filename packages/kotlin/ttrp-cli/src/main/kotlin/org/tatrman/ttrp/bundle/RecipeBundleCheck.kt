@@ -40,7 +40,28 @@ object RecipeBundleCheck {
                     located(c.name) ?: continue,
                 )
         }
-        for ((island, e) in RecipeStatements.failures(plan, skip = unbundled.map { it.name }.toSet())) {
+        // an island inlines the cone it reads, so an island upstream that fails (or is not bundled) fails every island
+        // downstream of it too — the finding is the upstream one's alone. An island reads the island owning the node
+        // that feeds its IN port, or — a role reads a role by its name (`in overdue`) — the island that port names.
+        val owner = exec.islands.flatMap { i -> (i.memberIds + i.id).map { it to i.name } }.toMap()
+        val names = exec.islands.map { it.name }.toSet()
+        val reads =
+            exec.islands.associate { i ->
+                i.name to
+                    graph.edges
+                        .filter { it.to.nodeId == i.id }
+                        .flatMap { listOfNotNull(owner[it.from.nodeId], it.to.port.takeIf { p -> p in names }) }
+                        .filter { it != i.name }
+                        .toSet()
+            }
+        val failures = RecipeStatements.failures(plan, skip = unbundled.map { it.name }.toSet())
+        val broken = failures.keys + unbundled.map { it.name }
+
+        fun upstreamBroken(
+            island: String,
+            seen: Set<String> = emptySet(),
+        ): Boolean = reads[island].orEmpty().any { it !in seen && (it in broken || upstreamBroken(it, seen + island)) }
+        for ((island, e) in failures.filterKeys { !upstreamBroken(it) }) {
             out +=
                 TtrpDiagnostic(
                     TtrpDiagnosticId.REC_080,

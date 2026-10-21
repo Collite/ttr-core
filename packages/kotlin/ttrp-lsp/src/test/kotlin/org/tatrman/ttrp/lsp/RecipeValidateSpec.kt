@@ -82,6 +82,33 @@ class RecipeValidateSpec :
             broken.lines()[e.line - 1] shouldContain "departmnt"
         }
 
+        // review-119 M5: the loop never reads "clean" for a recipe the build cannot bundle
+        "a fragment column no row carries: REC-080 in the context's block — what `ttrp build` refuses, once" {
+            val broken = h1.replace("i.status = 'open'", "i.statuss = 'open'")
+            (broken != h1) shouldBe true
+            val e = errors(broken).single()
+            e.code shouldBe "TTRP-REC-080"
+            e.block shouldBe "overdue"
+            e.message shouldContain "statuss"
+        }
+
+        "a `turn` island: REC-080 — a recipe bundle runs SQL statements only" {
+            val turn =
+                h1.replace(
+                    Regex(
+                        """context overdue\(in orders, out rows\) target erp ""${'"'}sql.*?""${'"'}""",
+                        RegexOption.DOT_MATCHES_ALL,
+                    ),
+                    "context overdue(in orders, out rows) turn agents.care ask \"Any overdue invoices?\" answer care_answer",
+                )
+            (turn != h1) shouldBe true
+            // the decision reading it is not reported again
+            errors(turn).single().let {
+                it.code shouldBe "TTRP-REC-080"
+                it.block shouldBe "overdue"
+            }
+        }
+
         "a program (no recipe) validates as before: no block on its findings" {
             val program = "uses world \"hartland.worlds.demo\"\nx = load(nope)\n"
             validate(program).forEach { it.block shouldBe null }

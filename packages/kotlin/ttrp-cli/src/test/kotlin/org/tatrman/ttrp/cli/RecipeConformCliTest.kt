@@ -45,7 +45,7 @@ class RecipeConformCliTest :
         test("one engine: every statement runs on DuckDB, each output's rows counted") {
             val r = ttrp().test("conform $recipe --engines duckdb $fixtureArgs --as-of 2026-11-02T08:00")
             r.statusCode shouldBe 0
-            r.stdout shouldContain "settlement.money_overdue: 1 row(s)"
+            r.stdout shouldContain "settlement.money_overdue: 2 row(s)"
             r.stdout shouldContain "settlement.closed: 2 row(s)"
         }
 

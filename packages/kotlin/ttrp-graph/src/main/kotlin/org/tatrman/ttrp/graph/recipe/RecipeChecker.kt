@@ -35,8 +35,10 @@ import org.tatrman.ttrp.expr.TtrpType
 import org.tatrman.ttrp.graph.build.GraphBuilder
 import org.tatrman.ttrp.graph.model.Container
 import org.tatrman.ttrp.graph.model.Filter
+import org.tatrman.ttrp.graph.model.NodeExpressions
 import org.tatrman.ttrp.graph.model.PortDirection
 import org.tatrman.ttrp.graph.model.PortKind
+import org.tatrman.ttrp.graph.model.PortNames
 import org.tatrman.ttrp.graph.model.PortRef
 import org.tatrman.ttrp.graph.model.RecipeGraph
 import org.tatrman.ttrp.graph.model.Switch
@@ -132,6 +134,7 @@ class RecipeChecker(
 
         val routeRow = routeRows(rg, rows)
         checkKeyCarried(recipe, rg, rows, contexts, routeRow, keyColumns)
+        checkRelationJoins(rg, rows)
         val routeOrigin =
             rg.switch?.let { rows.inputOrigin(it) }
                 ?: candidatesId?.takeIf { rg.decision == null }?.let { id ->
@@ -422,6 +425,48 @@ class RecipeChecker(
                         "under that name — every route's rows must",
                     decision.location,
                 )
+        }
+    }
+
+    // ---- `on: relation R` over a port's rows (RES-004, review-119 m5) -----------------------------------------
+
+    /**
+     * A join whose condition is inferred from a relation reads the relation's attribute names on the side a port
+     * feeds (the other side is a `load` of the entity, read by its bound columns), so that side's rows must carry
+     * them — else the condition names a column no row has. The front half cannot tell: it does not know a role's
+     * input rows. Only the names are checked, not that the rows ARE the relation's entity: 17's return lines carry
+     * the request's `customer` for `rel_line_customer`.
+     */
+    private fun checkRelationJoins(
+        rg: RecipeGraph,
+        rows: RecipeRows,
+    ) {
+        for ((joinId, relation) in rg.relationJoins) {
+            val join = graph.nodes[joinId] as? org.tatrman.ttrp.graph.model.Join ?: continue
+            val on = join.on ?: continue
+            for (side in listOf(PortNames.LEFT, PortNames.RIGHT)) {
+                val feed = rows.feed(PortRef(joinId, side)) ?: continue
+                if (graph.nodes[feed.nodeId] is org.tatrman.ttrp.graph.model.Load) continue
+                val row = rows.of(feed) ?: continue
+                val missing =
+                    NodeExpressions
+                        .walk(on)
+                        .filterIsInstance<ColumnRef>()
+                        .filter { it.port == side && it.column !in row.keys }
+                        .map { it.column }
+                        .distinct()
+                if (missing.isNotEmpty()) {
+                    diags +=
+                        err(
+                            TtrpDiagnosticId.RES_004,
+                            "`on: relation $relation` joins on `${missing.joinToString(
+                                "`, `",
+                            )}`, which the $side rows " +
+                                "do not carry — they are not that relation's rows; write the `on:` condition",
+                            join.location,
+                        )
+                }
+            }
         }
     }
 

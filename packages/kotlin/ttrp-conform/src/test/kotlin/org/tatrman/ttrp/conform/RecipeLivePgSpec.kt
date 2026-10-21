@@ -5,7 +5,6 @@ import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import org.tatrman.ttrp.emit.recipe.RecipeStatements
-import java.net.URI
 
 /**
  * AU-core-P2 · S2.1 T6 / S2.2 T6 / S2.4 T1 — the four `17` recipes compiled and **run**: every statement of every
@@ -21,21 +20,14 @@ import java.net.URI
  */
 class RecipeLivePgSpec :
     FunSpec({
-        val enabled = System.getenv("TTRP_CONFORM_PG") == "1"
-        val erpPg = System.getenv("TTR_CONN_ERP_PG")?.let { URI(it) }
-        val userInfo = erpPg?.userInfo?.split(":", limit = 2)
-        val server =
-            erpPg?.let { "jdbc:postgresql://${it.host}:${if (it.port > 0) it.port else 5432}" }
-                ?: System.getProperty("spike.pg.server", "jdbc:postgresql://localhost:55432")
-        val user = userInfo?.getOrNull(0) ?: System.getProperty("spike.pg.user", "postgres")
-        val password = userInfo?.getOrNull(1) ?: System.getProperty("spike.pg.password", "ttrp")
+        val enabled = RecipePlanted.pgEnabled
 
         lateinit var pg: PostgresRecipeEngine
         lateinit var duck: DuckDbRecipeEngine
 
         beforeSpec {
             if (!enabled) return@beforeSpec
-            pg = PostgresRecipeEngine(server, user, password, "ttrp_recipes", RecipePlanted.scripts)
+            pg = RecipePlanted.pgEngine("ttrp_recipes")
             duck = DuckDbRecipeEngine(RecipePlanted.scripts)
         }
 

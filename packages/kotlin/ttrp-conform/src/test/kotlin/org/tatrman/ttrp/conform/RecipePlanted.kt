@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttrp.conform
 
+import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import org.tatrman.ttrp.graph.TtrpPipeline
 import org.tatrman.ttrp.project.TtrpManifest
 import java.nio.file.Files
+import java.net.URI
 import java.nio.file.Path
 import java.time.LocalDateTime
 
@@ -48,10 +50,36 @@ object RecipePlanted {
         listOf(Files.readString(sample.resolve("schema.sql")), Files.readString(sample.resolve("sample.sql")))
     }
 
-    fun plan(name: String): TtrpPipeline.PlanResult {
-        val plan = pipeline.plan(Files.readString(recipes.resolve(name)), name)
-        plan.ok shouldBe true
+    fun plan(name: String): TtrpPipeline.PlanResult = planSource(Files.readString(recipes.resolve(name)), name)
+
+    /** [source] planned against the fixture model, which must check clean. */
+    fun planSource(
+        source: String,
+        name: String = "probe.ttrp",
+    ): TtrpPipeline.PlanResult {
+        val plan = pipeline.plan(source, name)
+        withClue(plan.diagnostics.joinToString("\n")) { plan.ok shouldBe true }
         return plan
+    }
+
+    /**
+     * Postgres, when `TTRP_CONFORM_PG=1`: the server from `TTR_CONN_ERP_PG` (`postgresql://user:pass@host:port/db`),
+     * else the local ttrp-pg container (`spike.pg.*`, localhost:55432); a scratch [database] with [fixtures] loaded.
+     */
+    val pgEnabled = System.getenv("TTRP_CONFORM_PG") == "1"
+
+    fun pgEngine(
+        database: String,
+        fixtures: List<String> = scripts,
+    ): PostgresRecipeEngine {
+        val erpPg = System.getenv("TTR_CONN_ERP_PG")?.let { URI(it) }
+        val userInfo = erpPg?.userInfo?.split(":", limit = 2)
+        val server =
+            erpPg?.let { "jdbc:postgresql://${it.host}:${if (it.port > 0) it.port else 5432}" }
+                ?: System.getProperty("spike.pg.server", "jdbc:postgresql://localhost:55432")
+        val user = userInfo?.getOrNull(0) ?: System.getProperty("spike.pg.user", "postgres")
+        val password = userInfo?.getOrNull(1) ?: System.getProperty("spike.pg.password", "ttrp")
+        return PostgresRecipeEngine(server, user, password, database, fixtures)
     }
 
     /** [run]'s outputs as rows (column → value), every statement having run. */
@@ -114,7 +142,8 @@ object RecipePlanted {
                 keys(r["inbound.complete"], "line_id") shouldContainExactlyInAnyOrder listOf(913)
                 keys(r["inbound.damaged"], "line_id") shouldContainExactlyInAnyOrder listOf(914)
                 keys(r["inbound.expired"], "line_id") shouldContainExactlyInAnyOrder listOf(912)
-                keys(r["inbound.remind"], "line_id") shouldContainExactlyInAnyOrder listOf(911)
+                // 916: created at midnight 30 days back — the days are `(a, b]`, so not yet expired (review-119 m1)
+                keys(r["inbound.remind"], "line_id") shouldContainExactlyInAnyOrder listOf(911, 916)
                 keys(r["inbound.complete.receipts"], "line_id") shouldContainExactlyInAnyOrder listOf(913)
                 keys(r["inbound.damaged.receipts"], "line_id") shouldContainExactlyInAnyOrder listOf(914)
                 r.keys.none { it.endsWith(".else") } shouldBe true
@@ -123,14 +152,17 @@ object RecipePlanted {
                 keys(r["settlement.credit_note_issued"], "line_id") shouldContainExactlyInAnyOrder listOf(923)
                 keys(r["settlement.money_received"], "line_id") shouldContainExactlyInAnyOrder listOf(923)
                 keys(r["settlement.goods_shipped"], "line_id") shouldContainExactlyInAnyOrder listOf(922)
-                keys(r["settlement.money_overdue"], "line_id") shouldContainExactlyInAnyOrder listOf(921)
+                keys(r["settlement.money_overdue"], "line_id") shouldContainExactlyInAnyOrder listOf(921, 924)
                 keys(r["settlement.goods_overdue"], "line_id").shouldBeEmpty()
                 keys(r["settlement.closed"], "line_id") shouldContainExactlyInAnyOrder listOf(922, 923)
                 keys(r["settlement.money_overdue.open_obligations"], "line_id") shouldContainExactlyInAnyOrder
-                    listOf(921)
+                    listOf(921, 924)
+                val late = r.getValue("settlement.money_overdue").associateBy { (it["line_id"] as Number).toInt() }
                 // 25 Oct → 2 Nov: 26, 27, 29, 30 Oct and 2 Nov (the 28th is a holiday, the 31st and 1st the weekend)
-                r.getValue("settlement.money_overdue").single()["verdict_reason"] shouldBe "refund 5 working days late"
-                keys(r["overdue_days.rows"], "line_id") shouldContainExactlyInAnyOrder listOf(921, 922, 923)
+                late.getValue(921)["verdict_reason"] shouldBe "refund 5 working days late"
+                // 27 Oct (a working day) → 2 Nov: 29, 30 Oct and 2 Nov — the 27th itself is not counted, `(a, b]`
+                late.getValue(924)["verdict_reason"] shouldBe "refund 3 working days late"
+                keys(r["overdue_days.rows"], "line_id") shouldContainExactlyInAnyOrder listOf(921, 922, 923, 924)
             }
             else -> error("no planted keys for $recipe")
         }

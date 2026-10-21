@@ -58,6 +58,20 @@ class SevenPointComparatorTest :
             point(cmp.compare(bad, bad), 3).pass shouldBe false
         }
 
+        test("a tolerance never lets decimal meet float64; only a declared engine numeric delta does (review-119 m9)") {
+            val dec = table(listOf(col("share", "decimal(38,20)")), listOf(BigDecimal("0.68965517241379310345")))
+            val dbl = table(listOf(col("share", "float64")), listOf(0.6896551724137931))
+            SevenPointComparator(tolerances = mapOf("share" to 1e-12)).compare(dec, dbl).pass shouldBe false
+            SevenPointComparator(numericDeltas = mapOf("share" to 1e-12)).compare(dec, dbl).pass shouldBe true
+            // the delta bounds the difference: 0.6896 is 5.5e-5 away
+            val far = table(listOf(col("share", "float64")), listOf(0.6896))
+            SevenPointComparator(numericDeltas = mapOf("share" to 1e-12)).compare(dec, far).pass shouldBe false
+            // and it names its column: another decimal ⇄ float64 column still fails Q9-1
+            val other = table(listOf(col("ratio", "decimal(38,20)")), listOf(BigDecimal("0.5")))
+            val otherDbl = table(listOf(col("ratio", "float64")), listOf(0.5))
+            SevenPointComparator(numericDeltas = mapOf("share" to 1e-12)).compare(other, otherDbl).pass shouldBe false
+        }
+
         test("Q9-4 numerics: decimals compare exactly; a scale-diff-but-equal decimal still matches") {
             val cols = listOf(col("amount", "decimal(19,2)"))
             val a = table(cols, listOf(BigDecimal("10.50")))

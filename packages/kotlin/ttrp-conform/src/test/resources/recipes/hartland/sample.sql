@@ -83,7 +83,7 @@ INSERT INTO warehouse_outage (wo_warehouse_sk, wo_from_date, wo_to_date, wo_reas
 -- 901 refund_no_return (order 11, delivered 2026-10-20, damaged, 10.00 < 15) · 902 reject_late (order 12, delivered
 -- 2026-09-01, before 2026-10-03) · 903 reject_not_ours (order 99 does not exist) · 904 refund_after_return (an
 -- exchange for 103, of which center 1 has 0) · 905 to_customer_care (request 805 is worth 600 > 500; customer 10
--- returned 670 of 2 197 bought this year — 0.30) · 906 reject_abuse (customer 20 returns 20 of 29 bought — 0.69) ·
+-- returned 690 of 2 197 bought this year — 0.31) · 906 reject_abuse (customer 20 returns 20 of 29 bought — 0.69) ·
 -- 907 reject_not_ours (order 11 exists and was delivered, but carries no item 103 — the LEFT JOIN's right key is NULL,
 -- review-119 B1).
 INSERT INTO return_request (rr_request_number, rr_customer_sk, rr_order_number, rr_channel, rr_requested_date, rr_state) VALUES
@@ -99,9 +99,11 @@ INSERT INTO return_request (rr_request_number, rr_customer_sk, rr_order_number, 
     (813, 10, 11, 'web', DATE '2026-10-05', 'decided'),
     (814, 10, 11, 'web', DATE '2026-10-05', 'decided'),
     (815, 10, 11, 'web', DATE '2026-10-30', 'decided'),
+    (816, 10, 11, 'web', DATE '2026-10-03', 'decided'),
     (821, 10, 11, 'web', DATE '2026-10-15', 'decided'),
     (822, 10, 11, 'web', DATE '2026-10-15', 'decided'),
-    (823, 10, 11, 'web', DATE '2026-10-15', 'decided');
+    (823, 10, 11, 'web', DATE '2026-10-15', 'decided'),
+    (824, 10, 11, 'web', DATE '2026-10-20', 'decided');
 
 INSERT INTO return_request_line (rl_line_id, rl_request_number, rl_line_no, rl_item_sk, rl_quantity, rl_unit_price, rl_reason, rl_requested_resolution, rl_requested_variant_sk, rl_state, rl_way, rl_customer_sk) VALUES
     (901, 801, 1, 101, 1, 10.00, 'damaged', 'refund', NULL, 'received', NULL, 10),
@@ -117,27 +119,34 @@ INSERT INTO return_request_line (rl_line_id, rl_request_number, rl_line_no, rl_i
     (913, 813, 1, 101, 1, 10.00, 'wrong_size', 'exchange', 103, 'awaiting_goods', 'exchange', 10),
     (914, 814, 1, 101, 1, 10.00, 'wrong_size', 'refund', NULL, 'awaiting_goods', 'refund_after_return', 10),
     (915, 815, 1, 101, 1, 10.00, 'wrong_size', 'refund', NULL, 'awaiting_goods', 'refund_after_return', 10),
+    (916, 816, 1, 101, 1, 10.00, 'wrong_size', 'refund', NULL, 'awaiting_goods', 'refund_after_return', 10),
     -- settle (R2c): settling, or the goods back
     (921, 821, 1, 101, 1, 10.00, 'damaged', 'refund', NULL, 'settling', 'refund_no_return', 10),
     (922, 822, 1, 101, 1, 10.00, 'damaged', 'replacement', NULL, 'settling', 'replacement_no_return', 10),
-    (923, 823, 1, 101, 1, 10.00, 'wrong_size', 'refund', NULL, 'goods_received', 'refund_after_return', 10);
+    (923, 823, 1, 101, 1, 10.00, 'wrong_size', 'refund', NULL, 'goods_received', 'refund_after_return', 10),
+    (924, 824, 1, 101, 1, 10.00, 'damaged', 'refund', NULL, 'settling', 'refund_no_return', 10);
 
 -- ---- monitor_inbound (R2b) — lines 911–915 -------------------------------------------------------------------
 -- 911 remind (open 28 days > 14, never reminded) · 912 expired (open 32 days > 30) · 913 complete (1 of 1 back ok) ·
--- 914 damaged (the one back is damaged) · 915 nothing (open 3 days: `else: none`, no verdict row).
+-- 914 damaged (the one back is damaged) · 915 nothing (open 3 days: `else: none`, no verdict row) · 916 remind (created
+-- at MIDNIGHT 2026-10-03: the days in (10-03, 11-02] are 30, not > 30 — counting 10-03 too, `[a, b]`, would make it
+-- 31 and expired; review-119 m1).
 -- ---- settle (R2c) — lines 921–923 ----------------------------------------------------------------------------
 -- 921 money_overdue (a refund with no payment; its credit-note obligation fell due 2026-10-25 — 5 working days
 -- late) · 922 goods_shipped + closed (its replacement shipped 2026-10-31) · 923 credit_note_issued + money_received +
--- closed (note 3001, paid 2026-11-01).
+-- closed (note 3001, paid 2026-11-01) · 924 money_overdue (its credit note fell due Tuesday 2026-10-27, a WORKING
+-- day: 29, 30 Oct and 2 Nov — 3 working days late; counting the 27th too, `[a, b]`, would make it 4; review-119 m1).
 INSERT INTO obligation (id, recipe, run, entity, key, kind, due, state, created_at) VALUES
     ('ob-911', 'decide_return', 'r0', 'return_request_line', '911', 'inbound', DATE '2026-11-10', 'open', TIMESTAMP '2026-10-05 09:00'),
     ('ob-912', 'decide_return', 'r0', 'return_request_line', '912', 'inbound', DATE '2026-11-10', 'open', TIMESTAMP '2026-10-01 09:00'),
     ('ob-913', 'decide_return', 'r0', 'return_request_line', '913', 'inbound', DATE '2026-11-10', 'open', TIMESTAMP '2026-10-05 09:00'),
     ('ob-914', 'decide_return', 'r0', 'return_request_line', '914', 'inbound', DATE '2026-11-10', 'open', TIMESTAMP '2026-10-05 09:00'),
     ('ob-915', 'decide_return', 'r0', 'return_request_line', '915', 'inbound', DATE '2026-11-10', 'open', TIMESTAMP '2026-10-30 09:00'),
+    ('ob-916', 'decide_return', 'r0', 'return_request_line', '916', 'inbound', DATE '2026-11-10', 'open', TIMESTAMP '2026-10-03 00:00'),
     ('ob-921', 'decide_return', 'r0', 'return_request_line', '921', 'credit_note', DATE '2026-10-25', 'open', TIMESTAMP '2026-10-15 09:00'),
     ('ob-922', 'decide_return', 'r0', 'return_request_line', '922', 'replacement', DATE '2026-11-05', 'open', TIMESTAMP '2026-10-15 09:00'),
-    ('ob-923', 'monitor_inbound', 'r0', 'return_request_line', '923', 'payment', DATE '2026-11-03', 'open', TIMESTAMP '2026-10-30 09:00');
+    ('ob-923', 'monitor_inbound', 'r0', 'return_request_line', '923', 'payment', DATE '2026-11-03', 'open', TIMESTAMP '2026-10-30 09:00'),
+    ('ob-924', 'decide_return', 'r0', 'return_request_line', '924', 'credit_note', DATE '2026-10-27', 'open', TIMESTAMP '2026-10-20 09:00');
 
 INSERT INTO return_receipt (rc_receipt_id, rc_line_id, rc_received_date, rc_item_sk, rc_quantity, rc_condition) VALUES
     (1, 913, DATE '2026-10-30', 101, 1, 'ok'),
