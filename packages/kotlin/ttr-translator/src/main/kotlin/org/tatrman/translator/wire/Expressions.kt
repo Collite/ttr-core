@@ -663,6 +663,12 @@ object Expressions {
     ): RexNode {
         val operator = operatorFor(fn.operation, catalog)
         val operands = fn.operandsList.map { decode(builder, it, catalog) }
+        // `in` over a value list (`state IN ('placed', 'held')`, AU-core-P2): Calcite has no RexCall(IN) — its IN is
+        // a sub-query's (decodeSubquery) — and asserts on one; a value list is a SEARCH (an OR of `=` when the
+        // values are not literals), which RelBuilder.in builds.
+        if (operator === org.apache.calcite.sql.`fun`.SqlStdOperatorTable.IN && operands.size >= 2) {
+            return builder.`in`(operands.first(), operands.drop(1))
+        }
         return builder.call(operator, operands)
     }
 

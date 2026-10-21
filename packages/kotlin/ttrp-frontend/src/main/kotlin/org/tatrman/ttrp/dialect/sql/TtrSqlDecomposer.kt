@@ -51,7 +51,12 @@ class TtrSqlDecomposer(
     data class Result(
         val statements: List<Statement>,
         val derivedInPorts: List<String>,
+        /** See [org.tatrman.ttrp.ast.FragmentDecomposition.refOperands]. */
+        val refOperands: Map<org.tatrman.ttrp.ast.SourceLocation, String> = emptyMap(),
     )
+
+    /** The operand each post-join qualified column named (AU-core-P2), filled while decomposing. */
+    private val refOperands = LinkedHashMap<org.tatrman.ttrp.ast.SourceLocation, String>()
 
     fun decompose(
         program: P.FragmentProgramContext,
@@ -73,7 +78,7 @@ class TtrSqlDecomposer(
             } else {
                 ChainStmt(finalChain, loc.of(program.queryExpression()))
             }
-        return Result(out, derived.toList())
+        return Result(out, derived.toList(), refOperands.toMap())
     }
 
     // ---- query / core ----
@@ -117,6 +122,9 @@ class TtrSqlDecomposer(
     private fun decomposeSelect(core: P.SelectQueryContext): List<ChainElem> {
         val elems = mutableListOf<ChainElem>()
         val aliasPort = mutableMapOf<String, String>()
+        // AU-core-P2: table / alias → the operand it names in a join chain (a loaded table's variable, an in-port,
+        // a CTE) — what a post-join `l.state` reads, beside its `left` (see [Result.refOperands]).
+        val operands = mutableMapOf<String, String>()
 
         // FROM / JOIN.
         val from = core.fromClause()
@@ -131,6 +139,8 @@ class TtrSqlDecomposer(
             } else {
                 // Left-deep join chain. For a single join (the hero) no intermediate name is needed.
                 var leftName = operandRef(base.first, loc.of(from.fromItem()))
+                operands[base.first] = leftName
+                base.second?.let { operands[it] = leftName }
                 // Every table (and alias) joined so far is a column source of the NEXT join's left input — so a
                 // qualifier naming any of them reads `left` (AU-core-P1: only the first table's did, and a later
                 // `q.line_id` came out unqualified, ambiguous against a right side with the same column).
@@ -139,6 +149,8 @@ class TtrSqlDecomposer(
                     val rightItem = fromItemName(jc.fromItem())
                     noteExternal(rightItem.first)
                     val rightName = operandRef(rightItem.first, loc.of(jc.fromItem()))
+                    operands[rightItem.first] = rightName
+                    rightItem.second?.let { operands[it] = rightName }
                     val ap = mutableMapOf<String, String>()
                     // qualifiers for THIS join's ON: first operand → left, joined → right (C2-b-ii).
                     joinedSoFar.forEach { ap[it] = "left" }
@@ -168,6 +180,16 @@ class TtrSqlDecomposer(
                     }
                 }
             }
+        }
+
+        // Folds after the join chain record which operand each qualified column named.
+        val seen = exprFolder.qualifiers.keys.toSet()
+
+        fun noteOperands() {
+            if (operands.isEmpty()) return
+            exprFolder.qualifiers
+                .filterKeys { it !in seen }
+                .forEach { (at, q) -> operands[q]?.let { refOperands[at] = it } }
         }
 
         // WHERE — EXISTS/IN-subquery desugar to semi/anti Join (T6.1.6), else Filter.
@@ -208,6 +230,8 @@ class TtrSqlDecomposer(
         if (!projectedByAggregate) {
             elems += projectElem(core.selectList(), aliasPort)
         }
+
+        noteOperands()
 
         // DISTINCT → distinct.
         if (core.DISTINCT() != null) elems += opCall("distinct", emptyList(), null, loc.of(core))

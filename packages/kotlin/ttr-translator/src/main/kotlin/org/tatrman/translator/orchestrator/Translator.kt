@@ -110,9 +110,9 @@ class Translator(
      *   with no join pairs), and the physical stage cannot condition it from a table foreign key either. Failure
      *   `join_unconditioned` ([org.tatrman.translator.joiner.JoinerMessages.UNCONDITIONED]), naming the join's sides
      *   and why. The comma list and `CROSS JOIN` are the author's own Cartesian products and keep their warning; so
-     *   does a bare join the physical stage conditions. A bare INNER join its WHERE conditions (a condition reading
-     *   both of its sides) is the author's join: the condition moves into its ON ([BareJoinMarker.lift]). The SQL
-     *   carrier marks each bare join it leaves unconditioned
+     *   does a bare join the physical stage conditions. A bare INNER join its WHERE conditions (a comparison between
+     *   its two sides) is the author's join, and is not refused; its plan is the one this option off gives
+     *   ([BareJoinMarker.lift]). The SQL carrier marks each bare join it leaves unconditioned
      *   (`JoinNode.condition_required`) and the refusal is decided per join where the physical stage runs: on this
      *   call for a `DB` target; for an `ER` target (the first call of the two-half pipeline) the plan carries the mark,
      *   and the REL_NODE re-entry refuses on it — whatever its own value of this option, which only SQL reads. Default

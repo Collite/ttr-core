@@ -30,6 +30,12 @@ data class LoadSource(
     /** The source dialect of [sql] when the model declared one (`tsql`, …); null = the project default. */
     val sqlDialect: String? = null,
     val columns: List<LoadColumn>,
+    /**
+     * AU-core-P2: an entity no er2db binding reaches because the deploying world's automation storage holds it —
+     * an automation stdlib entity (`obligation`, …) or a recipe's own verdict entity. [name] is the entity's, every
+     * column reads itself: a statement over E-R names the entity, and a DB rendering names its table after it.
+     */
+    val unbound: Boolean = false,
 )
 
 /** One logical column of a [LoadSource]: the program-facing [name], the [physical] column it reads, its [type]. */
@@ -51,9 +57,33 @@ object LoadSourceResolver {
     ): LoadSource? =
         when (obj) {
             is DbTable -> tableSource(obj)
-            is Entity -> entitySource(obj, index)
+            is Entity -> entitySource(obj, index) ?: obj.takeIf { index.isAutomationStdlib(it) }?.let { stdlib(it) }
             else -> null
         }
+
+    /**
+     * An entity the world's automation storage holds (AU-core-P2): [LoadSource.unbound], read by its own name
+     * — [columns] its logical row (`name` → type spelling).
+     */
+    fun unbound(
+        objectQname: String,
+        name: String,
+        columns: List<Pair<String, String>>,
+    ): LoadSource =
+        LoadSource(
+            objectQname = objectQname,
+            namespace = "",
+            name = name,
+            columns = columns.map { (n, t) -> LoadColumn(n, n, t) },
+            unbound = true,
+        )
+
+    private fun stdlib(entity: Entity): LoadSource =
+        unbound(
+            entity.qname.dotted(),
+            entity.qname.name.substringAfterLast('.'),
+            entity.attributes.map { it.qname.name.substringAfterLast('.') to it.type },
+        )
 
     private fun tableSource(table: DbTable): LoadSource =
         LoadSource(

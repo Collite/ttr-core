@@ -28,12 +28,16 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   - The comma list and `CROSS JOIN` are the author's own Cartesian products: never marked, and they keep their
     `JOIN_NO_RELATION` warning.
   - **A bare `JOIN` its WHERE conditions is accepted** (`FROM a JOIN b WHERE a.x = b.y`): the author wrote the
-    condition, in the wrong clause. Each top-level `AND` condition that reads both sides of a marked INNER join, and
-    nothing outside it, moves into that join's `ON` (the lowest such join in a chain), so the plan is the one the `ON`
-    form gives: no refusal, no warning, and no relation or foreign key stacked on the author's condition. A bare
-    `LEFT`/`RIGHT`/`FULL JOIN` is still refused that way, because a WHERE condition on both of its sides drops the
-    rows the outer join keeps, so the author meant `ON`. A condition with a sub-query stays in WHERE. Without the
-    option nothing moves.
+    condition, in the wrong clause. A top-level `AND` condition that compares the two sides of a marked INNER join
+    (`=`, `<`, `<=`, `>`, `>=`, `IS NOT DISTINCT FROM`; a `BETWEEN` is two of them) takes that join's mark off, and
+    nothing else: the plan and its warnings are the ones the option off gives. A disjunction or a `<>` reading both
+    sides filters the Cartesian product rather than joining it, so that join is still refused, and so is a bare
+    `LEFT`/`RIGHT`/`FULL JOIN` conditioned in WHERE: such a condition drops the rows the outer join keeps, so the
+    author meant `ON`. A condition inside a sub-query does not count.
+    - **Fixed since 0.12.5**, which moved such a condition into the join's `ON` instead. The physical stage then found
+      the join conditioned, so an FK-only relation lost its foreign key, and a filter that merely read both sides
+      (`WHERE date_dim.year = 2000 OR sales.quantity > 100`) became the whole join condition; and a cross-side `OR`
+      let a bare join with no relation through, neither refused nor warned. 0.12.5 does this only with the option set.
   - Unset, nothing changes: no mark, and the join is a Cartesian product with its warning, byte for byte as before.
   - The two plan stamps that ride Calcite as hints (`condition_required` on a Join, `expanded_from` on a Project) are now
     registered with every cluster the translator builds (`TtrHintStrategies`), each un-inheritable. Calcite propagates

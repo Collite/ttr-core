@@ -53,9 +53,31 @@ internal object JoinDedup {
         leftCols: List<String>,
         rightCols: List<String>,
         rightKeys: Set<String>,
+        /** AU-core-P2: right keys kept all the same — a qualified reference reads them (`out_.warehouse`). */
+        keep: Set<String> = emptySet(),
     ): List<Pair<Int, String>> =
-        leftCols.mapIndexed { i, name -> i to name } +
-            rightCols.mapIndexedNotNull { j, name ->
-                if (name in rightKeys) null else (leftCols.size + j) to name
+        unique(
+            leftCols.mapIndexed { i, name -> i to name } +
+                rightCols.mapIndexedNotNull { j, name ->
+                    if (name in rightKeys && name !in keep) null else (leftCols.size + j) to name
+                },
+        )
+
+    /**
+     * Each name made unique as Calcite names a join's row (AU-core-P2): a name already taken gets the first free
+     * `<name>0`, `<name>1`, … — so a right column that repeats a left one (`quantity_on_hand` of a second join) stays
+     * its own column instead of an alias the left one shadows.
+     */
+    fun unique(cols: List<Pair<Int, String>>): List<Pair<Int, String>> {
+        val used = HashSet<String>()
+        return cols.map { (i, name) ->
+            if (used.add(name)) {
+                i to name
+            } else {
+                var j = 0
+                while (!used.add("$name$j")) j++
+                i to "$name$j"
             }
+        }
+    }
 }

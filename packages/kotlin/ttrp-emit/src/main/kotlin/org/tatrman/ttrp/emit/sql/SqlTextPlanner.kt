@@ -55,6 +55,21 @@ class SqlTextPlanner(
     private val dialect: SqlDialect,
     /** The program's runtime params (name → positional index + surface tag). */
     private val params: Map<String, PlanParam>,
+    /** AU-core-P2: a recipe's decomposed `"""sql` fragments emit from their members ([SqlGraphEmitter]). */
+    private val fragmentsAsMembers: Boolean = false,
+    /**
+     * AU-core-P2: the tier the statement names its sources in. [SqlTier.DB] (the AG-P0 rule) scans physical tables
+     * and renames to the logical names; [SqlTier.ER] names each entity and its attributes — SQL over E-R, which the
+     * door translates (a recipe's statements: the door owns the binding, the row rules and the engine).
+     */
+    private val tier: SqlTier = SqlTier.DB,
+    /**
+     * AU-core-P2: an output never carries a synthesized `_ttrp_` column (reserved, RJ-103) — the recipe lowering's
+     * helper columns (a calendar count, a latest marker) are projected away at the statement's end.
+     */
+    private val dropSynthesized: Boolean = false,
+    /** AU-core-P2: a text = integer equality compares the integer as text ([SqlGraphEmitter]'s `textKeys`). */
+    private val textKeys: Boolean = false,
 ) {
     private data class Built(
         val plan: PlanNode,
@@ -77,32 +92,70 @@ class SqlTextPlanner(
         port: String,
         projection: DisplaySchema? = null,
     ): SqlTextOutput {
-        tables.clear()
-        inlineSql.clear()
-        val portPlan = output(container, port, HashMap())
-        val built = projection?.let { project(portPlan, it, container, port) } ?: portPlan
-        val model =
-            tables.map { (key, cols) ->
-                ModelTable(
-                    qname =
-                        QualifiedName
-                            .newBuilder()
-                            .setSchemaCode(SchemaCode.DB)
-                            .setNamespace(key.first)
-                            .setName(key.second)
-                            .build(),
-                    columns = cols.map { (n, t) -> ModelColumn(n, TypeMapping.surfaceType(t)) },
-                )
-            }
+        val built = build(container, port, projection)
+        val model = modelTables()
         val facade = TranslatorFacade(IslandModelHandle(model), dialect)
         val (raw, order) = facade.unparseNamed(built.plan, params.mapValues { it.value.typeTag }, container.label)
         val named = SqlTextRender.namePlaceholders(raw, order)
         val inlined = SqlTextRender.inlineSources(named, INLINE_NS, inlineSql)
         // The door dialect (F-AG-17): the host's SQL door parses the statement back with default quoting
         // and resolves DB-tier tables unqualified — so tables lose the schema, identifiers use "…".
-        val sql = SqlTextRender.doubleQuoted(SqlTextRender.unqualify(inlined, TABLE_NS))
+        val sql =
+            SqlTextRender.doubleQuoted(
+                SqlTextRender.unqualify(SqlTextRender.unqualify(inlined, TABLE_NS), ENTITY_NS),
+            )
         return SqlTextOutput(port, sql.trim(), built.columns, order.distinct())
     }
+
+    /** The plan.v1 tree of [container]'s OUT [port] and the tables it scans — what [emit] unparses (a test's view). */
+    fun planOf(
+        container: Container,
+        port: String,
+    ): Pair<PlanNode, List<ModelTable>> {
+        val built = build(container, port, null)
+        return built.plan to modelTables()
+    }
+
+    private fun build(
+        container: Container,
+        port: String,
+        projection: DisplaySchema?,
+    ): Built {
+        tables.clear()
+        inlineSql.clear()
+        val portPlan = output(container, port, HashMap()).let { if (dropSynthesized) withoutSynthesized(it) else it }
+        return projection?.let { project(portPlan, it, container, port) } ?: portPlan
+    }
+
+    /** [built] without its `_ttrp_` columns (unchanged when it has none). */
+    private fun withoutSynthesized(built: Built): Built {
+        val kept = built.columns.filterNot { it.name.startsWith(SYNTHESIZED_PREFIX) }
+        if (kept.size == built.columns.size) return built
+        val project = ProjectNode.newBuilder().setInput(built.plan)
+        kept.forEach { c ->
+            project.addExpressions(
+                NamedExpression
+                    .newBuilder()
+                    .setExpression(PbExpression.newBuilder().setColumnRef(PbColumnRef.newBuilder().setName(c.name)))
+                    .setAlias(c.name),
+            )
+        }
+        return Built(PlanNode.newBuilder().setProject(project).build(), kept)
+    }
+
+    private fun modelTables(): List<ModelTable> =
+        tables.map { (key, cols) ->
+            ModelTable(
+                qname =
+                    QualifiedName
+                        .newBuilder()
+                        .setSchemaCode(SchemaCode.DB)
+                        .setNamespace(key.first)
+                        .setName(key.second)
+                        .build(),
+                columns = cols.map { (n, t) -> ModelColumn(n, TypeMapping.surfaceType(t)) },
+            )
+        }
 
     /** [built] projected to an action display's [schema] columns, in schema order, each cast (see [emit]). */
     private fun project(
@@ -148,9 +201,17 @@ class SqlTextPlanner(
         memo: HashMap<Pair<String, String>, Built>,
     ): Built =
         memo.getOrPut(container.id to port) {
-            container.verbatimFragment?.let { frag -> return@getOrPut fragmentSource(container, port, frag.sourceText) }
+            container.verbatimFragment
+                ?.takeUnless { fragmentsAsMembers && container.memberIds.isNotEmpty() }
+                ?.let { frag -> return@getOrPut fragmentSource(container, port, frag.sourceText) }
             val chain =
-                SqlGraphEmitter(graph, world, sqlText = true).plansByOutput(container)[port]
+                SqlGraphEmitter(
+                    graph,
+                    world,
+                    sqlText = true,
+                    fragmentsAsMembers = fragmentsAsMembers,
+                    textKeys = textKeys,
+                ).plansByOutput(container)[port]
                     ?: throw TtrpEmitException(
                         EmitDiagnosticId.UNSUPPORTED_NODE,
                         detail = "island '${container.label}' has no emittable OUT port '$port'",
@@ -166,6 +227,7 @@ class SqlTextPlanner(
                         ins.map { i ->
                             i.columns.map { it.name }
                         },
+                        en.joinKeep,
                     )
                 built[en.node.id] = Built(body, en.outputColumns)
             }
@@ -192,9 +254,19 @@ class SqlTextPlanner(
                 )
         }
 
-    /** A model Load: scan the physical relation, then rename physical → logical columns. */
+    /**
+     * A model Load: scan the physical relation, then rename physical → logical columns. In [SqlTier.ER], and for an
+     * entity the world's automation storage holds ([org.tatrman.ttrp.resolve.LoadSource.unbound]), the scan names
+     * the entity itself with its logical columns — no rename.
+     */
     private fun modelScan(m: EmitInput.Model): Built {
         val src = m.source
+        if (tier == SqlTier.ER || src.unbound) {
+            val name = if (tier == SqlTier.ER) src.objectQname.substringAfterLast('.') else src.name
+            val registered = tables.getOrPut(ENTITY_NS to name) { LinkedHashMap() }
+            src.columns.forEach { registered.putIfAbsent(it.name, it.type) }
+            return Built(scan(ENTITY_NS, name, src.columns.map { it.name }.distinct()), m.columns)
+        }
         val inline = src.sql
         val ns = if (inline != null) INLINE_NS else TABLE_NS
         if (inline != null) inlineSql[src.name] = inline
@@ -266,8 +338,17 @@ class SqlTextPlanner(
 
         /** Namespace physical tables register under for the translator; removed from the text (unqualified). */
         const val TABLE_NS = "_ttrp_table"
+
+        /** Namespace an entity read by its own name registers under ([SqlTier.ER], an unbound entity); unqualified. */
+        const val ENTITY_NS = "_ttrp_entity"
+
+        /** The reserved prefix of a synthesized column (RJ-103). */
+        const val SYNTHESIZED_PREFIX = "_ttrp_"
     }
 }
+
+/** The tier a `sql-text` statement names its sources in (AU-core-P2): physical tables, or E-R entities. */
+enum class SqlTier { DB, ER }
 
 /** Text post-processing of an unparsed `sql-text` statement (pure; unit-tested on its own). */
 object SqlTextRender {

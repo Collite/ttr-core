@@ -22,6 +22,8 @@ application {
 
 tasks.test {
     useJUnitPlatform()
+    // AU-core-P2 · S2.4: `-DupdateGolden=true` rewrites the authoring-context example (RecipeAuthoringContextSpec).
+    systemProperty("updateGolden", System.getProperty("updateGolden") ?: "false")
 }
 
 dependencies {

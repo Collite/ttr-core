@@ -74,6 +74,9 @@ dependencies {
     // PL-P5.S4 — the Airflow 3 emit plugin, in-tree (built-in target org.tatrman:ttr-emit-airflow3).
     runtimeOnly(project(":packages:kotlin:ttr-emit-airflow3"))
     implementation(project(":packages:kotlin:ttrp-conform"))
+    // AU-core-P2 · S2.4 — `ttrp conform --engines pg,duckdb` runs a recipe's statements over JDBC (RecipeConformCli).
+    runtimeOnly(libs.postgresql)
+    runtimeOnly(libs.duckdb.jdbc)
     implementation(project(":packages:kotlin:ttr-metadata"))
     // PL-P1.S2: `ttr fetch` writes archives into the snapshot cache.
     implementation(project(":packages:kotlin:ttr-snapshot"))

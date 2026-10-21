@@ -100,10 +100,15 @@ class PlanNodeBuilder(
         node: Node,
         inputs: List<PlanNode>,
         inputColumns: List<List<String>>? = null,
+        /** AU-core-P2: a join's right equi-keys to keep ([EmitNode.joinKeep]). */
+        joinKeep: Set<String> = emptySet(),
     ): PlanNode {
         knownInputColumns = inputColumns
+        this.joinKeep = joinKeep
         return bodyOf(node, inputs)
     }
+
+    private var joinKeep: Set<String> = emptySet()
 
     private fun bodyOf(
         node: Node,
@@ -199,6 +204,7 @@ class PlanNodeBuilder(
         node: Aggregate,
         input: PlanNode,
     ): PlanNode {
+        if (node.aggregations.any { !plainAggregate(it.value) }) return aggregateOverExpressions(node, input)
         val b = AggregateNode.newBuilder().setInput(input)
         node.groupBy.forEach { b.addGroupKeys(PbColumnRef.newBuilder().setName(it)) }
         node.aggregations.forEach { agg ->
@@ -236,6 +242,92 @@ class PlanNodeBuilder(
             )
         }
         return PlanNode.newBuilder().setAggregate(b).build()
+    }
+
+    /** An aggregation plan.v1 carries as it stands: one aggregate call over plain columns. */
+    private fun plainAggregate(e: Expression): Boolean = e is AggregateCall && e.args.all { it is ColumnRef }
+
+    /**
+     * An aggregate whose calls read expressions, or whose bindings compute over aggregates (AU-core-P2: TTR-SQL's
+     * `SUM(quantity * unit_price)`, `COALESCE(SUM(CASE … END), 0)`) — plan.v1's aggregate takes plain columns only,
+     * so: a projection computes every non-column argument (`_ttrp_a<n>`), the aggregate names each call
+     * (`_ttrp_g<n>`), and a projection over it computes every binding from the group keys and those calls. The
+     * output row is the same — the group keys, then each binding in order.
+     */
+    private fun aggregateOverExpressions(
+        node: Aggregate,
+        input: PlanNode,
+    ): PlanNode {
+        node.having?.let {
+            throw TtrpEmitException(
+                EmitDiagnosticId.SUGAR_REACHED_EMIT,
+                detail = "Aggregate '${node.label}' still carries a HAVING clause (T8 should have split it)",
+                location = node.location,
+            )
+        }
+        val preArgs = LinkedHashMap<String, Expression>()
+        val calls = mutableListOf<Pair<String, PbAggregateCall.Builder>>()
+
+        fun argColumn(arg: Expression): String =
+            if (arg is ColumnRef) {
+                arg.column
+            } else {
+                "_ttrp_a${preArgs.size}".also { preArgs[it] = arg }
+            }
+
+        fun lift(e: Expression): Expression =
+            when (e) {
+                is AggregateCall -> {
+                    val name = "_ttrp_g${calls.size}"
+                    val pb =
+                        PbAggregateCall
+                            .newBuilder()
+                            .setFunction(aggName(e))
+                            .setDistinct(e.distinct)
+                            .setAlias(name)
+                    e.args.forEach { pb.addArgs(PbColumnRef.newBuilder().setName(argColumn(it))) }
+                    calls += name to pb
+                    ColumnRef(null, name, e.location)
+                }
+                is FunctionCall -> e.copy(args = e.args.map { lift(it) })
+                is Cast -> e.copy(expr = lift(e.expr))
+                is CaseWhen ->
+                    e.copy(
+                        branches =
+                            e.branches.map { (w, t) ->
+                                lift(w) to lift(t)
+                            },
+                        elseExpr = e.elseExpr?.let { lift(it) },
+                    )
+                is IsNull -> e.copy(expr = lift(e.expr))
+                is InList -> e.copy(expr = lift(e.expr), items = e.items.map { lift(it) })
+                else -> e
+            }
+        val bindings = node.aggregations.map { it.name to lift(it.value) }
+
+        // pre: the group keys, every plain column a call reads, every computed argument
+        val pre = ProjectNode.newBuilder().setInput(input)
+        val plainArgs =
+            calls
+                .flatMap { (_, pb) -> pb.argsList.map { it.name } }
+                .filter { it !in preArgs && it !in node.groupBy }
+                .distinct()
+        (node.groupBy + plainArgs).forEach { pre.addExpressions(passthroughColumn(it)) }
+        preArgs.forEach { (name, e) ->
+            pre.addExpressions(NamedExpression.newBuilder().setExpression(expr(e)).setAlias(name))
+        }
+
+        val agg = AggregateNode.newBuilder().setInput(PlanNode.newBuilder().setProject(pre))
+        node.groupBy.forEach { agg.addGroupKeys(PbColumnRef.newBuilder().setName(it)) }
+        calls.forEach { (_, pb) -> agg.addAggregates(pb) }
+
+        // post: the group keys, then each binding over the calls
+        val post = ProjectNode.newBuilder().setInput(PlanNode.newBuilder().setAggregate(agg))
+        node.groupBy.forEach { post.addExpressions(passthroughColumn(it)) }
+        bindings.forEach { (name, e) ->
+            post.addExpressions(NamedExpression.newBuilder().setExpression(expr(e)).setAlias(name))
+        }
+        return PlanNode.newBuilder().setProject(post).build()
     }
 
     private fun sort(
@@ -343,7 +435,7 @@ class PlanNodeBuilder(
             return joinNode
         }
         val project = ProjectNode.newBuilder().setInput(joinNode)
-        JoinDedup.survivors(leftCols, rightCols, rightKeys).forEach { (ordinal, name) ->
+        JoinDedup.survivors(leftCols, rightCols, rightKeys, joinKeep).forEach { (ordinal, name) ->
             project.addExpressions(
                 NamedExpression
                     .newBuilder()
@@ -468,7 +560,15 @@ class PlanNodeBuilder(
                         .build()
                 } else {
                     val ref = PbColumnRef.newBuilder().setName(e.column)
-                    val alias = if (inJoin) joinInputTag(e.port) ?: unqualifiedSide(e) else e.port
+                    // In a join condition a qualifier that is no side (`customer.center`, a table alias of an
+                    // earlier join) is resolved by name, as an unqualified column is (AU-core-P2).
+                    val alias =
+                        if (inJoin) {
+                            joinInputTag(e.port)
+                                ?: unqualifiedSide(if (joinInputTag(e.port) == null) e.copy(port = null) else e)
+                        } else {
+                            e.port
+                        }
                     alias?.let { ref.sourceAlias = it }
                     PbExpression.newBuilder().setColumnRef(ref).build()
                 }
@@ -514,11 +614,25 @@ class PlanNodeBuilder(
                     location = e.location,
                 )
             is MdPath -> mdPath(e)
-            // AU-core-P0 parses `:name` bindings and durations; their lowering is AU-core-P2.
-            is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr ->
+            // AU-core-P2: a recipe `:name` (a parameter, `:as_of`, a value the run binds) is a runtime param — the
+            // statement keeps it as `:name` and the runner binds it.
+            is org.tatrman.ttrp.expr.ParamRef -> {
+                val p =
+                    params[e.name] ?: throw TtrpEmitException(
+                        EmitDiagnosticId.UNSUPPORTED_NODE,
+                        detail = "`:${e.name}` is no parameter of the recipe nor a value the run binds",
+                        location = e.location,
+                    )
+                PbExpression
+                    .newBuilder()
+                    .setParameter(ParameterRef.newBuilder().setName(e.name).setPositionalIndex(p.index))
+                    .setResultType(p.typeTag)
+                    .build()
+            }
+            is org.tatrman.ttrp.expr.DurationExpr ->
                 throw TtrpEmitException(
                     EmitDiagnosticId.UNSUPPORTED_NODE,
-                    detail = "a recipe `:name` binding or duration is not lowered to plan.v1 yet (AU-core-P2)",
+                    detail = "a duration is lowered with the time sugar (AU-core-P2 S2.2)",
                     location = e.location,
                 )
             // TTRP 0.5: a cn definition form — refused at check (TTRP-CN-001); a program never emits one.
@@ -726,6 +840,8 @@ class PlanNodeBuilder(
                 "mul" to "mul",
                 "div" to "div",
                 "neg" to "-",
+                // AU-core-P2: `because:` texts concatenate (the decoder's `||` → SqlStdOperatorTable.CONCAT)
+                "concat" to "||",
             )
     }
 }

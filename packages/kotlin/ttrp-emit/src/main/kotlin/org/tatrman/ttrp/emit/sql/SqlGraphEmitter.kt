@@ -20,6 +20,8 @@ import org.tatrman.ttrp.graph.model.Join
 import org.tatrman.ttrp.graph.model.Limit
 import org.tatrman.ttrp.graph.model.Load
 import org.tatrman.ttrp.graph.model.Node
+import org.tatrman.ttrp.graph.model.PortNames
+import org.tatrman.ttrp.graph.model.NodeExpressions
 import org.tatrman.ttrp.graph.model.PortRef
 import org.tatrman.ttrp.graph.model.Project
 import org.tatrman.ttrp.graph.model.Sort
@@ -59,10 +61,27 @@ class SqlGraphEmitter(
      * default) keeps the CTE/ADBC behaviour: Loads are session temps, IN ports staged relations.
      */
     private val sqlText: Boolean = false,
+    /**
+     * AU-core-P2 (a recipe): a `"""sql` fragment with a decomposition emits from its members, like canonical — a
+     * recipe's TTR-SQL reads E-R entities and other islands' ports, which no verbatim run could. Off (the default)
+     * keeps the AG-P0 rule: an authored fragment runs as written.
+     */
+    private val fragmentsAsMembers: Boolean = false,
+    /**
+     * AU-core-P2 (a recipe's statements only): an equality of a text column with an INTEGER column compares the
+     * integer as text — the automation stdlib's `obligation.key` is text, an entity's key a number. Off (the default)
+     * leaves every comparison as written: an ordinary program's SQL never changes (review-119 B5).
+     */
+    private val textKeys: Boolean = false,
 ) {
+    /** The fragment [c] runs as written — none when [fragmentsAsMembers] and [c] decomposed into members. */
+    private fun verbatim(c: Container) =
+        c.verbatimFragment?.takeUnless { fragmentsAsMembers && c.memberIds.isNotEmpty() }
+
     /** OUT port name → the ordered [EmitNode] plan (terminal last) producing that port's rows. */
     fun plansByOutput(container: Container): LinkedHashMap<String, List<EmitNode>> {
         val members = container.memberIds.mapNotNull { graph.nodes[it] }.map { logical(it) }
+        qualifiedRefs = qualifiedRefsOf(members)
         val transforms = members.filter { it !is Load }
         val ordered = topoOrder(transforms)
         val cteNames = SsaNames.assign(ordered)
@@ -80,14 +99,7 @@ class SqlGraphEmitter(
             val chain =
                 ordered
                     .filter { it.id in cone }
-                    .map { n ->
-                        EmitNode(
-                            cteNames.getValue(n.id),
-                            n,
-                            inputsOf(n, container, cteNames, outCols),
-                            outCols.getValue(n.id),
-                        )
-                    }
+                    .map { n -> emitNode(n, container, cteNames, outCols) }
             plans[port] = chain
         }
         return plans
@@ -108,6 +120,7 @@ class SqlGraphEmitter(
         nodeId: String,
     ): List<EmitNode>? {
         val members = container.memberIds.mapNotNull { graph.nodes[it] }
+        qualifiedRefs = qualifiedRefsOf(members)
         val transforms = members.filter { it !is Load }
         val terminal = transforms.firstOrNull { it.id == nodeId } ?: return null
         val ordered = topoOrder(transforms)
@@ -115,15 +128,192 @@ class SqlGraphEmitter(
         val outCols = LinkedHashMap<String, List<EmitColumn>>()
         ordered.forEach { n -> outCols[n.id] = outputColumns(n, container, outCols) }
         val cone = ancestorsAndSelf(terminal, transforms)
-        return ordered.filter { it.id in cone }.map { n ->
-            EmitNode(
-                cteNames.getValue(n.id),
-                n,
-                inputsOf(n, container, cteNames, outCols),
-                outCols.getValue(n.id),
-            )
+        return ordered.filter { it.id in cone }.map { n -> emitNode(n, container, cteNames, outCols) }
+    }
+
+    // --- qualified references (AU-core-P2) --------------------------------------------
+
+    /**
+     * Per node, `(qualifier, column)` of every qualified reference it makes (`out_.warehouse`) — a decomposed TTR-SQL
+     * reference by its table operand ([TtrpGraph.refOperands]: `s.item` after a join is spelled `left.item` but reads
+     * `s`), so a later `s.item IS NULL` keeps the LEFT join's right key it reads (review-119 B1).
+     */
+    private var qualifiedRefs: Map<String, Set<Pair<String, String>>> = emptyMap()
+
+    private fun qualifiedRefsOf(members: List<Node>): Map<String, Set<Pair<String, String>>> =
+        members.associate { n ->
+            n.id to
+                NodeExpressions
+                    .of(n)
+                    .flatMap { NodeExpressions.walk(it) }
+                    .filterIsInstance<ColumnRef>()
+                    .mapNotNull { r ->
+                        val q =
+                            graph.refOperands[r.location]
+                                ?: r.port?.takeIf { it != PortNames.LEFT && it != PortNames.RIGHT }
+                        q?.let { it to r.column }
+                    }.toSet()
+        }
+
+    /** [n] as an [EmitNode]: its qualified references resolved against its input rows, a join's kept keys. */
+    private fun emitNode(
+        n: Node,
+        container: Container,
+        cteNames: Map<String, String>,
+        outCols: Map<String, List<EmitColumn>>,
+    ): EmitNode {
+        val ins = inputCols(n, container, outCols)
+        return EmitNode(
+            cteNames.getValue(n.id),
+            qualify(n, ins),
+            inputsOf(n, container, cteNames, outCols),
+            outCols.getValue(n.id),
+            if (n is Join && ins.size == 2) joinKeep(n, ins[1]) else emptySet(),
+        )
+    }
+
+    /**
+     * [n] with every qualified column reference (`out_.warehouse`, `customer.center`) resolved to the column of its
+     * input row the qualifier names — the latest such column (a second join of `latest` is the one read after it);
+     * in a join's condition, on the side that carries it. A reference no qualifier matches is left as written.
+     */
+    private fun qualify(
+        n: Node,
+        ins: List<List<EmitColumn>>,
+    ): Node {
+        val joined = n is Join && ins.size == 2
+        val flat = ins.flatten()
+        // A projected plain column keeps its authored name when the reference resolves to a renamed one.
+        if (n is Project) {
+            val resolved = n.columns.map { c -> (c as? ColumnRef)?.let { resolveRef(it, flat) } ?: c }
+            val aliases = n.columns.indices.map { i -> n.aliases.getOrNull(i) ?: (n.columns[i] as? ColumnRef)?.column }
+            return NodeExpressions.map(n.copy(columns = resolved, aliases = aliases)) { e ->
+                coerceKeys(qualifyRefs(e, flat), flat, flat)
+            }
+        }
+        return NodeExpressions.map(n) { e ->
+            if (!joined) return@map coerceKeys(qualifyRefs(e, flat), flat, flat)
+            val resolved =
+                NodeExpressions.rewrite(e) { x ->
+                    val r = x as? ColumnRef ?: return@rewrite null
+                    val q = r.port ?: return@rewrite null
+                    // In a join's condition `left.`/`right.` are its own sides — the plan builder places them.
+                    if (q == PortNames.LEFT || q == PortNames.RIGHT) return@rewrite null
+                    find(q, r.column, ins[0])?.let { ColumnRef(PortNames.LEFT, it.name, r.location, r.type) }
+                        ?: find(q, r.column, ins[1])?.let { ColumnRef(PortNames.RIGHT, it.name, r.location, r.type) }
+                }
+            coerceKeys(resolved, ins[0], ins[1])
         }
     }
+
+    /** The latest column of [cols] the qualifier [q] names under the name [c]. */
+    private fun find(
+        q: String,
+        c: String,
+        cols: List<EmitColumn>,
+    ) = cols.lastOrNull { it.base == c && q in it.qualifiers }
+
+    /**
+     * [r] resolved in [cols] when it is qualified and a column answers to it (`left.`/`right.` after a join too) — a
+     * decomposed TTR-SQL reference by the operand its table qualifier named first ([TtrpGraph.refOperands]: `l.state`
+     * and `r.state` both read `left.state`).
+     */
+    private fun resolveRef(
+        r: ColumnRef,
+        cols: List<EmitColumn>,
+    ): ColumnRef? {
+        val q = r.port ?: return null
+        val c = graph.refOperands[r.location]?.let { find(it, r.column, cols) } ?: find(q, r.column, cols)
+        return c?.let { ColumnRef(null, it.name, r.location, r.type) }
+    }
+
+    /** [e]'s qualified references resolved in [cols] (the latest column the qualifier names). */
+    private fun qualifyRefs(
+        e: org.tatrman.ttrp.expr.Expression,
+        cols: List<EmitColumn>,
+    ): org.tatrman.ttrp.expr.Expression =
+        NodeExpressions.rewrite(e) { x ->
+            (x as? ColumnRef)?.let {
+                resolveRef(it, cols)
+            }
+        }
+
+    /**
+     * With [textKeys] (a recipe's statements): an equality of a text column with an integer column (`ob.key =
+     * l.line_id`: the automation stdlib's `key` is text, an entity's key a number) compares the integer as text —
+     * `CAST(l.line_id AS VARCHAR) = ob.key` — as its author would write it; the other way would cast every key of
+     * every entity to a number (AU-core-P2). A decimal or a float is never cast: its text differs per engine.
+     */
+    private fun coerceKeys(
+        e: org.tatrman.ttrp.expr.Expression,
+        left: List<EmitColumn>,
+        right: List<EmitColumn>,
+    ): org.tatrman.ttrp.expr.Expression =
+        if (!textKeys) {
+            e
+        } else {
+            coerceTextKeys(e, left, right)
+        }
+
+    private fun coerceTextKeys(
+        e: org.tatrman.ttrp.expr.Expression,
+        left: List<EmitColumn>,
+        right: List<EmitColumn>,
+    ): org.tatrman.ttrp.expr.Expression =
+        NodeExpressions.rewrite(e) { x ->
+            val call = x as? FunctionCall ?: return@rewrite null
+            if (call.function.name != "eq" && call.function.name != "neq") return@rewrite null
+            val (a, b) = call.args.takeIf { it.size == 2 } ?: return@rewrite null
+
+            fun typeOf(c: org.tatrman.ttrp.expr.Expression): String? {
+                val r = c as? ColumnRef ?: return null
+                val side = if (r.port == PortNames.RIGHT) right else left
+                return (side.lastOrNull { it.name == r.column } ?: (left + right).lastOrNull { it.name == r.column })
+                    ?.type
+            }
+            val ta = typeOf(a) ?: return@rewrite null
+            val tb = typeOf(b) ?: return@rewrite null
+
+            fun text(c: org.tatrman.ttrp.expr.Expression) = Cast(c, org.tatrman.ttrp.expr.TtrpType.Str, c.location)
+            when {
+                isText(ta) && isNumber(tb) -> call.copy(args = listOf(a, text(b)))
+                isNumber(ta) && isText(tb) -> call.copy(args = listOf(text(a), b))
+                else -> null
+            }
+        }
+
+    private fun isText(t: String) = t.substringBefore('(').lowercase() in setOf("text", "varchar", "char", "string")
+
+    private fun isNumber(t: String) =
+        t.substringBefore('(').lowercase() in setOf("int", "integer", "bigint", "smallint")
+
+    /**
+     * The right equi-key columns of [join] a qualified reference reads after it — in any other node; the join's own
+     * condition reads its keys before the join — the join keeps them (by their names). After a LEFT join the right key
+     * is NULL where the left one is not, so `s.item IS NULL` must read the right one.
+     */
+    private fun joinKeep(
+        join: Join,
+        right: List<EmitColumn>,
+    ): Set<String> {
+        val keys = join.on?.let { JoinDedup.rightEquiKeys(it) }.orEmpty()
+        val readAfter =
+            qualifiedRefs
+                .filterKeys { it != join.id }
+                .values
+                .flatten()
+                .toSet()
+        return right
+            .filter { c -> c.name in keys && c.qualifiers.any { (it to c.base) in readAfter } }
+            .map { it.name }
+            .toSet()
+    }
+
+    /** The variable a node's output is bound to (`out_#2` → `out_`), when it has one. */
+    private fun variableOf(n: Node): String? =
+        n.label
+            .substringBefore('#', "")
+            .takeIf { it.isNotEmpty() && !it.startsWith("~") && '~' !in it }
 
     /**
      * The base relation name a guard's input edge [inFrom] reads, when it is a [Load] member (a CSV
@@ -230,7 +420,12 @@ class SqlGraphEmitter(
     private fun modelInput(
         loadId: String,
         source: org.tatrman.ttrp.resolve.LoadSource,
-    ): EmitInput.Model = EmitInput.Model(loadId, source, source.columns.map { EmitColumn(it.name, it.type) })
+    ): EmitInput.Model {
+        // Qualified by the entity (`customer.center`) and by the variable the load is bound to (`out_`).
+        val qualifiers =
+            setOfNotNull(source.objectQname.substringAfterLast('.'), graph.nodes[loadId]?.let { variableOf(it) })
+        return EmitInput.Model(loadId, source, source.columns.map { EmitColumn(it.name, it.type, qualifiers) })
+    }
 
     /**
      * AG-P0: a container IN [port] in sql-text mode → the feeding container's OUT port, typed by that
@@ -263,11 +458,16 @@ class SqlGraphEmitter(
                     location = container.location,
                 )
         val columns =
-            if (producer.verbatimFragment != null) {
+            if (verbatim(producer) != null) {
                 stagingSchema(port, container)
             } else {
-                SqlGraphEmitter(graph, world, sqlText = true)
-                    .plansByOutput(producer)[feed.from.port]
+                SqlGraphEmitter(
+                    graph,
+                    world,
+                    sqlText = true,
+                    fragmentsAsMembers = fragmentsAsMembers,
+                    textKeys = textKeys,
+                ).plansByOutput(producer)[feed.from.port]
                     ?.lastOrNull()
                     ?.outputColumns
                     ?: throw TtrpEmitException(
@@ -276,7 +476,8 @@ class SqlGraphEmitter(
                         location = producer.location,
                     )
             }
-        return EmitInput.Upstream(producer.id, feed.from.port, columns)
+        // An IN port's rows are qualified by the port's name (`orders.order_number`).
+        return EmitInput.Upstream(producer.id, feed.from.port, columns.map { it.copy(qualifiers = setOf(port)) })
     }
 
     /**
@@ -295,18 +496,22 @@ class SqlGraphEmitter(
         outCols: Map<String, List<EmitColumn>>,
     ): List<EmitColumn> {
         val ins = inputCols(node, container, outCols)
-        return when (node) {
-            is Filter, is Sort, is Limit, is Distinct -> ins.firstOrNull() ?: emptyList()
-            is Join -> joinColumns(node, ins)
-            is Aggregate -> aggregateColumns(node, ins.firstOrNull() ?: emptyList())
-            is Project -> projectColumns(node, ins.firstOrNull() ?: emptyList())
-            else ->
-                throw TtrpEmitException(
-                    EmitDiagnosticId.UNSUPPORTED_NODE,
-                    detail = "node ${node::class.simpleName} '${node.label}' has no SQL schema propagation",
-                    location = node.location,
-                )
-        }
+        val cols =
+            when (node) {
+                is Filter, is Sort, is Limit, is Distinct -> ins.firstOrNull() ?: emptyList()
+                is Join -> joinColumns(node, ins)
+                is Aggregate -> aggregateColumns(node, ins.firstOrNull() ?: emptyList())
+                is Project -> projectColumns(node, ins.firstOrNull() ?: emptyList())
+                else ->
+                    throw TtrpEmitException(
+                        EmitDiagnosticId.UNSUPPORTED_NODE,
+                        detail = "node ${node::class.simpleName} '${node.label}' has no SQL schema propagation",
+                        location = node.location,
+                    )
+            }
+        // The variable the node is bound to qualifies its whole row (`stock = … -> latest(…)`: `stock.x`).
+        val variable = variableOf(node) ?: return cols
+        return cols.map { it.copy(qualifiers = it.qualifiers + variable) }
     }
 
     /** Resolved input column lists for [node] (in port order) — from staged/Load/CTE sources. */
@@ -324,6 +529,12 @@ class SqlGraphEmitter(
             }
         }
 
+    /** [cols] tagged as the [tag] side of a join — whatever side of an earlier join they were forgotten. */
+    private fun sided(
+        cols: List<EmitColumn>,
+        tag: String,
+    ) = cols.map { it.copy(qualifiers = it.qualifiers - PortNames.LEFT - PortNames.RIGHT + tag) }
+
     private fun joinColumns(
         node: Join,
         ins: List<List<EmitColumn>>,
@@ -335,14 +546,17 @@ class SqlGraphEmitter(
         if (node.type == org.tatrman.ttrp.graph.model.JoinType.SEMI ||
             node.type == org.tatrman.ttrp.graph.model.JoinType.ANTI
         ) {
-            return left
+            return sided(left, PortNames.LEFT)
         }
-        val rightKeys = node.on?.let { JoinDedup.rightEquiKeys(it) }
-        if (rightKeys.isNullOrEmpty()) return left + right
-        val byName = (left + right).associateBy { it.name }
+        val rightKeys = node.on?.let { JoinDedup.rightEquiKeys(it) }.orEmpty()
+        // Each side's columns are `left.`/`right.` to the nodes after the join (a decomposed fragment's `cp.price`
+        // reaches them as `left.price`) — the side of THIS join, an earlier join's side forgotten.
+        val all = sided(left, PortNames.LEFT) + sided(right, PortNames.RIGHT)
+        // The same survivors, names and order the plan builder projects ([PlanNodeBuilder]) — a repeated right
+        // name made unique, a right key kept when a qualified reference reads it (AU-core-P2).
         return JoinDedup
-            .survivors(left.map { it.name }, right.map { it.name }, rightKeys)
-            .map { (_, name) -> byName.getValue(name) }
+            .survivors(left.map { it.name }, right.map { it.name }, rightKeys, joinKeep(node, right))
+            .map { (ordinal, name) -> all[ordinal].copy(name = name) }
     }
 
     private fun aggregateColumns(
@@ -382,8 +596,10 @@ class SqlGraphEmitter(
         val byName = input.associateBy { it.name }
         val computed =
             node.columns.mapIndexed { i, c ->
-                val name = node.aliasOf(i) ?: "_expr$i"
-                EmitColumn(name, computedType(c, byName))
+                val name = node.aliasOf(i) ?: (c as? ColumnRef)?.column ?: "_expr$i"
+                // A plain column carried under its own name keeps what qualifies it.
+                val carried = (c as? ColumnRef)?.takeIf { it.column == name }?.let { byName[it.column] }
+                EmitColumn(name, computedType(c, byName), carried?.qualifiers.orEmpty(), carried?.base ?: name)
             }
         if (!node.passthrough) return computed
         // calc add-semantics: input columns first, minus any overridden by a computed alias and
@@ -426,8 +642,13 @@ class SqlGraphEmitter(
                     is org.tatrman.ttrp.expr.LiteralValue.Bool -> "bool"
                     else -> "text"
                 }
+            // A NULL branch says nothing of the type (AU-core-P2: `CASE WHEN a IS NULL THEN NULL ELSE … END`).
             is org.tatrman.ttrp.expr.CaseWhen ->
-                e.branches.firstOrNull()?.let { computedType(it.second, byName) }
+                (e.branches.map { it.second } + listOfNotNull(e.elseExpr))
+                    .firstOrNull {
+                        (it as? org.tatrman.ttrp.expr.Literal)?.value !=
+                            org.tatrman.ttrp.expr.LiteralValue.Null
+                    }?.let { computedType(it, byName) }
                     ?: "text"
             else -> "text"
         }

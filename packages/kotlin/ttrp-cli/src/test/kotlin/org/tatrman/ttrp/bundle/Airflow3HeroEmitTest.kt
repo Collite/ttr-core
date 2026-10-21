@@ -59,7 +59,7 @@ class Airflow3HeroEmitTest :
         }
 
         test("emit-determinism PASSES for the airflow3 plugin over the hero request (Q-6 gate)") {
-            val req = buildHero(Files.createTempDirectory("ttrp-af3-det")).emitRequest
+            val req = buildHero(Files.createTempDirectory("ttrp-af3-det")).emitRequest!!
             // The core populated executorInstance from the world (empty here — no airflow3 executor declared).
             req.executorInstance.text shouldBe ""
             val report = EmitDeterminismKit.check(EmitPluginLoader.builtin("airflow3"), listOf(req, req))

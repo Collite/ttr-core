@@ -56,6 +56,11 @@ data class RunManifest(
      * a project without extra roots, so every other manifest stays byte-identical.
      */
     val modelRoots: List<ModelRootRef>? = null,
+    /**
+     * AU-core-P2 — a recipe bundle's `recipe` object (contracts §5.1; the manifest is then `schemaVersion: 3`,
+     * `ttrpVersion: 2`). Null (omitted) for every program, so its manifest stays byte-identical.
+     */
+    val recipe: RecipeManifest? = null,
     val files: Map<String, String>,
 ) {
     fun toJson(): String = JSON.encodeToString(this)
@@ -135,6 +140,11 @@ data class IslandEntry(
      * byte-identical. [file]/[sha256] above then name the first output.
      */
     val outputs: List<IslandOutput>? = null,
+    /**
+     * AU-core-P2 — the tier a recipe island's statements name their sources in: `er` (entities and attributes; the
+     * door translates them). Null (omitted) for every other island.
+     */
+    val schema: String? = null,
 )
 
 /** One `sql-text` island output (AG-P0): the port, its statement file, its row type, the params it binds. */
@@ -145,6 +155,11 @@ data class IslandOutput(
     val sha256: String,
     val columns: List<OutputColumn>,
     val params: List<String>? = null,
+    /**
+     * AU-core-P2 — a recipe output's rows are per candidate (they carry the key): a run for one key (`port: key`)
+     * filters this output on it (AU-C-3). False for a lookup or a set-level context. Null (omitted) elsewhere.
+     */
+    val keyed: Boolean? = null,
 )
 
 @Serializable

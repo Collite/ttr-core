@@ -141,6 +141,12 @@ data class TtrpGraph(
      * whose loads keep logical names, reads this instead. Empty when no relation join is authored.
      */
     val logicalJoins: Map<String, org.tatrman.ttrp.expr.Expression> = emptyMap(),
+    /**
+     * AU-core-P2: a decomposed TTR-SQL column reference after a join chain, by its location → the operand its table
+     * qualifier named ([org.tatrman.ttrp.ast.FragmentDecomposition.refOperands]) — the SQL emitter resolves
+     * `left.state` to `l`'s column, not `r`'s. A side table like [mdResolutions].
+     */
+    val refOperands: Map<SourceLocation, String> = emptyMap(),
 ) {
     fun node(id: String): Node? = nodes[id]
 
