@@ -198,7 +198,7 @@ class TtrpPipeline(
             compiled =
                 compiled.copy(
                     loadSources =
-                        compiled.loadSources.mapValues { (_, src) ->
+                        compiled.loadSources.mapValues { (loadId, src) ->
                             if (src.storage != null) {
                                 src
                             } else {
@@ -208,13 +208,20 @@ class TtrpPipeline(
                                         bound.world,
                                         report.modelIndex,
                                     )
-                                if (placements.size != 1) {
+                                val failure =
+                                    org.tatrman.ttrp.resolve.RecipePlacement.failure(
+                                        src,
+                                        bound.world,
+                                        placements,
+                                    )
+                                if (failure != null) {
                                     diags +=
                                         TtrpDiagnostic(
                                             org.tatrman.ttrp.diagnostics.TtrpDiagnosticId.REC_090,
                                             Severity.ERROR,
-                                            "recipe load ${src.objectQname} has no unique storage",
-                                            org.tatrman.ttrp.ast.SourceLocation.UNKNOWN,
+                                            failure,
+                                            compiled.nodes[loadId]?.location
+                                                ?: org.tatrman.ttrp.ast.SourceLocation.UNKNOWN,
                                         )
                                     src
                                 } else {

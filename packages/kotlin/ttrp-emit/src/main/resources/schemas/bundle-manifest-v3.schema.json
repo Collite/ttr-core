@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tatrman.org/schemas/ttrp/bundle-manifest/v3",
-  "title": "TTR-P recipe bundle manifest, v3 (AU-core-P2, contracts \u00a75.1)",
-  "description": "A recipe bundle's manifest.json (AU contracts \u00a75.1\u2013\u00a75.2): v2 + the `recipe` object, `schema` on an island (its statements' tier, `er`), `keyed` on an island output (a per-candidate output the runner filters on the run's key). Every other bundle stays v2.",
+  "title": "TTR-P recipe bundle manifest, v3 (AU-core-P2, contracts §5.1)",
+  "description": "A recipe bundle's manifest.json (AU contracts §5.1–§5.2): v2 + the `recipe` object, `schema` on an island (its statements' tier, `er`), `keyed` on an island output (a per-candidate output the runner filters on the run's key). Every other bundle stays v2.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,11 +21,11 @@
   ],
   "properties": {
     "schemaVersion": {
-      "description": "v3 \u2014 a recipe bundle.",
+      "description": "v3 — a recipe bundle.",
       "const": 3
     },
     "ttrpVersion": {
-      "description": "TTR-P 2 \u2014 the recipe block.",
+      "description": "TTR-P 2 — the recipe block.",
       "const": 2
     },
     "toolchain": {
@@ -82,7 +82,7 @@
       "$ref": "#/$defs/lineage"
     },
     "rejectSites": {
-      "description": "Tatrman RJ extension (TTR-P contracts \u00a77/\u00a79): elaborated reject sites for the eighth (partition) conformance point. Optional; empty for programs with no wired rejects.",
+      "description": "Tatrman RJ extension (TTR-P contracts §7/§9): elaborated reject sites for the eighth (partition) conformance point. Optional; empty for programs with no wired rejects.",
       "type": "array",
       "items": {
         "$ref": "#/$defs/rejectSite"
@@ -183,7 +183,7 @@
           ]
         },
         "connections": {
-          "description": "Per-island connection refs (was bundle-global \u2014 H-5 least exposure).",
+          "description": "Per-island connection refs (was bundle-global — H-5 least exposure).",
           "type": "array",
           "items": {
             "type": "string"
@@ -197,7 +197,7 @@
           }
         },
         "outputs": {
-          "description": "AG-P0: a sql-text island's outputs \u2014 one self-contained statement per OUT port, run by the host's own SQL door. Absent for every other delivery.",
+          "description": "AG-P0: a sql-text island's outputs — one self-contained statement per OUT port, run by the host's own SQL door. Absent for every other delivery.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/islandOutput"
@@ -365,7 +365,7 @@
       }
     },
     "lineage": {
-      "description": "CQ-5 STATIC column lineage, compile-derived. Maps 1:1 onto the OpenLineage columnLineage facet (export mapping lives in Veles connectors, \u00a718).",
+      "description": "CQ-5 STATIC column lineage, compile-derived. Maps 1:1 onto the OpenLineage columnLineage facet (export mapping lives in Veles connectors, §18).",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -412,7 +412,7 @@
               "type": "string"
             },
             "materialized": {
-              "description": "Physical target qname the output column materializes to (the island's store(...) target); a catalog-shaped id a downstream catalog (OpenMetadata, \u00a718) keys on. Omitted for display/in-memory-only outputs.",
+              "description": "Physical target qname the output column materializes to (the island's store(...) target); a catalog-shaped id a downstream catalog (OpenMetadata, §18) keys on. Omitted for display/in-memory-only outputs.",
               "type": "string"
             }
           }
@@ -437,7 +437,7 @@
           }
         },
         "transform": {
-          "description": "Transform-tag vocabulary (\u2691, contracts \u00a76): identity | expression | aggregate:<fn> | join-key | filter-only.",
+          "description": "Transform-tag vocabulary (⚑, contracts §6): identity | expression | aggregate:<fn> | join-key | filter-only.",
           "type": "string",
           "pattern": "^(identity|expression|join-key|filter-only|aggregate:[A-Za-z_][A-Za-z0-9_]*)$"
         }
@@ -449,7 +449,9 @@
       "required": [
         "port",
         "columns",
-        "keyed"
+        "keyed",
+        "file",
+        "sha256"
       ],
       "properties": {
         "port": {
@@ -497,44 +499,7 @@
         "storage": {
           "type": "string"
         }
-      },
-      "oneOf": [
-        {
-          "required": [
-            "file",
-            "sha256"
-          ],
-          "not": {
-            "required": [
-              "combine"
-            ]
-          }
-        },
-        {
-          "required": [
-            "combine"
-          ],
-          "not": {
-            "anyOf": [
-              {
-                "required": [
-                  "file"
-                ]
-              },
-              {
-                "required": [
-                  "sha256"
-                ]
-              },
-              {
-                "required": [
-                  "storage"
-                ]
-              }
-            ]
-          }
-        }
-      ]
+      }
     },
     "recipeParameter": {
       "type": "object",
@@ -956,6 +921,12 @@
           "items": {
             "type": "string"
           }
+        },
+        "engine": {
+          "const": "duckdb"
+        },
+        "dialect": {
+          "const": "duckdb"
         }
       }
     },

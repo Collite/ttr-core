@@ -56,13 +56,17 @@ object LoadSourceResolver {
     fun resolve(
         obj: ModelObject,
         index: ModelIndex,
-        allowUnbound: Boolean = false,
+        allowUnbound: Boolean? = null,
     ): LoadSource? =
         when (obj) {
             is DbTable -> tableSource(obj)
             is Entity ->
                 entitySource(obj, index)
-                    ?: obj.takeIf { (allowUnbound || index.isAutomationStdlib(it)) }?.let { stdlib(it) }
+                    ?: obj
+                        .takeIf {
+                            index.erToDb(it.qname).dbQname == null &&
+                                (allowUnbound ?: index.isAutomationStdlib(it))
+                        }?.let { stdlib(it) }
             else -> null
         }
 
@@ -105,16 +109,8 @@ object LoadSourceResolver {
     private fun entitySource(
         entity: Entity,
         index: ModelIndex,
-        allowUnbound: Boolean = false,
     ): LoadSource? {
-        val target = index.erToDb(entity.qname).dbQname ?: return null
-        val byQname = index.snapshot.model.objectByQname()
-        // A query binding is written `db.query.<name>` while the Query object itself is keyed under the
-        // query schema code — fall back to the same-named query/view when the exact qname misses.
-        val obj =
-            byQname[target]
-                ?: byQname.values.firstOrNull { (it is Query || it is DbView) && it.qname.name == target.name }
-                ?: return null
+        val obj = index.bindingTarget(entity) ?: return null
         // Each bound attribute → (logical name, physical column). An unbound attribute has no column to
         // read; it is simply absent from the physical row (referencing it is the checker's RES-005).
         val columns =

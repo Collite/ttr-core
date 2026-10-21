@@ -118,8 +118,8 @@ class RecipeBundleSpec :
             val combining = outputs.filter { it.combine != null }
             (combining.isNotEmpty()) shouldBe true
             combining.forEach { o ->
-                o.file shouldBe null
-                o.sha256 shouldBe null
+                o.file shouldBe o.combine!!.file
+                o.sha256 shouldBe o.combine!!.sha256
                 val c = o.combine!!
                 result.manifest.files[c.file] shouldBe c.sha256
                 c.parts.forEach { name -> parts.any { it.name == name } shouldBe true }
@@ -129,6 +129,70 @@ class RecipeBundleSpec :
                 p.keyed shouldBe p.columns.any { it.name == "line_id" }
             }
             RunManifest.fromJson(result.manifest.toJson()) shouldBe result.manifest
+        }
+        "review-121: a key-carrying part read by a lookup or set context is never keyed" {
+            val p =
+                TtrpPipeline(
+                    manifest,
+                    fixtures.resolve("model"),
+                ).plan(source("monitor_inbound.ttrp"), "monitor_inbound.ttrp")
+            for (kind in listOf(
+                org.tatrman.ttrp.graph.recipe.ContextClass.LOOKUP,
+                org.tatrman.ttrp.graph.recipe.ContextClass.SET_LEVEL,
+            )) {
+                val model = p.recipe!!
+                val adjusted =
+                    p.copy(
+                        recipe =
+                            model.copy(
+                                contexts =
+                                    model.contexts.map {
+                                        if (it.name == "reminded") it.copy(contextClass = kind) else it
+                                    },
+                            ),
+                    )
+                val statements =
+                    org.tatrman.ttrp.emit.recipe.RecipeStatements
+                        .plan(adjusted)
+                val read =
+                    statements
+                        .filter { it.island == "reminded" }
+                        .flatMap { it.parts }
+                        .filter { part -> part.columns.any { it.name == "line_id" } }
+                        .map { it.name }
+                (read.isNotEmpty()) shouldBe true
+                val bundle =
+                    RecipeBundleAssembler().assemble(
+                        adjusted,
+                        "monitor_inbound.ttrp",
+                        Files.createTempDirectory("part-key"),
+                    )
+                bundle.manifest.recipe!!
+                    .parts!!
+                    .filter { it.name in read }
+                    .forEach { it.keyed shouldBe false }
+            }
+        }
+        "review-121: connections and island fallback match the actual execution engine" {
+            val bundle = build("monitor_inbound.ttrp")
+            bundle.manifest.connections shouldContainExactly listOf("TTR_CONN_AUTOMATION", "TTR_CONN_ERP")
+            bundle.manifest.islands.forEach { island ->
+                island.connections shouldContain "TTR_CONN_AUTOMATION"
+                if (island.outputs!!.first().combine != null) {
+                    island.engine shouldBe "duckdb"
+                    island.invocation shouldBe "duckdb"
+                    island.schema shouldBe "db"
+                }
+                island.outputs!!.forEach { output ->
+                    // The deployed Server requires file; the v3 schema enforces the same reader contract.
+                    output.file shouldNotBe null
+                    output.sha256 shouldNotBe null
+                    output.combine?.let {
+                        it.engine shouldBe "duckdb"
+                        it.dialect shouldBe "duckdb"
+                    }
+                }
+            }
         }
         "changing an ERP part moves text, never values or labels" {
             val original = source("settle.ttrp")

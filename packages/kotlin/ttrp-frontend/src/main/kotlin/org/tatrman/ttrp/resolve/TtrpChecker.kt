@@ -56,7 +56,7 @@ class TtrpChecker(
     private val memberCatalog: org.tatrman.ttr.md.resolve.MemberCatalog? = null,
 ) {
     private val modelIndex: ModelIndex? =
-        ModelRepo.snapshotOf(modelsRoot, manifest.extraModelRootPaths())?.let { ModelIndex(it) }
+        ModelRepo.indexOf(modelsRoot, manifest.extraModelRootPaths())
     private val typechecker = ExpressionTypechecker()
 
     data class Report(
@@ -205,23 +205,8 @@ class TtrpChecker(
             }
         }
 
-        if (doc.statements.any { it is org.tatrman.ttrp.ast.RecipeDecl } && world != null) {
-            ctx.loadSources.replaceAll { location, source ->
-                val placements = RecipePlacement.storages(source, world, modelIndex)
-                if (placements.size != 1) {
-                    diags +=
-                        diag(
-                            TtrpDiagnosticId.REC_090,
-                            "entity `${source.objectQname}` has ${placements.size} storage placements: " +
-                                placements.joinToString(),
-                            location,
-                        )
-                    source
-                } else {
-                    source.copy(storage = placements.single())
-                }
-            }
-        }
+        // Recipe placement runs once in TtrpPipeline after sugar lowering, so synthesized loads
+        // receive the same checks and source locations as authored loads.
 
         // ---- action displays (DSP, grammar 0.14): display(<name>) held to an imported row schema ----
         val displaySchemas = checkDisplays(doc, world, imports, programSchemas, diags)
@@ -685,10 +670,20 @@ class TtrpChecker(
     ): List<Column>? {
         if (opLocation != null) {
             modelIndex?.let { idx ->
-                LoadSourceResolver.resolve(obj, idx, allowUnbound = ctx.recipeEntities.isNotEmpty())?.let {
-                    ctx.loadSources[opLocation] =
-                        it
-                }
+                LoadSourceResolver
+                    .resolve(
+                        obj,
+                        idx,
+                        allowUnbound =
+                            if (ctx.recipeEntities.isEmpty()) {
+                                null
+                            } else {
+                                ctx.world?.let { RecipePlacement.writable(obj.qname.dotted(), it) } == true
+                            },
+                    )?.let {
+                        ctx.loadSources[opLocation] =
+                            it
+                    }
             }
         }
         return loadModelObjectSchema(obj, loc, ctx)
@@ -705,9 +700,23 @@ class TtrpChecker(
                 ctx.pendingEntity = obj
                 // er entity → db table via er2db (E-d early rewrite, mandatory provenance).
                 val binding = modelIndex!!.erToDb(obj.qname)
-                if (binding.dbQname == null) {
+                val physical = modelIndex.bindingTarget(obj)
+                if (physical !is DbTable &&
+                    physical !is org.tatrman.ttr.metadata.model.Query &&
+                    physical !is org.tatrman.ttr.metadata.model.DbView
+                ) {
                     // A stdlib entity is bound by the deploying world's automation storage, never by er2db.
-                    if (!modelIndex.isAutomationStdlib(obj) && ctx.recipeEntities.isEmpty()) {
+                    if (LoadSourceResolver.resolve(
+                            obj,
+                            modelIndex,
+                            allowUnbound =
+                                if (ctx.recipeEntities.isEmpty()) {
+                                    null
+                                } else {
+                                    ctx.world?.let { RecipePlacement.writable(obj.qname.dotted(), it) } == true
+                                },
+                        ) == null
+                    ) {
                         ctx.diags +=
                             diag(
                                 TtrpDiagnosticId.RES_005,

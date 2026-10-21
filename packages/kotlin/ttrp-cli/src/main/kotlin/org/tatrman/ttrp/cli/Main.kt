@@ -258,13 +258,13 @@ class ConformCommand : CliktCommand(name = "conform") {
                 RecipeConformCli.run(
                     recipePlan,
                     engines.split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                    fixture.filter { "=" !in it }.map { Path.of(it).toAbsolutePath() },
+                    fixture.filterNot { RecipeConformCli.scopedFixture(it) }.map { Path.of(it).toAbsolutePath() },
                     instant,
                     tolerances(),
                     System.getenv().filterKeys { it.startsWith("TTR_CONN_") },
                     numericDeltas = pairs(engineDelta),
                     storageFixtures =
-                        fixture.filter { "=" in it }.groupBy(
+                        fixture.filter { RecipeConformCli.scopedFixture(it) }.groupBy(
                             { it.substringBefore('=') },
                             { Path.of(it.substringAfter('=')).toAbsolutePath() },
                         ),

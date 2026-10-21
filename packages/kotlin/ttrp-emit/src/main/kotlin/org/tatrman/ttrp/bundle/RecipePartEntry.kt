@@ -23,4 +23,6 @@ data class RecipeCombine(
     val sha256: String,
     val parts: List<String>,
     val params: List<String>,
+    val engine: String = "duckdb",
+    val dialect: String = "duckdb",
 )

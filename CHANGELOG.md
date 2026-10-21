@@ -6,6 +6,13 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`grammar/v0.17.3` / AU S2.5** — recipe statements now split at storage boundaries into door parts and
+  DuckDB combines. Every recipe's `text` fingerprint changes, including `release_order` and `decide_return`,
+  because the hashed statement section is sorted by SQL file path and includes paths instead of `island.port`.
+  The `ttrp-recipe-text/1` marker stays unchanged (D-137); re-baseline approvals when deploying this toolchain pin.
+  Shared parts accept a candidate key only when every reader is keyed. Manifests retain required output files
+  and hashes, explicitly mark DuckDB combines, and list the connections used by their parts.
+
 - **`ttr-translator`** — **`refuseUnconditionedBareJoins`** (new option on `Translator.parseToRelNode`, `translate`
   and `explain`, default `false`; ttr-server#232). Set, a SQL statement whose **bare** join (`JOIN` with no `ON`) stays a
   Cartesian product is refused as `join_unconditioned` (`JoinerMessages.UNCONDITIONED`). The message names the join's

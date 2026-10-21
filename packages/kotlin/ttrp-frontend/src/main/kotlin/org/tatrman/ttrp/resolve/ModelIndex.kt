@@ -29,13 +29,26 @@ data class ImportScope(
  */
 class ModelIndex(
     val snapshot: RegistrySnapshot,
+    private val packageOf: (ModelObject) -> String = { it.qname.`package` },
 ) {
     private val query = MetadataQuery(snapshot)
-    private val objects: List<ModelObject> =
-        snapshot.model
-            .objectByQname()
-            .values
-            .toList()
+    val objectsByQname = snapshot.model.objectByQname()
+    private val objects: List<ModelObject> = objectsByQname.values.toList()
+    private val objectsByDotted = objects.associateBy { it.qname.dotted() }
+
+    fun objectNamed(qname: String): ModelObject? = objectsByDotted[qname]
+
+    /** Loader-owned package identity, never inferred from the checkout's absolute path. */
+    fun packageOf(obj: ModelObject): String = packageOf.invoke(obj)
+
+    /** Query bindings use db.query while query objects use their schema code. */
+    fun bindingTarget(obj: ModelObject): ModelObject? {
+        val target = erToDb(obj.qname).dbQname ?: return null
+        return objectsByQname[target] ?: objects.firstOrNull {
+            (it is org.tatrman.ttr.metadata.model.Query || it is org.tatrman.ttr.metadata.model.DbView) &&
+                it.qname.name == target.name
+        }
+    }
 
     /**
      * True iff some model object lives in package [pkg] (dir-path convention: `.` → `/`).

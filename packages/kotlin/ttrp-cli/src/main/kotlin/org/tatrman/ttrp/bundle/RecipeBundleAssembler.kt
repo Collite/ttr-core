@@ -37,6 +37,7 @@ class RecipeBundleAssembler(
         plan: TtrpPipeline.PlanResult,
         program: String,
         outDir: Path,
+        statements: List<RecipeStatement> = RecipeStatements.plan(plan),
     ): BundleAssembler.BundleResult {
         val model = requireNotNull(plan.recipe) { "$program holds no recipe" }
         val bound = requireNotNull(plan.bound)
@@ -48,7 +49,6 @@ class RecipeBundleAssembler(
         val files = sortedMapOf<String, String>()
 
         // --- statements, one per output, grouped by island ---
-        val statements = RecipeStatements.plan(plan)
         val parts =
             statements
                 .flatMap { it.parts }
@@ -67,7 +67,8 @@ class RecipeBundleAssembler(
                         files.getValue(p.file),
                         p.columns.map { OutputColumn(it.name, it.type) },
                         p.params,
-                        model.keyColumns.all { k -> p.columns.any { it.name == k } },
+                        model.keyColumns.all { k -> p.columns.any { it.name == k } } &&
+                            statements.filter { s -> s.parts.any { it.name == p.name } }.all { keyed(model, it) },
                     )
                 }.sortedBy { it.name }
         val islands =
@@ -79,8 +80,8 @@ class RecipeBundleAssembler(
                         write(bundleDir, s.file, s.sql + "\n", files)
                         IslandOutput(
                             port = s.port,
-                            file = s.file.takeIf { s.parts.isEmpty() },
-                            sha256 = files.getValue(s.file).takeIf { s.parts.isEmpty() },
+                            file = s.file,
+                            sha256 = files.getValue(s.file),
                             columns = s.columns.map { OutputColumn(it.name, it.type) },
                             params = s.params.ifEmpty { null },
                             keyed = keyed(model, s),
@@ -98,15 +99,26 @@ class RecipeBundleAssembler(
                     }
                 IslandEntry(
                     name = island.name,
-                    engine = island.engine,
+                    engine = if (own.first().parts.isNotEmpty()) "duckdb" else island.engine,
                     executor = NATIVE,
-                    invocation = SQL_TEXT,
+                    invocation = if (own.first().parts.isNotEmpty()) "duckdb" else SQL_TEXT,
                     file = own.first().file,
                     sha256 = files.getValue(own.first().file),
-                    connections = listOf(connEnv(island.engine)),
+                    connections =
+                        own
+                            .flatMap { s ->
+                                if (s.parts.isEmpty()) {
+                                    val engine =
+                                        bound.storages.firstOrNull { it.qname.name == s.storage }?.via ?: island.engine
+                                    listOf(connEnv(engine))
+                                } else {
+                                    s.parts.map { connEnv(it.engine) }
+                                }
+                            }.distinct()
+                            .sorted(),
                     params = outputs.flatMap { it.params.orEmpty() }.distinct().ifEmpty { null },
                     outputs = outputs,
-                    schema = ER,
+                    schema = if (own.first().parts.isNotEmpty()) "db" else ER,
                 )
             }
 

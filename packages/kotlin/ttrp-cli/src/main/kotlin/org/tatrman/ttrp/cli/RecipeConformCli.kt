@@ -117,6 +117,24 @@ object RecipeConformCli {
         return outcome.exitCode
     }
 
+    internal fun databaseName(
+        pid: Long,
+        suffix: String,
+    ): String {
+        val raw = "ttrp_conform_${pid}$suffix"
+        val safe = raw.lowercase(java.util.Locale.ROOT).replace(Regex("[^a-z0-9_]"), "_")
+        val hash =
+            java.security.MessageDigest
+                .getInstance("SHA-256")
+                .digest(raw.toByteArray())
+                .take(6)
+                .joinToString("") { "%02x".format(it) }
+        // Hash the original suffix, so case/sanitization/truncation cannot merge two storages.
+        return safe.take(50) + "_" + hash
+    }
+
+    internal fun scopedFixture(value: String): Boolean = Regex("[A-Za-z_][A-Za-z0-9_]*=.+").matches(value)
+
     /** Postgres from the recipe's island engine's `TTR_CONN_<ENGINE>` (`postgresql://user:pass@host:port/db`). */
     private fun postgres(
         plan: TtrpPipeline.PlanResult,
@@ -154,7 +172,7 @@ object RecipeConformCli {
             server,
             user,
             password,
-            "ttrp_conform_${ProcessHandle.current().pid()}${databaseSuffix.replace(Regex("[^a-zA-Z0-9_]"), "_")}",
+            databaseName(ProcessHandle.current().pid(), databaseSuffix),
             scripts,
         )
     }
