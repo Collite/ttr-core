@@ -49,6 +49,27 @@ class RecipeBundleAssembler(
 
         // --- statements, one per output, grouped by island ---
         val statements = RecipeStatements.plan(plan)
+        val parts =
+            statements
+                .flatMap { it.parts }
+                .groupBy { it.name }
+                .map { (_, copies) ->
+                    val p = copies.first()
+                    require(
+                        copies.all { it.storage == p.storage && it.sql == p.sql },
+                    ) { "part hash collision: ${p.name}" }
+                    write(bundleDir, p.file, p.sql + "\n", files)
+                    RecipePartEntry(
+                        p.name,
+                        p.storage,
+                        p.engine,
+                        p.file,
+                        files.getValue(p.file),
+                        p.columns.map { OutputColumn(it.name, it.type) },
+                        p.params,
+                        model.keyColumns.all { k -> p.columns.any { it.name == k } },
+                    )
+                }.sortedBy { it.name }
         val islands =
             exec.islands.mapNotNull { island ->
                 val own = statements.filter { it.island == island.name }
@@ -58,11 +79,21 @@ class RecipeBundleAssembler(
                         write(bundleDir, s.file, s.sql + "\n", files)
                         IslandOutput(
                             port = s.port,
-                            file = s.file,
-                            sha256 = files.getValue(s.file),
+                            file = s.file.takeIf { s.parts.isEmpty() },
+                            sha256 = files.getValue(s.file).takeIf { s.parts.isEmpty() },
                             columns = s.columns.map { OutputColumn(it.name, it.type) },
                             params = s.params.ifEmpty { null },
                             keyed = keyed(model, s),
+                            storage = s.storage.takeIf { s.parts.isEmpty() },
+                            combine =
+                                s.parts.takeIf { it.isNotEmpty() }?.let { ps ->
+                                    RecipeCombine(
+                                        s.file,
+                                        files.getValue(s.file),
+                                        ps.map { it.name }.distinct(),
+                                        s.params,
+                                    )
+                                },
                         )
                     }
                 IslandEntry(
@@ -70,8 +101,8 @@ class RecipeBundleAssembler(
                     engine = island.engine,
                     executor = NATIVE,
                     invocation = SQL_TEXT,
-                    file = outputs.first().file,
-                    sha256 = outputs.first().sha256,
+                    file = own.first().file,
+                    sha256 = files.getValue(own.first().file),
                     connections = listOf(connEnv(island.engine)),
                     params = outputs.flatMap { it.params.orEmpty() }.distinct().ifEmpty { null },
                     outputs = outputs,
@@ -165,6 +196,7 @@ class RecipeBundleAssembler(
                 objectsRead = objectsRead(plan),
                 fingerprints = fingerprints,
                 protocol = model.protocol,
+                parts = parts.ifEmpty { null },
             )
 
         val manifest =

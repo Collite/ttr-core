@@ -209,7 +209,10 @@ class ConformCommand : CliktCommand(name = "conform") {
     private val engines by option("--engines", help = "a recipe's engines, comma-separated: pg, duckdb").default(
         "pg,duckdb",
     )
-    private val fixture by option("--fixture", help = "a recipe's fixture script (SQL), loaded in order").multiple()
+    private val fixture by option(
+        "--fixture",
+        help = "SQL fixture, or <storage>=<sql> for cross-storage recipes (repeatable)",
+    ).multiple()
     private val asOf by option("--as-of", help = "a recipe's :as_of, an ISO local date-time (2026-11-02T08:00)")
     private val engineDelta by option(
         "--engine-delta",
@@ -255,11 +258,16 @@ class ConformCommand : CliktCommand(name = "conform") {
                 RecipeConformCli.run(
                     recipePlan,
                     engines.split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                    fixture.map { Path.of(it).toAbsolutePath() },
+                    fixture.filter { "=" !in it }.map { Path.of(it).toAbsolutePath() },
                     instant,
                     tolerances(),
                     System.getenv().filterKeys { it.startsWith("TTR_CONN_") },
                     numericDeltas = pairs(engineDelta),
+                    storageFixtures =
+                        fixture.filter { "=" in it }.groupBy(
+                            { it.substringBefore('=') },
+                            { Path.of(it.substringAfter('=')).toAbsolutePath() },
+                        ),
                 ) { echo(it) },
             )
         }
@@ -526,6 +534,14 @@ object TtrpCli {
             listOf("as_of") + model.derivedParams.map { "${it.name} (${it.base} ${it.op} ${it.amount} ${it.unit})" }
         return buildString {
             appendLine("bundle · ${statements.size} statements (SQL over E-R) · verdict ${model.name}_verdict")
+            statements.flatMap { it.parts }.distinctBy { it.name }.sortedBy { it.name }.forEach { p ->
+                appendLine("  part ${p.name}: storage ${p.storage} · engine ${p.engine} · ${p.file}")
+            }
+            statements.filter { it.parts.isNotEmpty() }.forEach { s ->
+                appendLine(
+                    "  combine ${s.island}.${s.port}: DuckDB · ${s.file} · parts ${s.parts.joinToString { it.name }}",
+                )
+            }
             appendLine("  the run binds: ${bound.joinToString(", ")}")
             appendLine("  fingerprints: text ${fp.text} · values ${fp.values} · labels ${fp.labels}")
         }.trimEnd()

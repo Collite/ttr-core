@@ -151,8 +151,8 @@ data class IslandEntry(
 @Serializable
 data class IslandOutput(
     val port: String,
-    val file: String,
-    val sha256: String,
+    val file: String? = null,
+    val sha256: String? = null,
     val columns: List<OutputColumn>,
     val params: List<String>? = null,
     /**
@@ -160,6 +160,8 @@ data class IslandOutput(
      * filters this output on it (AU-C-3). False for a lookup or a set-level context. Null (omitted) elsewhere.
      */
     val keyed: Boolean? = null,
+    val combine: RecipeCombine? = null,
+    val storage: String? = null,
 )
 
 @Serializable

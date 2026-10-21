@@ -194,6 +194,39 @@ class TtrpPipeline(
             compiled = sugared.graph
         }
 
+        if (recipeModel != null) {
+            compiled =
+                compiled.copy(
+                    loadSources =
+                        compiled.loadSources.mapValues { (_, src) ->
+                            if (src.storage != null) {
+                                src
+                            } else {
+                                val placements =
+                                    org.tatrman.ttrp.resolve.RecipePlacement.storages(
+                                        src,
+                                        bound.world,
+                                        report.modelIndex,
+                                    )
+                                if (placements.size != 1) {
+                                    diags +=
+                                        TtrpDiagnostic(
+                                            org.tatrman.ttrp.diagnostics.TtrpDiagnosticId.REC_090,
+                                            Severity.ERROR,
+                                            "recipe load ${src.objectQname} has no unique storage",
+                                            org.tatrman.ttrp.ast.SourceLocation.UNKNOWN,
+                                        )
+                                    src
+                                } else {
+                                    src.copy(storage = placements.single())
+                                }
+                            }
+                        },
+                )
+        }
+        if (diags.any { it.severity == Severity.ERROR }) {
+            return PlanResult(fileName, null, null, null, emptyList(), diags, ok = false, recipe = recipeModel)
+        }
         val norm: NormalizeResult = RewriteEngine(Rules.ALL, bound).normalize(compiled)
         // RJ-P1 elaboration authoring diagnostics (dead-wire RJ-101; fail-closed RJ-107 unsupported
         // reject type + RJ-108 reject-capable join ON — RJ-P5 review).

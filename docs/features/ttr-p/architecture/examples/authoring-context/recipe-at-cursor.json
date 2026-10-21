@@ -3188,6 +3188,10 @@
       {
         "id": "TTRP-REC-080",
         "suggestedAlternative": "the island's output does not compile to a statement the door runs — restate it with what the message names (a column the row carries, a whole-WHERE `IN`/`EXISTS`, a `target` island)"
+      },
+      {
+        "id": "TTRP-REC-090",
+        "suggestedAlternative": "place the entity on exactly one storage: er2db/hosts, or writable for an unbound entity"
       }
     ]
   },
@@ -3385,6 +3389,11 @@
       "id": "TTRP-REC-080",
       "area": "REC",
       "suggestedAlternative": "the island's output does not compile to a statement the door runs — restate it with what the message names (a column the row carries, a whole-WHERE `IN`/`EXISTS`, a `target` island)"
+    },
+    {
+      "id": "TTRP-REC-090",
+      "area": "REC",
+      "suggestedAlternative": "place the entity on exactly one storage: er2db/hosts, or writable for an unbound entity"
     },
     {
       "id": "TTRP-PRS-007",

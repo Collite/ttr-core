@@ -109,6 +109,43 @@ class RecipeBundleSpec :
             }
         }
 
+        "cross-storage manifest declares shared parts and combines instead of door statements" {
+            val result = build("monitor_inbound.ttrp")
+            val parts = result.manifest.recipe!!.parts!!
+            parts.map { it.storage }.toSet() shouldBe setOf("erp_db", "automation_db")
+            parts.map { it.name }.distinct().size shouldBe parts.size
+            val outputs = result.manifest.islands.flatMap { it.outputs.orEmpty() }
+            val combining = outputs.filter { it.combine != null }
+            (combining.isNotEmpty()) shouldBe true
+            combining.forEach { o ->
+                o.file shouldBe null
+                o.sha256 shouldBe null
+                val c = o.combine!!
+                result.manifest.files[c.file] shouldBe c.sha256
+                c.parts.forEach { name -> parts.any { it.name == name } shouldBe true }
+            }
+            parts.forEach { p ->
+                result.manifest.files[p.file] shouldBe p.sha256
+                p.keyed shouldBe p.columns.any { it.name == "line_id" }
+            }
+            RunManifest.fromJson(result.manifest.toJson()) shouldBe result.manifest
+        }
+        "changing an ERP part moves text, never values or labels" {
+            val original = source("settle.ttrp")
+            val changed =
+                original.replace(
+                    "l.state IN ('settling', 'goods_received')",
+                    "l.state IN ('settling')",
+                )
+            (changed != original) shouldBe true
+            val a = build("settle.ttrp", original).manifest.recipe!!
+            val b = build("settle.ttrp", changed).manifest.recipe!!
+            a.parts shouldNotBe b.parts
+            a.fingerprints.text shouldNotBe b.fingerprints.text
+            a.fingerprints.values shouldBe b.fingerprints.values
+            a.fingerprints.labels shouldBe b.fingerprints.labels
+        }
+
         "the recipe object: roles, routes, wiring in TTR-P's spelling, mode, the verdict schema, what it reads" {
             val rec = build("release_order.ttrp").manifest.recipe!!
             rec.name shouldBe "release_order"

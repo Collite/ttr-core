@@ -141,7 +141,13 @@ class RecipeStatementsSpec :
         "the statements match their goldens" {
             val all =
                 statements.flatMap { (f, list) ->
-                    list.map { s -> "recipes/${f.removeSuffix(".ttrp")}/${s.island}.${s.port}.sql" to s.sql }
+                    list
+                        .flatMap { s ->
+                            val suffix = if (s.parts.isEmpty()) ".sql" else ".duckdb.sql"
+                            val file = "${s.island}.${s.port}$suffix"
+                            listOf("recipes/${f.removeSuffix(".ttrp")}/$file" to s.sql) +
+                                s.parts.map { p -> "recipes/${f.removeSuffix(".ttrp")}/${p.file}" to p.sql }
+                        }.distinct()
                 }
             if (System.getProperty("updateGolden") == "true") {
                 // every golden at once (GoldenSupport stops at the first); then fail, so the diff is reviewed

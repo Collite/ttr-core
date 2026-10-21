@@ -70,11 +70,22 @@ class SqlTextPlanner(
     private val dropSynthesized: Boolean = false,
     /** AU-core-P2: a text = integer equality compares the integer as text ([SqlGraphEmitter]'s `textKeys`). */
     private val textKeys: Boolean = false,
+    /** S2.5: cut at storage boundaries; ordinary programs and DB-tier oracles keep their old plan. */
+    private val cutStorage: Boolean = false,
+    private val partDialect: SqlDialect? = null,
 ) {
     private data class Built(
         val plan: PlanNode,
         val columns: List<EmitColumn>,
+        val storages: Set<String> = emptySet(),
+        val combined: Boolean = false,
     )
+
+    val parts = linkedMapOf<String, org.tatrman.ttrp.emit.recipe.RecipePart>()
+    var storage: String? = null
+        private set
+    var combining: Boolean = false
+        private set
 
     private val tables = LinkedHashMap<Pair<String, String>, LinkedHashMap<String, String>>()
     private val inlineSql = LinkedHashMap<String, String>()
@@ -93,9 +104,26 @@ class SqlTextPlanner(
         projection: DisplaySchema? = null,
     ): SqlTextOutput {
         val built = build(container, port, projection)
+        storage = built.storages.singleOrNull()
+        combining = built.combined
+        val target =
+            when {
+                built.combined -> SqlDialect.DUCKDB
+                cutStorage && storage != null && partDialect == null -> storageDialect(requireNotNull(storage))
+                else -> dialect
+            }
+        return render(built, port, target, container.label)
+    }
+
+    private fun render(
+        built: Built,
+        port: String,
+        target: SqlDialect,
+        label: String,
+    ): SqlTextOutput {
         val model = modelTables()
-        val facade = TranslatorFacade(IslandModelHandle(model), dialect)
-        val (raw, order) = facade.unparseNamed(built.plan, params.mapValues { it.value.typeTag }, container.label)
+        val facade = TranslatorFacade(IslandModelHandle(model), target)
+        val (raw, order) = facade.unparseNamed(built.plan, params.mapValues { it.value.typeTag }, label)
         val named = SqlTextRender.namePlaceholders(raw, order)
         val inlined = SqlTextRender.inlineSources(named, INLINE_NS, inlineSql)
         // The door dialect (F-AG-17): the host's SQL door parses the statement back with default quoting
@@ -121,6 +149,8 @@ class SqlTextPlanner(
         port: String,
         projection: DisplaySchema?,
     ): Built {
+        parts.clear()
+        combining = false
         tables.clear()
         inlineSql.clear()
         val portPlan = output(container, port, HashMap()).let { if (dropSynthesized) withoutSynthesized(it) else it }
@@ -140,7 +170,7 @@ class SqlTextPlanner(
                     .setAlias(c.name),
             )
         }
-        return Built(PlanNode.newBuilder().setProject(project).build(), kept)
+        return built.copy(plan = PlanNode.newBuilder().setProject(project).build(), columns = kept)
     }
 
     private fun modelTables(): List<ModelTable> =
@@ -219,7 +249,17 @@ class SqlTextPlanner(
                     )
             val built = HashMap<String, Built>()
             for (en in chain) {
-                val ins = en.inputs.map { input(it, built, memo, container) }
+                val original = en.inputs.map { input(it, built, memo, container) }
+                val storages = original.flatMap { it.storages }.toSet()
+                val combined = original.any { it.combined } || storages.size > 1
+                val ins =
+                    if (cutStorage && combined) {
+                        original.map { source ->
+                            if (!source.combined && source.storages.size == 1) part(source, container.label) else source
+                        }
+                    } else {
+                        original
+                    }
                 val body =
                     PlanNodeBuilder(params = params, existenceAsJoin = true).body(
                         en.node,
@@ -229,7 +269,7 @@ class SqlTextPlanner(
                         },
                         en.joinKeep,
                     )
-                built[en.node.id] = Built(body, en.outputColumns)
+                built[en.node.id] = Built(body, en.outputColumns, storages, cutStorage && combined)
             }
             built.getValue(chain.last().node.id)
         }
@@ -261,11 +301,12 @@ class SqlTextPlanner(
      */
     private fun modelScan(m: EmitInput.Model): Built {
         val src = m.source
+        val storage = src.storage?.let { setOf(it) }.orEmpty()
         if (tier == SqlTier.ER || src.unbound) {
             val name = if (tier == SqlTier.ER) src.objectQname.substringAfterLast('.') else src.name
             val registered = tables.getOrPut(ENTITY_NS to name) { LinkedHashMap() }
             src.columns.forEach { registered.putIfAbsent(it.name, it.type) }
-            return Built(scan(ENTITY_NS, name, src.columns.map { it.name }.distinct()), m.columns)
+            return Built(scan(ENTITY_NS, name, src.columns.map { it.name }.distinct()), m.columns, storage)
         }
         val inline = src.sql
         val ns = if (inline != null) INLINE_NS else TABLE_NS
@@ -283,7 +324,44 @@ class SqlTextPlanner(
                     .setAlias(c.name),
             )
         }
-        return Built(PlanNode.newBuilder().setProject(project).build(), m.columns)
+        return Built(PlanNode.newBuilder().setProject(project).build(), m.columns, storage)
+    }
+
+    private fun storageDialect(storage: String): SqlDialect {
+        val engine = requireNotNull(world.storages.single { it.qname.name == storage }.via)
+        val resolved = world.engines.getValue(engine).engine
+        return DialectRegistry.forEngine(resolved.type ?: "postgres", resolved.version)
+    }
+
+    /** Replace a maximal single-storage input with its content-addressed table in the combine. */
+    private fun part(
+        source: Built,
+        label: String,
+    ): Built {
+        val storage = source.storages.single()
+        val engine = requireNotNull(world.storages.single { it.qname.name == storage }.via)
+        val target = storageDialect(storage)
+        val statement = render(source, "", partDialect ?: target, label)
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        // Storage is part of identity: identical SQL on two databases is two different reads.
+        val hash = digest.digest((storage + "\n" + statement.sql).toByteArray()).joinToString("") { "%02x".format(it) }
+        val name = "p_" + hash.take(8)
+        val part =
+            org.tatrman.ttrp.emit.recipe.RecipePart(
+                name,
+                storage,
+                engine,
+                statement.sql,
+                source.columns.map {
+                    EmitColumn(it.name, it.type)
+                },
+                statement.params,
+            )
+        val prior = parts.putIfAbsent(name, part)
+        require(prior == null || prior == part) { "part hash collision: $name: $prior versus $part" }
+        val registered = tables.getOrPut(TABLE_NS to name) { LinkedHashMap() }
+        source.columns.forEach { registered[it.name] = it.type }
+        return Built(scan(TABLE_NS, name, source.columns.map { it.name }), source.columns, source.storages, true)
     }
 
     /** An opaque `"""sql` fragment producer: its verbatim text as an inline source, typed by the world schema. */

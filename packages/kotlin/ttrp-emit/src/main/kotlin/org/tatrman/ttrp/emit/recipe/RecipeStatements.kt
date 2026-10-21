@@ -38,8 +38,10 @@ data class RecipeStatement(
     val sql: String,
     val columns: List<EmitColumn>,
     val params: List<String>,
+    val parts: List<RecipePart> = emptyList(),
+    val storage: String? = null,
 ) {
-    val file: String get() = "islands/$island.$port.sql"
+    val file: String get() = "islands/$island.$port" + if (parts.isEmpty()) ".sql" else ".duckdb.sql"
 }
 
 /**
@@ -61,13 +63,16 @@ object RecipeStatements {
         plan: TtrpPipeline.PlanResult,
         tier: SqlTier = SqlTier.ER,
         dialect: SqlDialect? = null,
+        splitStorage: Boolean = tier == SqlTier.ER,
     ): List<RecipeStatement> {
         val graph = requireNotNull(plan.graph) { "a recipe compiles only from a checked plan" }
         val exec = requireNotNull(plan.exec)
         val bound = requireNotNull(plan.bound)
         val model = requireNotNull(plan.recipe) { "${plan.fileName} holds no recipe" }
         val params = params(model, graph)
-        return exec.islands.flatMap { island -> islandStatements(island, graph, bound, params, tier, dialect) }
+        return exec.islands.flatMap { island ->
+            islandStatements(island, graph, bound, params, tier, dialect, splitStorage)
+        }
     }
 
     private fun islandStatements(
@@ -77,6 +82,7 @@ object RecipeStatements {
         params: Map<String, PlanParam>,
         tier: SqlTier,
         dialect: SqlDialect?,
+        splitStorage: Boolean = tier == SqlTier.ER,
     ): List<RecipeStatement> {
         val container = graph.containers.getValue(island.id)
         val planner =
@@ -89,12 +95,22 @@ object RecipeStatements {
                 tier = tier,
                 dropSynthesized = true,
                 textKeys = true,
+                cutStorage = splitStorage,
+                partDialect = dialect,
             )
         return container.declaredPorts
             .filter { it.direction == PortDirection.OUT && it.kind == PortKind.DATA && it.name != "rejects" }
             .map { port ->
                 val out = planner.emit(container, port.name)
-                RecipeStatement(island.name, port.name, out.sql, out.columns, out.params)
+                RecipeStatement(
+                    island.name,
+                    port.name,
+                    out.sql,
+                    out.columns,
+                    out.params,
+                    planner.parts.values.toList(),
+                    planner.storage,
+                )
             }
     }
 

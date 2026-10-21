@@ -247,13 +247,26 @@ interface RecipeEngine : AutoCloseable {
 /** Embedded DuckDB, in memory (D-18/D-40: the native runner's second engine) — [fixtures] run in order. */
 class DuckDbRecipeEngine(
     fixtures: List<String>,
+    attachment: String? = null,
 ) : RecipeEngine {
     override val name = "duckdb"
     override val dialect = SqlDialect.DUCKDB
     override val connection: Connection = DriverManager.getConnection("jdbc:duckdb:")
 
     init {
-        fixtures.forEach { JdbcStatements.load(connection, it) }
+        try {
+            if (attachment != null) {
+                val name = "\"" + attachment.replace("\"", "\"\"") + "\""
+                connection.createStatement().use {
+                    it.execute("ATTACH ':memory:' AS $name")
+                    it.execute("USE $name")
+                }
+            }
+            fixtures.forEach { JdbcStatements.load(connection, it) }
+        } catch (e: Exception) {
+            connection.close()
+            throw e
+        }
     }
 
     override fun close() = connection.close()
@@ -331,6 +344,13 @@ class RecipeConform(
         }
         return EngineRun(engine.name, statements, outputs, failures)
     }
+
+    /** S2.5: each part is read once on its storage; only its rows reach the embedded combine engine. */
+    fun runAcross(
+        engines: Map<String, RecipeEngine>,
+        plan: TtrpPipeline.PlanResult,
+        asOf: LocalDateTime,
+    ): EngineRun = RecipeCrossStorage.run(engines, plan, asOf)
 
     /** Exit 0 every output agrees · 1 an output differs · 2 a statement failed on an engine. */
     fun compare(runs: List<EngineRun>): ConformOutcome {

@@ -205,6 +205,24 @@ class TtrpChecker(
             }
         }
 
+        if (doc.statements.any { it is org.tatrman.ttrp.ast.RecipeDecl } && world != null) {
+            ctx.loadSources.replaceAll { location, source ->
+                val placements = RecipePlacement.storages(source, world, modelIndex)
+                if (placements.size != 1) {
+                    diags +=
+                        diag(
+                            TtrpDiagnosticId.REC_090,
+                            "entity `${source.objectQname}` has ${placements.size} storage placements: " +
+                                placements.joinToString(),
+                            location,
+                        )
+                    source
+                } else {
+                    source.copy(storage = placements.single())
+                }
+            }
+        }
+
         // ---- action displays (DSP, grammar 0.14): display(<name>) held to an imported row schema ----
         val displaySchemas = checkDisplays(doc, world, imports, programSchemas, diags)
 
@@ -666,7 +684,12 @@ class TtrpChecker(
         opLocation: SourceLocation? = null,
     ): List<Column>? {
         if (opLocation != null) {
-            modelIndex?.let { idx -> LoadSourceResolver.resolve(obj, idx)?.let { ctx.loadSources[opLocation] = it } }
+            modelIndex?.let { idx ->
+                LoadSourceResolver.resolve(obj, idx, allowUnbound = ctx.recipeEntities.isNotEmpty())?.let {
+                    ctx.loadSources[opLocation] =
+                        it
+                }
+            }
         }
         return loadModelObjectSchema(obj, loc, ctx)
     }
@@ -684,7 +707,7 @@ class TtrpChecker(
                 val binding = modelIndex!!.erToDb(obj.qname)
                 if (binding.dbQname == null) {
                     // A stdlib entity is bound by the deploying world's automation storage, never by er2db.
-                    if (!modelIndex.isAutomationStdlib(obj)) {
+                    if (!modelIndex.isAutomationStdlib(obj) && ctx.recipeEntities.isEmpty()) {
                         ctx.diags +=
                             diag(
                                 TtrpDiagnosticId.RES_005,

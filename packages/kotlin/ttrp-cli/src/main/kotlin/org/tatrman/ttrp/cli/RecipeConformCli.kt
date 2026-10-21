@@ -13,7 +13,8 @@ import java.time.LocalDateTime
 
 /**
  * `ttrp conform <recipe>.ttrp --engines pg,duckdb --fixture <sql>… --as-of <instant>` (AU-core-P2 · S2.4 T3) — a
- * recipe has no placement variants (one engine, the door): it conforms ACROSS engines. Every engine gets its own
+ * recipe conforms across engines. Scoped `<storage>=<sql>` fixtures use separate source databases and DuckDB
+ * combines; unscoped fixtures retain the single-database oracle. Every engine gets its own
  * database loaded with the fixture scripts in order (Postgres: a scratch database on the server `TTR_CONN_<ENGINE>`
  * names, dropped afterwards; DuckDB: in memory), runs every output's statement with the run's bindings at `--as-of`,
  * and every engine's outputs are compared with the first's on the seven points. One engine: the statements run, and
@@ -29,15 +30,52 @@ object RecipeConformCli {
         tolerances: Map<String, Double>,
         env: Map<String, String>,
         numericDeltas: Map<String, Double> = emptyMap(),
+        storageFixtures: Map<String, List<Path>> = emptyMap(),
         echo: (String) -> Unit,
     ): Int {
-        if (fixtures.isEmpty()) {
+        if (fixtures.isEmpty() && storageFixtures.isEmpty()) {
             echo("ttrp conform: a recipe conforms over a fixture — pass --fixture <script.sql> (schema, then rows)")
             return 2
         }
         val scripts = fixtures.map { Files.readString(it) }
         val opened = mutableListOf<RecipeEngine>()
         try {
+            val conform = RecipeConform(tolerances, numericDeltas)
+            if (storageFixtures.isNotEmpty()) {
+                require(fixtures.isEmpty()) { "use either unscoped fixtures or <storage>=<sql>, not both" }
+                val bound = requireNotNull(plan.bound)
+                val used =
+                    requireNotNull(plan.graph)
+                        .loadSources.values
+                        .mapNotNull { it.storage }
+                        .distinct()
+                require(storageFixtures.keys == used.toSet()) {
+                    "fixtures must name exactly the recipe's storages: ${used.joinToString()}"
+                }
+                val runs =
+                    engines.mapIndexed { i, e ->
+                        val sources =
+                            used.associateWith { storage ->
+                                val scriptsForStorage = storageFixtures.getValue(storage).map { Files.readString(it) }
+                                val engine = requireNotNull(bound.storages.single { it.qname.name == storage }.via)
+                                val source =
+                                    when (e.lowercase()) {
+                                        "duckdb" -> DuckDbRecipeEngine(scriptsForStorage, storage)
+                                        "pg", "postgres" ->
+                                            postgres(plan, env, scriptsForStorage, echo, engine, "_${i}_$storage")
+                                                ?: return 2
+                                        else -> {
+                                            echo("ttrp conform: unknown engine '$e' (a recipe runs on pg, duckdb)")
+                                            return 2
+                                        }
+                                    }
+                                opened += source
+                                source
+                            }
+                        conform.runAcross(sources, plan, asOf)
+                    }
+                return report(conform, runs, echo)
+            }
             for (e in engines) {
                 opened +=
                     when (e.lowercase()) {
@@ -53,20 +91,30 @@ object RecipeConformCli {
                         }
                     }
             }
-            val conform = RecipeConform(tolerances, numericDeltas)
             val runs = opened.map { conform.runOn(it, plan, asOf) }
-            if (runs.size == 1) {
-                val run = runs.single()
-                run.outputs.forEach { (out, t) -> echo("$out: ${t.rows.size} row(s)") }
-                run.failures.forEach { (out, why) -> echo("$out FAILED on ${run.engine}: $why") }
-                return if (run.failures.isEmpty()) 0 else 2
-            }
-            val outcome = conform.compare(runs)
-            echo(outcome.summary())
-            return outcome.exitCode
+            return report(conform, runs, echo)
+        } catch (e: Exception) {
+            echo("ttrp conform: ${e.message}")
+            return 2
         } finally {
-            opened.forEach { runCatching { it.close() } }
+            opened.asReversed().forEach { runCatching { it.close() } }
         }
+    }
+
+    private fun report(
+        conform: RecipeConform,
+        runs: List<RecipeConform.EngineRun>,
+        echo: (String) -> Unit,
+    ): Int {
+        if (runs.size == 1) {
+            val run = runs.single()
+            run.outputs.forEach { (out, t) -> echo("$out: ${t.rows.size} row(s)") }
+            run.failures.forEach { (out, why) -> echo("$out FAILED on ${run.engine}: $why") }
+            return if (run.failures.isEmpty()) 0 else 2
+        }
+        val outcome = conform.compare(runs)
+        echo(outcome.summary())
+        return outcome.exitCode
     }
 
     /** Postgres from the recipe's island engine's `TTR_CONN_<ENGINE>` (`postgresql://user:pass@host:port/db`). */
@@ -75,12 +123,20 @@ object RecipeConformCli {
         env: Map<String, String>,
         scripts: List<String>,
         echo: (String) -> Unit,
+        storageEngine: String? = null,
+        databaseSuffix: String = "",
     ): RecipeEngine? {
         val names =
-            requireNotNull(plan.exec)
-                .islands
-                .map { "TTR_CONN_" + it.engine.uppercase().replace(Regex("[^A-Z0-9]"), "_") }
-                .distinct()
+            if (storageEngine !=
+                null
+            ) {
+                listOf("TTR_CONN_" + storageEngine.uppercase().replace(Regex("[^A-Z0-9]"), "_"))
+            } else {
+                requireNotNull(plan.exec)
+                    .islands
+                    .map { "TTR_CONN_" + it.engine.uppercase().replace(Regex("[^A-Z0-9]"), "_") }
+                    .distinct()
+            }
         val name = names.singleOrNull()
         val url = name?.let { env[it] }
         if (url == null) {
@@ -94,6 +150,12 @@ object RecipeConformCli {
         val uri = URI(url)
         val (user, password) = (uri.userInfo ?: "").split(":", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
         val server = "jdbc:postgresql://${uri.host}:${if (uri.port > 0) uri.port else 5432}"
-        return PostgresRecipeEngine(server, user, password, "ttrp_conform_${ProcessHandle.current().pid()}", scripts)
+        return PostgresRecipeEngine(
+            server,
+            user,
+            password,
+            "ttrp_conform_${ProcessHandle.current().pid()}${databaseSuffix.replace(Regex("[^a-zA-Z0-9_]"), "_")}",
+            scripts,
+        )
     }
 }

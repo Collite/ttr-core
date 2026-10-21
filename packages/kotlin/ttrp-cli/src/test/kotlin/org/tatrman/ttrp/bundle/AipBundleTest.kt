@@ -98,7 +98,7 @@ class AipBundleTest :
             val r = build()
             val checked =
                 r.manifest.islands.flatMap { it.outputs.orEmpty() }.map { o ->
-                    golden(o.file.removePrefix("islands/"), Files.readString(r.dir.resolve(o.file)))
+                    golden(requireNotNull(o.file).removePrefix("islands/"), Files.readString(r.dir.resolve(o.file)))
                 }
             // Updated goldens must be reviewed in `git diff`, never silently green.
             if (checked.any { !it }) fail("goldens updated — review git diff, re-run without -DupdateGolden")
