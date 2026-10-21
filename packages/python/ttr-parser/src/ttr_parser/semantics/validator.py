@@ -48,7 +48,7 @@ from .references import (
 )
 from .resolver import ResolutionContext, Resolved, Resolver, Unresolved
 from .search_method import validate_search_method
-from .symbol_table import SymbolTable
+from .symbol_table import SymbolEntry, SymbolTable
 
 _ER2DB_KINDS = frozenset({"er2db_entity", "er2db_attribute", "er2db_relation"})
 
@@ -102,6 +102,16 @@ def _warn(code: DiagnosticCode, message: str, source: SourceLocation) -> Validat
 
 def _info(code: DiagnosticCode, message: str, source: SourceLocation) -> ValidationDiagnostic:
     return ValidationDiagnostic(code, DiagnosticSeverity.INFORMATION, source, message)
+
+
+def _imported_package_of(symbol: SymbolEntry) -> str:
+    """The package part of an import that reaches `symbol`: the key less its name, as an element's
+    named import is written. 0.17: a concept - or an event's participant label under it - is imported
+    by package and name (`import hartland.core.Customer`), so it reads the symbol's package. Mirrors
+    the TS `importedPackageOf`."""
+    if symbol.schema_code == "cn":
+        return symbol.package_name
+    return symbol.qname.value.rsplit(".", 1)[0]
 
 
 class Validator:
@@ -418,6 +428,7 @@ class Validator:
             schema_code = doc.schema_code or default_schema_for_kind(
                 collected.owner_def.kind
             )
+            # The ref itself: a cn slot's ref carries its context (0.17), so it resolves among concepts.
             res = resolver.resolve_reference(
                 collected.path,
                 ResolutionContext(
@@ -426,12 +437,13 @@ class Validator:
                     imports=doc.imports,
                     package_name=doc.package_name,
                 ),
+                cn_context=collected.cn_context,
             )
             if isinstance(res, Resolved) and res.via_step in (
                 "named-import",
                 "wildcard-import",
             ):
-                used.add(res.symbol.qname.value.rsplit(".", 1)[0])
+                used.add(_imported_package_of(res.symbol))
 
         for imp in doc.imports:
             if not imp.wildcard:

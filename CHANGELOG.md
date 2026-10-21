@@ -87,6 +87,10 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   - **A `concept { }` on a measure written inline in a cubelet's `measures:` is `cn/grounding-target-kind`** — it
     grounds nothing (the inline measure is no symbol a grounding could name); it was dropped silently on all three.
     Fixture 104.
+  - **A named concept import counts as used.** `ttr/unused-import` reads the reference whole (its cn context) and
+    compares the concept's package, on TS, Kotlin and Python — `import hartland.core.Customer` beside `involves:
+    [Customer]` was reported unused, and the safe fix deleted it. A concept a `concept { }` block alone declares is
+    located at its name. Fixture 105.
   - **`ttr-writer`** — `TtrRenderer` writes concept defs, the cn bindings and the `concept { }` sugar in the
     formatter's layout; expression blocks re-parse byte-exact.
   - **`ttr-metadata`** — the typed tier `CnSchema` (`SchemaCode.CN`, library-only): every concept with what the

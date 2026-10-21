@@ -300,7 +300,8 @@ class SymbolTable:
                 source_file=uri,
                 stereotype=c.stereotype,
                 cn_origin=SUGAR,
-                location=c.declaring.source,
+                # The name in the declaring slot, not the slot (TS parity, review-119 M-5).
+                location=c.declaring.ref.source,
             )
             out.append(entry)
             if c.stereotype == "event":

@@ -20,14 +20,18 @@ import path from 'node:path';
  *
  * Grammar 0.16 (AU-core-P0, 2026-10-19): the base reached ≈ 601 KB gz — the generated TTR parser grew by
  * the automation model's rules, no SQL parser involved. Ceiling 640 KB: still far below a parser leak.
+ *
+ * Grammar 0.17 (CN-P2, 2026-10-21): the base reached ≈ 641 KB gz — the cn model's parser rules, semantics
+ * (desugar, groundings, validation, the hygiene report) and LSP features (hover, rename); still no SQL
+ * parser. Ceiling 680 KB: a parser leak (≈ +400 KB) still trips it.
  */
-const CEILING_BYTES = 640 * 1024;
+const CEILING_BYTES = 680 * 1024;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const bundle = path.resolve(here, '../../dist/server-browser.js');
 
 describe('browser Worker bundle size (S0.3 / E11)', () => {
-  it('server-browser.js gzips under the 640 KB ceiling (no parser leak)', () => {
+  it('server-browser.js gzips under the 680 KB ceiling (no parser leak)', () => {
     if (!existsSync(bundle)) {
       throw new Error(
         `dist/server-browser.js missing — run \`pnpm --filter @tatrman/lsp build\` before this test`,

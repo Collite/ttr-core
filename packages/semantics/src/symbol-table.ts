@@ -127,7 +127,8 @@ export class DocumentSymbolTable {
         qname: this.makeQname('concept', [c.name]),
         kind: 'concept',
         name: c.name,
-        source: c.declaring.source,
+        // The name in the declaring slot, not the slot — what a rename edits (review-119 M-5).
+        source: c.declaring.ref.source,
         documentUri: this.documentUri,
         packageName: this.packageName,
         schemaCode: 'cn',

@@ -94,7 +94,8 @@ internal class DocumentSymbols(
                     kind = "concept",
                     name = c.name,
                     namespace = namespace,
-                    source = c.declaring.source,
+                    // The name in the declaring slot, not the slot (TS parity, review-119 M-5).
+                    source = c.declaring.ref.source,
                     documentUri = documentUri,
                     parent = null,
                     packageName = packageName,

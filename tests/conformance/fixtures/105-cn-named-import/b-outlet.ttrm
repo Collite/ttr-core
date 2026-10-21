@@ -1,0 +1,5 @@
+// A second `Store`, in `hartland.outlet` — `c-web.ttrm` imports this package by wildcard too.
+package hartland.outlet
+model cn
+
+def kind Store { label: { en: "Outlet" } }

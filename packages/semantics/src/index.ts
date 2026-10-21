@@ -80,7 +80,15 @@ export type { DeclaredVocabulary, DeclaredVocabularyEntry, DeclaredValue } from 
 export { ProjectSymbolTable } from './project-symbols.js';
 export { Resolver } from './resolver.js';
 export type { ResolutionResult, LexicalScope, ResolutionStep, ResolutionAttempt } from './resolver.js';
-export { collectReferences, collectAllReferences, nestedDefs, isCnContextRef } from './references.js';
+export {
+  collectReferences,
+  collectAllReferences,
+  collectSugarDeclaringRefs,
+  conceptSugarOf,
+  nestedDefs,
+  isCnContextRef,
+  sugarDeclaringRef,
+} from './references.js';
 export type { CnSlotReference } from './references.js';
 export { ReferenceIndex, enclosingQnameOf } from './reference-index.js';
 export type { ReferenceLocation } from './reference-index.js';

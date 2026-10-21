@@ -1,0 +1,24 @@
+{
+    "diagnostics": [
+        "cn/ungrounded",
+        "cn/ungrounded",
+        "cn/ungrounded",
+        "cn/ungrounded",
+        "cn/ungrounded"
+    ],
+    "resolved": [
+        "Party => hartland.core.cn.concept.Party",
+        "Shopper => hartland.web.cn.concept.Shopper",
+        "Store => hartland.core.cn.concept.Store",
+        "Visit => hartland.web.cn.concept.Visit"
+    ],
+    "symbols": [
+        "hartland.core.cn.concept.Party",
+        "hartland.core.cn.concept.Store",
+        "hartland.outlet.cn.concept.Store",
+        "hartland.web.cn.concept.Shopper",
+        "hartland.web.cn.concept.Visit",
+        "hartland.web.cn.concept.Visit.shopper",
+        "hartland.web.cn.concept.Visit.store"
+    ]
+}

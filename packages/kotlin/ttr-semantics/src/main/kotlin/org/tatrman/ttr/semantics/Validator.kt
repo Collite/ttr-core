@@ -385,6 +385,14 @@ class Validator(
         return diagnostics
     }
 
+    /**
+     * The package part of an import that reaches [symbol]: the key less its name, as an element's named import is
+     * written. 0.17: a concept — or an event's participant label under it — is imported by package and name
+     * (`import hartland.core.Customer`), so it reads the symbol's package. Mirrors TS `importedPackageOf`.
+     */
+    private fun importedPackageOf(symbol: SymbolEntry): String =
+        if (symbol.schemaCode == "cn") symbol.packageName else symbol.qname.substringBeforeLast('.')
+
     fun validateImports(doc: SemanticDocument): List<ValidationDiagnostic> {
         val diagnostics = mutableListOf<ValidationDiagnostic>()
         val seenTargets = mutableSetOf<String>()
@@ -413,9 +421,10 @@ class Validator(
         val usedTargets = mutableSetOf<String>()
         for (collected in collectAllReferences(doc.definitions)) {
             val schemaCode = doc.schemaCode.ifEmpty { defaultSchemaForKind(kindOf(collected.ownerDef)) }
+            // The ref itself: a cn slot's ref carries its context (0.17), so it resolves among concepts.
             val res =
                 resolver.resolveReference(
-                    Resolver.Ref(collected.path, collected.parts),
+                    collected.toRef(),
                     ResolutionContext(
                         schemaCode = schemaCode,
                         namespace = doc.namespace,
@@ -426,7 +435,7 @@ class Validator(
             if (res is ResolutionResult.Resolved &&
                 (res.viaStep == ResolutionStep.NamedImport || res.viaStep == ResolutionStep.WildcardImport)
             ) {
-                usedTargets += res.symbol.qname.substringBeforeLast('.')
+                usedTargets += importedPackageOf(res.symbol)
             }
         }
 

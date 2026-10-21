@@ -21,6 +21,7 @@ import {
   type CodeAction,
   type CompletionItem,
   type TextDocumentEdit,
+  type TextEdit,
 } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import fuzzysort from 'fuzzysort';
@@ -81,6 +82,7 @@ import {
   cnHygieneReport,
   renderCnHygieneMarkdown,
   validateCn,
+  sugarDeclaringRef,
   type CnDocument,
   type CnHygieneReport,
   type CnValidation,
@@ -89,6 +91,7 @@ import {
   type SqlConfig,
   type SqlRefHit,
   type SqlRefEntry,
+  type SymbolEntry,
 } from '@tatrman/semantics';
 import { findSqlRefAtOffset, sqlCompletionContext, sqlScopeFromTokens } from './sql-features.js';
 import { buildProjectModelGraph, emptyLayout, buildSymbolDetail, memberRefsOf, type LayoutFile, type RenderableSchemaCode } from './model-graph.js';
@@ -107,6 +110,7 @@ import { buildDocumentSymbols } from './document-symbol.js';
 import { loadCompletionConfig, getCompletionConfig, invalidateCompletionConfig } from './config-completion.js';
 import { automationHoverLines } from './automation-hover.js';
 import { conceptHoverLines } from './concept-hover.js';
+import { labelSource, participantsOf } from './concept-rename.js';
 import { formatDocument, DEFAULT_FORMAT_CONFIG, type FormatConfig } from '@tatrman/format';
 import { lintDocument, lintProject, recommendedConfig, loadLintConfig, ruleForCode, type LintDiagnostic, type ResolvedLintConfig, type DocumentRuleContext } from '@tatrman/lint';
 import { refactorExtractDefToNewFile } from './code-actions.js';
@@ -337,6 +341,9 @@ export function createServerConnection(
       for (const ref of collectReferences(def)) {
         consider({ kind: 'ref', ref, from: def }, ref.source);
       }
+      // 0.17 — a `concept { }` block's declaring slot names its concept (review-119 H-2).
+      const declaring = sugarDeclaringRef(def);
+      if (declaring) consider({ kind: 'ref', ref: declaring, from: def }, declaring.source);
     }
 
     for (const def of ast.definitions) visit(def);
@@ -1427,7 +1434,7 @@ export function createServerConnection(
     if (found.kind === 'ref') {
       const res = resolver.resolveReference(
         found.ref,
-        { schemaCode, namespace, enclosingQname: enclosingQnameOf(found.from, schemaCode, namespace, effPkg(uri, ast)), packageName: effPkg(uri, ast) }
+        { schemaCode, namespace, enclosingQname: enclosingQnameOf(found.from, schemaCode, namespace, effPkg(uri, ast)), imports: ast.imports, packageName: effPkg(uri, ast) }
       );
       if (!res.resolved) return null;
       return {
@@ -1501,7 +1508,7 @@ export function createServerConnection(
     if (!targetQname && found?.kind === 'ref') {
       const res = resolver.resolveReference(
         found.ref,
-        { schemaCode, namespace, enclosingQname: enclosingQnameOf(found.from, schemaCode, namespace, effPkg(uri, ast)), packageName: effPkg(uri, ast) }
+        { schemaCode, namespace, enclosingQname: enclosingQnameOf(found.from, schemaCode, namespace, effPkg(uri, ast)), imports: ast.imports, packageName: effPkg(uri, ast) }
       );
       if (res.resolved) targetQname = res.symbol.qname;
     } else if (!targetQname && found?.kind === 'def') {
@@ -1594,7 +1601,7 @@ export function createServerConnection(
     if (found.kind === 'ref') {
       const res = resolver.resolveReference(
         found.ref,
-        { schemaCode, namespace, enclosingQname: enclosingQnameOf(found.from, schemaCode, namespace, effPkg(uri, ast)), packageName: effPkg(uri, ast) }
+        { schemaCode, namespace, enclosingQname: enclosingQnameOf(found.from, schemaCode, namespace, effPkg(uri, ast)), imports: ast.imports, packageName: effPkg(uri, ast) }
       );
       if (!res.resolved) return null;
       qname = res.symbol.qname;
@@ -1674,6 +1681,10 @@ export function createServerConnection(
       return { range: preciseSqlNameRange(sqlCtx.block, sqlCtx.hit.ref.span, syms[0].name), placeholder: syms[0].name };
     }
 
+    // 0.17 — on a participant label (`Store as seller`) F2 renames the label, never the event around it.
+    const label = participantLabelAt(ast, uri, params.position);
+    if (label) return label.symbol ? { range: sourceLocationToRange(label.range), placeholder: label.symbol.name } : null;
+
     const found = findNodeAtPosition(ast, params.position);
 
     // An inline-mapping ref (a column, an fk, a binding target) is not in the AST
@@ -1698,7 +1709,7 @@ export function createServerConnection(
     } else if (found.kind === 'ref') {
       const res = resolver.resolveReference(
         found.ref,
-        { schemaCode, namespace, enclosingQname: enclosingQnameOf(found.from, schemaCode, namespace, packageName), packageName }
+        { schemaCode, namespace, enclosingQname: enclosingQnameOf(found.from, schemaCode, namespace, packageName), imports: ast.imports, packageName }
       );
       if (res.resolved) qname = res.symbol.qname;
     }
@@ -1749,12 +1760,19 @@ export function createServerConnection(
     const packageName = effPkg(uri, ast);
 
     let targetQname: string | null = null;
+    let labelSymbol: SymbolEntry | undefined;
     // Rename invoked from inside a SQL usage (§4.5) — resolve the db symbol.
     const sqlCtx = sqlContextAt(ast, params.position);
+    const label = sqlCtx ? undefined : participantLabelAt(ast, uri, params.position);
     if (sqlCtx) {
       const syms = resolveSqlContextHit(sqlCtx);
       if (syms.length !== 1) return { documentChanges: [] };
       targetQname = syms[0].qname;
+    } else if (label) {
+      // A participant label: rename the label, never the event around it (review-119 L-7(c)).
+      if (!label.symbol) return { documentChanges: [] };
+      labelSymbol = label.symbol;
+      targetQname = label.symbol.qname;
     } else {
       const found = findNodeAtPosition(ast, params.position);
       // An inline-mapping ref: rename the object it names, not the enclosing def.
@@ -1770,14 +1788,14 @@ export function createServerConnection(
       } else if (found.kind === 'ref') {
         const res = resolver.resolveReference(
           found.ref,
-          { schemaCode, namespace, enclosingQname: enclosingQnameOf(found.from, schemaCode, namespace, packageName), packageName }
+          { schemaCode, namespace, enclosingQname: enclosingQnameOf(found.from, schemaCode, namespace, packageName), imports: ast.imports, packageName }
         );
         if (res.resolved) targetQname = res.symbol.qname;
       }
     }
 
     if (!targetQname) return { documentChanges: [] };
-    const symbol = projectSymbols.get(targetQname);
+    const symbol = labelSymbol ?? projectSymbols.get(targetQname);
     if (!symbol) return { documentChanges: [] };
 
     // Surface invalid / colliding renames as LSP errors (I1.5) so VS Code shows
@@ -1786,16 +1804,115 @@ export function createServerConnection(
       throw new ResponseError(ErrorCodes.InvalidParams, `'${params.newName}' is not a valid identifier.`);
     }
     const newBareName = params.newName ?? symbol.name;
-    const conflictCheck = projectSymbols.findByName(newBareName).filter(e => e.qname !== targetQname && e.qname.endsWith('.' + newBareName));
+    const conflictCheck = renameConflicts(symbol, newBareName);
     if (conflictCheck.length > 0) {
       throw new ResponseError(ErrorCodes.InvalidParams, `Cannot rename to '${newBareName}': a symbol with that name already exists (${conflictCheck[0].qname}).`);
     }
 
+    // 0.17 — a participant label: its own edit (the label, the `participants:` keys that read it).
+    if (symbol.kind === 'participant') return buildParticipantRename(symbol, newBareName);
+
     // TTR-side edit (def + references + imports + .ttrg) plus in-SQL usages.
     const edit = buildSymbolRenameWithSql(targetQname, symbol, newBareName, doc.getText());
-    if (symbol.kind === 'concept') keepParticipantLabels(edit, targetQname, newBareName);
+    if (symbol.kind === 'concept') {
+      keepParticipantLabels(edit, targetQname, newBareName);
+      renameConceptImports(edit, symbol, newBareName);
+    }
     return edit;
   });
+
+  /**
+   * The symbols a rename to `newName` collides with. 0.17 (review-119 M-6): concepts share one namespace
+   * per package and an event's labels one per event, apart from the elements' — so a concept collides only
+   * with a concept of its package, a label only with a label of its event, and an element never with
+   * either (`cn.Customer` and `md.Customer` never meet).
+   */
+  function renameConflicts(symbol: SymbolEntry, newName: string): SymbolEntry[] {
+    if (symbol.kind === 'participant') {
+      const sibling = symbol.parent ? projectSymbols.get(`${symbol.parent}.${newName}`) : undefined;
+      return sibling && sibling.qname !== symbol.qname ? [sibling] : [];
+    }
+    const sameName = projectSymbols
+      .findByName(newName)
+      .filter((e) => e.qname !== symbol.qname && e.qname.endsWith('.' + newName));
+    if (symbol.kind === 'concept') return sameName.filter((e) => e.kind === 'concept' && e.packageName === symbol.packageName);
+    return sameName.filter((e) => e.kind !== 'concept' && e.kind !== 'participant');
+  }
+
+  /**
+   * 0.17 (review-119 M-5) — rename an event's participant label: a written label's span, or ` as <new>`
+   * after a default-labelled participant, and every binding `participants:` key that reads it. The
+   * participant ref names the concept the event involves; it is never edited. A definition's
+   * `this.<label>` is out of the editor's reach (CN-D29) — `ttr cn hygiene` reports what no longer resolves.
+   */
+  function buildParticipantRename(symbol: SymbolEntry, newName: string): WorkspaceEdit {
+    const changes = new Map<string, TextEdit[]>();
+    const push = (uri: string, edit: TextEdit) => changes.set(uri, [...(changes.get(uri) ?? []), edit]);
+    const text = anyDocumentText(symbol.documentUri);
+    const ast = text !== undefined ? parseDocument(text, symbol.documentUri) : undefined;
+    const written = ast
+      ? participantsOf(ast).find(({ participant }) => participant.source.offsetStart === symbol.source.offsetStart)
+      : undefined;
+    if (written) {
+      const at = labelSource(written.participant);
+      if (at) {
+        push(symbol.documentUri, { range: sourceLocationToRange(at), newText: newName });
+      } else {
+        const end = sourceLocationToRange(written.participant.ref.source).end;
+        push(symbol.documentUri, { range: { start: end, end }, newText: ` as ${newName}` });
+      }
+    }
+    for (const ref of refIndex.findByQname(symbol.qname)) {
+      push(ref.documentUri, { range: sourceLocationToRange(ref.source), newText: newName });
+    }
+    return { documentChanges: [...changes].map(([uri, edits]) => ({ textDocument: { uri, version: null }, edits })) };
+  }
+
+  /**
+   * 0.17 (review-119 M-5, L-7(c)) — the participant label at the cursor: a written label (`seller` in
+   * `Store as seller`) and the label symbol it declares (`undefined` where none registers — a block
+   * restating an event's participants). The cursor on a label is never a rename of the enclosing def.
+   */
+  function participantLabelAt(
+    ast: Document,
+    uri: string,
+    position: { line: number; character: number },
+  ): { range: SourceLocation; symbol?: SymbolEntry } | undefined {
+    const packageName = effPkg(uri, ast);
+    for (const { participant, event } of participantsOf(ast)) {
+      const range = labelSource(participant);
+      if (!range || !isPositionInRange(position.line + 1, position.character, range)) continue;
+      const qname = `${buildCanonicalKey({ packageName, kind: 'concept', parts: [event] })}.${participant.label}`;
+      const symbol = projectSymbols
+        .getAll(qname)
+        .find((e) => e.documentUri === uri && e.source.offsetStart === participant.source.offsetStart);
+      return { range, symbol };
+    }
+    return undefined;
+  }
+
+  /**
+   * 0.17 (review-119 M-7) — a named import of a concept is written `import <pkg>.<Name>`, not by its key
+   * (`<pkg>.cn.concept.<Name>`, which the generic rename follows): rename those too, or the references the
+   * rename rewrote no longer resolve through the import.
+   */
+  function renameConceptImports(edit: WorkspaceEdit, symbol: SymbolEntry, newName: string): void {
+    if (!symbol.packageName) return;
+    const oldTarget = `${symbol.packageName}.${symbol.name}`;
+    const changes = (edit.documentChanges ?? []) as TextDocumentEdit[];
+    for (const d of documents.all()) {
+      if (!d.uri.endsWith('.ttrm')) continue;
+      const content = d.getText();
+      const importRe = new RegExp(`(^|\\n)(\\s*import\\s+)(${escapeRegExp(oldTarget)})(?=\\s|$)`, 'g');
+      let m: RegExpExecArray | null;
+      while ((m = importRe.exec(content)) !== null) {
+        const at = m.index + m[1].length + m[2].length;
+        const range = { start: d.positionAt(at), end: d.positionAt(at + oldTarget.length) };
+        changes.push({ textDocument: { uri: d.uri, version: null }, edits: [{ range, newText: `${symbol.packageName}.${newName}` }] });
+      }
+    }
+    edit.documentChanges = changes;
+  }
 
   /**
    * 0.17 (CN-P2 S2.7 T4) — a concept an event `involves:` unlabelled names its participant by the default label,

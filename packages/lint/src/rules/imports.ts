@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { DiagnosticCode } from '@tatrman/parser';
 import type { Definition } from '@tatrman/parser';
-import { defaultSchemaForKind, packageOfImport } from '@tatrman/semantics';
+import { defaultSchemaForKind, packageOfImport, type SymbolEntry } from '@tatrman/semantics';
 import { removeLineEdit } from '@tatrman/edit';
 import type { DocumentRuleContext, Rule } from '../rule.js';
 
@@ -57,6 +57,16 @@ const duplicateImport: Rule = {
   },
 };
 
+/**
+ * The package part of an import that reaches `symbol`: the key less its name, as an element's named
+ * import is written (`import <pkg>.er.entity.<name>`). 0.17: a concept — or an event's participant
+ * label under it — is imported by package and name (`import hartland.core.Customer`), so it reads the
+ * symbol's package (review-119 M-7).
+ */
+function importedPackageOf(symbol: SymbolEntry): string {
+  return symbol.schemaCode === 'cn' ? symbol.packageName : symbol.qname.slice(0, symbol.qname.lastIndexOf('.'));
+}
+
 /** Targets actually used by a resolved reference (named- or wildcard-import). */
 function usedTargets(ctx: DocumentRuleContext): Set<string> {
   const ast = ctx.ast;
@@ -67,13 +77,10 @@ function usedTargets(ctx: DocumentRuleContext): Set<string> {
   const used = new Set<string>();
   for (const { ref, ownerDef } of ctx.refs) {
     const schemaCode = directiveSchema ?? defaultSchemaForKind((ownerDef as Definition).kind);
-    const res = ctx.resolver.resolveReference(
-      { path: ref.path, parts: ref.parts },
-      { schemaCode, namespace, imports, packageName }
-    );
+    // The ref itself: a cn slot's ref carries its context (0.17), so it resolves among concepts.
+    const res = ctx.resolver.resolveReference(ref, { schemaCode, namespace, imports, packageName });
     if (res.resolved && (res.viaStep === 'named-import' || res.viaStep === 'wildcard-import')) {
-      const lastDot = res.symbol.qname.lastIndexOf('.');
-      used.add(res.symbol.qname.slice(0, lastDot));
+      used.add(importedPackageOf(res.symbol));
     }
   }
   return used;

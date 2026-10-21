@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { Definition, Document, SourceLocation } from '@tatrman/parser';
-import { collectAllReferences } from './references.js';
+import { collectAllReferences, collectSugarDeclaringRefs } from './references.js';
 import { defaultSchemaForKind, keyKindOf } from './default-schema.js';
 import { buildCanonicalKey } from './qname.js';
 import type { Resolver } from './resolver.js';
@@ -69,19 +69,21 @@ export class ReferenceIndex {
       // The ref itself, not a copy of its path: a cn slot's ref carries its context (`isCnContextRef`).
       const res = resolver.resolveReference(
         ref,
-        { schemaCode: effSchema, namespace, enclosingQname: referrerQname ?? undefined, packageName }
+        { schemaCode: effSchema, namespace, enclosingQname: referrerQname ?? undefined, imports: ast.imports, packageName }
       );
       if (!res.resolved) continue;
-      const loc: ReferenceLocation = {
-        documentUri: uri,
-        source: ref.source,
-        targetQname: res.symbol.qname,
-        referrerQname,
-      };
-      locations.push(loc);
-      const list = this.byTargetQname.get(res.symbol.qname) ?? [];
-      list.push(loc);
-      this.byTargetQname.set(res.symbol.qname, list);
+      this.add(locations, { documentUri: uri, source: ref.source, targetQname: res.symbol.qname, referrerQname });
+    }
+
+    // 0.17 — a `concept { }` block's declaring slot, where it names a concept declared elsewhere (a
+    // cn def, another block): a rename of that concept must reach the block (review-119 H-2). Where
+    // the block itself declares, the slot is the concept's declaration, not a reference to it.
+    for (const { ref, ownerDef } of collectSugarDeclaringRefs(ast)) {
+      const res = resolver.resolveReference(ref, { schemaCode, namespace, imports: ast.imports, packageName });
+      if (!res.resolved) continue;
+      if (res.symbol.documentUri === uri && res.symbol.source.offsetStart === ref.source.offsetStart) continue;
+      const referrerQname = enclosingQnameOf(ownerDef, schemaCode || defaultSchemaForKind(ownerDef.kind), namespace, packageName) ?? null;
+      this.add(locations, { documentUri: uri, source: ref.source, targetQname: res.symbol.qname, referrerQname });
     }
 
     // Inline mapping column references resolve against the enclosing entity's
@@ -92,20 +94,23 @@ export class ReferenceIndex {
       ...collectBindingReferences(ast, resolver, schemaCode, namespace, pkg),
       ...collectBindingTargetReferences(ast, resolver, schemaCode, namespace, pkg),
     ]) {
-      const loc: ReferenceLocation = {
+      this.add(locations, {
         documentUri: uri,
         source: m.ref.source,
         targetQname: m.targetQname,
         referrerQname: m.referrerQname,
         viaMapping: true,
-      };
-      locations.push(loc);
-      const list = this.byTargetQname.get(m.targetQname) ?? [];
-      list.push(loc);
-      this.byTargetQname.set(m.targetQname, list);
+      });
     }
 
     this.byDocument.set(uri, locations);
+  }
+
+  private add(locations: ReferenceLocation[], loc: ReferenceLocation): void {
+    locations.push(loc);
+    const list = this.byTargetQname.get(loc.targetQname) ?? [];
+    list.push(loc);
+    this.byTargetQname.set(loc.targetQname, list);
   }
 
   removeDocument(uri: string): void {

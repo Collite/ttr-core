@@ -1,0 +1,11 @@
+// Both named imports are used, from cn slots only (`of:`, `involves:`): neither is `ttr/unused-import`.
+// `Store` is in both imported packages; the named import picks `hartland.core`'s, ahead of the
+// wildcard (no `ttr/ambiguous-reference`) — so removing it as unused would break the model.
+package hartland.web
+import hartland.core.Party
+import hartland.core.Store
+import hartland.outlet.*
+model cn
+
+def role Shopper { of: Party, event: Visit }
+def event Visit  { involves: [Shopper, Store], period: { at: visited_at } }

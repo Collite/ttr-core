@@ -80,7 +80,11 @@ def term web_buyer { for: cn.WebBuyer, forms: ["web buyer"] }
 
 /** The position of the `nth` occurrence of `needle` in `uri`, `delta` characters into it. */
 function at(uri: string, needle: string, delta = 0, nth = 0): lsp.Position {
-  const text = FILES[uri];
+  return posIn(FILES, uri, needle, delta, nth);
+}
+
+function posIn(files: Record<string, string>, uri: string, needle: string, delta = 0, nth = 0): lsp.Position {
+  const text = files[uri];
   let i = -1;
   for (let k = 0; k <= nth; k++) i = text.indexOf(needle, i + 1);
   if (i < 0) throw new Error(`'${needle}' not in ${uri}`);
@@ -188,10 +192,10 @@ describe('CN-P2 S2.1 — navigation over the conceptual model', () => {
     );
   });
 
-  it('goto to a concept a `concept { }` block declares lands on the block (CN-P2 S2.2)', async () => {
+  it('goto to a concept a `concept { }` block declares lands on its name in the block (CN-P2 S2.2; review-119 M-5)', async () => {
     const loc = await definition(LEXICON, at(LEXICON, 'cn.WebBuyer', 3));
     expect(loc?.uri).toBe(ER);
-    expect(loc?.range.start).toEqual(at(ER, 'role: WebBuyer'));
+    expect(loc?.range.start).toEqual(at(ER, 'role: WebBuyer', 6));
     const hover = (await client.sendRequest('textDocument/hover', {
       textDocument: { uri: LEXICON },
       position: at(LEXICON, 'cn.WebBuyer', 3),
@@ -264,6 +268,206 @@ describe('CN-P2 S2.1 — navigation over the conceptual model', () => {
       [
         `concepts.ttrm:${lineOf(CONCEPTS, 'def kind Warehouse')}:9 Depot`,
         `concepts.ttrm:${lineOf(CONCEPTS, 'Warehouse as fulfilling')}:${at(CONCEPTS, 'Warehouse as fulfilling').character} Depot`,
+      ].sort(),
+    );
+  });
+});
+
+// ---- CN-P2 review-119 — rename, the sugar's declaring slot, participant labels, named concept imports ----
+
+const ROOT119 = 'file:///cnnav119';
+const CORE119 = `${ROOT119}/core.ttrm`;
+const OTHER119 = `${ROOT119}/other.ttrm`;
+const CONCEPTS119 = `${ROOT119}/concepts.ttrm`;
+const ER119 = `${ROOT119}/er.ttrm`;
+const BINDINGS119 = `${ROOT119}/bindings.ttrm`;
+const LEXICON119 = `${ROOT119}/lexicon.ttrm`;
+const IMPORTS119 = `${ROOT119}/imports.ttrm`;
+// In dependency order (ttr-core#174).
+const FILES119: Record<string, string> = {
+  [CORE119]: `package hartland.core
+model cn
+def kind Supplier { label: { en: "Supplier" } }
+`,
+  [OTHER119]: `package hartland.other
+model cn
+def kind Supplier { label: { en: "Wholesaler" } }
+`,
+  [CONCEPTS119]: `package hartland.web
+model cn
+def kind Party { label: { en: "Party" } }
+def kind Store { label: { en: "Store" } }
+def role Shopper { of: Party, event: Visit }
+def event Visit { involves: [Shopper, Store as seller], period: { at: visited_at } }
+`,
+  [ER119]: `package hartland.web
+model er
+def entity party { attributes: [ def attribute party_id { type: int, isKey: true } ], concept { kind: Party } }
+def entity store { attributes: [ def attribute store_id { type: int, isKey: true } ] }
+def entity visit { attributes: [ def attribute visit_id { type: int, isKey: true } ] }
+def entity web_return {
+    attributes: [ def attribute return_id { type: int, isKey: true } ],
+    concept { event: WebReturn, involves: [Shopper, Store] }
+}
+def relation visit_party { from: er.entity.visit, to: er.entity.party }
+def relation visit_store { from: er.entity.visit, to: er.entity.store }
+`,
+  [BINDINGS119]: `package hartland.web
+model binding
+def cn2er_event visit_g {
+    event: cn.Visit,
+    target: er.entity.visit,
+    participants: { shopper: [er.relation.visit_party], seller: [er.relation.visit_store] }
+}
+`,
+  [LEXICON119]: `package hartland.web
+model lexicon locale en
+def term web_return { for: cn.WebReturn, forms: ["web return"] }
+`,
+  [IMPORTS119]: `package hartland.web
+import hartland.core.Supplier
+import hartland.other.*
+model cn
+def kind Vendor { is_a: Supplier }
+`,
+};
+
+describe('CN-P2 review-119 — rename, the sugar declaring slot, labels and named concept imports', () => {
+  let client: lsp.Connection;
+  let server: lsp.Connection;
+  const diagnostics = new Map<string, lsp.Diagnostic[]>();
+  const at119 = (uri: string, needle: string, delta = 0) => posIn(FILES119, uri, needle, delta);
+  const pos119 = (uri: string, needle: string, delta = 0) => {
+    const p = at119(uri, needle, delta);
+    return `${uri.split('/').pop()}:${p.line}:${p.character}`;
+  };
+
+  beforeAll(async () => {
+    const p = createPairedConnection();
+    client = p.client;
+    server = p.server;
+    client.onNotification('textDocument/publishDiagnostics', (params: lsp.PublishDiagnosticsParams) => {
+      diagnostics.set(params.uri, params.diagnostics);
+    });
+    createServerConnection(server);
+    await client.sendRequest('initialize', {
+      processId: null,
+      rootUri: ROOT119,
+      workspaceFolders: [{ uri: ROOT119, name: 'cnnav119' }],
+      capabilities: {},
+    });
+    client.sendNotification('initialized', {});
+    for (const [uri, text] of Object.entries(FILES119)) {
+      client.sendNotification('textDocument/didOpen', { textDocument: { uri, languageId: 'ttr', version: 1, text } });
+    }
+    await sleep(500);
+  });
+  afterAll(() => {
+    client.dispose();
+    server.dispose();
+  });
+
+  async function rename(uri: string, position: lsp.Position, newName: string): Promise<string[]> {
+    const edit = (await client.sendRequest('textDocument/rename', { textDocument: { uri }, position, newName })) as lsp.WorkspaceEdit;
+    return (edit.documentChanges ?? [])
+      .flatMap((c) => ('edits' in c ? c.edits.map((e) => `${c.textDocument.uri.split('/').pop()}:${e.range.start.line}:${e.range.start.character} ${e.newText}`) : []))
+      .sort();
+  }
+  async function hoverText(uri: string, position: lsp.Position): Promise<string> {
+    const hover = (await client.sendRequest('textDocument/hover', { textDocument: { uri }, position })) as lsp.Hover | null;
+    return hover && typeof hover.contents === 'object' && 'value' in hover.contents ? hover.contents.value : '';
+  }
+
+  it('H-2: a block naming a cn def concept in its declaring slot is a reference to it — goto, hover, references, rename', async () => {
+    const goto = (await client.sendRequest('textDocument/definition', {
+      textDocument: { uri: ER119 },
+      position: at119(ER119, 'kind: Party', 7),
+    })) as lsp.Location;
+    expect(goto.uri).toBe(CONCEPTS119);
+    expect(goto.range.start.line).toBe(at119(CONCEPTS119, 'def kind Party').line);
+    expect(await hoverText(ER119, at119(ER119, 'kind: Party', 7))).toContain('**hartland.web.cn.concept.Party** *(concept)*');
+    const refs = (await client.sendRequest('textDocument/references', {
+      textDocument: { uri: CONCEPTS119 },
+      position: at119(CONCEPTS119, 'def kind Party', 9),
+      context: { includeDeclaration: false },
+    })) as lsp.Location[];
+    expect(refs.map((r) => `${r.uri.split('/').pop()}:${r.range.start.line}:${r.range.start.character}`).sort()).toEqual(
+      [pos119(CONCEPTS119, 'of: Party', 4), pos119(ER119, 'kind: Party', 6)].sort(),
+    );
+    expect(await rename(CONCEPTS119, at119(CONCEPTS119, 'def kind Party', 9), 'Agent')).toEqual(
+      [
+        `${pos119(CONCEPTS119, 'def kind Party', 9)} Agent`,
+        `${pos119(CONCEPTS119, 'of: Party', 4)} Agent`,
+        `${pos119(ER119, 'kind: Party', 6)} Agent`,
+      ].sort(),
+    );
+  });
+
+  it('M-5: renaming a concept only a block declares edits its name, not the slot', async () => {
+    expect(await rename(LEXICON119, at119(LEXICON119, 'cn.WebReturn', 4), 'OnlineReturn')).toEqual(
+      [`${pos119(ER119, 'event: WebReturn', 7)} OnlineReturn`, `${pos119(LEXICON119, 'cn.WebReturn')} cn.OnlineReturn`].sort(),
+    );
+    // F2 on the block's declaring name renames that concept, not the entity around it
+    const prepared = (await client.sendRequest('textDocument/prepareRename', {
+      textDocument: { uri: ER119 },
+      position: at119(ER119, 'event: WebReturn', 9),
+    })) as { range: lsp.Range; placeholder: string };
+    expect(prepared.placeholder).toBe('WebReturn');
+    expect(prepared.range.start).toEqual(at119(ER119, 'event: WebReturn', 7));
+  });
+
+  it('M-5: renaming a default label from a `participants:` key writes the label out, never the participant ref', async () => {
+    expect(await rename(BINDINGS119, at119(BINDINGS119, 'shopper:', 2), 'client')).toEqual(
+      [
+        `${pos119(BINDINGS119, 'shopper:')} client`,
+        `${pos119(CONCEPTS119, 'involves: [Shopper', 'involves: [Shopper'.length)}  as client`,
+      ].sort(),
+    );
+  });
+
+  it('L-7(c): F2 on a written label renames the label, not the event that involves it', async () => {
+    const prepared = (await client.sendRequest('textDocument/prepareRename', {
+      textDocument: { uri: CONCEPTS119 },
+      position: at119(CONCEPTS119, 'Store as seller', 11),
+    })) as { range: lsp.Range; placeholder: string };
+    expect(prepared).toEqual({
+      range: { start: at119(CONCEPTS119, 'seller'), end: at119(CONCEPTS119, 'seller', 'seller'.length) },
+      placeholder: 'seller',
+    });
+    expect(await rename(CONCEPTS119, at119(CONCEPTS119, 'Store as seller', 11), 'vendor')).toEqual(
+      [`${pos119(CONCEPTS119, 'seller')} vendor`, `${pos119(BINDINGS119, 'seller:')} vendor`].sort(),
+    );
+  });
+
+  it("M-6: the conflict check stays in the target's namespace", async () => {
+    // an er entity may take a participant label's name, and a concept an er entity's
+    expect(await rename(ER119, at119(ER119, 'def entity store', 11), 'seller')).toContain(`${pos119(ER119, 'def entity store', 11)} seller`);
+    expect(await rename(CONCEPTS119, at119(CONCEPTS119, 'def kind Party', 9), 'party')).toContain(
+      `${pos119(CONCEPTS119, 'def kind Party', 9)} party`,
+    );
+    // a concept never takes a concept's name in its package; a label never a sibling label's
+    await expect(rename(CONCEPTS119, at119(CONCEPTS119, 'def kind Store', 9), 'Party')).rejects.toThrow(
+      /a symbol with that name already exists \(hartland\.web\.cn\.concept\.Party\)/,
+    );
+    await expect(rename(CONCEPTS119, at119(CONCEPTS119, 'Store as seller', 11), 'shopper')).rejects.toThrow(
+      /hartland\.web\.cn\.concept\.Visit\.shopper/,
+    );
+  });
+
+  it('M-7: a named concept import is used, and the editor resolves through it — hover, goto, rename', async () => {
+    expect((diagnostics.get(IMPORTS119) ?? []).filter((d) => d.code === 'ttr/unused-import')).toEqual([]);
+    expect((diagnostics.get(IMPORTS119) ?? []).filter((d) => d.code === 'ttr/ambiguous-reference')).toEqual([]);
+    expect(await hoverText(IMPORTS119, at119(IMPORTS119, 'is_a: Supplier', 6))).toContain('**hartland.core.cn.concept.Supplier**');
+    const goto = (await client.sendRequest('textDocument/definition', {
+      textDocument: { uri: IMPORTS119 },
+      position: at119(IMPORTS119, 'is_a: Supplier', 6),
+    })) as lsp.Location;
+    expect(goto.uri).toBe(CORE119);
+    expect(await rename(CORE119, at119(CORE119, 'def kind Supplier', 9), 'Provider')).toEqual(
+      [
+        `${pos119(CORE119, 'def kind Supplier', 9)} Provider`,
+        `${pos119(IMPORTS119, 'hartland.core.Supplier')} hartland.core.Provider`,
+        `${pos119(IMPORTS119, 'is_a: Supplier', 6)} Provider`,
       ].sort(),
     );
   });

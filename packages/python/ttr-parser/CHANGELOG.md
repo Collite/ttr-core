@@ -23,6 +23,9 @@ All notable changes to `ttr-parser` (Python) are documented here. While
   known keys: `LexiconBlock` gains `default` and `sense_priority` (it fingerprinted the block's `repr` and missed
   both). `CubeletDef.inline_measure_concepts` keeps the `concept { }` of each inline measure, which cn semantics
   reports as `cn/grounding-target-kind` (it grounds nothing; it was dropped).
+- `ttr/unused-import` keeps a concept reference's cn context and compares the concept's package — a named concept
+  import used from a cn slot was reported unused. A concept a `concept { }` block alone declares is located at its
+  name.
 
 ## 0.17.0 — unreleased
 

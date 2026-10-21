@@ -301,6 +301,37 @@ export function collectAllReferences(ast: Document): CollectedReference[] {
   return out;
 }
 
+/** The stereotype slots a `concept { }` block declares with (`desugar.ts` reads the same five). */
+const SUGAR_DECLARING_KEYS: ReadonlySet<string> = new Set(['kind', 'role', 'quality', 'event', 'phase']);
+
+/**
+ * 0.17 — the declaring slot of a host's `concept { }` block (`event: Return`) as a cn reference, or
+ * `undefined`. It declares its concept, or names one a cn def or another block declares (S2.2's merge
+ * rule), so it is none of {@link collectReferences}' — nor the conformance dump's. The editor reads
+ * it (review-119 H-2): the cursor finds it, and the reference index lists it wherever it resolves to
+ * a concept declared elsewhere, so goto, hover, find-references and rename reach the block.
+ */
+export function sugarDeclaringRef(def: Definition): CnSlotReference | undefined {
+  const sugar = conceptSugarOf(def);
+  if (!sugar) return undefined;
+  const key = sugarStereotypeKey(sugar);
+  if (!key || !SUGAR_DECLARING_KEYS.has(key)) return undefined;
+  const declaring = sugar.properties.find((p) => p.kind === 'ref' && p.key === key);
+  return declaring?.kind === 'ref' ? cnRef(declaring.ref) : undefined;
+}
+
+/** {@link sugarDeclaringRef} over a document, nested hosts included, owned as {@link collectAllReferences} owns. */
+export function collectSugarDeclaringRefs(ast: Document): CollectedReference[] {
+  const out: CollectedReference[] = [];
+  for (const def of ast.definitions) {
+    for (const host of [def, ...nestedDefs(def)]) {
+      const ref = sugarDeclaringRef(host);
+      if (ref) out.push({ ref, ownerDef: def });
+    }
+  }
+  return out;
+}
+
 /**
  * Returns the nested per-def children (attributes, columns, indices, ...).
  * Top-level relations / queries / roles are at file scope, not nested here.

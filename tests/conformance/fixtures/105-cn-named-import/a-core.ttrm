@@ -1,0 +1,8 @@
+// 0.17 (CN-P2 review-119 M-7) — a named import of a concept. `hartland.core` declares the concepts
+// `c-web.ttrm` imports by package and name (`import hartland.core.Party`), the way an element's named
+// import is written by its key.
+package hartland.core
+model cn
+
+def kind Party { label: { en: "Party" } }
+def kind Store { label: { en: "Store" } }
