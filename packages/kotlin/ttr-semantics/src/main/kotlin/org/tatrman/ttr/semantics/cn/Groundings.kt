@@ -94,13 +94,15 @@ fun propertyFingerprint(p: ConceptProperty): String =
             is ConceptProperty.DefinitionBlock -> append(blockFp(p.block))
             is ConceptProperty.MembersBlock -> append(blockFp(p.block))
             is ConceptProperty.FilterBlock -> append(blockFp(p.block))
+            // A `lexicon { }` block by its five known keys, each form quoted (`["red,blue"]` ≠ `["red", "blue"]`) —
+            // the canonical form TS and Python share (review-119 M-10).
             is ConceptProperty.Lexicon ->
                 append(
                     listOf(
                         p.block.terms,
                         p.block.patterns,
                         p.block.examples,
-                    ).joinToString("|") { it.joinToString(",") },
+                    ).joinToString("|") { forms -> forms.joinToString(",", "[", "]") { quoted(it) } },
                 ).append('|').append(p.block.default).append('|').append(p.block.sensePriority)
             is ConceptProperty.Target ->
                 when (val v = p.value) {
@@ -131,8 +133,11 @@ private fun valueFingerprint(v: PropertyValue): String =
         is PropertyValue.NullValue -> "null"
         is PropertyValue.IdValue -> "id:" + refPath(v.ref.path)
         is PropertyValue.ListValue -> v.items.joinToString(",", "[", "]") { valueFingerprint(it) }
+        // entries sorted by key: `{ start:, end: }` says what `{ end:, start: }` says (review-119 M-10)
         is PropertyValue.ObjectValue ->
-            v.entries.entries.joinToString(",", "{", "}") { "${quoted(it.key)}:${valueFingerprint(it.value)}" }
+            v.entries.entries
+                .sortedBy { it.key }
+                .joinToString(",", "{", "}") { "${quoted(it.key)}:${valueFingerprint(it.value)}" }
         is PropertyValue.FunctionCall -> v.name + v.args.joinToString(",", "(", ")") { valueFingerprint(it) }
         is TaggedBlockValue -> v.tag + quoted(v.value)
     }

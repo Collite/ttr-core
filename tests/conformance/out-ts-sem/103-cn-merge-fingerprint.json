@@ -1,0 +1,36 @@
+{
+    "diagnostics": [
+        "cn/duplicate-grounding",
+        "cn/duplicate-grounding"
+    ],
+    "resolved": [],
+    "symbols": [
+        "hartland.web.binding.cn2er_event.Order.concept",
+        "hartland.web.binding.cn2er_event.WebReturn.concept",
+        "hartland.web.binding.cn2er_kind.Bin.concept",
+        "hartland.web.binding.cn2er_kind.Brand.concept",
+        "hartland.web.binding.cn2er_kind.Colour.concept",
+        "hartland.web.binding.cn2er_kind.Shelf.concept",
+        "hartland.web.cn.concept.Bin",
+        "hartland.web.cn.concept.Brand",
+        "hartland.web.cn.concept.Colour",
+        "hartland.web.cn.concept.Order",
+        "hartland.web.cn.concept.Shelf",
+        "hartland.web.cn.concept.WebReturn",
+        "hartland.web.er.entity.bin",
+        "hartland.web.er.entity.bin.bin_id",
+        "hartland.web.er.entity.brand",
+        "hartland.web.er.entity.brand.brand_id",
+        "hartland.web.er.entity.colour",
+        "hartland.web.er.entity.colour.colour_id",
+        "hartland.web.er.entity.shelf",
+        "hartland.web.er.entity.shelf.shelf_id",
+        "hartland.web.er.entity.web_order",
+        "hartland.web.er.entity.web_order.delivered_date",
+        "hartland.web.er.entity.web_order.order_id",
+        "hartland.web.er.entity.web_order.placed_date",
+        "hartland.web.er.entity.web_return",
+        "hartland.web.er.entity.web_return.return_id",
+        "hartland.web.er.entity.web_return.returned_on"
+    ]
+}

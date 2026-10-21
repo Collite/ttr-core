@@ -1,0 +1,7 @@
+// West's md face (the hop across packages is `ttr-metadata` CnHopSpec's — the Python walker has no md bindings).
+package hartland.west
+model md
+
+def domain Code { type: text }
+def dimension Store { key: code, attributes: [ def attribute code { domain: md.Code, isKey: true } ] }
+def cubelet sales { grain: [Store.code] }

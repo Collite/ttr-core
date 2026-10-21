@@ -6,6 +6,8 @@ import org.tatrman.ttr.parser.diagnostics.DiagnosticSeverity
 import org.tatrman.ttr.parser.model.BindingPropertyBlock
 import org.tatrman.ttr.parser.model.ConceptDef
 import org.tatrman.ttr.parser.model.ConceptProperty
+import org.tatrman.ttr.parser.model.CubeletDef
+import org.tatrman.ttr.parser.model.CubeletMeasure
 import org.tatrman.ttr.parser.model.Definition
 import org.tatrman.ttr.parser.model.EntityDef
 import org.tatrman.ttr.parser.model.Er2DbEntityDef
@@ -128,6 +130,14 @@ private fun StatedProperty?.isTrue(): Boolean =
     ((this?.property as? ConceptProperty.Entry)?.value as? PropertyValue.BoolValue)?.raw == true
 
 private fun shortName(qname: String): String = qname.substringAfterLast('.')
+
+/** The message for a `concept { }` on a cubelet's inline measure (review-119 M-11; TS `inlineMeasureSugar`). */
+internal fun inlineMeasureSugar(
+    measure: String,
+    cubelet: String,
+): String =
+    "a 'concept { }' on the measure '$measure' written inline in cubelet '$cubelet' grounds nothing — declare it " +
+        "with 'def measure $measure' and list it in 'measures:'"
 
 /** The model of a symbol (`md`, `er`, `db`, …) — its key's first segment past the package. */
 private fun modelOf(sym: SymbolEntry): String {
@@ -334,6 +344,24 @@ private class CnValidator(
     // --- cn/grounding-target-kind · cn/db-grounding ------------------------------------------------------------
 
     private fun checkGroundingTargets() {
+        // A `concept { }` on a measure written inline in a cubelet's `measures:` grounds nothing — the inline measure
+        // is no symbol a grounding could name (review-119 M-11): reported, never dropped silently.
+        for (doc in docs) {
+            for (def in doc.definitions) {
+                if (def !is CubeletDef) continue
+                for (m in def.measures) {
+                    val inline = m as? CubeletMeasure.Inline ?: continue
+                    val sugar = inline.measure.concept ?: continue
+                    report(
+                        DiagnosticCode.CnGroundingTargetKind,
+                        DiagnosticSeverity.Error,
+                        doc.uri,
+                        sugar.source,
+                        inlineMeasureSugar(inline.measure.name, def.name),
+                    )
+                }
+            }
+        }
         for (placed in groundings.groundings) {
             val g = placed.grounding
             val name = g.conceptName ?: placed.conceptKey?.let(::shortName) ?: g.conceptRef?.path ?: g.name

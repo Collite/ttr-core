@@ -229,9 +229,11 @@ conformance:
 
 # The cn hygiene report over a model dir — `ttr cn hygiene` run from the repo until `ttr-concept` first publishes
 # (CN-P3 S3.1). The dir is relative to the repo root; flags pass through, e.g.
-# `just cn-hygiene tests/conformance/cn-hygiene --format json --fail-on error`.
+# `just cn-hygiene tests/conformance/cn-hygiene --format json --fail-on error`. It runs the installed distribution,
+# not `gradle run`, so the CLI's exit code (0 · 1 findings at `--fail-on` · 2 usage) and a dir with spaces survive.
 cn-hygiene dir *flags:
-    ./gradlew -q --console=plain :packages:kotlin:ttr-concept:run --args="cn hygiene {{dir}} {{flags}}"
+    ./gradlew -q --console=plain :packages:kotlin:ttr-concept:installDist
+    packages/kotlin/ttr-concept/build/install/ttr/bin/ttr cn hygiene "{{dir}}" {{flags}}
 
 # ── Grammar regeneration ────────────────────────────────────────────────────────
 

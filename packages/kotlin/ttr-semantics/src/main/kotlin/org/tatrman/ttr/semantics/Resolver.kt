@@ -197,6 +197,43 @@ class Resolver(
             }
         }
 
+        // Step 7 — the slot-filling fallback (TS `slotResolveReference`, qname-redesign §5; ttr-core#228): read the
+        // reference into its slots and look for its name path in the reference's package and model (its kind too,
+        // when written), then in its model, then anywhere. The first scope with one candidate wins; a scope with
+        // several is ambiguous. So `er.entity.store` in `hartland.west` names west's `store` beside `hartland.east`'s
+        // (D10 "current package first"), and `md.revenue` the md measure beside a lexicon term `revenue`.
+        val vocab = vocab()
+        val written = classify(ref.path, vocab)
+        val keyed =
+            elementsBySuffix(written.tail)
+                .filter { it.qname != fullQname && it.qname != cncQname }
+                .distinctBy { it.qname }
+                .map { it to classify(it.qname, vocab) }
+                .filter { (_, slots) -> slots.tail == written.tail }
+        val pkg = written.pkg ?: context.packageName ?: ""
+        val inModel = { slots: Slots -> written.model == null || slots.model == written.model }
+        val inPackage = { slots: Slots ->
+            inModel(slots) && (slots.pkg ?: "") == pkg && (written.schema == null || slots.schema == written.schema)
+        }
+        val scopes =
+            listOf<(Slots) -> Boolean>(
+                { inPackage(it) && (written.kind == null || it.kind == written.kind) },
+                inPackage,
+                inModel,
+                { true },
+            )
+        for (scope in scopes) {
+            val candidates = keyed.filter { scope(it.second) }.map { it.first }
+            if (candidates.size == 1) {
+                tried += ResolutionAttempt(ResolutionStep.FullyQualified, candidates[0].qname)
+                return ResolutionResult.Resolved(candidates[0], ResolutionStep.FullyQualified)
+            }
+            if (candidates.size > 1) {
+                for (c in candidates) tried += ResolutionAttempt(ResolutionStep.FullyQualified, c.qname, "ambiguous")
+                return ResolutionResult.Unresolved(ResolutionResult.Reason.Ambiguous, tried, candidates)
+            }
+        }
+
         return ResolutionResult.Unresolved(ResolutionResult.Reason.NotFound, tried)
     }
 
@@ -313,46 +350,68 @@ class Resolver(
             "md2er_cubelet",
         )
 
-    /**
-     * The trailing name path of a dotted reference, with any leading
-     * model/package/schema/kind segments stripped (D4 slot order). Mirrors TS
-     * `Resolver.classifiedTail` / `classifyReference`.
-     */
-    private fun classifiedTail(path: String): String {
-        val segs = path.split('.').filter { it.isNotEmpty() }
-        val packages = symbols.listPackages().filter { it.isNotEmpty() }.toSet()
+    /** The packages and db schemas of the project — what [classify] reads a dotted path against. */
+    private class Vocab(
+        val packages: Set<String>,
+        val schemas: Set<String>,
+    )
+
+    private fun vocab(): Vocab {
         val schemas = mutableSetOf("dbo")
         for (q in symbols.allQnames()) {
             val parts = q.split('.')
             val i = parts.indexOf("db")
             if (i >= 0 && i + 1 < parts.size) schemas += parts[i + 1]
         }
+        return Vocab(symbols.listPackages().filter { it.isNotEmpty() }.toSet(), schemas)
+    }
+
+    /** A dotted reference (or a canonical key) read into its slots; [tail] is the trailing name path. */
+    private data class Slots(
+        val pkg: String?,
+        val model: String?,
+        val schema: String?,
+        val kind: String?,
+        val tail: String,
+    )
+
+    /**
+     * Read [path] into its slots: the leading model/package/schema/kind segments (D4 slot order) and the trailing
+     * name path. Mirrors TS `classifyReference`.
+     */
+    private fun classify(
+        path: String,
+        vocab: Vocab = vocab(),
+    ): Slots {
+        val segs = path.split('.').filter { it.isNotEmpty() }
         var i = 0
-        var model = false
-        var schema = false
-        if (i < segs.size && segs[i] in MODEL_CODES) {
-            i++
-            model = true
-        }
+        var model: String? = null
+        var pkg: String? = null
+        var schema: String? = null
+        var kind: String? = null
+        if (i < segs.size && segs[i] in MODEL_CODES) model = segs[i++]
         run {
             var best = -1
             for (j in i until segs.size) {
-                if (segs.subList(i, j + 1).joinToString(".") in packages) best = j
+                if (segs.subList(i, j + 1).joinToString(".") in vocab.packages) best = j
             }
-            if (best >= i) i = best + 1
+            if (best >= i) {
+                pkg = segs.subList(i, best + 1).joinToString(".")
+                i = best + 1
+            }
         }
-        if (i < segs.size && segs[i] in schemas) {
-            i++
-            schema = true
-        }
+        if (i < segs.size && segs[i] in vocab.schemas) schema = segs[i++]
         // The model may also follow the package (`pkg.er.entity.x`) — only when none led (TS `classifyReference`;
         // since 0.17 `cn` is a model code, and `db.dbo.cn.x` names a column `cn`, not the cn model).
-        if (!model && i < segs.size && segs[i] in MODEL_CODES) i++
+        if (model == null && i < segs.size && segs[i] in MODEL_CODES) model = segs[i++]
         // schema may follow the post-package model (`pkg.db.dbo.x`).
-        if (!schema && i < segs.size && segs[i] in schemas) i++
-        if (i < segs.size && segs[i] in kindKeywords) i++
-        return segs.subList(i, segs.size).joinToString(".")
+        if (schema == null && i < segs.size && segs[i] in vocab.schemas) schema = segs[i++]
+        if (i < segs.size && segs[i] in kindKeywords) kind = segs[i++]
+        return Slots(pkg, model, schema, kind, segs.subList(i, segs.size).joinToString("."))
     }
+
+    /** The trailing name path of a dotted reference ([classify]'s `tail`). Mirrors TS `Resolver.classifiedTail`. */
+    private fun classifiedTail(path: String): String = classify(path).tail
 
     fun resolveBareId(
         name: String,

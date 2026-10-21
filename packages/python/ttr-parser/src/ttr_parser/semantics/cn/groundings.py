@@ -141,7 +141,8 @@ def _value_fp(v: PropertyValue | None) -> object:
     if isinstance(v, ListValue):
         return [_value_fp(i) for i in v.items]
     if isinstance(v, ObjectValue):
-        return [[k, _value_fp(x)] for k, x in v.entries.items()]
+        # entries sorted by key: `{ start:, end: }` says what `{ end:, start: }` says (review-119 M-10)
+        return [[k, _value_fp(x)] for k, x in sorted(v.entries.items())]
     if isinstance(v, FunctionCall):
         return {"call": v.name, "args": [_value_fp(a) for a in v.args]}
     if isinstance(v, (StringValue, TripleStringValue, NumberValue, BoolValue)):
@@ -161,8 +162,8 @@ def _block_fp(b: EmbeddedBlock) -> object:
 
 def property_fingerprint(p: ConceptProperty) -> str:
     """A property's meaning as a string: its value with every source position dropped; a concept ref's
-    optional `cn.` head dropped (`Order` and `cn.Order` say the same). Mirrors TS `propertyFingerprint`
-    (an equality, not the same string)."""
+    optional `cn.` head dropped (`Order` and `cn.Order` say the same); object entries sorted by key. Mirrors
+    TS `propertyFingerprint` (an equality, not the same string)."""
     body: object
     if isinstance(p, ConceptDescription):
         body = [_value_fp(p.value) if p.value is not None else None, _loc_fp(p.localized)]
@@ -181,7 +182,15 @@ def property_fingerprint(p: ConceptProperty) -> str:
     elif isinstance(p, (ConceptDefinition, ConceptMembers, ConceptFilter)):
         body = _block_fp(p.block)
     elif isinstance(p, ConceptLexicon):
-        body = repr(p.block)
+        # by its five known keys — the canonical form TS and Kotlin share (review-119 M-10)
+        b = p.block
+        body = {
+            "terms": list(b.terms),
+            "patterns": list(b.patterns),
+            "examples": list(b.examples),
+            "default": b.default,
+            "sense_priority": b.sense_priority,
+        }
     elif isinstance(p, ConceptTarget):
         if isinstance(p.value, TargetReferenceValue):
             body = {"ref": _ref_path(p.value.ref.path) if p.value.ref is not None else None}

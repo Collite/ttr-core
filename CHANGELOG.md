@@ -62,7 +62,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   `roles:` are deprecated (they parse unchanged). Tooling: TextMate highlighting and the formatter's cn layout
   (see `packages/grammar/CHANGELOG.md` 0.17). Manual: [Conceptual model (cn)](docs/manual/en/20-conceptual-model.md).
 - **Grammar 0.17.1 — the cn semantics (CN-P2; code only, `TTR.g4` stays 0.17).** What CN-P1 carried through
-  unchecked is now resolved, desugared and checked, the same on TS, Kotlin and Python (conformance `out-ts-sem` 01–101
+  unchecked is now resolved, desugared and checked, the same on TS, Kotlin and Python (conformance `out-ts-sem` 01–106
   zero drift on three targets):
   - **`ttr-semantics`** — `cn` is a model code: a concept keys `<pkg>.cn.concept.<Name>`, an event's participant
     labels are its children (a bare participant's label is its concept's name lower-cased). A reference from a cn slot,
@@ -74,6 +74,19 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
     `unknown-relation-type`, `antirigid-supertype`, `db-grounding`, `ungrounded`, `phase-no-definition`,
     `event-no-period`, `cnc-deprecated`, and `ttr/required-property-missing` for a bearer-less quality or phase (the
     lexicon pair `duplicate-default-sense` / `phase-as-default` is TS-only).
+  - **Resolution: the slot-filling fallback on Kotlin and Python (ttr-core#228).** After the project-wide unique match,
+    `Resolver.resolveReference` reads a reference into its slots and looks for its name path in the reference's package
+    and model (its kind too, when written), then in its model, then anywhere — TS's `slotResolveReference`. So
+    `grounds: er.entity.store` in `hartland.west` names west's `store` beside `hartland.east`'s (D10 "current package
+    first"), and `md.revenue` names the md measure beside a lexicon term `revenue`; a scope with several candidates is
+    `ttr/ambiguous-reference`. Before, both stayed unresolved on Kotlin and Python while TS resolved them, and the cn
+    tier read the gap as a dangling grounding. Fixtures 102 and 106.
+  - **The sugar merge rule reads a property's meaning alike on the three runtimes.** An object's entries in any order
+    say the same (`period: { end:, start: }` = `{ start:, end: }`); a `lexicon { }` block is compared by its five known
+    keys, each form quoted (`["red,blue"]` ≠ `["red", "blue"]`). Fixture 103.
+  - **A `concept { }` on a measure written inline in a cubelet's `measures:` is `cn/grounding-target-kind`** — it
+    grounds nothing (the inline measure is no symbol a grounding could name); it was dropped silently on all three.
+    Fixture 104.
   - **`ttr-writer`** — `TtrRenderer` writes concept defs, the cn bindings and the `concept { }` sugar in the
     formatter's layout; expression blocks re-parse byte-exact.
   - **`ttr-metadata`** — the typed tier `CnSchema` (`SchemaCode.CN`, library-only): every concept with what the
@@ -107,7 +120,11 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   lifts to it), phase-as-default rows and retired codes (none until vocabulary versions register) — then the
   definition-level findings; `HygieneRender` renders it as JSON and as markdown. **`ttr cn hygiene <dir>
   [--format text|json] [--fail-on error|warning]`** (an `application` entry point; `just cn-hygiene <dir>` runs it
-  from the repo until the module publishes). The other service families are still CN-P3.
+  from the repo until the module publishes). The other service families are still CN-P3. A usage error (an unknown
+  flag or value, a missing argument) exits **2**, as the contract pins — clikt's own 1 read as "findings at
+  `--fail-on`"; `just cn-hygiene` runs the installed distribution, so the exit code and a path with spaces survive.
+  The markdown escapes authored text (term forms, open-tier entries); a nested list in a participant or `via:` path
+  is read through, as TS reads it.
 - **TTR-P — the recipe checker (AU-core-P1; `ttrp-frontend` · `ttrp-graph` · `ttrp-cli`).** A recipe is checked
   against the world and the model: the role shape and wiring (`TTRP-REC-000`), the action wiring typed against
   `def action` (`-001`…`-003`), the candidates' key (`-004`, `-005`), key lineage with each context's class (lookup /

@@ -27,6 +27,18 @@ from ..model import ImportStatement
 from .default_schema import MODEL_CODES
 from .symbol_table import SymbolEntry, SymbolTable
 
+
+@dataclass(frozen=True)
+class _Slots:
+    """A dotted reference (or a canonical key) read into its slots; `tail` is the trailing name path."""
+
+    package: str | None
+    model: str | None
+    schema: str | None
+    kind: str | None
+    tail: str
+
+
 # Kind segments that may lead a written reference (camelCase + MD aliases).
 _KIND_KEYWORDS: frozenset[str] = frozenset(
     {
@@ -246,6 +258,49 @@ class Resolver:
                 )
                 return Resolved(unique_matches[0], "fully-qualified")
 
+        # Step 7 — the slot-filling fallback (TS `slotResolveReference`, qname-redesign §5;
+        # ttr-core#228): read the reference into its slots and look for its name path in the
+        # reference's package and model (its kind too, when written), then in its model, then
+        # anywhere. The first scope with one candidate wins; a scope with several is ambiguous.
+        # So `er.entity.store` in `hartland.west` names west's `store` beside `hartland.east`'s
+        # (D10 "current package first"), and `md.revenue` the md measure beside a lexicon term.
+        vocab = self._vocab()
+        written = self._classify(path, vocab)
+        keyed: dict[str, tuple[SymbolEntry, _Slots]] = {}
+        for e in self._elements_by_suffix(written.tail):
+            if e.qname.value in (full_qname, cnc_qname) or e.qname.value in keyed:
+                continue
+            slots = self._classify(e.qname.value, vocab)
+            if slots.tail == written.tail:
+                keyed[e.qname.value] = (e, slots)
+        pkg = written.package or context.package_name or ""
+
+        def in_model(s: _Slots) -> bool:
+            return written.model is None or s.model == written.model
+
+        def in_package(s: _Slots) -> bool:
+            return (
+                in_model(s)
+                and (s.package or "") == pkg
+                and (written.schema is None or s.schema == written.schema)
+            )
+
+        scopes = (
+            lambda s: in_package(s) and (written.kind is None or s.kind == written.kind),
+            in_package,
+            in_model,
+            lambda s: True,
+        )
+        for scope in scopes:
+            candidates = [e for e, s in keyed.values() if scope(s)]
+            if len(candidates) == 1:
+                tried.append(ResolutionAttempt("fully-qualified", candidates[0].qname.value))
+                return Resolved(candidates[0], "fully-qualified")
+            if len(candidates) > 1:
+                for c in candidates:
+                    tried.append(ResolutionAttempt("fully-qualified", c.qname.value, "ambiguous"))
+                return Unresolved("ambiguous", tuple(tried), tuple(candidates))
+
         return Unresolved("not-found", tuple(tried))
 
     def _resolve_cn(self, written: list[str], context: ResolutionContext) -> ResolutionResult:
@@ -312,10 +367,8 @@ class Resolver:
             return Unresolved("ambiguous", tuple(tried), tuple(anywhere))
         return Unresolved("not-found", tuple(tried))
 
-    def _classified_tail(self, path: str) -> str:
-        """The trailing name path with leading model/package/schema/kind segments
-        stripped (← TS ``Resolver.classifiedTail`` / ``classifyReference``)."""
-        segs = [s for s in path.split(".") if s]
+    def _vocab(self) -> tuple[set[str], set[str]]:
+        """The project's packages and db schemas - what `_classify` reads a dotted path against."""
         all_entries = self._symbols.get_all()
         packages = {e.package_name for e in all_entries if e.package_name}
         schemas = {"dbo"}
@@ -325,30 +378,47 @@ class Resolver:
                 k = parts.index("db")
                 if k + 1 < len(parts):
                     schemas.add(parts[k + 1])
+        return packages, schemas
+
+    def _classify(self, path: str, vocab: tuple[set[str], set[str]] | None = None) -> _Slots:
+        """Read a dotted reference (or a canonical key) into its slots: the leading
+        model/package/schema/kind segments (D4 slot order) and the trailing name path
+        (← TS ``classifyReference``)."""
+        packages, schemas = vocab if vocab is not None else self._vocab()
+        segs = [s for s in path.split(".") if s]
         i = 0
-        model = schema = False
+        model = pkg = schema = kind = None
         if i < len(segs) and segs[i] in MODEL_CODES:
+            model = segs[i]
             i += 1
-            model = True
         best = -1
         for j in range(i, len(segs)):
             if ".".join(segs[i : j + 1]) in packages:
                 best = j
         if best >= i:
+            pkg = ".".join(segs[i : best + 1])
             i = best + 1
         if i < len(segs) and segs[i] in schemas:
+            schema = segs[i]
             i += 1
-            schema = True
         # The model may also follow the package (`pkg.er.entity.x`) - only when none led (TS
         # `classifyReference`; since 0.17 `cn` is a model code, and `db.dbo.cn.x` names a column `cn`).
-        if not model and i < len(segs) and segs[i] in MODEL_CODES:
+        if model is None and i < len(segs) and segs[i] in MODEL_CODES:
+            model = segs[i]
             i += 1
         # schema may follow the post-package model (`pkg.db.dbo.x`).
-        if not schema and i < len(segs) and segs[i] in schemas:
+        if schema is None and i < len(segs) and segs[i] in schemas:
+            schema = segs[i]
             i += 1
         if i < len(segs) and segs[i] in _KIND_KEYWORDS:
+            kind = segs[i]
             i += 1
-        return ".".join(segs[i:])
+        return _Slots(pkg, model, schema, kind, ".".join(segs[i:]))
+
+    def _classified_tail(self, path: str) -> str:
+        """The trailing name path with leading model/package/schema/kind segments
+        stripped (← TS ``Resolver.classifiedTail`` / ``classifyReference``)."""
+        return self._classify(path).tail
 
     def resolve_bare_id(self, name: str, scope: LexicalScope) -> ResolutionResult:
         tried: list[ResolutionAttempt] = []

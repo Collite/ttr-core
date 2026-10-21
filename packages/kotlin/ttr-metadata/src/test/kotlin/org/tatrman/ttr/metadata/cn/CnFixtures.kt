@@ -62,10 +62,7 @@ internal object CnFixtures {
                 ),
         )
 
-    /**
-     * Fixture 75's concepts with fixture 78's lexicon in the same package. Apart from [concepts]: 78's term `revenue`
-     * makes 75's `md.revenue` ambiguous to the Kotlin resolver (ttr-core#228) — the links are what this one reads.
-     */
+    /** Fixture 75's concepts with fixture 78's lexicon in the same package — the links are what this one reads. */
     fun lexicon(): CnProject =
         load(
             dir(resources.resolve("concepts"), "hartland/concepts") +

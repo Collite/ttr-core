@@ -191,13 +191,14 @@ object HygieneRender {
                             c.grounding?.let { it.target ?: "unresolved (${it.bindingKind})" } ?: DASH,
                             c.hop?.let { "${it.mdElement} → ${it.erTarget ?: it.slug ?: "?"}" } ?: DASH,
                             (c.erTarget ?: DASH) + (c.landingFrom?.let { " (← $it)" } ?: ""),
-                            (c.openEntries + c.relations).joinToString(", ").ifEmpty { DASH },
+                            (c.openEntries + c.relations).joinToString(", ") { md(it) }.ifEmpty { DASH },
                         )
                     appendLine(cells.joinToString(" | ", "| ", " |"))
                 }
                 appendLine()
             }
-            appendLine("Open-tier relation types: ${report.relationTypes.joinToString(", ").ifEmpty { "none" }}.")
+            val relationTypes = report.relationTypes.joinToString(", ") { md(it) }.ifEmpty { "none" }
+            appendLine("Open-tier relation types: $relationTypes.")
             section(
                 "Dangling groundings",
                 cs.flatMap { c ->
@@ -208,8 +209,8 @@ object HygieneRender {
                 "Redundant term duplicates",
                 cs.flatMap { c ->
                     c.redundantTerms.map {
-                        "${c.qname} — \"${it.form}\" (${it.locale ?: "base"}): term `${it.conceptEntry}`, and term " +
-                            "`${it.elementEntry}` on ${it.element}"
+                        "${c.qname} — \"${md(it.form)}\" (${it.locale ?: "base"}): " +
+                            "term `${it.conceptEntry}`, and term `${it.elementEntry}` on ${it.element}"
                     }
                 },
             )
@@ -217,8 +218,8 @@ object HygieneRender {
                 "Phase as default sense",
                 cs.flatMap { c ->
                     c.phaseAsDefault.map {
-                        "${c.qname} — term `${it.entry}` defaults \"${it.form}\" to the phase, but " +
-                            "\"${it.form}\" also names ${it.alsoNames} up its `of:` chain (cn/phase-as-default)"
+                        "${c.qname} — term `${it.entry}` defaults \"${md(it.form)}\" to the phase, but " +
+                            "\"${md(it.form)}\" also names ${it.alsoNames} up its `of:` chain (cn/phase-as-default)"
                     }
                 },
             )
@@ -240,6 +241,24 @@ object HygieneRender {
         if (rows.isEmpty()) appendLine("None.")
         rows.forEach { appendLine("- $it") }
     }
+
+    /**
+     * Authored text (a term form, an open-tier entry or relation) escaped for markdown: a character that would render
+     * as emphasis, code, a link or a table-cell break in an editor preview gets a backslash. An underscore inside a
+     * word stays (`loyalty_programme`) — CommonMark never reads it as emphasis. TS `mdEscape` is the twin.
+     */
+    internal fun md(s: String): String =
+        buildString {
+            s.forEachIndexed { i, ch ->
+                val inWord = ch == '_' && s.getOrNull(i - 1).isWordChar() && s.getOrNull(i + 1).isWordChar()
+                if (ch in MD_SPECIAL && !inWord) append('\\')
+                append(ch)
+            }
+        }
+
+    private fun Char?.isWordChar() = this != null && isLetterOrDigit()
+
+    private const val MD_SPECIAL = "\\`*_[]<>|~"
 
     private const val DASH = "—"
 

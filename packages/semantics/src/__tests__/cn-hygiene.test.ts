@@ -6,7 +6,7 @@ import { parseString } from '@tatrman/parser';
 import { ProjectSymbolTable } from '../project-symbols.js';
 import { Resolver } from '../resolver.js';
 import type { CnDocument } from '../cn/groundings.js';
-import { cnHygieneReport, renderCnHygieneMarkdown } from '../cn/hygiene.js';
+import { cnHygieneReport, mdEscape, renderCnHygieneMarkdown } from '../cn/hygiene.js';
 
 // CN-P2 S2.7 T3 — the editor's hygiene report against the golden `ttr-concept` is held to
 // (`tests/conformance/cn-hygiene/`): the data is `expected.json` less the Kotlin-only `definitions`
@@ -44,6 +44,14 @@ describe('cn hygiene report — the editor half of the golden (CN-P2 S2.7)', () 
 
   it('renders as expected-editor.md', () => {
     expect(renderCnHygieneMarkdown(golden())).toBe(readFileSync(join(GOLDEN, 'expected-editor.md'), 'utf-8'));
+  });
+
+  it('escapes authored text for markdown; an underscore inside a word stays (review-119 L-5, = Kotlin HygieneRender.md)', () => {
+    expect(mdEscape('*vendor*')).toBe('\\*vendor\\*');
+    expect(mdEscape('_x_')).toBe('\\_x\\_');
+    expect(mdEscape('loyalty_programme')).toBe('loyalty_programme');
+    expect(mdEscape('`a|b` [c] <d> ~e~ \\')).toBe('\\`a\\|b\\` \\[c\\] \\<d\\> \\~e\\~ \\\\');
+    expect(mdEscape('návštěva_ř')).toBe('návštěva_ř');
   });
 
   it('a project with no concepts: an empty report', () => {

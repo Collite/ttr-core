@@ -1,0 +1,4 @@
+package hartland.east
+model er
+
+def entity sale { attributes: [ def attribute sale_id { type: int, isKey: true }, def attribute store_code { type: text } ] }

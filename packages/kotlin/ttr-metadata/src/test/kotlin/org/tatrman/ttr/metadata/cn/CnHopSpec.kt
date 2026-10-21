@@ -65,6 +65,26 @@ class CnHopSpec :
             cn.byName("BigWebSale")!!.hop.shouldBeNull()
         }
 
+        "two packages declare the same md and er names: a grounding lands in its own package (ttr-core#228)" {
+            val cn =
+                CnFixtures
+                    .load(
+                        CnFixtures.dir(CnFixtures.resources.resolve("samename/east"), "hartland/east") +
+                            CnFixtures.dir(CnFixtures.resources.resolve("samename/west"), "hartland/west"),
+                    ).cn
+            cn.byName("Sale")!!.let {
+                it.grade shouldBe GroundingGrade.MD_GROUNDED
+                it.erTarget shouldBe "er.entity.sale"
+                it.hop shouldBe HopResult("er.entity.sale", HopVia.EXPLICIT)
+            }
+            cn.byName("store_code")!!.let {
+                it.grade shouldBe GroundingGrade.MD_GROUNDED
+                it.erTarget shouldBe "er.entity.sale.store_code"
+            }
+            // a dimension has no md2er_cubelet: resolved, and the hop answers md/er-unmapped
+            cn.byName("Store")!!.hop!!.diagnostic shouldBe HopResult.UNMAPPED
+        }
+
         "the seam is pluggable: the builder reads whatever hop it is given" {
             val derived =
                 object : MdErHop {

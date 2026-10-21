@@ -15,7 +15,11 @@ Grammar 0.17.1 — the cn semantics in the editor.
   through the md → er hop, inherited from its bearer, or the `md/er-unmapped` reason).
 - **"TTR: Concept hygiene report"** — a new command: the conceptual model's hygiene report (grades, groundings, the
   hop, open tier, dangling groundings, redundant terms, phase-as-default) as a markdown preview. Definition blocks are
-  checked by `ttr cn hygiene`, not in the editor.
+  checked by `ttr cn hygiene`, not in the editor. Term forms and open-tier entries are escaped, so `*vendor*` previews
+  as written.
+- A `concept { }` on a measure written inline in a cubelet's `measures:` is reported (`cn-grounding-target-kind`): it
+  grounds nothing — declare the measure with `def measure`. A `concept { }` block restating its def's `period:` or
+  `lexicon { }` in another key order is no longer a `cn-duplicate-grounding`.
 
 Grammar 0.17 — the conceptual model (`model cn`).
 

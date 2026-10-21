@@ -318,6 +318,17 @@ class CnValidator {
   // --- cn/grounding-target-kind · cn/db-grounding --------------------------
 
   private checkGroundingTargets(): void {
+    // A `concept { }` on a measure written inline in a cubelet's `measures:` grounds nothing — the inline
+    // measure is no symbol a grounding could name (review-119 M-11): reported, never dropped silently.
+    for (const doc of this.docs) {
+      for (const def of doc.ast.definitions) {
+        if (def.kind !== 'cubelet') continue;
+        for (const m of def.measures) {
+          if (typeof m === 'string' || !m.concept) continue;
+          this.report(DiagnosticCode.CnGroundingTargetKind, 'error', doc.uri, m.concept.source, inlineMeasureSugar(m.name, def.name));
+        }
+      }
+    }
     for (const g of this.groundings.groundings) {
       const name = g.conceptName ?? (g.conceptKey ? shortName(g.conceptKey) : g.conceptRef?.path ?? g.name);
       if (!g.bindingKind) {
@@ -722,6 +733,11 @@ class CnValidator {
  * The model-level cn checks over a project. `resolver` must be built over the symbol table of exactly
  * these documents (the desugared concepts resolve through it).
  */
+/** The message for a `concept { }` on a cubelet's inline measure (review-119 M-11; the Kotlin and Python twins say the same). */
+export function inlineMeasureSugar(measure: string, cubelet: string): string {
+  return `a 'concept { }' on the measure '${measure}' written inline in cubelet '${cubelet}' grounds nothing — declare it with 'def measure ${measure}' and list it in 'measures:'`;
+}
+
 export function validateCn(docs: CnDocument[], resolver: Resolver): CnValidation {
   const v = new CnValidator(docs, resolver);
   const diagnostics = v.run();

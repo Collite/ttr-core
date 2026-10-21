@@ -603,10 +603,10 @@ private fun text(v: PropertyValue): String? =
 private fun strings(v: PropertyValue): List<String> =
     (v as? PropertyValue.ListValue)?.items.orEmpty().mapNotNull(::text)
 
-/** The ids of a value: an id, or a list's ids (the ttr-semantics `idsOf`). */
+/** The ids of a value: an id, or a list's ids, nested lists flattened (the ttr-semantics and TS `idsOf`). */
 private fun ids(v: PropertyValue?): List<PropertyValue.IdValue> =
     when (v) {
         is PropertyValue.IdValue -> listOf(v)
-        is PropertyValue.ListValue -> v.items.filterIsInstance<PropertyValue.IdValue>()
+        is PropertyValue.ListValue -> v.items.flatMap { ids(it) }
         else -> emptyList()
     }

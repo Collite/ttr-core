@@ -688,6 +688,9 @@ class LexiconBlock:
     terms: tuple[str, ...] = ()
     patterns: tuple[str, ...] = ()
     examples: tuple[str, ...] = ()
+    # Grammar 0.17 — the sense fields beside the shorthands (cn contracts §1.5); None when absent.
+    default: bool | None = None
+    sense_priority: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1463,6 +1466,9 @@ class CubeletDef(Definition):
     grain: tuple[Reference, ...] = ()
     #: `measures: [refs]` — the ref form only; inline measure defs are not modelled.
     measure_refs: tuple[Reference, ...] = ()
+    #: The `concept { }` of each inline measure that writes one, with the measure's name — kept so cn
+    #: semantics reports it (it grounds nothing; review-119 M-11).
+    inline_measure_concepts: tuple[tuple[str, ConceptSugar], ...] = ()
     kind: ClassVar[str] = "cubelet"
 
 

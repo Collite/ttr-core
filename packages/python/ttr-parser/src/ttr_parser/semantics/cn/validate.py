@@ -28,6 +28,7 @@ from ...model import (
     ConceptPeriod,
     ConceptProperty,
     ConceptRef,
+    CubeletDef,
     Definition,
     EntityDef,
     Er2DbEntityDef,
@@ -145,6 +146,14 @@ def _is_true(s: StatedProperty | None) -> bool:
         and isinstance(s.property, ConceptEntry)
         and isinstance(s.property.value, BoolValue)
         and s.property.value.raw
+    )
+
+
+def inline_measure_sugar(measure: str, cubelet: str) -> str:
+    """The message for a `concept { }` on a cubelet's inline measure (review-119 M-11; TS `inlineMeasureSugar`)."""
+    return (
+        f"a 'concept {{ }}' on the measure '{measure}' written inline in cubelet '{cubelet}' grounds nothing — "
+        f"declare it with 'def measure {measure}' and list it in 'measures:'"
     )
 
 
@@ -326,6 +335,20 @@ class _CnValidator:
     # --- cn/grounding-target-kind - cn/db-grounding --------------------------
 
     def _check_grounding_targets(self) -> None:
+        # A `concept { }` on a measure written inline in a cubelet's `measures:` grounds nothing - the
+        # inline measure is no symbol a grounding could name (review-119 M-11): reported, never dropped.
+        for doc in self._docs:
+            for d in doc.definitions:
+                if not isinstance(d, CubeletDef):
+                    continue
+                for measure, sugar in d.inline_measure_concepts:
+                    self._report(
+                        DiagnosticCode.CN_GROUNDING_TARGET_KIND,
+                        DiagnosticSeverity.ERROR,
+                        doc.uri,
+                        sugar.source,
+                        inline_measure_sugar(measure, d.name),
+                    )
         for placed in self.groundings.groundings:
             g = placed.grounding
             name = g.concept_name or (

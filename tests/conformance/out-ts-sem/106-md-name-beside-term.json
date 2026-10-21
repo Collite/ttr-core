@@ -1,0 +1,17 @@
+{
+    "diagnostics": [],
+    "resolved": [
+        "er.entity.sale => hartland.web.er.entity.sale",
+        "md.Money => hartland.web.md.domain.Money",
+        "md.measure.revenue => hartland.web.md.measure.revenue",
+        "md.revenue => hartland.web.md.measure.revenue"
+    ],
+    "symbols": [
+        "hartland.web.db.dbo.term.revenue",
+        "hartland.web.er.entity.sale",
+        "hartland.web.er.entity.sale.amount",
+        "hartland.web.er.relation.sale_revenue",
+        "hartland.web.md.domain.Money",
+        "hartland.web.md.measure.revenue"
+    ]
+}

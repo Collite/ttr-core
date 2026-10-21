@@ -1,0 +1,5 @@
+// An authored binding in west: its target resolves the same way.
+package hartland.west
+model binding
+
+def cn2er_kind shop_g { kind: cn.Shop, target: er.entity.store }

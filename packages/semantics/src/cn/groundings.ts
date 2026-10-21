@@ -70,13 +70,37 @@ const PLACE_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * A property's meaning as a string: its value with every source position dropped and object keys
- * sorted; a concept ref's optional `cn.` head is dropped (`Order` and `cn.Order` say the same).
+ * A property's meaning as a string: its value with every source position dropped, object keys and an
+ * object value's entries sorted by key (`{ start:, end: }` = `{ end:, start: }`); a concept ref's
+ * optional `cn.` head is dropped (`Order` and `cn.Order` say the same). A `lexicon { }` block is read
+ * by its five known keys (terms, patterns, examples, default, sense_priority) — the canonical form the
+ * Kotlin and Python twins share (review-119 M-10).
  */
 export function propertyFingerprint(p: ConceptProperty): string {
+  if (p.kind === 'lexicon') {
+    const entry = (key: string) => p.block.object.entries.find((e) => e.key === key)?.value;
+    const d = entry('default');
+    const s = entry('sense_priority');
+    return JSON.stringify([
+      'lexicon',
+      p.key,
+      {
+        terms: p.block.terms ?? [],
+        patterns: p.block.patterns ?? [],
+        examples: p.block.examples ?? [],
+        default: d?.kind === 'bool' ? d.value : null,
+        sense_priority: s?.kind === 'number' ? s.value : null,
+      },
+    ]);
+  }
   const norm = (v: unknown): unknown => {
     if (Array.isArray(v)) return v.map(norm);
     if (v && typeof v === 'object') {
+      const node = v as { kind?: unknown; entries?: unknown };
+      if (node.kind === 'object' && Array.isArray(node.entries)) {
+        const entries = [...(node.entries as Array<{ key: string }>)].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+        return { kind: 'object', entries: entries.map(norm) };
+      }
       const out: Record<string, unknown> = {};
       for (const k of Object.keys(v).sort()) {
         if (PLACE_KEYS.has(k)) continue;

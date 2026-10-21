@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.concept
 
-import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.testing.test
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
@@ -9,9 +8,8 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldStartWith
 import kotlinx.serialization.json.Json
-import org.tatrman.concept.cli.CnCommand
-import org.tatrman.concept.cli.CnHygieneCommand
-import org.tatrman.concept.cli.TtrCommand
+import org.tatrman.concept.cli.runTtr
+import org.tatrman.concept.cli.ttr
 import org.tatrman.ttr.metadata.model.ModelDescriptor
 import org.tatrman.ttr.metadata.reconcile.ModelReconciler
 import org.tatrman.ttr.metadata.source.FileBasedSource
@@ -95,7 +93,57 @@ class CnHygieneSpec :
             HygieneRender.markdown(r) shouldContain "0 concepts\n"
         }
 
-        fun ttr() = TtrCommand().subcommands(CnCommand().subcommands(CnHygieneCommand()))
+        "authored text is escaped for markdown; an underscore inside a word stays (review-119 L-5, = TS mdEscape)" {
+            HygieneRender.md("*vendor*") shouldBe "\\*vendor\\*"
+            HygieneRender.md("_x_") shouldBe "\\_x\\_"
+            HygieneRender.md("loyalty_programme") shouldBe "loyalty_programme"
+            HygieneRender.md("`a|b` [c] <d> ~e~ \\") shouldBe "\\`a\\|b\\` \\[c\\] \\<d\\> \\~e\\~ \\\\"
+            HygieneRender.md("návštěva_ř") shouldBe "návštěva_ř"
+        }
+
+        "a nested list in a participant path is read through, as TS does: the dangling ref is reported (L-6)" {
+            val root = Files.createTempDirectory("cn-nested")
+            val pkg = Files.createDirectories(root.resolve("hartland/visits"))
+            Files.writeString(
+                pkg.resolve("a-er.ttrm"),
+                """
+                package hartland.visits
+                model er
+
+                def entity visit {
+                    attributes: [ def attribute visit_id { type: int, isKey: true }, def attribute at { type: date } ]
+                }
+                def entity shopper { attributes: [ def attribute shopper_id { type: int, isKey: true } ] }
+                def relation rel_visit_shopper { from: er.entity.visit, to: er.entity.shopper }
+                """.trimIndent(),
+            )
+            Files.writeString(
+                pkg.resolve("b-cn.ttrm"),
+                """
+                package hartland.visits
+                model cn
+
+                def kind Shopper { grounds: er.entity.shopper }
+                def event Visit { involves: [Shopper], period: { at: at } }
+                """.trimIndent(),
+            )
+            Files.writeString(
+                pkg.resolve("c-bind.ttrm"),
+                """
+                package hartland.visits
+                model binding
+
+                def cn2er_event visit_g {
+                    event: cn.Visit,
+                    target: er.entity.visit,
+                    participants: { shopper: [[er.relation.rel_nope], er.relation.rel_visit_shopper] },
+                    period: { at: er.entity.visit.at }
+                }
+                """.trimIndent(),
+            )
+            val visit = CnHygiene.report(load(root)).concepts.single { it.qname == "cn.Visit" }
+            visit.danglingGroundings shouldBe listOf(DanglingRef("visit_g", "er.relation.rel_nope"))
+        }
 
         "ttr cn hygiene: the text, or the json, and exit 0 without --fail-on" {
             ttr().test("cn hygiene $golden").let {
@@ -123,5 +171,16 @@ class CnHygieneSpec :
 
         "ttr cn hygiene on a path that is not a directory: usage, exit 2" {
             ttr().test("cn hygiene ${golden.resolve("expected.md")}").statusCode shouldBe 2
+        }
+
+        "the ttr exit code: a usage error is 2, never the 1 of findings at --fail-on (review-119 M-8)" {
+            runTtr(listOf("cn", "hygiene", "$golden", "--bogus")) shouldBe 2
+            runTtr(listOf("cn", "hygiene", "$golden", "--format", "xml")) shouldBe 2
+            runTtr(listOf("cn", "hygiene")) shouldBe 2
+            runTtr(listOf("cn")) shouldBe 2
+            runTtr(listOf("cn", "hygiene", "${golden.resolve("expected.md")}")) shouldBe 2
+            runTtr(listOf("cn", "hygiene", "$golden")) shouldBe 0
+            runTtr(listOf("cn", "hygiene", "$golden", "--fail-on", "error")) shouldBe 1
+            runTtr(listOf("--help")) shouldBe 0
         }
     })

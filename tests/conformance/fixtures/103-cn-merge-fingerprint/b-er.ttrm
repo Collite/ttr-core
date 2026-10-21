@@ -1,0 +1,29 @@
+// The first four blocks restate their def in another order — no finding. The last two differ: a block
+// that leaves out the def's `sense_priority:`, and one form `"red,blue"` against two — `cn/duplicate-grounding`.
+package hartland.web
+model er
+
+def entity web_order {
+    attributes: [ def attribute order_id { type: int, isKey: true }, def attribute placed_date { type: date }, def attribute delivered_date { type: date } ],
+    concept { event: Order, period: { end: delivered_date, start: placed_date } }
+}
+def entity brand {
+    attributes: [ def attribute brand_id { type: int, isKey: true } ],
+    concept { kind: Brand, lexicon { examples: ["the brand"], terms: ["brand"] } }
+}
+def entity shelf {
+    attributes: [ def attribute shelf_id { type: int, isKey: true } ],
+    concept { kind: Shelf, lexicon { sense_priority: 2.0, default: true, terms: ["shelf"] } }
+}
+def entity bin {
+    attributes: [ def attribute bin_id { type: int, isKey: true } ],
+    concept { kind: Bin, spec: { height: 2, width: 1 } }
+}
+def entity web_return {
+    attributes: [ def attribute return_id { type: int, isKey: true }, def attribute returned_on { type: date } ],
+    concept { event: WebReturn, lexicon { terms: ["return"] } }
+}
+def entity colour {
+    attributes: [ def attribute colour_id { type: int, isKey: true } ],
+    concept { kind: Colour, lexicon { terms: ["red", "blue"] } }
+}

@@ -84,7 +84,7 @@ that model, and the cn properties are an error there.
 | `valued_state` | `true` | a quality whose value changes over time |
 | `definition` | an expression block | what a defined quality or phase means |
 | `members` | an expression block | which members a sub-kind of a vocabulary kind restricts to |
-| `imprecision` | `certainly` · `possibly` | how a definition reads an imprecise time |
+| `imprecision` | `certainly` · `possibly` | how a definition reads an imprecise time (default `certainly`) |
 | `basis` | `occurrence` · `current_state` · `past_state` | what a condition phase is evaluated on |
 | `relations` | `[ { type: <relation_type>, to: <concept> } ]` | open-tier relations |
 | `lexicon` | `{ terms: […] }` | the inline lexicon shorthand, targeting the concept |
@@ -113,6 +113,10 @@ named import, the wildcard imports, then a name unique in the project.
 | a `concept { }` block | its other slots | as on a concept def |
 | a lexicon entry | `for: cn.X` | a concept |
 
+An element reference written without its package — `grounds: er.entity.store` — names the referring file's own
+package's `store` when another package declares one too; written `md.revenue`, it names an md element even when a
+lexicon term or an er element shares the name.
+
 **Participant labels.** `Warehouse as fulfilling` is labelled `fulfilling`; a participant written bare is labelled by
 its concept's name, lower-cased (`Customer` → `customer`). A binding's `participants:` keys and a definition's
 `this.<label>` read the label. Renaming a concept in the editor keeps such a label by writing it out:
@@ -134,10 +138,10 @@ model cn
 
 def quality open_amount { of: Invoicing, definition: "amount - paid" }
 
-def quality transfer_delay {
-    of: StockTransfer,
+def quality delivery_time {
+    of: Order,
     definition: """pl
-        this.period.at - this.from.period.at
+        this.period.end - this.period.start
     """
 }
 
@@ -198,7 +202,7 @@ def event StockTransfer {
     extent: instantaneous,
     involves: [Item, Warehouse as from, Warehouse as to],
     period: { at: shipped_at, precision: day },
-    qualities: [shipped_at, transfer_delay]
+    qualities: [shipped_at]
 }
 ```
 
@@ -261,6 +265,9 @@ An md or er def can declare its own concept in place — the binding is implied 
 | `entity` | a kind, a role or an event |
 | er `attribute` | a quality, or a value kind |
 
+A measure written inline in a cubelet's `measures:` is not a host: its `concept { }` grounds nothing and is
+`cn/grounding-target-kind` — declare the measure with `def measure` and list it.
+
 ```ttrm
 model md
 
@@ -268,7 +275,7 @@ def cubelet storeReturns {
     grain: [Customer.code, Product.code],
     concept { event: Return, involves: [Customer, Item, ReturnReason] }
 }
-def measure returnAmount { domain: md.Money, aggregation: sum, concept { quality: return_amount } }
+def measure returnAmount { domain: md.Money, aggregation: sum, concept { quality: return_amount, of: Return } }
 ```
 
 ```ttrm
@@ -277,11 +284,14 @@ model er
 def entity invoice {
     attributes: [
         def attribute invoice_id { type: int, isKey: true },
-        def attribute status { type: text, concept { quality: invoice_status } }
+        def attribute status { type: text, concept { quality: invoice_status, of: Invoice } }
     ],
     concept { kind: Invoice }
 }
-def entity customer { concept { role: Customer, event: Order } }
+def entity customer {
+    attributes: [ def attribute customer_id { type: int, isKey: true } ],
+    concept { role: Customer, event: Order }
+}
 ```
 
 ## One grounding per concept
@@ -304,7 +314,9 @@ Where a concept lands on the er layer is its **grade**:
 | `cn2db_concept` | ungrounded | — documentation only |
 
 A defined phase with no grounding takes its bearer's grade and landing. In this release the hop reads explicit
-`md2er_cubelet` bindings only — a cubelet, and the md attributes its `attributes:` map names.
+`md2er_cubelet` bindings only — a cubelet, and the md attributes its `attributes:` map names. Every other md grounding
+— a dimension, a domain, a measure: `Item` to `md.Product` above — is md-grounded-hop-missing until the hop is
+derived; ground such a concept to er when it needs a landing now.
 
 ## Lexicon entries for concepts
 
@@ -339,13 +351,17 @@ Each `cn/*` diagnostic fires in one of three places:
 
 - **editor** — the language server and `modeler-lint`, as you type (lint category `cn` in `.ttrlint.toml`; the hygiene
   ones are off under the `recommended` preset and `info` under `strict`);
-- **`ttr cn hygiene`** — the checks on definition blocks, and the [hygiene report](#the-hygiene-report);
-- **consumer** — the tools that read the model at run time refuse a statement, an assertion or a recipe with it.
+- **`ttr cn hygiene`** — the checks on definition blocks, and the [hygiene report](#the-hygiene-report). It also
+  loads the model the way the editor checks it: an error-grade *editor* finding is printed to stderr as a load error
+  and fails `--fail-on error`; the editor's warnings and hygiene findings it does not print;
+- **consumer** *(a later release)* — the tools that read the model at run time will refuse a statement, an assertion
+  or a recipe with it.
 
 | slug | grade | fires in | meaning |
 |---|---|---|---|
 | `cn/duplicate-grounding` | error | editor | a second grounding of one concept, or a `concept { }` block restating a cn def differently |
-| `cn/grounding-target-kind` | error | editor | the target is not what the stereotype grounds to on that layer (a kind to a measure, a phase to md, …) |
+| `cn/grounding-target-kind` | error | editor | the target is not what the stereotype grounds to on that layer (a kind to a measure, a phase to md, …), or a `concept { }` on a cubelet's inline measure |
+| `concept-bearer-missing` | error | editor | a quality or a phase that names no bearer — `of:` is required (`ttr/required-property-missing` in the Kotlin and Python toolchains) |
 | `cn/role-no-event` | error | editor | a role names no defining event |
 | `cn/phase-double-definition` | error | editor | a phase with both `definition:` and a grounding |
 | `cn/hierarchy-shape` | error | editor | a `hierarchy:` closure entity lacks its two named attributes or a key |
@@ -375,7 +391,7 @@ Each `cn/*` diagnostic fires in one of three places:
 | `cn/unit-mismatch` | error | consumer | an asserted value's unit differs from the attribute's |
 | `cn/ambiguous-statement` · `cn/ambiguous-assertion` | error | consumer | a statement or assertion with unresolved candidates |
 | `cn/missing-time` | error | consumer | a statement with no time and not `all_time` |
-| `cn/materialize-parametric` | error | `ttr cn materialize` | a definition reading `:name` or `:as_of` cannot become a stacked entity |
+| `cn/materialize-parametric` | error | `ttr cn materialize` *(a later release)* | a definition reading `:name` or `:as_of` cannot become a stacked entity |
 | `cn/no-concept` | — | consumer | no concept or element matched a mention |
 
 The definition checks read a definition with every phase and defined quality it names inlined, transitively. A
@@ -431,7 +447,7 @@ release the command runs from the ttr-core repository: `just cn-hygiene <model-d
 ## Definitions
 
 - cn.LoyalShopper — cn/definition-cycle (error) at hartland/hygiene/c-concepts.ttrm:11: the definitions inline each
-  other: LoyalShopper → VipShopper → LoyalShopper
+  other: LoyalShopper → VipShopper → LoyalShopper (AM-26)
 ```
 
 In the editor, the command **TTR: Concept hygiene report** previews the same report without the definitions section,
@@ -440,7 +456,8 @@ which the editor does not check.
 ## `cnc` is deprecated
 
 `model cnc`, `def role` in it, and an entity's `roles:` still parse in grammar 0.17; `cn/cnc-deprecated` warns on
-each (never on the stock vocabulary), and a later major release removes them. There is **nothing to migrate to**: the
+the `model cnc` line of each such file and on each `roles:` (never on the stock vocabulary), and a later major release
+removes them. There is **nothing to migrate to**: the
 classification `cnc` recorded (fact, dimension, …) is derived from the md bindings and the entities' `semantics { }`
 kinds, so a model drops its `cnc` files and `roles:` rather than rewriting them.
 

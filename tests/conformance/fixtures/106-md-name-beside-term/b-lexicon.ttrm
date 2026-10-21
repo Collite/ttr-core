@@ -1,0 +1,5 @@
+// The term shares the measure's name.
+package hartland.web
+model lexicon locale en
+
+def term revenue { for: md.measure.revenue, forms: ["revenue"] }

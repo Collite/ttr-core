@@ -2,9 +2,12 @@
 package org.tatrman.concept.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.Context
+import com.github.ajalt.clikt.core.PrintHelpMessage
 import com.github.ajalt.clikt.core.ProgramResult
-import com.github.ajalt.clikt.core.main
+import com.github.ajalt.clikt.core.UsageError
+import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.default
@@ -21,12 +24,27 @@ import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.system.exitProcess
 
 /** The `ttr` command family. This module contributes `cn` (`hygiene`; `materialize` joins it at CN-P3). */
-fun main(args: Array<String>) {
-    TtrCommand()
-        .subcommands(CnCommand().subcommands(CnHygieneCommand()))
-        .main(args)
+fun ttr(): CliktCommand = TtrCommand().subcommands(CnCommand().subcommands(CnHygieneCommand()))
+
+fun main(args: Array<String>): Unit = exitProcess(runTtr(args.toList()))
+
+/**
+ * Run [ttr] on [args] and answer the exit code. Clikt exits 1 on a usage error (an unknown flag or value, a missing
+ * argument or subcommand); the cn contracts (§7) pin 2, so a mistyped flag in CI never reads as "findings at
+ * `--fail-on`".
+ */
+fun runTtr(args: List<String>): Int {
+    val command = ttr()
+    return try {
+        command.parse(args)
+        0
+    } catch (e: CliktError) {
+        command.echoFormattedHelp(e)
+        if (e is UsageError || (e is PrintHelpMessage && e.error)) 2 else e.statusCode
+    }
 }
 
 class TtrCommand : CliktCommand(name = "ttr") {

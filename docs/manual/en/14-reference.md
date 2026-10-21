@@ -167,7 +167,8 @@ rows are off under `recommended` and `info` under `strict`.
 | Code | Severity | Meaning |
 |---|---|---|
 | `cn/duplicate-grounding` | Error | A concept grounded twice (binding, `grounds:` or `concept { }`); the first is read. |
-| `cn/grounding-target-kind` | Error | The target is not what the stereotype grounds to on that layer. |
+| `cn/grounding-target-kind` | Error | The target is not what the stereotype grounds to on that layer, or a `concept { }` on a cubelet's inline measure. |
+| `concept-bearer-missing` (`ttr/required-property-missing` on Kotlin / Python) | Error | A quality or a phase with no `of:`. |
 | `cn/role-no-event` · `cn/phase-double-definition` | Error | A role with no `event:` · a phase with both `definition:` and a grounding. |
 | `cn/hierarchy-shape` · `cn/participant-path-broken` · `cn/involves-unlabelled-duplicate` | Error | A `hierarchy:` closure without its attributes or key · a participant path that does not chain · one concept twice in `involves:` unlabelled. |
 | `cn/unknown-relation-type` · `cn/duplicate-default-sense` | Error | An open-tier edge's `type:` is no relation type · two defaults for one bare form and locale. |

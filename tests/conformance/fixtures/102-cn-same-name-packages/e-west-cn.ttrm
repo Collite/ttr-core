@@ -1,0 +1,13 @@
+// West's concepts. Each grounding names an element both packages declare, written without the package;
+// each resolves to west's. `Depot` (west only) and `Outlet` (package-qualified) are the controls.
+package hartland.west
+model cn
+
+def kind Store { grounds: er.entity.store }
+def kind Outlet { grounds: hartland.west.er.entity.store }
+def kind Depot { grounds: er.entity.depot }
+def kind Shop { }
+def quality region { of: Store, grounds: er.entity.store.region }
+def kind Branch { grounds: md.Store }
+def event Sale { period: { at: sold_on }, grounds: md.sales }
+def quality store_code { of: Sale, grounds: md.Store.code }

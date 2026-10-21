@@ -1,0 +1,17 @@
+// review-119 M-11 — a `concept { }` on a measure written inline in a cubelet's `measures:` grounds
+// nothing (the inline measure is no symbol a grounding could name): `cn/grounding-target-kind`, on all
+// three runtimes, instead of a silent drop. The same sugar on a `def measure` grounds its quality.
+package hartland.web
+model md
+
+def domain Money { type: decimal }
+def domain Code { type: text }
+def dimension Product { key: sku, attributes: [ def attribute sku { domain: md.Code, isKey: true } ] }
+def measure net_sales { domain: md.Money, aggregation: sum, concept { quality: net_sales, of: Sale } }
+def cubelet sales {
+    grain: [Product.sku],
+    measures: [
+        def measure units { domain: md.Money, aggregation: sum, concept { quality: units_sold, of: Sale } }
+    ],
+    concept { event: Sale, period: { at: sold_on } }
+}

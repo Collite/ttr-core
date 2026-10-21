@@ -506,6 +506,26 @@ export const EDITOR_DEFINITIONS_NOTE =
   'Not checked in the editor — `ttr cn hygiene <dir>` reports the definition-level findings (syntax, names, cycles,\n' +
   'reachability, basis, instant comparisons; CN-D29).';
 
+/**
+ * Authored text (a term form, an open-tier entry or relation) escaped for markdown: a character that would render as
+ * emphasis, code, a link or a table-cell break in an editor preview gets a backslash. An underscore inside a word stays
+ * (`loyalty_programme`) — CommonMark never reads it as emphasis. Kotlin `HygieneRender.md` is the twin (UTF-16 units,
+ * a letter or decimal digit on both sides).
+ */
+export function mdEscape(s: string): string {
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    const inWord = ch === '_' && i > 0 && i < s.length - 1 && WORD_CHAR.test(s[i - 1]) && WORD_CHAR.test(s[i + 1]);
+    if (MD_SPECIAL.includes(ch) && !inWord) out += '\\';
+    out += ch;
+  }
+  return out;
+}
+
+const MD_SPECIAL = '\\`*_[]<>|~';
+const WORD_CHAR = /^[\p{L}\p{Nd}]$/u;
+
 export function renderCnHygieneMarkdown(report: CnHygieneReport): string {
   const lines: string[] = [];
   const cs = report.concepts;
@@ -526,13 +546,13 @@ export function renderCnHygieneMarkdown(report: CnHygieneReport): string {
         c.grounding ? c.grounding.target ?? `unresolved (${c.grounding.binding})` : DASH,
         c.hop ? `${c.hop.from} → ${c.hop.to ?? c.hop.slug ?? '?'}` : DASH,
         (c.landsOn ?? DASH) + (c.landingFrom ? ` (← ${c.landingFrom})` : ''),
-        [...c.openEntries, ...c.relations].join(', ') || DASH,
+        [...c.openEntries, ...c.relations].map(mdEscape).join(', ') || DASH,
       ];
       lines.push(`| ${cells.join(' | ')} |`);
     }
     lines.push('');
   }
-  lines.push(`Open-tier relation types: ${report.relationTypes.join(', ') || 'none'}.`);
+  lines.push(`Open-tier relation types: ${report.relationTypes.map(mdEscape).join(', ') || 'none'}.`);
   const section = (title: string, rows: string[]) => {
     lines.push('', `## ${title}`, '');
     if (rows.length === 0) lines.push('None.');
@@ -542,13 +562,13 @@ export function renderCnHygieneMarkdown(report: CnHygieneReport): string {
   section(
     'Redundant term duplicates',
     cs.flatMap((c) =>
-      c.redundantTerms.map((t) => `${c.concept} — "${t.form}" (${t.locale ?? 'base'}): term \`${t.conceptEntry}\`, and term \`${t.elementEntry}\` on ${t.element}`),
+      c.redundantTerms.map((t) => `${c.concept} — "${mdEscape(t.form)}" (${t.locale ?? 'base'}): term \`${t.conceptEntry}\`, and term \`${t.elementEntry}\` on ${t.element}`),
     ),
   );
   section(
     'Phase as default sense',
     cs.flatMap((c) =>
-      c.phaseAsDefault.map((p) => `${c.concept} — term \`${p.entry}\` defaults "${p.form}" to the phase, but "${p.form}" also names ${p.alsoNames} up its \`of:\` chain (cn/phase-as-default)`),
+      c.phaseAsDefault.map((p) => `${c.concept} — term \`${p.entry}\` defaults "${mdEscape(p.form)}" to the phase, but "${mdEscape(p.form)}" also names ${p.alsoNames} up its \`of:\` chain (cn/phase-as-default)`),
     ),
   );
   lines.push('', '## Retired codes', '');
