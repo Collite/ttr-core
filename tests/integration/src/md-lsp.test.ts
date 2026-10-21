@@ -54,8 +54,11 @@ describe('Phase 2 — MD LSP features', () => {
     const pair = createPairedConnection();
     client = pair.client;
     server = pair.server;
-    client.onNotification('textDocument/publishDiagnostics', (p: lsp.PublishDiagnosticsParams) => {
-      diagnostics.set(p.uri, p.diagnostics);
+    const diagnosticsPublished = new Promise<void>((resolve) => {
+      client.onNotification('textDocument/publishDiagnostics', (p: lsp.PublishDiagnosticsParams) => {
+        diagnostics.set(p.uri, p.diagnostics);
+        if (p.uri === uri) resolve();
+      });
     });
     createServerConnection(server, {
       async scanProjectFiles() {
@@ -65,11 +68,12 @@ describe('Phase 2 — MD LSP features', () => {
 
     await client.sendRequest('initialize', { processId: null, rootUri: pathToFileURL(root).href, capabilities: {} });
     client.sendNotification('initialized', {});
-    await sleep(50);
     client.sendNotification('textDocument/didOpen', {
       textDocument: { uri, languageId: 'ttr', version: 1, text: MODEL },
     });
-    await sleep(120);
+    // Concurrent CI suites can keep diagnostics in flight for longer than
+    // 120 ms. Wait for delivery, then assert the notification's contents below.
+    await diagnosticsPublished;
   });
 
   afterAll(async () => {
