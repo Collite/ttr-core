@@ -84,8 +84,29 @@ export class ProjectSymbolTable {
     this.synthesizedByDocument.set(uri, entries);
   }
 
+  /**
+   * The entry a qname reads as. 0.17: an authored symbol over one the cn desugar synthesized
+   * (`cnOrigin` — a concept a `concept { }` block declares where a cn def declares it too, S2.2);
+   * among synthesized ones the first in document order, so the answer does not depend on the order
+   * documents were opened in.
+   */
   get(qname: string): SymbolEntry | undefined {
-    return this.byQname.get(qname)?.[0];
+    const list = this.byQname.get(qname);
+    if (!list || list.length < 2) return list?.[0];
+    const authored = list.find((e) => e.cnOrigin === undefined);
+    if (authored) return authored;
+    return [...list].sort((a, b) =>
+      a.documentUri < b.documentUri ? -1 : a.documentUri > b.documentUri ? 1 : a.source.offsetStart - b.source.offsetStart,
+    )[0];
+  }
+
+  /**
+   * How a document was upserted — its model directive code, namespace and effective package — or
+   * `undefined` for a document the table does not hold. A project rule reads a document's package here
+   * rather than re-deriving it (0.17, the cn checks).
+   */
+  documentContext(uri: string): { schemaCode: string; namespace: string; packageName: string } | undefined {
+    return this.byDocument.get(uri)?.context();
   }
 
   allQnames(): string[] {

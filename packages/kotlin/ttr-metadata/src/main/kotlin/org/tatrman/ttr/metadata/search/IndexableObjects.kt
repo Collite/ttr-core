@@ -42,6 +42,16 @@ internal fun RegistrySnapshot.searchableObjects(): Sequence<IndexableObject> =
                     for (o in schema.objects.values) {
                         yield(IndexableObject(o.qname, o.kind, o.description, o.label, SearchHints.EMPTY))
                     }
+                // Grammar 0.17 — concepts (and the open tier's relation types, for browsing) by name, description and
+                // label; groundings are plumbing, not found by search.
+                is org.tatrman.ttr.metadata.model.CnSchema -> {
+                    for (c in schema.concepts.values) {
+                        yield(IndexableObject(c.qname, c.kind, c.description, c.label, SearchHints.EMPTY))
+                    }
+                    for (r in schema.relationTypes.values) {
+                        yield(IndexableObject(r.qname, r.kind, r.description, r.label, SearchHints.EMPTY))
+                    }
+                }
                 else -> {}
             }
         }

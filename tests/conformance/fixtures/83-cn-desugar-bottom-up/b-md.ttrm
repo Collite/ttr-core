@@ -1,0 +1,23 @@
+// The md hosts, each with its `concept { }`.
+package hartland.stores
+model md
+
+def dimension Product {
+    key: sku,
+    attributes: [
+        def attribute sku   { domain: md.Sku, isKey: true },
+        def attribute color { domain: md.Color, concept { quality: color, of: Item } }
+    ],
+    concept { kind: Item, label: { en: "Product" } }
+}
+def dimension Shopper {
+    key: shopper_code,
+    attributes: [ def attribute shopper_code { domain: md.ShopperCode, isKey: true } ],
+    concept: { role: Shopper, of: Party, event: StoreSale }
+}
+def domain Brand { type: text, concept { kind: Brand } }
+def measure net_sales { domain: md.Money, aggregation: sum, concept { quality: net_sales, of: StoreSale } }
+def cubelet store_sales {
+    grain: [Shopper.shopper_code, Product.sku],
+    concept { event: StoreSale, involves: [Shopper, Item], period: { at: sold_date } }
+}

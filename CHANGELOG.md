@@ -65,6 +65,86 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   defs through unchecked (the cn semantics, the typed model and `ttr-writer` support are CN-P2). `model cnc` and
   `roles:` are deprecated (they parse unchanged). Tooling: TextMate highlighting and the formatter's cn layout
   (see `packages/grammar/CHANGELOG.md` 0.17). Manual: [Conceptual model (cn)](docs/manual/en/20-conceptual-model.md).
+- **Grammar 0.17.1 — the cn semantics (CN-P2; code only, `TTR.g4` stays 0.17).** What CN-P1 carried through
+  unchecked is now resolved, desugared and checked, the same on TS, Kotlin and Python (conformance `out-ts-sem` 01–106
+  zero drift on three targets):
+  - **`ttr-semantics`** — `cn` is a model code: a concept keys `<pkg>.cn.concept.<Name>`, an event's participant
+    labels are its children (a bare participant's label is its concept's name lower-cased). A reference from a cn slot,
+    or written with the `cn.` head, resolves **among concepts only**; an element reference never reaches a concept, so
+    no existing reference moves. `grounds:` and `concept { }` desugar to canonical bindings (`<Concept>.grounds`,
+    `<Concept>.concept`); **one grounding per concept** — a second is `cn/duplicate-grounding`, the first is read.
+    The model-level `cn/*` slugs (contracts §7): `duplicate-grounding`, `grounding-target-kind`, `role-no-event`,
+    `phase-double-definition`, `hierarchy-shape`, `participant-path-broken`, `involves-unlabelled-duplicate`,
+    `unknown-relation-type`, `antirigid-supertype`, `db-grounding`, `ungrounded`, `phase-no-definition`,
+    `event-no-period`, `cnc-deprecated`, and `ttr/required-property-missing` for a bearer-less quality or phase (the
+    lexicon pair `duplicate-default-sense` / `phase-as-default` is TS-only).
+  - **Resolution: the slot-filling fallback on Kotlin and Python (ttr-core#228).** The project-wide step tries a
+    written form as an exact key first (`er.entity.store` is the root package's `store`, whose key it is); after it,
+    `Resolver.resolveReference` reads a reference into its slots and looks for its name path in the reference's package
+    and model (its kind too, when written; for `db` its schema — written, else the file's), then in its model, then
+    anywhere, as TS's `slotResolveReference` does. So `grounds: er.entity.store` in `hartland.west` names west's
+    `store` beside `hartland.east`'s (D10 "current package first"), `md.revenue` names the md measure beside a lexicon
+    term `revenue`, and `db.Orders.cust_id` in a `schema dbo` file names dbo's table beside `archive`'s; a scope with
+    several candidates is `ttr/ambiguous-reference`. Before, these stayed unresolved on Kotlin and Python while TS
+    resolved them, and the cn tier read the gap as a dangling grounding. TS also reads the manifest's package and
+    project default schema (`modeler.toml`), which Kotlin and Python have no notion of. Fixtures 102, 106, 107, 108.
+  - **The sugar merge rule reads a property's meaning alike on the three runtimes.** An object's entries in any order
+    say the same (`period: { end:, start: }` = `{ start:, end: }`); a `lexicon { }` block is compared by its five known
+    keys, each form quoted (`["red,blue"]` ≠ `["red", "blue"]`). Fixture 103.
+  - **A `concept { }` on a measure written inline in a cubelet's `measures:` is `cn/grounding-target-kind`** — it
+    grounds nothing (the inline measure is no symbol a grounding could name); it was dropped silently on all three.
+    Fixture 104.
+  - **A named concept import counts as used.** `ttr/unused-import` reads the reference whole (its cn context) and
+    compares the concept's package, on TS, Kotlin and Python — `import hartland.core.Customer` beside `involves:
+    [Customer]` was reported unused, and the safe fix deleted it. A concept a `concept { }` block alone declares is
+    located at its name. Fixture 105.
+  - **`ttr-writer`** — `TtrRenderer` writes concept defs, the cn bindings and the `concept { }` sugar in the
+    formatter's layout; expression blocks re-parse byte-exact.
+  - **`ttr-metadata`** — the typed tier `CnSchema` (`SchemaCode.CN`, library-only): every concept with what the
+    project states of it, its one grounding, where it lands on the er layer (`erTarget`, `via` DIRECT | MD_HOP,
+    `grade`; a defined phase inherits its bearer's), the md → er hop seam (`MdErHop`; P2 fills it from explicit
+    `md2er_cubelet`: `ExplicitMdErHop`, else `md/er-unmapped` / `md/er-ambiguous`), the reverse index
+    (`liftsTo`), lexicon links, open-tier relation types. S2.7 adds `Concept.hop` (the hop's answer for the concept's
+    own md grounding) and `CnSchema.elementTerms` (canonical lexicon terms on md / er elements, by ref).
+- **`TTRP.g4` 0.4 → 0.5 — the conceptual-model definition forms (CN-P2 S2.6, CN-D29; `ttrp-frontend`, Kotlin
+  only).** A cn `definition:` / `members:` / `filter:` block is a TTR-P expression; 0.5 adds what it needs and 0.4
+  lacked: `[not] exists C [v] (, C [v])* involving p [as label] … [where e]`, the concept aggregate `count(C involving
+  … [where …] (, name: e)*)` + `.quality`, `x [not] in <call>` (`code in descendants(Kind, 'X')`), the temporal words
+  `at_or_before before contains ended_before overlaps` (infix, comparison level), `this` (+ a path), and `end` after a
+  dot. New tokens: `exists involving where this at_or_before before contains ended_before overlaps`; eight stay soft
+  (still names), `this` does not. In a TTR-P document a temporal word followed by `:` is a route or a config key as in
+  0.4 (`before: is_early`), never the comparison. Every 0.4 document parses to the same AST, except a column named
+  `this`. The AST gains a sealed `ConceptForm` family (`ExistsExpr`, `ConceptAggregate`, `ThisRef`, `InCall`,
+  `TemporalPredicate`); a TTR-P document refuses each wherever it sits (a chain op, a recipe route, a decision
+  statement, a wiring `when:`) with **`TTRP-CN-001`**, and the emitters treat them as `UNSUPPORTED_NODE`.
+  **Migration:** a TTR-P program with a column named `this` now fails `TTRP-CN-001` — rename the column (`this` always
+  reads as the cn `this`). TTR-P spans count code points (a span after an astral character on an earlier line ended
+  one column short); a syntax error at the end of the input is an empty span. Where 0.4 already spelled a construct the cn
+  spelling is TTR-P's: `:as_of`, `:name`, `hours(24)`, `within(x, last: d)`, `<>` (cn contracts §1.1 "The 0.5
+  spellings"). **`TtrpParser.parseExpression` reads the whole input** (`standaloneExpr : expr EOF`, ttr-core#202): a
+  tail after the expression is `TTRP-PRS-001` — it was dropped silently. The TTR-P formatter renders `<>` as `<>` (it
+  wrote `!=`, which does not lex).
+- **`ttr-concept`** (not published) — **`ResolvedCnModel(model, definitions, snapshotHash)`** replaces the placeholder:
+  the reconciled `Model`, every definition block parsed with `TTRP.g4` 0.5 and name-resolved (`CnDefinitions`: the
+  definition's reads — concepts, inlined definitions, `:name` parameters, `:as_of`, instant comparisons), and the
+  definition-level `cn/…` slugs (`definitionDiagnostics()`): `cn/definition-syntax`, `cn/definition-unknown-name`,
+  `cn/descendants-no-hierarchy` (new), `cn/definition-cycle`, `cn/definition-unresolved`,
+  `cn/definition-unreachable(md|er)`, `cn/basis-mismatch`, `cn/imprecise-comparison`. `Diagnostic` gains `location`.
+  **The hygiene report v2** (S2.7, contracts §7): `CnConceptService(model).hygieneReport()` — per concept its grade,
+  `via`, grounding and the hop column, its landing, core vs open (the free-form keys and `relations:` edges listed),
+  dangling grounding refs, redundant term duplicates (a form a concept's term shares with a term on an element that
+  lifts to it), phase-as-default rows and retired codes (none until vocabulary versions register) — then the
+  definition-level findings; `HygieneRender` renders it as JSON and as markdown. **`ttr cn hygiene <dir>
+  [--format text|json] [--fail-on error|warning]`** (an `application` entry point; `just cn-hygiene <dir>` runs it
+  from the repo until the module publishes). The other service families are still CN-P3. A usage error (an unknown
+  flag or value, a missing argument) exits **2**, as the contract pins — clikt's own 1 read as "findings at
+  `--fail-on`" — and so does a model that cannot be read (one line on stderr, no stack trace); `just cn-hygiene`
+  runs the installed distribution with the arguments as given, so the exit code and any path survive. The stock
+  `cnc.role.*` vocabulary loads with the model, so a deprecated `roles: [fact]` is no load error.
+  The markdown escapes authored text (term forms, open-tier entries); a nested list in a participant or `via:` path
+  is read through, as TS reads it. A window reads `:as_of`: `within(x, last: d)` counts as `x <= :as_of` in the
+  `basis:` table (`x >= :as_of - d` beside it), `within(x, from:, to:)` as its two comparisons; `age(since:)` reads
+  `:as_of`.
 - **TTR-P — the recipe checker (AU-core-P1; `ttrp-frontend` · `ttrp-graph` · `ttrp-cli`).** A recipe is checked
   against the world and the model: the role shape and wiring (`TTRP-REC-000`), the action wiring typed against
   `def action` (`-001`…`-003`), the candidates' key (`-004`, `-005`), key lineage with each context's class (lookup /

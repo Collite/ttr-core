@@ -1,0 +1,6 @@
+// The er face names the measure by its model and name only.
+package hartland.web
+model er
+
+def entity sale { attributes: [ def attribute amount { type: decimal } ], description: "A web sale." }
+def relation sale_revenue { from: er.entity.sale, to: md.revenue }

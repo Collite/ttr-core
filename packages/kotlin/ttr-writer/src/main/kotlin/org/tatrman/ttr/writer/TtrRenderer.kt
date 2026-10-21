@@ -4,10 +4,16 @@ package org.tatrman.ttr.writer
 import org.tatrman.ttr.parser.loader.ParseResult
 import org.tatrman.ttr.parser.model.AttributeDef
 import org.tatrman.ttr.parser.model.ColumnDef
+import org.tatrman.ttr.parser.model.ConceptBindingDef
+import org.tatrman.ttr.parser.model.ConceptDef
+import org.tatrman.ttr.parser.model.ConceptParticipant
+import org.tatrman.ttr.parser.model.ConceptProperty
+import org.tatrman.ttr.parser.model.ConceptSugar
 import org.tatrman.ttr.parser.model.CubeletDef
 import org.tatrman.ttr.parser.model.Definition
 import org.tatrman.ttr.parser.model.DimensionDef
 import org.tatrman.ttr.parser.model.DrillMapDef
+import org.tatrman.ttr.parser.model.EmbeddedBlock
 import org.tatrman.ttr.parser.model.EntityDef
 import org.tatrman.ttr.parser.model.Er2CncRoleDef
 import org.tatrman.ttr.parser.model.Er2DbAttributeDef
@@ -20,6 +26,7 @@ import org.tatrman.ttr.parser.model.AllocationSpec
 import org.tatrman.ttr.parser.model.AttrColumnBinding
 import org.tatrman.ttr.parser.model.CubeletMeasure
 import org.tatrman.ttr.parser.model.JournalingSpec
+import org.tatrman.ttr.parser.model.LexiconBlock
 import org.tatrman.ttr.parser.model.MdDomainDef
 import org.tatrman.ttr.parser.model.MdMapDef
 import org.tatrman.ttr.parser.model.Md2dbCubeletDef
@@ -93,6 +100,9 @@ object TtrRenderer {
             Md2dbCubeletDef::class,
             // Grammar 0.16 — the automation kinds (one class; ordered by kind then name below).
             AutomationDef::class,
+            // Grammar 0.17 — the conceptual model: the concepts (every stereotype one class), then the bindings.
+            ConceptDef::class,
+            ConceptBindingDef::class,
         )
 
     /** Contract §3 — render definitions with an optional leading schema directive. */
@@ -157,19 +167,23 @@ object TtrRenderer {
         val grouped = definitions.filterNot { isMdLogicalDef(it) }.groupBy { it::class }
         val sortedGroups = grouped.entries.sortedBy { (kind, _) -> KIND_ORDER.indexOf(kind) }
         for ((_, defs) in sortedGroups) {
-            val ordered =
-                defs.sortedWith(
-                    compareBy<Definition>({
-                        (it as? AutomationDef)?.let { a -> AutomationDef.KINDS.indexOf(a.kind) }
-                            ?: 0
-                    }, { it.name }),
-                )
+            // Within a class: the automation kinds, the concept stereotypes and the cn binding kinds in grammar
+            // order, then by name.
+            val ordered = defs.sortedWith(compareBy<Definition>({ subKindRank(it) }, { it.name }))
             for (def in ordered) {
                 sb.appendLine(renderDef(def))
             }
         }
         return sb.toString()
     }
+
+    private fun subKindRank(def: Definition): Int =
+        when (def) {
+            is AutomationDef -> AutomationDef.KINDS.indexOf(def.kind)
+            is ConceptDef -> ConceptDef.STEREOTYPES.indexOf(def.stereotype)
+            is ConceptBindingDef -> ConceptBindingDef.KINDS.indexOf(def.bindingKind)
+            else -> 0
+        }
 
     fun renderDef(def: Definition): String =
         when (def) {
@@ -196,6 +210,9 @@ object TtrRenderer {
             is MeasureDef -> renderMeasure(def)
             is CubeletDef -> renderCubelet(def)
             is Md2dbCubeletDef -> renderMd2dbCubelet(def)
+            // Grammar 0.17 — the conceptual model.
+            is ConceptDef -> renderConceptDef(def)
+            is ConceptBindingDef -> renderConceptBinding(def)
             // The remaining v3.1 MD logical defs (domain/dimension/map/hierarchy) have no surface
             // renderer yet — see [isMdLogicalDef]. Emit nothing rather than throwing; `renderDefinitions`
             // already filters them out of file output.
@@ -452,6 +469,7 @@ object TtrRenderer {
             sb.append(renderBinding(it))
             sb.append(",")
         }
+        def.concept?.let { sb.append(" ${renderConceptSugar(it)},") }
         if (def.attributes.isNotEmpty()) {
             sb.appendLine()
             sb.append("    attributes: [")
@@ -506,6 +524,7 @@ object TtrRenderer {
             sb.append(def.transitions.joinToString(", ") { "${it.from}: [${it.to.joinToString(", ")}]" })
             sb.append(" },")
         }
+        def.concept?.let { sb.append(" ${renderConceptSugar(it)},") }
         sb.append(" }")
         return sb.toString()
     }
@@ -1007,6 +1026,7 @@ object TtrRenderer {
             }
         }
         def.validBy?.let { parts.add("validBy: $it") }
+        def.concept?.let { parts.add(renderConceptSugar(it)) }
         sb.append(" ${parts.joinToString(", ")} }")
         return sb.toString()
     }
@@ -1034,9 +1054,237 @@ object TtrRenderer {
                 }
             parts.add("measures: [$rendered]")
         }
+        def.concept?.let { parts.add(renderConceptSugar(it)) }
         sb.append(" ${parts.joinToString(", ")} }")
         return sb.toString()
     }
+
+    // ----- Grammar 0.17 — the conceptual model (CN-P2 S2.4). A cn body prints its properties in the formatter's
+    // ONE canonical order (grammar CHANGELOG 0.17; `packages/format` `CN_BODY_ORDER` / `CN_BINDING_ORDER`), a key
+    // the order does not list after the listed ones in authored order. A concept def or a binding prints on one
+    // line — `modeler-fmt` keeps a one-line cn def on one line — unless the formatter would break it (more than
+    // three `involves:` participants, a non-empty binding `participants:`, a value spanning lines); then one
+    // property per line, the formatter's broken layout. Either way `modeler-fmt` leaves the def as it is. An
+    // expression block (`definition:`, `members:`, `filter:`) renders so its text re-parses byte-exact.
+
+    private val CN_BODY_ORDER =
+        listOf(
+            "description",
+            "label",
+            "tags",
+            "sources",
+            "is_a",
+            "abstract",
+            "of",
+            "event",
+            "extent",
+            "grounds",
+            "hierarchy",
+            "involves",
+            "period",
+            "qualities",
+            "value_space",
+            "valued_state",
+            "definition",
+            "imprecision",
+            "basis",
+            "members",
+            "relations",
+            "lexicon",
+        )
+
+    /** The sugar's stereotype ref leads its body; `event:` only when no kind / role / quality does. */
+    private val CN_SUGAR_STEREOTYPES = listOf("kind", "role", "quality", "phase", "event")
+
+    private val CN_BINDING_ORDER =
+        listOf(
+            "description",
+            "tags",
+            "kind",
+            "role",
+            "quality",
+            "event",
+            "phase",
+            "concept",
+            "target",
+            "period",
+            "hierarchy",
+            "participants",
+            "via",
+            "filter",
+        )
+
+    /** `involves:` stays on one line up to this many participants (the formatter's rule). */
+    private const val CN_INVOLVES_INLINE_MAX = 3
+
+    private const val CN_INDENT = "    "
+
+    /** [properties] in [order]; a key the order does not list keeps its authored place after the listed ones. */
+    private fun cnOrder(
+        properties: List<ConceptProperty>,
+        order: List<String>,
+    ): List<ConceptProperty> =
+        properties.sortedBy { p ->
+            order.indexOf(p.key).let {
+                if (it ==
+                    -1
+                ) {
+                    order.size
+                } else {
+                    it
+                }
+            }
+        }
+
+    private fun renderConceptDef(def: ConceptDef): String =
+        renderCnDef("def ${def.stereotype} ${def.name}", cnOrder(def.body.properties, CN_BODY_ORDER))
+
+    private fun renderConceptBinding(def: ConceptBindingDef): String =
+        renderCnDef("def ${def.bindingKind} ${def.name}", cnOrder(def.body.properties, CN_BINDING_ORDER))
+
+    private fun renderCnDef(
+        header: String,
+        properties: List<ConceptProperty>,
+    ): String {
+        if (properties.isEmpty()) return "$header {}"
+        val inline = properties.map { "${it.key}: ${renderCnValue(it, CN_INDENT)}" }
+        if (properties.none(::cnBreaks) && inline.none { '\n' in it }) return "$header { ${inline.joinToString(", ")} }"
+        return properties.joinToString(",\n", prefix = "$header {\n", postfix = "\n}") {
+            "$CN_INDENT${it.key}: ${renderCnValue(it, CN_INDENT, broken = true)}"
+        }
+    }
+
+    /** True where the formatter breaks a property over lines whatever the def's layout. */
+    private fun cnBreaks(p: ConceptProperty): Boolean =
+        (p is ConceptProperty.Involves && p.participants.size > CN_INVOLVES_INLINE_MAX) ||
+            (
+                p is ConceptProperty.Entry &&
+                    p.key == "participants" &&
+                    (p.value as? PropertyValue.ObjectValue)?.entries?.isNotEmpty() == true
+            )
+
+    /**
+     * The `concept { … }` sugar of an er / md def — written without the `:` (the contracts' spelling), its stereotype
+     * ref first, then the cn body order; on one line (its host's line).
+     */
+    private fun renderConceptSugar(sugar: ConceptSugar): String {
+        val properties = sugar.body.properties
+        val stereotype = CN_SUGAR_STEREOTYPES.firstOrNull { k -> properties.any { it.key == k } }
+        val order =
+            if (stereotype !=
+                null
+            ) {
+                listOf(stereotype) + CN_BODY_ORDER.filter { it != stereotype }
+            } else {
+                CN_BODY_ORDER
+            }
+        val ordered = cnOrder(properties, order)
+        if (ordered.isEmpty()) return "concept {}"
+        return "concept { ${ordered.joinToString(", ") { "${it.key}: ${renderCnValue(it, CN_INDENT)}" }} }"
+    }
+
+    /** A cn property's value. [broken]: the def prints one property per line (a participant list may break too). */
+    private fun renderCnValue(
+        p: ConceptProperty,
+        indent: String,
+        broken: Boolean = false,
+    ): String =
+        when (p) {
+            is ConceptProperty.Description ->
+                p.localized?.let { renderLocalizedString(it) } ?: p.value?.let { renderPropertyValue(it) } ?: "\"\""
+            is ConceptProperty.Label -> renderLocalizedString(p.value)
+            is ConceptProperty.Tags -> "[${p.value.joinToString(", ") { renderString(it) }}]"
+            is ConceptProperty.Ref -> p.ref.path
+            is ConceptProperty.Grounds -> p.ref.path
+            is ConceptProperty.ValueSpace -> p.ref.path
+            is ConceptProperty.Involves -> renderInvolves(p.participants, indent, broken)
+            is ConceptProperty.Period -> renderCnObject(p.value, indent, broken = false)
+            is ConceptProperty.Extent -> p.value
+            is ConceptProperty.Basis -> p.value
+            is ConceptProperty.DefinitionBlock -> renderEmbeddedBlock(p.block)
+            is ConceptProperty.MembersBlock -> renderEmbeddedBlock(p.block)
+            is ConceptProperty.FilterBlock -> renderEmbeddedBlock(p.block)
+            is ConceptProperty.Lexicon -> renderLexiconBlock(p.block)
+            is ConceptProperty.Target -> renderTargetValue(p.value)
+            is ConceptProperty.Entry ->
+                when (val v = p.value) {
+                    is PropertyValue.ObjectValue ->
+                        renderCnObject(
+                            v,
+                            indent,
+                            broken = broken && p.key == "participants",
+                        )
+                    else -> renderPropertyValue(v)
+                }
+        }
+
+    private fun renderParticipant(pt: ConceptParticipant): String =
+        if (pt.label == null) pt.ref.path else "${pt.ref.path} as ${pt.label}"
+
+    /** `[A, B as b]`, or one participant per line past three (the formatter's `involvesDoc`). */
+    private fun renderInvolves(
+        participants: List<ConceptParticipant>,
+        indent: String,
+        broken: Boolean,
+    ): String {
+        if (!broken || participants.size <= CN_INVOLVES_INLINE_MAX) {
+            return participants.joinToString(", ", "[", "]") { renderParticipant(it) }
+        }
+        val inner = indent + CN_INDENT
+        return participants.joinToString(",\n", "[\n", "\n$indent]") { inner + renderParticipant(it) }
+    }
+
+    /** `{ k: v, … }` (`{}` when empty), or — a binding's `participants:` — one label per line. */
+    private fun renderCnObject(
+        v: PropertyValue.ObjectValue,
+        indent: String,
+        broken: Boolean,
+    ): String {
+        if (v.entries.isEmpty()) return "{}"
+        if (!broken) return renderPropertyValue(v)
+        val inner = indent + CN_INDENT
+        return v.entries.entries.joinToString(
+            ",\n",
+            "{\n",
+            "\n$indent}",
+        ) { (k, x) -> "$inner$k: ${renderPropertyValue(x)}" }
+    }
+
+    /** An inline `lexicon { … }` — the canonical shorthand keys the model keeps. */
+    private fun renderLexiconBlock(b: LexiconBlock): String {
+        val parts =
+            listOf("terms" to b.terms, "patterns" to b.patterns, "examples" to b.examples)
+                .filter { it.second.isNotEmpty() }
+                .map { (k, items) -> "$k: [${items.joinToString(", ") { renderString(it) }}]" } +
+                listOfNotNull(
+                    b.default?.let { "default: $it" },
+                    b.sensePriority?.let { "sense_priority: ${renderNumber(it)}" },
+                )
+        return if (parts.isEmpty()) "{}" else "{ ${parts.joinToString(", ")} }"
+    }
+
+    /**
+     * An expression block (⚑CN-P5), so that a re-parse yields the same [EmbeddedBlock.text] (and, for the string
+     * form, the same escapes): the string form re-escapes exactly the characters written escaped; the triple-string
+     * form opens on its own line (the walker drops that newline, and the text is already dedented); the tagged form
+     * restores the closing newline the walker drops.
+     */
+    private fun renderEmbeddedBlock(b: EmbeddedBlock): String =
+        when (b.form) {
+            "string" -> {
+                val escaped = b.escapes.toSet()
+                val sb = StringBuilder("\"")
+                var i = 0
+                b.text.codePoints().forEach { cp ->
+                    if (i in escaped) sb.append('\\')
+                    sb.appendCodePoint(cp)
+                    i++
+                }
+                sb.append('"').toString()
+            }
+            "tagged" -> "\"\"\"${b.language}\n${b.text}\n\"\"\""
+            else -> "\"\"\"\n${b.text}\"\"\""
+        }
 
     /**
      * `def md2db_cubelet <name> { cubelet:, target:, shape:, attributes:, measures:, journaling?, allocation? }`

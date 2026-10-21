@@ -66,22 +66,61 @@ data class LexicalScope(
 class Resolver(
     private val symbols: SymbolTable,
 ) {
+    /**
+     * What [resolveReference] reads off a reference: its written path and segments, and — for a reference from a
+     * cn slot ([CollectedRef.cnContext]) — the cn context. Pass [CollectedRef.toRef] so the context survives.
+     */
     data class Ref(
         val path: String,
         val parts: List<String>,
+        val cnContext: Boolean = false,
     )
+
+    /** Direct symbol-table lookup by canonical key ([SymbolTable.get]). Mirrors TS `Resolver.getSymbol`. */
+    fun getSymbol(qname: String): SymbolEntry? = symbols.get(qname)
+
+    // ----- 0.17: concepts are reachable only from a cn slot or through the `cn.` head (CN-P2 S2.1) -----
+
+    /** A concept or one of its participant labels (model `cn`). */
+    private fun isCnSymbol(e: SymbolEntry): Boolean = e.schemaCode == "cn"
+
+    /**
+     * What an element reference never reaches: the cn model, and the bindings the cn desugar synthesized —
+     * named `<Concept>.grounds` / `<Concept>.concept`, they would otherwise match a bare name by suffix.
+     */
+    private fun isHiddenFromElements(e: SymbolEntry): Boolean = isCnSymbol(e) || e.cnOrigin != null
+
+    private fun elementGet(qname: String): SymbolEntry? = symbols.get(qname)?.takeUnless(::isHiddenFromElements)
+
+    private fun elementsByPackage(pkg: String): List<SymbolEntry> =
+        symbols.getByPackage(pkg).filterNot(::isHiddenFromElements)
+
+    private fun elementsBySuffix(suffix: String): List<SymbolEntry> =
+        symbols.getBySuffix(suffix).filterNot(::isHiddenFromElements)
+
+    /** The concept (or participant label) a key reads as ([SymbolTable.get]: authored first). */
+    private fun cnSymbol(key: String): SymbolEntry? = symbols.get(key)?.takeIf(::isCnSymbol)
+
+    /** The canonical key of a concept (or `<Name>.<label>`) in [pkg]: `<pkg>.cn.concept.<parts>`. */
+    private fun cnKey(
+        pkg: String,
+        parts: List<String>,
+    ): String = (if (pkg.isNotEmpty()) "$pkg." else "") + (listOf("cn", "concept") + parts).joinToString(".")
 
     fun resolveReference(
         ref: Ref,
         context: ResolutionContext,
     ): ResolutionResult {
+        // 0.17 — a cn slot's reference, or one written `cn.<Name>`, resolves among concepts only.
+        if (ref.cnContext || (ref.parts.size > 1 && ref.parts[0] == "cn")) return resolveCn(ref, context)
+
         val tried = mutableListOf<ResolutionAttempt>()
 
         // Step 1 — lexical (child of the enclosing def).
         val enclosingCandidate = context.enclosingQname?.let { "$it.${ref.path}" }
         if (enclosingCandidate != null) {
             tried += ResolutionAttempt(ResolutionStep.Lexical, enclosingCandidate)
-            symbols.get(enclosingCandidate)?.let { return ResolutionResult.Resolved(it, ResolutionStep.Lexical) }
+            elementGet(enclosingCandidate)?.let { return ResolutionResult.Resolved(it, ResolutionStep.Lexical) }
             tried.markLastUnknown()
         }
 
@@ -89,11 +128,11 @@ class Resolver(
         val fullQname = "${context.schemaCode}.${context.namespace}.${ref.path}"
         if (fullQname != context.enclosingQname) {
             tried += ResolutionAttempt(ResolutionStep.SamePackage, fullQname)
-            symbols.get(fullQname)?.let { return ResolutionResult.Resolved(it, ResolutionStep.SamePackage) }
+            elementGet(fullQname)?.let { return ResolutionResult.Resolved(it, ResolutionStep.SamePackage) }
             tried.markLastUnknown()
         }
         if (context.packageName != null) {
-            for (entry in symbols.getByPackage(context.packageName)) {
+            for (entry in elementsByPackage(context.packageName)) {
                 if (entry.name == ref.path && entry.qname != enclosingCandidate && entry.qname != fullQname) {
                     return ResolutionResult.Resolved(entry, ResolutionStep.SamePackage)
                 }
@@ -106,7 +145,7 @@ class Resolver(
             for (imp in imports) {
                 if (imp.wildcard) continue
                 if (imp.target.endsWith(".${ref.path}")) {
-                    symbols.get(imp.target)?.let {
+                    elementGet(imp.target)?.let {
                         return ResolutionResult.Resolved(it, ResolutionStep.NamedImport)
                     }
                 }
@@ -115,7 +154,7 @@ class Resolver(
             val wildcardMatches = mutableListOf<SymbolEntry>()
             for (imp in imports) {
                 if (!imp.wildcard) continue
-                val matches = symbols.getByPackage(imp.target).filter { it.name == ref.path && it.qname != fullQname }
+                val matches = elementsByPackage(imp.target).filter { it.name == ref.path && it.qname != fullQname }
                 for (m in matches) {
                     if (wildcardMatches.none { it.qname == m.qname }) wildcardMatches += m
                 }
@@ -136,7 +175,7 @@ class Resolver(
         val cncQname = "cnc.role.${ref.path}"
         if (cncQname != fullQname && cncQname != context.enclosingQname) {
             tried += ResolutionAttempt(ResolutionStep.AutoImport, cncQname)
-            symbols.get(cncQname)?.let { return ResolutionResult.Resolved(it, ResolutionStep.AutoImport) }
+            elementGet(cncQname)?.let { return ResolutionResult.Resolved(it, ResolutionStep.AutoImport) }
             tried.markLastUnknown()
         }
 
@@ -144,13 +183,18 @@ class Resolver(
         // form, then the classified tail — the trailing name path with leading
         // model/package/schema/kind segments stripped — so a reference naming a
         // slot the v4.0 key now carries explicitly (`db.dbo.Orders` →
-        // `…db.dbo.table.Orders`) still resolves by suffix.
+        // `…db.dbo.table.Orders`) still resolves by suffix. An exact key wins
+        // ahead of the suffix match (TS: `er.entity.store` is the root package's).
         val tail = classifiedTail(ref.path)
         val forms = if (tail.isNotEmpty() && tail != ref.path) listOf(ref.path, tail) else listOf(ref.path)
         for (cand in forms) {
+            val exact = elementGet(cand)
+            if (exact != null && exact.qname != fullQname && exact.qname != cncQname) {
+                tried += ResolutionAttempt(ResolutionStep.FullyQualified, exact.qname)
+                return ResolutionResult.Resolved(exact, ResolutionStep.FullyQualified)
+            }
             val uniqueMatches =
-                symbols
-                    .getBySuffix(cand)
+                elementsBySuffix(cand)
                     .filter { it.qname != fullQname && it.qname != cncQname }
                     .distinctBy { it.qname }
             if (uniqueMatches.size == 1) {
@@ -159,6 +203,125 @@ class Resolver(
             }
         }
 
+        // Step 7 — the slot-filling fallback (TS `slotResolveReference`, qname-redesign §5; ttr-core#228): read the
+        // reference into its slots and look for its name path in the reference's package and model (its kind too,
+        // when written; for db its schema — written, else the file's), then in its model, then anywhere. The first
+        // scope with one candidate wins; a scope with several is ambiguous. So `er.entity.store` in `hartland.west`
+        // names west's `store` beside `hartland.east`'s (D10 "current package first"), `md.revenue` the md measure
+        // beside a lexicon term `revenue`, and `db.Orders.x` in a `schema dbo` file dbo's `Orders`. TS also reads the
+        // manifest's package and project default schema; this resolver has no manifest.
+        val vocab = vocab()
+        val written = classify(ref.path, vocab)
+        val keyed =
+            elementsBySuffix(written.tail)
+                .filter { it.qname != fullQname && it.qname != cncQname }
+                .distinctBy { it.qname }
+                .map { it to classify(it.qname, vocab) }
+                .filter { (_, slots) -> slots.tail == written.tail }
+        val pkg = written.pkg ?: context.packageName ?: ""
+        val schema = if (written.model == "db") written.schema ?: context.namespace.ifEmpty { null } else null
+        val inModel = { slots: Slots -> written.model == null || slots.model == written.model }
+        val inPackage = { slots: Slots ->
+            inModel(slots) && (slots.pkg ?: "") == pkg && (schema == null || slots.schema == schema)
+        }
+        val scopes =
+            listOf<(Slots) -> Boolean>(
+                { inPackage(it) && (written.kind == null || it.kind == written.kind) },
+                inPackage,
+                inModel,
+                { true },
+            )
+        for (scope in scopes) {
+            val candidates = keyed.filter { scope(it.second) }.map { it.first }
+            if (candidates.size == 1) {
+                tried += ResolutionAttempt(ResolutionStep.FullyQualified, candidates[0].qname)
+                return ResolutionResult.Resolved(candidates[0], ResolutionStep.FullyQualified)
+            }
+            if (candidates.size > 1) {
+                for (c in candidates) tried += ResolutionAttempt(ResolutionStep.FullyQualified, c.qname, "ambiguous")
+                return ResolutionResult.Unresolved(ResolutionResult.Reason.Ambiguous, tried, candidates)
+            }
+        }
+
+        return ResolutionResult.Unresolved(ResolutionResult.Reason.NotFound, tried)
+    }
+
+    /**
+     * 0.17 — a reference from a cn slot, or one written with the `cn.` head, resolves among concepts only:
+     * `<pkg>.cn.concept.<Name>`, or an event's participant label `<Name>.<label>`. The steps mirror the element
+     * ones — package-qualified, same package, named import, wildcard import, then a unique match across the
+     * project (`unimported-reference` names the missing import). It never falls back to an element of the same
+     * name. Mirrors TS `Resolver.resolveCn`.
+     */
+    private fun resolveCn(
+        ref: Ref,
+        context: ResolutionContext,
+    ): ResolutionResult {
+        val tried = mutableListOf<ResolutionAttempt>()
+        val parts = if (ref.parts.size > 1 && ref.parts[0] == "cn") ref.parts.drop(1) else ref.parts
+
+        fun lookup(
+            step: ResolutionStep,
+            key: String,
+        ): SymbolEntry? {
+            tried += ResolutionAttempt(step, key)
+            val symbol = cnSymbol(key)
+            if (symbol == null) tried.markLastUnknown()
+            return symbol
+        }
+
+        // Package-qualified (`hartland.core.Party`): a known package prefix that leaves a name.
+        val packages = symbols.listPackages().toSet()
+        for (i in parts.size - 1 downTo 1) {
+            val pkg = parts.subList(0, i).joinToString(".")
+            if (pkg !in packages) continue
+            lookup(ResolutionStep.FullyQualified, cnKey(pkg, parts.drop(i)))?.let {
+                return ResolutionResult.Resolved(it, ResolutionStep.FullyQualified)
+            }
+        }
+
+        lookup(ResolutionStep.SamePackage, cnKey(context.packageName ?: "", parts))?.let {
+            return ResolutionResult.Resolved(it, ResolutionStep.SamePackage)
+        }
+
+        val imports = context.imports ?: emptyList()
+        for (imp in imports) {
+            if (imp.wildcard) continue
+            val segs = imp.target.split('.')
+            if (segs.size < 2 || segs.last() != parts[0]) continue
+            lookup(ResolutionStep.NamedImport, cnKey(segs.dropLast(1).joinToString("."), parts))?.let {
+                return ResolutionResult.Resolved(it, ResolutionStep.NamedImport)
+            }
+        }
+
+        val wildcardMatches =
+            imports
+                .filter { it.wildcard }
+                .mapNotNull { cnSymbol(cnKey(it.target, parts)) }
+                .distinctBy { it.qname }
+        if (wildcardMatches.size > 1) {
+            for (m in wildcardMatches) tried += ResolutionAttempt(ResolutionStep.WildcardImport, m.qname, "ambiguous")
+            return ResolutionResult.Unresolved(ResolutionResult.Reason.Ambiguous, tried, wildcardMatches)
+        }
+        if (wildcardMatches.size == 1) {
+            tried += ResolutionAttempt(ResolutionStep.WildcardImport, wildcardMatches[0].qname)
+            return ResolutionResult.Resolved(wildcardMatches[0], ResolutionStep.WildcardImport)
+        }
+
+        val anywhere =
+            symbols
+                .getBySuffix(cnKey("", parts))
+                .filter(::isCnSymbol)
+                .distinctBy { it.qname }
+                .map { cnSymbol(it.qname) ?: it }
+        if (anywhere.size == 1) {
+            tried += ResolutionAttempt(ResolutionStep.FullyQualified, anywhere[0].qname)
+            return ResolutionResult.Resolved(anywhere[0], ResolutionStep.FullyQualified)
+        }
+        if (anywhere.size > 1) {
+            for (m in anywhere) tried += ResolutionAttempt(ResolutionStep.FullyQualified, m.qname, "ambiguous")
+            return ResolutionResult.Unresolved(ResolutionResult.Reason.Ambiguous, tried, anywhere)
+        }
         return ResolutionResult.Unresolved(ResolutionResult.Reason.NotFound, tried)
     }
 
@@ -196,36 +359,75 @@ class Resolver(
             "md2er_cubelet",
         )
 
-    /**
-     * The trailing name path of a dotted reference, with any leading
-     * model/package/schema/kind segments stripped (D4 slot order). Mirrors TS
-     * `Resolver.classifiedTail` / `classifyReference`.
-     */
-    private fun classifiedTail(path: String): String {
-        val segs = path.split('.').filter { it.isNotEmpty() }
-        val packages = symbols.listPackages().filter { it.isNotEmpty() }.toSet()
+    /** The packages and db schemas of the project — what [classify] reads a dotted path against. */
+    private class Vocab(
+        val packages: Set<String>,
+        val schemas: Set<String>,
+    )
+
+    /** [vocab] for a [SymbolTable.version] — a whole-table scan, so once per change, not per reference. */
+    private var vocabCache: Pair<Int, Vocab>? = null
+
+    private fun vocab(): Vocab {
+        val version = symbols.version
+        vocabCache?.let { (v, vocab) -> if (v == version) return vocab }
         val schemas = mutableSetOf("dbo")
         for (q in symbols.allQnames()) {
             val parts = q.split('.')
             val i = parts.indexOf("db")
             if (i >= 0 && i + 1 < parts.size) schemas += parts[i + 1]
         }
+        return Vocab(symbols.listPackages().filter { it.isNotEmpty() }.toSet(), schemas).also {
+            vocabCache = version to it
+        }
+    }
+
+    /** A dotted reference (or a canonical key) read into its slots; [tail] is the trailing name path. */
+    private data class Slots(
+        val pkg: String?,
+        val model: String?,
+        val schema: String?,
+        val kind: String?,
+        val tail: String,
+    )
+
+    /**
+     * Read [path] into its slots: the leading model/package/schema/kind segments (D4 slot order) and the trailing
+     * name path. Mirrors TS `classifyReference`.
+     */
+    private fun classify(
+        path: String,
+        vocab: Vocab = vocab(),
+    ): Slots {
+        val segs = path.split('.').filter { it.isNotEmpty() }
         var i = 0
-        if (i < segs.size && segs[i] in MODEL_CODES) i++
+        var model: String? = null
+        var pkg: String? = null
+        var schema: String? = null
+        var kind: String? = null
+        if (i < segs.size && segs[i] in MODEL_CODES) model = segs[i++]
         run {
             var best = -1
             for (j in i until segs.size) {
-                if (segs.subList(i, j + 1).joinToString(".") in packages) best = j
+                if (segs.subList(i, j + 1).joinToString(".") in vocab.packages) best = j
             }
-            if (best >= i) i = best + 1
+            if (best >= i) {
+                pkg = segs.subList(i, best + 1).joinToString(".")
+                i = best + 1
+            }
         }
-        if (i < segs.size && segs[i] in schemas) i++
-        if (i < segs.size && segs[i] in MODEL_CODES) i++
+        if (i < segs.size && segs[i] in vocab.schemas) schema = segs[i++]
+        // The model may also follow the package (`pkg.er.entity.x`) — only when none led (TS `classifyReference`;
+        // since 0.17 `cn` is a model code, and `db.dbo.cn.x` names a column `cn`, not the cn model).
+        if (model == null && i < segs.size && segs[i] in MODEL_CODES) model = segs[i++]
         // schema may follow the post-package model (`pkg.db.dbo.x`).
-        if (i < segs.size && segs[i] in schemas) i++
-        if (i < segs.size && segs[i] in kindKeywords) i++
-        return segs.subList(i, segs.size).joinToString(".")
+        if (schema == null && i < segs.size && segs[i] in vocab.schemas) schema = segs[i++]
+        if (i < segs.size && segs[i] in kindKeywords) kind = segs[i++]
+        return Slots(pkg, model, schema, kind, segs.subList(i, segs.size).joinToString("."))
     }
+
+    /** The trailing name path of a dotted reference ([classify]'s `tail`). Mirrors TS `Resolver.classifiedTail`. */
+    private fun classifiedTail(path: String): String = classify(path).tail
 
     fun resolveBareId(
         name: String,

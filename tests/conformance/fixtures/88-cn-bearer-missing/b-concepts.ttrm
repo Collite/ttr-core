@@ -1,0 +1,8 @@
+package hartland.stores
+model cn
+
+def kind Item       { grounds: er.entity.item }
+def quality weight  { grounds: er.entity.item.weight }
+def quality color   { of: Item, grounds: er.entity.item.color }
+def phase Heavy     { definition: """weight > 20""" }
+def phase Light     { of: Item, definition: """weight < 1""" }

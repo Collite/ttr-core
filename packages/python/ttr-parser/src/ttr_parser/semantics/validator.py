@@ -37,17 +37,29 @@ from ..model import (
     TableDef,
     ViewDef,
 )
+from .cn.groundings import CnDocument
+from .cn.validate import cnc_deprecations, validate_cn
 from .default_schema import default_schema_for_kind
 from .references import (
     collect_all_references,
     enclosing_qname_of,
+    kind_of,
     package_of_import,
 )
 from .resolver import ResolutionContext, Resolved, Resolver, Unresolved
 from .search_method import validate_search_method
-from .symbol_table import SymbolTable
+from .symbol_table import SymbolEntry, SymbolTable
 
 _ER2DB_KINDS = frozenset({"er2db_entity", "er2db_attribute", "er2db_relation"})
+
+#: The MD logical and binding def kinds (TS camelCase) — their cross-references are the md resolver's,
+#: not the generic one's (TS reports them in its `md-unknown-ref` rule).
+MD_KINDS = frozenset(
+    {
+        "mdDomain", "md_domain", "dimension", "mdMap", "md_map", "hierarchy", "measure", "cubelet",
+        "md2db_cubelet", "md2db_domain", "md2db_map", "md2er_cubelet",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +77,19 @@ class _Doc:
     namespace: str
     package_name: str
     imports: tuple[ImportStatement, ...]
+    uri: str = ""
+    directive_source: SourceLocation | None = None
+
+    def cn(self) -> CnDocument:
+        return CnDocument(
+            uri=self.uri,
+            definitions=self.definitions,
+            schema_code=self.schema_code,
+            namespace=self.namespace,
+            package_name=self.package_name,
+            imports=self.imports,
+            directive_source=self.directive_source,
+        )
 
 
 def _error(code: DiagnosticCode, message: str, source: SourceLocation) -> ValidationDiagnostic:
@@ -79,22 +104,44 @@ def _info(code: DiagnosticCode, message: str, source: SourceLocation) -> Validat
     return ValidationDiagnostic(code, DiagnosticSeverity.INFORMATION, source, message)
 
 
+def _imported_target_of(symbol: SymbolEntry) -> str:
+    """What an import that reaches `symbol` is matched by: for an element the key less its name, as an
+    element's named import is written (compared by its package part). 0.17: a concept - or an event's
+    participant label under it - is imported by package and name (`import hartland.core.Customer`), so
+    it is that whole target: one used concept import never covers another of the same package
+    (review-120 F12). Mirrors the TS `importedTargetOf`."""
+    if symbol.schema_code != "cn":
+        return symbol.qname.value.rsplit(".", 1)[0]
+    prefix = f"{symbol.package_name}.cn.concept." if symbol.package_name else "cn.concept."
+    local = symbol.qname.value[len(prefix):] if symbol.qname.value.startswith(prefix) else symbol.qname.value
+    concept = local.split(".")[0]
+    return f"{symbol.package_name}.{concept}" if symbol.package_name else concept
+
+
 class Validator:
     def validate(
-        self, results: tuple[ParseResult, ...] | list[ParseResult], symbols: SymbolTable
+        self,
+        results: tuple[ParseResult, ...] | list[ParseResult],
+        symbols: SymbolTable,
+        uris: list[str] | None = None,
     ) -> tuple[ValidationDiagnostic, ...]:
+        """`uris` are the URIs the documents were upserted under (default: each `source_file`) — the
+        cn checks find a symbol's document by it."""
         resolver = Resolver(symbols)
-        docs = [self._doc(r) for r in results]
+        docs = [self._doc(r, uris[i] if uris is not None else r.source_file) for i, r in enumerate(results)]
         out: list[ValidationDiagnostic] = []
         for doc in docs:
             out.extend(self._validate_document(doc))
             out.extend(self._validate_references(doc, resolver))
             out.extend(self._validate_imports(doc, resolver, symbols))
         out.extend(self._validate_project(symbols))
+        # 0.17 — the model-level `cn/...` slugs (cn contracts §7, the portable subset).
+        for d in validate_cn([doc.cn() for doc in docs], resolver).diagnostics:
+            out.append(ValidationDiagnostic(d.code, d.severity, d.source, d.message))
         return tuple(out)
 
     @staticmethod
-    def _doc(result: ParseResult) -> _Doc:
+    def _doc(result: ParseResult, uri: str = "") -> _Doc:
         directive = result.model_directive
         schema_code = directive.model_code if directive else ""
         namespace = (directive.schema if directive else "") or ""
@@ -104,6 +151,8 @@ class Validator:
             namespace=namespace,
             package_name=result.package_name or "",
             imports=result.imports,
+            uri=uri,
+            directive_source=directive.source if directive else None,
         )
 
     # -- per-document -------------------------------------------------------
@@ -175,6 +224,9 @@ class Validator:
                     out.append(
                         (_error if is_error else _warn)(code, message, source)
                     )
+        # 0.17 — `model cnc` and an entity's `roles:` are deprecated (`cn/cnc-deprecated`).
+        for d in cnc_deprecations(doc.cn()):
+            out.append(ValidationDiagnostic(d.code, d.severity, d.source, d.message))
         return out
 
     @staticmethod
@@ -219,6 +271,10 @@ class Validator:
     ) -> list[ValidationDiagnostic]:
         out: list[ValidationDiagnostic] = []
         for collected in collect_all_references(doc.definitions):
+            # MD cross-references resolve against the MD namespaces, not the generic resolver; a cn ref
+            # in an md host's `concept { }` sugar is not one.
+            if kind_of(collected.owner_def) in MD_KINDS and not collected.cn_context:
+                continue
             schema_code = doc.schema_code or default_schema_for_kind(
                 collected.owner_def.kind
             )
@@ -234,12 +290,13 @@ class Validator:
                     package_name=doc.package_name,
                     enclosing_qname=enclosing,
                 ),
+                cn_context=collected.cn_context,
             )
 
             if isinstance(res, Unresolved):
                 if res.reason == "ambiguous":
                     source = (
-                        res.candidates[0].definition.source
+                        res.candidates[0].site
                         if res.candidates
                         else collected.source
                     )
@@ -251,7 +308,9 @@ class Validator:
                             source,
                         )
                     )
-                else:
+                elif not collected.soft:
+                    # A soft cn ref (a bearer-local `qualities:` / `period:` name) that names no
+                    # concept is an implicit quality, not a dangling reference.
                     tried = ", ".join(a.candidate for a in res.tried)
                     out.append(
                         _warn(
@@ -283,9 +342,14 @@ class Validator:
 
     def _validate_project(self, symbols: SymbolTable) -> list[ValidationDiagnostic]:
         out: list[ValidationDiagnostic] = []
-        for group in symbols.duplicates():
-            has_inline = any(e.mapping_source is not None for e in group)
-            if has_inline and group[0].kind in _ER2DB_KINDS:
+        for all_entries in symbols.duplicates():
+            has_inline = any(e.mapping_source is not None for e in all_entries)
+            if has_inline and all_entries[0].kind in _ER2DB_KINDS:
+                continue
+            # 0.17 — a concept a `concept { }` block declares where a cn def (or another block) declares
+            # it too is the sugar merge, or a second grounding: `cn/duplicate-grounding`'s.
+            group = tuple(e for e in all_entries if e.cn_origin is None)
+            if len(group) < 2:
                 continue
             for entry in group:
                 others = ", ".join(
@@ -368,6 +432,7 @@ class Validator:
             schema_code = doc.schema_code or default_schema_for_kind(
                 collected.owner_def.kind
             )
+            # The ref itself: a cn slot's ref carries its context (0.17), so it resolves among concepts.
             res = resolver.resolve_reference(
                 collected.path,
                 ResolutionContext(
@@ -376,17 +441,18 @@ class Validator:
                     imports=doc.imports,
                     package_name=doc.package_name,
                 ),
+                cn_context=collected.cn_context,
             )
             if isinstance(res, Resolved) and res.via_step in (
                 "named-import",
                 "wildcard-import",
             ):
-                used.add(res.symbol.qname.value.rsplit(".", 1)[0])
+                used.add(_imported_target_of(res.symbol))
 
         for imp in doc.imports:
             if not imp.wildcard:
                 pkg = package_of_import(imp)
-                if pkg and pkg not in used:
+                if pkg and pkg not in used and imp.target not in used:
                     out.append(
                         _warn(
                             DiagnosticCode.UNUSED_IMPORT,

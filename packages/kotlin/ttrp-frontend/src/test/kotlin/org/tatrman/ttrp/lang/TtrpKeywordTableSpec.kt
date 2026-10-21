@@ -43,6 +43,7 @@ class TtrpKeywordTableSpec :
             val expected =
                 KeywordTable.statementKeywords +
                     KeywordTable.recipeKeywords +
+                    KeywordTable.conceptKeywords +
                     KeywordTable.durationUnits +
                     KeywordTable.expressionKeywords +
                     (KeywordTable.reservedPorts - "rejects") +

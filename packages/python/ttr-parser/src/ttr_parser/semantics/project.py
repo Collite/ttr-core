@@ -15,7 +15,7 @@ from ..diagnostics import DiagnosticCode, DiagnosticSeverity
 from ..loader import parse_directory, parse_string
 from ..model import ParseError, ParseResult, SourceLocation
 from .default_schema import default_schema_for_kind
-from .references import collect_all_references, enclosing_qname_of
+from .references import collect_all_references, enclosing_qname_of, kind_of
 from .resolver import (
     ResolutionContext,
     ResolutionResult,
@@ -24,7 +24,7 @@ from .resolver import (
 )
 from .stock_loader import _read_stock
 from .symbol_table import SymbolTable
-from .validator import ValidationDiagnostic, Validator
+from .validator import MD_KINDS, ValidationDiagnostic, Validator
 
 _STOCK_URI = "stock://cnc-roles.ttrm"
 
@@ -89,6 +89,9 @@ class Project:
 
         out: list[ValidationDiagnostic] = []
         for collected in collect_all_references(result.definitions):
+            # MD cross-references are the md resolver's (TS `md-unknown-ref`), not the generic one's.
+            if kind_of(collected.owner_def) in MD_KINDS and not collected.cn_context:
+                continue
             schema_code = doc_schema or default_schema_for_kind(
                 collected.owner_def.kind
             )
@@ -104,8 +107,9 @@ class Project:
                     package_name=package,
                     enclosing_qname=enclosing,
                 ),
+                cn_context=collected.cn_context,
             )
-            if isinstance(res, Unresolved):
+            if isinstance(res, Unresolved) and (res.reason == "ambiguous" or not collected.soft):
                 code = (
                     DiagnosticCode.AMBIGUOUS_REFERENCE
                     if res.reason == "ambiguous"

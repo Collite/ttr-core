@@ -225,6 +225,17 @@ test-py module="":
 conformance:
     pnpm --filter @tatrman/integration-tests run conformance
 
+# ── Conceptual model (cn) ───────────────────────────────────────────────────────
+
+# `ttr cn hygiene` from the repo until `ttr-concept` first publishes (CN-P3 S3.1). It runs the installed
+# distribution with the arguments as given (no shell re-reading), so the CLI's exit code — 0 · 1 findings at
+# `--fail-on` · 2 usage — and any path survive; the build's own output goes to stderr, so `--format json` pipes.
+# The cn hygiene report: `just cn-hygiene <model-dir> [--format text|json] [--fail-on error|warning]`
+[positional-arguments]
+cn-hygiene *args:
+    ./gradlew -q --console=plain :packages:kotlin:ttr-concept:installDist >&2
+    packages/kotlin/ttr-concept/build/install/ttr/bin/ttr cn hygiene "$@"
+
 # ── Grammar regeneration ────────────────────────────────────────────────────────
 
 # Regenerate the TS parser from TTR.g4, then the TextMate grammar. See CLAUDE.md

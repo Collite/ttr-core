@@ -1,0 +1,5 @@
+// The db face: one legacy table and a doc-grade concept grounded to it (`cn2db_concept` reaches no consumer).
+package hartland.concepts
+model db schema dbo
+
+def table legacy_stock { columns: [ def column item_no { type: text, isKey: true } ] }

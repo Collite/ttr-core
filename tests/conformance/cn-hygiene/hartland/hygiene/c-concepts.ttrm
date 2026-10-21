@@ -1,0 +1,14 @@
+package hartland.hygiene
+model cn
+
+def kind Shopper     { grounds: er.entity.shopper, loyalty_programme: "Hartland Rewards" }
+def event Sale       { involves: [Shopper], period: { at: sold_on }, grounds: md.sales }
+def kind Store       { grounds: md.Store }
+def kind Supplier    { relations: [ { type: supplies, to: Store } ] }
+def event StoreVisit { involves: [Shopper], period: { at: visited_at } }
+
+def phase FrequentShopper { of: Shopper, definition: """count(Sale involving this) >= 12""" }
+def phase LoyalShopper    { of: Shopper, definition: """VipShopper""" }
+def phase VipShopper      { of: Shopper, definition: """LoyalShopper""" }
+
+def relation_type supplies { label: { en: "supplies" } }

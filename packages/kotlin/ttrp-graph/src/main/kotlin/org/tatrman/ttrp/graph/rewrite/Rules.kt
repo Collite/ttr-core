@@ -390,6 +390,7 @@ object Rules {
             is Literal -> e
             is MdPath -> e // no port-qualified refs inside an MD path
             is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr -> e // no port refs either
+            is org.tatrman.ttrp.expr.ConceptForm -> e // TTRP 0.5: refused at check (TTRP-CN-001)
         }
 
     /** `not(coalesce(pred, false))` — 3VL-correct FALSE-port complement (NULL ⇒ false). */

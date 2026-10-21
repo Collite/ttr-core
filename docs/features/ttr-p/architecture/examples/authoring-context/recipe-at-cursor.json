@@ -4113,6 +4113,11 @@
       "id": "TTRP-DSP-005",
       "area": "DSP",
       "suggestedAlternative": "an action display's column must be a scalar every engine can produce — declare it as text, int, bigint, smallint, decimal (precision ≤ 38), float, bool, date, time, datetime or timestamp"
+    },
+    {
+      "id": "TTRP-CN-001",
+      "area": "CN",
+      "suggestedAlternative": "a conceptual-model form (`exists … involving …`, `count(<Concept> involving …)`, `this`, `in <call>`, `at_or_before` / `before` / `contains` / `ended_before` / `overlaps`) belongs in a cn `definition:` — in a TTR-P program write the join, the filter or the comparison it stands for"
     }
   ]
 }

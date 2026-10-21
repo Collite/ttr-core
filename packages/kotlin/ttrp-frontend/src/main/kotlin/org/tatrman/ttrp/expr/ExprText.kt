@@ -44,6 +44,8 @@ object ExprText {
             )} ${if (e.negated) "not in" else "in"} (${e.items.joinToString(", ") { render(it) }})"
             is IsNull -> "${operand(e.expr)} is ${if (e.negated) "not " else ""}null"
             is MdPath -> "<md path>"
+            // a cn definition form never reaches a manifest: a TTR-P document refuses it (TTRP-CN-001)
+            is ConceptForm -> "<cn form>"
         }
 
     private fun call(e: FunctionCall): String {

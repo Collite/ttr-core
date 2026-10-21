@@ -1,0 +1,30 @@
+{
+    "diagnostics": [
+        "cn/event-no-period",
+        "cn/event-no-period"
+    ],
+    "resolved": [
+        "er.entity.price_check => hartland.stores.er.entity.price_check",
+        "er.entity.store_visit => hartland.stores.er.entity.store_visit"
+    ],
+    "symbols": [
+        "hartland.stores.binding.cn2er_event.Delivery.concept",
+        "hartland.stores.binding.cn2er_event.PriceCheck.grounds",
+        "hartland.stores.binding.cn2er_event.Referral.concept",
+        "hartland.stores.binding.cn2er_event.StoreVisit.grounds",
+        "hartland.stores.cn.concept.Delivery",
+        "hartland.stores.cn.concept.PriceCheck",
+        "hartland.stores.cn.concept.Referral",
+        "hartland.stores.cn.concept.StoreVisit",
+        "hartland.stores.er.entity.delivery",
+        "hartland.stores.er.entity.delivery.delivered_at",
+        "hartland.stores.er.entity.delivery.delivery_id",
+        "hartland.stores.er.entity.price_check",
+        "hartland.stores.er.entity.price_check.check_id",
+        "hartland.stores.er.entity.referral",
+        "hartland.stores.er.entity.referral.referral_id",
+        "hartland.stores.er.entity.store_visit",
+        "hartland.stores.er.entity.store_visit.visit_id",
+        "hartland.stores.er.entity.store_visit.visited_at"
+    ]
+}

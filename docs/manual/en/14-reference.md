@@ -158,6 +158,28 @@ The `md` model and the `binding`-model `md2*` kinds (see [MD model](15-md-model.
 | `md/shape-measure-mismatch` / `md/incomplete-journaling` / `md/multisource-grain-mismatch` | Error | Binding shape↔measure form / writeback completeness / multi-source grain agreement. |
 | `md/md2er-physical-prop` | Error | An `md2er_cubelet` (structural-only) carries shape/measures/journaling. |
 
+### Conceptual model (cn)
+
+The `cn` model and the `binding`-model `cn2*` kinds (see [Conceptual model](20-conceptual-model.md#diagnostics), which
+also says where each fires: the editor, `ttr cn hygiene`, or a consumer at run time). Lint category `cn`; the hygiene
+rows are off under `recommended` and `info` under `strict`.
+
+| Code | Severity | Meaning |
+|---|---|---|
+| `cn/duplicate-grounding` | Error | A concept grounded twice (binding, `grounds:` or `concept { }`); the first is read. |
+| `cn/grounding-target-kind` | Error | The target is not what the stereotype grounds to on that layer, or a `concept { }` on a cubelet's inline measure. |
+| `concept-bearer-missing` (`ttr/required-property-missing` on Kotlin / Python) | Error | A quality or a phase with no `of:`. |
+| `cn/role-no-event` · `cn/phase-double-definition` | Error | A role with no `event:` · a phase with both `definition:` and a grounding. |
+| `cn/hierarchy-shape` · `cn/participant-path-broken` · `cn/involves-unlabelled-duplicate` | Error | A `hierarchy:` closure without its attributes or key · a participant path that does not chain · one concept twice in `involves:` unlabelled. |
+| `cn/unknown-relation-type` · `cn/duplicate-default-sense` | Error | An open-tier edge's `type:` is no relation type · two defaults for one bare form and locale. |
+| `cn/antirigid-supertype` · `cn/phase-as-default` · `cn/cnc-deprecated` | Warning | A kind `is_a` a role or phase · a phase as a bare form's default · `model cnc` / `roles:`. |
+| `cn/db-grounding` | Advisory | A `cn2db_concept` grounding — documentation only. |
+| `cn/ungrounded` · `cn/phase-no-definition` · `cn/event-no-period` | Hygiene | No grounding · a phase with no definition or grounding · an event with no `period:`. |
+| `cn/definition-syntax` · `cn/definition-unknown-name` · `cn/descendants-no-hierarchy` | Error | A definition block that does not parse · names what its scope lacks · `descendants()` over a kind with no `hierarchy:` (`ttr cn hygiene`). |
+| `cn/definition-cycle` · `cn/basis-mismatch` | Error | Definitions that inline each other · a condition whose definition does not match its `basis:` (`ttr cn hygiene`). |
+| `cn/definition-unresolved` · `cn/definition-unreachable(md)` · `(er)` | Hygiene | A definition reading an ungrounded concept · one with no grounding on that layer (`ttr cn hygiene`). |
+| `cn/imprecise-comparison` | Advisory | Instants of different granularity compared under `imprecision: certainly` (`ttr cn hygiene`). |
+
 ## Grammar cheat-sheet
 
 ```

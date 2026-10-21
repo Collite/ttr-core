@@ -1,0 +1,37 @@
+{
+    "diagnostics": [
+        "cn/phase-double-definition",
+        "cn/phase-double-definition"
+    ],
+    "resolved": [
+        "Order => hartland.stores.cn.concept.Order",
+        "Order => hartland.stores.cn.concept.Order",
+        "Order => hartland.stores.cn.concept.Order",
+        "Order => hartland.stores.cn.concept.Order",
+        "cn.HeldOrder => hartland.stores.cn.concept.HeldOrder",
+        "er.entity.order => hartland.stores.er.entity.order",
+        "er.entity.order_in_state => hartland.stores.er.entity.order_in_state",
+        "er.entity.order_in_state => hartland.stores.er.entity.order_in_state",
+        "er.entity.order_in_state => hartland.stores.er.entity.order_in_state"
+    ],
+    "symbols": [
+        "hartland.stores.binding.cn2er_event.Order.grounds",
+        "hartland.stores.binding.cn2er_phase.PlacedOrder.grounds",
+        "hartland.stores.binding.cn2er_phase.ShippedOrder.grounds",
+        "hartland.stores.binding.cn2er_phase.held_g",
+        "hartland.stores.cn.concept.HeldOrder",
+        "hartland.stores.cn.concept.OpenOrder",
+        "hartland.stores.cn.concept.Order",
+        "hartland.stores.cn.concept.PlacedOrder",
+        "hartland.stores.cn.concept.ShippedOrder",
+        "hartland.stores.er.entity.order",
+        "hartland.stores.er.entity.order.delivered_date",
+        "hartland.stores.er.entity.order.order_number",
+        "hartland.stores.er.entity.order.placed_date",
+        "hartland.stores.er.entity.order.state",
+        "hartland.stores.er.entity.order_in_state",
+        "hartland.stores.er.entity.order_in_state.order_number",
+        "hartland.stores.er.entity.order_in_state.state",
+        "hartland.stores.er.query.orders_by_state"
+    ]
+}

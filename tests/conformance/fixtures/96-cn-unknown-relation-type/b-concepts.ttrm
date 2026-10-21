@@ -1,0 +1,8 @@
+package hartland.stores
+model cn
+
+def relation_type supplies { label: { en: "supplies" } }
+def kind Warehouse { grounds: er.entity.warehouse }
+def kind Supplier  { grounds: er.entity.party, relations: [ { type: supplies, to: Warehouse } ] }
+def kind Carrier   { grounds: er.entity.party, relations: [ { type: delivers, to: Warehouse } ] }
+def kind Broker    { grounds: er.entity.party, relations: [ { type: Warehouse, to: Warehouse } ] }

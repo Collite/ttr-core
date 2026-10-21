@@ -1,0 +1,7 @@
+package hartland.west
+model md
+
+def domain Code { type: text }
+def dimension Store { key: code, attributes: [ def attribute code { domain: md.Code, isKey: true } ] }
+def cubelet sales { grain: [Store.code] }
+def md2er_cubelet sales_er { cubelet: md.sales, target: er.entity.sale, attributes: { Store.code: store_code } }

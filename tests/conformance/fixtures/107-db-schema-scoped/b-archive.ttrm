@@ -1,0 +1,6 @@
+// The same tables in a second schema of the same package.
+package hartland.shop
+model db schema archive
+
+def table Orders { columns: [ def column order_id { type: int, isKey: true }, def column cust_id { type: int } ] }
+def table Customers { columns: [ def column id { type: int, isKey: true } ] }

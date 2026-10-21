@@ -80,13 +80,15 @@ def dump_sem_docs(docs: list[tuple[ParseResult, str]]) -> str:
                     package_name=package,
                     enclosing_qname=enclosing,
                 ),
+                # The ref itself: a cn slot's ref carries its context (0.17).
+                cn_context=collected.cn_context,
             )
             if isinstance(res, Resolved):
                 resolved.append(f"{collected.path} => {res.symbol.qname.value}")
 
     diagnostics = [
         d.code.value
-        for d in Validator().validate([r for r, _ in docs], symbols)
+        for d in Validator().validate([r for r, _ in docs], symbols, [uri for _, uri in docs])
     ]
 
     symbol_qnames = [

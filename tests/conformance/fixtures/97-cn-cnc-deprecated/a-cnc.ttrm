@@ -1,0 +1,9 @@
+// 0.17 (CN-P2 S2.3) — `cn/cnc-deprecated` (warning, cn contracts §1.6): `model cnc` and an entity's
+// `roles:` parse through the window, warned; "nothing to migrate to" (CN-D18). Never on the stock
+// `stock://cnc-roles.ttr`.
+// Expected (sem): cn/cnc-deprecated ×2 — this file's `model cnc`, and `roles:` on `sale` in
+// `b-er.ttrm`. Near-misses: `store` and `shopper` (no `roles:`), and `c-concepts.ttrm`'s `def role` in `model cn`.
+package hartland.stores
+model cnc
+
+def role sales_fact { description: "A fact role" }

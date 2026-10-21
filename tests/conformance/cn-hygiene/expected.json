@@ -1,0 +1,215 @@
+{
+  "concepts": [
+    {
+      "concept": "cn.FrequentShopper",
+      "package": "hartland.hygiene",
+      "stereotype": "phase",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": null,
+      "hop": null,
+      "landsOn": "er.entity.shopper",
+      "landingFrom": "cn.Shopper",
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [
+        {
+          "entry": "frequent",
+          "form": "shopper",
+          "alsoNames": "cn.Shopper"
+        }
+      ],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.LoyalShopper",
+      "package": "hartland.hygiene",
+      "stereotype": "phase",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": null,
+      "hop": null,
+      "landsOn": "er.entity.shopper",
+      "landingFrom": "cn.Shopper",
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.Sale",
+      "package": "hartland.hygiene",
+      "stereotype": "event",
+      "grade": "md-grounded",
+      "via": "md-hop",
+      "grounding": {
+        "layer": "md",
+        "binding": "cn2md_event",
+        "target": "md.cubelet.sales"
+      },
+      "hop": {
+        "from": "md.cubelet.sales",
+        "to": "er.entity.sale",
+        "slug": null
+      },
+      "landsOn": "er.entity.sale",
+      "landingFrom": null,
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [
+        {
+          "form": "sale",
+          "locale": "en",
+          "conceptEntry": "sale",
+          "element": "md.cubelet.sales",
+          "elementEntry": "sales_cubelet"
+        }
+      ],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.Shopper",
+      "package": "hartland.hygiene",
+      "stereotype": "kind",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": {
+        "layer": "er",
+        "binding": "cn2er_kind",
+        "target": "er.entity.shopper"
+      },
+      "hop": null,
+      "landsOn": "er.entity.shopper",
+      "landingFrom": null,
+      "openEntries": [
+        "loyalty_programme"
+      ],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [
+        {
+          "form": "shopper",
+          "locale": "en",
+          "conceptEntry": "shopper",
+          "element": "er.entity.shopper",
+          "elementEntry": "shopper_entity"
+        }
+      ],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.Store",
+      "package": "hartland.hygiene",
+      "stereotype": "kind",
+      "grade": "md-grounded-hop-missing",
+      "via": "md-hop",
+      "grounding": {
+        "layer": "md",
+        "binding": "cn2md_kind",
+        "target": "md.dimension.Store"
+      },
+      "hop": {
+        "from": "md.dimension.Store",
+        "to": null,
+        "slug": "md/er-unmapped"
+      },
+      "landsOn": null,
+      "landingFrom": null,
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.StoreVisit",
+      "package": "hartland.hygiene",
+      "stereotype": "event",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": {
+        "layer": "er",
+        "binding": "cn2er_event",
+        "target": "er.entity.store_visit"
+      },
+      "hop": null,
+      "landsOn": "er.entity.store_visit",
+      "landingFrom": null,
+      "openEntries": [],
+      "relations": [],
+      "dangling": [
+        {
+          "binding": "visit_g",
+          "ref": "er.entity.store_visit.visited_at"
+        }
+      ],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.Supplier",
+      "package": "hartland.hygiene",
+      "stereotype": "kind",
+      "grade": "ungrounded",
+      "via": null,
+      "grounding": null,
+      "hop": null,
+      "landsOn": null,
+      "landingFrom": null,
+      "openEntries": [],
+      "relations": [
+        "supplies → cn.Store"
+      ],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.VipShopper",
+      "package": "hartland.hygiene",
+      "stereotype": "phase",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": null,
+      "hop": null,
+      "landsOn": "er.entity.shopper",
+      "landingFrom": "cn.Shopper",
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    }
+  ],
+  "relationTypes": [
+    "cn.supplies"
+  ],
+  "retiredCodes": "checked once vocabulary versions register (CN-P4 S4.2) — none yet",
+  "definitions": [
+    {
+      "concept": "cn.LoyalShopper",
+      "slug": "cn/definition-cycle",
+      "severity": "error",
+      "at": "hartland/hygiene/c-concepts.ttrm:11",
+      "message": "the definitions inline each other: LoyalShopper → VipShopper → LoyalShopper (AM-26)"
+    },
+    {
+      "concept": "cn.VipShopper",
+      "slug": "cn/definition-cycle",
+      "severity": "error",
+      "at": "hartland/hygiene/c-concepts.ttrm:12",
+      "message": "the definitions inline each other: VipShopper → LoyalShopper → VipShopper (AM-26)"
+    }
+  ]
+}

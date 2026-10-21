@@ -1,0 +1,13 @@
+package hartland.stores
+model cn
+
+def kind Party            { label: { en: "Party" } }
+def role Shopper          { of: Party, event: StoreVisit }
+def event StoreVisit      { involves: [Shopper], period: { at: visited_at } }
+def quality basket_size   { of: StoreVisit }
+def quality basket_value  { of: StoreVisit, definition: """sum(line_amount)""" }
+def phase Regular         { of: Shopper, definition: """count(StoreVisit involving this) >= 4""" }
+def kind PremiumParty     { is_a: Party, members: """descendants(Party, 'P1')""" }
+def relation_type refers  { label: { en: "refers" } }
+def kind Store            { grounds: er.entity.store }
+def kind Brand            { label: { en: "Brand" } }

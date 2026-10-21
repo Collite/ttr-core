@@ -1,0 +1,8 @@
+// review-119 H-1 / ttr-core#228 — a model-qualified short reference whose bare name is not unique:
+// `md.revenue` beside a lexicon term `revenue` in the same package names the md measure (the
+// slot-filling fallback reads the written model, D10). The md face: the measure.
+package hartland.web
+model md
+
+def domain Money { type: decimal }
+def measure revenue { domain: md.Money, aggregation: sum }

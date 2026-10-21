@@ -80,6 +80,36 @@ export interface ResolutionContext {
 
 
 
+/**
+ * What {@link Resolver.resolveReference} reads off a reference: its written path and segments, and —
+ * for a reference from a cn slot (`CnSlotReference`) — the cn context. Pass the collected
+ * reference itself, not a copy of its path, so the context survives.
+ */
+export interface ReferenceInput {
+  path: string;
+  parts: string[];
+  cnContext?: boolean;
+}
+
+/** A concept or one of its participant labels (model `cn`, 0.17). */
+function isCnSymbol(e: SymbolEntry): boolean {
+  return e.schemaCode === 'cn';
+}
+
+/**
+ * What an element reference never reaches: the cn model, and the bindings the cn desugar
+ * synthesized (S2.2) — named `<Concept>.grounds` / `<Concept>.concept`, they would otherwise match a
+ * bare name by suffix.
+ */
+function isHiddenFromElements(e: SymbolEntry): boolean {
+  return isCnSymbol(e) || e.cnOrigin !== undefined;
+}
+
+/** The canonical key of a concept (or `<Name>.<label>`) in `pkg`: `<pkg>.cn.concept.<parts>`. */
+function cnKey(pkg: string, parts: string[]): string {
+  return (pkg ? `${pkg}.` : '') + ['cn', 'concept', ...parts].join('.');
+}
+
 function attempt(step: ResolutionStep, candidate: string, reason?: ResolutionAttempt['reason']): ResolutionAttempt {
   return { step, candidate, reason };
 }
@@ -119,6 +149,26 @@ export class Resolver {
     manifest?: ResolvedManifest | (() => ResolvedManifest | undefined),
   ) {
     this.manifestSource = manifest;
+  }
+
+  /**
+   * The symbols an element reference may resolve to. Concepts are reachable only from a cn slot or
+   * through the `cn.` head (CN-P2 S2.1), so a concept never shadows, or ambiguates, an element of the
+   * same name — adding concepts to a project moves no existing reference.
+   */
+  private readonly elements = {
+    get: (qname: string): SymbolEntry | undefined => {
+      const e = this.symbols.get(qname);
+      return e && !isHiddenFromElements(e) ? e : undefined;
+    },
+    getByPackage: (pkg: string): SymbolEntry[] => this.symbols.getByPackage(pkg).filter((e) => !isHiddenFromElements(e)),
+    getBySuffix: (suffix: string): SymbolEntry[] => this.symbols.getBySuffix(suffix).filter((e) => !isHiddenFromElements(e)),
+  };
+
+  /** The concept (or participant label) a key reads as (`ProjectSymbolTable.get`: authored first). */
+  private cnSymbol(key: string): SymbolEntry | undefined {
+    const e = this.symbols.get(key);
+    return e && isCnSymbol(e) ? e : undefined;
   }
 
   private currentManifest(): ResolvedManifest | undefined {
@@ -171,7 +221,7 @@ export class Resolver {
    * schema while requiring the trailing name path to equal `parts` exactly.
    */
   private symbolIndex(vocab: Vocab): SymbolIndex {
-    const symbols = this.symbols;
+    const symbols = this.elements;
     return {
       has: (key) => symbols.get(key) !== undefined,
       kindOf: (key) => symbols.get(key)?.kind,
@@ -236,19 +286,22 @@ export class Resolver {
   /** Symbol-table lookup that also tries the root-elision variants of `qname`. */
   private getCanonical(qname: string): SymbolEntry | undefined {
     for (const cand of this.rootVariants(qname)) {
-      const symbol = this.symbols.get(cand);
+      const symbol = this.elements.get(cand);
       if (symbol) return symbol;
     }
     return undefined;
   }
 
-  resolveReference(ref: { path: string; parts: string[] }, context: ResolutionContext): ResolutionResult {
+  resolveReference(ref: ReferenceInput, context: ResolutionContext): ResolutionResult {
+    // 0.17 — a cn slot's reference, or one written `cn.<Name>`, resolves among concepts only.
+    if (ref.cnContext || (ref.parts.length > 1 && ref.parts[0] === 'cn')) return this.resolveCn(ref, context);
+
     const tried: ResolutionAttempt[] = [];
     const enclosingCandidate = context.enclosingQname ? `${context.enclosingQname}.${ref.path}` : undefined;
 
     if (enclosingCandidate) {
       tried.push(attempt('lexical', enclosingCandidate));
-      const symbol = this.symbols.get(enclosingCandidate);
+      const symbol = this.elements.get(enclosingCandidate);
       if (symbol) return { resolved: true, symbol, viaStep: 'lexical' };
       tried[tried.length - 1].reason = 'unknown-symbol';
     }
@@ -262,7 +315,7 @@ export class Resolver {
     }
 
     if (context.packageName) {
-      const pkgSymbols = this.symbols.getByPackage(context.packageName);
+      const pkgSymbols = this.elements.getByPackage(context.packageName);
       for (const entry of pkgSymbols) {
         if (entry.name === ref.path) {
           const candidate = entry.qname;
@@ -286,7 +339,7 @@ export class Resolver {
       for (const imp of context.imports) {
         if (!imp.wildcard) continue;
         const pkg = imp.target;
-        const matches = this.symbols.getByPackage(pkg).filter(
+        const matches = this.elements.getByPackage(pkg).filter(
           (e) => e.name === ref.path && e.qname !== fullQname
         );
         for (const m of matches) {
@@ -311,7 +364,7 @@ export class Resolver {
     const cncQname = `cnc.role.${ref.path}`;
     if (cncQname !== fullQname && cncQname !== context.enclosingQname) {
       tried.push(attempt('auto-import', cncQname));
-      const cncSymbol = this.symbols.get(cncQname);
+      const cncSymbol = this.elements.get(cncQname);
       if (cncSymbol) return { resolved: true, symbol: cncSymbol, viaStep: 'auto-import' };
       tried[tried.length - 1].reason = 'unknown-symbol';
     }
@@ -325,13 +378,13 @@ export class Resolver {
     const tail = this.classifiedTail(ref.path);
     const forms = tail && tail !== ref.path ? [...this.rootVariants(ref.path), tail] : this.rootVariants(ref.path);
     for (const cand of forms) {
-      const exact = this.symbols.get(cand);
+      const exact = this.elements.get(cand);
       if (exact && exact.qname !== fullQname && exact.qname !== cncQname) {
         tried.push(attempt('fully-qualified', exact.qname));
         return { resolved: true, symbol: exact, viaStep: 'fully-qualified' };
       }
       const uniqueMatches = dedupeBy(
-        this.symbols.getBySuffix(cand).filter((e) => e.qname !== fullQname && e.qname !== cncQname),
+        this.elements.getBySuffix(cand).filter((e) => e.qname !== fullQname && e.qname !== cncQname),
         (e) => e.qname,
       );
       if (uniqueMatches.length === 1) {
@@ -361,14 +414,14 @@ export class Resolver {
       const partial = classifyReference(ref.path, vocab);
       const slot = slotResolveReference(partial, site, vocab, this.symbolIndex(vocab));
       if (slot.resolved) {
-        const symbol = this.symbols.get(slot.key);
+        const symbol = this.elements.get(slot.key);
         if (symbol && symbol.qname !== fullQname && symbol.qname !== cncQname) {
           tried.push(attempt('fully-qualified', symbol.qname));
           return { resolved: true, symbol, viaStep: 'fully-qualified' };
         }
       } else if (slot.code === 'AmbiguousReference') {
         const candidates = (slot.candidates ?? [])
-          .map((k) => this.symbols.get(k))
+          .map((k) => this.elements.get(k))
           .filter((s): s is SymbolEntry => s !== undefined && s.qname !== fullQname && s.qname !== cncQname);
         if (candidates.length > 1) {
           for (const c of candidates) tried.push(attempt('fully-qualified', c.qname, 'ambiguous'));
@@ -377,6 +430,76 @@ export class Resolver {
       }
     }
 
+    return { resolved: false, reason: 'not-found', tried };
+  }
+
+  /**
+   * 0.17 — a reference from a cn slot (`CnSlotReference`), or one written with the `cn.` head,
+   * resolves among concepts only: `<pkg>.cn.concept.<Name>`, or an event's participant label
+   * `<Name>.<label>`. The steps mirror the element ones — package-qualified, same package, named
+   * import, wildcard import, then a unique match across the project (`unimported-reference` names
+   * the missing import). It never falls back to an element of the same name.
+   */
+  private resolveCn(ref: ReferenceInput, context: ResolutionContext): ResolutionResult {
+    const tried: ResolutionAttempt[] = [];
+    const parts = ref.parts.length > 1 && ref.parts[0] === 'cn' ? ref.parts.slice(1) : ref.parts;
+    const lookup = (step: ResolutionStep, key: string): SymbolEntry | undefined => {
+      tried.push(attempt(step, key));
+      const symbol = this.cnSymbol(key);
+      if (symbol) return symbol;
+      tried[tried.length - 1].reason = 'unknown-symbol';
+      return undefined;
+    };
+
+    // Package-qualified (`hartland.core.Party`): a known package prefix that leaves a name.
+    const packages = this.vocab().packages;
+    for (let i = parts.length - 1; i >= 1; i--) {
+      const pkg = parts.slice(0, i).join('.');
+      if (!packages.has(pkg)) continue;
+      for (const variant of this.rootVariants(pkg)) {
+        const symbol = lookup('fully-qualified', cnKey(variant, parts.slice(i)));
+        if (symbol) return { resolved: true, symbol, viaStep: 'fully-qualified' };
+      }
+    }
+
+    const samePackage = lookup('same-package', cnKey(context.packageName ?? '', parts));
+    if (samePackage) return { resolved: true, symbol: samePackage, viaStep: 'same-package' };
+
+    for (const imp of context.imports ?? []) {
+      if (imp.wildcard) continue;
+      const segs = imp.target.split('.');
+      if (segs.length < 2 || segs[segs.length - 1] !== parts[0]) continue;
+      const symbol = lookup('named-import', cnKey(segs.slice(0, -1).join('.'), parts));
+      if (symbol) return { resolved: true, symbol, viaStep: 'named-import' };
+    }
+
+    const wildcardMatches = dedupeBy(
+      (context.imports ?? [])
+        .filter((imp) => imp.wildcard)
+        .map((imp) => this.cnSymbol(cnKey(imp.target, parts)))
+        .filter((e): e is SymbolEntry => e !== undefined),
+      (e) => e.qname,
+    );
+    if (wildcardMatches.length > 1) {
+      for (const m of wildcardMatches) tried.push(attempt('wildcard-import', m.qname, 'ambiguous'));
+      return { resolved: false, reason: 'ambiguous', tried, candidates: wildcardMatches };
+    }
+    if (wildcardMatches.length === 1) {
+      tried.push(attempt('wildcard-import', wildcardMatches[0].qname));
+      return { resolved: true, symbol: wildcardMatches[0], viaStep: 'wildcard-import' };
+    }
+
+    const suffix = cnKey('', parts);
+    const anywhere = dedupeBy(this.symbols.getBySuffix(suffix).filter(isCnSymbol), (e) => e.qname)
+      .map((e) => this.cnSymbol(e.qname) ?? e);
+    if (anywhere.length === 1) {
+      tried.push(attempt('fully-qualified', anywhere[0].qname));
+      return { resolved: true, symbol: anywhere[0], viaStep: 'fully-qualified' };
+    }
+    if (anywhere.length > 1) {
+      for (const m of anywhere) tried.push(attempt('fully-qualified', m.qname, 'ambiguous'));
+      return { resolved: false, reason: 'ambiguous', tried, candidates: anywhere };
+    }
     return { resolved: false, reason: 'not-found', tried };
   }
 

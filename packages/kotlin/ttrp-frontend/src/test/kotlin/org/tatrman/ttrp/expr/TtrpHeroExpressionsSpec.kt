@@ -180,5 +180,6 @@ private fun collectAggregates(
         }
         is ColumnRef, is Literal, is MdPath -> Unit
         is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr -> Unit
+        is org.tatrman.ttrp.expr.ConceptForm -> Unit
     }
 }

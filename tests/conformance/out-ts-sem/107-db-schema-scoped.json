@@ -1,0 +1,20 @@
+{
+    "diagnostics": [],
+    "resolved": [
+        "db.Customers.id => hartland.shop.db.dbo.table.Customers.id",
+        "db.Orders.cust_id => hartland.shop.db.dbo.table.Orders.cust_id"
+    ],
+    "symbols": [
+        "hartland.shop.db.archive.table.Customers",
+        "hartland.shop.db.archive.table.Customers.id",
+        "hartland.shop.db.archive.table.Orders",
+        "hartland.shop.db.archive.table.Orders.cust_id",
+        "hartland.shop.db.archive.table.Orders.order_id",
+        "hartland.shop.db.dbo.fk.fk_orders_cust",
+        "hartland.shop.db.dbo.table.Customers",
+        "hartland.shop.db.dbo.table.Customers.id",
+        "hartland.shop.db.dbo.table.Orders",
+        "hartland.shop.db.dbo.table.Orders.cust_id",
+        "hartland.shop.db.dbo.table.Orders.order_id"
+    ]
+}

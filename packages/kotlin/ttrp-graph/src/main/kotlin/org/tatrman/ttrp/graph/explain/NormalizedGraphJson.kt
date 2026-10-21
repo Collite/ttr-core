@@ -135,5 +135,7 @@ object NormalizedGraphJson {
             is org.tatrman.ttrp.expr.ParamRef -> "param(${e.name})"
             is org.tatrman.ttrp.expr.DurationLiteral -> "duration(${e.amount} ${e.unit.spelling})"
             is org.tatrman.ttrp.expr.DurationParam -> "duration(:${e.param} ${e.unit.spelling})"
+            // TTRP 0.5: refused at check (TTRP-CN-001) — named, never rendered.
+            is org.tatrman.ttrp.expr.ConceptForm -> "cn(${e::class.simpleName})"
         }
 }

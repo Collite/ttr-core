@@ -326,6 +326,7 @@ class CtePlanner(
             is IsNull -> collectMdPaths(e.expr)
             is ColumnRef, is Literal -> emptyList()
             is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr -> emptyList()
+            is org.tatrman.ttrp.expr.ConceptForm -> emptyList() // TTRP 0.5: refused at check (TTRP-CN-001)
         }
 
     private fun modelTable(

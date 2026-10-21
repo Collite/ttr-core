@@ -1,0 +1,25 @@
+// 0.17 (CN-P2 S2.3) — `cn/event-no-period` (hygiene → info outside `recommended`): an event without
+// `period:` (legitimate for an act with no time of its own; the report lists it).
+// Expected (sem): cn/event-no-period ×2 — `PriceCheck` (a cn def) and `Referral` (declared by
+// `referral`'s block). Near-misses: `StoreVisit` (a cn def) and `Delivery` (a block) state a period.
+package hartland.stores
+model er
+
+def entity price_check { attributes: [ def attribute check_id { type: int, isKey: true } ] }
+def entity store_visit {
+    attributes: [
+        def attribute visit_id   { type: int, isKey: true },
+        def attribute visited_at { type: timestamp }
+    ]
+}
+def entity referral {
+    attributes: [ def attribute referral_id { type: int, isKey: true } ],
+    concept { event: Referral }
+}
+def entity delivery {
+    attributes: [
+        def attribute delivery_id  { type: int, isKey: true },
+        def attribute delivered_at { type: timestamp }
+    ],
+    concept { event: Delivery, period: { at: delivered_at } }
+}

@@ -1,0 +1,7 @@
+// East's md face: a dimension and a cubelet named as west's are.
+package hartland.east
+model md
+
+def domain Code { type: text }
+def dimension Store { key: code, attributes: [ def attribute code { domain: md.Code, isKey: true } ] }
+def cubelet sales { grain: [Store.code] }

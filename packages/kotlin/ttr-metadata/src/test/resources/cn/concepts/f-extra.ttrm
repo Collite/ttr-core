@@ -1,0 +1,8 @@
+// Two concepts fixture 76 grounds but 75 does not declare: `legacy_g` grounds LegacyStock to db (`cn2db_concept`:
+// documentation only, reached by no consumer); `orderer_g` grounds the role Orderer to its base kind's entity with
+// the defining event's relation path (`via:`).
+package hartland.concepts
+model cn
+
+def kind LegacyStock { label: { en: "Legacy stock" } }
+def role Orderer     { of: Party, event: Order }

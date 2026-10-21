@@ -1,0 +1,12 @@
+// review-119 M-10 — the sugar merge rule reads a property's meaning, the same on TS, Kotlin and Python:
+// an object's entries in any order, a `lexicon { }` block by its five known keys, each form quoted.
+// The concept defs; `b-er.ttrm`'s `concept { }` blocks restate each property.
+package hartland.web
+model cn
+
+def event Order { period: { start: placed_date, end: delivered_date } }
+def kind Brand { lexicon { terms: ["brand"], examples: ["the brand"] } }
+def kind Shelf { lexicon { terms: ["shelf"], default: true, sense_priority: 2 } }
+def kind Bin { spec: { width: 1, height: 2 } }
+def event WebReturn { period: { at: returned_on }, lexicon { terms: ["return"], sense_priority: 2 } }
+def kind Colour { lexicon { terms: ["red,blue"] } }

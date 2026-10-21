@@ -1,0 +1,6 @@
+package hartland.stores
+model cn
+
+def kind LoyaltyCard { grounds: db.dbo.loyalty_card }
+def kind GiftCard    { label: { en: "Gift card" } }
+def kind Store       { grounds: er.entity.store }

@@ -1,0 +1,13 @@
+// 0.17 (CN-P2 S2.3) — `cn/phase-no-definition` (hygiene → info outside `recommended`): a phase with
+// neither `definition:` nor a grounding. An `abstract: true` phase is exempt (a superconcept).
+// Expected (sem): cn/phase-no-definition ×1 — `Discontinued`. Near-misses: `StockCondition`
+// (abstract), `OutOfStock` (a definition).
+package hartland.stores
+model er
+
+def entity item {
+    attributes: [
+        def attribute sku              { type: text, isKey: true },
+        def attribute quantity_on_hand { type: int }
+    ]
+}

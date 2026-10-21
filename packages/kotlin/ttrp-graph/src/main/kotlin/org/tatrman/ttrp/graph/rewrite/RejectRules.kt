@@ -142,6 +142,8 @@ object RejectElaboration {
                 is ColumnRef, is Literal, is MdPath -> emptyList()
                 // AU-core-P0: `:name` bindings and durations are leaves too.
                 is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr -> emptyList()
+                // TTRP 0.5: refused at check (TTRP-CN-001).
+                is org.tatrman.ttrp.expr.ConceptForm -> emptyList()
             }
         // `here` first: a cast's own reject precedes any reject nested inside its operand (first-error).
         return here + nested

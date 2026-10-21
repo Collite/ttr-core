@@ -1,0 +1,35 @@
+// CN-P2 S2.7 T1 — the hygiene report golden: one project with every row the report shows (cn contracts §7 "Hygiene
+// report v2"). `expected.json` is the report as data and `expected.md` as `ttr cn hygiene` prints it; the editor's
+// report (`expected-editor.md`) is the same less the Kotlin-only `definitions` rows (CN-D29). Read by `ttr-concept`
+// `CnHygieneSpec` and `@tatrman/semantics` `cn-hygiene.test.ts`. Hartland names.
+//
+// The rows: `Shopper` er-grounded · `Sale` md-grounded through the hop (`md2er_cubelet sales_er`) · `Store`
+// md-grounded with no hop (`md/er-unmapped`) · `Supplier` ungrounded, with an open-tier edge · `StoreVisit` a dangling
+// grounding (`visited_at` is not an attribute) · "shopper" and "sale" redundant term duplicates (each also a term on
+// the element the concept grounds to) · `FrequentShopper` a phase as the default sense of "shopper" · `LoyalShopper` ⇄
+// `VipShopper` a definition cycle (Kotlin only).
+package hartland.hygiene
+model er
+
+def entity shopper {
+    attributes: [
+        def attribute shopper_id { type: int, isKey: true },
+        def attribute joined_on  { type: date }
+    ]
+}
+def entity sale {
+    attributes: [
+        def attribute sale_id    { type: int, isKey: true },
+        def attribute shopper_id { type: int },
+        def attribute sold_on    { type: date },
+        def attribute net_amount { type: decimal }
+    ]
+}
+def entity store_visit {
+    attributes: [
+        def attribute visit_id   { type: int, isKey: true },
+        def attribute shopper_id { type: int },
+        def attribute visited_on { type: date }
+    ]
+}
+def relation rel_visit_shopper { from: er.entity.store_visit, to: er.entity.shopper }

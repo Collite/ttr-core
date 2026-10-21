@@ -93,7 +93,7 @@ def phase PendingOrder {
     label: { en: "Pending order" },
     definition: """state in ('placed', 'held')"""
 }
-def phase OverdueInvoice { of: Invoicing, definition: """invoice_status = 'open' and period.end < as_of""" }
+def phase OverdueInvoice { of: Invoicing, definition: """invoice_status = 'open' and period.end < :as_of""" }
 def phase DebtorCustomer {
     of: Customer,
     definition: """exists Invoicing involving this as customer where OverdueInvoice""",
@@ -105,7 +105,7 @@ def phase OutOfStock {
     of: Item,
     is_a: StockCondition,
     basis: current_state,
-    definition: """exists StockoutEpisode e involving this where e.period contains as_of"""
+    definition: """exists StockoutEpisode e involving this where e.period contains :as_of"""
 }
 
 // ---- the open tier ----

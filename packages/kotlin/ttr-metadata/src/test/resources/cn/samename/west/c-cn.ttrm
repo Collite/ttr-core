@@ -1,0 +1,6 @@
+package hartland.west
+model cn
+
+def kind Store { grounds: md.Store }
+def event Sale { period: { at: sold_on }, grounds: md.sales }
+def quality store_code { of: Sale, grounds: md.Store.code }

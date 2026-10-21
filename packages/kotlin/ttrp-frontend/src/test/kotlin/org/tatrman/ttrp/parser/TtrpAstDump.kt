@@ -523,6 +523,72 @@ object TtrpAstDump {
                     put("param", e.param)
                     put("unit", e.unit.spelling)
                 }
+            // TTRP 0.5 (CN-D29) — the conceptual-model forms.
+            is org.tatrman.ttrp.expr.ExistsExpr ->
+                obj("Exists", e.location) {
+                    put("negated", e.negated)
+                    put("concepts", conceptBindings(e.concepts))
+                    put("involving", participants(e.involving))
+                    put("where", e.where?.let { expr(it) } ?: JsonNull)
+                }
+            is org.tatrman.ttrp.expr.ConceptAggregate ->
+                obj("ConceptAggregate", e.location) {
+                    put("function", e.function)
+                    put("concepts", conceptBindings(e.concepts))
+                    put("involving", participants(e.involving))
+                    put("where", e.where?.let { expr(it) } ?: JsonNull)
+                    put(
+                        "namedArgs",
+                        buildJsonArray {
+                            e.namedArgs.forEach { (n, v) ->
+                                add(
+                                    buildJsonObject {
+                                        put("name", n)
+                                        put("value", expr(v))
+                                    },
+                                )
+                            }
+                        },
+                    )
+                    put("member", jsonStrings(e.member))
+                }
+            is org.tatrman.ttrp.expr.ThisRef -> obj("This", e.location) { put("path", jsonStrings(e.path)) }
+            is org.tatrman.ttrp.expr.InCall ->
+                obj("InCall", e.location) {
+                    put("negated", e.negated)
+                    put("expr", expr(e.expr))
+                    put("call", expr(e.call))
+                }
+            is org.tatrman.ttrp.expr.TemporalPredicate ->
+                obj("Temporal", e.location) {
+                    put("op", e.op.spelling)
+                    put("lhs", expr(e.lhs))
+                    put("rhs", expr(e.rhs))
+                }
+        }
+
+    private fun conceptBindings(bs: List<org.tatrman.ttrp.expr.ConceptBinding>): JsonArray =
+        buildJsonArray {
+            bs.forEach { b ->
+                add(
+                    buildJsonObject {
+                        put("concept", b.concept)
+                        put("var", b.variable ?: "")
+                    },
+                )
+            }
+        }
+
+    private fun participants(ps: List<org.tatrman.ttrp.expr.Participant>): JsonArray =
+        buildJsonArray {
+            ps.forEach { pt ->
+                add(
+                    buildJsonObject {
+                        put("path", expr(pt.path))
+                        put("label", pt.label ?: "")
+                    },
+                )
+            }
         }
 
     private fun literalKind(v: LiteralValue): String =

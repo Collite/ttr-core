@@ -146,6 +146,12 @@
         "command": "modeler.openInDesigner",
         "title": "Open in Designer",
         "description": "Opens the current TTR file in the graphical designer."
+      },
+      {
+        "command": "modeler.cnHygieneReport",
+        "title": "Concept hygiene report",
+        "category": "TTR",
+        "description": "Previews the conceptual model's hygiene report: grades, groundings, the md→er hop, terms."
       }
     ]
   },

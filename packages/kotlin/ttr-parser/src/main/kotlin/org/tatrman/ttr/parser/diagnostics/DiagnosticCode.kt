@@ -113,6 +113,23 @@ enum class DiagnosticCode(
     // 0.17 (CN-P1) — parse-level checks on a cn body. The `cn/*` slugs (cn contracts §7) are semantic, CN-P2.
     DuplicateProperty("ttr/duplicate-property"), // a cn body names one key twice — the first is read
     ExpressionBlockRequired("ttr/expression-block-required"), // a binding's `filter:` that is not a string or block
+
+    // 0.17 (CN-P2) — the model-level `cn/…` slugs (cn contracts §7), the portable ones. The lexicon pair
+    // (`cn/duplicate-default-sense`, `cn/phase-as-default`) is TS-only; the definition-level slugs are S2.6's.
+    CnDuplicateGrounding("cn/duplicate-grounding"), // a concept's second grounding, or sugar restating a concept
+    CnGroundingTargetKind("cn/grounding-target-kind"), // a target the stereotype × layer table does not allow
+    CnRoleNoEvent("cn/role-no-event"), // a role without its defining event (CN-D6)
+    CnPhaseDoubleDefinition("cn/phase-double-definition"), // a phase both defined and grounded (AM-2)
+    CnPhaseNoDefinition("cn/phase-no-definition"), // hygiene: a phase neither defined nor grounded
+    CnEventNoPeriod("cn/event-no-period"), // hygiene: an event without `period:`
+    CnUngrounded("cn/ungrounded"), // hygiene: a concept with no grounding (P-1)
+    CnDbGrounding("cn/db-grounding"), // advisory: a db grounding — documentation only
+    CnHierarchyShape("cn/hierarchy-shape"), // a `hierarchy:` closure without its two attributes or a key
+    CnParticipantPathBroken("cn/participant-path-broken"), // a participant's relation path does not chain
+    CnInvolvesUnlabelledDuplicate("cn/involves-unlabelled-duplicate"), // two participants of one event, one label
+    CnUnknownRelationType("cn/unknown-relation-type"), // an open-tier edge whose `type:` is no relation type
+    CnAntirigidSupertype("cn/antirigid-supertype"), // a kind whose `is_a` chain reaches a role or a phase
+    CnCncDeprecated("cn/cnc-deprecated"), // `model cnc` / `roles:` — deprecated (cn contracts §1.6)
     ;
 
     override fun toString(): String = id

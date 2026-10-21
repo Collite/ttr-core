@@ -74,6 +74,8 @@ object RejectPurityCheck {
             is ColumnRef, is Literal, is MdPath -> Unit
             // AU-core-P0: a `:name` binding and a duration are leaves too.
             is ParamRef, is DurationExpr -> Unit
+            // TTRP 0.5: a cn definition form is refused before emit (TTRP-CN-001) — nothing to guard inside it.
+            is org.tatrman.ttrp.expr.ConceptForm -> Unit
         }
     }
 

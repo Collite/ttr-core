@@ -1,20 +1,42 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { SourceLocation, Document, Definition } from '@tatrman/parser';
+import type { SourceLocation, Document, Definition, ConceptStereotype, ConceptBindingKind, ConceptProperty } from '@tatrman/parser';
 import { buildCanonicalKey, modelForKind } from './qname.js';
+import { keyKindOf } from './default-schema.js';
+import { desugarConcepts } from './cn/desugar.js';
 import type { ResolvedSemantics } from './semantics-block/model.js';
 
 export interface SymbolEntry {
   qname: string;
   // Nested world members (engine/executor/storage/worldSchema, and from 0.16 the
   // automation members identity/deployment/process) are not top-level Definition
-  // kinds but register as symbols under their world (v4.1).
-  kind: Definition['kind'] | 'engine' | 'executor' | 'storage' | 'worldSchema' | 'identity' | 'deployment' | 'process';
+  // kinds but register as symbols under their world (v4.1). An event's participant
+  // labels register under the event (0.17, `…cn.concept.Order.fulfilling`).
+  kind:
+    | Definition['kind']
+    | 'engine'
+    | 'executor'
+    | 'storage'
+    | 'worldSchema'
+    | 'identity'
+    | 'deployment'
+    | 'process'
+    | 'participant';
   name: string;
   source: SourceLocation;
   documentUri: string;
   parent?: string;
   packageName: string;
   schemaCode: string;
+  /** 0.17 — a concept's stereotype (`kind: 'concept'` only); every stereotype shares one namespace. */
+  stereotype?: ConceptStereotype;
+  /** 0.17 — a cn binding's keyword (`kind: 'conceptBinding'` only); its key's kind segment. */
+  bindingKind?: ConceptBindingKind;
+  /**
+   * 0.17 — set on what the cn desugar synthesized (CN-P2 S2.2): a concept a `concept { }` block
+   * declares (and its participant labels), or the binding a `grounds:` / `concept { }` stands for.
+   * Element references never reach these; an authored concept of the same key is preferred.
+   */
+  cnOrigin?: 'grounds' | 'sugar';
   /**
    * For er2db_* symbols only: distinguishes explicit `def er2db_*` declarations
    * from symbols synthesized from inline `binding:` properties on def entity /
@@ -90,6 +112,76 @@ export class DocumentSymbolTable {
     for (const def of ast.definitions) {
       this.addEntry(def);
     }
+    this.addDesugared(ast);
+  }
+
+  /**
+   * 0.17 — the concepts this document's `concept { }` blocks declare and the bindings its `grounds:`
+   * and `concept { }` stand for (`cn/desugar.ts`). A synthesized symbol never replaces one the
+   * document declares: an authored concept of the same name is the concept the block grounds.
+   */
+  private addDesugared(ast: Document): void {
+    const { concepts, groundings } = desugarConcepts(ast, this.packageName);
+    for (const c of concepts) {
+      const entry: SymbolEntry = {
+        qname: this.makeQname('concept', [c.name]),
+        kind: 'concept',
+        name: c.name,
+        // The name in the declaring slot, not the slot — what a rename edits (review-119 M-5).
+        source: c.declaring.ref.source,
+        documentUri: this.documentUri,
+        packageName: this.packageName,
+        schemaCode: 'cn',
+        stereotype: c.stereotype,
+        cnOrigin: 'sugar',
+      };
+      if (this.entries.has(entry.qname)) continue;
+      this.entries.set(entry.qname, entry);
+      if (c.stereotype === 'event') this.addParticipants(entry, c.body.properties, 'sugar');
+    }
+    for (const g of groundings) {
+      if (g.origin === 'binding' || !g.bindingKind) continue;
+      const qname = this.makeQname(g.bindingKind, g.name.split('.'));
+      if (this.entries.has(qname)) continue;
+      this.entries.set(qname, {
+        qname,
+        kind: 'conceptBinding',
+        name: g.name,
+        source: g.source,
+        documentUri: this.documentUri,
+        packageName: this.packageName,
+        schemaCode: 'binding',
+        bindingKind: g.bindingKind,
+        cnOrigin: g.origin,
+      });
+    }
+  }
+
+  /**
+   * 0.17 — an event's participants register by label (`Warehouse as fulfilling` → `fulfilling`;
+   * unlabelled → the concept name lower-cased, cn contracts §1.1), so a binding's `participants:`
+   * keys and a definition's `this.<label>` resolve. Two unlabelled participants of one concept
+   * share a key — `cn/involves-unlabelled-duplicate` (S2.3), not a duplicate definition.
+   */
+  private addParticipants(event: SymbolEntry, properties: ConceptProperty[], cnOrigin?: 'sugar'): void {
+    const involves = properties.find((p) => p.kind === 'involves');
+    if (involves?.kind !== 'involves') return;
+    for (const participant of involves.participants) {
+      const label = participant.label ?? participant.ref.parts[participant.ref.parts.length - 1].toLowerCase();
+      const pQname = this.makeQnameChild(event, label);
+      if (cnOrigin && this.entries.has(pQname)) continue;
+      this.entries.set(pQname, {
+        qname: pQname,
+        kind: 'participant',
+        name: label,
+        source: participant.source,
+        documentUri: this.documentUri,
+        parent: event.qname,
+        packageName: this.packageName,
+        schemaCode: event.schemaCode,
+        ...(cnOrigin ? { cnOrigin } : {}),
+      });
+    }
   }
 
   /**
@@ -121,7 +213,7 @@ export class DocumentSymbolTable {
   }
 
   private addEntry(def: Definition, parentQname?: string): void {
-    const qnameStr = this.makeQname(def.kind, [def.name]);
+    const qnameStr = this.makeQname(keyKindOf(def), [def.name]);
 
     const entry: SymbolEntry = {
       qname: qnameStr,
@@ -137,6 +229,8 @@ export class DocumentSymbolTable {
     if (def.kind === 'er2dbEntity' || def.kind === 'er2dbAttribute' || def.kind === 'er2dbRelation') {
       entry.mappingSource = 'explicit';
     }
+    if (def.kind === 'concept') entry.stereotype = def.stereotype;
+    if (def.kind === 'conceptBinding') entry.bindingKind = def.bindingKind;
     // Grounding Phase 1: carry the raw `kind:` off an entity/table semantics block
     // so cross-document `period:` refs can be kind-checked from the symbol alone.
     if ((def.kind === 'entity' || def.kind === 'table') && def.semantics) {
@@ -256,6 +350,8 @@ export class DocumentSymbolTable {
       }
     }
 
+    if (def.kind === 'concept' && def.stereotype === 'event') this.addParticipants(entry, def.properties);
+
     if (def.kind === 'table' && def.columns) {
       const tableEntry = entry;
       for (const col of def.columns) {
@@ -314,6 +410,11 @@ export class DocumentSymbolTable {
 
   all(): SymbolEntry[] {
     return Array.from(this.entries.values());
+  }
+
+  /** What the table was built with: the file's model directive code, namespace and effective package. */
+  context(): { schemaCode: string; namespace: string; packageName: string } {
+    return { schemaCode: this.schemaCode, namespace: this.namespace, packageName: this.packageName };
   }
 
   inDocument(): SymbolEntry[] {

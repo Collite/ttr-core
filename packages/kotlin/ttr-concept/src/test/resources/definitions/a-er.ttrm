@@ -1,0 +1,49 @@
+// CN-P2 S2.6 — the er face the definition fixtures read (invented Hartland-style names).
+package hartland.defs
+model er
+
+def entity customer { attributes: [ def attribute customer_id { type: int, isKey: true } ] }
+def entity invoice {
+    attributes: [
+        def attribute invoice_id { type: int, isKey: true },
+        def attribute customer   { type: int },
+        def attribute status     { type: text },
+        def attribute amount     { type: decimal },
+        def attribute paid       { type: decimal },
+        def attribute issued     { type: date },
+        def attribute due        { type: date }
+    ]
+}
+def entity order {
+    attributes: [
+        def attribute order_id       { type: int, isKey: true },
+        def attribute state          { type: text },
+        def attribute placed_at      { type: timestamp },
+        def attribute delivered_date { type: date }
+    ]
+}
+def entity item {
+    attributes: [ def attribute item_id { type: int, isKey: true }, def attribute category { type: text } ]
+}
+def entity category_code { attributes: [ def attribute code { type: text, isKey: true } ] }
+def entity category_closure {
+    attributes: [
+        def attribute ancestor_code   { type: text, isKey: true },
+        def attribute descendant_code { type: text, isKey: true }
+    ]
+}
+def entity stockout_episode {
+    attributes: [
+        def attribute episode_id { type: int, isKey: true },
+        def attribute item_id    { type: int },
+        def attribute started_on { type: date },
+        def attribute ended_on   { type: date }
+    ]
+}
+def entity inventory {
+    attributes: [
+        def attribute item_id          { type: int, isKey: true },
+        def attribute reading          { type: text },
+        def attribute quantity_on_hand { type: decimal }
+    ]
+}

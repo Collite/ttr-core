@@ -70,8 +70,13 @@ import org.tatrman.ttrp.expr.CaseWhen
 import org.tatrman.ttrp.expr.Cast
 import org.tatrman.ttrp.expr.CatalogId
 import org.tatrman.ttrp.expr.ColumnRef
+import org.tatrman.ttrp.expr.ConceptAggregate
+import org.tatrman.ttrp.expr.ConceptBinding
+import org.tatrman.ttrp.expr.ConceptForm
+import org.tatrman.ttrp.expr.ExistsExpr
 import org.tatrman.ttrp.expr.Expression
 import org.tatrman.ttrp.expr.FunctionCall
+import org.tatrman.ttrp.expr.InCall
 import org.tatrman.ttrp.expr.InList
 import org.tatrman.ttrp.expr.MdPath
 import org.tatrman.ttrp.expr.MdPathAtom
@@ -83,6 +88,10 @@ import org.tatrman.ttrp.expr.DurationParam
 import org.tatrman.ttrp.expr.DurationUnit
 import org.tatrman.ttrp.expr.LiteralValue
 import org.tatrman.ttrp.expr.ParamRef
+import org.tatrman.ttrp.expr.Participant
+import org.tatrman.ttrp.expr.TemporalOp
+import org.tatrman.ttrp.expr.TemporalPredicate
+import org.tatrman.ttrp.expr.ThisRef
 import org.tatrman.ttrp.expr.TtrpType
 import org.tatrman.ttrp.expr.catalog.FunctionCatalog
 import org.tatrman.ttrp.expr.catalog.FunctionKind
@@ -115,6 +124,13 @@ internal class TtrpWalker(
 
     /** Diagnostics the walker raises during folding (currently EQ-001 only). */
     val diagnostics = mutableListOf<TtrpDiagnostic>()
+
+    /**
+     * TTRP 0.5 — every cn definition form the walk built, wherever it sits (a chain op, a recipe route, a decision
+     * statement, a wiring `when:`). A document parse refuses them ([TtrpChecks.refuseConceptForms], TTRP-CN-001); a
+     * standalone expression (a cn `definition:` block) reads them.
+     */
+    val conceptForms = mutableListOf<ConceptForm>()
 
     fun walk(ctx: TTRPParser.DocumentContext): TtrpDocument =
         TtrpDocument(
@@ -298,8 +314,9 @@ internal class TtrpWalker(
         val interiorEnd = body.length - 3 // strip the closing """
         val sourceText =
             if (firstNl in 0 until interiorEnd) body.substring(interiorStart, interiorEnd) else ""
-        val absStart = token.startIndex + interiorStart
-        val absEnd = token.startIndex + interiorEnd
+        // ANTLR's startIndex counts code points; the body's indices are UTF-16 (review-120 F15).
+        val absStart = token.startIndex + body.codePointCount(0, interiorStart.coerceIn(0, body.length))
+        val absEnd = token.startIndex + body.codePointCount(0, interiorEnd.coerceIn(0, body.length))
         val (sLine, sCol) = offsetToLineCol(absStart)
         val (eLine, eCol) = offsetToLineCol(absEnd)
         val interiorLocation =
@@ -455,7 +472,11 @@ internal class TtrpWalker(
 
     private fun notExpr(ctx: TTRPParser.NotExprContext): Expression =
         if (ctx.NOT() != null) {
-            FunctionCall(CatalogId.NOT, listOf(notExpr(ctx.notExpr())), loc(ctx))
+            // 0.5 (DC-11): `not exists …` is the negated existence itself, not `op.not` around it.
+            when (val inner = notExpr(ctx.notExpr())) {
+                is ExistsExpr -> inner.copy(negated = !inner.negated, location = loc(ctx)).also { conceptForms += it }
+                else -> FunctionCall(CatalogId.NOT, listOf(inner), loc(ctx))
+            }
         } else {
             predicate(ctx.predicate())
         }
@@ -464,6 +485,17 @@ internal class TtrpWalker(
         val left = addExpr(ctx.addExpr(0))
         return when {
             ctx.IS() != null -> IsNull(left, negated = ctx.NOT() != null, location = loc(ctx))
+            // 0.5 (DC-1/8): `code in descendants(Kind, 'X')` — membership in what a call names.
+            ctx.IN() != null && ctx.functionCall() != null ->
+                InCall(left, functionCall(ctx.functionCall()), negated = ctx.NOT() != null, location = loc(ctx))
+                    .also { conceptForms += it }
+            ctx.temporalOp() != null ->
+                TemporalPredicate(
+                    op = TemporalOp.of(ctx.temporalOp().text) ?: error("unhandled temporal word at ${loc(ctx)}"),
+                    lhs = left,
+                    rhs = addExpr(ctx.addExpr(1)),
+                    location = loc(ctx),
+                ).also { conceptForms += it }
             ctx.IN() != null ->
                 InList(
                     expr = left,
@@ -546,11 +578,72 @@ internal class TtrpWalker(
             ctx.literal() != null -> literal(ctx.literal())
             ctx.castExpr() != null -> castExpr(ctx.castExpr())
             ctx.caseExpr() != null -> caseExpr(ctx.caseExpr())
+            ctx.existsExpr() != null -> existsExpr(ctx.existsExpr())
+            ctx.conceptAggregate() != null -> conceptAggregate(ctx.conceptAggregate())
             ctx.functionCall() != null -> functionCall(ctx.functionCall())
+            ctx.thisRef() != null -> thisRef(ctx.thisRef())
             ctx.dottedRef() != null -> columnRef(ctx.dottedRef())
             ctx.mdPath() != null -> mdPath(ctx.mdPath())
             else -> expr(ctx.expr()) // ( expr ) — parens are structural, dropped
         }
+
+    // --- the conceptual-model forms (0.5, CN-D29) — structural capture; a cn definition reads them, ttr-concept
+    // resolves them, a TTR-P document refuses them wherever they sit (TTRP-CN-001, [conceptForms]) ----------------
+    private fun existsExpr(ctx: TTRPParser.ExistsExprContext): ExistsExpr =
+        ExistsExpr(
+            concepts = ctx.conceptBinding().map { conceptBinding(it) },
+            involving = involving(ctx.involvingClause()),
+            where = ctx.expr()?.let { expr(it) },
+            negated = false,
+            location = loc(ctx),
+        ).also { conceptForms += it }
+
+    private fun conceptAggregate(ctx: TTRPParser.ConceptAggregateContext): ConceptAggregate {
+        val named = ctx.namedArg().map { it.fnArgName().text to expr(it.expr()) }
+        named
+            .groupBy { it.first }
+            .filterValues { it.size > 1 }
+            .keys
+            .firstOrNull()
+            ?.let { dup ->
+                diagnostics +=
+                    TtrpDiagnostic(
+                        TtrpDiagnosticId.PRS_008,
+                        Severity.ERROR,
+                        "`${ctx.identifier().text}(…)` names `$dup` twice",
+                        loc(ctx),
+                        TtrpDiagnosticId.PRS_008.suggestedAlternative,
+                    )
+            }
+        return ConceptAggregate(
+            function = ctx.identifier().text,
+            concepts = ctx.conceptBinding().map { conceptBinding(it) },
+            involving = involving(ctx.involvingClause()),
+            where = ctx.expr()?.let { expr(it) },
+            namedArgs = named,
+            member = ctx.idPart().map { it.text },
+            location = loc(ctx),
+        ).also { conceptForms += it }
+    }
+
+    private fun conceptBinding(ctx: TTRPParser.ConceptBindingContext): ConceptBinding =
+        ConceptBinding(
+            concept = ctx.identifier(0).text,
+            variable = ctx.identifier().getOrNull(1)?.text,
+            location = loc(ctx),
+        )
+
+    private fun involving(ctx: TTRPParser.InvolvingClauseContext): List<Participant> =
+        ctx.participant().map { p ->
+            Participant(
+                path = p.thisRef()?.let { thisRef(it) } ?: columnRef(p.dottedRef()),
+                label = p.identifier()?.text,
+                location = loc(p),
+            )
+        }
+
+    private fun thisRef(ctx: TTRPParser.ThisRefContext): ThisRef =
+        ThisRef(ctx.idPart().map { it.text }, loc(ctx)).also { conceptForms += it }
 
     // --- MD dot-path (contracts §1.2, D14) — structural capture; resolution is S2/S3 ------------
     private fun mdPath(ctx: TTRPParser.MdPathContext): MdPath =
@@ -1262,17 +1355,26 @@ internal class TtrpWalker(
         )
     }
 
+    /**
+     * The line and column of a token offset. ANTLR's offsets (and `charPositionInLine`) count code points, so this
+     * walks code points, not UTF-16 chars — an astral character (an emoji in a comment) on an earlier line used to
+     * end every later span one column short (review-119 L-1).
+     */
     private fun offsetToLineCol(offset: Int): Pair<Int, Int> {
         var line = 1
         var col = 0
-        val end = offset.coerceIn(0, source.length)
-        for (i in 0 until end) {
-            if (source[i] == '\n') {
+        var i = 0
+        var seen = 0
+        while (seen < offset && i < source.length) {
+            val cp = source.codePointAt(i)
+            if (cp == '\n'.code) {
                 line++
                 col = 0
             } else {
                 col++
             }
+            i += Character.charCount(cp)
+            seen++
         }
         return line to col
     }

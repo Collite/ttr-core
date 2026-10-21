@@ -29,7 +29,7 @@ object ExprRenderer {
             CatalogId.OR.value to "or",
             CatalogId.AND.value to "and",
             CatalogId.EQ.value to "=",
-            CatalogId.NEQ.value to "!=",
+            CatalogId.NEQ.value to "<>", // TTR-P's inequality — `!=` does not lex (was rendered `!=`, a re-parse error)
             CatalogId.LT.value to "<",
             CatalogId.LTE.value to "<=",
             CatalogId.GT.value to ">",
@@ -72,7 +72,38 @@ object ExprRenderer {
             is org.tatrman.ttrp.expr.ParamRef -> ":${expr.name}"
             is org.tatrman.ttrp.expr.DurationLiteral -> "${expr.amount} ${expr.unit.spelling}"
             is org.tatrman.ttrp.expr.DurationParam -> "${expr.unit.spelling}(:${expr.param})"
+            // TTRP 0.5 (CN-D29): the conceptual-model forms — refused in a program (TTRP-CN-001), laid out as written.
+            is org.tatrman.ttrp.expr.ExistsExpr ->
+                (if (expr.negated) "not exists " else "exists ") +
+                    conceptRange(expr.concepts, expr.involving, expr.where)
+            is org.tatrman.ttrp.expr.ConceptAggregate -> {
+                val named = expr.namedArgs.joinToString("") { (n, v) -> ", $n: ${render(v, 0)}" }
+                val member = expr.member.joinToString("") { ".$it" }
+                "${expr.function}(${conceptRange(expr.concepts, expr.involving, expr.where)}$named)$member"
+            }
+            is org.tatrman.ttrp.expr.ThisRef -> (listOf("this") + expr.path).joinToString(".")
+            is org.tatrman.ttrp.expr.InCall ->
+                "${render(
+                    expr.expr,
+                    precedence(expr) + 1,
+                )} ${if (expr.negated) "not in" else "in"} ${render(expr.call, 0)}"
+            is org.tatrman.ttrp.expr.TemporalPredicate ->
+                "${render(
+                    expr.lhs,
+                    precedence(expr) + 1,
+                )} ${expr.op.spelling} ${render(expr.rhs, precedence(expr) + 1)}"
         }
+
+    /** `C v, C2 involving this as customer, this.item where …` — the range of an `exists` or a concept aggregate. */
+    private fun conceptRange(
+        concepts: List<org.tatrman.ttrp.expr.ConceptBinding>,
+        involving: List<org.tatrman.ttrp.expr.Participant>,
+        where: Expression?,
+    ): String {
+        val cs = concepts.joinToString(", ") { c -> c.variable?.let { "${c.concept} $it" } ?: c.concept }
+        val ps = involving.joinToString(", ") { p -> render(p.path, 0) + (p.label?.let { " as $it" } ?: "") }
+        return "$cs involving $ps" + (where?.let { " where ${render(it, 0)}" } ?: "")
+    }
 
     private fun mdPathComponent(c: MdPathComponent): String =
         when (c) {
@@ -143,6 +174,10 @@ object ExprRenderer {
                     else -> 8 // ordinary function call binds tightest
                 }
             is IsNull, is InList -> 4
+            // `where` is greedy and a participant list is comma-separated: an `exists` keeps its own parentheses
+            // under any operator or argument list.
+            is org.tatrman.ttrp.expr.ExistsExpr -> 0
+            is org.tatrman.ttrp.expr.InCall, is org.tatrman.ttrp.expr.TemporalPredicate -> 4
             is CaseWhen -> 8
             else -> 8
         }

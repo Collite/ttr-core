@@ -1,0 +1,7 @@
+package hartland.stores
+model cn
+
+def kind Party     { grounds: er.entity.partner }
+def event Purchase { involves: [Customer], period: { at: sold_date }, grounds: er.entity.sale }
+def role Customer  { of: Party, event: Purchase, grounds: er.entity.partner }
+def role Shopper   { of: Party, event: Purchase, grounds: er.entity.web_account }

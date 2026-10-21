@@ -1,0 +1,12 @@
+// The md face.
+package hartland.stores
+model md
+
+def dimension Product {
+    key: sku,
+    attributes: [ def attribute sku { domain: md.Sku, isKey: true }, def attribute color { domain: md.Color } ]
+}
+def domain Size { type: text }
+def domain Money { type: decimal }
+def measure net_sales { domain: md.Money, aggregation: sum }
+def cubelet store_sales { grain: [Product.sku] }

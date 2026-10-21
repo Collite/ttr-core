@@ -1,0 +1,4 @@
+package hartland.stores
+model lexicon locale cs
+
+def term zakaznik { for: cn.Shopper, forms: ["customer"], default: true }

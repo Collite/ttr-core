@@ -1,0 +1,16 @@
+package hartland.stores
+model cn
+
+def kind ProductCategory {
+    grounds: er.entity.category_code,
+    hierarchy: { closure: er.entity.category_closure, ancestor: ancestor_code, descendant: descendant_code }
+}
+def kind Department {
+    grounds: er.entity.department,
+    hierarchy: { closure: er.entity.department_closure, ancestor: ancestor_code, descendant: descendant_code }
+}
+def kind Region {
+    grounds: er.entity.region,
+    hierarchy: { closure: er.entity.region_closure, ancestor: parent_code }
+}
+def kind Brand { label: { en: "Brand" } }

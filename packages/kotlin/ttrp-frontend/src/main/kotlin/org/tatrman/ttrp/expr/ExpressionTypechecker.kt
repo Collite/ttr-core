@@ -128,6 +128,7 @@ class ExpressionTypechecker(
             is Literal, is ColumnRef -> SCALAR
             // AU-core-P0: a `:name` binding and a duration are scalar leaves (typed at S1.3).
             is ParamRef, is DurationExpr -> SCALAR
+            is ConceptForm -> SCALAR
             is MdPath -> ctx.mdResolutions.firstOrNull { it.location == e.location }?.shape ?: SCALAR
             is AggregateCall -> SCALAR
             is Cast -> shapeOf(e.expr, ctx)
@@ -184,6 +185,10 @@ class ExpressionTypechecker(
             // timestamp, a parameter by its `def parameter`, date ± duration). Until then they
             // defer like a NULL operand, so a host expression (`:as_of - 30 days`) still checks.
             is ParamRef, is DurationExpr -> null
+            // TTRP 0.5 (CN-D29): a cn definition form — never read in a TTR-P document. The document parse refuses
+            // it wherever it sits (TTRP-CN-001, `TtrpChecks.refuseConceptForms`); its sub-expressions are not typed
+            // (they name concepts and labels, not columns).
+            is ConceptForm -> null
         }
 
     /**

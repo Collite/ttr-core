@@ -1,0 +1,21 @@
+// 0.17 (CN-P2 S2.3) — `cn/role-no-event` (error, CN-D6): a role names its defining event.
+// Expected (sem): cn/role-no-event ×2 — `Visitor` (a cn def) and `Holder` (declared by
+// `loyalty_card`'s block). Near-misses: `Guest` (a cn def) and `Member` (a block) name `StoreVisit`.
+package hartland.stores
+model er
+
+def entity party { attributes: [ def attribute party_id { type: int, isKey: true } ] }
+def entity store_visit {
+    attributes: [
+        def attribute visit_id   { type: int, isKey: true },
+        def attribute visited_at { type: timestamp }
+    ]
+}
+def entity loyalty_card {
+    attributes: [ def attribute card_no { type: text, isKey: true } ],
+    concept { role: Holder, of: Party }
+}
+def entity membership {
+    attributes: [ def attribute member_no { type: text, isKey: true } ],
+    concept { role: Member, of: Party, event: StoreVisit }
+}

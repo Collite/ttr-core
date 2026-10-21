@@ -1,0 +1,5 @@
+package hartland.stores
+model cn
+
+def event PriceCheck { grounds: er.entity.price_check }
+def event StoreVisit { period: { at: visited_at }, grounds: er.entity.store_visit }

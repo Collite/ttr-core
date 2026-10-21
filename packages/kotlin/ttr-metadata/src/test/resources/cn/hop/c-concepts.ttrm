@@ -1,0 +1,15 @@
+// Concepts grounded to md, with and without a hop: the event on a mapped cubelet lands on its fact entity; the
+// quality on a mapped attribute lands on the fact's column (ambiguous across the two cubelets but for its bearer's
+// entity — AM-29); the kind on a dimension and the quality on a measure have none (P2: `md/er-unmapped`).
+package hartland.web
+model cn
+
+def event WebSale    { involves: [Shopper, Item], period: { at: sold_at }, grounds: md.web_sales }
+def event WebReturn  { involves: [Shopper], period: { at: returned_at }, grounds: md.web_returns }
+def role Shopper     { event: WebSale, grounds: md.Shopper }
+def kind Item        { grounds: md.Product }
+def quality shopper_code { of: WebSale, grounds: md.Shopper.code }
+def quality returning    { of: WebReturn, grounds: md.Shopper.code }
+def quality item_sku     { of: WebSale, grounds: md.Product.sku }
+def quality net_sales    { of: WebSale, grounds: md.net_sales }
+def phase BigWebSale     { of: WebSale, definition: """net_sales > 1000""" }

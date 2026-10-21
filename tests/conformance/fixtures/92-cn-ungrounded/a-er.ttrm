@@ -1,0 +1,16 @@
+// 0.17 (CN-P2 S2.3) — `cn/ungrounded` (hygiene → info outside `recommended`; P-1: eventually
+// grounded): a concept with no grounding after the desugar. Exempt: a relation type (open tier), a
+// phase (`cn/phase-no-definition` speaks for it; a defined phase reads through its bearer), a defined
+// quality, a member-restricted sub-kind (`members:` lowers like a phase).
+// Expected (sem): cn/ungrounded ×4 — `Party`, `Shopper`, `StoreVisit`, `basket_size`.
+// Near-misses: `Store` (`grounds:`), `Brand` (an authored binding), `Region` (a block), and the
+// exempt `basket_value`, `Regular`, `PremiumParty`, `refers`.
+package hartland.stores
+model er
+
+def entity store  { attributes: [ def attribute store_id { type: int, isKey: true } ] }
+def entity brand  { attributes: [ def attribute brand_code { type: text, isKey: true } ] }
+def entity region {
+    attributes: [ def attribute region_code { type: text, isKey: true } ],
+    concept { kind: Region }
+}

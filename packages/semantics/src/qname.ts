@@ -11,6 +11,8 @@
 // `query` is NOT a model (D14) — a `def query` resolves to model `db`, or to `er`
 // when it is declared in a `model er` file (a logical query, LQ L-1). `cnc` is
 // schema-less with no namespace echo (D15). The schema slot is **db only** (D6).
+// `cn` (0.17, the conceptual model) is schema-less too: every concept keys as
+// `<pkg>.cn.concept.<Name>`, whatever its stereotype (CN-P2 S2.1).
 
 import { namespaceForKind, modelForKind } from './default-schema.js';
 
@@ -19,8 +21,8 @@ import { namespaceForKind, modelForKind } from './default-schema.js';
 // the Kotlin/Python parity name stay stable.
 export { modelForKind };
 
-/** The model type / layer. `query` folds into `db`; `cnc` is schema-less; `world` is v4.1; `automation` is 0.16. */
-export type ModelCode = 'db' | 'er' | 'md' | 'binding' | 'cnc' | 'world' | 'automation';
+/** The model type / layer. `query` folds into `db`; `cnc` is schema-less; `world` is v4.1; `automation` is 0.16; `cn` is 0.17. */
+export type ModelCode = 'db' | 'er' | 'md' | 'binding' | 'cnc' | 'world' | 'automation' | 'cn';
 
 /**
  * The model codes a reference may lead with (`er.entity.x`). `automation` keys symbols
@@ -28,7 +30,20 @@ export type ModelCode = 'db' | 'er' | 'md' | 'binding' | 'cnc' | 'world' | 'auto
  * named `automation`, so `automation.obligation` / `import automation.*` must read as that package
  * (review-114 B1). Automation references are resolved by name in the automation validator.
  */
-export const MODEL_CODES: ReadonlySet<ModelCode> = new Set(['db', 'er', 'md', 'binding', 'cnc', 'world']);
+export const MODEL_CODES: ReadonlySet<ModelCode> = new Set(['db', 'er', 'md', 'binding', 'cnc', 'world', 'cn']);
+
+/**
+ * The wire / display name of a concept symbol (cn contracts §2, §5): `cn.<Name>`, or
+ * `cn.<Event>.<label>` for a participant. Derived from the canonical key
+ * `<pkg>.cn.concept.<Name>[.<label>]` — never a second key. `undefined` for any other key.
+ */
+export function cnWireName(key: string): string | undefined {
+  const segs = key.split('.');
+  for (let i = 0; i + 2 < segs.length; i++) {
+    if (segs[i] === 'cn' && segs[i + 1] === 'concept') return ['cn', ...segs.slice(i + 2)].join('.');
+  }
+  return undefined;
+}
 
 /**
  * The uniform, package-first canonical key. `schema` and `kind` may be absent
@@ -39,7 +54,7 @@ export interface Qname {
   /** '' for the root package. */
   package: string;
   model: ModelCode;
-  /** db ONLY; undefined for er/md/cnc/binding. */
+  /** db ONLY; undefined for er/md/cnc/binding/cn. */
   schema?: string;
   /** Resolved object kind (always known after resolution), e.g. 'table', 'entity'. */
   kind: string;

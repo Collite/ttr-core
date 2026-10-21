@@ -1,0 +1,9 @@
+// The concepts; `Buyer`, `Purchase` and `Channel` are grounded by the blocks in `a-er.ttrm`.
+package hartland.stores
+model cn
+
+def kind Party     { grounds: er.entity.party }
+def kind Shop      { grounds: er.entity.store }
+def kind Channel   { label: { en: "Sales channel" } }
+def role Buyer     { of: Party, event: Purchase }
+def event Purchase { involves: [Buyer, Shop], period: { at: sold_date } }

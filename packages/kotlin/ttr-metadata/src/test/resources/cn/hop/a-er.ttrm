@@ -1,0 +1,20 @@
+// CN-P2 S2.5 T3 — the hop present: an md cubelet with an explicit `md2er_cubelet` (`b-md.ttrm`) lands on its fact
+// entity, and each md attribute the binding maps on that entity's attribute (`CnHopSpec`). Invented names.
+package hartland.web
+model er
+
+def entity web_sale {
+    attributes: [
+        def attribute sale_id     { type: int, isKey: true },
+        def attribute shopper_id  { type: int },
+        def attribute product_sku { type: text },
+        def attribute net_amount  { type: decimal }
+    ]
+}
+def entity web_return {
+    attributes: [
+        def attribute return_id   { type: int, isKey: true },
+        def attribute shopper_id  { type: int },
+        def attribute product_sku { type: text }
+    ]
+}

@@ -657,7 +657,7 @@
                 "definition": {
                     "form": "tripleString",
                     "language": "pl",
-                    "text": "invoice_status = 'open' and period.end < as_of"
+                    "text": "invoice_status = 'open' and period.end < :as_of"
                 },
                 "of": {
                     "kind": "id",
@@ -740,7 +740,7 @@
                 "definition": {
                     "form": "tripleString",
                     "language": "pl",
-                    "text": "exists StockoutEpisode e involving this where e.period contains as_of"
+                    "text": "exists StockoutEpisode e involving this where e.period contains :as_of"
                 },
                 "is_a": {
                     "kind": "id",

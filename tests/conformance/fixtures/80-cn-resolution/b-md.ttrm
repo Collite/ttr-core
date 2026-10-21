@@ -1,0 +1,10 @@
+// The md face: `Customer` and `revenue` are md elements here and concepts in `c-concepts.ttrm`.
+package hartland.web
+model md
+
+def dimension Customer { key: code, attributes: [ def attribute code { domain: md.CustomerCode, isKey: true } ] }
+def dimension Product {
+    key: sku,
+    attributes: [ def attribute sku { domain: md.Sku, isKey: true }, def attribute brand { domain: md.Brand } ]
+}
+def measure revenue { domain: md.Money, aggregation: sum }

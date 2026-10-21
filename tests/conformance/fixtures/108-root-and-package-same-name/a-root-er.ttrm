@@ -1,0 +1,5 @@
+// review-120 F1 — an element reference that is exactly a key resolves to it: `er.entity.store` written in
+// `hartland.north` is the root package's `store` (its key is exactly `er.entity.store`), beside `hartland.west`'s.
+model er
+
+def entity store { attributes: [ def attribute store_id { type: int, isKey: true } ] }

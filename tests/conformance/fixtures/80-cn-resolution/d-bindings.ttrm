@@ -1,0 +1,18 @@
+// The bindings live in another package and reach the concepts through the wildcard import: bare
+// (`Warehouse`), `cn.`-headed (`cn.Item`) and package-qualified (`cn.hartland.web.state`,
+// `hartland.web.placed_date`). A `participants:` key is a label of the bound event.
+package hartland.bindings
+import hartland.web.*
+model binding
+
+def cn2md_kind    item_g    { kind: cn.Item,   target: md.Product }
+def cn2md_quality brand_g   { quality: brand,  target: md.Product.brand }
+def cn2er_kind    warehouse_g { kind: Warehouse, target: er.entity.warehouse }
+def cn2er_event order_g {
+    event: cn.Order,
+    target: er.entity.order,
+    participants: { customer: [er.relation.order_customer], fulfilling: [er.relation.order_warehouse] },
+    period: { start: er.entity.order.placed_date, end: er.entity.order.delivered_date }
+}
+def cn2er_quality state_g  { quality: cn.hartland.web.state,    target: er.entity.order.state }
+def cn2er_quality placed_g { quality: hartland.web.placed_date, target: er.entity.order.placed_date }

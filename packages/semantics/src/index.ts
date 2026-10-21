@@ -17,7 +17,7 @@ export type {
 } from './sql-config.js';
 export { loadProjectFromOpenDocuments } from './project.js';
 export type { Project } from './project.js';
-export { qnameToKey, buildCanonicalKey, modelForKind, modelHasSchema, classifyReference, resolveReference, MODEL_CODES } from './qname.js';
+export { qnameToKey, buildCanonicalKey, modelForKind, modelHasSchema, classifyReference, resolveReference, MODEL_CODES, cnWireName } from './qname.js';
 export type {
   Qname, ModelCode, Vocab, PartialQname, RefSite, SymbolIndex,
   ResolvedReference, ReferenceDiagnostic, ReferenceDiagnosticCode,
@@ -33,6 +33,46 @@ export type { SecurityDiagnostic, SecurityDiagnosticCode } from './security-vali
 export { effectiveMatchMethod, fuzzyDeprecationMessage, validateSearchMethods, DEFAULT_TYPOS_DISTANCE } from './search-method.js';
 export type { EffectiveMatchMethod, MatchMethodName, SearchMethodDiagnostic } from './search-method.js';
 export { desugarLexicon } from './lexicon/desugar.js';
+export {
+  desugarConcepts,
+  bindingKindFor,
+  bindingConceptKey,
+  layerOf,
+  synthesizedBindingName,
+  type CnLayer,
+  type CnGrounding,
+  type SugarConcept,
+  type ConceptDesugar,
+} from './cn/desugar.js';
+export {
+  analyzeGroundings,
+  conceptKeyOf,
+  propertyFingerprint,
+  type CnDocument,
+  type CnDiagnostic,
+  type PlacedGrounding,
+  type GroundingAnalysis,
+} from './cn/groundings.js';
+export {
+  validateCn,
+  cncDeprecations,
+  type CnConcept,
+  type CnValidation,
+  type StatedProperty,
+} from './cn/validate.js';
+export {
+  cnHygieneReport,
+  renderCnHygieneMarkdown,
+  elementRefOf,
+  ExplicitMdErHop,
+  EDITOR_DEFINITIONS_NOTE,
+  RETIRED_CODES_NOTE,
+  type CnHygieneReport,
+  type ConceptHygieneRow,
+  type GroundingGrade,
+  type HopAnswer,
+  type HopSlug,
+} from './cn/hygiene.js';
 export type { CanonicalLexiconEntry, LexiconAnalysis, LexiconDiagnostic } from './lexicon/model.js';
 export { serializeVocabularySnapshot, foldId } from './lexicon/snapshot.js';
 export { foldForCollision } from './lexicon/fold.js';
@@ -40,7 +80,16 @@ export type { DeclaredVocabulary, DeclaredVocabularyEntry, DeclaredValue } from 
 export { ProjectSymbolTable } from './project-symbols.js';
 export { Resolver } from './resolver.js';
 export type { ResolutionResult, LexicalScope, ResolutionStep, ResolutionAttempt } from './resolver.js';
-export { collectReferences, collectAllReferences, nestedDefs } from './references.js';
+export {
+  collectReferences,
+  collectAllReferences,
+  collectSugarDeclaringRefs,
+  conceptSugarOf,
+  nestedDefs,
+  isCnContextRef,
+  sugarDeclaringRef,
+} from './references.js';
+export type { CnSlotReference } from './references.js';
 export { ReferenceIndex, enclosingQnameOf } from './reference-index.js';
 export type { ReferenceLocation } from './reference-index.js';
 export { PackageGraphBuilder, findCyclesOn } from './package-graph.js';
@@ -59,7 +108,7 @@ export {
   invalidPackageSegments,
 } from './derivation.js';
 export type { PackageMismatchKind } from './derivation.js';
-export { defaultSchemaForKind, defaultNamespaceForSchema, namespaceForKind } from './default-schema.js';
+export { defaultSchemaForKind, defaultNamespaceForSchema, namespaceForKind, keyKindOf } from './default-schema.js';
 export { resolveMdRef, underlyingDomainOf, mdCrossRefsOf } from './md-resolve.js';
 export { shapeSatisfied, validateCalcArgs } from './md-calc.js';
 export type { DomainShape, CalcArgProblem } from './md-calc.js';

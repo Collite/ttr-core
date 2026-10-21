@@ -1,0 +1,23 @@
+{
+    "diagnostics": [
+        "cn/grounding-target-kind"
+    ],
+    "resolved": [
+        "Product.sku => hartland.web.md.dimension.Product.sku",
+        "Sale => hartland.web.cn.concept.Sale",
+        "md.Code => hartland.web.md.domain.Code",
+        "md.Money => hartland.web.md.domain.Money"
+    ],
+    "symbols": [
+        "hartland.web.binding.cn2md_event.Sale.concept",
+        "hartland.web.binding.cn2md_quality.net_sales.concept",
+        "hartland.web.cn.concept.Sale",
+        "hartland.web.cn.concept.net_sales",
+        "hartland.web.md.cubelet.sales",
+        "hartland.web.md.dimension.Product",
+        "hartland.web.md.dimension.Product.sku",
+        "hartland.web.md.domain.Code",
+        "hartland.web.md.domain.Money",
+        "hartland.web.md.measure.net_sales"
+    ]
+}

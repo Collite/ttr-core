@@ -1,0 +1,10 @@
+// 0.17 (CN-P2 S2.3) — `cn/unknown-relation-type` (error, cn contracts §1.3): an open-tier edge whose
+// `type:` names no `def relation_type`.
+// Expected (sem): cn/unknown-relation-type ×2 — `Carrier`'s `delivers` (undefined; also
+// ttr/unresolved-reference ×1, the generic check) and `Broker`'s `Warehouse` (a kind).
+// Near-miss: `Supplier`'s `supplies`.
+package hartland.stores
+model er
+
+def entity party     { attributes: [ def attribute party_id { type: int, isKey: true } ] }
+def entity warehouse { attributes: [ def attribute warehouse_code { type: text, isKey: true } ] }

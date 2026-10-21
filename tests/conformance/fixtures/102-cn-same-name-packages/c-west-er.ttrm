@@ -1,0 +1,7 @@
+// West's er face: `store` again, with a region, and a `depot` only west has.
+package hartland.west
+model er
+
+def entity store { attributes: [ def attribute store_id { type: int, isKey: true }, def attribute region { type: text } ] }
+def entity depot { attributes: [ def attribute depot_id { type: int, isKey: true } ] }
+def entity sale { attributes: [ def attribute sale_id { type: int, isKey: true }, def attribute store_code { type: text } ] }

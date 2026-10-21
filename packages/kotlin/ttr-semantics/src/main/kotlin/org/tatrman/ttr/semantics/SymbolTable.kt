@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.semantics
 
+import org.tatrman.ttr.parser.model.ConceptBindingDef
+import org.tatrman.ttr.parser.model.ConceptDef
+import org.tatrman.ttr.parser.model.ConceptProperty
 import org.tatrman.ttr.parser.model.Definition
+import org.tatrman.ttr.parser.model.DimensionDef
 import org.tatrman.ttr.parser.model.EntityDef
 import org.tatrman.ttr.parser.model.Er2DbAttributeDef
 import org.tatrman.ttr.parser.model.Er2DbEntityDef
@@ -11,6 +15,8 @@ import org.tatrman.ttr.parser.model.SourceLocation
 import org.tatrman.ttr.parser.model.TableDef
 import org.tatrman.ttr.parser.model.ViewDef
 import org.tatrman.ttr.parser.model.WorldDef
+import org.tatrman.ttr.semantics.cn.GroundingOrigin
+import org.tatrman.ttr.semantics.cn.desugarConcepts
 
 /**
  * Distinguishes explicit `def er2db_*` declarations from symbols synthesized
@@ -33,6 +39,16 @@ data class SymbolEntry(
     val packageName: String,
     val schemaCode: String,
     val mappingSource: MappingSource? = null,
+    /** 0.17 — a concept's stereotype (`kind == "concept"` only); every stereotype shares one namespace. */
+    val stereotype: String? = null,
+    /** 0.17 — a cn binding's keyword (`kind == "conceptBinding"` only); its key's kind segment. */
+    val bindingKind: String? = null,
+    /**
+     * 0.17 — set on what the cn desugar synthesized (CN-P2 S2.2): a concept a `concept { }` block declares (and
+     * its participant labels), or the binding a `grounds:` / `concept { }` stands for. Element references never
+     * reach these; an authored symbol of the same key is preferred ([SymbolTable.get]).
+     */
+    val cnOrigin: GroundingOrigin? = null,
 )
 
 /** A qname that resolves to more than one entry. */
@@ -58,6 +74,92 @@ internal class DocumentSymbols(
 
     init {
         for (def in definitions) addEntry(def)
+        addDesugared(definitions)
+    }
+
+    /**
+     * 0.17 — the concepts this document's `concept { }` blocks declare and the bindings its `grounds:` and
+     * `concept { }` stand for ([desugarConcepts]). A synthesized symbol never replaces one the document
+     * declares: an authored concept of the same name is the concept the block grounds. Mirrors TS
+     * `DocumentSymbolTable.addDesugared`.
+     */
+    private fun addDesugared(definitions: List<Definition>) {
+        val desugar = desugarConcepts(definitions, packageName)
+        for (c in desugar.concepts) {
+            val q = makeQname("concept", listOf(c.name))
+            if (entries.containsKey(q)) continue
+            val entry =
+                SymbolEntry(
+                    qname = q,
+                    kind = "concept",
+                    name = c.name,
+                    namespace = namespace,
+                    // The name in the declaring slot, not the slot (TS parity, review-119 M-5).
+                    source = c.declaring.ref.source,
+                    documentUri = documentUri,
+                    parent = null,
+                    packageName = packageName,
+                    schemaCode = "cn",
+                    stereotype = c.stereotype,
+                    cnOrigin = GroundingOrigin.Sugar,
+                )
+            entries[q] = entry
+            if (c.stereotype == "event") addParticipants(entry, c.sugar.body.properties, GroundingOrigin.Sugar)
+        }
+        for (g in desugar.groundings) {
+            val bindingKind = g.bindingKind ?: continue
+            if (g.origin == GroundingOrigin.Binding) continue
+            val q = makeQname(bindingKind, g.name.split('.'))
+            if (entries.containsKey(q)) continue
+            entries[q] =
+                SymbolEntry(
+                    qname = q,
+                    kind = "conceptBinding",
+                    name = g.name,
+                    namespace = namespace,
+                    source = g.source,
+                    documentUri = documentUri,
+                    parent = null,
+                    packageName = packageName,
+                    schemaCode = "binding",
+                    bindingKind = bindingKind,
+                    cnOrigin = g.origin,
+                )
+        }
+    }
+
+    /**
+     * 0.17 — an event's participants register by label (`Warehouse as fulfilling` → `fulfilling`; unlabelled →
+     * the concept name lower-cased, cn contracts §1.1), so a binding's `participants:` keys resolve. Two
+     * unlabelled participants of one concept share a key — `cn/involves-unlabelled-duplicate`, not a duplicate.
+     */
+    private fun addParticipants(
+        event: SymbolEntry,
+        properties: List<ConceptProperty>,
+        cnOrigin: GroundingOrigin? = null,
+    ) {
+        val involves = properties.firstNotNullOfOrNull { it as? ConceptProperty.Involves } ?: return
+        for (participant in involves.participants) {
+            val label =
+                participant.label ?: participant.ref.parts
+                    .last()
+                    .lowercase()
+            val q = makeQnameChild(event, label)
+            if (cnOrigin != null && entries.containsKey(q)) continue
+            entries[q] =
+                SymbolEntry(
+                    qname = q,
+                    kind = "participant",
+                    name = label,
+                    namespace = namespace,
+                    source = participant.source,
+                    documentUri = documentUri,
+                    parent = event.qname,
+                    packageName = packageName,
+                    schemaCode = event.schemaCode,
+                    cnOrigin = cnOrigin,
+                )
+        }
     }
 
     fun all(): List<SymbolEntry> = entries.values.toList()
@@ -79,7 +181,7 @@ internal class DocumentSymbols(
 
     private fun addEntry(def: Definition) {
         val kind = kindOf(def)
-        val qnameStr = makeQname(kind, listOf(def.name))
+        val qnameStr = makeQname(keyKindOf(def), listOf(def.name))
 
         val entry =
             SymbolEntry(
@@ -98,11 +200,16 @@ internal class DocumentSymbols(
                     } else {
                         null
                     },
+                stereotype = (def as? ConceptDef)?.stereotype,
+                bindingKind = (def as? ConceptBindingDef)?.bindingKind,
             )
         entries[qnameStr] = entry
 
         when (def) {
             is EntityDef -> def.attributes.forEach { addChild(entry, it.name, "attribute", it.source) }
+            // v3.1 MD — dimension attributes register dimension-qualified (`md.dimension.<Dim>.<attr>`). TS parity.
+            is DimensionDef -> def.attributes.forEach { addChild(entry, it.name, "attribute", it.source) }
+            is ConceptDef -> if (def.stereotype == "event") addParticipants(entry, def.body.properties)
             is TableDef -> def.columns.forEach { addChild(entry, it.name, "column", it.source) }
             is ViewDef -> def.columns.forEach { addChild(entry, it.name, "column", it.source) }
             is ProcedureDef -> def.resultColumns.forEach { addChild(entry, it.name, "column", it.source) }
@@ -179,6 +286,10 @@ class SymbolTable {
     private val byDocument = LinkedHashMap<String, DocumentSymbols>()
     private val byQname = LinkedHashMap<String, MutableList<SymbolEntry>>()
 
+    /** Bumped on every document change — what a reader caching a view of the whole table keys on. */
+    var version: Int = 0
+        private set
+
     /**
      * Insert (or replace) a document's symbols.
      *
@@ -198,6 +309,7 @@ class SymbolTable {
         packageName: String = "",
     ) {
         if (byDocument.containsKey(uri)) removeDocument(uri)
+        version++
         val table = DocumentSymbols(uri, definitions, schemaCode, namespace, packageName)
         byDocument[uri] = table
         for (entry in table.all()) {
@@ -207,6 +319,7 @@ class SymbolTable {
 
     fun removeDocument(uri: String) {
         val table = byDocument[uri] ?: return
+        version++
         for (entry in table.all()) {
             val list = byQname[entry.qname] ?: continue
             list.removeAll { it.documentUri == uri }
@@ -215,7 +328,17 @@ class SymbolTable {
         byDocument.remove(uri)
     }
 
-    fun get(qname: String): SymbolEntry? = byQname[qname]?.firstOrNull()
+    /**
+     * The entry a qname reads as. 0.17: an authored symbol over one the cn desugar synthesized ([SymbolEntry.cnOrigin]
+     * — a concept a `concept { }` block declares where a cn def declares it too); among synthesized ones the first
+     * by document, then source offset. Mirrors TS `ProjectSymbolTable.get`.
+     */
+    fun get(qname: String): SymbolEntry? {
+        val list = byQname[qname] ?: return null
+        if (list.size < 2) return list.firstOrNull()
+        list.firstOrNull { it.cnOrigin == null }?.let { return it }
+        return list.minWith(compareBy<SymbolEntry>({ it.documentUri }, { it.source.offsetStart }))
+    }
 
     fun getAll(qname: String): List<SymbolEntry> = byQname[qname] ?: emptyList()
 

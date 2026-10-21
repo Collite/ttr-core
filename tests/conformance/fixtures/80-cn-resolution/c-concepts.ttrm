@@ -1,0 +1,28 @@
+// The concepts. Bare names in cn slots are concepts; groundings name the element they ground to.
+// `order_value` and `warehouse_name` are implicit qualities — listed, never declared, never reported.
+package hartland.web
+model cn
+
+def kind Party     { label: { en: "Party" } }
+def kind Warehouse { label: { en: "Distribution center" }, qualities: [warehouse_name] }
+def kind Item      { label: { en: "Product" }, qualities: [brand, category] }
+def kind ProductCategory {
+    grounds: er.entity.category_code,
+    hierarchy: { closure: er.entity.category_closure, ancestor: ancestor_code, descendant: descendant_code }
+}
+def kind Supplier { is_a: Party, relations: [ { type: supplies, to: Warehouse } ] }
+def role Customer { of: Party, event: Order, grounds: md.Customer }
+def event Order {
+    extent: durative,
+    involves: [Customer, Warehouse as fulfilling],
+    period: { start: placed_date, end: delivered_date, end_open: open },
+    qualities: [state, placed_date, delivered_date, order_value]
+}
+def quality state          { of: Order }
+def quality placed_date    { of: Order }
+def quality delivered_date { of: Order }
+def quality brand          { of: Item }
+def quality category       { of: Item, value_space: ProductCategory }
+def quality revenue        { of: Order, grounds: md.revenue }
+def phase PendingOrder     { of: Order, definition: """state in ('placed', 'held')""" }
+def relation_type supplies { label: { en: "supplies" } }

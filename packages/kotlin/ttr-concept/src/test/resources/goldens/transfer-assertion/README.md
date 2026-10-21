@@ -1,6 +1,6 @@
 # Transfer — the write frame
 
-Source: `design/09-grounding-and-frames.md` §5 (the clinical world's acceptance case). A `Transfer` `assertion.v1` with labelled participants (`from`/`to`), a period and `asserted_as_of` lowers to the `Statement[Transfer]` row payload. Invented names and codes only — never client content (this is a public repo).
+Source: `design/09-grounding-and-frames.md` §5 (the acceptance case for assertions). A `Transfer` `assertion.v1` with labelled participants (`from`/`to`), a period and `asserted_as_of` lowers to the `Statement[Transfer]` row payload. Invented names and codes only — never client content (this is a public repo).
 
 **Pending convention.** A case whose lowering needs a primitive that does not exist yet ships as
 `<case>.pending`, a one-line file naming the demand id it waits on (e.g. `G-ER-2` — see

@@ -1,0 +1,14 @@
+{
+    "diagnostics": [],
+    "resolved": [
+        "er.entity.store => er.entity.store"
+    ],
+    "symbols": [
+        "er.entity.store",
+        "er.entity.store.store_id",
+        "hartland.north.binding.cn2er_kind.Store.grounds",
+        "hartland.north.cn.concept.Store",
+        "hartland.west.er.entity.store",
+        "hartland.west.er.entity.store.store_id"
+    ]
+}

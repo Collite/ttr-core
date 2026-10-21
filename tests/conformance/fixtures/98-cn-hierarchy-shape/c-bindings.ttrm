@@ -1,0 +1,8 @@
+package hartland.stores
+model binding
+
+def cn2er_kind brand_g {
+    kind: cn.Brand,
+    target: er.entity.brand,
+    hierarchy: { closure: er.entity.brand_closure, ancestor: ancestor_code, descendant: child_code }
+}

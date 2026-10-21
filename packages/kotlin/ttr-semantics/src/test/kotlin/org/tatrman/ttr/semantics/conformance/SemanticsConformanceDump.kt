@@ -84,7 +84,15 @@ object SemanticsConformanceDump {
                 val packageName = result.packageName ?: ""
                 symbols.upsertDocument(uri, result.definitions, schemaCode, namespace, packageName)
                 Meta(
-                    SemanticDocument(uri, result.definitions, schemaCode, namespace, packageName, result.imports),
+                    SemanticDocument(
+                        uri,
+                        result.definitions,
+                        schemaCode,
+                        namespace,
+                        packageName,
+                        result.imports,
+                        result.modelDirective?.source,
+                    ),
                     schemaCode,
                     namespace,
                     packageName,
@@ -99,9 +107,10 @@ object SemanticsConformanceDump {
         for (m in metas) {
             collectAllReferences(m.doc.definitions).forEach { c ->
                 val enc = enclosingQnameOf(c.ownerDef, m.schemaCode, m.namespace, m.packageName)
+                // The ref itself: a cn slot's ref carries its context (0.17).
                 val res =
                     resolver.resolveReference(
-                        Resolver.Ref(c.path, c.parts),
+                        c.toRef(),
                         ResolutionContext(m.schemaCode, m.namespace, enc, m.doc.imports, m.packageName),
                     )
                 if (res is ResolutionResult.Resolved) resolved += "${c.path} => ${res.symbol.qname}"
@@ -112,8 +121,8 @@ object SemanticsConformanceDump {
                         validator.validateImports(m.doc)
                 ).map { it.code.id }.filter(::isPortable)
         }
-        // validateProject() is project-global — run once across all documents.
-        diagnostics += validator.validateProject().map { it.code.id }.filter(::isPortable)
+        // validateProject() is project-global — run once across all documents (0.17: the cn checks with it).
+        diagnostics += validator.validateProject(metas.map { it.doc }).map { it.code.id }.filter(::isPortable)
 
         // Full qnames of the scenario's own definitions (stock vocab excluded).
         val symbolQnames =

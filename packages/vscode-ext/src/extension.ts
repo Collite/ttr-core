@@ -59,6 +59,13 @@ export function activate(context: vscode.ExtensionContext) {
         `Use "Find All References" (Shift+F12) on ${qname ?? 'the symbol'} to list its references.`,
       );
     }),
+    // CN-P2 S2.7 T3 — "TTR: Concept hygiene report": the LSP's editor report (`modeler/getCnHygiene`, cn
+    // contracts §7) as a markdown preview. Definition-level findings stay `ttr cn hygiene`'s (CN-D29).
+    vscode.commands.registerCommand('modeler.cnHygieneReport', async () => {
+      const { markdown } = await client.sendRequest<{ markdown: string }>('modeler/getCnHygiene');
+      const doc = await vscode.workspace.openTextDocument({ language: 'markdown', content: markdown });
+      await vscode.commands.executeCommand('markdown.showPreview', doc.uri);
+    }),
     // Invoked by the "N files in package" code lens.
     vscode.commands.registerCommand('modeler.listPackageFiles', async (pkg?: string) => {
       if (!pkg) return;

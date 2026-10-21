@@ -1,0 +1,4 @@
+package hartland.stores
+model binding
+
+def cn2db_concept gift_card_g { concept: cn.GiftCard, target: db.dbo.gift_card }

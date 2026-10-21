@@ -1,0 +1,34 @@
+// 0.17 (CN-P2 S2.2) — the bottom-up sugar: a `concept { }` block in every md and er host the binding
+// table allows (er: entity as kind · role · event, attribute as quality · value kind; md: dimension as
+// kind · role, domain as kind, measure as quality, md attribute as quality, cubelet as event). Each
+// block declares its concept in the host's package and grounds it to the host.
+// `84-cn-desugar-bottom-up-authored/` says the same with cn defs and authored bindings: both desugar
+// to the same groundings and the same symbols, binding names aside (`cn-desugar.test.ts`).
+// `Party` and `Buyer` are also declared in `c-concepts.ttrm` — the merge: the block only grounds them.
+package hartland.stores
+model er
+
+def entity party { attributes: [ def attribute party_id { type: int, isKey: true } ], concept { kind: Party } }
+def entity customer {
+    attributes: [ def attribute customer_id { type: int, isKey: true } ],
+    concept: { role: Buyer, event: Purchase }
+}
+def entity store {
+    attributes: [
+        def attribute store_id { type: int, isKey: true },
+        def attribute channel  { type: text, concept { kind: Channel } }
+    ],
+    concept { kind: Shop }
+}
+def entity sale {
+    attributes: [
+        def attribute sale_id     { type: int, isKey: true },
+        def attribute store_id    { type: int },
+        def attribute customer_id { type: int },
+        def attribute sold_date   { type: date },
+        def attribute amount      { type: decimal, concept { quality: amount, of: Purchase } }
+    ],
+    concept { event: Purchase, involves: [Buyer, Shop], qualities: [amount], period: { at: sold_date } }
+}
+def relation sale_store    { from: er.entity.sale, to: er.entity.store }
+def relation sale_customer { from: er.entity.sale, to: er.entity.customer }

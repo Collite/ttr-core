@@ -1,0 +1,6 @@
+package hartland.stores
+model lexicon locale en
+
+def term customer_default { for: cn.Customer, forms: ["customer", "client"], default: true }
+def term shopper_default  { for: cn.Shopper,  forms: ["shopper", "customer"], default: true }
+def term buyer            { for: cn.Shopper,  forms: ["client"] }

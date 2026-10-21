@@ -1,0 +1,8 @@
+// 0.17.1 (review-119 H-1) — two packages declare an element of the same name. A cn grounding written
+// `er.entity.store` in `hartland.west` names west's store: the scoped unique match (D10 "current package
+// first") picks the one in the reference's own package. East's face of the store and the sale.
+package hartland.east
+model er
+
+def entity store { attributes: [ def attribute store_id { type: int, isKey: true } ] }
+def entity sale { attributes: [ def attribute sale_id { type: int, isKey: true }, def attribute store_code { type: text } ] }

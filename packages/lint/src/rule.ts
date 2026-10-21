@@ -14,7 +14,8 @@ export type RuleCategory =
   | 'style'
   | 'md'
   | 'semantics'
-  | 'lexicon';
+  | 'lexicon'
+  | 'cn';
 export type RuleScope = 'document' | 'project';
 export type RuleId = string; // kebab, no `ttr/` prefix
 

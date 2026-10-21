@@ -1,0 +1,9 @@
+package hartland.hygiene
+model binding
+
+def cn2er_event visit_g {
+    event: cn.StoreVisit,
+    target: er.entity.store_visit,
+    participants: { shopper: [er.relation.rel_visit_shopper] },
+    period: { at: er.entity.store_visit.visited_at }
+}

@@ -1,0 +1,23 @@
+package hartland.stores
+model binding
+
+def cn2er_event transfer_g {
+    event: cn.StockTransfer,
+    target: er.entity.transfer,
+    participants: {
+        item:   [er.relation.transfer_lot, er.relation.lot_item],
+        from:   [er.relation.transfer_from],
+        to:     [er.relation.lot_item],
+        region: [er.relation.transfer_to]
+    },
+    period: { at: er.entity.transfer.shipped_at }
+}
+def cn2er_event restock_g {
+    event: cn.Restock,
+    target: er.entity.restock,
+    participants: {
+        item:      [er.relation.restock_lot, er.relation.warehouse_region],
+        warehouse: [er.relation.restock_lot]
+    },
+    period: { at: er.entity.restock.restocked_at }
+}

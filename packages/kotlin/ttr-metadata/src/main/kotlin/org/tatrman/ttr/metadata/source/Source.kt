@@ -107,6 +107,10 @@ data class SourceSnapshot(
     val worlds: Map<QualifiedName, org.tatrman.ttr.metadata.model.World> = emptyMap(),
     /** Grammar 0.16 — the automation tier (`model automation` objects + automation roles), keyed by qname. */
     val automation: Map<QualifiedName, org.tatrman.ttr.metadata.model.AutomationObject> = emptyMap(),
+    /** Grammar 0.17 — the conceptual tier, built over this source's files as one project ([CnBuilder]). */
+    val cn: org.tatrman.ttr.metadata.model.CnSchema =
+        org.tatrman.ttr.metadata.model
+            .CnSchema(),
     val warnings: List<LoadWarning> = emptyList(),
     val errors: List<LoadWarning> = emptyList(),
     /**
@@ -200,6 +204,8 @@ data class LoadedFile(
     val definitions: List<org.tatrman.ttr.parser.model.Definition>,
     val schemaCode: String,
     val namespace: String,
+    /** v4.4 — a `model lexicon locale <id>` unit's locale (the cn lexicon links carry it); null otherwise. */
+    val locale: String? = null,
 )
 
 private fun listFilesMatching(
@@ -504,6 +510,13 @@ class FileBasedSource(
                     automation[obj.qname] = obj
                     continue
                 }
+                // Grammar 0.17 — the conceptual tier is read over the whole source after this loop ([CnBuilder]):
+                // a concept's grounding, its `concept { }` blocks and the elements it targets resolve across files.
+                if (def is org.tatrman.ttr.parser.model.ConceptDef ||
+                    def is org.tatrman.ttr.parser.model.ConceptBindingDef
+                ) {
+                    continue
+                }
                 // Directive-less ⇒ derive (schema, namespace) per def kind; otherwise use
                 // the file-level directive values for every def (legacy behaviour).
                 val (defSchema, defNs) = if (directiveLess) schemaNamespaceForKind(def) else (schemaCode to namespace)
@@ -535,11 +548,25 @@ class FileBasedSource(
                     definitions = pr.definitions,
                     schemaCode = schemaCode,
                     namespace = namespace,
+                    locale = pr.modelDirective?.locale,
                 ),
             )
         }
 
         resolveShortQueryTargets(mappings, queries, shortQueryTargets)
+
+        // Grammar 0.17 — the conceptual tier over the source as one project; its model-level `cn/…` errors and
+        // warnings are load issues (the automation-validator precedent), its hygiene / advisory ones ride the
+        // typed model (the grades) and are not repeated here.
+        val cn = CnBuilder.build(loadedFiles)
+        for (d in cn.diagnostics) {
+            val issue = LoadWarning(sourceId, d.uri, d.source.line, d.source.column, "${d.code.id}: ${d.message}")
+            when (d.severity) {
+                org.tatrman.ttr.parser.diagnostics.DiagnosticSeverity.Error -> errors += issue
+                org.tatrman.ttr.parser.diagnostics.DiagnosticSeverity.Warning -> warnings += issue
+                else -> {}
+            }
+        }
 
         return SourceSnapshot(
             sourceId = sourceId,
@@ -559,6 +586,7 @@ class FileBasedSource(
             rowSchemas = rowSchemas,
             worlds = worlds,
             automation = automation,
+            cn = cn.schema,
             warnings = warnings,
             errors = errors,
             loadedFiles = loadedFiles.toList(),
@@ -1630,8 +1658,15 @@ private fun definitionKind(def: org.tatrman.ttr.parser.model.Definition): String
         is org.tatrman.ttr.parser.model.QueryDef -> "query"
         is org.tatrman.ttr.parser.model.DrillMapDef -> "drill_map"
         is org.tatrman.ttr.parser.model.ColumnDef -> "column"
+        // Grammar 0.17 — a concept by its stereotype, a cn binding by its keyword (`'kind' definition not allowed …`).
+        is org.tatrman.ttr.parser.model.ConceptDef -> def.stereotype
+        is org.tatrman.ttr.parser.model.ConceptBindingDef -> def.bindingKind
         else -> "def"
     }
+
+/** Tiers a reference never names by their code (review-114 B1; grammar 0.17). */
+private val REFERENCE_EXCLUDED_TIERS =
+    setOf(org.tatrman.ttr.metadata.model.SchemaCode.AUTOMATION, org.tatrman.ttr.metadata.model.SchemaCode.CN)
 
 object Reference {
     /**
@@ -1664,9 +1699,11 @@ object Reference {
             else ->
                 // `automation` is a tier of the model but never a reference's schema token: a package
                 // segment named `automation` (`plant.automation.order.state`) stays a name (review-114 B1).
+                // Nor is `cn` (grammar 0.17): concept refs resolve in ttr-semantics, never here, and a db schema
+                // or package segment named `cn` keeps the reading it had.
                 if (org.tatrman.ttr.metadata.model
                         .parseSchemaCode(parts[1])
-                        .let { it != null && it != org.tatrman.ttr.metadata.model.SchemaCode.AUTOMATION }
+                        .let { it != null && it !in REFERENCE_EXCLUDED_TIERS }
                 ) {
                     // package.schema.namespace.name (stock vocabulary)
                     FileBasedSource.qname(parts[1], parts[2], parts.drop(3).joinToString("."), parts[0])

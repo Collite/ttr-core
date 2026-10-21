@@ -196,6 +196,17 @@ describe('project rules', () => {
     const all = [...byUri.values()].flat();
     expect(rulesOf(all)).toContain('duplicate-definition');
   });
+
+  it('duplicate-definition: a `concept { }` block grounding a cn def is the merge, not a duplicate (CN-P2 S2.2)', () => {
+    const er = { uri: '/proj/er.ttrm', src: `package p\nmodel er\ndef entity party { attributes: [def attribute id { type: int, isKey: true }], concept { kind: Party } }` };
+    const cn = { uri: '/proj/cn.ttrm', src: `package p\nmodel cn\ndef kind Party { label: { en: "Party" } }` };
+    const merged = [...lintProj([er, cn], { projectRoot: '/proj' }).values()].flat();
+    expect(rulesOf(merged)).not.toContain('duplicate-definition');
+    // two cn defs of one name stay a duplicate definition, the block aside
+    const twice = { uri: '/proj/cn2.ttrm', src: `package p\nmodel cn\ndef role Party { event: Order }` };
+    const dup = [...lintProj([er, cn, twice], { projectRoot: '/proj' }).values()].flat().filter((d) => d.ruleId === 'duplicate-definition');
+    expect(dup.map((d) => d.message.match(/also at (\S+):/)?.[1]).sort()).toEqual(['/proj/cn.ttrm', '/proj/cn2.ttrm']);
+  });
 });
 
 describe('lexicon rules (v4.4, RG-P4)', () => {

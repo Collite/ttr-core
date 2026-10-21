@@ -1,0 +1,34 @@
+// 0.17 (CN-P2 S2.3) — `cn/participant-path-broken` (error, L15-3): a participant's relation path
+// (1..n) must chain — the first relation touches the event's entity, each next one shares an entity
+// with the one before, and where the participant concept has a direct er grounding the path ends on
+// it. An md-grounded participant's end is not checked (its er landing needs the md→er hop).
+// Expected (sem): cn/participant-path-broken ×3 — `transfer_g`'s `to` (its first relation does not
+// touch `transfer`), `restock_g`'s `item` (the second relation does not continue from `item_lot`) and
+// `restock_g`'s `warehouse` (ends on `item_lot`; `Warehouse` grounds to `warehouse`).
+// Near-misses: `transfer_g`'s `item` (two hops, ends on `item`), `from`, and `region` (md-grounded:
+// its end is not checked).
+package hartland.stores
+model er
+
+def entity item      { attributes: [ def attribute sku { type: text, isKey: true } ] }
+def entity item_lot  { attributes: [ def attribute lot_no { type: text, isKey: true } ] }
+def entity warehouse { attributes: [ def attribute warehouse_code { type: text, isKey: true } ] }
+def entity region    { attributes: [ def attribute region_code { type: text, isKey: true } ] }
+def entity transfer {
+    attributes: [
+        def attribute transfer_id { type: int, isKey: true },
+        def attribute shipped_at  { type: timestamp }
+    ]
+}
+def entity restock {
+    attributes: [
+        def attribute restock_id   { type: int, isKey: true },
+        def attribute restocked_at { type: timestamp }
+    ]
+}
+def relation transfer_from     { from: er.entity.transfer, to: er.entity.warehouse }
+def relation transfer_to       { from: er.entity.transfer, to: er.entity.warehouse }
+def relation transfer_lot      { from: er.entity.transfer, to: er.entity.item_lot }
+def relation lot_item          { from: er.entity.item_lot, to: er.entity.item }
+def relation warehouse_region  { from: er.entity.warehouse, to: er.entity.region }
+def relation restock_lot       { from: er.entity.restock, to: er.entity.item_lot }

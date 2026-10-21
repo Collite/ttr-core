@@ -531,6 +531,8 @@ class TtrpChecker(
             is org.tatrman.ttrp.expr.MdPath -> emptyList()
             // AU-core-P0: a `:name` binding / a duration names no column.
             is org.tatrman.ttrp.expr.ParamRef, is org.tatrman.ttrp.expr.DurationExpr -> emptyList()
+            // TTRP 0.5: a cn definition form names concepts and labels, not columns (and is refused, TTRP-CN-001).
+            is org.tatrman.ttrp.expr.ConceptForm -> emptyList()
         }
 
     /** The single-input schema of an op: its bare source arg, else the chain predecessor. */

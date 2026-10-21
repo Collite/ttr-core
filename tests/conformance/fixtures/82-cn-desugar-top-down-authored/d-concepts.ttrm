@@ -1,0 +1,24 @@
+// The concepts of `81-cn-desugar-top-down/`, ungrounded here; `e-bindings.ttrm` grounds them.
+package hartland.stores
+model cn
+
+// md
+def kind Item          { label: { en: "Product" } }
+def kind Brand         { }
+def role Shopper       { of: Party, event: StoreSale }
+def event StoreSale    { involves: [Shopper, Item], period: { at: sold_date } }
+def quality net_sales  { of: StoreSale }
+def quality color      { of: Item }
+
+// er
+def kind Party         { label: { en: "Party" } }
+def kind Shop          { }
+def kind Channel       { }
+def kind ProductCategory { }
+def role Buyer         { of: Party, event: Purchase }
+def event Purchase     { involves: [Buyer, Shop], qualities: [amount], period: { at: sold_date } }
+def quality amount     { of: Purchase }
+def phase PlacedOrder  { of: Purchase }
+
+// db
+def kind LoyaltyCard   { }

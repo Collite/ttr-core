@@ -47,12 +47,12 @@ message KeyValues {
 }
 
 message Participant {
-  string label = 1;                                     // an involves label of the event ("from", "to", "patient")
+  string label = 1;                                     // an involves label of the event ("from", "to", "customer")
   org.tatrman.concept.v1.ConceptRef concept = 2;
   org.tatrman.concept.v1.MemberRef member = 3;
 }
 
-// Clinical "modifiers" (certainty, laterality, …) are qualities too.
+// Qualifiers an assertion carries (a certainty, a channel, …) are qualities too.
 message QualityValue {
   org.tatrman.concept.v1.ConceptRef quality = 1;
   org.tatrman.concept.v1.Value value = 2;

@@ -1,0 +1,7 @@
+// `for: cn.Customer` names the concept, `for: md.Customer` the dimension — one package, no collision.
+package hartland.web
+model lexicon locale en
+
+def term customer           { for: cn.Customer, forms: ["customer", "customers"], default: true }
+def term customer_dimension { for: md.Customer, forms: ["customer dimension"] }
+def term pending_order      { for: cn.PendingOrder, forms: ["pending order", "pending orders"] }

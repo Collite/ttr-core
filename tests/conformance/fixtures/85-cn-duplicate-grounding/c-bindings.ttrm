@@ -1,0 +1,5 @@
+// A second grounding of `Party` — one meaning, one binding (CN-D12): the first one is read.
+package hartland.stores
+model binding
+
+def cn2er_kind party_again { kind: cn.Party, target: er.entity.customer }

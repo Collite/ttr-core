@@ -1,0 +1,28 @@
+// 0.17 (CN-P2 S2.3) — `cn/phase-double-definition` (error, AM-2): a phase is a `definition:` or a
+// grounding to a stacked entity, never both.
+// Expected (sem): cn/phase-double-definition ×2 — `PlacedOrder` (`definition:` + `grounds:`) and
+// `HeldOrder` (`definition:` + the authored `held_g`). Near-misses: `OpenOrder` (a definition only),
+// `ShippedOrder` (a grounding only).
+package hartland.stores
+model er
+
+def entity order {
+    attributes: [
+        def attribute order_number   { type: int, isKey: true },
+        def attribute state          { type: text },
+        def attribute placed_date    { type: date },
+        def attribute delivered_date { type: date }
+    ]
+}
+def query orders_by_state {
+    sourceText: """sql
+SELECT order.order_number, order.state FROM order
+"""
+}
+def entity order_in_state {
+    binding: { target: { query: er.query.orders_by_state } },
+    attributes: [
+        def attribute order_number { type: int, isKey: true },
+        def attribute state        { type: text }
+    ]
+}

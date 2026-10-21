@@ -23,8 +23,12 @@ const duplicateDefinition: Rule = {
         const k = dup.entries[0].kind;
         if (k === 'er2dbEntity' || k === 'er2dbAttribute' || k === 'er2dbRelation') continue;
       }
-      for (const entry of dup.entries) {
-        const others = dup.entries
+      // 0.17 — a concept a `concept { }` block declares where a cn def (or another block) declares
+      // it too is the sugar merge, or a second grounding: `cn/duplicate-grounding`'s, not this rule's.
+      const entries = dup.entries.filter((e) => e.cnOrigin === undefined);
+      if (entries.length < 2) continue;
+      for (const entry of entries) {
+        const others = entries
           .filter((e) => !(e.documentUri === entry.documentUri && e.source.line === entry.source.line))
           .map((e) => `${e.documentUri}:${e.source.line}`)
           .join(', ');

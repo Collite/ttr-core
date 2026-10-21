@@ -14,6 +14,8 @@ tasks.test {
     useJUnitPlatform()
     // VL-P0: LayoutResolverSpec reads the shared layout vectors in place (never a copy).
     inputs.dir("../../package-sdk/schemas/layout-vectors")
+    // CN-P2 S2.5: the cn specs load conformance fixtures 75–84 in place.
+    inputs.dir("../../../tests/conformance/fixtures")
 }
 
 dependencies {

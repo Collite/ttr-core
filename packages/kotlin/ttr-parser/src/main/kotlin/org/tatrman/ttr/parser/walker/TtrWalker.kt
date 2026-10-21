@@ -334,7 +334,14 @@ class TtrWalker(
             }
             return emptyList()
         }
-        return LexiconBlock(terms = listKey("terms"), patterns = listKey("patterns"), examples = listKey("examples"))
+        return LexiconBlock(
+            terms = listKey("terms"),
+            patterns = listKey("patterns"),
+            examples = listKey("examples"),
+            // 0.17 — the sense fields an inline block writes beside its shorthands (TS `inlineSense`).
+            default = (obj.entries["default"] as? PropertyValue.BoolValue)?.raw,
+            sensePriority = (obj.entries["sense_priority"] as? PropertyValue.NumberValue)?.raw,
+        )
     }
 
     private fun visitDefinition(ctx: TTRParser.DefinitionContext): Definition? {

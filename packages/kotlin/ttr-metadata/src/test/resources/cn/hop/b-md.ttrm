@@ -1,0 +1,23 @@
+// The md face: two cubelets over one dimension pair; `web_sales` and `web_returns` each map their grain explicitly.
+package hartland.web
+model md
+
+def dimension Shopper { key: code, attributes: [ def attribute code { domain: md.Code, isKey: true } ] }
+def dimension Product {
+    key: sku,
+    attributes: [ def attribute sku { domain: md.Sku, isKey: true }, def attribute color { domain: md.Color } ]
+}
+def measure net_sales { domain: md.Money, aggregation: sum }
+def cubelet web_sales   { grain: [Shopper.code, Product.sku], measures: [net_sales] }
+def cubelet web_returns { grain: [Shopper.code, Product.sku] }
+
+def md2er_cubelet web_sales_er {
+    cubelet: md.web_sales,
+    target: er.entity.web_sale,
+    attributes: { Shopper.code: shopper_id, Product.sku: product_sku }
+}
+def md2er_cubelet web_returns_er {
+    cubelet: md.web_returns,
+    target: er.entity.web_return,
+    attributes: { Shopper.code: shopper_id }
+}

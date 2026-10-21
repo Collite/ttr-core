@@ -644,6 +644,15 @@ enum class TtrpDiagnosticId(
         "an action display's column must be a scalar every engine can produce — declare it as text, int, bigint, " +
             "smallint, decimal (precision ≤ 38), float, bool, date, time, datetime or timestamp",
     ),
+
+    // ---- TTRP 0.5 (CN-P2 S2.6, CN-D29): the conceptual-model forms parse anywhere (the grammar stays
+    // target-neutral) and only a cn `definition:` / `members:` / `filter:` block reads them. ----
+    CN_001(
+        "TTRP-CN-001",
+        "a conceptual-model form (`exists … involving …`, `count(<Concept> involving …)`, `this`, `in <call>`, " +
+            "`at_or_before` / `before` / `contains` / `ended_before` / `overlaps`) belongs in a cn " +
+            "`definition:` — in a TTR-P program write the join, the filter or the comparison it stands for",
+    ),
     ;
 
     companion object {

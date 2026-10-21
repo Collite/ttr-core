@@ -5,6 +5,32 @@ the grammar/IDE-support line owned by the `tatrman` repo.
 
 ## Unreleased
 
+Grammar 0.17.1 — the cn semantics in the editor.
+
+- **Checked.** cn references resolve (bare in a cn slot, or with the `cn.` head, among concepts only), `grounds:` and
+  `concept { }` desugar to bindings, and the model-level `cn/*` diagnostics show as you type (lint category `cn`;
+  the hygiene ones off under `recommended`). Goto, find-references and rename work across concept defs, bindings,
+  the sugar and lexicon `for:` — a rename keeps an unlabelled participant's label, written out (`Buyer as customer`).
+- **Hover on a concept** shows its stereotype, label, grounding and grade (where it lands on the er layer: directly,
+  through the md → er hop, inherited from its bearer, or the `md/er-unmapped` reason).
+- **"TTR: Concept hygiene report"** — a new command: the conceptual model's hygiene report (grades, groundings, the
+  hop, open tier, dangling groundings, redundant terms, phase-as-default) as a markdown preview. Definition blocks are
+  checked by `ttr cn hygiene`, not in the editor. Term forms and open-tier entries are escaped, so `*vendor*` previews
+  as written.
+- **Rename on cn, corrected.** A `concept { }` block that names a concept a cn def declares is a reference to it:
+  goto, hover, find-references and rename reach it, and a rename no longer detaches its grounding. A participant label
+  renames on its own — the written label (`Store as seller`), or ` as <new>` after a default one, plus the
+  `participants:` keys that read it — never the participant; F2 on a label no longer renames the event. A label a
+  definition block reads (`this.seller`, `as customer`) is not renamed: the editor says which definition, since it
+  does not rewrite definitions. A `concept { }`
+  block's declaring name renames its concept, and a concept rename follows `import <pkg>.<Name>`. The conflict check
+  stays in the target's namespace: concepts against the package's concepts, labels against the event's labels,
+  elements never against cn symbols (`cn.Customer` and `md.Customer` never meet). Hover, goto and rename resolve
+  through named imports, and a named concept import is no longer reported unused.
+- A `concept { }` on a measure written inline in a cubelet's `measures:` is reported (`cn-grounding-target-kind`): it
+  grounds nothing — declare the measure with `def measure`. A `concept { }` block restating its def's `period:` or
+  `lexicon { }` in another key order is no longer a `cn-duplicate-grounding`.
+
 Grammar 0.17 — the conceptual model (`model cn`).
 
 - **cn highlighting.** `cn` (and the `cn.` ref head), the concept def nouns (`kind`, `role`, `event`,

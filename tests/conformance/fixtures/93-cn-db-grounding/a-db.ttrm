@@ -1,0 +1,9 @@
+// 0.17 (CN-P2 S2.3) — `cn/db-grounding` (advisory → info): a db grounding is documentation only —
+// no consumer reaches it (cn contracts §1.2, AM-1).
+// Expected (sem): cn/db-grounding ×2 — `LoyaltyCard`'s `grounds:` and the authored `gift_card_g`.
+// Near-miss: `Store` grounds to er.
+package hartland.stores
+model db schema dbo
+
+def table loyalty_card { columns: [ def column card_no { type: text, isKey: true } ] }
+def table gift_card    { columns: [ def column card_no { type: text, isKey: true } ] }

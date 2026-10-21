@@ -241,7 +241,8 @@ class ModelIndex(
         ): ImportScope {
             if (qnameParts.size >= 2) {
                 val last = qnameParts.last()
-                val tier = parseSchemaCode(last)?.takeUnless { it == SchemaCode.AUTOMATION }
+                // Nor `cn` (grammar 0.17): the conceptual tier is not a TTR-P import scope; `x.cn` stays a package.
+                val tier = parseSchemaCode(last)?.takeUnless { it == SchemaCode.AUTOMATION || it == SchemaCode.CN }
                 if (tier != null) {
                     return ImportScope(qnameParts.dropLast(1).joinToString("."), tier, raw)
                 }

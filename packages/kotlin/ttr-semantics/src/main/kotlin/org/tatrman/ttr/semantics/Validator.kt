@@ -15,6 +15,8 @@ import org.tatrman.ttr.parser.model.SearchHintsValue
 import org.tatrman.ttr.parser.model.SourceLocation
 import org.tatrman.ttr.parser.model.TableDef
 import org.tatrman.ttr.parser.model.ViewDef
+import org.tatrman.ttr.semantics.cn.cncDeprecations
+import org.tatrman.ttr.semantics.cn.validateCn
 import org.tatrman.ttr.semantics.semanticsblock.SemanticsAnalyzer
 
 /** Lint policy from `modeler.toml` (TS `ResolvedManifest.lint`). */
@@ -48,7 +50,24 @@ data class SemanticDocument(
     val namespace: String,
     val packageName: String,
     val imports: List<ImportStatement>,
+    /** The `model` directive's span (`cn/cnc-deprecated` points at it); null when absent or unknown. */
+    val modelDirectiveSource: SourceLocation? = null,
 )
+
+/** The MD logical and binding def kinds — their cross-references are the md resolver's, not the generic one's. */
+private val MD_KINDS =
+    setOf(
+        "mdDomain",
+        "dimension",
+        "mdMap",
+        "hierarchy",
+        "measure",
+        "cubelet",
+        "md2dbCubelet",
+        "md2dbDomain",
+        "md2dbMap",
+        "md2erCubelet",
+    )
 
 /**
  * Per-kind and cross-reference validators. Ported from
@@ -192,6 +211,9 @@ class Validator(
             diagnostics += ValidationDiagnostic(d.code, severity, d.message, d.source)
         }
 
+        // 0.17 — `model cnc` and an entity's `roles:` are deprecated (cn contracts §1.6, `cn/cnc-deprecated`).
+        for (d in cncDeprecations(doc)) diagnostics += ValidationDiagnostic(d.code, d.severity, d.message, d.source)
+
         return diagnostics
     }
 
@@ -261,12 +283,15 @@ class Validator(
         val diagnostics = mutableListOf<ValidationDiagnostic>()
 
         for (collected in collectAllReferences(doc.definitions)) {
+            // MD cross-references resolve against the MD namespaces (role-aware), not the generic resolver — TS
+            // reports them in its `md-unknown-ref` rule. A cn ref in an md host's `concept { }` sugar is not one.
+            if (kindOf(collected.ownerDef) in MD_KINDS && !collected.cnContext) continue
             // No directive ⇒ schema is derived per referring def from its kind.
             val schemaCode = doc.schemaCode.ifEmpty { defaultSchemaForKind(kindOf(collected.ownerDef)) }
             val enclosingQname = enclosingQnameOf(collected.ownerDef, schemaCode, doc.namespace, doc.packageName)
             val res =
                 resolver.resolveReference(
-                    Resolver.Ref(collected.path, collected.parts),
+                    collected.toRef(),
                     ResolutionContext(
                         schemaCode = schemaCode,
                         namespace = doc.namespace,
@@ -285,7 +310,9 @@ class Validator(
                                 "Ambiguous reference: '${collected.path}' matches ${res.candidates.size} definitions via wildcard imports",
                                 res.candidates.firstOrNull()?.source ?: collected.source,
                             )
-                    } else {
+                    } else if (!collected.soft) {
+                        // A soft cn ref (a bearer-local `qualities:` / `period:` name) that names no concept is an
+                        // implicit quality, not a dangling reference.
                         diagnostics +=
                             diag(
                                 DiagnosticCode.UnresolvedReference,
@@ -319,15 +346,30 @@ class Validator(
         return diagnostics
     }
 
+    /**
+     * The project checks over [docs] — [validateProject] plus the model-level `cn/…` slugs (cn contracts §7, the
+     * portable subset; `validateCn`). [docs] are the documents the symbol table was built from, stock excluded.
+     */
+    fun validateProject(docs: List<SemanticDocument>): List<ValidationDiagnostic> =
+        validateProject() +
+            validateCn(
+                docs,
+                resolver,
+            ).diagnostics.map { ValidationDiagnostic(it.code, it.severity, it.message, it.source) }
+
     fun validateProject(): List<ValidationDiagnostic> {
         val diagnostics = mutableListOf<ValidationDiagnostic>()
 
         for (dup in symbols.duplicates()) {
             val hasInline = dup.entries.any { it.mappingSource == MappingSource.Inline }
             if (hasInline && isEr2db(dup.entries.first().kind)) continue
-            for (entry in dup.entries) {
+            // 0.17 — a concept a `concept { }` block declares where a cn def (or another block) declares it too is
+            // the sugar merge, or a second grounding: `cn/duplicate-grounding`'s, not this check's.
+            val entries = dup.entries.filter { it.cnOrigin == null }
+            if (entries.size < 2) continue
+            for (entry in entries) {
                 val others =
-                    dup.entries
+                    entries
                         .filter { !(it.documentUri == entry.documentUri && it.source.line == entry.source.line) }
                         .joinToString(", ") { "${it.documentUri}:${it.source.line}" }
                 diagnostics +=
@@ -341,6 +383,19 @@ class Validator(
 
         diagnostics += validateDuplicateBindings()
         return diagnostics
+    }
+
+    /**
+     * What an import that reaches [symbol] is matched by: for an element the key less its name, as an element's named
+     * import is written (compared by its package part). 0.17: a concept — or an event's participant label under it —
+     * is imported by package and name (`import hartland.core.Customer`), so it is that whole target: one used concept
+     * import never covers another of the same package (review-120 F12). Mirrors TS `importedTargetOf`.
+     */
+    private fun importedTargetOf(symbol: SymbolEntry): String {
+        if (symbol.schemaCode != "cn") return symbol.qname.substringBeforeLast('.')
+        val head = if (symbol.packageName.isEmpty()) "cn.concept." else "${symbol.packageName}.cn.concept."
+        val concept = symbol.qname.removePrefix(head).substringBefore('.')
+        return if (symbol.packageName.isEmpty()) concept else "${symbol.packageName}.$concept"
     }
 
     fun validateImports(doc: SemanticDocument): List<ValidationDiagnostic> {
@@ -371,9 +426,10 @@ class Validator(
         val usedTargets = mutableSetOf<String>()
         for (collected in collectAllReferences(doc.definitions)) {
             val schemaCode = doc.schemaCode.ifEmpty { defaultSchemaForKind(kindOf(collected.ownerDef)) }
+            // The ref itself: a cn slot's ref carries its context (0.17), so it resolves among concepts.
             val res =
                 resolver.resolveReference(
-                    Resolver.Ref(collected.path, collected.parts),
+                    collected.toRef(),
                     ResolutionContext(
                         schemaCode = schemaCode,
                         namespace = doc.namespace,
@@ -384,14 +440,14 @@ class Validator(
             if (res is ResolutionResult.Resolved &&
                 (res.viaStep == ResolutionStep.NamedImport || res.viaStep == ResolutionStep.WildcardImport)
             ) {
-                usedTargets += res.symbol.qname.substringBeforeLast('.')
+                usedTargets += importedTargetOf(res.symbol)
             }
         }
 
         for (imp in doc.imports) {
             if (!imp.wildcard) {
                 val pkg = packageOfImport(imp)
-                if (pkg.isNotEmpty() && pkg !in usedTargets) {
+                if (pkg.isNotEmpty() && pkg !in usedTargets && imp.target !in usedTargets) {
                     diagnostics +=
                         diag(
                             DiagnosticCode.UnusedImport,

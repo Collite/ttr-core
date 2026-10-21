@@ -1,0 +1,43 @@
+{
+    "diagnostics": [
+        "cn/ungrounded",
+        "cn/ungrounded",
+        "cn/ungrounded",
+        "cn/ungrounded"
+    ],
+    "resolved": [
+        "Party => hartland.stores.cn.concept.Party",
+        "Party => hartland.stores.cn.concept.Party",
+        "Shopper => hartland.stores.cn.concept.Shopper",
+        "Shopper => hartland.stores.cn.concept.Shopper",
+        "StoreVisit => hartland.stores.cn.concept.StoreVisit",
+        "StoreVisit => hartland.stores.cn.concept.StoreVisit",
+        "StoreVisit => hartland.stores.cn.concept.StoreVisit",
+        "cn.Brand => hartland.stores.cn.concept.Brand",
+        "er.entity.brand => hartland.stores.er.entity.brand",
+        "er.entity.store => hartland.stores.er.entity.store"
+    ],
+    "symbols": [
+        "hartland.stores.binding.cn2er_kind.Region.concept",
+        "hartland.stores.binding.cn2er_kind.Store.grounds",
+        "hartland.stores.binding.cn2er_kind.brand_g",
+        "hartland.stores.cn.concept.Brand",
+        "hartland.stores.cn.concept.Party",
+        "hartland.stores.cn.concept.PremiumParty",
+        "hartland.stores.cn.concept.Region",
+        "hartland.stores.cn.concept.Regular",
+        "hartland.stores.cn.concept.Shopper",
+        "hartland.stores.cn.concept.Store",
+        "hartland.stores.cn.concept.StoreVisit",
+        "hartland.stores.cn.concept.StoreVisit.shopper",
+        "hartland.stores.cn.concept.basket_size",
+        "hartland.stores.cn.concept.basket_value",
+        "hartland.stores.cn.concept.refers",
+        "hartland.stores.er.entity.brand",
+        "hartland.stores.er.entity.brand.brand_code",
+        "hartland.stores.er.entity.region",
+        "hartland.stores.er.entity.region.region_code",
+        "hartland.stores.er.entity.store",
+        "hartland.stores.er.entity.store.store_id"
+    ]
+}

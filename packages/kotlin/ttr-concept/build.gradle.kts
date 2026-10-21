@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ktlint)
     `java-library`
+    application
     `maven-publish`
     alias(libs.plugins.maven.publish.vanniktech)
 }
@@ -23,14 +24,35 @@ tasks.test {
 dependencies {
     // api: the `statement.v1` / `assertion.v1` / `concept.v1` messages are in ConceptService's signatures.
     api(project(":packages:kotlin:ttr-plan-proto"))
-    // The typed model (CnModel lands in CN-P2 S2.5), the md lowering chain, and the er renderer's dialects.
-    implementation(project(":packages:kotlin:ttr-metadata"))
+    // The typed model (`CnSchema`, CN-P2 S2.5) — api: `Via` and `GroundingGrade` live there and are in this module's
+    // public types (aliases in Results.kt). Then the md lowering chain and the er renderer's dialects.
+    api(project(":packages:kotlin:ttr-metadata"))
+    // TTRP 0.5 (CN-P2 S2.6, CN-D29): a `definition:` / `members:` / `filter:` block is a TTR-P expression; the parsed
+    // tree is in this module's public types (`CnDefinition.expression`). No cycle: ttrp-frontend depends on
+    // ttr-metadata, never on ttr-concept.
+    api(project(":packages:kotlin:ttrp-frontend"))
+    // The hygiene report (CN-P2 S2.7): the lexicon's collision fold (`TermNormalizer.fold`, the one the runtime index
+    // folds by) for redundant terms and phase-as-default; its JSON rendering is kotlinx (api — `HygieneRender.json`).
+    implementation(project(":packages:kotlin:ttr-lexicon"))
+    api(libs.kotlinx.ser.json)
+    // `ttr cn hygiene` (the house `ttr <verb>` pattern — ttr-import-schema, ttr-security-gen).
+    implementation(libs.clikt)
     implementation(project(":packages:kotlin:ttr-md-resolver"))
     implementation(project(":packages:kotlin:ttrp-emit"))
     implementation(project(":packages:kotlin:ttr-translator")) // dialects only (definition_render(er) targets)
 
     testImplementation(libs.bundles.kotest)
 }
+
+// CN-P2 S2.7 — `ttr cn hygiene <dir> [--format text|json] [--fail-on error|warning]` (`ttr cn materialize` joins it at
+// CN-P3). It ships when this module first publishes (CN-P3 S3.1); until then `just cn-hygiene <dir>` runs it from the
+// repo, with paths relative to the repo root.
+application {
+    applicationName = "ttr"
+    mainClass = "org.tatrman.concept.cli.MainKt"
+}
+
+tasks.named<JavaExec>("run") { workingDir = rootDir }
 
 // CN-P0 S0.4 T1 (architecture §7, the RG-P5 pattern) — the ZERO-LLM rule made mechanical, at BUILD time: fail
 // `check` if this module's runtimeClasspath resolves any LLM, gateway or kantheon artifact, or an HTTP client

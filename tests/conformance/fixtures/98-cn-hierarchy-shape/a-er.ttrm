@@ -1,0 +1,36 @@
+// 0.17 (CN-P2 S2.3) — `cn/hierarchy-shape` (error, cn contracts §1.2): a grounding's `hierarchy:`
+// closure entity must carry the two attributes it names, and a key.
+// Expected (sem): cn/hierarchy-shape ×3 — `Department` (its closure has no key), `Region` (no
+// `descendant:`), `brand_g` (the closure has no `child_code`; also ttr/unresolved-reference ×1, the
+// generic check). Near-miss: `ProductCategory`.
+package hartland.stores
+model er
+
+def entity category_code { attributes: [ def attribute code { type: text, isKey: true } ] }
+def entity category_closure {
+    attributes: [
+        def attribute ancestor_code   { type: text, isKey: true },
+        def attribute descendant_code { type: text, isKey: true }
+    ]
+}
+def entity department { attributes: [ def attribute department_code { type: text, isKey: true } ] }
+def entity department_closure {
+    attributes: [
+        def attribute ancestor_code   { type: text },
+        def attribute descendant_code { type: text }
+    ]
+}
+def entity region { attributes: [ def attribute region_code { type: text, isKey: true } ] }
+def entity region_closure {
+    attributes: [
+        def attribute parent_code { type: text, isKey: true },
+        def attribute child_code  { type: text, isKey: true }
+    ]
+}
+def entity brand { attributes: [ def attribute brand_code { type: text, isKey: true } ] }
+def entity brand_closure {
+    attributes: [
+        def attribute ancestor_code   { type: text, isKey: true },
+        def attribute descendant_code { type: text, isKey: true }
+    ]
+}

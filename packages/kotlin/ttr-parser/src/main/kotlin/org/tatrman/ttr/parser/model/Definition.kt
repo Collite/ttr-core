@@ -245,6 +245,10 @@ data class LexiconBlock(
     val terms: List<String> = emptyList(),
     val patterns: List<String> = emptyList(),
     val examples: List<String> = emptyList(),
+    /** Grammar 0.17 — `default: true|false` beside the shorthands (cn contracts §1.5); null when absent. */
+    val default: Boolean? = null,
+    /** Grammar 0.17 — `sense_priority: <n>` beside the shorthands; null when absent. */
+    val sensePriority: Double? = null,
 )
 
 /**

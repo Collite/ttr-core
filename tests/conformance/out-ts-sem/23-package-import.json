@@ -1,5 +1,6 @@
 {
     "diagnostics": [
+        "cn/cnc-deprecated",
         "ttr/unused-import",
         "ttr/wildcard-with-no-matches"
     ],

@@ -1,0 +1,43 @@
+{
+    "diagnostics": [
+        "cn/role-no-event",
+        "cn/role-no-event"
+    ],
+    "resolved": [
+        "Party => hartland.stores.cn.concept.Party",
+        "Party => hartland.stores.cn.concept.Party",
+        "Party => hartland.stores.cn.concept.Party",
+        "Party => hartland.stores.cn.concept.Party",
+        "Party => hartland.stores.cn.concept.Party",
+        "StoreVisit => hartland.stores.cn.concept.StoreVisit",
+        "StoreVisit => hartland.stores.cn.concept.StoreVisit",
+        "er.entity.party => hartland.stores.er.entity.party",
+        "er.entity.party => hartland.stores.er.entity.party",
+        "er.entity.party => hartland.stores.er.entity.party",
+        "er.entity.store_visit => hartland.stores.er.entity.store_visit"
+    ],
+    "symbols": [
+        "hartland.stores.binding.cn2er_event.StoreVisit.grounds",
+        "hartland.stores.binding.cn2er_kind.Party.grounds",
+        "hartland.stores.binding.cn2er_role.Guest.grounds",
+        "hartland.stores.binding.cn2er_role.Holder.concept",
+        "hartland.stores.binding.cn2er_role.Member.concept",
+        "hartland.stores.binding.cn2er_role.Visitor.grounds",
+        "hartland.stores.cn.concept.Guest",
+        "hartland.stores.cn.concept.Holder",
+        "hartland.stores.cn.concept.Member",
+        "hartland.stores.cn.concept.Party",
+        "hartland.stores.cn.concept.StoreVisit",
+        "hartland.stores.cn.concept.StoreVisit.party",
+        "hartland.stores.cn.concept.Visitor",
+        "hartland.stores.er.entity.loyalty_card",
+        "hartland.stores.er.entity.loyalty_card.card_no",
+        "hartland.stores.er.entity.membership",
+        "hartland.stores.er.entity.membership.member_no",
+        "hartland.stores.er.entity.party",
+        "hartland.stores.er.entity.party.party_id",
+        "hartland.stores.er.entity.store_visit",
+        "hartland.stores.er.entity.store_visit.visit_id",
+        "hartland.stores.er.entity.store_visit.visited_at"
+    ]
+}

@@ -3,6 +3,32 @@
 All notable changes to `ttr-parser` (Python) are documented here. While
 `< 1.0.0`, minor bumps may introduce breaking changes (see each entry).
 
+## 0.17.1 — unreleased
+
+- **The cn semantics (CN-P2 S2.4; code only).** `ttr_parser.semantics` resolves, desugars and checks the conceptual
+  model as the TS and Kotlin twins do (conformance `out-ts-sem` 01–106 byte-identical): `cn` is a model code; a
+  concept keys `<pkg>.cn.concept.<Name>`, a binding by its keyword, an event's participant labels as children; a cn
+  slot or a `cn.`-headed ref resolves among concepts only, an element ref never reaches a concept. `grounds:` and
+  `concept { }` desugar to canonical groundings (`<Concept>.grounds` / `<Concept>.concept`), one per concept (the
+  merge rule), and the 14 portable `cn/*` slugs plus `ttr/required-property-missing` for a quality or phase with no
+  `of:` (TS's lint rule `concept-bearer-missing`) (`semantics.cn.validate_cn`, run by the project validator);
+  `cn/cnc-deprecated` per document. `db.dbo.cn.x` names a column `cn` (a model code is stripped after the package only
+  when none led). The md hosts gain the identity-level cross-references the cn fixtures exercise (no md model).
+- **Resolution: the slot-filling fallback (ttr-core#228).** `Resolver.resolve_reference` tries a written form as an
+  exact key first, then reads the reference into its slots and looks for its name path in the reference's package and
+  model (its kind too, when written; for `db` its schema — written, else the file's), then in its model, then anywhere,
+  as TS does (less the manifest's default schemas) — so `er.entity.store` names the referring package's `store` when
+  another package declares one, `md.revenue` the md measure beside a lexicon term `revenue`, and `db.Orders.x` in a
+  `schema dbo` file dbo's table (all were `ttr/unresolved-reference`); several candidates in a scope are
+  `ttr/ambiguous-reference`.
+- **The sugar merge rule** compares an object's entries by key, in any order, and a `lexicon { }` block by its five
+  known keys: `LexiconBlock` gains `default` and `sense_priority` (it fingerprinted the block's `repr` and missed
+  both). `CubeletDef.inline_measure_concepts` keeps the `concept { }` of each inline measure, which cn semantics
+  reports as `cn/grounding-target-kind` (it grounds nothing; it was dropped).
+- `ttr/unused-import` keeps a concept reference's cn context and compares the concept's package — a named concept
+  import used from a cn slot was reported unused. A concept a `concept { }` block alone declares is located at its
+  name.
+
 ## 0.17.0 — unreleased
 
 - **Grammar 0.17 (additive) — the conceptual model (CN-P1).** `model cn`: `ConceptDef` (`kind =
