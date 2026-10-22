@@ -318,7 +318,7 @@
       "patterns": [
         {
           "name": "keyword.other.kind.ttrm",
-          "match": "\\b(project|area|map|table|view|column|index|constraint|fk|procedure|entity|attribute|relation|er2db_entity|er2db_attribute|er2db_relation|role|er2cnc_role|drill_map|domain|dimension|hierarchy|measure|cubelet|md2db_cubelet|md2db_domain|md2db_map|md2er_cubelet|engine|executor|storage|parameter|action|service|approval|program|recipe|identity|deployment|process|step|event|phase|quality|relation_type|cn2md_kind|cn2md_role|cn2md_quality|cn2md_event|cn2er_kind|cn2er_role|cn2er_event|cn2er_quality|cn2er_phase|cn2db_concept|term|pattern|example)\\b"
+          "match": "\\b(project|area|map|table|view|column|index|constraint|fk|procedure|entity|attribute|relation|er2db_entity|er2db_attribute|er2db_relation|role|er2cnc_role|drill_map|domain|dimension|hierarchy|measure|cubelet|md2db_cubelet|md2db_domain|md2db_map|md2er_dimension|md2er_cubelet|engine|executor|storage|parameter|action|service|approval|program|recipe|identity|deployment|process|step|event|phase|quality|relation_type|cn2md_kind|cn2md_role|cn2md_quality|cn2md_event|cn2er_kind|cn2er_role|cn2er_event|cn2er_quality|cn2er_phase|cn2db_concept|term|pattern|example)\\b"
         }
       ]
     },

@@ -76,6 +76,7 @@ const KIND_KEYWORD: Record<string, string> = {
   md2dbDomain: 'md2db_domain',
   md2dbMap: 'md2db_map',
   md2erCubelet: 'md2er_cubelet',
+  md2erDimension: 'md2er_dimension',
 };
 
 export function dump(result: ParseResult): string {
@@ -324,6 +325,18 @@ function propsOf(d: Definition): { [k: string]: Json } {
       break;
     // 0.17 — the md hosts of the `concept { }` sugar. The md kinds dump no other property (they never
     // did); `concept` is present-only, so every pre-0.17 md fixture dumps unchanged.
+    case 'md2erDimension':
+      if (d.dimensionRef) set('dimension', d.dimensionRef);
+      if (d.entity) set('entity', d.entity);
+      if (Object.keys(d.attributes).length) set('attributes', d.attributes);
+      break;
+    case 'md2erCubelet':
+      if (d.cubeletRef) set('cubelet', d.cubeletRef);
+      if (d.entity) set('target', d.entity);
+      if (Object.keys(d.attributes).length) set('attributes', d.attributes);
+      if (d.measures && Object.keys(d.measures).length) set('measures', d.measures);
+      set('physicalProps', d.physicalProps);
+      break;
     case 'cubelet':
     case 'dimension':
     case 'mdDomain':

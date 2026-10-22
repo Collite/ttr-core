@@ -11,6 +11,12 @@ package org.tatrman.ttr.parser.diagnostics
 enum class DiagnosticCode(
     val id: String,
 ) {
+    MdMd2erPhysicalProp("md/md2er-physical-prop"),
+    MdMd2erReference("md/md2er-reference"),
+    MdMd2erDimensionKey("md/md2er-dimension-key"),
+    MdMd2erPathAmbiguous("md/md2er-path-ambiguous"),
+    MdMd2erMeasureUnknown("md/md2er-measure-unknown"),
+    MdDuplicateBinding("md/duplicate-binding"),
     ParseError("ttr/parse-error"),
     ParseRecoveryInfo("ttr/parse-recovery-info"),
     UnknownProperty("ttr/unknown-property"),

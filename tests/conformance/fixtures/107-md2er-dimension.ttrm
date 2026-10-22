@@ -1,0 +1,6 @@
+model binding
+def md2er_dimension customer_hop {
+  description: "The customer's ER landing", tags: ["structural"],
+  dimension: md.Customer, entity: er.entity.customer,
+  attributes: { code: sk, state: address.state }
+}

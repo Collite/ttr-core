@@ -1,0 +1,7 @@
+package base
+model md
+def domain Code { type: string }
+def dimension Customer { key: code, attributes: [def attribute code { domain: md.Code }] }
+def dimension CustomerEast { key: code, attributes: [def attribute code { domain: md.Code }] }
+def dimension CustomerHidden { key: code, attributes: [def attribute code { domain: md.Code }] }
+def dimension CustomerNamed { key: code, attributes: [def attribute code { domain: md.Code }] }

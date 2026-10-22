@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { DiagnosticCode } from '@tatrman/parser';
 import type { Definition } from '@tatrman/parser';
-import { defaultSchemaForKind, packageOfImport, type SymbolEntry } from '@tatrman/semantics';
+import { defaultSchemaForKind, packageOfImport, buildMdErRelationIndex, mdErUsedRelations, type CnDocument, type SymbolEntry } from '@tatrman/semantics';
 import { removeLineEdit } from '@tatrman/edit';
 import type { DocumentRuleContext, Rule } from '../rule.js';
 
@@ -79,6 +79,13 @@ function usedTargets(ctx: DocumentRuleContext): Set<string> {
   const packageName = ast.packageDecl?.name ?? '';
   const imports = ast.imports ?? [];
   const used = new Set<string>();
+  if (ast.definitions.some(def => def.kind === 'md2erDimension') && imports.some(imp => !imp.wildcard)) {
+    const docs: CnDocument[] = [...ctx.symbols.documentAsts()].map(([uri, ast]) => ({
+      uri, ast, ...(ctx.symbols.documentContext(uri) ?? { schemaCode: '', namespace: '', packageName: '' }),
+    }));
+    const doc = docs.find(doc => doc.uri === ctx.uri);
+    if (doc) for (const relation of mdErUsedRelations(buildMdErRelationIndex(docs, ctx.resolver), doc, ctx.resolver)) used.add(relation);
+  }
   for (const { ref, ownerDef } of ctx.refs) {
     const schemaCode = directiveSchema ?? defaultSchemaForKind((ownerDef as Definition).kind);
     // The ref itself: a cn slot's ref carries its context (0.17), so it resolves among concepts.

@@ -100,6 +100,8 @@ from ttr_parser.model import (
     ConceptValueSpace,
     ConstraintDef,
     CubeletDef,
+    Md2erCubeletDef,
+    Md2erDimensionDef,
     DimensionDef,
     EmbeddedBlock,
     MdDomainDef,
@@ -185,6 +187,8 @@ KIND_KEYWORD: dict[str, str] = {
     "dimension": "dimension",
     "measure": "measure",
     "cubelet": "cubelet",
+    "md2er_dimension": "md2er_dimension",
+    "md2er_cubelet": "md2er_cubelet",
 }
 
 
@@ -371,6 +375,21 @@ def _properties(d: Definition) -> dict[str, Any]:
     if isinstance(d, (ConceptDef, ConceptBindingDef)):
         return _concept_props(d.body, with_common=False)
     # 0.17 — the md hosts of the `concept { }` sugar dump no other property (the md kinds never did).
+    if isinstance(d, (Md2erDimensionDef, Md2erCubeletDef)):
+        md_er: dict[str, Any] = {}
+        md_ref = d.dimension_ref if isinstance(d, Md2erDimensionDef) else d.cubelet_ref
+        if md_ref:
+            md_er["dimension" if isinstance(d, Md2erDimensionDef) else "cubelet"] = md_ref.path
+        if d.entity:
+            md_er["entity" if isinstance(d, Md2erDimensionDef) else "target"] = d.entity.path
+        if d.attributes:
+            md_er["attributes"] = dict(d.attributes)
+        if isinstance(d, Md2erCubeletDef):
+            if d.measures:
+                md_er["measures"] = dict(d.measures)
+            if d.physical_props:
+                md_er["physicalProps"] = list(d.physical_props)
+        return md_er
     if isinstance(d, (MdDomainDef, DimensionDef, MeasureDef, CubeletDef)):
         md: dict[str, Any] = {}
         _set_concept(md, d.concept)

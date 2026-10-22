@@ -1,0 +1,4 @@
+model er
+def entity customer { attributes: [def attribute sk { type: int }, def attribute amount { type: decimal }] }
+def entity addr { attributes: [def attribute state { type: text }] }
+def relation address { from: er.entity.customer, to: er.entity.addr, cardinality: { from: "N", to: "1" } }

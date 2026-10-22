@@ -1,0 +1,5 @@
+model binding
+def md2er_dimension md2er_dimension {
+    dimension: md.md2er_dimension, entity: er.entity.md2er_dimension,
+    attributes: { md2er_dimension: md2er_dimension }
+}

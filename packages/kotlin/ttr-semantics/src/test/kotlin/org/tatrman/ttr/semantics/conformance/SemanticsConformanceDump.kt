@@ -118,7 +118,7 @@ object SemanticsConformanceDump {
             diagnostics +=
                 (
                     validator.validateDocument(m.doc) + validator.validateReferences(m.doc) +
-                        validator.validateImports(m.doc)
+                        validator.validateImports(m.doc, metas.map { it.doc })
                 ).map { it.code.id }.filter(::isPortable)
         }
         // validateProject() is project-global — run once across all documents (0.17: the cn checks with it).

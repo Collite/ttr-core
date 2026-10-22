@@ -1,7 +1,9 @@
 // =============================================================================
 // TTR (Tatrman) grammar
 //
-// @grammar-version: 0.17
+// @grammar-version: 0.18
+// 0.18 (HP-P1): md2er_dimension; structural md2er_cubelet measures.
+// Every previously-valid file parses unchanged.
 //
 // Version scheme: X.Y — X is a breaking/major change, Y is additive
 // (syntactic sugar, new optional constructs, bug fixes). Bump the marker
@@ -516,6 +518,7 @@ objectDefinition
   | MD2DB_CUBELET  id  md2dbCubeletDef    // 3.1
   | MD2DB_DOMAIN   id  md2dbDomainDef     // 3.1
   | MD2DB_MAP      id  md2dbMapDef        // 3.1
+  | MD2ER_DIMENSION id md2erDimensionDef
   | MD2ER_CUBELET  id  md2erCubeletDef    // 3.1 — structural-only
   // ----- v4.1 world model — the ONLY top-level world def kind (ttr-metadata M0) -----
   // engine/executor/storage/world-schema are meaningless outside `def world`, so
@@ -589,6 +592,7 @@ cubeletDef       : LBRACE (cubeletProperty       (COMMA? cubeletProperty)*      
 md2dbCubeletDef  : LBRACE (md2dbCubeletProperty  (COMMA? md2dbCubeletProperty)*  COMMA?)? RBRACE ;
 md2dbDomainDef   : LBRACE (md2dbDomainProperty   (COMMA? md2dbDomainProperty)*   COMMA?)? RBRACE ;
 md2dbMapDef      : LBRACE (md2dbMapProperty      (COMMA? md2dbMapProperty)*      COMMA?)? RBRACE ;
+md2erDimensionDef : LBRACE (md2erDimensionProperty (COMMA? md2erDimensionProperty)* COMMA?)? RBRACE ;
 md2erCubeletDef  : LBRACE (md2erCubeletProperty  (COMMA? md2erCubeletProperty)*  COMMA?)? RBRACE ;
 
 // v4.4 lexicon model — one shared body for term/pattern/example (permissive
@@ -846,9 +850,10 @@ cubeletProperty      : descriptionProperty | tagsProperty | grainProperty | meas
 md2dbCubeletProperty : descriptionProperty | tagsProperty | cubeletRefProperty | targetProperty | shapeProperty | attributesMapProperty | measuresMapProperty | journalingProperty | allocationProperty ;
 md2dbDomainProperty  : descriptionProperty | tagsProperty | domainRefProperty | sourceProperty ;
 md2dbMapProperty     : descriptionProperty | tagsProperty | mapRefProperty | targetProperty | columnsMapProperty ;
-// Structurally md2er is attributes-only; the physical props (shape/measures/
-// journaling) are accepted here as a permissive superset and REJECTED in
+// MD to ER maps attributes and measures structurally. Physical shape, allocation and
+// journaling are accepted here as a permissive superset and REJECTED in
 // semantics (md/md2er-physical-prop) — the "parser stays mechanical" invariant.
+md2erDimensionProperty : descriptionProperty | tagsProperty | dimensionRefProperty | entityProperty_ | attributesMapProperty ;
 md2erCubeletProperty : descriptionProperty | tagsProperty | cubeletRefProperty | targetProperty | attributesMapProperty | shapeProperty | measuresMapProperty | journalingProperty | allocationProperty ;
 
 // MD property productions. `kind`/`class` values are bare ids validated in
@@ -1276,7 +1281,7 @@ idPart
   | AREA                                            // v3.0 subject area
   | MD                                              // v3.1 schema code
   | DOMAIN | DIMENSION | HIERARCHY | MEASURE | CUBELET          // v3.1 def kinds (MAP already present)
-  | MD2DB_CUBELET | MD2DB_DOMAIN | MD2DB_MAP | MD2ER_CUBELET    // v3.1 binding kinds
+  | MD2DB_CUBELET | MD2DB_DOMAIN | MD2DB_MAP | MD2ER_CUBELET | MD2ER_DIMENSION    // v3.1 binding kinds
   | RESTRICT | MEMBERS | KIND | CALC | KEY | HIERARCHIES        // v3.1 body keywords
   | PUBLISH                                                     // MD dot-path §1.4 (cross-ref safe)
   | LEVELS | VIA | CLASS | AGGREGATION | VALID_BY | GRAIN
@@ -1369,6 +1374,7 @@ CUBELET          : 'cubelet' ;         // v3.1 (also the `cubelet:` prop keyword
 MD2DB_CUBELET    : 'md2db_cubelet' ;   // v3.1
 MD2DB_DOMAIN     : 'md2db_domain' ;    // v3.1
 MD2DB_MAP        : 'md2db_map' ;       // v3.1
+MD2ER_DIMENSION  : 'md2er_dimension' ; // 0.18
 MD2ER_CUBELET    : 'md2er_cubelet' ;   // v3.1
 // v3.1 MD model — body property keywords (enum/string VALUES stay un-minted ids,
 // validated in semantics, e.g. `kind: calc`, `journaling: overwrite`).

@@ -216,20 +216,42 @@ def md2db_map cc_building_map {
 `md2db_map` on a calc map is `md/binding-on-calc-map`; `columns` must cover every
 `from`/`to` domain (`md/map-columns-incomplete`).
 
-### `md2er_cubelet` — structural only
+### The md → er hop: what you pin, what is derived
 
-A read-oriented md→er binding is **structural only** — it maps grain attributes
-to ER attributes and carries no physical shape/journaling/measures:
+`md2er_cubelet` pins a cubelet's ER entity, grain attributes and structural measures:
 
 ```ttrm
+model binding
 def md2er_cubelet sales_er {
   cubelet: md.sales,
   target: er.entity.Sale,
-  attributes: { Customer.code: customerCode, Time.day: saleDate }
+  attributes: { Customer.code: customerCode, Time.day: saleDate },
+  measures: { revenue: amount }
 }
 ```
 
-A physical prop here is `md/md2er-physical-prop`.
+`md2er_dimension` pins a dimension and its attributes. Its attribute map must include the dimension's key:
+
+```ttrm
+def md2er_dimension customer_er {
+  dimension: md.Customer,
+  entity: er.entity.customer,
+  attributes: { code: sk, state: address.state }
+}
+```
+
+A plain value names an attribute of `entity:`. `address.state` traverses the outgoing ER relation
+named `address` and selects its target's `state` attribute. Exactly one relation must match;
+multiple matching paths are `md/md2er-path-ambiguous`. A missing dimension key is
+`md/md2er-dimension-key`; a measure mapping to an unknown target attribute is
+`md/md2er-measure-unknown`. On a dimension binding, `md/md2er-reference` checks the dimension, entity and both sides of each attribute map. On a cubelet binding it also requires `cubelet:` and checks that each measure belongs to that cubelet. There is one explicit binding per dimension (`md/duplicate-binding`).
+
+Both bindings are structural. Physical `shape`, `journaling` and `allocation` on a cubelet binding
+remain `md/md2er-physical-prop`. A domain is a value type; it has no explicit `md2er_domain` form.
+
+The formatter orders documentation, tags, dimension/cubelet, entity/target, attributes, then measures.
+It preserves bindings with comments or refused physical fields verbatim. Physical derivation is the
+next hop phase; this grammar cut supplies the explicit overrides it needs.
 
 ---
 

@@ -1,0 +1,4 @@
+model binding
+def md2er_dimension p { entity: er.entity.x }
+def md2er_cubelet q { target: er.entity.x, measures: { m: a } }
+def md2er_cubelet invalid_values { cubelet: md.sales, target: er.entity.x, attributes: { code: 1 }, measures: { m: false } }

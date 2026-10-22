@@ -199,7 +199,7 @@ lint-py module="":
         exit 0
     fi
     path=$(just _resolve "{{module}}")
-    cd "$path" && uv run ruff check .
+    cd "$path" && uv run --extra dev ruff check .
 
 # Sync (install) every Python package's frozen lock, or one.
 build-py module="":
@@ -222,12 +222,20 @@ test-py module="":
         exit 0
     fi
     path=$(just _resolve "{{module}}")
-    cd "$path" && uv run pytest
+    cd "$path" && uv run --extra dev python -m pytest
 
 # ── Conformance (TS ⟷ Kotlin ⟷ Python grammar parity) ───────────────────────────
 
+# Requires the built TS workspace; compare AST and semantics on all three runtimes.
 conformance:
-    pnpm --filter @tatrman/integration-tests run conformance
+    pnpm --filter @tatrman/conformance dump-all
+    ./gradlew :packages:kotlin:ttr-parser:test :packages:kotlin:ttr-semantics:test --tests '*ConformanceSpec' --rerun-tasks
+    pnpm --filter @tatrman/conformance diff
+    pnpm --filter @tatrman/conformance diff-sem
+    env PYTHONPATH=packages/python/ttr-parser/src uv run --project packages/python/ttr-parser python tests/conformance/dump.py
+    env PYTHONPATH=packages/python/ttr-parser/src uv run --project packages/python/ttr-parser python tests/conformance/dump_sem.py
+    diff -ru tests/conformance/out-ts tests/conformance/out-py
+    diff -ru tests/conformance/out-ts-sem tests/conformance/out-py-sem
 
 # ── Conceptual model (cn) ───────────────────────────────────────────────────────
 
@@ -641,7 +649,7 @@ publish *args:
             #
             # JOINED at CN-P3 S3.1 (A-CN-1): ttr-concept — the cn layer; the ttrp-emit closure again.
             PREFIX=grammar
-            DESC="org.tatrman:{ttr-parser, ttr-writer, ttr-semantics, ttr-metadata, ttr-metadata-git, ttr-snapshot, ttr-md-resolver, ttr-lexicon, ttr-lexicon-compile, ttr-lexicon-cli, ttrp-frontend, ttrp-graph, ttrp-emit, ttrp-emit-spi, ttrp-conform, ttrp-cli (+dist zip), ttr-emit-bash, ttr-emit-kestra, ttr-emit-airflow3, ttr-concept} — ttr-translator pinned to its latest tag" ;;
+            DESC="org.tatrman:{ttr-parser, ttr-writer, ttr-semantics, ttr-metadata, ttr-metadata-git, ttr-snapshot, ttr-md-resolver, ttr-lexicon, ttr-lexicon-compile, ttr-lexicon-cli, ttr-metadata-cli (+dist zip), ttrp-frontend, ttrp-graph, ttrp-emit, ttrp-emit-spi, ttrp-conform, ttrp-cli (+dist zip), ttr-emit-bash, ttr-emit-kestra, ttr-emit-airflow3, ttr-concept} — ttr-translator pinned to its latest tag" ;;
         "bundle metadata")
             echo "❌ The 'metadata' bundle no longer exists — it was folded into 'grammar' on 2026-07-30." >&2
             echo "   ttr-metadata \`api\`s the grammar artifacts, so the two MUST share a version;" >&2

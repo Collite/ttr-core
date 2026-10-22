@@ -1,0 +1,13 @@
+model binding
+def md2er_dimension good { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk, state: address.state } }
+def md2er_dimension missing_key { dimension: md.Customer, entity: er.entity.customer, attributes: {} }
+def md2er_cubelet measure { cubelet: md.sales, target: er.entity.customer, measures: { revenue: unknown } }
+def md2er_cubelet typo { cubelet: md.sales, target: er.entity.customer, measures: { revnue: amount } }
+def md2er_cubelet foreign_measure { cubelet: md.sales, target: er.entity.customer, measures: { bonus: amount } }
+def md2er_cubelet missing_cubelet { target: er.entity.customer, measures: { revenue: amount } }
+def md2er_cubelet unknown_cubelet { cubelet: md.salez, target: er.entity.customer }
+def md2er_cubelet bad_grain { cubelet: md.sales, target: er.entity.customer, attributes: { Customer.bogus: absent } }
+def md2er_dimension unknown_attribute { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk, bogus: sk } }
+def md2er_dimension wrong_kind_a { dimension: md.sales, entity: er.entity.customer, attributes: {} }
+def md2er_dimension wrong_kind_b { dimension: md.sales, entity: er.entity.customer, attributes: {} }
+def md2er_cubelet wrong_target { cubelet: md.sales, target: db.dbo.sales, measures: { revenue: amount } }

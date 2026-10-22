@@ -2,6 +2,7 @@
 package org.tatrman.ttr.writer
 
 import org.tatrman.ttr.parser.loader.ParseResult
+import org.tatrman.ttr.parser.loader.TtrId
 import org.tatrman.ttr.parser.model.AttributeDef
 import org.tatrman.ttr.parser.model.ColumnDef
 import org.tatrman.ttr.parser.model.ConceptBindingDef
@@ -30,6 +31,8 @@ import org.tatrman.ttr.parser.model.LexiconBlock
 import org.tatrman.ttr.parser.model.MdDomainDef
 import org.tatrman.ttr.parser.model.MdMapDef
 import org.tatrman.ttr.parser.model.Md2dbCubeletDef
+import org.tatrman.ttr.parser.model.Md2erCubeletDef
+import org.tatrman.ttr.parser.model.Md2erDimensionDef
 import org.tatrman.ttr.parser.model.MeasureColumnBinding
 import org.tatrman.ttr.parser.model.MeasureDef
 import org.tatrman.ttr.parser.model.ShapeSpec
@@ -98,6 +101,8 @@ object TtrRenderer {
             MeasureDef::class,
             CubeletDef::class,
             Md2dbCubeletDef::class,
+            Md2erCubeletDef::class,
+            Md2erDimensionDef::class,
             // Grammar 0.16 — the automation kinds (one class; ordered by kind then name below).
             AutomationDef::class,
             // Grammar 0.17 — the conceptual model: the concepts (every stereotype one class), then the bindings.
@@ -210,6 +215,32 @@ object TtrRenderer {
             is MeasureDef -> renderMeasure(def)
             is CubeletDef -> renderCubelet(def)
             is Md2dbCubeletDef -> renderMd2dbCubelet(def)
+            is Md2erDimensionDef ->
+                renderMdEr(
+                    "md2er_dimension",
+                    def.name,
+                    def.description,
+                    def.descriptionLocalized,
+                    def.tags,
+                    "dimension",
+                    def.dimensionRef?.path,
+                    def.entity?.path,
+                    def.attributes,
+                    emptyMap(),
+                )
+            is Md2erCubeletDef ->
+                renderMdEr(
+                    "md2er_cubelet",
+                    def.name,
+                    def.description,
+                    def.descriptionLocalized,
+                    def.tags,
+                    "cubelet",
+                    def.cubeletRef?.path,
+                    def.entity?.path,
+                    def.attributes,
+                    def.measures,
+                )
             // Grammar 0.17 — the conceptual model.
             is ConceptDef -> renderConceptDef(def)
             is ConceptBindingDef -> renderConceptBinding(def)
@@ -227,7 +258,7 @@ object TtrRenderer {
     private fun renderWorld(def: WorldDef): String {
         val sb = StringBuilder("def world ${def.name} {")
         renderDescriptionIfAny(def.description, def.descriptionLocalized)?.let { sb.append(it) }
-        renderTagsIfAny(def.tags)?.let { sb.append(" $it,") }
+        renderTagsIfAny(def.tags)?.let { sb.append(" $it") }
         def.extends?.let { sb.append(" extends: $it,") }
         for (e in def.engines) {
             sb.append(" ").append(
@@ -352,7 +383,7 @@ object TtrRenderer {
         version?.let { sb.append(" version: ${renderString(it)},") }
         extends?.let { sb.append(" extends: $it,") }
         renderDescriptionIfAny(description, descriptionLocalized)?.let { sb.append(it) }
-        renderTagsIfAny(tags)?.let { sb.append(" $it,") }
+        renderTagsIfAny(tags)?.let { sb.append(" $it") }
         for ((k, v) in manifest) sb.append(" $k: ${renderPropertyValue(v)},")
         sb.append(" }")
         return sb.toString()
@@ -366,7 +397,7 @@ object TtrRenderer {
         if (s.staging) sb.append(" staging: true,")
         s.extends?.let { sb.append(" extends: $it,") }
         renderDescriptionIfAny(s.description, s.descriptionLocalized)?.let { sb.append(it) }
-        renderTagsIfAny(s.tags)?.let { sb.append(" $it,") }
+        renderTagsIfAny(s.tags)?.let { sb.append(" $it") }
         for (sc in s.schemas) sb.append(" ").append(renderWorldSchema(sc))
         for ((k, v) in s.manifest) sb.append(" $k: ${renderPropertyValue(v)},")
         sb.append(" }")
@@ -1285,6 +1316,44 @@ object TtrRenderer {
             "tagged" -> "\"\"\"${b.language}\n${b.text}\n\"\"\""
             else -> "\"\"\"\n${b.text}\"\"\""
         }
+
+    /**
+     * Structural MD/ER bindings: documentation, tags, owner, entity, attributes, then measures.
+     * Physical props are errors represented only by their names in the AST and are not rendered.
+     * Empty map values (including values lost from non-string/non-id source forms) are omitted;
+     * the writer has no source to recover them. Keys must be grammar ids; invalid programmatic keys
+     * are omitted because the grammar does not permit quoted object keys. Values are quoted as needed.
+     */
+    private fun renderMdEr(
+        kind: String,
+        name: String,
+        description: String?,
+        localized: LocalizedStringValue,
+        tags: List<String>,
+        slot: String,
+        md: String?,
+        entity: String?,
+        attributes: Map<String, String>,
+        measures: Map<String, String>,
+    ): String {
+        val parts = mutableListOf<String>()
+        renderDescriptionValue(description, localized)?.let { parts += "description: $it" }
+        renderTagsIfAny(tags)?.let { parts += it.removeSuffix(",") }
+        md?.takeIf { it.isNotEmpty() }?.let { parts += "$slot: $it" }
+        entity?.takeIf { it.isNotEmpty() }?.let { parts += "${if (slot == "cubelet") "target" else "entity"}: $it" }
+
+        fun value(s: String): String = if (SEM_IDENT.matches(s) && TtrId.isId(s)) s else renderString(s)
+
+        fun record(values: Map<String, String>): String? {
+            val entries = values.filter { (key, v) -> TtrId.isId(key) && v.isNotEmpty() }
+            if (entries.isEmpty()) return null
+            val body = entries.entries.joinToString(", ") { "${it.key}: ${value(it.value)}" }
+            return "{ $body }"
+        }
+        record(attributes)?.let { parts += "attributes: $it" }
+        record(measures)?.let { parts += "measures: $it" }
+        return "def $kind $name { ${parts.joinToString(", ")} }"
+    }
 
     /**
      * `def md2db_cubelet <name> { cubelet:, target:, shape:, attributes:, measures:, journaling?, allocation? }`

@@ -1445,6 +1445,7 @@ class MdDomainDef(Definition):
 
 @dataclass(frozen=True, slots=True)
 class DimensionDef(Definition):
+    key: str | None = None
     concept: ConceptSugar | None = None
     #: The inline `def attribute` items (each with its `domain:` and `concept { }`).
     attributes: tuple[AttributeDef, ...] = ()
@@ -1473,6 +1474,27 @@ class CubeletDef(Definition):
 
 
 # ============================================================================
+# Explicit MD to ER bindings (grammar 0.18). Python validates the structural layer only.
+
+
+@dataclass(frozen=True, slots=True)
+class Md2erDimensionDef(Definition):
+    dimension_ref: Reference | None = None
+    entity: Reference | None = None
+    attributes: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
+    kind: ClassVar[str] = "md2er_dimension"
+
+
+@dataclass(frozen=True, slots=True)
+class Md2erCubeletDef(Definition):
+    cubelet_ref: Reference | None = None
+    entity: Reference | None = None
+    attributes: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
+    measures: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
+    physical_props: tuple[str, ...] = ()
+    kind: ClassVar[str] = "md2er_cubelet"
+
+
 # Top-level ParseResult
 # ============================================================================
 

@@ -192,3 +192,5 @@ export {
   mentionKindOf,
 } from './semantics-block/mention-kinds.js';
 export type { MentionKind, ObjectFacts } from './semantics-block/mention-kinds.js';
+
+export { mdErBindingDiagnostics, explicitErAttributes, resolveMdErRef, buildMdErRelationIndex, mdErUsedRelations } from './md/explicit.js';

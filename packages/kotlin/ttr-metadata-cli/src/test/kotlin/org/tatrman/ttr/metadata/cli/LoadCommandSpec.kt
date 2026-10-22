@@ -103,8 +103,18 @@ class LoadCommandSpec :
                 out.exitCode shouldBe 1
                 val issue = payload(out)["issues"]!!.jsonArray.single().jsonObject
                 issue["code"]!!.jsonPrimitive.content shouldBe "no-model-dir"
-                issue["message"]!!.jsonPrimitive.content.startsWith("no model/ directory under ") shouldBe true
+                issue["file"]!!.jsonPrimitive.content shouldBe "model"
+                issue["message"]!!.jsonPrimitive.content shouldBe "no model/ directory in the checkout"
+                out.stdout.contains(world("no-model-dir").toString()) shouldBe false
+                out.stderr.contains(world("no-model-dir").toString()) shouldBe false
             }
+        }
+        "diagnostic paths resolve against the checkout rather than the process directory" {
+            val project = world("clean")
+            checkoutRelative(project, "modeler.toml") shouldBe "modeler.toml"
+            checkoutRelative(project, "model/../modeler.toml") shouldBe "modeler.toml"
+            checkoutRelative(project, project.resolve("modeler.toml").toString()) shouldBe "modeler.toml"
+            checkoutRelative(project, null) shouldBe null
         }
         "usage errors are distinct from model errors and help succeeds" {
             for (args in listOf(listOf("load", "x", "--strcit"), listOf("load"), listOf("load", "a", "b"))) {

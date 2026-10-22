@@ -12,6 +12,7 @@ import org.tatrman.ttr.parser.model.Md2dbCubeletDef
 import org.tatrman.ttr.parser.model.Md2dbDomainDef
 import org.tatrman.ttr.parser.model.Md2dbMapDef
 import org.tatrman.ttr.parser.model.Md2erCubeletDef
+import org.tatrman.ttr.parser.model.Md2erDimensionDef
 import org.tatrman.ttr.parser.model.DimensionDef
 import org.tatrman.ttr.parser.model.HierarchyDef
 import org.tatrman.ttr.parser.model.MdDomainDef
@@ -78,6 +79,7 @@ fun kindOf(def: Definition): String =
         is Md2dbCubeletDef -> "md2dbCubelet"
         is Md2dbDomainDef -> "md2dbDomain"
         is Md2dbMapDef -> "md2dbMap"
+        is Md2erDimensionDef -> "md2erDimension"
         is Md2erCubeletDef -> "md2erCubelet"
         is WorldDef -> "world"
         // v4.4 — a canonical lexicon entry keys on its keyword (`term`/`pattern`/
@@ -143,7 +145,7 @@ private fun modelForKindOnly(kind: String): String =
     when (kind) {
         "entity", "attribute", "relation" -> "er"
         "er2dbEntity", "er2dbAttribute", "er2dbRelation",
-        "md2dbCubelet", "md2dbDomain", "md2dbMap", "md2erCubelet",
+        "md2dbCubelet", "md2dbDomain", "md2dbMap", "md2erCubelet", "md2erDimension",
         // 0.17 — the cn bindings: `conceptBinding` is the def kind, the ten binding keywords key it.
         "conceptBinding", "cn2md_kind", "cn2md_role", "cn2md_quality", "cn2md_event",
         "cn2er_kind", "cn2er_role", "cn2er_event", "cn2er_quality", "cn2er_phase", "cn2db_concept",
@@ -176,6 +178,7 @@ fun namespaceForKind(kind: String): String =
         "md2dbCubelet" -> "md2db_cubelet"
         "md2dbDomain" -> "md2db_domain"
         "md2dbMap" -> "md2db_map"
+        "md2erDimension" -> "md2er_dimension"
         "md2erCubelet" -> "md2er_cubelet"
         else -> ""
     }

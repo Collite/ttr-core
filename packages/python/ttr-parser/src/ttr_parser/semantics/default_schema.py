@@ -79,6 +79,7 @@ _MODEL_BY_KIND: dict[str, str] = {
     "md2db_domain": "binding",
     "md2db_map": "binding",
     "md2er_cubelet": "binding",
+    "md2er_dimension": "binding",
     # 0.17 — the cn bindings: `concept_binding` is the def kind, the ten binding keywords key it.
     "concept_binding": "binding",
     "cn2md_kind": "binding",
@@ -143,6 +144,7 @@ _NAMESPACE_BY_KIND: dict[str, str] = {
     "md2db_domain": "md2db_domain",
     "md2db_map": "md2db_map",
     "md2er_cubelet": "md2er_cubelet",
+    "md2er_dimension": "md2er_dimension",
 }
 
 

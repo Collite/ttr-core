@@ -16,6 +16,55 @@ class MdRenderSpec :
 
         fun render(src: String): String = TtrRenderer.render(TtrLoader.parseString(src).definitions).trim()
 
+        "HP-P1: both explicit hop bindings round-trip" {
+            for (src in listOf(
+                "model binding\ndef md2er_dimension c { tags: [\"example\"], description: { en: \"x\", cs: \"y\" }, dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk, state: address.state } }",
+                "model binding\ndef md2er_cubelet c { tags: [\"example\"], description: { en: \"x\", cs: \"y\" }, cubelet: md.sales, target: er.entity.sales, attributes: { Customer.code: id }, measures: { revenue: amount } }",
+            )) {
+                val once = render(src)
+                TtrLoader.parseString(once).errors shouldBe emptyList()
+                render(once) shouldBe once
+            }
+        }
+
+        "R3: explicit map strings quote spaces, keywords and punctuation" {
+            val src =
+                """
+                model binding
+                def md2er_dimension c {
+                    dimension: md.Customer, entity: er.entity.customer,
+                    attributes: { code: "order id", state: "string", číslo: "true", note: "a-b" }
+                }
+                def md2er_cubelet c {
+                    cubelet: md.sales, target: er.entity.sales, measures: { revenue: "order id" }
+                }
+                """.trimIndent()
+            val once = render(src)
+            TtrLoader.parseString(once).errors shouldBe emptyList()
+            render(once) shouldBe once
+            val dims =
+                TtrLoader
+                    .parseString(
+                        once,
+                    ).definitions
+                    .filterIsInstance<org.tatrman.ttr.parser.model.Md2erDimensionDef>()
+            dims.single().attributes shouldBe
+                TtrLoader
+                    .parseString(
+                        src,
+                    ).definitions
+                    .filterIsInstance<org.tatrman.ttr.parser.model.Md2erDimensionDef>()
+                    .single()
+                    .attributes
+        }
+
+        "R3 R17: invalid value forms and physical props are deliberately omitted" {
+            render(
+                "def md2er_cubelet c { cubelet: md.sales, target: er.entity.sales, attributes: { code: 1 }, shape: wide, journaling: overwrite, allocation: equal }",
+            ) shouldBe
+                "def md2er_cubelet c { cubelet: md.sales, target: er.entity.sales }"
+        }
+
         "a logical measure renders its domain / class / aggregation" {
             render("def measure net { class: additive, domain: md.Money, aggregation: sum }") shouldBe
                 "def measure net { domain: md.Money, class: additive, aggregation: sum }"

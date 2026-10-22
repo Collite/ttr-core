@@ -6,7 +6,7 @@ import { parseString } from '@tatrman/parser';
 import { ProjectSymbolTable } from '../project-symbols.js';
 import { Resolver } from '../resolver.js';
 import type { CnDocument } from '../cn/groundings.js';
-import { cnHygieneReport, mdEscape, renderCnHygieneMarkdown } from '../cn/hygiene.js';
+import { ExplicitMdErHop, cnHygieneReport, mdEscape, renderCnHygieneMarkdown } from '../cn/hygiene.js';
 
 // CN-P2 S2.7 T3 — the editor's hygiene report against the golden `ttr-concept` is held to
 // (`tests/conformance/cn-hygiene/`): the data is `expected.json` less the Kotlin-only `definitions`
@@ -104,5 +104,72 @@ def quality shopper_code { of: Shopper, grounds: md.Shopper.code }
     // the bearer lands nowhere on E-R, so nothing picks between the two cubelets' mappings
     expect(rows.get('cn.shopper_code')!.hop!.slug).toBe('md/er-ambiguous');
     expect(rows.get('cn.shopper_code')!.grade).toBe('md-grounded-hop-missing');
+  });
+});
+
+function explicitHop(files: Array<{ uri: string; src: string }>) {
+  const symbols = new ProjectSymbolTable();
+  const docs: CnDocument[] = files.map(({ uri, src }) => {
+    const r = parseString(src, uri);
+    expect(r.errors).toEqual([]);
+    const ast = r.ast!;
+    const doc = { uri, ast, packageName: ast.packageDecl?.name ?? '', schemaCode: ast.modelDirective?.modelCode ?? '', namespace: ast.modelDirective?.schema ?? '' };
+    symbols.upsertDocument(uri, ast, doc.schemaCode, doc.namespace, doc.packageName);
+    return doc;
+  });
+  return new ExplicitMdErHop(docs, new Resolver(symbols));
+}
+
+const HOP_MD = `model md
+ def domain Customer { type: text }
+ def dimension Customer { key: code, attributes: [def attribute code { domain: md.Customer }] }
+ def measure revenue { domain: md.Customer, aggregation: sum }
+ def cubelet revenue { grain: [Customer.code], measures: [md.measure.revenue] }`;
+const HOP_ER = `model er
+ def entity customer { attributes: [def attribute sk { type: int }, def attribute amount { type: decimal }] }
+ def entity sale { attributes: [def attribute cust { type: int }] }`;
+const GRAIN_HOP = 'def md2er_cubelet grain { cubelet: md.revenue, target: er.entity.sale, attributes: { Customer.code: cust } }';
+const DIM_HOP = 'def md2er_dimension own { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk } }';
+const hopBindings = (bindings: string) => explicitHop([
+  { uri: 'md.ttrm', src: HOP_MD }, { uri: 'er.ttrm', src: HOP_ER },
+  { uri: 'binding.ttrm', src: `model binding\n${bindings}` },
+]);
+
+describe('review-125 explicit hop precedence and visibility', () => {
+  it('N2 never maps a top-level measure through a same-named inline measure', () => {
+    const hop = explicitHop([
+      { uri: 'md.ttrm', src: `model md
+        def domain Amount { type: decimal }
+        def measure units { domain: md.Amount, aggregation: sum }
+        def cubelet sales { measures: [def measure units { domain: md.Amount, aggregation: sum }] }` },
+      { uri: 'er.ttrm', src: 'model er\ndef entity sale { attributes: [def attribute n { type: decimal }] }' },
+      { uri: 'binding.ttrm', src: 'model binding\ndef md2er_cubelet m { cubelet: md.sales, target: er.entity.sale, measures: { units: n } }' },
+    ]);
+    expect(hop.erTargetOf('md.measure.units').slug).toBe('md/er-unmapped');
+  });
+  it('R6 resolves measure/cubelet and domain/dimension name collisions', () => {
+    const hop = hopBindings(DIM_HOP + '\ndef md2er_cubelet m { cubelet: md.revenue, target: er.entity.customer, measures: { revenue: amount } }');
+    expect(hop.erTargetOf('md.dimension.Customer').erTarget).toBe('er.entity.customer');
+    expect(hop.erTargetOf('md.measure.revenue').erTarget).toBe('er.entity.customer.amount');
+  });
+  it('R7 dimension wins after bearer filtering, including when the bearer matches neither', () => {
+    expect(hopBindings(GRAIN_HOP).erTargetOf('md.dimension.Customer.code').erTarget).toBe('er.entity.sale.cust');
+    const hop = hopBindings(GRAIN_HOP + '\n' + DIM_HOP);
+    expect(hop.erTargetOf('md.dimension.Customer.code').erTarget).toBe('er.entity.customer.sk');
+    expect(hop.erTargetOf('md.dimension.Customer.code', 'er.entity.sale').erTarget).toBe('er.entity.sale.cust');
+    expect(hop.erTargetOf('md.dimension.Customer.code', 'er.entity.other').erTarget).toBe('er.entity.customer.sk');
+  });
+  it('R7 upgrades duplicate targets to dimension provenance and preserves two-cubelet ambiguity', () => {
+    const second = 'def md2er_cubelet second { cubelet: md.revenue, target: er.entity.customer, attributes: { Customer.code: sk } }';
+    expect(hopBindings(GRAIN_HOP + '\n' + second).erTargetOf('md.dimension.Customer.code').slug).toBe('md/er-ambiguous');
+    expect(hopBindings(second + '\n' + GRAIN_HOP + '\n' + DIM_HOP).erTargetOf('md.dimension.Customer.code').erTarget).toBe('er.entity.customer.sk');
+  });
+  it('R11 respects wildcard and named imports and excludes unrelated packages', () => {
+    const root = join(__dirname, '../../../../tests/conformance/fixtures/111-md2er-path-ambiguous');
+    const hop = explicitHop(readdirSync(root).map(uri => ({ uri, src: readFileSync(join(root, uri), 'utf8') })));
+    expect(hop.erTargetOf('md.dimension.Customer.code').slug).toBe('md/er-ambiguous');
+    expect(hop.erTargetOf('md.dimension.CustomerEast.code').erTarget).toBe('er.entity.addr.state');
+    expect(hop.erTargetOf('md.dimension.CustomerNamed.code').erTarget).toBe('er.entity.addr.state');
+    expect(hop.erTargetOf('md.dimension.CustomerHidden.code').slug).toBe('md/er-unmapped');
   });
 });

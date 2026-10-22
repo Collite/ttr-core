@@ -1,0 +1,47 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "md2er_dimension",
+            "name": "p",
+            "properties": {
+                "entity": "er.entity.x"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "md2er_cubelet",
+            "name": "q",
+            "properties": {
+                "measures": {
+                    "m": "a"
+                },
+                "target": "er.entity.x"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "md2er_cubelet",
+            "name": "invalid_values",
+            "properties": {
+                "attributes": {
+                    "code": ""
+                },
+                "cubelet": "md.sales",
+                "measures": {
+                    "m": ""
+                },
+                "target": "er.entity.x"
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": null,
+    "schemaDirective": {
+        "code": "binding",
+        "namespace": null
+    }
+}

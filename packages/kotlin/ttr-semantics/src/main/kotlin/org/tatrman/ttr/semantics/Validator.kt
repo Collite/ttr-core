@@ -15,6 +15,9 @@ import org.tatrman.ttr.parser.model.SearchHintsValue
 import org.tatrman.ttr.parser.model.SourceLocation
 import org.tatrman.ttr.parser.model.TableDef
 import org.tatrman.ttr.parser.model.ViewDef
+import org.tatrman.ttr.semantics.md.mdErBindingDiagnostics
+import org.tatrman.ttr.semantics.md.buildMdErRelationIndex
+import org.tatrman.ttr.semantics.md.mdErUsedRelations
 import org.tatrman.ttr.semantics.cn.cncDeprecations
 import org.tatrman.ttr.semantics.cn.validateCn
 import org.tatrman.ttr.semantics.semanticsblock.SemanticsAnalyzer
@@ -67,6 +70,7 @@ private val MD_KINDS =
         "md2dbDomain",
         "md2dbMap",
         "md2erCubelet",
+        "md2erDimension",
     )
 
 /**
@@ -351,7 +355,7 @@ class Validator(
      * portable subset; `validateCn`). [docs] are the documents the symbol table was built from, stock excluded.
      */
     fun validateProject(docs: List<SemanticDocument>): List<ValidationDiagnostic> =
-        validateProject() +
+        validateProject() + mdErBindingDiagnostics(docs, resolver) +
             validateCn(
                 docs,
                 resolver,
@@ -379,7 +383,10 @@ class Validator(
         return if (symbol.packageName.isEmpty()) concept else "${symbol.packageName}.$concept"
     }
 
-    fun validateImports(doc: SemanticDocument): List<ValidationDiagnostic> {
+    fun validateImports(
+        doc: SemanticDocument,
+        docs: List<SemanticDocument> = listOf(doc),
+    ): List<ValidationDiagnostic> {
         val diagnostics = mutableListOf<ValidationDiagnostic>()
         val seenTargets = mutableSetOf<String>()
 
@@ -404,7 +411,7 @@ class Validator(
             }
         }
 
-        val usedTargets = mutableSetOf<String>()
+        val usedTargets = mdErUsedRelations(buildMdErRelationIndex(docs, resolver), doc, resolver).toMutableSet()
         for (collected in collectAllReferences(doc.definitions)) {
             val schemaCode = doc.schemaCode.ifEmpty { defaultSchemaForKind(kindOf(collected.ownerDef)) }
             // The ref itself: a cn slot's ref carries its context (0.17), so it resolves among concepts.

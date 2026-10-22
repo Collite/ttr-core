@@ -117,6 +117,8 @@ from .model import (
     LocalizedStringListValue,
     LocalizedStringValue,
     MatchMethodValue,
+    Md2erCubeletDef,
+    Md2erDimensionDef,
     MdDomainDef,
     MeasureDef,
     ModelDirective,
@@ -522,6 +524,10 @@ def _visit_definition(
         return _visit_md_host(MeasureDef, od.measureDef().measureProperty(), name, src, file, warnings, errors)
     if od.CUBELET() is not None:
         return _visit_md_host(CubeletDef, od.cubeletDef().cubeletProperty(), name, src, file, warnings, errors)
+    if od.MD2ER_DIMENSION() is not None:
+        return _visit_md_er(od.md2erDimensionDef().md2erDimensionProperty(), True, name, src, file)
+    if od.MD2ER_CUBELET() is not None:
+        return _visit_md_er(od.md2erCubeletDef().md2erCubeletProperty(), False, name, src, file)
     # Grammar 0.17 — the concept defs (`model cn`) and the cn bindings.
     stereotype = _concept_stereotype_of(od)
     if stereotype is not None:
@@ -1581,6 +1587,45 @@ def _visit_concept_binding(
     )
 
 
+def _visit_md_er(props: Any, dimension: bool, name: str, source: SourceLocation, file: str) -> Definition:
+    fields: dict[str, Any] = {}
+    physical: list[str] = []
+    for p in props:
+        d = p.descriptionProperty()
+        if d is not None:
+            fields["description"], fields["description_localized"] = _visit_description(d, file)
+        t = p.tagsProperty()
+        if t is not None:
+            fields["tags"] = _visit_list_of_strings(t.listOfStrings(), file)
+        ref = p.dimensionRefProperty() if dimension else p.cubeletRefProperty()
+        if ref is not None:
+            fields["dimension_ref" if dimension else "cubelet_ref"] = _reference_of(ref.id_(), file)
+        target = p.entityProperty_() if dimension else p.targetProperty()
+        if target is not None:
+            if target.id_() is not None:
+                fields["entity"] = _reference_of(target.id_(), file)
+            elif not dimension and target.object_() is not None:
+                obj = _visit_object(target.object_(), file)
+                table = obj.entries.get("table")
+                if isinstance(table, IdValue):
+                    fields["entity"] = table.ref
+        for method, field_name in (("attributesMapProperty", "attributes"), ("measuresMapProperty", "measures")):
+            prop = getattr(p, method, lambda: None)()
+            if prop is not None:
+                obj = _visit_object(prop.object_(), file)
+                fields[field_name] = MappingProxyType({
+                    k: ".".join(v.parts) if isinstance(v, IdValue) else v.raw if isinstance(v, (StringValue, TripleStringValue)) else ""
+                    for k, v in obj.entries.items()
+                })
+        for method, key in (("shapeProperty", "shape"), ("journalingProperty", "journaling"), ("allocationProperty", "allocation")):
+            if getattr(p, method, lambda: None)() is not None:
+                physical.append(key)
+    if not dimension:
+        fields["physical_props"] = tuple(physical)
+    cls = Md2erDimensionDef if dimension else Md2erCubeletDef
+    return cls(name=name, source=source, **fields)
+
+
 def _visit_md_host(
     cls: type[MdDomainDef] | type[DimensionDef] | type[MeasureDef] | type[CubeletDef],
     props: Any,
@@ -1605,6 +1650,9 @@ def _visit_md_host(
         if t is not None:
             tags = _visit_list_of_strings(t.listOfStrings(), file)
         if cls is DimensionDef:
+            kp = p.keyProperty()
+            if kp is not None:
+                refs["key"] = _id_text(kp.id_())
             ap = p.attributesProperty()
             if ap is not None:
                 refs["attributes"] = tuple(_visit_attribute_def_list(ap.attributeDefList(), file, warnings, errors))
@@ -2389,7 +2437,7 @@ def _visit_security_block(ctx: Any, file: str) -> SecurityBlock:
     """
     statements: list[SecurityStatement] = []
     for st in ctx.securityStatement() or ():
-        ids = st.id_() or ()
+        ids: list[Any] = list(st.id_() or ())
         loc = _loc_of(st, file)
         if st.OWN() is not None and len(ids) >= 2:
             statements.append(

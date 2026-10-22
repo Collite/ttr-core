@@ -1,0 +1,2 @@
+model er
+def entity md2er_dimension { attributes: [def attribute md2er_dimension { type: int }] }
