@@ -253,9 +253,9 @@ internal class DefinitionResolver(
         return all.firstOrNull { it.qname.`package` == pkg } ?: all.singleOrNull()
     }
 
-    // ---- what a name resolves to -----------------------------------------------------------------------------
+    // ---- what a name resolves to (internal: the md renderer walks names the same way — CN-P3 S3.3) -------------
 
-    private sealed interface Value {
+    internal sealed interface Value {
         data class Instance(
             val concept: Concept,
         ) : Value
@@ -286,7 +286,7 @@ internal class DefinitionResolver(
         data object Opaque : Value
     }
 
-    private sealed interface Walk {
+    internal sealed interface Walk {
         data class Ok(
             val value: Value,
             val concepts: List<QualifiedName>,
@@ -350,7 +350,7 @@ internal class DefinitionResolver(
     }
 
     /** Walks [parts] from [i] on the subject [s]; reads are collected, committed only on success. */
-    private fun walk(
+    internal fun walk(
         s: Concept,
         parts: List<String>,
         i: Int,

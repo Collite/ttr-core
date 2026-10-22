@@ -16,7 +16,7 @@ S3.5 assertion lower · S3.6 explain). Every expectation comes from an oracle in
 | `frame` | an S3.1 sample under `../frames/` (`statement-e0` …) — else the case's own `statement.json` / `assertion.json` |
 | `locale` | the explain calls' locale |
 | `target`, `layer`, `dialect`, `options` | `definitionRender` / `materialize`: the concept, `ER`, the dialect, `RenderOptions` as JSON |
-| `tags` | `live` — also checked on the live-PG harness (S3.8) |
+| `tags` | `live` — also run on the live-PG harness (`ConceptLiveSpec`; S3.3 T7, the PR's live suite at S3.8) |
 | `oracle` | where the expectation comes from (below) |
 
 | file | compared with |
@@ -28,6 +28,7 @@ S3.5 assertion lower · S3.6 explain). Every expectation comes from an oracle in
 | `expected.rows.json` | `RowObjects` — the keys it names |
 | `expected.sql` · `expected.rendering.json` | `Rendering.text` (whitespace-collapsed until S3.4 pins the formatter, then byte-equal) · the rest of `Rendering`, the keys it names |
 | `expected/<path>` | `ModelText.files` |
+| `seed.sql` · `expected.live.json` | a `live` case: its invented rows (a `statementLower` case's go on top of ttrp-conform's `md_seed.sql`) · the rows the lowered plan returns on PostgreSQL (`{"rows": [["150.50"]]}`, numbers by value) |
 
 A key the expectation names that the result type does not carry yet (an S3.4 `RenderOptions` field, S3.5's
 `assertedAsOf`) fails the case — it is red until that field exists, never silently dropped.
@@ -42,7 +43,9 @@ ignored, named with the id — never as passed. When the demand lands, the file 
 ## Oracles (`GoldenOracleSpec`, green from day one)
 
 - **md** — `oracle.mdPath`: the expected dot-path and plan are what `DefaultMdPathResolver` + `MdPathLowering` make of
-  that dot-path text; `oracle.semiJoin` (ActiveCustomer, ⚑CN-P9): two such reads composed as a grain-key semi-join.
+  that dot-path text; `oracle.semiJoin` (ActiveCustomer, ⚑CN-P9): two such reads composed as a grain-key semi-join. A
+  read's group keys are the `*`s its text writes; a grain dimension the text leaves out is aggregated over and left out
+  of the expected dot-path (the statement's shape, A-CN-39 — S3.3).
 - **er** — every `expected.sql` translates (`ttr-translator` over the world's er tier): strict ER lane when it reads no
   parameter, lenient otherwise.
 - **H-1** — `oracle.au`: AU's hand-written island; `"plan": "equal"` = the same ER plan bytes (A-H-2), `"rowset"` =
@@ -55,6 +58,8 @@ ignored, named with the id — never as passed. When the demand lands, the file 
 ./gradlew :packages:kotlin:ttr-concept:test -Pcn.goldens=all            # every case — red ones included (TDD view)
 ./gradlew :packages:kotlin:ttr-concept:test --tests 'org.tatrman.concept.Golden*' -Pcn.goldens.regen
                                                                         # rewrite the oracle-made files; review the diff
+TTR_CONN_ERP_PG=postgresql://user:pass@host:port/db ./gradlew :packages:kotlin:ttr-concept:test --tests 'org.tatrman.concept.ConceptLiveSpec'
+                                                                        # the `live` cases on PostgreSQL (else ignored)
 ```
 
 Public repo: invented names and codes only (Hartland's public demo names; `X21`-style clinical codes).

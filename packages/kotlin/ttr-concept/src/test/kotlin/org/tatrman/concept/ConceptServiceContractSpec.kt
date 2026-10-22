@@ -72,12 +72,14 @@ class ConceptServiceContractSpec :
             BindingPath("measures[0]", "cn.revenue").via shouldBe Via.DIRECT
         }
 
-        test("ResolvedCnModel is the reconciled model + the parsed definitions + the snapshot hash (CN-P2 S2.6 T5)") {
+        test(
+            "ResolvedCnModel is the model + the parsed definitions + the snapshot hash + the md tier (S2.6 T5, S3.3)",
+        ) {
             ResolvedCnModel::class.java.declaredFields
                 .filterNot {
                     java.lang.reflect.Modifier
                         .isStatic(it.modifiers)
-                }.map { it.name } shouldBe listOf("model", "definitions", "snapshotHash")
+                }.map { it.name } shouldBe listOf("model", "definitions", "snapshotHash", "md")
             Diagnostic("cn/definition-syntax", Severity.ERROR).location shouldBe null
         }
 

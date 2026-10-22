@@ -12,8 +12,8 @@ import kotlin.io.path.isRegularFile
  * CN-P3 S3.7 — the golden fixture worlds (`resources/worlds/<name>/`), each one model root loaded the way Veles loads
  * one ([DefinitionFixtures.load]): `hartland` (the AU extension on er + the channel md face), `clinic` (the invented
  * clinical world — DC-1/2/7/8/11/12 and the Transfer assertion), `sales` (the md hero of E-0 and ActiveCustomer).
- * The md tier rides beside the cn model ([md], `MdRepo` — ttr-metadata carries none) until S3.3 folds it into
- * [ResolvedCnModel].
+ * The md tier is loaded from the same root (`MdRepo` — ttr-metadata carries none) into [ResolvedCnModel.md] (S3.3);
+ * [World.md] is the same object, for the oracles.
  */
 internal object GoldenWorlds {
     val root: Path = DefinitionFixtures.repo.resolve("packages/kotlin/ttr-concept/src/test/resources/worlds")
@@ -37,6 +37,7 @@ internal object GoldenWorlds {
         val files =
             Files.walk(dir).use { s -> s.filter { it.isRegularFile() && it.extension == "ttrm" }.sorted().toList() }
         val model = DefinitionFixtures.load(files.associateBy { dir.relativize(it).toString() })
-        return World(name, dir, ResolvedCnModel.of(model, snapshotHash = "golden:$name"), MdRepo.loadFrom(dir))
+        val md = MdRepo.loadFrom(dir)
+        return World(name, dir, ResolvedCnModel.of(model, snapshotHash = "golden:$name", md = md), md)
     }
 }

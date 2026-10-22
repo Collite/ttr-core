@@ -26,8 +26,10 @@ import org.tatrman.translator.orchestrator.Translator
 import org.tatrman.translator.params.SqlParam
 import org.tatrman.ttr.md.resolve.CanonicalRenderer
 import org.tatrman.ttr.md.resolve.DefaultMdPathResolver
+import org.tatrman.ttr.md.resolve.PathShape
 import org.tatrman.ttr.md.resolve.PathText
 import org.tatrman.ttr.md.resolve.ResolutionOutcome
+import org.tatrman.ttr.md.resolve.Selector
 import org.tatrman.ttrp.emit.sql.MdPathLowering
 import java.time.Instant
 import kotlin.io.path.writeText
@@ -37,7 +39,9 @@ import kotlin.io.path.writeText
  *
  *  - an md case's expected dot-path and plan are what the md chain (`DefaultMdPathResolver` + `MdPathLowering`) makes
  *    of its `oracle.mdPath` text — or, for ActiveCustomer (⚑CN-P9), of two such reads composed as a grain-key
- *    semi-join; `-Pcn.goldens.regen` rewrites them (reviewed by hand, committed);
+ *    semi-join; `-Pcn.goldens.regen` rewrites them (reviewed by hand, committed). A read's free (group-by)
+ *    coordinates are the `*`s its text writes (`code.*`); a grain dimension the text leaves out is aggregated over and
+ *    left out of the expected dot-path — the statement's shape, A-CN-39 (CN-P3 S3.3);
  *  - an er case's expected SQL translates (`ttr-translator`, the world's er tier as [GoldenModelHandle]) — on the strict
  *    ER lane when it reads no parameter, lenient otherwise;
  *  - an H-1 context's expected SQL translates to the SAME ER plan bytes as AU's hand-written island (`au.sql`, A-H-2) —
@@ -136,7 +140,11 @@ class GoldenOracleSpec :
             fun read(raw: String): Pair<String, PlanNode> {
                 val out = DefaultMdPathResolver().resolve(PathText.parse(raw), md.model, null, asOf)
                 val r = out as? ResolutionOutcome.Resolved ?: fail("`$raw` does not resolve: $out")
-                return CanonicalRenderer.render(r.path) to MdPathLowering(md.bindings, md.model).lower(r.path, r.shape)
+                val written = Regex("(\\w+)\\.\\*").findAll(raw).map { it.groupValues[1] }.toSet()
+                val free = r.path.coordinates.filter { it.attribute.substringAfterLast('.') in written }
+                val shown = r.path.coordinates.filter { it.selector != Selector.Star || it in free }
+                val plan = MdPathLowering(md.bindings, md.model).lower(r.path, PathShape(free.map { it.attribute }))
+                return CanonicalRenderer.render(r.path.copy(coordinates = shown)) to plan
             }
             oracle["mdPath"]?.let { return read(it.jsonPrimitive.content) }
             val sj = oracle["semiJoin"]!!.jsonObject

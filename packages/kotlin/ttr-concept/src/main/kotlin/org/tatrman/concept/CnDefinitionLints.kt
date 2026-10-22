@@ -17,8 +17,9 @@ import org.tatrman.ttr.metadata.model.QualifiedName
  *  - `cn/definition-cycle` (error) — phases / defined qualities / member-restricted kinds that inline each other (AM-26);
  *  - `cn/definition-unresolved` (hygiene) — what a definition reads, inlined transitively, includes an ungrounded
  *    concept;
- *  - `cn/definition-unreachable(md)` / `(er)` (hygiene, model) — a concept it reads has no md grounding / no er
- *    landing (`erTarget`): the definition cannot render on that layer;
+ *  - `cn/definition-unreachable(md)` / `(er)` (hygiene, model) — a concept it reads has no md face (its md grounding,
+ *    or the reverse hop — ⚑CN-P8, A-CN-37; CN-P3 S3.3) / no er landing (`erTarget`): the definition cannot render on
+ *    that layer;
  *  - `cn/basis-mismatch` (error) — a condition's definition does not read its declared `basis:` ([BASIS_SHAPES]);
  *  - `cn/imprecise-comparison` (advisory) — under `imprecision: certainly` a comparison of two instants whose
  *    granularities are known and differ (AM-42; `period: { precision }`, else the attribute's type; `:as_of` is a day).
@@ -167,7 +168,7 @@ object CnDefinitionLints {
         closure: List<CnDefinition>,
     ): List<Diagnostic> {
         val reads = read(cn, closure)
-        val noMd = reads.filter { it.grounding?.layer != GroundingLayer.MD }
+        val noMd = reads.filter { it.grounding?.layer != GroundingLayer.MD && it.reverseHop.isEmpty() }
         val noEr = reads.filter { it.erTarget == null }
         return listOfNotNull(
             noMd.takeIf { it.isNotEmpty() }?.let {
@@ -175,7 +176,7 @@ object CnDefinitionLints {
                     "$UNREACHABLE(md)",
                     Severity.HYGIENE,
                     "the ${d.kind.property} cannot render on md: ${names(it)} ha${if (it.size == 1) "s" else "ve"} " +
-                        "no md grounding",
+                        "no md grounding and no md element hops to ${if (it.size == 1) "its" else "their"} E-R landing",
                     owner.ref,
                     d.block.source,
                 )

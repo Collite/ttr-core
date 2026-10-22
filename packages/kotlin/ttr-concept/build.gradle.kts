@@ -22,6 +22,25 @@ tasks.test {
     systemProperty("cn.goldens.regen", providers.gradleProperty("cn.goldens.regen").map { "true" }.getOrElse("false"))
 }
 
+// CN-P3 S3.3 — `LowerProvenance.grammarVersion`: TTR.g4's `@grammar-version`, baked in as a resource at build time (the
+// parser artifact carries none; ttr-concept and ttr-parser are cut together in the grammar bundle, so they agree).
+val grammarVersionResource by tasks.registering {
+    val g4 = rootProject.file("packages/grammar/src/TTR.g4")
+    val out = layout.buildDirectory.dir("generated/resources/grammar-version")
+    inputs.file(g4)
+    outputs.dir(out)
+    doLast {
+        val version =
+            Regex("@grammar-version:\\s*(\\S+)").find(g4.readText())?.groupValues?.get(1)
+                ?: error("no `@grammar-version` header in $g4")
+        val file = out.get().file("org/tatrman/concept/grammar-version").asFile
+        file.parentFile.mkdirs()
+        file.writeText(version)
+    }
+}
+
+sourceSets.main { resources.srcDir(grammarVersionResource) }
+
 // CN (conceptual model, `project/tatrman/features/conceptual/`) — `ttr-concept`: the three function families
 // below the frontier (statements · assertions · definition rendering on the md and er layers), contracts §3.
 // Built at CN-P3. A pure function of resolved, cached inputs (the S6 / PL-P0.S2 compile rule): no LLM, no server
@@ -51,6 +70,8 @@ dependencies {
     testImplementation(libs.protobuf.java.util)
     // CN-P3 S3.7 — the goldens' er oracle translates over an `InMemoryModelHandle` (the translator's test fixture).
     testImplementation(testFixtures(project(":packages:kotlin:ttr-translator")))
+    // CN-P3 S3.3 T7 — the live suite (`ConceptLiveSpec`) runs the lowered plans on PostgreSQL (`TTR_CONN_ERP_PG`).
+    testImplementation(libs.postgresql)
 }
 
 // CN-P2 S2.7 — `ttr cn hygiene <dir> [--format text|json] [--fail-on error|warning]` (`ttr cn materialize` joins it at

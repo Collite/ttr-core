@@ -16,4 +16,8 @@ md hero's month is an int and the resolver has no month names. The golden pins t
 `sales[customer.name: "Kaufland", time.month: 1, time.year: 2026].net @ sum` (`time.period_code "2026-01"` → the
 `month` and `year` calc coordinates); "January 2026" lives in the explain. Oracle: `oracle.mdPath`.
 
+`kaufland-en` is `live` (S3.3 T7): unparsed to PostgreSQL and run over ttrp-conform's `md_seed.sql` plus its own
+`seed.sql` (January 2026 rows, and the February / January 2025 / Lidl rows each coordinate must exclude) it returns
+`150.50`.
+
 Pending convention, case format and oracles: [`../README.md`](../README.md).

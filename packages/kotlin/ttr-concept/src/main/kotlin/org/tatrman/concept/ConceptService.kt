@@ -4,6 +4,7 @@ package org.tatrman.concept
 import org.tatrman.assertion.v1.Assertion
 import org.tatrman.concept.v1.ConceptRef
 import org.tatrman.statement.v1.Statement
+import java.time.Clock
 
 /**
  * The cn layer below the determinism frontier (cn contracts §3; architecture §2). Three function families:
@@ -78,15 +79,20 @@ interface ConceptService {
 /**
  * The service over a [ResolvedCnModel] (cn contracts §3). CN-P2 S2.7 pulls [hygieneReport] forward — model-only, no
  * consumer ([CnHygiene]); CN-P3 lands the families stage by stage (S3.2: the two validates — [StatementValidator],
- * [AssertionValidator]); a family not landed yet refuses as the scaffold does.
+ * [AssertionValidator]; S3.3: [statementLower] — [StatementLowerer]); a family not landed yet refuses as the scaffold
+ * does. [clock] gives "now" — the evaluation day of a statement with no `as_of` (recorded in its provenance).
  */
 class CnConceptService(
     private val model: ResolvedCnModel,
+    clock: Clock = Clock.systemUTC(),
 ) : ConceptService by NotImplementedConceptService() {
     private val statements = StatementValidator(model)
     private val assertions = AssertionValidator(model)
+    private val lowerer = StatementLowerer(model, clock)
 
     override fun statementValidate(s: Statement): List<Diagnostic> = statements.validate(s)
+
+    override fun statementLower(s: Statement): LowerResult = lowerer.lower(s)
 
     override fun assertionValidate(a: Assertion): List<Diagnostic> = assertions.validate(a)
 

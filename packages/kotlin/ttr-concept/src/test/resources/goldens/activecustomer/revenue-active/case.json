@@ -2,6 +2,9 @@
   "world": "sales",
   "call": "statementLower",
   "stage": "S3.3",
+  "tags": [
+    "live"
+  ],
   "oracle": {
     "semiJoin": {
       "outer": "sales.name.*.month.1.year.2026.net",

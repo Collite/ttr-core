@@ -76,20 +76,19 @@ class CnHygieneSpec :
                 )
         }
 
-        "the service answers hygieneReport and the validates (S3.2); every other family is still CN-P3" {
+        "the service answers hygieneReport, the validates (S3.2) and statementLower (S3.3); the rest is still CN-P3" {
             val svc = CnConceptService(model)
+            val empty =
+                org.tatrman.statement.v1.Statement
+                    .getDefaultInstance()
             svc.hygieneReport() shouldBe report
-            svc
-                .statementValidate(
-                    org.tatrman.statement.v1.Statement
-                        .getDefaultInstance(),
-                ).map { it.slug } shouldContain FrameSlugs.MISSING_TIME
-            shouldThrow<UnsupportedOperationException> {
-                svc.statementLower(
-                    org.tatrman.statement.v1.Statement
-                        .getDefaultInstance(),
-                )
+            svc.statementValidate(empty).map { it.slug } shouldContain FrameSlugs.MISSING_TIME
+            // a lower refuses on the validate's errors — no plan
+            svc.statementLower(empty).let {
+                it.plan shouldBe null
+                it.diagnostics.map { d -> d.slug } shouldContain FrameSlugs.MISSING_TIME
             }
+            shouldThrow<UnsupportedOperationException> { svc.statementExplain(empty, "en") }
         }
 
         "a model with no cn: an empty report" {

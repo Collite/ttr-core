@@ -15,7 +15,8 @@ slot: its definition is inlined, rendered on the md layer, recorded in the prove
 — an existence md cannot say (G-MD-1). When the existence ranges over the carrying cubelet's own event, `ttr-concept`
 composes it on `plan.v1` as a grain-key semi-join: the outer read grouped by `customer.name`, kept where the key is
 `IN` the keys of a second read over the window (`time.day: "2025-01-31".."2026-01-31"` — `within(x, last: d)` is
-`x >= as_of - d and x <= as_of`), aggregated again. `oracle.semiJoin` builds exactly that from the two md reads. The
-dot-path spells the composition `<outer> where customer.name in (<inner>)`.
+`x >= as_of - d and x <= as_of` — grouped by the key alone), aggregated again. `oracle.semiJoin` builds exactly that
+from the two md reads. The dot-path spells the composition `<outer> where customer.name in (<inner>)`. `revenue-active`
+is `live`: on PostgreSQL over its `seed.sql` it returns January 2026's net of the customers active as of 2026-01-31.
 
 Pending convention, case format and oracles: [`../README.md`](../README.md).
