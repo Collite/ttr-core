@@ -180,12 +180,12 @@ class ErModelHandle(
         fun bare(name: String): String = name.substringAfter("table.").substringAfter("view.").substringAfter("query.")
 
         fun surface(type: String): SurfaceType =
-            when (type.lowercase().substringBefore('(')) {
-                "int", "integer", "long", "bigint", "smallint", "tinyint" -> SurfaceType.INT
-                "decimal", "float", "double", "number", "numeric", "money", "real" -> SurfaceType.FLOAT
-                "bool", "boolean", "bit" -> SurfaceType.BOOL
-                "date", "timestamp", "datetime", "datetime2", "timestamptz", "smalldatetime" -> SurfaceType.DATETIME
-                else -> SurfaceType.TEXT
+            when (ErType.of(type)) {
+                ErType.INTEGER -> SurfaceType.INT
+                ErType.DECIMAL -> SurfaceType.FLOAT
+                ErType.BOOLEAN -> SurfaceType.BOOL
+                ErType.DATE, ErType.TIMESTAMP -> SurfaceType.DATETIME
+                ErType.TEXT, null -> SurfaceType.TEXT
             }
 
         fun entity(name: String): QualifiedName =

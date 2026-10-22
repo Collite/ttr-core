@@ -262,9 +262,9 @@ object CnDefinitionLints {
 
     /** An attribute type's granularity: a date is a day, a timestamp a second; anything else is not known. */
     internal fun ofType(type: String?): Granularity? =
-        when (type?.lowercase()?.substringBefore('(')) {
-            "date" -> Granularity.DAY
-            "datetime", "datetime2", "timestamp", "timestamptz", "smalldatetime" -> Granularity.SECOND
+        when (ErType.of(type)) {
+            ErType.DATE -> Granularity.DAY
+            ErType.TIMESTAMP -> Granularity.SECOND
             else -> null
         }
 

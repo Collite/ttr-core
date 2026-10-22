@@ -412,13 +412,13 @@ internal class RowPlanner(
 
         /** The attribute type's family (the canonical er types and their db spellings); null — not known, any text. */
         fun family(type: String?): Family? =
-            when (type?.lowercase()?.substringBefore('(')?.trim()) {
-                "int", "integer", "bigint", "smallint", "tinyint", "long" -> Family.INTEGER
-                "decimal", "numeric", "float", "double", "real", "money" -> Family.DECIMAL
-                "bool", "boolean", "bit" -> Family.BOOLEAN
-                "date", "datetime", "datetime2", "timestamp", "timestamptz", "smalldatetime" -> Family.TEMPORAL
-                "text", "string", "varchar", "nvarchar", "char", "nchar" -> Family.TEXT
-                else -> null
+            when (ErType.of(type)) {
+                ErType.INTEGER -> Family.INTEGER
+                ErType.DECIMAL -> Family.DECIMAL
+                ErType.BOOLEAN -> Family.BOOLEAN
+                ErType.DATE, ErType.TIMESTAMP -> Family.TEMPORAL
+                ErType.TEXT -> Family.TEXT
+                null -> null
             }
 
         val SPELLING: Map<Granularity, DateTimeFormatter> =

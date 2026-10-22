@@ -285,6 +285,7 @@ class AssertionLowerSpec :
                         quality("score", "{ \"boolValue\": true }"),
                         quality("urgent", "{ \"intValue\": 1 }"),
                         quality("ward", instant),
+                        quality("weight", "{ \"stringValue\": \"abc\" }"), // `number` is a decimal (R125-6)
                     ),
                 ),
                 "cn/slot-mismatch identity.known",
@@ -292,6 +293,7 @@ class AssertionLowerSpec :
                 "cn/slot-mismatch qualities[1].value",
                 "cn/slot-mismatch qualities[2].value",
                 "cn/slot-mismatch qualities[3].value",
+                "cn/slot-mismatch qualities[4].value",
             )
         }
 
@@ -347,7 +349,8 @@ class AssertionLowerSpec :
                             def attribute severity { type: int, optional: true },
                             def attribute score { type: decimal, optional: true },
                             def attribute urgent { type: bool, optional: true },
-                            def attribute remark { type: text, optional: true }
+                            def attribute remark { type: text, optional: true },
+                            def attribute weight { type: number, optional: true }
                         ]
                     }
                     def entity bed_note {
@@ -372,7 +375,7 @@ class AssertionLowerSpec :
                     def event BedMove {
                         involves: [Encounter, Patient, Bed, Note, Room],
                         period: { at: moved_on, precision: month },
-                        qualities: [severity, score, urgent, remark, ward]
+                        qualities: [severity, score, urgent, remark, ward, weight]
                     }
                     def event Stay {
                         extent: durative,
