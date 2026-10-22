@@ -26,6 +26,7 @@ export type ObjectDetail = TtrmObjectDetail;
 export type SearchHit = TtrmSearchHit;
 export type LayoutPayload = TtrmLayoutPayload;
 export type { LayoutSummary, ResolvedLayout } from './ttrm-types.js';
+export interface LayoutIssue { path: string; reason: string }
 
 /** Model kinds a backend may serve (mirrors `@tatrman/lsp` RenderableSchemaCode: db|er|md|cnc). */
 export type ModelKind = RenderableSchemaCode;
@@ -155,4 +156,5 @@ export interface ModelDataSource {
   listLayouts?(): Promise<LayoutSummary[]>;
   /** One served layout, resolved by the catalog (VL V-36, `GET /model/layout?name=`); the viewer re-resolves it. */
   getLayoutDoc?(name: string): Promise<ResolvedLayout>;
+  layoutIssues?(): Promise<LayoutIssue[]>;
 }

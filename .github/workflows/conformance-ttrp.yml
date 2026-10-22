@@ -46,6 +46,23 @@ jobs:
         env:
           TTRP_CONFORM_PG: "1"
           TTR_CONN_ERP_PG: postgresql://postgres:ttrp@localhost:5432/ttrp
+      - name: Verify the live PostgreSQL rounding regression ran
+        run: |
+          python3 - <<'PYTEST'
+          import pathlib
+          import xml.etree.ElementTree as ET
+          name = "integer and numeric ceil/round output types match executed PostgreSQL columns"
+          files = pathlib.Path("packages/kotlin/ttrp-cli/build/test-results/test").glob("TEST-*.xml")
+          cases = [case for file in files for case in ET.parse(file).getroot().iter("testcase") if case.get("name") == name]
+          assert len(cases) == 1, f"expected one PostgreSQL rounding case, found {len(cases)}"
+          assert not any(cases[0].find(tag) is not None for tag in ("skipped", "failure", "error")), "live rounding case did not pass"
+          print(f"PASS: {name} (recipe and ordinary CTE paths)")
+          PYTEST
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: postgres-rounding-test-report
+          path: packages/kotlin/ttrp-cli/build/test-results/test/TEST-*RecipeBundleSpec*.xml
       - name: ttr-concept live suite (CN-P3 — the cn goldens on PostgreSQL, A-CN-15)
         # ConceptLiveSpec seeds a schema of its own (`cn_live`: ttrp-conform's md seed, each world's tables and rows)
         # and never touches the tables seeded above. CN_LIVE_REQUIRED fails the run if the database is not reached,

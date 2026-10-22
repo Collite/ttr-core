@@ -956,10 +956,10 @@ export function buildNodeForDef(
   return null;
 }
 
-export function buildProjectModelGraph(asts: Document[], schema: RenderableSchemaCode, preferredLang = 'en'): ModelGraph {
+export function buildProjectModelGraph(asts: Document[], schema: RenderableSchemaCode, preferredLang = 'en', packageOf?: (ast: Document) => string): ModelGraph {
   const nodes: ModelGraphNode[] = [];
   const edges: ModelGraphEdge[] = [];
-  const knownNodes = new Map<string, { def: Definition; qname: string; schemaCode: string; namespace: string; packageName: string }>();
+  const knownNodes = new Map<string, { def: Definition; qname: string; schemaCode: string; namespace: string; packageName: string; pkg: string }>();
 
   for (const ast of asts) {
     if (ast.modelDirective?.modelCode && ast.modelDirective.modelCode !== schema) continue;
@@ -972,7 +972,7 @@ export function buildProjectModelGraph(asts: Document[], schema: RenderableSchem
       if (def.kind === 'table' || def.kind === 'view' || def.kind === 'entity'
         || def.kind === 'cubelet' || def.kind === 'dimension') {
         const qname = buildQname(schemaCode, namespace, def.kind, [def.name], packageName);
-        knownNodes.set(qname, { def, qname, schemaCode, namespace, packageName });
+        knownNodes.set(qname, { def, qname, schemaCode, namespace, packageName, pkg: packageOf?.(ast) ?? packageName });
       }
     }
   }
@@ -980,9 +980,9 @@ export function buildProjectModelGraph(asts: Document[], schema: RenderableSchem
   const knownQnames = new Set(knownNodes.keys());
   const mdContext = buildMdContext(asts);
 
-  for (const [, { def, schemaCode, namespace, packageName }] of knownNodes) {
+  for (const [, { def, schemaCode, namespace, packageName, pkg }] of knownNodes) {
     const node = buildNodeForDef(def, schemaCode, namespace, preferredLang, packageName, mdContext);
-    if (node) nodes.push(node);
+    if (node) nodes.push({ ...node, pkg });
   }
 
   for (const ast of asts) {

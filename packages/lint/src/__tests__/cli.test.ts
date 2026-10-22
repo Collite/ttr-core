@@ -18,6 +18,16 @@ function runCli(args: string[]): { status: number; stdout: string; stderr: strin
 }
 
 describe('modeler-lint CLI', () => {
+  it('preserves the manifest unknown-key warning and exits zero under default fail-on', () => {
+    const temp = mkdtempSync(join(tmpdir(), 'modeler-lint-manifest-'));
+    try {
+      writeFileSync(join(temp, 'modeler.toml'), '[bindings]\nrequire = true');
+      writeFileSync(join(temp, 'empty.ttrm'), '');
+      const result = runCli([temp, '--format', 'json']);
+      expect(result.status).toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual([expect.objectContaining({ code: 'ttrlint/manifest-unknown-key', severity: 'warning' })]);
+    } finally { rmSync(temp, { recursive: true, force: true }); }
+  });
   let root: string;
 
   beforeAll(() => {

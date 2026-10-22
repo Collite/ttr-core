@@ -41,6 +41,7 @@ Which backend serves the model is **explicit, never sniffed** (P2):
 | `http://localhost:5173/?server=ws://127.0.0.1:7270` | `ttr-designer-server` over WS | **read-only** |
 | `http://localhost:5173/?veles=http://localhost:7260` | Veles JSON read API (dev) | **read-only (catalog)** |
 | `https://…/?veles=/veles` | Veles behind the viewer's ingress (in-chart) | **read-only (catalog)** |
+| `https://…/m/_designer/index.html?backend=host` | Parent-authenticated BFF snapshot + worker LSP | **read-only (P0)** |
 | `https://…/` (image, `VIEWER_CATALOG_URL`) | the runtime config's catalog (default `<base>veles`) | **read-only (catalog)** |
 
 Precedence (see `src/data/select-data-source.ts`): (1) `?server=<ws-origin>` → the
@@ -52,6 +53,11 @@ The `?server=` value must be a **loopback** WS origin (`ws://127.0.0.1…` /
 `ws://localhost…`, no path — S24); anything else is a visible error, never a
 guess-and-fallback. Combining `?server=`/`?veles=`/`?demo=` is an error (they select
 different backends).
+
+`?backend=host` explicitly selects the Studio iframe protocol and overrides the deployment's
+catalog default. It cannot be combined with `?server=`, `?veles=` or `?demo=`. The parent supplies
+the API, scope, bearer and language by same-origin `postMessage`; the iframe carries app routes in
+its hash. See [stage-1 hosting](../../docs/manual/studio-hosting.md) for the messages and local smoke.
 
 The `?veles=` value is EITHER a same-origin absolute path prefix (`/veles`, the
 in-chart shape — the browser stays same-origin behind the viewer's ingress, no CORS)

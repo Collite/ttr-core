@@ -281,7 +281,7 @@ class TtrpMethods(
             filePath?.parent?.takeIf { Files.isWritable(it) }
                 ?: Files.createTempDirectory("ttrp-bundle")
         return BundleAssembler(org.tatrman.ttrp.cli.ToolchainVersion.current)
-            .build(doc.text, fileNameOf(doc.uri), ctx.manifest, ctx.modelsRoot, outDir)
+            .build(doc.text, fileNameOf(doc.uri), ctx.manifest, ctx.modelsRoot, outDir, recipeDir = filePath?.parent)
     }
 
     private fun requireVersion(

@@ -44,6 +44,7 @@ case "$BASE" in /*) ;; *) BASE="/$BASE" ;; esac
 case "$BASE" in */) ;; *) BASE="$BASE/" ;; esac
 matches '/([A-Za-z0-9._~-]+/)*' "$BASE" || die "VIEWER_BASE_PATH must be a path like /models/, got '${VIEWER_BASE_PATH:-}'"
 case "$BASE" in */./* | */../*) die "VIEWER_BASE_PATH must not contain . or .. segments, got '$BASE'" ;; esac
+case "$BASE" in /m/_designer/) die "VIEWER_BASE_PATH /m/_designer/ is reserved for the Studio iframe" ;; esac
 
 # The catalog URL the browser fetches: a same-origin path, an http(s) origin, or a ws(s) origin
 # (exactly what `?veles=` accepts). Default: this image's own proxy under the base path.

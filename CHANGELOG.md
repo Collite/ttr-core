@@ -36,6 +36,13 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   `Period.start` (no `end`); `Value.is_null` is SQL NULL. Their canonical JSON mapping is protobuf JsonFormat (samples
   in `ttr-concept`'s tests round-trip byte-equal). The **Python wheel** (`ttr-plan-proto`, `python-plan/v*`) now packs
   them too (`org.tatrman.concept|statement|assertion.v1`), checked against the same JSON samples.
+- **AU bundle handoff** — generated verdict catalogs omit retired CNC roles so the automation loader can
+  reconcile them; recipe bundles carry sorted, hashed golden YAML fixtures in `recipe.tests` (omitted when empty); PostgreSQL recipe
+  expressions support typed `ceil` without a capability diagnostic. Integer `ceil`/`round` emit their argument
+  (including `round(i, n)` for a non-negative integer literal scale), keeping ordinary PostgreSQL calcs on the
+  translator path beside CASE/IS NULL expressions. Two-argument `round` over an integer with a negative or
+  non-literal scale is declared decimal. `round(<duration>)` is now refused with TTRP-TYP-001; PostgreSQL has no
+  `round(interval)`.
 
 - **`grammar/v0.17.3` / AU S2.5** — recipe statements now split at storage boundaries into door parts and
   DuckDB combines. Every recipe's `text` fingerprint changes, including `release_order` and `decide_return`,

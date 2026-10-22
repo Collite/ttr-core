@@ -14,6 +14,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldMatch
+import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.string.shouldStartWith
 import org.tatrman.ttr.metadata.model.ModelDescriptor
 import org.tatrman.ttr.metadata.reconcile.ModelReconciler
@@ -22,9 +23,12 @@ import org.tatrman.ttr.metadata.source.LocalFsStorage
 import org.tatrman.ttrp.emit.recipe.RecipeFingerprints
 import org.tatrman.ttrp.graph.TtrpPipeline
 import org.tatrman.ttrp.project.TtrpManifest
+import java.net.URI
+import java.net.URLDecoder
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.util.Properties
 
 /**
  * AU-core-P2 · S2.3 T1–T7 — a recipe builds into `<recipe>.bundle/` (contracts §5.2): one statement file per output,
@@ -56,6 +60,7 @@ class RecipeBundleSpec :
             BundleAssembler("1.0.0").build(
                 source = text,
                 fileName = name,
+                recipeDir = recipes,
                 pipelineManifest = manifest,
                 modelsRoot = fixtures.resolve("model"),
                 outDir = Files.createTempDirectory("ttrp-recipe"),
@@ -418,6 +423,219 @@ class RecipeBundleSpec :
             }
         }
 
+        "CEIL in a PostgreSQL recipe is supported without capability diagnostics" {
+            val r =
+                build(
+                    "release_order.ttrp",
+                    source("release_order.ttrp").replace(
+                        "on_hand = coalesce(stock.quantity_on_hand, 0)",
+                        "on_hand = ceil(coalesce(stock.quantity_on_hand, 0))",
+                    ),
+                )
+            r.diagnostics.shouldBeEmpty()
+            Files.readString(r.dir.resolve("islands/shortfall.rows.sql")).uppercase() shouldNotContain "CEIL("
+            val numeric =
+                build(
+                    "release_order.ttrp",
+                    source("release_order.ttrp").replace(
+                        "on_hand = coalesce(stock.quantity_on_hand, 0)",
+                        "on_hand = ceil(coalesce(stock.quantity_on_hand, 0) * 1.1)",
+                    ),
+                )
+            Files.readString(numeric.dir.resolve("islands/shortfall.rows.sql")).uppercase() shouldContain "CEIL("
+            numeric.manifest.islands
+                .single { it.name == "shortfall" }
+                .outputs!!
+                .single()
+                .columns
+                .single { it.name == "on_hand" }
+                .type shouldStartWith "decimal"
+        }
+
+        "integer and numeric ceil/round output types match executed PostgreSQL columns".config(
+            enabled = System.getenv("TTRP_CONFORM_PG") == "1",
+        ) {
+            val r =
+                build(
+                    "rounding.ttrp",
+                    """
+                    uses world "hartland.worlds.demo"
+                    import hartland.*
+                    import hartland.automation.*
+                    recipe {
+                        key: order.order_number
+                        candidates placed(out orders) target erp {
+                            load(er.entity.order)
+                            -> select(order_number, ci = ceil(order_number), ri = round(order_number),
+                                      cn = ceil(value), rn = round(value)) -> orders
+                        }
+                        decision v(in orders) { orders -> switch { go: true because: "probe" } }
+                        actions { v.go -> notify { who: role.ops, detail: placed } }
+                    }
+                    """.trimIndent(),
+                )
+            val sql = Files.readString(r.dir.resolve("islands/placed.orders.sql"))
+            val url =
+                System.getenv("TTR_CONN_ERP_PG") ?: "postgresql://localhost:55432/postgres?user=postgres&password=ttrp"
+            val uri = URI(url)
+            val props = Properties()
+
+            fun decode(value: String) = URLDecoder.decode(value, Charsets.UTF_8)
+            uri.rawUserInfo?.split(":", limit = 2)?.let {
+                props.setProperty("user", decode(it[0]))
+                if (it.size == 2) props.setProperty("password", decode(it[1]))
+            }
+            uri.rawQuery?.split("&")?.filter { it.isNotEmpty() }?.forEach {
+                val pair = it.split("=", limit = 2)
+                props.setProperty(decode(pair[0]), decode(pair.getOrElse(1) { "" }))
+            }
+            val jdbcUri =
+                URI(
+                    "postgresql",
+                    null,
+                    uri.host,
+                    uri.port.takeIf { it > 0 } ?: 5432,
+                    uri.path.ifEmpty { "/postgres" },
+                    null,
+                    null,
+                )
+            java.sql.DriverManager.getConnection("jdbc:$jdbcUri", props).use { db ->
+                db.createStatement().use { stmt ->
+                    stmt.execute("CREATE TEMP TABLE \"order\" (order_number INTEGER, value NUMERIC(12,2))")
+                    stmt.execute("INSERT INTO \"order\" VALUES (7, 12.3)")
+                    val acme =
+                        org.tatrman.ttr.metadata.fixtures.MetadataFixtures
+                            .erpProjectRoot()
+                    val cte =
+                        TtrpPipeline(
+                            TtrpManifest(world = "acme.worlds.dev", manifestDir = acme),
+                            org.tatrman.ttr.metadata.fixtures.MetadataFixtures
+                                .erpModelsRoot(),
+                        ).plan(
+                            """
+                            uses world "acme.worlds.dev"
+                            container rounding(out result) target erp_pg {
+                                raw = load(files.sales_2026, schema: sales_csv)
+                                typed = raw -> calc { q = cast(amount as int), amount_decimal = cast(amount as decimal) }
+                                result = typed -> calc { ci = ceil(q), ri = round(q), cn = ceil(amount_decimal), rn = round(amount_decimal),
+                                    scaled = round(q, -1), f = case when region is null then 0 else 1 end, n = region is null }
+                            }
+                            rounding.result -> display(rounding_result)
+                            """.trimIndent(),
+                            "cte-rounding.ttrp",
+                        )
+                    cte.ok shouldBe true
+                    val island = cte.exec!!.islands.single { it.name == "rounding" }
+                    val cteSql =
+                        org.tatrman.ttrp.emit.sql
+                            .SqlIslandEmitter(cte.bound!!)
+                            .emit(island, cte.graph!!)
+                            .text
+                    stmt.execute("CREATE TEMP TABLE sales_2026 (customer TEXT, amount NUMERIC(12,2), region TEXT)")
+                    stmt.execute("INSERT INTO sales_2026 VALUES ('probe', 1234.3, NULL)")
+                    stmt
+                        .executeQuery(
+                            "SELECT pg_typeof(ci)::text, pg_typeof(ri)::text, pg_typeof(cn)::text, " +
+                                "pg_typeof(rn)::text, pg_typeof(scaled)::text, scaled, f, n FROM ($cteSql) probe",
+                        ).use { rows ->
+                            rows.next() shouldBe true
+                            (1..5).map { rows.getString(it) } shouldBe
+                                listOf("integer", "integer", "numeric", "numeric", "numeric")
+                            rows.getInt(6) shouldBe 1230
+                            rows.getInt(7) shouldBe 0
+                            rows.getBoolean(8) shouldBe true
+                        }
+                    val types =
+                        "SELECT pg_typeof(ci)::text, pg_typeof(ri)::text, " +
+                            "pg_typeof(cn)::text, pg_typeof(rn)::text FROM ($sql) probe"
+                    stmt.executeQuery(types).use { rows ->
+                        rows.next() shouldBe true
+                        (1..4).map { rows.getString(it) } shouldBe listOf("integer", "integer", "numeric", "numeric")
+                    }
+                }
+            }
+            val columns =
+                r.manifest.islands
+                    .single { it.name == "placed" }
+                    .outputs!!
+                    .single()
+                    .columns
+            columns.filter { it.name in setOf("ci", "ri") }.map { it.type }.distinct() shouldBe listOf("int")
+            columns
+                .filter { it.name in setOf("cn", "rn") }
+                .map { it.type }
+                .distinct()
+                .single() shouldStartWith
+                "decimal"
+        }
+
+        "a recipe without golden fixtures omits the additive tests field" {
+            val r = build("release_order.ttrp")
+            val json = Files.readString(r.dir.resolve("manifest.json"))
+            ObjectMapper().readTree(json).path("recipe").has("tests") shouldBe false
+            r.manifest.recipe!!.tests shouldBe null
+            // Baseline from f400192's CLI with its unconditional empty tests key removed: the pre-field wire shape.
+            val baseline = Path.of("src/test/resources/fixtures/release-order-before-golden-field.json")
+            json shouldBe Files.readString(baseline)
+        }
+
+        "golden seeds beside a recipe are bundled, hashed and listed in path order" {
+            val dir = Files.createTempDirectory("recipe-goldens")
+            val file = dir.resolve("release_order.ttrp")
+            Files.writeString(file, source("release_order.ttrp"))
+            Files.createDirectories(dir.resolve("tests"))
+            Files.writeString(dir.resolve("tests/z.yaml"), "world: us\n")
+            Files.writeString(dir.resolve("tests/a.yaml"), "world: cz\n")
+            Files.writeString(dir.resolve("tests/notes.txt"), "not a golden")
+            Files.writeString(dir.resolve("tests/yaml"), "ignored")
+            Files.write(dir.resolve("tests/._a.yaml"), byteArrayOf(0xff.toByte()))
+            val r =
+                BundleAssembler("1.0.0").build(
+                    source("release_order.ttrp"),
+                    file.toString(),
+                    manifest,
+                    fixtures.resolve("model"),
+                    Files.createTempDirectory("recipe-goldens-out"),
+                    recipeDir = dir,
+                )
+            val json = ObjectMapper().readTree(r.manifest.toJson())
+            json.path("recipe").path("tests").map { it.asText() } shouldBe listOf("tests/a.yaml", "tests/z.yaml")
+            Files.readString(r.dir.resolve("tests/a.yaml")) shouldBe "world: cz\n"
+            r.manifest.files.keys shouldContain "tests/a.yaml"
+        }
+
+        "a recipe without an explicit directory reports missing golden discovery, never consulting cwd" {
+            val r =
+                BundleAssembler("1.0.0").build(
+                    source("release_order.ttrp"),
+                    "relative.ttrp",
+                    manifest,
+                    fixtures.resolve("model"),
+                    Files.createTempDirectory("no-location"),
+                )
+            r.diagnostics.single().message shouldContain "no file location"
+            r.manifest.recipe!!.tests shouldBe null
+        }
+
+        "invalid UTF-8 in a golden fixture is a named refusal" {
+            val dir = Files.createTempDirectory("bad-golden")
+            Files.createDirectories(dir.resolve("tests"))
+            Files.write(dir.resolve("tests/b.yaml"), byteArrayOf(0xff.toByte()))
+            val e =
+                io.kotest.assertions.throwables.shouldThrow<BundleAssembler.BundleRefused> {
+                    BundleAssembler("1.0.0").build(
+                        source("release_order.ttrp"),
+                        "relative.ttrp",
+                        manifest,
+                        fixtures.resolve("model"),
+                        Files.createTempDirectory("bad-golden-out"),
+                        recipeDir = dir,
+                    )
+                }
+            e.diagnostics.single().message shouldContain "golden fixture is not UTF-8"
+            e.diagnostics.single().message shouldContain "b.yaml"
+        }
+
         "the four `17` catalogs load in one snapshot with hartland's model and automation package" {
             val out = Files.createTempDirectory("ttrp-recipes")
             for (f in listOf("release_order.ttrp", "decide_return.ttrp", "monitor_inbound.ttrp", "settle.ttrp")) {
@@ -431,6 +649,30 @@ class RecipeBundleSpec :
             (snapshots.flatMap { it.errors } + result.errors)
                 .filter { it.sourceId == "bundles" && !it.message.startsWith("ttr/package-") }
                 .map { it.message }
+                .shouldBeEmpty()
+            val loadedCatalogs =
+                Files.walk(out).use { paths ->
+                    paths
+                        .filter { it.fileName.toString().endsWith("_verdict.ttrm") }
+                        .map { it.fileName.toString() }
+                        .toList()
+                        .sorted()
+                }
+            loadedCatalogs shouldBe
+                listOf(
+                    "decide_return_verdict.ttrm",
+                    "monitor_inbound_verdict.ttrm",
+                    "release_order_verdict.ttrm",
+                    "settle_verdict.ttrm",
+                )
+            (snapshots.flatMap { it.errors } + result.errors)
+                .filter {
+                    it.file.endsWith("_verdict.ttrm") &&
+                        (
+                            it.message.startsWith("ttr/unimported-reference") ||
+                                it.message.startsWith("ttr/unresolved-reference")
+                        )
+                }.map { it.message }
                 .shouldBeEmpty()
             val entities =
                 result.model.schemas.values
@@ -459,6 +701,13 @@ class RecipeBundleSpec :
                 (snapshots.flatMap { it.errors } + result.errors)
                     .filter { it.sourceId == "catalog" && !it.message.startsWith("ttr/package-") }
             catalogErrors.map { it.message }.shouldBeEmpty()
+            // Resolver findings can have the role's source id rather than the catalog source id.
+            (snapshots.flatMap { it.errors } + result.errors)
+                .filter {
+                    it.message.startsWith("ttr/unimported-reference") &&
+                        it.file.endsWith("release_order_verdict.ttrm")
+                }.map { it.message }
+                .shouldBeEmpty()
             val entities =
                 result.model.schemas.values
                     .flatMap { s -> (s as? org.tatrman.ttr.metadata.model.ErSchema)?.entities?.values.orEmpty() }

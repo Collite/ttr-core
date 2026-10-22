@@ -116,6 +116,7 @@ class BuildCommand : CliktCommand(name = "build") {
             try {
                 BundleAssembler(ToolchainVersion.current).build(
                     source = Files.readString(abs),
+                    recipeDir = abs.parent,
                     fileName = abs.toString(),
                     pipelineManifest = manifestResult.manifest,
                     modelsRoot = manifestResult.manifest.modelsRoot(),
@@ -339,6 +340,7 @@ class EmitDeterminismCommand : CliktCommand(name = "emit-determinism") {
                 BundleAssembler(ToolchainVersion.current, emitPlugin)
                     .build(
                         source = Files.readString(abs),
+                        recipeDir = abs.parent,
                         fileName = abs.toString(),
                         pipelineManifest = manifest.manifest,
                         modelsRoot = manifest.manifest.modelsRoot(),

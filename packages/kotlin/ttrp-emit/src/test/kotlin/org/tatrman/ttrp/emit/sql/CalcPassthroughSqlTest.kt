@@ -3,6 +3,8 @@ package org.tatrman.ttrp.emit.sql
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.string.shouldContain
 import org.tatrman.ttr.metadata.fixtures.MetadataFixtures
 import org.tatrman.ttrp.emit.GoldenSupport
@@ -24,6 +26,74 @@ class CalcPassthroughSqlTest :
                 TtrpManifest(world = "acme.worlds.dev", manifestDir = MetadataFixtures.erpProjectRoot()),
                 MetadataFixtures.erpModelsRoot(),
             ).plan(src, "calc-passthrough.ttrp")
+
+        for (fn in listOf("ceil(q)", "round(q)", "round(q, 0)", "round(q, 2)")) {
+            for (sibling in listOf("case when region is null then 0 else 1 end", "region is null")) {
+                test("integer $fn alongside $sibling keeps the CTE translator path") {
+                    val source =
+                        src.replace(
+                            "result = raw -> calc { doubled = amount * 2 }",
+                            "typed = raw -> calc(q = cast(amount as int))\n" +
+                                "result = typed -> calc { r = $fn, f = $sibling }",
+                        )
+                    val checked =
+                        TtrpPipeline(
+                            TtrpManifest(world = "acme.worlds.dev", manifestDir = MetadataFixtures.erpProjectRoot()),
+                            MetadataFixtures.erpModelsRoot(),
+                        ).plan(source, "integer-rounding.ttrp")
+                    checked.ok.shouldBeTrue()
+                    val container =
+                        checked.graph!!
+                            .containers.values
+                            .single { it.label == "calc_demo" }
+                    val chain =
+                        SqlGraphEmitter(
+                            checked.graph!!,
+                            checked.bound!!,
+                        ).plansByOutput(container).getValue("result")
+                    val sql = EmitFixtures.pgPlanner().emit(chain, "calc_demo")
+                    sql.uppercase() shouldNotContain "CEIL("
+                    sql.uppercase() shouldNotContain "ROUND("
+                    chain
+                        .last()
+                        .outputColumns
+                        .single { it.name == "r" }
+                        .type shouldBe "integer"
+                }
+            }
+        }
+
+        for (scale in listOf("-1", "q")) {
+            test("integer round at scale $scale retains ROUND and declares numeric") {
+                val source =
+                    src.replace(
+                        "result = raw -> calc { doubled = amount * 2 }",
+                        "typed = raw -> calc(q = cast(amount as int))\n" +
+                            "result = typed -> calc { r = round(q, $scale) }",
+                    )
+                val checked =
+                    TtrpPipeline(
+                        TtrpManifest(world = "acme.worlds.dev", manifestDir = MetadataFixtures.erpProjectRoot()),
+                        MetadataFixtures.erpModelsRoot(),
+                    ).plan(source, "scaled-rounding.ttrp")
+                checked.ok.shouldBeTrue()
+                val container =
+                    checked.graph!!
+                        .containers.values
+                        .single { it.label == "calc_demo" }
+                val chain =
+                    SqlGraphEmitter(
+                        checked.graph!!,
+                        checked.bound!!,
+                    ).plansByOutput(container).getValue("result")
+                EmitFixtures.pgPlanner().emit(chain, "calc_demo").uppercase() shouldContain "ROUND("
+                chain
+                    .last()
+                    .outputColumns
+                    .single { it.name == "r" }
+                    .type shouldBe "decimal"
+            }
+        }
 
         test("the calc container plans cleanly") {
             plan.ok.shouldBeTrue()
