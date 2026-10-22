@@ -1,0 +1,8 @@
+{
+  "op": "insert-entity",
+  "args": {
+    "name": "request_copy",
+    "file": "model/er/request-copy.ttrm",
+    "from": "db.dbo.return_request"
+  }
+}

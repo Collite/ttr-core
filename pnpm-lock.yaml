@@ -160,16 +160,22 @@ importers:
 
   packages/edit:
     dependencies:
+      '@tatrman/format':
+        specifier: workspace:*
+        version: link:../format
+      '@tatrman/parser':
+        specifier: workspace:*
+        version: link:../parser
       '@tatrman/semantics':
         specifier: workspace:*
         version: link:../semantics
+      '@tatrman/sql':
+        specifier: workspace:*
+        version: link:../sql
       vscode-languageserver-types:
         specifier: ^3.17.5
         version: 3.17.5
     devDependencies:
-      '@tatrman/parser':
-        specifier: workspace:*
-        version: link:../parser
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.19

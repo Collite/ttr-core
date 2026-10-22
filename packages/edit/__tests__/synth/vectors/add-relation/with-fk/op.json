@@ -1,0 +1,9 @@
+{
+  "op": "add-relation",
+  "args": {
+    "from": "er.entity.return_receipt",
+    "to": "er.entity.return_request",
+    "kind": "many-to-one",
+    "fk": "db.dbo.request_customer"
+  }
+}

@@ -192,50 +192,52 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
       break;
     }
     case 'project':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true)); add('version', qstr(def.version));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true)); add('version', qstr(def.version));
       break;
     case 'table':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('primaryKey', def.primaryKey && keyListDoc(def.primaryKey));
       add('columns', defList(def.columns)); add('indices', defList(def.indices)); add('constraints', defList(def.constraints));
       add('search', v(def.search), def.search); add('semantics', v(def.semantics), def.semantics); add('lexicon', v(def.lexicon), def.lexicon);
       break;
     case 'view':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('columns', defList(def.columns)); add('definitionSql', v(def.definitionSql), def.definitionSql); add('search', v(def.search), def.search);
       break;
     case 'column':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('type', v(def.type), def.type); add('optional', b(def.optional)); add('isKey', b(def.isKey)); add('indexed', b(def.indexed));
       add('search', v(def.search), def.search); add('semantics', v(def.semantics), def.semantics); add('lexicon', v(def.lexicon), def.lexicon);
       break;
     case 'index':
       // Grammar keyword for index/constraint type is `type` (DATA_TYPE token).
-      add('description', v(def.description), def.description); add('type', def.indexType && text(def.indexType));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('type', def.indexType && text(def.indexType));
       add('columns', def.columns && strListDoc(def.columns, true));
       break;
     case 'constraint':
-      add('description', v(def.description), def.description); add('type', def.constraintType && text(def.constraintType));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('type', def.constraintType && text(def.constraintType));
       add('columns', def.columns && strListDoc(def.columns, true));
       break;
     case 'fk':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('from', v(def.from), def.from); add('to', v(def.to), def.to);
       break;
     case 'procedure':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('parameters', def.parameters && def.parameters.length ? paramListDoc(def.parameters, ctx) : undefined);
       add('resultColumns', defList(def.resultColumns));
       break;
     case 'entity':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('labelPlural', qstr(def.labelPlural)); add('nameAttribute', v(def.nameAttribute), def.nameAttribute); add('codeAttribute', v(def.codeAttribute), def.codeAttribute);
       add('aliases', def.aliases && strListDoc(def.aliases, true)); add('attributes', defList(def.attributes));
+      add('binding', v(def.binding), def.binding);
       add('roles', def.roles && strListDoc(def.roles, false)); add('displayLabel', v(def.displayLabel), def.displayLabel); add('search', v(def.search), def.search); add('semantics', v(def.semantics), def.semantics); add('lexicon', v(def.lexicon), def.lexicon);
       if (def.concept) p.push(conceptSugarProp(def.concept, ctx));
       break;
     case 'attribute':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
+      add('binding', v(def.binding), def.binding);
       add('type', v(def.type), def.type); add('isKey', b(def.isKey)); add('optional', b(def.optional));
       add('valueLabels', v(def.valueLabels), def.valueLabels); add('displayLabel', v(def.displayLabel), def.displayLabel); add('search', v(def.search), def.search); add('semantics', v(def.semantics), def.semantics); add('lexicon', v(def.lexicon), def.lexicon);
       // 0.16 — lifecycle states (D-67); the property nodes carry the comments written on them.
@@ -248,43 +250,44 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
       if (def.concept) p.push(conceptSugarProp(def.concept, ctx));
       break;
     case 'relation':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('from', v(def.from), def.from); add('to', v(def.to), def.to);
       add('cardinality', v(def.cardinality), def.cardinality); add('join', v(def.join), def.join); add('search', v(def.search), def.search);
+      add('binding', v(def.binding), def.binding);
       break;
     case 'er2dbEntity':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('entity', v(def.entity), def.entity); add('target', v(def.target), def.target); add('whereFilter', v(def.whereFilter), def.whereFilter);
       break;
     case 'er2dbAttribute':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('attribute', v(def.attribute), def.attribute); add('target', v(def.target), def.target);
       break;
     case 'er2dbRelation':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('relation', v(def.relation), def.relation); add('fk', v(def.fk), def.fk);
       break;
     case 'query':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('language', def.language && text(def.language));
       add('parameters', def.parameters && def.parameters.length ? paramListDoc(def.parameters, ctx) : undefined);
       add('sourceText', v(def.sourceText), def.sourceText); add('search', v(def.search), def.search);
       break;
     case 'role':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('label', v(def.label), def.label); add('search', v(def.search), def.search);
       break;
     case 'er2cncRole':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('entity', v(def.entity), def.entity); add('role', v(def.role), def.role);
       break;
     // 0.14 — a named row schema: the column list, formatted exactly like a view's.
     case 'schema':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('columns', defList(def.columns));
       break;
     case 'area':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       // packages/entities are bare-id (dotted) lists — never quoted.
       add('packages', def.packages.length ? strListDoc(def.packages, false) : undefined);
       add('entities', def.entities.length ? strListDoc(def.entities, false) : undefined);
@@ -294,7 +297,7 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
     case 'term':
     case 'pattern':
     case 'example':
-      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('for', v(def.target), def.target);
       add('forms', def.forms && strListDoc(def.forms, true));
       add('match', qstr(def.match));

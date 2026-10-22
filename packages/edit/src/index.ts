@@ -19,3 +19,5 @@ export {
 } from './lint-fixes.js';
 export type { GraphOp, PortRef, EdgeRole, EdgeInsertionTarget } from './graph-ops.js';
 export { buildInsertNodeOnEdge, buildSetArgOp, buildSetSourceOp, buildRemoveObjectOp, insertionNodeId } from './graph-ops.js';
+export { synthesize } from './synth/index.js';
+export type { EditArgs, EditArguments, EditOp, RefusalCode, RefusalRef, SynthContext, SynthResult } from './synth/index.js';

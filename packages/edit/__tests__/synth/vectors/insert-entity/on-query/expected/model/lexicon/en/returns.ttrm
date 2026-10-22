@@ -1,0 +1,8 @@
+package hartland
+
+model lexicon locale en
+
+def term returns_review_en {
+    for: hartland.er.entity.returns_review,
+    forms: ["returns review"]
+}

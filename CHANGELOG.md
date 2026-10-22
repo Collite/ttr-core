@@ -6,6 +6,12 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **Studio synthesizer (S1.1)** — six pure `@tatrman/edit` operations create bound entities, attributes,
+  relations and bilingual terms, replace definition source, and remove definitions with orphan checks/force
+  cleanup. Fourteen byte-for-byte vectors pin the output, including Hartland's returns-review projection.
+  The formatter now retains inline entity/attribute/relation bindings and localized descriptions.
+  LSP request wiring and the hosted save seam follow in S1.2/S1.3; no release is cut here.
+
 - **Reference indexing (#258)** — preserve MD slot kinds in reverse references, find-references and rename;
   prefer the current model, then top-level definitions for same-package names, and report remaining ambiguity
   at the reference. TypeScript, Kotlin and Python share the rule and MD slot-aware lookup, guarded by collision

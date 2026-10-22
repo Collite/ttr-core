@@ -1,0 +1,12 @@
+{
+  "op": "insert-entity",
+  "args": {
+    "name": "returns_review",
+    "file": "model/er/returns-review.ttrm",
+    "on": "er.query.returns_review",
+    "terms": {
+      "en": "returns review",
+      "cs": "přehled reklamací"
+    }
+  }
+}

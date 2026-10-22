@@ -1,0 +1,5 @@
+{
+  "ok": false,
+  "code": "entity-needs-binding",
+  "message": "Choose a table or a parameterless query."
+}

@@ -1,0 +1,30 @@
+package hartland
+
+model er
+
+def entity return_request {
+    attributes: [
+        def attribute request_number { type: int, isKey: true },
+        def attribute customer { type: int },
+        def attribute requested_date { type: date },
+        def attribute state { type: text },
+        def attribute note { type: text }
+    ]
+}
+
+def entity return_receipt {
+    attributes: [
+        def attribute line_id { type: int },
+        def attribute received_date { type: date }
+    ]
+}
+
+def entity return_request_line {
+    attributes: [
+        def attribute line_id { type: int },
+        def attribute request_number { type: int },
+        def attribute item { type: int },
+        def attribute quantity { type: int },
+        def attribute unit_price { type: { type: decimal, length: 12, precision: 2 } }
+    ]
+}

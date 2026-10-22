@@ -1,0 +1,21 @@
+{
+  "ok": false,
+  "code": "text-unparseable",
+  "message": "mismatched input '<EOF>' expecting {'binding', 'concept', 'description', 'tags', 'attributes', 'labelPlural', 'nameAttribute', 'codeAttribute', 'aliases', 'displayLabel', 'roles', 'search', 'semantics', 'lexicon', '}'}",
+  "refs": [
+    {
+      "uri": "model/er/returns-flow.ttrm",
+      "kind": "parse-error",
+      "range": {
+        "start": {
+          "line": 4,
+          "character": 19
+        },
+        "end": {
+          "line": 4,
+          "character": 19
+        }
+      }
+    }
+  ]
+}
