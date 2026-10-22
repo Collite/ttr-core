@@ -1,0 +1,3 @@
+package shop
+model md
+def cubelet sales { grain: [], measures: [revenue] }

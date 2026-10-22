@@ -60,9 +60,10 @@ data class CollectedRef(
     val ownerDef: Definition,
     val cnContext: Boolean = false,
     val soft: Boolean = false,
+    val mdContext: MdReferenceRole? = null,
 ) {
-    /** The reference as the resolver reads it — its cn context included. */
-    fun toRef(): Resolver.Ref = Resolver.Ref(path, parts, cnContext)
+    /** The reference as the resolver reads it — its cn or MD slot context included. */
+    fun toRef(): Resolver.Ref = Resolver.Ref(path, parts, cnContext, mdContext)
 }
 
 /**
@@ -127,17 +128,19 @@ private fun collectInto(
         is LexiconEntryDef -> def.target?.let { out += refOf(it, owner) }
         // v3.1 MD — the cross-references the TS walker collects as `crossRefs` (domain / map / dimension /
         // measure / hierarchy / grain), read off the typed fields.
-        is AttributeDef -> def.domainRef?.let { out += refOf(it, owner) }
-        is DimensionDef -> def.hierarchies.forEach { out += refOf(it, owner) }
-        is MdMapDef -> (def.from + def.to).forEach { out += refOf(it, owner) }
+        is AttributeDef -> def.domainRef?.let { out += mdRef(it, owner, MdReferenceRole.Domain) }
+        is DimensionDef -> def.hierarchies.forEach { out += mdRef(it, owner, MdReferenceRole.Hierarchy) }
+        is MdMapDef -> (def.from + def.to).forEach { out += mdRef(it, owner, MdReferenceRole.Domain) }
         is HierarchyDef -> {
-            def.dimensionRef?.let { out += refOf(it, owner) }
-            def.levels.forEach { level -> level.via?.let { out += refOf(it, owner) } }
+            def.dimensionRef?.let { out += mdRef(it, owner, MdReferenceRole.Dimension) }
+            def.levels.forEach { level -> level.via?.let { out += mdRef(it, owner, MdReferenceRole.Map) } }
         }
-        is MeasureDef -> def.domainRef?.let { out += refOf(it, owner) }
+        is MeasureDef -> def.domainRef?.let { out += mdRef(it, owner, MdReferenceRole.Domain) }
         is CubeletDef -> {
-            def.grain.forEach { out += refOf(it, owner) }
-            def.measures.forEach { m -> if (m is CubeletMeasure.Ref) out += refOf(m.ref, owner) }
+            def.grain.forEach { out += mdRef(it, owner, MdReferenceRole.Grain) }
+            def.measures.forEach { m ->
+                if (m is CubeletMeasure.Ref) out += mdRef(m.ref, owner, MdReferenceRole.Measure)
+            }
         }
         // 0.17 — the cn model: a concept def's and a binding's slots.
         is ConceptDef -> collectConceptBody(def.body, BodyMode.Def, owner, out)
@@ -263,6 +266,12 @@ private fun collectConceptBody(
         }
     }
 }
+
+private fun mdRef(
+    ref: Reference,
+    owner: Definition,
+    role: MdReferenceRole,
+): CollectedRef = CollectedRef(ref.path, ref.parts, ref.source, owner, mdContext = role)
 
 private fun refOf(
     ref: Reference,

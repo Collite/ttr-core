@@ -1,0 +1,3 @@
+package shop
+model er
+def entity sale { attributes: [def attribute revenue { type: decimal }] }

@@ -1,0 +1,4 @@
+package shop
+model er
+def entity customer { attributes: [def attribute id { type: int }] }
+def entity order { attributes: [def attribute id { type: int }, def attribute customer { type: int }] }

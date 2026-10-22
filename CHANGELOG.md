@@ -28,6 +28,11 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   type (`entity_type_ref = cn.X` downstream), so lex-matcher and the resolver move to v6 first, and an estate's archives
   are rebuilt after — all of an estate's archives together (a reader skips an additive archive whose schema differs from
   the primary's). The lexicon hash covers the entries only, so caches key on the archive id.
+- **Reference indexing (#258)** — preserve MD slot kinds in reverse references, find-references and rename;
+  prefer the current model, then top-level definitions for same-package names, and report remaining ambiguity
+  at the reference. TypeScript, Kotlin and Python share the rule and MD slot-aware lookup, guarded by collision
+  conformance fixtures. Resolution no longer depends on document indexing order.
+
 - **Grammar 0.18 / HP-P1** — explicit `md2er_dimension` and structural `md2er_cubelet.measures`
   across TS, Kotlin and Python. Validate dimension keys, one-relation paths, duplicate bindings and
   measure targets. The Kotlin writer and TS formatter render both bindings; the formatter preserves comments.

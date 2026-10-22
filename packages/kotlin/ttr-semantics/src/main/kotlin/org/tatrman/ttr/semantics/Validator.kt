@@ -308,11 +308,20 @@ class Validator(
             when (res) {
                 is ResolutionResult.Unresolved ->
                     if (res.reason == ResolutionResult.Reason.Ambiguous) {
+                        val via =
+                            if (res.tried.any {
+                                    it.step == ResolutionStep.SamePackage && it.reason == "ambiguous"
+                                }
+                            ) {
+                                "same-package lookup"
+                            } else {
+                                "wildcard imports"
+                            }
                         diagnostics +=
                             error(
                                 DiagnosticCode.AmbiguousReference,
-                                "Ambiguous reference: '${collected.path}' matches ${res.candidates.size} definitions via wildcard imports",
-                                res.candidates.firstOrNull()?.source ?: collected.source,
+                                "Ambiguous reference: '${collected.path}' matches ${res.candidates.size} definitions via $via",
+                                collected.source,
                             )
                     } else if (!collected.soft) {
                         // A soft cn ref (a bearer-local `qualities:` / `period:` name) that names no concept is an
