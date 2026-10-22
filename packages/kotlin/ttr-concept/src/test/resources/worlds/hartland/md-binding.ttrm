@@ -1,0 +1,14 @@
+// CN-P3 S3.7 — the md face's physical binding: `channelSales` reads the `channel_sales` table (wide), the oracle's
+// lowering (`MdPathLowering`) and the S3.3 statement lowering read the same binding.
+model binding
+
+def md2db_cubelet channel_sales_binding {
+    cubelet: md.channelSales,
+    target: { table: db.dbo.channel_sales },
+    shape: wide,
+    attributes: { Channel.code: { column: channel } },
+    measures: {
+        revenue: { column: ext_sales_price },
+        quantity: { column: quantity }
+    }
+}

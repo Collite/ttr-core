@@ -1,0 +1,114 @@
+// CN-P3 S3.7 — one grounding per concept (AM-15). The recipe vocabulary on er; an event's participants are relation
+// paths from its entity (L15-3); `revenue` / `quantity` on md (the channel cubelet). `Channel` is a value kind on the
+// `channel_sales.channel` attribute (AM-27) — no participant path: it is a column of the event's own entity.
+model binding
+
+def cn2er_role customer_g  { role: cn.Customer, target: er.entity.customer }
+def cn2er_kind item_g      { kind: cn.Item, target: er.entity.item }
+def cn2er_kind warehouse_g { kind: cn.Warehouse, target: er.entity.warehouse }
+def cn2er_kind channel_g   { kind: cn.Channel, target: er.entity.channel_sales.channel }
+
+def cn2er_event sale_g {
+    event: cn.Sale,
+    target: er.entity.channel_sales,
+    period: { at: er.entity.channel_sales.sold_date },
+    participants: { customer: [er.relation.channel_sales_customer], item: [er.relation.channel_sales_item] }
+}
+def cn2er_event order_g {
+    event: cn.Order,
+    target: er.entity.order,
+    period: { start: er.entity.order.placed_date, end: er.entity.order.delivered_date },
+    participants: { customer: [er.relation.order_customer], fulfilling: [er.relation.order_warehouse] }
+}
+def cn2er_event order_line_g {
+    event: cn.OrderLine,
+    target: er.entity.sales_line,
+    period: { at: er.entity.sales_line.sold_date },
+    participants: {
+        order: [er.relation.sales_line_order],
+        item: [er.relation.sales_line_item],
+        warehouse: [er.relation.sales_line_warehouse]
+    }
+}
+def cn2er_event invoicing_g {
+    event: cn.Invoicing,
+    target: er.entity.invoice,
+    period: { start: er.entity.invoice.issued, end: er.entity.invoice.due },
+    participants: { customer: [er.relation.invoice_customer], order: [er.relation.invoice_order] }
+}
+def cn2er_event inventory_g {
+    event: cn.Inventory,
+    target: er.entity.inventory,
+    period: { at: er.entity.inventory.as_of_date },
+    participants: { item: [er.relation.inventory_item], warehouse: [er.relation.inventory_warehouse] }
+}
+def cn2er_event outage_g {
+    event: cn.WarehouseOutage,
+    target: er.entity.warehouse_outage,
+    period: { start: er.entity.warehouse_outage.from_date, end: er.entity.warehouse_outage.to_date },
+    participants: { warehouse: [er.relation.outage_warehouse] }
+}
+def cn2er_event price_list_g {
+    event: cn.PriceList,
+    target: er.entity.price_list,
+    period: { start: er.entity.price_list.valid_from, end: er.entity.price_list.valid_to },
+    participants: { item: [er.relation.price_list_item] }
+}
+def cn2er_event customer_price_g {
+    event: cn.CustomerPrice,
+    target: er.entity.customer_price,
+    period: { start: er.entity.customer_price.valid_from, end: er.entity.customer_price.valid_to },
+    participants: { customer: [er.relation.customer_price_customer], item: [er.relation.customer_price_item] }
+}
+def cn2er_event return_request_g {
+    event: cn.ReturnRequest,
+    target: er.entity.return_request,
+    period: { at: er.entity.return_request.requested_date },
+    participants: { customer: [er.relation.return_request_customer], order: [er.relation.return_request_order] }
+}
+def cn2er_event return_line_g {
+    event: cn.ReturnLine,
+    target: er.entity.return_request_line,
+    participants: {
+        request: [er.relation.return_line_request],
+        customer: [er.relation.return_line_request, er.relation.return_request_customer],
+        item: [er.relation.return_line_item]
+    }
+}
+
+def cn2md_quality revenue_g  { quality: cn.revenue, target: md.revenue }
+def cn2md_quality quantity_g { quality: cn.quantity, target: md.quantity }
+
+def cn2er_quality sale_date_g { quality: cn.sale_date, target: er.entity.channel_sales.sold_date }
+def cn2er_quality order_value_g { quality: cn.order_value, target: er.entity.order.value }
+def cn2er_quality state_g { quality: cn.state, target: er.entity.order.state }
+def cn2er_quality channel_g { quality: cn.channel, target: er.entity.order.channel }
+def cn2er_quality placed_date_g { quality: cn.placed_date, target: er.entity.order.placed_date }
+def cn2er_quality delivered_date_g { quality: cn.delivered_date, target: er.entity.order.delivered_date }
+def cn2er_quality line_quantity_g { quality: cn.line_quantity, target: er.entity.sales_line.quantity }
+def cn2er_quality unit_price_g { quality: cn.unit_price, target: er.entity.sales_line.unit_price }
+def cn2er_quality line_date_g { quality: cn.line_date, target: er.entity.sales_line.sold_date }
+def cn2er_quality amount_g { quality: cn.amount, target: er.entity.invoice.amount }
+def cn2er_quality paid_g { quality: cn.paid, target: er.entity.invoice.paid }
+def cn2er_quality invoice_status_g { quality: cn.invoice_status, target: er.entity.invoice.status }
+def cn2er_quality issued_g { quality: cn.issued, target: er.entity.invoice.issued }
+def cn2er_quality due_g { quality: cn.due, target: er.entity.invoice.due }
+def cn2er_quality quantity_on_hand_g { quality: cn.quantity_on_hand, target: er.entity.inventory.quantity_on_hand }
+def cn2er_quality as_of_date_g { quality: cn.as_of_date, target: er.entity.inventory.as_of_date }
+def cn2er_quality outage_from_g { quality: cn.outage_from, target: er.entity.warehouse_outage.from_date }
+def cn2er_quality outage_to_g { quality: cn.outage_to, target: er.entity.warehouse_outage.to_date }
+def cn2er_quality outage_reason_g { quality: cn.outage_reason, target: er.entity.warehouse_outage.reason }
+def cn2er_quality pl_price_g { quality: cn.pl_price, target: er.entity.price_list.price }
+def cn2er_quality pl_channel_g { quality: cn.pl_channel, target: er.entity.price_list.channel }
+def cn2er_quality pl_from_g { quality: cn.pl_from, target: er.entity.price_list.valid_from }
+def cn2er_quality pl_to_g { quality: cn.pl_to, target: er.entity.price_list.valid_to }
+def cn2er_quality cp_price_g { quality: cn.cp_price, target: er.entity.customer_price.price }
+def cn2er_quality cp_from_g { quality: cn.cp_from, target: er.entity.customer_price.valid_from }
+def cn2er_quality cp_to_g { quality: cn.cp_to, target: er.entity.customer_price.valid_to }
+def cn2er_quality request_state_g { quality: cn.request_state, target: er.entity.return_request.state }
+def cn2er_quality requested_date_g { quality: cn.requested_date, target: er.entity.return_request.requested_date }
+def cn2er_quality return_quantity_g { quality: cn.return_quantity, target: er.entity.return_request_line.return_quantity }
+def cn2er_quality return_unit_price_g { quality: cn.return_unit_price, target: er.entity.return_request_line.return_unit_price }
+def cn2er_quality return_reason_g { quality: cn.return_reason, target: er.entity.return_request_line.reason }
+def cn2er_quality line_state_g { quality: cn.line_state, target: er.entity.return_request_line.line_state }
+def cn2er_quality line_amount_g { quality: cn.line_amount, target: er.entity.return_request_line.amount }

@@ -1,0 +1,15 @@
+package hartland.consumer
+model md
+
+def domain Code  { type: string }
+def domain Money { type: decimal }
+
+def dimension Channel { key: code, attributes: [ def attribute code { domain: md.Code, isKey: true } ] }
+def measure revenue { domain: md.Money, aggregation: sum }
+def cubelet channelSales { grain: [Channel.code], measures: [revenue] }
+
+def md2er_cubelet channel_sales_er {
+    cubelet: md.channelSales,
+    target: er.entity.channel_sale,
+    attributes: { Channel.code: channel }
+}

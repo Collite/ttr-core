@@ -9,6 +9,9 @@ concepts; the bindings tell them where the data is.
 > sugar into bindings, and reports the model-level `cn/*` diagnostics as you type. `ttr cn hygiene` adds the checks on
 > `definition:` / `members:` / `filter:` blocks and prints the [hygiene report](#the-hygiene-report).
 > [Diagnostics](#diagnostics) says which check fires where.
+>
+> **Toolchain 0.17.5 — used.** `org.tatrman:ttr-concept` lowers what agents say in concepts to data operations:
+> [statements, assertions and rendering](#statements-assertions-rendering), and `ttr cn materialize`.
 
 | where | what |
 |---|---|
@@ -362,8 +365,9 @@ Each `cn/*` diagnostic fires in one of three places:
   Kotlin toolchain — the editor's error rows but the lexicon pair (`cn/duplicate-default-sense` is the editor's
   alone) — and loading errors such as a file whose `package` does not match its directory. Warnings and hygiene
   findings it does not print;
-- **consumer** *(a later release)* — the tools that read the model at run time will refuse a statement, an assertion
-  or a recipe with it.
+- **consumer** — `ttr-concept` (toolchain 0.17.5) refuses a statement, an assertion or a recipe with it: its validates
+  and lowers, which the tools that read the model at run time call (see
+  [Statements, assertions, rendering](#statements-assertions-rendering)).
 
 | slug | grade | fires in | meaning |
 |---|---|---|---|
@@ -398,8 +402,15 @@ Each `cn/*` diagnostic fires in one of three places:
 | `cn/not-assertable` | error | consumer | an asserted event with no landing on the er layer |
 | `cn/unit-mismatch` | error | consumer | an asserted value's unit differs from the attribute's |
 | `cn/ambiguous-statement` · `cn/ambiguous-assertion` | error | consumer | a statement or assertion with unresolved candidates |
-| `cn/missing-time` | error | consumer | a statement with no time and not `all_time` |
-| `cn/materialize-parametric` | error | `ttr cn materialize` *(a later release)* | a definition reading `:name` or `:as_of` cannot become a stacked entity |
+| `cn/missing-time` | error | consumer | a statement with no time and not `all_time`, or an assertion with no period where its event declares one |
+| `cn/unsupported-ask` | error | consumer | a statement asking for a set (`ASK_SET`, reserved) or asking nothing |
+| `cn/unknown-participant-label` | error | consumer | an asserted participant label the event's `involves:` does not declare |
+| `cn/slot-mismatch` | error | consumer | a concept the slot does not take (a phase as a measure, …), or an asserted value its attribute's type does not take, or NULL where it is not `optional` |
+| `cn/malformed-frame` | error | consumer | a frame field out of its shape: a time the vocabulary lacks, a filter with no form, an end before the start, one attribute asserted with two values, … |
+| `cn/missing-as-of` | error | consumer | a state claim (the event bears a current- or past-state phase) asserted without `asserted_as_of` |
+| `cn/snapshot-mismatch` | warning | consumer | the frame was built on another snapshot of the model |
+| `cn/explain-locale-fallback` | warning | consumer | an explanation asked for in a locale it does not speak (it speaks en and cs) — the text is English |
+| `cn/materialize-parametric` | error | `ttr cn materialize` | a definition reading `:name` or `:as_of` cannot become a stacked entity |
 | `cn/no-concept` | — | consumer | no concept or element matched a mention |
 
 The definition checks read a definition with every phase and defined quality it names inlined, transitively. A
@@ -419,6 +430,140 @@ A window counts as the comparisons it stands for: `within(x, last: d)` is `x >= 
 
 **Granularity.** An instant's granularity is its event's `period: { precision }`, else its attribute's type (a `date`
 is a day, a timestamp a second); `:as_of` is a day. Unknown on either side — no finding.
+
+## Statements, assertions, rendering
+
+An agent never writes SQL against the model. It proposes a **frame** over concepts — a `statement.v1` to read, an
+`assertion.v1` to record — or a recipe names a phase, and `ttr-concept` turns that into a data operation through the
+bindings. The same model and the same frame always give the same bytes: no model call, no server call, no clock read
+when the frame names its day.
+
+| frame | validate | lower | explain |
+|---|---|---|---|
+| statement (read) | `statementValidate` | `statementLower` → a `plan.v1` through the md path | `statementExplain` |
+| assertion (write) | `assertionValidate` | `assertionLower` → the E-R row payload | `assertionExplain` |
+| a phase, by name | — | `definitionRender` → md predicate or er SQL; `materialize` → model text | — |
+
+A frame that cannot be served is refused with its findings (`cn/missing-time`, `cn/ambiguous-statement`,
+`cn/not-analytically-reachable`, `cn/not-assertable`, `cn/slot-mismatch`, …, see [Diagnostics](#diagnostics)) and
+nothing else: no plan, no rows, no text.
+
+### Statements
+
+A statement names measures, filters, grouping, a time and optionally an `as_of`, all as concepts. Each slot goes
+through its `cn2md` grounding; a phase filter's definition is inlined (and phases inside it, transitively); `:name`
+parameters take the world's values, `:as_of` the statement's day. "Net revenue for Kaufland in January 2026":
+
+```json
+{ "ask": "ASK_VALUE", "measures": [{ "qname": "cn.revenue" }],
+  "filters": [{ "member": { "concept": { "qname": "cn.Customer" },
+                            "member": { "label": "Kaufland", "resolvedValue": "Kaufland" } } }],
+  "time": { "periodCode": "2026-01" }, "locale": "en" }
+```
+
+lowers through the md dot-path `sales[customer.name: "Kaufland", time.month: 1, time.year: 2026].net @ sum` to a
+plan, with its provenance beside it: which binding each slot went through, the definitions inlined, the parameters
+bound, the as-of, the model snapshot.
+
+### Assertions
+
+An assertion records an event — its participants by label, its period, its qualities — and lowers to **one row, the
+event's**, for a writer to store. cn itself never writes.
+
+```json
+{ "rows": [{ "entity": "transfer",
+             "values": { "patient_id": "1001", "from_encounter": "501", "to_encounter": "502",
+                         "at": "2026-03-14T09:30", "transfer_kind": "step-down" } }],
+  "assertedAsOf": "2026-03-14" }
+```
+
+- A participant becomes the foreign-key value its labelled relation writes on the event's row; it must carry a
+  resolved member. A participant two relations away (the patient of the encounter the transfer starts from) is an
+  **obligation**: the writer checks that the row the path reaches holds that member.
+- Instants are written as the frame writes them (`2026-03`, `2026-03-14T09:30`); an imprecise period's stored upper
+  bound is the next granule (`2026-04`). An absent end is NULL, and whether it is open or unknown travels beside the
+  row.
+- A value that does not fit its attribute's type, or one attribute given two values, refuses the assertion.
+
+### Explanations
+
+The sentence a frame says, in English or Czech, built from the frame (never from its lowering), for the inspector to
+show before anything runs:
+
+```
+Net revenue · customer Kaufland · January 2026.
+Čistý obrat · zákazník Kaufland · leden 2026.
+Net revenue · large sale: net revenue > large_sale (= 10000) · January 2026.
+Transfer · patient: Patient P-1001 · from: Encounter E-501 · to: Encounter E-502 · at 2026-03-14 09:30 · kind of transfer: step-down · asserted as of 2026-03-14 · source: manual:steward
+```
+
+A concept reads as its label in the locale, else its lexicon term in the locale, else its English label, else its
+name in words (`LargeSale` → `large sale`); a parameter as `name (= value)`. A phase filter says its definition; a
+construct the explanation cannot put into words is quoted from the source, never guessed. A refused frame is still
+explained and ends `— refused: <slug> (<subject>)`. Another locale reads English, with `cn/explain-locale-fallback`.
+
+### Rendering a definition
+
+`definitionRender` renders a phase, a defined quality or a member-restricted kind on the **md** layer (a predicate
+over the carrying cubelet's attributes, for TTR-P) or the **er** layer (SQL over entities). `PREDICATE` mode selects
+the bearer's key:
+
+```sql
+-- cn.PendingOrder: state in ('placed', 'held')
+SELECT "order".order_number
+FROM "order"
+WHERE "order".state IN ('placed', 'held')
+```
+
+`CONTEXT` mode joins the bearer to a candidate phase and projects named columns, the shape of a recipe's island. A
+definition that reads the evaluation day reads it as a placeholder, and the rendering lists what it reads and how a
+derived bound is computed:
+
+```sql
+-- cn.RecentBuyer: exists Order o involving this where within(o.period.start, last: days(365))
+SELECT customer.sk
+FROM customer
+WHERE EXISTS (
+  SELECT 1
+  FROM "order" o
+  WHERE o.customer = customer.sk AND o.placed_date >= {window_lo} AND o.placed_date <= {as_of}
+)
+-- reads: window_lo (= as_of - days(365)), as_of
+```
+
+The layout is fixed (one clause per line, a subquery indented two spaces), so a rendering diffs cleanly. A concept the
+definition mentions that has no grounding on the layer refuses it (`cn/definition-unreachable(er)` · `(md)`).
+
+### `ttr cn materialize`
+
+A phase that many readers share can be stored as a logical query instead of re-rendered each time:
+
+```
+ttr cn materialize <model-dir> <cn.Phase> [--dialect postgresql] [--out <dir>]
+```
+
+It writes the phase's er rendering as a `def query <phase>_q` and an entity stacked on it, in the phase's package;
+printed, or written under `--out` as `<phase>.ttrm`. You then replace the phase's `definition:` by a `cn2er_phase`
+grounding on that entity. A definition that reads a `:name` parameter or `:as_of` is refused
+(`cn/materialize-parametric`): a logical query takes no parameters. Exit 0 — written; 1 — refused (the finding on
+stderr); 2 — usage, or a model that cannot be read. From the ttr-core repository: `just cn-materialize <model-dir>
+<cn.Phase> [flags]`.
+
+```ttrm
+model er
+
+def query placed_order_q {
+    sourceText: """sql
+SELECT "order".order_number
+FROM "order"
+WHERE "order".state = 'placed'
+"""
+}
+def entity placed_order {
+    binding: { target: { query: er.query.placed_order_q } },
+    attributes: [ def attribute order_number { type: int, isKey: true } ]
+}
+```
 
 ## The hygiene report
 

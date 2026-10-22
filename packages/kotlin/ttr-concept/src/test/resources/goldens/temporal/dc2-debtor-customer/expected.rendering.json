@@ -1,0 +1,10 @@
+{
+  "parametersRead": [
+    {
+      "name": "as_of"
+    }
+  ],
+  "definitionsInlined": [
+    "cn.OverdueInvoice"
+  ]
+}

@@ -145,6 +145,10 @@ jobs:
           unzip -l packages/python/ttr-plan-proto/dist/*.whl \
             | grep -E 'org/tatrman/plan/v1/plan_pb2\.py' \
             || { echo "::error::generated plan.v1 classes missing from wheel"; exit 1; }
+          # CN-P3 S3.1 — the frozen cn frames ride the same wheel.
+          unzip -l packages/python/ttr-plan-proto/dist/*.whl \
+            | grep -E 'org/tatrman/statement/v1/statement_pb2\.py' \
+            || { echo "::error::generated cn statement.v1 classes missing from wheel"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: dist-plan

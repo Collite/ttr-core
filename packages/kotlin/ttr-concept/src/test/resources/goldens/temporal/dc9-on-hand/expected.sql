@@ -1,0 +1,6 @@
+SELECT sales_line.order_number, sales_line.line_no, COALESCE(on_hand.quantity_on_hand, 0) AS on_hand
+FROM sales_line
+LEFT JOIN (
+  SELECT inventory.item, inventory.warehouse, inventory.quantity_on_hand, ROW_NUMBER() OVER (PARTITION BY inventory.item, inventory.warehouse ORDER BY inventory.as_of_date DESC) AS rn
+  FROM inventory
+) on_hand ON on_hand.item = sales_line.item AND on_hand.warehouse = sales_line.warehouse AND on_hand.rn = 1

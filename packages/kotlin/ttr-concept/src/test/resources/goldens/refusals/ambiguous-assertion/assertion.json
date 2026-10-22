@@ -1,0 +1,19 @@
+{
+  "event": {
+    "candidates": [
+      {
+        "qname": "cn.Transfer"
+      },
+      {
+        "qname": "cn.Encounter"
+      }
+    ]
+  },
+  "identity": {
+    "new": true
+  },
+  "provenance": {
+    "producer": "manual:steward"
+  },
+  "locale": "en"
+}

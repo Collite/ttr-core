@@ -1,0 +1,6 @@
+// CN-P3 S3.7 — the parameters the Hartland definitions read as `:name` (A-CN-26): the price check's tolerance (H-1)
+// and the return window (LateReturnLine, G-ER-2 pending).
+model automation
+
+def parameter tolerance     { type: decimal, value: 0.01 }
+def parameter return_window { type: int, value: 30 }

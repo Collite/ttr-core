@@ -1,0 +1,8 @@
+{
+  "world": "hartland",
+  "call": "statementLower",
+  "stage": "S3.3",
+  "oracle": {
+    "mdPath": "channelSales.code.*.revenue"
+  }
+}

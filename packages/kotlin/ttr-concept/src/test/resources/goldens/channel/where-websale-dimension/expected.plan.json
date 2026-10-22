@@ -1,0 +1,44 @@
+{
+  "aggregate": {
+    "input": {
+      "filter": {
+        "input": {
+          "tableScan": {
+            "table": {
+              "schemaCode": "DB",
+              "namespace": "dbo",
+              "name": "channel_sales"
+            },
+            "outputColumns": [{
+              "name": "channel"
+            }, {
+              "name": "ext_sales_price"
+            }]
+          }
+        },
+        "condition": {
+          "function": {
+            "operation": "eq",
+            "operands": [{
+              "columnRef": {
+                "name": "channel"
+              }
+            }, {
+              "literal": {
+                "stringValue": "web",
+                "type": "text"
+              }
+            }]
+          }
+        }
+      }
+    },
+    "aggregates": [{
+      "function": "sum",
+      "args": [{
+        "name": "ext_sales_price"
+      }],
+      "alias": "revenue"
+    }]
+  }
+}

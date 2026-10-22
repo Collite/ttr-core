@@ -1,0 +1,172 @@
+// CN-P3 S3.7 — the Hartland AU extension's er face: the S0.3 entity set (memo §2) and the relations the
+// participant paths walk, one per foreign key (from the holder to the referenced entity). `warehouse_outage.to_date`
+// is CLOSED (the last day of the outage, memo §2) — no open state.
+model er
+
+def entity order {
+    binding: { target: { table: db.dbo.table.order } },
+    attributes: [
+        def attribute order_number { type: int, isKey: true },
+        def attribute channel { type: text },
+        def attribute customer { type: int },
+        def attribute placed_date { type: date },
+        def attribute delivered_date { type: date, optional: true },
+        def attribute fulfilling_warehouse { type: int },
+        def attribute value { type: decimal },
+        def attribute state { type: text }
+    ]
+}
+
+def entity sales_line {
+    binding: { target: { table: db.dbo.table.sales_line } },
+    attributes: [
+        def attribute order_number { type: int, isKey: true },
+        def attribute line_no { type: int, isKey: true },
+        def attribute item { type: int },
+        def attribute quantity { type: int },
+        def attribute unit_price { type: decimal },
+        def attribute warehouse { type: int },
+        def attribute sold_date { type: date },
+        def attribute customer { type: int },
+        def attribute channel { type: text }
+    ]
+}
+
+def entity inventory {
+    binding: { target: { table: db.dbo.table.inventory } },
+    attributes: [
+        def attribute as_of_date { type: date, isKey: true },
+        def attribute item { type: int, isKey: true },
+        def attribute warehouse { type: int, isKey: true },
+        def attribute quantity_on_hand { type: int }
+    ]
+}
+
+def entity warehouse_outage {
+    binding: { target: { table: db.dbo.table.warehouse_outage } },
+    attributes: [
+        def attribute warehouse { type: int, isKey: true },
+        def attribute from_date { type: date, isKey: true },
+        def attribute to_date { type: date },
+        def attribute reason { type: text }
+    ]
+}
+
+def entity price_list {
+    binding: { target: { table: db.dbo.table.price_list } },
+    attributes: [
+        def attribute item { type: int, isKey: true },
+        def attribute channel { type: text, isKey: true },
+        def attribute valid_from { type: date, isKey: true },
+        def attribute price { type: decimal },
+        def attribute valid_to { type: date, optional: true }
+    ]
+}
+
+def entity customer_price {
+    binding: { target: { table: db.dbo.table.customer_price } },
+    attributes: [
+        def attribute item { type: int, isKey: true },
+        def attribute customer { type: int, isKey: true },
+        def attribute valid_from { type: date, isKey: true },
+        def attribute price { type: decimal },
+        def attribute valid_to { type: date, optional: true }
+    ]
+}
+
+def entity invoice {
+    binding: { target: { table: db.dbo.table.invoice } },
+    attributes: [
+        def attribute invoice_id { type: int, isKey: true },
+        def attribute customer { type: int },
+        def attribute order_number { type: int },
+        def attribute issued { type: date },
+        def attribute due { type: date },
+        def attribute amount { type: decimal },
+        def attribute paid { type: decimal },
+        def attribute status { type: text }
+    ]
+}
+
+def entity customer {
+    binding: { target: { table: db.dbo.table.customer } },
+    attributes: [
+        def attribute sk { type: int, isKey: true },
+        def attribute customer_id { type: text }
+    ]
+}
+
+def entity item {
+    binding: { target: { table: db.dbo.table.item } },
+    attributes: [
+        def attribute sk { type: int, isKey: true },
+        def attribute item_id { type: text }
+    ]
+}
+
+def entity warehouse {
+    binding: { target: { table: db.dbo.table.warehouse } },
+    attributes: [
+        def attribute sk { type: int, isKey: true },
+        def attribute warehouse_name { type: text }
+    ]
+}
+
+def entity channel_sales {
+    binding: { target: { table: db.dbo.table.channel_sales } },
+    attributes: [
+        def attribute sale_id { type: int, isKey: true },
+        def attribute channel { type: text },
+        def attribute customer { type: int },
+        def attribute item { type: int },
+        def attribute sold_date { type: date },
+        def attribute ext_sales_price { type: decimal },
+        def attribute quantity { type: int }
+    ]
+}
+
+def entity return_request {
+    binding: { target: { table: db.dbo.table.return_request } },
+    attributes: [
+        def attribute request_id { type: int, isKey: true },
+        def attribute order_number { type: int },
+        def attribute customer { type: int },
+        def attribute requested_date { type: date },
+        def attribute state { type: text }
+    ]
+}
+
+def entity return_request_line {
+    binding: { target: { table: db.dbo.table.return_request_line } },
+    attributes: [
+        def attribute request_id { type: int, isKey: true },
+        def attribute line_no { type: int, isKey: true },
+        def attribute item { type: int },
+        def attribute return_quantity { type: int },
+        def attribute return_unit_price { type: decimal },
+        def attribute reason { type: text },
+        def attribute line_state { type: text },
+        def attribute amount { type: decimal }
+    ]
+}
+
+def relation order_customer { from: er.entity.order, to: er.entity.customer, join: [{ from: er.entity.order.customer, to: er.entity.customer.sk }] }
+def relation order_warehouse { from: er.entity.order, to: er.entity.warehouse, join: [{ from: er.entity.order.fulfilling_warehouse, to: er.entity.warehouse.sk }] }
+def relation sales_line_order { from: er.entity.sales_line, to: er.entity.order, join: [{ from: er.entity.sales_line.order_number, to: er.entity.order.order_number }] }
+def relation sales_line_item { from: er.entity.sales_line, to: er.entity.item, join: [{ from: er.entity.sales_line.item, to: er.entity.item.sk }] }
+def relation sales_line_warehouse { from: er.entity.sales_line, to: er.entity.warehouse, join: [{ from: er.entity.sales_line.warehouse, to: er.entity.warehouse.sk }] }
+def relation sales_line_customer { from: er.entity.sales_line, to: er.entity.customer, join: [{ from: er.entity.sales_line.customer, to: er.entity.customer.sk }] }
+def relation inventory_item { from: er.entity.inventory, to: er.entity.item, join: [{ from: er.entity.inventory.item, to: er.entity.item.sk }] }
+def relation inventory_warehouse { from: er.entity.inventory, to: er.entity.warehouse, join: [{ from: er.entity.inventory.warehouse, to: er.entity.warehouse.sk }] }
+def relation outage_warehouse { from: er.entity.warehouse_outage, to: er.entity.warehouse, join: [{ from: er.entity.warehouse_outage.warehouse, to: er.entity.warehouse.sk }] }
+def relation price_list_item { from: er.entity.price_list, to: er.entity.item, join: [{ from: er.entity.price_list.item, to: er.entity.item.sk }] }
+def relation customer_price_item { from: er.entity.customer_price, to: er.entity.item, join: [{ from: er.entity.customer_price.item, to: er.entity.item.sk }] }
+def relation customer_price_customer { from: er.entity.customer_price, to: er.entity.customer, join: [{ from: er.entity.customer_price.customer, to: er.entity.customer.sk }] }
+def relation invoice_customer { from: er.entity.invoice, to: er.entity.customer, join: [{ from: er.entity.invoice.customer, to: er.entity.customer.sk }] }
+def relation invoice_order { from: er.entity.invoice, to: er.entity.order, join: [{ from: er.entity.invoice.order_number, to: er.entity.order.order_number }] }
+def relation channel_sales_customer { from: er.entity.channel_sales, to: er.entity.customer, join: [{ from: er.entity.channel_sales.customer, to: er.entity.customer.sk }] }
+def relation channel_sales_item { from: er.entity.channel_sales, to: er.entity.item, join: [{ from: er.entity.channel_sales.item, to: er.entity.item.sk }] }
+def relation return_request_order { from: er.entity.return_request, to: er.entity.order, join: [{ from: er.entity.return_request.order_number, to: er.entity.order.order_number }] }
+def relation return_request_customer { from: er.entity.return_request, to: er.entity.customer, join: [{ from: er.entity.return_request.customer, to: er.entity.customer.sk }] }
+def relation return_line_request { from: er.entity.return_request_line, to: er.entity.return_request, join: [{ from: er.entity.return_request_line.request_id, to: er.entity.return_request.request_id }] }
+def relation return_line_item { from: er.entity.return_request_line, to: er.entity.item, join: [{ from: er.entity.return_request_line.item, to: er.entity.item.sk }] }

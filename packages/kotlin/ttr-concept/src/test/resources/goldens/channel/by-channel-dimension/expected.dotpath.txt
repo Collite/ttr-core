@@ -1,0 +1,1 @@
+channelSales[channel.code: *].revenue @ sum

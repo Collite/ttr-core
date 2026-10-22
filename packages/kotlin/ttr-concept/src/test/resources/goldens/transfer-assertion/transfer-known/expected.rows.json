@@ -1,0 +1,13 @@
+{
+  "rows": [
+    {
+      "entity": "transfer",
+      "values": {
+        "transfer_id": "77",
+        "from_encounter": "501",
+        "to_encounter": "502",
+        "at": "2026-03-14T09:30"
+      }
+    }
+  ]
+}

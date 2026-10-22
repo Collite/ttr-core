@@ -6,9 +6,8 @@
 // members, confidences, instants and periods with these messages. Ambiguity is REPRESENTABLE (a ref with
 // candidates) and refused at lowering — never guessed (P-3 v2).
 //
-// ⚠ PRE-RELEASE (CN-P0 S0.4). The messages contracts §2.1 pins are written as pinned. Field sets the contracts
-// leave open (`Value`; `Period.precision`'s type) are provisional until CN-P3 S3.1 freezes this package. No
-// consumer exists before then, so the J-v2 additive-only rule starts at that freeze, not at this commit.
+// FROZEN at CN-P3 S3.1 (2026-10-22): every message below is as contracts §2.1 pins it, `Value` and `Period.precision`
+// included (A-CN-24). From here the J-v2 rules hold — additive only, never a rename or a renumber.
 // =============================================================================
 syntax = "proto3";
 
@@ -70,17 +69,19 @@ enum EndState {
   END_UNKNOWN = 3;                     // ended or not — unknown
 }
 
+// An episode's interval, or an occurrence's instant: an instantaneous event (`period: { at }`) carries its instant
+// in `start` and has no `end` (end_state unset).
 message Period {
   Instant start = 1;
   Instant end = 2;
   EndState end_state = 3;
   // contracts §2.1 writes `Precision precision = 4`; its only reading (§1.1 `period:` "precision: optional
-  // override") is a granularity override, so it is typed as one here (provisional; S0.4 memo ⚑S04-2).
+  // override") is a granularity override, so it is typed as one (A-CN-24, ⚑S04-2).
   Granularity precision = 4;
 }
 
-// A value as a frame carries it (a quality's value, a filter's operand). Provisional: contracts §2 names `Value`
-// without a field set (CN-P3 S3.1 pins it).
+// A value as a frame carries it (a quality's value, a filter's operand). `is_null` set = SQL NULL (the oneof is then
+// empty); an empty `Value` is no value at all.
 message Value {
   oneof v {
     string string_value = 1;

@@ -1,0 +1,12 @@
+{
+  "world": "hartland",
+  "call": "definitionRender",
+  "stage": "S3.4",
+  "target": "cn.MispricedLine",
+  "layer": "ER",
+  "dialect": "postgresql",
+  "options": {
+    "mode": "PREDICATE",
+    "placeholderStyle": "CURLY"
+  }
+}

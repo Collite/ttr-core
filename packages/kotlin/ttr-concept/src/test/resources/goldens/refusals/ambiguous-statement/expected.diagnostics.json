@@ -1,0 +1,7 @@
+[
+  {
+    "slug": "cn/ambiguous-statement",
+    "severity": "ERROR",
+    "subject": "measures[0]"
+  }
+]

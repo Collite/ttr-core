@@ -1,0 +1,24 @@
+{
+  "world": "hartland",
+  "call": "definitionRender",
+  "stage": "S3.4",
+  "target": "cn.ShortLine",
+  "layer": "ER",
+  "dialect": "postgresql",
+  "options": {
+    "mode": "CONTEXT",
+    "placeholderStyle": "CURLY",
+    "candidates": "cn.PendingOrder",
+    "columns": [
+      "item",
+      "line_quantity",
+      "on_hand",
+      "outage",
+      "short"
+    ]
+  },
+  "oracle": {
+    "au": "au.sql",
+    "plan": "equal"
+  }
+}

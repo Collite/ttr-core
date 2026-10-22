@@ -240,6 +240,12 @@ cn-hygiene *args:
     ./gradlew -q --console=plain :packages:kotlin:ttr-concept:installDist >&2
     packages/kotlin/ttr-concept/build/install/ttr/bin/ttr cn hygiene "$@"
 
+# A phase as model text (CN-D1): `just cn-materialize <model-dir> <cn.Phase> [--dialect …] [--out <dir>]`
+[positional-arguments]
+cn-materialize *args:
+    ./gradlew -q --console=plain :packages:kotlin:ttr-concept:installDist >&2
+    packages/kotlin/ttr-concept/build/install/ttr/bin/ttr cn materialize "$@"
+
 # ── Grammar regeneration ────────────────────────────────────────────────────────
 
 # Regenerate the TS parser from TTR.g4, then the TextMate grammar. See CLAUDE.md
@@ -632,8 +638,10 @@ publish *args:
             # their POMs at this version). ttr-translator keeps its own line; publish.yml pins it to the
             # latest translator tag and REFUSES the cut if the translator sources moved since — cut
             # `just publish bundle translator` first in that case.
+            #
+            # JOINED at CN-P3 S3.1 (A-CN-1): ttr-concept — the cn layer; the ttrp-emit closure again.
             PREFIX=grammar
-            DESC="org.tatrman:{ttr-parser, ttr-writer, ttr-semantics, ttr-metadata, ttr-metadata-git, ttr-snapshot, ttr-md-resolver, ttr-lexicon, ttr-lexicon-compile, ttr-lexicon-cli, ttrp-frontend, ttrp-graph, ttrp-emit, ttrp-emit-spi, ttrp-conform, ttrp-cli (+dist zip), ttr-emit-bash, ttr-emit-kestra, ttr-emit-airflow3} — ttr-translator pinned to its latest tag" ;;
+            DESC="org.tatrman:{ttr-parser, ttr-writer, ttr-semantics, ttr-metadata, ttr-metadata-git, ttr-snapshot, ttr-md-resolver, ttr-lexicon, ttr-lexicon-compile, ttr-lexicon-cli, ttrp-frontend, ttrp-graph, ttrp-emit, ttrp-emit-spi, ttrp-conform, ttrp-cli (+dist zip), ttr-emit-bash, ttr-emit-kestra, ttr-emit-airflow3, ttr-concept} — ttr-translator pinned to its latest tag" ;;
         "bundle metadata")
             echo "❌ The 'metadata' bundle no longer exists — it was folded into 'grammar' on 2026-07-30." >&2
             echo "   ttr-metadata \`api\`s the grammar artifacts, so the two MUST share a version;" >&2
@@ -672,6 +680,10 @@ publish *args:
                 packages/kotlin/ttrp-*|packages/kotlin/ttr-emit-bash|packages/kotlin/ttr-emit-kestra|packages/kotlin/ttr-emit-airflow3)
                     echo "❌ '$MOD_NAME' publishes lockstep only — use: just publish bundle grammar" >&2
                     echo "   (the TTR-P toolchain joined the grammar bundle on 2026-10-02, AG-14 — ttrp-lsp is not published)" >&2
+                    exit 1 ;;
+                packages/kotlin/ttr-concept)
+                    echo "❌ '$MOD_NAME' publishes lockstep only — use: just publish bundle grammar" >&2
+                    echo "   (ttr-concept joined the grammar bundle at CN-P3 S3.1, A-CN-1)" >&2
                     exit 1 ;;
                 packages/kotlin/ttr-plan-proto|packages/kotlin/ttr-translator)
                     echo "❌ '$MOD_NAME' publishes lockstep only — use: just publish bundle translator" >&2

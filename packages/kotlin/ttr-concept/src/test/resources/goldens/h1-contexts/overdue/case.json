@@ -1,0 +1,21 @@
+{
+  "world": "hartland",
+  "call": "definitionRender",
+  "stage": "S3.4",
+  "target": "cn.DebtorCustomer",
+  "layer": "ER",
+  "dialect": "postgresql",
+  "options": {
+    "mode": "CONTEXT",
+    "placeholderStyle": "CURLY",
+    "candidates": "cn.PendingOrder",
+    "columns": [
+      "due",
+      "open_amount"
+    ]
+  },
+  "oracle": {
+    "au": "au.sql",
+    "plan": "equal"
+  }
+}

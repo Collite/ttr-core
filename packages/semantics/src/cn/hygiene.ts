@@ -331,7 +331,7 @@ class HygieneBuilder {
     }
     const period = p.properties.find((q) => q.key === 'period');
     if (period?.kind === 'period') {
-      for (const key of ['start', 'end', 'at']) {
+      for (const key of ['start', 'end', 'at', 'start_hi', 'at_hi']) {
         const id = entryValue(period.value, key);
         if (id?.kind === 'id') element(id);
       }

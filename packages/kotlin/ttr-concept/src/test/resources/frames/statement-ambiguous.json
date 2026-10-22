@@ -1,0 +1,26 @@
+{
+  "ask": "ASK_VALUE",
+  "measures": [{
+    "candidates": [{
+      "qname": "cn.revenue",
+      "confidence": {
+        "value": 0.61,
+        "producer": "resolver",
+        "method": "lexicon"
+      },
+      "resumeToken": "rt-1"
+    }, {
+      "qname": "cn.order_value",
+      "confidence": {
+        "value": 0.58,
+        "producer": "resolver",
+        "method": "lexicon"
+      },
+      "resumeToken": "rt-2"
+    }]
+  }],
+  "time": {
+    "allTime": true
+  },
+  "locale": "en"
+}

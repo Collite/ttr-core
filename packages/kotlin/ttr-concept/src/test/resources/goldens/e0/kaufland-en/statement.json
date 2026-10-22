@@ -1,0 +1,25 @@
+{
+  "ask": "ASK_VALUE",
+  "measures": [
+    {
+      "qname": "cn.revenue"
+    }
+  ],
+  "filters": [
+    {
+      "member": {
+        "concept": {
+          "qname": "cn.Customer"
+        },
+        "member": {
+          "label": "Kaufland",
+          "resolvedValue": "Kaufland"
+        }
+      }
+    }
+  ],
+  "time": {
+    "periodCode": "2026-01"
+  },
+  "locale": "en"
+}
