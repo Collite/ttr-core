@@ -41,6 +41,12 @@ data class SourceRow(
      * one place that knows which layer it is producing.
      */
     val profile: MatchProfile? = null,
+    /**
+     * CN-P4 (cn contracts §1.5) — the entry's `default: true` and `sense_priority:`, as the TTR-M surface writes them
+     * (a `def term` or a concept's inline `lexicon { }`). The data-file surface has neither: false / null there.
+     */
+    val defaultSense: Boolean = false,
+    val sensePriority: Double? = null,
 )
 
 /** One parsed `model lexicon [locale <id>]` unit — the TTR-M sugar side of the DECLARED layer. */
@@ -109,6 +115,14 @@ data class CompileWarning(
          * (`ttr/lexicon-form-collides-with-name`) reports the same thing at `verify-model` time.
          */
         const val FORM_COLLISION: String = "RG-LEXC-004"
+
+        /**
+         * CN-P4 (A-CN-8, AM-36) — a `default: true` on a PHASE's term whose form a concept up the phase's `of:` chain
+         * also names: the archive drops that default, so the resolver never sees it. The code is the lint's own slug —
+         * the same condition `ttr cn hygiene` reports, and two codes for one condition is what the area loader's
+         * warnings avoid by travelling unchanged.
+         */
+        const val PHASE_AS_DEFAULT: String = "cn/phase-as-default"
 
         /**
          * File, then line, then code, then message. Public because the build folds the AREA

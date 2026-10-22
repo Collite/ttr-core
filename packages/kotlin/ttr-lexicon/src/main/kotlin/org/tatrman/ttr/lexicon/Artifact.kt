@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.lexicon
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.security.MessageDigest
@@ -70,6 +72,7 @@ data class EntryProvenance(
  * One row of the uniform entry table. `lemma` is null until the NLP side lemmatizes at
  * build time — the column exists now so its absence is a value, not a schema change.
  */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class CompiledEntry(
     val termNormalized: String,
@@ -101,6 +104,21 @@ data class CompiledEntry(
      * authored, and the matcher is where a rule fails to fire (the build already warned).
      */
     val matchProfile: MatchProfile? = null,
+    /**
+     * CN-P4 (cn contracts §1.5, A-CN-8) — the entry's `default: true`: this target is the default sense of the bare
+     * form, which the resolver's ordering reads after exact-over-partial (step 3) and **ignores on a phase**. The
+     * compiler already drops it from a phase's row whose form a concept up the phase's `of:` chain shares
+     * (`cn/phase-as-default`), so the resolver never sees one there.
+     *
+     * Written only when set ([EncodeDefault.Mode.NEVER]), and so is [sensePriority]: a row without them keeps the bytes
+     * it had in v5, so an estate with no cn content keeps its entry table — and the RV-39 [CompiledLexicon.contentHash]
+     * taken over it — across the v5 → v6 rebuild.
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val defaultSense: Boolean = false,
+    /** CN-P4 — the entry's `sense_priority:`, higher wins (§1.5 step 4); null when not written. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val sensePriority: Double? = null,
 )
 
 /** Per-layer input fingerprints, so a rebuild can be attributed to the layer that moved. */
@@ -151,8 +169,21 @@ data class CompiledLexiconHeader(
          * claimed they pinned it; they do not). Introducing that check, in both, is MS-P2's job,
          * and a mismatch should log a WARN that NAMES the versions — an old reader's only signal
          * today is a generic "undecodable", which is the hardest thing to diagnose in a cluster.
+         * (MS-P2·S2 has since added it: both readers WARN on a mismatch and name both versions.)
+         *
+         * v6 (cn, CN-P4 — cn contracts §5, A-CN-2…8) adds the conceptual layer: a `targets` entry
+         * per concept ([TargetFacts.CONCEPT]: [TargetFacts.stereotype], [TargetFacts.erTarget],
+         * [TargetFacts.via], [TargetFacts.ofRef]), [TargetFacts.liftsTo] on every er and md element
+         * a concept is grounded on, and [CompiledEntry.defaultSense] / [CompiledEntry.sensePriority].
+         * Every field is defaulted and the enum is untouched, so a v5 reader DECODES a v6 archive —
+         * and that is exactly why the bump is load-bearing anyway: such a reader projects every
+         * `cn.*` row as an entity type of kind `concept`, and sends `entity_type_ref = cn.X`
+         * downstream, a ref no planner knows (spike S0.2 test 5). The version is the one signal it
+         * gets. Readers first (lex-matcher, resolver — S4.3/S4.4), then the producer; an estate with
+         * several archives rebuilds them together, because a reader skips an additive archive whose
+         * version differs from the primary's.
          */
-        const val SCHEMA_VERSION: String = "ttr-lexicon-compiled/v5"
+        const val SCHEMA_VERSION: String = "ttr-lexicon-compiled/v6"
     }
 }
 
@@ -187,7 +218,10 @@ data class Reach(
  */
 @Serializable
 data class TargetFacts(
-    /** One of the four `MentionKinds` values. Consumers tolerate unknowns (J-v2). */
+    /**
+     * One of the four `MentionKinds` values, or [CONCEPT] (v6). Consumers tolerate unknowns (J-v2). `""` on an md
+     * element (v6): MS derives no md kind, and the md entry exists only to carry [liftsTo].
+     */
     val objectKind: String,
     /** The owning entity's targetRef; null for entities. */
     val ownerRef: String? = null,
@@ -239,6 +273,51 @@ data class TargetFacts(
      * Defaulted: a v4 archive decodes with `false` everywhere, and a v4 reader ignores the field.
      */
     val memberVocabulary: Boolean = false,
+    /**
+     * cn (v6, contracts §5) — a concept's stereotype: `kind · role · event · phase · quality`. Null on every element.
+     * A lift carries it by reference (the lifted concept's own entry), and the frame builder filters on it (A-CN-7).
+     */
+    val stereotype: String? = null,
+    /**
+     * cn (v6, A-CN-3) — where a concept lands on E-R: an entity, or the ATTRIBUTE for a value kind or a quality (AM-27);
+     * a defined phase inherits its bearer's. [ownerRef] keeps its meaning — the entity around this landing. Null when
+     * the concept has no landing: ungrounded, or md-grounded with the hop missing ([via] then tells the two apart).
+     * The resolver's one normalization (A-CN-6) is "a concept governs as its [erTarget]".
+     */
+    val erTarget: String? = null,
+    /** cn (v6) — how [erTarget] is reached: [VIA_DIRECT] or [VIA_MD_HOP] (even when the hop is missing); null ungrounded. */
+    val via: String? = null,
+    /**
+     * cn (v6) — the concept's `of:`, as `cn.<Name>`: a phase's or a quality's bearer, a role's base kind. What §1.5
+     * step 1 ("a phase yields to its bearer") walks, entry by entry, up the chain. Null when the concept states none.
+     */
+    val ofRef: String? = null,
+    /**
+     * cn (v6, A-CN-4) — the reverse index, projected here at compile time like [reachedFrom]: the concepts this er or md
+     * ELEMENT lifts to, each with its [ConceptLift.via] — a concept grounded on it (an md target, an er target) or
+     * landing on it through the hop. **Never a phase** (L17-2). Sorted by concept. Empty on a concept, on a member and
+     * on an element no concept is grounded on. Which lifts a HIT takes — its own ref's; a member's category's and the
+     * category owner's — is the resolver's rule (A-CN-7), never across a relation.
+     */
+    val liftsTo: List<ConceptLift> = emptyList(),
+) {
+    companion object {
+        /** v6 — the [objectKind] of a concept entry. Never a `MentionKinds` value: a concept is not a model object. */
+        const val CONCEPT: String = "concept"
+
+        /** [via] / [ConceptLift.via] — the concept's own er grounding. */
+        const val VIA_DIRECT: String = "direct"
+
+        /** [via] / [ConceptLift.via] — the concept's md grounding, through the md → er hop. */
+        const val VIA_MD_HOP: String = "md-hop"
+    }
+}
+
+/** cn (v6, A-CN-4/5) — one `liftsTo` entry: the concept (`cn.<Name>`) and how it lands — a function of the concept. */
+@Serializable
+data class ConceptLift(
+    val qname: String,
+    val via: String,
 )
 
 /**

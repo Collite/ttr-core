@@ -6,6 +6,20 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`ttr-lexicon` archive v6** (cn, CN-P4 S4.1 — cn contracts §5, A-CN-2…8): `ttr-lexicon-compiled/v6` carries the
+  conceptual layer. A `targets` entry per concept (`objectKind = "concept"`, `stereotype`, `ownerRef` = the landing's
+  entity, `erTarget` = the landing — the attribute for a value kind or a quality, `via` `direct` | `md-hop`, `ofRef` the
+  `of:` concept); **`liftsTo: [{qname, via}]`** on every er **and md** element a concept is grounded on or lands on (md
+  elements get an entry for the first time — `liftsTo` only, no kind; a phase is never lifted to); `defaultSense` /
+  `sensePriority` on the rows whose `def term` or inline concept `lexicon { }` wrote them (and only there — an entry
+  without them keeps its v5 bytes, so an estate with no cn content keeps its lexicon hash). `ttr-lexicon-compile`
+  resolves `cn.<Name>` targets, compiles a concept's inline terms, drops a phase's `default: true` where its bearer
+  shares the form (`cn/phase-as-default`), and silences `RG-LEXC-004` where a concept grounds to the element it collides
+  with (R-cn-1). `ttr-lexicon build` prints the archive's schema and its concept count.
+  **Rollout — readers before the producer:** a v5 reader decodes a v6 archive and projects every `cn.*` row as an entity
+  type (`entity_type_ref = cn.X` downstream), so lex-matcher and the resolver move to v6 first, and an estate's archives
+  are rebuilt after — all of an estate's archives together (a reader skips an additive archive whose schema differs from
+  the primary's). The lexicon hash covers the entries only, so caches key on the archive id.
 - **Studio strict metadata gate** — new `ttr-metadata load <root> --strict --json` CLI,
   version checking and category-coded diagnostics. Manifest `[packages].layout` grades package mismatches like
   TypeScript (off suppresses, flexible warns, strict errors); invalid TOML uses defaults plus a manifest error. `MetadataLoader.load(LoadOptions)`

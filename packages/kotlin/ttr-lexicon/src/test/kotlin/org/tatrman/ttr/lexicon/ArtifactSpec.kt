@@ -6,6 +6,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
@@ -84,8 +85,68 @@ class ArtifactSpec :
             decoded.header.schemaVersion shouldBe "ttr-lexicon-compiled/v2"
         }
 
-        "the schema label moved to v5" {
-            CompiledLexiconHeader.SCHEMA_VERSION shouldBe "ttr-lexicon-compiled/v5"
+        "the schema label moved to v6" {
+            CompiledLexiconHeader.SCHEMA_VERSION shouldBe "ttr-lexicon-compiled/v6"
+        }
+
+        // ---- CN-P4 S4.1 — v6: the conceptual layer ----------------------------------------------------------------------
+
+        "a v5 archive decodes here with every cn field at its default" {
+            val v5 =
+                """
+                {
+                  "header": {
+                    "schemaVersion": "ttr-lexicon-compiled/v5",
+                    "modelSnapshotHash": "sha256:${"ab".repeat(32)}",
+                    "sourceHashes": { "declared": "d", "metadata": "m" },
+                    "builtAt": "2026-09-29T00:00:00Z"
+                  },
+                  "entries": [
+                    { "termNormalized": "prodejna", "lemma": null, "lang": "cs", "targetRef": "er.entity.store",
+                      "targetClass": "MODEL_OBJECT", "method": "EXACT", "sourceTag": "METADATA",
+                      "provenance": { "file": "model/er/parties.ttrm", "line": 0 }, "matchProfile": null }
+                  ],
+                  "targets": {
+                    "er.entity.store": { "objectKind": "entity", "ownerRef": null, "reachedFrom": [],
+                      "nameRef": null, "codeRef": null, "codeFormat": null, "memberVocabulary": false }
+                  }
+                }
+                """.trimIndent()
+
+            val decoded = CompiledLexicon.fromJson(v5)
+            decoded.targets.getValue("er.entity.store") shouldBe TargetFacts("entity")
+            decoded.entries.single().let { it.defaultSense to it.sensePriority } shouldBe (false to null)
+        }
+
+        "a concept's facts and an element's liftsTo round-trip, and stay outside the lexicon hash" {
+            val concept =
+                TargetFacts(
+                    objectKind = TargetFacts.CONCEPT,
+                    ownerRef = "er.entity.store",
+                    stereotype = "kind",
+                    erTarget = "er.entity.store",
+                    via = TargetFacts.VIA_DIRECT,
+                    ofRef = "cn.Place",
+                )
+            val element = TargetFacts("entity", liftsTo = listOf(ConceptLift("cn.Store", TargetFacts.VIA_DIRECT)))
+            val before = lexicon(mapOf("cn.Store" to concept, "er.entity.store" to element))
+
+            CompiledLexicon.fromJson(before.toJson()) shouldBe before
+            before.contentHash shouldBe lexicon(mapOf("er.entity.store" to TargetFacts("entity"))).contentHash
+        }
+
+        "the default sense is written only where it is set — an entry without it keeps its v5 bytes" {
+            val plain = lexicon(emptyMap())
+            val row = plain.entries.single()
+            plain.toJson() shouldNotContain "defaultSense"
+            plain.toJson() shouldNotContain "sensePriority"
+
+            val sensed = plain.copy(entries = listOf(row.copy(defaultSense = true, sensePriority = 2.0)))
+            sensed.toJson() shouldContain "\"defaultSense\": true"
+            sensed.toJson() shouldContain "\"sensePriority\": 2.0"
+            CompiledLexicon.fromJson(sensed.toJson()) shouldBe sensed
+            // The sense IS vocabulary — it changes what binds — so it moves the hash.
+            sensed.contentHash shouldNotBe plain.contentHash
         }
 
         "contentHash covers the entry table only, so reach does not move the id" {
