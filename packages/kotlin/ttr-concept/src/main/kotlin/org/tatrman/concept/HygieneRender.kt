@@ -249,21 +249,8 @@ object HygieneRender {
      * (`loyalty_programme`) — CommonMark never reads it as emphasis. TS `mdEscape` is the twin.
      */
     internal fun md(s: String): String =
-        buildString {
-            s.forEachIndexed { i, ch ->
-                val inWord = ch == '_' && s.getOrNull(i - 1).isWordChar() && s.getOrNull(i + 1).isWordChar()
-                if (ch == '\n' || ch == '\r') {
-                    append(' ')
-                    return@forEachIndexed
-                }
-                if (ch in MD_SPECIAL && !inWord) append('\\')
-                append(ch)
-            }
-        }
-
-    private fun Char?.isWordChar() = this != null && isLetterOrDigit()
-
-    private const val MD_SPECIAL = "\\`*_[]<>|~&"
+        org.tatrman.ttr.metadata.source
+            .markdownEscape(s)
 
     private const val DASH = "—"
 

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { DiagnosticCode } from '@tatrman/parser';
-import { buildCanonicalKey, mdHopReport } from '@tatrman/semantics';
+import { mdHopReport } from '@tatrman/semantics';
 import type { MdHopReport } from '@tatrman/semantics';
+import { validationFor } from './cn.js';
 import { cnDocumentsFor } from './project-documents.js';
 import type { Rule } from '../rule.js';
 
@@ -13,7 +14,7 @@ function hopRule(id: string, code: DiagnosticCode, severity: Rule['defaultSeveri
       if (ctx.scope !== 'project') return;
       const docs = cnDocumentsFor(ctx);
       let report = ctx.cache.get('md:hop') as MdHopReport | undefined;
-      if (!report) { report = mdHopReport(docs, ctx.resolver); ctx.cache.set('md:hop', report); }
+      if (!report) { report = mdHopReport(docs, ctx.resolver, false, undefined, validationFor(ctx)); ctx.cache.set('md:hop', report); }
       for (const issue of report.issues) {
         if (issue.slug !== code) continue;
         const direct = ctx.symbols.get(issue.element);
@@ -21,14 +22,13 @@ function hopRule(id: string, code: DiagnosticCode, severity: Rule['defaultSeveri
           ctx.report({ source: { ...direct.source, file: direct.documentUri }, message: issue.message });
           continue;
         }
-        const [schema, ns, name, attr] = issue.element.split('.');
-        const kind = ns === 'domain' ? 'mdDomain' : ns;
-        for (const doc of docs) {
-          if (doc.schemaCode !== schema) continue;
-          const key = buildCanonicalKey({ packageName: doc.packageName, schemaId: doc.namespace, kind, parts: [name], declaringModel: schema });
-          const sym = ctx.symbols.get(attr && ns === 'dimension' ? `${key}.${attr}` : key);
-          if (!sym || sym.documentUri !== doc.uri) continue;
-          ctx.report({ source: { ...sym.source, file: doc.uri }, message: issue.message });
+        // Grain refs are scoped by their cubelet and have no independent symbol.
+        let prefix = issue.element;
+        while (prefix.includes('.')) {
+          prefix = prefix.slice(0, prefix.lastIndexOf('.'));
+          const owner = ctx.symbols.get(prefix);
+          if (!owner) continue;
+          ctx.report({ source: { ...owner.source, file: owner.documentUri }, message: issue.message });
           break;
         }
       }

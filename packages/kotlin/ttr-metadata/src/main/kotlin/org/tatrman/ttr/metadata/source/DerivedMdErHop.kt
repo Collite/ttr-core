@@ -17,6 +17,7 @@ class DerivedMdErHop(
     val causes = mutableMapOf<String, String>()
     val lineageIssues = mutableListOf<MdHopIssue>()
     private val domainAttributes = linkedMapOf<String, MutableSet<String>>()
+    private val viaTargets = linkedMapOf<String, List<String>>()
     private val dimensions = linkedMapOf<String, Pair<SemanticDocument, DimensionDef>>()
 
     private fun add(
@@ -26,7 +27,7 @@ class DerivedMdErHop(
         candidates.getOrPut(md) { sortedSetOf() }.addAll(er)
     }
 
-    private fun local(key: String): String = resolver.getSymbol(key)?.let(::elementRefOf) ?: key
+    private fun local(key: String): String = key
 
     private fun columns(
         md: String,
@@ -52,7 +53,10 @@ class DerivedMdErHop(
         for ((entity, query) in physical.queryEntities) {
             val definition = physical.entities.getValue(entity).second
             for ((i, attr) in definition.attributes.withIndex()) {
-                val origins = lineage.originsOf(context, query, attr.name, i)
+                val origins =
+                    runCatching {
+                        lineage.originsOf(context, query, physical.boundColumn("$entity.${attr.name}"), i)
+                    }.getOrNull()
                 if (origins == null) {
                     lineageIssues +=
                         MdHopIssue(
@@ -80,7 +84,7 @@ class DerivedMdErHop(
         for (doc in docs) {
             for (def in doc.definitions.filterIsInstance<Md2dbCubeletDef>()) {
                 val cubelet = def.cubeletRef?.path?.let { resolveMdNs(resolver, doc, it, "cubelet") } ?: continue
-                val md = elementRefOf(cubelet)
+                val md = cubelet.qname
                 val table = def.table?.path?.let { physical.resolve(doc, it) } ?: continue
                 val entities = physical.tableToErEntity[table.qname].orEmpty()
                 add(md, entities.map(::local))
@@ -94,7 +98,7 @@ class DerivedMdErHop(
                             is MeasureColumnBinding.Column -> binding.column
                             is MeasureColumnBinding.Code -> (def.shape as? ShapeSpec.Long)?.valueColumn
                         }
-                    columns(elementRefOf(measure), col?.let { physical.column(doc, table.qname, it) })
+                    columns(measure.qname, col?.let { physical.column(doc, table.qname, it) })
                 }
                 for ((name, binding) in def.attributes) {
                     val attr = resolveMdAttribute(resolver, doc, name) ?: continue
@@ -107,7 +111,26 @@ class DerivedMdErHop(
                                     physical.column(doc, it.qname, binding.from.column)
                                 }
                         }
-                    columns(grain, col, entities)
+                    if (binding is AttrColumnBinding.Via) {
+                        val map = resolveMdNs(resolver, doc, binding.via.path, "map")
+                        val mapDoc = docs.find { it.uri == map?.documentUri }
+                        val logical = mapDoc?.definitions?.filterIsInstance<MdMapDef>()?.find { it.name == map?.name }
+                        val targetDomains =
+                            logical?.to.orEmpty().mapNotNull {
+                                resolveMdNs(
+                                    resolver,
+                                    mapDoc!!,
+                                    it.path,
+                                    "domain",
+                                )?.qname
+                            }
+                        val targetAttrs = targetDomains.flatMap { domainAttributes[it].orEmpty() }
+                        // The via source is on its own table; never restrict it to the fact entity.
+                        columns(grain, col)
+                        viaTargets[grain] = targetAttrs
+                    } else {
+                        columns(grain, col, entities)
+                    }
                     // R3(a): only a dimension key, with a relation whose from side binds this FK attribute.
                     val dimension = dimensions[attr.parent] ?: continue
                     if (dimension.second.key != attr.name) continue
@@ -116,7 +139,7 @@ class DerivedMdErHop(
                         if (relation.from !in entities || relation.pairs.none { it.first in erAttrs }) continue
                         val dim = local(attr.parent!!)
                         add(dim, listOf(local(relation.to)))
-                        add(elementRefOf(attr), relation.pairs.filter { it.first in erAttrs }.map { local(it.second) })
+                        add(attr.qname, relation.pairs.filter { it.first in erAttrs }.map { local(it.second) })
                     }
                 }
             }
@@ -157,7 +180,7 @@ class DerivedMdErHop(
                 val table = physical.resolve(doc, src.table.path) ?: continue
                 bound += domain.qname
                 val col = physical.column(doc, table.qname, src.column)
-                columns(elementRefOf(domain), col)
+                columns(domain.qname, col)
                 for (attr in domainAttributes[domain.qname].orEmpty()) {
                     columns(local(attr), col)
                     if (dimensions[attr.substringBeforeLast('.')]?.second?.key == attr.substringAfterLast('.')) {
@@ -189,6 +212,10 @@ class DerivedMdErHop(
                     "no relation or map from the dimension's key to an er entity"
             }
         }
+        for ((grain, attrs) in viaTargets) {
+            val targets = attrs.flatMap { candidates[it].orEmpty() }.toSet()
+            if (targets.isNotEmpty()) candidates[grain] = targets.toMutableSet()
+        }
         for ((domain, attrs) in domainAttributes) {
             if (domain !in bound) {
                 add(local(domain), attrs.flatMap { candidates[local(it)].orEmpty() })
@@ -199,10 +226,26 @@ class DerivedMdErHop(
     override fun erTargetOf(
         mdElement: String,
         bearerEntity: String?,
+    ): HopResult =
+        qualifiedTargetOf(mdElement, bearerEntity).let { answer ->
+            answer.copy(erTarget = answer.erTarget?.let { resolver.getSymbol(it)?.let(::elementRefOf) ?: it })
+        }
+
+    fun qualifiedTargetOf(
+        mdElement: String,
+        bearerEntity: String? = null,
+        allowed: Set<String>? = null,
     ): HopResult {
-        val found = candidates[mdElement].orEmpty()
+        val found = allowed ?: candidates[mdElement].orEmpty()
         if (bearerEntity != null) {
-            val restricted = found.filter { entityOfElement(it) == bearerEntity }
+            val restricted =
+                found.filter {
+                    qualifiedEntity(it) == bearerEntity ||
+                        (
+                            resolver.getSymbol(bearerEntity) == null &&
+                                resolver.getSymbol(qualifiedEntity(it).orEmpty())?.let(::elementRefOf) == bearerEntity
+                        )
+                }
             if (restricted.size == 1) return HopResult(restricted.single(), HopVia.DERIVED_BEARER)
             if (restricted.size >
                 1
@@ -226,7 +269,14 @@ class DerivedMdErHop(
     }
 
     override fun mdElementsOn(erElement: String): List<String> =
-        candidates.filterValues { erElement in it }.keys.sorted()
+        candidates
+            .filterValues { values ->
+                values.any {
+                    it == erElement ||
+                        resolver.getSymbol(it)?.let(::elementRefOf) == erElement
+                }
+            }.keys
+            .sorted()
 }
 
 data class MdHopIssue(
@@ -240,78 +290,80 @@ data class MdHopIssue(
 class CompositeMdErHop(
     val explicit: MdErHop,
     val derived: DerivedMdErHop,
-    private val allowScopes: Boolean = true,
 ) : MdErHop {
     constructor(
         docs: List<SemanticDocument>,
         resolver: Resolver,
-    ) : this(ExplicitMdErHop(docs, resolver), DerivedMdErHop(docs, resolver))
-
-    private val scopes = mutableMapOf<String, CompositeMdErHop>()
-
-    private fun belongsTo(
-        def: Definition,
-        doc: SemanticDocument,
-        pkg: String,
-    ): Boolean {
-        val ref =
-            when (def) {
-                is Md2dbCubeletDef -> def.cubeletRef?.path?.let { it to "cubelet" }
-                is Md2erCubeletDef -> def.cubeletRef?.path?.let { it to "cubelet" }
-                is Md2erDimensionDef -> def.dimensionRef?.path?.let { it to "dimension" }
-                is Md2dbDomainDef -> def.domainRef?.path?.let { it to "domain" }
-                is Md2dbMapDef -> def.mapRef?.path?.let { it to "map" }
-                else -> null
-            }
-        if (ref != null) return resolveMdNs(derived.resolver, doc, ref.first, ref.second)?.packageName == pkg
-        return when (def) {
-            is DimensionDef, is MdDomainDef, is CubeletDef, is MdMapDef, is MeasureDef -> doc.packageName == pkg
-            else -> true
-        }
-    }
-
-    private fun scoped(mdElement: String): Pair<CompositeMdErHop, String>? {
-        if (!allowScopes) return null
-        val symbol =
-            derived.resolver.getSymbol(mdElement)?.takeIf { it.schemaCode == "md" }
-                ?: generateSequence(
-                    mdElement.substringBeforeLast('.', ""),
-                ) { it.substringBeforeLast('.', "").ifEmpty { null } }
-                    .mapNotNull { derived.resolver.getSymbol(it) }
-                    .firstOrNull { it.schemaCode == "md" && it.kind == "cubelet" }
-                ?: return null
-        val hop =
-            scopes.getOrPut(symbol.packageName) {
-                val docs =
-                    derived.docs.map { doc ->
-                        doc.copy(definitions = doc.definitions.filter { belongsTo(it, doc, symbol.packageName) })
-                    }
-                CompositeMdErHop(
-                    ExplicitMdErHop(docs, derived.resolver),
-                    DerivedMdErHop(docs, derived.resolver, derived.physical),
-                    false,
-                )
-            }
-        return hop to (elementRefOf(symbol) + mdElement.removePrefix(symbol.qname))
-    }
+    ) : this(ExplicitMdErHop(docs, resolver, qualified = true), DerivedMdErHop(docs, resolver))
 
     override fun erTargetOf(
         mdElement: String,
         bearerEntity: String?,
+    ): HopResult =
+        qualifiedTargetOf(mdElement, bearerEntity).let { answer ->
+            answer.copy(erTarget = answer.erTarget?.let { derived.resolver.getSymbol(it)?.let(::elementRefOf) ?: it })
+        }
+
+    private fun pinnedEntities(md: String): Set<String>? {
+        val attr = derived.resolver.getSymbol(md)?.takeIf { it.kind == "attribute" } ?: return null
+        val dimension =
+            derived.resolver.getSymbol(attr.parent.orEmpty())?.takeIf { it.kind == "dimension" } ?: return null
+        val pin = explicit.erTargetOf(dimension.qname).erTarget ?: return null
+        val reached = linkedSetOf(pin)
+        var size: Int
+        do {
+            size = reached.size
+            for (rel in derived.physical.relations) if (rel.from in reached) reached += rel.to
+        } while (reached.size != size)
+        return reached
+    }
+
+    private fun attributeCandidates(md: String): Set<String>? {
+        val reached = pinnedEntities(md) ?: return null
+        val found =
+            derived.candidates[md]
+                .orEmpty()
+                .filter { qualifiedEntity(it) in reached }
+                .toSet()
+        if (found.isNotEmpty()) return found
+        val symbol = derived.resolver.getSymbol(md) ?: return found
+        val owner = derived.resolver.getSymbol(symbol.parent.orEmpty())
+        val dimension =
+            derived.docs.find { it.uri == owner?.documentUri }?.definitions?.filterIsInstance<DimensionDef>()?.find {
+                it.name ==
+                    owner?.name
+            }
+        if (dimension?.key != symbol.name) return found
+        return reached
+            .flatMap { entity ->
+                derived.physical.entities[entity]
+                    ?.second
+                    ?.attributes
+                    .orEmpty()
+                    .filter { it.isKey }
+                    .map { "$entity.${it.name}" }
+            }.toSet()
+    }
+
+    fun qualifiedTargetOf(
+        mdElement: String,
+        bearerEntity: String? = null,
     ): HopResult {
-        scoped(mdElement)?.let { (hop, local) -> return hop.erTargetOf(local, bearerEntity) }
         val pinned = explicit.erTargetOf(mdElement, bearerEntity)
-        return if (pinned.diagnostic != HopResult.UNMAPPED) pinned else derived.erTargetOf(mdElement, bearerEntity)
+        return if (pinned.diagnostic !=
+            HopResult.UNMAPPED
+        ) {
+            pinned
+        } else {
+            derived.qualifiedTargetOf(mdElement, bearerEntity, attributeCandidates(mdElement))
+        }
     }
 
     fun issues(
         mdElement: String,
         bearerEntity: String? = null,
     ): List<MdHopIssue> {
-        scoped(mdElement)?.let { (hop, local) ->
-            return hop.issues(local, bearerEntity).map { if (it.element == local) it.copy(element = mdElement) else it }
-        }
-        val answer = erTargetOf(mdElement, bearerEntity)
+        val answer = qualifiedTargetOf(mdElement, bearerEntity)
         val out = mutableListOf<MdHopIssue>()
         if (answer.diagnostic != null) out += MdHopIssue(mdElement, answer.diagnostic, "warning", answer.message)
         if (answer.via == HopVia.EXPLICIT) {
@@ -328,10 +380,25 @@ class CompositeMdErHop(
                     )
             }
         }
+        val reached = pinnedEntities(mdElement)
+        val unreachable =
+            derived.candidates[mdElement].orEmpty().filter {
+                reached != null &&
+                    qualifiedEntity(it) !in reached
+            }
+        if (unreachable.isNotEmpty()) {
+            out +=
+                MdHopIssue(
+                    mdElement,
+                    "md/er-hop-override",
+                    "info",
+                    "Dimension pin excludes derived ${unreachable.joinToString(", ")}",
+                )
+        }
         out +=
             derived.lineageIssues.filter {
                 it.element == answer.erTarget ||
-                    (bearerEntity != null && entityOfElement(it.element) == bearerEntity)
+                    (bearerEntity != null && qualifiedEntity(it.element) == bearerEntity)
             }
         return out
     }
@@ -342,7 +409,9 @@ class CompositeMdErHop(
             .filter { md ->
                 val answer = erTargetOf(md, entityOfElement(erElement))
                 answer.erTarget == erElement
-            }.sorted()
+            }.map { derived.resolver.getSymbol(it)?.let(::elementRefOf) ?: it }
+            .distinct()
+            .sorted()
 }
 
 /** Whole-model report inventory; cubelet grain refs are kept distinct from dimension attributes (R5). */
@@ -379,55 +448,9 @@ fun mdHopElements(
         }
     }.sorted()
 
-/** Default lint scope uses each concept's actual bearer context, not the unrestricted report row. */
+/** Default findings share the exact CN landing walk used by the typed model. */
 fun groundedMdHopIssues(
     docs: List<SemanticDocument>,
     resolver: Resolver,
     hop: CompositeMdErHop,
-): List<MdHopIssue> {
-    val validation =
-        org.tatrman.ttr.semantics.cn
-            .validateCn(docs, resolver)
-    val visiting = mutableSetOf<String>()
-
-    fun bearer(key: String): String? {
-        val c = validation.concepts[key] ?: return null
-        val property = c.properties.find { it.property.key == "of" } ?: return null
-        val value = (property.property as? ConceptProperty.Entry)?.value as? PropertyValue.IdValue ?: return null
-        val doc = property.doc
-        return (
-            resolver.resolveReference(
-                Resolver.Ref(value.ref.path, value.parts, true),
-                ResolutionContext(doc.schemaCode, doc.namespace, null, doc.imports, doc.packageName),
-            ) as? ResolutionResult.Resolved
-        )?.symbol?.qname
-    }
-
-    fun landing(key: String): String? {
-        if (!visiting.add(key)) return null
-        return try {
-            val target =
-                validation.groundings.byConcept[key]
-                    ?.firstOrNull()
-                    ?.targetSymbol
-            val of = bearer(key)
-            when (target?.schemaCode) {
-                "er" -> elementRefOf(target)
-                "md" -> hop.erTargetOf(target.qname, of?.let { landing(it) }?.let(::entityOfElement)).erTarget
-                else -> of?.let { landing(it) }
-            }
-        } finally {
-            visiting.remove(key)
-        }
-    }
-    return validation.groundings.groundings
-        .flatMap { g ->
-            val target = g.targetSymbol?.takeIf { it.schemaCode == "md" } ?: return@flatMap emptyList()
-            val of =
-                g.conceptKey
-                    ?.let(::bearer)
-                    ?.let { landing(it) }
-                    ?.let(::entityOfElement)
-            hop.issues(target.qname, of)
-        }.distinct()
-}
+): List<MdHopIssue> = cnLandingIssues(docs, resolver, hop)

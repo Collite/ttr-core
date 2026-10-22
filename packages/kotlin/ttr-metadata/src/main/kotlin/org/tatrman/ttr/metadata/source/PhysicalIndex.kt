@@ -18,6 +18,10 @@ class PhysicalIndex(
     val queries = linkedMapOf<String, Pair<SemanticDocument, QueryDef>>()
     val queryEntities = linkedMapOf<String, String>()
     val relations = mutableListOf<PhysicalRelation>()
+    val attributeColumns = linkedMapOf<String, String>()
+
+    fun boundColumn(attribute: String): String = attributeColumns[attribute] ?: attribute.substringAfterLast('.')
+
     private val fks = linkedMapOf<String, Pair<SemanticDocument, FkDef>>()
 
     fun resolve(
@@ -89,6 +93,15 @@ class PhysicalIndex(
                 bindEntity(entity.qname, def.target, doc)
             }
         }
+        for ((entity, pair) in entities) {
+            if (entity !in entityToTable && entity !in queryEntities) {
+                val (doc, def) = pair
+                resolve(doc, "db.dbo.${def.name}")?.takeIf { it.kind == "table" }?.let {
+                    tableToErEntity.getOrPut(it.qname) { linkedSetOf() }.add(entity)
+                    entityToTable.getOrPut(entity) { linkedSetOf() }.add(it.qname)
+                }
+            }
+        }
         // Inline columns and per-attribute bindings are interpreted in the entity's physical table.
         for ((entity, pair) in entities) {
             val (doc, def) = pair
@@ -97,7 +110,7 @@ class PhysicalIndex(
                     entry.name to
                         when (val v = entry.value) {
                             is BindingColumnBareId -> v.id.path
-                            is BindingColumnObject -> id(v.obj.entries["target"]) ?: id(v.obj.entries["column"])
+                            is BindingColumnObject -> id(inlineColumnEntries(v)["column"])
                         }
                 }
             for (attr in def.attributes) {
@@ -106,7 +119,8 @@ class PhysicalIndex(
                         is BindingPropertyBareId -> binding.id.path
                         is BindingPropertyBlock -> targetRef(binding.target)
                         else -> columns[attr.name]
-                    } ?: continue
+                    } ?: attr.name
+                attributeColumns["$entity.${attr.name}"] = name.substringAfterLast('.')
                 for (table in entityToTable[entity].orEmpty()) {
                     column(doc, table, name)?.let { addOrigin(it, "$entity.${attr.name}") }
                 }
@@ -120,6 +134,9 @@ class PhysicalIndex(
                         ?.let { resolve(doc, it) }
                         ?.takeIf { it.kind == "attribute" } ?: continue
                 val path = targetRef(def.target) ?: continue
+                attributeColumns[attr.qname] = path.substringAfterLast('.')
+                // An explicit attribute mapping replaces the identity/inline convention.
+                erAttrToColumn.remove(attr.qname)?.forEach { columnToErAttr[it]?.remove(attr.qname) }
                 val col = resolve(doc, path)?.takeIf { it.kind == "column" }
                 if (col != null) {
                     addOrigin(col.qname, attr.qname)
@@ -194,6 +211,15 @@ class PhysicalIndex(
         doc: SemanticDocument,
         value: PropertyValue?,
     ): List<String> {
+        if (value is PropertyValue.IdValue) {
+            return listOfNotNull(
+                resolve(doc, value.ref.path)
+                    ?.takeIf {
+                        it.kind ==
+                            "column"
+                    }?.qname,
+            )
+        }
         if (value is PropertyValue.ListValue) {
             val resolved =
                 value.items.map {

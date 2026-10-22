@@ -52,7 +52,7 @@ class QueryLineageContext(
         val guard = "$query.$name"
         if (!visiting.add(guard)) return null
         return try {
-            provider.originsOf(this, query, name, ordinal)
+            runCatching { provider.originsOf(this, query, physical.boundColumn("$entity.$name"), ordinal) }.getOrNull()
         } finally {
             visiting.remove(guard)
         }
@@ -84,6 +84,7 @@ class SyntacticQueryLineage : QueryLineage {
             }
         }
         val out = sortedSetOf<String>()
+        var selected: Int? = null
         for (branch in branches) {
             if (!branch.firstOrNull().equals("SELECT", true)) return null
             val from = branch.indexOfFirst { it.equals("FROM", true) }
@@ -93,6 +94,7 @@ class SyntacticQueryLineage : QueryLineage {
             // Only one source, with an optional alias. A filter doesn't change a column's origin.
             val stop = tail.indexOfFirst { it.equals("WHERE", true) }.let { if (it < 0) tail.size else it }
             val sourceTokens = tail.take(stop)
+            if (sourceTokens.isEmpty()) return null
             var n = 1
             var source = unquote(sourceTokens[0])
             while (sourceTokens.getOrNull(n) == "." && sourceTokens.getOrNull(n + 1) != null) {
@@ -117,7 +119,17 @@ class SyntacticQueryLineage : QueryLineage {
             for (token in branch.subList(1, from)) {
                 if (token == ",") items += mutableListOf<String>() else items.last() += token
             }
-            var expr = items.getOrNull(ordinal)?.toList() ?: return null
+            if (selected == null) {
+                val matches =
+                    items.indices.filter { index ->
+                        val item = items[index]
+                        val asAt = item.indexOfFirst { it.equals("AS", true) }
+                        val label = if (asAt >= 0) item.getOrNull(asAt + 1) else item.lastOrNull()
+                        label?.let(::unquote)?.equals(column, true) == true
+                    }
+                selected = matches.singleOrNull() ?: return null
+            }
+            var expr = items.getOrNull(selected)?.toList() ?: return null
             val asAt = expr.indexOfFirst { it.equals("AS", true) }
             if (asAt >= 0) {
                 if (asAt != expr.size - 2 || !identifier(expr.last())) return null

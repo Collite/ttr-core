@@ -42,7 +42,10 @@ class MdHopCommand : CliktCommand(name = "hop") {
         val reconciled =
             ModelReconciler(ModelDescriptor(id = "md-hop", name = "md-hop"))
                 .reconcile(listOf(BuiltinStockSource().load(), snapshot))
-        val (docs, resolver) = CnBuilder.project(snapshot.loadedFiles)
+        val analysis = snapshot.mdHopAnalysis
+        val (docs, resolver) =
+            analysis?.hop?.derived?.let { it.docs to it.resolver }
+                ?: CnBuilder.project(snapshot.loadedFiles)
         val loadErrors =
             (snapshot.errors + reconciled.errors).distinct().map { "${it.file}:${it.line}: ${it.message}" } +
                 mdErBindingDiagnostics(
@@ -50,7 +53,7 @@ class MdHopCommand : CliktCommand(name = "hop") {
                     resolver,
                 ).map { "${it.source.file}:${it.source.line}: ${it.code.id}: ${it.message}" }
         loadErrors.forEach { echo(it, err = true) }
-        val report = mdHopReport(docs, resolver, all)
+        val report = mdHopReport(docs, resolver, all, analysis)
         echo(if (format == "json") MdHopRender.json(report) else MdHopRender.markdown(report), trailingNewline = false)
         if (failOn != null &&
             (loadErrors.isNotEmpty() || (failOn == "warning" && report.issues.any { it.severity == "warning" }))

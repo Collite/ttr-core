@@ -13,7 +13,7 @@
 
 import type { ConceptProperty, IdValue, LexiconEntryDef, Md2ErCubeletDef, ObjectValue, PropertyValue } from '@tatrman/parser';
 import { explicitErAttributes, buildMdErRelationIndex, resolveMdNs, resolveMdAttribute, cubeletMeasureKeys, resolveMdErRef } from '../md/explicit.js';
-import { CompositeMdErHop } from '../md/hop.js';
+import { CompositeMdErHop, type MdHopIssue } from '../md/hop.js';
 import { buildCanonicalKey } from '../qname.js';
 import type { Resolver } from '../resolver.js';
 import type { SymbolEntry } from '../symbol-table.js';
@@ -96,7 +96,7 @@ export class ExplicitMdErHop {
   private readonly ambiguousPaths = new Set<string>();
   private readonly candidates = new Map<string, Array<{ er: string; from: 'dimension' | 'cubelet' }>>();
 
-  constructor(docs: CnDocument[], resolver: Resolver) {
+  constructor(docs: CnDocument[], private readonly resolver: Resolver, private readonly qualified = false) {
     const relationIndex = buildMdErRelationIndex(docs, resolver);
     for (const doc of docs) {
       for (const def of doc.ast.definitions) {
@@ -104,12 +104,12 @@ export class ExplicitMdErHop {
           const entity = resolveMdErRef(resolver, doc, def.entity);
           const dimension = resolveMdNs(resolver, doc, def.dimensionRef, 'dimension');
           if (entity?.kind !== 'entity' || dimension?.kind !== 'dimension') continue;
-          this.add(elementRefOf(dimension), elementRefOf(entity), 'dimension');
+          this.add(this.ref(dimension), this.ref(entity), 'dimension');
           for (const [attr, path] of Object.entries(def.attributes)) {
             const md = resolver.getSymbol(`${dimension.qname}.${attr}`);
             const targets = explicitErAttributes(relationIndex, doc, resolver, entity, path);
-            if (md && targets.length > 1) this.ambiguousPaths.add(elementRefOf(md));
-            if (md?.kind === 'attribute' && targets.length === 1) this.add(elementRefOf(md), elementRefOf(targets[0]), 'dimension');
+            if (md && targets.length > 1) this.ambiguousPaths.add(this.ref(md));
+            if (md?.kind === 'attribute' && targets.length === 1) this.add(this.ref(md), this.ref(targets[0]), 'dimension');
           }
           continue;
         }
@@ -119,23 +119,25 @@ export class ExplicitMdErHop {
         if (entity?.kind !== 'entity') continue;
         const cubelet = d.cubeletRef ? resolveMdNs(resolver, doc, d.cubeletRef, 'cubelet') : undefined;
         if (!cubelet) continue;
-        this.add(elementRefOf(cubelet), elementRefOf(entity));
+        this.add(this.ref(cubelet), this.ref(entity));
         const measures = cubeletMeasureKeys(docs, resolver, cubelet);
         for (const [measure, erAttr] of Object.entries(d.measures ?? {})) {
           const md = resolveMdNs(resolver, doc, measure, 'measure');
           const er = resolver.getSymbol(`${entity.qname}.${erAttr}`);
-          if (md?.kind === 'measure' && measures.has(md.qname) && er?.kind === 'attribute') this.add(elementRefOf(md), elementRefOf(er));
+          if (md?.kind === 'measure' && measures.has(md.qname) && er?.kind === 'attribute') this.add(this.ref(md), this.ref(er));
         }
         for (const [mdAttr, erAttr] of Object.entries(d.attributes ?? {})) {
           const md = resolveMdAttribute(resolver, doc, mdAttr);
           if (md?.kind !== 'attribute' || md.schemaCode !== 'md') continue;
           const er = resolver.getSymbol(`${entity.qname}.${erAttr}`);
           if (er?.kind !== 'attribute') continue;
-          this.add(elementRefOf(md), elementRefOf(er));
+          this.add(this.ref(md), this.ref(er));
         }
       }
     }
   }
+
+  private ref(sym: SymbolEntry) { return this.qualified ? sym.qname : elementRefOf(sym); }
 
   private add(md: string, er: string, from: 'dimension' | 'cubelet' = 'cubelet'): void {
     const list = this.candidates.get(md) ?? [];
@@ -152,7 +154,7 @@ export class ExplicitMdErHop {
     if (found.length === 0) return {
       slug: 'md/er-unmapped', message: `'${mdElement}' has no er counterpart — no explicit md2er binding maps it`,
     };
-    const ofBearer = found.filter(c => entityOfElement(c.er) === bearerEntity);
+    const ofBearer = found.filter(c => { const sym = this.resolver.getSymbol(c.er); const er = sym ? elementRefOf(sym) : c.er; return c.er.slice(0, c.er.lastIndexOf('.')) === bearerEntity || (!this.qualified || !this.resolver.getSymbol(bearerEntity ?? '')) && entityOfElement(er) === bearerEntity; });
     if (bearerEntity !== undefined && ofBearer.length === 1) return { erTarget: ofBearer[0].er, message: '' };
     const own = found.filter(c => c.from === 'dimension');
     if (own.length === 1) return { erTarget: own[0].er, message: '' };
@@ -170,6 +172,7 @@ interface Landing {
   grade: GroundingGrade;
   from?: string;
   hop?: HopAnswer;
+  qualifiedErTarget?: string;
 }
 
 interface TermLink {
@@ -218,11 +221,12 @@ class HygieneBuilder {
   private readonly conceptTerms = new Map<string, TermLink[]>();
   private readonly elementTerms = new Map<string, TermLink[]>();
   private readonly hop: CompositeMdErHop;
+  readonly hopIssues: MdHopIssue[] = [];
 
-  constructor(docs: CnDocument[], private readonly resolver: Resolver, private readonly v: CnValidation) {
+  constructor(docs: CnDocument[], private readonly resolver: Resolver, private readonly v: CnValidation, hop?: CompositeMdErHop) {
     this.docs = [...docs].sort((a, b) => (a.uri < b.uri ? -1 : a.uri > b.uri ? 1 : 0));
     this.docByUri = new Map(this.docs.map((d) => [d.uri, d]));
-    this.hop = new CompositeMdErHop(this.docs, resolver);
+    this.hop = hop ?? new CompositeMdErHop(this.docs, resolver);
     this.collectCanonicalTerms();
   }
 
@@ -288,15 +292,20 @@ class HygieneBuilder {
       case 'er':
         return {
           erTarget: target && (target.kind === 'entity' || target.kind === 'attribute') ? elementRefOf(target) : undefined,
+          qualifiedErTarget: target?.qname,
           via: 'direct',
           grade: 'er-grounded',
         };
       case 'md': {
         if (!target) return { via: 'md-hop', grade: 'md-grounded-hop-missing' };
         const bearer = c.stereotype === 'quality' ? this.bearerEntity(c) : undefined;
-        const answer = this.hop.erTargetOf(target.qname, bearer);
+        const qualified = this.hop.qualifiedTargetOf(target.qname, bearer);
+        const landed = qualified.erTarget && this.resolver.getSymbol(qualified.erTarget);
+        const answer = landed ? { ...qualified, erTarget: elementRefOf(landed) } : qualified;
+        this.hopIssues.push(...this.hop.issues(target.qname, bearer));
         return {
           erTarget: answer.erTarget,
+          qualifiedErTarget: qualified.erTarget,
           via: 'md-hop',
           grade: answer.erTarget !== undefined ? 'md-grounded' : 'md-grounded-hop-missing',
           hop: answer,
@@ -310,8 +319,10 @@ class HygieneBuilder {
   /** The er entity a quality's bearer lands on — rule 2 of the hop (AM-29). */
   private bearerEntity(c: CnConcept): string | undefined {
     const bearer = this.ofKey(c);
-    const er = bearer ? this.landingOf(bearer).erTarget : undefined;
-    return er ? entityOfElement(er) : undefined;
+    const er = bearer ? this.landingOf(bearer).qualifiedErTarget : undefined;
+    if (!er) return undefined;
+    const parts = er.split('.'); const i = parts.findIndex((p, n) => p === 'er' && parts[n + 1] === 'entity');
+    return i < 0 ? undefined : parts.slice(0, i + 3).join('.');
   }
 
   // --- dangling refs (the Kotlin `Grounding.dangling`) --------------------
@@ -512,8 +523,8 @@ class HygieneBuilder {
  * The editor's hygiene report over a project. `resolver` must be built over the symbol table of
  * exactly these documents; `validation` is `validateCn(docs, resolver)` when the caller has it.
  */
-export function cnHygieneReport(docs: CnDocument[], resolver: Resolver, validation?: CnValidation): CnHygieneReport {
-  return new HygieneBuilder(docs, resolver, validation ?? validateCn(docs, resolver)).report();
+export function cnHygieneReport(docs: CnDocument[], resolver: Resolver, validation?: CnValidation, hop?: CompositeMdErHop): CnHygieneReport {
+  return new HygieneBuilder(docs, resolver, validation ?? validateCn(docs, resolver), hop).report();
 }
 
 // ---------------------------------------------------------------------------
@@ -550,7 +561,7 @@ export function mdEscape(s: string): string {
   return out;
 }
 
-const MD_SPECIAL = '\\`*_[]<>|~&';
+const MD_SPECIAL = '\\`*_[]<>|~&#';
 const WORD_CHAR = /^[\p{L}\p{Nd}]$/u;
 
 export function renderCnHygieneMarkdown(report: CnHygieneReport): string {
@@ -604,4 +615,11 @@ export function renderCnHygieneMarkdown(report: CnHygieneReport): string {
   lines.push(...retired);
   lines.push('', '## Definitions', '', EDITOR_DEFINITIONS_NOTE);
   return `${lines.join('\n')}\n`;
+}
+
+/** Findings are collected by the same landing walk that produces the hygiene rows. */
+export function cnHopIssues(docs: CnDocument[], resolver: Resolver, hop: CompositeMdErHop, validation?: CnValidation): MdHopIssue[] {
+  const builder = new HygieneBuilder(docs, resolver, validation ?? validateCn(docs, resolver), hop);
+  builder.report();
+  return builder.hopIssues;
 }

@@ -137,6 +137,7 @@ data class SourceSnapshot(
     /** Parse failures that removed an entire file; retained separately for strict load reports. */
     val droppedFiles: List<LoadWarning> = emptyList(),
     val mdHopIssues: List<org.tatrman.ttr.metadata.LoadIssue> = emptyList(),
+    val mdHopAnalysis: MdHopAnalysis? = null,
 )
 
 /**
@@ -600,6 +601,7 @@ class FileBasedSource(
             loadedFiles = loadedFiles.toList(),
             layoutFiles = layoutFiles,
             droppedFiles = droppedFiles,
+            mdHopAnalysis = cn.mdHopAnalysis,
             mdHopIssues =
                 cn.mdIssues.map { d ->
                     val parts = d.element.split('.')
@@ -617,7 +619,7 @@ class FileBasedSource(
                         loadedFiles
                             .firstOrNull { file ->
                                 file.schemaCode == parts.getOrNull(at) &&
-                                    (pkg.isEmpty() || (file.declaredPackage ?: file.computedPackage) == pkg) &&
+                                    ((file.declaredPackage ?: file.computedPackage) == pkg) &&
                                     file.definitions.any { it.name == parts.getOrNull(at + 2) }
                             }?.storageFile
                             ?.path,
@@ -1479,15 +1481,7 @@ class FileBasedSource(
             is BindingColumnBareId ->
                 AttributeMappingTarget.Column(refToQname(value.id, "db", "dbo"))
             is BindingColumnObject -> {
-                val entries = value.obj.entries
-                // The walker wraps form (b) `{ target: <inner> }` and form (c) the same way;
-                // peel one layer of `target:` if present.
-                val inner =
-                    (entries["target"] as? PropertyValue.ObjectValue)?.entries
-                        ?: (entries["target"] as? PropertyValue.IdValue)?.let {
-                            return@let mapOf("column" to it as PropertyValue)
-                        }
-                        ?: entries
+                val inner = inlineColumnEntries(value)
                 when {
                     inner.containsKey("column") ->
                         AttributeMappingTarget.Column(refToQname(inner["column"], "db", "dbo"))

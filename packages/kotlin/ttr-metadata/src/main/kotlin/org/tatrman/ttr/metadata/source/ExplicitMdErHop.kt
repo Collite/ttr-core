@@ -24,8 +24,11 @@ import org.tatrman.ttr.semantics.SymbolEntry
  */
 class ExplicitMdErHop(
     docs: List<SemanticDocument>,
-    resolver: Resolver,
+    private val resolver: Resolver,
+    private val qualified: Boolean = false,
 ) : MdErHop {
+    private fun ref(symbol: SymbolEntry): String = if (qualified) symbol.qname else elementRefOf(symbol)
+
     /** md cubelet / md attribute → its explicit er candidates, in document order. */
     private data class Candidate(
         val er: String,
@@ -56,15 +59,15 @@ class ExplicitMdErHop(
                     val dimension =
                         def.dimensionRef?.let { resolveMdNs(resolver, doc, it.path, "dimension") }
                             ?: continue
-                    add(elementRefOf(dimension), elementRefOf(entity), true)
+                    add(ref(dimension), ref(entity), true)
                     for ((attr, path) in def.attributes) {
                         val md = resolver.getSymbol("${dimension.qname}.$attr") ?: continue
                         val targets = explicitErAttributes(relationIndex, doc, resolver, entity, path)
-                        if (targets.size > 1) ambiguousPaths += elementRefOf(md)
+                        if (targets.size > 1) ambiguousPaths += ref(md)
                         if (md.kind == "attribute" &&
                             targets.size == 1
                         ) {
-                            add(elementRefOf(md), elementRefOf(targets.single()), true)
+                            add(ref(md), ref(targets.single()), true)
                         }
                     }
                     continue
@@ -82,13 +85,13 @@ class ExplicitMdErHop(
                         ?: continue
                 val cubelet = def.cubeletRef?.let { resolveMdNs(resolver, doc, it.path, "cubelet") }
                 if (cubelet == null) continue
-                add(elementRefOf(cubelet), elementRefOf(entity))
+                add(ref(cubelet), ref(entity))
                 val measures = cubeletMeasureKeys(docs, resolver, cubelet)
                 for ((measure, erAttr) in def.measures) {
                     val md = resolveMdNs(resolver, doc, measure, "measure")?.takeIf { it.qname in measures } ?: continue
                     val er =
                         resolver.getSymbol("${entity.qname}.$erAttr")?.takeIf { it.kind == "attribute" } ?: continue
-                    add(elementRefOf(md), elementRefOf(er))
+                    add(ref(md), ref(er))
                 }
                 for ((mdAttr, erAttr) in def.attributes) {
                     val md =
@@ -97,7 +100,7 @@ class ExplicitMdErHop(
                         } ?: continue
                     val er =
                         resolver.getSymbol("${entity.qname}.$erAttr")?.takeIf { it.kind == "attribute" } ?: continue
-                    add(elementRefOf(md), elementRefOf(er))
+                    add(ref(md), ref(er))
                 }
             }
         }
@@ -131,7 +134,17 @@ class ExplicitMdErHop(
                 "'$mdElement' has no er counterpart — no explicit md2er binding maps it",
             )
         }
-        val ofBearer = found.filter { entityOfElement(it.er) == bearerEntity }
+        val ofBearer =
+            found.filter {
+                (
+                    qualifiedEntity(it.er) == bearerEntity ||
+                        (
+                            (!qualified || resolver.getSymbol(bearerEntity.orEmpty()) == null) &&
+                                resolver.getSymbol(qualifiedEntity(it.er).orEmpty())?.let(::elementRefOf) ==
+                                bearerEntity
+                        )
+                )
+            }
         if (bearerEntity != null && ofBearer.size == 1) return HopResult(ofBearer.single().er, HopVia.EXPLICIT)
         val own = found.filter { it.fromDimension }
         if (own.size == 1) return HopResult(own.single().er, HopVia.EXPLICIT)
@@ -140,7 +153,14 @@ class ExplicitMdErHop(
 
     /** Every md element an explicit binding (`md2er_cubelet` or `md2er_dimension`) maps onto [erElement]. */
     override fun mdElementsOn(erElement: String): List<String> =
-        candidates.filterValues { list -> list.any { it.er == erElement } }.keys.sorted()
+        candidates
+            .filterValues { list ->
+                list.any {
+                    it.er == erElement ||
+                        resolver.getSymbol(it.er)?.let(::elementRefOf) == erElement
+                }
+            }.keys
+            .sorted()
 }
 
 /**

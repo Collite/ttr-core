@@ -83,7 +83,7 @@ import {
   calcNames,
   elementRefOf,
   cnHygieneReport,
-  mdHopReport, renderMdHopMarkdown, type MdHopReport,
+  CompositeMdErHop, mdHopReport, renderMdHopMarkdown, type MdHopReport,
   renderCnHygieneMarkdown,
   validateCn,
   sugarDeclaringRef,
@@ -790,7 +790,9 @@ export function createServerConnection(
       docs.push({ uri, ast, ...context });
     }
     const validation = validateCn(docs, resolver);
-    cnCache = { validation, report: cnHygieneReport(docs, resolver, validation), mdReport: mdHopReport(docs, resolver, true) };
+    const hop = new CompositeMdErHop(docs, resolver);
+    let mdReport: MdHopReport | undefined;
+    cnCache = { validation, report: cnHygieneReport(docs, resolver, validation, hop), get mdReport() { return mdReport ??= mdHopReport(docs, resolver, true, hop); } };
     return cnCache;
   }
 
@@ -1709,7 +1711,7 @@ export function createServerConnection(
     if (def) lines.push(...automationHoverLines(def));
     // 0.17 (CN-P2 S2.7 T4) — a concept: its stereotype, label, grounding and grade (the hygiene row).
     if (symbol.kind === 'entity' && symbol.schemaCode === 'er') {
-      const row = cnProject().mdReport.roles.find((r) => r.entity === elementRefOf(symbol));
+      const row = cnProject().mdReport.roles.find((r) => r.entity === symbol.qname);
       if (row) lines.push(`- **Derived warehouse role:** ${row.role}`, ...row.why.map((why) => `- ${why}`));
     }
     if (symbol.kind === 'concept') {

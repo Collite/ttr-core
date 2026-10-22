@@ -52,6 +52,7 @@ data class CnBuild(
     val schema: CnSchema,
     val diagnostics: List<CnDiagnostic>,
     val mdIssues: List<MdHopIssue> = emptyList(),
+    val mdHopAnalysis: MdHopAnalysis? = null,
 )
 
 /**
@@ -115,6 +116,7 @@ private data class Landing(
     val grade: GroundingGrade = GroundingGrade.UNGROUNDED,
     val from: QualifiedName? = null,
     val hop: HopResult? = null,
+    val qualifiedErTarget: String? = null,
 )
 
 /** The stock keys a concept's free-form entries may carry (CN-D7) — every other key is the open tier. */
@@ -132,6 +134,7 @@ private class CnTierBuilder(
     private val docByUri = this.docs.associateBy { it.uri }
     private val validation = validateCn(this.docs, resolver)
     private val concepts: Map<String, CnConcept> = validation.concepts
+    private val hopIssues = mutableListOf<MdHopIssue>()
     private val landings = mutableMapOf<String, Landing>()
     private val visiting = mutableSetOf<String>()
     private val lexicon: Map<String, List<LexiconLink>>
@@ -166,13 +169,14 @@ private class CnTierBuilder(
                 for (element in mdHopElements(docs, resolver)) mdIssues += hop.issues(element)
                 mdIssues += hop.derived.lineageIssues
             } else {
-                mdIssues += groundedMdHopIssues(docs, resolver, hop)
+                mdIssues += hopIssues
             }
         }
         return CnBuild(
             CnSchema(out, bindings, relationTypes, elementTerms = elementTerms),
             validation.diagnostics,
             mdIssues.distinct(),
+            (hop as? CompositeMdErHop)?.let { MdHopAnalysis(it, hopIssues.distinct()) },
         )
     }
 
@@ -387,15 +391,49 @@ private class CnTierBuilder(
                     target?.takeIf { it.kind == "entity" || it.kind == "attribute" }?.let(::elementRefOf),
                     Via.DIRECT,
                     GroundingGrade.ER_GROUNDED,
+                    qualifiedErTarget = target?.qname,
                 )
             GroundingLayer.MD -> {
                 if (target == null) return Landing(null, Via.MD_HOP, HOP_MISSING)
                 val bearer = if (c.stereotype == "quality") bearerEntity(c) else null
                 // The built-in composite accepts canonical identities; injected hops retain the archive-ref seam.
                 val md = if (hop is CompositeMdErHop) target.qname else elementRefOf(target)
-                val answer = hop.erTargetOf(md, bearer)
+                val qualified =
+                    if (hop is CompositeMdErHop) {
+                        hop.qualifiedTargetOf(
+                            md,
+                            bearer,
+                        )
+                    } else {
+                        hop.erTargetOf(md, bearer)
+                    }
+                val answer =
+                    if (hop is CompositeMdErHop) {
+                        qualified.copy(
+                            erTarget =
+                                qualified.erTarget?.let {
+                                    resolver.getSymbol(it)?.let(::elementRefOf)
+                                        ?: it
+                                },
+                        )
+                    } else {
+                        qualified
+                    }
+                if (hop is CompositeMdErHop) hopIssues += hop.issues(md, bearer)
                 val er = answer.erTarget
-                Landing(er, Via.MD_HOP, if (er != null) GroundingGrade.MD_GROUNDED else HOP_MISSING, hop = answer)
+                Landing(
+                    er,
+                    Via.MD_HOP,
+                    if (er !=
+                        null
+                    ) {
+                        GroundingGrade.MD_GROUNDED
+                    } else {
+                        HOP_MISSING
+                    },
+                    hop = answer,
+                    qualifiedErTarget = qualified.erTarget,
+                )
             }
             GroundingLayer.DB -> Landing()
         }
@@ -408,7 +446,7 @@ private class CnTierBuilder(
             (v as? PropertyValue.IdValue)?.let { resolve(it.ref.path, it.parts, d, cn = true) }?.takeIf {
                 it.kind == "concept"
             } ?: return null
-        return landingOf(bearer.qname).erTarget?.let(::entityOfElement)
+        return landingOf(bearer.qname).let { it.qualifiedErTarget ?: it.erTarget }?.let(::qualifiedEntity)
     }
 
     // --- groundings ---------------------------------------------------------------------------------------------
@@ -645,3 +683,10 @@ private fun ids(v: PropertyValue?): List<PropertyValue.IdValue> =
         is PropertyValue.ListValue -> v.items.flatMap { ids(it) }
         else -> emptyList()
     }
+
+/** Reuse CnTierBuilder rather than approximating its bearer/inheritance rules. */
+internal fun cnLandingIssues(
+    docs: List<SemanticDocument>,
+    resolver: Resolver,
+    hop: CompositeMdErHop,
+): List<MdHopIssue> = CnTierBuilder(docs, resolver, hop, emptyMap(), false).build().mdIssues

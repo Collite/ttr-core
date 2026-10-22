@@ -178,3 +178,11 @@ publishing {
         }
     }
 }
+
+// R129-R4: run outside the shared test JVM, before any other Calcite initialization.
+val verifyLineageCharset by tasks.registering(JavaExec::class) {
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "org.tatrman.concept.LineageCharsetFork"
+}
+tasks.named("check") { dependsOn(verifyLineageCharset) }

@@ -100,3 +100,30 @@ describe('MD/ER derived hop, the Kotlin fixture', () => {
     expect(hop.issues('md.dimension.Customer').map((i) => i.slug)).toEqual(['md/er-hop-override']);
   });
 });
+
+describe('review-129 shared regressions', () => {
+  const cases = JSON.parse(readFileSync(join(ROOT, 'review-129.json'), 'utf8')) as Array<{
+    name: string; overrides: Record<string, string>; expected: Record<string, string | null>;
+    bearer?: string; origins?: Record<string, string[]>; opaque?: string; relation?: string;
+    override?: string; issue?: string; concept?: string;
+  }>;
+  for (const c of cases) it(c.name, () => {
+    const p = mdHopProject(c.overrides); const hop = new CompositeMdErHop(p.docs, p.resolver);
+    for (const [md, er] of Object.entries(c.expected)) expect(hop.qualifiedTargetOf(md, c.bearer).erTarget ?? null, md).toBe(er);
+    for (const [attr, cols] of Object.entries(c.origins ?? {})) expect([...hop.derived.physical.erAttrToColumn.get(attr) ?? []].sort()).toEqual(cols);
+    if (c.opaque) expect(hop.derived.lineageIssues.some((i) => i.element === c.opaque)).toBe(true);
+    if (c.relation) expect(hop.derived.physical.relations.find((r) => r.key === c.relation)?.pairs).toEqual([['er.entity.store_sales.customer', 'er.entity.customer.sk']]);
+    if (c.override) expect(hop.issues(c.override).map((i) => i.slug)).toContain('md/er-hop-override');
+    if (c.issue) {
+      expect(mdHopReport(p.docs, p.resolver).issues.map((i) => i.slug)).toContain(c.issue);
+      expect(cnHygieneReport(p.docs, p.resolver).concepts.find((r) => r.concept === c.concept)?.hop?.slug).toBe(c.issue);
+    }
+  });
+  it('keeps package role rows distinct and locates packaged lineage findings', () => {
+    const extra: Record<string, string> = {};
+    for (const pkg of ['east', 'west']) for (const f of readdirSync(ROOT).filter((f) => f.endsWith('.ttrm'))) extra[`${pkg}/${f}`] = `package ${pkg}\n${readFileSync(join(ROOT, f), 'utf8')}`;
+    const p = mdHopProject(extra); const report = mdHopReport(p.docs, p.resolver, true);
+    for (const prefix of ['', 'east.', 'west.']) expect(report.roles.filter((r) => r.entity === `${prefix}er.entity.store_sales`).map((r) => r.role)).toEqual(['fact']);
+    expect(report.roles.filter((r) => r.entity.endsWith('er.entity.sales'))).toHaveLength(3);
+  });
+});

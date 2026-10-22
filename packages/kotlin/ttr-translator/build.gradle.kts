@@ -18,7 +18,6 @@ kotlin { jvmToolchain(21) }
 
 tasks.test {
     useJUnitPlatform()
-    inputs.dir("../ttr-metadata/src/test/resources/md-hop")
     // Calcite freezes its default literal charset (ISO-8859-1) at class-load. The
     // library promotes it to UTF-8 at its entry points, but specs touching Calcite
     // directly can load it first in arbitrary order — pin the charset for the test
@@ -35,9 +34,6 @@ val codegenJavacc: Configuration by configurations.creating
 val calciteCodegenTemplates: Configuration by configurations.creating { isTransitive = false }
 
 dependencies {
-    // Optional md-hop QueryLineage provider; metadata stays independent.
-    implementation(project(":packages:kotlin:ttr-metadata"))
-
     api(project(":packages:kotlin:ttr-plan-proto")) // was api(project(":shared:proto")) in kantheon
     api(libs.calcite.core)
     implementation(libs.slf4j.api)

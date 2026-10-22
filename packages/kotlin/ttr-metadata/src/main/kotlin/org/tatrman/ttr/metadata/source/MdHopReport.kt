@@ -25,15 +25,22 @@ data class MdHopReport(
     val issues: List<MdHopIssue>,
 )
 
+/** Reusable load analysis. Reports retain the exact hop and default findings already used by CN. */
+data class MdHopAnalysis(
+    val hop: CompositeMdErHop,
+    val groundedIssues: List<MdHopIssue>,
+)
+
 fun mdHopReport(
     docs: List<SemanticDocument>,
     resolver: Resolver,
     all: Boolean = false,
+    analysis: MdHopAnalysis? = null,
 ): MdHopReport {
-    val hop = CompositeMdErHop(docs, resolver)
+    val hop = analysis?.hop ?: CompositeMdErHop(docs, resolver)
     val rows =
         mdHopElements(docs, resolver).map { md ->
-            val answer = hop.erTargetOf(md)
+            val answer = hop.qualifiedTargetOf(md)
             MdHopRow(
                 md,
                 answer.erTarget,
@@ -51,7 +58,7 @@ fun mdHopReport(
                     hop.issues(it.element)
                 }
             } else {
-                groundedMdHopIssues(docs, resolver, hop)
+                analysis?.groundedIssues ?: groundedMdHopIssues(docs, resolver, hop)
             }
         ).toMutableList()
     if (all) issues += hop.derived.lineageIssues
@@ -59,7 +66,7 @@ fun mdHopReport(
     for (doc in docs) {
         for (def in doc.definitions.filterIsInstance<EntityDef>()) {
             val sym = resolver.getSymbol(hop.derived.physical.key(doc, "entity", def.name)) ?: continue
-            val role = roles.find { it.entity == elementRefOf(sym) } ?: continue
+            val role = roles.find { it.entity == sym.qname } ?: continue
             val claims =
                 def.roles.map { it.path.substringAfterLast('.') }.filter {
                     it in
@@ -98,9 +105,9 @@ fun deriveTableRoles(hop: CompositeMdErHop): List<TableRole> {
         why.getOrPut(entity) { linkedMapOf() }.getOrPut(role) { sortedSetOf() }.add(cause)
     }
 
-    fun local(key: String) = p.resolver.getSymbol(key)?.let(::elementRefOf) ?: key
+    fun local(key: String) = key
     for (row in mdHopElements(p.docs, p.resolver)) {
-        val er = hop.erTargetOf(row).erTarget ?: continue
+        val er = hop.qualifiedTargetOf(row).erTarget ?: continue
         val logical = if (".md." in row) "md." + row.substringAfterLast(".md.") else row
         when {
             logical.startsWith("md.cubelet.") && logical.split('.').size == 3 -> mark(er, "fact", "cubelet $row (R1)")
@@ -118,12 +125,15 @@ fun deriveTableRoles(hop: CompositeMdErHop): List<TableRole> {
         val er = local(key)
         val outgoing = p.relations.filter { it.from == key && many(it.fromCardinality) && one(it.toCardinality) }
         val measures =
-            hop.derived.candidates.filterKeys { it.startsWith("md.measure.") }.values.any { attrs ->
-                attrs.any {
-                    entityOfElement(it) ==
-                        er
+            hop.derived.candidates
+                .filterKeys { it.startsWith("md.measure.") || ".md.measure." in it }
+                .values
+                .any { attrs ->
+                    attrs.any {
+                        qualifiedEntity(it) ==
+                            er
+                    }
                 }
-            }
         if (outgoing.size >= 2 && measures) mark(er, "fact", "measures and at least two many-to-one relations")
     }
     for (rel in p.relations) {
@@ -248,20 +258,5 @@ object MdHopRender {
             }
         }
 
-    private fun escape(s: String): String =
-        s
-            .replace(
-                "\\",
-                "\\\\",
-            ).replace(
-                "|",
-                "\\|",
-            ).replace(
-                "\n",
-                " ",
-            ).replace("\r", " ")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("`", "\\`")
-            .replace("*", "\\*")
+    private fun escape(s: String): String = markdownEscape(s)
 }
