@@ -141,12 +141,7 @@ internal class StatementLowerer(
         /** The evaluation day: the frame's `as_of` (its last day when coarser than a day), else today on the clock. */
         val asOfDay: LocalDate by lazy {
             if (!s.hasAsOf()) return@lazy LocalDate.now(clock)
-            val i = FrameTime.interval(s.asOf).getOrThrow() // validated
-            if (s.asOf.granularity == Granularity.MONTH || s.asOf.granularity == Granularity.YEAR) {
-                i.hi.toLocalDate().minusDays(1)
-            } else {
-                i.lo.toLocalDate()
-            }
+            checkNotNull(FrameTime.evaluationDay(s.asOf)) { "as_of validated" }
         }
 
         fun run(warnings: List<Diagnostic>): LowerResult {
@@ -651,8 +646,7 @@ internal class StatementLowerer(
 
         /** `last(<n>,<unit>)`'s first day, back from the evaluation day (days, weeks, months). */
         fun relative(r: String): LocalDate {
-            val (n, unit) = Regex("last\\(\\s*(\\d+)\\s*,\\s*([a-z_]+)\\s*\\)").matchEntire(r.trim())!!.destructured
-            val amount = n.toLong()
+            val (amount, unit) = checkNotNull(FrameTime.relative(r)) { "time.relative validated" }
             return when (unit) {
                 "days" -> asOfDay.minusDays(amount)
                 "weeks" -> asOfDay.minusWeeks(amount)
@@ -913,15 +907,6 @@ internal class StatementLowerer(
                 ComparisonOp.GT to ">",
                 ComparisonOp.GTE to ">=",
             )
-
-        fun member(text: String): PathComponent =
-            if (text.isNotEmpty() &&
-                text.all { it.isDigit() }
-            ) {
-                PathComponent.IntLit(text)
-            } else {
-                PathComponent.Quoted(text)
-            }
 
         fun column(name: String): Expression =
             Expression.newBuilder().setColumnRef(ColumnRef.newBuilder().setName(name)).build()

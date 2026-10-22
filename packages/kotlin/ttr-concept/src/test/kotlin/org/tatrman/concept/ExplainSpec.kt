@@ -7,6 +7,7 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.tatrman.assertion.v1.Assertion
 import org.tatrman.statement.v1.Statement
 import org.tatrman.ttr.metadata.model.ErSchema
@@ -224,6 +225,16 @@ class ExplainSpec :
                 it.locale shouldBe "cs"
                 it.diagnostics.shouldBeEmpty()
             }
+        }
+
+        test("a month or year as_of evaluates on its last day — in the prose as in the lowering (R125-7)") {
+            val phase = "\"filters\": [{ \"phase\": { \"phase\": { \"qname\": \"cn.OverdueInvoice\" } } }]"
+            val month = "\"asOf\": { \"value\": \"2026-01\", \"granularity\": \"MONTH\" }"
+            said(hartland, st(revenue, phase, jan, month), "en") shouldContain "end < as_of (= 2026-01-31)"
+            val year = "\"asOf\": { \"value\": \"2025\", \"granularity\": \"YEAR\" }"
+            said(hartland, st(revenue, phase, jan, year), "en") shouldContain "end < as_of (= 2025-12-31)"
+            val day = "\"asOf\": { \"value\": \"2026-01-10\", \"granularity\": \"DAY\" }"
+            said(hartland, st(revenue, phase, jan, day), "en") shouldContain "end < as_of (= 2026-01-10)"
         }
 
         test("the label chain: the locale's label → the locale's lexicon term → the English label → the name") {

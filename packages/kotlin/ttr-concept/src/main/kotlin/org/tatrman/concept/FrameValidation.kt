@@ -303,13 +303,29 @@ internal object FrameTime {
 
     fun periodCode(code: String): Boolean = PERIOD_CODE.matches(code)
 
+    /** `last(<n>,<unit>)` → its count and unit; null when [relative] is not that spelling — the one parser (R125-10). */
+    fun relative(relative: String): Pair<Long, String>? {
+        val (n, unit) = RELATIVE.matchEntire(relative.trim())?.destructured ?: return null
+        return (n.toLongOrNull() ?: return null) to unit
+    }
+
+    /**
+     * A frame's `as_of` as the evaluation day: its last day when coarser than a day (a month is as of its end), else its
+     * day; null when it is no instant. The lowering and the explanation read it alike (review-125 R125-7).
+     */
+    fun evaluationDay(asOf: Instant): LocalDate? {
+        val i = interval(asOf).getOrNull() ?: return null
+        return if (asOf.granularity == Granularity.MONTH || asOf.granularity == Granularity.YEAR) {
+            i.hi.toLocalDate().minusDays(1)
+        } else {
+            i.lo.toLocalDate()
+        }
+    }
+
     /** Why [relative] is outside the vocabulary; null when it is in it. */
     fun relativeProblem(relative: String): String? {
-        val m =
-            RELATIVE.matchEntire(relative.trim())
-                ?: return "`$relative` is not `last(<n>,<unit>)`"
-        val (n, unit) = m.destructured
-        if (n.toBigInteger().signum() == 0) return "`$relative` counts no ${m.groupValues[2]}"
+        val (n, unit) = relative(relative) ?: return "`$relative` is not `last(<n>,<unit>)`"
+        if (n == 0L) return "`$relative` counts no $unit"
         if (unit !in RELATIVE_UNITS) {
             return "`$relative` counts in `$unit` — the units are ${RELATIVE_UNITS.sorted().joinToString(", ")}"
         }

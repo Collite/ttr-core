@@ -496,15 +496,6 @@ internal class MdRenderer(
     }
 
     private companion object {
-        fun member(text: String): PathComponent =
-            if (text.isNotEmpty() &&
-                text.all { it.isDigit() }
-            ) {
-                PathComponent.IntLit(text)
-            } else {
-                PathComponent.Quoted(text)
-            }
-
         fun text(v: AutoValue): String? =
             when (v) {
                 is AutoValue.Str -> v.raw
@@ -523,3 +514,7 @@ internal class MdRenderer(
             }
     }
 }
+
+/** A member as a dot-path component: digits a number (`month.1`), anything else quoted — the one spelling (R125-10). */
+internal fun member(text: String): PathComponent =
+    if (text.isNotEmpty() && text.all { it.isDigit() }) PathComponent.IntLit(text) else PathComponent.Quoted(text)

@@ -85,18 +85,7 @@ internal class Explainer(
         val (words, fallback) = words(locale.ifBlank { s.locale })
         val labels = ExplainLabels(model, words)
         val asOf =
-            (
-                if (s.hasAsOf()) {
-                    FrameTime
-                        .interval(s.asOf)
-                        .getOrNull()
-                        ?.lo
-                        ?.toLocalDate()
-                } else {
-                    null
-                }
-            )
-                ?: LocalDate.now(clock)
+            (if (s.hasAsOf()) FrameTime.evaluationDay(s.asOf) else null) ?: LocalDate.now(clock)
         val prose = DefinitionProse(model, words, labels, asOf).takeIf { definitions }
         val say = StatementSentence(words, labels, prose)
         val items = mutableListOf<String>()
@@ -155,10 +144,8 @@ internal class Explainer(
                         t.range.takeIf { it.hasFrom() }?.let { "${words.from} ${words.instant(it.from)}" },
                         t.range.takeIf { it.hasTo() }?.let { "${words.until} ${words.instant(it.to)}" },
                     ).joinToString(" ").ifEmpty { null }
-                TimeSpec.SpecCase.RELATIVE -> {
-                    val m = RELATIVE.matchEntire(t.relative.trim())
-                    if (m == null) "\"${t.relative}\"" else words.last(m.groupValues[1].toLong(), m.groupValues[2])
-                }
+                TimeSpec.SpecCase.RELATIVE ->
+                    FrameTime.relative(t.relative)?.let { (n, unit) -> words.last(n, unit) } ?: "\"${t.relative}\""
                 TimeSpec.SpecCase.ALL_TIME -> words.allTime.takeIf { t.allTime }
                 else -> null
             }
@@ -255,8 +242,6 @@ internal class Explainer(
     companion object {
         /** WARNING — the locale asked for has no words; the explanation is English (A-CN-52). */
         const val FALLBACK = "cn/explain-locale-fallback"
-
-        private val RELATIVE = Regex("last\\(\\s*(\\d+)\\s*,\\s*([a-z_]+)\\s*\\)")
 
         private val OPS =
             mapOf(
