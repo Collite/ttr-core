@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.PrintHelpMessage
+import com.github.ajalt.clikt.core.ProgramResult
 import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
@@ -23,10 +24,12 @@ fun main(args: Array<String>) {
 /** Parse through the real command tree while keeping usage errors separate from model failures. */
 fun runMetadataCommand(args: List<String>): CliOutcome {
     var outcome = CliOutcome(0, "", "")
-    val command = MetadataCommand().subcommands(LoadCommand { outcome = it })
+    val command = MetadataCommand().subcommands(LoadCommand { outcome = it }, mdCommand())
     return try {
         command.parse(args)
         outcome
+    } catch (error: ProgramResult) {
+        CliOutcome(error.statusCode, "", "")
     } catch (error: CliktError) {
         val help = command.getFormattedHelp(error).orEmpty() + "\n"
         if (error is PrintHelpMessage && !error.error) CliOutcome(0, help, "") else CliOutcome(64, "", help)

@@ -1,0 +1,13 @@
+model db schema dbo
+def table store_sales { columns: [def column cust { type: int }, def column item { type: int }, def column sold { type: int }, def column amount { type: decimal }] }
+def table web_sales { columns: [def column cust { type: int }, def column item { type: int }, def column sold { type: int }, def column amount { type: decimal }] }
+def table catalog_sales { columns: [def column cust { type: int }, def column item { type: int }, def column sold { type: int }, def column amount { type: decimal }] }
+def table customer { columns: [def column sk { type: int }, def column addr { type: int }, def column born { type: int }] }
+def table customer_address { columns: [def column sk { type: int }, def column state { type: text }] }
+def table item { columns: [def column sk { type: int }] }
+def table date_dim { columns: [def column sk { type: int }] }
+def table orphan { columns: [def column sk { type: int }] }
+def table household { columns: [def column sk { type: int }] }
+def view sales_view { columns: [def column amount { type: decimal }] }
+def fk store_customer { from: [db.dbo.store_sales.cust], to: [db.dbo.customer.sk] }
+def table customer_item { columns: [def column cust { type: int }, def column item { type: int }] }

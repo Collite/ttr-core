@@ -12,7 +12,8 @@
 // inherits its bearer's. HP-P1 adds explicit dimensions and structural measures to `ExplicitMdErHop`.
 
 import type { ConceptProperty, IdValue, LexiconEntryDef, Md2ErCubeletDef, ObjectValue, PropertyValue } from '@tatrman/parser';
-import { explicitErAttributes, buildMdErRelationIndex, resolveMdNs, resolveMdAttribute, cubeletMeasureKeys } from '../md/explicit.js';
+import { explicitErAttributes, buildMdErRelationIndex, resolveMdNs, resolveMdAttribute, cubeletMeasureKeys, resolveMdErRef } from '../md/explicit.js';
+import { CompositeMdErHop } from '../md/hop.js';
 import { buildCanonicalKey } from '../qname.js';
 import type { Resolver } from '../resolver.js';
 import type { SymbolEntry } from '../symbol-table.js';
@@ -26,6 +27,7 @@ export type HopSlug = 'md/er-unmapped' | 'md/er-ambiguous';
 
 /** An md element's E-R landing, or the md/hop slug saying why there is none (the Kotlin `HopResult`). */
 export interface HopAnswer {
+  via?: 'explicit' | 'derived' | 'derived-bearer';
   erTarget?: string;
   slug?: HopSlug;
   message: string;
@@ -99,7 +101,7 @@ export class ExplicitMdErHop {
     for (const doc of docs) {
       for (const def of doc.ast.definitions) {
         if (def.kind === 'md2erDimension') {
-          const entity = resolveIn(resolver, doc, def.entity, def.entity.split('.'));
+          const entity = resolveMdErRef(resolver, doc, def.entity);
           const dimension = resolveMdNs(resolver, doc, def.dimensionRef, 'dimension');
           if (entity?.kind !== 'entity' || dimension?.kind !== 'dimension') continue;
           this.add(elementRefOf(dimension), elementRefOf(entity), 'dimension');
@@ -113,7 +115,7 @@ export class ExplicitMdErHop {
         }
         if (def.kind !== 'md2erCubelet') continue;
         const d = def as Md2ErCubeletDef;
-        const entity = d.entity ? resolveIn(resolver, doc, d.entity, d.entity.split('.')) : undefined;
+        const entity = d.entity ? resolveMdErRef(resolver, doc, d.entity) : undefined;
         if (entity?.kind !== 'entity') continue;
         const cubelet = d.cubeletRef ? resolveMdNs(resolver, doc, d.cubeletRef, 'cubelet') : undefined;
         if (!cubelet) continue;
@@ -215,12 +217,12 @@ class HygieneBuilder {
   private readonly visiting = new Set<string>();
   private readonly conceptTerms = new Map<string, TermLink[]>();
   private readonly elementTerms = new Map<string, TermLink[]>();
-  private readonly hop: ExplicitMdErHop;
+  private readonly hop: CompositeMdErHop;
 
   constructor(docs: CnDocument[], private readonly resolver: Resolver, private readonly v: CnValidation) {
     this.docs = [...docs].sort((a, b) => (a.uri < b.uri ? -1 : a.uri > b.uri ? 1 : 0));
     this.docByUri = new Map(this.docs.map((d) => [d.uri, d]));
-    this.hop = new ExplicitMdErHop(this.docs, resolver);
+    this.hop = new CompositeMdErHop(this.docs, resolver);
     this.collectCanonicalTerms();
   }
 
@@ -292,7 +294,7 @@ class HygieneBuilder {
       case 'md': {
         if (!target) return { via: 'md-hop', grade: 'md-grounded-hop-missing' };
         const bearer = c.stereotype === 'quality' ? this.bearerEntity(c) : undefined;
-        const answer = this.hop.erTargetOf(elementRefOf(target), bearer);
+        const answer = this.hop.erTargetOf(target.qname, bearer);
         return {
           erTarget: answer.erTarget,
           via: 'md-hop',

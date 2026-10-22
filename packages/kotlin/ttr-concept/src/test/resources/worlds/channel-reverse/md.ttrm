@@ -1,0 +1,6 @@
+model md
+def domain ChannelCode { type: string }
+def domain Money { type: decimal }
+def dimension Channel { key: code, attributes: [def attribute code { domain: md.ChannelCode }] }
+def measure revenue { domain: md.Money, aggregation: sum }
+def cubelet channelSales { grain: [Channel.code], measures: [revenue] }

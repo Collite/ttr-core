@@ -136,6 +136,7 @@ data class SourceSnapshot(
     val layoutFiles: List<LayoutFileRef> = emptyList(),
     /** Parse failures that removed an entire file; retained separately for strict load reports. */
     val droppedFiles: List<LoadWarning> = emptyList(),
+    val mdHopIssues: List<org.tatrman.ttr.metadata.LoadIssue> = emptyList(),
 )
 
 /**
@@ -305,6 +306,7 @@ class FileBasedSource(
      * index from them, or gets a new version when one is written.
      */
     private val layouts: Boolean = false,
+    private val allMdHopIssues: Boolean = false,
 ) : ModelSource {
     override fun load(): SourceSnapshot {
         val extensions = if (layouts) MODEL_AND_LAYOUT_EXTENSIONS else MODEL_EXTENSIONS
@@ -564,7 +566,7 @@ class FileBasedSource(
         // Grammar 0.17 — the conceptual tier over the source as one project; its model-level `cn/…` errors and
         // warnings are load issues (the automation-validator precedent), its hygiene / advisory ones ride the
         // typed model (the grades) and are not repeated here.
-        val cn = CnBuilder.build(loadedFiles)
+        val cn = CnBuilder.build(loadedFiles, allMdHopIssues = allMdHopIssues)
         for (d in cn.diagnostics) {
             val issue = LoadWarning(sourceId, d.uri, d.source.line, d.source.column, "${d.code.id}: ${d.message}")
             when (d.severity) {
@@ -598,6 +600,30 @@ class FileBasedSource(
             loadedFiles = loadedFiles.toList(),
             layoutFiles = layoutFiles,
             droppedFiles = droppedFiles,
+            mdHopIssues =
+                cn.mdIssues.map { d ->
+                    val parts = d.element.split('.')
+                    val at = parts.indexOfLast { it == "md" || it == "er" }
+                    val pkg = parts.take(at.coerceAtLeast(0)).joinToString(".")
+                    org.tatrman.ttr.metadata.LoadIssue(
+                        org.tatrman.ttr.metadata.LoadIssue.Category.BINDING_INCONSISTENCY,
+                        if (d.severity ==
+                            "warning"
+                        ) {
+                            org.tatrman.ttr.metadata.LoadIssue.Severity.WARNING
+                        } else {
+                            org.tatrman.ttr.metadata.LoadIssue.Severity.INFO
+                        },
+                        loadedFiles
+                            .firstOrNull { file ->
+                                file.schemaCode == parts.getOrNull(at) &&
+                                    (pkg.isEmpty() || (file.declaredPackage ?: file.computedPackage) == pkg) &&
+                                    file.definitions.any { it.name == parts.getOrNull(at + 2) }
+                            }?.storageFile
+                            ?.path,
+                        "${d.slug}: ${d.element}: ${d.message}",
+                    )
+                },
         )
     }
 

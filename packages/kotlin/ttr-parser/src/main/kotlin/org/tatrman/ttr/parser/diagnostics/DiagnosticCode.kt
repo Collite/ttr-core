@@ -11,6 +11,11 @@ package org.tatrman.ttr.parser.diagnostics
 enum class DiagnosticCode(
     val id: String,
 ) {
+    MdErUnmapped("md/er-unmapped"),
+    MdErAmbiguous("md/er-ambiguous"),
+    MdErHopOverride("md/er-hop-override"),
+    MdErLineageOpaque("md/er-lineage-opaque"),
+    MdRoleClaimMismatch("md/role-claim-mismatch"),
     MdMd2erPhysicalProp("md/md2er-physical-prop"),
     MdMd2erReference("md/md2er-reference"),
     MdMd2erDimensionKey("md/md2er-dimension-key"),

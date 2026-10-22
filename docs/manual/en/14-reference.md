@@ -156,6 +156,11 @@ The `md` model and the `binding`-model `md2*` kinds (see [MD model](15-md-model.
 | `md/semiadditive-no-validby` / `md/nonadditive-recompute-unsupported` | Error | Additivity consistency (semi-additive latest-valid needs `validBy`; non-additive recompute is v1.1). |
 | `md/grain-ref-unknown` / `md/grain-not-leaf` | Error / Warning | A cubelet grain ref doesn't resolve / is coarser than another in the grain. |
 | `md/shape-measure-mismatch` / `md/incomplete-journaling` / `md/multisource-grain-mismatch` | Error | Binding shape↔measure form / writeback completeness / multi-source grain agreement. |
+| `md/er-unmapped` | Warning | A grounded MD element has no ER counterpart through explicit or physical bindings. |
+| `md/er-ambiguous` | Warning | Several ER candidates remain after bearer restriction. |
+| `md/er-hop-override` | Info | An explicit mapping disagrees with physical derivation. |
+| `md/er-lineage-opaque` | Info | A stacked query output's column origins cannot be resolved. |
+| `md/role-claim-mismatch` | Warning | A deprecated CNC role claim contradicts the derived warehouse role. |
 | `md/md2er-physical-prop` | Error | An `md2er_cubelet` (structural-only) carries shape/journaling/allocation. |
 | `md/md2er-reference` | Error | Missing or invalid MD owner, non-member mapping keys, or unresolved ER entity/attribute paths. |
 | `md/md2er-dimension-key` | Error | The explicit dimension attribute map omits its key. |

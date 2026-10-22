@@ -250,8 +250,27 @@ Both bindings are structural. Physical `shape`, `journaling` and `allocation` on
 remain `md/md2er-physical-prop`. A domain is a value type; it has no explicit `md2er_domain` form.
 
 The formatter orders documentation, tags, dimension/cubelet, entity/target, attributes, then measures.
-It preserves bindings with comments or refused physical fields verbatim. Physical derivation is the
-next hop phase; this grammar cut supplies the explicit overrides it needs.
+It preserves bindings with comments or refused physical fields verbatim.
+
+### What is derived, and how
+
+The hop joins `md2db_*` and `er2db_*` on the same resolved database table/view and column:
+
+- **R1:** a cubelet lands on the entity bound to its fact table.
+- **R2:** a measure collects the ER attributes bound to its columns across every carrying cubelet.
+- **R3:** a dimension follows its key's fact FK through ER relations; maps from its key domain and a bound-domain source corroborate the target entity. Disagreeing entities remain ambiguous.
+- **R4:** the key lands on the relation's target key. A descriptive attribute follows the MD map to its own physical column; it may live on a different entity. For example, `Customer.state` can land on `customer_address.state`.
+- **R5:** a cubelet grain attribute lands on that fact's FK attribute, separately from the dimension's own key.
+- **R6:** a bound domain uses its member-source column; otherwise its dimension attributes supply candidate landings.
+- **R7:** an entity stacked on an ER query adds its output columns' physical origins. For `sales` over a three-branch sales union, revenue has three fact landings and `sales.ext_sales_price`. A quality whose bearer is `sales` picks the latter (`derived-bearer`). A database view has no inferred lineage.
+
+Explicit mappings win per element. Without one, the bearer restricts quality candidates first, then a unique unrestricted candidate wins. Multiple candidates give `md/er-ambiguous`; none gives `md/er-unmapped`, naming the missing physical binding or relation. `md/er-hop-override` is information when an explicit answer differs from derivation.
+
+The metadata library uses conservative syntactic lineage for bare SELECT attributes, aliases, literals and UNION ALL. Unsupported expressions yield `md/er-lineage-opaque` information. When the translator is present, its optional Calcite service supplies column origins and recursively expands stacked bindings. Python retains the structural MD/ER validation; it has no MD derivation model.
+
+`ttr md hop <dir> [--all] [--format text|json] [--fail-on warning]` prints every MD element, landing, rule or diagnostic and the derived warehouse roles. Findings default to concept-grounded elements and use each quality's bearer; `--all` includes ungrounded elements. Exit codes are 0 for success, 1 for a finding at the requested threshold, and 2 for usage or unreadable input. `just md-hop <dir>` invokes it from this repository. In VS Code, use **TTR: md → er hop report** (`modeler/getMdHop`). ER entity hover shows the derived role and its reasons.
+
+Roles are derived from the same mappings: a cubelet's entity is a fact; a dimension's entity is a dimension. Measures plus two many-to-one outgoing relations also identify a fact; the one side from a fact identifies a dimension. An N:N map target is flagged as a bridge and excluded from grain coarsening; other entities stay unclassified. Only deprecated CNC `roles:` claims are checked against this result (`md/role-claim-mismatch`, warning).
 
 ---
 

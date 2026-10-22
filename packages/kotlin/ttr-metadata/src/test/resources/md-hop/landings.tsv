@@ -1,0 +1,11 @@
+md.cubelet.storeSales	er.entity.store_sales
+md.cubelet.webSales	er.entity.web_sales
+md.cubelet.catalogSales	er.entity.catalog_sales
+md.dimension.Customer	er.entity.customer
+md.dimension.Customer.customerCode	er.entity.customer.sk
+md.dimension.Customer.state	er.entity.customer_address.state
+md.dimension.Customer.birthYear	er.entity.customer.birthYear
+md.dimension.Product	er.entity.item
+md.dimension.Product.code	er.entity.item.sk
+md.dimension.Calendar	er.entity.date_dim
+md.dimension.Calendar.day	er.entity.date_dim.sk

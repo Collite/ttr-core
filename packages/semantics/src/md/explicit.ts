@@ -7,6 +7,17 @@ import type { SymbolEntry } from '../symbol-table.js';
 
 export function resolveMdErRef(resolver: Resolver, doc: CnDocument, path: string): SymbolEntry | undefined {
   if (!path) return undefined;
+  if (doc.packageName && /^(md|er|db)\./.test(path)) {
+    const qualified = `${doc.packageName}.${path}`;
+    const same = resolver.resolveReference({ path: qualified, parts: qualified.split('.') }, {
+      schemaCode: doc.schemaCode, namespace: doc.namespace, packageName: doc.packageName, imports: doc.ast.imports,
+    });
+    if (same.resolved && same.symbol.packageName === doc.packageName) {
+      const local = same.symbol.qname.slice(doc.packageName.length + 1);
+      const physical = local.replace(/^(db\.[^.]+)\.(table|view|fk|query)\./, '$1.');
+      if (local === path || physical === path) return same.symbol;
+    }
+  }
   const r = resolver.resolveReference({ path, parts: path.split('.') }, {
     schemaCode: doc.schemaCode, namespace: doc.namespace, packageName: doc.packageName, imports: doc.ast.imports,
   });
@@ -23,10 +34,10 @@ function mdPaths(path: string, ns: string): string[] {
 }
 
 /** Resolve authored MD shorthand in its expected namespace, retaining only the requested kind. */
-export function resolveMdNs(resolver: Resolver, doc: CnDocument, path: string, ns: 'dimension' | 'cubelet' | 'measure'): SymbolEntry | undefined {
+export function resolveMdNs(resolver: Resolver, doc: CnDocument, path: string, ns: 'dimension' | 'cubelet' | 'measure' | 'domain' | 'map'): SymbolEntry | undefined {
   for (const candidate of mdPaths(path, ns)) {
     const symbol = resolveMdErRef(resolver, doc, candidate);
-    if (symbol?.kind === ns && symbol.schemaCode === 'md') return symbol;
+    if (symbol?.kind === (ns === 'domain' ? 'mdDomain' : ns === 'map' ? 'mdMap' : ns) && symbol.schemaCode === 'md') return symbol;
   }
   return undefined;
 }

@@ -1,0 +1,2 @@
+model db schema dbo
+def table channel_sales { columns: [def column channel { type: text }, def column ext_sales_price { type: decimal }] }

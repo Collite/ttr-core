@@ -1,0 +1,6 @@
+model cn
+def event Sale { grounds: er.entity.channel_sales }
+def kind Channel {}
+def quality revenue { of: Sale }
+def quality channel { of: Sale, grounds: er.entity.channel_sales.channel }
+def phase WebSale { of: Sale, definition: """channel = 'web'""" }

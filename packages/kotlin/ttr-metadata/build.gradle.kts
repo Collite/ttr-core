@@ -16,11 +16,13 @@ tasks.test {
     inputs.dir("../../package-sdk/schemas/layout-vectors")
     // CN-P2 S2.5: the cn specs load conformance fixtures 75–84 in place.
     inputs.dir("../../../tests/conformance/fixtures")
+    inputs.dir("../../../tests/conformance/md-hop")
 }
 
 dependencies {
     // Re-exported: consumers get one coherent ttr-* set (contracts §1).
     api(project(":packages:kotlin:ttr-parser"))
+    implementation(libs.kotlinx.ser.json) // Deterministic md-hop report rendering.
     api(project(":packages:kotlin:ttr-writer"))
     api(project(":packages:kotlin:ttr-semantics"))
     // S6-A — the MemberCatalog capability implements ttr-md-resolver's member interfaces

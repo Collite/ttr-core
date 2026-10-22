@@ -107,7 +107,7 @@ data class MdDimension(
 )
 
 /** How a map coarsens grain: N:1 (demotes leaf-ness), 1:1 (co-leaf), or calc (implicitly N:1). */
-enum class MapKind { N1, ONE_ONE, CALC }
+enum class MapKind { N1, ONE_ONE, CALC, MANY_MANY }
 
 data class MdMap(
     val name: String,
@@ -183,6 +183,7 @@ internal object MdModelBuilder {
                             when {
                                 m.calc != null -> MapKind.CALC
                                 m.cardinality == "1:1" -> MapKind.ONE_ONE
+                                m.cardinality == "N:N" -> MapKind.MANY_MANY
                                 else -> MapKind.N1
                             },
                         calc = m.calc?.name,

@@ -6,6 +6,17 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **MD hop / HP-P2** — derive MD → ER landings through shared physical bindings, FK/join relations,
+  domain/map sources and stacked ER-query column origins (R1–R7). Explicit mappings retain priority;
+  qualities first restrict candidates to their bearer's entity. The TS/Kotlin CN tier reads the composite hop.
+  `ttr md hop` and the editor report every MD landing, diagnostics and derived fact/dimension/bridge roles;
+  entity hover shows the role reasons. Named lint rules respect configured severity and default to grounded MD
+  elements; `--all` expands report finding scope. Deprecated CNC role claims are checked for mismatch.
+  The optional translator lineage service uses Calcite; metadata retains a conservative syntactic default.
+  Parameter-free ER query bodies now expand through the CN renderer's model handle. The CN Sales-union fixture
+  activates return-share, with both SQL dialect oracles; remaining channel primitives are tracked under CN-P6.
+  N:N map cardinality is retained and excluded from grain coarsening. No grammar production changes.
+
 - **Grammar 0.18 / HP-P1** — explicit `md2er_dimension` and structural `md2er_cubelet.measures`
   across TS, Kotlin and Python. Validate dimension keys, one-relation paths, duplicate bindings and
   measure targets. The Kotlin writer and TS formatter render both bindings; the formatter preserves comments.

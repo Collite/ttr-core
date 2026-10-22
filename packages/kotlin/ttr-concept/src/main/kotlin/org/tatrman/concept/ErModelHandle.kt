@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.concept
 
+import org.tatrman.translate.v1.Language
+import org.tatrman.translator.orchestrator.Translator
+import org.tatrman.translator.orchestrator.ParseResult
+import java.util.concurrent.ConcurrentHashMap
 import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.translator.framework.EntityMapping
@@ -30,8 +34,8 @@ import org.tatrman.ttr.metadata.model.Model
  * tatrman (`IslandModelHandle` is db-only). Public since S3.8 (A-CN-55, the AM-31 pre-check): a caller of
  * `definitionRender` — AU's `ttrp-doc` / `ttrp build`, P5's door — translates the island it gets over this handle,
  * with no ttr-concept internals. An entity without an explicit mapping maps to the db table of its own name when there
- * is one (TTR-M's convention); a query-bound entity maps to its query, whose body this handle does not carry (saved
- * queries are the translator's UNFOLD stage — empty).
+ * is one (TTR-M's convention); a query-bound entity maps to its query. Parameter-free ER query bodies compile once per handle to an ER plan;
+ * EXPAND_LOGICAL_BODIES/MAP_TO_PHYSICAL then expand the same stacked Sales shape the hop reads.
  */
 class ErModelHandle(
     private val model: Model,
@@ -158,20 +162,65 @@ class ErModelHandle(
                 if (column == attribute) null else attribute to column
             }.toMap()
 
+    private val compiledQueries = ConcurrentHashMap<QualifiedName, SavedQueryBody>()
+    private val queries by lazy {
+        model.queries.values
+            .filter { it.qname.schemaCode == org.tatrman.ttr.metadata.model.SchemaCode.ER }
+            .associateBy {
+                QualifiedName
+                    .newBuilder()
+                    .setSchemaCode(
+                        SchemaCode.ER,
+                    ).setNamespace("query")
+                    .setName(bare(it.qname.name))
+                    .build()
+            }
+    }
+
     override fun savedQueries(
         schemaCode: SchemaCode,
         namespace: String,
-    ): Map<QualifiedName, ModelSavedQuery> = emptyMap()
+    ): Map<QualifiedName, ModelSavedQuery> =
+        if (schemaCode == SchemaCode.ER &&
+            namespace == "query"
+        ) {
+            queries.keys.associateWith(::ModelSavedQuery)
+        } else {
+            emptyMap()
+        }
 
     override fun savedQueryBody(queryQname: QualifiedName): SavedQueryBody =
-        error("ErModelHandle carries no saved query bodies ($queryQname)")
+        compiledQueries.computeIfAbsent(queryQname) {
+            val query = queries[it] ?: error("Unknown ER query $it")
+            require(query.parameters.isEmpty()) { "Parameterized ER query bodies require bound parameters: $it" }
+            val parsed =
+                Translator(this).parseToRelNode(
+                    query.sourceText,
+                    Language.SQL,
+                    targetSchema = SchemaCode.ER,
+                    sourceSchema = SchemaCode.ER,
+                    expandLogicalBodies = false,
+                )
+            val plan =
+                when (parsed) {
+                    is ParseResult.Success -> parsed.plan
+                    is ParseResult.Failure -> error("Cannot compile ER query $it: ${parsed.code}: ${parsed.message}")
+                }
+            SavedQueryBody(plan, emptyList(), emptyList())
+        }
 
     override fun currentVersion(): String = model.version.value
 
     override fun namespaces(schemaCode: SchemaCode): Set<String> =
         when (schemaCode) {
             SchemaCode.DB -> if (tables.isEmpty()) emptySet() else setOf(namespace)
-            SchemaCode.ER -> if (entities.isEmpty()) emptySet() else setOf("entity")
+            SchemaCode.ER ->
+                if (entities.isEmpty()) {
+                    emptySet()
+                } else {
+                    setOf("entity") +
+                        if (queries.isEmpty()) emptySet() else setOf("query")
+                }
             else -> emptySet()
         }
 

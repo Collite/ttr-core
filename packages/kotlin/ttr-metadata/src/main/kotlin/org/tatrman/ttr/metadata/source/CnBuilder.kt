@@ -51,6 +51,7 @@ import org.tatrman.ttr.semantics.cn.validateCn
 data class CnBuild(
     val schema: CnSchema,
     val diagnostics: List<CnDiagnostic>,
+    val mdIssues: List<MdHopIssue> = emptyList(),
 )
 
 /**
@@ -60,21 +61,27 @@ data class CnBuild(
  * grounding with its concept and target resolved, the first per concept the one read) — and adds what consumers read:
  * each concept's E-R landing ([Concept.erTarget], [Concept.via], [Concept.grade]; T4), its lexicon links (T6). The
  * reverse index is derived by [CnSchema] itself (T5). md groundings reach E-R through [hop]; P2's is
- * [ExplicitMdErHop].
+ * [CompositeMdErHop].
  *
  * A source with no cn content gets an empty tier and no symbol table is built.
  */
 object CnBuilder {
     fun build(
         files: List<LoadedFile>,
-        hop: ((List<SemanticDocument>, Resolver) -> MdErHop) = ::ExplicitMdErHop,
+        hop: ((List<SemanticDocument>, Resolver) -> MdErHop) = ::CompositeMdErHop,
+    ): CnBuild = build(files, allMdHopIssues = false, hop = hop)
+
+    fun build(
+        files: List<LoadedFile>,
+        allMdHopIssues: Boolean,
+        hop: ((List<SemanticDocument>, Resolver) -> MdErHop) = ::CompositeMdErHop,
     ): CnBuild {
-        if (files.none { hasCn(it.definitions, it.declaredPackage ?: it.computedPackage) }) {
+        if (!allMdHopIssues && files.none { hasCn(it.definitions, it.declaredPackage ?: it.computedPackage) }) {
             return CnBuild(CnSchema(), emptyList())
         }
         val (docs, resolver) = project(files)
         val locales = files.associate { it.storageFile.path to it.locale }
-        return CnTierBuilder(docs, resolver, hop(docs, resolver), locales).build()
+        return CnTierBuilder(docs, resolver, hop(docs, resolver), locales, allMdHopIssues).build()
     }
 
     /**
@@ -119,6 +126,7 @@ private class CnTierBuilder(
     private val resolver: Resolver,
     private val hop: MdErHop,
     private val locales: Map<String, String?>,
+    private val allMdHopIssues: Boolean,
 ) {
     private val docs = docs.sortedBy { it.uri }
     private val docByUri = this.docs.associateBy { it.uri }
@@ -152,7 +160,20 @@ private class CnTierBuilder(
             val concept = concept(c, bindings)
             out.putIfAbsent(concept.qname, concept)
         }
-        return CnBuild(CnSchema(out, bindings, relationTypes, elementTerms = elementTerms), validation.diagnostics)
+        val mdIssues = mutableListOf<MdHopIssue>()
+        if (hop is CompositeMdErHop) {
+            if (allMdHopIssues) {
+                for (element in mdHopElements(docs, resolver)) mdIssues += hop.issues(element)
+                mdIssues += hop.derived.lineageIssues
+            } else {
+                mdIssues += groundedMdHopIssues(docs, resolver, hop)
+            }
+        }
+        return CnBuild(
+            CnSchema(out, bindings, relationTypes, elementTerms = elementTerms),
+            validation.diagnostics,
+            mdIssues.distinct(),
+        )
     }
 
     // --- resolution ---------------------------------------------------------------------------------------------
@@ -368,8 +389,10 @@ private class CnTierBuilder(
                     GroundingGrade.ER_GROUNDED,
                 )
             GroundingLayer.MD -> {
-                val md = target?.let(::elementRefOf) ?: return Landing(null, Via.MD_HOP, HOP_MISSING)
+                if (target == null) return Landing(null, Via.MD_HOP, HOP_MISSING)
                 val bearer = if (c.stereotype == "quality") bearerEntity(c) else null
+                // The built-in composite accepts canonical identities; injected hops retain the archive-ref seam.
+                val md = if (hop is CompositeMdErHop) target.qname else elementRefOf(target)
                 val answer = hop.erTargetOf(md, bearer)
                 val er = answer.erTarget
                 Landing(er, Via.MD_HOP, if (er != null) GroundingGrade.MD_GROUNDED else HOP_MISSING, hop = answer)

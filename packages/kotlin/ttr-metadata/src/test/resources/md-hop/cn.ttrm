@@ -1,0 +1,4 @@
+model cn
+def kind Sale { grounds: er.entity.sales }
+def kind Customer { grounds: md.Customer }
+def quality revenue { of: Sale, grounds: md.revenue }

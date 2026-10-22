@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.concept
 
+import org.tatrman.translate.v1.Language
+import org.tatrman.translator.orchestrator.Translator
+import org.tatrman.translator.orchestrator.ParseResult
+import org.tatrman.translator.framework.SavedQueryBody
+import org.tatrman.ttr.metadata.model.Er2DbEntityMapping
+import org.tatrman.ttr.metadata.model.MappingTarget
+import org.tatrman.ttr.metadata.model.SchemaCode as MetadataSchemaCode
 import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.translator.framework.EntityMapping
@@ -43,6 +50,62 @@ internal object GoldenModelHandle {
                     },
                 )
             }
+        val flat =
+            InMemoryModelHandle(
+                tables =
+                    entities.map { e ->
+                        ModelTable(
+                            table(e.qname.name),
+                            e.attributes.map { ModelColumn(it.name, it.surfaceType, it.nullable) },
+                        )
+                    },
+                entities = entities,
+                relations = relations,
+                entityMappings = entities.associate { it.qname to EntityMapping.ToTable(table(it.qname.name)) },
+            )
+        // The independent oracle compiles stored ER bodies over the flat source handle. The production handle
+        // compiles lazily over its actual mappings; both must expand Sales to the same ER plan.
+        val bodies =
+            model.queries.values
+                .filter { it.qname.schemaCode == MetadataSchemaCode.ER }
+                .associate { q ->
+                    val key =
+                        QualifiedName
+                            .newBuilder()
+                            .setSchemaCode(
+                                SchemaCode.ER,
+                            ).setNamespace("query")
+                            .setName(q.qname.name)
+                            .build()
+                    val result =
+                        Translator(flat).parseToRelNode(
+                            q.sourceText,
+                            Language.SQL,
+                            targetSchema = SchemaCode.ER,
+                            sourceSchema = SchemaCode.ER,
+                        )
+                    val plan = (result as ParseResult.Success).plan
+                    key to
+                        SavedQueryBody(plan, emptyList(), emptyList())
+                }
+        if (bodies.isEmpty()) return flat
+        val mapped =
+            model.mappings
+                .filterIsInstance<Er2DbEntityMapping>()
+                .mapNotNull { mapping ->
+                    val query =
+                        mapping.target as? MappingTarget.SqlQuery
+                            ?: return@mapNotNull null
+                    entity(mapping.entity.name) to
+                        EntityMapping.ToQuery(
+                            QualifiedName
+                                .newBuilder()
+                                .setSchemaCode(SchemaCode.ER)
+                                .setNamespace("query")
+                                .setName(query.qname.name.substringAfter("query."))
+                                .build(),
+                        )
+                }.toMap()
         return InMemoryModelHandle(
             tables =
                 entities.map { e ->
@@ -53,7 +116,12 @@ internal object GoldenModelHandle {
                 },
             entities = entities,
             relations = relations,
-            entityMappings = entities.associate { it.qname to EntityMapping.ToTable(table(it.qname.name)) },
+            entityMappings =
+                entities.associate {
+                    it.qname to
+                        (mapped[it.qname] ?: EntityMapping.ToTable(table(it.qname.name)))
+                },
+            savedQueryBodies = bodies,
         )
     }
 

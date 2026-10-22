@@ -1,0 +1,27 @@
+model er
+def entity store_sales { attributes: [def attribute customer { type: int }, def attribute item { type: int }, def attribute sold { type: int }, def attribute ext_sales_price { type: decimal }] }
+def entity web_sales { attributes: [def attribute customer { type: int }, def attribute item { type: int }, def attribute sold { type: int }, def attribute ext_sales_price { type: decimal }] }
+def entity catalog_sales { attributes: [def attribute customer { type: int }, def attribute item { type: int }, def attribute sold { type: int }, def attribute ext_sales_price { type: decimal }] }
+def entity customer { attributes: [def attribute sk { type: int, isKey: true }, def attribute address { type: int }, def attribute birthYear { type: int }] }
+def entity customer_address { attributes: [def attribute sk { type: int, isKey: true }, def attribute state { type: text }] }
+def entity item { attributes: [def attribute sk { type: int, isKey: true }] }
+def entity date_dim { attributes: [def attribute sk { type: int, isKey: true }] }
+def entity household { attributes: [def attribute sk { type: int, isKey: true }] }
+def query sales_union { sourceText: """sql
+SELECT 'store' AS channel, customer, item, sold, ext_sales_price FROM store_sales
+UNION ALL SELECT 'web', customer, item, sold, ext_sales_price FROM web_sales
+UNION ALL SELECT 'catalog', customer, item, sold, ext_sales_price FROM catalog_sales
+""" }
+def entity sales { binding: { target: { query: er.query.sales_union } }, attributes: [def attribute channel { type: text }, def attribute customer { type: int }, def attribute item { type: int }, def attribute sold { type: int }, def attribute ext_sales_price { type: decimal }] }
+def entity view_sales { binding: { target: { view: db.dbo.sales_view }, columns: { amount: amount } }, attributes: [def attribute amount { type: decimal }] }
+def relation store_sales_customer { from: er.entity.store_sales, to: er.entity.customer, cardinality: { from: "N", to: "1" }, binding: { fk: db.dbo.store_customer } }
+def relation store_sales_item { from: er.entity.store_sales, to: er.entity.item, cardinality: { from: "N", to: "1" }, join: [{ from: er.entity.store_sales.item, to: er.entity.item.sk }] }
+def relation store_sales_sold { from: er.entity.store_sales, to: er.entity.date_dim, cardinality: { from: "N", to: "1" }, join: [{ from: er.entity.store_sales.sold, to: er.entity.date_dim.sk }] }
+def relation web_sales_customer { from: er.entity.web_sales, to: er.entity.customer, cardinality: { from: "N", to: "1" }, join: [{ from: er.entity.web_sales.customer, to: er.entity.customer.sk }] }
+def relation web_sales_item { from: er.entity.web_sales, to: er.entity.item, cardinality: { from: "N", to: "1" }, join: [{ from: er.entity.web_sales.item, to: er.entity.item.sk }] }
+def relation web_sales_sold { from: er.entity.web_sales, to: er.entity.date_dim, cardinality: { from: "N", to: "1" }, join: [{ from: er.entity.web_sales.sold, to: er.entity.date_dim.sk }] }
+def relation catalog_sales_customer { from: er.entity.catalog_sales, to: er.entity.customer, cardinality: { from: "N", to: "1" }, join: [{ from: er.entity.catalog_sales.customer, to: er.entity.customer.sk }] }
+def relation catalog_sales_item { from: er.entity.catalog_sales, to: er.entity.item, cardinality: { from: "N", to: "1" }, join: [{ from: er.entity.catalog_sales.item, to: er.entity.item.sk }] }
+def relation catalog_sales_sold { from: er.entity.catalog_sales, to: er.entity.date_dim, cardinality: { from: "N", to: "1" }, join: [{ from: er.entity.catalog_sales.sold, to: er.entity.date_dim.sk }] }
+def relation address { from: er.entity.customer, to: er.entity.customer_address, cardinality: { from: "N", to: "1" }, join: [{ from: er.entity.customer.address, to: er.entity.customer_address.sk }] }
+def entity customer_item { binding: { target: db.dbo.customer_item, columns: { customer: cust, item: item } }, attributes: [def attribute customer { type: int }, def attribute item { type: int }] }
