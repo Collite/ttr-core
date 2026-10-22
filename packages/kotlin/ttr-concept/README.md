@@ -8,7 +8,7 @@ predicate for `ttrp-emit`) or the er layer (SQL over entities in the shared dial
 mid-lower: the same model and frame always give the same bytes.
 
 **Status: CN-P3 complete.** Published as `org.tatrman:ttr-concept` in the `grammar/v*` bundle (A-CN-1) — first with
-`grammar/v0.17.4` — beside `ttr-plan-proto` / `ttr-translator` at the pinned translator release.
+`grammar/v0.17.5` — beside `ttr-plan-proto` / `ttr-translator` at the pinned translator release.
 
 ## Loading a model
 

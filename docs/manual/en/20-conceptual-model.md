@@ -10,7 +10,7 @@ concepts; the bindings tell them where the data is.
 > `definition:` / `members:` / `filter:` blocks and prints the [hygiene report](#the-hygiene-report).
 > [Diagnostics](#diagnostics) says which check fires where.
 >
-> **Toolchain 0.17.4 — used.** `org.tatrman:ttr-concept` lowers what agents say in concepts to data operations:
+> **Toolchain 0.17.5 — used.** `org.tatrman:ttr-concept` lowers what agents say in concepts to data operations:
 > [statements, assertions and rendering](#statements-assertions-rendering), and `ttr cn materialize`.
 
 | where | what |
@@ -365,7 +365,7 @@ Each `cn/*` diagnostic fires in one of three places:
   Kotlin toolchain — the editor's error rows but the lexicon pair (`cn/duplicate-default-sense` is the editor's
   alone) — and loading errors such as a file whose `package` does not match its directory. Warnings and hygiene
   findings it does not print;
-- **consumer** — `ttr-concept` (toolchain 0.17.4) refuses a statement, an assertion or a recipe with it: its validates
+- **consumer** — `ttr-concept` (toolchain 0.17.5) refuses a statement, an assertion or a recipe with it: its validates
   and lowers, which the tools that read the model at run time call (see
   [Statements, assertions, rendering](#statements-assertions-rendering)).
 
