@@ -182,6 +182,8 @@ class CnMaterializeCommand : CliktCommand(name = "materialize") {
         }
         val (model, loadErrors) = load(root, "cn-materialize")
         loadErrors.forEach { echo("ttr cn materialize: $it", err = true) }
+        // never model text from a model read in part (review-125 re-review): exit 2, as documented
+        if (loadErrors.isNotEmpty()) throw ProgramResult(2)
         val ref =
             ConceptRef
                 .newBuilder()

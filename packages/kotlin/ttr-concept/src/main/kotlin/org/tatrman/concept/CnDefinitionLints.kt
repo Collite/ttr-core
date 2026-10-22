@@ -335,13 +335,19 @@ object CnDefinitionLints {
     /**
      * Whether a comparison whose coarser side has a stored upper bound is DECIDED by that bound — the er renderer reads
      * it through the bound, so it is exact under `imprecision: certainly` (A-CN-45, review-125 R125-4): the coarser side
-     * on the lesser side of `<` / `<=` / `before` / `at_or_before`, or on the greater side of `>` / `>=`. Elsewhere the
-     * stored instant decides, and the advisory stands. Shared by this lint and the renderer, so the two cannot drift.
+     * on the lesser side of `<` / `<=` / `before` / `at_or_before`, or on the greater side of `>` / `>=` — and, for the
+     * non-strict ones, the finer side `:as_of` (its upper end `{as_of_hi}` is derivable; a column's is not, G-ER-1).
+     * Elsewhere the stored instant decides, and the advisory stands. Shared by this lint and the renderer.
      */
     internal fun decidedByBound(
         op: String,
         coarserIsLhs: Boolean,
-    ): Boolean = if (coarserIsLhs) op in setOf("<", "<=", "before", "at_or_before") else op in setOf(">", ">=")
+        finerIsAsOf: Boolean,
+    ): Boolean {
+        val lesser = if (coarserIsLhs) op in setOf("<", "<=", "before", "at_or_before") else op in setOf(">", ">=")
+        val strict = op in setOf("<", ">", "before")
+        return lesser && (strict || finerIsAsOf)
+    }
 
     /** Whether [t] is a period bound whose grounding names a stored upper bound for it (⚑CN-P10). */
     private fun storedBound(
@@ -367,9 +373,9 @@ object CnDefinitionLints {
         return d.reads.comparisons.mapNotNull { c ->
             val l = granularity(cn, er, c.lhs) ?: return@mapNotNull null
             val r = granularity(cn, er, c.rhs) ?: return@mapNotNull null
-            if (l == r || (storedBound(cn, if (l > r) c.lhs else c.rhs) && decidedByBound(c.op, l > r))) {
-                return@mapNotNull null
-            }
+            val (coarserTerm, finerTerm) = if (l > r) c.lhs to c.rhs else c.rhs to c.lhs
+            val bound = storedBound(cn, coarserTerm) && decidedByBound(c.op, l > r, finerTerm is InstantTerm.AsOf)
+            if (l == r || bound) return@mapNotNull null
             val coarser = maxOf(l, r).name.lowercase()
             Diagnostic(
                 IMPRECISE,

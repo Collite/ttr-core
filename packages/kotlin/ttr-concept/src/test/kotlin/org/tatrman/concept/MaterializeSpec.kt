@@ -87,4 +87,16 @@ class MaterializeSpec :
             refused.statusCode shouldBe 1
             refused.stderr shouldContain "cn/definition-unreachable(er)"
         }
+
+        test("a model read in part is never materialized — exit 2 (review-125 re-review)") {
+            val dir = Files.createTempDirectory("cn-broken")
+            Files
+                .walk(world.dir)
+                .use { s -> s.filter { it.isRegularFile() && it.extension == "ttrm" }.toList() }
+                .forEach { Files.copy(it, dir.resolve(it.fileName.toString())) }
+            Files.writeString(dir.resolve("broken.ttrm"), "model cn\ndef phase Broken {\n")
+            val r = ttr().test("cn materialize $dir cn.PlacedOrder")
+            r.statusCode shouldBe 2
+            r.stdout shouldBe ""
+        }
     })

@@ -249,6 +249,16 @@ internal class AssertionValidator(
                         )
                     }
                 }
+                // a known identity names ONE row: the whole key, or the writer cannot match it (review-125 re-review)
+                val missing = (keys - values.keys).sorted()
+                if (missing.isNotEmpty() && values.keys.all { it in keys }) {
+                    f.error(
+                        FrameSlugs.MALFORMED_FRAME,
+                        "identity.known",
+                        "a known identity names the whole key of `${landedEvent.erTarget}` — " +
+                            missing.joinToString(", ") { "`$it`" } + " missing",
+                    )
+                }
             }
             else ->
                 f.error(

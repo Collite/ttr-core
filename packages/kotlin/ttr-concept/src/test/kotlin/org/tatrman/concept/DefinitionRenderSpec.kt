@@ -72,6 +72,35 @@ class DefinitionRenderSpec :
             er("OnsetAfter").diagnostics.map { it.slug } shouldBe listOf(CnDefinitionLints.IMPRECISE)
         }
 
+        test("decidedByBound: the lesser side of < <= before at_or_before, or the greater of > >=; <= needs :as_of") {
+            val d = CnDefinitionLints::decidedByBound
+            d("<", true, false) shouldBe true // x < t: x_hi <= t, whatever t is
+            d("<=", true, true) shouldBe true // x <= :as_of: x_hi <= {as_of_hi}
+            d("<=", true, false) shouldBe false // x <= column: its upper end is not derivable (G-ER-1)
+            d("at_or_before", true, true) shouldBe true
+            d(">=", true, true) shouldBe false // x >= t: the stored start decides
+            d(">=", false, true) shouldBe true // :as_of >= x — the mirror of x <= :as_of
+            d(">", false, false) shouldBe true
+        }
+
+        test("a CONTEXT whose candidates phase does not parse is refused, never thrown (review-125 re-review)") {
+            val unparsed = "model cn\ndef phase Broken { of: Order, definition: \"\"\"state in (\"\"\" }\n"
+            val broken = StatementLowerSpec.world("hartland", HARTLAND + ("broken/cn.ttrm" to unparsed))
+            val r =
+                CnConceptService(broken).definitionRender(
+                    ConceptRef.newBuilder().setQname("cn.ShortLine").build(),
+                    Layer.ER,
+                    "postgresql",
+                    RenderOptions(
+                        mode = RenderMode.CONTEXT,
+                        candidates = ConceptRef.newBuilder().setQname("cn.Broken").build(),
+                        columns = listOf("item"),
+                    ),
+                )
+            r.text shouldBe ""
+            r.diagnostics.single().message shouldContain "does not parse"
+        }
+
         test("a target named in two packages is refused, never the first — definitionRender and materialize (R125-5)") {
             val two = CnConceptService(FrameValidationSpec.model(FrameValidationSpec.TWO_PACKAGES))
             val thing = ConceptRef.newBuilder().setQname("cn.Thing").build()

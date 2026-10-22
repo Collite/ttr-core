@@ -313,6 +313,13 @@ class AssertionLowerSpec :
             closed.meta.endState shouldBe EndState.END_STATE_UNSPECIFIED
         }
 
+        test("a known identity names the whole key — a part of a composite key is refused (review-125 re-review)") {
+            val both = "\"identity\": { \"known\": { \"values\": { \"ward_no\": \"3\", \"bed_no\": \"7\" } } }"
+            lower(plus, frame(ev("cn.BedAssignment"), both)).rows.single().values shouldBe
+                mapOf("bed_no" to "7", "ward_no" to "3")
+            refused(plus, frame(ev("cn.BedAssignment"), known("ward_no", "3")), "cn/malformed-frame identity.known")
+        }
+
         test("a start-only event (`period: { start }`, no `end:`): its start alone; an end is malformed (R125-2/3)") {
             val start = "\"period\": { \"start\": { \"value\": \"2026-03-01\", \"granularity\": \"DAY\" } }"
             val r = lower(plus, frame(ev("cn.Admission"), fresh, start))
@@ -362,6 +369,9 @@ class AssertionLowerSpec :
                     def entity admission {
                         attributes: [ def attribute admission_id { type: int, isKey: true }, def attribute admitted_on { type: date } ]
                     }
+                    def entity bed_assignment {
+                        attributes: [ def attribute ward_no { type: int, isKey: true }, def attribute bed_no { type: int, isKey: true } ]
+                    }
                     def relation move_encounter { from: er.entity.bed_move, to: er.entity.encounter, join: [{ from: er.entity.bed_move.encounter_id, to: er.entity.encounter.encounter_id }] }
                     def relation note_move { from: er.entity.bed_note, to: er.entity.bed_move, join: [{ from: er.entity.bed_note.move_id, to: er.entity.bed_move.move_id }] }
                     def relation move_room { from: er.entity.bed_move, to: er.entity.room, join: [{ from: er.entity.bed_move.ward, to: er.entity.room.ward }, { from: er.entity.bed_move.room_no, to: er.entity.room.room_no }] }
@@ -386,6 +396,7 @@ class AssertionLowerSpec :
                         extent: durative,
                         period: { start: admitted_on }
                     }
+                    def event BedAssignment {}
                     """.trimIndent(),
                 "plus/bindings.ttrm" to
                     """
@@ -404,6 +415,7 @@ class AssertionLowerSpec :
                             room: [er.relation.move_room]
                         }
                     }
+                    def cn2er_event bed_assignment_g { event: cn.BedAssignment, target: er.entity.bed_assignment }
                     def cn2er_event admission_g {
                         event: cn.Admission,
                         target: er.entity.admission,

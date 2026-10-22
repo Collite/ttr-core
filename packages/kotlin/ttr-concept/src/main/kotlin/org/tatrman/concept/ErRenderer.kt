@@ -448,7 +448,9 @@ internal class ErRenderer(
             project(options.columns, columnScope, select)
 
             if (candidates != null && candidateDef != null) {
-                select.where += inline(candidates, candidateDef.expression!!, rootRef, select, record = true)
+                val candidateExpression =
+                    candidateDef.expression ?: refuse("`${candidates.ref}`'s definition does not parse")
+                select.where += inline(candidates, candidateExpression, rootRef, select, record = true)
             }
             for (c in conjuncts) {
                 val ranged = lifted[c]
@@ -793,13 +795,10 @@ internal class ErRenderer(
             if (scope.owner.imprecision == Imprecision.POSSIBLY) return null
             val gl = l.moment?.granularity ?: return null
             val gr = r.moment?.granularity ?: return null
-            if (gl == gr || !CnDefinitionLints.decidedByBound(op, gl > gr)) return null
             val (x, t) = if (gl > gr) l to r else r to l
+            if (gl == gr || !CnDefinitionLints.decidedByBound(op, gl > gr, t.moment?.asOf == true)) return null
             val hi = x.moment?.hi ?: return null
-            return when (op) {
-                "<", ">" -> SqlExpr.Bin("<=", hi, t.sql)
-                else -> if (t.moment?.asOf == true) SqlExpr.Bin("<=", hi, upper(t)) else null
-            }
+            return if (op == "<" || op == ">") SqlExpr.Bin("<=", hi, t.sql) else SqlExpr.Bin("<=", hi, upper(t))
         }
 
         private fun advise(
