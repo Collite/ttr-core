@@ -1,0 +1,4 @@
+package base
+import east.er.relation.address
+model binding
+def md2er_dimension f_named { dimension: md.CustomerNamed, entity: er.entity.customer, attributes: { code: address.state } }

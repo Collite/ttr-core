@@ -326,13 +326,13 @@ function propsOf(d: Definition): { [k: string]: Json } {
     // 0.17 — the md hosts of the `concept { }` sugar. The md kinds dump no other property (they never
     // did); `concept` is present-only, so every pre-0.17 md fixture dumps unchanged.
     case 'md2erDimension':
-      set('dimension', d.dimensionRef);
-      set('entity', d.entity);
+      if (d.dimensionRef) set('dimension', d.dimensionRef);
+      if (d.entity) set('entity', d.entity);
       if (Object.keys(d.attributes).length) set('attributes', d.attributes);
       break;
     case 'md2erCubelet':
-      set('cubelet', d.cubeletRef);
-      set('target', d.entity);
+      if (d.cubeletRef) set('cubelet', d.cubeletRef);
+      if (d.entity) set('target', d.entity);
       if (Object.keys(d.attributes).length) set('attributes', d.attributes);
       if (d.measures && Object.keys(d.measures).length) set('measures', d.measures);
       set('physicalProps', d.physicalProps);

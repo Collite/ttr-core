@@ -12,7 +12,7 @@
 // inherits its bearer's. HP-P1 adds explicit dimensions and structural measures to `ExplicitMdErHop`.
 
 import type { ConceptProperty, IdValue, LexiconEntryDef, Md2ErCubeletDef, ObjectValue, PropertyValue } from '@tatrman/parser';
-import { explicitErAttributes } from '../md/explicit.js';
+import { explicitErAttributes, buildMdErRelationIndex, resolveMdNs, resolveMdAttribute, cubeletMeasureKeys } from '../md/explicit.js';
 import { buildCanonicalKey } from '../qname.js';
 import type { Resolver } from '../resolver.js';
 import type { SymbolEntry } from '../symbol-table.js';
@@ -89,22 +89,25 @@ function resolveIn(resolver: Resolver, doc: CnDocument, path: string, parts: str
   return r.resolved ? r.symbol : undefined;
 }
 
-/** Explicit structural cubelet/dimension mappings, including measures and one-relation attribute paths. */
+/** Explicit structural mappings. Bearer selection runs first; then a dimension's own binding wins over a cubelet grain mapping of the same attribute. */
 export class ExplicitMdErHop {
-  private readonly candidates = new Map<string, string[]>();
+  private readonly ambiguousPaths = new Set<string>();
+  private readonly candidates = new Map<string, Array<{ er: string; from: 'dimension' | 'cubelet' }>>();
 
   constructor(docs: CnDocument[], resolver: Resolver) {
+    const relationIndex = buildMdErRelationIndex(docs, resolver);
     for (const doc of docs) {
       for (const def of doc.ast.definitions) {
         if (def.kind === 'md2erDimension') {
           const entity = resolveIn(resolver, doc, def.entity, def.entity.split('.'));
-          const dimension = resolveIn(resolver, doc, def.dimensionRef, def.dimensionRef.split('.'));
+          const dimension = resolveMdNs(resolver, doc, def.dimensionRef, 'dimension');
           if (entity?.kind !== 'entity' || dimension?.kind !== 'dimension') continue;
-          this.add(elementRefOf(dimension), elementRefOf(entity));
+          this.add(elementRefOf(dimension), elementRefOf(entity), 'dimension');
           for (const [attr, path] of Object.entries(def.attributes)) {
             const md = resolver.getSymbol(`${dimension.qname}.${attr}`);
-            const targets = explicitErAttributes(docs, resolver, entity, path);
-            if (md && targets.length === 1) this.add(elementRefOf(md), elementRefOf(targets[0]));
+            const targets = explicitErAttributes(relationIndex, doc, resolver, entity, path);
+            if (md && targets.length > 1) this.ambiguousPaths.add(elementRefOf(md));
+            if (md?.kind === 'attribute' && targets.length === 1) this.add(elementRefOf(md), elementRefOf(targets[0]), 'dimension');
           }
           continue;
         }
@@ -112,15 +115,17 @@ export class ExplicitMdErHop {
         const d = def as Md2ErCubeletDef;
         const entity = d.entity ? resolveIn(resolver, doc, d.entity, d.entity.split('.')) : undefined;
         if (entity?.kind !== 'entity') continue;
-        const cubelet = d.cubeletRef ? resolveIn(resolver, doc, d.cubeletRef, d.cubeletRef.split('.')) : undefined;
-        if (cubelet?.kind === 'cubelet') this.add(elementRefOf(cubelet), elementRefOf(entity));
+        const cubelet = d.cubeletRef ? resolveMdNs(resolver, doc, d.cubeletRef, 'cubelet') : undefined;
+        if (!cubelet) continue;
+        this.add(elementRefOf(cubelet), elementRefOf(entity));
+        const measures = cubeletMeasureKeys(docs, resolver, cubelet);
         for (const [measure, erAttr] of Object.entries(d.measures ?? {})) {
-          const md = resolveIn(resolver, doc, `md.${measure}`, ['md', measure]);
+          const md = resolveMdNs(resolver, doc, measure, 'measure');
           const er = resolver.getSymbol(`${entity.qname}.${erAttr}`);
-          if (md?.kind === 'measure' && er?.kind === 'attribute') this.add(elementRefOf(md), elementRefOf(er));
+          if (md?.kind === 'measure' && measures.has(md.qname) && er?.kind === 'attribute') this.add(elementRefOf(md), elementRefOf(er));
         }
         for (const [mdAttr, erAttr] of Object.entries(d.attributes ?? {})) {
-          const md = resolveIn(resolver, doc, mdAttr, mdAttr.split('.'));
+          const md = resolveMdAttribute(resolver, doc, mdAttr);
           if (md?.kind !== 'attribute' || md.schemaCode !== 'md') continue;
           const er = resolver.getSymbol(`${entity.qname}.${erAttr}`);
           if (er?.kind !== 'attribute') continue;
@@ -130,24 +135,26 @@ export class ExplicitMdErHop {
     }
   }
 
-  private add(md: string, er: string): void {
+  private add(md: string, er: string, from: 'dimension' | 'cubelet' = 'cubelet'): void {
     const list = this.candidates.get(md) ?? [];
-    if (!list.includes(er)) list.push(er);
+    const existing = list.find(c => c.er === er);
+    if (!existing) list.push({ er, from });
+    else if (from === 'dimension') existing.from = 'dimension';
     this.candidates.set(md, list);
   }
 
   erTargetOf(mdElement: string, bearerEntity?: string): HopAnswer {
     const found = this.candidates.get(mdElement) ?? [];
-    if (found.length === 1) return { erTarget: found[0], message: '' };
-    if (found.length === 0) {
-      return {
-        slug: 'md/er-unmapped',
-        message: `'${mdElement}' has no er counterpart — no explicit md2er binding maps it`,
-      };
-    }
-    const ofBearer = found.filter((e) => entityOfElement(e) === bearerEntity);
-    if (bearerEntity !== undefined && ofBearer.length === 1) return { erTarget: ofBearer[0], message: '' };
-    return { slug: 'md/er-ambiguous', message: `'${mdElement}' maps to ${found.join(', ')}` };
+    if (found.length === 1) return { erTarget: found[0].er, message: '' };
+    if (!found.length && this.ambiguousPaths.has(mdElement)) return { slug: 'md/er-ambiguous', message: `'${mdElement}' has an ambiguous explicit dimension path` };
+    if (found.length === 0) return {
+      slug: 'md/er-unmapped', message: `'${mdElement}' has no er counterpart — no explicit md2er binding maps it`,
+    };
+    const ofBearer = found.filter(c => entityOfElement(c.er) === bearerEntity);
+    if (bearerEntity !== undefined && ofBearer.length === 1) return { erTarget: ofBearer[0].er, message: '' };
+    const own = found.filter(c => c.from === 'dimension');
+    if (own.length === 1) return { erTarget: own[0].er, message: '' };
+    return { slug: 'md/er-ambiguous', message: `'${mdElement}' maps to ${found.map(c => c.er).join(', ')}` };
   }
 }
 

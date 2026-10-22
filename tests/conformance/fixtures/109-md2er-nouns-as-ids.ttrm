@@ -1,3 +1,4 @@
+// Known generic resolver fallback defect: https://github.com/Collite/ttr-core/issues/262 (review-125 R16).
 model binding
 def md2er_dimension md2er_dimension {
   dimension: md.md2er_dimension, entity: er.entity.md2er_dimension,

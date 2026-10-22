@@ -1,0 +1,15 @@
+{
+    "diagnostics": [],
+    "resolved": [
+        "er.entity.md2er_dimension => er.entity.md2er_dimension",
+        "md.Code => md.domain.Code"
+    ],
+    "symbols": [
+        "binding.md2er_dimension.md2er_dimension",
+        "er.entity.md2er_dimension",
+        "er.entity.md2er_dimension.md2er_dimension",
+        "md.dimension.md2er_dimension",
+        "md.dimension.md2er_dimension.md2er_dimension",
+        "md.domain.Code"
+    ]
+}

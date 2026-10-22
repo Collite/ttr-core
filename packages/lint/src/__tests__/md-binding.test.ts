@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from 'vitest';
 import { DiagnosticCode } from '@tatrman/parser';
-import { lintProj, type ProjectFile } from './helpers.js';
+import { recommendedConfig, lintProj, type ProjectFile } from './helpers.js';
 
 const LOGICAL = `model md
 def domain Day { type: date }
@@ -164,5 +164,53 @@ describe('HP-P1 explicit MD to ER bindings', () => {
   });
   it('rejects duplicate dimension bindings', () => {
     expect(hopCodes('def md2er_dimension a { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk } }\ndef md2er_dimension b { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk } }')).toContain('md/duplicate-binding');
+  });
+});
+
+describe('review-125 namespace and mapping validation', () => {
+  const codes = (binding: string, logical = LOGICAL) => [...lintProj([
+    { uri: 'file:///md.ttrm', src: logical }, { uri: 'file:///er.ttrm', src: ER_HOP },
+    { uri: 'file:///binding.ttrm', src: `model binding\n${binding}` },
+  ]).values()].flat().filter(d => d.code.startsWith('md/md2er-') || d.code === 'md/duplicate-binding').map(d => d.code);
+
+  it('R6 resolves dimension shorthand by namespace when a domain shares its name', () => {
+    const logical = LOGICAL + '\ndef domain Customer { type: text }';
+    expect(codes('def md2er_dimension c { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk } }', logical)).toEqual([]);
+    expect(codes('def md2er_dimension c { dimension: md.Customer, entity: er.entity.customer, attributes: {} }', logical)).toEqual(['md/md2er-dimension-key']);
+  });
+  it('R8 requires an own mapping for prototype-named keys', () => {
+    const logical = LOGICAL.replace('key: code, attributes: [def attribute code', 'key: toString, attributes: [def attribute toString');
+    expect(codes('def md2er_dimension c { dimension: md.Customer, entity: er.entity.customer, attributes: {} }', logical)).toContain('md/md2er-dimension-key');
+  });
+  it.each([
+    ['missing cubelet', 'target: er.entity.customer'],
+    ['unknown cubelet', 'cubelet: md.typo, target: er.entity.customer'],
+    ['unknown measure', 'cubelet: md.sales, target: er.entity.customer, measures: { revnue: amount }'],
+    ['foreign measure', 'cubelet: md.sales, target: er.entity.customer, measures: { bonus: amount }'],
+    ['unknown MD attribute', 'cubelet: md.sales, target: er.entity.customer, attributes: { Customer.bogus: sk }'],
+    ['unknown ER attribute', 'cubelet: md.sales, target: er.entity.customer, attributes: { Customer.code: absent }'],
+  ])('R10 rejects %s', (_name, body) => {
+    expect(codes(`def md2er_cubelet c { ${body} }`, LOGICAL + '\ndef measure bonus { domain: md.Money, aggregation: sum }')).toEqual(['md/md2er-reference']);
+  });
+  it('R10 rejects an unknown dimension attribute key', () => {
+    expect(codes('def md2er_dimension c { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk, bogus: sk } }')).toEqual(['md/md2er-reference']);
+  });
+  it('R9 never uses a wrong-kind dimension for key/duplicate checks', () => {
+    expect(codes('def md2er_dimension a { dimension: md.sales, entity: er.entity.customer }\ndef md2er_dimension b { dimension: md.sales, entity: er.entity.customer }')).toEqual(['md/md2er-reference', 'md/md2er-reference']);
+  });
+});
+
+
+describe('review-125 configured MD/ER lint severities', () => {
+  it('R5 honors warning, info and off independently', () => {
+    const diagnostics = [...lintProj([
+      { uri: 'file:///md.ttrm', src: LOGICAL }, { uri: 'file:///er.ttrm', src: ER_HOP },
+      { uri: 'file:///binding.ttrm', src: `model binding
+        def md2er_dimension d { dimension: md.Customer, entity: er.entity.missing, attributes: {} }
+        def md2er_cubelet c { cubelet: md.sales, target: er.entity.customer, measures: { net: missing } }` },
+    ], { config: recommendedConfig({ 'md-md2er-dimension-key': 'warning', 'md-md2er-reference': 'info', 'md-md2er-measure-unknown': 'off' }) }).values()].flat();
+    expect(diagnostics.find(d => d.code === 'md/md2er-dimension-key')?.severity).toBe('warning');
+    expect(diagnostics.find(d => d.code === 'md/md2er-reference')?.severity).toBe('info');
+    expect(diagnostics.some(d => d.code === 'md/md2er-measure-unknown')).toBe(false);
   });
 });

@@ -33,7 +33,7 @@ PROTOS = [
 class CustomBuildHook(BuildHookInterface):
     PLUGIN_NAME = "custom"
 
-    def initialize(self, version: str, build_data: dict[str, Any]) -> None:  # noqa: ARG002
+    def initialize(self, version: str, build_data: dict[str, Any]) -> None:
         root = Path(self.root)
         proto_root = (root / ".." / ".." / "kotlin" / "ttr-plan-proto" / "src" / "main" / "proto").resolve()
         if not proto_root.is_dir():

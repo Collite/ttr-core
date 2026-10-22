@@ -11,6 +11,11 @@ import org.tatrman.ttr.metadata.model.HopVia
 import org.tatrman.ttr.metadata.model.MdErHop
 import org.tatrman.ttr.metadata.source.CnBuilder
 import org.tatrman.ttr.metadata.source.ExplicitMdErHop
+import org.tatrman.ttr.parser.loader.TtrLoader
+import org.tatrman.ttr.semantics.SemanticDocument
+import org.tatrman.ttr.semantics.SymbolTable
+import org.tatrman.ttr.semantics.Resolver
+import java.nio.file.Files
 
 /**
  * Grammar 0.17 — the md → er hop seam (CN-P2 S2.5 T3; cn contracts §8.1, the md/hop demand §3). P2 fills it with the
@@ -23,35 +28,106 @@ class CnHopSpec :
         val hop =
             CnBuilder.project(project.snapshot.loadedFiles).let { (docs, resolver) -> ExplicitMdErHop(docs, resolver) }
 
+        fun explicitSources(sources: Map<String, String>): ExplicitMdErHop {
+            val table = SymbolTable()
+            val docs =
+                sources.map { (uri, src) ->
+                    val parsed = TtrLoader.parseString(src, uri)
+                    parsed.errors shouldBe emptyList()
+                    val schema = parsed.modelDirective?.modelCode.orEmpty()
+                    val namespace = parsed.modelDirective?.schema.orEmpty()
+                    val pkg = parsed.packageName.orEmpty()
+                    table.upsertDocument(uri, parsed.definitions, schema, namespace, pkg)
+                    SemanticDocument(uri, parsed.definitions, schema, namespace, pkg, parsed.imports)
+                }
+            return ExplicitMdErHop(docs, Resolver(table))
+        }
+
         "HP-P1: explicit dimensions, one-hop attributes and structural measures" {
-            val root =
-                java.nio.file.Files
-                    .createTempDirectory("explicit-hop")
             val sources =
                 mapOf(
                     "md.ttrm" to
-                        "model md\ndef domain Code { type: string }\ndef dimension Customer { key: code, attributes: [def attribute code { domain: md.Code }, def attribute state { domain: md.Code }] }\ndef measure revenue { domain: md.Code, aggregation: sum }",
+                        "model md\ndef domain Code { type: string }\ndef domain Customer { type: string }\ndef dimension Customer { key: code, attributes: [def attribute code { domain: md.Code }, def attribute state { domain: md.Code }] }\ndef measure revenue { domain: md.Code, aggregation: sum }\ndef cubelet revenue { measures: [revenue] }",
                     "er.ttrm" to
                         "model er\ndef entity customer { attributes: [def attribute sk { type: int }, def attribute amount { type: decimal }] }\ndef entity addr { attributes: [def attribute state { type: text }] }\ndef relation address { from: er.entity.customer, to: er.entity.addr, cardinality: { from: \"N\", to: \"1\" } }",
                     "binding.ttrm" to
-                        "model binding\ndef md2er_dimension c { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk, state: address.state } }\ndef md2er_cubelet m { target: er.entity.customer, measures: { revenue: amount } }",
+                        "model binding\ndef md2er_dimension c { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk, state: address.state } }\ndef md2er_cubelet m { cubelet: md.revenue, target: er.entity.customer, measures: { revenue: amount } }",
                 )
-            val files =
-                sources.mapValues { (name, text) ->
-                    root.resolve(name).also {
-                        java.nio.file.Files
-                            .writeString(it, text)
-                    }
-                }
-            val loaded = CnFixtures.load(files.mapKeys { "demo/${it.key}" })
-            val explicit =
-                CnBuilder.project(loaded.snapshot.loadedFiles).let { (docs, resolver) ->
-                    ExplicitMdErHop(docs, resolver)
-                }
+            val explicit = explicitSources(sources)
             explicit.erTargetOf("md.dimension.Customer") shouldBe HopResult("er.entity.customer", HopVia.EXPLICIT)
             explicit.erTargetOf("md.dimension.Customer.state") shouldBe
                 HopResult("er.entity.addr.state", HopVia.EXPLICIT)
             explicit.erTargetOf("md.measure.revenue") shouldBe HopResult("er.entity.customer.amount", HopVia.EXPLICIT)
+        }
+
+        "R7: dimension ownership follows bearer selection and preserves cubelet ambiguity" {
+            val md =
+                """
+                model md
+                def domain Code { type: string }
+                def dimension Customer { key: code, attributes: [def attribute code { domain: md.Code }] }
+                def cubelet sales { grain: [Customer.code] }
+                """.trimIndent()
+            val er =
+                """
+                model er
+                def entity customer { attributes: [def attribute sk { type: int }] }
+                def entity sale { attributes: [def attribute cust { type: int }] }
+                """.trimIndent()
+            val grain =
+                """
+                def md2er_cubelet g {
+                    cubelet: md.sales, target: er.entity.sale,
+                    attributes: { Customer.code: cust }
+                }
+                """.trimIndent()
+            val own =
+                """
+                def md2er_dimension d {
+                    dimension: md.Customer, entity: er.entity.customer,
+                    attributes: { code: sk }
+                }
+                """.trimIndent()
+            val second =
+                """
+                def md2er_cubelet h {
+                    cubelet: md.sales, target: er.entity.customer,
+                    attributes: { Customer.code: sk }
+                }
+                """.trimIndent()
+
+            fun explicit(binding: String) =
+                explicitSources(
+                    mapOf(
+                        "md" to md,
+                        "er" to er,
+                        "binding" to "model binding\n$binding",
+                    ),
+                )
+            explicit(grain).erTargetOf("md.dimension.Customer.code").erTarget shouldBe "er.entity.sale.cust"
+            val hop = explicit("$grain\n$own")
+            hop.erTargetOf("md.dimension.Customer.code") shouldBe HopResult("er.entity.customer.sk", HopVia.EXPLICIT)
+            hop.erTargetOf("md.dimension.Customer.code", "er.entity.sale").erTarget shouldBe "er.entity.sale.cust"
+            hop.erTargetOf("md.dimension.Customer.code", "er.entity.other").erTarget shouldBe "er.entity.customer.sk"
+            explicit("$grain\n$second").erTargetOf("md.dimension.Customer.code").diagnostic shouldBe HopResult.AMBIGUOUS
+            explicit("$second\n$grain\n$own").erTargetOf("md.dimension.Customer.code").erTarget shouldBe
+                "er.entity.customer.sk"
+        }
+
+        "R11: only imported or same-package relations contribute to the hop" {
+            val root = CnFixtures.conformance.resolve("111-md2er-path-ambiguous")
+            val sources =
+                Files.list(root).use { paths ->
+                    paths.toList().associate {
+                        it.fileName.toString() to
+                            Files.readString(it)
+                    }
+                }
+            val hop = explicitSources(sources)
+            hop.erTargetOf("md.dimension.Customer.code").diagnostic shouldBe HopResult.AMBIGUOUS
+            hop.erTargetOf("md.dimension.CustomerEast.code").erTarget shouldBe "er.entity.addr.state"
+            hop.erTargetOf("md.dimension.CustomerNamed.code").erTarget shouldBe "er.entity.addr.state"
+            hop.erTargetOf("md.dimension.CustomerHidden.code").diagnostic shouldBe HopResult.UNMAPPED
         }
 
         "a cubelet with an md2er_cubelet hops to the binding's entity" {

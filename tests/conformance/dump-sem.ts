@@ -77,7 +77,7 @@ const PORTABLE_RULE_IDS = new Set([
   'md-md2er-path-ambiguous',
   'md-md2er-measure-unknown',
   'md-duplicate-binding',
-  'md-er-binding-reference',
+  'md-md2er-reference',
 ]);
 /**
  * The cn hygiene slugs are off in `recommended` (an editor shows them only on request), but they are

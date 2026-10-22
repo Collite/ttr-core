@@ -3,6 +3,8 @@ package org.tatrman.ttr.semantics.md
 
 import org.tatrman.ttr.parser.diagnostics.DiagnosticCode
 import org.tatrman.ttr.parser.diagnostics.DiagnosticSeverity
+import org.tatrman.ttr.parser.model.CubeletDef
+import org.tatrman.ttr.parser.model.CubeletMeasure
 import org.tatrman.ttr.parser.model.DimensionDef
 import org.tatrman.ttr.parser.model.Md2erCubeletDef
 import org.tatrman.ttr.parser.model.Md2erDimensionDef
@@ -14,42 +16,126 @@ import org.tatrman.ttr.semantics.Resolver
 import org.tatrman.ttr.semantics.SemanticDocument
 import org.tatrman.ttr.semantics.SymbolEntry
 import org.tatrman.ttr.semantics.ValidationDiagnostic
+import org.tatrman.ttr.semantics.buildCanonicalKey
 
 fun resolveMdErRef(
     resolver: Resolver,
     doc: SemanticDocument,
     path: String,
-): SymbolEntry? =
-    (
+): SymbolEntry? {
+    if (path.isEmpty()) return null
+    val result =
         resolver.resolveReference(
             Resolver.Ref(path, path.split('.')),
             ResolutionContext(doc.schemaCode, doc.namespace, null, doc.imports, doc.packageName),
-        ) as? ResolutionResult.Resolved
-    )?.symbol
+        )
+    return (result as? ResolutionResult.Resolved)?.symbol
+}
 
-/** Resolve a direct attribute or exactly one named outgoing relation. Preserve path count for ambiguity. */
-fun explicitErAttributes(
+private fun mdPaths(
+    path: String,
+    ns: String,
+): List<String> {
+    if (path.isEmpty()) return emptyList()
+    val parts = path.split('.')
+    val canonical =
+        if (parts.first() == "md") {
+            if (parts.getOrNull(1) == ns) path else (listOf("md", ns) + parts.drop(1)).joinToString(".")
+        } else {
+            "md.$ns.$path"
+        }
+    return listOf(canonical, path).distinct()
+}
+
+fun resolveMdNs(
+    resolver: Resolver,
+    doc: SemanticDocument,
+    path: String,
+    ns: String,
+): SymbolEntry? =
+    mdPaths(path, ns).firstNotNullOfOrNull { candidate ->
+        resolveMdErRef(resolver, doc, candidate)?.takeIf { it.kind == ns && it.schemaCode == "md" }
+    }
+
+fun resolveMdAttribute(
+    resolver: Resolver,
+    doc: SemanticDocument,
+    path: String,
+): SymbolEntry? =
+    mdPaths(path, "dimension").firstNotNullOfOrNull { candidate ->
+        resolveMdErRef(resolver, doc, candidate)?.takeIf { it.kind == "attribute" && it.schemaCode == "md" }
+    }
+
+data class MdErRelationLanding(
+    val toEntityQname: String,
+    val packageName: String,
+    val qname: String,
+)
+typealias MdErRelationIndex = Map<String, Map<String, List<MdErRelationLanding>>>
+
+/** Resolve each relation's endpoints once, in its own document. */
+fun buildMdErRelationIndex(
     docs: List<SemanticDocument>,
+    resolver: Resolver,
+): MdErRelationIndex {
+    val index = linkedMapOf<String, MutableMap<String, MutableList<MdErRelationLanding>>>()
+    for (doc in docs) {
+        for (rel in doc.definitions.filterIsInstance<RelationDef>()) {
+            val from = resolveMdErRef(resolver, doc, (rel.from as? PropertyValue.IdValue)?.ref?.path.orEmpty())
+            val to = resolveMdErRef(resolver, doc, (rel.to as? PropertyValue.IdValue)?.ref?.path.orEmpty())
+            if (from?.kind != "entity" || to?.kind != "entity") continue
+            val qname = buildCanonicalKey(doc.packageName, doc.namespace, "relation", listOf(rel.name), doc.schemaCode)
+            index
+                .getOrPut(from.qname) { linkedMapOf() }
+                .getOrPut(rel.name) { mutableListOf() }
+                .add(MdErRelationLanding(to.qname, doc.packageName, qname))
+        }
+    }
+    return index
+}
+
+/** Count visible paths, even when two relations land on the same attribute. */
+fun explicitErAttributes(
+    index: MdErRelationIndex,
+    bindingDoc: SemanticDocument,
     resolver: Resolver,
     entity: SymbolEntry,
     path: String,
 ): List<SymbolEntry> {
     val parts = path.split('.')
-    if (parts.size ==
-        1
-    ) {
+    if (parts.size == 1) {
         return listOfNotNull(resolver.getSymbol("${entity.qname}.$path")?.takeIf { it.kind == "attribute" })
     }
     if (parts.size != 2) return emptyList()
-    return docs.flatMap { doc ->
-        doc.definitions.filterIsInstance<RelationDef>().filter { it.name == parts[0] }.mapNotNull { rel ->
-            val from = (rel.from as? PropertyValue.IdValue)?.ref?.path ?: return@mapNotNull null
-            val to = (rel.to as? PropertyValue.IdValue)?.ref?.path ?: return@mapNotNull null
-            if (resolveMdErRef(resolver, doc, from)?.qname != entity.qname) return@mapNotNull null
-            val target = resolveMdErRef(resolver, doc, to) ?: return@mapNotNull null
-            resolver.getSymbol("${target.qname}.${parts[1]}")?.takeIf { it.kind == "attribute" }
+    return index[entity.qname]
+        ?.get(parts[0])
+        .orEmpty()
+        .filter { rel ->
+            rel.packageName == bindingDoc.packageName ||
+                bindingDoc.imports.any { imp ->
+                    if (imp.wildcard) imp.target.removeSuffix(".*") == rel.packageName else imp.target == rel.qname
+                }
+        }.mapNotNull { rel ->
+            resolver.getSymbol("${rel.toEntityQname}.${parts[1]}")?.takeIf { it.kind == "attribute" }
         }
-    }
+}
+
+fun cubeletMeasureKeys(
+    docs: List<SemanticDocument>,
+    resolver: Resolver,
+    cubelet: SymbolEntry,
+): Set<String> {
+    val doc = docs.find { it.uri == cubelet.documentUri } ?: return emptySet()
+    val def = doc.definitions.filterIsInstance<CubeletDef>().find { it.name == cubelet.name } ?: return emptySet()
+    return def.measures
+        .mapNotNull { measure ->
+            val path =
+                when (measure) {
+                    is CubeletMeasure.Ref -> measure.ref.path
+                    is CubeletMeasure.Inline -> measure.measure.name
+                }
+            resolveMdNs(resolver, doc, path, "measure")?.qname
+        }.toSet()
 }
 
 fun mdErBindingDiagnostics(
@@ -58,6 +144,8 @@ fun mdErBindingDiagnostics(
 ): List<ValidationDiagnostic> {
     val out = mutableListOf<ValidationDiagnostic>()
     val seen = mutableSetOf<String>()
+    val index = buildMdErRelationIndex(docs, resolver)
+    val byUri = docs.associateBy { it.uri }
     for (doc in docs) {
         for (def in doc.definitions) {
             fun report(
@@ -66,91 +154,105 @@ fun mdErBindingDiagnostics(
             ) {
                 out += ValidationDiagnostic(code, DiagnosticSeverity.Error, message, def.source)
             }
+
+            fun entity(path: String): SymbolEntry? = resolveMdErRef(resolver, doc, path)?.takeIf { it.kind == "entity" }
             when (def) {
                 is Md2erCubeletDef -> {
+                    val erPath = def.entity?.path.orEmpty()
+                    val er = entity(erPath)
+                    if (er == null) report(DiagnosticCode.MdMd2erReference, "Unresolved ER entity '$erPath'")
                     if (def.physicalProps.isNotEmpty()) {
                         report(
                             DiagnosticCode.MdMd2erPhysicalProp,
                             "md2er_cubelet is structural-only; remove: ${def.physicalProps.joinToString(", ")}",
                         )
                     }
-                    val entity =
-                        def.entity?.let { resolveMdErRef(resolver, doc, it.path) }?.takeIf {
-                            it.kind ==
-                                "entity"
-                        }
-                    if (entity == null) {
-                        report(DiagnosticCode.MdMd2erReference, "Unresolved ER entity '${def.entity?.path}'")
-                        continue
+                    val path = def.cubeletRef?.path.orEmpty()
+                    val cubelet = resolveMdNs(resolver, doc, path, "cubelet")
+                    if (cubelet == null) {
+                        report(
+                            DiagnosticCode.MdMd2erReference,
+                            if (path.isEmpty()) "md2er_cubelet needs `cubelet:`" else "Unresolved MD cubelet '$path'",
+                        )
                     }
-                    for ((measure, attr) in def.measures) {
-                        if (resolver.getSymbol("${entity.qname}.$attr") ==
-                            null
-                        ) {
+                    val measures = cubelet?.let { cubeletMeasureKeys(docs, resolver, it) }
+                    for ((key, attr) in def.measures) {
+                        val measure = resolveMdNs(resolver, doc, key, "measure")
+                        if (measure == null) {
+                            report(DiagnosticCode.MdMd2erReference, "Unknown MD measure '$key'")
+                        } else if (measures != null && measure.qname !in measures) {
+                            report(
+                                DiagnosticCode.MdMd2erReference,
+                                "'$key' is not a measure of cubelet '$path'",
+                            )
+                        }
+                        if (er != null && resolver.getSymbol("${er.qname}.$attr")?.kind != "attribute") {
                             report(
                                 DiagnosticCode.MdMd2erMeasureUnknown,
-                                "Measure '$measure' names unknown attribute '$attr'",
+                                "Measure '$key' names unknown attribute '$attr'",
+                            )
+                        }
+                    }
+                    for ((key, attr) in def.attributes) {
+                        if (resolveMdAttribute(resolver, doc, key) == null) {
+                            report(
+                                DiagnosticCode.MdMd2erReference,
+                                "Unknown MD attribute '$key'",
+                            )
+                        }
+                        if (er != null && resolver.getSymbol("${er.qname}.$attr")?.kind != "attribute") {
+                            report(
+                                DiagnosticCode.MdMd2erReference,
+                                "Unresolved ER attribute path '$attr' from '$erPath'",
                             )
                         }
                     }
                 }
                 is Md2erDimensionDef -> {
-                    val dim =
-                        def.dimensionRef?.let { resolveMdErRef(resolver, doc, it.path) }?.takeIf {
-                            it.kind ==
-                                "dimension"
-                        }
-                    if (dim ==
-                        null
-                    ) {
-                        report(
-                            DiagnosticCode.MdMd2erReference,
-                            "Unresolved MD dimension '${def.dimensionRef?.path}'",
-                        )
-                    }
+                    val path = def.dimensionRef?.path.orEmpty()
+                    val dim = resolveMdNs(resolver, doc, path, "dimension")
+                    if (dim == null) report(DiagnosticCode.MdMd2erReference, "Unresolved MD dimension '$path'")
                     val logical =
-                        dim?.let { s ->
-                            docs.find { it.uri == s.documentUri }?.definitions?.filterIsInstance<DimensionDef>()?.find {
+                        dim?.let { sym ->
+                            byUri[sym.documentUri]?.definitions?.filterIsInstance<DimensionDef>()?.find {
                                 it.name ==
-                                    s.name
+                                    sym.name
                             }
                         }
-                    if (logical?.key != null &&
-                        logical.key !in def.attributes
-                    ) {
-                        report(DiagnosticCode.MdMd2erDimensionKey, "md2er_dimension must map key '${logical.key}'")
-                    }
-                    if (dim != null &&
-                        !seen.add(dim.qname)
-                    ) {
+                    if (logical?.key != null && logical.key !in def.attributes) {
                         report(
-                            DiagnosticCode.MdDuplicateBinding,
-                            "Duplicate md2er_dimension for '${def.dimensionRef?.path}'",
+                            DiagnosticCode.MdMd2erDimensionKey,
+                            "md2er_dimension must map key '${logical.key}'",
                         )
                     }
-                    val entity =
-                        def.entity?.let { resolveMdErRef(resolver, doc, it.path) }?.takeIf {
-                            it.kind ==
-                                "entity"
-                        }
-                    if (entity == null) {
-                        report(DiagnosticCode.MdMd2erReference, "Unresolved ER entity '${def.entity?.path}'")
-                        continue
+                    if (dim != null && !seen.add(dim.qname)) {
+                        report(
+                            DiagnosticCode.MdDuplicateBinding,
+                            "Duplicate md2er_dimension for '$path'",
+                        )
                     }
-                    for (path in def.attributes.values) {
-                        val attrs = explicitErAttributes(docs, resolver, entity, path)
-                        if (attrs.size >
-                            1
-                        ) {
-                            report(
-                                DiagnosticCode.MdMd2erPathAmbiguous,
-                                "ER attribute path '$path' is ambiguous from '${def.entity?.path}'",
-                            )
-                        }
-                        if (attrs.isEmpty()) {
+                    val erPath = def.entity?.path.orEmpty()
+                    val er = entity(erPath)
+                    if (er == null) report(DiagnosticCode.MdMd2erReference, "Unresolved ER entity '$erPath'")
+                    for ((key, attr) in def.attributes) {
+                        if (dim != null && resolver.getSymbol("${dim.qname}.$key")?.kind != "attribute") {
                             report(
                                 DiagnosticCode.MdMd2erReference,
-                                "Unresolved ER attribute path '$path' from '${def.entity?.path}'",
+                                "'$key' is not an attribute of '$path'",
+                            )
+                        }
+                        if (er == null) continue
+                        val targets = explicitErAttributes(index, doc, resolver, er, attr)
+                        if (targets.size > 1) {
+                            report(
+                                DiagnosticCode.MdMd2erPathAmbiguous,
+                                "ER attribute path '$attr' is ambiguous from '$erPath'",
+                            )
+                        }
+                        if (targets.isEmpty()) {
+                            report(
+                                DiagnosticCode.MdMd2erReference,
+                                "Unresolved ER attribute path '$attr' from '$erPath'",
                             )
                         }
                     }

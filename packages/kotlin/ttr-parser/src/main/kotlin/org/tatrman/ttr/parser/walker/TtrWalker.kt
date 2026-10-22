@@ -1073,7 +1073,7 @@ class TtrWalker(
             dimensionRef = props.firstNotNullOfOrNull { it.dimensionRefProperty()?.id()?.let { i -> makeRef(i) } },
             entity = props.firstNotNullOfOrNull { it.entityProperty_()?.id()?.let { i -> makeRef(i) } },
             attributes =
-                props.firstNotNullOfOrNull { it.attributesMapProperty()?.let { a -> objectStringMap(a.object_()) } }
+                props.firstNotNullOfOrNull { it.attributesMapProperty()?.let { a -> mdErStringMap(a.object_()) } }
                     ?: emptyMap(),
         )
     }
@@ -1096,11 +1096,11 @@ class TtrWalker(
             cubeletRef = props.firstNotNullOfOrNull { it.cubeletRefProperty()?.id()?.let { i -> makeRef(i) } },
             entity = props.firstNotNullOfOrNull { it.targetProperty()?.let { t -> targetTableRef(t) } },
             attributes =
-                props.firstNotNullOfOrNull { it.attributesMapProperty()?.let { a -> objectStringMap(a.object_()) } }
+                props.firstNotNullOfOrNull { it.attributesMapProperty()?.let { a -> mdErStringMap(a.object_()) } }
                     ?: emptyMap(),
             physicalProps = physical,
             measures =
-                props.firstNotNullOfOrNull { it.measuresMapProperty()?.let { m -> objectStringMap(m.object_()) } }
+                props.firstNotNullOfOrNull { it.measuresMapProperty()?.let { m -> mdErStringMap(m.object_()) } }
                     ?: emptyMap(),
         )
     }
@@ -1256,6 +1256,19 @@ class TtrWalker(
             ctx.literal()?.BOOLEAN_LITERAL() != null -> ctx.literal().BOOLEAN_LITERAL().text
             else -> null
         }
+
+    /** MD/ER maps carry ids or strings; other value forms are unavailable, as in TS and Python. */
+    private fun mdErStringMap(ctx: TTRParser.Object_Context?): Map<String, String> =
+        ctx?.propertyList()?.propertyEntry()?.associate { e ->
+            val value = e.value()
+            val text =
+                value.id()?.text ?: value
+                    .literal()
+                    ?.stringLiteralForm()
+                    ?.let { stringForm(it) }
+                    .orEmpty()
+            e.key().id().text to text
+        } ?: emptyMap()
 
     private fun objectStringMap(ctx: TTRParser.Object_Context?): Map<String, String> =
         ctx?.propertyList()?.propertyEntry()?.associate { e -> e.key().id().text to (scalarText(e.value()) ?: "") }

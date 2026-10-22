@@ -244,7 +244,7 @@ A plain value names an attribute of `entity:`. `address.state` traverses the out
 named `address` and selects its target's `state` attribute. Exactly one relation must match;
 multiple matching paths are `md/md2er-path-ambiguous`. A missing dimension key is
 `md/md2er-dimension-key`; a measure mapping to an unknown target attribute is
-`md/md2er-measure-unknown`. Unresolved dimension/entity or attribute paths are `md/md2er-reference`. There is one explicit binding per dimension (`md/duplicate-binding`).
+`md/md2er-measure-unknown`. On a dimension binding, `md/md2er-reference` checks the dimension, entity and both sides of each attribute map. On a cubelet binding it also requires `cubelet:` and checks that each measure belongs to that cubelet. There is one explicit binding per dimension (`md/duplicate-binding`).
 
 Both bindings are structural. Physical `shape`, `journaling` and `allocation` on a cubelet binding
 remain `md/md2er-physical-prop`. A domain is a value type; it has no explicit `md2er_domain` form.

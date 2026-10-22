@@ -195,7 +195,7 @@ lint-py module="":
         exit 0
     fi
     path=$(just _resolve "{{module}}")
-    cd "$path" && uv run ruff check .
+    cd "$path" && uv run --extra dev ruff check .
 
 # Sync (install) every Python package's frozen lock, or one.
 build-py module="":
@@ -218,12 +218,20 @@ test-py module="":
         exit 0
     fi
     path=$(just _resolve "{{module}}")
-    cd "$path" && uv run pytest
+    cd "$path" && uv run --extra dev python -m pytest
 
 # ── Conformance (TS ⟷ Kotlin ⟷ Python grammar parity) ───────────────────────────
 
+# Requires the built TS workspace; compare AST and semantics on all three runtimes.
 conformance:
-    pnpm --filter @tatrman/integration-tests run conformance
+    pnpm --filter @tatrman/conformance dump-all
+    ./gradlew :packages:kotlin:ttr-parser:test :packages:kotlin:ttr-semantics:test --tests '*ConformanceSpec' --rerun-tasks
+    pnpm --filter @tatrman/conformance diff
+    pnpm --filter @tatrman/conformance diff-sem
+    env PYTHONPATH=packages/python/ttr-parser/src uv run --project packages/python/ttr-parser python tests/conformance/dump.py
+    env PYTHONPATH=packages/python/ttr-parser/src uv run --project packages/python/ttr-parser python tests/conformance/dump_sem.py
+    diff -ru tests/conformance/out-ts tests/conformance/out-py
+    diff -ru tests/conformance/out-ts-sem tests/conformance/out-py-sem
 
 # ── Conceptual model (cn) ───────────────────────────────────────────────────────
 

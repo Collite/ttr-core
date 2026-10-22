@@ -17,6 +17,20 @@ import java.nio.file.Paths
 class WorldRoundTripSpec :
     StringSpec({
 
+        listOf(
+            "def world w { tags: [\"world\"] }",
+            "def world w { def engine e { tags: [\"engine\"], type: postgres } }",
+            "def world w { def storage s { tags: [\"storage\"], type: filesystem } }",
+        ).forEach { source ->
+            "R4: pre-existing world/member tags reparse without duplicate commas: $source" {
+                val parsed = TtrLoader.parseString(source)
+                parsed.errors shouldBe emptyList()
+                val once = TtrRenderer.render(parsed)
+                TtrLoader.parseString(once).errors shouldBe emptyList()
+                TtrRenderer.render(TtrLoader.parseString(once)) shouldBe once
+            }
+        }
+
         listOf("57-world.ttrm", "58-world-extends.ttrm").forEach { name ->
             "round-trips $name byte-stable and structurally" {
                 val src = Files.readString(fixture(name))

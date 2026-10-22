@@ -2,6 +2,7 @@
 package org.tatrman.ttr.writer
 
 import org.tatrman.ttr.parser.loader.ParseResult
+import org.tatrman.ttr.parser.loader.TtrId
 import org.tatrman.ttr.parser.model.AttributeDef
 import org.tatrman.ttr.parser.model.ColumnDef
 import org.tatrman.ttr.parser.model.ConceptBindingDef
@@ -257,7 +258,7 @@ object TtrRenderer {
     private fun renderWorld(def: WorldDef): String {
         val sb = StringBuilder("def world ${def.name} {")
         renderDescriptionIfAny(def.description, def.descriptionLocalized)?.let { sb.append(it) }
-        renderTagsIfAny(def.tags)?.let { sb.append(" $it,") }
+        renderTagsIfAny(def.tags)?.let { sb.append(" $it") }
         def.extends?.let { sb.append(" extends: $it,") }
         for (e in def.engines) {
             sb.append(" ").append(
@@ -382,7 +383,7 @@ object TtrRenderer {
         version?.let { sb.append(" version: ${renderString(it)},") }
         extends?.let { sb.append(" extends: $it,") }
         renderDescriptionIfAny(description, descriptionLocalized)?.let { sb.append(it) }
-        renderTagsIfAny(tags)?.let { sb.append(" $it,") }
+        renderTagsIfAny(tags)?.let { sb.append(" $it") }
         for ((k, v) in manifest) sb.append(" $k: ${renderPropertyValue(v)},")
         sb.append(" }")
         return sb.toString()
@@ -396,7 +397,7 @@ object TtrRenderer {
         if (s.staging) sb.append(" staging: true,")
         s.extends?.let { sb.append(" extends: $it,") }
         renderDescriptionIfAny(s.description, s.descriptionLocalized)?.let { sb.append(it) }
-        renderTagsIfAny(s.tags)?.let { sb.append(" $it,") }
+        renderTagsIfAny(s.tags)?.let { sb.append(" $it") }
         for (sc in s.schemas) sb.append(" ").append(renderWorldSchema(sc))
         for ((k, v) in s.manifest) sb.append(" $k: ${renderPropertyValue(v)},")
         sb.append(" }")
@@ -1317,9 +1318,11 @@ object TtrRenderer {
         }
 
     /**
-     * `def md2db_cubelet <name> { cubelet:, target:, shape:, attributes:, measures:, journaling?, allocation? }`
-     * — the physical binding of a cubelet to a fact table. Map-valued `attributes`/`measures` are emitted in
-     * key order for diff-stable output.
+     * Structural MD/ER bindings: documentation, tags, owner, entity, attributes, then measures.
+     * Physical props are errors represented only by their names in the AST and are not rendered.
+     * Empty map values (including values lost from non-string/non-id source forms) are omitted;
+     * the writer has no source to recover them. Keys must be grammar ids; invalid programmatic keys
+     * are omitted because the grammar does not permit quoted object keys. Values are quoted as needed.
      */
     private fun renderMdEr(
         kind: String,
@@ -1333,28 +1336,30 @@ object TtrRenderer {
         attributes: Map<String, String>,
         measures: Map<String, String>,
     ): String {
-        val sb = StringBuilder("def $kind $name {")
-        renderDescriptionIfAny(description, localized)?.let { sb.append(it) }
-        renderTagsIfAny(tags)?.let { sb.append(" $it,") }
-        md?.let { sb.append(" $slot: $it,") }
-        entity?.let { sb.append(" ${if (slot == "cubelet") "target" else "entity"}: $it,") }
-        sb
-            .append(
-                " attributes: { ",
-            ).append(attributes.entries.joinToString(", ") { "${it.key}: ${it.value}" })
-            .append(" }")
-        if (measures.isNotEmpty()) {
-            sb
-                .append(", measures: { ")
-                .append(
-                    measures.entries.joinToString(", ") {
-                        "${it.key}: ${it.value}"
-                    },
-                ).append(" }")
+        val parts = mutableListOf<String>()
+        renderDescriptionValue(description, localized)?.let { parts += "description: $it" }
+        renderTagsIfAny(tags)?.let { parts += it.removeSuffix(",") }
+        md?.takeIf { it.isNotEmpty() }?.let { parts += "$slot: $it" }
+        entity?.takeIf { it.isNotEmpty() }?.let { parts += "${if (slot == "cubelet") "target" else "entity"}: $it" }
+
+        fun value(s: String): String = if (SEM_IDENT.matches(s) && TtrId.isId(s)) s else renderString(s)
+
+        fun record(values: Map<String, String>): String? {
+            val entries = values.filter { (key, v) -> TtrId.isId(key) && v.isNotEmpty() }
+            if (entries.isEmpty()) return null
+            val body = entries.entries.joinToString(", ") { "${it.key}: ${value(it.value)}" }
+            return "{ $body }"
         }
-        return sb.append(" }").toString()
+        record(attributes)?.let { parts += "attributes: $it" }
+        record(measures)?.let { parts += "measures: $it" }
+        return "def $kind $name { ${parts.joinToString(", ")} }"
     }
 
+    /**
+     * `def md2db_cubelet <name> { cubelet:, target:, shape:, attributes:, measures:, journaling?, allocation? }`
+     * — the physical binding of a cubelet to a fact table. Map-valued `attributes`/`measures` are emitted in
+     * key order for diff-stable output.
+     */
     private fun renderMd2dbCubelet(def: Md2dbCubeletDef): String {
         val sb = StringBuilder()
         sb.append("def md2db_cubelet ${def.name} {")

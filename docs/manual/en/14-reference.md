@@ -157,6 +157,11 @@ The `md` model and the `binding`-model `md2*` kinds (see [MD model](15-md-model.
 | `md/grain-ref-unknown` / `md/grain-not-leaf` | Error / Warning | A cubelet grain ref doesn't resolve / is coarser than another in the grain. |
 | `md/shape-measure-mismatch` / `md/incomplete-journaling` / `md/multisource-grain-mismatch` | Error | Binding shape↔measure form / writeback completeness / multi-source grain agreement. |
 | `md/md2er-physical-prop` | Error | An `md2er_cubelet` (structural-only) carries shape/journaling/allocation. |
+| `md/md2er-reference` | Error | Missing or invalid MD owner, non-member mapping keys, or unresolved ER entity/attribute paths. |
+| `md/md2er-dimension-key` | Error | The explicit dimension attribute map omits its key. |
+| `md/md2er-path-ambiguous` | Error | An attribute path matches multiple visible outgoing relations. |
+| `md/md2er-measure-unknown` | Error | A measure mapping names no attribute of the target entity. |
+| `md/duplicate-binding` | Error | More than one explicit binding targets the same dimension. |
 
 ### Conceptual model (cn)
 

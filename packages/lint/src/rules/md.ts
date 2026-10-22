@@ -19,6 +19,7 @@ import {
   type MdMapGraph,
   type ProjectSymbolTable,
 } from '@tatrman/semantics';
+import { cnDocumentsFor } from './project-documents.js';
 import type { Rule, DocumentRuleContext, ProjectRuleContext } from '../rule.js';
 
 /** The six MD logical def kinds (schema md). */
@@ -619,7 +620,6 @@ const grainNotLeaf: Rule = {
 type Md2DbDomain = Extract<Definition, { kind: 'md2dbDomain' }>;
 type Md2DbMap = Extract<Definition, { kind: 'md2dbMap' }>;
 type Md2DbCubelet = Extract<Definition, { kind: 'md2dbCubelet' }>;
-type Md2ErCubelet = Extract<Definition, { kind: 'md2erCubelet' }>;
 type Domain = Extract<Definition, { kind: 'mdDomain' }>;
 
 interface BindingModel {
@@ -631,7 +631,6 @@ interface BindingModel {
   md2dbDomains: Md2DbDomain[];
   md2dbMaps: Md2DbMap[];
   md2dbCubelets: Md2DbCubelet[];
-  md2erCubelets: Md2ErCubelet[];
 }
 
 /**
@@ -663,7 +662,6 @@ function buildBindingModel(documents: ReadonlyMap<string, Document>, symbols: Pr
     md2dbDomains: [],
     md2dbMaps: [],
     md2dbCubelets: [],
-    md2erCubelets: [],
   };
   for (const doc of documents.values()) {
     for (const def of doc.definitions) {
@@ -674,7 +672,6 @@ function buildBindingModel(documents: ReadonlyMap<string, Document>, symbols: Pr
         case 'md2dbDomain': m.md2dbDomains.push(def); break;
         case 'md2dbMap': m.md2dbMaps.push(def); break;
         case 'md2dbCubelet': m.md2dbCubelets.push(def); break;
-        case 'md2erCubelet': m.md2erCubelets.push(def); break;
         default: break;
       }
     }
@@ -890,27 +887,24 @@ const multisourceGrainMismatch: Rule = {
   },
 };
 
-const mdErStructuralRules: Rule[] = [
-  ['md-md2er-physical-prop', DiagnosticCode.MdMd2erPhysicalProp],
-  ['md-md2er-dimension-key', DiagnosticCode.MdMd2erDimensionKey],
-  ['md-md2er-path-ambiguous', DiagnosticCode.MdMd2erPathAmbiguous],
-  ['md-md2er-measure-unknown', DiagnosticCode.MdMd2erMeasureUnknown],
-  ['md-duplicate-binding', DiagnosticCode.MdDuplicateBinding],
-  ['md-er-binding-reference', DiagnosticCode.MdMd2erReference],
-].map(([id, code]) => ({
-  id, code: code as DiagnosticCode, category: 'md', scope: 'project', defaultSeverity: 'error',
-  docs: 'Validate explicit structural MD to ER bindings.',
+const mdErStructuralDefinitions: Array<[string, DiagnosticCode, string]> = [
+  ['md-md2er-physical-prop', DiagnosticCode.MdMd2erPhysicalProp, 'A structural cubelet binding carries physical shape, journaling or allocation.'],
+  ['md-md2er-dimension-key', DiagnosticCode.MdMd2erDimensionKey, 'An explicit dimension binding omits the dimension key.'],
+  ['md-md2er-path-ambiguous', DiagnosticCode.MdMd2erPathAmbiguous, 'An attribute path traverses multiple visible outgoing relations.'],
+  ['md-md2er-measure-unknown', DiagnosticCode.MdMd2erMeasureUnknown, 'A measure mapping names no attribute on its target entity.'],
+  ['md-duplicate-binding', DiagnosticCode.MdDuplicateBinding, 'More than one explicit binding names the same dimension.'],
+  ['md-md2er-reference', DiagnosticCode.MdMd2erReference, 'An MD/ER binding has missing, unresolved, wrong-kind or non-member references.'],
+];
+const mdErStructuralRules: Rule[] = mdErStructuralDefinitions.map(([id, code, docs]) => ({
+  id, code, category: 'md', scope: 'project', defaultSeverity: 'error', docs,
   check(ctx) {
     if (ctx.scope !== 'project') return;
     let diagnostics = ctx.cache.get('md:erStructural') as ReturnType<typeof mdErBindingDiagnostics> | undefined;
     if (!diagnostics) {
-      diagnostics = mdErBindingDiagnostics([...ctx.documents].map(([uri, ast]) => {
-        const sym = ctx.symbols.documentContext(uri);
-        return { uri, ast, schemaCode: ast.modelDirective?.modelCode ?? '', namespace: ast.modelDirective?.schema ?? '', packageName: sym?.packageName ?? ast.packageDecl?.name ?? '' };
-      }), ctx.resolver);
+      diagnostics = mdErBindingDiagnostics(cnDocumentsFor(ctx), ctx.resolver);
       ctx.cache.set('md:erStructural', diagnostics);
     }
-    for (const d of diagnostics) if (d.code === code) ctx.report(d);
+    for (const d of diagnostics) if (d.code === code) ctx.report({ source: { ...d.source, file: d.uri }, message: d.message });
   },
 }));
 

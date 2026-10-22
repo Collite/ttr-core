@@ -9,6 +9,10 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - **Grammar 0.18 / HP-P1** — explicit `md2er_dimension` and structural `md2er_cubelet.measures`
   across TS, Kotlin and Python. Validate dimension keys, one-relation paths, duplicate bindings and
   measure targets. The Kotlin writer and TS formatter render both bindings; the formatter preserves comments.
+  Review hardening checks MD owners and cubelet measure membership, resolves MD shorthand by kind, and restricts
+  relation paths to visible relations. Explicit dimension attributes take precedence after bearer filtering.
+  Formatter/writer output preserves localized descriptions and quotes map values safely; Kotlin also fixes
+  pre-existing duplicate tag commas in world, engine/executor and storage rendering.
 
 - **`grammar/v0.17.3` / AU S2.5** — recipe statements now split at storage boundaries into door parts and
   DuckDB combines. Every recipe's `text` fingerprint changes, including `release_order` and `decide_return`,
