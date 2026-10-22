@@ -70,8 +70,10 @@ export class PhysicalIndex {
       if (sym?.kind === 'entity') this.bindEntity(sym.qname, def.target, doc);
     }
     for (const [key, { doc, def }] of this.entities) if (!this.entityToTable.has(key) && !this.queryEntities.has(key)) {
-      const table = this.resolve(doc, `db.dbo.${def.name}`);
-      if (table?.kind === 'table') { add(this.tableToErEntity, table.qname, [key]); add(this.entityToTable, key, [table.qname]); }
+      for (const namespace of new Set(docs.filter((d) => d.schemaCode === 'db').map((d) => d.namespace || 'dbo'))) {
+        const table = this.resolve(doc, `db.${namespace}.${def.name}`);
+        if (table?.kind === 'table') { add(this.tableToErEntity, table.qname, [key]); add(this.entityToTable, key, [table.qname]); }
+      }
     }
     for (const [key, { doc, def }] of this.entities) {
       const columns = def.binding?.kind === 'block' ? def.binding.columns ?? [] : [];

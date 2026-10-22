@@ -96,9 +96,14 @@ class PhysicalIndex(
         for ((entity, pair) in entities) {
             if (entity !in entityToTable && entity !in queryEntities) {
                 val (doc, def) = pair
-                resolve(doc, "db.dbo.${def.name}")?.takeIf { it.kind == "table" }?.let {
-                    tableToErEntity.getOrPut(it.qname) { linkedSetOf() }.add(entity)
-                    entityToTable.getOrPut(entity) { linkedSetOf() }.add(it.qname)
+                for (namespace in docs
+                    .filter { it.schemaCode == "db" }
+                    .map { it.namespace.ifEmpty { "dbo" } }
+                    .distinct()) {
+                    resolve(doc, "db.$namespace.${def.name}")?.takeIf { it.kind == "table" }?.let {
+                        tableToErEntity.getOrPut(it.qname) { linkedSetOf() }.add(entity)
+                        entityToTable.getOrPut(entity) { linkedSetOf() }.add(it.qname)
+                    }
                 }
             }
         }
