@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import type {
+  CrossRef,
   ConceptBody,
   ConceptRefKey,
   ConceptSugar,
@@ -12,6 +13,15 @@ import type {
   Reference,
   SourceLocation,
 } from '@tatrman/parser';
+
+/** Preserve the MD slot when the generic reference index consumes a cross-reference. */
+export interface MdSlotReference extends Reference {
+  mdContext: CrossRef['role'];
+}
+
+function mdRef(ref: CrossRef): MdSlotReference {
+  return { path: ref.path, parts: ref.path.split('.'), source: ref.source, mdContext: ref.role };
+}
 
 /**
  * 0.17 — a reference written in a cn slot (cn contracts §1.1–§1.4): `is_a`, `of`, a role's `event`,
@@ -87,7 +97,7 @@ export function collectReferences(def: Definition): Reference[] {
     case 'measure':
     case 'cubelet':
       for (const c of def.crossRefs ?? []) {
-        refs.push({ path: c.path, parts: c.path.split('.'), source: c.source });
+        refs.push(mdRef(c));
       }
       break;
     // v4.4 lexicon entries — the `for:` target ref (er/db/md) resolves through the

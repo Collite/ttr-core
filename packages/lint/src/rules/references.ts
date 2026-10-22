@@ -69,7 +69,7 @@ const ambiguousReference: Rule = {
   category: 'references',
   scope: 'document',
   defaultSeverity: 'error',
-  docs: 'A reference matches multiple definitions via wildcard imports.',
+  docs: 'A reference matches multiple definitions in its package or wildcard imports.',
   // Qualifying the reference to one candidate is a judgment call → suggestion.
   fix: {
     kind: 'suggestion',
@@ -88,10 +88,11 @@ const ambiguousReference: Rule = {
     if (ctx.scope !== 'document') return;
     for (const { ref, res } of resolveAll(ctx)) {
       if (!res.resolved && res.reason === 'ambiguous') {
-        const loc = res.candidates?.[0]?.source ?? ref.source;
+        const via = res.tried.some((a) => a.step === 'same-package' && a.reason === 'ambiguous')
+          ? 'same-package lookup' : 'wildcard imports';
         ctx.report({
-          source: loc,
-          message: `Ambiguous reference: '${ref.path}' matches ${res.candidates?.length ?? 0} definitions via wildcard imports`,
+          source: ref.source,
+          message: `Ambiguous reference: '${ref.path}' matches ${res.candidates?.length ?? 0} definitions via ${via}`,
           data: {
             qualified: res.candidates?.[0]?.qname,
             refLine: ref.source.line,

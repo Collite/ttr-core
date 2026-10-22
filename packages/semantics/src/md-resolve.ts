@@ -51,15 +51,16 @@ const ROLE_NS: Record<CrossRef['role'], string> = {
  * the namespace segment (`from: md.Day`, `grain: [Customer.code]`); symbols are
  * registered with it (`md.domain.Day`, `md.dimension.Customer.code`). We insert
  * the namespace after the `md` schema prefix (or prepend `md.<ns>` for a
- * namespace-less ref). The last candidate is the canonical form used for the
+ * namespace-less ref), retaining an explicit package prefix. The last candidate is the canonical form used for the
  * package-qualified suffix fallback.
  */
 function candidates(path: string, ns: string): string[] {
   const parts = path.split('.');
   const out: string[] = [];
-  if (parts[0] === 'md' && parts[1] === ns) out.push(path); // already canonical
+  const model = parts.lastIndexOf('md');
+  if (model >= 0 && parts[model + 1] === ns) out.push(path); // already canonical
   const canonical =
-    parts[0] === 'md' ? ['md', ns, ...parts.slice(1)].join('.') : ['md', ns, ...parts].join('.');
+    model >= 0 ? [...parts.slice(0, model + 1), ns, ...parts.slice(model + 1)].join('.') : ['md', ns, ...parts].join('.');
   out.push(canonical);
   return [...new Set(out)];
 }
@@ -73,7 +74,8 @@ function candidates(path: string, ns: string): string[] {
 export function resolveMdRef(
   symbols: ProjectSymbolTable,
   path: string,
-  role: CrossRef['role']
+  role: CrossRef['role'],
+  packageName?: string
 ): SymbolEntry | undefined {
   const namespaces = [ROLE_NS[role]];
   // map `from`/`to` may name an attribute instead of a domain (the sugar).
@@ -81,6 +83,14 @@ export function resolveMdRef(
 
   for (const ns of namespaces) {
     const cands = candidates(path, ns);
+    // Match the reference's own package before widening to the project. The
+    // generic resolver and reverse index already have that source context.
+    if (packageName) {
+      for (const c of cands) {
+        const hit = symbols.get(`${packageName}.${c}`);
+        if (hit) return hit;
+      }
+    }
     for (const c of cands) {
       const hit = symbols.get(c);
       if (hit) return hit;
