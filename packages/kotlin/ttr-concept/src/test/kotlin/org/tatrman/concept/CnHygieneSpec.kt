@@ -2,7 +2,6 @@
 package org.tatrman.concept
 
 import com.github.ajalt.clikt.testing.test
-import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.collections.shouldContain
@@ -76,7 +75,7 @@ class CnHygieneSpec :
                 )
         }
 
-        "the service answers hygieneReport, the validates (S3.2) and statementLower (S3.3); the rest is still CN-P3" {
+        "the service answers hygieneReport, the validates (S3.2), statementLower (S3.3) and statementExplain (S3.6)" {
             val svc = CnConceptService(model)
             val empty =
                 org.tatrman.statement.v1.Statement
@@ -88,7 +87,9 @@ class CnHygieneSpec :
                 it.plan shouldBe null
                 it.diagnostics.map { d -> d.slug } shouldContain FrameSlugs.MISSING_TIME
             }
-            shouldThrow<UnsupportedOperationException> { svc.statementExplain(empty, "en") }
+            // explained even when refused: what it claims, then why
+            svc.statementExplain(empty, "en").text shouldBe
+                "Refused: cn/unsupported-ask (ask); cn/malformed-frame (measures); cn/missing-time (time)."
         }
 
         "a model with no cn: an empty report" {

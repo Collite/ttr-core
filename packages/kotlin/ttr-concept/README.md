@@ -10,8 +10,8 @@ mid-lower: the same model and frame always give the same bytes.
 **Status: CN-P3 in progress.** Built: the definition surface and the hygiene report (CN-P2); the frames
 (`statement.v1` / `assertion.v1`, `ttr-plan-proto`) frozen and their canonical JSON pinned (CN-P3 S3.1); the validates
 (S3.2), `statementLower` (S3.3), `definitionRender` on both layers and `materialize` — `ttr cn materialize` (S3.4),
-`assertionLower` — the `Statement[<Entity>]` row payload, data only: cn never writes (S3.5). The explanations land at
-S3.6. Published as `org.tatrman:ttr-concept` in the
+`assertionLower` — the `Statement[<Entity>]` row payload, data only: cn never writes (S3.5), `statementExplain` /
+`assertionExplain` in en and cs, a phase's definition as prose (S3.6). Published as `org.tatrman:ttr-concept` in the
 `grammar/v*` bundle from the first grammar cut after CN-P3 S3.1 (A-CN-1).
 
 **Law order.** This module implements `project/tatrman/features/conceptual/` (outside this repo): `design/design.md`

@@ -96,6 +96,7 @@ class CnConceptService(
     private val rows = AssertionLowerer(model)
     private val lowerer = StatementLowerer(model, clock)
     private val definitions = DefinitionRenderer(model, clock)
+    private val explainer = Explainer(model, clock)
 
     override fun statementValidate(s: Statement): List<Diagnostic> = statements.validate(s)
 
@@ -104,6 +105,17 @@ class CnConceptService(
     override fun assertionValidate(a: Assertion): List<Diagnostic> = assertions.validate(a)
 
     override fun assertionLower(a: Assertion): RowObjects = rows.lower(a)
+
+    /** A phase filter's definition is always said as prose — the inspector's bubble ① names it (H-4, A-CN-54). */
+    override fun statementExplain(
+        s: Statement,
+        locale: String,
+    ): Explanation = explainer.statement(s, locale, definitions = true)
+
+    override fun assertionExplain(
+        a: Assertion,
+        locale: String,
+    ): Explanation = explainer.assertion(a, locale)
 
     /** The er text is the shared dialect's (S0.3 §3); the translator unparses it per engine, so [dialect] is not read. */
     override fun definitionRender(
