@@ -96,6 +96,7 @@ def test_cn_frames_canonical_json_matches_the_kotlin_samples() -> None:
     from pathlib import Path
 
     from google.protobuf import json_format
+
     from org.tatrman.assertion.v1 import assertion_pb2
     from org.tatrman.statement.v1 import statement_pb2
 

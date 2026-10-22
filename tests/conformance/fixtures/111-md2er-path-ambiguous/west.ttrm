@@ -1,0 +1,4 @@
+package west
+import base.*
+model er
+def relation address { from: base.er.entity.customer, to: base.er.entity.addr, cardinality: { from: "N", to: "1" } }

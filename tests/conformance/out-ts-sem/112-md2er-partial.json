@@ -1,0 +1,19 @@
+{
+    "diagnostics": [
+        "md/md2er-reference",
+        "md/md2er-reference",
+        "md/md2er-reference",
+        "md/md2er-reference",
+        "md/md2er-reference",
+        "md/md2er-reference",
+        "md/md2er-reference",
+        "md/md2er-reference",
+        "md/md2er-reference"
+    ],
+    "resolved": [],
+    "symbols": [
+        "binding.md2er_cubelet.invalid_values",
+        "binding.md2er_cubelet.q",
+        "binding.md2er_dimension.p"
+    ]
+}

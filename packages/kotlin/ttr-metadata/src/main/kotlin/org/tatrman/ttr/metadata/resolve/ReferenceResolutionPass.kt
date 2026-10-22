@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.metadata.resolve
 
+import org.tatrman.ttr.metadata.source.CnBuilder
 import org.tatrman.ttr.metadata.source.LoadedFile
 import org.tatrman.ttr.metadata.source.LoadWarning
 import org.tatrman.ttr.parser.model.Definition
@@ -12,6 +13,8 @@ import org.tatrman.ttr.parser.model.Er2DbRelationDef
 import org.tatrman.ttr.parser.model.PropertyValue
 import org.tatrman.ttr.parser.model.Reference
 import org.tatrman.ttr.parser.model.RelationDef
+import org.tatrman.ttr.semantics.md.buildMdErRelationIndex
+import org.tatrman.ttr.semantics.md.mdErUsedRelations
 
 class ReferenceResolutionPass(
     private val sourceId: String,
@@ -19,6 +22,9 @@ class ReferenceResolutionPass(
 ) {
     fun run(): ResolutionResult {
         val adapter = PublishedResolverAdapter.build(files)
+        val (docs, semanticResolver) = CnBuilder.project(files)
+        val relationIndex = buildMdErRelationIndex(docs, semanticResolver)
+        val docsByUri = docs.associateBy { it.uri }
         val newWarnings = mutableListOf<LoadWarning>()
         val newErrors = mutableListOf<LoadWarning>()
         val resolvedRefs = mutableListOf<ResolvedReference>()
@@ -72,6 +78,13 @@ class ReferenceResolutionPass(
                 }
                 // Record which import was consulted (for unused-import detection)
                 recordUsedImport(adapter, ctx, ref.path, fileImportsUsed, fileWildcardMatches)
+            }
+
+            docsByUri[file.storageFile.path]?.let { doc ->
+                val usedRelations = mdErUsedRelations(relationIndex, doc, semanticResolver)
+                for ((idx, imp) in file.imports.withIndex()) {
+                    if (!imp.wildcard && imp.target in usedRelations) fileImportsUsed.add(idx)
+                }
             }
 
             // A5 Task 5 — duplicate-import (W): same import twice in one file

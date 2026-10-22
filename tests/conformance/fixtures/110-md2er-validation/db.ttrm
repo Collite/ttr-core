@@ -1,0 +1,2 @@
+model db schema dbo
+def table sales { columns: [def column amount { type: decimal }] }

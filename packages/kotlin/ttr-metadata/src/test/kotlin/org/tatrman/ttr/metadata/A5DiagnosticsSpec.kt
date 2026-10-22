@@ -179,6 +179,49 @@ class A5DiagnosticsSpec :
             r.errHas("ttr/missing-package-declaration") shouldBe false
         }
 
+        "N1: a named relation import used by an MD/ER path is not unused" {
+            val root = Files.createTempDirectory("diag-mder-import")
+            try {
+                write(
+                    root,
+                    "md.ttrm",
+                    "model md\ndef domain Code { type: string }\ndef dimension Customer { key: code, attributes: [def attribute code { domain: md.Code }] }",
+                )
+                write(
+                    root,
+                    "er.ttrm",
+                    "model er\ndef entity customer { attributes: [def attribute sk { type: int }] }\ndef entity addr { attributes: [def attribute state { type: text }] }",
+                )
+                write(
+                    root,
+                    "east/er.ttrm",
+                    "package east\nmodel er\ndef relation address { from: er.entity.customer, to: er.entity.addr }",
+                )
+                write(
+                    root,
+                    "binding.ttrm",
+                    "import east.er.relation.address\nmodel binding\ndef md2er_dimension c { dimension: md.Customer, entity: er.entity.customer, attributes: { code: address.state } }",
+                )
+                reconcile(root).warnings.any {
+                    it.message.contains("unused-import") &&
+                        it.message.contains("east.er.relation.address")
+                } shouldBe
+                    false
+                write(
+                    root,
+                    "binding.ttrm",
+                    "import east.er.relation.address\nmodel binding\ndef md2er_dimension c { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk } }",
+                )
+                reconcile(root).warnings.any {
+                    it.message.contains("unused-import") &&
+                        it.message.contains("east.er.relation.address")
+                } shouldBe
+                    true
+            } finally {
+                root.toFile().deleteRecursively()
+            }
+        }
+
         "ttr/unused-import (warn) — a named import no reference uses, non-blocking" {
             val root = Files.createTempDirectory("diag-unused")
             write(

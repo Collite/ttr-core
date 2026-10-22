@@ -1,0 +1,12 @@
+{
+    "diagnostics": [
+        "md/md2er-reference",
+        "md/md2er-reference"
+    ],
+    "resolved": [
+        "er.entity.md2er_dimension => binding.md2er_dimension.md2er_dimension"
+    ],
+    "symbols": [
+        "binding.md2er_dimension.md2er_dimension"
+    ]
+}

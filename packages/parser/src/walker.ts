@@ -101,6 +101,7 @@ import {
   Md2dbDomainDefContext,
   Md2dbMapDefContext,
   Md2erCubeletDefContext,
+  Md2erDimensionDefContext,
   ShapeValueContext,
   JournalingValueContext,
   AllocationValueContext,
@@ -228,6 +229,7 @@ import type {
   Md2DbDomainDef,
   Md2DbMapDef,
   Md2ErCubeletDef,
+  Md2ErDimensionDef,
   ShapeSpec,
   AttrColumnBinding,
   MeasureColumnBinding,
@@ -1838,6 +1840,27 @@ function walkMd2DbMapDef(ctx: Md2dbMapDefContext, name: string, source: SourceLo
   return { kind: 'md2dbMap', name, source, description, descriptionLocalized, tags, mapRef, table, columns };
 }
 
+function walkMd2ErDimensionDef(ctx: Md2erDimensionDefContext, name: string, source: SourceLocation, file: string): Md2ErDimensionDef {
+  const def: Md2ErDimensionDef = { kind: 'md2erDimension', name, source, dimensionRef: '', entity: '', attributes: {} };
+  for (const p of ctx.md2erDimensionProperty()) {
+    if (p.descriptionProperty()) {
+      def.description = descriptionOf(p.descriptionProperty()!, file);
+      def.descriptionLocalized = descriptionLocalizedOf(p.descriptionProperty()!, file);
+    }
+    if (p.tagsProperty()) def.tags = walkListOfStrings(p.tagsProperty()!.listOfStrings()!, file);
+    if (p.dimensionRefProperty()) {
+      def.dimensionReference = referenceOf(p.dimensionRefProperty()!.id()!, file);
+      def.dimensionRef = def.dimensionReference?.path ?? '';
+    }
+    if (p.entityProperty_()) {
+      def.entityReference = referenceOf(p.entityProperty_()!.id()!, file);
+      def.entity = def.entityReference?.path ?? '';
+    }
+    if (p.attributesMapProperty()) def.attributes = walkStringRecord(p.attributesMapProperty()!.object_()!, file);
+  }
+  return def;
+}
+
 function walkMd2ErCubeletDef(ctx: Md2erCubeletDefContext, name: string, source: SourceLocation, file: string): Md2ErCubeletDef {
   let description: StringValue | TripleStringValue | undefined;
   let descriptionLocalized: LocalizedString | undefined;
@@ -1845,6 +1868,7 @@ function walkMd2ErCubeletDef(ctx: Md2erCubeletDefContext, name: string, source: 
   let cubeletRef = '';
   let entity = '';
   let attributes: Record<string, string> = {};
+  let measures: Record<string, string> | undefined;
   const physicalProps: string[] = [];
 
   for (const p of ctx.md2erCubeletProperty()) {
@@ -1858,12 +1882,12 @@ function walkMd2ErCubeletDef(ctx: Md2erCubeletDefContext, name: string, source: 
     if (p.attributesMapProperty()) attributes = walkStringRecord(p.attributesMapProperty()!.object_()!, file);
     // Permissive-superset props that semantics rejects (md/md2er-physical-prop).
     if (p.shapeProperty()) physicalProps.push('shape');
-    if (p.measuresMapProperty()) physicalProps.push('measures');
+    if (p.measuresMapProperty()) measures = walkStringRecord(p.measuresMapProperty()!.object_()!, file);
     if (p.journalingProperty()) physicalProps.push('journaling');
     if (p.allocationProperty()) physicalProps.push('allocation');
   }
 
-  return { kind: 'md2erCubelet', name, source, description, descriptionLocalized, tags, cubeletRef, entity, attributes, physicalProps: physicalProps.length ? physicalProps : undefined };
+  return { kind: 'md2erCubelet', name, source, description, descriptionLocalized, tags, cubeletRef, entity, attributes, measures, physicalProps: physicalProps.length ? physicalProps : undefined };
 }
 
 function walkGraphLayout(ctx: Object_Context, file: string): GraphLayout {
@@ -1998,6 +2022,7 @@ function walkDefinition(ctx: DefinitionContext, file: string, errors: ParseError
   if (objDef.MD2DB_CUBELET()) return walkMd2DbCubeletDef(objDef.md2dbCubeletDef()!, name, source, file);
   if (objDef.MD2DB_DOMAIN()) return walkMd2DbDomainDef(objDef.md2dbDomainDef()!, name, source, file);
   if (objDef.MD2DB_MAP()) return walkMd2DbMapDef(objDef.md2dbMapDef()!, name, source, file);
+  if (objDef.MD2ER_DIMENSION()) return walkMd2ErDimensionDef(objDef.md2erDimensionDef()!, name, source, file);
   if (objDef.MD2ER_CUBELET()) return walkMd2ErCubeletDef(objDef.md2erCubeletDef()!, name, source, file);
   // v4.4 lexicon kinds (model lexicon) — one shared body, kind tag distinguishes.
   if (objDef.TERM()) return walkLexiconEntryDef(objDef.lexiconEntryDef()!, 'term', name, source, file);

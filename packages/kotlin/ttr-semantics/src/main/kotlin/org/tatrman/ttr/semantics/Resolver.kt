@@ -357,6 +357,7 @@ class Resolver(
             "md2db_domain",
             "md2db_map",
             "md2er_cubelet",
+            "md2er_dimension",
         )
 
     /** The packages and db schemas of the project — what [classify] reads a dotted path against. */

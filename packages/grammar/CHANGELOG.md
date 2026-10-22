@@ -12,6 +12,17 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
+## 0.18 — 2026-10-22
+
+Additive (HP-P1, md → er hop). Every previously-valid file parses unchanged.
+
+1. `def md2er_dimension` pins a dimension's ER entity and its key/descriptive attributes;
+   `relation.attribute` values traverse one outgoing relation.
+2. `md2er_cubelet.measures` maps measures to structural ER attributes. Shape, journaling and
+   allocation remain physical-property errors.
+3. TS, Kotlin and Python carry the explicit bindings; missing dimension keys, ambiguous paths
+   and unknown measure attributes receive matching structural diagnostics.
+
 ## 0.17 — 2026-10-20
 
 **Additive (the conceptual model — CN-P1 S1.1; CN-D3…D8, D11, D17/D18, D20…D25, D28; A-CN-9/13/16/18/19).**

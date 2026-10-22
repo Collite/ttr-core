@@ -1,0 +1,5 @@
+package base
+import east.*
+import west.*
+model binding
+def md2er_dimension customer { dimension: md.Customer, entity: er.entity.customer, attributes: { code: address.state } }

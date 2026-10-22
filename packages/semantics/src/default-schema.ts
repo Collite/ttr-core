@@ -63,6 +63,7 @@ export function modelForKind(kind: string, declaringModel?: string): ModelCode {
     case 'md2dbCubelet':
     case 'md2dbDomain':
     case 'md2dbMap':
+    case 'md2erDimension':
     case 'md2erCubelet':
     // 0.17 — the cn bindings: `conceptBinding` is the def kind, the ten binding keywords key it.
     case 'conceptBinding':
@@ -166,6 +167,8 @@ export function namespaceForKind(kind: string): string {
       return 'md2db_domain';
     case 'md2dbMap':
       return 'md2db_map';
+    case 'md2erDimension':
+      return 'md2er_dimension';
     case 'md2erCubelet':
       return 'md2er_cubelet';
     default:

@@ -1,0 +1,44 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "md2er_cubelet",
+            "name": "sales_hop",
+            "properties": {
+                "attributes": {
+                    "Customer.code": "customer"
+                },
+                "cubelet": "md.sales",
+                "measures": {
+                    "revenue": "amount"
+                },
+                "target": "er.entity.sales"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "md2er_cubelet",
+            "name": "physical",
+            "properties": {
+                "cubelet": "md.sales",
+                "measures": {
+                    "revenue": "amount"
+                },
+                "physicalProps": [
+                    "shape",
+                    "journaling",
+                    "allocation"
+                ],
+                "target": "er.entity.sales"
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": null,
+    "schemaDirective": {
+        "code": "binding",
+        "namespace": null
+    }
+}

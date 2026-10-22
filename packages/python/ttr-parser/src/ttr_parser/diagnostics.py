@@ -17,6 +17,12 @@ from enum import Enum
 
 
 class DiagnosticCode(Enum):
+    MD_MD2ER_PHYSICAL_PROP = "md/md2er-physical-prop"
+    MD_MD2ER_REFERENCE = "md/md2er-reference"
+    MD_MD2ER_DIMENSION_KEY = "md/md2er-dimension-key"
+    MD_MD2ER_PATH_AMBIGUOUS = "md/md2er-path-ambiguous"
+    MD_MD2ER_MEASURE_UNKNOWN = "md/md2er-measure-unknown"
+    MD_DUPLICATE_BINDING = "md/duplicate-binding"
     PARSE_ERROR = "ttr/parse-error"
     PARSE_RECOVERY_INFO = "ttr/parse-recovery-info"
     UNKNOWN_PROPERTY = "ttr/unknown-property"

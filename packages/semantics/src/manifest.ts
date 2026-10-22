@@ -134,7 +134,7 @@ const KIND_KEYWORDS: ReadonlySet<string> = new Set([
   'entity', 'attribute', 'relation', 'er2db_entity', 'er2db_attribute', 'er2db_relation',
   'query', 'role', 'er2cnc_role', 'drill_map', 'area',
   'domain', 'dimension', 'map', 'hierarchy', 'measure', 'cubelet',
-  'md2db_cubelet', 'md2db_domain', 'md2db_map', 'md2er_cubelet',
+  'md2db_cubelet', 'md2db_domain', 'md2db_map', 'md2er_cubelet', 'md2er_dimension',
   // 0.16 — the automation kinds.
   'parameter', 'action', 'service', 'approval', 'program', 'recipe',
 ]);

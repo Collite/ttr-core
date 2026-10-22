@@ -53,6 +53,10 @@ export function collectReferences(def: Definition): Reference[] {
       if (def.nameAttribute) refs.push(def.nameAttribute);
       if (def.codeAttribute) refs.push(def.codeAttribute);
       break;
+    case 'md2erDimension':
+      if (def.dimensionReference) refs.push(def.dimensionReference);
+      if (def.entityReference) refs.push(def.entityReference);
+      break;
     case 'er2dbEntity':
       if (def.entity) refs.push(def.entity);
       break;

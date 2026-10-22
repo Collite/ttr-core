@@ -1,0 +1,26 @@
+{
+    "definitions": [
+        {
+            "description": "The customer's ER landing",
+            "kind": "md2er_dimension",
+            "name": "customer_hop",
+            "properties": {
+                "attributes": {
+                    "code": "sk",
+                    "state": "address.state"
+                },
+                "dimension": "md.Customer",
+                "entity": "er.entity.customer"
+            },
+            "tags": [
+                "structural"
+            ]
+        }
+    ],
+    "imports": [],
+    "package": null,
+    "schemaDirective": {
+        "code": "binding",
+        "namespace": null
+    }
+}

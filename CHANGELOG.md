@@ -6,6 +6,15 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **Grammar 0.18 / HP-P1** — explicit `md2er_dimension` and structural `md2er_cubelet.measures`
+  across TS, Kotlin and Python. Validate dimension keys, one-relation paths, duplicate bindings and
+  measure targets. The Kotlin writer and TS formatter render both bindings; the formatter preserves comments.
+  Review hardening checks MD owners and cubelet measure membership, resolves MD shorthand by kind, and restricts
+  relation paths to visible relations. Explicit dimension attributes take precedence after bearer filtering.
+  Formatter/writer output preserves localized descriptions and quotes map values safely; Kotlin also fixes
+  pre-existing duplicate tag commas in world, engine/executor and storage rendering.
+  CN-P3 reverse hops include dimension and measure mappings. Named relations traversed by binding paths count
+  as used imports; inline measures never borrow a top-level measure's identity.
 - **Hosted snapshot navigation** — preserve the parent's requested route through an asynchronous SHA reload,
   even if the old shell rewrites the address bar while loading. Failed refreshes retain the current snapshot
   and navigate within it; the regression test waits for the committed tab and copy link.

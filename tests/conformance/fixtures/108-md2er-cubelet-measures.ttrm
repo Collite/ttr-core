@@ -1,0 +1,9 @@
+model binding
+def md2er_cubelet sales_hop {
+  cubelet: md.sales, target: er.entity.sales,
+  attributes: { Customer.code: customer }, measures: { revenue: amount }
+}
+def md2er_cubelet physical {
+  cubelet: md.sales, target: er.entity.sales, attributes: {},
+  measures: { revenue: amount }, shape: wide, journaling: overwrite, allocation: equal
+}

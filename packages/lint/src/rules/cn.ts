@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { DiagnosticCode } from '@tatrman/parser';
 import { cncDeprecations, validateCn } from '@tatrman/semantics';
-import type { CnDocument, CnValidation } from '@tatrman/semantics';
+import type { CnValidation } from '@tatrman/semantics';
+import { cnDocumentsFor } from './project-documents.js';
 import type { ProjectRuleContext, Rule } from '../rule.js';
 
 // 0.17 (CN-P2 S2.3) — surface the ttr-semantics cn analysis (`validateCn`, cn contracts §7) as lint
@@ -15,16 +16,7 @@ const CN_KEY = 'cn:validation';
 function validationFor(ctx: ProjectRuleContext): CnValidation {
   const cached = ctx.cache.get(CN_KEY) as CnValidation | undefined;
   if (cached) return cached;
-  const docs: CnDocument[] = [...ctx.documents].map(([uri, ast]) => ({
-    uri,
-    ast,
-    ...(ctx.symbols.documentContext(uri) ?? {
-      schemaCode: ast.modelDirective?.modelCode ?? '',
-      namespace: ast.modelDirective?.schema ?? '',
-      packageName: ast.packageDecl?.name ?? '',
-    }),
-  }));
-  const validation = validateCn(docs, ctx.resolver);
+  const validation = validateCn(cnDocumentsFor(ctx), ctx.resolver);
   ctx.cache.set(CN_KEY, validation);
   return validation;
 }

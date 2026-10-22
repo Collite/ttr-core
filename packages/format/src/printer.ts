@@ -3,6 +3,7 @@ import type {
   Document, Definition, SourceLocation, ParameterDef, GraphBlock, Trivia,
   ConceptBody, ConceptBindingDef, ConceptDef, ConceptParticipant, ConceptProperty, ConceptSugar, ListValue, ObjectValue,
 } from '@tatrman/parser';
+import { TTR_NON_ID_WORDS } from '@tatrman/parser/layout';
 import { Doc, text, verbatim, concat, line, hardline, indent, group, join } from './ir.js';
 import { render } from './render.js';
 
@@ -151,6 +152,8 @@ const KIND_KEYWORD: Record<string, string> = {
   er2dbAttribute: 'er2db_attribute',
   er2dbRelation: 'er2db_relation',
   er2cncRole: 'er2cnc_role',
+  md2erDimension: 'md2er_dimension',
+  md2erCubelet: 'md2er_cubelet',
 };
 function kindKeyword(kind: string): string {
   return KIND_KEYWORD[kind] ?? kind;
@@ -171,6 +174,23 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
   const qstr = (x: string | undefined) => (x === undefined ? undefined : text(JSON.stringify(x)));
   const defList = (arr: Definition[] | undefined) => (arr && arr.length ? defListDoc(arr, ctx) : undefined);
   switch (def.kind) {
+    case 'md2erDimension':
+    case 'md2erCubelet': {
+      add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized);
+      add('tags', def.tags && strListDoc(def.tags, true));
+      if (def.kind === 'md2erDimension') add('dimension', v(def.dimensionReference) ?? (def.dimensionRef ? text(def.dimensionRef) : undefined));
+      else add('cubelet', def.cubeletRef ? text(def.cubeletRef) : undefined);
+      add(def.kind === 'md2erDimension' ? 'entity' : 'target',
+        (def.kind === 'md2erDimension' ? v(def.entityReference) : undefined) ?? (def.entity ? text(def.entity) : undefined));
+      const value = (s: string) => /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(s)
+        && s.split('.').every(p => !TTR_NON_ID_WORDS.has(p)) ? s : JSON.stringify(s);
+      // Object keys are grammar `id`s, not string literals; keep their valid authored spelling.
+      const record = (entries: Record<string, string>) => Object.keys(entries).length
+        ? text(`{ ${Object.entries(entries).map(([k, val]) => `${k}: ${value(val)}`).join(', ')} }`) : undefined;
+      add('attributes', record(def.attributes));
+      if (def.kind === 'md2erCubelet' && def.measures) add('measures', record(def.measures) ?? text('{}'));
+      break;
+    }
     case 'project':
       add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true)); add('version', qstr(def.version));
       break;
@@ -422,10 +442,16 @@ function topLevelBroken(def: Definition, ctx: Ctx, commentsForceBreak: boolean, 
 const LAID_OUT_KINDS = new Set([
   'project', 'table', 'view', 'column', 'index', 'constraint', 'fk', 'procedure', 'entity', 'attribute',
   'relation', 'er2dbEntity', 'er2dbAttribute', 'er2dbRelation', 'query', 'role', 'er2cncRole', 'schema',
+  'md2erDimension', 'md2erCubelet',
   'area', 'term', 'pattern', 'example', 'concept', 'conceptBinding',
 ]);
 
 function isVerbatimDef(def: Definition): boolean {
+  if (def.kind === 'md2erDimension' || def.kind === 'md2erCubelet') {
+    // Maps lack per-entry spans. Preserve the complete source when it contains comments or invalid physical fields.
+    if (Object.values(def.attributes).some(v => v === '') || (def.kind === 'md2erCubelet' && Object.values(def.measures ?? {}).some(v => v === ''))) return true;
+    if (triviaUnder(def).length || (def.kind === 'md2erCubelet' && def.physicalProps?.length)) return true;
+  }
   return !LAID_OUT_KINDS.has(def.kind) || (def.kind === 'role' && (def.entries?.length ?? 0) > 0);
 }
 

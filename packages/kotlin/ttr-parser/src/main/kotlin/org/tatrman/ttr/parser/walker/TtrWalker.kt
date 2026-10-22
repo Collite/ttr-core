@@ -27,6 +27,7 @@ import org.tatrman.ttr.parser.model.Md2dbCubeletDef
 import org.tatrman.ttr.parser.model.Md2dbDomainDef
 import org.tatrman.ttr.parser.model.Md2dbMapDef
 import org.tatrman.ttr.parser.model.Md2erCubeletDef
+import org.tatrman.ttr.parser.model.Md2erDimensionDef
 import org.tatrman.ttr.parser.model.MdDomainDef
 import org.tatrman.ttr.parser.model.MdMapDef
 import org.tatrman.ttr.parser.model.MeasureColumnBinding
@@ -377,6 +378,7 @@ class TtrWalker(
             od.MD2DB_CUBELET() != null -> visitMd2dbCubelet(od)
             od.MD2DB_DOMAIN() != null -> visitMd2dbDomain(od)
             od.MD2DB_MAP() != null -> visitMd2dbMap(od)
+            od.MD2ER_DIMENSION() != null -> visitMd2erDimension(od)
             od.MD2ER_CUBELET() != null -> visitMd2erCubelet(od)
             od.WORLD() != null -> visitWorld(od)
             od.TERM() != null -> visitLexiconEntry(od, "term")
@@ -1058,12 +1060,29 @@ class TtrWalker(
         )
     }
 
+    private fun visitMd2erDimension(od: TTRParser.ObjectDefinitionContext): Md2erDimensionDef {
+        val props = od.md2erDimensionDef().md2erDimensionProperty()
+        return Md2erDimensionDef(
+            name = od.id().text,
+            source = defSource(od),
+            description = descriptionOf(props.firstNotNullOfOrNull { it.descriptionProperty() }),
+            descriptionLocalized = descriptionLocalizedOf(props.firstNotNullOfOrNull { it.descriptionProperty() }),
+            tags =
+                props.firstNotNullOfOrNull { it.tagsProperty()?.let { t -> stringList(t.listOfStrings()) } }
+                    ?: emptyList(),
+            dimensionRef = props.firstNotNullOfOrNull { it.dimensionRefProperty()?.id()?.let { i -> makeRef(i) } },
+            entity = props.firstNotNullOfOrNull { it.entityProperty_()?.id()?.let { i -> makeRef(i) } },
+            attributes =
+                props.firstNotNullOfOrNull { it.attributesMapProperty()?.let { a -> mdErStringMap(a.object_()) } }
+                    ?: emptyMap(),
+        )
+    }
+
     private fun visitMd2erCubelet(od: TTRParser.ObjectDefinitionContext): Md2erCubeletDef {
         val props = od.md2erCubeletDef().md2erCubeletProperty()
         // Physical props are a permissive parse superset here; semantics rejects them (md/md2er-physical-prop).
         val physical = mutableListOf<String>()
         if (props.any { it.shapeProperty() != null }) physical += "shape"
-        if (props.any { it.measuresMapProperty() != null }) physical += "measures"
         if (props.any { it.journalingProperty() != null }) physical += "journaling"
         if (props.any { it.allocationProperty() != null }) physical += "allocation"
         return Md2erCubeletDef(
@@ -1077,9 +1096,12 @@ class TtrWalker(
             cubeletRef = props.firstNotNullOfOrNull { it.cubeletRefProperty()?.id()?.let { i -> makeRef(i) } },
             entity = props.firstNotNullOfOrNull { it.targetProperty()?.let { t -> targetTableRef(t) } },
             attributes =
-                props.firstNotNullOfOrNull { it.attributesMapProperty()?.let { a -> objectStringMap(a.object_()) } }
+                props.firstNotNullOfOrNull { it.attributesMapProperty()?.let { a -> mdErStringMap(a.object_()) } }
                     ?: emptyMap(),
             physicalProps = physical,
+            measures =
+                props.firstNotNullOfOrNull { it.measuresMapProperty()?.let { m -> mdErStringMap(m.object_()) } }
+                    ?: emptyMap(),
         )
     }
 
@@ -1234,6 +1256,19 @@ class TtrWalker(
             ctx.literal()?.BOOLEAN_LITERAL() != null -> ctx.literal().BOOLEAN_LITERAL().text
             else -> null
         }
+
+    /** MD/ER maps carry ids or strings; other value forms are unavailable, as in TS and Python. */
+    private fun mdErStringMap(ctx: TTRParser.Object_Context?): Map<String, String> =
+        ctx?.propertyList()?.propertyEntry()?.associate { e ->
+            val value = e.value()
+            val text =
+                value.id()?.text ?: value
+                    .literal()
+                    ?.stringLiteralForm()
+                    ?.let { stringForm(it) }
+                    .orEmpty()
+            e.key().id().text to text
+        } ?: emptyMap()
 
     private fun objectStringMap(ctx: TTRParser.Object_Context?): Map<String, String> =
         ctx?.propertyList()?.propertyEntry()?.associate { e -> e.key().id().text to (scalarText(e.value()) ?: "") }

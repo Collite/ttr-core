@@ -1,0 +1,4 @@
+package base
+
+model binding
+def md2er_dimension e_hidden { dimension: md.CustomerHidden, entity: er.entity.customer, attributes: { code: address.state } }

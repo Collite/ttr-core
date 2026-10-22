@@ -1126,6 +1126,24 @@ export interface Md2DbMapDef {
   columns: Record<string, string>;
 }
 
+export interface Md2ErDimensionDef {
+  kind: 'md2erDimension';
+  name: string;
+  source: SourceLocation;
+  leadingTrivia?: Trivia[];
+  trailingTrivia?: Trivia[];
+  description?: StringValue | TripleStringValue;
+  descriptionLocalized?: LocalizedString;
+  tags?: string[];
+  dimensionRef: string;
+  entity: string;
+  /** Span-carrying references for editor navigation. */
+  dimensionReference?: Reference;
+  entityReference?: Reference;
+  /** Dimension attribute → target attribute or relation-label.attribute. */
+  attributes: Record<string, string>;
+}
+
 export interface Md2ErCubeletDef {
   kind: 'md2erCubelet';
   name: string;
@@ -1142,10 +1160,12 @@ export interface Md2ErCubeletDef {
   /**
    * Physical props that must NOT appear on a structural md→er binding. The
    * grammar accepts them (permissive superset); semantics rejects via
-   * `md/md2er-physical-prop`. Lists the offending keys ('shape'|'measures'|
+   * `md/md2er-physical-prop`. Lists the offending keys ('shape'|
    * 'journaling'|'allocation') when present; absent when the binding is clean.
    */
   physicalProps?: string[];
+  /** Measure → target ER attribute (0.18). */
+  measures?: Record<string, string>;
 }
 
 export type Definition =
@@ -1179,6 +1199,7 @@ export type Definition =
   | Md2DbDomainDef
   | Md2DbMapDef
   | Md2ErCubeletDef
+  | Md2ErDimensionDef
   | WorldDef
   | LexiconEntryDef
   | AutomationDef

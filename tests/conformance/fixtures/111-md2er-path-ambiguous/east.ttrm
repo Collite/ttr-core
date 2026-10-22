@@ -1,0 +1,4 @@
+package east
+import base.*
+model er schema ignored
+def relation address { from: base.er.entity.customer, to: base.er.entity.addr, cardinality: { from: "N", to: "1" } }

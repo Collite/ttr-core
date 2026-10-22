@@ -4,6 +4,7 @@ import { DocumentSymbolTable, type SymbolEntry } from './symbol-table.js';
 
 export class ProjectSymbolTable {
   private byDocument: Map<string, DocumentSymbolTable> = new Map();
+  private asts: Map<string, Document> = new Map();
   private byQname: Map<string, SymbolEntry[]> = new Map();
   private synthesizedByDocument: Map<string, SymbolEntry[]> = new Map();
 
@@ -21,6 +22,7 @@ export class ProjectSymbolTable {
 
     const table = new DocumentSymbolTable(uri, ast, schemaCode, namespace, packageName);
     this.byDocument.set(uri, table);
+    this.asts.set(uri, ast);
 
     for (const entry of table.all()) {
       const existing = this.byQname.get(entry.qname) ?? [];
@@ -46,6 +48,7 @@ export class ProjectSymbolTable {
     }
 
     this.byDocument.delete(uri);
+    this.asts.delete(uri);
 
     const synth = this.synthesizedByDocument.get(uri) ?? [];
     for (const e of synth) {
@@ -107,6 +110,11 @@ export class ProjectSymbolTable {
    */
   documentContext(uri: string): { schemaCode: string; namespace: string; packageName: string } | undefined {
     return this.byDocument.get(uri)?.context();
+  }
+
+  /** Parsed documents for semantic checks that follow structural paths across files. */
+  documentAsts(): ReadonlyMap<string, Document> {
+    return this.asts;
   }
 
   allQnames(): string[] {

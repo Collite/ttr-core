@@ -1,0 +1,16 @@
+{
+    "diagnostics": [
+        "md/md2er-reference"
+    ],
+    "resolved": [
+        "md.Amount => md.domain.Amount"
+    ],
+    "symbols": [
+        "binding.md2er_cubelet.m",
+        "er.entity.sale",
+        "er.entity.sale.n",
+        "md.cubelet.sales",
+        "md.domain.Amount",
+        "md.measure.units"
+    ]
+}
