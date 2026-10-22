@@ -15,6 +15,6 @@ rendering's `diagnostics`).
 | `unknown-participant-label` | `cn/unknown-participant-label` — **new slug** (contracts §3 checks the labels; added to §7 at S3.2, A-CN-33) | clinic |
 | `unit-mismatch` | `cn/unit-mismatch` — an `Observation` value asserted in `mg/dL`; its grounding declares `unit: "mmol/L"` (⚑CN-P10, ruled 2026-10-22) | clinic |
 | `definition-cycle` | `cn/definition-cycle` (`LoopA` ⇄ `LoopB`) | hartland |
-| `retired-code.pending` | `cn/retired-code` — no vocabulary versions until CN-P4 S4.2 | — |
+| `retired-code.pending` | `cn/retired-code` — no vocabulary versions until CN-P5 S5.3 (the registration endpoint lives beside the candidate store; S4.2 typed the field) | — |
 
 Pending convention, case format and oracles: [`../README.md`](../README.md).

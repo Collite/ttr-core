@@ -107,6 +107,10 @@ class MetadataServerSource(
             areas = a.areas + b.areas,
             rowSchemas = a.rowSchemas + b.rowSchemas,
             worlds = a.worlds + b.worlds,
+            // CN-P4 S4.2 — the two tiers a source builds over its own files: dropped here before, so a connected load
+            // served no concepts and no automation objects though the archive carried their documents.
+            automation = a.automation + b.automation,
+            cn = a.cn + b.cn,
             warnings = a.warnings + b.warnings,
             errors = a.errors + b.errors,
             protectedQnames = a.protectedQnames + b.protectedQnames,

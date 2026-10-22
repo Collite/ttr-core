@@ -6,6 +6,14 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **Connected loads carry the cn and automation tiers** (cn, CN-P4 S4.2 — cn contracts §5): `MetadataServerSource`
+  (`ttrp-frontend`) joined its archives' snapshots without `cn` or `automation`, so a connected compile served no
+  concept and no automation object although the archive carried their documents. Both merge now, the cn tier through
+  the new `CnSchema.plus` (the later archive wins a qname, as every other map there). **`CnSchema.vocabularyVersions`
+  is typed** (breaking for a caller that read the always-empty map): `List<VocabularyVersion>` — `vocabulary`,
+  `version`, `bundle?`, `registeredAt` — the history of registrations, merged across sources in precedence order with a
+  version registered twice kept once. No source fills it, because no model text states a version; the service that
+  holds the registrations sets it (CN-P5 S5.3). The `cn/retired-code` hygiene note points there now.
 - **`ttr-lexicon` archive v6** (cn, CN-P4 S4.1 — cn contracts §5, A-CN-2…8): `ttr-lexicon-compiled/v6` carries the
   conceptual layer. A `targets` entry per concept (`objectKind = "concept"`, `stereotype`, `ownerRef` = the landing's
   entity, `erTarget` = the landing — the attribute for a value kind or a quality, `via` `direct` | `md-hop`, `ofRef` the
