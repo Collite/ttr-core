@@ -6,6 +6,10 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **Studio metadata CLI** — keep manifest and missing-model diagnostics relative to the checkout when invoked
+  from a subdirectory, and omit checkout paths from the missing-directory message (#265). Restore the CLI
+  artifact in the grammar publication bundle after the #261 merge dropped it; remove a duplicated metadata-git task.
+
 - **Studio strict metadata gate** — new `ttr-metadata load <root> --strict --json` CLI,
   version checking and category-coded diagnostics. Manifest `[packages].layout` grades package mismatches like
   TypeScript (off suppresses, flexible warns, strict errors); invalid TOML uses defaults plus a manifest error. `MetadataLoader.load(LoadOptions)`
