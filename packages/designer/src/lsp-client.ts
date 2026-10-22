@@ -5,7 +5,7 @@ import {
   createProtocolConnection,
 } from 'vscode-languageserver-protocol/browser.js';
 
-import type { ModelGraph, LayoutFile, SymbolDetail, RenderableSchemaCode, GraphMetadata, GetGraphResponse, PackageGraphResponse, BindingMapData } from '@tatrman/lsp';
+import type { ModelGraph, LayoutFile, SymbolDetail, RenderableSchemaCode, GraphMetadata, GetGraphResponse, PackageGraphResponse, BindingMapData, ProjectRootResult, SchemaSubject, ListSymbolsParams, ListedSymbol } from '@tatrman/lsp';
 import type { WorkspaceEdit } from 'vscode-languageserver-types';
 import LspWorker from '@tatrman/lsp/browser?worker';
 import { lspClientOver } from './lsp-connection.js';
@@ -14,7 +14,8 @@ export { lspClientOver, type LspConnection } from './lsp-connection.js';
 export interface LspClient {
   transportKind: 'node' | 'browser';
   openDocument(uri: string, content: string): Promise<void>;
-  setProjectRoot(projectRoot: string): Promise<{ projectRoot: string }>;
+  setProjectRoot(projectRoot: string, manifest?: string): Promise<ProjectRootResult>;
+  listSchemaSubjects(): Promise<{ subjects: SchemaSubject[] }>;
   listGraphs(projectRoot: string): Promise<{ graphs: GraphMetadata[] }>;
   getGraph(uri: string): Promise<GetGraphResponse | null>;
   getPackageGraph(): Promise<PackageGraphResponse>;
@@ -24,7 +25,8 @@ export interface LspClient {
   setLayout(uri: string, layout: LayoutFile, projectRoot?: string): Promise<WorkspaceEdit>;
   exportLayout(uri?: string, projectRoot?: string): Promise<LayoutFile>;
   getSymbolDetail(qname: string): Promise<SymbolDetail | null>;
-  listSymbols(options?: { kinds?: string[]; limit?: number; includeMembers?: boolean }): Promise<Array<{ qname: string; kind: string; name: string; packageName: string | null; memberPath?: string[]; parent?: string }>>;
+  /** Reads every page; `limit` is the size of a page, not a cap on the result. */
+  listSymbols(options?: Omit<ListSymbolsParams, 'cursor'>): Promise<ListedSymbol[]>;
   onDiagnostics(handler: (uri: string, messages: string[]) => void): void;
   dispose(): void;
 }

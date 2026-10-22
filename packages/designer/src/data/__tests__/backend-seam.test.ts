@@ -25,6 +25,7 @@ function workerStub(): LspClient {
   return {
     transportKind: 'browser',
     openDocument: vi.fn(), setProjectRoot: vi.fn(),
+    listSchemaSubjects: vi.fn().mockResolvedValue({ subjects: [] }),
     listGraphs: vi.fn().mockResolvedValue({ graphs: [{ uri: 'file:///er.ttrg', name: 'sales', schema: 'er', tags: [], objectCount: 1, missingObjectCount: 0 }] }),
     getGraph: vi.fn().mockResolvedValue(RICH),
     getPackageGraph: vi.fn().mockResolvedValue({ packages: [], dependencies: [], cycles: [] }),

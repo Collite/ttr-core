@@ -27,6 +27,9 @@ export interface LayoutIndexEntry {
   pkg: string;
   /** the schema code (`er`, `db`) */
   schema: string;
+  /** Worker graph ids may include the DB kind segment the catalog omits. */
+  fullQnameAliases?: readonly string[];
+  qnameAliases?: readonly string[];
 }
 
 export interface LayoutModelIndex {
@@ -53,11 +56,11 @@ export interface Resolution {
 /** A qname whose kind segment (the one before the name) is one of these names an edge, not a card. */
 export const EDGE_KIND_SEGMENTS: ReadonlySet<string> = new Set(['relation', 'fk', 'foreign_key']);
 
-const STEPS: ReadonlyArray<(e: LayoutIndexEntry) => string> = [
-  (e) => e.fullQname,
-  (e) => e.qname,
-  (e) => `${e.kind}.${e.name}`,
-  (e) => e.name,
+const STEPS: ReadonlyArray<(e: LayoutIndexEntry) => readonly string[]> = [
+  (e) => [e.fullQname, ...(e.fullQnameAliases ?? [])],
+  (e) => [e.qname, ...(e.qnameAliases ?? [])],
+  (e) => [`${e.kind}.${e.name}`],
+  (e) => [e.name],
 ];
 
 /** Per step: a form → the distinct full qnames of the entries spelled so, sorted. */
@@ -67,10 +70,11 @@ function stepMapsOf(entries: readonly LayoutIndexEntry[]): StepMaps {
   return STEPS.map((form) => {
     const by = new Map<string, Set<string>>();
     for (const e of entries) {
-      const key = form(e);
-      const hits = by.get(key) ?? new Set<string>();
-      hits.add(e.fullQname);
-      by.set(key, hits);
+      for (const key of form(e)) {
+        const hits = by.get(key) ?? new Set<string>();
+        hits.add(e.fullQname);
+        by.set(key, hits);
+      }
     }
     return new Map([...by].map(([key, hits]) => [key, sortAlphabetical(hits)]));
   });

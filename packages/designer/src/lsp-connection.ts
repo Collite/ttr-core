@@ -8,7 +8,7 @@ import {
   PublishDiagnosticsNotification,
   type InitializeParams,
 } from 'vscode-languageserver-protocol';
-import type { ModelGraph, LayoutFile, SymbolDetail, GraphMetadata, GetGraphResponse, PackageGraphResponse, BindingMapData } from '@tatrman/lsp';
+import type { ModelGraph, LayoutFile, SymbolDetail, GraphMetadata, GetGraphResponse, PackageGraphResponse, BindingMapData, ProjectRootResult, SchemaSubject, SymbolPage, ListedSymbol } from '@tatrman/lsp';
 import type { WorkspaceEdit } from 'vscode-languageserver-types';
 import type { LspClient } from './lsp-client.js';
 
@@ -45,8 +45,11 @@ export async function lspClientOver(
         textDocument: { uri, languageId: 'ttr', version: 1, text: content },
       });
     },
-    async setProjectRoot(projectRoot) {
-      return connection.sendRequest('modeler/setProjectRoot', { projectRoot }) as Promise<{ projectRoot: string }>;
+    async setProjectRoot(projectRoot, manifest) {
+      return connection.sendRequest('modeler/setProjectRoot', { projectRoot, ...(manifest === undefined ? {} : { manifest }) }) as Promise<ProjectRootResult>;
+    },
+    async listSchemaSubjects() {
+      return connection.sendRequest('modeler/listSchemaSubjects', {}) as Promise<{ subjects: SchemaSubject[] }>;
     },
     async listGraphs(projectRoot) {
       return connection.sendRequest('modeler/listGraphs', { projectRoot }) as Promise<{ graphs: GraphMetadata[] }>;
@@ -79,7 +82,14 @@ export async function lspClientOver(
       return connection.sendRequest('modeler/getSymbolDetail', { qname }) as Promise<SymbolDetail | null>;
     },
     async listSymbols(options) {
-      return connection.sendRequest('modeler/listSymbols', options ?? {}) as Promise<Array<{ qname: string; kind: string; name: string; packageName: string | null; memberPath?: string[]; parent?: string }>>;
+      const symbols: ListedSymbol[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await connection.sendRequest('modeler/listSymbols', { ...options, ...(cursor === undefined ? {} : { cursor }) }) as SymbolPage;
+        symbols.push(...page.symbols);
+        cursor = page.nextCursor;
+      } while (cursor !== undefined);
+      return symbols;
     },
     onDiagnostics(handler) {
       diagnosticHandlers.push(handler);

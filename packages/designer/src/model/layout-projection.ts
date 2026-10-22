@@ -66,11 +66,21 @@ export function layoutIndexOf(whole: GetGraphResponse): LayoutGraphIndex {
   const cards: LayoutIndexEntry[] = [];
   for (const n of whole.nodes) {
     const pkg = n.pkg ?? '';
-    const fq = fullQname(n.qname, pkg);
+    const original = fullQname(n.qname, pkg);
+    const unqualified = pkg && original.startsWith(`${pkg}.`) ? original.slice(pkg.length + 1) : original;
+    const parts = unqualified.split('.');
+    // DB catalog names omit the card kind (`db.dbo.item`); worker node ids
+    // include it (`db.dbo.table.item`). Save portable catalog names and accept
+    // both spellings when opening an existing layout, without two candidates.
+    const catalogName = schema === 'db' && parts.length === 4 && parts[0] === 'db' && parts[2] === n.kind
+      ? [parts[0], parts[1], parts[3]].join('.') : unqualified;
+    const fq = fullQname(catalogName, pkg);
     nodeOf.set(fq, n.qname);
     fullQnameOf.set(n.qname, fq);
     pkgOf.set(n.qname, pkg);
-    cards.push(entryOf(fq, pkg, n.kind, n.name, schema));
+    cards.push({ ...entryOf(fq, pkg, n.kind, n.name, schema),
+      ...(fq === original ? {} : { fullQnameAliases: [original], qnameAliases: [unqualified] }),
+    });
   }
   const edges: LayoutIndexEntry[] = [];
   for (const e of whole.edges) {

@@ -54,6 +54,21 @@ describe('layoutIndexOf — the catalog keys nodes without the package', () => {
     const idx = layoutIndexOf(six);
     expect(idx.nodeOf.get(fq('a'))).toBe(fq('a'));
   });
+
+  it('DB worker ids and catalog refs resolve to one portable full name, with no false ambiguity', () => {
+    const whole: GetGraphResponse = { ...six, schema: 'db', edges: [], nodes: [
+      { ...node('item'), qname: 'shop.db.sales.table.item', pkg: 'shop', kind: 'table', name: 'item', schemaCode: 'db' },
+    ] };
+    const idx = layoutIndexOf(whole);
+    expect(idx.fullQnameOf.get('shop.db.sales.table.item')).toBe('shop.db.sales.item');
+    for (const ref of ['shop.db.sales.item', 'db.sales.item', 'shop.db.sales.table.item', 'db.sales.table.item', 'table.item', 'item']) {
+      const p = projectLayout(whole, doc([ref], 'db'), { hops: 1 }, idx);
+      expect(p.graph.nodes.map((n) => n.qname)).toEqual(['shop.db.sales.table.item']);
+      expect(p.ambiguous).toEqual([]);
+      expect(p.missing).toEqual([]);
+      expect([...p.resolved.values()]).toEqual(['shop.db.sales.item']);
+    }
+  });
 });
 
 describe('projectLayout (V-23) — nodes, real edges, the resolution report', () => {

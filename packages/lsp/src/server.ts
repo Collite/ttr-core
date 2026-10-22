@@ -53,6 +53,8 @@ import {
   Resolver,
   effectiveSchemaId,
   resolveManifest,
+  parseManifest,
+  validateManifest,
   loadProjectFromOpenDocuments,
   collectReferences,
   nestedDefs,
@@ -110,6 +112,7 @@ import { buildDocumentSymbols } from './document-symbol.js';
 import { loadCompletionConfig, getCompletionConfig, invalidateCompletionConfig } from './config-completion.js';
 import { automationHoverLines } from './automation-hover.js';
 import { conceptHoverLines } from './concept-hover.js';
+import type { ListSymbolsParams, ListedSymbol, SchemaSubject } from './hosted-protocol.js';
 import { definitionLabelReads, labelSource, participantsOf, type LabelRead } from './concept-rename.js';
 import { formatDocument, DEFAULT_FORMAT_CONFIG, type FormatConfig } from '@tatrman/format';
 import { lintDocument, lintProject, recommendedConfig, loadLintConfig, ruleForCode, type LintDiagnostic, type ResolvedLintConfig, type DocumentRuleContext } from '@tatrman/lint';
@@ -275,6 +278,7 @@ export function createServerConnection(
 
   const projectSymbols = new ProjectSymbolTable();
   let manifest: ResolvedManifest = resolveManifest(undefined, '');
+  const warnedManifestRoots = new Set<string>();
   // `[sql]` config from modeler.toml (embedded-sql §3.3) — default dialect +
   // (database, schema) ⇄ namespace map for the §3.4 SQL resolver. Refreshed
   // whenever the project root changes; empty until then.
@@ -1151,11 +1155,31 @@ export function createServerConnection(
   // root; without it, nested files mis-infer their package and emit spurious
   // ttr/package-declaration-mismatch errors. Re-validates already-open docs so
   // it is order-independent with respect to didOpen.
-  connection.onRequest('modeler/setProjectRoot', async (params: { projectRoot: string }) => {
+  connection.onRequest('modeler/setProjectRoot', async (params: { projectRoot: string; manifest?: string }) => {
     const root = params.projectRoot.startsWith('file://')
       ? new URL(params.projectRoot).pathname
       : params.projectRoot;
-    manifest = resolveManifest(undefined, root);
+    // The browser has no filesystem: the host supplies the very same TOML that
+    // the Node loader reads. Parse before changing any state (invalid TOML fails atomically).
+    let nextManifest = resolveManifest(params.manifest === undefined ? undefined : parseManifest(params.manifest), root);
+    if (params.manifest === undefined && opts.loadManifest) {
+      nextManifest = await opts.loadManifest(`${params.projectRoot.replace(/\/$/, '')}/modeler.toml`);
+    }
+    manifest = nextManifest;
+    const configDiagnostics: Diagnostic[] = validateManifest(manifest).map((d) => ({
+      range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+      severity: d.severity === 'error' ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning,
+      code: d.code, source: 'modeler', message: d.message,
+    }));
+    if (params.manifest === undefined && !opts.loadManifest && !warnedManifestRoots.has(root)) {
+      warnedManifestRoots.add(root);
+      configDiagnostics.push({
+        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+        severity: DiagnosticSeverity.Warning, code: 'lsp/manifest-missing', source: 'modeler',
+        message: 'The host did not supply modeler.toml. Default manifest settings apply; model references may not resolve.',
+      });
+    }
+    connection.sendDiagnostics({ uri: `file://${root.replace(/\/$/, '')}/modeler.toml`, diagnostics: configDiagnostics });
     rebuildSemantics(root);
     // Seed the whole project first; open docs then override their own entries.
     await loadProjectIntoSymbols();
@@ -1164,7 +1188,18 @@ export function createServerConnection(
     }
     // Re-reads `.ttrlint.toml` under the new root and re-publishes all open docs.
     await refreshLintConfig();
-    return { projectRoot: root };
+    return { ok: true, projectRoot: root, manifest };
+  });
+
+  connection.onRequest('modeler/listSchemaSubjects', () => {
+    const symbols = projectSymbols.all();
+    const subjects: SchemaSubject[] = [];
+    for (const schema of ['er', 'db', 'md', 'cn'] as const) {
+      const members = symbols.filter((s) => s.schemaCode === schema && !s.parent && !['term', 'area', 'project'].includes(s.kind));
+      if (members.length === 0) continue;
+      subjects.push({ schema, objectCount: members.length, packageCount: new Set(members.map((s) => s.packageName ?? '')).size });
+    }
+    return { subjects };
   });
 
   connection.onRequest('modeler/getModelGraph', (params: { textDocument: { uri: string }; schema: RenderableSchemaCode }) => {
@@ -1321,11 +1356,16 @@ export function createServerConnection(
     }, (content, uri) => parseString(content, uri));
   });
 
-  connection.onRequest('modeler/listSymbols', (params: { kinds?: string[]; limit?: number; includeMembers?: boolean }) => {
+  connection.onRequest('modeler/listSymbols', (params: ListSymbolsParams = {}) => {
     const limit = params.limit ?? 500;
-    const allowed = params.kinds ? new Set(params.kinds) : null;
-    const tops = projectSymbols.all().filter((s) => !allowed || allowed.has(s.kind));
-    const out: Array<{ qname: string; kind: string; name: string; packageName: string | null; memberPath?: string[]; parent?: string }> =
+    const start = params.cursor === undefined ? 0 : Number(params.cursor);
+    if (!Number.isSafeInteger(limit) || limit < 1 || !Number.isSafeInteger(start) || start < 0 || (params.cursor !== undefined && !/^\d+$/.test(params.cursor))) {
+      throw new ResponseError(ErrorCodes.InvalidParams, 'Expected a positive integer limit and a cursor returned by listSymbols.');
+    }
+    const kinds = params.kind ? [params.kind] : params.kinds;
+    const allowed = kinds ? new Set(kinds) : null;
+    const tops = projectSymbols.all().filter((s) => (!allowed || allowed.has(s.kind)) && (params.package === undefined || (s.packageName ?? '') === params.package));
+    const out: ListedSymbol[] =
       tops.map((s) => ({ qname: s.qname, kind: s.kind, name: s.name, packageName: s.packageName ?? null }));
     if (params.includeMembers) {
       // FO-A1 W2 (contracts §5): expand table/view/entity members into `kind:'member'`
@@ -1340,7 +1380,7 @@ export function createServerConnection(
         for (const m of memberRefsOf(detail, s.packageName ?? null)) out.push(m);
       }
     }
-    return out.slice(0, limit);
+    return { symbols: out.slice(start, start + limit), total: out.length, ...(start + limit < out.length ? { nextCursor: String(start + limit) } : {}) };
   });
 
   connection.onDefinition((params) => {

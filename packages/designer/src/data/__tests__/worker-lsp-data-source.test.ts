@@ -9,6 +9,7 @@ function stubClient(overrides: Partial<LspClient> = {}): LspClient {
     transportKind: 'browser',
     openDocument: vi.fn(),
     setProjectRoot: vi.fn(),
+    listSchemaSubjects: vi.fn().mockResolvedValue({ subjects: [] }),
     listGraphs: vi.fn().mockResolvedValue({ graphs: [{ uri: 'g1', name: 'g1', schema: 'db', tags: [], objectCount: 1, missingObjectCount: 0 }] }),
     getGraph: vi.fn(),
     getPackageGraph: vi.fn().mockResolvedValue({ packages: [{ name: 'acme.erp', documentUris: [] }], dependencies: [], cycles: [] }),

@@ -34,6 +34,9 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastContainer, makeToast, type ToastMessage } from './Toast';
 
 function isModelFile(relativePath: string): boolean {
+  // VL layouts are read from the file map, not authored LSP graphs (their
+  // object lists omit edges and use the catalog's DB naming convention).
+  if (relativePath.startsWith('model/layouts/')) return false;
   return relativePath.endsWith('.ttrm') || relativePath.endsWith('.ttrg');
 }
 
@@ -185,8 +188,8 @@ function WorkerStudio({ demo }: { demo: string | null }) {
     await clientRef.current!.openDocument(uri, content);
   };
 
-  const buildStudio = async (client: LspClient, projectRoot: string, workspace: string, files: string[]) => {
-    const dataSource = new WorkerLspDataSource(client, { projectRoot });
+  const buildStudio = async (client: LspClient, projectRoot: string, workspace: string, files: string[], project: ProjectFiles) => {
+    const dataSource = new WorkerLspDataSource(client, { projectRoot, files: project.files, directoryHandle: project.directoryHandle });
     const io: ViewStateStoreIO = {
       kind: 'in-file',
       layout: {
@@ -240,10 +243,10 @@ function WorkerStudio({ demo }: { demo: string | null }) {
     (async () => {
       try {
         const files = await loadDemoFiles(demo);
-        await client.setProjectRoot(`file:///${demo}`);
+        await client.setProjectRoot(`file:///${demo}`, files.files.get('modeler.toml'));
         const modelPaths = Array.from(files.files.keys()).filter(isModelFile);
         await Promise.all(modelPaths.map((p) => openDoc(`file:///${demo}/${p}`, files.files.get(p)!)));
-        await buildStudio(client, `file:///${demo}`, demo, modelPaths);
+        await buildStudio(client, `file:///${demo}`, demo, modelPaths, files);
       } catch (e) {
         setError(`Failed to load demo: ${e}`);
       } finally {
@@ -260,10 +263,10 @@ function WorkerStudio({ demo }: { demo: string | null }) {
     if (!client) return;
     setLoading(true);
     try {
-      await client.setProjectRoot(`file:///${files.rootName}`);
+      await client.setProjectRoot(`file:///${files.rootName}`, files.files.get('modeler.toml'));
       const modelPaths = Array.from(files.files.keys()).filter(isModelFile);
       await Promise.all(modelPaths.map((p) => openDoc(`file:///${files.rootName}/${p}`, files.files.get(p)!)));
-      await buildStudio(client, `file:///${files.rootName}`, files.rootName, modelPaths);
+      await buildStudio(client, `file:///${files.rootName}`, files.rootName, modelPaths, files);
     } catch (e) {
       setError(`Failed to load project: ${e}`);
     } finally {
