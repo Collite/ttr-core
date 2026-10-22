@@ -55,6 +55,7 @@ object BuiltinCatalog : FunctionCatalog {
             scalar("fn.length", "length", listOf(str), ReturnTypeRule.Fixed(int), NullRule.STRICT),
             scalar("fn.abs", "abs", listOf(num), ReturnTypeRule.SameAsArg(0), NullRule.STRICT),
             scalar("fn.round", "round", listOf(num), ReturnTypeRule.SameAsArg(0), NullRule.STRICT),
+            scalar("fn.round", "round", listOf(num, int), ReturnTypeRule.SameAsArg(0), NullRule.STRICT),
             scalar("fn.ceil", "ceil", listOf(num), ReturnTypeRule.SameAsArg(0), NullRule.STRICT),
             // Grounding twins (grammar 4.2 / ai-platform feature-grounding-contracts.md §6 —
             // the NORMATIVE signature table; GroundingFunctionsSignatureSpec drift-guards these).

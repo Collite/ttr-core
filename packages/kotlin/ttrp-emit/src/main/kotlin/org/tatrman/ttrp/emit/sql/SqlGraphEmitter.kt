@@ -10,7 +10,8 @@ import org.tatrman.ttrp.expr.ColumnRef
 import org.tatrman.ttrp.expr.Expression
 import org.tatrman.ttrp.expr.FunctionCall
 import org.tatrman.ttrp.expr.IsNull
-import org.tatrman.ttrp.expr.TtrpType
+import org.tatrman.ttrp.expr.Literal
+import org.tatrman.ttrp.expr.LiteralValue
 import org.tatrman.ttrp.graph.capability.BoundWorld
 import org.tatrman.ttrp.graph.model.Aggregate
 import org.tatrman.ttrp.graph.model.Container
@@ -189,7 +190,7 @@ class SqlGraphEmitter(
             val resolved = n.columns.map { c -> (c as? ColumnRef)?.let { resolveRef(it, flat) } ?: c }
             val aliases = n.columns.indices.map { i -> n.aliases.getOrNull(i) ?: (n.columns[i] as? ColumnRef)?.column }
             return NodeExpressions.map(n.copy(columns = resolved, aliases = aliases)) { e ->
-                preserveIntegerRounding(coerceKeys(qualifyRefs(e, flat), flat, flat), flat)
+                exactIntegerRounding(coerceKeys(qualifyRefs(e, flat), flat, flat), flat)
             }
         }
         return NodeExpressions.map(n) { e ->
@@ -207,26 +208,34 @@ class SqlGraphEmitter(
         }
     }
 
-    /** PostgreSQL promotes integer CEIL/ROUND to float8; retain the declared integer row type. */
-    private fun preserveIntegerRounding(
+    /**
+     * PostgreSQL resolves integer CEIL/ROUND to float8/numeric. For an integer the result is the argument,
+     * so emit the argument; negative or runtime ROUND scales can change its value and stay numeric calls.
+     */
+    private fun exactIntegerRounding(
         e: Expression,
         cols: List<EmitColumn>,
     ): Expression =
         NodeExpressions.rewrite(e) { x ->
             val call = x as? FunctionCall ?: return@rewrite null
-            if (call.function.name !in setOf("ceil", "round")) return@rewrite null
-            val type = call.args.firstOrNull()?.let { computedType(it, cols.associateBy { it.name }) }
-            if (type != null && isNumber(type)) {
-                val target =
-                    when (type) {
-                        "int", "integer" -> TtrpType.Integer
-                        else -> TtrpType.Named(type)
-                    }
-                Cast(call, target, call.location)
-            } else {
-                null
-            }
+            if (!integerRoundingIsIdentity(call)) return@rewrite null
+            val arg = call.args.first()
+            if (isNumber(computedType(arg, cols.associateBy { it.name }))) arg else null
         }
+
+    private fun integerRoundingIsIdentity(call: FunctionCall): Boolean =
+        when (call.function.name) {
+            "ceil" -> call.args.size == 1
+            "round" -> call.args.size == 1 || (call.args.size == 2 && nonnegativeIntegerLiteral(call.args[1]))
+            else -> false
+        }
+
+    private fun nonnegativeIntegerLiteral(e: Expression): Boolean =
+        ((e as? Literal)?.value as? LiteralValue.Num)
+            ?.raw
+            ?.toBigIntegerOrNull()
+            ?.signum()
+            ?.let { it >= 0 } == true
 
     /** The latest column of [cols] the qualifier [q] names under the name [c]. */
     private fun find(
@@ -646,7 +655,11 @@ class SqlGraphEmitter(
                     -> "bool"
                     // AG-P0: value-preserving functions keep their first argument's type; arithmetic is
                     // numeric (a sql-text output's declared row type feeds the host's typed displays).
-                    "coalesce", "abs", "round", "ceil" ->
+                    "round" -> {
+                        val arg = e.args.firstOrNull()?.let { computedType(it, byName) } ?: "text"
+                        if (isNumber(arg) && !integerRoundingIsIdentity(e)) "decimal" else arg
+                    }
+                    "coalesce", "abs", "ceil" ->
                         e.args.firstOrNull()?.let { computedType(it, byName) }
                             ?: "text"
                     "add", "sub", "mul", "div", "neg" -> numericOf(e.args.map { computedType(it, byName) })

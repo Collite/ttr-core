@@ -14,6 +14,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldMatch
+import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.string.shouldStartWith
 import org.tatrman.ttr.metadata.model.ModelDescriptor
 import org.tatrman.ttr.metadata.reconcile.ModelReconciler
@@ -429,7 +430,23 @@ class RecipeBundleSpec :
                     ),
                 )
             r.diagnostics.shouldBeEmpty()
-            Files.readString(r.dir.resolve("islands/shortfall.rows.sql")).uppercase() shouldContain "CAST(CEIL("
+            Files.readString(r.dir.resolve("islands/shortfall.rows.sql")).uppercase() shouldNotContain "CEIL("
+            val numeric =
+                build(
+                    "release_order.ttrp",
+                    source("release_order.ttrp").replace(
+                        "on_hand = coalesce(stock.quantity_on_hand, 0)",
+                        "on_hand = ceil(coalesce(stock.quantity_on_hand, 0) * 1.1)",
+                    ),
+                )
+            Files.readString(numeric.dir.resolve("islands/shortfall.rows.sql")).uppercase() shouldContain "CEIL("
+            numeric.manifest.islands
+                .single { it.name == "shortfall" }
+                .outputs!!
+                .single()
+                .columns
+                .single { it.name == "on_hand" }
+                .type shouldStartWith "decimal"
         }
 
         "integer and numeric ceil/round output types match executed PostgreSQL columns".config(
@@ -461,6 +478,48 @@ class RecipeBundleSpec :
                 db.createStatement().use { stmt ->
                     stmt.execute("CREATE TEMP TABLE \"order\" (order_number INTEGER, value NUMERIC(12,2))")
                     stmt.execute("INSERT INTO \"order\" VALUES (7, 12.3)")
+                    val acme =
+                        org.tatrman.ttr.metadata.fixtures.MetadataFixtures
+                            .erpProjectRoot()
+                    val cte =
+                        TtrpPipeline(
+                            TtrpManifest(world = "acme.worlds.dev", manifestDir = acme),
+                            org.tatrman.ttr.metadata.fixtures.MetadataFixtures
+                                .erpModelsRoot(),
+                        ).plan(
+                            """
+                            uses world "acme.worlds.dev"
+                            container rounding(out result) target erp_pg {
+                                raw = load(files.sales_2026, schema: sales_csv)
+                                typed = raw -> calc { q = cast(amount as int), amount_decimal = cast(amount as decimal) }
+                                result = typed -> calc { ci = ceil(q), ri = round(q), cn = ceil(amount_decimal), rn = round(amount_decimal),
+                                    scaled = round(q, -1), f = case when region is null then 0 else 1 end, n = region is null }
+                            }
+                            rounding.result -> display(rounding_result)
+                            """.trimIndent(),
+                            "cte-rounding.ttrp",
+                        )
+                    cte.ok shouldBe true
+                    val island = cte.exec!!.islands.single { it.name == "rounding" }
+                    val cteSql =
+                        org.tatrman.ttrp.emit.sql
+                            .SqlIslandEmitter(cte.bound!!)
+                            .emit(island, cte.graph!!)
+                            .text
+                    stmt.execute("CREATE TEMP TABLE sales_2026 (customer TEXT, amount NUMERIC(12,2), region TEXT)")
+                    stmt.execute("INSERT INTO sales_2026 VALUES ('probe', 1234.3, NULL)")
+                    stmt
+                        .executeQuery(
+                            "SELECT pg_typeof(ci)::text, pg_typeof(ri)::text, pg_typeof(cn)::text, " +
+                                "pg_typeof(rn)::text, pg_typeof(scaled)::text, scaled, f, n FROM ($cteSql) probe",
+                        ).use { rows ->
+                            rows.next() shouldBe true
+                            (1..5).map { rows.getString(it) } shouldBe
+                                listOf("integer", "integer", "numeric", "numeric", "numeric")
+                            rows.getInt(6) shouldBe 1230
+                            rows.getInt(7) shouldBe 0
+                            rows.getBoolean(8) shouldBe true
+                        }
                     val types =
                         "SELECT pg_typeof(ci)::text, pg_typeof(ri)::text, " +
                             "pg_typeof(cn)::text, pg_typeof(rn)::text FROM ($sql) probe"
