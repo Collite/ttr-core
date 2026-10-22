@@ -105,6 +105,22 @@ class ValidatorSpec :
             v.validateProject().count { it.code == DiagnosticCode.DuplicateDefinition } shouldBeGreaterThanOrEqual 2
         }
 
+        "shared duplicate rule exempts inline binding pairs" {
+            val symbols = SymbolTable()
+            val text = "model binding\ndef er2db_entity item { entity: er.entity.item, target: { table: db.dbo.item } }"
+            Fixtures.upsert(symbols, "a.ttr", text)
+            Fixtures.upsert(symbols, "b.ttr", text)
+            val duplicate = symbols.duplicates().single()
+            duplicateDefinitions(listOf(duplicate)).size shouldBe 2
+            val inlinePair =
+                duplicate.copy(
+                    entries =
+                        duplicate.entries.mapIndexed { index, entry ->
+                            if (index == 0) entry.copy(mappingSource = MappingSource.Inline) else entry
+                        },
+                )
+            duplicateDefinitions(listOf(inlinePair)) shouldBe emptyList()
+        }
         "FuzzyWithoutSearchable warning when fuzzy:true but searchable absent" {
             val (v, doc) =
                 setup(

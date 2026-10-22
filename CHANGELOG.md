@@ -6,6 +6,17 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **Studio strict metadata gate** — new `ttr-metadata load <root> --strict --json` CLI,
+  version checking and category-coded diagnostics. Manifest `[packages].layout` grades package mismatches like
+  TypeScript (off suppresses, flexible warns, strict errors); invalid TOML uses defaults plus a manifest error. `MetadataLoader.load(LoadOptions)`
+  collects an opt-in report (null when unchecked), including duplicate definitions within a file source via the
+  shared semantic Validator rule. Duplicate messages use relative paths, usage errors exit 64, and missing
+  `model/` is diagnosed explicitly. Existing `load()` behavior
+  and registry refresh semantics remain unchanged. `just build-metadata-cli` installs `bin/ttr-metadata`;
+  the CLI jar and distribution join the grammar release bundle. See [metadata-cli](docs/manual/metadata-cli.md).
+- **Hosted viewer image** — fix nginx's `/m/_designer/` directory entry to internally select its HTML route,
+  avoiding a 500 from nginx's index handling. The explicit HTML entry and standalone catalog routes are retained.
+
 - **`org.tatrman:ttr-concept`** (cn, CN-P3) — **first release**: every `ConceptService` function (cn contracts §3)
   over a `ResolvedCnModel`, deterministic and pure: no LLM, no server call, no I/O, no clock but the injected one.
   - **Statements** — `statementValidate` (references, ambiguity, missing time, reachability per consumer) and
