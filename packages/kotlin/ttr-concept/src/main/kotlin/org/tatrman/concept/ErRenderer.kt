@@ -771,8 +771,35 @@ internal class ErRenderer(
             val rs = scalar(r)
             val lm = (l as? Scalar)?.moment
             val rm = (r as? Scalar)?.moment
-            if (lm != null && rm != null) advise(op, lm, rm, scope)
+            if (lm != null && rm != null) {
+                throughBound(op, l as Scalar, r as Scalar, scope)?.let { return it }
+                advise(op, lm, rm, scope)
+            }
             return SqlExpr.Bin(op, ls, rs)
+        }
+
+        /**
+         * A plain comparison read CERTAINLY through the coarser side's stored upper bound where that bound decides it
+         * ([CnDefinitionLints.decidedByBound], A-CN-45, review-125 R125-4) — as the DC-12 words are: `x <= t` → `x_hi <=
+         * {as_of_hi}`, `x < t` → `x_hi <= t`, mirrored for `t >= x` / `t > x`. Null — the stored instants and the advisory
+         * — when the bound does not decide, there is none, or `t`'s upper end is not derivable (a column: G-ER-1).
+         */
+        private fun throughBound(
+            op: String,
+            l: Scalar,
+            r: Scalar,
+            scope: Scope,
+        ): SqlExpr? {
+            if (scope.owner.imprecision == Imprecision.POSSIBLY) return null
+            val gl = l.moment?.granularity ?: return null
+            val gr = r.moment?.granularity ?: return null
+            if (gl == gr || !CnDefinitionLints.decidedByBound(op, gl > gr)) return null
+            val (x, t) = if (gl > gr) l to r else r to l
+            val hi = x.moment?.hi ?: return null
+            return when (op) {
+                "<", ">" -> SqlExpr.Bin("<=", hi, t.sql)
+                else -> if (t.moment?.asOf == true) SqlExpr.Bin("<=", hi, upper(t)) else null
+            }
         }
 
         private fun advise(
@@ -783,8 +810,8 @@ internal class ErRenderer(
         ) {
             val ga = a.granularity ?: return
             val gb = b.granularity ?: return
+            // a comparison read through a stored bound never reaches here (throughBound, the DC-12 branch) — R125-4
             if (ga == gb || scope.owner.imprecision == Imprecision.POSSIBLY) return
-            if ((if (ga > gb) a else b).hi != null) return
             val coarser = maxOf(ga, gb).name.lowercase()
             val message =
                 "`$op` compares a ${ga.name.lowercase()} with a ${gb.name.lowercase()} under " +

@@ -332,6 +332,17 @@ object CnDefinitionLints {
             }
         }
 
+    /**
+     * Whether a comparison whose coarser side has a stored upper bound is DECIDED by that bound — the er renderer reads
+     * it through the bound, so it is exact under `imprecision: certainly` (A-CN-45, review-125 R125-4): the coarser side
+     * on the lesser side of `<` / `<=` / `before` / `at_or_before`, or on the greater side of `>` / `>=`. Elsewhere the
+     * stored instant decides, and the advisory stands. Shared by this lint and the renderer, so the two cannot drift.
+     */
+    internal fun decidedByBound(
+        op: String,
+        coarserIsLhs: Boolean,
+    ): Boolean = if (coarserIsLhs) op in setOf("<", "<=", "before", "at_or_before") else op in setOf(">", ">=")
+
     /** Whether [t] is a period bound whose grounding names a stored upper bound for it (⚑CN-P10). */
     private fun storedBound(
         cn: CnSchema,
@@ -356,7 +367,9 @@ object CnDefinitionLints {
         return d.reads.comparisons.mapNotNull { c ->
             val l = granularity(cn, er, c.lhs) ?: return@mapNotNull null
             val r = granularity(cn, er, c.rhs) ?: return@mapNotNull null
-            if (l == r || storedBound(cn, if (l > r) c.lhs else c.rhs)) return@mapNotNull null
+            if (l == r || (storedBound(cn, if (l > r) c.lhs else c.rhs) && decidedByBound(c.op, l > r))) {
+                return@mapNotNull null
+            }
             val coarser = maxOf(l, r).name.lowercase()
             Diagnostic(
                 IMPRECISE,

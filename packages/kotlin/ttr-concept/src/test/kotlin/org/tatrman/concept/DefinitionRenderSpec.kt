@@ -44,6 +44,34 @@ class DefinitionRenderSpec :
 
         // ---- er: aggregates ---------------------------------------------------------------------------------------
 
+        test("a plain comparison over a stored bound reads through it where the bound decides (R125-4, A-CN-45)") {
+            val clinic = FrameValidationSpec.world("clinic", STORED_BOUND)
+            val svc = CnConceptService(clinic)
+
+            fun er(name: String): Rendering {
+                val ref = ConceptRef.newBuilder().setQname("cn.$name").build()
+                return svc.definitionRender(ref, Layer.ER, "postgresql", RenderOptions())
+            }
+
+            val before = er("OnsetBefore")
+            before.text shouldContain "\"condition\".onset_hi <= {as_of_hi}"
+            before.diagnostics shouldBe emptyList()
+            val strict = er("OnsetStrictlyBefore")
+            strict.text shouldContain "\"condition\".onset_hi <= {as_of}"
+            strict.diagnostics shouldBe emptyList()
+            er("OnsetAfter").text shouldContain "\"condition\".onset >= {as_of}" // the stored start decides
+            val window = er("OnsetWindow")
+            window.text shouldContain "\"condition\".onset >= {window_lo} AND \"condition\".onset_hi <= {as_of_hi}"
+            window.diagnostics shouldBe emptyList()
+            // the lint and the renderer agree: the advisory stands only where the stored instant decides
+            val mine = setOf("cn.OnsetBefore", "cn.OnsetStrictlyBefore", "cn.OnsetAfter", "cn.OnsetWindow")
+            clinic
+                .definitionDiagnostics()
+                .filter { it.slug == CnDefinitionLints.IMPRECISE && it.subject in mine }
+                .map { it.subject } shouldBe listOf("cn.OnsetAfter")
+            er("OnsetAfter").diagnostics.map { it.slug } shouldBe listOf(CnDefinitionLints.IMPRECISE)
+        }
+
         test("a target named in two packages is refused, never the first — definitionRender and materialize (R125-5)") {
             val two = CnConceptService(FrameValidationSpec.model(FrameValidationSpec.TWO_PACKAGES))
             val thing = ConceptRef.newBuilder().setQname("cn.Thing").build()
@@ -53,9 +81,19 @@ class DefinitionRenderSpec :
                 r.diagnostics.single().slug shouldBe "cn/definition-unreachable(${layer.name.lowercase()})"
                 r.diagnostics.single().message shouldContain "2 packages (`shop.a`, `shop.b`)"
             }
-            two.materialize(thing, "postgresql").diagnostics.single().message shouldContain
+            two
+                .materialize(thing, "postgresql")
+                .diagnostics
+                .single()
+                .message shouldContain
                 "2 packages (`shop.a`, `shop.b`)"
-            val bare = two.definitionRender(ConceptRef.newBuilder().setQname("Thing").build(), Layer.ER, "pg", RenderOptions())
+            val bare =
+                two.definitionRender(
+                    ConceptRef.newBuilder().setQname("Thing").build(),
+                    Layer.ER,
+                    "pg",
+                    RenderOptions(),
+                )
             bare.diagnostics.single().message shouldContain "a target writes `cn.<Name>`"
         }
 
@@ -250,6 +288,19 @@ class DefinitionRenderSpec :
                     """
                     model cn
                     def phase NonIschemicRecord { of: ConditionRecord, definition: ""${'"'}code not in descendants(Diagnosis, 'X20-X25')""${'"'} }
+                    """.trimIndent(),
+            )
+
+        /** The clinic's `RecordedOnset` (month-granular, `at_hi:`) compared without the DC-12 words (review-125 R125-4). */
+        val STORED_BOUND: Map<String, String> =
+            mapOf(
+                "bound/cn.ttrm" to
+                    """
+                    model cn
+                    def phase OnsetBefore { of: Patient, imprecision: certainly, definition: ""${'"'}exists RecordedOnset involving this where period.at <= :as_of""${'"'} }
+                    def phase OnsetStrictlyBefore { of: Patient, imprecision: certainly, definition: ""${'"'}exists RecordedOnset involving this where period.at < :as_of""${'"'} }
+                    def phase OnsetAfter { of: Patient, imprecision: certainly, definition: ""${'"'}exists RecordedOnset involving this where period.at >= :as_of""${'"'} }
+                    def phase OnsetWindow { of: Patient, imprecision: certainly, definition: ""${'"'}exists RecordedOnset involving this where within(period.at, last: days(30))""${'"'} }
                     """.trimIndent(),
             )
     }
