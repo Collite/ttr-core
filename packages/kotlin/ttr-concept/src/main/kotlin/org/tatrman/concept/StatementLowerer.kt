@@ -196,6 +196,7 @@ internal class StatementLowerer(
 
             val coords = mutableListOf<Coord>()
             val semiJoins = mutableListOf<Pair<String, MdRenderer.SemiJoin>>() // the phase filter's subject → it
+            val phased = mutableListOf<Pair<Ask.Phase, Coord>>() // what each phase filter pins on the carrier
             val havings = mutableListOf<Ask.Having>()
             for (a in asks) {
                 when (a) {
@@ -203,6 +204,7 @@ internal class StatementLowerer(
                     is Ask.Phase -> {
                         val p = phase(a, carrier)
                         coords += p.coordinates
+                        phased += p.coordinates.map { a to it }
                         semiJoins += p.semiJoins.map { "${a.slot}.phase.phase" to it }
                     }
                     is Ask.Having -> {
@@ -218,7 +220,20 @@ internal class StatementLowerer(
                     }
                 }
             }
-            if (timed) coords += time(carrier, periodFace)
+            if (timed) {
+                val t = time(carrier, periodFace)
+                // a phase filter and the time on one attribute: cn's refusal, not the md resolver's MD-006 (R125-8)
+                for (c in t) {
+                    val (phase, pinned) = phased.firstOrNull { it.second.attribute == c.attribute } ?: continue
+                    refuse(
+                        FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                        "${phase.slot}.phase.phase",
+                        "`${phase.filter.phase.qname}` constrains `${pinned.spelled}`, which the statement's time " +
+                            "constrains too — a follow-up (intersecting the two)",
+                    )
+                }
+                coords += t
+            }
 
             // ⚑CN-P9: the outer read keeps each semi-join's key free; a key the statement already pins cannot be both
             val requested = coords.filter { it.target == PathComponent.Star }.map { it.attribute }.toSet()

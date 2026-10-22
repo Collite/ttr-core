@@ -6,6 +6,7 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.tatrman.plan.v1.PlanNode
 import org.tatrman.statement.v1.Statement
 import org.tatrman.ttr.semantics.md.MD_CATALOG_VERSION
@@ -318,6 +319,16 @@ class StatementLowerSpec :
             val r = lowered(lower(plus, ask, revenue, always, asOf("2026-01-31"), filters(phase("cn.RecentSale"))))
             r.dotPath shouldBe "sales[time.day: \"2026-01-17\"..\"2026-01-31\"].net @ sum"
             r.provenance.asOf shouldBe "2026-01-31"
+        }
+
+        test("a phase filter and the time on one attribute: cn names the clash, not the md resolver (R125-8)") {
+            val range =
+                "\"time\": { \"range\": { \"from\": { \"value\": \"2026-01-01\", \"granularity\": \"DAY\" }, " +
+                    "\"to\": { \"value\": \"2026-02-01\", \"granularity\": \"DAY\" } } }"
+            val r = lower(plus, ask, revenue, range, asOf("2026-01-31"), filters(phase("cn.RecentSale")))
+            refused(r) shouldBe listOf("cn/not-analytically-reachable filters[0].phase.phase")
+            r.diagnostics.single().message shouldContain "`cn.RecentSale` constrains `time.day`"
+            r.diagnostics.single().message shouldNotContain "MD-006"
         }
 
         test("T5: `customer in (…)` is a member set on the participant's grain attribute") {
