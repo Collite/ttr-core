@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttrp.bundle
 
+import org.tatrman.ttrp.ast.SourceLocation
+import org.tatrman.ttrp.diagnostics.Severity
+import org.tatrman.ttrp.diagnostics.TtrpDiagnostic
+import org.tatrman.ttrp.diagnostics.TtrpDiagnosticId
 import org.tatrman.ttrp.emit.recipe.RecipeCatalogEmitter
 import org.tatrman.ttrp.emit.recipe.RecipeFingerprints
 import org.tatrman.ttrp.emit.recipe.RecipeStatement
@@ -11,6 +15,8 @@ import org.tatrman.ttrp.graph.model.Load
 import org.tatrman.ttrp.graph.recipe.ContextClass
 import org.tatrman.ttrp.graph.recipe.RecipeModel
 import org.tatrman.ttrp.graph.recipe.SwitchLowering
+import java.nio.ByteBuffer
+import java.nio.charset.CharacterCodingException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -38,6 +44,7 @@ class RecipeBundleAssembler(
         program: String,
         outDir: Path,
         statements: List<RecipeStatement> = RecipeStatements.plan(plan),
+        recipeDir: Path? = null,
     ): BundleAssembler.BundleResult {
         val model = requireNotNull(plan.recipe) { "$program holds no recipe" }
         val bound = requireNotNull(plan.bound)
@@ -165,23 +172,46 @@ class RecipeBundleAssembler(
         write(bundleDir, catalog.recipeFile, catalog.recipeText, files)
         write(bundleDir, catalog.verdictFile, catalog.verdictText, files)
 
-        val testsDir =
-            Path
-                .of(program)
-                .toAbsolutePath()
-                .parent
-                .resolve("tests")
+        val diagnostics = mutableListOf<TtrpDiagnostic>()
+
+        fun fixtureDiagnostic(
+            message: String,
+            severity: Severity,
+        ) = TtrpDiagnostic(
+            TtrpDiagnosticId.REC_080,
+            severity,
+            message,
+            SourceLocation.UNKNOWN.copy(file = program),
+        )
+        val testsDir = recipeDir?.resolve("tests")
+        if (recipeDir == null) {
+            diagnostics +=
+                fixtureDiagnostic("golden fixtures were not collected: recipe has no file location", Severity.INFO)
+        }
         val tests =
-            if (Files.isDirectory(testsDir)) {
+            if (testsDir != null && Files.isDirectory(testsDir)) {
                 Files.list(testsDir).use { paths ->
                     paths
                         .filter {
+                            val n = it.fileName.toString()
                             Files.isRegularFile(it) &&
-                                it.fileName.toString().substringAfterLast('.') in setOf("yaml", "yml")
+                                !n.startsWith(".") &&
+                                n.substringAfterLast('.', missingDelimiterValue = "") in setOf("yaml", "yml")
                         }.sorted()
                         .map { path ->
+                            val text =
+                                try {
+                                    Charsets.UTF_8
+                                        .newDecoder()
+                                        .decode(ByteBuffer.wrap(Files.readAllBytes(path)))
+                                        .toString()
+                                } catch (_: CharacterCodingException) {
+                                    throw BundleAssembler.BundleRefused(
+                                        listOf(fixtureDiagnostic("golden fixture is not UTF-8: $path", Severity.ERROR)),
+                                    )
+                                }
                             val relative = "tests/${path.fileName}"
-                            write(bundleDir, relative, Files.readString(path), files)
+                            write(bundleDir, relative, text, files)
                             relative
                         }.toList()
                 }
@@ -256,7 +286,7 @@ class RecipeBundleAssembler(
             )
         Files.writeString(bundleDir.resolve("manifest.json"), manifest.toJson())
         // no launcher: the Server runs the statements
-        return BundleAssembler.BundleResult(bundleDir, manifest, null)
+        return BundleAssembler.BundleResult(bundleDir, manifest, null, diagnostics)
     }
 
     /**

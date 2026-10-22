@@ -56,6 +56,7 @@ class RecipeBundleSpec :
             BundleAssembler("1.0.0").build(
                 source = text,
                 fileName = name,
+                recipeDir = recipes,
                 pipelineManifest = manifest,
                 modelsRoot = fixtures.resolve("model"),
                 outDir = Files.createTempDirectory("ttrp-recipe"),
@@ -434,37 +435,53 @@ class RecipeBundleSpec :
         "integer and numeric ceil/round output types match executed PostgreSQL columns".config(
             enabled = System.getenv("TTRP_ROUNDING_PG") == "1",
         ) {
-            val r = build("rounding.ttrp", """
-                uses world "hartland.worlds.demo"
-                import hartland.*
-                import hartland.automation.*
-                recipe {
-                    key: order.order_number
-                    candidates placed(out orders) target erp {
-                        load(er.entity.order)
-                        -> select(order_number, ci = ceil(order_number), ri = round(order_number),
-                                  cn = ceil(value), rn = round(value)) -> orders
+            val r =
+                build(
+                    "rounding.ttrp",
+                    """
+                    uses world "hartland.worlds.demo"
+                    import hartland.*
+                    import hartland.automation.*
+                    recipe {
+                        key: order.order_number
+                        candidates placed(out orders) target erp {
+                            load(er.entity.order)
+                            -> select(order_number, ci = ceil(order_number), ri = round(order_number),
+                                      cn = ceil(value), rn = round(value)) -> orders
+                        }
+                        decision v(in orders) { orders -> switch { go: true because: "probe" } }
+                        actions { v.go -> notify { who: role.ops, detail: placed } }
                     }
-                    decision v(in orders) { orders -> switch { go: true because: "probe" } }
-                    actions { v.go -> notify { who: role.ops, detail: placed } }
-                }
-            """.trimIndent())
+                    """.trimIndent(),
+                )
             val sql = Files.readString(r.dir.resolve("islands/placed.orders.sql"))
-            val url = System.getenv("TTR_CONN_ERP_PG") ?: "postgresql://localhost:55432/postgres?user=postgres&password=ttrp"
+            val url =
+                System.getenv("TTR_CONN_ERP_PG") ?: "postgresql://localhost:55432/postgres?user=postgres&password=ttrp"
             java.sql.DriverManager.getConnection("jdbc:$url").use { db ->
                 db.createStatement().use { stmt ->
                     stmt.execute("CREATE TEMP TABLE \"order\" (order_number INTEGER, value NUMERIC(12,2))")
                     stmt.execute("INSERT INTO \"order\" VALUES (7, 12.3)")
-                    val types = "SELECT pg_typeof(ci)::text, pg_typeof(ri)::text, pg_typeof(cn)::text, pg_typeof(rn)::text FROM ($sql) probe"
+                    val types = "SELECT pg_typeof(ci)::text, pg_typeof(ri)::text, " +
+                        "pg_typeof(cn)::text, pg_typeof(rn)::text FROM ($sql) probe"
                     stmt.executeQuery(types).use { rows ->
                         rows.next() shouldBe true
                         (1..4).map { rows.getString(it) } shouldBe listOf("integer", "integer", "numeric", "numeric")
                     }
                 }
             }
-            val columns = r.manifest.islands.single { it.name == "placed" }.outputs!!.single().columns
+            val columns =
+                r.manifest.islands
+                    .single { it.name == "placed" }
+                    .outputs!!
+                    .single()
+                    .columns
             columns.filter { it.name in setOf("ci", "ri") }.map { it.type }.distinct() shouldBe listOf("int")
-            columns.filter { it.name in setOf("cn", "rn") }.map { it.type }.distinct().single() shouldStartWith "decimal"
+            columns
+                .filter { it.name in setOf("cn", "rn") }
+                .map { it.type }
+                .distinct()
+                .single() shouldStartWith
+                "decimal"
         }
 
         "a recipe without golden fixtures omits the additive tests field" {
@@ -482,6 +499,8 @@ class RecipeBundleSpec :
             Files.writeString(dir.resolve("tests/z.yaml"), "world: us\n")
             Files.writeString(dir.resolve("tests/a.yaml"), "world: cz\n")
             Files.writeString(dir.resolve("tests/notes.txt"), "not a golden")
+            Files.writeString(dir.resolve("tests/yaml"), "ignored")
+            Files.write(dir.resolve("tests/._a.yaml"), byteArrayOf(0xff.toByte()))
             val r =
                 BundleAssembler("1.0.0").build(
                     source("release_order.ttrp"),
@@ -489,11 +508,44 @@ class RecipeBundleSpec :
                     manifest,
                     fixtures.resolve("model"),
                     Files.createTempDirectory("recipe-goldens-out"),
+                    recipeDir = dir,
                 )
             val json = ObjectMapper().readTree(r.manifest.toJson())
             json.path("recipe").path("tests").map { it.asText() } shouldBe listOf("tests/a.yaml", "tests/z.yaml")
             Files.readString(r.dir.resolve("tests/a.yaml")) shouldBe "world: cz\n"
             r.manifest.files.keys shouldContain "tests/a.yaml"
+        }
+
+        "a recipe without an explicit directory reports missing golden discovery, never consulting cwd" {
+            val r =
+                BundleAssembler("1.0.0").build(
+                    source("release_order.ttrp"),
+                    "relative.ttrp",
+                    manifest,
+                    fixtures.resolve("model"),
+                    Files.createTempDirectory("no-location"),
+                )
+            r.diagnostics.single().message shouldContain "no file location"
+            r.manifest.recipe!!.tests shouldBe null
+        }
+
+        "invalid UTF-8 in a golden fixture is a named refusal" {
+            val dir = Files.createTempDirectory("bad-golden")
+            Files.createDirectories(dir.resolve("tests"))
+            Files.write(dir.resolve("tests/b.yaml"), byteArrayOf(0xff.toByte()))
+            val e =
+                io.kotest.assertions.throwables.shouldThrow<BundleAssembler.BundleRefused> {
+                    BundleAssembler("1.0.0").build(
+                        source("release_order.ttrp"),
+                        "relative.ttrp",
+                        manifest,
+                        fixtures.resolve("model"),
+                        Files.createTempDirectory("bad-golden-out"),
+                        recipeDir = dir,
+                    )
+                }
+            e.diagnostics.single().message shouldContain "golden fixture is not UTF-8"
+            e.diagnostics.single().message shouldContain "b.yaml"
         }
 
         "the four `17` catalogs load in one snapshot with hartland's model and automation package" {
