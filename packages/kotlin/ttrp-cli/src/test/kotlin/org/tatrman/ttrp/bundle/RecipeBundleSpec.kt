@@ -562,6 +562,30 @@ class RecipeBundleSpec :
                 .filter { it.sourceId == "bundles" && !it.message.startsWith("ttr/package-") }
                 .map { it.message }
                 .shouldBeEmpty()
+            val loadedCatalogs =
+                Files.walk(out).use { paths ->
+                    paths
+                        .filter { it.fileName.toString().endsWith("_verdict.ttrm") }
+                        .map { it.fileName.toString() }
+                        .toList()
+                        .sorted()
+                }
+            loadedCatalogs shouldBe
+                listOf(
+                    "decide_return_verdict.ttrm",
+                    "monitor_inbound_verdict.ttrm",
+                    "release_order_verdict.ttrm",
+                    "settle_verdict.ttrm",
+                )
+            (snapshots.flatMap { it.errors } + result.errors)
+                .filter {
+                    it.file.endsWith("_verdict.ttrm") &&
+                        (
+                            it.message.startsWith("ttr/unimported-reference") ||
+                                it.message.startsWith("ttr/unresolved-reference")
+                        )
+                }.map { it.message }
+                .shouldBeEmpty()
             val entities =
                 result.model.schemas.values
                     .flatMap { s -> (s as? org.tatrman.ttr.metadata.model.ErSchema)?.entities?.values.orEmpty() }
