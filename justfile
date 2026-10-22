@@ -22,6 +22,10 @@ intellij_res := "intellij-plugin/src/main/resources"
 default:
     @just --list
 
+# SO S0.3 — the gate calls build/install/ttr-metadata/bin/ttr-metadata.
+build-metadata-cli:
+    ./gradlew :packages:kotlin:ttr-metadata-cli:installDist
+
 # ── Module resolution ─────────────────────────────────────────────────────────
 
 # Resolve a bare module name to its on-disk path (packages/<name>,

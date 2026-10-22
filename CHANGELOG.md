@@ -6,6 +6,14 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **Studio strict metadata gate** — new `ttr-metadata load <root> --strict --json` CLI,
+  version checking and structured dropped-file/reconciliation diagnostics. `MetadataLoader.load(LoadOptions)`
+  collects an opt-in report, including duplicate definitions within a file source; existing `load()` behavior
+  and registry refresh semantics remain unchanged. `just build-metadata-cli` installs `bin/ttr-metadata`;
+  the CLI jar and distribution join the grammar release bundle. See [metadata-cli](docs/manual/metadata-cli.md).
+- **Hosted viewer image** — fix nginx's `/m/_designer/` directory entry to internally select its HTML route,
+  avoiding a 500 from nginx's index handling. The explicit HTML entry and standalone catalog routes are retained.
+
 - **AU bundle handoff** — generated verdict catalogs omit retired CNC roles so the automation loader can
   reconcile them; recipe bundles carry sorted, hashed golden YAML fixtures in `recipe.tests` (omitted when empty); PostgreSQL recipe
   expressions support typed `ceil` without a capability diagnostic. Integer `ceil`/`round` emit their argument

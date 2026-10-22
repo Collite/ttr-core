@@ -52,10 +52,9 @@ http {
 
         # Stage-1 Studio iframe. Same bundle as the standalone viewer, with its own base.
         location = /m/_designer/ {
-            alias /usr/share/ttr-viewer/html/hosted/index.html;
-            default_type text/html;
-            add_header Cache-Control "no-cache" always;
-            add_header X-Content-Type-Options nosniff always;
+            # A file alias on a slash URI invokes nginx's index module and appends index.html
+            # to the filename. Internally select the explicit HTML location instead.
+            rewrite ^ /m/_designer/index.html last;
         }
         location = /m/_designer/index.html {
             alias /usr/share/ttr-viewer/html/hosted/index.html;

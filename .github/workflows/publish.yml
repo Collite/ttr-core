@@ -11,7 +11,7 @@ name: Publish Kotlin artifacts
 # human-named bundle:
 #   grammar/v<x.y.z>     bundle: THE unified TTR toolchain — ttr-parser + ttr-writer +
 #                        ttr-semantics + ttr-metadata + ttr-metadata-git + ttr-snapshot +
-#                        ttr-md-resolver + ttr-lexicon + ttr-lexicon-compile + ttr-lexicon-cli.
+#                        ttr-md-resolver + ttr-lexicon + ttr-lexicon-compile + ttr-lexicon-cli + ttr-metadata-cli.
 #                        One `api` closure, one version, one tag.
 #                        (was kotlin/v*; absorbed the metadata bundle 2026-07-30)
 #   ttr-parser/v<x.y.z>  ttr-parser only                                  (was kotlin-parser/v*)
@@ -163,7 +163,7 @@ jobs:
             # latest translator tag (-PtranslatorVersion, see build.gradle.kts) after checking the
             # translator sources have not moved since that tag — else the POMs would name a version
             # nothing published, or a published one that is not the code this build compiled against.
-            MODULES=":packages:kotlin:ttr-parser:publish :packages:kotlin:ttr-writer:publish :packages:kotlin:ttr-semantics:publish :packages:kotlin:ttr-metadata:publish :packages:kotlin:ttr-metadata-git:publish :packages:kotlin:ttr-snapshot:publish :packages:kotlin:ttr-md-resolver:publish :packages:kotlin:ttr-lexicon:publish :packages:kotlin:ttr-lexicon-compile:publish :packages:kotlin:ttr-lexicon-cli:publish :packages:kotlin:ttrp-frontend:publish :packages:kotlin:ttrp-graph:publish :packages:kotlin:ttrp-emit:publish :packages:kotlin:ttrp-emit-spi:publish :packages:kotlin:ttrp-conform:publish :packages:kotlin:ttrp-cli:publish :packages:kotlin:ttr-emit-bash:publish :packages:kotlin:ttr-emit-kestra:publish :packages:kotlin:ttr-emit-airflow3:publish"
+            MODULES=":packages:kotlin:ttr-parser:publish :packages:kotlin:ttr-writer:publish :packages:kotlin:ttr-semantics:publish :packages:kotlin:ttr-metadata:publish :packages:kotlin:ttr-metadata-cli:publish :packages:kotlin:ttr-metadata-git:publish :packages:kotlin:ttr-snapshot:publish :packages:kotlin:ttr-md-resolver:publish :packages:kotlin:ttr-lexicon:publish :packages:kotlin:ttr-lexicon-compile:publish :packages:kotlin:ttr-lexicon-cli:publish :packages:kotlin:ttrp-frontend:publish :packages:kotlin:ttrp-graph:publish :packages:kotlin:ttrp-emit:publish :packages:kotlin:ttrp-emit-spi:publish :packages:kotlin:ttrp-conform:publish :packages:kotlin:ttrp-cli:publish :packages:kotlin:ttr-emit-bash:publish :packages:kotlin:ttr-emit-kestra:publish :packages:kotlin:ttr-emit-airflow3:publish"
             TRANSLATOR=$(git tag -l 'translator/v*' | sed -E 's|^translator/v||; s/-RELEASE$//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
             TRANSLATOR_TAG=$(git tag -l "translator/v${TRANSLATOR}" "translator/v${TRANSLATOR}-RELEASE" | head -1)
             if [ -z "$TRANSLATOR_TAG" ]; then

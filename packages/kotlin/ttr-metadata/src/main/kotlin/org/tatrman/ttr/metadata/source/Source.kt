@@ -134,6 +134,8 @@ data class SourceSnapshot(
      * them ([FileBasedSource]'s `layouts`).
      */
     val layoutFiles: List<LayoutFileRef> = emptyList(),
+    /** Parse failures that removed an entire file; retained separately for strict load reports. */
+    val droppedFiles: List<LoadWarning> = emptyList(),
 )
 
 /**
@@ -317,6 +319,7 @@ class FileBasedSource(
         val warnings = mutableListOf<LoadWarning>()
         val errors = mutableListOf<LoadWarning>()
         val loadedFiles = mutableListOf<LoadedFile>()
+        val droppedFiles = mutableListOf<LoadWarning>()
 
         val tables = mutableMapOf<QualifiedName, DbTable>()
         val views = mutableMapOf<QualifiedName, DbView>()
@@ -339,7 +342,10 @@ class FileBasedSource(
             val pr = TtrLoader.parseString(content, fileLabel = file.path)
             errors += pr.errors.map { it.toLoadWarning(sourceId) }
             warnings += pr.warnings.map { it.toLoadWarning(sourceId) }
-            if (!pr.ok) continue
+            if (!pr.ok) {
+                droppedFiles += pr.errors.first().toLoadWarning(sourceId)
+                continue
+            }
 
             // Grounding Phase 1 (grammar 4.2) — resolve `semantics { … }` blocks
             // document-locally. `resolved` carries only diagnostics-free elements
@@ -591,6 +597,7 @@ class FileBasedSource(
             errors = errors,
             loadedFiles = loadedFiles.toList(),
             layoutFiles = layoutFiles,
+            droppedFiles = droppedFiles,
         )
     }
 
