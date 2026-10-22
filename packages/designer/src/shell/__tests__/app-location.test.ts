@@ -12,6 +12,7 @@ describe('app-location (ttr-core#171)', () => {
     window.history.replaceState(null, '', '/m/_designer/index.html?backend=host&lang=cs#/w/hartland/s/er');
     setRuntimeConfig({ ...defaultRuntimeConfig(), basePath: '/m/' });
     expect(currentAppPath()).toBe('/w/hartland/s/er');
+    expect(absoluteUrlFor('/s/viewer?object=er')).toBeNull();
     replaceAppPath('/w/hartland/s/md?skin=md.star');
     expect(window.location.pathname).toBe('/m/_designer/index.html');
     expect(window.location.search).toBe('?backend=host&lang=cs');

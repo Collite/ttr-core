@@ -8,6 +8,7 @@ import type { LspClient } from '../../lsp-client.js';
 import { WorkerLspDataSource } from '../worker-lsp-data-source.js';
 import { buildCatalog } from '../../shell/catalog.js';
 import { projectLayout } from '../../model/layout-projection.js';
+import { openFileMap } from '../open-file-map.js';
 import { BffFilesDataSource } from '../bff-files-data-source.js';
 
 const ROOT = 'file:///world';
@@ -36,8 +37,7 @@ beforeAll(async () => {
   serverConn.listen(); clientConn.listen();
   close = () => { clientConn.dispose(); serverConn.dispose(); };
   client = await lspClientOver({ sendRequest: (m, p) => clientConn.sendRequest(m, p), sendNotification: (m, p) => clientConn.sendNotification(m, p), onNotification: (m, h) => clientConn.onNotification(m, h) }, { transportKind: 'browser', dispose: close });
-  await client.setProjectRoot(ROOT, files.get('modeler.toml'));
-  for (const [path, text] of files) if (path.endsWith('.ttrm') || path.endsWith('.ttrg')) await client.openDocument(`${ROOT}/${path}`, text);
+  await openFileMap(client, ROOT, files);
   source = new WorkerLspDataSource(client, { projectRoot: ROOT, files });
 });
 afterAll(() => close());

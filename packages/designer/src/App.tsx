@@ -32,17 +32,11 @@ import { loadProjectViaFileSystemAccessAPI, type ProjectFiles } from './fs/file-
 import { applyWorkspaceEdit } from './lsp/apply-workspace-edit';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastContainer, makeToast, type ToastMessage } from './Toast';
+import { openFileMap } from './data/open-file-map.js';
 import { BffFilesDataSource } from './data/bff-files-data-source';
 import { HostChannel } from './host/host-channel';
-import { APP_LOCATION_CHANGED, currentAppPath, navigateAppPath } from './shell/app-location';
+import { APP_LOCATION_CHANGED, currentAppPath, navigateAppPath, replaceAppPath, hostAppLocation } from './shell/app-location';
 import { setRuntimeConfig } from './runtime-config';
-
-function isModelFile(relativePath: string): boolean {
-  // VL layouts are read from the file map, not authored LSP graphs (their
-  // object lists omit edges and use the catalog's DB naming convention).
-  if (relativePath.startsWith('model/layouts/')) return false;
-  return relativePath.endsWith('.ttrm') || relativePath.endsWith('.ttrg');
-}
 
 function resolveBackend(): BackendSelection | { kind: 'error'; message: string } {
   try {
@@ -247,9 +241,8 @@ function WorkerStudio({ demo }: { demo: string | null }) {
     (async () => {
       try {
         const files = await loadDemoFiles(demo);
-        await client.setProjectRoot(`file:///${demo}`, files.files.get('modeler.toml'));
-        const modelPaths = Array.from(files.files.keys()).filter(isModelFile);
-        await Promise.all(modelPaths.map((p) => openDoc(`file:///${demo}/${p}`, files.files.get(p)!)));
+        const modelPaths = await openFileMap(client, `file:///${demo}`, files.files);
+        for (const p of modelPaths) docTextCache.current.set(`file:///${demo}/${p}`, files.files.get(p)!);
         await buildStudio(client, `file:///${demo}`, demo, modelPaths, files);
       } catch (e) {
         setError(`Failed to load demo: ${e}`);
@@ -267,9 +260,8 @@ function WorkerStudio({ demo }: { demo: string | null }) {
     if (!client) return;
     setLoading(true);
     try {
-      await client.setProjectRoot(`file:///${files.rootName}`, files.files.get('modeler.toml'));
-      const modelPaths = Array.from(files.files.keys()).filter(isModelFile);
-      await Promise.all(modelPaths.map((p) => openDoc(`file:///${files.rootName}/${p}`, files.files.get(p)!)));
+      const modelPaths = await openFileMap(client, `file:///${files.rootName}`, files.files);
+      for (const p of modelPaths) docTextCache.current.set(`file:///${files.rootName}/${p}`, files.files.get(p)!);
       await buildStudio(client, `file:///${files.rootName}`, files.rootName, modelPaths, files);
     } catch (e) {
       setError(`Failed to load project: ${e}`);
@@ -443,17 +435,17 @@ function HostedStudio() {
     let disposed = false;
     let latestToken: string | null = null;
     let renderedSha: string | null = null;
+    let workspace: string | null = null;
     let lastLocation = '';
     const syncSession = async () => {
-      const changed = await source!.refresh();
-      if (disposed || (!changed && renderedSha === source!.sha)) return;
+      const changed = await source!.refresh({ deferDisposal: true });
+      if (disposed || (!changed && renderedSha === source!.sha)) return false;
       const { graphs, symbols } = await source!.listCatalog();
       if (disposed) return;
-      const parts = currentAppPath().split('/');
-      const workspace = parts[1] === 'w' && parts[2] ? decodeURIComponent(parts[2]) : 'repo';
       setError(false);
       renderedSha = source!.sha;
-      setSession({ source: source!, catalog: buildCatalog(graphs, symbols), workspace, sha: source!.sha! });
+      setSession({ source: source!, catalog: buildCatalog(graphs, symbols), workspace: workspace!, sha: source!.sha! });
+      return true;
     };
     const channel = new HostChannel(async (message) => {
       try {
@@ -464,6 +456,14 @@ function HostedStudio() {
           document.documentElement.lang = message.lang;
           setRuntimeConfig({ ...getRuntimeConfig(), basePath: message.basePath, lang: message.lang });
           setStickyParam('lang', message.lang);
+          workspace = message.workspace;
+          let path: string;
+          try { path = hostAppLocation(currentAppPath(), workspace); }
+          catch {
+            path = hostAppLocation('/', workspace);
+            channel.send({ type: 'ttr.frame.error', code: 'host/bad-location', message: 'Invalid app location; opening the workspace.' });
+          }
+          replaceAppPath(path);
           source = new BffFilesDataSource({ ...message, token: latestToken ?? message.token });
           await syncSession();
         } else if (message.type === 'ttr.host.token') {
@@ -472,8 +472,16 @@ function HostedStudio() {
         } else if (source && message.type === 'ttr.host.refresh') {
           await syncSession();
         } else if (source && message.type === 'ttr.host.navigate') {
-          if (message.sha && message.sha !== source.sha) await syncSession();
-          navigateAppPath(message.location);
+          let path: string;
+          try { path = hostAppLocation(message.location, workspace!); }
+          catch { channel.send({ type: 'ttr.frame.error', code: 'host/bad-location', message: 'Invalid app location.' }); return; }
+          if (!message.sha || message.sha === source.sha) navigateAppPath(path);
+          else {
+            // Only change the hash: the old shell must not handle a request for the new snapshot.
+            replaceAppPath(path);
+            try { if (!await syncSession()) navigateAppPath(path); }
+            catch (e) { navigateAppPath(path); throw e; } // keep navigating on the previous snapshot
+          }
         }
       } catch (e) {
         if (!disposed) setError(true);
@@ -483,15 +491,18 @@ function HostedStudio() {
     channelRef.current = channel;
     const locationChanged = () => {
       const location = currentAppPath();
-      if (location !== lastLocation) {
+      if (readySent.current && location !== lastLocation) {
         lastLocation = location;
         channel.send({ type: 'ttr.frame.location', location });
       }
     };
     const hashChanged = () => {
       if (!source) return;
-      try { navigateAppPath(currentAppPath()); }
-      catch { channel.send({ type: 'ttr.frame.error', code: 'host/load-failed', message: 'Invalid app location.' }); }
+      try { navigateAppPath(hostAppLocation(currentAppPath(), workspace!)); }
+      catch {
+        channel.send({ type: 'ttr.frame.error', code: 'host/bad-location', message: 'Invalid app location.' });
+        navigateAppPath(hostAppLocation('/', workspace!));
+      }
     };
     window.addEventListener(APP_LOCATION_CHANGED, locationChanged);
     window.addEventListener('hashchange', hashChanged);
@@ -506,6 +517,7 @@ function HostedStudio() {
   }, []);
   // Runs after React has committed the first shell render, never before fetch / worker loading.
   useEffect(() => {
+    session?.source.disposeRetired();
     if (session && !readySent.current) {
       readySent.current = true;
       channelRef.current?.send({ type: 'ttr.frame.ready' });

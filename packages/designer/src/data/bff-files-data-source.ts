@@ -9,8 +9,10 @@ import type {
   GraphScope,
   ModelKind,
   SearchParams,
+  CatalogListing,
 } from './model-data-source.js';
-import type { GetGraphResponse, ListedSymbol } from '@tatrman/lsp';
+import { openFileMap } from './open-file-map.js';
+import type { GetGraphResponse } from '@tatrman/lsp';
 
 /** A fetched SHA is immutable. Share schema/symbol reads across its layout catalog and canvas. */
 class SnapshotWorker extends WorkerLspDataSource {
@@ -76,6 +78,8 @@ export class BffFilesDataSource implements ModelDataSource {
   project: ProjectFiles | null = null;
   sha: string | null = null;
   private worker: WorkerLspDataSource | null = null;
+  private catalog: CatalogListing | null = null;
+  private retired: LspClient[] = [];
   private disposed = false;
   private pending: Promise<boolean> | null = null;
   private abort = new AbortController();
@@ -96,15 +100,15 @@ export class BffFilesDataSource implements ModelDataSource {
   setToken(token: string): void {
     this.token = token;
   }
-  refresh(): Promise<boolean> {
+  refresh(options: { deferDisposal?: boolean } = {}): Promise<boolean> {
     if (this.disposed) return Promise.reject(new Error('Hosted source is disposed.'));
     if (!this.pending)
-      this.pending = this.load().finally(() => {
+      this.pending = this.load(options.deferDisposal ?? false).finally(() => {
         this.pending = null;
       });
     return this.pending;
   }
-  private async load(): Promise<boolean> {
+  private async load(deferDisposal: boolean): Promise<boolean> {
     const scope = this.options.scope;
     const path =
       scope.kind === 'served' ? '/served/files' : `/changes/${encodeURIComponent(scope.id)}/files`;
@@ -124,32 +128,22 @@ export class BffFilesDataSource implements ModelDataSource {
     };
     const client = await this.createClient();
     try {
-      await client.setProjectRoot('file:///repo', project.files.get('modeler.toml'));
-      for (const [p, text] of project.files) {
-        if (p.startsWith('model/') && !p.startsWith('model/layouts/') && /\.ttr[mg]$/.test(p)) {
-          await client.openDocument(`file:///repo/${p}`, text);
-        }
-      }
-      if (this.disposed) throw new Error('Hosted source is disposed.');
-      const previous = this.worker;
-      let symbols: Promise<ListedSymbol[]> | null = null;
-      const snapshotClient: LspClient = {
-        ...client,
-        listSymbols: (options) => {
-          if (options) return client.listSymbols(options);
-          return (symbols ??= client.listSymbols().catch((error) => {
-            symbols = null;
-            throw error;
-          }));
-        },
-      };
-      this.worker = new SnapshotWorker(snapshotClient, {
+      // Contract §4.1 — the BFF serves model/** only.
+      await openFileMap(client, 'file:///repo', project.files, { under: 'model/' });
+      const worker = new SnapshotWorker(client, {
         projectRoot: 'file:///repo',
         files: project.files,
       });
+      // Validate the entire catalog before replacing any currently served state.
+      const catalog = await worker.listCatalog();
+      if (this.disposed) throw new Error('Hosted source is disposed.');
+      const previous = this.worker;
+      this.worker = worker;
+      this.catalog = catalog;
       this.project = project;
       this.sha = snapshot.sha;
-      previous?.lspClient.dispose();
+      if (previous) this.retired.push(previous.lspClient);
+      if (!deferDisposal) this.disposeRetired();
       for (const cb of this.listeners) cb(snapshot.sha);
       return true;
     } catch (error) {
@@ -173,8 +167,12 @@ export class BffFilesDataSource implements ModelDataSource {
   getSchemaGraph(schema: ModelKind) {
     return this.source.getSchemaGraph(schema);
   }
-  listCatalog() {
-    return this.source.listCatalog();
+  async listCatalog(): Promise<CatalogListing> {
+    if (!this.catalog) throw new Error('Hosted snapshot has not loaded.');
+    return this.catalog;
+  }
+  layoutIssues() {
+    return this.source.layoutIssues();
   }
   listLayouts() {
     return this.source.listLayouts();
@@ -202,11 +200,17 @@ export class BffFilesDataSource implements ModelDataSource {
       },
     };
   }
+  /** Called after React commits the replacement shell; its old reads can finish until then. */
+  disposeRetired(): void {
+    for (const client of this.retired.splice(0)) client.dispose();
+  }
   dispose(): void {
     this.disposed = true;
     this.abort.abort();
     this.worker?.lspClient.dispose();
     this.worker = null;
+    this.catalog = null;
+    this.disposeRetired();
     this.listeners.clear();
   }
 }

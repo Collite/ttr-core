@@ -91,10 +91,13 @@ export function browserPathFor(appPath: string): string {
 }
 
 /** The absolute URL for an app path (a copyable link): origin + base path + app path + session. */
-export function absoluteUrlFor(appPath: string): string {
+export function absoluteUrlFor(appPath: string): string | null {
   const origin = typeof window === 'undefined' ? '' : window.location.origin;
   // A shared hosted link must re-enter the parent, which can provide the auth/scope/init again.
-  if (isHosted()) return origin + toBrowserPath(appPath.replace(/^\/w\//, '/'), getRuntimeConfig().basePath, []);
+  if (isHosted()) {
+    if (!/^\/w\/[^/?#]+(?:[/?]|$)/.test(appPath)) return null;
+    return origin + toBrowserPath(appPath.replace(/^\/w\//, '/'), getRuntimeConfig().basePath, []);
+  }
   return origin + browserPathFor(appPath);
 }
 
@@ -109,11 +112,24 @@ export function replaceAppPath(appPath: string): void {
 }
 
 /** Host navigation uses the same restore path as an initial deep link. */
-export function navigateAppPath(location: string): void {
+export function parseAppLocation(location: string): string {
   const path = location.startsWith('#') ? location.slice(1) : location;
   // Reject malformed percent escapes before the shell's segment decoder sees them.
   try { decodeURIComponent(path); } catch { throw new Error('Invalid app location.'); }
-  if (!path.startsWith('/w/') || /[\r\n]/.test(path)) throw new Error('Invalid app location.');
+  if (!/^\/w\/[^/?#]+(?:[/?]|$)/.test(path) || /[\r\n#]/.test(path)) throw new Error('Invalid app location.');
+  return path;
+}
+
+/** Pin every hosted route to the world the parent configured. */
+export function hostAppLocation(location: string, workspace: string): string {
+  const path = location.startsWith('#') ? location.slice(1) : location;
+  const root = `/w/${encodeURIComponent(workspace)}`;
+  if (!path || path === '/') return root;
+  return parseAppLocation(path).replace(/^\/w\/[^/?#]+/, root);
+}
+
+export function navigateAppPath(location: string): void {
+  const path = parseAppLocation(location);
   replaceAppPath(path);
   window.dispatchEvent(new CustomEvent(APP_NAVIGATE, { detail: path }));
 }

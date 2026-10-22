@@ -27,6 +27,7 @@
       window.initAt = performance.now();
       hostSend({
         type: 'ttr.host.init',
+        workspace: 'hartland',
         basePath: '/m/',
         api: '/api/model',
         token: 'smoke-only',
@@ -46,6 +47,6 @@
         history.replaceState(null, '', '/m/' + event.data.location.replace(/^\/w\//, ''));
       }
     });
-    frame.src = '/m/_designer/index.html?backend=host#/w/hartland/s/md';
+    frame.src = '/m/_designer/index.html?backend=host#/';
   </script>
 </html>

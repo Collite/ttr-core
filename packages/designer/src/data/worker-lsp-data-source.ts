@@ -27,10 +27,11 @@ import type {
   Disposable,
   CatalogListing,
   LayoutSummary,
+  LayoutIssue,
   ResolvedLayout,
 } from './model-data-source.js';
 import type { TtrmNode, TtrmEdge } from './ttrm-types.js';
-import { readLayoutFiles, normalizeForTab } from '../layout/open-files.js';
+import { readLayoutFiles, normalizeForTab, type OpenedLayout } from '../layout/open-files.js';
 import { resolveRefs } from '../layout/resolve.js';
 import { layoutIndexOf } from '../model/layout-projection.js';
 import { modeOf } from '@tatrman/parser/layout';
@@ -113,18 +114,13 @@ export class WorkerLspDataSource implements ModelDataSource {
   }
 
   /**
-   * The whole-schema graph (VL V-21): the project's model graph for `schema`, each card's package from
-   * the symbol listing (the worker's qnames already carry it; the panel groups by it).
+   * The whole-schema graph (VL V-21), including each card's effective package from the LSP.
    */
   async getSchemaGraph(schema: RenderableSchemaCode): Promise<GetGraphResponse | null> {
-    const [mg, symbols] = await Promise.all([
-      this.lspClient.getModelGraph(this.ctx.graphUri ?? this.ctx.projectRoot, schema),
-      this.lspClient.listSymbols(),
-    ]);
-    const pkg = new Map(symbols.map((s) => [s.qname, s.packageName ?? '']));
+    const mg = await this.lspClient.getModelGraph(this.ctx.graphUri ?? this.ctx.projectRoot, schema);
     return {
       schema,
-      nodes: mg.nodes.map((n) => ({ ...n, pkg: pkg.get(n.qname) ?? '' })),
+      nodes: mg.nodes.map((n) => ({ ...n, pkg: n.pkg ?? '' })),
       edges: mg.edges,
       layout: { nodes: {}, edges: {} },
       missingObjects: [],
@@ -155,38 +151,80 @@ export class WorkerLspDataSource implements ModelDataSource {
     };
   }
 
-  private layoutFiles(): Array<{ name: string; source: string }> {
-    const layouts = [...(this.ctx.files?.keys() ?? [])].filter((p) => p.startsWith('model/layouts/') && p.endsWith('.ttrg'))
-      .map((source) => ({ name: source.slice(source.lastIndexOf('/') + 1, -5), source }));
-    if (new Set(layouts.map((l) => l.name)).size !== layouts.length) throw new Error('Layout file names must be unique under model/layouts/.');
-    return layouts;
+  private warnedLayoutIssues = new Set<string>();
+
+  private readLayouts() {
+    type Parsed = Extract<OpenedLayout, { ok: true }>;
+    const grouped = new Map<string, Array<{ source: string; parsed: Parsed }>>();
+    const issues: LayoutIssue[] = [];
+    const paths = [...(this.ctx.files?.keys() ?? [])].filter((p) => p.startsWith('model/layouts/') && p.endsWith('.ttrg')).sort();
+    for (const source of paths) {
+      try {
+        const inputs = [{ name: source, text: this.ctx.files!.get(source)! }];
+        const sidecar = source.replace(/\.ttrg$/, '.ttrl');
+        const text = this.ctx.files!.get(sidecar);
+        if (text !== undefined) inputs.push({ name: sidecar, text });
+        const parsed = readLayoutFiles(inputs);
+        if (!parsed.ok) throw new Error(parsed.error);
+        const group = grouped.get(parsed.doc.name) ?? [];
+        group.push({ source, parsed });
+        grouped.set(parsed.doc.name, group);
+      } catch (e) { issues.push({ path: source, reason: String(e instanceof Error ? e.message : e).replace(/[\r\n]+/g, ' ') }); }
+    }
+    const layouts = new Map<string, { source: string; parsed: Parsed }>();
+    for (const [name, entries] of grouped) {
+      if (entries.length === 1) layouts.set(name, entries[0]);
+      else for (const entry of entries) issues.push({ path: entry.source,
+        reason: `the name ${name} is also declared by ${entries.filter((e) => e !== entry).map((e) => e.source).join(', ')}` });
+    }
+    return { layouts, issues };
+  }
+
+  private async resolvedLayouts() {
+    const { layouts: parsed, issues } = this.readLayouts();
+    const schemas = new Map<RenderableSchemaCode, Promise<GetGraphResponse | null>>();
+    const entries = [...parsed.entries()];
+    const results = await Promise.allSettled(entries.map(async ([name, entry]) => {
+      const model = entry.parsed.doc.model;
+      if (!schemas.has(model)) schemas.set(model, this.capabilities.modelKinds.includes(model)
+        ? Promise.resolve().then(() => this.getSchemaGraph(model)) : Promise.resolve(null));
+      let whole: GetGraphResponse | null;
+      try { whole = await schemas.get(model)!; } catch { whole = null; }
+      if (!whole) throw new Error(`the ${model} schema could not be read`);
+      const doc = entry.parsed.doc;
+      const r = resolveRefs([...doc.objects, ...Object.keys(doc.positions)], layoutIndexOf(whole).index, model);
+      const normalized = normalizeForTab(doc, r);
+      const fromObjects = new Set(doc.objects);
+      const objects = [...new Set(doc.objects.flatMap((ref) => r.resolved.has(ref) ? [r.resolved.get(ref)!] : []))];
+      const layout: ResolvedLayout = { name, source: entry.source, schema: model, objects, positions: normalized.positions,
+        mode: modeOf(normalized), skin: normalized.skin ?? null, collapsed: normalized.collapsed ?? [],
+        missing: r.missing.filter((ref) => fromObjects.has(ref)), ambiguous: r.ambiguous.filter((a) => fromObjects.has(a.ref)),
+        ignored: r.ignored.filter((ref) => fromObjects.has(ref)), positionsFrom: entry.parsed.positionsFrom, modelVersion: '' };
+      return layout;
+    }));
+    const layouts = new Map<string, ResolvedLayout>();
+    results.forEach((result, i) => {
+      if (result.status === 'fulfilled') layouts.set(result.value.name, result.value);
+      else issues.push({ path: entries[i][1].source, reason: String(result.reason instanceof Error ? result.reason.message : result.reason).replace(/[\r\n]+/g, ' ') });
+    });
+    for (const issue of issues) {
+      const key = `${issue.path}: ${issue.reason}`;
+      if (!this.warnedLayoutIssues.has(key)) { this.warnedLayoutIssues.add(key); console.warn(`layout ${key} — not shown`); }
+    }
+    return { layouts, issues };
   }
 
   async listLayouts(): Promise<LayoutSummary[]> {
-    return Promise.all(this.layoutFiles().map(async ({ name, source }) => {
-      const l = await this.getLayoutDoc(name);
-      return { name, source, schema: l.schema, objectCount: l.objects.length, missingCount: l.missing.length,
-        ambiguousCount: l.ambiguous.length, hasPositions: Object.keys(l.positions).length > 0 };
-    }));
+    return [...(await this.resolvedLayouts()).layouts.values()].map((l) => ({ name: l.name, source: l.source, schema: l.schema,
+      objectCount: l.objects.length, missingCount: l.missing.length, ambiguousCount: l.ambiguous.length, hasPositions: Object.keys(l.positions).length > 0 }));
   }
 
+  async layoutIssues(): Promise<LayoutIssue[]> { return (await this.resolvedLayouts()).issues; }
+
   async getLayoutDoc(name: string): Promise<ResolvedLayout> {
-    const entry = this.layoutFiles().find((l) => l.name === name);
-    if (!entry) throw new Error(`Unknown layout '${name}'.`);
-    const inputs = [{ name: entry.source, text: this.ctx.files!.get(entry.source)! }];
-    const sidecar = entry.source.replace(/\.ttrg$/, '.ttrl');
-    const sidecarText = this.ctx.files!.get(sidecar);
-    if (sidecarText !== undefined) inputs.push({ name: sidecar, text: sidecarText });
-    const parsed = readLayoutFiles(inputs);
-    if (!parsed.ok) throw new Error(parsed.error);
-    const whole = await this.getSchemaGraph(parsed.doc.model);
-    if (!whole) throw new Error(`Cannot load schema '${parsed.doc.model}' for layout '${name}'.`);
-    const r = resolveRefs([...parsed.doc.objects, ...Object.keys(parsed.doc.positions)], layoutIndexOf(whole).index, parsed.doc.model);
-    const doc = normalizeForTab(parsed.doc, r);
-    const objects = [...new Set(parsed.doc.objects.flatMap((ref) => r.resolved.has(ref) ? [r.resolved.get(ref)!] : []))];
-    return { name, source: entry.source, schema: doc.model, objects, positions: doc.positions,
-      mode: modeOf(doc), skin: doc.skin ?? null, collapsed: doc.collapsed ?? [], missing: r.missing, ambiguous: r.ambiguous,
-      ignored: r.ignored, positionsFrom: parsed.positionsFrom, modelVersion: '' };
+    const layout = (await this.resolvedLayouts()).layouts.get(name);
+    if (!layout) throw new Error(`Unknown layout '${name}'.`);
+    return layout;
   }
 
   async getObject(qname: string): Promise<ObjectDetail> {

@@ -436,6 +436,19 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     return () => window.removeEventListener(APP_NAVIGATE, navigate);
   });
 
+  function appPathForTab(t: SubjectTab): string {
+    let path: string;
+    if (t.perspective === 'lineage') {
+      const ls = lineageState[t.id];
+      path = formatPath({ kind: 'perspective', workspace, perspective: 'lineage', params: { root: t.subject.ref, scope: ls?.scope ?? 'neighborhood', dir: ls?.direction ?? 'upstream', kind: ls?.rootKind ?? 'measure', label: t.subject.label.replace(/^lineage · /, '') } });
+    } else if (t.perspective === 'binding') {
+      path = formatPath({ kind: 'perspective', workspace, perspective: 'binding', params: { left: t.subject.ref, ...(bindingSel ? { sel: bindingSel } : {}) } });
+    } else {
+      path = tabUrl(workspace, t);
+    }
+    return path;
+  }
+
   // URL round-trip: reflect the active tab in the address bar (a truth surface like the chip).
   useEffect(() => {
     if (!bootedRef.current) return;
@@ -445,16 +458,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
     if (!tab) { syncUrl({ kind: 'none', workspace }); return; }
     // App paths throughout: replaceAppPath keeps the base path and the session parameters, so the
     // rewritten URL reloads into this same backend and graph (ttr-core#171).
-    let path: string;
-    if (tab.perspective === 'lineage') {
-      const ls = lineageState[tab.id];
-      path = formatPath({ kind: 'perspective', workspace, perspective: 'lineage', params: { root: tab.subject.ref, scope: ls?.scope ?? 'neighborhood', dir: ls?.direction ?? 'upstream', kind: ls?.rootKind ?? 'measure', label: tab.subject.label.replace(/^lineage · /, '') } });
-    } else if (tab.perspective === 'binding') {
-      path = formatPath({ kind: 'perspective', workspace, perspective: 'binding', params: { left: tab.subject.ref, ...(bindingSel ? { sel: bindingSel } : {}) } });
-    } else {
-      path = tabUrl(workspace, tab);
-    }
-    replaceAppPath(path);
+    replaceAppPath(appPathForTab(tab));
   }, [tab, workspace, lineageState, bindingSel]);
 
   // ⌘K command registry — every toolbar action gets a command twin (E-4/D-6 parity)
@@ -1013,7 +1017,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
               if (tab.layout && tab.layout.source !== 'catalog') {
                 return <CopyLinkButton url="" disabledReason="Saved files are not on the server — commit it to share." />;
               }
-              const path = federationPathForTab(tab);
+              const path = isHosted() ? appPathForTab(tab) : federationPathForTab(tab);
               const url = path && typeof window !== 'undefined' ? absoluteUrlFor(path) : null;
               return url ? <CopyLinkButton url={url} /> : null;
             })()}

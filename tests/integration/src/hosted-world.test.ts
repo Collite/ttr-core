@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as parser from '@tatrman/parser';
+import type { ModelGraph, SymbolPage } from '@tatrman/lsp';
 import { PassThrough } from 'node:stream';
 import * as lsp from 'vscode-languageserver/node';
-import { createServerConnection } from '../server.js';
+import { createServerConnection } from '@tatrman/lsp/server';
 
 const ROOT = 'file:///world';
 const MANIFEST = `[schemas]\ndeclared = ["db", "er", "md", "binding", "lexicon"]
@@ -74,17 +76,12 @@ describe('the hosted worker world (shared Node/browser handlers)', () => {
     expect([...diagnostics.values()].flat().some((d) => d.code === 'lsp/manifest-missing')).toBe(false);
   });
 
-  it('warns once per root when the host omits the manifest, and keeps defaults', async () => {
-    let warnings = 0;
-    client.onNotification('textDocument/publishDiagnostics', (p: lsp.PublishDiagnosticsParams) => {
-      warnings += p.diagnostics.filter((d) => d.code === 'lsp/manifest-missing').length;
-    });
+  it('keeps one missing-manifest warning published until a manifest is supplied', async () => {
     expect(await load()).toMatchObject({ ok: true, manifest: { bindings: { required: false }, defaults: {} } });
-    expect(warnings).toBe(1);
-    const page = await client.sendRequest('modeler/listSymbols', { kind: 'table' }) as { symbols: { qname: string }[] };
-    expect(page.symbols[0].qname).toBe('shop.db.dbo.table.item');
+    const current = () => diagnostics.get(`${ROOT}/modeler.toml`) ?? [];
+    expect(current().filter((d) => d.code === 'lsp/manifest-missing')).toHaveLength(1);
     await client.sendRequest('modeler/setProjectRoot', { projectRoot: ROOT, manifest: MANIFEST });
-    expect([...diagnostics.values()].flat().filter((d) => d.severity === 1)).toEqual([]);
+    expect(current().filter((d) => d.code === 'lsp/manifest-missing')).toHaveLength(0);
   });
 
   it('lists populated schema subjects with object and package counts', async () => {
@@ -97,11 +94,50 @@ describe('the hosted worker world (shared Node/browser handlers)', () => {
     ] });
   });
 
-  it('rejects malformed TOML without replacing the working configuration', async () => {
+  it('lists renderable cnc subjects and leaves cn out', async () => {
+    await client.sendNotification('textDocument/didOpen', { textDocument: { uri: `${ROOT}/old.ttrm`, languageId: 'ttr', version: 1, text: 'model cnc\ndef entity Item {}' } });
+    await client.sendNotification('textDocument/didOpen', { textDocument: { uri: `${ROOT}/new.ttrm`, languageId: 'ttr', version: 1, text: 'model cn\ndef kind Product {}' } });
+    expect(await client.sendRequest('modeler/listSchemaSubjects', {})).toEqual({ subjects: [{ schema: 'cnc', objectCount: 1, packageCount: 1 }] });
+  });
+
+  it('stamps the effective package without changing existing graph qnames', async () => {
+    const uri = `${ROOT}/sales/items.ttrm`;
+    await client.sendRequest('modeler/setProjectRoot', { projectRoot: ROOT, manifest: '[packages]\nroot = "shop"\nlayout = "strict"' });
+    await client.sendNotification('textDocument/didOpen', { textDocument: { uri, languageId: 'ttr', version: 1, text: 'model er\ndef entity item {}' } });
+    const graph = await client.sendRequest('modeler/getModelGraph', { textDocument: { uri }, schema: 'er' }) as ModelGraph;
+    expect(graph.nodes[0]).toMatchObject({ pkg: 'shop.sales', qname: 'er.entity.item' });
+    const page = await client.sendRequest('modeler/listSymbols', { kind: 'entity' }) as SymbolPage;
+    expect(page.symbols[0].qname).toBe('shop.sales.er.entity.item');
+  });
+
+  it('builds member details once for a paged listing and rejects cursors after a change', async () => {
     await load(MANIFEST);
-    await expect(client.sendRequest('modeler/setProjectRoot', { projectRoot: ROOT, manifest: '[bindings' })).rejects.toThrow();
-    const page = await client.sendRequest('modeler/listSymbols', { kind: 'table' }) as { symbols: { qname: string }[] };
-    expect(page.symbols[0].qname).toBe('shop.db.warehouse.table.item');
+    const parse = vi.spyOn(parser, 'parseString');
+    try {
+      let page = await client.sendRequest('modeler/listSymbols', { includeMembers: true, limit: 2 }) as SymbolPage;
+      const firstCount = parse.mock.calls.length;
+      expect(firstCount).toBeGreaterThan(0);
+      const cursor = page.nextCursor;
+      let pages = 1;
+      while (page.nextCursor) {
+        page = await client.sendRequest('modeler/listSymbols', { includeMembers: true, limit: 2, cursor: page.nextCursor }) as SymbolPage;
+        pages++;
+      }
+      expect(pages).toBeGreaterThanOrEqual(3);
+      expect(parse.mock.calls.length).toBe(firstCount);
+      await client.sendNotification('textDocument/didChange', { textDocument: { uri: `${ROOT}/model/er/items.ttrm`, version: 2 }, contentChanges: [{ text: FILES['model/er/items.ttrm'] + '\ndef entity another {}' }] });
+      await expect(client.sendRequest('modeler/listSymbols', { includeMembers: true, cursor })).rejects.toThrow('stale cursor');
+    } finally { parse.mockRestore(); }
+  });
+
+  it('loads malformed TOML with defaults and a located error diagnostic', async () => {
+    expect(await load('[bindings')).toMatchObject({ ok: true, manifest: { bindings: { required: false } } });
+    expect(diagnostics.get(`${ROOT}/modeler.toml`)).toEqual([expect.objectContaining({
+      code: 'lsp/manifest-invalid', severity: 1, message: expect.stringContaining('Default manifest settings apply.'),
+      range: { start: { line: 0, character: expect.any(Number) }, end: { line: 0, character: expect.any(Number) } },
+    })]);
+    const subjects = await client.sendRequest('modeler/listSchemaSubjects', {}) as { subjects: { schema: string }[] };
+    expect(subjects.subjects.map((s) => s.schema)).toEqual(['er', 'db', 'md']);
   });
 
   it('pages symbols without truncation, preserving filters and member expansion', async () => {

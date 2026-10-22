@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import type { RenderableSchemaCode } from './model-graph.js';
 import type { ResolvedManifest } from '@tatrman/semantics';
 
 export interface ProjectRootResult {
@@ -9,7 +10,7 @@ export interface ProjectRootResult {
 }
 
 export interface SchemaSubject {
-  schema: 'er' | 'db' | 'md' | 'cn';
+  schema: RenderableSchemaCode;
   objectCount: number;
   packageCount: number;
 }

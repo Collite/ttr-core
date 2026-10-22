@@ -33,6 +33,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   const errors = [];
   const requests = [];
+  let served = snapshot;
   if (process.env.TRACE_RPC)
     await page.addInitScript(() => {
       window.rpcTrace = [];
@@ -62,19 +63,26 @@ try {
       path: new URL(r.request().url()).pathname,
       authorization: r.request().headers().authorization,
     });
-    return r.fulfill({ contentType: 'application/json', body: JSON.stringify(snapshot) });
+    return r.fulfill({ contentType: 'application/json', body: JSON.stringify(served) });
   });
   await page.goto(new URL('host-smoke.html', base).href);
   await page.waitForFunction(() => Number.isFinite(window.readyMs), undefined, { timeout: 30000 });
   const readyMs = await page.evaluate(() => window.readyMs);
   const frame = page.frames().find((f) => f.url().includes('backend=host'));
   const labels = await frame.getByTestId('catalog-item').allTextContents();
+  const initialLocation = await page.evaluate(
+    () => messages.find((m) => m.type === 'ttr.frame.location')?.location
+  );
+  await page.evaluate(() => hostSend({ type: 'ttr.host.navigate', location: '/w/foreign/s/md' }));
   await frame.waitForFunction(() => document.querySelectorAll('.react-flow__node').length === 14);
   await frame.waitForTimeout(800);
   const md = {
     nodes: await frame.locator('.react-flow__node').count(),
     edges: await frame.locator('.react-flow__edge').count(),
   };
+  const mdLink = await frame
+    .getByTestId('copy-federation-link')
+    .getAttribute('data-federation-url');
   await page.screenshot({ path: join(out, 'md.png') });
   await page.evaluate(() => hostSend({ type: 'ttr.host.navigate', location: '/w/hartland/s/er' }));
   await frame.waitForFunction(() => document.querySelectorAll('.react-flow__node').length === 36);
@@ -101,6 +109,14 @@ try {
     messages.some((m) => m.type === 'ttr.frame.location' && m.location.includes('layout%3Asales'))
   );
   await page.waitForTimeout(200);
+  const previousHeader = await frame.getByTestId('studio-header').elementHandle();
+  served = { ...snapshot, sha: `${snapshot.sha}-refreshed` };
+  await page.evaluate(
+    (sha) => hostSend({ type: 'ttr.host.navigate', location: '/w/foreign/s/md', sha }),
+    served.sha
+  );
+  await frame.waitForFunction((old) => !old.isConnected, previousHeader);
+  await frame.waitForFunction(() => document.querySelectorAll('.react-flow__node').length === 14);
   const state = await frame.evaluate(() => ({
     path: location.pathname,
     hash: location.hash,
@@ -119,6 +135,9 @@ try {
         md,
         er,
         sales,
+        initialLocation,
+        mdLink,
+        refreshedMdNodes: await frame.locator('.react-flow__node').count(),
         state,
         hostPath: new URL(page.url()).pathname,
         requests,
@@ -131,6 +150,9 @@ try {
   );
   if (
     readyMs > 3000 ||
+    initialLocation !== '/w/hartland' ||
+    mdLink !== `${new URL(base).origin}/m/hartland/s/md` ||
+    requests.length !== 3 ||
     errors.length ||
     messages.some((m) => m.type === 'ttr.frame.error') ||
     requests.at(-1)?.authorization !== 'Bearer refreshed-smoke-only' ||

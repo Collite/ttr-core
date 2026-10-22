@@ -64,7 +64,7 @@ export function layoutIndexOf(whole: GetGraphResponse): LayoutGraphIndex {
   const fullQnameOf = new Map<string, string>();
   const pkgOf = new Map<string, string>();
   const cards: LayoutIndexEntry[] = [];
-  for (const n of whole.nodes) {
+  const named = whole.nodes.map((n) => {
     const pkg = n.pkg ?? '';
     const original = fullQname(n.qname, pkg);
     const unqualified = pkg && original.startsWith(`${pkg}.`) ? original.slice(pkg.length + 1) : original;
@@ -74,7 +74,13 @@ export function layoutIndexOf(whole: GetGraphResponse): LayoutGraphIndex {
     // both spellings when opening an existing layout, without two candidates.
     const catalogName = schema === 'db' && parts.length === 4 && parts[0] === 'db' && parts[2] === n.kind
       ? [parts[0], parts[1], parts[3]].join('.') : unqualified;
-    const fq = fullQname(catalogName, pkg);
+    return { n, pkg, original, unqualified, catalog: fullQname(catalogName, pkg) };
+  });
+  const counts = new Map<string, number>();
+  for (const { catalog } of named) counts.set(catalog, (counts.get(catalog) ?? 0) + 1);
+  for (const { n, pkg, original, unqualified, catalog } of named) {
+    // Collapsing DB kind names is safe only when the catalog name is unique.
+    const fq = counts.get(catalog) === 1 ? catalog : original;
     nodeOf.set(fq, n.qname);
     fullQnameOf.set(n.qname, fq);
     pkgOf.set(n.qname, pkg);

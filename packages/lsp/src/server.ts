@@ -89,6 +89,7 @@ import {
   type CnHygieneReport,
   type CnValidation,
   type ResolvedManifest,
+  type ProjectManifest,
   type PackageGraph,
   type SqlConfig,
   type SqlRefHit,
@@ -278,7 +279,6 @@ export function createServerConnection(
 
   const projectSymbols = new ProjectSymbolTable();
   let manifest: ResolvedManifest = resolveManifest(undefined, '');
-  const warnedManifestRoots = new Set<string>();
   // `[sql]` config from modeler.toml (embedded-sql §3.3) — default dialect +
   // (database, schema) ⇄ namespace map for the §3.4 SQL resolver. Refreshed
   // whenever the project root changes; empty until then.
@@ -293,6 +293,13 @@ export function createServerConnection(
   // CN-P2 S2.7 — the project's cn analysis (the validation and the hygiene report), read by
   // `modeler/getCnHygiene` and the concept hover; dropped whenever the symbol table changes.
   let cnCache: { validation: CnValidation; report: CnHygieneReport } | null = null;
+  let symbolGeneration = 0;
+  let symbolPageCache: { key: string; symbols: ListedSymbol[] } | null = null;
+  function invalidateSymbols(): void {
+    cnCache = null;
+    symbolGeneration++;
+    symbolPageCache = null;
+  }
   let supportsConfiguration = false;
   // Resolved `.ttrlint.toml` config, cached and refreshed asynchronously
   // (publishDiagnostics is sync). Starts at the legacy-aware recommended config.
@@ -599,7 +606,7 @@ export function createServerConnection(
     resolver = new Resolver(projectSymbols, '', () => manifest);
     if (projectRoot) manifest.projectRoot = projectRoot;
     packageGraph = null;
-    cnCache = null;
+    invalidateSymbols();
   }
 
   function getPackageGraph(): PackageGraph {
@@ -614,7 +621,7 @@ export function createServerConnection(
     return packageGraph;
   }
 
-  function publishDiagnostics(uri: string, content: string): void {
+  function publishDiagnostics(uri: string, content: string, projectDiagnostics?: Map<string, LintDiagnostic[]>): void {
     if (uri.endsWith('.ttrl')) return;
 
     const result = parseString(content, uri);
@@ -635,8 +642,7 @@ export function createServerConnection(
       const docDiags = lintDocument(uri, result.ast, deps, config);
       // Project-scoped rules (duplicate-definition/-mapping, circular), bucketed
       // by uri and filtered to this file — mirrors the old `.filter(d.source.file)`.
-      const docs = getProjectDocuments();
-      const projectByUri = lintProject(docs, pkgGraph, deps, config);
+      const projectByUri = projectDiagnostics ?? lintProject(getProjectDocuments(), pkgGraph, deps, config);
       const projDiags = projectByUri.get(uri) ?? [];
 
       for (const d of [...docDiags, ...projDiags]) {
@@ -729,8 +735,12 @@ export function createServerConnection(
     await refreshSqlConfig();
     cachedLintConfig = await loadLintConfig(manifest.projectRoot, manifest.lint, opts.readConfigFile);
     publishConfigDiagnostics();
+    // One stable project snapshot for this full revalidation. Rebuilding project lint per document
+    // made a browser file-map's required second pass quadratic and repeated the same diagnostics.
+    const projectDiagnostics = lintProject(getProjectDocuments(), getPackageGraph(),
+      { manifest, symbols: projectSymbols, resolver }, lintConfig());
     for (const doc of documents.all()) {
-      publishDiagnostics(doc.uri, doc.getText());
+      publishDiagnostics(doc.uri, doc.getText(), projectDiagnostics);
     }
   }
 
@@ -811,7 +821,7 @@ export function createServerConnection(
   }
 
   function updateSymbolTable(uri: string, content: string): void {
-    cnCache = null;
+    invalidateSymbols();
     const result = parseString(content, uri);
     if (!result.ast) return;
     // '' (no directive) ⇒ the semantics layer derives the schema per definition
@@ -877,7 +887,7 @@ export function createServerConnection(
     }
 
     packageGraph = null;
-    cnCache = null;
+    invalidateSymbols();
   }
 
   documents.onDidOpen(async (event: TextDocumentChangeEvent<TextDocument>) => {
@@ -920,7 +930,7 @@ export function createServerConnection(
       sqlRefIndex.removeDocument(uri);
     }
     packageGraph = null;
-    cnCache = null;
+    invalidateSymbols();
   });
 
   documents.onDidSave(() => {
@@ -933,6 +943,7 @@ export function createServerConnection(
         const docs = await opts.loadStock();
         for (const d of docs) {
           projectSymbols.upsertDocument(d.uri, d.ast, d.schemaCode, d.namespace, '');
+          invalidateSymbols();
           synthesizeMappings(projectSymbols, d.uri, d.ast);
         }
       } catch {
@@ -1068,7 +1079,7 @@ export function createServerConnection(
 
     if (touched) {
       packageGraph = null;
-    cnCache = null;
+    invalidateSymbols();
       // Cross-file resolution changed; re-publish diagnostics for open docs.
       for (const doc of documents.all()) {
         publishDiagnostics(doc.uri, doc.getText());
@@ -1164,8 +1175,13 @@ export function createServerConnection(
       ? new URL(params.projectRoot).pathname
       : params.projectRoot;
     // The browser has no filesystem: the host supplies the very same TOML that
-    // the Node loader reads. Parse before changing any state (invalid TOML fails atomically).
-    let nextManifest = resolveManifest(params.manifest === undefined ? undefined : parseManifest(params.manifest), root);
+    // the Node loader reads. Desktop projects fall back to defaults on malformed TOML;
+    // browser projects must still load too, with a diagnostic explaining the fallback.
+    let raw: ProjectManifest | undefined;
+    let invalid: unknown;
+    try { raw = params.manifest === undefined ? undefined : parseManifest(params.manifest); }
+    catch (e) { invalid = e; }
+    let nextManifest = resolveManifest(raw, root);
     if (params.manifest === undefined && opts.loadManifest) {
       nextManifest = await opts.loadManifest(`${params.projectRoot.replace(/\/$/, '')}/modeler.toml`);
     }
@@ -1175,12 +1191,19 @@ export function createServerConnection(
       severity: d.severity === 'error' ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning,
       code: d.code, source: 'modeler', message: d.message,
     }));
-    if (params.manifest === undefined && !opts.loadManifest && !warnedManifestRoots.has(root)) {
-      warnedManifestRoots.add(root);
+    if (params.manifest === undefined && !opts.loadManifest) {
       configDiagnostics.push({
         range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
         severity: DiagnosticSeverity.Warning, code: 'lsp/manifest-missing', source: 'modeler',
         message: 'The host did not supply modeler.toml. Default manifest settings apply; model references may not resolve.',
+      });
+    }
+    if (invalid) {
+      const error = invalid as { line?: number; column?: number; message?: string };
+      const position = { line: Math.max(0, (error.line ?? 1) - 1), character: Math.max(0, (error.column ?? 1) - 1) };
+      configDiagnostics.push({ range: { start: position, end: position }, severity: DiagnosticSeverity.Error,
+        code: 'lsp/manifest-invalid', source: 'modeler',
+        message: `modeler.toml could not be parsed: ${String(error.message ?? invalid).split(/\r?\n/)[0]}. Default manifest settings apply.`,
       });
     }
     connection.sendDiagnostics({ uri: `file://${root.replace(/\/$/, '')}/modeler.toml`, diagnostics: configDiagnostics });
@@ -1197,9 +1220,11 @@ export function createServerConnection(
 
   connection.onRequest('modeler/listSchemaSubjects', () => {
     const symbols = projectSymbols.all();
+    // Legacy cnc entities use ER canonical symbol kinds, but their canvas is still the cnc model.
+    const cncFiles = new Set([...getProjectDocuments()].filter(([, ast]) => ast.modelDirective?.modelCode === 'cnc').map(([uri]) => uri));
     const subjects: SchemaSubject[] = [];
-    for (const schema of ['er', 'db', 'md', 'cn'] as const) {
-      const members = symbols.filter((s) => s.schemaCode === schema && !s.parent && !['term', 'area', 'project'].includes(s.kind));
+    for (const schema of (['er', 'db', 'md', 'cnc'] as const satisfies readonly RenderableSchemaCode[])) {
+      const members = symbols.filter((s) => (cncFiles.has(s.documentUri) ? 'cnc' : s.schemaCode) === schema && !s.parent && !['term', 'area', 'project'].includes(s.kind));
       if (members.length === 0) continue;
       subjects.push({ schema, objectCount: members.length, packageCount: new Set(members.map((s) => s.packageName ?? '')).size });
     }
@@ -1213,13 +1238,14 @@ export function createServerConnection(
 
     const allDocs = documents.all();
     const asts: Document[] = [];
+    const packages = new Map<Document, string>();
     for (const doc of allDocs) {
       const content = doc.getText();
       const result = parseString(content, doc.uri);
-      if (result.ast) asts.push(result.ast);
+      if (result.ast) { asts.push(result.ast); packages.set(result.ast, effPkg(doc.uri, result.ast)); }
     }
 
-    return buildProjectModelGraph(asts, params.schema, manifest.preferredLanguage);
+    return buildProjectModelGraph(asts, params.schema, manifest.preferredLanguage, (ast) => packages.get(ast) ?? '');
   });
 
   connection.onRequest('modeler/listGraphs', (_params: { projectRoot: string }) => {
@@ -1362,29 +1388,36 @@ export function createServerConnection(
 
   connection.onRequest('modeler/listSymbols', (params: ListSymbolsParams = {}) => {
     const limit = params.limit ?? 500;
-    const start = params.cursor === undefined ? 0 : Number(params.cursor);
-    if (!Number.isSafeInteger(limit) || limit < 1 || !Number.isSafeInteger(start) || start < 0 || (params.cursor !== undefined && !/^\d+$/.test(params.cursor))) {
+    const cursor = params.cursor === undefined ? null : /^(\d+):(\d+)$/.exec(params.cursor);
+    const start = cursor ? Number(cursor[2]) : 0;
+    if (!Number.isSafeInteger(limit) || limit < 1 || !Number.isSafeInteger(start) || start < 0 || (params.cursor !== undefined && !cursor)) {
       throw new ResponseError(ErrorCodes.InvalidParams, 'Expected a positive integer limit and a cursor returned by listSymbols.');
     }
+    if (cursor && Number(cursor[1]) !== symbolGeneration) throw new ResponseError(ErrorCodes.InvalidParams, 'stale cursor');
     const kinds = params.kind ? [params.kind] : params.kinds;
-    const allowed = kinds ? new Set(kinds) : null;
-    const tops = projectSymbols.all().filter((s) => (!allowed || allowed.has(s.kind)) && (params.package === undefined || (s.packageName ?? '') === params.package));
-    const out: ListedSymbol[] =
-      tops.map((s) => ({ qname: s.qname, kind: s.kind, name: s.name, packageName: s.packageName ?? null }));
-    if (params.includeMembers) {
-      // FO-A1 W2 (contracts §5): expand table/view/entity members into `kind:'member'`
-      // refs carrying memberPath + parent. Reuses the same rosters as getSymbolDetail.
-      for (const s of tops) {
-        if (s.kind !== 'table' && s.kind !== 'view' && s.kind !== 'entity') continue;
-        const detail = buildSymbolDetail(s.qname, projectSymbols, resolver, refIndex, manifest, (uri) => {
-          const doc = documents.get(uri);
-          return doc ? doc.getText() : null;
-        }, (content, uri) => parseString(content, uri));
-        if (!detail) continue;
-        for (const m of memberRefsOf(detail, s.packageName ?? null)) out.push(m);
+    const key = JSON.stringify([symbolGeneration, kinds ? [...new Set(kinds)].sort() : null, params.package ?? null, !!params.includeMembers]);
+    if (symbolPageCache?.key !== key) {
+      const allowed = kinds ? new Set(kinds) : null;
+      const tops = projectSymbols.all().filter((s) => (!allowed || allowed.has(s.kind)) && (params.package === undefined || (s.packageName ?? '') === params.package));
+      const out: ListedSymbol[] =
+        tops.map((s) => ({ qname: s.qname, kind: s.kind, name: s.name, packageName: s.packageName ?? null }));
+      if (params.includeMembers) {
+        // FO-A1 W2 (contracts §5): expand table/view/entity members into `kind:'member'`
+        // refs carrying memberPath + parent. Reuses the same rosters as getSymbolDetail.
+        for (const s of tops) {
+          if (s.kind !== 'table' && s.kind !== 'view' && s.kind !== 'entity') continue;
+          const detail = buildSymbolDetail(s.qname, projectSymbols, resolver, refIndex, manifest, (uri) => {
+            const doc = documents.get(uri);
+            return doc ? doc.getText() : null;
+          }, (content, uri) => parseString(content, uri));
+          if (!detail) continue;
+          for (const m of memberRefsOf(detail, s.packageName ?? null)) out.push(m);
+        }
       }
+      symbolPageCache = { key, symbols: out };
     }
-    return { symbols: out.slice(start, start + limit), total: out.length, ...(start + limit < out.length ? { nextCursor: String(start + limit) } : {}) };
+    const out = symbolPageCache.symbols;
+    return { symbols: out.slice(start, start + limit), total: out.length, ...(start + limit < out.length ? { nextCursor: `${symbolGeneration}:${start + limit}` } : {}) };
   });
 
   connection.onDefinition((params) => {

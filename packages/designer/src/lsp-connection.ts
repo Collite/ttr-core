@@ -82,14 +82,22 @@ export async function lspClientOver(
       return connection.sendRequest('modeler/getSymbolDetail', { qname }) as Promise<SymbolDetail | null>;
     },
     async listSymbols(options) {
-      const symbols: ListedSymbol[] = [];
-      let cursor: string | undefined;
-      do {
-        const page = await connection.sendRequest('modeler/listSymbols', { ...options, ...(cursor === undefined ? {} : { cursor }) }) as SymbolPage;
-        symbols.push(...page.symbols);
-        cursor = page.nextCursor;
-      } while (cursor !== undefined);
-      return symbols;
+      for (let attempt = 0; ; attempt++) {
+        const symbols: ListedSymbol[] = [];
+        let cursor: string | undefined;
+        try {
+          do {
+            const page = await connection.sendRequest('modeler/listSymbols', { ...options, ...(cursor === undefined ? {} : { cursor }) }) as SymbolPage;
+            symbols.push(...page.symbols);
+            cursor = page.nextCursor;
+          } while (cursor !== undefined);
+          return symbols;
+        } catch (error) {
+          const e = error as { code?: number; message?: string };
+          if (attempt > 0 || e.code !== -32602 || e.message !== 'stale cursor') throw error;
+          // A model change invalidated the page sequence. Retry once from a fresh generation.
+        }
+      }
     },
     onDiagnostics(handler) {
       diagnosticHandlers.push(handler);

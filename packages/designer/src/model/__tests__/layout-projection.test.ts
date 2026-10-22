@@ -40,6 +40,15 @@ const six: GetGraphResponse = {
 const fq = (n: string) => `p.er.entity.${n}`;
 
 describe('layoutIndexOf — the catalog keys nodes without the package', () => {
+  it('keeps kinded names when a DB table and view share a catalog name', () => {
+    const whole: GetGraphResponse = { ...six, schema: 'db', edges: [], nodes: (['table', 'view'] as const).map((kind) => ({
+      ...node('item'), qname: `shop.db.dbo.${kind}.item`, pkg: 'shop', kind, schemaCode: 'db',
+    })) };
+    const idx = layoutIndexOf(whole);
+    expect(new Set(idx.index.cards.map((c) => c.fullQname)).size).toBe(2);
+    for (const kind of ['table', 'view']) expect(projectLayout(whole, doc([`${kind}.item`], 'db'), { hops: 1 }, idx).graph.nodes[0].kind).toBe(kind);
+    expect(projectLayout(whole, doc(['item'], 'db'), { hops: 1 }, idx).ambiguous).toHaveLength(1);
+  });
   it('maps full qnames to node ids and back; relations become ignorable edges', () => {
     const idx = layoutIndexOf(er);
     expect(idx.nodeOf.get('hartland.er.entity.item')).toBe('er.entity.item');

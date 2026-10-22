@@ -38,6 +38,56 @@ function stubClient(overrides: Partial<LspClient> = {}): LspClient {
 }
 
 describe('WorkerLspDataSource', () => {
+  const layoutSource = (files: Record<string, string>, failSchema = false) => {
+    const client = stubClient({ getModelGraph: vi.fn(async (): Promise<ModelGraph> => {
+      if (failSchema) throw new Error('unavailable');
+      return { schemaCode: 'er', edges: [], nodes: [{ qname: 'shop.er.entity.item', pkg: 'shop', kind: 'entity', name: 'item', schemaCode: 'er', label: 'item', sourceUri: '', sourceLocation: { line: 1, column: 0 }, rows: [] }] };
+    }) });
+    return { source: new WorkerLspDataSource(client, { projectRoot: 'file:///p', files: new Map(Object.entries(files)) }), client };
+  };
+
+  it('isolates unreadable and duplicate declared layout names, and reports each issue once', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { source, client } = layoutSource({
+        'model/layouts/a.ttrg': 'graph duplicate { model: er, objects: [item] }',
+        'model/layouts/b.ttrg': 'graph duplicate { model: er, objects: [item] }',
+        'model/layouts/good.ttrg': 'graph good { model: er, objects: [item] }',
+        'model/layouts/also/good.ttrg': 'graph other { model: er, objects: [item] }',
+        'model/layouts/bad.ttrg': 'not a layout',
+      });
+      expect((await source.listCatalog()).graphs.filter((g) => g.layout).map((g) => g.name)).toEqual(['other', 'good']);
+      expect(client.getModelGraph).toHaveBeenCalledTimes(1);
+      const issues = await source.layoutIssues();
+      expect(issues).toHaveLength(3);
+      expect(issues.find((i) => i.path === 'model/layouts/a.ttrg')!.reason).toContain('model/layouts/b.ttrg');
+      expect(issues.find((i) => i.path === 'model/layouts/b.ttrg')!.reason).toContain('model/layouts/a.ttrg');
+      expect(warn).toHaveBeenCalledTimes(3);
+      await expect(source.getLayoutDoc('duplicate')).rejects.toThrow("Unknown layout 'duplicate'");
+    } finally { warn.mockRestore(); }
+  });
+
+  it('isolates layouts whose model cannot be read', async () => {
+    const { source } = layoutSource({ 'model/layouts/a.ttrg': 'graph a { model: er, objects: [item] }' }, true);
+    await expect(source.listCatalog()).resolves.toBeDefined();
+    expect(await source.layoutIssues()).toEqual([{ path: 'model/layouts/a.ttrg', reason: 'the er schema could not be read' }]);
+  });
+
+  it('only reports unresolved objects, not stale position-only keys', async () => {
+    const make = (objects: string) => layoutSource({ 'model/layouts/a.ttrg': `graph a { model: er, objects: [${objects}] }`, 'model/layouts/a.ttrl': 'ttrl 1\ncanvas a { mode: manual\nnodes: { "item": {x: 1, y: 2}\n"gone": {x: 3, y: 4} } }' }).source;
+    const source = make('item');
+    const layout = await source.getLayoutDoc('a');
+    expect(layout.missing).toEqual([]);
+    expect(layout.positions).toEqual({ 'shop.er.entity.item': { x: 1, y: 2 } });
+    expect((await source.listLayouts())[0].missingCount).toBe(0);
+    expect((await make('item, gone').getLayoutDoc('a')).missing).toEqual(['gone']);
+  });
+
+  it('gets MD packages from the graph without fetching symbols', async () => {
+    const { source, client } = layoutSource({});
+    expect((await source.getSchemaGraph('md'))!.nodes[0].pkg).toBe('shop');
+    expect(client.listSymbols).not.toHaveBeenCalled();
+  });
   it('capabilities.edit is true and exposes the lspClient escape hatch', () => {
     const client = stubClient();
     const src = new WorkerLspDataSource(client, { projectRoot: 'file:///proj' });

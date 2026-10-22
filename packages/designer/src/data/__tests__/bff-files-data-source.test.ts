@@ -51,6 +51,7 @@ describe('BFF snapshots in a worker', () => {
       'model er'
     );
     expect(source.project!.files.get('model/layouts/sales.ttrg')).toBe('graph sales {}');
+    expect(clients[0].setProjectRoot).toHaveBeenCalledTimes(2);
     source.dispose();
   });
 
@@ -118,6 +119,36 @@ describe('BFF snapshots in a worker', () => {
     expect(b.sha).toBeNull();
     expect(broken.dispose).toHaveBeenCalledOnce();
     b.dispose();
+  });
+
+  it('retains the old snapshot on a catalog failure and defers retirement until the new shell commits', async () => {
+    const { source, clients, fetcher, createClient } = harness();
+    await source.refresh();
+    fetcher.mockResolvedValue({
+      ok: true,
+      json: async () => ({ sha: 'two', files: { 'modeler.toml': manifest } }),
+    } as Response);
+    const broken = {
+      setProjectRoot: vi.fn(),
+      openDocument: vi.fn(),
+      dispose: vi.fn(),
+      listGraphs: vi.fn(async () => {
+        throw new Error('catalog unavailable');
+      }),
+      listSymbols: vi.fn(async () => []),
+      listSchemaSubjects: vi.fn(async () => ({ subjects: [] })),
+    } as unknown as LspClient;
+    createClient.mockResolvedValueOnce(broken);
+    await expect(source.refresh()).rejects.toThrow('catalog unavailable');
+    expect(source.sha).toBe('one');
+    expect(clients[0].dispose).not.toHaveBeenCalled();
+    expect(broken.dispose).toHaveBeenCalledOnce();
+    await source.refresh({ deferDisposal: true });
+    expect(source.sha).toBe('two');
+    expect(clients[0].dispose).not.toHaveBeenCalled();
+    source.disposeRetired();
+    expect(clients[0].dispose).toHaveBeenCalledOnce();
+    source.dispose();
   });
 
   it('rejects cross-origin API paths before a bearer can be sent', () => {

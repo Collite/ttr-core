@@ -4,6 +4,7 @@ export type HostScope = { kind: 'served' } | { kind: 'change'; id: string };
 export interface HostInit {
   type: 'ttr.host.init';
   basePath: string;
+  workspace: string;
   api: string;
   token: string;
   scope: HostScope;
@@ -48,6 +49,7 @@ function parseMessage(value: unknown): HostMessage | null {
       return isHostPath(m.api) &&
         isHostPath(m.basePath) &&
         m.basePath.endsWith('/') &&
+        typeof m.workspace === 'string' && m.workspace.trim().length > 0 && !m.workspace.includes('/') &&
         typeof m.token === 'string' &&
         (m.lang === 'en' || m.lang === 'cs') &&
         m.theme === 'light' &&
