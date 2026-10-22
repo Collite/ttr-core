@@ -52,8 +52,66 @@ class LoadCommandSpec :
             out.exitCode shouldBe 1
             payload(
                 out,
-            )["issues"]!!.jsonArray.any { it.jsonObject["code"]!!.jsonPrimitive.content == "reconcile-error" } shouldBe
+            )["issues"]!!.jsonArray.any { it.jsonObject["code"]!!.jsonPrimitive.content == "duplicate-qname" } shouldBe
                 true
+        }
+        "duplicate messages use stable checkout relative locations" {
+            val out = run("reconcile-error")
+            out.stdout.contains("model/b.ttrm:2") shouldBe true
+            out.stdout.contains(world("reconcile-error").toString()) shouldBe false
+            out.stderr.contains(world("reconcile-error").toString()) shouldBe false
+        }
+        "package layout follows the manifest policy" {
+            run("layout-off").exitCode shouldBe 0
+            payload(run("layout-off"))["issues"]!!.jsonArray.size shouldBe 0
+            val strict = run("layout-strict")
+            strict.exitCode shouldBe 1
+            val issue = payload(strict)["issues"]!!.jsonArray.single().jsonObject
+            issue["code"]!!.jsonPrimitive.content shouldBe "package-mismatch"
+            issue["severity"]!!.jsonPrimitive.content shouldBe "error"
+            val flexible = run("layout-default")
+            flexible.exitCode shouldBe 0
+            payload(flexible)["issues"]!!
+                .jsonArray
+                .single()
+                .jsonObject["severity"]!!
+                .jsonPrimitive.content shouldBe
+                "warning"
+        }
+        "bad TOML applies defaults and reports a manifest error" {
+            val out = run("manifest-invalid")
+            out.exitCode shouldBe 1
+            val issues = payload(out)["issues"]!!.jsonArray.map { it.jsonObject }
+            issues.count { it["code"]!!.jsonPrimitive.content == "manifest-invalid" } shouldBe 1
+            issues
+                .first {
+                    it["code"]!!.jsonPrimitive.content == "manifest-invalid"
+                }["file"]!!
+                .jsonPrimitive.content shouldBe
+                "modeler.toml"
+            issues
+                .first {
+                    it["code"]!!.jsonPrimitive.content == "package-mismatch"
+                }["severity"]!!
+                .jsonPrimitive.content shouldBe
+                "warning"
+            run("manifest-invalid", strict = false).exitCode shouldBe 0
+        }
+        "a missing model directory has a readable issue in both modes" {
+            for (strict in listOf(true, false)) {
+                val out = run("no-model-dir", strict)
+                out.exitCode shouldBe 1
+                val issue = payload(out)["issues"]!!.jsonArray.single().jsonObject
+                issue["code"]!!.jsonPrimitive.content shouldBe "no-model-dir"
+                issue["message"]!!.jsonPrimitive.content.startsWith("no model/ directory under ") shouldBe true
+            }
+        }
+        "usage errors are distinct from model errors and help succeeds" {
+            for (args in listOf(listOf("load", "x", "--strcit"), listOf("load"), listOf("load", "a", "b"))) {
+                runMetadataCommand(args).exitCode shouldBe 64
+            }
+            runMetadataCommand(listOf("--help")).exitCode shouldBe 0
+            runMetadataCommand(listOf("load", "--help")).exitCode shouldBe 0
         }
         "version mismatch and missing manifest use their contracted exits" {
             run("clean", expectVersion = "9.9.9").exitCode shouldBe 2

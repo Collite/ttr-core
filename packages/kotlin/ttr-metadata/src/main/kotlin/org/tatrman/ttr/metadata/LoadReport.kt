@@ -2,12 +2,17 @@
 package org.tatrman.ttr.metadata
 
 import org.tatrman.ttr.metadata.source.SourceSnapshot
-import org.tatrman.ttr.semantics.MappingSource
+import org.tatrman.ttr.metadata.source.underRoot
+import org.tatrman.ttr.semantics.duplicateDefinitions
 import org.tatrman.ttr.semantics.SymbolTable
+
+/** Package-declaration mismatch policy from `modeler.toml`, matching the TypeScript lint. */
+enum class PackageLayout { Flexible, Strict, Off }
 
 /** Opt-in validation for a checkout gate; does not change model construction or registry swap policy. */
 data class LoadOptions(
     val strict: Boolean = false,
+    val packageLayout: PackageLayout = PackageLayout.Flexible,
 )
 
 data class LoadReportIssue(
@@ -20,6 +25,7 @@ data class LoadReportIssue(
 
 /** A successfully parsed input document. [objects] counts its authored top-level definitions. */
 data class LoadSource(
+    val sourceId: String,
     val path: String,
     val objects: Int,
 )
@@ -35,6 +41,7 @@ data class LoadReport(
         internal fun collect(
             snapshots: List<SourceSnapshot>,
             issues: List<LoadIssue>,
+            options: LoadOptions,
         ): LoadReport {
             val dropped =
                 snapshots
@@ -43,23 +50,31 @@ data class LoadReport(
                     .distinct()
                     .sorted()
             val reportIssues =
-                issues.map {
+                issues.mapNotNull { issue ->
+                    val severity =
+                        if (issue.category == LoadIssue.Category.PACKAGE_MISMATCH) {
+                            when (options.packageLayout) {
+                                PackageLayout.Off -> return@mapNotNull null
+                                PackageLayout.Flexible -> LoadIssue.Severity.WARNING
+                                PackageLayout.Strict -> LoadIssue.Severity.ERROR
+                            }
+                        } else {
+                            issue.severity
+                        }
                     LoadReportIssue(
-                        it.file,
-                        it.line,
-                        if (it.file in
+                        issue.file,
+                        issue.line,
+                        if (issue.file in
                             dropped
                         ) {
                             "dropped-file"
-                        } else if (it.severity == LoadIssue.Severity.ERROR) {
-                            "reconcile-error"
                         } else {
-                            it.category.name
+                            issue.category.name
                                 .lowercase()
                                 .replace('_', '-')
                         },
-                        it.severity,
-                        it.message,
+                        severity,
+                        issue.message,
                     )
                 }
             // A FileBasedSource stores objects in maps, so duplicates within it have already been
@@ -78,30 +93,25 @@ data class LoadReport(
                             packageName = file.declaredPackage ?: file.computedPackage,
                         )
                     }
-                    symbols.duplicates().flatMap { duplicate ->
-                        val inlineBinding =
-                            duplicate.entries.any { it.mappingSource == MappingSource.Inline } &&
-                                duplicate.entries.first().kind in
-                                setOf("er2dbEntity", "er2dbAttribute", "er2dbRelation")
-                        val entries = duplicate.entries.filter { it.cnOrigin == null }
-                        if (inlineBinding || entries.size < 2) {
-                            emptyList()
-                        } else {
-                            entries.map { entry ->
-                                LoadReportIssue(
-                                    entry.documentUri,
-                                    entry.source.line,
-                                    "reconcile-error",
-                                    LoadIssue.Severity.ERROR,
-                                    "Duplicate definition of '${duplicate.qname}' (also at " +
-                                        entries
-                                            .filter {
-                                                it !== entry
-                                            }.joinToString { "${it.documentUri}:${it.source.line}" } +
-                                        ")",
-                                )
-                            }
+                    val sourceNames =
+                        peers.flatMap { it.loadedFiles }.associate { file ->
+                            val storage = file.storageFile
+                            storage.path to
+                                listOfNotNull(
+                                    storage.rootPath?.fileName?.toString(),
+                                    storage.underRoot(),
+                                ).joinToString("/")
                         }
+                    duplicateDefinitions(symbols.duplicates()) { entry ->
+                        "${sourceNames[entry.documentUri] ?: entry.documentUri}:${entry.source.line}"
+                    }.map { diagnostic ->
+                        LoadReportIssue(
+                            diagnostic.source.file,
+                            diagnostic.source.line,
+                            "duplicate-qname",
+                            LoadIssue.Severity.ERROR,
+                            diagnostic.message,
+                        )
                     }
                 }
             return LoadReport(
@@ -109,9 +119,10 @@ data class LoadReport(
                 droppedFiles = dropped,
                 sources =
                     snapshots
-                        .flatMap { it.loadedFiles }
-                        .map {
-                            LoadSource(it.storageFile.path, it.definitions.size)
+                        .flatMap { snapshot ->
+                            snapshot.loadedFiles.map {
+                                LoadSource(snapshot.sourceId, it.storageFile.path, it.definitions.size)
+                            }
                         }.sortedBy { it.path },
             )
         }

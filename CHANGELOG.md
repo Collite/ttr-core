@@ -7,8 +7,11 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 ## Unreleased
 
 - **Studio strict metadata gate** — new `ttr-metadata load <root> --strict --json` CLI,
-  version checking and structured dropped-file/reconciliation diagnostics. `MetadataLoader.load(LoadOptions)`
-  collects an opt-in report, including duplicate definitions within a file source; existing `load()` behavior
+  version checking and category-coded diagnostics. Manifest `[packages].layout` grades package mismatches like
+  TypeScript (off suppresses, flexible warns, strict errors); invalid TOML uses defaults plus a manifest error. `MetadataLoader.load(LoadOptions)`
+  collects an opt-in report (null when unchecked), including duplicate definitions within a file source via the
+  shared semantic Validator rule. Duplicate messages use relative paths, usage errors exit 64, and missing
+  `model/` is diagnosed explicitly. Existing `load()` behavior
   and registry refresh semantics remain unchanged. `just build-metadata-cli` installs `bin/ttr-metadata`;
   the CLI jar and distribution join the grammar release bundle. See [metadata-cli](docs/manual/metadata-cli.md).
 - **Hosted viewer image** — fix nginx's `/m/_designer/` directory entry to internally select its HTML route,

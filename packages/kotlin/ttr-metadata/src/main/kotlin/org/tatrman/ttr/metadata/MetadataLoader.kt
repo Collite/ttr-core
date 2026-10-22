@@ -47,7 +47,7 @@ class MetadataLoader(
             LoadResult(
                 model = result.model,
                 issues = issues,
-                report = if (options.strict) LoadReport.collect(snapshots, issues) else LoadReport(),
+                report = if (options.strict) LoadReport.collect(snapshots, issues, options) else null,
             )
         }.getOrElse { e ->
             val issue =
@@ -58,7 +58,7 @@ class MetadataLoader(
             LoadResult(
                 model = null,
                 issues = listOf(issue),
-                report = if (options.strict) LoadReport.collect(emptyList(), listOf(issue)) else LoadReport(),
+                report = if (options.strict) LoadReport.collect(emptyList(), listOf(issue), options) else null,
             )
         }
 }
@@ -67,7 +67,8 @@ class MetadataLoader(
 data class LoadResult(
     val model: Model?,
     val issues: List<LoadIssue>,
-    val report: LoadReport = LoadReport(),
+    /** Null unless [LoadOptions.strict] requested validation. */
+    val report: LoadReport? = null,
 ) {
     val errors: List<LoadIssue> get() = issues.filter { it.severity == LoadIssue.Severity.ERROR }
     val warnings: List<LoadIssue> get() = issues.filter { it.severity == LoadIssue.Severity.WARNING }

@@ -41,6 +41,7 @@ sourceSets.main { resources.srcDir(generateMetadataVersion) }
 dependencies {
     implementation(project(":packages:kotlin:ttr-metadata"))
     implementation(libs.clikt)
+    implementation(libs.tomlj)
     implementation(libs.kotlinx.ser.json)
     testImplementation(libs.bundles.kotest)
 }
