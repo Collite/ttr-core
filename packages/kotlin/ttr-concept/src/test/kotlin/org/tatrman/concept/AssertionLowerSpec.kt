@@ -310,6 +310,21 @@ class AssertionLowerSpec :
             closed.rows.single().values["discharged_at"] shouldBe "2026-03-04"
             closed.meta.endState shouldBe EndState.END_STATE_UNSPECIFIED
         }
+
+        test("a start-only event (`period: { start }`, no `end:`): its start alone; an end is malformed (R125-2/3)") {
+            val start = "\"period\": { \"start\": { \"value\": \"2026-03-01\", \"granularity\": \"DAY\" } }"
+            val r = lower(plus, frame(ev("cn.Admission"), fresh, start))
+            r.diagnostics.shouldBeEmpty()
+            r.rows.single().values shouldBe mapOf("admitted_on" to "2026-03-01")
+            r.meta.endState shouldBe EndState.END_STATE_UNSPECIFIED
+            CnConceptService(plus).assertionValidate(assertion(frame(ev("cn.Admission"), fresh, start))).shouldBeEmpty()
+            val ended =
+                "\"period\": { \"start\": { \"value\": \"2026-03-01\", \"granularity\": \"DAY\" }, " +
+                    "\"end\": { \"value\": \"2026-03-04\", \"granularity\": \"DAY\" } }"
+            refused(plus, frame(ev("cn.Admission"), fresh, ended), "cn/malformed-frame period.end")
+            val open = "\"period\": { \"start\": { \"value\": \"2026-03-01\", \"granularity\": \"DAY\" }, \"endState\": \"END_OPEN\" }"
+            refused(plus, frame(ev("cn.Admission"), fresh, open), "cn/malformed-frame period.end")
+        }
     }) {
     companion object {
         /** `clinic` plus the shapes the golden world lacks. Invented, like the world. */
@@ -339,6 +354,9 @@ class AssertionLowerSpec :
                     def entity room {
                         attributes: [ def attribute ward { type: int, isKey: true }, def attribute room_no { type: int, isKey: true } ]
                     }
+                    def entity admission {
+                        attributes: [ def attribute admission_id { type: int, isKey: true }, def attribute admitted_on { type: date } ]
+                    }
                     def relation move_encounter { from: er.entity.bed_move, to: er.entity.encounter, join: [{ from: er.entity.bed_move.encounter_id, to: er.entity.encounter.encounter_id }] }
                     def relation note_move { from: er.entity.bed_note, to: er.entity.bed_move, join: [{ from: er.entity.bed_note.move_id, to: er.entity.bed_move.move_id }] }
                     def relation move_room { from: er.entity.bed_move, to: er.entity.room, join: [{ from: er.entity.bed_move.ward, to: er.entity.room.ward }, { from: er.entity.bed_move.room_no, to: er.entity.room.room_no }] }
@@ -359,6 +377,10 @@ class AssertionLowerSpec :
                         period: { start: stay_start, end: stay_end, end_open: unknown },
                         qualities: [stay_start, stay_end]
                     }
+                    def event Admission {
+                        extent: durative,
+                        period: { start: admitted_on }
+                    }
                     """.trimIndent(),
                 "plus/bindings.ttrm" to
                     """
@@ -376,6 +398,11 @@ class AssertionLowerSpec :
                             note: [er.relation.note_move],
                             room: [er.relation.move_room]
                         }
+                    }
+                    def cn2er_event admission_g {
+                        event: cn.Admission,
+                        target: er.entity.admission,
+                        period: { start: er.entity.admission.admitted_on }
                     }
                     def cn2er_event stay_g {
                         event: cn.Stay,

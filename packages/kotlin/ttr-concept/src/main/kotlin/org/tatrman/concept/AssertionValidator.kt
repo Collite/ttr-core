@@ -446,6 +446,17 @@ internal class AssertionValidator(
             }
             return
         }
+        // a start-only period (`period: { start }`, no `end:`) is its start: no attribute holds an end (review-125 R125-2/3)
+        if (declared.end == null) {
+            if (p.hasEnd() || p.endState != EndState.END_STATE_UNSPECIFIED) {
+                f.error(
+                    FrameSlugs.MALFORMED_FRAME,
+                    "period.end",
+                    "`${event.ref}` declares no `end:` — no attribute holds an end",
+                )
+            }
+            return
+        }
         if (p.hasEnd()) {
             if (p.endState != EndState.END_STATE_UNSPECIFIED && p.endState != EndState.END_CLOSED) {
                 f.error(
