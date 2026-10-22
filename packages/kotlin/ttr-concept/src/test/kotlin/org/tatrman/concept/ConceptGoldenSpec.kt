@@ -4,6 +4,7 @@ package org.tatrman.concept
 import com.google.protobuf.util.JsonFormat
 import io.kotest.assertions.fail
 import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.shouldBe
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -24,27 +25,48 @@ import kotlin.io.path.readText
  * [CnConceptService] over the case's world ([GoldenWorlds]), compared with its `expected.*`. A `.pending` case is
  * reported as ignored, named with its demand id — never as passed.
  *
- * The goldens were authored FIRST (S3.7 runs before S3.2): every case is red until its stage lands. A stage that has
- * not landed is left out of `check` ([LANDED_STAGES]); `-Pcn.goldens=all` runs every case regardless, red ones
- * included — the TDD view. S3.8 removes the switch (every stage landed).
+ * The goldens were authored FIRST (S3.7 runs before S3.2) and turned green stage by stage; since S3.8 every case runs
+ * in `check`. The pending set is pinned ([PENDING]): a new `.pending` file is a deliberate edit, never a quiet skip.
  */
 class ConceptGoldenSpec :
     FunSpec({
-        val all = System.getProperty("cn.goldens") == "all"
-
+        test("the pending cases are exactly the pinned set, each with its demand") {
+            GoldenCases.pending.associate { it.id to it.demand } shouldBe PENDING
+        }
         for (p in GoldenCases.pending) {
             test("${p.id} — pending ${p.demand}").config(enabled = false) {}
         }
         for (c in GoldenCases.cases) {
-            test("${c.id} [${c.call}, ${c.stage}]").config(enabled = all || c.stage in LANDED_STAGES) {
+            test("${c.id} [${c.call}, ${c.stage}]") {
                 val problems = run(c)
                 if (problems.isNotEmpty()) fail("${c.id}:\n" + problems.joinToString("\n") { "- $it" })
             }
         }
     }) {
     companion object {
-        /** The stages whose cases `check` runs; each stage adds itself when it lands (S3.8: all, switch removed). */
-        val LANDED_STAGES: Set<String> = setOf("S3.2", "S3.3", "S3.4", "S3.5", "S3.6")
+        /**
+         * The cases waiting on a primitive that does not exist yet (case → demand id; plan.md, `demands/`): G-ER-1/2
+         * (#201), G-MD-1/2/6, `md/hop` (⚑CN-P8), CN-P4 S4.2. When a demand lands, its cases leave this table.
+         */
+        val PENDING: Map<String, String> =
+            mapOf(
+                "activecustomer/cross-cubelet" to "G-MD-1",
+                "activecustomer/phase-filter-debtor-customer" to "G-MD-1",
+                "activecustomer/phase-filter-has-broken-leg" to "G-MD-6",
+                "activecustomer/phase-filter-post-stemi" to "G-MD-6",
+                "activecustomer/phase-filter-stemi-patient" to "G-MD-2",
+                "channel/by-channel-sales" to "md/hop",
+                "channel/where-websale-carrier" to "md/hop",
+                "refusals/retired-code" to "CN-P4 S4.2",
+                "temporal/dc12-post-stemi-certainly" to "G-ER-1",
+                "temporal/dc4-return-share" to "md/hop",
+                "temporal/late-return-line" to "G-ER-2",
+                "temporal/length-of-stay" to "G-ER-2",
+                "temporal/rehospitalized-30d" to "G-ER-2",
+                "temporal/transfer-delay" to "G-ER-2",
+                "temporal/transferred-within-24h" to "G-ER-1",
+                "temporal/within-around-instant" to "G-ER-1",
+            )
 
         private val printer = JsonFormat.printer()
 

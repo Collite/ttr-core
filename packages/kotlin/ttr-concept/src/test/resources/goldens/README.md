@@ -2,7 +2,8 @@
 
 The acceptance cases of `ConceptService` (cn contracts §3), authored FIRST — CN-P3 S3.7, before any function body —
 and turned from red to green stage by stage (S3.2 validate · S3.3 statement lower · S3.4 er renderer + materialize ·
-S3.5 assertion lower · S3.6 explain). Every expectation comes from an oracle independent of the code under test.
+S3.5 assertion lower · S3.6 explain); since S3.8 every case runs in `check`. Every expectation comes from an oracle
+independent of the code under test.
 
 ## A case
 
@@ -12,7 +13,7 @@ S3.5 assertion lower · S3.6 explain). Every expectation comes from an oracle in
 |---|---|
 | `world` | the model it runs over: `hartland` · `clinic` · `sales` (`../worlds/`, see its README) |
 | `call` | `statementValidate` · `statementLower` · `statementExplain` · `assertionValidate` · `assertionLower` · `assertionExplain` · `definitionRender` · `materialize` |
-| `stage` | the CN-P3 stage that turns it green; `check` runs it once that stage has landed |
+| `stage` | the CN-P3 stage that turned it green (a record — since S3.8 `check` runs every case) |
 | `frame` | an S3.1 sample under `../frames/` (`statement-e0` …) — else the case's own `statement.json` / `assertion.json` |
 | `locale` | the explain calls' locale |
 | `target`, `layer`, `dialect`, `options` | `definitionRender` / `materialize`: the concept, `ER`, the dialect, `RenderOptions` as JSON |
@@ -36,9 +37,11 @@ A key the expectation names that the result type does not carry yet (an S3.4 `Re
 ## Pending
 
 `<group>/<case>.pending` is a case whose lowering needs a primitive that does not exist yet; its one line is the
-demand id it waits on (`G-ER-1`, `G-ER-2`, `G-MD-1/2/6`, `md/hop`, `CN-P4 S4.2`, `CN-P10` — see
+demand id it waits on (`G-ER-1`, `G-ER-2`, `G-MD-1/2/6`, `md/hop`, `CN-P4 S4.2` — see
 `project/tatrman/features/conceptual/plan/demands/ttrp-catalog-dc-gaps.md` and plan.md). The runner reports it as
 ignored, named with the id — never as passed. When the demand lands, the file is replaced by the real case.
+`ConceptGoldenSpec.PENDING` pins the whole set (case → demand): a new `.pending` file is a deliberate edit there too,
+never a quiet way to skip a red case.
 
 ## Oracles (`GoldenOracleSpec`, green from day one)
 
@@ -54,8 +57,7 @@ ignored, named with the id — never as passed. When the demand lands, the file 
 ## Running
 
 ```bash
-./gradlew :packages:kotlin:ttr-concept:test                             # the landed stages' cases + the oracles
-./gradlew :packages:kotlin:ttr-concept:test -Pcn.goldens=all            # every case — red ones included (TDD view)
+./gradlew :packages:kotlin:ttr-concept:test                             # every case + the oracles
 ./gradlew :packages:kotlin:ttr-concept:test --tests 'org.tatrman.concept.Golden*' -Pcn.goldens.regen
                                                                         # rewrite the oracle-made files; review the diff
 TTR_CONN_ERP_PG=postgresql://user:pass@host:port/db ./gradlew :packages:kotlin:ttr-concept:test --tests 'org.tatrman.concept.ConceptLiveSpec'

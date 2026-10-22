@@ -15,31 +15,38 @@ kotlin {
 
 tasks.test {
     useJUnitPlatform()
-    // CN-P3 S3.7 — the goldens (`ConceptGoldenSpec`). `-Pcn.goldens=all` runs every case, the stages not landed yet
-    // included (red by design — the TDD view); `-Pcn.goldens.regen` rewrites the oracle-made expectations. Both reach
-    // the test JVM only as system properties (a `-D` on the Gradle command line does not); S3.8 removes the first.
-    systemProperty("cn.goldens", providers.gradleProperty("cn.goldens").getOrElse("landed"))
+    // CN-P3 S3.7 — the goldens (`ConceptGoldenSpec`): every case runs in `check` (S3.8 removed the stage switch).
+    // `-Pcn.goldens.regen` rewrites the oracle-made expectations; it reaches the test JVM only as a system property (a
+    // `-D` on the Gradle command line does not).
     systemProperty("cn.goldens.regen", providers.gradleProperty("cn.goldens.regen").map { "true" }.getOrElse("false"))
 }
 
-// CN-P3 S3.3 — `LowerProvenance.grammarVersion`: TTR.g4's `@grammar-version`, baked in as a resource at build time (the
-// parser artifact carries none; ttr-concept and ttr-parser are cut together in the grammar bundle, so they agree).
-val grammarVersionResource by tasks.registering {
+// CN-P3 S3.3 — `LowerProvenance.grammarVersion`: TTR.g4's `@grammar-version`, baked in at build time (the parser
+// artifact carries none; ttr-concept and ttr-parser are cut together in the grammar bundle, so they agree). S3.8: a
+// generated constant, not a resource — a lower reads nothing, not even its own jar (`PuritySpec`).
+val grammarVersionSource by tasks.registering {
     val g4 = rootProject.file("packages/grammar/src/TTR.g4")
-    val out = layout.buildDirectory.dir("generated/resources/grammar-version")
+    val out = layout.buildDirectory.dir("generated/sources/grammar-version/kotlin")
     inputs.file(g4)
     outputs.dir(out)
     doLast {
         val version =
             Regex("@grammar-version:\\s*(\\S+)").find(g4.readText())?.groupValues?.get(1)
                 ?: error("no `@grammar-version` header in $g4")
-        val file = out.get().file("org/tatrman/concept/grammar-version").asFile
+        val file = out.get().file("org/tatrman/concept/GrammarVersion.kt").asFile
         file.parentFile.mkdirs()
-        file.writeText(version)
+        file.writeText(
+            "// Generated from TTR.g4's `@grammar-version` (build.gradle.kts, grammarVersionSource) — do not edit.\n" +
+                "package org.tatrman.concept\n\ninternal const val GRAMMAR_VERSION: String = \"$version\"\n",
+        )
     }
 }
 
-sourceSets.main { resources.srcDir(grammarVersionResource) }
+kotlin.sourceSets.main { kotlin.srcDir(grammarVersionSource) }
+
+ktlint {
+    filter { exclude("**/generated/**") }
+}
 
 // CN (conceptual model, `project/tatrman/features/conceptual/`) — `ttr-concept`: the three function families
 // below the frontier (statements · assertions · definition rendering on the md and er layers), contracts §3.

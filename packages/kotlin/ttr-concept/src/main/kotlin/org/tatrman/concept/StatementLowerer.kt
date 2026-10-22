@@ -894,15 +894,6 @@ internal class StatementLowerer(
     }
 
     private companion object {
-        /** TTR.g4's `@grammar-version`, baked in at build time (`build.gradle.kts`, `grammarVersionResource`). */
-        val GRAMMAR_VERSION: String by lazy {
-            StatementLowerer::class.java
-                .getResourceAsStream("/org/tatrman/concept/grammar-version")
-                ?.bufferedReader()
-                ?.use { it.readText().trim() }
-                .orEmpty()
-        }
-
         val OPS =
             mapOf(
                 ComparisonOp.EQ to "eq",
