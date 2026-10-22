@@ -132,8 +132,7 @@ internal class FrameRefs(
     fun lookup(name: String): List<Concept> = byName[name].orEmpty()
 
     /** `cn.<Name>` → `<Name>`; null when [qname] is not that spelling. */
-    fun nameOf(qname: String): String? =
-        qname.removePrefix("cn.").takeIf { qname.startsWith("cn.") && it.isNotEmpty() && '.' !in it }
+    fun nameOf(qname: String): String? = conceptName(qname)
 
     /** Reports [ref]'s ambiguity (candidates, an empty qname) — true when it has none. */
     fun unambiguous(
@@ -215,6 +214,10 @@ internal class FrameRefs(
     companion object {
         /** How the grade reads in a message: `er-grounded`, `md-grounded-hop-missing`. */
         fun grade(g: GroundingGrade): String = g.name.lowercase().replace('_', '-')
+
+        /** `cn.<Name>` → `<Name>`; null when [qname] is not that spelling (a frame's, and `definitionRender`'s target). */
+        fun conceptName(qname: String): String? =
+            qname.removePrefix("cn.").takeIf { qname.startsWith("cn.") && it.isNotEmpty() && '.' !in it }
     }
 }
 

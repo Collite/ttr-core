@@ -44,6 +44,21 @@ class DefinitionRenderSpec :
 
         // ---- er: aggregates ---------------------------------------------------------------------------------------
 
+        test("a target named in two packages is refused, never the first — definitionRender and materialize (R125-5)") {
+            val two = CnConceptService(FrameValidationSpec.model(FrameValidationSpec.TWO_PACKAGES))
+            val thing = ConceptRef.newBuilder().setQname("cn.Thing").build()
+            for (layer in Layer.entries) {
+                val r = two.definitionRender(thing, layer, "postgresql", RenderOptions())
+                r.text shouldBe ""
+                r.diagnostics.single().slug shouldBe "cn/definition-unreachable(${layer.name.lowercase()})"
+                r.diagnostics.single().message shouldContain "2 packages (`shop.a`, `shop.b`)"
+            }
+            two.materialize(thing, "postgresql").diagnostics.single().message shouldContain
+                "2 packages (`shop.a`, `shop.b`)"
+            val bare = two.definitionRender(ConceptRef.newBuilder().setQname("Thing").build(), Layer.ER, "pg", RenderOptions())
+            bare.diagnostics.single().message shouldContain "a target writes `cn.<Name>`"
+        }
+
         test("a sum compared to a constant is JOIN + GROUP BY + HAVING (false on no rows); `value` is quoted") {
             er(hartland, "BigSpender").text shouldBe
                 "SELECT customer.sk FROM customer JOIN \"order\" ON \"order\".customer = customer.sk " +

@@ -23,22 +23,41 @@ internal class DefinitionRenderer(
     private val er = ErRenderer(model)
     private val md = MdRenderer(model)
 
-    private fun concept(qname: String): Concept? = cn.byName(qname.removePrefix("cn."))
+    private val byName: Map<String, List<Concept>> = cn.concepts.values.groupBy { it.qname.name }
+
+    /**
+     * The one concept [qname] names, resolved as the frames resolve it (`cn.<Name>`, one package — [FrameRefs]); null
+     * and why not otherwise — a bad spelling, none, or several packages: refused, never the first (review-125 R125-5).
+     */
+    private fun concept(qname: String): Pair<Concept?, String> {
+        val name =
+            FrameRefs.conceptName(qname) ?: return null to "`$qname` is not a concept ref — a target writes `cn.<Name>`"
+        val found = byName[name].orEmpty()
+        return when (found.size) {
+            0 -> null to "no concept `$qname`"
+            1 -> found.single() to ""
+            else ->
+                null to
+                    "`$qname` names a concept in ${found.size} packages " +
+                    "(${found.map { it.qname.`package` }.sorted().joinToString(", ") { "`$it`" }}) — refused, never the first"
+        }
+    }
 
     fun render(
         target: ConceptRef,
         layer: Layer,
         options: RenderOptions,
     ): Rendering {
+        val (found, why) = concept(target.qname)
         val c =
-            concept(target.qname)
+            found
                 ?: return Rendering(
                     diagnostics =
                         listOf(
                             Diagnostic(
                                 "cn/definition-unreachable(${layer.name.lowercase()})",
                                 Severity.ERROR,
-                                "no concept `${target.qname}`",
+                                why,
                                 target.qname,
                             ),
                         ),
@@ -172,7 +191,8 @@ internal class DefinitionRenderer(
             slug: String,
             message: String,
         ) = ModelText(diagnostics = listOf(Diagnostic(slug, Severity.ERROR, message, ref.qname)))
-        val c = concept(ref.qname) ?: return refused(ER_UNREACHABLE, "no concept `${ref.qname}`")
+        val (found, why) = concept(ref.qname)
+        val c = found ?: return refused(ER_UNREACHABLE, why)
         if (c.stereotype !=
             "phase"
         ) {
