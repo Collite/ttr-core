@@ -81,6 +81,10 @@ class ExplicitMdErHop(
         if (bearerEntity != null && ofBearer.size == 1) return HopResult(ofBearer.single(), HopVia.EXPLICIT)
         return HopResult.ambiguous("'$mdElement' maps to ${found.joinToString(", ")}")
     }
+
+    /** Every md cubelet / attribute an explicit `md2er_cubelet` maps onto [erElement] (one of its candidates). */
+    override fun mdElementsOn(erElement: String): List<String> =
+        candidates.filterValues { erElement in it }.keys.sorted()
 }
 
 /**

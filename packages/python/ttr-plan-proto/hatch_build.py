@@ -27,6 +27,11 @@ PROTOS = [
     "org/tatrman/plan/v1/parameters.proto",
     "org/tatrman/transdsl/v1/transdsl.proto",
     "org/tatrman/dfdsl/v1/dfdsl.proto",
+    # CN (conceptual model) — the frames below the frontier, frozen at CN-P3 S3.1: the shared refs, the read frame
+    # (`statement.v1`) and the write frame (`assertion.v1`). A Python frame builder (kantheon) builds them.
+    "org/tatrman/concept/v1/refs.proto",
+    "org/tatrman/statement/v1/statement.proto",
+    "org/tatrman/assertion/v1/assertion.proto",
 ]
 
 
@@ -65,7 +70,8 @@ class CustomBuildHook(BuildHookInterface):
         # they must stay PEP 420 namespace packages — NO `__init__.py` — otherwise a
         # regular `org.tatrman` package here shadows the other distribution's
         # submodules and `from org.tatrman.<x>.v1 import …` fails for one of them.
-        # Deeper levels (`org.tatrman.plan`, `.transdsl`, `.dfdsl` and below) are
+        # Deeper levels (`org.tatrman.plan`, `.transdsl`, `.dfdsl`, the cn `.concept` / `.statement` /
+        # `.assertion`, and below) are
         # wheel-owned and get a regular `__init__.py`.
         org = out / "org"
         namespace_dirs = {org, org / "tatrman"}

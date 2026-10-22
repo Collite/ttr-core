@@ -1,0 +1,149 @@
+// CN-P3 S3.7 — the Hartland AU extension's physical face (invented data; Hartland's public demo names).
+model db schema dbo
+
+def table order {
+    primaryKey: ["order_number"]
+    columns: [
+        def column order_number { type: int, isKey: true },
+        def column channel { type: text },
+        def column customer { type: int },
+        def column placed_date { type: date },
+        def column delivered_date { type: date, optional: true },
+        def column fulfilling_warehouse { type: int },
+        def column value { type: decimal },
+        def column state { type: text }
+    ]
+}
+
+def table sales_line {
+    primaryKey: ["order_number", "line_no"]
+    columns: [
+        def column order_number { type: int, isKey: true },
+        def column line_no { type: int, isKey: true },
+        def column item { type: int },
+        def column quantity { type: int },
+        def column unit_price { type: decimal },
+        def column warehouse { type: int },
+        def column sold_date { type: date },
+        def column customer { type: int },
+        def column channel { type: text }
+    ]
+}
+
+def table inventory {
+    primaryKey: ["as_of_date", "item", "warehouse"]
+    columns: [
+        def column as_of_date { type: date, isKey: true },
+        def column item { type: int, isKey: true },
+        def column warehouse { type: int, isKey: true },
+        def column quantity_on_hand { type: int }
+    ]
+}
+
+def table warehouse_outage {
+    primaryKey: ["warehouse", "from_date"]
+    columns: [
+        def column warehouse { type: int, isKey: true },
+        def column from_date { type: date, isKey: true },
+        def column to_date { type: date },
+        def column reason { type: text }
+    ]
+}
+
+def table price_list {
+    primaryKey: ["item", "channel", "valid_from"]
+    columns: [
+        def column item { type: int, isKey: true },
+        def column channel { type: text, isKey: true },
+        def column valid_from { type: date, isKey: true },
+        def column price { type: decimal },
+        def column valid_to { type: date, optional: true }
+    ]
+}
+
+def table customer_price {
+    primaryKey: ["item", "customer", "valid_from"]
+    columns: [
+        def column item { type: int, isKey: true },
+        def column customer { type: int, isKey: true },
+        def column valid_from { type: date, isKey: true },
+        def column price { type: decimal },
+        def column valid_to { type: date, optional: true }
+    ]
+}
+
+def table invoice {
+    primaryKey: ["invoice_id"]
+    columns: [
+        def column invoice_id { type: int, isKey: true },
+        def column customer { type: int },
+        def column order_number { type: int },
+        def column issued { type: date },
+        def column due { type: date },
+        def column amount { type: decimal },
+        def column paid { type: decimal },
+        def column status { type: text }
+    ]
+}
+
+def table customer {
+    primaryKey: ["sk"]
+    columns: [
+        def column sk { type: int, isKey: true },
+        def column customer_id { type: text }
+    ]
+}
+
+def table item {
+    primaryKey: ["sk"]
+    columns: [
+        def column sk { type: int, isKey: true },
+        def column item_id { type: text }
+    ]
+}
+
+def table warehouse {
+    primaryKey: ["sk"]
+    columns: [
+        def column sk { type: int, isKey: true },
+        def column warehouse_name { type: text }
+    ]
+}
+
+def table channel_sales {
+    primaryKey: ["sale_id"]
+    columns: [
+        def column sale_id { type: int, isKey: true },
+        def column channel { type: text },
+        def column customer { type: int },
+        def column item { type: int },
+        def column sold_date { type: date },
+        def column ext_sales_price { type: decimal },
+        def column quantity { type: int }
+    ]
+}
+
+def table return_request {
+    primaryKey: ["request_id"]
+    columns: [
+        def column request_id { type: int, isKey: true },
+        def column order_number { type: int },
+        def column customer { type: int },
+        def column requested_date { type: date },
+        def column state { type: text }
+    ]
+}
+
+def table return_request_line {
+    primaryKey: ["request_id", "line_no"]
+    columns: [
+        def column request_id { type: int, isKey: true },
+        def column line_no { type: int, isKey: true },
+        def column item { type: int },
+        def column return_quantity { type: int },
+        def column return_unit_price { type: decimal },
+        def column reason { type: text },
+        def column line_state { type: text },
+        def column amount { type: decimal }
+    ]
+}

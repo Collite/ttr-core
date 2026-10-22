@@ -1,0 +1,30 @@
+{
+  "event": {
+    "qname": "cn.Sale"
+  },
+  "identity": {
+    "new": true
+  },
+  "participants": [
+    {
+      "label": "customer",
+      "concept": {
+        "qname": "cn.Customer"
+      },
+      "member": {
+        "label": "Kaufland",
+        "resolvedValue": "Kaufland"
+      }
+    }
+  ],
+  "period": {
+    "start": {
+      "value": "2026-01-15",
+      "granularity": "DAY"
+    }
+  },
+  "provenance": {
+    "producer": "manual:steward"
+  },
+  "locale": "en"
+}

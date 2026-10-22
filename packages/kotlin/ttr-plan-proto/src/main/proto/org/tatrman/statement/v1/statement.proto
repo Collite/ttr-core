@@ -6,10 +6,9 @@
 // (refusing ambiguity, a missing time, an unreachable slot), lowers it to `plan.v1` through the md path, and
 // explains it back in the user's language. Nothing below this frame calls an LLM (P-3 v2).
 //
-// JSON mapping: protobuf JsonFormat, canonical. ⚠ PRE-RELEASE (CN-P0 S0.4): the top-level `Statement` and the
-// messages contracts §2.2 pins are written as pinned. The sub-message field sets it only names (MemberFilter,
-// QualityFilter, BoolGroup, ExprFilter, DateRange, OrderKey, MemberPair, CompareMode) follow the round-1 sketch and
-// are provisional until CN-P3 S3.1 freezes the package — the J-v2 additive-only rule starts there.
+// JSON mapping: protobuf JsonFormat, canonical. FROZEN at CN-P3 S3.1 (2026-10-22): `Statement` and the messages
+// contracts §2.2 pins, and the sub-messages it only names (MemberFilter, QualityFilter, BoolGroup, ExprFilter,
+// DateRange, OrderKey, MemberPair, CompareMode) as written here — J-v2 additive-only from that freeze.
 // =============================================================================
 syntax = "proto3";
 

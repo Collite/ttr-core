@@ -211,6 +211,26 @@ def test_cn_head_participant_key_and_the_declaring_slot() -> None:
     assert sale is not None and sale.cn_origin == "sugar"
 
 
+def test_binding_period_upper_bounds_are_er_refs() -> None:
+    """⚑CN-P10: a binding period's stored upper bounds `start_hi` / `at_hi` are er refs, like `start` / `at`."""
+    p = _Project(
+        [
+            ("er.ttrm", _ER),
+            ("cn.ttrm", "package p\nmodel cn\n\ndef event Visit { period: { start: s } }\n"),
+            (
+                "b.ttrm",
+                "package p\nmodel binding\n\ndef cn2er_event visit_g { event: Visit, target: er.entity.party,"
+                " period: { start: er.entity.party.party_id, start_hi: er.entity.party.party_id,"
+                " at_hi: er.entity.party.nope } }\n",
+            ),
+        ]
+    )
+    b = next(d for d in p.docs if d.uri == "b.ttrm")
+    paths = [c.path for c in collect_all_references(b.definitions)]
+    assert paths.count("er.entity.party.party_id") == 2
+    assert p.resolve("b.ttrm", "er.entity.party.nope") is None
+
+
 def test_authored_concept_wins_over_the_block() -> None:
     p = _Project(
         [

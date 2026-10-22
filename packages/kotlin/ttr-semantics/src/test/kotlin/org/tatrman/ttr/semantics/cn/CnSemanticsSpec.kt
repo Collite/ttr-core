@@ -255,6 +255,21 @@ class CnSemanticsSpec :
             p.symbols.get("p.binding.cn2er_event.Sale.concept")?.cnOrigin shouldBe GroundingOrigin.Sugar
         }
 
+        "a binding period's stored upper bounds start_hi / at_hi are er refs (⚑CN-P10)" {
+            val p =
+                project(
+                    "er.ttrm" to er,
+                    "cn.ttrm" to "package p\nmodel cn\n\ndef event Visit { period: { start: s } }\n",
+                    "b.ttrm" to
+                        "package p\nmodel binding\n\ndef cn2er_event visit_g { event: Visit, target: er.entity.party," +
+                        " period: { start: er.entity.party.party_id, start_hi: er.entity.party.party_id," +
+                        " at_hi: er.entity.party.nope } }\n",
+                )
+            val paths = collectAllReferences(p.docs.first { it.uri == "b.ttrm" }.definitions).map { it.path }
+            paths.count { it == "er.entity.party.party_id" } shouldBe 2
+            resolve(p, "b.ttrm") { it.path == "er.entity.party.nope" } shouldBe null
+        }
+
         "an authored concept wins over the block that grounds it, whatever the document order" {
             val p =
                 project(

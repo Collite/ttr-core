@@ -127,6 +127,30 @@ class CnDefinitions(
 
     val diagnostics: List<Diagnostic> get() = all.flatMap { it.diagnostics }
 
+    private val conceptBlocks: Map<QualifiedName, List<CnDefinition>> by lazy {
+        all.filter { it.kind != BlockKind.FILTER }.groupBy { it.owner }
+    }
+
+    /**
+     * [owner]'s `definition:` / `members:` blocks with every definition they name inlined, transitively — cycle-safe
+     * (AM-26): what a rendering of [owner] reads (CN-P3 S3.2, a PhaseFilter's reachability). Empty when [owner] has no
+     * such block.
+     */
+    fun closure(owner: QualifiedName): List<CnDefinition> {
+        val seen = linkedSetOf<QualifiedName>()
+        val out = mutableListOf<CnDefinition>()
+        val queue = ArrayDeque(listOf(owner))
+        while (queue.isNotEmpty()) {
+            val q = queue.removeFirst()
+            if (!seen.add(q)) continue
+            for (d in conceptBlocks[q].orEmpty()) {
+                out += d
+                queue += d.reads.definitions
+            }
+        }
+        return out
+    }
+
     companion object {
         /** The block does not parse as a TTR-P 0.5 expression (the message names the `TTRP-*` id). */
         const val SYNTAX = "cn/definition-syntax"
@@ -173,26 +197,18 @@ internal class DefinitionResolver(
         pkg: String,
     ): Concept? = byName[name]?.let { cs -> cs.firstOrNull { it.qname.`package` == pkg } ?: cs.singleOrNull() }
 
+    private val lattice = ConceptChain(cn)
+
     private fun of(q: QualifiedName?): Concept? = q?.let { cn.concepts[it] }
 
-    /** [c] and what it specializes — a role's or a phase's `of:`, every `is_a` — breadth first. */
-    fun chain(c: Concept): List<Concept> {
-        val out = linkedMapOf(c.qname to c)
-        val queue = ArrayDeque(listOf(c))
-        while (queue.isNotEmpty()) {
-            val x = queue.removeFirst()
-            for (next in listOfNotNull(of(x.of)) + x.isA.mapNotNull { of(it) }) {
-                if (out.putIfAbsent(next.qname, next) == null) queue += next
-            }
-        }
-        return out.values.toList()
-    }
+    /** [c] and what it specializes ([ConceptChain.chain]). */
+    fun chain(c: Concept): List<Concept> = lattice.chain(c)
 
-    /** Whether a [want] slot takes a [got] row: one specializes the other. */
+    /** Whether a [want] slot takes a [got] row ([ConceptChain.compatible]). */
     fun compatible(
         want: Concept,
         got: Concept,
-    ): Boolean = chain(got).any { it.qname == want.qname } || chain(want).any { it.qname == got.qname }
+    ): Boolean = lattice.compatible(want, got)
 
     fun concept(
         c: Concept,
@@ -237,9 +253,9 @@ internal class DefinitionResolver(
         return all.firstOrNull { it.qname.`package` == pkg } ?: all.singleOrNull()
     }
 
-    // ---- what a name resolves to -----------------------------------------------------------------------------
+    // ---- what a name resolves to (internal: the md renderer walks names the same way — CN-P3 S3.3) -------------
 
-    private sealed interface Value {
+    internal sealed interface Value {
         data class Instance(
             val concept: Concept,
         ) : Value
@@ -270,7 +286,24 @@ internal class DefinitionResolver(
         data object Opaque : Value
     }
 
-    private sealed interface Walk {
+    /**
+     * A hop a [walk] takes on its way to the [Value] (CN-P3 S3.4): a participant traversed — what the er renderer replays
+     * as joins along the binding's relation path — or a quality's value space entered.
+     */
+    internal sealed interface Step {
+        data class Participant(
+            val owner: Concept,
+            val label: String,
+            val concept: Concept,
+        ) : Step
+
+        data class ValueSpace(
+            val quality: String,
+            val kind: Concept,
+        ) : Step
+    }
+
+    internal sealed interface Walk {
         data class Ok(
             val value: Value,
             val concepts: List<QualifiedName>,
@@ -315,13 +348,10 @@ internal class DefinitionResolver(
         return null
     }
 
-    private fun participant(
+    internal fun participant(
         s: Concept,
         label: String,
-    ): Pair<Concept, org.tatrman.ttr.metadata.model.CnParticipant>? {
-        for (c in chain(s)) c.involves.firstOrNull { it.label == label }?.let { return c to it }
-        return null
-    }
+    ): Pair<Concept, org.tatrman.ttr.metadata.model.CnParticipant>? = lattice.participant(s, label)
 
     private fun periodOf(s: Concept): Pair<Concept, CnPeriod>? {
         for (c in chain(s)) c.period?.let { return c to it }
@@ -336,13 +366,17 @@ internal class DefinitionResolver(
         return byName[name]?.firstOrNull { it.stereotype == "phase" && it.of in owners }
     }
 
-    /** Walks [parts] from [i] on the subject [s]; reads are collected, committed only on success. */
-    private fun walk(
+    /**
+     * Walks [parts] from [i] on the subject [s]; reads are collected, committed only on success. [steps], when given,
+     * receives the hops taken (a renderer replays them — the one name walk, CN-P3 S3.4).
+     */
+    internal fun walk(
         s: Concept,
         parts: List<String>,
         i: Int,
         concepts: MutableList<QualifiedName> = mutableListOf(),
         definitions: MutableList<QualifiedName> = mutableListOf(),
+        steps: MutableList<Step>? = null,
     ): Walk {
         if (i == parts.size) return Walk.Ok(Value.Instance(s), concepts, definitions)
         val p = parts[i]
@@ -366,7 +400,8 @@ internal class DefinitionResolver(
             val pc = of(pt.concept) ?: return Walk.Fail("`${owner.qname.name}`'s participant `$p` names no concept")
             concepts += owner.qname
             concepts += pc.qname
-            return walk(pc, parts, i + 1, concepts, definitions)
+            steps?.add(Step.Participant(owner, p, pc))
+            return walk(pc, parts, i + 1, concepts, definitions, steps)
         }
         quality(s, p)?.let { hit ->
             val def = hit.def
@@ -377,7 +412,8 @@ internal class DefinitionResolver(
             }
             if (rest == 0) return Walk.Ok(Value.Quality(hit.owner, p, def), concepts, definitions)
             val vs = of(def?.valueSpace) ?: return Walk.Fail("`$p` is a value — nothing follows it")
-            return walk(vs, parts, i + 1, concepts, definitions)
+            steps?.add(Step.ValueSpace(p, vs))
+            return walk(vs, parts, i + 1, concepts, definitions, steps)
         }
         phaseOn(s, p)?.let { ph ->
             if (ph.definition != null) definitions += ph.qname else concepts += ph.qname

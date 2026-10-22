@@ -1,9 +1,22 @@
-# ActiveCustomer — a phase as a statement filter
+# Phase filters on md — ActiveCustomer and the gated ones
 
-Source: `design/04-statement-options.md` §E-0 (`filters: [ phase: ActiveCustomer ]`), with the definition of `design/02-metamodel-options.md` / `03-grounding-options.md` ("purchased in the last 12 months" — a DC-3 window). A phase used as a PhaseFilter: the definition is inlined, rendered on the md layer, and recorded in the provenance.
+Source: `design/04-statement-options.md` §E-0 ("the phase IS the filter"), world `sales`. A phase in a statement's filter
+slot: its definition is inlined, rendered on the md layer, recorded in the provenance (`inlinedDefinitions`).
 
-**Pending convention.** A case whose lowering needs a primitive that does not exist yet ships as
-`<case>.pending`, a one-line file naming the demand id it waits on (e.g. `G-ER-2` — see
-`project/tatrman/features/conceptual/plan/demands/ttrp-catalog-dc-gaps.md`). The golden runner reports a
-`.pending` case as pending, never as passed. When the demand lands, the file is replaced by the real fixture.
-No fixture content yet: CN-P3 S3.7 authors these goldens FIRST, before S3.2.
+| case | | stage / demand |
+|---|---|---|
+| `revenue-active` | net revenue in January 2026 from customers active in the 365 days before `as_of` 2026-01-31 | S3.3 |
+| `cross-cubelet.pending` | an existence over another cubelet's event | G-MD-1 |
+| `phase-filter-debtor-customer.pending` | `DebtorCustomer` (existence over invoices) as a statement filter | G-MD-1 |
+| `phase-filter-stemi-patient.pending` | `StemiPatient` (closure membership) | G-MD-2 |
+| `phase-filter-post-stemi.pending` · `phase-filter-has-broken-leg.pending` | the DC-12 words on md | G-MD-6 |
+
+**⚑CN-P9 (default, plan.md):** `ActiveCustomer` is `exists Sale involving this where within(period.at, last: days(365))`
+— an existence md cannot say (G-MD-1). When the existence ranges over the carrying cubelet's own event, `ttr-concept`
+composes it on `plan.v1` as a grain-key semi-join: the outer read grouped by `customer.name`, kept where the key is
+`IN` the keys of a second read over the window (`time.day: "2025-01-31".."2026-01-31"` — `within(x, last: d)` is
+`x >= as_of - d and x <= as_of` — grouped by the key alone), aggregated again. `oracle.semiJoin` builds exactly that
+from the two md reads. The dot-path spells the composition `<outer> where customer.name in (<inner>)`. `revenue-active`
+is `live`: on PostgreSQL over its `seed.sql` it returns January 2026's net of the customers active as of 2026-01-31.
+
+Pending convention, case format and oracles: [`../README.md`](../README.md).

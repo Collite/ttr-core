@@ -169,6 +169,13 @@ data class Concept(
      * an inherited landing, and an md target that does not resolve.
      */
     val hop: HopResult? = null,
+    /**
+     * The reverse hop (CN-P3, ⚑CN-P8's default — [MdErHop.mdElementsOn]): for a concept that lands on E-R directly
+     * (its own er grounding, or a phase's inherited one), the md elements whose hop lands on [erTarget] — how a value
+     * kind reaches a cubelet's grain attribute and an event its cubelet. Empty for an md grounding (its md face is its
+     * own target) and when no md element lands there.
+     */
+    val reverseHop: List<String> = emptyList(),
     val sourceLocation: SourceLocation? = null,
 ) : ModelObject {
     override val kind: String = "concept"
@@ -295,6 +302,12 @@ data class Grounding(
     val participants: Map<String, List<String>> = emptyMap(),
     /** The attributes that carry the event's instants. */
     val period: GroundingPeriod? = null,
+    /**
+     * A `cn2er_quality`'s `unit:` (⚑CN-P10, ruled 2026-10-22) — the unit the target attribute's values are in, as
+     * written (`unit: "mmol/L"` or `unit: kg`); cn never converts, so an asserted value in another unit is refused
+     * (`cn/unit-mismatch`). Null when the grounding declares none.
+     */
+    val unit: String? = null,
     /** A `cn2er_role`'s `via:` — the base entity's path to the defining event (relations, in order). */
     val viaPath: List<String> = emptyList(),
     /** A valued state's series selector (A-CN-18) — text and source map. */
@@ -314,11 +327,17 @@ data class CnHierarchy(
     val ranges: HierarchyRanges = HierarchyRanges.NODE,
 )
 
-/** A grounding's `period:` — the er attributes carrying the instants. */
+/**
+ * A grounding's `period:` — the er attributes carrying the instants. [startHi] / [atHi] (⚑CN-P10, ruled 2026-10-22)
+ * name a stored UPPER bound of an imprecise start / instant (contracts §1.1 DC-12, "a declared upper-bound
+ * attribute"): the *certainly* reading compares it instead of deriving the bound from the granularity.
+ */
 data class GroundingPeriod(
     val start: String? = null,
     val end: String? = null,
     val at: String? = null,
+    val startHi: String? = null,
+    val atHi: String? = null,
 )
 
 /** One reverse-index entry (A-CN-4): a concept an element lifts to, its stereotype (A-CN-7) and how it lands. */

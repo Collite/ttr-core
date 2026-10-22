@@ -1,0 +1,11 @@
+{
+  "parametersRead": [
+    {
+      "name": "window_lo",
+      "derivation": "as_of - days(365)"
+    },
+    {
+      "name": "as_of"
+    }
+  ]
+}

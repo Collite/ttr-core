@@ -1,0 +1,7 @@
+[
+  {
+    "slug": "cn/unit-mismatch",
+    "severity": "ERROR",
+    "subject": "qualities[1].unit"
+  }
+]

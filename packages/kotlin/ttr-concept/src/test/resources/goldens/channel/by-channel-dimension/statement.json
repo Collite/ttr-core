@@ -1,0 +1,17 @@
+{
+  "ask": "ASK_VALUE",
+  "measures": [
+    {
+      "qname": "cn.revenue"
+    }
+  ],
+  "time": {
+    "allTime": true
+  },
+  "groupBy": [
+    {
+      "qname": "cn.Channel"
+    }
+  ],
+  "locale": "en"
+}
