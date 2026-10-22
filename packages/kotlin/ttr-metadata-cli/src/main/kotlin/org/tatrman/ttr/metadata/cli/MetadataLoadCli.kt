@@ -60,11 +60,11 @@ object MetadataLoadCli {
                     issues =
                         manifestIssues +
                             LoadReportIssue(
-                                "model",
+                                modelRoot.toString(),
                                 -1,
                                 "no-model-dir",
                                 LoadIssue.Severity.ERROR,
-                                "no model/ directory under $project",
+                                "no model/ directory in the checkout",
                             ),
                 ),
                 json,
@@ -91,7 +91,7 @@ object MetadataLoadCli {
                 return PackageLayout.Flexible to
                     listOf(
                         LoadReportIssue(
-                            "modeler.toml",
+                            manifest.toString(),
                             -1,
                             "manifest-invalid",
                             LoadIssue.Severity.ERROR,
@@ -104,7 +104,7 @@ object MetadataLoadCli {
             return PackageLayout.Flexible to
                 listOf(
                     LoadReportIssue(
-                        "modeler.toml",
+                        manifest.toString(),
                         error.position().line(),
                         "manifest-invalid",
                         LoadIssue.Severity.ERROR,
@@ -126,7 +126,7 @@ object MetadataLoadCli {
             PackageLayout.Flexible to
                 listOf(
                     LoadReportIssue(
-                        "modeler.toml",
+                        manifest.toString(),
                         parsed.inputPositionOf("packages.layout")?.line() ?: -1,
                         "manifest-package-layout",
                         LoadIssue.Severity.WARNING,
@@ -143,13 +143,7 @@ object MetadataLoadCli {
         json: Boolean,
         failed: Boolean,
     ): CliOutcome {
-        fun relative(file: String?): String? =
-            file?.let {
-                runCatching {
-                    val path = Path.of(it).toAbsolutePath().normalize()
-                    if (path.startsWith(project)) project.relativize(path).joinToString("/") else it
-                }.getOrDefault(it)
-            }
+        fun relative(file: String?): String? = checkoutRelative(project, file)
         // Existing reconciler messages may also embed source paths (for example duplicate mappings).
         val sourcePaths =
             (report.sources.map { it.path } + report.droppedFiles + report.issues.mapNotNull { it.file })
@@ -201,3 +195,15 @@ object MetadataLoadCli {
         )
     }
 }
+
+/** Normalize report paths against their checkout; relative inputs must never depend on the process CWD. */
+internal fun checkoutRelative(
+    project: Path,
+    file: String?,
+): String? =
+    file?.let {
+        runCatching {
+            val path = project.resolve(it).normalize()
+            if (path.startsWith(project)) project.relativize(path).joinToString("/") else it
+        }.getOrDefault(it)
+    }

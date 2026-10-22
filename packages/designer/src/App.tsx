@@ -73,13 +73,14 @@ interface LanguageChoice {
 }
 
 function Studio({
-  dataSource, viewState, catalog, files, workspace, processingSource, language,
+  dataSource, viewState, catalog, files, workspace, processingSource, language, initialAppPath,
 }: {
   dataSource: ModelDataSource;
   viewState?: ViewStateStore;
   catalog: CatalogGroup[];
   files: string[];
   workspace: string;
+  initialAppPath?: string;
   processingSource?: ProcessingGraphSource;
   /** present on a catalog backend: model labels follow this language. */
   language?: LanguageChoice;
@@ -140,6 +141,7 @@ function Studio({
         <ShellFrame
           dataSource={dataSource}
           workspace={workspace}
+          initialAppPath={initialAppPath}
           catalog={catalog}
           files={files}
           displayMode={displayMode}
@@ -426,7 +428,7 @@ export default App;
 
 /** Stage 1: the parent supplies configuration; the frame owns only its rendered model. */
 function HostedStudio() {
-  const [session, setSession] = useState<{ source: BffFilesDataSource; catalog: CatalogGroup[]; workspace: string; sha: string } | null>(null);
+  const [session, setSession] = useState<{ source: BffFilesDataSource; catalog: CatalogGroup[]; workspace: string; sha: string; initialAppPath: string } | null>(null);
   const [error, setError] = useState(false);
   const channelRef = useRef<HostChannel | null>(null);
   const readySent = useRef(false);
@@ -437,14 +439,16 @@ function HostedStudio() {
     let renderedSha: string | null = null;
     let workspace: string | null = null;
     let lastLocation = '';
-    const syncSession = async () => {
+    const syncSession = async (initialAppPath?: string) => {
       const changed = await source!.refresh({ deferDisposal: true });
       if (disposed || (!changed && renderedSha === source!.sha)) return false;
       const { graphs, symbols } = await source!.listCatalog();
       if (disposed) return;
       setError(false);
       renderedSha = source!.sha;
-      setSession({ source: source!, catalog: buildCatalog(graphs, symbols), workspace: workspace!, sha: source!.sha! });
+      // The old shell may sync its URL while this snapshot loads. Carry the requested route
+      // into the new shell instead of letting it boot from that mutable address bar.
+      setSession({ source: source!, catalog: buildCatalog(graphs, symbols), workspace: workspace!, sha: source!.sha!, initialAppPath: initialAppPath ?? currentAppPath() });
       return true;
     };
     const channel = new HostChannel(async (message) => {
@@ -465,7 +469,7 @@ function HostedStudio() {
           }
           replaceAppPath(path);
           source = new BffFilesDataSource({ ...message, token: latestToken ?? message.token });
-          await syncSession();
+          await syncSession(path);
         } else if (message.type === 'ttr.host.token') {
           latestToken = message.token;
           source?.setToken(message.token);
@@ -479,7 +483,7 @@ function HostedStudio() {
           else {
             // Only change the hash: the old shell must not handle a request for the new snapshot.
             replaceAppPath(path);
-            try { if (!await syncSession()) navigateAppPath(path); }
+            try { if (!await syncSession(path)) navigateAppPath(path); }
             catch (e) { navigateAppPath(path); throw e; } // keep navigating on the previous snapshot
           }
         }
@@ -526,5 +530,5 @@ function HostedStudio() {
   }, [session]);
   const viewState = useMemo(() => makeViewStateStore('file', { kind: 'file' }), []);
   if (!session) return <div className="hosted-status" role="status">{error ? 'Could not load the model.' : 'Waiting for Studio…'}</div>;
-  return <Studio key={session.sha} dataSource={session.source} viewState={viewState} catalog={session.catalog} files={[]} workspace={session.workspace} />;
+  return <Studio key={session.sha} dataSource={session.source} viewState={viewState} catalog={session.catalog} files={[]} workspace={session.workspace} initialAppPath={session.initialAppPath} />;
 }
