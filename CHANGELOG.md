@@ -6,6 +6,10 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **Hosted snapshot navigation** — preserve the parent's requested route through an asynchronous SHA reload,
+  even if the old shell rewrites the address bar while loading. Failed refreshes retain the current snapshot
+  and navigate within it; the regression test waits for the committed tab and copy link.
+
 - **Studio metadata CLI** — keep manifest and missing-model diagnostics relative to the checkout when invoked
   from a subdirectory, and omit checkout paths from the missing-directory message (#265). Restore the CLI
   artifact in the grammar publication bundle after the #261 merge dropped it; remove a duplicated metadata-git task.
