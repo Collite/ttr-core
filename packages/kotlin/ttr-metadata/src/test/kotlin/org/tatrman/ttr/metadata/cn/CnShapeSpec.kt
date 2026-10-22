@@ -21,9 +21,11 @@ import org.tatrman.ttr.metadata.model.QualifiedName
 import org.tatrman.ttr.metadata.model.SchemaCode
 import org.tatrman.ttr.metadata.model.SchemaContents
 import org.tatrman.ttr.metadata.model.Via
+import org.tatrman.ttr.metadata.model.VocabularyVersion
 import org.tatrman.ttr.metadata.model.parseSchemaCode
 import org.tatrman.ttr.metadata.model.schemaCodeToToken
 import org.tatrman.ttr.semantics.cn.GroundingOrigin
+import java.time.Instant
 
 /**
  * Grammar 0.17 — the typed conceptual tier's SHAPE (CN-P2 S2.5 T1; cn contracts §1.1–§1.3, §5): what every field
@@ -75,7 +77,33 @@ class CnShapeSpec :
             schema.objects().toList() shouldBe emptyList()
             parseSchemaCode("cn") shouldBe SchemaCode.CN
             schemaCodeToToken(SchemaCode.CN) shouldBe "cn"
-            CnSchema().vocabularyVersions shouldBe emptyMap() // Q15-5: present, empty until P4 S4.2
+            CnSchema().vocabularyVersions shouldBe emptyList() // Q15-5: present; set by the registering service
+        }
+
+        "two tiers merge as two snapshots' maps do — the later wins a qname, the version history appends (S4.2)" {
+            val at = Instant.parse("2026-10-22T10:00:00Z")
+            val v1 = VocabularyVersion("sukl", "2026.09", registeredAt = at)
+            val v2 = VocabularyVersion("sukl", "2026.10", registeredAt = at.plusSeconds(60))
+            val first =
+                CnSchema(
+                    concepts =
+                        mapOf(
+                            cn("Customer") to concept("Customer", "kind"),
+                            cn("Item") to concept("Item", "kind"),
+                        ),
+                    vocabularyVersions = listOf(v1),
+                )
+            val second =
+                CnSchema(
+                    concepts = mapOf(cn("Customer") to concept("Customer", "role")),
+                    vocabularyVersions = listOf(v1, v2),
+                )
+
+            val merged = first + second
+
+            merged.concepts.mapValues { it.value.stereotype } shouldBe
+                mapOf(cn("Customer") to "role", cn("Item") to "kind")
+            merged.vocabularyVersions shouldContainExactly listOf(v1, v2)
         }
 
         "a concept defaults to ungrounded, core, with no landing" {

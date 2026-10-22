@@ -43,10 +43,12 @@ data class CnSchema(
     /** The open tier's relation types (`def relation_type`), keyed like concepts — they share the namespace. */
     val relationTypes: Map<QualifiedName, CnRelationType> = emptyMap(),
     /**
-     * The registered vocabulary versions (Q15-5; the MV A-MV-10 precedent): vocabulary → version. Present, and empty
-     * until P4 S4.2 registers them.
+     * The registered vocabulary versions (Q15-5; the MV A-MV-10 precedent; contracts §5): what an importer loaded, in
+     * registration order. No model text states them — a vocabulary-bound kind carries no version, the snapshot does
+     * (design `10` §4.3) — so no source fills this: the service that holds the registrations sets it on the model it
+     * publishes (CN-P5 S5.3, beside the candidate store). Empty until then.
      */
-    val vocabularyVersions: Map<String, String> = emptyMap(),
+    val vocabularyVersions: List<VocabularyVersion> = emptyList(),
     /**
      * The canonical lexicon entries whose `for:` names an md or er element, by element ref, in document order (CN-P2
      * S2.7) — what the hygiene report sets beside a concept's own terms: a form on both the concept and an element
@@ -71,6 +73,21 @@ data class CnSchema(
 
     /** The concept named [name] (any package), or null. */
     fun byName(name: String): Concept? = concepts.values.firstOrNull { it.qname.name == name }
+
+    /**
+     * This tier with [other] laid over it, as two snapshots' maps merge (`Map.plus`: [other] wins a key both hold);
+     * the version history appends, a version registered twice kept once. The one field-by-field merge of a tier outside
+     * the reconciler's precedence fold — a connected load joins its archives with it (`MetadataServerSource`) — so a
+     * field added here is not silently dropped there.
+     */
+    operator fun plus(other: CnSchema): CnSchema =
+        CnSchema(
+            concepts = concepts + other.concepts,
+            bindings = bindings + other.bindings,
+            relationTypes = relationTypes + other.relationTypes,
+            vocabularyVersions = (vocabularyVersions + other.vocabularyVersions).distinctBy(VocabularyVersion::key),
+            elementTerms = elementTerms + other.elementTerms,
+        )
 
     override fun objects(): Sequence<ModelObject> =
         concepts.values.asSequence() + relationTypes.values.asSequence() + bindings.values.asSequence()
@@ -339,6 +356,22 @@ data class GroundingPeriod(
     val startHi: String? = null,
     val atHi: String? = null,
 )
+
+/**
+ * One registered vocabulary version (Q15-5, contracts §5): [vocabulary] at [version] (`uzis-mkn10` at `2026`), the
+ * [bundle] it arrived in when an importer loads several together (`athena-2026-09`), and when it was registered. A
+ * re-registration appends: the list is the history, and the newest registration of a vocabulary is its current
+ * version.
+ */
+data class VocabularyVersion(
+    val vocabulary: String,
+    val version: String,
+    val bundle: String? = null,
+    val registeredAt: java.time.Instant,
+) {
+    /** What a registration is: a version registered twice is one entry of the history. */
+    val key: Pair<String, String> get() = vocabulary to version
+}
 
 /** One reverse-index entry (A-CN-4): a concept an element lifts to, its stereotype (A-CN-7) and how it lands. */
 data class CnLift(

@@ -36,12 +36,14 @@ import org.tatrman.ttr.metadata.model.SchemaCode
 import org.tatrman.ttr.metadata.model.Via
 import org.tatrman.ttr.metadata.model.Via.DIRECT
 import org.tatrman.ttr.metadata.model.Via.MD_HOP
+import org.tatrman.ttr.metadata.model.VocabularyVersion
 import org.tatrman.ttr.metadata.query.MetadataQuery
 import org.tatrman.ttr.metadata.reconcile.ModelReconciler
 import org.tatrman.ttr.metadata.registry.RegistrySnapshot
 import org.tatrman.ttr.metadata.search.searchableObjects
 import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
+import org.tatrman.ttr.metadata.source.SourceSnapshot
 import org.tatrman.ttr.semantics.cn.GroundingOrigin
 import java.nio.file.Files
 import java.time.Instant
@@ -137,6 +139,27 @@ class CnModelSpec :
             s.cn shouldBe CnSchema()
             ModelReconciler(ModelDescriptor(id = "d", name = "d")).reconcile(listOf(s)).model.schemas["cn"] shouldBe
                 CnSchema()
+        }
+
+        "registered vocabulary versions merge as one history: precedence order, a version registered twice kept once" {
+            val at = Instant.parse("2026-10-22T10:00:00Z")
+            val mkn2025 = VocabularyVersion("uzis-mkn10", "2025", registeredAt = at)
+            val mkn2026 =
+                VocabularyVersion("uzis-mkn10", "2026", bundle = "uzis-2026-01", registeredAt = at.plusSeconds(60))
+            val sukl = VocabularyVersion("sukl", "2026.10", registeredAt = at)
+
+            fun source(
+                id: String,
+                priority: Int,
+                vararg versions: VocabularyVersion,
+            ) = SourceSnapshot(id, priority, "v1", cn = CnSchema(vocabularyVersions = versions.toList()))
+
+            val cn =
+                ModelReconciler(ModelDescriptor(id = "d", name = "d"))
+                    .reconcile(listOf(source("low", 10, mkn2025, sukl), source("high", 100, mkn2025, mkn2026)))
+                    .model.schemas["cn"] as CnSchema
+
+            cn.vocabularyVersions shouldContainExactly listOf(mkn2025, mkn2026, sukl)
         }
 
         "a cn def in an er file is a wrong-file-kind, named by its stereotype or binding keyword" {
@@ -433,8 +456,8 @@ class CnModelSpec :
             // `def example web_revenue { for: cn.WebSale }` names no declared concept; `for: md.Product` no concept
             lex.cn.concepts.values
                 .sumOf { it.lexiconLinks.size } shouldBe 6
-            // `vocabularyVersions` is present and empty until P4 S4.2 (Q15-5)
-            lex.cn.vocabularyVersions shouldBe emptyMap()
+            // `vocabularyVersions` is present and empty: no model text states one (Q15-5; CN-P5 S5.3 sets them)
+            lex.cn.vocabularyVersions shouldBe emptyList()
             // S2.7 — `for: md.Product` is an element term, kept by element ref for the hygiene report's redundant terms
             lex.cn.elementTerms.mapValues { (_, links) -> links.map { it.name to it.forms } } shouldBe
                 mapOf("md.dimension.Product" to listOf("product" to listOf("product")))

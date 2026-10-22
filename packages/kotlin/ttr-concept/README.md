@@ -100,7 +100,7 @@ with the bodies (P5's door).
 `src/test/resources/goldens/` — the acceptance cases, authored before the code (CN-P3 S3.7), each expectation from an
 oracle independent of the code under test ([format](src/test/resources/goldens/README.md)). All of them run in `check`.
 Sixteen wait on a primitive that does not exist yet, pinned with their demand (`ConceptGoldenSpec.PENDING`): G-ER-1 and
-G-ER-2 (#201), G-MD-1/2/6, `md/hop` (⚑CN-P8), CN-P4 S4.2. The `live` cases also run on PostgreSQL (`ConceptLiveSpec`,
+G-ER-2 (#201), G-MD-1/2/6, `md/hop` (⚑CN-P8), CN-P5 S5.3. The `live` cases also run on PostgreSQL (`ConceptLiveSpec`,
 22 cases, a `cn_live` schema of their own) — in CI in `conformance-ttrp.yml`, locally with
 `TTR_CONN_ERP_PG=postgresql://user:pass@host:port/db`.
 

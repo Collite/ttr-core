@@ -57,7 +57,7 @@ export interface CnHygieneReport {
   retiredCodes: string;
 }
 
-export const RETIRED_CODES_NOTE = 'checked once vocabulary versions register (CN-P4 S4.2) — none yet';
+export const RETIRED_CODES_NOTE = 'checked once vocabulary versions register (CN-P5 S5.3) — none yet';
 
 // ---------------------------------------------------------------------------
 // Element refs and the hop

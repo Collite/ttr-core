@@ -21,7 +21,7 @@ import org.tatrman.ttr.metadata.model.LexiconLink
  *    elements; never a phase's);
  *  - **phase as default** — a phase's `default: true` term whose form also names a concept up its `of:` chain, nearest
  *    first (AM-36); one row per term;
- *  - **retired codes** — empty until vocabulary versions register (P4 S4.2).
+ *  - **retired codes** — empty until vocabulary versions register (CN-P5 S5.3, beside the candidate store).
  *
  * The definition-level findings ([ResolvedCnModel.definitionDiagnostics]) close the report — Kotlin only (CN-D29);
  * the editor's report (`@tatrman/semantics` `cnHygieneReport`) is this one less them.

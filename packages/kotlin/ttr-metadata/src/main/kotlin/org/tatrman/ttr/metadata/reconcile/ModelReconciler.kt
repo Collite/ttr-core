@@ -11,6 +11,7 @@ import org.tatrman.ttr.metadata.model.MappingSource
 import org.tatrman.ttr.metadata.model.Model
 import org.tatrman.ttr.metadata.model.ModelDescriptor
 import org.tatrman.ttr.metadata.model.ModelVersion
+import org.tatrman.ttr.metadata.model.VocabularyVersion
 import org.tatrman.ttr.metadata.model.Query
 import org.tatrman.ttr.metadata.model.SchemaCode
 import org.tatrman.ttr.metadata.resolve.ReferenceResolutionPass
@@ -148,9 +149,9 @@ class ModelReconciler(
                 bindings = mergeMaps(sorted) { it.cn.bindings },
                 relationTypes = mergeMaps(sorted) { it.cn.relationTypes },
                 vocabularyVersions =
-                    sorted.fold(emptyMap()) { acc, s ->
-                        acc + s.cn.vocabularyVersions.filterKeys { it !in acc }
-                    },
+                    sorted
+                        .flatMap { it.cn.vocabularyVersions }
+                        .distinctBy(VocabularyVersion::key),
                 elementTerms =
                     sorted.fold(emptyMap()) { acc, s ->
                         acc + s.cn.elementTerms.filterKeys { it !in acc }

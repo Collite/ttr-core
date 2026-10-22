@@ -37,7 +37,7 @@ A key the expectation names that the result type does not carry yet (an S3.4 `Re
 ## Pending
 
 `<group>/<case>.pending` is a case whose lowering needs a primitive that does not exist yet; its one line is the
-demand id it waits on (`G-ER-1`, `G-ER-2`, `G-MD-1/2/6`, `md/hop`, `CN-P4 S4.2` — see
+demand id it waits on (`G-ER-1`, `G-ER-2`, `G-MD-1/2/6`, `md/hop`, `CN-P5 S5.3` — see
 `project/tatrman/features/conceptual/plan/demands/ttrp-catalog-dc-gaps.md` and plan.md). The runner reports it as
 ignored, named with the id — never as passed. When the demand lands, the file is replaced by the real case.
 `ConceptGoldenSpec.PENDING` pins the whole set (case → demand): a new `.pending` file is a deliberate edit there too,
