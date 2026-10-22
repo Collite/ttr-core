@@ -6,6 +6,9 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
 import org.tatrman.ttr.metadata.source.*
+import org.tatrman.ttr.metadata.model.ModelDescriptor
+import org.tatrman.ttr.metadata.reconcile.ModelReconciler
+import org.tatrman.ttr.semantics.md.mdErBindingDiagnostics
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -36,12 +39,21 @@ class MdHopCommand : CliktCommand(name = "hop") {
             throw ProgramResult(2)
         }
         val snapshot = FileBasedSource("md-hop", 100, LocalFsStorage("md-hop", root)).load()
-        snapshot.errors.forEach { echo("${it.file}:${it.line}: ${it.message}", err = true) }
+        val reconciled =
+            ModelReconciler(ModelDescriptor(id = "md-hop", name = "md-hop"))
+                .reconcile(listOf(BuiltinStockSource().load(), snapshot))
         val (docs, resolver) = CnBuilder.project(snapshot.loadedFiles)
+        val loadErrors =
+            (snapshot.errors + reconciled.errors).distinct().map { "${it.file}:${it.line}: ${it.message}" } +
+                mdErBindingDiagnostics(
+                    docs,
+                    resolver,
+                ).map { "${it.source.file}:${it.source.line}: ${it.code.id}: ${it.message}" }
+        loadErrors.forEach { echo(it, err = true) }
         val report = mdHopReport(docs, resolver, all)
         echo(if (format == "json") MdHopRender.json(report) else MdHopRender.markdown(report), trailingNewline = false)
         if (failOn != null &&
-            (snapshot.errors.isNotEmpty() || (failOn == "warning" && report.issues.any { it.severity == "warning" }))
+            (loadErrors.isNotEmpty() || (failOn == "warning" && report.issues.any { it.severity == "warning" }))
         ) {
             throw ProgramResult(1)
         }
