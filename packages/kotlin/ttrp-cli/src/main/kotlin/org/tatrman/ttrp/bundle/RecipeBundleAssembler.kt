@@ -233,7 +233,7 @@ class RecipeBundleAssembler(
                 fingerprints = fingerprints,
                 protocol = model.protocol,
                 parts = parts.ifEmpty { null },
-                tests = tests,
+                tests = tests.ifEmpty { null },
             )
 
         val manifest =

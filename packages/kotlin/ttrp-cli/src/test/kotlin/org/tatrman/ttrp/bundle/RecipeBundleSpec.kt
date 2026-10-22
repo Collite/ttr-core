@@ -431,6 +431,13 @@ class RecipeBundleSpec :
             Files.readString(r.dir.resolve("islands/shortfall.rows.sql")).uppercase() shouldContain "CEIL("
         }
 
+        "a recipe without golden fixtures omits the additive tests field" {
+            val r = build("release_order.ttrp")
+            val json = Files.readString(r.dir.resolve("manifest.json"))
+            ObjectMapper().readTree(json).path("recipe").has("tests") shouldBe false
+            r.manifest.recipe!!.tests shouldBe null
+        }
+
         "golden seeds beside a recipe are bundled, hashed and listed in path order" {
             val dir = Files.createTempDirectory("recipe-goldens")
             val file = dir.resolve("release_order.ttrp")
