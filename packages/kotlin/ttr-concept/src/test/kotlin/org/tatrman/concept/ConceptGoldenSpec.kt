@@ -46,7 +46,7 @@ class ConceptGoldenSpec :
     companion object {
         /**
          * The cases waiting on a primitive that does not exist yet (case → demand id; plan.md, `demands/`): G-ER-1/2
-         * (#201), G-MD-1/2/6, `md/hop` (⚑CN-P8), CN-P4 S4.2. When a demand lands, its cases leave this table.
+         * (#201), G-MD-1/2/6, `md/hop` (⚑CN-P8), CN-P5 S5.3. When a demand lands, its cases leave this table.
          */
         val PENDING: Map<String, String> =
             mapOf(
@@ -57,7 +57,7 @@ class ConceptGoldenSpec :
                 "activecustomer/phase-filter-stemi-patient" to "G-MD-2",
                 "channel/by-channel-sales" to "CN-P6 A-H-7 (ER statement grouping; MD needs Channel grain)",
                 "channel/where-websale-carrier" to "CN-P6 A-H-7 (phase-to-carrier binding)",
-                "refusals/retired-code" to "CN-P4 S4.2",
+                "refusals/retired-code" to "CN-P5 S5.3",
                 "temporal/dc12-post-stemi-certainly" to "G-ER-1",
                 "temporal/late-return-line" to "G-ER-2",
                 "temporal/length-of-stay" to "G-ER-2",

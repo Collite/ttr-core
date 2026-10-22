@@ -135,7 +135,7 @@ class LexiconPackerSpec :
 
             lexicon.targets shouldBe facts
             lexicon.header.schemaVersion shouldBe CompiledLexiconHeader.SCHEMA_VERSION
-            lexicon.header.schemaVersion shouldBe "ttr-lexicon-compiled/v5"
+            lexicon.header.schemaVersion shouldBe "ttr-lexicon-compiled/v6"
         }
 
         test("targets are serialized in key order, so two builds are byte-identical") {

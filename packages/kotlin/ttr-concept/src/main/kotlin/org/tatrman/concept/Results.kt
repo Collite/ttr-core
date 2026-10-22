@@ -271,6 +271,6 @@ data class HygieneReport(
     companion object {
         /** Why [ConceptHygiene.retiredCodes] is empty in P2. */
         const val RETIRED_CODES_NOTE: String =
-            "checked once vocabulary versions register (CN-P4 S4.2) — none yet"
+            "checked once vocabulary versions register (CN-P5 S5.3) — none yet"
     }
 }

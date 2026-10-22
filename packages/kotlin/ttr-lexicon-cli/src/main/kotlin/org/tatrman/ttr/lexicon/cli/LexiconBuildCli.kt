@@ -6,6 +6,7 @@ import org.tatrman.ttr.lexicon.LexiconArchive
 import org.tatrman.ttr.lexicon.LexiconViolation
 import org.tatrman.ttr.lexicon.OperatorLibrary
 import org.tatrman.ttr.lexicon.TargetClass
+import org.tatrman.ttr.lexicon.TargetFacts
 import org.tatrman.ttr.lexicon.compile.CompileWarning
 import org.tatrman.ttr.lexicon.compile.LexiconBuild
 import org.tatrman.ttr.metadata.LoadIssue
@@ -169,13 +170,19 @@ object LexiconBuildCli {
         }
 
         val id = outcome.packed.id
-        val entries = outcome.result.lexicon.entries
+        val lexicon = outcome.result.lexicon
+        val entries = lexicon.entries
         stdout.appendLine("ttr-lexicon build: $id")
+        // CN-P4 — the archive's schema, said out loud: v5 → v6 is a readers-first rollout (cn contracts §5, A-CN-2),
+        // and the person running the build is the one who has to know which side of it this archive is.
+        stdout.appendLine("  schema: ${lexicon.header.schemaVersion}")
         stdout.appendLine("  entries: ${entries.size}")
         TargetClass.entries
             .map { cls -> cls to entries.count { it.targetClass == cls } }
             .filter { (_, count) -> count > 0 }
             .forEach { (cls, count) -> stdout.appendLine("    $cls: $count") }
+        val concepts = lexicon.targets.values.count { it.objectKind == TargetFacts.CONCEPT }
+        if (concepts > 0) stdout.appendLine("  concepts: $concepts")
         stdout.appendLine("  operators: ${outcome.result.operators.operators.size}")
         if (outcome.result.warnings.isNotEmpty()) stdout.appendLine("  warnings: ${outcome.result.warnings.size}")
 
