@@ -44,7 +44,11 @@ interface ConceptService {
     /** Refs resolved · the event has an ER landing · participant labels and paths · units · as-of · basis. */
     fun assertionValidate(a: Assertion): List<Diagnostic>
 
-    /** The `Statement[<Entity>]` row payload: participants' FK values via the labelled relation paths. */
+    /**
+     * The `Statement[<Entity>]` row payload: the event's row — its known key, the participants' FK values via the
+     * labelled relation paths, the period, the qualities — with the as-of, the meta and the obligations beside it.
+     * Data only: cn never writes it. Refuses (the findings, no rows) on any `assertionValidate` ERROR.
+     */
     fun assertionLower(a: Assertion): RowObjects
 
     /** The inspector's sentence (bubble ①'s twin) in [locale]. */
@@ -89,6 +93,7 @@ class CnConceptService(
 ) : ConceptService by NotImplementedConceptService() {
     private val statements = StatementValidator(model)
     private val assertions = AssertionValidator(model)
+    private val rows = AssertionLowerer(model)
     private val lowerer = StatementLowerer(model, clock)
     private val definitions = DefinitionRenderer(model, clock)
 
@@ -97,6 +102,8 @@ class CnConceptService(
     override fun statementLower(s: Statement): LowerResult = lowerer.lower(s)
 
     override fun assertionValidate(a: Assertion): List<Diagnostic> = assertions.validate(a)
+
+    override fun assertionLower(a: Assertion): RowObjects = rows.lower(a)
 
     /** The er text is the shared dialect's (S0.3 §3); the translator unparses it per engine, so [dialect] is not read. */
     override fun definitionRender(

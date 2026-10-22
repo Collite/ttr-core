@@ -44,7 +44,7 @@ class ConceptGoldenSpec :
     }) {
     companion object {
         /** The stages whose cases `check` runs; each stage adds itself when it lands (S3.8: all, switch removed). */
-        val LANDED_STAGES: Set<String> = setOf("S3.2", "S3.3", "S3.4")
+        val LANDED_STAGES: Set<String> = setOf("S3.2", "S3.3", "S3.4", "S3.5")
 
         private val printer = JsonFormat.printer()
 
@@ -101,7 +101,12 @@ class ConceptGoldenSpec :
                 }
                 "assertionLower" -> {
                     val r = svc.assertionLower(c.assertion())
-                    out += GoldenCases.mismatches(c.jsonFile("expected.rows.json").jsonObject, GoldenCases.rows(r))
+                    out +=
+                        GoldenCases.mismatches(
+                            c.jsonFile("expected.rows.json").jsonObject,
+                            GoldenCases.rows(r),
+                            alwaysCompared = setOf("diagnostics", "assertedAsOf", "obligations"),
+                        )
                 }
                 "definitionRender" -> {
                     val options = options(c.spec["options"]?.jsonObject ?: JsonObject(emptyMap()), out)

@@ -86,6 +86,7 @@ internal class ErRenderer(
                 .orEmpty(),
         )
     private val lattice = ConceptChain(cn)
+    private val paths = ParticipantPaths(model)
 
     /** [target] rendered on er under [options]; a refusal is an empty text and one error-grade diagnostic. */
     fun render(
@@ -139,10 +140,7 @@ internal class ErRenderer(
     /** Where [c] lands on E-R as a row source — its entity — or null (a value kind lands on an attribute). */
     private fun entityOf(c: Concept): Entity? = entityOf(c.erTarget)
 
-    private fun relation(ref: String): Relation? {
-        val name = ref.removePrefix("er.relation.")
-        return er?.relations?.values?.firstOrNull { it.qname.name == name }
-    }
+    private fun relation(ref: String): Relation? = paths.relation(ref)
 
     private fun simple(a: Attribute): String = a.qname.name.substringAfterLast('.')
 
@@ -157,8 +155,7 @@ internal class ErRenderer(
     private fun grounding(
         c: Concept,
         pick: (Grounding) -> Boolean,
-    ): Grounding? =
-        lattice.chain(c).firstNotNullOfOrNull { x -> x.grounding?.takeIf { it.layer == GroundingLayer.ER && pick(it) } }
+    ): Grounding? = paths.grounding(c, pick)
 
     private fun unreachable(c: Concept): Nothing =
         refuse(
@@ -507,16 +504,11 @@ internal class ErRenderer(
         private fun path(
             owner: Concept,
             label: String,
-        ): List<Relation> {
-            val g = grounding(owner) { label in it.participants }
-            val names = g?.participants?.get(label).orEmpty()
-            if (names.isEmpty()) {
-                refuse(
+        ): List<Relation> =
+            (paths.of(owner, label) as? ParticipantPaths.Relations)?.relations
+                ?: refuse(
                     "`${owner.ref}`'s participant `$label` has no relation path on E-R (cn/participant-path-broken)",
                 )
-            }
-            return names.map { relation(it) ?: refuse("no relation `$it`") }
-        }
 
         // ---- projection ---------------------------------------------------------------------------------------
 
@@ -922,23 +914,21 @@ internal class ErRenderer(
             concept: Concept,
         ): V {
             val row = bound(ref)
-            val g = grounding(ref.concept) { label in it.participants }
-            val names = g?.participants?.get(label).orEmpty()
-            if (names.isEmpty()) {
-                // a value kind is a column of the event's own entity (AM-27)
-                val (entity, attr) =
-                    attributeRef(concept.erTarget)
-                        ?: refuse(
+            val rels =
+                when (val p = paths.of(ref.concept, label, concept)) {
+                    null ->
+                        refuse(
                             "`${ref.concept.ref}`'s participant `$label` has no relation path on E-R (cn/participant-path-broken)",
                         )
-                if (entity !=
-                    row.entity.qname.name
-                ) {
-                    refuse("`$label` is a column of `$entity`, not of `${row.entity.qname.name}`")
+                    // a value kind is a column of the event's own entity (AM-27)
+                    is ParticipantPaths.Column -> {
+                        if (p.entity != row.entity.qname.name) {
+                            refuse("`$label` is a column of `${p.entity}`, not of `${row.entity.qname.name}`")
+                        }
+                        return Scalar(SqlExpr.Col(row.alias, p.attribute))
+                    }
+                    is ParticipantPaths.Relations -> p.relations
                 }
-                return Scalar(SqlExpr.Col(row.alias, attr))
-            }
-            val rels = names.map { relation(it) ?: refuse("no relation `$it`") }
             var cur = row
             for (r in rels.dropLast(1)) cur = hop(cur, r)
             val last = rels.last()
@@ -951,11 +941,7 @@ internal class ErRenderer(
             }
         }
 
-        private fun attributeRef(ref: String?): Pair<String, String>? {
-            val segs = ref?.split('.') ?: return null
-            if (segs.size != 4 || segs[0] != "er" || segs[1] != "entity") return null
-            return segs[2] to segs[3]
-        }
+        private fun attributeRef(ref: String?): Pair<String, String>? = ParticipantPaths.attributeRef(ref)
 
         /** `<row>.<attribute>` for an `er.entity.<e>.<a>` ref that must be on [row]'s entity. */
         private fun column(
@@ -988,29 +974,21 @@ internal class ErRenderer(
             val l =
                 label ?: ref?.let { participantOn(ranged, it.concept) }
                     ?: refuse("`${ranged.ref}` involves no one participant that the row named can be")
-            val g = grounding(ranged) { l in it.participants }
-            val names = g?.participants?.get(l).orEmpty()
-            if (names.isEmpty()) {
-                val pc =
-                    lattice
-                        .participant(ranged, l)
-                        ?.second
-                        ?.concept
-                        ?.let { cn.concepts[it] }
-                val (entity, attr) =
-                    attributeRef(pc?.erTarget)
-                        ?: refuse(
+            val rels =
+                when (val p = paths.of(ranged, l)) {
+                    null ->
+                        refuse(
                             "`${ranged.ref}`'s participant `$l` has no relation path on E-R (cn/participant-path-broken)",
                         )
-                if (entity !=
-                    r.entity.qname.name
-                ) {
-                    refuse("`$l` is a column of `$entity`, not of `${r.entity.qname.name}`")
+                    is ParticipantPaths.Column -> {
+                        if (p.entity != r.entity.qname.name) {
+                            refuse("`$l` is a column of `${p.entity}`, not of `${r.entity.qname.name}`")
+                        }
+                        return listOf(SqlExpr.Bin("=", SqlExpr.Col(r.alias, p.attribute), scalar(outer))) to null
+                    }
+                    is ParticipantPaths.Relations -> p.relations
                 }
-                return listOf(SqlExpr.Bin("=", SqlExpr.Col(r.alias, attr), scalar(outer))) to null
-            }
             if (ref == null) refuse("`${ranged.ref}`'s participant `$l` is a row — a value cannot stand for it")
-            val rels = names.map { relation(it) ?: refuse("no relation `$it`") }
             var cur = r
             for (x in rels.dropLast(1)) cur = hop(cur, x)
             val last = rels.last()

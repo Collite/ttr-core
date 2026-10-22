@@ -186,6 +186,25 @@ internal object GoldenCases {
                     }
                 },
             )
+            r.assertedAsOf?.let { put("assertedAsOf", it) }
+            if (r.obligations.isNotEmpty()) {
+                put(
+                    "obligations",
+                    buildJsonArray {
+                        for (o in r.obligations) {
+                            add(
+                                buildJsonObject {
+                                    put("label", o.label)
+                                    put("value", o.value)
+                                    put("relations", JsonArray(o.relations.map(::JsonPrimitive)))
+                                    put("anchor", o.anchor)
+                                    put("anchoredBy", o.anchoredBy)
+                                },
+                            )
+                        }
+                    },
+                )
+            }
             put("diagnostics", diagnostics(r.diagnostics))
         }
 

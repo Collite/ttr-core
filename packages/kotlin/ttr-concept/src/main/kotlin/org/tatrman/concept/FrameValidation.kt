@@ -79,6 +79,8 @@ internal class Findings {
         out += Diagnostic(slug, Severity.WARNING, message, subject)
     }
 
+    fun hasErrors(): Boolean = out.any { it.severity == Severity.ERROR }
+
     fun sorted(): List<Diagnostic> =
         out.distinct().sortedWith(
             Comparator<Diagnostic> { a, b -> naturalCompare(a.subject, b.subject) }

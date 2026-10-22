@@ -26,6 +26,9 @@ import org.tatrman.ttr.metadata.model.EndState as ModelEndState
  *
  * A **state claim** (AM-38): the event bears a `current_state` / `past_state` phase, or such a phase reads its period
  * in a state shape (the episode event — [CnDefinitionLints.BASIS_SHAPES]), or an asserted quality is `valued_state`.
+ *
+ * Once those checks pass, the event's row is planned ([RowPlanner], CN-P3 S3.5) and its findings join them — so a frame
+ * this validator passes is one `assertionLower` lowers (A-CN-49).
  */
 internal class AssertionValidator(
     private val model: ResolvedCnModel,
@@ -33,6 +36,14 @@ internal class AssertionValidator(
     private val cn = model.cn
     private val er = model.model.schemas["er"] as? ErSchema
     private val lattice = ConceptChain(cn)
+    private val paths = ParticipantPaths(model)
+    private val planner = RowPlanner(model)
+
+    /** The findings, and — when there is no ERROR — the event's row. */
+    class Checked(
+        val diagnostics: List<Diagnostic>,
+        val plan: RowPlan?,
+    )
 
     /** The events a state-basis phase bears or reads the period of in a state shape. */
     private val stateEvents: Set<QualifiedName> by lazy {
@@ -57,8 +68,12 @@ internal class AssertionValidator(
         out
     }
 
-    fun validate(a: Assertion): List<Diagnostic> {
+    fun validate(a: Assertion): List<Diagnostic> = check(a).diagnostics
+
+    fun check(a: Assertion): Checked {
         val f = Findings()
+        val planned = mutableListOf<PlannedParticipant>()
+        val plannedQualities = mutableListOf<PlannedQuality>()
         val refs = FrameRefs(model, FrameSlugs.AMBIGUOUS_ASSERTION, f)
         val event = refs.concept(a.event, "event", "event", setOf("event"))
         val landed = event?.let { landing(it, f) } ?: false
@@ -111,9 +126,15 @@ internal class AssertionValidator(
             } else {
                 refs.member(p.member, "$subject.member", "the participant $of")
             }
-            if (declared != null && landed) path(event!!, p.label, subject, f)
+            if (declared != null && landed) {
+                val path = path(event!!, p.label, subject, f)
+                if (path != null) planned += PlannedParticipant(i, p, path)
+            }
         }
-        val asserted = a.qualitiesList.mapIndexedNotNull { i, q -> quality(q, "qualities[$i]", event, landed, refs, f) }
+        val asserted =
+            a.qualitiesList.mapIndexedNotNull { i, q ->
+                quality(q, "qualities[$i]", event, landed, refs, f) { plannedQualities += PlannedQuality(i, q, it) }
+            }
         if (event != null) period(a, event, f)
         val asOf = if (a.hasAssertedAsOf()) instant(a.assertedAsOf, "assertedAsOf", f) else null
         if (event != null &&
@@ -144,7 +165,17 @@ internal class AssertionValidator(
                 "the frame was built on snapshot `${a.snapshotHash}`; this model is `${model.snapshotHash}`",
             )
         }
-        return f.sorted()
+        val entity = event?.let { entityOf(it) }
+        if (event != null && entity == null && !f.hasErrors()) {
+            f.error(
+                FrameSlugs.NOT_ASSERTABLE,
+                "event",
+                "`${event.ref}` lands on `${event.erTarget}` — no entity holds its row",
+            )
+        }
+        if (f.hasErrors() || event == null || entity == null) return Checked(f.sorted(), null)
+        val plan = planner.plan(a, event, entity, planned, plannedQualities, f)
+        return Checked(f.sorted(), plan.takeUnless { f.hasErrors() })
     }
 
     /** The event's E-R landing — `cn/not-assertable` when it has none; true when it lands. */
@@ -228,13 +259,16 @@ internal class AssertionValidator(
         }
     }
 
-    /** The label's relation path in the event's direct `cn2er_event` (L15-3). */
+    /**
+     * The label's way onto E-R: its relation path from the event's `cn2er_event` (L15-3) — up its chain — or, a value
+     * kind (AM-27), its column; null — reported — when it has neither.
+     */
     private fun path(
         event: Concept,
         label: String,
         subject: String,
         f: Findings,
-    ) {
+    ): ParticipantPaths.Path? {
         val g = event.grounding
         if (event.via != Via.DIRECT || g == null || g.layer != GroundingLayer.ER) {
             f.error(
@@ -242,14 +276,15 @@ internal class AssertionValidator(
                 subject,
                 "`${event.ref}` lands on E-R through the hop — no grounding states `$label`'s relation path",
             )
-            return
+            return null
         }
-        if (label !in g.participants) {
+        return paths.of(event, label) ?: run {
             f.error(
                 FrameSlugs.PARTICIPANT_PATH_BROKEN,
                 subject,
                 "`${g.qname.name}` has no relation path that chains for `$label` (`participants:`)",
             )
+            null
         }
     }
 
@@ -264,6 +299,7 @@ internal class AssertionValidator(
         landed: Boolean,
         refs: FrameRefs,
         f: Findings,
+        onTarget: (String) -> Unit,
     ): Concept? {
         if (!q.hasValue() || (q.value.vCase == Value.VCase.V_NOT_SET && !q.value.isNull)) {
             f.error(FrameSlugs.MALFORMED_FRAME, "$subject.value", "the quality is asserted with no value")
@@ -307,19 +343,22 @@ internal class AssertionValidator(
             f.error(FrameSlugs.NOT_ASSERTABLE, qs, "`${c.ref}` is defined (`definition:`) — computed, never asserted")
             return c
         }
-        if (landed) target(c, name, event, qs, f)
+        if (landed) target(c, name, event, qs, f)?.let(onTarget)
         unit(q, c, subject, f)
         return c
     }
 
-    /** The quality's E-R target: its grounding's, else the event entity's attribute of its name — on the event's entity. */
+    /**
+     * The quality's E-R target: its grounding's, else the event entity's attribute of its name — on the event's entity.
+     * Returns the attribute's name when it is there.
+     */
     private fun target(
         c: Concept?,
         name: String,
         event: Concept,
         subject: String,
         f: Findings,
-    ) {
+    ): String? {
         val entity =
             event.erTarget
                 ?.split('.')
@@ -341,7 +380,9 @@ internal class AssertionValidator(
                     subject,
                     "`cn.$name` lands on `$target`, not on the event's entity `$entity` — its row cannot carry it",
                 )
+            else -> return ParticipantPaths.attributeRef(target)?.second
         }
+        return null
     }
 
     /** ⚑CN-P10: an asserted unit must be the one the grounding declares; cn never converts. */

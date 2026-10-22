@@ -516,7 +516,17 @@ class FrameValidationSpec :
             st(transfer, fresh, quals(qv("cn.transfer_department")), minute),
             "cn/not-assertable qualities[0].quality",
         )
-        a("a soft quality on the entity", plus, st(ev("cn.Admission"), fresh, quals(qv("cn.department_id")), adm))
+        a(
+            "a soft quality on the entity",
+            plus,
+            st(ev("cn.Admission"), fresh, quals(qv("cn.department_id", "{ \"intValue\": 7 }")), adm),
+        )
+        a(
+            "a soft quality's value its attribute's type does not take (S3.5's row)",
+            plus,
+            st(ev("cn.Admission"), fresh, quals(qv("cn.department_id")), adm),
+            "cn/slot-mismatch qualities[0].value",
+        )
         a(
             "a soft quality the entity lacks",
             plus,

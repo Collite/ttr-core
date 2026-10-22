@@ -72,16 +72,52 @@ data class Explanation(
     val diagnostics: List<Diagnostic> = emptyList(),
 )
 
-/** One E-R row of an assertion's lowered payload: the entity and its attribute → value text. */
+/** One E-R row of an assertion's lowered payload: the entity and its attribute → value text (null = SQL NULL). */
 data class RowObject(
     val entity: String,
-    val values: Map<String, String> = emptyMap(),
+    val values: Map<String, String?> = emptyMap(),
 )
 
-/** `assertionLower`: the `Statement[<Entity>]` row payload — rows only; cn never writes them. */
+/**
+ * `assertionLower`: the `Statement[<Entity>]` row payload — data only; cn never writes it (contracts §2.3). CN-P3 S3.5
+ * adds the last three, additively (A-CN-49): [assertedAsOf] — the instant the source claims the state for, as the frame
+ * writes it (null when it names none); [meta] — what the frame carries that no attribute holds; [obligations] — the
+ * participants the rows cannot hold, as checks for the writer (A-CN-47).
+ */
 data class RowObjects(
     val rows: List<RowObject> = emptyList(),
     val diagnostics: List<Diagnostic> = emptyList(),
+    val assertedAsOf: String? = null,
+    val meta: RowMeta = RowMeta(),
+    val obligations: List<Obligation> = emptyList(),
+)
+
+/**
+ * What an assertion carries beside its rows (A-CN-49): its provenance, the assertions it consolidates or corrects, the
+ * snapshot and locale it was built on, how its absent period end reads ([endState] — `END_OPEN` / `END_UNKNOWN`, the
+ * frame's or else the event's `end_open:`; unspecified when the end is present or the event has no end), and each
+ * quality's verbatim by the attribute it lands on.
+ */
+data class RowMeta(
+    val provenance: org.tatrman.assertion.v1.Provenance? = null,
+    val derivedFrom: List<String> = emptyList(),
+    val snapshotHash: String = "",
+    val locale: String = "",
+    val endState: org.tatrman.concept.v1.EndState = org.tatrman.concept.v1.EndState.END_STATE_UNSPECIFIED,
+    val verbatims: Map<String, String> = emptyMap(),
+)
+
+/**
+ * A participant the event row cannot hold (A-CN-47): [label]'s path runs [relations] from the event's entity, its first
+ * relation's foreign key [anchor] written by the participant [anchoredBy]; the row its path ends at must be [value] —
+ * a lowering cannot read data, so the writer checks it.
+ */
+data class Obligation(
+    val label: String,
+    val value: String,
+    val relations: List<String>,
+    val anchor: String,
+    val anchoredBy: String,
 )
 
 /**
