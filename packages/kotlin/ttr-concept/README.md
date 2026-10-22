@@ -7,8 +7,10 @@ lowers to an E-R row payload, and `definitionRender` renders a phase or defined 
 predicate for `ttrp-emit`) or the er layer (SQL over entities in the shared dialect). No LLM, no server call, no I/O
 mid-lower: the same model and frame always give the same bytes.
 
-**Status: scaffold (CN-P0 S0.4).** The API surface exists as interfaces and data classes; every body is CN-P3. Not
-published yet.
+**Status: CN-P3 in progress.** Built: the definition surface and the hygiene report (CN-P2); the frames
+(`statement.v1` / `assertion.v1`, `ttr-plan-proto`) frozen and their canonical JSON pinned (CN-P3 S3.1). The statement /
+assertion / rendering bodies land stage by stage (S3.2–S3.6). Published as `org.tatrman:ttr-concept` in the
+`grammar/v*` bundle from the first grammar cut after CN-P3 S3.1 (A-CN-1).
 
 **Law order.** This module implements `project/tatrman/features/conceptual/` (outside this repo): `design/design.md`
 v2 and the decision log › `plan/contracts.md` (§3 is this module's API) › `plan/architecture.md` › `plan/plan.md` ›

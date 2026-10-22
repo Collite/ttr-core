@@ -19,8 +19,8 @@ tasks.test {
 
 // CN (conceptual model, `project/tatrman/features/conceptual/`) — `ttr-concept`: the three function families
 // below the frontier (statements · assertions · definition rendering on the md and er layers), contracts §3.
-// CN-P0 S0.4: the SCAFFOLD — signatures and the arch guard only; every body is CN-P3. A pure function of
-// resolved, cached inputs (the S6 / PL-P0.S2 compile rule): no LLM, no server call, no I/O mid-lower.
+// Built at CN-P3. A pure function of resolved, cached inputs (the S6 / PL-P0.S2 compile rule): no LLM, no server
+// call, no I/O mid-lower.
 dependencies {
     // api: the `statement.v1` / `assertion.v1` / `concept.v1` messages are in ConceptService's signatures.
     api(project(":packages:kotlin:ttr-plan-proto"))
@@ -42,11 +42,12 @@ dependencies {
     implementation(project(":packages:kotlin:ttr-translator")) // dialects only (definition_render(er) targets)
 
     testImplementation(libs.bundles.kotest)
+    // CN-P3 S3.1 — the frames' canonical JSON mapping (JsonFormat), the golden inputs' format.
+    testImplementation(libs.protobuf.java.util)
 }
 
 // CN-P2 S2.7 — `ttr cn hygiene <dir> [--format text|json] [--fail-on error|warning]` (`ttr cn materialize` joins it at
-// CN-P3). It ships when this module first publishes (CN-P3 S3.1); until then `just cn-hygiene <dir>` runs it from the
-// repo, with paths relative to the repo root.
+// CN-P3 S3.4). `just cn-hygiene <dir>` runs it from the repo, with paths relative to the repo root.
 application {
     applicationName = "ttr"
     mainClass = "org.tatrman.concept.cli.MainKt"
@@ -82,9 +83,8 @@ val verifyNoLlmDependency by tasks.registering {
 
 tasks.named("check") { dependsOn(verifyNoLlmDependency) }
 
-// Not in any publish.yml bundle yet (scaffold only, CHANGELOG "Unreleased") — see the bundle header there for why
-// the translator bundle cannot carry it as the build stands (⚑CN-5 re-check, CN-P0 S0.4). The block is here so
-// CN-P3 S3.1 only has to add the module to a bundle.
+// Published in the `grammar/v*` bundle (publish.yml `MODULES`, since CN-P3 S3.1 — A-CN-1 amends ⚑CN-5): it shares the
+// ttrp-emit closure, so the translator bundle would write a POM naming grammar modules at a version never cut.
 mavenPublishing {
     publishToMavenCentral()
     if (providers.environmentVariable("ORG_GRADLE_PROJECT_signingInMemoryKey").isPresent ||

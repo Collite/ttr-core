@@ -1,0 +1,95 @@
+{
+  "ask": "ASK_VALUE",
+  "measures": [{
+    "qname": "cn.revenue"
+  }, {
+    "qname": "cn.quantity"
+  }],
+  "filters": [{
+    "member": {
+      "concept": {
+        "qname": "cn.Customer"
+      },
+      "member": {
+        "label": "Acme Market",
+        "resolvedValue": "A123"
+      }
+    }
+  }, {
+    "quality": {
+      "quality": {
+        "qname": "cn.line_quantity"
+      },
+      "op": "GT",
+      "value": {
+        "intValue": "5"
+      }
+    }
+  }, {
+    "phase": {
+      "phase": {
+        "qname": "cn.ActiveCustomer"
+      },
+      "negated": true
+    }
+  }, {
+    "group": {
+      "op": "ANY",
+      "filters": [{
+        "phase": {
+          "phase": {
+            "qname": "cn.HeldOrder"
+          }
+        }
+      }, {
+        "quality": {
+          "quality": {
+            "qname": "cn.state"
+          },
+          "op": "EQ",
+          "value": {
+            "stringValue": "placed"
+          }
+        }
+      }]
+    }
+  }, {
+    "expr": {
+      "plExpr": "revenue between 1000 and 2000"
+    }
+  }],
+  "time": {
+    "range": {
+      "from": {
+        "value": "2026-01-01",
+        "granularity": "DAY"
+      },
+      "to": {
+        "value": "2026-04-01",
+        "granularity": "DAY"
+      }
+    }
+  },
+  "groupBy": [{
+    "qname": "cn.Channel"
+  }],
+  "orderLimit": {
+    "by": [{
+      "by": {
+        "qname": "cn.revenue"
+      },
+      "descending": true
+    }],
+    "limit": 10
+  },
+  "compare": {
+    "periodCode": "2025-Q4",
+    "mode": "DELTA"
+  },
+  "snapshotHash": "sha256:0f3c",
+  "locale": "en",
+  "asOf": {
+    "value": "2026-10-22",
+    "granularity": "DAY"
+  }
+}

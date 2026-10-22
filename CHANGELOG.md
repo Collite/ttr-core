@@ -6,6 +6,15 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`org.tatrman:ttr-concept`** (cn, CN-P3 S3.1) — **joins the `grammar/v*` bundle** (A-CN-1): first published with the
+  next grammar cut, at the grammar version, beside the TTR-P toolchain whose closure it shares (`api` `ttr-metadata`,
+  `ttrp-frontend`, `ttr-plan-proto`; `ttr-plan-proto` / `ttr-translator` at the pinned translator release).
+- **`ttr-plan-proto`** — the cn frames **`org.tatrman.concept.v1`**, **`statement.v1`**, **`assertion.v1`** are
+  **frozen** (CN-P3 S3.1): J-v2 additive-only from here. Clarified, not changed: an instantaneous event's instant rides
+  `Period.start` (no `end`); `Value.is_null` is SQL NULL. Their canonical JSON mapping is protobuf JsonFormat (samples
+  in `ttr-concept`'s tests round-trip byte-equal). The **Python wheel** (`ttr-plan-proto`, `python-plan/v*`) now packs
+  them too (`org.tatrman.concept|statement|assertion.v1`), checked against the same JSON samples.
+
 - **`grammar/v0.17.3` / AU S2.5** — recipe statements now split at storage boundaries into door parts and
   DuckDB combines. Every recipe's `text` fingerprint changes, including `release_order` and `decide_return`,
   because the hashed statement section is sorted by SQL file path and includes paths instead of `island.port`.
