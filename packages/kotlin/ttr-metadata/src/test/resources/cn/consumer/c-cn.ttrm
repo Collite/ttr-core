@@ -1,0 +1,11 @@
+package hartland.consumer
+model cn
+
+def kind Channel {}
+def event Sale   { involves: [Channel], period: { start: sold_at }, qualities: [amount, weight, revenue] }
+def event Onset  { period: { at: onset } }
+def event Return { period: { start: returned_at } }
+def quality amount  { of: Sale }
+def quality weight  { of: Sale }
+def quality revenue { of: Sale }
+def phase WebSale   { of: Sale, definition: """channel = 'web'""" }

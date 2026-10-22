@@ -1,0 +1,22 @@
+// CN-P3 — what the consumers read that P2 did not: an er-grounded value kind and event a cubelet hops to (the reverse
+// hop, ⚑CN-P8), a quality's unit and a period's stored upper bounds (⚑CN-P10). Invented names.
+package hartland.consumer
+model er
+
+def entity channel_sale {
+    attributes: [
+        def attribute sale_id    { type: int, isKey: true },
+        def attribute channel    { type: text },
+        def attribute sold_at    { type: date },
+        def attribute sold_at_hi { type: date },
+        def attribute amount     { type: decimal },
+        def attribute weight     { type: decimal }
+    ]
+}
+def entity onset_record {
+    attributes: [
+        def attribute record_id { type: int, isKey: true },
+        def attribute onset     { type: date },
+        def attribute onset_hi  { type: date }
+    ]
+}

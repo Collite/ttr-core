@@ -127,6 +127,30 @@ class CnDefinitions(
 
     val diagnostics: List<Diagnostic> get() = all.flatMap { it.diagnostics }
 
+    private val conceptBlocks: Map<QualifiedName, List<CnDefinition>> by lazy {
+        all.filter { it.kind != BlockKind.FILTER }.groupBy { it.owner }
+    }
+
+    /**
+     * [owner]'s `definition:` / `members:` blocks with every definition they name inlined, transitively — cycle-safe
+     * (AM-26): what a rendering of [owner] reads (CN-P3 S3.2, a PhaseFilter's reachability). Empty when [owner] has no
+     * such block.
+     */
+    fun closure(owner: QualifiedName): List<CnDefinition> {
+        val seen = linkedSetOf<QualifiedName>()
+        val out = mutableListOf<CnDefinition>()
+        val queue = ArrayDeque(listOf(owner))
+        while (queue.isNotEmpty()) {
+            val q = queue.removeFirst()
+            if (!seen.add(q)) continue
+            for (d in conceptBlocks[q].orEmpty()) {
+                out += d
+                queue += d.reads.definitions
+            }
+        }
+        return out
+    }
+
     companion object {
         /** The block does not parse as a TTR-P 0.5 expression (the message names the `TTRP-*` id). */
         const val SYNTAX = "cn/definition-syntax"
@@ -173,26 +197,18 @@ internal class DefinitionResolver(
         pkg: String,
     ): Concept? = byName[name]?.let { cs -> cs.firstOrNull { it.qname.`package` == pkg } ?: cs.singleOrNull() }
 
+    private val lattice = ConceptChain(cn)
+
     private fun of(q: QualifiedName?): Concept? = q?.let { cn.concepts[it] }
 
-    /** [c] and what it specializes — a role's or a phase's `of:`, every `is_a` — breadth first. */
-    fun chain(c: Concept): List<Concept> {
-        val out = linkedMapOf(c.qname to c)
-        val queue = ArrayDeque(listOf(c))
-        while (queue.isNotEmpty()) {
-            val x = queue.removeFirst()
-            for (next in listOfNotNull(of(x.of)) + x.isA.mapNotNull { of(it) }) {
-                if (out.putIfAbsent(next.qname, next) == null) queue += next
-            }
-        }
-        return out.values.toList()
-    }
+    /** [c] and what it specializes ([ConceptChain.chain]). */
+    fun chain(c: Concept): List<Concept> = lattice.chain(c)
 
-    /** Whether a [want] slot takes a [got] row: one specializes the other. */
+    /** Whether a [want] slot takes a [got] row ([ConceptChain.compatible]). */
     fun compatible(
         want: Concept,
         got: Concept,
-    ): Boolean = chain(got).any { it.qname == want.qname } || chain(want).any { it.qname == got.qname }
+    ): Boolean = lattice.compatible(want, got)
 
     fun concept(
         c: Concept,
@@ -318,10 +334,7 @@ internal class DefinitionResolver(
     private fun participant(
         s: Concept,
         label: String,
-    ): Pair<Concept, org.tatrman.ttr.metadata.model.CnParticipant>? {
-        for (c in chain(s)) c.involves.firstOrNull { it.label == label }?.let { return c to it }
-        return null
-    }
+    ): Pair<Concept, org.tatrman.ttr.metadata.model.CnParticipant>? = lattice.participant(s, label)
 
     private fun periodOf(s: Concept): Pair<Concept, CnPeriod>? {
         for (c in chain(s)) c.period?.let { return c to it }

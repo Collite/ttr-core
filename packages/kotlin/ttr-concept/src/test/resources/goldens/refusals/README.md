@@ -8,13 +8,13 @@ rendering's `diagnostics`).
 | `ambiguous-statement` | `cn/ambiguous-statement` (a measure with candidates) | hartland |
 | `ambiguous-assertion` | `cn/ambiguous-assertion` (an event with candidates) | clinic |
 | `missing-time` | `cn/missing-time` | sales |
-| `ask-set` | `cn/unsupported-ask` — **new slug** (`ASK_SET` is reserved, rejected in v1; §7 names no slug — added at S3.2) | sales |
+| `ask-set` | `cn/unsupported-ask` — **new slug** (`ASK_SET` is reserved, rejected in v1; added to §7 at S3.2, A-CN-32) | sales |
 | `not-analytically-reachable` | `cn/not-analytically-reachable` (an er-only quality as a measure) | hartland |
 | `definition-unreachable-er` | `cn/definition-unreachable(er)` (an md-grounded phase, no hop — the recipe consumer's `cn/not-recipe-reachable` cause) | sales |
 | `not-assertable` | `cn/not-assertable` (an md-grounded event with no ER landing) | sales |
-| `unknown-participant-label` | `cn/unknown-participant-label` — **new slug** (contracts §3 checks the labels, §7 names no slug — added at S3.5) | clinic |
+| `unknown-participant-label` | `cn/unknown-participant-label` — **new slug** (contracts §3 checks the labels; added to §7 at S3.2, A-CN-33) | clinic |
+| `unit-mismatch` | `cn/unit-mismatch` — an `Observation` value asserted in `mg/dL`; its grounding declares `unit: "mmol/L"` (⚑CN-P10, ruled 2026-10-22) | clinic |
 | `definition-cycle` | `cn/definition-cycle` (`LoopA` ⇄ `LoopB`) | hartland |
 | `retired-code.pending` | `cn/retired-code` — no vocabulary versions until CN-P4 S4.2 | — |
-| `unit-mismatch.pending` | `cn/unit-mismatch` — nothing in the model carries a unit to compare with (CN-P10) | — |
 
 Pending convention, case format and oracles: [`../README.md`](../README.md).

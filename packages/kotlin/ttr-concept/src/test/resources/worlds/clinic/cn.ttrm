@@ -40,6 +40,12 @@ def event ConditionOnset {                                                      
     period: { at: onset_at, precision: month },
     qualities: [onset_code, onset_at]
 }
+def event Observation {                                                          // a measured value — its unit on the grounding (⚑CN-P10)
+    label: { en: "Observation", cs: "Pozorování" },
+    involves: [Patient],
+    period: { at: observed_at },
+    qualities: [observed_at, analyte, observed_value]
+}
 def event FractureEpisode {
     label: { en: "Fracture episode", cs: "Epizoda zlomeniny" },
     extent: durative,
@@ -61,6 +67,9 @@ def quality onset          { of: ConditionRecord }
 def quality abatement      { of: ConditionRecord }
 def quality onset_code     { of: ConditionOnset, value_space: Diagnosis }
 def quality onset_at       { of: ConditionOnset }
+def quality observed_at    { of: Observation }
+def quality analyte        { of: Observation }
+def quality observed_value { of: Observation, label: { en: "observed value", cs: "naměřená hodnota" } }
 def quality episode_start  { of: FractureEpisode }
 def quality episode_end    { of: FractureEpisode }
 

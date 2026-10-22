@@ -196,7 +196,7 @@ object CnDefinitionLints {
     private fun names(cs: List<Concept>): String = cs.joinToString(", ") { "`${it.qname.name}`" }
 
     /** The basis shapes a comparison has (at most one), per [BASIS_SHAPES]. */
-    private fun shapeOf(c: InstantComparison): Basis? {
+    internal fun shapeOf(c: InstantComparison): Basis? {
         // normalize `:as_of > x` to `x < :as_of`
         val (op, l, r) =
             when {

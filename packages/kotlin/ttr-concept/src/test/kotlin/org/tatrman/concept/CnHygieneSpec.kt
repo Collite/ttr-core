@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.testing.test
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldStartWith
 import kotlinx.serialization.json.Json
@@ -75,11 +76,16 @@ class CnHygieneSpec :
                 )
         }
 
-        "the service answers hygieneReport; every other family is still CN-P3" {
+        "the service answers hygieneReport and the validates (S3.2); every other family is still CN-P3" {
             val svc = CnConceptService(model)
             svc.hygieneReport() shouldBe report
+            svc
+                .statementValidate(
+                    org.tatrman.statement.v1.Statement
+                        .getDefaultInstance(),
+                ).map { it.slug } shouldContain FrameSlugs.MISSING_TIME
             shouldThrow<UnsupportedOperationException> {
-                svc.statementValidate(
+                svc.statementLower(
                     org.tatrman.statement.v1.Statement
                         .getDefaultInstance(),
                 )

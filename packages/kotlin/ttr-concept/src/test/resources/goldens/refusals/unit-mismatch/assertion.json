@@ -1,0 +1,50 @@
+{
+  "event": {
+    "qname": "cn.Observation"
+  },
+  "identity": {
+    "new": true
+  },
+  "participants": [
+    {
+      "label": "patient",
+      "concept": {
+        "qname": "cn.Patient"
+      },
+      "member": {
+        "label": "P-1001",
+        "resolvedValue": "1001"
+      }
+    }
+  ],
+  "qualities": [
+    {
+      "quality": {
+        "qname": "cn.analyte"
+      },
+      "value": {
+        "stringValue": "glucose"
+      }
+    },
+    {
+      "quality": {
+        "qname": "cn.observed_value"
+      },
+      "value": {
+        "floatValue": 108
+      },
+      "unit": "mg/dL",
+      "verbatim": "fasting glucose 108 mg/dL"
+    }
+  ],
+  "period": {
+    "start": {
+      "value": "2026-03-14T07:15",
+      "granularity": "MINUTE"
+    }
+  },
+  "provenance": {
+    "producer": "manual:steward"
+  },
+  "locale": "en"
+}

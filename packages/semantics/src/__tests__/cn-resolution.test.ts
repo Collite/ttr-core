@@ -334,6 +334,28 @@ def cn2er_event order_g { event: Order, target: er.entity.order, participants: {
     expect(resolved.get('Order.buyer')).toBeUndefined();
   });
 
+  it("a binding period's stored upper bounds start_hi / at_hi are er refs (⚑CN-P10)", () => {
+    const p = project([
+      ER,
+      CONCEPTS,
+      {
+        uri: 'bounds.ttrm',
+        src: `package hartland.web
+model binding
+def cn2er_event order_g {
+    event: Order,
+    target: er.entity.order,
+    period: { start: er.entity.order.placed_date, start_hi: er.entity.order.state, at_hi: er.entity.order.nope }
+}
+`,
+      },
+    ]);
+    const resolved = resolveAll(p, 'bounds.ttrm');
+    expect(resolved.get('er.entity.order.state')).toBe('hartland.web.er.entity.order.state');
+    expect(resolved.has('er.entity.order.nope')).toBe(true);
+    expect(resolved.get('er.entity.order.nope')).toBeUndefined();
+  });
+
   it("sugar: the stereotype slot declares (no ref); every other slot is a cn ref", () => {
     const p = project([CONCEPTS, MD, SUGAR]);
     const buyer = collectReferences(def(p, SUGAR.uri, 'buyer'));

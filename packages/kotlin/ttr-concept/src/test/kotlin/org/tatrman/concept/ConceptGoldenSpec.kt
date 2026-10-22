@@ -45,7 +45,7 @@ class ConceptGoldenSpec :
     }) {
     companion object {
         /** The stages whose cases `check` runs; each stage adds itself when it lands (S3.8: all, switch removed). */
-        val LANDED_STAGES: Set<String> = emptySet()
+        val LANDED_STAGES: Set<String> = setOf("S3.2")
 
         private val printer = JsonFormat.printer()
 

@@ -77,11 +77,19 @@ interface ConceptService {
 
 /**
  * The service over a [ResolvedCnModel] (cn contracts §3). CN-P2 S2.7 pulls [hygieneReport] forward — model-only, no
- * consumer ([CnHygiene]); every other family is CN-P3 and refuses as the scaffold does.
+ * consumer ([CnHygiene]); CN-P3 lands the families stage by stage (S3.2: the two validates — [StatementValidator],
+ * [AssertionValidator]); a family not landed yet refuses as the scaffold does.
  */
 class CnConceptService(
     private val model: ResolvedCnModel,
 ) : ConceptService by NotImplementedConceptService() {
+    private val statements = StatementValidator(model)
+    private val assertions = AssertionValidator(model)
+
+    override fun statementValidate(s: Statement): List<Diagnostic> = statements.validate(s)
+
+    override fun assertionValidate(a: Assertion): List<Diagnostic> = assertions.validate(a)
+
     override fun hygieneReport(): HygieneReport = CnHygiene.report(model)
 }
 

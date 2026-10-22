@@ -42,6 +42,12 @@ def cn2er_event condition_onset_g {
     period: { at: er.entity.condition.onset },
     participants: { patient: [er.relation.condition_patient] }
 }
+def cn2er_event observation_g {
+    event: cn.Observation,
+    target: er.entity.observation,
+    period: { at: er.entity.observation.observed_at },
+    participants: { patient: [er.relation.observation_patient] }
+}
 def cn2er_event fracture_g {
     event: cn.FractureEpisode,
     target: er.entity.fracture_episode,
@@ -61,5 +67,8 @@ def cn2er_quality onset_g          { quality: cn.onset, target: er.entity.condit
 def cn2er_quality abatement_g      { quality: cn.abatement, target: er.entity.condition.abatement }
 def cn2er_quality onset_code_g     { quality: cn.onset_code, target: er.entity.condition.code }
 def cn2er_quality onset_at_g       { quality: cn.onset_at, target: er.entity.condition.onset }
+def cn2er_quality observed_at_g    { quality: cn.observed_at, target: er.entity.observation.observed_at }
+def cn2er_quality analyte_g        { quality: cn.analyte, target: er.entity.observation.analyte }
+def cn2er_quality observed_value_g { quality: cn.observed_value, target: er.entity.observation.value, unit: "mmol/L" } // ⚑CN-P10
 def cn2er_quality episode_start_g  { quality: cn.episode_start, target: er.entity.fracture_episode.period_start }
 def cn2er_quality episode_end_g    { quality: cn.episode_end, target: er.entity.fracture_episode.period_end }
