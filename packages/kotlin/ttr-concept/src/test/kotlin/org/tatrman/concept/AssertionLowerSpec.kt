@@ -322,7 +322,9 @@ class AssertionLowerSpec :
                 "\"period\": { \"start\": { \"value\": \"2026-03-01\", \"granularity\": \"DAY\" }, " +
                     "\"end\": { \"value\": \"2026-03-04\", \"granularity\": \"DAY\" } }"
             refused(plus, frame(ev("cn.Admission"), fresh, ended), "cn/malformed-frame period.end")
-            val open = "\"period\": { \"start\": { \"value\": \"2026-03-01\", \"granularity\": \"DAY\" }, \"endState\": \"END_OPEN\" }"
+            val open =
+                "\"period\": { \"start\": { \"value\": \"2026-03-01\", \"granularity\": \"DAY\" }, " +
+                    "\"endState\": \"END_OPEN\" }"
             refused(plus, frame(ev("cn.Admission"), fresh, open), "cn/malformed-frame period.end")
         }
     }) {

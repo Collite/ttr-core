@@ -36,10 +36,10 @@ internal class DefinitionRenderer(
         return when (found.size) {
             0 -> null to "no concept `$qname`"
             1 -> found.single() to ""
-            else ->
-                null to
-                    "`$qname` names a concept in ${found.size} packages " +
-                    "(${found.map { it.qname.`package` }.sorted().joinToString(", ") { "`$it`" }}) — refused, never the first"
+            else -> {
+                val packages = found.map { it.qname.`package` }.sorted().joinToString(", ") { "`$it`" }
+                null to "`$qname` names a concept in ${found.size} packages ($packages) — refused, never the first"
+            }
         }
     }
 
