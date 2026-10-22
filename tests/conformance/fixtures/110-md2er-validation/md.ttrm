@@ -1,0 +1,5 @@
+model md
+def domain Code { type: string }
+def dimension Customer { key: code, attributes: [def attribute code { domain: md.Code }] }
+def measure revenue { domain: md.Code, aggregation: sum }
+def cubelet sales { grain: [Customer.code], measures: [revenue] }

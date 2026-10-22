@@ -698,9 +698,21 @@ data class Md2dbMapDef(
     val columns: Map<String, String> = emptyMap(),
 ) : Definition
 
+/** An explicit dimension → entity landing, including key and one-relation attribute paths. */
+data class Md2erDimensionDef(
+    override val name: String,
+    override val source: SourceLocation,
+    override val description: String? = null,
+    override val descriptionLocalized: LocalizedStringValue = LocalizedStringValue(),
+    override val tags: List<String> = emptyList(),
+    val dimensionRef: Reference? = null,
+    val entity: Reference? = null,
+    val attributes: Map<String, String> = emptyMap(),
+) : Definition
+
 /**
  * `def md2er_cubelet <id> { cubelet:, target: <entity>, attributes: { attr → er attr } }` —
- * structural-only. Physical props (shape/measures/journaling) are a permissive parse superset and
+ * structural-only. Physical props (shape/allocation/journaling) are a permissive parse superset and
  * rejected in semantics (`md/md2er-physical-prop`); [physicalProps] records any that appeared.
  */
 data class Md2erCubeletDef(
@@ -713,6 +725,7 @@ data class Md2erCubeletDef(
     val entity: Reference? = null,
     val attributes: Map<String, String> = emptyMap(),
     val physicalProps: List<String> = emptyList(),
+    val measures: Map<String, String> = emptyMap(),
 ) : Definition
 
 /**

@@ -15,6 +15,7 @@ import org.tatrman.ttr.parser.model.Md2dbCubeletDef
 import org.tatrman.ttr.parser.model.Md2dbDomainDef
 import org.tatrman.ttr.parser.model.Md2dbMapDef
 import org.tatrman.ttr.parser.model.Md2erCubeletDef
+import org.tatrman.ttr.parser.model.Md2erDimensionDef
 import org.tatrman.ttr.parser.model.DimensionDef
 import org.tatrman.ttr.parser.model.HierarchyDef
 import org.tatrman.ttr.parser.model.MdDomainDef
@@ -209,6 +210,7 @@ object ConformanceDump {
             is Md2dbDomainDef -> "md2db_domain"
             is Md2dbMapDef -> "md2db_map"
             is Md2erCubeletDef -> "md2er_cubelet"
+            is Md2erDimensionDef -> "md2er_dimension"
             is WorldDef -> "world"
             is LexiconEntryDef -> d.entryKind
             is AutomationDef -> d.kind
@@ -355,7 +357,31 @@ object ConformanceDump {
             is DimensionDef -> conceptSugar(d.concept)?.let { p["concept"] = it }
             is MeasureDef -> conceptSugar(d.concept)?.let { p["concept"] = it }
             is CubeletDef -> conceptSugar(d.concept)?.let { p["concept"] = it }
-            is MdMapDef, is HierarchyDef, is Md2dbCubeletDef, is Md2dbDomainDef, is Md2dbMapDef, is Md2erCubeletDef,
+            is Md2erDimensionDef -> {
+                d.dimensionRef?.let { p["dimension"] = JsonPrimitive(it.path) }
+                d.entity?.let { p["entity"] = JsonPrimitive(it.path) }
+                if (d.attributes.isNotEmpty()) {
+                    p["attributes"] =
+                        JsonObject(d.attributes.mapValues { JsonPrimitive(it.value) })
+                }
+            }
+            is Md2erCubeletDef -> {
+                d.cubeletRef?.let { p["cubelet"] = JsonPrimitive(it.path) }
+                d.entity?.let { p["target"] = JsonPrimitive(it.path) }
+                if (d.attributes.isNotEmpty()) {
+                    p["attributes"] =
+                        JsonObject(d.attributes.mapValues { JsonPrimitive(it.value) })
+                }
+                if (d.measures.isNotEmpty()) {
+                    p["measures"] =
+                        JsonObject(d.measures.mapValues { JsonPrimitive(it.value) })
+                }
+                if (d.physicalProps.isNotEmpty()) {
+                    p["physicalProps"] =
+                        JsonArray(d.physicalProps.map { JsonPrimitive(it) })
+                }
+            }
+            is MdMapDef, is HierarchyDef, is Md2dbCubeletDef, is Md2dbDomainDef, is Md2dbMapDef,
             -> {}
             is WorldDef -> {
                 d.extends?.let { p["extends"] = JsonPrimitive(it) }

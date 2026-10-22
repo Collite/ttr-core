@@ -1,0 +1,23 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "md2er_dimension",
+            "name": "md2er_dimension",
+            "properties": {
+                "attributes": {
+                    "md2er_dimension": "md2er_dimension"
+                },
+                "dimension": "md.md2er_dimension",
+                "entity": "er.entity.md2er_dimension"
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": null,
+    "schemaDirective": {
+        "code": "binding",
+        "namespace": null
+    }
+}

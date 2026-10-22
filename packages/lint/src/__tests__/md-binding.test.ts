@@ -139,3 +139,30 @@ describe('Stage 3C — multi-source, completeness, md2er', () => {
 
 // keep the logical file referenced (lints the same in every project build)
 void mdFile;
+
+const ER_HOP = `model er
+ def entity customer { attributes: [def attribute sk { type: int }, def attribute amount { type: decimal }] }
+ def entity address { attributes: [def attribute state { type: text }] }
+ def relation address { from: er.entity.customer, to: er.entity.address, cardinality: { from: "N", to: "1" } }`;
+
+function hopCodes(binding: string): string[] {
+  return [...lintProj([
+    { uri: 'file:///md.ttrm', src: LOGICAL },
+    { uri: 'file:///er.ttrm', src: ER_HOP },
+    { uri: 'file:///binding.ttrm', src: `model binding\n${binding}` },
+  ]).values()].flat().map(d => d.code);
+}
+
+describe('HP-P1 explicit MD to ER bindings', () => {
+  it('requires the dimension key in the explicit attribute map', () => {
+    expect(hopCodes('def md2er_dimension c { dimension: md.Customer, entity: er.entity.customer, attributes: {} }')).toContain('md/md2er-dimension-key');
+    expect(hopCodes('def md2er_dimension c { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk, state: address.state } }')).not.toContain('md/md2er-dimension-key');
+  });
+  it('admits structural measures and checks their target attributes', () => {
+    expect(hopCodes('def md2er_cubelet c { cubelet: md.sales, target: er.entity.customer, measures: { net: amount } }')).not.toContain('md/md2er-physical-prop');
+    expect(hopCodes('def md2er_cubelet c { cubelet: md.sales, target: er.entity.customer, measures: { net: missing } }')).toContain('md/md2er-measure-unknown');
+  });
+  it('rejects duplicate dimension bindings', () => {
+    expect(hopCodes('def md2er_dimension a { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk } }\ndef md2er_dimension b { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk } }')).toContain('md/duplicate-binding');
+  });
+});

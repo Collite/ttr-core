@@ -2,6 +2,7 @@
 import { DiagnosticCode } from '@tatrman/parser';
 import type { Definition, SourceLocation, Document } from '@tatrman/parser';
 import {
+  mdErBindingDiagnostics,
   defaultSchemaForKind,
   namespaceForKind,
   resolveMdRef,
@@ -30,12 +31,13 @@ const MD_LOGICAL_KINDS: ReadonlySet<string> = new Set([
   'cubelet',
 ]);
 
-/** The four MD binding def kinds (schema binding). */
+/** The MD binding def kinds (schema binding). */
 const MD_BINDING_KINDS: ReadonlySet<string> = new Set([
   'md2dbCubelet',
   'md2dbDomain',
   'md2dbMap',
   'md2erCubelet',
+  'md2erDimension',
 ]);
 
 export function isMdKind(kind: string): boolean {
@@ -888,22 +890,29 @@ const multisourceGrainMismatch: Rule = {
   },
 };
 
-const md2erPhysicalProp: Rule = {
-  id: 'md-md2er-physical-prop',
-  code: DiagnosticCode.MdMd2erPhysicalProp,
-  category: 'md',
-  scope: 'project',
-  defaultSeverity: 'error',
-  docs: 'An `md2er_cubelet` (structural-only) carries a physical prop (shape/measures/journaling).',
+const mdErStructuralRules: Rule[] = [
+  ['md-md2er-physical-prop', DiagnosticCode.MdMd2erPhysicalProp],
+  ['md-md2er-dimension-key', DiagnosticCode.MdMd2erDimensionKey],
+  ['md-md2er-path-ambiguous', DiagnosticCode.MdMd2erPathAmbiguous],
+  ['md-md2er-measure-unknown', DiagnosticCode.MdMd2erMeasureUnknown],
+  ['md-duplicate-binding', DiagnosticCode.MdDuplicateBinding],
+  ['md-er-binding-reference', DiagnosticCode.MdMd2erReference],
+].map(([id, code]) => ({
+  id, code: code as DiagnosticCode, category: 'md', scope: 'project', defaultSeverity: 'error',
+  docs: 'Validate explicit structural MD to ER bindings.',
   check(ctx) {
     if (ctx.scope !== 'project') return;
-    for (const def of bindingModelFor(ctx).md2erCubelets) {
-      if (def.physicalProps?.length) {
-        ctx.report({ source: def.source, message: `md2er_cubelet is structural-only; remove: ${def.physicalProps.join(', ')}` });
-      }
+    let diagnostics = ctx.cache.get('md:erStructural') as ReturnType<typeof mdErBindingDiagnostics> | undefined;
+    if (!diagnostics) {
+      diagnostics = mdErBindingDiagnostics([...ctx.documents].map(([uri, ast]) => {
+        const sym = ctx.symbols.documentContext(uri);
+        return { uri, ast, schemaCode: ast.modelDirective?.modelCode ?? '', namespace: ast.modelDirective?.schema ?? '', packageName: sym?.packageName ?? ast.packageDecl?.name ?? '' };
+      }), ctx.resolver);
+      ctx.cache.set('md:erStructural', diagnostics);
     }
+    for (const d of diagnostics) if (d.code === code) ctx.report(d);
   },
-};
+}));
 
 export const MD_RULES: Rule[] = [
   unknownRef,
@@ -935,5 +944,5 @@ export const MD_RULES: Rule[] = [
   cubeletGrainCoverage,
   incompleteJournaling,
   multisourceGrainMismatch,
-  md2erPhysicalProp,
+  ...mdErStructuralRules,
 ];

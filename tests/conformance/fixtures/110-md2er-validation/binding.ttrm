@@ -1,0 +1,4 @@
+model binding
+def md2er_dimension good { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk, state: address.state } }
+def md2er_dimension missing_key { dimension: md.Customer, entity: er.entity.customer, attributes: {} }
+def md2er_cubelet measure { cubelet: md.sales, target: er.entity.customer, measures: { revenue: unknown } }

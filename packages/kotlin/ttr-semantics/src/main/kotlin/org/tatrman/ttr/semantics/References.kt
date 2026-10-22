@@ -22,6 +22,7 @@ import org.tatrman.ttr.parser.model.HierarchyDef
 import org.tatrman.ttr.parser.model.IndexDef
 import org.tatrman.ttr.parser.model.LexiconEntryDef
 import org.tatrman.ttr.parser.model.MdMapDef
+import org.tatrman.ttr.parser.model.Md2erDimensionDef
 import org.tatrman.ttr.parser.model.MeasureDef
 import org.tatrman.ttr.parser.model.ProcedureDef
 import org.tatrman.ttr.parser.model.PropertyValue
@@ -98,6 +99,10 @@ private fun collectInto(
         is EntityDef -> {
             def.nameAttribute?.let { out += refOf(it, owner) }
             def.codeAttribute?.let { out += refOf(it, owner) }
+        }
+        is Md2erDimensionDef -> {
+            def.dimensionRef?.let { out += refOf(it, owner) }
+            def.entity?.let { out += refOf(it, owner) }
         }
         is Er2DbEntityDef -> def.entity?.let { out += refOf(it, owner) }
         is Er2DbAttributeDef -> def.attribute?.let { out += refOf(it, owner) }

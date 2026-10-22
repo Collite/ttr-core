@@ -23,6 +23,37 @@ class CnHopSpec :
         val hop =
             CnBuilder.project(project.snapshot.loadedFiles).let { (docs, resolver) -> ExplicitMdErHop(docs, resolver) }
 
+        "HP-P1: explicit dimensions, one-hop attributes and structural measures" {
+            val root =
+                java.nio.file.Files
+                    .createTempDirectory("explicit-hop")
+            val sources =
+                mapOf(
+                    "md.ttrm" to
+                        "model md\ndef domain Code { type: string }\ndef dimension Customer { key: code, attributes: [def attribute code { domain: md.Code }, def attribute state { domain: md.Code }] }\ndef measure revenue { domain: md.Code, aggregation: sum }",
+                    "er.ttrm" to
+                        "model er\ndef entity customer { attributes: [def attribute sk { type: int }, def attribute amount { type: decimal }] }\ndef entity addr { attributes: [def attribute state { type: text }] }\ndef relation address { from: er.entity.customer, to: er.entity.addr, cardinality: { from: \"N\", to: \"1\" } }",
+                    "binding.ttrm" to
+                        "model binding\ndef md2er_dimension c { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk, state: address.state } }\ndef md2er_cubelet m { target: er.entity.customer, measures: { revenue: amount } }",
+                )
+            val files =
+                sources.mapValues { (name, text) ->
+                    root.resolve(name).also {
+                        java.nio.file.Files
+                            .writeString(it, text)
+                    }
+                }
+            val loaded = CnFixtures.load(files.mapKeys { "demo/${it.key}" })
+            val explicit =
+                CnBuilder.project(loaded.snapshot.loadedFiles).let { (docs, resolver) ->
+                    ExplicitMdErHop(docs, resolver)
+                }
+            explicit.erTargetOf("md.dimension.Customer") shouldBe HopResult("er.entity.customer", HopVia.EXPLICIT)
+            explicit.erTargetOf("md.dimension.Customer.state") shouldBe
+                HopResult("er.entity.addr.state", HopVia.EXPLICIT)
+            explicit.erTargetOf("md.measure.revenue") shouldBe HopResult("er.entity.customer.amount", HopVia.EXPLICIT)
+        }
+
         "a cubelet with an md2er_cubelet hops to the binding's entity" {
             hop.erTargetOf("md.cubelet.web_sales") shouldBe HopResult("er.entity.web_sale", HopVia.EXPLICIT)
             hop.erTargetOf("md.cubelet.web_returns") shouldBe HopResult("er.entity.web_return", HopVia.EXPLICIT)

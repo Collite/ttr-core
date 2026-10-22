@@ -5,6 +5,8 @@ import org.tatrman.ttr.metadata.model.HopResult
 import org.tatrman.ttr.metadata.model.HopVia
 import org.tatrman.ttr.metadata.model.MdErHop
 import org.tatrman.ttr.parser.model.Md2erCubeletDef
+import org.tatrman.ttr.parser.model.Md2erDimensionDef
+import org.tatrman.ttr.semantics.md.explicitErAttributes
 import org.tatrman.ttr.semantics.ResolutionContext
 import org.tatrman.ttr.semantics.ResolutionResult
 import org.tatrman.ttr.semantics.Resolver
@@ -12,15 +14,10 @@ import org.tatrman.ttr.semantics.SemanticDocument
 import org.tatrman.ttr.semantics.SymbolEntry
 
 /**
- * The hop as P2 answers it (CN-P2 S2.5 T3): rule 1 of [MdErHop]'s order, read off the **explicit `md2er_cubelet`**
- * defs only — a cubelet lands on the binding's `target:` entity, and each md attribute its `attributes:` map names
- * lands on that entity's attribute (`{ Customer.code: customerCode }` → `er.entity.<target>.customerCode`). Every
- * other md element — a dimension, a domain, a measure (structural `measures:` and `md2er_domain` are the md/hop
- * sub-arc's, with the derivation) — answers `md/er-unmapped`.
- *
- * An md attribute two cubelets map to different er attributes is ambiguous unless a [bearerEntity] picks one (the
- * bearer restriction of rule 2, applied to the explicit candidates); else `md/er-ambiguous`. A ref that does not
- * resolve contributes nothing — `ttr/unresolved-reference` reports it.
+ * Explicit structural MD → ER landings (grammar 0.18): cubelets, dimension entities, grain and
+ * dimension attributes, and cubelet measures. Dimension attribute paths traverse one named relation.
+ * Missing mappings remain unmapped here; the derivation composes with this explicit tier in HP-P2.
+ * Multiple explicit targets require a bearer to select exactly one candidate.
  */
 class ExplicitMdErHop(
     docs: List<SemanticDocument>,
@@ -40,11 +37,31 @@ class ExplicitMdErHop(
                 (resolver.resolveReference(Resolver.Ref(path, parts), ctx) as? ResolutionResult.Resolved)?.symbol
 
             for (def in doc.definitions) {
+                if (def is Md2erDimensionDef) {
+                    val entity =
+                        def.entity?.let { resolve(it.path, it.parts) }?.takeIf { it.kind == "entity" } ?: continue
+                    val dimension =
+                        def.dimensionRef?.let { resolve(it.path, it.parts) }?.takeIf { it.kind == "dimension" }
+                            ?: continue
+                    add(elementRefOf(dimension), elementRefOf(entity))
+                    for ((attr, path) in def.attributes) {
+                        val md = resolver.getSymbol("${dimension.qname}.$attr") ?: continue
+                        val targets = explicitErAttributes(docs, resolver, entity, path)
+                        if (targets.size == 1) add(elementRefOf(md), elementRefOf(targets.single()))
+                    }
+                    continue
+                }
                 if (def !is Md2erCubeletDef) continue
                 val entity =
                     def.entity?.let { resolve(it.path, it.parts) }?.takeIf { it.kind == "entity" } ?: continue
                 val cubelet = def.cubeletRef?.let { resolve(it.path, it.parts) }?.takeIf { it.kind == "cubelet" }
                 if (cubelet != null) add(elementRefOf(cubelet), elementRefOf(entity))
+                for ((measure, erAttr) in def.measures) {
+                    val md = resolve("md.$measure", listOf("md", measure))?.takeIf { it.kind == "measure" } ?: continue
+                    val er =
+                        resolver.getSymbol("${entity.qname}.$erAttr")?.takeIf { it.kind == "attribute" } ?: continue
+                    add(elementRefOf(md), elementRefOf(er))
+                }
                 for ((mdAttr, erAttr) in def.attributes) {
                     val md =
                         resolve(mdAttr, mdAttr.split('.'))?.takeIf {
@@ -74,7 +91,7 @@ class ExplicitMdErHop(
         if (found.size == 1) return HopResult(found.single(), HopVia.EXPLICIT)
         if (found.isEmpty()) {
             return HopResult.unmapped(
-                "'$mdElement' has no er counterpart — no md2er_cubelet maps it (the derivation is the md/hop sub-arc's)",
+                "'$mdElement' has no er counterpart — no explicit md2er binding maps it",
             )
         }
         val ofBearer = found.filter { entityOfElement(it) == bearerEntity }

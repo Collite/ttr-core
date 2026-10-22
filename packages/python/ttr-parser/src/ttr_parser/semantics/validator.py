@@ -26,8 +26,12 @@ from ..model import (
     AttributeDef,
     ColumnDef,
     Definition,
+    DimensionDef,
     EntityDef,
+    IdValue,
     ImportStatement,
+    Md2erCubeletDef,
+    Md2erDimensionDef,
     ParseResult,
     QueryDef,
     RelationDef,
@@ -57,7 +61,7 @@ _ER2DB_KINDS = frozenset({"er2db_entity", "er2db_attribute", "er2db_relation"})
 MD_KINDS = frozenset(
     {
         "mdDomain", "md_domain", "dimension", "mdMap", "md_map", "hierarchy", "measure", "cubelet",
-        "md2db_cubelet", "md2db_domain", "md2db_map", "md2er_cubelet",
+        "md2db_cubelet", "md2db_domain", "md2db_map", "md2er_cubelet", "md2er_dimension",
     }
 )
 
@@ -138,7 +142,71 @@ class Validator:
         # 0.17 — the model-level `cn/...` slugs (cn contracts §7, the portable subset).
         for d in validate_cn([doc.cn() for doc in docs], resolver).diagnostics:
             out.append(ValidationDiagnostic(d.code, d.severity, d.source, d.message))
+        out.extend(self._validate_md_er(docs, resolver))
         return tuple(out)
+
+    @staticmethod
+    def _validate_md_er(docs: list[_Doc], resolver: Resolver) -> list[ValidationDiagnostic]:
+        out: list[ValidationDiagnostic] = []
+        seen: set[str] = set()
+
+        def resolve(doc: _Doc, path: str) -> SymbolEntry | None:
+            r = resolver.resolve_reference(path, ResolutionContext(schema_code=doc.schema_code, namespace=doc.namespace, imports=doc.imports, package_name=doc.package_name))
+            return r.symbol if isinstance(r, Resolved) else None
+
+        for doc in docs:
+            for d in doc.definitions:
+                if not isinstance(d, (Md2erDimensionDef, Md2erCubeletDef)):
+                    continue
+                entity = resolve(doc, d.entity.path) if d.entity else None
+                if entity is not None and entity.kind != "entity":
+                    entity = None
+                if entity is None:
+                    out.append(_error(DiagnosticCode.MD_MD2ER_REFERENCE, "Unresolved ER entity", d.source))
+                if isinstance(d, Md2erCubeletDef):
+                    if d.physical_props:
+                        out.append(_error(DiagnosticCode.MD_MD2ER_PHYSICAL_PROP, "md2er_cubelet is structural-only", d.source))
+                    for measure, attr_name in d.measures.items():
+                        if entity and resolver.get_symbol(f"{entity.qname}.{attr_name}") is None:
+                            out.append(_error(DiagnosticCode.MD_MD2ER_MEASURE_UNKNOWN, f"Unknown attribute '{attr_name}' for '{measure}'", d.source))
+                    continue
+                dim = resolve(doc, d.dimension_ref.path) if d.dimension_ref else None
+                if dim is not None and dim.kind != "dimension":
+                    dim = None
+                if dim is None:
+                    out.append(_error(DiagnosticCode.MD_MD2ER_REFERENCE, "Unresolved MD dimension", d.source))
+                logical = next((x for other in docs for x in other.definitions if dim and other.uri == dim.source_file and isinstance(x, DimensionDef) and x.name == dim.name), None)
+                if logical and logical.key and logical.key not in d.attributes:
+                    out.append(_error(DiagnosticCode.MD_MD2ER_DIMENSION_KEY, f"Missing key '{logical.key}'", d.source))
+                if dim:
+                    if str(dim.qname) in seen:
+                        out.append(_error(DiagnosticCode.MD_DUPLICATE_BINDING, "Duplicate dimension binding", d.source))
+                    seen.add(str(dim.qname))
+                if entity is None or entity.kind != "entity":
+                    continue
+                for path in d.attributes.values():
+                    parts = path.split(".")
+                    found: list[SymbolEntry] = []
+                    if len(parts) == 1:
+                        attr = resolver.get_symbol(f"{entity.qname}.{path}")
+                        if attr:
+                            found.append(attr)
+                    elif len(parts) == 2:
+                        for other in docs:
+                            for rel in other.definitions:
+                                if not isinstance(rel, RelationDef) or rel.name != parts[0] or not isinstance(rel.from_, IdValue) or not isinstance(rel.to, IdValue):
+                                    continue
+                                origin = resolve(other, ".".join(rel.from_.parts))
+                                target = resolve(other, ".".join(rel.to.parts))
+                                if origin and target and origin.qname == entity.qname:
+                                    attr = resolver.get_symbol(f"{target.qname}.{parts[1]}")
+                                    if attr:
+                                        found.append(attr)
+                    if len(found) > 1:
+                        out.append(_error(DiagnosticCode.MD_MD2ER_PATH_AMBIGUOUS, f"Ambiguous path '{path}'", d.source))
+                    if not found:
+                        out.append(_error(DiagnosticCode.MD_MD2ER_REFERENCE, f"Unresolved path '{path}'", d.source))
+        return out
 
     @staticmethod
     def _doc(result: ParseResult, uri: str = "") -> _Doc:

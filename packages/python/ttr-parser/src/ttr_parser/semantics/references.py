@@ -38,6 +38,7 @@ from ..model import (
     IdValue,
     ImportStatement,
     ListValue,
+    Md2erDimensionDef,
     MeasureDef,
     ObjectValue,
     PatternDef,
@@ -108,6 +109,10 @@ def _collect_into(
             out.append(_ref_of(definition.name_attribute, owner))
         if definition.code_attribute is not None:
             out.append(_ref_of(definition.code_attribute, owner))
+    elif isinstance(definition, Md2erDimensionDef):
+        for ref in (definition.dimension_ref, definition.entity):
+            if ref is not None:
+                out.append(_ref_of(ref, owner))
     elif isinstance(definition, Er2DbEntityDef):
         if definition.entity is not None:
             out.append(_ref_of(definition.entity, owner))

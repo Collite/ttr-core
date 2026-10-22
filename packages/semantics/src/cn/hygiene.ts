@@ -9,9 +9,10 @@
 //
 // The landing mirrors the Kotlin typed tier (ttr-metadata `CnBuilder`, CN-P2 S2.5): an er grounding
 // lands directly, an md one through the hop, a db one nowhere, and a defined phase with no grounding
-// inherits its bearer's. The hop is P2's (`ExplicitMdErHop`): explicit `md2er_cubelet` defs only.
+// inherits its bearer's. HP-P1 adds explicit dimensions and structural measures to `ExplicitMdErHop`.
 
 import type { ConceptProperty, IdValue, LexiconEntryDef, Md2ErCubeletDef, ObjectValue, PropertyValue } from '@tatrman/parser';
+import { explicitErAttributes } from '../md/explicit.js';
 import { buildCanonicalKey } from '../qname.js';
 import type { Resolver } from '../resolver.js';
 import type { SymbolEntry } from '../symbol-table.js';
@@ -88,24 +89,36 @@ function resolveIn(resolver: Resolver, doc: CnDocument, path: string, parts: str
   return r.resolved ? r.symbol : undefined;
 }
 
-/**
- * The md → er hop as P2 answers it (the Kotlin `ExplicitMdErHop`; cn contracts §8.1): an explicit
- * `md2er_cubelet` lands its cubelet on the binding's entity and each md attribute its `attributes:`
- * maps on that entity's attribute. Any other md element is `md/er-unmapped`; an md attribute two
- * cubelets map differently is `md/er-ambiguous` unless the bearer's entity picks one (AM-29).
- */
+/** Explicit structural cubelet/dimension mappings, including measures and one-relation attribute paths. */
 export class ExplicitMdErHop {
   private readonly candidates = new Map<string, string[]>();
 
   constructor(docs: CnDocument[], resolver: Resolver) {
     for (const doc of docs) {
       for (const def of doc.ast.definitions) {
+        if (def.kind === 'md2erDimension') {
+          const entity = resolveIn(resolver, doc, def.entity, def.entity.split('.'));
+          const dimension = resolveIn(resolver, doc, def.dimensionRef, def.dimensionRef.split('.'));
+          if (entity?.kind !== 'entity' || dimension?.kind !== 'dimension') continue;
+          this.add(elementRefOf(dimension), elementRefOf(entity));
+          for (const [attr, path] of Object.entries(def.attributes)) {
+            const md = resolver.getSymbol(`${dimension.qname}.${attr}`);
+            const targets = explicitErAttributes(docs, resolver, entity, path);
+            if (md && targets.length === 1) this.add(elementRefOf(md), elementRefOf(targets[0]));
+          }
+          continue;
+        }
         if (def.kind !== 'md2erCubelet') continue;
         const d = def as Md2ErCubeletDef;
         const entity = d.entity ? resolveIn(resolver, doc, d.entity, d.entity.split('.')) : undefined;
         if (entity?.kind !== 'entity') continue;
         const cubelet = d.cubeletRef ? resolveIn(resolver, doc, d.cubeletRef, d.cubeletRef.split('.')) : undefined;
         if (cubelet?.kind === 'cubelet') this.add(elementRefOf(cubelet), elementRefOf(entity));
+        for (const [measure, erAttr] of Object.entries(d.measures ?? {})) {
+          const md = resolveIn(resolver, doc, `md.${measure}`, ['md', measure]);
+          const er = resolver.getSymbol(`${entity.qname}.${erAttr}`);
+          if (md?.kind === 'measure' && er?.kind === 'attribute') this.add(elementRefOf(md), elementRefOf(er));
+        }
         for (const [mdAttr, erAttr] of Object.entries(d.attributes ?? {})) {
           const md = resolveIn(resolver, doc, mdAttr, mdAttr.split('.'));
           if (md?.kind !== 'attribute' || md.schemaCode !== 'md') continue;
@@ -129,7 +142,7 @@ export class ExplicitMdErHop {
     if (found.length === 0) {
       return {
         slug: 'md/er-unmapped',
-        message: `'${mdElement}' has no er counterpart — no md2er_cubelet maps it (the derivation is the md/hop sub-arc's)`,
+        message: `'${mdElement}' has no er counterpart — no explicit md2er binding maps it`,
       };
     }
     const ofBearer = found.filter((e) => entityOfElement(e) === bearerEntity);

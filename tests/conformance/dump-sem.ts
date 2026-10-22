@@ -72,6 +72,12 @@ const PORTABLE_RULE_IDS = new Set([
   'cn-unknown-relation-type',
   'cn-antirigid-supertype',
   'cn-cnc-deprecated',
+  'md-md2er-physical-prop',
+  'md-md2er-dimension-key',
+  'md-md2er-path-ambiguous',
+  'md-md2er-measure-unknown',
+  'md-duplicate-binding',
+  'md-er-binding-reference',
 ]);
 /**
  * The cn hygiene slugs are off in `recommended` (an editor shows them only on request), but they are

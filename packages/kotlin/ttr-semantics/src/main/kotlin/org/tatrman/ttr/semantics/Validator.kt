@@ -15,6 +15,7 @@ import org.tatrman.ttr.parser.model.SearchHintsValue
 import org.tatrman.ttr.parser.model.SourceLocation
 import org.tatrman.ttr.parser.model.TableDef
 import org.tatrman.ttr.parser.model.ViewDef
+import org.tatrman.ttr.semantics.md.mdErBindingDiagnostics
 import org.tatrman.ttr.semantics.cn.cncDeprecations
 import org.tatrman.ttr.semantics.cn.validateCn
 import org.tatrman.ttr.semantics.semanticsblock.SemanticsAnalyzer
@@ -67,6 +68,7 @@ private val MD_KINDS =
         "md2dbDomain",
         "md2dbMap",
         "md2erCubelet",
+        "md2erDimension",
     )
 
 /**
@@ -351,7 +353,7 @@ class Validator(
      * portable subset; `validateCn`). [docs] are the documents the symbol table was built from, stock excluded.
      */
     fun validateProject(docs: List<SemanticDocument>): List<ValidationDiagnostic> =
-        validateProject() +
+        validateProject() + mdErBindingDiagnostics(docs, resolver) +
             validateCn(
                 docs,
                 resolver,

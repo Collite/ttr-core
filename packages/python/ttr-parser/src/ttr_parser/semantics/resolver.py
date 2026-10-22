@@ -46,7 +46,7 @@ _KIND_KEYWORDS: frozenset[str] = frozenset(
         "constraint", "fk", "procedure", "query", "drillMap", "role", "project",
         "area", "er2dbEntity", "er2dbAttribute", "er2dbRelation", "er2cncRole",
         "domain", "map", "dimension", "hierarchy", "measure", "cubelet",
-        "md2db_cubelet", "md2db_domain", "md2db_map", "md2er_cubelet",
+        "md2db_cubelet", "md2db_domain", "md2db_map", "md2er_cubelet", "md2er_dimension",
     }
 )
 

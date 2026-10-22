@@ -99,6 +99,8 @@ from .model import (
     LocalizedStringListValue,
     LocalizedStringValue,
     MatchMethodValue,
+    Md2erCubeletDef,
+    Md2erDimensionDef,
     MdDomainDef,
     MeasureDef,
     ModelDirective,
@@ -255,6 +257,8 @@ __all__ = [
     "CubeletDef",
     "DimensionDef",
     "EmbeddedBlock",
+    "Md2erCubeletDef",
+    "Md2erDimensionDef",
     "MdDomainDef",
     "MeasureDef",
     # model — PropertyValue hierarchy

@@ -16,6 +16,17 @@ class MdRenderSpec :
 
         fun render(src: String): String = TtrRenderer.render(TtrLoader.parseString(src).definitions).trim()
 
+        "HP-P1: both explicit hop bindings round-trip" {
+            for (src in listOf(
+                "model binding\ndef md2er_dimension c { dimension: md.Customer, entity: er.entity.customer, attributes: { code: sk, state: address.state } }",
+                "model binding\ndef md2er_cubelet c { cubelet: md.sales, target: er.entity.sales, attributes: { Customer.code: id }, measures: { revenue: amount } }",
+            )) {
+                val once = render(src)
+                TtrLoader.parseString(once).errors shouldBe emptyList()
+                render(once) shouldBe once
+            }
+        }
+
         "a logical measure renders its domain / class / aggregation" {
             render("def measure net { class: additive, domain: md.Money, aggregation: sum }") shouldBe
                 "def measure net { domain: md.Money, class: additive, aggregation: sum }"

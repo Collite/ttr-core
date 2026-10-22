@@ -112,6 +112,11 @@ export enum DiagnosticCode {
   MdBindingOnCalcMap = 'md/binding-on-calc-map',
   MdMapColumnsIncomplete = 'md/map-columns-incomplete',
   MdMd2erPhysicalProp = 'md/md2er-physical-prop',
+  MdMd2erReference = 'md/md2er-reference',
+  MdMd2erDimensionKey = 'md/md2er-dimension-key',
+  MdMd2erPathAmbiguous = 'md/md2er-path-ambiguous',
+  MdMd2erMeasureUnknown = 'md/md2er-measure-unknown',
+  MdDuplicateBinding = 'md/duplicate-binding',
   MdIncompleteJournaling = 'md/incomplete-journaling',
   // embedded-sql (DESIGN §12.8 / contracts §5.1): SQL reference resolution
   // against the TTR `db` symbol table. Best-effort (warnings); see §3.4/§3.5.

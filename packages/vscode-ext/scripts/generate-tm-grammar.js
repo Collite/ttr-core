@@ -187,6 +187,7 @@ function tokenToScope(name, literal) {
         case 'MD2DB_CUBELET': return 'keyword.other.kind.ttrm';
         case 'MD2DB_DOMAIN': return 'keyword.other.kind.ttrm';
         case 'MD2DB_MAP': return 'keyword.other.kind.ttrm';
+        case 'MD2ER_DIMENSION': return 'keyword.other.kind.ttrm';
         case 'MD2ER_CUBELET': return 'keyword.other.kind.ttrm';
         case 'RESTRICT': return 'keyword.other.property.ttrm';
         case 'MEMBERS': return 'keyword.other.property.ttrm';

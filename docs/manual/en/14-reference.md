@@ -156,7 +156,7 @@ The `md` model and the `binding`-model `md2*` kinds (see [MD model](15-md-model.
 | `md/semiadditive-no-validby` / `md/nonadditive-recompute-unsupported` | Error | Additivity consistency (semi-additive latest-valid needs `validBy`; non-additive recompute is v1.1). |
 | `md/grain-ref-unknown` / `md/grain-not-leaf` | Error / Warning | A cubelet grain ref doesn't resolve / is coarser than another in the grain. |
 | `md/shape-measure-mismatch` / `md/incomplete-journaling` / `md/multisource-grain-mismatch` | Error | Binding shape↔measure form / writeback completeness / multi-source grain agreement. |
-| `md/md2er-physical-prop` | Error | An `md2er_cubelet` (structural-only) carries shape/measures/journaling. |
+| `md/md2er-physical-prop` | Error | An `md2er_cubelet` (structural-only) carries shape/journaling/allocation. |
 
 ### Conceptual model (cn)
 

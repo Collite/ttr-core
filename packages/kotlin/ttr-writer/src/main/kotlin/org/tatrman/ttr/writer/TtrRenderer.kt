@@ -30,6 +30,8 @@ import org.tatrman.ttr.parser.model.LexiconBlock
 import org.tatrman.ttr.parser.model.MdDomainDef
 import org.tatrman.ttr.parser.model.MdMapDef
 import org.tatrman.ttr.parser.model.Md2dbCubeletDef
+import org.tatrman.ttr.parser.model.Md2erCubeletDef
+import org.tatrman.ttr.parser.model.Md2erDimensionDef
 import org.tatrman.ttr.parser.model.MeasureColumnBinding
 import org.tatrman.ttr.parser.model.MeasureDef
 import org.tatrman.ttr.parser.model.ShapeSpec
@@ -98,6 +100,8 @@ object TtrRenderer {
             MeasureDef::class,
             CubeletDef::class,
             Md2dbCubeletDef::class,
+            Md2erCubeletDef::class,
+            Md2erDimensionDef::class,
             // Grammar 0.16 — the automation kinds (one class; ordered by kind then name below).
             AutomationDef::class,
             // Grammar 0.17 — the conceptual model: the concepts (every stereotype one class), then the bindings.
@@ -210,6 +214,32 @@ object TtrRenderer {
             is MeasureDef -> renderMeasure(def)
             is CubeletDef -> renderCubelet(def)
             is Md2dbCubeletDef -> renderMd2dbCubelet(def)
+            is Md2erDimensionDef ->
+                renderMdEr(
+                    "md2er_dimension",
+                    def.name,
+                    def.description,
+                    def.descriptionLocalized,
+                    def.tags,
+                    "dimension",
+                    def.dimensionRef?.path,
+                    def.entity?.path,
+                    def.attributes,
+                    emptyMap(),
+                )
+            is Md2erCubeletDef ->
+                renderMdEr(
+                    "md2er_cubelet",
+                    def.name,
+                    def.description,
+                    def.descriptionLocalized,
+                    def.tags,
+                    "cubelet",
+                    def.cubeletRef?.path,
+                    def.entity?.path,
+                    def.attributes,
+                    def.measures,
+                )
             // Grammar 0.17 — the conceptual model.
             is ConceptDef -> renderConceptDef(def)
             is ConceptBindingDef -> renderConceptBinding(def)
@@ -1291,6 +1321,40 @@ object TtrRenderer {
      * — the physical binding of a cubelet to a fact table. Map-valued `attributes`/`measures` are emitted in
      * key order for diff-stable output.
      */
+    private fun renderMdEr(
+        kind: String,
+        name: String,
+        description: String?,
+        localized: LocalizedStringValue,
+        tags: List<String>,
+        slot: String,
+        md: String?,
+        entity: String?,
+        attributes: Map<String, String>,
+        measures: Map<String, String>,
+    ): String {
+        val sb = StringBuilder("def $kind $name {")
+        renderDescriptionIfAny(description, localized)?.let { sb.append(it) }
+        renderTagsIfAny(tags)?.let { sb.append(" $it,") }
+        md?.let { sb.append(" $slot: $it,") }
+        entity?.let { sb.append(" ${if (slot == "cubelet") "target" else "entity"}: $it,") }
+        sb
+            .append(
+                " attributes: { ",
+            ).append(attributes.entries.joinToString(", ") { "${it.key}: ${it.value}" })
+            .append(" }")
+        if (measures.isNotEmpty()) {
+            sb
+                .append(", measures: { ")
+                .append(
+                    measures.entries.joinToString(", ") {
+                        "${it.key}: ${it.value}"
+                    },
+                ).append(" }")
+        }
+        return sb.append(" }").toString()
+    }
+
     private fun renderMd2dbCubelet(def: Md2dbCubeletDef): String {
         val sb = StringBuilder()
         sb.append("def md2db_cubelet ${def.name} {")

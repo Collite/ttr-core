@@ -1,0 +1,30 @@
+{
+    "diagnostics": [
+        "md/md2er-path-ambiguous",
+        "ttr/unimported-reference",
+        "ttr/unimported-reference",
+        "ttr/unimported-reference",
+        "ttr/unimported-reference"
+    ],
+    "resolved": [
+        "base.er.entity.addr => base.er.entity.addr",
+        "base.er.entity.addr => base.er.entity.addr",
+        "base.er.entity.customer => base.er.entity.customer",
+        "base.er.entity.customer => base.er.entity.customer",
+        "er.entity.customer => base.er.entity.customer",
+        "md.Code => base.md.domain.Code",
+        "md.Customer => base.md.dimension.Customer"
+    ],
+    "symbols": [
+        "base.binding.md2er_dimension.customer",
+        "base.er.entity.addr",
+        "base.er.entity.addr.state",
+        "base.er.entity.customer",
+        "base.er.entity.customer.sk",
+        "base.md.dimension.Customer",
+        "base.md.dimension.Customer.code",
+        "base.md.domain.Code",
+        "east.er.relation.address",
+        "west.er.relation.address"
+    ]
+}

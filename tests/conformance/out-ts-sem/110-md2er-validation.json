@@ -1,0 +1,35 @@
+{
+    "diagnostics": [
+        "md/duplicate-binding",
+        "md/md2er-dimension-key",
+        "md/md2er-measure-unknown"
+    ],
+    "resolved": [
+        "Customer.code => md.dimension.Customer.code",
+        "er.entity.addr => er.entity.addr",
+        "er.entity.customer => er.entity.customer",
+        "er.entity.customer => er.entity.customer",
+        "er.entity.customer => er.entity.customer",
+        "md.Code => md.domain.Code",
+        "md.Code => md.domain.Code",
+        "md.Customer => md.dimension.Customer",
+        "md.Customer => md.dimension.Customer",
+        "revenue => md.measure.revenue"
+    ],
+    "symbols": [
+        "binding.md2er_cubelet.measure",
+        "binding.md2er_dimension.good",
+        "binding.md2er_dimension.missing_key",
+        "er.entity.addr",
+        "er.entity.addr.state",
+        "er.entity.customer",
+        "er.entity.customer.amount",
+        "er.entity.customer.sk",
+        "er.relation.address",
+        "md.cubelet.sales",
+        "md.dimension.Customer",
+        "md.dimension.Customer.code",
+        "md.domain.Code",
+        "md.measure.revenue"
+    ]
+}

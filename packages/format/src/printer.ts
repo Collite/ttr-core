@@ -151,6 +151,8 @@ const KIND_KEYWORD: Record<string, string> = {
   er2dbAttribute: 'er2db_attribute',
   er2dbRelation: 'er2db_relation',
   er2cncRole: 'er2cnc_role',
+  md2erDimension: 'md2er_dimension',
+  md2erCubelet: 'md2er_cubelet',
 };
 function kindKeyword(kind: string): string {
   return KIND_KEYWORD[kind] ?? kind;
@@ -171,6 +173,17 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
   const qstr = (x: string | undefined) => (x === undefined ? undefined : text(JSON.stringify(x)));
   const defList = (arr: Definition[] | undefined) => (arr && arr.length ? defListDoc(arr, ctx) : undefined);
   switch (def.kind) {
+    case 'md2erDimension':
+    case 'md2erCubelet': {
+      add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true));
+      if (def.kind === 'md2erDimension') add('dimension', text(def.dimensionRef));
+      else add('cubelet', text(def.cubeletRef));
+      add(def.kind === 'md2erDimension' ? 'entity' : 'target', text(def.entity));
+      const record = (entries: Record<string, string>) => text(`{ ${Object.entries(entries).map(([k, val]) => `${k}: ${val}`).join(', ')} }`);
+      add('attributes', record(def.attributes));
+      if (def.kind === 'md2erCubelet' && def.measures) add('measures', record(def.measures));
+      break;
+    }
     case 'project':
       add('description', v(def.description), def.description); add('tags', def.tags && strListDoc(def.tags, true)); add('version', qstr(def.version));
       break;
@@ -422,10 +435,15 @@ function topLevelBroken(def: Definition, ctx: Ctx, commentsForceBreak: boolean, 
 const LAID_OUT_KINDS = new Set([
   'project', 'table', 'view', 'column', 'index', 'constraint', 'fk', 'procedure', 'entity', 'attribute',
   'relation', 'er2dbEntity', 'er2dbAttribute', 'er2dbRelation', 'query', 'role', 'er2cncRole', 'schema',
+  'md2erDimension', 'md2erCubelet',
   'area', 'term', 'pattern', 'example', 'concept', 'conceptBinding',
 ]);
 
 function isVerbatimDef(def: Definition): boolean {
+  if (def.kind === 'md2erDimension' || def.kind === 'md2erCubelet') {
+    // Maps lack per-entry spans. Preserve the complete source when it contains comments or invalid physical fields.
+    if (triviaUnder(def).length || (def.kind === 'md2erCubelet' && def.physicalProps?.length)) return true;
+  }
   return !LAID_OUT_KINDS.has(def.kind) || (def.kind === 'role' && (def.entries?.length ?? 0) > 0);
 }
 
