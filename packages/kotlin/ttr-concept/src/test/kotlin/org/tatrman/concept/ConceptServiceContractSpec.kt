@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.concept
 
-import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.tatrman.assertion.v1.Assertion
 import org.tatrman.concept.v1.ConceptRef
@@ -46,21 +46,17 @@ class ConceptServiceContractSpec :
             m("hygieneReport").returnType shouldBe HygieneReport::class.java
         }
 
-        test("the scaffold stand-in refuses every call with the phase that builds it") {
-            val svc: ConceptService = NotImplementedConceptService()
-            val calls: List<() -> Any> =
-                listOf(
-                    { svc.statementValidate(Statement.getDefaultInstance()) },
-                    { svc.statementLower(Statement.getDefaultInstance()) },
-                    { svc.statementExplain(Statement.getDefaultInstance(), "cs") },
-                    { svc.assertionValidate(Assertion.getDefaultInstance()) },
-                    { svc.assertionLower(Assertion.getDefaultInstance()) },
-                    { svc.assertionExplain(Assertion.getDefaultInstance(), "cs") },
-                    { svc.definitionRender(ConceptRef.getDefaultInstance(), Layer.ER, "POSTGRESQL", RenderOptions()) },
-                    { svc.materialize(ConceptRef.getDefaultInstance(), "POSTGRESQL") },
-                    { svc.hygieneReport() },
-                )
-            for (call in calls) shouldThrow<UnsupportedOperationException> { call() }.message shouldBe "CN-P3"
+        test("the service answers every call on an empty frame with findings, never an exception") {
+            val svc: ConceptService = CnConceptService(GoldenWorlds["clinic"].cn)
+            val empty = ConceptRef.getDefaultInstance()
+            svc.statementValidate(Statement.getDefaultInstance()).shouldNotBeEmpty()
+            svc.statementLower(Statement.getDefaultInstance()).diagnostics.shouldNotBeEmpty()
+            svc.statementExplain(Statement.getDefaultInstance(), "cs").diagnostics.shouldNotBeEmpty()
+            svc.assertionValidate(Assertion.getDefaultInstance()).shouldNotBeEmpty()
+            svc.assertionLower(Assertion.getDefaultInstance()).diagnostics.shouldNotBeEmpty()
+            svc.assertionExplain(Assertion.getDefaultInstance(), "cs").diagnostics.shouldNotBeEmpty()
+            svc.definitionRender(empty, Layer.ER, "postgresql", RenderOptions()).diagnostics.shouldNotBeEmpty()
+            svc.materialize(empty, "postgresql").diagnostics.shouldNotBeEmpty()
         }
 
         test("Via and GroundingGrade are the typed model's (ttr-metadata since CN-P2 S2.5), aliased here") {

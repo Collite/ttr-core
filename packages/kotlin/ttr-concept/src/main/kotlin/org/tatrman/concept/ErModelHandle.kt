@@ -27,11 +27,13 @@ import org.tatrman.ttr.metadata.model.Model
  * attributes typed and keyed, its relations), the db tier (`db.<namespace>.<table>`, its columns and foreign keys) and the
  * `er2db` mappings between them — what an er rendering translates over (the goldens' oracle proves it against the
  * test-only `GoldenModelHandle`; the live suite unparses through it). No production handle over a `Model` existed in
- * tatrman (`IslandModelHandle` is db-only); AU's `ttrp build` and P5's door need the same (AM-31). An entity without an
- * explicit mapping maps to the db table of its own name when there is one (TTR-M's convention); a query-bound entity
- * maps to its query, whose body this handle does not carry (saved queries are the translator's UNFOLD stage — empty).
+ * tatrman (`IslandModelHandle` is db-only). Public since S3.8 (A-CN-55, the AM-31 pre-check): a caller of
+ * `definitionRender` — AU's `ttrp-doc` / `ttrp build`, P5's door — translates the island it gets over this handle,
+ * with no ttr-concept internals. An entity without an explicit mapping maps to the db table of its own name when there
+ * is one (TTR-M's convention); a query-bound entity maps to its query, whose body this handle does not carry (saved
+ * queries are the translator's UNFOLD stage — empty).
  */
-internal class ErModelHandle(
+class ErModelHandle(
     private val model: Model,
 ) : ModelHandle {
     private val db: DbSchema? = model.schemas["db"] as? DbSchema

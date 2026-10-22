@@ -46,11 +46,18 @@ import kotlin.io.path.readText
  * Everything runs in a schema of its own ([LivePg.SCHEMA], the connection's `search_path`; the plans' tables unparse
  * bare), so it never touches ttrp-conform's tables. Gated like its ttrp-conform siblings: the database is
  * `TTR_CONN_ERP_PG` (`postgresql://user:pass@host:port/db`, CI's), else — with `TTRP_CONFORM_PG=1` — the local ttrp-pg
- * (`spike.pg.*`). Without either the cases are reported ignored, never failed.
+ * (`spike.pg.*`). Without either the cases are reported ignored, never failed — unless `CN_LIVE_REQUIRED=1` (the PR's
+ * CI job, `conformance-ttrp.yml`): then a missing database fails the run instead of skipping it.
  */
 class ConceptLiveSpec :
     FunSpec({
         val db = LivePg.connection()
+
+        if (System.getenv("CN_LIVE_REQUIRED") == "1") {
+            test("the live suite has its database (CN_LIVE_REQUIRED)") {
+                withClue("set TTR_CONN_ERP_PG (or TTRP_CONFORM_PG=1)") { (db != null) shouldBe true }
+            }
+        }
 
         for (c in GoldenCases.cases.filter { "live" in it.tags && it.call == "statementLower" }) {
             test("${c.id} — the lowered plan computes its rows on live PostgreSQL").config(enabled = db != null) {

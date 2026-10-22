@@ -70,7 +70,9 @@ dependencies {
     implementation(libs.clikt)
     implementation(project(":packages:kotlin:ttr-md-resolver"))
     implementation(project(":packages:kotlin:ttrp-emit"))
-    implementation(project(":packages:kotlin:ttr-translator")) // dialects only (definition_render(er) targets)
+    // The er renderer's dialects and reserved words; api since S3.8 (A-CN-55): `ErModelHandle` is public, a translator
+    // `ModelHandle` a caller translates an er rendering over.
+    api(project(":packages:kotlin:ttr-translator"))
 
     testImplementation(libs.bundles.kotest)
     // CN-P3 S3.1 — the frames' canonical JSON mapping (JsonFormat), the golden inputs' format.

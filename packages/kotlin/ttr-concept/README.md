@@ -7,12 +7,109 @@ lowers to an E-R row payload, and `definitionRender` renders a phase or defined 
 predicate for `ttrp-emit`) or the er layer (SQL over entities in the shared dialect). No LLM, no server call, no I/O
 mid-lower: the same model and frame always give the same bytes.
 
-**Status: CN-P3 in progress.** Built: the definition surface and the hygiene report (CN-P2); the frames
-(`statement.v1` / `assertion.v1`, `ttr-plan-proto`) frozen and their canonical JSON pinned (CN-P3 S3.1); the validates
-(S3.2), `statementLower` (S3.3), `definitionRender` on both layers and `materialize` — `ttr cn materialize` (S3.4),
-`assertionLower` — the `Statement[<Entity>]` row payload, data only: cn never writes (S3.5), `statementExplain` /
-`assertionExplain` in en and cs, a phase's definition as prose (S3.6). Published as `org.tatrman:ttr-concept` in the
-`grammar/v*` bundle from the first grammar cut after CN-P3 S3.1 (A-CN-1).
+**Status: CN-P3 complete.** Published as `org.tatrman:ttr-concept` in the `grammar/v*` bundle (A-CN-1) — first with
+`grammar/v0.17.4` — beside `ttr-plan-proto` / `ttr-translator` at the pinned translator release.
+
+## Loading a model
+
+`ConceptService` is built over a `ResolvedCnModel`: the reconciled ttr-metadata `Model` (the cn tier beside the er,
+db and automation tiers a definition reads), every `definition:` / `members:` / `filter:` parsed and name-resolved, the
+snapshot hash every lower echoes, and the md tier a statement lowers through. A host loads its model root the way Veles
+does, once:
+
+```kotlin
+val snapshot = FileBasedSource("models", 100, LocalFsStorage(id = "models", rootPath = root)).load()
+val model = ModelReconciler(ModelDescriptor(id = "models", name = "models")).reconcile(listOf(snapshot)).model
+val cn = ResolvedCnModel.of(model, md = MdRepo.loadFrom(root)) // snapshotHash defaults to the model version
+val svc: ConceptService = CnConceptService(cn) // clock: Clock = Clock.systemUTC()
+```
+
+`md` is null when the root declares no cubelet (`statementLower` then refuses). The clock gives "today" only where a
+frame names no day (a statement without `as_of` whose phase reads `:as_of`, an md rendering without `asOf`); pass a
+fixed one to pin it.
+
+## The three families (contracts §3)
+
+| call | returns |
+|---|---|
+| `statementValidate(s)` | `cn/*` findings: references, ambiguity, missing time, reachability per consumer |
+| `statementLower(s)` | `LowerResult` — the `plan.v1`, the md dot-path it came from, the provenance (binding paths, inlined definitions, parameters bound, as-of, grammar and catalog versions, snapshot hash) |
+| `statementExplain(s, locale)` | `Explanation` — the sentence in `en` or `cs`, a phase filter's definition in words |
+| `assertionValidate(a)` | `cn/*` findings — everything `assertionLower` would refuse |
+| `assertionLower(a)` | `RowObjects` — the event's row (`entity`, attribute → value text), `assertedAsOf`, `meta`, `obligations` |
+| `assertionExplain(a, locale)` | `Explanation` — the inspector's line |
+| `definitionRender(phase, layer, dialect, options)` | `Rendering` — the text, the placeholders it reads, the definitions it inlined |
+| `materialize(phase, dialect)` | `ModelText` — a `def query` + the entity stacked on it, as model text (CN-D1) |
+| `hygieneReport()` | `HygieneReport` — grade, `via`, groundings, hop, redundant terms, definitions |
+
+A frame the service cannot serve is refused with error-grade findings (no plan, no rows, no text), never an
+exception; every lower calls its validate first.
+
+- **Statements** bind each slot through its `cn2md` grounding, inline phases transitively (rendered on md) and bind
+  `:name` from the world (R-cn-7) and `:as_of` from the frame.
+- **Assertions** lower to one row, the event's (A-CN-47…49): FK values only — a participant carries a resolved member;
+  a two-hop participant becomes an `Obligation` the writer checks; instants are written as the frame writes them (cn
+  never converts), an imprecise stored upper bound as the next granule; an absent end is NULL with its end state in
+  `meta`. **cn never writes**: the payload is data (`PuritySpec`: no JDBC, no DML in this module).
+- **Explanations** (A-CN-51…54) come from the frame, never from a lowering; labels by locale label → locale lexicon
+  term → English label → the name in words; a definition the verbaliser cannot say reads as its source in quotes; a
+  refused frame is still explained and ends `— refused: <slug> (<subject>)`. Any other locale reads English with
+  `cn/explain-locale-fallback`.
+
+## Rendering definitions
+
+`RenderOptions`:
+
+| field | default | meaning |
+|---|---|---|
+| `mode` | `PREDICATE` | `PREDICATE` — `SELECT <bearer key> FROM <bearer> WHERE …`; `CONTEXT` — the bearer joined to `candidates`, sub-terms lifted to joins and projected (AU's recipe islands, A-CN-20) |
+| `placeholderStyle` | `CURLY` | `{name}` (the translator's) or `COLON` — `:name` (AU's islands) |
+| `asOf` | null | the evaluation instant; null = today on the clock (an er `latest(…, by:)` is then unbounded) |
+| `candidates` | null | CONTEXT: the phase whose bearer keys the context (H-1's `cn.PendingOrder`) |
+| `columns` | `[]` | what the projection carries after the keys: a participant, a grounded quality, a defined quality |
+
+The er text follows the formatting contract (A-CN-42) byte for byte. A caller translates it over **`ErModelHandle`**
+(public since S3.8, A-CN-55) — the model's er and db tiers and their `er2db` mappings as the translator's
+`ModelHandle`:
+
+```kotlin
+val phase = ConceptRef.newBuilder().setQname("cn.ShortLine").build()
+val r = svc.definitionRender(phase, Layer.ER, "postgresql", options)
+val plan = Translator(ErModelHandle(model)).parseToRelNode(r.text, Language.SQL,
+    targetSchema = SchemaCode.DB, sourceSchema = SchemaCode.ER, parameters = /* r.parametersRead, bound */)
+```
+
+That is the whole of AU's need (AM-31): a scratch project on the published jars renders `cn.ShortLine` in CONTEXT mode,
+gets the golden's text, and its ER-lane plan equals the golden's and AU's hand-written island's.
+
+## Guarantees, tested
+
+- **Deterministic** (`DeterminismSpec`): every golden's whole result is byte-identical twice over one model and over an
+  independent reload whose files load shuffled and whose every map is re-inserted shuffled; a frame that fixes its day
+  never reads the clock.
+- **Pure** (`PuritySpec`, over the compiled classes): no `java.net`, file I/O, resource read, `getenv` or process
+  outside `cli/`; no wall clock but the injected one, no randomness.
+- **No LLM** (`verifyNoLlmDependency` in `check`, `NoLlmDependencySpec`): no LLM, gateway, kantheon or HTTP-client
+  artifact on the runtime classpath.
+
+## Goldens
+
+`src/test/resources/goldens/` — the acceptance cases, authored before the code (CN-P3 S3.7), each expectation from an
+oracle independent of the code under test ([format](src/test/resources/goldens/README.md)). All of them run in `check`.
+Sixteen wait on a primitive that does not exist yet, pinned with their demand (`ConceptGoldenSpec.PENDING`): G-ER-1 and
+G-ER-2 (#201), G-MD-1/2/6, `md/hop` (⚑CN-P8), CN-P4 S4.2. The `live` cases also run on PostgreSQL (`ConceptLiveSpec`,
+22 cases, a `cn_live` schema of their own) — in CI in `conformance-ttrp.yml`, locally with
+`TTR_CONN_ERP_PG=postgresql://user:pass@host:port/db`.
+
+## The CLI
+
+```
+ttr cn hygiene <model-dir> [--format text|json] [--fail-on error|warning]
+ttr cn materialize <model-dir> <cn.Phase> [--dialect postgresql] [--out <dir>]
+```
+
+From the ttr-core repository: `just cn-hygiene …` / `just cn-materialize …` (paths relative to the repo root). The
+manual's chapter 20 has both.
 
 **Law order.** This module implements `project/tatrman/features/conceptual/` (outside this repo): `design/design.md`
 v2 and the decision log › `plan/contracts.md` (§3 is this module's API) › `plan/architecture.md` › `plan/plan.md` ›

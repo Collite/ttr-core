@@ -4,6 +4,7 @@ name: ttrp-conform
 # regression suite for any SQL/Polars/bundle emit change. The offline comparator + invoker tests
 # run unconditionally; the gated live hero run (TTRP_CONFORM_PG=1) executes the authored bundle
 # against a dockerized Postgres, proving the emit→bundle→run path end-to-end (PG + Polars).
+# The same Postgres serves ttr-concept's live suite (CN-P3 S3.8 T4): the cn goldens executed on PG.
 on:
   pull_request:
     paths:
@@ -45,8 +46,19 @@ jobs:
         env:
           TTRP_CONFORM_PG: "1"
           TTR_CONN_ERP_PG: postgresql://postgres:ttrp@localhost:5432/ttrp
+      - name: ttr-concept live suite (CN-P3 — the cn goldens on PostgreSQL, A-CN-15)
+        # ConceptLiveSpec seeds a schema of its own (`cn_live`: ttrp-conform's md seed, each world's tables and rows)
+        # and never touches the tables seeded above. CN_LIVE_REQUIRED fails the run if the database is not reached,
+        # rather than skipping the cases. It runs whatever the step above did, so its own result always shows.
+        if: ${{ !cancelled() }}
+        run: ./gradlew :packages:kotlin:ttr-concept:test --tests 'org.tatrman.concept.ConceptLiveSpec'
+        env:
+          CN_LIVE_REQUIRED: "1"
+          TTR_CONN_ERP_PG: postgresql://postgres:ttrp@localhost:5432/ttrp
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: conform-report
-          path: "**/build/conform-report*.json"
+          path: |
+            **/build/conform-report*.json
+            packages/kotlin/ttr-concept/build/test-results/test/*.xml

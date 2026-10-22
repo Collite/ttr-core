@@ -6,6 +6,28 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **`org.tatrman:ttr-concept`** (cn, CN-P3) — **first release**: every `ConceptService` function (cn contracts §3)
+  over a `ResolvedCnModel`, deterministic and pure: no LLM, no server call, no I/O, no clock but the injected one.
+  - **Statements** — `statementValidate` (references, ambiguity, missing time, reachability per consumer) and
+    `statementLower`: each slot through its `cn2md` grounding, phases inlined transitively, `:name` / `:as_of` bound
+    → `plan.v1` through the md dot-path, with its provenance (binding paths, inlined definitions, parameters bound,
+    as-of, grammar / catalog versions, snapshot hash).
+  - **Assertions** — `assertionValidate` predicts every `assertionLower` refusal; `assertionLower` gives the
+    `Statement[<Entity>]` row payload: the event's row (FK values only), `assertedAsOf`, `meta` (provenance, end
+    state, verbatims) and `obligations` for two-hop participants. Data only: the module has no JDBC and no DML.
+  - **Explanations** — `statementExplain` / `assertionExplain` in `en` and `cs` (another locale: English with
+    `cn/explain-locale-fallback`); a phase filter's definition in words.
+  - **Definitions** — `definitionRender` on the md layer (a PL predicate) and the er layer (SQL over entities, in the
+    formatting contract's layout; `PREDICATE` or `CONTEXT` mode, `{name}` or `:name` placeholders); `materialize` and
+    **`ttr cn materialize`** write a phase as a `def query` + stacked entity.
+  - **`ErModelHandle`** (public) — a ttr-metadata `Model` as the translator's `ModelHandle` (er + db tiers, `er2db`
+    mappings): what a caller translates an er rendering over. `ttr-translator` is therefore an `api` dependency.
+  - New frame diagnostics: `cn/unsupported-ask`, `cn/unknown-participant-label`, `cn/slot-mismatch`,
+    `cn/malformed-frame`, `cn/missing-as-of`, `cn/snapshot-mismatch`, `cn/explain-locale-fallback`.
+- **`ttr-metadata`** (CN-P3) — `Grounding.unit` (a `cn2er_quality`'s `unit:`); `GroundingPeriod.startHi` / `atHi` (a
+  binding period's stored upper bounds `start_hi:` / `at_hi:`); `Concept.reverseHop` and `MdErHop.mdElementsOn` (the
+  md elements whose hop lands on an er element). All additive.
+- **`ttr-semantics`** (and the TS / Python semantics) — a binding period's `start_hi:` / `at_hi:` resolve as er refs.
 - **`org.tatrman:ttr-concept`** (cn, CN-P3 S3.1) — **joins the `grammar/v*` bundle** (A-CN-1): first published with the
   next grammar cut, at the grammar version, beside the TTR-P toolchain whose closure it shares (`api` `ttr-metadata`,
   `ttrp-frontend`, `ttr-plan-proto`; `ttr-plan-proto` / `ttr-translator` at the pinned translator release).

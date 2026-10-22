@@ -16,9 +16,9 @@ import java.time.Clock
  *    materialize a phase as model text.
  *
  * Every function is a pure function of the resolved, snapshot-pinned model it was built over ([ResolvedCnModel]):
- * no LLM, no server call, no I/O mid-lower (architecture §7). CN-P0 S0.4 pins the SHAPE only —
- * [ConceptServiceContractSpec] asserts the method names and arities, so a rename at CN-P3 shows up as a test change,
- * not as drift. Every body is CN-P3 ([NotImplementedConceptService]) but [hygieneReport] ([CnConceptService], S2.7).
+ * no LLM, no server call, no I/O mid-lower (architecture §7; `PuritySpec`, `DeterminismSpec`). The shape is pinned —
+ * `ConceptServiceContractSpec` asserts the method names, arities and types, so a rename shows up as a test change, not
+ * as drift. [CnConceptService] implements it.
  */
 interface ConceptService {
     // --- statements (read) ---
@@ -81,16 +81,17 @@ interface ConceptService {
 }
 
 /**
- * The service over a [ResolvedCnModel] (cn contracts §3). CN-P2 S2.7 pulls [hygieneReport] forward — model-only, no
- * consumer ([CnHygiene]); CN-P3 lands the families stage by stage (S3.2: the two validates — [StatementValidator],
- * [AssertionValidator]; S3.3: [statementLower] — [StatementLowerer]; S3.4: [definitionRender] and [materialize] —
- * [DefinitionRenderer]); a family not landed yet refuses as the scaffold does. [clock] gives "now" — the evaluation day
- * of a statement with no `as_of` (recorded in its provenance), and of an md rendering's window.
+ * The service over a [ResolvedCnModel] (cn contracts §3): [hygieneReport] (CN-P2 S2.7, [CnHygiene]); the validates
+ * ([StatementValidator], [AssertionValidator] — S3.2); [statementLower] ([StatementLowerer] — S3.3); [definitionRender]
+ * and [materialize] ([DefinitionRenderer] — S3.4); [assertionLower] ([AssertionLowerer] — S3.5); the explains
+ * ([Explainer] — S3.6). A frame it cannot serve is refused with findings, never an exception. [clock] gives "now" — the
+ * evaluation day of a statement with no `as_of` (recorded in its provenance), of an md rendering with no
+ * `RenderOptions.asOf` and of an explanation's `:as_of`; nothing else reads a clock (`PuritySpec`).
  */
 class CnConceptService(
     private val model: ResolvedCnModel,
     clock: Clock = Clock.systemUTC(),
-) : ConceptService by NotImplementedConceptService() {
+) : ConceptService {
     private val statements = StatementValidator(model)
     private val assertions = AssertionValidator(model)
     private val rows = AssertionLowerer(model)
@@ -131,41 +132,4 @@ class CnConceptService(
     ): ModelText = definitions.materialize(phase)
 
     override fun hygieneReport(): HygieneReport = CnHygiene.report(model)
-}
-
-/** The scaffold stand-in: every call refuses with the phase that builds it. */
-class NotImplementedConceptService : ConceptService {
-    private fun later(): Nothing = throw UnsupportedOperationException("CN-P3")
-
-    override fun statementValidate(s: Statement): List<Diagnostic> = later()
-
-    override fun statementLower(s: Statement): LowerResult = later()
-
-    override fun statementExplain(
-        s: Statement,
-        locale: String,
-    ): Explanation = later()
-
-    override fun assertionValidate(a: Assertion): List<Diagnostic> = later()
-
-    override fun assertionLower(a: Assertion): RowObjects = later()
-
-    override fun assertionExplain(
-        a: Assertion,
-        locale: String,
-    ): Explanation = later()
-
-    override fun definitionRender(
-        target: ConceptRef,
-        layer: Layer,
-        dialect: String,
-        options: RenderOptions,
-    ): Rendering = later()
-
-    override fun materialize(
-        phase: ConceptRef,
-        dialect: String,
-    ): ModelText = later()
-
-    override fun hygieneReport(): HygieneReport = later()
 }
