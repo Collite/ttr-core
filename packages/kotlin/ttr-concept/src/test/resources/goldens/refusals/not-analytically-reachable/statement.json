@@ -1,0 +1,12 @@
+{
+  "ask": "ASK_VALUE",
+  "measures": [
+    {
+      "qname": "cn.order_value"
+    }
+  ],
+  "time": {
+    "allTime": true
+  },
+  "locale": "en"
+}

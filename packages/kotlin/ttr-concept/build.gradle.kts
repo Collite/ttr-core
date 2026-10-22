@@ -15,6 +15,11 @@ kotlin {
 
 tasks.test {
     useJUnitPlatform()
+    // CN-P3 S3.7 — the goldens (`ConceptGoldenSpec`). `-Pcn.goldens=all` runs every case, the stages not landed yet
+    // included (red by design — the TDD view); `-Pcn.goldens.regen` rewrites the oracle-made expectations. Both reach
+    // the test JVM only as system properties (a `-D` on the Gradle command line does not); S3.8 removes the first.
+    systemProperty("cn.goldens", providers.gradleProperty("cn.goldens").getOrElse("landed"))
+    systemProperty("cn.goldens.regen", providers.gradleProperty("cn.goldens.regen").map { "true" }.getOrElse("false"))
 }
 
 // CN (conceptual model, `project/tatrman/features/conceptual/`) — `ttr-concept`: the three function families
@@ -44,6 +49,8 @@ dependencies {
     testImplementation(libs.bundles.kotest)
     // CN-P3 S3.1 — the frames' canonical JSON mapping (JsonFormat), the golden inputs' format.
     testImplementation(libs.protobuf.java.util)
+    // CN-P3 S3.7 — the goldens' er oracle translates over an `InMemoryModelHandle` (the translator's test fixture).
+    testImplementation(testFixtures(project(":packages:kotlin:ttr-translator")))
 }
 
 // CN-P2 S2.7 — `ttr cn hygiene <dir> [--format text|json] [--fail-on error|warning]` (`ttr cn materialize` joins it at

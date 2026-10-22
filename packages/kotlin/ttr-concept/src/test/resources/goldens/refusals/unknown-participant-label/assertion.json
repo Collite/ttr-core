@@ -1,0 +1,30 @@
+{
+  "event": {
+    "qname": "cn.Transfer"
+  },
+  "identity": {
+    "new": true
+  },
+  "participants": [
+    {
+      "label": "via",
+      "concept": {
+        "qname": "cn.Encounter"
+      },
+      "member": {
+        "label": "E-503",
+        "resolvedValue": "503"
+      }
+    }
+  ],
+  "period": {
+    "start": {
+      "value": "2026-03-14T09:30",
+      "granularity": "MINUTE"
+    }
+  },
+  "provenance": {
+    "producer": "manual:steward"
+  },
+  "locale": "en"
+}

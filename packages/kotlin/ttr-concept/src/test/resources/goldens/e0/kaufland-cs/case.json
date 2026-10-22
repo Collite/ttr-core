@@ -1,0 +1,10 @@
+{
+  "world": "sales",
+  "call": "statementLower",
+  "stage": "S3.3",
+  "frame": "statement-e0",
+  "oracle": {
+    "mdPath": "sales.name.Kaufland.month.1.year.2026.net.sum",
+    "asOf": "2026-10-22T00:00:00Z"
+  }
+}

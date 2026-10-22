@@ -1,0 +1,7 @@
+{
+  "world": "hartland",
+  "call": "materialize",
+  "stage": "S3.4",
+  "target": "cn.MispricedLine",
+  "dialect": "postgresql"
+}

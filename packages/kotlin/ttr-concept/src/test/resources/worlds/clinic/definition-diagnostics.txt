@@ -1,0 +1,15 @@
+cn/definition-unreachable(md) HYGIENE cn.FrequentPatient
+cn/definition-unreachable(md) HYGIENE cn.HasBrokenLeg
+cn/definition-unreachable(md) HYGIENE cn.HistoryOfLegFracture
+cn/definition-unreachable(md) HYGIENE cn.IschemicRecord
+cn/definition-unreachable(md) HYGIENE cn.IschemicRecordLexical
+cn/definition-unreachable(md) HYGIENE cn.PostStemi
+cn/definition-unreachable(md) HYGIENE cn.PostStemiCertainly
+cn/definition-unreachable(md) HYGIENE cn.PostStemiPossibly
+cn/definition-unreachable(md) HYGIENE cn.Rehospitalized30d
+cn/definition-unreachable(md) HYGIENE cn.StemiPatient
+cn/definition-unreachable(md) HYGIENE cn.TransferredWithin24h
+cn/definition-unreachable(md) HYGIENE cn.length_of_stay
+cn/definition-unreachable(md) HYGIENE cn.transfer_delay
+cn/imprecise-comparison ADVISORY cn.FrequentPatient
+cn/imprecise-comparison ADVISORY cn.PostStemiCertainly

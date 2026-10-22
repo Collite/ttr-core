@@ -1,0 +1,21 @@
+{
+  "ask": "ASK_VALUE",
+  "measures": [
+    {
+      "qname": "cn.revenue"
+    }
+  ],
+  "filters": [
+    {
+      "phase": {
+        "phase": {
+          "qname": "cn.WebSale"
+        }
+      }
+    }
+  ],
+  "time": {
+    "allTime": true
+  },
+  "locale": "en"
+}

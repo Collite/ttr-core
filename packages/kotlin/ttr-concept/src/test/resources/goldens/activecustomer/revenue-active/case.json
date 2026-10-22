@@ -1,0 +1,13 @@
+{
+  "world": "sales",
+  "call": "statementLower",
+  "stage": "S3.3",
+  "oracle": {
+    "semiJoin": {
+      "outer": "sales.name.*.month.1.year.2026.net",
+      "inner": "sales.name.*.day.\"2025-01-31\"..\"2026-01-31\".net",
+      "key": "customer_name"
+    },
+    "asOf": "2026-10-22T00:00:00Z"
+  }
+}

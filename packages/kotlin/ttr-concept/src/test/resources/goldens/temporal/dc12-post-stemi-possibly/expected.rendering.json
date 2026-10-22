@@ -1,0 +1,9 @@
+{
+  "parametersRead": [
+    {
+      "name": "as_of_hi",
+      "derivation": "as_of + days(1)"
+    }
+  ],
+  "imprecisionMode": "POSSIBLY"
+}

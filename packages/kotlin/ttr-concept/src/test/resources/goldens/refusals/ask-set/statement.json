@@ -1,0 +1,12 @@
+{
+  "ask": "ASK_SET",
+  "measures": [
+    {
+      "qname": "cn.revenue"
+    }
+  ],
+  "time": {
+    "periodCode": "2026-01"
+  },
+  "locale": "en"
+}

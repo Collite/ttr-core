@@ -1,0 +1,22 @@
+// CN-P3 S3.7 — Hartland's md face, cut to what the channel goldens need (⚑CN-P8's default): one cubelet that carries
+// `Channel` as a grain attribute, and an explicit `md2er_cubelet` whose attribute map lands `Channel.code` on
+// `channel_sales.channel` — `Channel`'s erTarget, so the value kind and its phases reach md through the reverse hop.
+// A-H-7's literal per-channel cubelets (`webSales`, …) are md/hop's (their carrier needs the view's derivation facts).
+model md
+
+def domain ChannelCode { type: string }
+def domain Money       { type: decimal }
+def domain Count       { type: int }
+
+def dimension Channel { key: code, attributes: [ def attribute code { domain: md.ChannelCode, isKey: true } ] }
+
+def measure revenue  { domain: md.Money, class: additive, aggregation: sum }
+def measure quantity { domain: md.Count, class: additive, aggregation: sum }
+
+def cubelet channelSales { grain: [Channel.code], measures: [revenue, quantity] }
+
+def md2er_cubelet channel_sales_er {
+    cubelet: md.channelSales,
+    target: er.entity.channel_sales,
+    attributes: { Channel.code: channel }
+}

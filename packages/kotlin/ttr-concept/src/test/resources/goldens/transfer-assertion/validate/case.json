@@ -1,0 +1,6 @@
+{
+  "world": "clinic",
+  "call": "assertionValidate",
+  "stage": "S3.2",
+  "frame": "assertion-transfer"
+}
