@@ -295,21 +295,18 @@ class Validator:
                     enclosing_qname=enclosing,
                 ),
                 cn_context=collected.cn_context,
+                md_context=collected.md_context,
             )
 
             if isinstance(res, Unresolved):
                 if res.reason == "ambiguous":
-                    source = (
-                        res.candidates[0].site
-                        if res.candidates
-                        else collected.source
-                    )
+                    via = "same-package lookup" if any(a.step == "same-package" and a.reason == "ambiguous" for a in res.tried) else "wildcard imports"
                     out.append(
                         _error(
                             DiagnosticCode.AMBIGUOUS_REFERENCE,
                             f"Ambiguous reference: '{collected.path}' matches "
-                            f"{len(res.candidates)} definitions via wildcard imports",
-                            source,
+                            f"{len(res.candidates)} definitions via {via}",
+                            collected.source,
                         )
                     )
                 elif not collected.soft:
@@ -446,6 +443,7 @@ class Validator:
                     package_name=doc.package_name,
                 ),
                 cn_context=collected.cn_context,
+                md_context=collected.md_context,
             )
             if isinstance(res, Resolved) and res.via_step in (
                 "named-import",

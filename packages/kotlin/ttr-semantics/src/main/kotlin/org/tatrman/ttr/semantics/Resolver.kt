@@ -1,6 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.semantics
 
+/** The originating MD slot restricts lookup to its target namespace (TS `CrossRef.role`). */
+enum class MdReferenceRole(
+    val namespace: String,
+) {
+    Domain("domain"),
+    Map("map"),
+    Dimension("dimension"),
+    Measure("measure"),
+    Hierarchy("hierarchy"),
+    Grain("dimension"),
+}
+
 /**
  * One step in the six-step resolution chain (contract §4.3). Ordered as tried.
  */
@@ -61,19 +73,21 @@ data class LexicalScope(
 /**
  * Six-step reference resolver. Mirrors `packages/semantics/src/resolver.ts`
  * exactly: lexical → same-package → named-import → wildcard-import (non-recursive)
- * → cnc auto-import → fully-qualified-but-unique. First hit wins.
+ * → cnc auto-import → fully-qualified-but-unique. A matching step must have a unique candidate.
  */
 class Resolver(
     private val symbols: SymbolTable,
+    private val root: String = "",
 ) {
     /**
      * What [resolveReference] reads off a reference: its written path and segments, and — for a reference from a
-     * cn slot ([CollectedRef.cnContext]) — the cn context. Pass [CollectedRef.toRef] so the context survives.
+     * cn or MD slot — its slot context. Pass [CollectedRef.toRef] so the context survives.
      */
     data class Ref(
         val path: String,
         val parts: List<String>,
         val cnContext: Boolean = false,
+        val mdContext: MdReferenceRole? = null,
     )
 
     /** Direct symbol-table lookup by canonical key ([SymbolTable.get]). Mirrors TS `Resolver.getSymbol`. */
@@ -111,6 +125,8 @@ class Resolver(
         ref: Ref,
         context: ResolutionContext,
     ): ResolutionResult {
+        if (ref.mdContext != null) return resolveMd(ref, context, ref.mdContext)
+
         // 0.17 — a cn slot's reference, or one written `cn.<Name>`, resolves among concepts only.
         if (ref.cnContext || (ref.parts.size > 1 && ref.parts[0] == "cn")) return resolveCn(ref, context)
 
@@ -132,10 +148,18 @@ class Resolver(
             tried.markLastUnknown()
         }
         if (context.packageName != null) {
-            for (entry in elementsByPackage(context.packageName)) {
-                if (entry.name == ref.path && entry.qname != enclosingCandidate && entry.qname != fullQname) {
-                    return ResolutionResult.Resolved(entry, ResolutionStep.SamePackage)
+            val matches =
+                elementsByPackage(context.packageName).filter {
+                    it.name == ref.path && it.qname != enclosingCandidate && it.qname != fullQname
                 }
+            val sameModel = matches.filter { it.schemaCode == context.schemaCode }
+            val pool = sameModel.ifEmpty { matches }
+            val topLevel = pool.filter { it.parent == null }
+            val candidates = topLevel.ifEmpty { pool }.sortedBy { it.qname }
+            if (candidates.size == 1) return ResolutionResult.Resolved(candidates[0], ResolutionStep.SamePackage)
+            if (candidates.size > 1) {
+                candidates.forEach { tried += ResolutionAttempt(ResolutionStep.SamePackage, it.qname, "ambiguous") }
+                return ResolutionResult.Unresolved(ResolutionResult.Reason.Ambiguous, tried, candidates)
             }
         }
 
@@ -244,6 +268,102 @@ class Resolver(
         }
 
         return ResolutionResult.Unresolved(ResolutionResult.Reason.NotFound, tried)
+    }
+
+    private fun rootVariants(path: String): List<String> {
+        if (root.isEmpty()) return listOf(path)
+        val variant =
+            if (path == root ||
+                path.startsWith("$root.")
+            ) {
+                path.removePrefix(root).removePrefix(".")
+            } else {
+                "$root.$path"
+            }
+        return listOf(path, variant).filter { it.isNotEmpty() }.distinct()
+    }
+
+    /** Role-aware MD lookup, including namespace sugar and unique package suffixes (TS `resolveMdRef`). */
+    private fun mdSymbol(
+        path: String,
+        role: MdReferenceRole,
+        packageName: String? = null,
+    ): SymbolEntry? {
+        val namespaces = mutableListOf(role.namespace)
+        if (role == MdReferenceRole.Domain && '.' in path && !path.startsWith("md.")) namespaces += "dimension"
+        for (ns in namespaces) {
+            val parts = path.split('.')
+            val model = parts.lastIndexOf("md")
+            val canonical =
+                if (model >=
+                    0
+                ) {
+                    (parts.take(model + 1) + ns + parts.drop(model + 1)).joinToString(".")
+                } else {
+                    "md.$ns.$path"
+                }
+            val candidates =
+                (
+                    if (model >= 0 &&
+                        parts.getOrNull(model + 1) == ns
+                    ) {
+                        listOf(path, canonical)
+                    } else {
+                        listOf(canonical)
+                    }
+                ).distinct()
+            if (!packageName.isNullOrEmpty()) {
+                for (candidate in candidates) symbols.get("$packageName.$candidate")?.let { return it }
+            }
+            for (candidate in candidates) symbols.get(candidate)?.let { return it }
+            val matches = symbols.getBySuffix(candidates.last()).distinctBy { it.qname }
+            if (matches.size == 1) return matches[0]
+        }
+        return null
+    }
+
+    private fun resolveMd(
+        ref: Ref,
+        context: ResolutionContext,
+        role: MdReferenceRole,
+    ): ResolutionResult {
+        var fallback: SymbolEntry? = null
+        for (path in rootVariants(ref.path)) {
+            val symbol = mdSymbol(path, role, context.packageName) ?: continue
+            if (symbol.packageName == context.packageName || ref.parts.size > 1) {
+                val step = if (ref.parts.size == 1) ResolutionStep.SamePackage else ResolutionStep.FullyQualified
+                return ResolutionResult.Resolved(symbol, step)
+            }
+            if (fallback == null) fallback = symbol
+        }
+        for (imp in context.imports.orEmpty()) {
+            if (imp.wildcard || !imp.target.endsWith(".${ref.path}")) continue
+            for (path in rootVariants(imp.target)) {
+                mdSymbol(path, role)?.let { return ResolutionResult.Resolved(it, ResolutionStep.NamedImport) }
+            }
+        }
+        val wildcardMatches = mutableMapOf<String, SymbolEntry>()
+        for (imp in context.imports.orEmpty()) {
+            if (!imp.wildcard) continue
+            for (pkg in rootVariants(imp.target)) {
+                val symbol = mdSymbol(ref.path, role, pkg)
+                if (symbol != null && symbol.packageName == pkg) wildcardMatches[symbol.qname] = symbol
+            }
+        }
+        val candidates = wildcardMatches.values.sortedBy { it.qname }
+        if (candidates.size == 1) return ResolutionResult.Resolved(candidates[0], ResolutionStep.WildcardImport)
+        if (candidates.size > 1) {
+            return ResolutionResult.Unresolved(
+                ResolutionResult.Reason.Ambiguous,
+                candidates.map { ResolutionAttempt(ResolutionStep.WildcardImport, it.qname, "ambiguous") },
+                candidates,
+            )
+        }
+        fallback?.let { return ResolutionResult.Resolved(it, ResolutionStep.FullyQualified) }
+        return ResolutionResult.Unresolved(
+            ResolutionResult.Reason.NotFound,
+            listOf(ResolutionAttempt(ResolutionStep.FullyQualified, ref.path, "unknown-symbol")),
+        )
     }
 
     /**

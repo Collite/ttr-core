@@ -1,0 +1,3 @@
+package shop
+model lexicon locale en
+def term Revenue { for: revenue, forms: ["Revenue"] }

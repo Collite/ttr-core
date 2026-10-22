@@ -6,6 +6,11 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **Reference indexing (#258)** — preserve MD slot kinds in reverse references, find-references and rename;
+  prefer the current model, then top-level definitions for same-package names, and report remaining ambiguity
+  at the reference. TypeScript, Kotlin and Python share the rule and MD slot-aware lookup, guarded by collision
+  conformance fixtures. Resolution no longer depends on document indexing order.
+
 - **Grammar 0.18 / HP-P1** — explicit `md2er_dimension` and structural `md2er_cubelet.measures`
   across TS, Kotlin and Python. Validate dimension keys, one-relation paths, duplicate bindings and
   measure targets. The Kotlin writer and TS formatter render both bindings; the formatter preserves comments.

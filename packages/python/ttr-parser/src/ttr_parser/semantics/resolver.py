@@ -50,6 +50,8 @@ _KIND_KEYWORDS: frozenset[str] = frozenset(
     }
 )
 
+MdReferenceRole = Literal["domain", "map", "dimension", "measure", "hierarchy", "grain"]
+
 ResolutionStep = Literal[
     "lexical",
     "same-package",
@@ -131,8 +133,9 @@ def _cn_key(pkg: str, parts: list[str] | tuple[str, ...]) -> str:
 
 
 class Resolver:
-    def __init__(self, symbols: SymbolTable) -> None:
+    def __init__(self, symbols: SymbolTable, root: str = "") -> None:
         self._symbols = symbols
+        self._root = root
         #: `_vocab` for a symbol-table version - a whole-table scan, so once per change
         self._vocab_cache: tuple[int, tuple[set[str], set[str]]] | None = None
 
@@ -157,12 +160,16 @@ class Resolver:
         return e if e is not None and _is_cn_symbol(e) else None
 
     def resolve_reference(
-        self, ref: str, context: ResolutionContext, *, cn_context: bool = False
+        self, ref: str, context: ResolutionContext, *, cn_context: bool = False,
+        md_context: MdReferenceRole | None = None,
     ) -> ResolutionResult:
         """Resolve a dotted reference. `cn_context` marks a reference from a cn slot
-        (`CollectedRef.cn_context`): it - and any `cn.`-headed reference - resolves among concepts only."""
+        (`CollectedRef.cn_context`): it - and any `cn.`-headed reference - resolves among concepts only.
+        `md_context` preserves an MD reference's target namespace from its originating slot."""
         path = ref
         parts = path.split(".")
+        if md_context is not None:
+            return self._resolve_md(path, context, md_context)
         if cn_context or (len(parts) > 1 and parts[0] == "cn"):
             return self._resolve_cn(parts, context)
         tried: list[ResolutionAttempt] = []
@@ -191,11 +198,19 @@ class Resolver:
             )
 
         if context.package_name:
-            for entry in self._elements_by_package(context.package_name):
-                if entry.name == path:
-                    candidate = entry.qname.value
-                    if candidate not in (enclosing_candidate, full_qname):
-                        return Resolved(entry, "same-package")
+            matches = [
+                e for e in self._elements_by_package(context.package_name)
+                if e.name == path and e.qname.value not in (enclosing_candidate, full_qname)
+            ]
+            same_model = [e for e in matches if e.schema_code == context.schema_code]
+            pool = same_model or matches
+            top_level = [e for e in pool if e.parent is None]
+            candidates = sorted(top_level or pool, key=lambda e: e.qname.value)
+            if len(candidates) == 1:
+                return Resolved(candidates[0], "same-package")
+            if len(candidates) > 1:
+                tried.extend(ResolutionAttempt("same-package", e.qname.value, "ambiguous") for e in candidates)
+                return Unresolved("ambiguous", tuple(tried), tuple(candidates))
 
         # Steps 3–4 — imports.
         if context.imports:
@@ -314,6 +329,78 @@ class Resolver:
                 return Unresolved("ambiguous", tuple(tried), tuple(candidates))
 
         return Unresolved("not-found", tuple(tried))
+
+    def _root_variants(self, path: str) -> list[str]:
+        if not self._root:
+            return [path]
+        if path == self._root or path.startswith(self._root + "."):
+            variant = path[len(self._root):].removeprefix(".")
+        else:
+            variant = f"{self._root}.{path}"
+        return list(dict.fromkeys(p for p in (path, variant) if p))
+
+    def _md_symbol(self, path: str, role: MdReferenceRole, package: str = "") -> SymbolEntry | None:
+        """Role-aware namespace sugar and unique package suffix lookup (TS `resolveMdRef`)."""
+        namespaces = ["dimension" if role == "grain" else role]
+        if role == "domain" and "." in path and not path.startswith("md."):
+            namespaces.append("dimension")
+        for ns in namespaces:
+            parts = path.split(".")
+            model = max((i for i, p in enumerate(parts) if p == "md"), default=-1)
+            canonical = (
+                ".".join([*parts[:model + 1], ns, *parts[model + 1:]])
+                if model >= 0 else f"md.{ns}.{path}"
+            )
+            already_canonical = model >= 0 and parts[model + 1:model + 2] == [ns]
+            candidates = list(dict.fromkeys([path, canonical] if already_canonical else [canonical]))
+            if package:
+                for candidate in candidates:
+                    if (hit := self._symbols.get(f"{package}.{candidate}")) is not None:
+                        return hit
+            for candidate in candidates:
+                if (hit := self._symbols.get(candidate)) is not None:
+                    return hit
+            matches = {e.qname.value: e for e in self._symbols.get_by_suffix(candidates[-1])}
+            if len(matches) == 1:
+                return next(iter(matches.values()))
+        return None
+
+    def _resolve_md(self, path: str, context: ResolutionContext, role: MdReferenceRole) -> ResolutionResult:
+        fallback: SymbolEntry | None = None
+        for variant in self._root_variants(path):
+            symbol = self._md_symbol(variant, role, context.package_name)
+            if symbol is None:
+                continue
+            if symbol.package_name == context.package_name or "." in path:
+                return Resolved(symbol, "fully-qualified" if "." in path else "same-package")
+            if fallback is None:
+                fallback = symbol
+        for imp in context.imports:
+            if imp.wildcard or not imp.target.endswith(f".{path}"):
+                continue
+            for variant in self._root_variants(imp.target):
+                if (symbol := self._md_symbol(variant, role)) is not None:
+                    return Resolved(symbol, "named-import")
+        wildcard_matches: dict[str, SymbolEntry] = {}
+        for imp in context.imports:
+            if not imp.wildcard:
+                continue
+            for pkg in self._root_variants(imp.target):
+                symbol = self._md_symbol(path, role, pkg)
+                if symbol is not None and symbol.package_name == pkg:
+                    wildcard_matches[symbol.qname.value] = symbol
+        candidates = sorted(wildcard_matches.values(), key=lambda e: e.qname.value)
+        if len(candidates) == 1:
+            return Resolved(candidates[0], "wildcard-import")
+        if len(candidates) > 1:
+            return Unresolved(
+                "ambiguous",
+                tuple(ResolutionAttempt("wildcard-import", e.qname.value, "ambiguous") for e in candidates),
+                tuple(candidates),
+            )
+        if fallback is not None:
+            return Resolved(fallback, "fully-qualified")
+        return Unresolved("not-found", (ResolutionAttempt("fully-qualified", path, "unknown-symbol"),))
 
     def _resolve_cn(self, written: list[str], context: ResolutionContext) -> ResolutionResult:
         """0.17 - a reference from a cn slot, or one written with the `cn.` head, resolves among concepts

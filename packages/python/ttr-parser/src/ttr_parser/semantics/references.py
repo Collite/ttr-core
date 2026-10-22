@@ -55,6 +55,7 @@ from ..model import (
 )
 from .cn.desugar import concept_sugar_of, sugar_stereotype_key
 from .default_schema import build_canonical_key, kind_segment
+from .resolver import MdReferenceRole
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +71,7 @@ class CollectedRef:
     owner_def: Definition
     cn_context: bool = False
     soft: bool = False
+    md_context: MdReferenceRole | None = None
 
 
 def nested_defs(definition: Definition) -> tuple[Definition, ...]:
@@ -97,8 +99,8 @@ def collect_all_references(definitions: tuple[Definition, ...]) -> list[Collecte
     return out
 
 
-def _ref_of(ref: Reference, owner: Definition) -> CollectedRef:
-    return CollectedRef(ref.path, ref.parts, ref.source, owner)
+def _ref_of(ref: Reference, owner: Definition, md_context: MdReferenceRole | None = None) -> CollectedRef:
+    return CollectedRef(ref.path, ref.parts, ref.source, owner, md_context=md_context)
 
 
 def _collect_into(
@@ -144,14 +146,15 @@ def _collect_into(
     # measure), read off the identity-level fields the Python md hosts carry.
     elif isinstance(definition, AttributeDef):
         if definition.domain_ref is not None:
-            out.append(_ref_of(definition.domain_ref, owner))
+            out.append(_ref_of(definition.domain_ref, owner, "domain"))
     elif isinstance(definition, DimensionDef):
-        out.extend(_ref_of(r, owner) for r in definition.hierarchies)
+        out.extend(_ref_of(r, owner, "hierarchy") for r in definition.hierarchies)
     elif isinstance(definition, MeasureDef):
         if definition.domain_ref is not None:
-            out.append(_ref_of(definition.domain_ref, owner))
+            out.append(_ref_of(definition.domain_ref, owner, "domain"))
     elif isinstance(definition, CubeletDef):
-        out.extend(_ref_of(r, owner) for r in (*definition.grain, *definition.measure_refs))
+        out.extend(_ref_of(r, owner, "grain") for r in definition.grain)
+        out.extend(_ref_of(r, owner, "measure") for r in definition.measure_refs)
     # 0.17 - the cn model: a concept def's and a binding's slots.
     elif isinstance(definition, ConceptDef):
         _collect_concept_body(definition.body, "def", owner, out)

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { ImportDecl } from '@tatrman/parser';
+import type { CrossRef, ImportDecl } from '@tatrman/parser';
+import { resolveMdRef } from './md-resolve.js';
 import type { SymbolEntry } from './symbol-table.js';
 import { ProjectSymbolTable } from './project-symbols.js';
 import {
@@ -82,13 +83,14 @@ export interface ResolutionContext {
 
 /**
  * What {@link Resolver.resolveReference} reads off a reference: its written path and segments, and —
- * for a reference from a cn slot (`CnSlotReference`) — the cn context. Pass the collected
+ * for a reference from a cn or MD slot — its slot context. Pass the collected
  * reference itself, not a copy of its path, so the context survives.
  */
 export interface ReferenceInput {
   path: string;
   parts: string[];
   cnContext?: boolean;
+  mdContext?: CrossRef['role'];
 }
 
 /** A concept or one of its participant labels (model `cn`, 0.17). */
@@ -293,6 +295,45 @@ export class Resolver {
   }
 
   resolveReference(ref: ReferenceInput, context: ResolutionContext): ResolutionResult {
+    // The reverse reference index must use the same MD slot rules as navigation
+    // and diagnostics; a measure slot can never bind to a same-named attribute.
+    if (ref.mdContext) {
+      let fallback: SymbolEntry | undefined;
+      for (const path of this.rootVariants(ref.path)) {
+        const symbol = resolveMdRef(this.symbols, path, ref.mdContext, context.packageName);
+        if (!symbol) continue;
+        if (symbol.packageName === context.packageName || ref.parts.length > 1) {
+          return { resolved: true, symbol, viaStep: ref.parts.length === 1 ? 'same-package' : 'fully-qualified' };
+        }
+        fallback ??= symbol;
+      }
+      // Preserve the generic chain's import precedence while constraining each
+      // imported target to the MD slot. Widen to the project only afterwards.
+      for (const imp of context.imports ?? []) {
+        if (imp.wildcard || !imp.target.endsWith(`.${ref.path}`)) continue;
+        for (const path of this.rootVariants(imp.target)) {
+          const symbol = resolveMdRef(this.symbols, path, ref.mdContext);
+          if (symbol) return { resolved: true, symbol, viaStep: 'named-import' };
+        }
+      }
+      const wildcardMatches = new Map<string, SymbolEntry>();
+      for (const imp of context.imports ?? []) {
+        if (!imp.wildcard) continue;
+        for (const pkg of this.rootVariants(imp.target)) {
+          const symbol = resolveMdRef(this.symbols, ref.path, ref.mdContext, pkg);
+          if (symbol?.packageName === pkg) wildcardMatches.set(symbol.qname, symbol);
+        }
+      }
+      const candidates = [...wildcardMatches.values()].sort((a, b) => a.qname.localeCompare(b.qname));
+      if (candidates.length === 1) return { resolved: true, symbol: candidates[0], viaStep: 'wildcard-import' };
+      if (candidates.length > 1) {
+        return { resolved: false, reason: 'ambiguous', candidates,
+          tried: candidates.map((symbol) => attempt('wildcard-import', symbol.qname, 'ambiguous')) };
+      }
+      if (fallback) return { resolved: true, symbol: fallback, viaStep: 'fully-qualified' };
+      return { resolved: false, reason: 'not-found', tried: [attempt('fully-qualified', ref.path, 'unknown-symbol')] };
+    }
+
     // 0.17 — a cn slot's reference, or one written `cn.<Name>`, resolves among concepts only.
     if (ref.cnContext || (ref.parts.length > 1 && ref.parts[0] === 'cn')) return this.resolveCn(ref, context);
 
@@ -315,14 +356,20 @@ export class Resolver {
     }
 
     if (context.packageName) {
-      const pkgSymbols = this.elements.getByPackage(context.packageName);
-      for (const entry of pkgSymbols) {
-        if (entry.name === ref.path) {
-          const candidate = entry.qname;
-          if (candidate !== enclosingCandidate && candidate !== fullQname) {
-            return { resolved: true, symbol: entry, viaStep: 'same-package' };
-          }
-        }
+      const matches = this.elements.getByPackage(context.packageName).filter(
+        (entry) => entry.name === ref.path && entry.qname !== enclosingCandidate && entry.qname !== fullQname
+      );
+      const sameModel = matches.filter((entry) => entry.schemaCode === context.schemaCode);
+      const pool = sameModel.length ? sameModel : matches;
+      // Members remain reachable lexically and as a fallback when no top-level definition matches.
+      const topLevel = pool.filter((entry) => !entry.parent);
+      const candidates = (topLevel.length ? topLevel : pool).sort((a, b) => a.qname.localeCompare(b.qname));
+      if (candidates.length === 1) {
+        return { resolved: true, symbol: candidates[0], viaStep: 'same-package' };
+      }
+      if (candidates.length > 1) {
+        for (const candidate of candidates) tried.push(attempt('same-package', candidate.qname, 'ambiguous'));
+        return { resolved: false, reason: 'ambiguous', tried, candidates };
       }
     }
 
