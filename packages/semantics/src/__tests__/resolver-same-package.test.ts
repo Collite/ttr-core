@@ -80,4 +80,23 @@ describe('same-package candidate selection', () => {
         .toMatchObject({ resolved: true, symbol: { qname: 'east.md.measure.revenue' } });
     }
   });
+
+  it('preserves named and wildcard MD imports, including ambiguous wildcards', () => {
+    const symbols = new ProjectSymbolTable();
+    for (const pkg of ['east', 'west']) {
+      const ast = parseString(`package ${pkg}\nmodel md\ndef measure revenue {}`).ast!;
+      symbols.upsertDocument(`${pkg}.ttrm`, ast, 'md', '', pkg);
+    }
+    const resolver = new Resolver(symbols);
+    for (const imports of ['import west.md.measure.revenue', 'import west.*']) {
+      const ast = parseString(`package app\n${imports}\nmodel md\ndef cubelet Sales { measures: [revenue] }`).ast!;
+      expect(resolver.resolveReference(collectAllReferences(ast)[0].ref,
+        { ...context, schemaCode: 'md', packageName: 'app', imports: ast.imports }))
+        .toMatchObject({ resolved: true, symbol: { qname: 'west.md.measure.revenue' } });
+    }
+    const ast = parseString('package app\nimport east.*\nimport west.*\nmodel md\ndef cubelet Sales { measures: [revenue] }').ast!;
+    expect(resolver.resolveReference(collectAllReferences(ast)[0].ref,
+      { ...context, schemaCode: 'md', packageName: 'app', imports: ast.imports }))
+      .toMatchObject({ resolved: false, reason: 'ambiguous' });
+  });
 });

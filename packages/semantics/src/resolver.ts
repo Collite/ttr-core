@@ -298,10 +298,39 @@ export class Resolver {
     // The reverse reference index must use the same MD slot rules as navigation
     // and diagnostics; a measure slot can never bind to a same-named attribute.
     if (ref.mdContext) {
+      let fallback: SymbolEntry | undefined;
       for (const path of this.rootVariants(ref.path)) {
         const symbol = resolveMdRef(this.symbols, path, ref.mdContext, context.packageName);
-        if (symbol) return { resolved: true, symbol, viaStep: 'fully-qualified' };
+        if (!symbol) continue;
+        if (symbol.packageName === context.packageName || ref.parts.length > 1) {
+          return { resolved: true, symbol, viaStep: 'fully-qualified' };
+        }
+        fallback ??= symbol;
       }
+      // Preserve the generic chain's import precedence while constraining each
+      // imported target to the MD slot. Widen to the project only afterwards.
+      for (const imp of context.imports ?? []) {
+        if (imp.wildcard || !imp.target.endsWith(`.${ref.path}`)) continue;
+        for (const path of this.rootVariants(imp.target)) {
+          const symbol = resolveMdRef(this.symbols, path, ref.mdContext);
+          if (symbol) return { resolved: true, symbol, viaStep: 'named-import' };
+        }
+      }
+      const wildcardMatches = new Map<string, SymbolEntry>();
+      for (const imp of context.imports ?? []) {
+        if (!imp.wildcard) continue;
+        for (const pkg of this.rootVariants(imp.target)) {
+          const symbol = resolveMdRef(this.symbols, ref.path, ref.mdContext, pkg);
+          if (symbol?.packageName === pkg) wildcardMatches.set(symbol.qname, symbol);
+        }
+      }
+      const candidates = [...wildcardMatches.values()].sort((a, b) => a.qname.localeCompare(b.qname));
+      if (candidates.length === 1) return { resolved: true, symbol: candidates[0], viaStep: 'wildcard-import' };
+      if (candidates.length > 1) {
+        return { resolved: false, reason: 'ambiguous', candidates,
+          tried: candidates.map((symbol) => attempt('wildcard-import', symbol.qname, 'ambiguous')) };
+      }
+      if (fallback) return { resolved: true, symbol: fallback, viaStep: 'fully-qualified' };
       return { resolved: false, reason: 'not-found', tried: [attempt('fully-qualified', ref.path, 'unknown-symbol')] };
     }
 
