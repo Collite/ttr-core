@@ -47,6 +47,14 @@ class TimeTypingSpec :
             return RecipeFixtures.findings(r)
         }
 
+        "ceil and round preserve numeric types and refuse durations" {
+            for (fn in listOf("ceil", "round")) {
+                findings("orders -> calc(n = $fn(value)) -> filter(n > 0) -> rows").shouldBeEmpty()
+                findings("orders -> calc(n = $fn(days(2))) -> rows")
+                    .filter { it.id == TtrpDiagnosticId.TYP_001 }.single().message shouldContain "takes no duration"
+            }
+        }
+
         "`:as_of` is the run's instant; `date - days` is a date" {
             findings(
                 "orders -> filter(placed_date >= :as_of - :return_window and placed_date < :as_of) -> rows",

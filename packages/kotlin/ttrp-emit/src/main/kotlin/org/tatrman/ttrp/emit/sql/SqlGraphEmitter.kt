@@ -188,7 +188,7 @@ class SqlGraphEmitter(
             val resolved = n.columns.map { c -> (c as? ColumnRef)?.let { resolveRef(it, flat) } ?: c }
             val aliases = n.columns.indices.map { i -> n.aliases.getOrNull(i) ?: (n.columns[i] as? ColumnRef)?.column }
             return NodeExpressions.map(n.copy(columns = resolved, aliases = aliases)) { e ->
-                coerceKeys(qualifyRefs(e, flat), flat, flat)
+                preserveIntegerRounding(coerceKeys(qualifyRefs(e, flat), flat, flat), flat)
             }
         }
         return NodeExpressions.map(n) { e ->
@@ -205,6 +205,19 @@ class SqlGraphEmitter(
             coerceKeys(resolved, ins[0], ins[1])
         }
     }
+
+    /** PostgreSQL promotes integer CEIL/ROUND to float8; retain the declared integer row type. */
+    private fun preserveIntegerRounding(e: Expression, cols: List<EmitColumn>): Expression =
+        NodeExpressions.rewrite(e) { x ->
+            val call = x as? FunctionCall ?: return@rewrite null
+            if (call.function.name !in setOf("ceil", "round")) return@rewrite null
+            val type = call.args.firstOrNull()?.let { computedType(it, cols.associateBy { it.name }) }
+            if (type != null && isNumber(type)) {
+                Cast(call, org.tatrman.ttrp.expr.TtrpType.Integer, call.location)
+            } else {
+                null
+            }
+        }
 
     /** The latest column of [cols] the qualifier [q] names under the name [c]. */
     private fun find(

@@ -428,7 +428,43 @@ class RecipeBundleSpec :
                     ),
                 )
             r.diagnostics.shouldBeEmpty()
-            Files.readString(r.dir.resolve("islands/shortfall.rows.sql")).uppercase() shouldContain "CEIL("
+            Files.readString(r.dir.resolve("islands/shortfall.rows.sql")).uppercase() shouldContain "CAST(CEIL("
+        }
+
+        "integer and numeric ceil/round output types match executed PostgreSQL columns".config(
+            enabled = System.getenv("TTRP_ROUNDING_PG") == "1",
+        ) {
+            val r = build("rounding.ttrp", """
+                uses world "hartland.worlds.demo"
+                import hartland.*
+                import hartland.automation.*
+                recipe {
+                    key: order.order_number
+                    candidates placed(out orders) target erp {
+                        load(er.entity.order)
+                        -> select(order_number, ci = ceil(order_number), ri = round(order_number),
+                                  cn = ceil(value), rn = round(value)) -> orders
+                    }
+                    decision v(in orders) { orders -> switch { go: true because: "probe" } }
+                    actions { v.go -> notify { who: role.ops, detail: placed } }
+                }
+            """.trimIndent())
+            val sql = Files.readString(r.dir.resolve("islands/placed.orders.sql"))
+            val url = System.getenv("TTR_CONN_ERP_PG") ?: "postgresql://localhost:55432/postgres?user=postgres&password=ttrp"
+            java.sql.DriverManager.getConnection("jdbc:$url").use { db ->
+                db.createStatement().use { stmt ->
+                    stmt.execute("CREATE TEMP TABLE \"order\" (order_number INTEGER, value NUMERIC(12,2))")
+                    stmt.execute("INSERT INTO \"order\" VALUES (7, 12.3)")
+                    val types = "SELECT pg_typeof(ci)::text, pg_typeof(ri)::text, pg_typeof(cn)::text, pg_typeof(rn)::text FROM ($sql) probe"
+                    stmt.executeQuery(types).use { rows ->
+                        rows.next() shouldBe true
+                        (1..4).map { rows.getString(it) } shouldBe listOf("integer", "integer", "numeric", "numeric")
+                    }
+                }
+            }
+            val columns = r.manifest.islands.single { it.name == "placed" }.outputs!!.single().columns
+            columns.filter { it.name in setOf("ci", "ri") }.map { it.type }.distinct() shouldBe listOf("int")
+            columns.filter { it.name in setOf("cn", "rn") }.map { it.type }.distinct().single() shouldStartWith "decimal"
         }
 
         "a recipe without golden fixtures omits the additive tests field" {
