@@ -165,6 +165,30 @@ class RecipeBundleAssembler(
         write(bundleDir, catalog.recipeFile, catalog.recipeText, files)
         write(bundleDir, catalog.verdictFile, catalog.verdictText, files)
 
+        val testsDir =
+            Path
+                .of(program)
+                .toAbsolutePath()
+                .parent
+                .resolve("tests")
+        val tests =
+            if (Files.isDirectory(testsDir)) {
+                Files.list(testsDir).use { paths ->
+                    paths
+                        .filter {
+                            Files.isRegularFile(it) &&
+                                it.fileName.toString().substringAfterLast('.') in setOf("yaml", "yml")
+                        }.sorted()
+                        .map { path ->
+                            val relative = "tests/${path.fileName}"
+                            write(bundleDir, relative, Files.readString(path), files)
+                            relative
+                        }.toList()
+                }
+            } else {
+                emptyList()
+            }
+
         val recipe =
             RecipeManifest(
                 name = model.name,
@@ -209,6 +233,7 @@ class RecipeBundleAssembler(
                 fingerprints = fingerprints,
                 protocol = model.protocol,
                 parts = parts.ifEmpty { null },
+                tests = tests,
             )
 
         val manifest =

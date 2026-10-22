@@ -40,6 +40,8 @@ data class RecipeManifest(
     /** `always` · `on_route` (D-80; a program may override). */
     val protocol: String,
     val parts: List<RecipePartEntry>? = null,
+    /** Golden fixtures carried in this bundle; presence gates execution (D-59). */
+    val tests: List<String> = emptyList(),
 )
 
 @Serializable

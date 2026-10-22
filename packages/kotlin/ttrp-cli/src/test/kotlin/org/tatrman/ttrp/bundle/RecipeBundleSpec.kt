@@ -418,6 +418,41 @@ class RecipeBundleSpec :
             }
         }
 
+        "CEIL in a PostgreSQL recipe is supported without capability diagnostics" {
+            val r =
+                build(
+                    "release_order.ttrp",
+                    source("release_order.ttrp").replace(
+                        "on_hand = coalesce(stock.quantity_on_hand, 0)",
+                        "on_hand = ceil(coalesce(stock.quantity_on_hand, 0))",
+                    ),
+                )
+            r.diagnostics.shouldBeEmpty()
+            Files.readString(r.dir.resolve("islands/shortfall.rows.sql")).uppercase() shouldContain "CEIL("
+        }
+
+        "golden seeds beside a recipe are bundled, hashed and listed in path order" {
+            val dir = Files.createTempDirectory("recipe-goldens")
+            val file = dir.resolve("release_order.ttrp")
+            Files.writeString(file, source("release_order.ttrp"))
+            Files.createDirectories(dir.resolve("tests"))
+            Files.writeString(dir.resolve("tests/z.yaml"), "world: us\n")
+            Files.writeString(dir.resolve("tests/a.yaml"), "world: cz\n")
+            Files.writeString(dir.resolve("tests/notes.txt"), "not a golden")
+            val r =
+                BundleAssembler("1.0.0").build(
+                    source("release_order.ttrp"),
+                    file.toString(),
+                    manifest,
+                    fixtures.resolve("model"),
+                    Files.createTempDirectory("recipe-goldens-out"),
+                )
+            val json = ObjectMapper().readTree(r.manifest.toJson())
+            json.path("recipe").path("tests").map { it.asText() } shouldBe listOf("tests/a.yaml", "tests/z.yaml")
+            Files.readString(r.dir.resolve("tests/a.yaml")) shouldBe "world: cz\n"
+            r.manifest.files.keys shouldContain "tests/a.yaml"
+        }
+
         "the four `17` catalogs load in one snapshot with hartland's model and automation package" {
             val out = Files.createTempDirectory("ttrp-recipes")
             for (f in listOf("release_order.ttrp", "decide_return.ttrp", "monitor_inbound.ttrp", "settle.ttrp")) {
@@ -459,6 +494,13 @@ class RecipeBundleSpec :
                 (snapshots.flatMap { it.errors } + result.errors)
                     .filter { it.sourceId == "catalog" && !it.message.startsWith("ttr/package-") }
             catalogErrors.map { it.message }.shouldBeEmpty()
+            // Resolver findings can have the role's source id rather than the catalog source id.
+            (snapshots.flatMap { it.errors } + result.errors)
+                .filter {
+                    it.message.startsWith("ttr/unimported-reference") &&
+                        it.file.endsWith("release_order_verdict.ttrm")
+                }.map { it.message }
+                .shouldBeEmpty()
             val entities =
                 result.model.schemas.values
                     .flatMap { s -> (s as? org.tatrman.ttr.metadata.model.ErSchema)?.entities?.values.orEmpty() }

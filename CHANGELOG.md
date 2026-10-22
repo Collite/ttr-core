@@ -6,6 +6,10 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **AU bundle handoff** — generated verdict catalogs omit retired CNC roles so the automation loader can
+  reconcile them; recipe bundles carry sorted, hashed golden YAML fixtures in `recipe.tests`; PostgreSQL recipe
+  expressions support typed `ceil` without a capability diagnostic.
+
 - **`grammar/v0.17.3` / AU S2.5** — recipe statements now split at storage boundaries into door parts and
   DuckDB combines. Every recipe's `text` fingerprint changes, including `release_order` and `decide_return`,
   because the hashed statement section is sorted by SQL file path and includes paths instead of `island.port`.

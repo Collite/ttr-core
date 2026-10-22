@@ -624,7 +624,9 @@ class SqlGraphEmitter(
                     -> "bool"
                     // AG-P0: value-preserving functions keep their first argument's type; arithmetic is
                     // numeric (a sql-text output's declared row type feeds the host's typed displays).
-                    "coalesce", "abs", "round" -> e.args.firstOrNull()?.let { computedType(it, byName) } ?: "text"
+                    "coalesce", "abs", "round", "ceil" ->
+                        e.args.firstOrNull()?.let { computedType(it, byName) }
+                            ?: "text"
                     "add", "sub", "mul", "div", "neg" -> numericOf(e.args.map { computedType(it, byName) })
                     else -> "text"
                 }
