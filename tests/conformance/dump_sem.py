@@ -82,6 +82,7 @@ def dump_sem_docs(docs: list[tuple[ParseResult, str]]) -> str:
                 ),
                 # The ref itself: a cn slot's ref carries its context (0.17).
                 cn_context=collected.cn_context,
+                md_context=collected.md_context,
             )
             if isinstance(res, Resolved):
                 resolved.append(f"{collected.path} => {res.symbol.qname.value}")

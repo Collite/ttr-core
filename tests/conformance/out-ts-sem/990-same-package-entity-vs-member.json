@@ -1,0 +1,15 @@
+{
+    "diagnostics": [],
+    "resolved": [
+        "customer => shop.er.entity.customer",
+        "order => shop.er.entity.order"
+    ],
+    "symbols": [
+        "shop.er.entity.customer",
+        "shop.er.entity.customer.id",
+        "shop.er.entity.order",
+        "shop.er.entity.order.customer",
+        "shop.er.entity.order.id",
+        "shop.er.relation.places"
+    ]
+}

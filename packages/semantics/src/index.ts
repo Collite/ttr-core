@@ -89,7 +89,7 @@ export {
   isCnContextRef,
   sugarDeclaringRef,
 } from './references.js';
-export type { CnSlotReference } from './references.js';
+export type { CnSlotReference, MdSlotReference } from './references.js';
 export { ReferenceIndex, enclosingQnameOf } from './reference-index.js';
 export type { ReferenceLocation } from './reference-index.js';
 export { PackageGraphBuilder, findCyclesOn } from './package-graph.js';
