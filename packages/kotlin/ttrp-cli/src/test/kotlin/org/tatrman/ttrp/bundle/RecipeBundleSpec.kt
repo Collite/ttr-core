@@ -461,8 +461,9 @@ class RecipeBundleSpec :
                 db.createStatement().use { stmt ->
                     stmt.execute("CREATE TEMP TABLE \"order\" (order_number INTEGER, value NUMERIC(12,2))")
                     stmt.execute("INSERT INTO \"order\" VALUES (7, 12.3)")
-                    val types = "SELECT pg_typeof(ci)::text, pg_typeof(ri)::text, " +
-                        "pg_typeof(cn)::text, pg_typeof(rn)::text FROM ($sql) probe"
+                    val types =
+                        "SELECT pg_typeof(ci)::text, pg_typeof(ri)::text, " +
+                            "pg_typeof(cn)::text, pg_typeof(rn)::text FROM ($sql) probe"
                     stmt.executeQuery(types).use { rows ->
                         rows.next() shouldBe true
                         (1..4).map { rows.getString(it) } shouldBe listOf("integer", "integer", "numeric", "numeric")
@@ -489,6 +490,9 @@ class RecipeBundleSpec :
             val json = Files.readString(r.dir.resolve("manifest.json"))
             ObjectMapper().readTree(json).path("recipe").has("tests") shouldBe false
             r.manifest.recipe!!.tests shouldBe null
+            // Baseline from f400192's CLI with its unconditional empty tests key removed: the pre-field wire shape.
+            val baseline = Path.of("src/test/resources/fixtures/release-order-before-golden-field.json")
+            json shouldBe Files.readString(baseline)
         }
 
         "golden seeds beside a recipe are bundled, hashed and listed in path order" {

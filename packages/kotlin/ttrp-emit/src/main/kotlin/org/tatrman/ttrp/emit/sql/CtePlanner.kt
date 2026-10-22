@@ -180,7 +180,14 @@ class CtePlanner(
         guarded: Boolean,
     ): String? {
         val node = en.node as? org.tatrman.ttrp.graph.model.Project ?: return null
-        if (node.columns.none { RejectGuardSql.isInternal(it) || it is org.tatrman.ttrp.expr.Cast }) return null
+        if (node.columns
+                .flatMap {
+                    org.tatrman.ttrp.graph.model.NodeExpressions
+                        .walk(it)
+                }.none { RejectGuardSql.isInternal(it) || it is org.tatrman.ttrp.expr.Cast }
+        ) {
+            return null
+        }
         val input = en.inputs.singleOrNull() ?: return null
         val overridden =
             node.columns.indices

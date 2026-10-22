@@ -51,7 +51,9 @@ class TimeTypingSpec :
             for (fn in listOf("ceil", "round")) {
                 findings("orders -> calc(n = $fn(value)) -> filter(n > 0) -> rows").shouldBeEmpty()
                 findings("orders -> calc(n = $fn(days(2))) -> rows")
-                    .filter { it.id == TtrpDiagnosticId.TYP_001 }.single().message shouldContain "takes no duration"
+                    .filter { it.id == TtrpDiagnosticId.TYP_001 }
+                    .single()
+                    .message shouldContain "takes no duration"
             }
         }
 

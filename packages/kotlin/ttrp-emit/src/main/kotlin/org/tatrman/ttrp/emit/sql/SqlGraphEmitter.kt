@@ -10,6 +10,7 @@ import org.tatrman.ttrp.expr.ColumnRef
 import org.tatrman.ttrp.expr.Expression
 import org.tatrman.ttrp.expr.FunctionCall
 import org.tatrman.ttrp.expr.IsNull
+import org.tatrman.ttrp.expr.TtrpType
 import org.tatrman.ttrp.graph.capability.BoundWorld
 import org.tatrman.ttrp.graph.model.Aggregate
 import org.tatrman.ttrp.graph.model.Container
@@ -207,13 +208,21 @@ class SqlGraphEmitter(
     }
 
     /** PostgreSQL promotes integer CEIL/ROUND to float8; retain the declared integer row type. */
-    private fun preserveIntegerRounding(e: Expression, cols: List<EmitColumn>): Expression =
+    private fun preserveIntegerRounding(
+        e: Expression,
+        cols: List<EmitColumn>,
+    ): Expression =
         NodeExpressions.rewrite(e) { x ->
             val call = x as? FunctionCall ?: return@rewrite null
             if (call.function.name !in setOf("ceil", "round")) return@rewrite null
             val type = call.args.firstOrNull()?.let { computedType(it, cols.associateBy { it.name }) }
             if (type != null && isNumber(type)) {
-                Cast(call, org.tatrman.ttrp.expr.TtrpType.Integer, call.location)
+                val target =
+                    when (type) {
+                        "int", "integer" -> TtrpType.Integer
+                        else -> TtrpType.Named(type)
+                    }
+                Cast(call, target, call.location)
             } else {
                 null
             }
