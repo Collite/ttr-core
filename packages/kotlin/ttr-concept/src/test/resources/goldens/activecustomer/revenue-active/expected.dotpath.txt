@@ -1,0 +1,1 @@
+sales[customer.name: *, time.month: 1, time.year: 2026].net @ sum where customer.name in (sales[customer.name: *, time.day: "2025-01-31".."2026-01-31"].net @ sum)

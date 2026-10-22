@@ -24,6 +24,13 @@ interface MdErHop {
         mdElement: String,
         bearerEntity: String? = null,
     ): HopResult
+
+    /**
+     * The reverse hop (CN-P3, ⚑CN-P8's default): the md elements whose hop lands on [erElement] — how an er-grounded
+     * value kind or event reaches md (a cubelet on its entity, a grain attribute on its attribute). Sorted; empty when
+     * none does, and by default — a hop that cannot answer it reaches nothing this way.
+     */
+    fun mdElementsOn(erElement: String): List<String> = emptyList()
 }
 
 /** Which rule of the hop order answered. */

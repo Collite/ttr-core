@@ -175,6 +175,9 @@ function keySource(entry: ObjectEntry): SourceLocation {
 /** `period:` names its instants through `start` / `end` / `at`; `end_open` and `precision` are enums. */
 const PERIOD_INSTANTS: ReadonlySet<string> = new Set(['start', 'end', 'at']);
 
+/** A binding's `period:` may also name a stored upper bound — `start_hi` / `at_hi` (⚑CN-P10, ruled 2026-10-22). */
+const BINDING_PERIOD_INSTANTS: ReadonlySet<string> = new Set([...PERIOD_INSTANTS, 'start_hi', 'at_hi']);
+
 /**
  * The references of one cn body, in authored order. `mode` says whose body it is: a concept def
  * (`period:` names the bearer's qualities), a binding (`period:` names er attributes, `participants:`
@@ -203,7 +206,7 @@ function collectConceptBodyRefs(body: ConceptBody, mode: 'def' | 'binding' | 'su
         break;
       case 'period':
         for (const e of p.value.entries) {
-          if (!PERIOD_INSTANTS.has(e.key)) continue;
+          if (!(mode === 'binding' ? BINDING_PERIOD_INSTANTS : PERIOD_INSTANTS).has(e.key)) continue;
           for (const id of idsOf(e.value)) out.push(mode === 'binding' ? idRef(id) : cnRef(idRef(id), true));
         }
         break;

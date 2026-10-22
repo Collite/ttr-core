@@ -26,6 +26,7 @@ include(":packages:kotlin:ttr-validator-spi")
 // resolver over MdModel. Standalone — must NOT depend on ttrp-frontend (S3 wires it the other way).
 include(":packages:kotlin:ttr-md-resolver")
 include(":packages:kotlin:ttr-metadata")
+include(":packages:kotlin:ttr-metadata-cli")
 include(":packages:kotlin:ttr-metadata-git")
 // PL-P1.S1 — deterministic snapshot archives + cache (the ② seam transport unit).
 include(":packages:kotlin:ttr-snapshot")

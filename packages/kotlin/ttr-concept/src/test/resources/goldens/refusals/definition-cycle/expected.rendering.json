@@ -1,0 +1,10 @@
+{
+  "parametersRead": [],
+  "diagnostics": [
+    {
+      "slug": "cn/definition-cycle",
+      "severity": "ERROR",
+      "subject": "cn.LoopA"
+    }
+  ]
+}

@@ -72,45 +72,108 @@ data class Explanation(
     val diagnostics: List<Diagnostic> = emptyList(),
 )
 
-/** One E-R row of an assertion's lowered payload: the entity and its attribute → value text. */
+/** One E-R row of an assertion's lowered payload: the entity and its attribute → value text (null = SQL NULL). */
 data class RowObject(
     val entity: String,
-    val values: Map<String, String> = emptyMap(),
-)
-
-/** `assertionLower`: the `Statement[<Entity>]` row payload — rows only; cn never writes them. */
-data class RowObjects(
-    val rows: List<RowObject> = emptyList(),
-    val diagnostics: List<Diagnostic> = emptyList(),
+    val values: Map<String, String?> = emptyMap(),
 )
 
 /**
- * How a definition renders. ⚑ The two fields are the S0.3 spike's defaults, pending Bora (memo ⚑S03-10 / ⚑S03-1):
- * [mode] — `PREDICATE` (the bearer's keys under the predicate) or `CONTEXT` (sub-terms lifted to joins and projected,
- * the shape AU's recipe islands use); [placeholderStyle] — `CURLY` (`{name}`, the translator's) or `COLON` (`:name`,
- * AU's islands).
+ * `assertionLower`: the `Statement[<Entity>]` row payload — data only; cn never writes it (contracts §2.3). CN-P3 S3.5
+ * adds the last three, additively (A-CN-49): [assertedAsOf] — the instant the source claims the state for, as the frame
+ * writes it (null when it names none); [meta] — what the frame carries that no attribute holds; [obligations] — the
+ * participants the rows cannot hold, as checks for the writer (A-CN-47).
+ */
+data class RowObjects(
+    val rows: List<RowObject> = emptyList(),
+    val diagnostics: List<Diagnostic> = emptyList(),
+    val assertedAsOf: String? = null,
+    val meta: RowMeta = RowMeta(),
+    val obligations: List<Obligation> = emptyList(),
+)
+
+/**
+ * What an assertion carries beside its rows (A-CN-49): its provenance, the assertions it consolidates or corrects, the
+ * snapshot and locale it was built on, how its absent period end reads ([endState] — `END_OPEN` / `END_UNKNOWN`, the
+ * frame's or else the event's `end_open:`; unspecified when the end is present or the event has no end), and each
+ * quality's verbatim by the attribute it lands on.
+ */
+data class RowMeta(
+    val provenance: org.tatrman.assertion.v1.Provenance? = null,
+    val derivedFrom: List<String> = emptyList(),
+    val snapshotHash: String = "",
+    val locale: String = "",
+    val endState: org.tatrman.concept.v1.EndState = org.tatrman.concept.v1.EndState.END_STATE_UNSPECIFIED,
+    val verbatims: Map<String, String> = emptyMap(),
+)
+
+/**
+ * A participant the event row cannot hold (A-CN-47): [label]'s path runs [relations] from the event's entity, its first
+ * relation's foreign key [anchor] written by the participant [anchoredBy]; the row its path ends at must be [value] —
+ * a lowering cannot read data, so the writer checks it.
+ */
+data class Obligation(
+    val label: String,
+    val value: String,
+    val relations: List<String>,
+    val anchor: String,
+    val anchoredBy: String,
+)
+
+/**
+ * How a definition renders (contracts §3, A-CN-11/20; CN-P3 S3.4 T1 adds the last three, additively). [mode] —
+ * `PREDICATE` (`SELECT <bearer key> FROM <bearer> WHERE …`) or `CONTEXT` (the bearer joined to the [candidates],
+ * sub-terms lifted to joins and projected — AU's recipe islands, A-CN-20); [placeholderStyle] — `CURLY` (`{name}`, the
+ * translator's) or `COLON` (`:name`, AU's islands); [asOf] — the evaluation instant, null = now (a `latest(…, by:)` is
+ * then unbounded, A-CN-17; given, it is bounded by `{as_of}`); [candidates] — CONTEXT: the phase whose bearer keys the
+ * context (H-1's `cn.PendingOrder`), joined to the target's bearer through a participant path, its predicate first in
+ * the WHERE; [columns] — what the projection carries after the keys: names in the definition's scope (a participant —
+ * its key column; a grounded quality — its column, bare; a defined quality — `AS <name>`).
  */
 data class RenderOptions(
     val mode: RenderMode = RenderMode.PREDICATE,
     val placeholderStyle: PlaceholderStyle = PlaceholderStyle.CURLY,
+    val asOf: java.time.Instant? = null,
+    val candidates: org.tatrman.concept.v1.ConceptRef? = null,
+    val columns: List<String> = emptyList(),
 )
 
 enum class RenderMode { PREDICATE, CONTEXT }
 
 enum class PlaceholderStyle { CURLY, COLON }
 
-/** `definitionRender`: the text, what it read, what it inlined, and how it compared instants. */
+/**
+ * A placeholder a rendering reads (A-CN-22): a `:name` parameter, `as_of`, or a bound the renderer DERIVES and names
+ * (`window_lo`, `as_of_hi`) — [derivation] says how the consumer computes it (`as_of - days(365)`); null for one bound
+ * as it is.
+ */
+data class ParameterRead(
+    val name: String,
+    val derivation: String? = null,
+)
+
+/**
+ * `definitionRender`: the [text] (ER — SQL over entities in the formatting contract's layout, contracts §3; MD — the PL
+ * predicate over the carrying cubelet's attributes), the placeholders it reads, in the order the text reads them, the
+ * definitions it inlined (phases and defined qualities, transitively — the target itself not included), how it
+ * compared instants, and why it did not render (an error-grade diagnostic, [text] empty) or what it degraded
+ * (advisory).
+ */
 data class Rendering(
     val text: String = "",
-    val parametersRead: List<String> = emptyList(),
+    val parametersRead: List<ParameterRead> = emptyList(),
     val definitionsInlined: List<String> = emptyList(),
     val imprecisionMode: ImprecisionMode = ImprecisionMode.CERTAINLY,
     val diagnostics: List<Diagnostic> = emptyList(),
 )
 
-/** `materialize`: model text, path → content (a `def query` + its stacked entity). Canon stays text (CN-D1). */
+/**
+ * `materialize`: model text, path → content (a `def query` + its stacked entity). Canon stays text (CN-D1). Refused —
+ * no files — with an error-grade diagnostic (`cn/materialize-parametric`, or why the er rendering failed).
+ */
 data class ModelText(
     val files: Map<String, String> = emptyMap(),
+    val diagnostics: List<Diagnostic> = emptyList(),
 )
 
 /** The hygiene grades of S-6 v2 — computed by the typed model, so in `ttr-metadata` since CN-P2 S2.5 (alias). */

@@ -12,6 +12,32 @@ import { copySamples, listSampleFiles } from './scripts/copy-samples';
 const SAMPLE_NAME = 'v1.1-mini';
 const samplesSrc = path.resolve(__dirname, `../../samples/${SAMPLE_NAME}`);
 
+/** One JS/worker build, two entry documents. nginx maps the hosted assets to the same files. */
+function hostedEntryPlugin(): import('vite').Plugin {
+  let outDir: string;
+  let base: string;
+  return {
+    name: 'hosted-entry',
+    configResolved(config) { outDir = config.build.outDir; base = config.base; },
+    closeBundle() {
+      const html = fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')
+        .replaceAll(`${base}assets/`, './assets/')
+        .replace('<head>', '<head><base href="/m/_designer/" />');
+      fs.mkdirSync(path.join(outDir, 'hosted'), { recursive: true });
+      fs.writeFileSync(path.join(outDir, 'hosted/index.html'), html);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        if (req.url?.startsWith('/m/_designer/')) {
+          const suffix = req.url.slice('/m/_designer/'.length);
+          req.url = !suffix || suffix.startsWith('index.html') ? '/hosted/index.html' : `/${suffix}`;
+        }
+        next();
+      });
+    },
+  };
+}
+
 function copySamplesPlugin() {
   return {
     name: 'copy-samples',
@@ -55,7 +81,7 @@ function copySamplesPlugin() {
 const velesProxyTarget = process.env.VELES_PROXY_TARGET;
 
 export default defineConfig({
-  plugins: [react(), copySamplesPlugin()],
+  plugins: [react(), copySamplesPlugin(), hostedEntryPlugin()],
   // `/` by default; `/<sub-path>/` for a fixed sub-path build; `./` for the container image, whose
   // base path is chosen at runtime (the entrypoint writes `<base href>` + config.json).
   base: process.env.DESIGNER_BASE_URL ?? '/',

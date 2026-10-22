@@ -1,0 +1,218 @@
+{
+  "aggregate": {
+    "input": {
+      "filter": {
+        "input": {
+          "aggregate": {
+            "input": {
+              "filter": {
+                "input": {
+                  "join": {
+                    "left": {
+                      "tableScan": {
+                        "table": {
+                          "schemaCode": "DB",
+                          "namespace": "dbo",
+                          "name": "f_sales"
+                        },
+                        "outputColumns": [{
+                          "name": "customer_name"
+                        }, {
+                          "name": "sale_date"
+                        }, {
+                          "name": "net"
+                        }]
+                      }
+                    },
+                    "right": {
+                      "tableScan": {
+                        "table": {
+                          "schemaCode": "DB",
+                          "namespace": "dbo",
+                          "name": "d_calendar"
+                        },
+                        "outputColumns": [{
+                          "name": "cal_date"
+                        }, {
+                          "name": "cal_month"
+                        }]
+                      }
+                    },
+                    "joinType": "INNER",
+                    "condition": {
+                      "function": {
+                        "operation": "eq",
+                        "operands": [{
+                          "columnRef": {
+                            "sourceAlias": "$L",
+                            "name": "sale_date"
+                          }
+                        }, {
+                          "columnRef": {
+                            "sourceAlias": "$R",
+                            "name": "cal_date"
+                          }
+                        }]
+                      }
+                    }
+                  }
+                },
+                "condition": {
+                  "function": {
+                    "operation": "and",
+                    "operands": [{
+                      "function": {
+                        "operation": "eq",
+                        "operands": [{
+                          "columnRef": {
+                            "name": "cal_month"
+                          }
+                        }, {
+                          "literal": {
+                            "intValue": "1",
+                            "type": "int"
+                          }
+                        }]
+                      }
+                    }, {
+                      "function": {
+                        "operation": "eq",
+                        "operands": [{
+                          "function": {
+                            "operation": "extract",
+                            "operands": [{
+                              "literal": {
+                                "stringValue": "YEAR",
+                                "type": "symbol:TimeUnitRange"
+                              }
+                            }, {
+                              "columnRef": {
+                                "name": "sale_date"
+                              }
+                            }]
+                          }
+                        }, {
+                          "literal": {
+                            "intValue": "2026",
+                            "type": "int"
+                          }
+                        }]
+                      }
+                    }]
+                  }
+                }
+              }
+            },
+            "groupKeys": [{
+              "name": "customer_name"
+            }],
+            "aggregates": [{
+              "function": "sum",
+              "args": [{
+                "name": "net"
+              }],
+              "alias": "net"
+            }]
+          }
+        },
+        "condition": {
+          "subquery": {
+            "subquery": {
+              "project": {
+                "input": {
+                  "aggregate": {
+                    "input": {
+                      "filter": {
+                        "input": {
+                          "tableScan": {
+                            "table": {
+                              "schemaCode": "DB",
+                              "namespace": "dbo",
+                              "name": "f_sales"
+                            },
+                            "outputColumns": [{
+                              "name": "customer_name"
+                            }, {
+                              "name": "sale_date"
+                            }, {
+                              "name": "net"
+                            }]
+                          }
+                        },
+                        "condition": {
+                          "function": {
+                            "operation": "and",
+                            "operands": [{
+                              "function": {
+                                "operation": "ge",
+                                "operands": [{
+                                  "columnRef": {
+                                    "name": "sale_date"
+                                  }
+                                }, {
+                                  "literal": {
+                                    "stringValue": "2025-01-31",
+                                    "type": "text"
+                                  }
+                                }]
+                              }
+                            }, {
+                              "function": {
+                                "operation": "le",
+                                "operands": [{
+                                  "columnRef": {
+                                    "name": "sale_date"
+                                  }
+                                }, {
+                                  "literal": {
+                                    "stringValue": "2026-01-31",
+                                    "type": "text"
+                                  }
+                                }]
+                              }
+                            }]
+                          }
+                        }
+                      }
+                    },
+                    "groupKeys": [{
+                      "name": "customer_name"
+                    }],
+                    "aggregates": [{
+                      "function": "sum",
+                      "args": [{
+                        "name": "net"
+                      }],
+                      "alias": "net"
+                    }]
+                  }
+                },
+                "expressions": [{
+                  "expression": {
+                    "columnRef": {
+                      "name": "customer_name"
+                    }
+                  },
+                  "alias": "customer_name"
+                }]
+              }
+            },
+            "kind": "in",
+            "operands": [{
+              "columnRef": {
+                "name": "customer_name"
+              }
+            }]
+          }
+        }
+      }
+    },
+    "aggregates": [{
+      "function": "sum",
+      "args": [{
+        "name": "net"
+      }],
+      "alias": "net"
+    }]
+  }
+}

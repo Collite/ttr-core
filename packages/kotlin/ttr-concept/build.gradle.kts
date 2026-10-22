@@ -15,12 +15,43 @@ kotlin {
 
 tasks.test {
     useJUnitPlatform()
+    // CN-P3 S3.7 — the goldens (`ConceptGoldenSpec`): every case runs in `check` (S3.8 removed the stage switch).
+    // `-Pcn.goldens.regen` rewrites the oracle-made expectations; it reaches the test JVM only as a system property (a
+    // `-D` on the Gradle command line does not).
+    systemProperty("cn.goldens.regen", providers.gradleProperty("cn.goldens.regen").map { "true" }.getOrElse("false"))
+}
+
+// CN-P3 S3.3 — `LowerProvenance.grammarVersion`: TTR.g4's `@grammar-version`, baked in at build time (the parser
+// artifact carries none; ttr-concept and ttr-parser are cut together in the grammar bundle, so they agree). S3.8: a
+// generated constant, not a resource — a lower reads nothing, not even its own jar (`PuritySpec`).
+val grammarVersionSource by tasks.registering {
+    val g4 = rootProject.file("packages/grammar/src/TTR.g4")
+    val out = layout.buildDirectory.dir("generated/sources/grammar-version/kotlin")
+    inputs.file(g4)
+    outputs.dir(out)
+    doLast {
+        val version =
+            Regex("@grammar-version:\\s*(\\S+)").find(g4.readText())?.groupValues?.get(1)
+                ?: error("no `@grammar-version` header in $g4")
+        val file = out.get().file("org/tatrman/concept/GrammarVersion.kt").asFile
+        file.parentFile.mkdirs()
+        file.writeText(
+            "// Generated from TTR.g4's `@grammar-version` (build.gradle.kts, grammarVersionSource) — do not edit.\n" +
+                "package org.tatrman.concept\n\ninternal const val GRAMMAR_VERSION: String = \"$version\"\n",
+        )
+    }
+}
+
+kotlin.sourceSets.main { kotlin.srcDir(grammarVersionSource) }
+
+ktlint {
+    filter { exclude("**/generated/**") }
 }
 
 // CN (conceptual model, `project/tatrman/features/conceptual/`) — `ttr-concept`: the three function families
 // below the frontier (statements · assertions · definition rendering on the md and er layers), contracts §3.
-// CN-P0 S0.4: the SCAFFOLD — signatures and the arch guard only; every body is CN-P3. A pure function of
-// resolved, cached inputs (the S6 / PL-P0.S2 compile rule): no LLM, no server call, no I/O mid-lower.
+// Built at CN-P3. A pure function of resolved, cached inputs (the S6 / PL-P0.S2 compile rule): no LLM, no server
+// call, no I/O mid-lower.
 dependencies {
     // api: the `statement.v1` / `assertion.v1` / `concept.v1` messages are in ConceptService's signatures.
     api(project(":packages:kotlin:ttr-plan-proto"))
@@ -39,14 +70,22 @@ dependencies {
     implementation(libs.clikt)
     implementation(project(":packages:kotlin:ttr-md-resolver"))
     implementation(project(":packages:kotlin:ttrp-emit"))
-    implementation(project(":packages:kotlin:ttr-translator")) // dialects only (definition_render(er) targets)
+    // The er renderer's dialects and reserved words; api since S3.8 (A-CN-55): `ErModelHandle` is public, a translator
+    // `ModelHandle` a caller translates an er rendering over.
+    api(project(":packages:kotlin:ttr-translator"))
 
     testImplementation(libs.bundles.kotest)
+    // CN-P3 S3.1 — the frames' canonical JSON mapping (JsonFormat), the golden inputs' format.
+    testImplementation(libs.protobuf.java.util)
+    // CN-P3 S3.7 — the goldens' er oracle translates over an `InMemoryModelHandle` (the translator's test fixture).
+    testImplementation(testFixtures(project(":packages:kotlin:ttr-translator")))
+    // CN-P3 S3.3 T7 — the live suite (`ConceptLiveSpec`) runs the lowered plans on PostgreSQL (`TTR_CONN_ERP_PG`).
+    testImplementation(libs.postgresql)
 }
 
-// CN-P2 S2.7 — `ttr cn hygiene <dir> [--format text|json] [--fail-on error|warning]` (`ttr cn materialize` joins it at
-// CN-P3). It ships when this module first publishes (CN-P3 S3.1); until then `just cn-hygiene <dir>` runs it from the
-// repo, with paths relative to the repo root.
+// CN-P2 S2.7 — `ttr cn hygiene <dir> [--format text|json] [--fail-on error|warning]`; CN-P3 S3.4 — `ttr cn materialize
+// <dir> <cn.Phase> [--dialect …] [--out <dir>]`. `just cn-hygiene` / `just cn-materialize` run them from the repo, with
+// paths relative to the repo root.
 application {
     applicationName = "ttr"
     mainClass = "org.tatrman.concept.cli.MainKt"
@@ -82,9 +121,8 @@ val verifyNoLlmDependency by tasks.registering {
 
 tasks.named("check") { dependsOn(verifyNoLlmDependency) }
 
-// Not in any publish.yml bundle yet (scaffold only, CHANGELOG "Unreleased") — see the bundle header there for why
-// the translator bundle cannot carry it as the build stands (⚑CN-5 re-check, CN-P0 S0.4). The block is here so
-// CN-P3 S3.1 only has to add the module to a bundle.
+// Published in the `grammar/v*` bundle (publish.yml `MODULES`, since CN-P3 S3.1 — A-CN-1 amends ⚑CN-5): it shares the
+// ttrp-emit closure, so the translator bundle would write a POM naming grammar modules at a version never cut.
 mavenPublishing {
     publishToMavenCentral()
     if (providers.environmentVariable("ORG_GRADLE_PROJECT_signingInMemoryKey").isPresent ||
@@ -119,6 +157,21 @@ mavenPublishing {
             connection.set("scm:git:https://github.com/Collite/ttr-core.git")
             developerConnection.set("scm:git:git@github.com:Collite/ttr-core.git")
             url.set("https://github.com/Collite/ttr-core")
+        }
+    }
+}
+
+// The internal lane: publish.yml publishes every tag to GitHub Packages first (this repository's
+// `publishAllPublicationsToGitHubPackagesRepository`), Central only for -RELEASE — declared as in every bundle module.
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/Collite/ttr-core")
+            credentials {
+                username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
+                password = providers.gradleProperty("gpr.token").orNull ?: System.getenv("GITHUB_TOKEN")
+            }
         }
     }
 }

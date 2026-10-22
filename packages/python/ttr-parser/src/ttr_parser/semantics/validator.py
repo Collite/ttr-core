@@ -40,7 +40,7 @@ from ..model import (
 from .cn.groundings import CnDocument
 from .cn.validate import cnc_deprecations, validate_cn
 from .default_schema import default_schema_for_kind
-from .md_er import md_er_binding_diagnostics
+from .md_er import RelationIndex, build_relation_index, md_er_binding_diagnostics, md_er_used_relations
 from .references import (
     collect_all_references,
     enclosing_qname_of,
@@ -131,10 +131,11 @@ class Validator:
         resolver = Resolver(symbols)
         docs = [self._doc(r, uris[i] if uris is not None else r.source_file) for i, r in enumerate(results)]
         out: list[ValidationDiagnostic] = []
+        relation_index = build_relation_index([doc.cn() for doc in docs], resolver)
         for doc in docs:
             out.extend(self._validate_document(doc))
             out.extend(self._validate_references(doc, resolver))
-            out.extend(self._validate_imports(doc, resolver, symbols))
+            out.extend(self._validate_imports(doc, resolver, symbols, relation_index))
         out.extend(self._validate_project(symbols))
         # 0.17 — the model-level `cn/...` slugs (cn contracts §7, the portable subset).
         for d in validate_cn([doc.cn() for doc in docs], resolver).diagnostics:
@@ -406,7 +407,7 @@ class Validator:
     # -- imports ------------------------------------------------------------
 
     def _validate_imports(
-        self, doc: _Doc, resolver: Resolver, symbols: SymbolTable
+        self, doc: _Doc, resolver: Resolver, symbols: SymbolTable, relation_index: RelationIndex
     ) -> list[ValidationDiagnostic]:
         out: list[ValidationDiagnostic] = []
         seen: set[str] = set()
@@ -430,7 +431,7 @@ class Validator:
             else:
                 seen.add(imp.target)
 
-        used: set[str] = set()
+        used = md_er_used_relations(relation_index, doc.cn(), resolver)
         for collected in collect_all_references(doc.definitions):
             schema_code = doc.schema_code or default_schema_for_kind(
                 collected.owner_def.kind

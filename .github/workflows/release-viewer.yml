@@ -100,6 +100,11 @@ jobs:
           test "$refused" = 64
           ASSET=$(curl -fsS http://127.0.0.1:8080/models/ | grep -o 'assets/index-[^"]*\.js' | head -n1)
           curl -fsS -o /dev/null "http://127.0.0.1:8080/models/${ASSET}"
+          # The same image also hosts the Studio iframe at its reserved entry, with shared assets.
+          curl -fsS 'http://127.0.0.1:8080/m/_designer/index.html?backend=host' | grep -q '<base href="/m/_designer/" />'
+          curl -fsS http://127.0.0.1:8080/m/_designer/ | grep -q '<base href="/m/_designer/" />'
+          curl -fsS -o /dev/null "http://127.0.0.1:8080/m/_designer/${ASSET}"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/m/_designer/assets/missing.js)" = 404
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/models/assets/missing.js)" = 404
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/models)" = 301
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/elsewhere)" = 404

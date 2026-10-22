@@ -1,0 +1,4 @@
+model md
+def domain Amount { type: decimal }
+def measure units { domain: md.Amount, aggregation: sum }
+def cubelet sales { measures: [def measure units { domain: md.Amount, aggregation: sum }] }

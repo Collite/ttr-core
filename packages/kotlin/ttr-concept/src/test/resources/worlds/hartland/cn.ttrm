@@ -1,0 +1,158 @@
+// CN-P3 S3.7 — design `11` §1's Hartland package in the 0.5 spellings (A-CN-25…31), cut to what the goldens read.
+// The recipe vocabulary is er-grounded (`bindings.ttrm`); `revenue` / `quantity` are md-grounded on the channel cubelet
+// (`md.ttrm`). `Customer` is er-grounded HERE: H-1 renders `DebtorCustomer` on er, and the hop for an md dimension is
+// md/hop's (P2's `ExplicitMdErHop` answers an explicit `md2er_cubelet` only). The md-grounded `Customer` of E-0 lives
+// in the `sales` world.
+model cn
+
+// ---- kinds ----
+def kind Party     { label: { en: "Party", cs: "Strana" } }
+def kind Item      { label: { en: "Product", cs: "Produkt" } }
+def kind Warehouse { label: { en: "Distribution center", cs: "Distribuční centrum" } }
+def kind Channel   { label: { en: "Channel", cs: "Kanál" } }                     // a value kind: store · web · marketplace
+
+// ---- roles ----
+def role Customer { of: Party, event: Order, label: { en: "Customer", cs: "Zákazník" } }
+
+// ---- events ----
+def event Sale {
+    label: { en: "Sale", cs: "Prodej" },
+    involves: [Customer, Item, Channel],
+    period: { at: sale_date },
+    qualities: [revenue, quantity, sale_date]
+}
+def event Order {
+    label: { en: "Order", cs: "Objednávka" },
+    extent: durative,
+    involves: [Customer, Warehouse as fulfilling],
+    period: { start: placed_date, end: delivered_date, end_open: open },
+    qualities: [order_value, state, channel, placed_date, delivered_date]
+}
+def event OrderLine {
+    label: { en: "Order line", cs: "Řádek objednávky" },
+    involves: [Order, Item, Warehouse],
+    period: { at: line_date },
+    qualities: [line_quantity, unit_price, line_date]
+}
+def event Invoicing {
+    label: { en: "Invoice", cs: "Faktura" },
+    extent: durative,
+    involves: [Customer, Order],
+    period: { start: issued, end: due },
+    qualities: [amount, paid, invoice_status, issued, due]
+}
+def event Inventory {
+    label: { en: "Stock reading", cs: "Stav zásob" },
+    involves: [Item, Warehouse],
+    period: { at: as_of_date },
+    qualities: [quantity_on_hand, as_of_date]
+}
+def event WarehouseOutage {
+    label: { en: "Outage", cs: "Výpadek" },
+    extent: durative,
+    involves: [Warehouse],
+    period: { start: outage_from, end: outage_to },                              // closed: the end is the last day (no `end_open:`)
+    qualities: [outage_from, outage_to, outage_reason]
+}
+def event PriceList {
+    label: { en: "List price", cs: "Ceníková cena" },
+    extent: durative,
+    involves: [Item],
+    period: { start: pl_from, end: pl_to, end_open: open },
+    qualities: [pl_price, pl_channel, pl_from, pl_to]
+}
+def event CustomerPrice {
+    label: { en: "Individual price", cs: "Individuální cena" },
+    extent: durative,
+    involves: [Customer, Item],
+    period: { start: cp_from, end: cp_to, end_open: open },
+    qualities: [cp_price, cp_from, cp_to]
+}
+def event ReturnRequest {
+    label: { en: "Return request", cs: "Reklamace" },
+    involves: [Customer, Order],
+    period: { at: requested_date },
+    qualities: [request_state, requested_date]
+}
+def event ReturnLine {
+    label: { en: "Return request line", cs: "Řádek reklamace" },
+    involves: [ReturnRequest as request, Customer, Item],
+    qualities: [return_quantity, return_unit_price, return_reason, line_state, line_amount]
+}
+
+// ---- qualities (defined) ----
+def quality open_amount { of: Invoicing, label: { en: "Open amount", cs: "Neuhrazená částka" }, definition: """amount - paid""" }
+def quality on_hand {
+    of: OrderLine,
+    label: { en: "On hand", cs: "Skladem" },
+    definition: """coalesce(latest(Inventory involving this.item, this.warehouse, by: as_of_date).quantity_on_hand, 0)"""
+}
+def quality short { of: OrderLine, label: { en: "Short", cs: "Chybí" }, definition: """line_quantity - on_hand""" }
+def quality outage {                                                             // a boolean: the line's center is out today
+    of: OrderLine,
+    label: { en: "Outage", cs: "Výpadek" },
+    definition: """exists WarehouseOutage involving this.warehouse where period contains :as_of"""
+}
+def quality list_price {
+    of: OrderLine,
+    label: { en: "List price", cs: "Ceníková cena" },
+    definition: """coalesce(
+        max(CustomerPrice involving this.item, this.order.customer where period contains this.order.period.start).cp_price,
+        max(PriceList involving this.item where pl_channel = this.order.channel and period contains this.order.period.start).pl_price)"""
+}
+def quality return_share {                                                       // DC-4: revenue's er landing is md/hop's
+    of: Customer,
+    definition: """sum(ReturnLine involving this where within(request.period.at, last: days(365))).line_amount
+        / sum(Sale involving this where within(period.at, last: days(365))).revenue"""
+}
+
+// ---- phases: the per-channel cubelets are phases of one event (L16-5) ----
+def phase StoreSale       { of: Sale, label: { en: "Store sale", cs: "Prodej na prodejně" }, definition: """channel = 'store'""" }
+def phase WebSale         { of: Sale, label: { en: "Web sale", cs: "Prodej na webu" },       definition: """channel = 'web'""" }
+def phase MarketplaceSale { of: Sale, label: { en: "Marketplace sale", cs: "Prodej na tržišti" }, definition: """channel = 'marketplace'""" }
+
+// ---- phases: the recipe vocabulary ----
+def phase PendingOrder { of: Order, label: { en: "Pending order", cs: "Čekající objednávka" }, definition: """state in ('placed', 'held')""" }
+def phase HeldOrder    { of: Order, label: { en: "Held order", cs: "Pozastavená objednávka" }, definition: """state = 'held'""" }
+def phase PlacedOrder  { of: Order, label: { en: "Placed order", cs: "Zadaná objednávka" }, definition: """state = 'placed'""" }
+def phase ShortLine {
+    of: OrderLine,
+    label: { en: "Line short of stock", cs: "Řádek bez krytí" },
+    definition: """outage or on_hand < line_quantity"""
+}
+def phase MispricedLine {
+    of: OrderLine,
+    label: { en: "Mispriced line", cs: "Řádek s odchylkou ceny" },
+    definition: """list_price is null or abs(unit_price - list_price) > :tolerance"""
+}
+def phase OverdueInvoice {
+    of: Invoicing,
+    label: { en: "Overdue invoice", cs: "Faktura po splatnosti" },
+    definition: """invoice_status = 'open' and period.end < :as_of"""
+}
+def phase DebtorCustomer {
+    of: Customer,
+    label: { en: "Customer with overdue invoices", cs: "Zákazník s fakturami po splatnosti" },
+    definition: """exists Invoicing involving this as customer where OverdueInvoice"""
+}
+def phase RecentBuyer {
+    of: Customer,
+    basis: occurrence,
+    label: { en: "Recent buyer", cs: "Nedávný zákazník" },
+    definition: """exists Order o involving this where within(o.period.start, last: days(365))"""
+}
+def phase AbusiveReturner { of: Customer, definition: """return_share > 0.4""" }
+def phase BoughtHereLine  { of: ReturnLine, definition: """exists OrderLine involving this.request.order, this.item""" }
+def phase ForeignReturnLine {
+    of: ReturnLine,
+    label: { en: "Return of an item not bought on the order", cs: "Vratka zboží, které na objednávce nebylo" },
+    definition: """not exists OrderLine involving this.request.order, this.item"""
+}
+def phase LateReturnLine {                                                       // DC-6 + DC-10: G-ER-2
+    of: ReturnLine,
+    definition: """this.request.period.at - this.request.order.period.end > days(:return_window)"""
+}
+
+// ---- refusals: a definition cycle (cn/definition-cycle) ----
+def phase LoopA { of: Order, definition: """LoopB""" }
+def phase LoopB { of: Order, definition: """LoopA""" }

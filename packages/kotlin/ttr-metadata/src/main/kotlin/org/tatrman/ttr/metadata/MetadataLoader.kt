@@ -33,25 +33,32 @@ class MetadataLoader(
         policy: ReconciliationPolicy = ReconciliationPolicy(),
     ) : this(listOf(source), descriptor, policy)
 
-    fun load(): LoadResult =
+    fun load(): LoadResult = load(LoadOptions())
+
+    fun load(options: LoadOptions): LoadResult =
         runCatching {
             // Order is the caller's: the reconciler resolves by priority, and the stock source
             // registers ahead of user sources exactly as it does at the service's boot.
-            val result = ModelReconciler(descriptor, policy).reconcile(sources.map { it.load() })
+            val snapshots = sources.map { it.load() }
+            val result = ModelReconciler(descriptor, policy).reconcile(snapshots)
             val issues =
                 result.errors.map { LoadIssue.from(it, LoadIssue.Severity.ERROR) } +
                     result.warnings.map { LoadIssue.from(it, LoadIssue.Severity.WARNING) }
-            LoadResult(model = result.model, issues = issues)
+            LoadResult(
+                model = result.model,
+                issues = issues,
+                report = if (options.strict) LoadReport.collect(snapshots, issues, options) else null,
+            )
         }.getOrElse { e ->
+            val issue =
+                LoadIssue.from(
+                    LoadWarning("loader", "", -1, -1, "load failed: ${e.message}"),
+                    LoadIssue.Severity.ERROR,
+                )
             LoadResult(
                 model = null,
-                issues =
-                    listOf(
-                        LoadIssue.from(
-                            LoadWarning("loader", "", -1, -1, "load failed: ${e.message}"),
-                            LoadIssue.Severity.ERROR,
-                        ),
-                    ),
+                issues = listOf(issue),
+                report = if (options.strict) LoadReport.collect(emptyList(), listOf(issue), options) else null,
             )
         }
 }
@@ -60,6 +67,8 @@ class MetadataLoader(
 data class LoadResult(
     val model: Model?,
     val issues: List<LoadIssue>,
+    /** Null unless [LoadOptions.strict] requested validation. */
+    val report: LoadReport? = null,
 ) {
     val errors: List<LoadIssue> get() = issues.filter { it.severity == LoadIssue.Severity.ERROR }
     val warnings: List<LoadIssue> get() = issues.filter { it.severity == LoadIssue.Severity.WARNING }

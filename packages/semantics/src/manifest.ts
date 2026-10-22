@@ -76,8 +76,8 @@ export interface PackageConfig {
 
 /** A `modeler.toml` validation problem (D9 collision / unknown package schema). */
 export interface ManifestDiagnostic {
-  code: 'schema-name-collision' | 'unknown-package-schema';
-  severity: 'error';
+  code: 'schema-name-collision' | 'unknown-package-schema' | 'manifest/unknown-key';
+  severity: 'error' | 'warning';
   message: string;
 }
 
@@ -88,6 +88,7 @@ export interface ProjectManifest {
   // sub-table is a SchemaBinding.
   schemas?: { declared?: string[]; namespaces?: Record<string, string> } & Record<string, unknown>;
   stock?: { load?: string[] };
+  bindings?: { required?: boolean } & Record<string, unknown>;
   lint?: {
     strict?: boolean;
     requireDescriptions?: boolean;
@@ -114,6 +115,9 @@ export interface ResolvedManifest {
   packageConfigs: Record<string, PackageConfig>;
   /** v4.0 — project-wide fallbacks. `model` is never defaulted (derived from kind). */
   defaults: { schema?: string };
+  bindings: { required: boolean };
+  /** Configuration warnings that require the raw TOML keys (before resolution). */
+  configDiagnostics?: ManifestDiagnostic[];
 }
 
 /**
@@ -223,6 +227,12 @@ export function resolveManifest(m: ProjectManifest | undefined, projectRoot: str
     schemas: resolveSchemaBindings(m?.schemas),
     packageConfigs: resolvePackageConfigs(m?.packages),
     defaults: { schema: m?.defaults?.schema },
+    bindings: { required: m?.bindings?.required === true },
+    configDiagnostics: Object.keys(m?.bindings ?? {}).filter((k) => k !== 'required').map((key) => ({
+      code: 'manifest/unknown-key' as const,
+      severity: 'warning' as const,
+      message: `Unknown [bindings] key '${key}'. Expected 'required'.`,
+    })),
   };
 }
 
@@ -236,7 +246,7 @@ export function resolveManifest(m: ProjectManifest | undefined, projectRoot: str
  * Pure — returns diagnostics for the host to surface.
  */
 export function validateManifest(resolved: ResolvedManifest): ManifestDiagnostic[] {
-  const diagnostics: ManifestDiagnostic[] = [];
+  const diagnostics: ManifestDiagnostic[] = [...(resolved.configDiagnostics ?? [])];
   const packageNames = new Set(Object.keys(resolved.packageConfigs));
   for (const name of Object.keys(resolved.schemas)) {
     let clash: string | undefined;

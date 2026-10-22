@@ -9,9 +9,10 @@ def test_explicit_md_er_structural_diagnostics() -> None:
     root = Path(__file__).resolve().parents[4] / "tests/conformance/fixtures"
     expected = {
         "113-md2er-nouns-resolve": set(),
+        "114-md2er-inline-measure": {"md/md2er-reference"},
         "112-md2er-partial": {"md/md2er-reference"},
         "110-md2er-validation": {"md/md2er-dimension-key", "md/md2er-measure-unknown", "md/duplicate-binding", "md/md2er-reference"},
-        "111-md2er-path-ambiguous": {"md/md2er-path-ambiguous", "md/md2er-reference", "ttr/unused-import"},
+        "111-md2er-path-ambiguous": {"md/md2er-path-ambiguous", "md/md2er-reference"},
     }
     for fixture, codes in expected.items():
         paths = sorted((root / fixture).glob("*.ttrm")) if (root / fixture).is_dir() else [root / f"{fixture}.ttrm"]

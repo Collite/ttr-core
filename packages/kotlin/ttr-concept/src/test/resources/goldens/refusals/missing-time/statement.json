@@ -1,0 +1,22 @@
+{
+  "ask": "ASK_VALUE",
+  "measures": [
+    {
+      "qname": "cn.revenue"
+    }
+  ],
+  "filters": [
+    {
+      "member": {
+        "concept": {
+          "qname": "cn.Customer"
+        },
+        "member": {
+          "label": "Kaufland",
+          "resolvedValue": "Kaufland"
+        }
+      }
+    }
+  ],
+  "locale": "en"
+}

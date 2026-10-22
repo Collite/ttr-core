@@ -58,6 +58,24 @@ class CnHopSpec :
             explicit.erTargetOf("md.dimension.Customer.state") shouldBe
                 HopResult("er.entity.addr.state", HopVia.EXPLICIT)
             explicit.erTargetOf("md.measure.revenue") shouldBe HopResult("er.entity.customer.amount", HopVia.EXPLICIT)
+            explicit.mdElementsOn("er.entity.customer") shouldBe listOf("md.cubelet.revenue", "md.dimension.Customer")
+            explicit.mdElementsOn("er.entity.addr.state") shouldBe listOf("md.dimension.Customer.state")
+            explicit.mdElementsOn("er.entity.customer.amount") shouldBe listOf("md.measure.revenue")
+        }
+
+        "N2: an inline measure cannot borrow a top-level measure's identity" {
+            val explicit =
+                explicitSources(
+                    mapOf(
+                        "md.ttrm" to
+                            "model md\ndef domain Amount { type: decimal }\ndef measure units { domain: md.Amount, aggregation: sum }\ndef cubelet sales { measures: [def measure units { domain: md.Amount, aggregation: sum }] }",
+                        "er.ttrm" to "model er\ndef entity sale { attributes: [def attribute n { type: decimal }] }",
+                        "binding.ttrm" to
+                            "model binding\ndef md2er_cubelet m { cubelet: md.sales, target: er.entity.sale, measures: { units: n } }",
+                    ),
+                )
+            explicit.erTargetOf("md.measure.units").diagnostic shouldBe HopResult.UNMAPPED
+            explicit.mdElementsOn("er.entity.sale.n") shouldBe emptyList()
         }
 
         "R7: dimension ownership follows bearer selection and preserves cubelet ambiguity" {

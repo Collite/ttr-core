@@ -101,6 +101,7 @@ fun explicitErAttributes(
     resolver: Resolver,
     entity: SymbolEntry,
     path: String,
+    usedRelations: MutableSet<String>? = null,
 ): List<SymbolEntry> {
     val parts = path.split('.')
     if (parts.size == 1) {
@@ -116,8 +117,26 @@ fun explicitErAttributes(
                     if (imp.wildcard) imp.target.removeSuffix(".*") == rel.packageName else imp.target == rel.qname
                 }
         }.mapNotNull { rel ->
-            resolver.getSymbol("${rel.toEntityQname}.${parts[1]}")?.takeIf { it.kind == "attribute" }
+            resolver
+                .getSymbol("${rel.toEntityQname}.${parts[1]}")
+                ?.takeIf { it.kind == "attribute" }
+                ?.also { usedRelations?.add(rel.qname) }
         }
+}
+
+/** Relations actually traversed by a dimension binding, also used by unused-import checks. */
+fun mdErUsedRelations(
+    index: MdErRelationIndex,
+    doc: SemanticDocument,
+    resolver: Resolver,
+): Set<String> {
+    val used = mutableSetOf<String>()
+    for (def in doc.definitions.filterIsInstance<Md2erDimensionDef>()) {
+        val entity = resolveMdErRef(resolver, doc, def.entity?.path.orEmpty()) ?: continue
+        if (entity.kind != "entity") continue
+        for (path in def.attributes.values) explicitErAttributes(index, doc, resolver, entity, path, used)
+    }
+    return used
 }
 
 fun cubeletMeasureKeys(
@@ -127,15 +146,11 @@ fun cubeletMeasureKeys(
 ): Set<String> {
     val doc = docs.find { it.uri == cubelet.documentUri } ?: return emptySet()
     val def = doc.definitions.filterIsInstance<CubeletDef>().find { it.name == cubelet.name } ?: return emptySet()
+    // Inline measures have no project symbol and must not borrow a top-level measure's identity.
     return def.measures
-        .mapNotNull { measure ->
-            val path =
-                when (measure) {
-                    is CubeletMeasure.Ref -> measure.ref.path
-                    is CubeletMeasure.Inline -> measure.measure.name
-                }
-            resolveMdNs(resolver, doc, path, "measure")?.qname
-        }.toSet()
+        .filterIsInstance<CubeletMeasure.Ref>()
+        .mapNotNull { resolveMdNs(resolver, doc, it.ref.path, "measure")?.qname }
+        .toSet()
 }
 
 fun mdErBindingDiagnostics(

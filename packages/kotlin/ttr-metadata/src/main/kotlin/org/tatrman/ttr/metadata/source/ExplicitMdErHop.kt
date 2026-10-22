@@ -127,6 +127,10 @@ class ExplicitMdErHop(
         if (own.size == 1) return HopResult(own.single().er, HopVia.EXPLICIT)
         return HopResult.ambiguous("'$mdElement' maps to ${found.joinToString(", ") { it.er }}")
     }
+
+    /** Every md element an explicit binding (`md2er_cubelet` or `md2er_dimension`) maps onto [erElement]. */
+    override fun mdElementsOn(erElement: String): List<String> =
+        candidates.filterValues { list -> list.any { it.er == erElement } }.keys.sorted()
 }
 
 /**

@@ -1,0 +1,22 @@
+package hartland.consumer
+model binding
+
+def cn2er_kind channel_g { kind: cn.Channel, target: er.entity.channel_sale.channel }
+def cn2er_event sale_g {
+    event: cn.Sale,
+    target: er.entity.channel_sale,
+    period: { start: er.entity.channel_sale.sold_at, start_hi: er.entity.channel_sale.sold_at_hi }
+}
+def cn2er_event onset_g {
+    event: cn.Onset,
+    target: er.entity.onset_record,
+    period: { at: er.entity.onset_record.onset, at_hi: er.entity.onset_record.onset_hi }
+}
+def cn2er_event return_g {
+    event: cn.Return,
+    target: er.entity.channel_sale,
+    period: { start: er.entity.channel_sale.sold_at, start_hi: er.entity.channel_sale.nope }
+}
+def cn2er_quality amount_g  { quality: cn.amount, target: er.entity.channel_sale.amount, unit: "EUR" }
+def cn2er_quality weight_g  { quality: cn.weight, target: er.entity.channel_sale.weight, unit: kg }
+def cn2md_quality revenue_g { quality: cn.revenue, target: md.revenue }

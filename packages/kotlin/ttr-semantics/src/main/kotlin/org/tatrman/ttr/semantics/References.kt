@@ -155,6 +155,9 @@ private enum class BodyMode { Def, Binding, Sugar }
 /** `period:` names its instants through `start` / `end` / `at`; `end_open` and `precision` are enums. */
 private val PERIOD_INSTANTS = setOf("start", "end", "at")
 
+/** A binding's `period:` may also name a stored upper bound — `start_hi` / `at_hi` (⚑CN-P10, ruled 2026-10-22). */
+private val BINDING_PERIOD_INSTANTS = PERIOD_INSTANTS + setOf("start_hi", "at_hi")
+
 /** The id values of a value that is one id or a list of them. */
 internal fun idsOf(value: PropertyValue?): List<PropertyValue.IdValue> =
     when (value) {
@@ -213,7 +216,7 @@ private fun collectConceptBody(
             is ConceptProperty.Involves -> p.participants.forEach { cn(it.ref.path, it.ref.parts, it.ref.source) }
             is ConceptProperty.Period ->
                 for ((key, value) in p.value.entries) {
-                    if (key !in PERIOD_INSTANTS) continue
+                    if (key !in (if (mode == BodyMode.Binding) BINDING_PERIOD_INSTANTS else PERIOD_INSTANTS)) continue
                     idsOf(value).forEach { if (mode == BodyMode.Binding) plain(it) else cn(it, soft = true) }
                 }
             is ConceptProperty.Target ->

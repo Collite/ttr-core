@@ -50,6 +50,24 @@ http {
         # is served. Empty when the base path is `/`.
         include /tmp/ttr-viewer/outside-base.conf;
 
+        # Stage-1 Studio iframe. Same bundle as the standalone viewer, with its own base.
+        location = /m/_designer/ {
+            # A file alias on a slash URI invokes nginx's index module and appends index.html
+            # to the filename. Internally select the explicit HTML location instead.
+            rewrite ^ /m/_designer/index.html last;
+        }
+        location = /m/_designer/index.html {
+            alias /usr/share/ttr-viewer/html/hosted/index.html;
+            default_type text/html;
+            add_header Cache-Control "no-cache" always;
+            add_header X-Content-Type-Options nosniff always;
+        }
+        location ^~ /m/_designer/assets/ {
+            alias /usr/share/ttr-viewer/html/assets/;
+            add_header Cache-Control "public, max-age=31536000, immutable" always;
+            add_header X-Content-Type-Options nosniff always;
+        }
+
         # The runtime config the app reads before its first render.
         location = @@BASE@@config.json {
             alias /tmp/ttr-viewer/config.json;

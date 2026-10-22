@@ -1,0 +1,2 @@
+model er
+def entity broken { attributes: [

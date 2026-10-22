@@ -11,9 +11,13 @@
 // sub-path navigated out of its own prefix, and a reload of a rewritten URL lost the catalog.
 
 import { getRuntimeConfig } from '../runtime-config.js';
+import { isHosted } from '../host/host-channel.js';
+
+export const APP_LOCATION_CHANGED = 'ttr:app-location';
+export const APP_NAVIGATE = 'ttr:app-navigate';
 
 /** Query parameters that choose the session (backend, language): kept on every rewrite. */
-export const STICKY_PARAMS = ['veles', 'server', 'demo', 'manifest', 'lang'] as const;
+export const STICKY_PARAMS = ['veles', 'server', 'demo', 'manifest', 'lang', 'backend'] as const;
 
 /**
  * Session parameters the app reads but never writes back. `velesToken` is a dev-only bearer for the
@@ -75,18 +79,25 @@ export function toBrowserPath(appPath: string, basePath: string, sticky: Array<[
 /** The current location as an app path (`/w/…/s/…?skin=…`), or `/` outside a browser. */
 export function currentAppPath(): string {
   if (typeof window === 'undefined') return '/';
+  if (isHosted()) return window.location.hash.slice(1) || '/';
   return toAppPath(window.location.pathname, window.location.search, getRuntimeConfig().basePath);
 }
 
 /** The browser path for an app path, carrying the current session parameters. */
 export function browserPathFor(appPath: string): string {
   const search = typeof window === 'undefined' ? '' : window.location.search;
+  if (isHosted()) return `${window.location.pathname}${search}#${appPath}`;
   return toBrowserPath(appPath, getRuntimeConfig().basePath, stickyParams(search));
 }
 
 /** The absolute URL for an app path (a copyable link): origin + base path + app path + session. */
-export function absoluteUrlFor(appPath: string): string {
+export function absoluteUrlFor(appPath: string): string | null {
   const origin = typeof window === 'undefined' ? '' : window.location.origin;
+  // A shared hosted link must re-enter the parent, which can provide the auth/scope/init again.
+  if (isHosted()) {
+    if (!/^\/w\/[^/?#]+(?:[/?]|$)/.test(appPath)) return null;
+    return origin + toBrowserPath(appPath.replace(/^\/w\//, '/'), getRuntimeConfig().basePath, []);
+  }
   return origin + browserPathFor(appPath);
 }
 
@@ -94,7 +105,33 @@ export function absoluteUrlFor(appPath: string): string {
 export function replaceAppPath(appPath: string): void {
   if (typeof window === 'undefined') return;
   const next = browserPathFor(appPath);
-  if (next !== window.location.pathname + window.location.search) window.history.replaceState(null, '', next);
+  if (next !== window.location.pathname + window.location.search + window.location.hash) {
+    window.history.replaceState(null, '', next);
+    window.dispatchEvent(new CustomEvent(APP_LOCATION_CHANGED, { detail: appPath }));
+  }
+}
+
+/** Host navigation uses the same restore path as an initial deep link. */
+export function parseAppLocation(location: string): string {
+  const path = location.startsWith('#') ? location.slice(1) : location;
+  // Reject malformed percent escapes before the shell's segment decoder sees them.
+  try { decodeURIComponent(path); } catch { throw new Error('Invalid app location.'); }
+  if (!/^\/w\/[^/?#]+(?:[/?]|$)/.test(path) || /[\r\n#]/.test(path)) throw new Error('Invalid app location.');
+  return path;
+}
+
+/** Pin every hosted route to the world the parent configured. */
+export function hostAppLocation(location: string, workspace: string): string {
+  const path = location.startsWith('#') ? location.slice(1) : location;
+  const root = `/w/${encodeURIComponent(workspace)}`;
+  if (!path || path === '/') return root;
+  return parseAppLocation(path).replace(/^\/w\/[^/?#]+/, root);
+}
+
+export function navigateAppPath(location: string): void {
+  const path = parseAppLocation(location);
+  replaceAppPath(path);
+  window.dispatchEvent(new CustomEvent(APP_NAVIGATE, { detail: path }));
 }
 
 /** Set (or, with `null`, drop) one sticky parameter in the address bar, keeping everything else. */
@@ -103,6 +140,10 @@ export function setStickyParam(key: (typeof STICKY_PARAMS)[number], value: strin
   const query = new URLSearchParams(window.location.search);
   if (value === null) query.delete(key);
   else query.set(key, value);
+  if (isHosted()) {
+    window.history.replaceState(null, '', `${window.location.pathname}?${query.toString()}${window.location.hash}`);
+    return;
+  }
   const next = toBrowserPath(currentAppPath(), getRuntimeConfig().basePath, stickyParams(`?${query.toString()}`));
   window.history.replaceState(null, '', next);
 }

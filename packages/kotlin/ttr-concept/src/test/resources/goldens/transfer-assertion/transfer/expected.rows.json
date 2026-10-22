@@ -1,0 +1,15 @@
+{
+  "rows": [
+    {
+      "entity": "transfer",
+      "values": {
+        "patient_id": "1001",
+        "from_encounter": "501",
+        "to_encounter": "502",
+        "at": "2026-03-14T09:30",
+        "transfer_kind": "step-down"
+      }
+    }
+  ],
+  "assertedAsOf": "2026-03-14"
+}

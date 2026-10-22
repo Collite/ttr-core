@@ -136,6 +136,17 @@ const hopBindings = (bindings: string) => explicitHop([
 ]);
 
 describe('review-125 explicit hop precedence and visibility', () => {
+  it('N2 never maps a top-level measure through a same-named inline measure', () => {
+    const hop = explicitHop([
+      { uri: 'md.ttrm', src: `model md
+        def domain Amount { type: decimal }
+        def measure units { domain: md.Amount, aggregation: sum }
+        def cubelet sales { measures: [def measure units { domain: md.Amount, aggregation: sum }] }` },
+      { uri: 'er.ttrm', src: 'model er\ndef entity sale { attributes: [def attribute n { type: decimal }] }' },
+      { uri: 'binding.ttrm', src: 'model binding\ndef md2er_cubelet m { cubelet: md.sales, target: er.entity.sale, measures: { units: n } }' },
+    ]);
+    expect(hop.erTargetOf('md.measure.units').slug).toBe('md/er-unmapped');
+  });
   it('R6 resolves measure/cubelet and domain/dimension name collisions', () => {
     const hop = hopBindings(DIM_HOP + '\ndef md2er_cubelet m { cubelet: md.revenue, target: er.entity.customer, measures: { revenue: amount } }');
     expect(hop.erTargetOf('md.dimension.Customer').erTarget).toBe('er.entity.customer');

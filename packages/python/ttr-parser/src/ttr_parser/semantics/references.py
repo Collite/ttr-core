@@ -166,6 +166,9 @@ def _collect_into(
 #: `period:` names its instants through `start` / `end` / `at`; `end_open` and `precision` are enums.
 _PERIOD_INSTANTS = frozenset({"start", "end", "at"})
 
+#: A binding's `period:` may also name a stored upper bound — `start_hi` / `at_hi` (⚑CN-P10, ruled 2026-10-22).
+_BINDING_PERIOD_INSTANTS = _PERIOD_INSTANTS | {"start_hi", "at_hi"}
+
 
 def ids_of(value: PropertyValue | None) -> list[IdValue]:
     """The id values of a value that is one id or a list of them."""
@@ -217,7 +220,7 @@ def _collect_concept_body(body: ConceptBody, mode: str, owner: Definition, out: 
                 cn(participant.ref.path, participant.ref.parts, participant.ref.source)
         elif isinstance(p, ConceptPeriod):
             for key, value in p.value.entries.items():
-                if key not in _PERIOD_INSTANTS:
+                if key not in (_BINDING_PERIOD_INSTANTS if mode == "binding" else _PERIOD_INSTANTS):
                     continue
                 for v in ids_of(value):
                     if mode == "binding":

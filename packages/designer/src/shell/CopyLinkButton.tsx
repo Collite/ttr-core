@@ -3,7 +3,8 @@
 // The copyable federation URL for the active view (FO contracts §3: "every Studio
 // surface renders a stable, copyable URL for its current context"). Read-only —
 // no edit code (FO-21 safe). The URL is the §3 federation projection of the active
-// tab (see `federation-link.ts`), never the richer internal §6 address bar.
+// tab (see `federation-link.ts`) in the standalone viewer. Hosted mode supplies the
+// current view under the parent rail instead, so shared links can receive init/auth again.
 //
 // Chrome styled from @tatrman/tokens (FO-P1.S6.T1 — shared suite palette).
 

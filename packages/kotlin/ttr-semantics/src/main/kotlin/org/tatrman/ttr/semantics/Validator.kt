@@ -16,6 +16,8 @@ import org.tatrman.ttr.parser.model.SourceLocation
 import org.tatrman.ttr.parser.model.TableDef
 import org.tatrman.ttr.parser.model.ViewDef
 import org.tatrman.ttr.semantics.md.mdErBindingDiagnostics
+import org.tatrman.ttr.semantics.md.buildMdErRelationIndex
+import org.tatrman.ttr.semantics.md.mdErUsedRelations
 import org.tatrman.ttr.semantics.cn.cncDeprecations
 import org.tatrman.ttr.semantics.cn.validateCn
 import org.tatrman.ttr.semantics.semanticsblock.SemanticsAnalyzer
@@ -362,26 +364,7 @@ class Validator(
     fun validateProject(): List<ValidationDiagnostic> {
         val diagnostics = mutableListOf<ValidationDiagnostic>()
 
-        for (dup in symbols.duplicates()) {
-            val hasInline = dup.entries.any { it.mappingSource == MappingSource.Inline }
-            if (hasInline && isEr2db(dup.entries.first().kind)) continue
-            // 0.17 — a concept a `concept { }` block declares where a cn def (or another block) declares it too is
-            // the sugar merge, or a second grounding: `cn/duplicate-grounding`'s, not this check's.
-            val entries = dup.entries.filter { it.cnOrigin == null }
-            if (entries.size < 2) continue
-            for (entry in entries) {
-                val others =
-                    entries
-                        .filter { !(it.documentUri == entry.documentUri && it.source.line == entry.source.line) }
-                        .joinToString(", ") { "${it.documentUri}:${it.source.line}" }
-                diagnostics +=
-                    error(
-                        DiagnosticCode.DuplicateDefinition,
-                        "Duplicate definition of '${dup.qname}' (also at $others)",
-                        entry.source,
-                    )
-            }
-        }
+        diagnostics += duplicateDefinitions(symbols.duplicates())
 
         diagnostics += validateDuplicateBindings()
         return diagnostics
@@ -400,7 +383,10 @@ class Validator(
         return if (symbol.packageName.isEmpty()) concept else "${symbol.packageName}.$concept"
     }
 
-    fun validateImports(doc: SemanticDocument): List<ValidationDiagnostic> {
+    fun validateImports(
+        doc: SemanticDocument,
+        docs: List<SemanticDocument> = listOf(doc),
+    ): List<ValidationDiagnostic> {
         val diagnostics = mutableListOf<ValidationDiagnostic>()
         val seenTargets = mutableSetOf<String>()
 
@@ -425,7 +411,7 @@ class Validator(
             }
         }
 
-        val usedTargets = mutableSetOf<String>()
+        val usedTargets = mdErUsedRelations(buildMdErRelationIndex(docs, resolver), doc, resolver).toMutableSet()
         for (collected in collectAllReferences(doc.definitions)) {
             val schemaCode = doc.schemaCode.ifEmpty { defaultSchemaForKind(kindOf(collected.ownerDef)) }
             // The ref itself: a cn slot's ref carries its context (0.17), so it resolves among concepts.

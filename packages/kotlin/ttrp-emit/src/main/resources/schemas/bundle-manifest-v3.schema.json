@@ -713,6 +713,7 @@
         "protocol"
       ],
       "properties": {
+        "tests": { "type": "array", "items": { "type": "string", "pattern": "^tests/[^/]+\\.ya?ml$" } },
         "name": {
           "type": "string"
         },

@@ -298,7 +298,13 @@ class RecipeTime(
                         }
                         RecipeType.Duration(DurationUnit.of(e.function.name)!!)
                     }
-                    "coalesce", "abs", "round", "greatest", "least", "nullif" ->
+                    "round", "ceil" -> {
+                        if (args.any { it is RecipeType.Duration }) {
+                            err(TtrpDiagnosticId.TYP_001, "`${e.function.name}` takes no duration", e.location)
+                        }
+                        args.firstOrNull() ?: RecipeType.UNKNOWN
+                    }
+                    "coalesce", "abs", "greatest", "least", "nullif" ->
                         args.firstOrNull { it != RecipeType.UNKNOWN }
                             ?: RecipeType.UNKNOWN
                     else -> {

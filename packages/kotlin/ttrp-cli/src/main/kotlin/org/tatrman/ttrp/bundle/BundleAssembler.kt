@@ -117,6 +117,7 @@ class BundleAssembler(
         // Connected-mode member catalog (S6-B): null ⇒ disconnected (R13). Threaded to the pipeline,
         // which snapshots it once per pass and records the fingerprint in the run manifest's `md` block.
         memberCatalog: org.tatrman.ttr.md.resolve.MemberCatalog? = null,
+        recipeDir: Path? = null,
     ): BundleResult {
         val plan =
             TtrpPipeline(
@@ -134,7 +135,9 @@ class BundleAssembler(
             if (inspection.diagnostics.isNotEmpty()) throw BundleRefused(plan.diagnostics + inspection.diagnostics)
             return RecipeBundleAssembler(
                 toolchainVersion,
-            ).assemble(plan, fileName, outDir, inspection.statements).copy(diagnostics = plan.diagnostics)
+            ).assemble(plan, fileName, outDir, inspection.statements, recipeDir).let {
+                it.copy(diagnostics = plan.diagnostics + it.diagnostics)
+            }
         }
         // AG-P0 S5: fingerprint each host-generated model root the program compiled against.
         val modelRoots =

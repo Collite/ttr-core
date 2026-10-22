@@ -1,0 +1,12 @@
+{
+  "world": "clinic",
+  "call": "definitionRender",
+  "stage": "S3.4",
+  "target": "cn.PostStemiStoredBound",
+  "layer": "ER",
+  "dialect": "postgresql",
+  "options": {
+    "mode": "PREDICATE",
+    "placeholderStyle": "CURLY"
+  }
+}

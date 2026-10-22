@@ -1,0 +1,25 @@
+{
+  "world": "hartland",
+  "call": "definitionRender",
+  "stage": "S3.4",
+  "target": "cn.MispricedLine",
+  "layer": "ER",
+  "dialect": "postgresql",
+  "options": {
+    "mode": "CONTEXT",
+    "placeholderStyle": "CURLY",
+    "candidates": "cn.PendingOrder",
+    "columns": [
+      "item",
+      "unit_price",
+      "list_price"
+    ]
+  },
+  "tags": [
+    "live"
+  ],
+  "oracle": {
+    "au": "au.sql",
+    "plan": "rowset"
+  }
+}

@@ -8,9 +8,9 @@
 // payload is handed to whoever owns the write (a ledger / consolidation). Ambiguity is representable and
 // refused at lowering (`cn/ambiguous-assertion`); negation/absence is a quality value, never a slot.
 //
-// JSON mapping: protobuf JsonFormat, canonical. ⚠ PRE-RELEASE (CN-P0 S0.4): `Assertion` and `Identity` are as
-// contracts §2.3 pins them; the sub-message field sets it only sketches (KeyValues, Participant, QualityValue,
-// Provenance) are provisional until CN-P3 S3.1 freezes the package — the J-v2 additive-only rule starts there.
+// JSON mapping: protobuf JsonFormat, canonical. FROZEN at CN-P3 S3.1 (2026-10-22): `Assertion` and `Identity` as
+// contracts §2.3 pins them, and the sub-messages it sketches (KeyValues, Participant, QualityValue, Provenance) as
+// written here — J-v2 additive-only from that freeze.
 // =============================================================================
 syntax = "proto3";
 

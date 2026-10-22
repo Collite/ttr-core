@@ -255,6 +255,8 @@ private class CnTierBuilder(
             grade = landing.grade,
             landingFrom = landing.from,
             hop = landing.hop,
+            reverseHop =
+                landing.erTarget?.takeIf { landing.via == Via.DIRECT }?.let { hop.mdElementsOn(it) } ?: emptyList(),
             sourceLocation = c.source,
         )
     }
@@ -451,7 +453,13 @@ private class CnTierBuilder(
         val period =
             ((g.properties.firstOrNull { it.key == "period" } as? ConceptProperty.Period)?.value)?.let { v ->
                 fun at(key: String) = (v.entries[key] as? PropertyValue.IdValue)?.let(::element)
-                GroundingPeriod(start = at("start"), end = at("end"), at = at("at"))
+                GroundingPeriod(
+                    start = at("start"),
+                    end = at("end"),
+                    at = at("at"),
+                    startHi = at("start_hi"),
+                    atHi = at("at_hi"),
+                )
             }
         val viaPath = entryOf("via")?.let { v -> ids(v).mapNotNull { element(it) } } ?: emptyList()
         val synthesized = g.origin != GroundingOrigin.Binding
@@ -485,6 +493,10 @@ private class CnTierBuilder(
             hierarchy = hierarchy,
             participants = participants,
             period = period,
+            unit =
+                entryOf("unit")?.let { u ->
+                    text(u) ?: (u as? PropertyValue.IdValue)?.ref?.path
+                },
             viaPath = viaPath,
             filter =
                 (g.properties.firstOrNull { it is ConceptProperty.FilterBlock } as? ConceptProperty.FilterBlock)

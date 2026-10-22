@@ -1,0 +1,23 @@
+{
+  "snapshotHash": "golden:sales",
+  "bindingPaths": [
+    {
+      "slot": "measures[0]",
+      "concept": "cn.revenue",
+      "bindingDef": "revenue_g",
+      "element": "md.net",
+      "via": "DIRECT"
+    },
+    {
+      "slot": "filters[0]",
+      "concept": "cn.Customer",
+      "bindingDef": "customer_g",
+      "element": "md.Customer",
+      "via": "DIRECT"
+    }
+  ],
+  "inlinedDefinitions": [],
+  "parametersBound": {},
+  "asOf": "",
+  "imprecisionMode": "CERTAINLY"
+}

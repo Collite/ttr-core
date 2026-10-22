@@ -1,0 +1,28 @@
+{
+  "aggregate": {
+    "input": {
+      "tableScan": {
+        "table": {
+          "schemaCode": "DB",
+          "namespace": "dbo",
+          "name": "channel_sales"
+        },
+        "outputColumns": [{
+          "name": "channel"
+        }, {
+          "name": "ext_sales_price"
+        }]
+      }
+    },
+    "groupKeys": [{
+      "name": "channel"
+    }],
+    "aggregates": [{
+      "function": "sum",
+      "args": [{
+        "name": "ext_sales_price"
+      }],
+      "alias": "revenue"
+    }]
+  }
+}

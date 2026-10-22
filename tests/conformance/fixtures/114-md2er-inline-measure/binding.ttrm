@@ -1,0 +1,2 @@
+model binding
+def md2er_cubelet m { cubelet: md.sales, target: er.entity.sale, measures: { units: n } }

@@ -1,0 +1,38 @@
+// CN-P3 S3.7 — the grounded qualities, one `def quality` each (their groundings are in `bindings.ttrm`).
+model cn
+
+def quality revenue  { of: Sale, label: { en: "Revenue", cs: "Tržby" } }
+def quality quantity { of: Sale, label: { en: "Quantity", cs: "Množství" } }
+def quality sale_date         { of: Sale }
+def quality order_value       { of: Order }
+def quality state             { of: Order }
+def quality channel           { of: Order }
+def quality placed_date       { of: Order }
+def quality delivered_date    { of: Order }
+def quality line_quantity     { of: OrderLine }
+def quality unit_price        { of: OrderLine }
+def quality line_date         { of: OrderLine }
+def quality amount            { of: Invoicing }
+def quality paid              { of: Invoicing }
+def quality invoice_status    { of: Invoicing }
+def quality issued            { of: Invoicing }
+def quality due               { of: Invoicing }
+def quality quantity_on_hand  { of: Inventory }
+def quality as_of_date        { of: Inventory }
+def quality outage_from       { of: WarehouseOutage }
+def quality outage_to         { of: WarehouseOutage }
+def quality outage_reason     { of: WarehouseOutage }
+def quality pl_price          { of: PriceList }
+def quality pl_channel        { of: PriceList }
+def quality pl_from           { of: PriceList }
+def quality pl_to             { of: PriceList }
+def quality cp_price          { of: CustomerPrice }
+def quality cp_from           { of: CustomerPrice }
+def quality cp_to             { of: CustomerPrice }
+def quality request_state     { of: ReturnRequest }
+def quality requested_date    { of: ReturnRequest }
+def quality return_quantity   { of: ReturnLine }
+def quality return_unit_price { of: ReturnLine }
+def quality return_reason     { of: ReturnLine }
+def quality line_state        { of: ReturnLine }
+def quality line_amount       { of: ReturnLine }

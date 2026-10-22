@@ -9,11 +9,9 @@
 // now has real `ttrm/*` edit methods too) — decided 2026-07-15 (T5.2) to keep both,
 // not retire this one. Works with no `ttr-designer-server` process running.
 //
-// The mappings here are thin — no new semantics. Where the worker world is
-// graph-centric (no repo-wide index/version), the mapping is best-effort and
-// documented inline; the worker App does not route its read paths through these
-// (it calls LspClient directly), so this class exists for the abstraction + the
-// escape hatch, unit-pinned to issue exactly the expected modeler/* requests.
+// The mappings here are thin — no new semantics. Whole-schema subjects come
+// from the LSP; model/layouts/** uses the shared VL reader and resolver against
+// those graphs. The shell uses these reads for both local and hosted projects.
 
 import type { LspClient } from '../lsp-client.js';
 import type { ModelGraph, RenderableSchemaCode, BindingMapData, SymbolDetail, GetGraphResponse } from '@tatrman/lsp';
@@ -28,13 +26,22 @@ import type {
   GraphScope,
   Disposable,
   CatalogListing,
+  LayoutSummary,
+  LayoutIssue,
+  ResolvedLayout,
 } from './model-data-source.js';
 import type { TtrmNode, TtrmEdge } from './ttrm-types.js';
+import { readLayoutFiles, normalizeForTab, type OpenedLayout } from '../layout/open-files.js';
+import { resolveRefs } from '../layout/resolve.js';
+import { layoutIndexOf } from '../model/layout-projection.js';
+import { modeOf } from '@tatrman/parser/layout';
 
 export interface WorkerContext {
   projectRoot: string;
   /** The currently open graph document uri (set as graphs are opened). */
   graphUri?: string;
+  files?: ReadonlyMap<string, string>;
+  directoryHandle?: FileSystemDirectoryHandle;
 }
 
 /** Map the renderable ModelGraph (rows/fk/relation) down to the ttrm dependency-graph DTO. */
@@ -107,18 +114,13 @@ export class WorkerLspDataSource implements ModelDataSource {
   }
 
   /**
-   * The whole-schema graph (VL V-21): the project's model graph for `schema`, each card's package from
-   * the symbol listing (the worker's qnames already carry it; the panel groups by it).
+   * The whole-schema graph (VL V-21), including each card's effective package from the LSP.
    */
   async getSchemaGraph(schema: RenderableSchemaCode): Promise<GetGraphResponse | null> {
-    const [mg, symbols] = await Promise.all([
-      this.lspClient.getModelGraph(this.ctx.graphUri ?? this.ctx.projectRoot, schema),
-      this.lspClient.listSymbols({ kinds: ['entity', 'table', 'view'] }),
-    ]);
-    const pkg = new Map(symbols.map((s) => [s.qname, s.packageName ?? '']));
+    const mg = await this.lspClient.getModelGraph(this.ctx.graphUri ?? this.ctx.projectRoot, schema);
     return {
       schema,
-      nodes: mg.nodes.map((n) => ({ ...n, pkg: pkg.get(n.qname) ?? '' })),
+      nodes: mg.nodes.map((n) => ({ ...n, pkg: n.pkg ?? '' })),
       edges: mg.edges,
       layout: { nodes: {}, edges: {} },
       missingObjects: [],
@@ -127,19 +129,102 @@ export class WorkerLspDataSource implements ModelDataSource {
   }
 
   getGraph(ref: string): Promise<GetGraphResponse | null> {
+    if (this.capabilities.modelKinds.includes(ref as RenderableSchemaCode)) return this.getSchemaGraph(ref as RenderableSchemaCode);
     // Native rich shape — the Worker path carries the DS LSP graft (slot data, layout, imports).
     return this.lspClient.getGraph(ref);
   }
 
   async listCatalog(): Promise<CatalogListing> {
-    const [{ graphs }, symbols] = await Promise.all([
+    const [{ graphs }, symbols, { subjects }, layouts] = await Promise.all([
       this.lspClient.listGraphs(this.ctx.projectRoot),
       this.lspClient.listSymbols(),
+      this.lspClient.listSchemaSubjects(),
+      this.listLayouts(),
     ]);
     return {
-      graphs: graphs.map((g) => ({ uri: g.uri, name: g.name, schema: g.schema })),
+      graphs: [
+        ...subjects.filter((s) => this.capabilities.modelKinds.includes(s.schema as RenderableSchemaCode)).map((s) => ({ uri: s.schema, name: s.schema, schema: s.schema })),
+        ...graphs.filter((g) => !g.uri.startsWith(`${this.ctx.projectRoot.replace(/\/$/, '')}/model/layouts/`)).map((g) => ({ uri: g.uri, name: g.name, schema: g.schema })),
+        ...layouts.map((l) => ({ uri: l.source, name: l.name, schema: l.schema, layout: { missingCount: l.missingCount } })),
+      ],
       symbols: symbols.map((s) => ({ qname: s.qname, kind: s.kind, name: s.name, packageName: s.packageName })),
     };
+  }
+
+  private warnedLayoutIssues = new Set<string>();
+
+  private readLayouts() {
+    type Parsed = Extract<OpenedLayout, { ok: true }>;
+    const grouped = new Map<string, Array<{ source: string; parsed: Parsed }>>();
+    const issues: LayoutIssue[] = [];
+    const paths = [...(this.ctx.files?.keys() ?? [])].filter((p) => p.startsWith('model/layouts/') && p.endsWith('.ttrg')).sort();
+    for (const source of paths) {
+      try {
+        const inputs = [{ name: source, text: this.ctx.files!.get(source)! }];
+        const sidecar = source.replace(/\.ttrg$/, '.ttrl');
+        const text = this.ctx.files!.get(sidecar);
+        if (text !== undefined) inputs.push({ name: sidecar, text });
+        const parsed = readLayoutFiles(inputs);
+        if (!parsed.ok) throw new Error(parsed.error);
+        const group = grouped.get(parsed.doc.name) ?? [];
+        group.push({ source, parsed });
+        grouped.set(parsed.doc.name, group);
+      } catch (e) { issues.push({ path: source, reason: String(e instanceof Error ? e.message : e).replace(/[\r\n]+/g, ' ') }); }
+    }
+    const layouts = new Map<string, { source: string; parsed: Parsed }>();
+    for (const [name, entries] of grouped) {
+      if (entries.length === 1) layouts.set(name, entries[0]);
+      else for (const entry of entries) issues.push({ path: entry.source,
+        reason: `the name ${name} is also declared by ${entries.filter((e) => e !== entry).map((e) => e.source).join(', ')}` });
+    }
+    return { layouts, issues };
+  }
+
+  private async resolvedLayouts() {
+    const { layouts: parsed, issues } = this.readLayouts();
+    const schemas = new Map<RenderableSchemaCode, Promise<GetGraphResponse | null>>();
+    const entries = [...parsed.entries()];
+    const results = await Promise.allSettled(entries.map(async ([name, entry]) => {
+      const model = entry.parsed.doc.model;
+      if (!schemas.has(model)) schemas.set(model, this.capabilities.modelKinds.includes(model)
+        ? Promise.resolve().then(() => this.getSchemaGraph(model)) : Promise.resolve(null));
+      let whole: GetGraphResponse | null;
+      try { whole = await schemas.get(model)!; } catch { whole = null; }
+      if (!whole) throw new Error(`the ${model} schema could not be read`);
+      const doc = entry.parsed.doc;
+      const r = resolveRefs([...doc.objects, ...Object.keys(doc.positions)], layoutIndexOf(whole).index, model);
+      const normalized = normalizeForTab(doc, r);
+      const fromObjects = new Set(doc.objects);
+      const objects = [...new Set(doc.objects.flatMap((ref) => r.resolved.has(ref) ? [r.resolved.get(ref)!] : []))];
+      const layout: ResolvedLayout = { name, source: entry.source, schema: model, objects, positions: normalized.positions,
+        mode: modeOf(normalized), skin: normalized.skin ?? null, collapsed: normalized.collapsed ?? [],
+        missing: r.missing.filter((ref) => fromObjects.has(ref)), ambiguous: r.ambiguous.filter((a) => fromObjects.has(a.ref)),
+        ignored: r.ignored.filter((ref) => fromObjects.has(ref)), positionsFrom: entry.parsed.positionsFrom, modelVersion: '' };
+      return layout;
+    }));
+    const layouts = new Map<string, ResolvedLayout>();
+    results.forEach((result, i) => {
+      if (result.status === 'fulfilled') layouts.set(result.value.name, result.value);
+      else issues.push({ path: entries[i][1].source, reason: String(result.reason instanceof Error ? result.reason.message : result.reason).replace(/[\r\n]+/g, ' ') });
+    });
+    for (const issue of issues) {
+      const key = `${issue.path}: ${issue.reason}`;
+      if (!this.warnedLayoutIssues.has(key)) { this.warnedLayoutIssues.add(key); console.warn(`layout ${key} — not shown`); }
+    }
+    return { layouts, issues };
+  }
+
+  async listLayouts(): Promise<LayoutSummary[]> {
+    return [...(await this.resolvedLayouts()).layouts.values()].map((l) => ({ name: l.name, source: l.source, schema: l.schema,
+      objectCount: l.objects.length, missingCount: l.missing.length, ambiguousCount: l.ambiguous.length, hasPositions: Object.keys(l.positions).length > 0 }));
+  }
+
+  async layoutIssues(): Promise<LayoutIssue[]> { return (await this.resolvedLayouts()).issues; }
+
+  async getLayoutDoc(name: string): Promise<ResolvedLayout> {
+    const layout = (await this.resolvedLayouts()).layouts.get(name);
+    if (!layout) throw new Error(`Unknown layout '${name}'.`);
+    return layout;
   }
 
   async getObject(qname: string): Promise<ObjectDetail> {
@@ -159,11 +244,12 @@ export class WorkerLspDataSource implements ModelDataSource {
 
   async search(q: SearchParams): Promise<SearchHit[]> {
     // Same client-side filtering AddObjectPicker does today (pinned, not improved).
-    const symbols = await this.lspClient.listSymbols(q.limit ? { limit: q.limit } : {});
+    const symbols = await this.lspClient.listSymbols();
     const needle = q.query.toLowerCase();
     return symbols
       .filter((s) => s.qname.toLowerCase().includes(needle) || s.name.toLowerCase().includes(needle))
-      .map((s) => ({ qname: s.qname, score: 1, matchedField: 'name' }));
+      .map((s) => ({ qname: s.qname, score: 1, matchedField: 'name' }))
+      .slice(0, q.limit);
   }
 
   onModelChanged(_cb: (version: string) => void): Disposable {

@@ -1,0 +1,18 @@
+{
+  "parametersRead": [
+    {
+      "name": "window_lo",
+      "derivation": "as_of - days(30)"
+    },
+    {
+      "name": "as_of"
+    }
+  ],
+  "diagnostics": [
+    {
+      "slug": "cn/imprecise-comparison",
+      "severity": "ADVISORY",
+      "subject": "cn.FrequentPatient"
+    }
+  ]
+}

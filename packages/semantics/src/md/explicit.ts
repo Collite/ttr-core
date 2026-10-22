@@ -65,7 +65,7 @@ export function buildMdErRelationIndex(docs: CnDocument[], resolver: Resolver): 
 }
 
 /** A direct attribute or one visible named outgoing relation. Count paths, even to the same attribute. */
-export function explicitErAttributes(index: MdErRelationIndex, bindingDoc: CnDocument, resolver: Resolver, entity: SymbolEntry, path: string): SymbolEntry[] {
+export function explicitErAttributes(index: MdErRelationIndex, bindingDoc: CnDocument, resolver: Resolver, entity: SymbolEntry, path: string, usedRelations?: Set<string>): SymbolEntry[] {
   const parts = path.split('.');
   if (parts.length === 1) {
     const attr = resolver.getSymbol(`${entity.qname}.${path}`);
@@ -78,9 +78,24 @@ export function explicitErAttributes(index: MdErRelationIndex, bindingDoc: CnDoc
       imp.wildcard ? imp.target.replace(/\.\*$/, '') === rel.packageName : imp.target === rel.qname);
     if (!visible) continue;
     const attr = resolver.getSymbol(`${rel.toEntityQname}.${parts[1]}`);
-    if (attr?.kind === 'attribute') found.push(attr);
+    if (attr?.kind === 'attribute') {
+      found.push(attr);
+      usedRelations?.add(rel.qname);
+    }
   }
   return found;
+}
+
+/** Relations actually traversed by a dimension binding, also used by unused-import checks. */
+export function mdErUsedRelations(index: MdErRelationIndex, doc: CnDocument, resolver: Resolver): Set<string> {
+  const used = new Set<string>();
+  for (const def of doc.ast.definitions) {
+    if (def.kind !== 'md2erDimension') continue;
+    const entity = resolveMdErRef(resolver, doc, def.entity);
+    if (entity?.kind !== 'entity') continue;
+    for (const path of Object.values(def.attributes)) explicitErAttributes(index, doc, resolver, entity, path, used);
+  }
+  return used;
 }
 
 export function cubeletMeasureKeys(docs: CnDocument[], resolver: Resolver, cubelet: SymbolEntry): Set<string> {
@@ -88,7 +103,8 @@ export function cubeletMeasureKeys(docs: CnDocument[], resolver: Resolver, cubel
   const def = doc?.ast.definitions.find(d => d.kind === 'cubelet' && d.name === cubelet.name) as CubeletDef | undefined;
   const keys = new Set<string>();
   if (doc && def) for (const measure of def.measures) {
-    const symbol = resolveMdNs(resolver, doc, typeof measure === 'string' ? measure : measure.name, 'measure');
+    if (typeof measure !== 'string') continue; // Inline measures have no project symbol.
+    const symbol = resolveMdNs(resolver, doc, measure, 'measure');
     if (symbol) keys.add(symbol.qname);
   }
   return keys;

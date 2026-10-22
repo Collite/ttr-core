@@ -51,7 +51,8 @@ async function openCatalogLayout(label: string) {
   const { rerender } = render(view('just-names'));
   fireEvent.click(screen.getAllByTestId('catalog-item').find((b) => b.textContent === label)!);
   await waitFor(() => expect(attr('nodes')).toBe('er.entity.item,er.entity.store,er.entity.store_sales'));
-  await waitFor(() => expect(Object.keys(positions())).toHaveLength(3));
+  // Real ELK runs in this harness; a shared CI runner can exceed testing-library's 1 s default.
+  await waitFor(() => expect(Object.keys(positions())).toHaveLength(3), { timeout: 3000 });
   return { switchTo: (m: DisplayMode) => rerender(view(m)) };
 }
 

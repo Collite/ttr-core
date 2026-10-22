@@ -17,11 +17,14 @@ import org.tatrman.ttr.metadata.model.QualifiedName
  *  - `cn/definition-cycle` (error) — phases / defined qualities / member-restricted kinds that inline each other (AM-26);
  *  - `cn/definition-unresolved` (hygiene) — what a definition reads, inlined transitively, includes an ungrounded
  *    concept;
- *  - `cn/definition-unreachable(md)` / `(er)` (hygiene, model) — a concept it reads has no md grounding / no er
- *    landing (`erTarget`): the definition cannot render on that layer;
+ *  - `cn/definition-unreachable(md)` / `(er)` (hygiene, model) — a concept it reads has no md face (its md grounding,
+ *    or the reverse hop — ⚑CN-P8, A-CN-37; CN-P3 S3.3) / no er landing (`erTarget`): the definition cannot render on
+ *    that layer;
  *  - `cn/basis-mismatch` (error) — a condition's definition does not read its declared `basis:` ([BASIS_SHAPES]);
  *  - `cn/imprecise-comparison` (advisory) — under `imprecision: certainly` a comparison of two instants whose
- *    granularities are known and differ (AM-42; `period: { precision }`, else the attribute's type; `:as_of` is a day).
+ *    granularities are known and differ (AM-42; `period: { precision }`, else the attribute's type; `:as_of` is a day),
+ *    unless the coarser one is a period bound whose grounding stores its upper bound (`start_hi:` / `at_hi:`, ⚑CN-P10 —
+ *    the er renderer compares the stored bound, exactly; CN-P3 S3.4, A-CN-45).
  */
 object CnDefinitionLints {
     const val CYCLE = "cn/definition-cycle"
@@ -167,7 +170,7 @@ object CnDefinitionLints {
         closure: List<CnDefinition>,
     ): List<Diagnostic> {
         val reads = read(cn, closure)
-        val noMd = reads.filter { it.grounding?.layer != GroundingLayer.MD }
+        val noMd = reads.filter { it.grounding?.layer != GroundingLayer.MD && it.reverseHop.isEmpty() }
         val noEr = reads.filter { it.erTarget == null }
         return listOfNotNull(
             noMd.takeIf { it.isNotEmpty() }?.let {
@@ -175,7 +178,7 @@ object CnDefinitionLints {
                     "$UNREACHABLE(md)",
                     Severity.HYGIENE,
                     "the ${d.kind.property} cannot render on md: ${names(it)} ha${if (it.size == 1) "s" else "ve"} " +
-                        "no md grounding",
+                        "no md grounding and no md element hops to ${if (it.size == 1) "its" else "their"} E-R landing",
                     owner.ref,
                     d.block.source,
                 )
@@ -196,7 +199,7 @@ object CnDefinitionLints {
     private fun names(cs: List<Concept>): String = cs.joinToString(", ") { "`${it.qname.name}`" }
 
     /** The basis shapes a comparison has (at most one), per [BASIS_SHAPES]. */
-    private fun shapeOf(c: InstantComparison): Basis? {
+    internal fun shapeOf(c: InstantComparison): Basis? {
         // normalize `:as_of > x` to `x < :as_of`
         val (op, l, r) =
             when {
@@ -244,7 +247,7 @@ object CnDefinitionLints {
     /** Instant granularities, finest first; `:as_of` is a day (S0.3 §4). */
     enum class Granularity { SECOND, MINUTE, HOUR, DAY, WEEK, MONTH, QUARTER, YEAR }
 
-    private fun granularity(spelling: String?): Granularity? =
+    internal fun granularity(spelling: String?): Granularity? =
         when (spelling?.lowercase()) {
             "second" -> Granularity.SECOND
             "minute" -> Granularity.MINUTE
@@ -258,10 +261,10 @@ object CnDefinitionLints {
         }
 
     /** An attribute type's granularity: a date is a day, a timestamp a second; anything else is not known. */
-    private fun ofType(type: String?): Granularity? =
-        when (type?.lowercase()?.substringBefore('(')) {
-            "date" -> Granularity.DAY
-            "datetime", "datetime2", "timestamp", "timestamptz", "smalldatetime" -> Granularity.SECOND
+    internal fun ofType(type: String?): Granularity? =
+        when (ErType.of(type)) {
+            ErType.DATE -> Granularity.DAY
+            ErType.TIMESTAMP -> Granularity.SECOND
             else -> null
         }
 
@@ -329,6 +332,37 @@ object CnDefinitionLints {
             }
         }
 
+    /**
+     * Whether a comparison whose coarser side has a stored upper bound is DECIDED by that bound — the er renderer reads
+     * it through the bound, so it is exact under `imprecision: certainly` (A-CN-45, review-125 R125-4): the coarser side
+     * on the lesser side of `<` / `<=` / `before` / `at_or_before`, or on the greater side of `>` / `>=` — and, for the
+     * non-strict ones, the finer side `:as_of` (its upper end `{as_of_hi}` is derivable; a column's is not, G-ER-1).
+     * Elsewhere the stored instant decides, and the advisory stands. Shared by this lint and the renderer.
+     */
+    internal fun decidedByBound(
+        op: String,
+        coarserIsLhs: Boolean,
+        finerIsAsOf: Boolean,
+    ): Boolean {
+        val lesser = if (coarserIsLhs) op in setOf("<", "<=", "before", "at_or_before") else op in setOf(">", ">=")
+        val strict = op in setOf("<", ">", "before")
+        return lesser && (strict || finerIsAsOf)
+    }
+
+    /** Whether [t] is a period bound whose grounding names a stored upper bound for it (⚑CN-P10). */
+    private fun storedBound(
+        cn: CnSchema,
+        t: InstantTerm?,
+    ): Boolean {
+        if (t !is InstantTerm.PeriodBound) return false
+        val p = cn.concepts[t.owner]?.grounding?.period ?: return false
+        return when (t.bound) {
+            "start" -> p.startHi != null
+            "at" -> p.atHi != null
+            else -> false
+        }
+    }
+
     private fun imprecise(
         cn: CnSchema,
         er: ErSchema?,
@@ -339,7 +373,9 @@ object CnDefinitionLints {
         return d.reads.comparisons.mapNotNull { c ->
             val l = granularity(cn, er, c.lhs) ?: return@mapNotNull null
             val r = granularity(cn, er, c.rhs) ?: return@mapNotNull null
-            if (l == r) return@mapNotNull null
+            val (coarserTerm, finerTerm) = if (l > r) c.lhs to c.rhs else c.rhs to c.lhs
+            val bound = storedBound(cn, coarserTerm) && decidedByBound(c.op, l > r, finerTerm is InstantTerm.AsOf)
+            if (l == r || bound) return@mapNotNull null
             val coarser = maxOf(l, r).name.lowercase()
             Diagnostic(
                 IMPRECISE,

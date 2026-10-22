@@ -78,7 +78,7 @@ def build_relation_index(docs: list[CnDocument], resolver: Resolver) -> Relation
     return index
 
 
-def explicit_er_attributes(index: RelationIndex, doc: CnDocument, resolver: Resolver, entity: SymbolEntry, path: str) -> list[SymbolEntry]:
+def explicit_er_attributes(index: RelationIndex, doc: CnDocument, resolver: Resolver, entity: SymbolEntry, path: str, used_relations: set[str] | None = None) -> list[SymbolEntry]:
     parts = path.split(".")
     if len(parts) == 1:
         attr = resolver.get_symbol(f"{entity.qname}.{path}")
@@ -94,7 +94,23 @@ def explicit_er_attributes(index: RelationIndex, doc: CnDocument, resolver: Reso
             attr = resolver.get_symbol(f"{rel.to_entity_qname}.{parts[1]}")
             if attr and attr.kind == "attribute":
                 found.append(attr)
+                if used_relations is not None:
+                    used_relations.add(rel.qname)
     return found
+
+
+def md_er_used_relations(index: RelationIndex, doc: CnDocument, resolver: Resolver) -> set[str]:
+    """Relations actually traversed by a dimension binding, also used by unused-import checks."""
+    used: set[str] = set()
+    for binding in doc.definitions:
+        if not isinstance(binding, Md2erDimensionDef):
+            continue
+        entity = resolve_md_er_ref(resolver, doc, binding.entity.path if binding.entity else "")
+        if not entity or entity.kind != "entity":
+            continue
+        for path in binding.attributes.values():
+            explicit_er_attributes(index, doc, resolver, entity, path, used)
+    return used
 
 
 def md_er_binding_diagnostics(docs: list[CnDocument], resolver: Resolver) -> list[CnDiagnostic]:

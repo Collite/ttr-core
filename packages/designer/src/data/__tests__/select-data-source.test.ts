@@ -3,6 +3,12 @@ import { describe, it, expect } from 'vitest';
 import { selectBackend, serverWorkspaceName, BackendSelectionError } from '../select-data-source.js';
 
 describe('selectBackend', () => {
+  it('selects host explicitly, overrides the runtime catalog, and rejects mixed selectors', () => {
+    expect(selectBackend('?backend=host', { veles: '/veles' })).toEqual({ kind: 'host' });
+    for (const query of ['backend=unknown', 'backend=host&demo=x', 'backend=host&veles=/veles', 'backend=host&server=ws://localhost']) {
+      expect(() => selectBackend(query)).toThrow(BackendSelectionError);
+    }
+  });
   it('selects the WS backend for a loopback ?server= origin', () => {
     expect(selectBackend('?server=ws://127.0.0.1:7270')).toEqual({ kind: 'ws', origin: 'ws://127.0.0.1:7270' });
     expect(selectBackend('?server=ws://localhost:7270')).toEqual({ kind: 'ws', origin: 'ws://localhost:7270' });

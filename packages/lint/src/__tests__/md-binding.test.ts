@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from 'vitest';
 import { DiagnosticCode } from '@tatrman/parser';
-import { recommendedConfig, lintProj, type ProjectFile } from './helpers.js';
+import { recommendedConfig, lintProj, lintDocInProject, type ProjectFile } from './helpers.js';
 
 const LOGICAL = `model md
 def domain Day { type: date }
@@ -212,5 +212,34 @@ describe('review-125 configured MD/ER lint severities', () => {
     expect(diagnostics.find(d => d.code === 'md/md2er-dimension-key')?.severity).toBe('warning');
     expect(diagnostics.find(d => d.code === 'md/md2er-reference')?.severity).toBe('info');
     expect(diagnostics.some(d => d.code === 'md/md2er-measure-unknown')).toBe(false);
+  });
+});
+
+
+describe('re-review N1 named relation import usage', () => {
+  const uri = 'file:///binding.ttrm';
+  const files = (value: string): ProjectFile[] => [
+    { uri: 'file:///md.ttrm', src: LOGICAL },
+    { uri: 'file:///er.ttrm', src: ER_HOP.replace('def relation address', 'def relation local_address') },
+    { uri: 'file:///east.ttrm', src: `package east
+      model er
+      def relation address { from: er.entity.customer, to: er.entity.address }` },
+    { uri: 'file:///west.ttrm', src: `package west
+      model er
+      def relation address { from: er.entity.address, to: er.entity.address }` },
+    { uri, src: `import east.er.relation.address
+      import west.er.relation.address
+      model binding
+      def md2er_dimension c { dimension: md.Customer, entity: er.entity.customer, attributes: { code: ${value} } }` },
+  ];
+  it('counts the named relation actually traversed, retaining an unused same-label import', () => {
+    const unused = lintDocInProject(files('address.state'), uri).filter(d => d.code === 'ttr/unused-import');
+    expect(unused.map(d => d.message)).toEqual(["Import 'west.er.relation.address' is not referenced"]);
+    expect([...lintProj(files('address.state')).values()].flat().some(d => d.code === 'md/md2er-reference')).toBe(false);
+  });
+  it('still warns when no path uses the relation or its target attribute does not exist', () => {
+    for (const value of ['sk', 'address.missing']) {
+      expect(lintDocInProject(files(value), uri).filter(d => d.code === 'ttr/unused-import')).toHaveLength(2);
+    }
   });
 });

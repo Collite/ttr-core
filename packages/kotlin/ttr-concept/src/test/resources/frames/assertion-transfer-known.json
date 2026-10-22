@@ -1,0 +1,42 @@
+{
+  "event": {
+    "qname": "cn.Transfer"
+  },
+  "identity": {
+    "known": {
+      "values": {
+        "transfer_id": "77"
+      }
+    }
+  },
+  "participants": [{
+    "label": "from",
+    "concept": {
+      "qname": "cn.Encounter"
+    },
+    "member": {
+      "label": "E-501",
+      "resolvedValue": "501"
+    }
+  }, {
+    "label": "to",
+    "concept": {
+      "qname": "cn.Encounter"
+    },
+    "member": {
+      "label": "E-502",
+      "resolvedValue": "502"
+    }
+  }],
+  "period": {
+    "start": {
+      "value": "2026-03-14T09:30",
+      "granularity": "MINUTE"
+    }
+  },
+  "provenance": {
+    "producer": "manual:steward"
+  },
+  "locale": "en",
+  "derivedFrom": ["a-0001"]
+}

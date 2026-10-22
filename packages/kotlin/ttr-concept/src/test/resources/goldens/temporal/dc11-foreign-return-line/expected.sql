@@ -1,0 +1,8 @@
+SELECT return_request_line.request_id, return_request_line.line_no
+FROM return_request_line
+JOIN return_request ON return_request.request_id = return_request_line.request_id
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM sales_line
+  WHERE sales_line.order_number = return_request.order_number AND sales_line.item = return_request_line.item
+)

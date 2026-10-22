@@ -13,6 +13,57 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   relation paths to visible relations. Explicit dimension attributes take precedence after bearer filtering.
   Formatter/writer output preserves localized descriptions and quotes map values safely; Kotlin also fixes
   pre-existing duplicate tag commas in world, engine/executor and storage rendering.
+  CN-P3 reverse hops include dimension and measure mappings. Named relations traversed by binding paths count
+  as used imports; inline measures never borrow a top-level measure's identity.
+
+- **Studio strict metadata gate** — new `ttr-metadata load <root> --strict --json` CLI,
+  version checking and category-coded diagnostics. Manifest `[packages].layout` grades package mismatches like
+  TypeScript (off suppresses, flexible warns, strict errors); invalid TOML uses defaults plus a manifest error. `MetadataLoader.load(LoadOptions)`
+  collects an opt-in report (null when unchecked), including duplicate definitions within a file source via the
+  shared semantic Validator rule. Duplicate messages use relative paths, usage errors exit 64, and missing
+  `model/` is diagnosed explicitly. Existing `load()` behavior
+  and registry refresh semantics remain unchanged. `just build-metadata-cli` installs `bin/ttr-metadata`;
+  the CLI jar and distribution join the grammar release bundle. See [metadata-cli](docs/manual/metadata-cli.md).
+- **Hosted viewer image** — fix nginx's `/m/_designer/` directory entry to internally select its HTML route,
+  avoiding a 500 from nginx's index handling. The explicit HTML entry and standalone catalog routes are retained.
+
+- **`org.tatrman:ttr-concept`** (cn, CN-P3) — **first release**: every `ConceptService` function (cn contracts §3)
+  over a `ResolvedCnModel`, deterministic and pure: no LLM, no server call, no I/O, no clock but the injected one.
+  - **Statements** — `statementValidate` (references, ambiguity, missing time, reachability per consumer) and
+    `statementLower`: each slot through its `cn2md` grounding, phases inlined transitively, `:name` / `:as_of` bound
+    → `plan.v1` through the md dot-path, with its provenance (binding paths, inlined definitions, parameters bound,
+    as-of, grammar / catalog versions, snapshot hash).
+  - **Assertions** — `assertionValidate` predicts every `assertionLower` refusal; `assertionLower` gives the
+    `Statement[<Entity>]` row payload: the event's row (FK values only), `assertedAsOf`, `meta` (provenance, end
+    state, verbatims) and `obligations` for two-hop participants. Data only: the module has no JDBC and no DML.
+  - **Explanations** — `statementExplain` / `assertionExplain` in `en` and `cs` (another locale: English with
+    `cn/explain-locale-fallback`); a phase filter's definition in words.
+  - **Definitions** — `definitionRender` on the md layer (a PL predicate) and the er layer (SQL over entities, in the
+    formatting contract's layout; `PREDICATE` or `CONTEXT` mode, `{name}` or `:name` placeholders); `materialize` and
+    **`ttr cn materialize`** write a phase as a `def query` + stacked entity.
+  - **`ErModelHandle`** (public) — a ttr-metadata `Model` as the translator's `ModelHandle` (er + db tiers, `er2db`
+    mappings): what a caller translates an er rendering over. `ttr-translator` is therefore an `api` dependency.
+  - New frame diagnostics: `cn/unsupported-ask`, `cn/unknown-participant-label`, `cn/slot-mismatch`,
+    `cn/malformed-frame`, `cn/missing-as-of`, `cn/snapshot-mismatch`, `cn/explain-locale-fallback`.
+- **`ttr-metadata`** (CN-P3) — `Grounding.unit` (a `cn2er_quality`'s `unit:`); `GroundingPeriod.startHi` / `atHi` (a
+  binding period's stored upper bounds `start_hi:` / `at_hi:`); `Concept.reverseHop` and `MdErHop.mdElementsOn` (the
+  md elements whose hop lands on an er element). All additive.
+- **`ttr-semantics`** (and the TS / Python semantics) — a binding period's `start_hi:` / `at_hi:` resolve as er refs.
+- **`org.tatrman:ttr-concept`** (cn, CN-P3 S3.1) — **joins the `grammar/v*` bundle** (A-CN-1): first published with the
+  next grammar cut, at the grammar version, beside the TTR-P toolchain whose closure it shares (`api` `ttr-metadata`,
+  `ttrp-frontend`, `ttr-plan-proto`; `ttr-plan-proto` / `ttr-translator` at the pinned translator release).
+- **`ttr-plan-proto`** — the cn frames **`org.tatrman.concept.v1`**, **`statement.v1`**, **`assertion.v1`** are
+  **frozen** (CN-P3 S3.1): J-v2 additive-only from here. Clarified, not changed: an instantaneous event's instant rides
+  `Period.start` (no `end`); `Value.is_null` is SQL NULL. Their canonical JSON mapping is protobuf JsonFormat (samples
+  in `ttr-concept`'s tests round-trip byte-equal). The **Python wheel** (`ttr-plan-proto`, `python-plan/v*`) now packs
+  them too (`org.tatrman.concept|statement|assertion.v1`), checked against the same JSON samples.
+- **AU bundle handoff** — generated verdict catalogs omit retired CNC roles so the automation loader can
+  reconcile them; recipe bundles carry sorted, hashed golden YAML fixtures in `recipe.tests` (omitted when empty); PostgreSQL recipe
+  expressions support typed `ceil` without a capability diagnostic. Integer `ceil`/`round` emit their argument
+  (including `round(i, n)` for a non-negative integer literal scale), keeping ordinary PostgreSQL calcs on the
+  translator path beside CASE/IS NULL expressions. Two-argument `round` over an integer with a negative or
+  non-literal scale is declared decimal. `round(<duration>)` is now refused with TTRP-TYP-001; PostgreSQL has no
+  `round(interval)`.
 
 - **`grammar/v0.17.3` / AU S2.5** — recipe statements now split at storage boundaries into door parts and
   DuckDB combines. Every recipe's `text` fingerprint changes, including `release_order` and `decide_return`,

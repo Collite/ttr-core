@@ -1,0 +1,2 @@
+model er
+def entity sale { attributes: [def attribute n { type: decimal }] }

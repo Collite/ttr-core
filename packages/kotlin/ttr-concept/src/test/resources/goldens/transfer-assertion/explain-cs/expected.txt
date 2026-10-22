@@ -1,0 +1,1 @@
+Překlad · patient: Pacient P-1001 · from: Hospitalizace E-501 · to: Hospitalizace E-502 · 14. 3. 2026 09:30 · druh překladu: step-down · tvrzeno k 14. 3. 2026 · zdroj: manual:steward

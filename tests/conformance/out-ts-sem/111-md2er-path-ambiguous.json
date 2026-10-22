@@ -1,8 +1,7 @@
 {
     "diagnostics": [
         "md/md2er-path-ambiguous",
-        "md/md2er-reference",
-        "ttr/unused-import"
+        "md/md2er-reference"
     ],
     "resolved": [
         "base.er.entity.addr => base.er.entity.addr",
