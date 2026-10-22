@@ -81,7 +81,6 @@ import {
   resolveMdRef,
   mdCrossRefsOf,
   calcNames,
-  elementRefOf,
   cnHygieneReport,
   CompositeMdErHop, mdHopReport, renderMdHopMarkdown, type MdHopReport,
   renderCnHygieneMarkdown,

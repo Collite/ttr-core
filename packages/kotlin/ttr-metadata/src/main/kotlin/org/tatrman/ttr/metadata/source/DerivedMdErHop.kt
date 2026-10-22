@@ -17,7 +17,6 @@ class DerivedMdErHop(
     val causes = mutableMapOf<String, String>()
     val lineageIssues = mutableListOf<MdHopIssue>()
     private val domainAttributes = linkedMapOf<String, MutableSet<String>>()
-    private val viaTargets = linkedMapOf<String, List<String>>()
     private val dimensions = linkedMapOf<String, Pair<SemanticDocument, DimensionDef>>()
 
     private fun add(
@@ -80,6 +79,27 @@ class DerivedMdErHop(
                 }
             }
         }
+        val mapTargets = mutableMapOf<String, MutableSet<String>>()
+        for (doc in docs) {
+            for (binding in doc.definitions.filterIsInstance<Md2dbMapDef>()) {
+                val map = binding.mapRef?.path?.let { resolveMdNs(resolver, doc, it, "map") } ?: continue
+                val mapDoc = docs.find { it.uri == map.documentUri } ?: continue
+                val logical = mapDoc.definitions.filterIsInstance<MdMapDef>().find { it.name == map.name } ?: continue
+                val targets = logical.to.mapNotNull { resolveMdNs(resolver, mapDoc, it.path, "domain")?.qname }.toSet()
+                val table = binding.table?.path?.let { physical.resolve(doc, it) } ?: continue
+                for ((domainName, column) in binding.columns) {
+                    val domain = resolveMdNs(resolver, doc, domainName, "domain") ?: continue
+                    if (domain.qname in
+                        targets
+                    ) {
+                        mapTargets
+                            .getOrPut(map.qname) {
+                                sortedSetOf()
+                            }.addAll(physical.columnToErAttr[physical.column(doc, table.qname, column)].orEmpty())
+                    }
+                }
+            }
+        }
         // R1, R2 and R5, retaining every md2db source of a multi-source cubelet.
         for (doc in docs) {
             for (def in doc.definitions.filterIsInstance<Md2dbCubeletDef>()) {
@@ -113,21 +133,12 @@ class DerivedMdErHop(
                         }
                     if (binding is AttrColumnBinding.Via) {
                         val map = resolveMdNs(resolver, doc, binding.via.path, "map")
-                        val mapDoc = docs.find { it.uri == map?.documentUri }
-                        val logical = mapDoc?.definitions?.filterIsInstance<MdMapDef>()?.find { it.name == map?.name }
-                        val targetDomains =
-                            logical?.to.orEmpty().mapNotNull {
-                                resolveMdNs(
-                                    resolver,
-                                    mapDoc!!,
-                                    it.path,
-                                    "domain",
-                                )?.qname
-                            }
-                        val targetAttrs = targetDomains.flatMap { domainAttributes[it].orEmpty() }
-                        // The via source is on its own table; never restrict it to the fact entity.
+                        // A via grain uses this map's target, not every map sharing its output domain.
                         columns(grain, col)
-                        viaTargets[grain] = targetAttrs
+                        mapTargets[map?.qname]
+                            ?.takeIf {
+                                it.isNotEmpty()
+                            }?.let { candidates[grain] = it.toMutableSet() }
                     } else {
                         columns(grain, col, entities)
                     }
@@ -211,10 +222,6 @@ class DerivedMdErHop(
                 causes[md] =
                     "no relation or map from the dimension's key to an er entity"
             }
-        }
-        for ((grain, attrs) in viaTargets) {
-            val targets = attrs.flatMap { candidates[it].orEmpty() }.toSet()
-            if (targets.isNotEmpty()) candidates[grain] = targets.toMutableSet()
         }
         for ((domain, attrs) in domainAttributes) {
             if (domain !in bound) {

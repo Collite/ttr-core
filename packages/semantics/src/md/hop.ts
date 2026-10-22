@@ -4,6 +4,7 @@ import type { CnValidation } from '../cn/validate.js';
 import { cnHopIssues } from '../cn/hygiene.js';
 import type { CnDocument } from '../cn/groundings.js';
 import { ExplicitMdErHop, elementRefOf, type HopAnswer } from '../cn/hygiene.js';
+import { columnRefFromColumnValue } from '../mapping-references.js';
 import { buildCanonicalKey } from '../qname.js';
 import type { Resolver } from '../resolver.js';
 import { cubeletMeasureKeys, resolveMdAttribute, resolveMdErRef, resolveMdNs } from './explicit.js';
@@ -18,10 +19,6 @@ function targetRef(target: ObjectValue | Reference | undefined): string | undefi
   if (!target) return undefined;
   if ('path' in target) return target.path;
   return ['table', 'view', 'query', 'column'].map((key) => id(target.entries.find((e) => e.key === key)?.value)).find((x) => x !== undefined);
-}
-function inlineColumn(value: ObjectValue): string | undefined {
-  const target = value.entries.find((e) => e.key === 'target')?.value;
-  return target?.kind === 'id' ? target.path : id((target?.kind === 'object' ? target : value).entries.find((e) => e.key === 'column')?.value);
 }
 function add(index: Map<string, Set<string>>, key: string, values: Iterable<string>) {
   const set = index.get(key) ?? new Set<string>();
@@ -80,7 +77,7 @@ export class PhysicalIndex {
       const columns = def.binding?.kind === 'block' ? def.binding.columns ?? [] : [];
       for (const attr of def.attributes ?? []) {
         const value = columns.find((e) => e.name === attr.name)?.value;
-        let path = value?.kind === 'bareId' ? value.id.path : value?.kind === 'object' ? inlineColumn(value.object) : undefined;
+        let path = value && columnRefFromColumnValue(value)?.path;
         if (attr.binding?.kind === 'bareId') path = attr.binding.id.path;
         else if (attr.binding?.kind === 'block') path = targetRef(attr.binding.target);
         path ??= attr.name;
@@ -135,7 +132,7 @@ export class PhysicalIndex {
           return resolved.every((x) => x?.kind === 'column') ? resolved.map((x) => x!.qname) : [];
         };
         const left = cols(fk.def.from); const right = cols(fk.def.to);
-        if (left.length === right.length) left.forEach((a) => {
+        if (left.length === right.length) left.forEach((a, i) => {
           for (const src of this.columnToErAttr.get(a) ?? []) for (const dst of this.columnToErAttr.get(right[i]) ?? []) {
             if (parent(src) === from.qname && parent(dst) === to.qname) pairs.push([src, dst]);
           }
@@ -244,7 +241,6 @@ export class DerivedMdErHop implements MdErHop {
       else for (const col of origins) p.addOrigin(col, `${entity}.${a.name}`);
     });
     const dimensions = new Map<string, { doc: CnDocument; def: DimensionDef }>();
-    const viaTargets = new Map<string, string[]>();
     const domainAttrs = new Map<string, Set<string>>();
     for (const doc of docs) for (const def of doc.ast.definitions) if (def.kind === 'dimension') {
       const key = p.key(doc, 'dimension', def.name); dimensions.set(key, { doc, def });
@@ -252,6 +248,16 @@ export class DerivedMdErHop implements MdErHop {
         const domain = attr.domainRef && resolveMdNs(resolver, doc, attr.domainRef, 'domain');
         if (domain) add(domainAttrs, domain.qname, [`${key}.${attr.name}`]);
       }
+    }
+    const mapTargets = new Map<string, Set<string>>();
+    for (const doc of docs) for (const binding of doc.ast.definitions) if (binding.kind === 'md2dbMap') {
+      const map = resolveMdNs(resolver, doc, binding.mapRef, 'map');
+      const mapDoc = docs.find((d) => d.uri === map?.documentUri);
+      const logical = mapDoc?.ast.definitions.find((d) => d.kind === 'mdMap' && d.name === map?.name);
+      const table = p.resolve(doc, binding.table);
+      if (!map || !mapDoc || logical?.kind !== 'mdMap' || !table) continue;
+      const targets = logical.to.map((d) => resolveMdNs(resolver, mapDoc, d, 'domain')?.qname);
+      for (const [name, column] of Object.entries(binding.columns)) if (targets.includes(resolveMdNs(resolver, doc, name, 'domain')?.qname)) add(mapTargets, map.qname, p.columnToErAttr.get(p.column(doc, table.qname, column) ?? '') ?? []);
     }
     for (const doc of docs) for (const def of doc.ast.definitions) if (def.kind === 'md2dbCubelet') {
       const cubelet = resolveMdNs(resolver, doc, def.cubeletRef, 'cubelet'); const table = p.resolve(doc, def.table);
@@ -273,10 +279,8 @@ export class DerivedMdErHop implements MdErHop {
         if ('via' in binding) {
           this.columns(grain, col);
           const map = resolveMdNs(resolver, doc, binding.via, 'map');
-          const mapDoc = docs.find((d) => d.uri === map?.documentUri);
-          const logical = mapDoc?.ast.definitions.find((d) => d.kind === 'mdMap' && d.name === map?.name);
-          const targets = logical?.kind === 'mdMap' ? logical.to.map((d) => resolveMdNs(resolver, mapDoc!, d, 'domain')?.qname) : [];
-          viaTargets.set(grain, targets.flatMap((d) => [...domainAttrs.get(d ?? '') ?? []]));
+          const targets = mapTargets.get(map?.qname ?? '');
+          if (targets?.size) this.candidates.set(grain, new Set(targets));
         } else this.columns(grain, col, entities);
         const dim = dimensions.get(attr.parent ?? ''); if (dim?.def.key !== attr.name) continue;
         const erAttrs = p.columnToErAttr.get(col ?? '') ?? new Set<string>();
@@ -325,10 +329,6 @@ export class DerivedMdErHop implements MdErHop {
         this.add(`${md}.${def.key}`, (er?.[1].def.attributes ?? []).filter((a) => a.isKey).map((a) => `${entity}.${a.name}`));
       }
       if (!this.candidates.get(md)?.size) this.causes.set(md, "no relation or map from the dimension's key to an er entity");
-    }
-    for (const [grain, attrs] of viaTargets) {
-      const targets = attrs.flatMap((a) => [...this.candidates.get(a) ?? []]);
-      if (targets.length) this.candidates.set(grain, new Set(targets));
     }
     for (const [domain, attrs] of domainAttrs) if (!bound.has(domain)) this.add(this.local(domain), [...attrs].flatMap((a) => [...this.candidates.get(this.local(a)) ?? []]));
   }

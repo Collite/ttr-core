@@ -18,3 +18,11 @@ Their CN hygiene rows are pinned in `tests/conformance/cn-hygiene/expected-deriv
 Kotlin's optional Calcite QueryLineage service and its syntactic default agree on all fixture columns.
 TS implements syntactic lineage; Python has no MD derivation model and retains structural validation only.
 Unsupported query projections are reported as `md/er-lineage-opaque` information.
+
+Review-129 regressions share `review-129.json` beside the source fixture. They pin reordered/renamed/missing
+query outputs, malformed SQL, via-map targets (including an unrelated map to the same domain), implicit bindings,
+nested inline column targets, single-column FKs, cross-package conformed dimensions, explicit dimension pins,
+invalid phase groundings, trailing semicolons and translator syntax in filters. Metadata tests use the syntactic
+provider; concept tests load the optional Calcite provider from ttr-concept and read the same cases.
+The provider uses the translator framework and plans each query once; a separate fresh-JVM check guards UTF-8
+initialization before Czech string literals. Translator sources and dependencies stay on their separate release line.

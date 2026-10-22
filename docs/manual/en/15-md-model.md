@@ -266,7 +266,7 @@ The hop joins `md2db_*` and `er2db_*` on the same resolved database table/view a
 
 Explicit mappings win per element. Without one, the bearer restricts quality candidates first, then a unique unrestricted candidate wins. Multiple candidates give `md/er-ambiguous`; none gives `md/er-unmapped`, naming the missing physical binding or relation. `md/er-hop-override` is information when an explicit answer differs from derivation.
 
-The metadata library uses conservative syntactic lineage for bare SELECT attributes, aliases, literals and UNION ALL. Unsupported expressions yield `md/er-lineage-opaque` information. When the translator is present, its optional Calcite service supplies column origins and recursively expands stacked bindings. Python retains the structural MD/ER validation; it has no MD derivation model.
+The metadata library uses conservative syntactic lineage for bare SELECT attributes, aliases, literals and UNION ALL. Unsupported expressions yield `md/er-lineage-opaque` information. When ttr-concept is present, its optional Calcite service uses the translator's configured parser and supplies column origins and recursively expands stacked bindings. Python retains the structural MD/ER validation; it has no MD derivation model.
 
 `ttr md hop <dir> [--all] [--format text|json] [--fail-on warning]` prints every MD element, landing, rule or diagnostic and the derived warehouse roles. Findings default to concept-grounded elements and use each quality's bearer; `--all` includes ungrounded elements. Exit codes are 0 for success, 1 for a finding at the requested threshold, and 2 for usage or unreadable input. `just md-hop <dir>` invokes it from this repository. In VS Code, use **TTR: md → er hop report** (`modeler/getMdHop`). ER entity hover shows the derived role and its reasons.
 
@@ -277,3 +277,5 @@ Roles are derived from the same mappings: a cubelet's entity is a fact; a dimens
 See the [reference](14-reference.md#md-multidimensional-model) for the full
 keyword and `md/*` diagnostic list, and `docs/features/md/contracts.md` for the
 authoritative property tables.
+
+Query-backed attributes select output columns by their bound names, independent of attribute declaration order. Identity table/column bindings follow the translator convention. Reports retain package-qualified identities; shared dimensions can derive through cubelets in other visible packages. An explicit dimension pin constrains its derived attributes to reachable entities and reports excluded derived landings as override information.

@@ -195,12 +195,11 @@ function attributeBindingColumnRef(m: BindingProperty | undefined): Reference | 
  * The entry value is `COL` (bare id) or `{ target: COL }` / `{ target: {
  * column: COL } }` (object form).
  */
-function columnRefFromColumnValue(v: BindingColumnValue): Reference | undefined {
+export function columnRefFromColumnValue(v: BindingColumnValue): Reference | undefined {
   if (v.kind === 'bareId') return v.id;
 
   const targetEntry = v.object.entries.find((e) => e.key === 'target');
-  if (!targetEntry) return undefined;
-  const tv = targetEntry.value;
+  const tv = targetEntry?.value ?? v.object;
   if (tv.kind === 'id') return { path: tv.path, parts: tv.parts, source: tv.source };
   if (tv.kind === 'object') {
     const colEntry = tv.entries.find((e) => e.key === 'column');

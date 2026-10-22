@@ -32,7 +32,7 @@ describe('qualified MD hop finding locations', () => {
     const project = files();
     for (const pkg of ['east', 'west']) for (const f of files()) project.push({
       uri: f.uri.replace('file:///', `file:///${pkg}/`),
-      src: `package ${pkg}\n${f.src.replace('def entity customer {', 'def entity customer { roles: [fact],').replace('ext_sales_price FROM catalog_sales', 'ext_sales_price * 2 AS ext_sales_price FROM catalog_sales')}`,
+      src: `package ${pkg}\n${f.src.replace('grounds: er.entity.sales', `grounds: ${pkg}.er.entity.sales`).replace('def entity customer {', 'def entity customer { roles: [fact],').replace('ext_sales_price FROM catalog_sales', 'ext_sales_price * 2 AS ext_sales_price FROM catalog_sales')}`,
     });
     const ds = [...lintProj(project).values()].flat();
     for (const pkg of ['east', 'west']) for (const code of ['md/er-lineage-opaque', 'md/role-claim-mismatch']) {
