@@ -80,7 +80,10 @@ val plan = Translator(ErModelHandle(model)).parseToRelNode(r.text, Language.SQL,
 ```
 
 That is the whole of AU's need (AM-31): a scratch project on the published jars renders `cn.ShortLine` in CONTEXT mode,
-gets the golden's text, and its ER-lane plan equals the golden's and AU's hand-written island's.
+gets the golden's text, and its ER-lane plan equals the golden's and AU's hand-written island's. The handle carries no
+saved-query bodies, so an entity stacked on a logical query — what `materialize` writes — does not translate over it
+(the translator reports `saved_query_body_missing`); a host that serves materialized phases supplies its own handle
+with the bodies (P5's door).
 
 ## Guarantees, tested
 
