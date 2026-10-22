@@ -160,3 +160,18 @@ mavenPublishing {
         }
     }
 }
+
+// The internal lane: publish.yml publishes every tag to GitHub Packages first (this repository's
+// `publishAllPublicationsToGitHubPackagesRepository`), Central only for -RELEASE — declared as in every bundle module.
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/Collite/ttr-core")
+            credentials {
+                username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
+                password = providers.gradleProperty("gpr.token").orNull ?: System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+}
