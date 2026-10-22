@@ -105,7 +105,7 @@ object RecipeCatalogEmitter {
     ) {
         sb.append("def entity $name {\n")
         sb.append("    description: ${str(description)}\n")
-        sb.append("    roles: [transaction]\n")
+        // CNC roles are retired (CN-D18); a generated entity must not introduce an unresolved legacy role.
         sb.append("    attributes: [\n")
         sb.append(
             columns.joinToString(",\n") { c ->

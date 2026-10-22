@@ -6,6 +6,14 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **AU bundle handoff** — generated verdict catalogs omit retired CNC roles so the automation loader can
+  reconcile them; recipe bundles carry sorted, hashed golden YAML fixtures in `recipe.tests` (omitted when empty); PostgreSQL recipe
+  expressions support typed `ceil` without a capability diagnostic. Integer `ceil`/`round` emit their argument
+  (including `round(i, n)` for a non-negative integer literal scale), keeping ordinary PostgreSQL calcs on the
+  translator path beside CASE/IS NULL expressions. Two-argument `round` over an integer with a negative or
+  non-literal scale is declared decimal. `round(<duration>)` is now refused with TTRP-TYP-001; PostgreSQL has no
+  `round(interval)`.
+
 - **`grammar/v0.17.3` / AU S2.5** — recipe statements now split at storage boundaries into door parts and
   DuckDB combines. Every recipe's `text` fingerprint changes, including `release_order` and `decide_return`,
   because the hashed statement section is sorted by SQL file path and includes paths instead of `island.port`.
