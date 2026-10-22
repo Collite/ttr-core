@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from '../App.js';
-import { currentAppPath } from '../shell/app-location.js';
+import { currentAppPath, replaceAppPath } from '../shell/app-location.js';
 import { setRuntimeConfig } from '../runtime-config.js';
 import { BffFilesDataSource } from '../data/bff-files-data-source.js';
 import { createTestClient } from '../data/__tests__/lsp-harness.js';
@@ -137,11 +137,15 @@ describe('hosted mode through a parent window', () => {
   it('reloads a changed SHA on navigate, keeps the requested deep link, and announces ready once', async () => {
     render(<App />);
     post(init);
-    await screen.findByTestId('shell-frame');
-    fetcher.mockResolvedValue({
+    await waitFor(() =>
+      expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin)
+    );
+    const response = {
       ok: true,
       json: async () => ({ sha: 'two', files: { 'modeler.toml': manifest } }),
-    });
+    };
+    let finishRefresh!: (value: typeof response) => void;
+    fetcher.mockImplementationOnce(() => new Promise((resolve) => { finishRefresh = resolve; }));
     const previousHeader = screen.getByTestId('studio-header');
     const navigate = vi.fn();
     window.addEventListener(APP_NAVIGATE, navigate);
@@ -149,6 +153,10 @@ describe('hosted mode through a parent window', () => {
       expect(screen.getByTestId('studio-header')).not.toBe(previousHeader);
     });
     post({ type: 'ttr.host.navigate', location: '#/w/foreign/s/md', sha: 'two' });
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+    // The old shell can still sync its active tab while the replacement snapshot is loading.
+    replaceAppPath('/w/hartland/s/er');
+    finishRefresh(response);
     await waitFor(() => expect(createClient).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(currentAppPath()).toBe('/w/hartland/s/md'));
     await waitFor(() => expect(client.dispose).toHaveBeenCalledTimes(1));
@@ -181,7 +189,9 @@ describe('hosted mode through a parent window', () => {
     const refresh = vi.spyOn(BffFilesDataSource.prototype, 'refresh');
     render(<App />);
     post(init);
-    await screen.findByTestId('shell-frame');
+    await waitFor(() =>
+      expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin)
+    );
     const header = screen.getByTestId('studio-header');
     fetcher.mockResolvedValue({ ok: false, status: 500 });
     post({ type: 'ttr.host.navigate', location: '/w/hartland/s/md', sha: 'two' });
@@ -190,20 +200,25 @@ describe('hosted mode through a parent window', () => {
         sent.mock.calls.map(([m]) => m).filter((m) => m.type === 'ttr.frame.error')
       ).toHaveLength(1)
     );
-    expect(currentAppPath()).toBe('/w/hartland/s/md');
+    // The error is sent before React commits the fallback navigation on the retained shell.
+    await waitFor(() => {
+      expect(currentAppPath()).toBe('/w/hartland/s/md');
+      expect(screen.getByTestId('copy-federation-link')).toHaveAttribute(
+        'data-federation-url',
+        `${window.location.origin}/m/hartland/s/md`
+      );
+    });
     expect(screen.getByTestId('studio-header')).toBe(header);
     expect((refresh.mock.contexts[0] as BffFilesDataSource).sha).toBe('one');
     expect(client.dispose).not.toHaveBeenCalled();
-    expect(screen.getByTestId('copy-federation-link')).toHaveAttribute(
-      'data-federation-url',
-      `${window.location.origin}/m/hartland/s/md`
-    );
   });
 
   it('copies the parent path for a lineage tab too', async () => {
     render(<App />);
     post(init);
-    await screen.findByTestId('shell-frame');
+    await waitFor(() =>
+      expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin)
+    );
     post({
       type: 'ttr.host.navigate',
       location:

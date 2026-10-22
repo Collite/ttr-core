@@ -81,6 +81,8 @@ export interface ShellFrameProps {
   /** the generalized data seam (contracts §1) — Worker/WS/Veles behind one interface. */
   dataSource: ModelDataSource;
   workspace: string;
+  /** Route supplied with a replacement snapshot; takes precedence over the still-mounted shell's URL. */
+  initialAppPath?: string;
   catalog: CatalogGroup[];
   files: string[];
   displayMode: DisplayMode;
@@ -158,7 +160,7 @@ function seedLayoutName(tab: SubjectTab): string {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : 'untitled';
 }
 
-export function ShellFrame({ dataSource, workspace, catalog, files, displayMode, getSourceText, onError, onNotice, pickFiles = pickFilesFromDisk, downloadFile = downloadToDisk, onActiveChange, viewState, editContext, irisBaseUrl, processingSource, runSource, validateProgram }: ShellFrameProps) {
+export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, files, displayMode, getSourceText, onError, onNotice, pickFiles = pickFilesFromDisk, downloadFile = downloadToDisk, onActiveChange, viewState, editContext, irisBaseUrl, processingSource, runSource, validateProgram }: ShellFrameProps) {
   const [shell, setShell] = useState<ShellState>(emptyShell);
   // processing face (DM-P4): the fixture source serves the hero graph in dev + tests; the live
   // TtrpServerProcessingSource plugs in behind the same interface. The run backend is a separate
@@ -203,12 +205,12 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   const hostedBootPending = useRef(isHosted());
   // the edit gate (FO-21) — true only when an authoring context is injected AND grants it.
   const canEdit = !!editContext?.editable;
-  // Snapshot the address bar on first render, BEFORE the URL-sync effect can rewrite it — the
-  // deep-link boot parses this snapshot so it survives the catalog arriving a tick later. It is the
+  // Capture the boot route once. A hosted replacement supplies its requested route explicitly;
+  // otherwise snapshot the address bar before URL sync or an async catalog can rewrite it. It is the
   // APP path: base path stripped, session parameters (`?veles=`, `?lang=`) removed (ttr-core#171).
   const initialUrlRef = useRef<string | null>(null);
   if (initialUrlRef.current === null) {
-    initialUrlRef.current = currentAppPath();
+    initialUrlRef.current = initialAppPath ?? currentAppPath();
   }
 
   const tab = activeTab(shell);
