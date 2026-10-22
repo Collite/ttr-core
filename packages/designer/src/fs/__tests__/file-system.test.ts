@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { loadProjectViaUpload } from '../file-system';
 
 describe('loadProjectViaUpload', () => {
@@ -56,6 +56,25 @@ describe('loadProjectViaUpload', () => {
 });
 
 describe('loadProjectViaFileSystemAccessAPI', () => {
+  it('walks nested project files and retains the selected handle for a later save', async () => {
+    const dir = (name: string, children: unknown[]) => ({ name, kind: 'directory', async *entries() { for (const child of children) yield [(child as { name: string }).name, child]; } });
+    const file = (name: string, text: string) => ({ name, kind: 'file', getFile: async () => ({ text: async () => text }) });
+    const handle = dir('world', [file('modeler.toml', '[bindings]\nrequired = true'), dir('model', [
+      dir('er', [file('items.ttrm', 'model er')]),
+      dir('layouts', [file('sales.ttrg', 'graph sales {}'), file('sales.ttrl', 'layout {}')]),
+      file('photo.png', 'no'),
+    ]), dir('.git', [file('config.toml', 'no')]), dir('node_modules', [file('package.toml', 'no')])]);
+    Object.defineProperty(window, 'showDirectoryPicker', { value: vi.fn().mockResolvedValue(handle), configurable: true });
+    try {
+      const { loadProjectViaFileSystemAccessAPI } = await import('../file-system');
+      const project = await loadProjectViaFileSystemAccessAPI();
+      expect(project?.directoryHandle).toBe(handle);
+      expect([...project!.files.keys()]).toEqual(['modeler.toml', 'model/er/items.ttrm', 'model/layouts/sales.ttrg', 'model/layouts/sales.ttrl']);
+    } finally {
+      delete (window as unknown as Record<string, unknown>).showDirectoryPicker;
+    }
+  });
+
   it('returns null when showDirectoryPicker is undefined', async () => {
     const { loadProjectViaFileSystemAccessAPI } = await import('../file-system');
     const result = await loadProjectViaFileSystemAccessAPI();

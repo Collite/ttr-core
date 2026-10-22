@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+export type { ProjectRootResult, SchemaSubject, ListedSymbol, ListSymbolsParams, SymbolPage } from './hosted-protocol.js';
 export type {
   RenderableSchemaCode,
   DisplayMode,

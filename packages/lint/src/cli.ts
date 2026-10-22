@@ -17,13 +17,13 @@ import {
   effectiveSchemaId,
 } from '@tatrman/semantics';
 import { DiagnosticCode } from '@tatrman/parser';
-import type { ResolvedManifest } from '@tatrman/semantics';
+import type { ManifestDiagnostic, ResolvedManifest } from '@tatrman/semantics';
 import { applyWorkspaceEditToText } from '@tatrman/edit';
 import { lintDocument, lintProject } from './runner.js';
 import { loadLintConfig, type ResolvedLintConfig } from './config.js';
 import { collectSafeFixes } from './fix.js';
 import { RULES } from './registry.js';
-import type { LintDiagnostic, Rule } from './rule.js';
+import type { LintCode, LintDiagnostic, Rule } from './rule.js';
 
 const RANK: Record<string, number> = { off: 0, info: 1, warning: 2, error: 3, none: 0 };
 
@@ -149,7 +149,7 @@ function lintAll(root: string, files: string[], config: ResolvedLintConfig, rule
   }
   // Config-level diagnostics (unknown rule, clamp, deprecation) once.
   out.push(...config.diagnostics);
-  // Manifest-load diagnostics (D9: schema-name-collision / unknown-package-schema),
+  // Manifest-load diagnostics, preserving their individual codes and severities,
   // attributed to modeler.toml.
   out.push(...manifestDiagnostics(root, project.deps.manifest));
   return out;
@@ -158,12 +158,18 @@ function lintAll(root: string, files: string[], config: ResolvedLintConfig, rule
 /** validateManifest() diagnostics mapped onto LintDiagnostic, sourced at modeler.toml. */
 function manifestDiagnostics(root: string, manifest: ResolvedManifest): LintDiagnostic[] {
   const tomlFile = join(root, 'modeler.toml');
-  const codeFor = (c: string): DiagnosticCode =>
-    c === 'schema-name-collision' ? DiagnosticCode.SchemaNameCollision : DiagnosticCode.UnknownPackageSchema;
+  const codeFor = (c: ManifestDiagnostic['code']): LintCode => {
+    switch (c) {
+      case 'schema-name-collision': return DiagnosticCode.SchemaNameCollision;
+      case 'unknown-package-schema': return DiagnosticCode.UnknownPackageSchema;
+      case 'manifest/unknown-key': return 'ttrlint/manifest-unknown-key';
+      default: { const exhaustive: never = c; return exhaustive; }
+    }
+  };
   return validateManifest(manifest).map((d) => ({
     ruleId: d.code,
     code: codeFor(d.code),
-    severity: 'error' as const,
+    severity: d.severity,
     message: d.message,
     source: { file: tomlFile, line: 1, column: 0, endLine: 1, endColumn: 0, offsetStart: 0, offsetEnd: 0 },
   }));

@@ -2,7 +2,11 @@
 export interface ProjectFiles {
   rootName: string;
   files: Map<string, string>;
+  /** Retained so local edits can later be written back to the selected folder. */
+  directoryHandle?: FileSystemDirectoryHandle;
 }
+
+const isProjectFile = (name: string) => /\.(ttrm|ttrg|ttrl|toml)$/.test(name);
 
 export async function loadProjectViaUpload(input: HTMLInputElement): Promise<ProjectFiles> {
   const files = new Map<string, string>();
@@ -11,7 +15,7 @@ export async function loadProjectViaUpload(input: HTMLInputElement): Promise<Pro
 
   let rootName = 'project';
   for (const file of Array.from(entries)) {
-    if (!file.name.endsWith('.ttrm') && !file.name.endsWith('.ttrg') && !file.name.endsWith('.toml')) {
+    if (!isProjectFile(file.name)) {
       continue;
     }
     const content = await file.text();
@@ -33,16 +37,21 @@ export async function loadProjectViaFileSystemAccessAPI(): Promise<ProjectFiles 
   try {
     const dirHandle = await (window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker();
     const files = new Map<string, string>();
-    for await (const [name, handle] of dirHandle.entries()) {
-      if (handle.kind === 'file') {
-        if (!name.endsWith('.ttrm') && !name.endsWith('.ttrg') && !name.endsWith('.toml')) continue;
-        const fileHandle = handle as FileSystemFileHandle;
-        const file = await fileHandle.getFile();
-        const content = await file.text();
-        files.set(name, content);
+    async function walk(directory: FileSystemDirectoryHandle, prefix = ''): Promise<void> {
+      for await (const [name, handle] of directory.entries()) {
+        const path = `${prefix}${name}`;
+        if (handle.kind === 'directory') {
+          // Tool caches / dependencies aren't project sources (and may be huge).
+          if (name.startsWith('.') || name === 'node_modules') continue;
+          await walk(handle as FileSystemDirectoryHandle, `${path}/`);
+        } else if (isProjectFile(name)) {
+          const file = await (handle as FileSystemFileHandle).getFile();
+          files.set(path, await file.text());
+        }
       }
     }
-    return { rootName: dirHandle.name, files };
+    await walk(dirHandle);
+    return { rootName: dirHandle.name, files, directoryHandle: dirHandle };
   } catch {
     return null;
   }

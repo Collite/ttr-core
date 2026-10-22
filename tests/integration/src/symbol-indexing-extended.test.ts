@@ -109,13 +109,13 @@ describe('symbol-indexing-extended (H.4)', () => {
   });
 
   it('listSymbols with kinds=[relation] returns at least one relation', async () => {
-    const allSymbols = await client.sendRequest('modeler/listSymbols', { kinds: ['relation'], limit: 500 }) as Array<{ qname: string; kind: string; name: string }>;
+    const { symbols: allSymbols } = await client.sendRequest('modeler/listSymbols', { kinds: ['relation'], limit: 500 }) as import('@tatrman/lsp').SymbolPage;
     expect(allSymbols.length, `Expected at least 1 relation symbol, got ${allSymbols.length}`).toBeGreaterThanOrEqual(1);
     expect(allSymbols[0].kind).toBe('relation');
   });
 
   it('getSymbolDetail for a known relation qname returns non-null with perKindData.kind === relation', async () => {
-    const allSymbols = await client.sendRequest('modeler/listSymbols', { kinds: ['relation'], limit: 500 }) as Array<{ qname: string; kind: string; name: string }>;
+    const { symbols: allSymbols } = await client.sendRequest('modeler/listSymbols', { kinds: ['relation'], limit: 500 }) as import('@tatrman/lsp').SymbolPage;
     expect(allSymbols.length, `Expected at least 1 relation symbol, got ${allSymbols.length}`).toBeGreaterThanOrEqual(1);
 
     const firstRelation = allSymbols[0];

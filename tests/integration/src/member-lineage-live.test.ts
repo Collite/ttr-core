@@ -81,7 +81,7 @@ describe('member lineage — live LSP path (W2)', () => {
   });
 
   it('listSymbols includeMembers:true surfaces member refs (kind:"member" + memberPath + parent)', async () => {
-    const withMembers = await client.sendRequest('modeler/listSymbols', { includeMembers: true, limit: 5000 }) as Array<{ qname: string; kind: string; name: string; memberPath?: string[]; parent?: string }>;
+    const { symbols: withMembers } = await client.sendRequest('modeler/listSymbols', { includeMembers: true, limit: 5000 }) as import('@tatrman/lsp').SymbolPage;
     const members = withMembers.filter((s) => s.kind === 'member');
     expect(members.length, 'includeMembers must surface at least one member ref').toBeGreaterThanOrEqual(1);
     const m = members[0];
@@ -90,7 +90,7 @@ describe('member lineage — live LSP path (W2)', () => {
     expect(m.qname.startsWith(`${m.parent}.`), `member qname ${m.qname} is under parent ${m.parent}`).toBe(true);
 
     // and the default (no includeMembers) does NOT include members — additive, opt-in
-    const noMembers = await client.sendRequest('modeler/listSymbols', { limit: 5000 }) as Array<{ kind: string }>;
+    const { symbols: noMembers } = await client.sendRequest('modeler/listSymbols', { limit: 5000 }) as import('@tatrman/lsp').SymbolPage;
     expect(noMembers.some((s) => s.kind === 'member')).toBe(false);
   });
 });

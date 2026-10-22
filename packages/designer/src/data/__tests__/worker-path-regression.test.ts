@@ -37,19 +37,46 @@ function defaultResult(method: string): unknown {
     case 'modeler/getSymbolDetail':
       return null;
     case 'modeler/listSymbols':
-      return [];
+      return { symbols: [], total: 0 };
     default:
       return {};
   }
 }
 
 import { createLspClient } from '../../lsp-client.js';
+import { lspClientOver } from '../../lsp-connection.js';
+
+it('restarts symbol paging once after a stale cursor without retaining the partial list', async () => {
+  let reads = 0;
+  const request = vi.fn(async (method: string) => {
+    if (method === 'initialize') return {};
+    reads++;
+    if (reads === 1) return { symbols: [{ qname: 'old' }], total: 2, nextCursor: '1:1' };
+    if (reads === 2) throw Object.assign(new Error('stale cursor'), { code: -32602 });
+    if (reads === 3) return { symbols: [{ qname: 'a' }], total: 2, nextCursor: '2:1' };
+    return { symbols: [{ qname: 'b' }], total: 2 };
+  });
+  const client = await lspClientOver({ sendRequest: request, sendNotification: vi.fn(), onNotification: vi.fn() }, { transportKind: 'browser', dispose: vi.fn() });
+  expect((await client.listSymbols()).map((s) => s.qname)).toEqual(['a', 'b']);
+  expect(request.mock.calls).toHaveLength(5);
+});
 
 beforeEach(() => {
   sent.length = 0;
 });
 
 describe('worker path regression pins (lsp-client.ts request payloads)', () => {
+  it('reads every symbol page, retaining filters across requests', async () => {
+    const request = vi.fn(async (method: string, params: unknown) => {
+      if (method === 'initialize') return {};
+      const cursor = (params as { cursor?: string }).cursor;
+      return { symbols: [{ qname: cursor ? 'b' : 'a' }], total: 2, ...(cursor ? {} : { nextCursor: '1' }) };
+    });
+    const client = await lspClientOver({ sendRequest: request, sendNotification: vi.fn(), onNotification: vi.fn() }, { transportKind: 'browser', dispose: vi.fn() });
+    expect((await client.listSymbols({ kinds: ['table'], limit: 1 })).map((s) => s.qname)).toEqual(['a', 'b']);
+    expect(request).toHaveBeenLastCalledWith('modeler/listSymbols', { kinds: ['table'], limit: 1, cursor: '1' });
+  });
+
   it('listGraphs sends modeler/listGraphs {projectRoot}', async () => {
     const client = await createLspClient();
     await client.listGraphs('file:///proj');
