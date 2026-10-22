@@ -303,7 +303,7 @@ export class Resolver {
         const symbol = resolveMdRef(this.symbols, path, ref.mdContext, context.packageName);
         if (!symbol) continue;
         if (symbol.packageName === context.packageName || ref.parts.length > 1) {
-          return { resolved: true, symbol, viaStep: 'fully-qualified' };
+          return { resolved: true, symbol, viaStep: ref.parts.length === 1 ? 'same-package' : 'fully-qualified' };
         }
         fallback ??= symbol;
       }
@@ -360,7 +360,10 @@ export class Resolver {
         (entry) => entry.name === ref.path && entry.qname !== enclosingCandidate && entry.qname !== fullQname
       );
       const sameModel = matches.filter((entry) => entry.schemaCode === context.schemaCode);
-      const candidates = (sameModel.length ? sameModel : matches).sort((a, b) => a.qname.localeCompare(b.qname));
+      const pool = sameModel.length ? sameModel : matches;
+      // Members remain reachable lexically and as a fallback when no top-level definition matches.
+      const topLevel = pool.filter((entry) => !entry.parent);
+      const candidates = (topLevel.length ? topLevel : pool).sort((a, b) => a.qname.localeCompare(b.qname));
       if (candidates.length === 1) {
         return { resolved: true, symbol: candidates[0], viaStep: 'same-package' };
       }

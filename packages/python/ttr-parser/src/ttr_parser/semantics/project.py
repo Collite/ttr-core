@@ -108,6 +108,7 @@ class Project:
                     enclosing_qname=enclosing,
                 ),
                 cn_context=collected.cn_context,
+                md_context=collected.md_context,
             )
             if isinstance(res, Unresolved) and (res.reason == "ambiguous" or not collected.soft):
                 code = (

@@ -26,6 +26,24 @@ describe('same-package candidate selection', () => {
     }
   });
 
+  it('prefers top-level definitions over same-named members in both orders and from other models', () => {
+    const texts = [
+      'model er\ndef entity customer {}',
+      'model er\ndef entity order { attributes: [def attribute customer { type: int }] }',
+    ];
+    for (const order of [texts, [...texts].reverse()]) {
+      for (const schemaCode of ['er', 'lexicon']) {
+        expect(project(order).resolveReference({ path: 'customer', parts: ['customer'] }, { ...context, schemaCode }))
+          .toMatchObject({ resolved: true, symbol: { qname: 'shop.er.entity.customer' } });
+      }
+    }
+    expect(project([texts[1]]).resolveReference({ path: 'customer', parts: ['customer'] }, context))
+      .toMatchObject({ resolved: true, symbol: { qname: 'shop.er.entity.order.customer' } });
+    expect(project(texts).resolveReference({ path: 'customer', parts: ['customer'] },
+      { ...context, enclosingQname: 'shop.er.entity.order' }))
+      .toMatchObject({ resolved: true, symbol: { qname: 'shop.er.entity.order.customer' }, viaStep: 'lexical' });
+  });
+
   it('reports all remaining candidates deterministically instead of choosing the first', () => {
     const texts = [
       'model er\ndef entity sale { attributes: [def attribute revenue { type: decimal }] }',
@@ -49,7 +67,7 @@ describe('same-package candidate selection', () => {
     const ast = parseString('package shop\nmodel md\ndef cubelet Sales { grain: [], measures: [revenue] }').ast!;
     const [{ ref }] = collectAllReferences(ast);
     expect(resolver.resolveReference(ref, { ...context, schemaCode: 'md' }))
-      .toMatchObject({ resolved: true, symbol: { qname: 'shop.md.measure.revenue' } });
+      .toMatchObject({ resolved: true, symbol: { qname: 'shop.md.measure.revenue' }, viaStep: 'same-package' });
   });
 
   it('never substitutes another kind for a missing MD measure', () => {

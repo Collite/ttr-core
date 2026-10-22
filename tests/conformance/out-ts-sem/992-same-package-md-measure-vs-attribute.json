@@ -1,0 +1,14 @@
+{
+    "diagnostics": [],
+    "resolved": [
+        "md.Money => shop.md.domain.Money",
+        "revenue => shop.md.measure.revenue"
+    ],
+    "symbols": [
+        "shop.er.entity.sale",
+        "shop.er.entity.sale.revenue",
+        "shop.md.cubelet.sales",
+        "shop.md.domain.Money",
+        "shop.md.measure.revenue"
+    ]
+}

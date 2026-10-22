@@ -1,0 +1,13 @@
+{
+    "diagnostics": [
+        "ttr/ambiguous-reference"
+    ],
+    "resolved": [],
+    "symbols": [
+        "shop.db.dbo.term.Revenue",
+        "shop.er.entity.order",
+        "shop.er.entity.order.revenue",
+        "shop.er.entity.sale",
+        "shop.er.entity.sale.revenue"
+    ]
+}

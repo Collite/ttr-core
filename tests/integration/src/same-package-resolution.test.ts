@@ -64,6 +64,35 @@ describe('same-package reference resolution (#258)', () => {
     expect((await detail('shop.er.entity.sale.revenue')).referencedBy).toHaveLength(0);
   });
 
+  it.each([false, true])('keeps bare entity references indexed beside same-named attributes (reverse=%s)', async (reverse) => {
+    const docs = Object.entries({
+      entities: 'package shop\nmodel er\ndef entity customer {}\ndef entity order { attributes: [def attribute customer { type: int }] }',
+      relations: 'package shop\nmodel er\ndef relation places { from: order, to: customer, cardinality: { from: "0..*", to: "1" } }',
+      terms: 'package shop\nmodel lexicon locale en\ndef term Customer { for: customer, forms: ["Customer"] }',
+    });
+    for (const [name, text] of reverse ? docs.reverse() : docs) {
+      await client.sendNotification('textDocument/didOpen', { textDocument: {
+        uri: `${ROOT}/${name}.ttrm`, languageId: 'ttr', version: 1, text,
+      } });
+    }
+    await client.sendRequest('modeler/setProjectRoot', { projectRoot: ROOT, manifest: MANIFEST });
+    expect([...diagnostics.values()].flat().filter((d) => d.code === DiagnosticCode.AmbiguousReference)).toEqual([]);
+    const detail = await client.sendRequest('modeler/getSymbolDetail', { qname: 'shop.er.entity.customer' }) as { referencedBy: { qname: string }[] };
+    expect(detail.referencedBy).toHaveLength(2);
+    expect(detail.referencedBy.map((r) => r.qname)).toContain('shop.er.relation.places');
+    const references = await client.sendRequest('textDocument/references', {
+      textDocument: { uri: `${ROOT}/entities.ttrm` }, position: { line: 2, character: 15 },
+      context: { includeDeclaration: false },
+    }) as lsp.Location[];
+    expect(references.map((r) => r.uri).sort()).toEqual([`${ROOT}/relations.ttrm`, `${ROOT}/terms.ttrm`]);
+    const edit = await client.sendRequest('textDocument/rename', {
+      textDocument: { uri: `${ROOT}/entities.ttrm` }, position: { line: 2, character: 15 }, newName: 'buyer',
+    }) as lsp.WorkspaceEdit;
+    const changes = edit.documentChanges as lsp.TextDocumentEdit[];
+    expect(changes.map((c) => c.textDocument.uri).sort()).toEqual([`${ROOT}/entities.ttrm`, `${ROOT}/relations.ttrm`, `${ROOT}/terms.ttrm`]);
+    expect(changes.find((c) => c.textDocument.uri.endsWith('/entities.ttrm'))?.edits).toHaveLength(1);
+  });
+
   it('publishes same-package ambiguity on the reference rather than choosing an attribute', async () => {
     const uri = `${ROOT}/terms.ttrm`;
     for (const [name, text] of Object.entries({
