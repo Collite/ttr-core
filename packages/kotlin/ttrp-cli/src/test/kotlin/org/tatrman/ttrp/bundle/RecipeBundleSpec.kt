@@ -23,9 +23,12 @@ import org.tatrman.ttr.metadata.source.LocalFsStorage
 import org.tatrman.ttrp.emit.recipe.RecipeFingerprints
 import org.tatrman.ttrp.graph.TtrpPipeline
 import org.tatrman.ttrp.project.TtrpManifest
+import java.net.URI
+import java.net.URLDecoder
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.util.Properties
 
 /**
  * AU-core-P2 · S2.3 T1–T7 — a recipe builds into `<recipe>.bundle/` (contracts §5.2): one statement file per output,
@@ -450,7 +453,7 @@ class RecipeBundleSpec :
         }
 
         "integer and numeric ceil/round output types match executed PostgreSQL columns".config(
-            enabled = System.getenv("TTRP_ROUNDING_PG") == "1",
+            enabled = System.getenv("TTRP_CONFORM_PG") == "1",
         ) {
             val r =
                 build(
@@ -474,7 +477,29 @@ class RecipeBundleSpec :
             val sql = Files.readString(r.dir.resolve("islands/placed.orders.sql"))
             val url =
                 System.getenv("TTR_CONN_ERP_PG") ?: "postgresql://localhost:55432/postgres?user=postgres&password=ttrp"
-            java.sql.DriverManager.getConnection("jdbc:$url").use { db ->
+            val uri = URI(url)
+            val props = Properties()
+
+            fun decode(value: String) = URLDecoder.decode(value, Charsets.UTF_8)
+            uri.rawUserInfo?.split(":", limit = 2)?.let {
+                props.setProperty("user", decode(it[0]))
+                if (it.size == 2) props.setProperty("password", decode(it[1]))
+            }
+            uri.rawQuery?.split("&")?.filter { it.isNotEmpty() }?.forEach {
+                val pair = it.split("=", limit = 2)
+                props.setProperty(decode(pair[0]), decode(pair.getOrElse(1) { "" }))
+            }
+            val jdbcUri =
+                URI(
+                    "postgresql",
+                    null,
+                    uri.host,
+                    uri.port.takeIf { it > 0 } ?: 5432,
+                    uri.path.ifEmpty { "/postgres" },
+                    null,
+                    null,
+                )
+            java.sql.DriverManager.getConnection("jdbc:$jdbcUri", props).use { db ->
                 db.createStatement().use { stmt ->
                     stmt.execute("CREATE TEMP TABLE \"order\" (order_number INTEGER, value NUMERIC(12,2))")
                     stmt.execute("INSERT INTO \"order\" VALUES (7, 12.3)")
