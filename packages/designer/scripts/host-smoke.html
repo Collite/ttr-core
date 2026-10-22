@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><title>Studio iframe smoke host</title>
+  <style>
+    body {
+      margin: 0;
+      font: 14px system-ui;
+      background: #f1f5f9;
+    }
+    header {
+      padding: 10px;
+    }
+    iframe {
+      border: 0;
+      width: 100%;
+      height: 820px;
+      background: white;
+    }
+  </style>
+  <header>Studio iframe smoke · <span id="status">loading</span></header>
+  <iframe title="Hosted Studio" id="studio"></iframe>
+  <script>
+    const frame = document.getElementById('studio');
+    window.messages = [];
+    window.hostSend = (message) => frame.contentWindow.postMessage(message, location.origin);
+    frame.onload = () => {
+      window.initAt = performance.now();
+      hostSend({
+        type: 'ttr.host.init',
+        basePath: '/m/',
+        api: '/api/model',
+        token: 'smoke-only',
+        scope: { kind: 'served' },
+        lang: 'en',
+        theme: 'light',
+      });
+    };
+    window.addEventListener('message', (event) => {
+      if (event.origin !== location.origin || event.source !== frame.contentWindow) return;
+      messages.push(event.data);
+      if (event.data.type === 'ttr.frame.ready') {
+        window.readyMs = performance.now() - initAt;
+        document.getElementById('status').textContent = `ready in ${Math.round(readyMs)} ms`;
+      }
+      if (event.data.type === 'ttr.frame.location') {
+        history.replaceState(null, '', '/m/' + event.data.location.replace(/^\/w\//, ''));
+      }
+    });
+    frame.src = '/m/_designer/index.html?backend=host#/w/hartland/s/md';
+  </script>
+</html>

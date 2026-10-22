@@ -61,7 +61,8 @@ import { CommandPalette, useCmdKShortcut } from './CommandPalette.js';
 import { syncUrl, parsePath, formatPath } from './url.js';
 import { tabUrl } from './popout.js';
 import { federationIntentFromPath, federationPathForTab, askUrlForTab } from './federation-link.js';
-import { absoluteUrlFor, currentAppPath, replaceAppPath } from './app-location.js';
+import { absoluteUrlFor, currentAppPath, replaceAppPath, APP_NAVIGATE } from './app-location.js';
+import { isHosted } from '../host/host-channel.js';
 import { CopyLinkButton } from './CopyLinkButton.js';
 import { color, radius, space, fontSize } from '@tatrman/tokens';
 
@@ -199,6 +200,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   const [lineageState, setLineageState] = useState<Record<string, { scope: LineageScope; direction: LineageDirection; rootKind: ObjectKind; rootRef?: LineageRootRef }>>({});
   const loadingRef = useRef<Set<string>>(new Set());
   const bootedRef = useRef(false);
+  const hostedBootPending = useRef(isHosted());
   // the edit gate (FO-21) — true only when an authoring context is injected AND grants it.
   const canEdit = !!editContext?.editable;
   // Snapshot the address bar on first render, BEFORE the URL-sync effect can rewrite it — the
@@ -366,15 +368,22 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
 
   // Deep-link boot (contracts §6): once the catalog is available, parse the URL and open the
   // linked subject durably. An unknown ref is the DS-SHELL-001 hint, never a crash. Runs once.
-  useEffect(() => {
-    if (bootedRef.current || catalog.length === 0) return;
-    bootedRef.current = true;
+  function restorePath(path: string) {
+    setBootHint(null);
     const known = new Set<string>();
     for (const g of catalog) for (const it of g.items) known.add(it.ref);
-    const url = parsePath(initialUrlRef.current ?? '', known);
+    const url = parsePath(path, known);
     if (url.kind === 'subject') {
       const item = catalog.flatMap((g) => g.items).find((it) => it.ref === url.subjectRef);
-      if (item) openItem(item, false);
+      if (item) {
+        openItem(item, false);
+        setSubjectSkins((s) => {
+          const next = { ...s };
+          if (url.skin) next[item.ref] = url.skin;
+          else delete next[item.ref];
+          return next;
+        });
+      }
     } else if (url.kind === 'unknownSubject') {
       setBootHint(`This link points to “${url.subjectRef}”, which isn't in this workspace (DS-SHELL-001).`);
     } else if (url.kind === 'perspective') {
@@ -399,7 +408,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
       // Federation fallback (FO §3): an inbound cross-app deep link (`/s/viewer?object=…`,
       // `/s/lineage?cell=…`, `/s/process?program=…`) isn't an internal §6 path, so parsePath
       // yields `none`. Resolve it to the same open action a shared §6 link would take.
-      const intent = federationIntentFromPath(initialUrlRef.current ?? '');
+      const intent = federationIntentFromPath(path);
       if (intent?.kind === 'subject') {
         const item = catalog.flatMap((g) => g.items).find((it) => it.ref === intent.ref);
         if (item) openItem(item, false);
@@ -410,13 +419,29 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
         const item = catalog.flatMap((g) => g.items).find((it) => it.ref === intent.program && it.kind === 'program');
         if (item) openItem(item, false);
         else setBootHint(`This link points to the process “${intent.program}”, which isn't in this workspace (DS-SHELL-001).`);
+      } else if (isHosted()) {
+        setShell((s) => ({ ...s, activeTabId: null }));
       }
     }
+  }
+  useEffect(() => {
+    if (bootedRef.current || catalog.length === 0) return;
+    bootedRef.current = true;
+    restorePath(initialUrlRef.current ?? '');
   }, [catalog]);
+  // Keep the current catalog / tab closures when navigating a mounted hosted shell.
+  useEffect(() => {
+    const navigate = (e: Event) => restorePath((e as CustomEvent<string>).detail);
+    window.addEventListener(APP_NAVIGATE, navigate);
+    return () => window.removeEventListener(APP_NAVIGATE, navigate);
+  });
 
   // URL round-trip: reflect the active tab in the address bar (a truth surface like the chip).
   useEffect(() => {
     if (!bootedRef.current) return;
+    // Opening the initial tab can take an async layout read. Preserve its hash until it arrives.
+    if (hostedBootPending.current && !tab) return;
+    hostedBootPending.current = false;
     if (!tab) { syncUrl({ kind: 'none', workspace }); return; }
     // App paths throughout: replaceAppPath keeps the base path and the session parameters, so the
     // rewritten URL reloads into this same backend and graph (ttr-core#171).
@@ -823,7 +848,7 @@ export function ShellFrame({ dataSource, workspace, catalog, files, displayMode,
   // unsaved local work arms the browser's leave-page prompt (V-30); a catalog layout re-reads on reload
   const unsaved = hasUnsavedLocalLayout(shell);
   useEffect(() => {
-    if (!unsaved) return;
+    if (!unsaved || isHosted()) return;
     const guard = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', guard);
     return () => window.removeEventListener('beforeunload', guard);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PassThrough } from 'node:stream';
 import * as lsp from 'vscode-languageserver/node';
 import { createServerConnection } from '@tatrman/lsp/server';
@@ -8,6 +8,7 @@ import type { LspClient } from '../../lsp-client.js';
 import { WorkerLspDataSource } from '../worker-lsp-data-source.js';
 import { buildCatalog } from '../../shell/catalog.js';
 import { projectLayout } from '../../model/layout-projection.js';
+import { BffFilesDataSource } from '../bff-files-data-source.js';
 
 const ROOT = 'file:///world';
 const files = new Map([
@@ -42,6 +43,30 @@ beforeAll(async () => {
 afterAll(() => close());
 
 describe('hosted worker catalog and reads over the real LSP', () => {
+  it('replaces a BFF snapshot without retaining deleted documents or cached symbols', async () => {
+    const createClient = async () => {
+      const toServer = new PassThrough();
+      const toClient = new PassThrough();
+      const server = lsp.createConnection(new lsp.StreamMessageReader(toServer), new lsp.StreamMessageWriter(toClient));
+      const connection = lsp.createConnection(new lsp.StreamMessageReader(toClient), new lsp.StreamMessageWriter(toServer));
+      createServerConnection(server, { layoutStore: new Map() });
+      server.listen(); connection.listen();
+      return lspClientOver({ sendRequest: (m, p) => connection.sendRequest(m, p), sendNotification: (m, p) => connection.sendNotification(m, p), onNotification: (m, h) => connection.onNotification(m, h) }, { transportKind: 'browser', dispose: () => { connection.dispose(); server.dispose(); } });
+    };
+    const fetcher = vi.fn<typeof fetch>(async () => ({ ok: true, json: async () => ({ sha: 'one', files: Object.fromEntries(files) }) }) as Response);
+    const bff = new BffFilesDataSource({ api: '/api/model', token: 't', scope: { kind: 'served' } }, { fetch: fetcher, createClient });
+    try {
+      await bff.refresh();
+      expect((await bff.getSchemaGraph('er'))!.nodes).toHaveLength(2);
+      expect((await bff.search({ query: 'sale' })).length).toBeGreaterThan(0);
+      expect((await bff.listCatalog()).graphs.map((g) => g.name)).toContain('sales');
+      fetcher.mockResolvedValue({ ok: true, json: async () => ({ sha: 'two', files: { 'modeler.toml': files.get('modeler.toml'), 'model/md/items.ttrm': files.get('model/md/items.ttrm') } }) } as Response);
+      await bff.refresh();
+      expect((await bff.getSchemaGraph('er'))!.nodes).toHaveLength(0);
+      expect(await bff.search({ query: 'sale' })).toEqual([]);
+      expect((await bff.listCatalog()).graphs.map((g) => g.name)).toEqual(['md']);
+    } finally { bff.dispose(); }
+  });
   it('lists whole schemas ahead of layouts and opens a whole-schema ref', async () => {
     const { graphs, symbols } = await source.listCatalog();
     const catalog = buildCatalog(graphs, symbols);

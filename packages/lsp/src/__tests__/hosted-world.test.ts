@@ -56,6 +56,17 @@ describe('the hosted worker world (shared Node/browser handlers)', () => {
     return result;
   }
 
+  it('indexes and diagnoses each didOpen once in the filesystem-free worker', async () => {
+    let publications = 0;
+    client.onNotification('textDocument/publishDiagnostics', (p: lsp.PublishDiagnosticsParams) => {
+      if (p.uri.endsWith('/model/er/items.ttrm')) publications++;
+    });
+    await client.sendRequest('modeler/setProjectRoot', { projectRoot: ROOT, manifest: MANIFEST });
+    await client.sendNotification('textDocument/didOpen', { textDocument: { uri: `${ROOT}/model/er/items.ttrm`, languageId: 'ttr', version: 1, text: FILES['model/er/items.ttrm'] } });
+    expect(await client.sendRequest('modeler/listSchemaSubjects', {})).toMatchObject({ subjects: [{ schema: 'er', objectCount: 1 }] });
+    expect(publications).toBe(1);
+  });
+
   it('loads the supplied TOML and resolves the model with no errors', async () => {
     expect(await load(MANIFEST)).toMatchObject({ ok: true, manifest: { bindings: { required: true } } });
     const errors = [...diagnostics.values()].flat().filter((d) => d.severity === 1);

@@ -2,6 +2,8 @@
 // Explicit backend selection — never sniffed (P2).
 //
 // Precedence (also documented in packages/designer/README.md):
+//   (0) `?backend=host` → BFF file snapshots + the same-origin parent protocol. Overrides
+//       deployment defaults; cannot be combined with server/veles/demo selectors.
 //   (1) `?server=ws://127.0.0.1:7270` → WsDesignerServerDataSource (the value is the
 //       WS origin; the client appends `/ttrm`). Loopback-only (a modeling-time server).
 //   (2) `?veles=<base>` → VelesReadApiDataSource, the read-only catalog view over the Veles
@@ -28,6 +30,7 @@
 // Both are `kind: 'veles'` (VS-2); the `transport` discriminant picks the adapter. The bearer for the
 // ttrm transport comes from `?velesToken=` (dev-only, static v1 — never emitted in a deep link).
 export type BackendSelection =
+  | { kind: 'host' }
   | { kind: 'ws'; origin: string }
   | { kind: 'veles'; transport: 'read-api'; base: string }
   | { kind: 'veles'; transport: 'ttrm'; origin: string; token: string | null }
@@ -152,6 +155,12 @@ export function selectBackend(search: string | URLSearchParams, defaults?: Backe
   const server = params.get('server');
   const veles = params.get('veles');
   const demo = params.get('demo');
+  const backend = params.get('backend');
+  if (backend !== null) {
+    if (backend !== 'host') throw new BackendSelectionError('Unknown `?backend=` value. Expected host.');
+    if (server !== null || veles !== null || demo !== null) throw new BackendSelectionError('`?backend=host` cannot be combined with another backend.');
+    return { kind: 'host' };
+  }
 
   const selectors = [server, veles].filter((v) => v !== null).length;
   if (selectors > 1 || (selectors === 1 && demo !== null)) {

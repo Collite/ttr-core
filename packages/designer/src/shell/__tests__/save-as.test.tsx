@@ -261,6 +261,14 @@ describe('leaving the page (V-30)', () => {
     return e.defaultPrevented;
   };
 
+  it('delegates leaving a hosted frame to its parent, even with an unsaved local layout', async () => {
+    window.history.replaceState(null, '', '/m/_designer/index.html?backend=host');
+    await openVector('positions');
+    fireEvent.click(screen.getByTestId('objects-none'));
+    await waitFor(() => expect(screen.getByTestId('tab-dirty')).toBeInTheDocument());
+    expect(leave()).toBe(false);
+  });
+
   it('is guarded iff a file / new layout has unsaved edits — never for a catalog layout', async () => {
     const { saved } = await openVector('positions');
     expect(leave()).toBe(false); // opened, untouched

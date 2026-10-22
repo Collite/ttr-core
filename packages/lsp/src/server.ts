@@ -881,6 +881,10 @@ export function createServerConnection(
   }
 
   documents.onDidOpen(async (event: TextDocumentChangeEvent<TextDocument>) => {
+    // TextDocuments fires onDidChangeContent immediately after onDidOpen, even for a new file.
+    // The worker already has its manifest: let that handler index/lint once. A desktop host's
+    // async manifest load still needs the second pass below, after its configuration arrives.
+    if (!opts.loadManifest) return;
     // First open in a workspace: ask the host for the manifest. Cheap when
     // no callback is wired (browser worker).
     if (opts.loadManifest) {

@@ -15,6 +15,13 @@ body {
   overflow: hidden;
 }
 
+/* The host sets the iframe dimensions. No viewport-sized roots or forced dark form controls. */
+html[data-hosted] { height: 100%; }
+html[data-hosted] body { height: 100%; }
+html[data-hosted] #root { height: 100%; width: 100%; overflow: visible; color-scheme: light; }
+html[data-hosted] .studio-root { height: 100%; min-height: 0; }
+.hosted-status { padding: 1rem; color: #64748b; }
+
 .cy-node-label {
   /* Sized to match the Cytoscape node body (220 x data(h)) so the overlay
      and the node rectangle line up. cytoscape-node-html-label centers the

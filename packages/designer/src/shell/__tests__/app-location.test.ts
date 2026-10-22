@@ -1,11 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
 // ttr-core#171 — the address bar keeps the base path and the session parameters across every
 // rewrite. Pure mapping between browser locations and the shell's APP paths (contracts §6).
-import { describe, it, expect } from 'vitest';
-import { stripBasePath, toAppPath, toBrowserPath, stickyParams } from '../app-location.js';
+import { afterEach, describe, it, expect } from 'vitest';
+import { stripBasePath, toAppPath, toBrowserPath, stickyParams, currentAppPath, replaceAppPath, absoluteUrlFor } from '../app-location.js';
+import { defaultRuntimeConfig, setRuntimeConfig } from '../../runtime-config.js';
 import { parsePath, formatPath } from '../url.js';
 
 describe('app-location (ttr-core#171)', () => {
+  afterEach(() => { window.history.replaceState(null, '', '/'); setRuntimeConfig(null); });
+  it('keeps hosted app navigation in the hash and makes shareable links enter the parent', () => {
+    window.history.replaceState(null, '', '/m/_designer/index.html?backend=host&lang=cs#/w/hartland/s/er');
+    setRuntimeConfig({ ...defaultRuntimeConfig(), basePath: '/m/' });
+    expect(currentAppPath()).toBe('/w/hartland/s/er');
+    replaceAppPath('/w/hartland/s/md?skin=md.star');
+    expect(window.location.pathname).toBe('/m/_designer/index.html');
+    expect(window.location.search).toBe('?backend=host&lang=cs');
+    expect(window.location.hash).toBe('#/w/hartland/s/md?skin=md.star');
+    expect(absoluteUrlFor('/w/hartland/s/layout%3Asales')).toBe(`${window.location.origin}/m/hartland/s/layout%3Asales`);
+  });
   it('strips the base path, leaving the shell its own grammar', () => {
     expect(stripBasePath('/w/veles/s/er', '/')).toBe('/w/veles/s/er');
     expect(stripBasePath('/models/w/veles/s/er', '/models/')).toBe('/w/veles/s/er');

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Avoid duplicate indexing/linting on document open when the host does not load manifests
+  asynchronously (including the browser worker). The document manager already fires content changed.
+
 - Accept `modeler.toml` text in `modeler/setProjectRoot` for browser workers;
   return the resolved manifest and warn once per root when it is omitted.
 - Add `modeler/listSchemaSubjects` with object and package counts.
