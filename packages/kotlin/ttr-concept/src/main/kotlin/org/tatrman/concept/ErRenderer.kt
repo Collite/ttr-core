@@ -97,18 +97,30 @@ internal class ErRenderer(
         return try {
             run.render()
         } catch (r: Refused) {
-            Rendering(
-                imprecisionMode = mode(target),
-                diagnostics = listOf(Diagnostic(r.slug, Severity.ERROR, r.message, target.ref)),
-            )
+            refused(target, r)
         }
     }
 
-    /** [target]'s predicate-mode rendering as the `SELECT` tree, with what it read — `materialize`'s input. */
-    internal fun select(target: Concept): Pair<Select, Rendering> {
+    /**
+     * [target]'s predicate-mode rendering as the `SELECT` tree, with what it read — `materialize`'s input. The tree is
+     * null when the renderer refuses; the rendering then carries why (review-125 R125-1 — never an exception).
+     */
+    internal fun select(target: Concept): Pair<Select?, Rendering> {
         val run = Run(target, RenderOptions())
-        return run.tree() to run.render()
+        return try {
+            run.tree() to run.render()
+        } catch (r: Refused) {
+            null to refused(target, r)
+        }
     }
+
+    private fun refused(
+        target: Concept,
+        r: Refused,
+    ) = Rendering(
+        imprecisionMode = mode(target),
+        diagnostics = listOf(Diagnostic(r.slug, Severity.ERROR, r.message, target.ref)),
+    )
 
     private class Refused(
         val slug: String,

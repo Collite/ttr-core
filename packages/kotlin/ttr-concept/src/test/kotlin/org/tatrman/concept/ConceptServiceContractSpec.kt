@@ -57,6 +57,10 @@ class ConceptServiceContractSpec :
             svc.assertionExplain(Assertion.getDefaultInstance(), "cs").diagnostics.shouldNotBeEmpty()
             svc.definitionRender(empty, Layer.ER, "postgresql", RenderOptions()).diagnostics.shouldNotBeEmpty()
             svc.materialize(empty, "postgresql").diagnostics.shouldNotBeEmpty()
+            // and a phase that exists but does not render on er (review-125 R125-1)
+            val sales: ConceptService = CnConceptService(GoldenWorlds["sales"].cn)
+            val active = ConceptRef.newBuilder().setQname("cn.ActiveCustomer").build()
+            sales.materialize(active, "postgresql").diagnostics.shouldNotBeEmpty()
         }
 
         test("Via and GroundingGrade are the typed model's (ttr-metadata since CN-P2 S2.5), aliased here") {

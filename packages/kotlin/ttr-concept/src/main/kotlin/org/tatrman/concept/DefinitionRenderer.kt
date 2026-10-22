@@ -178,12 +178,13 @@ internal class DefinitionRenderer(
         ) {
             return refused(ER_UNREACHABLE, "`${c.ref}` is a ${c.stereotype} — materialize writes a phase")
         }
-        val (select, rendering) = er.select(c)
+        val (tree, rendering) = er.select(c)
         rendering.diagnostics.firstOrNull { it.severity == Severity.ERROR }?.let {
             return ModelText(
                 diagnostics = listOf(it),
             )
         }
+        val select = checkNotNull(tree) // a rendering without an error has its tree
         if (rendering.parametersRead.isNotEmpty()) {
             return refused(
                 PARAMETRIC,

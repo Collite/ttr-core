@@ -21,7 +21,7 @@ import kotlin.io.path.readText
 /**
  * CN-P3 S3.4 T6 — `materialize` and `ttr cn materialize`: the text a phase materializes to parses and reconciles in its
  * model (the logical query and the entity stacked on it, bound to it); the CLI prints it or writes it under `--out`, and
- * refuses a parametric definition with exit 1.
+ * refuses a parametric definition — or one the er renderer refuses — with exit 1.
  */
 class MaterializeSpec :
     FunSpec({
@@ -71,5 +71,20 @@ class MaterializeSpec :
             refused.statusCode shouldBe 1
             refused.stderr shouldContain "cn/materialize-parametric"
             runTtr(listOf("cn", "materialize", "${world.dir}")) shouldBe 2 // usage: the phase is missing
+        }
+
+        test("a phase the er renderer refuses is refused — by the service and by the CLI, never thrown (R125-1)") {
+            val sales = GoldenWorlds["sales"]
+            val text =
+                CnConceptService(sales.cn).materialize(
+                    ConceptRef.newBuilder().setQname("cn.ActiveCustomer").build(),
+                    "postgresql",
+                )
+            text.files shouldBe emptyMap()
+            text.diagnostics.map { it.slug to it.severity } shouldBe
+                listOf("cn/definition-unreachable(er)" to Severity.ERROR)
+            val refused = ttr().test("cn materialize ${sales.dir} cn.ActiveCustomer")
+            refused.statusCode shouldBe 1
+            refused.stderr shouldContain "cn/definition-unreachable(er)"
         }
     })

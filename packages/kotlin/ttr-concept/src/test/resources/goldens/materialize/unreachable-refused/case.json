@@ -1,0 +1,7 @@
+{
+  "world": "sales",
+  "call": "materialize",
+  "stage": "S3.8",
+  "target": "cn.ActiveCustomer",
+  "dialect": "postgresql"
+}
