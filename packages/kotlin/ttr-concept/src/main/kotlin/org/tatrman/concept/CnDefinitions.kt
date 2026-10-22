@@ -286,6 +286,23 @@ internal class DefinitionResolver(
         data object Opaque : Value
     }
 
+    /**
+     * A hop a [walk] takes on its way to the [Value] (CN-P3 S3.4): a participant traversed — what the er renderer replays
+     * as joins along the binding's relation path — or a quality's value space entered.
+     */
+    internal sealed interface Step {
+        data class Participant(
+            val owner: Concept,
+            val label: String,
+            val concept: Concept,
+        ) : Step
+
+        data class ValueSpace(
+            val quality: String,
+            val kind: Concept,
+        ) : Step
+    }
+
     internal sealed interface Walk {
         data class Ok(
             val value: Value,
@@ -331,7 +348,7 @@ internal class DefinitionResolver(
         return null
     }
 
-    private fun participant(
+    internal fun participant(
         s: Concept,
         label: String,
     ): Pair<Concept, org.tatrman.ttr.metadata.model.CnParticipant>? = lattice.participant(s, label)
@@ -349,13 +366,17 @@ internal class DefinitionResolver(
         return byName[name]?.firstOrNull { it.stereotype == "phase" && it.of in owners }
     }
 
-    /** Walks [parts] from [i] on the subject [s]; reads are collected, committed only on success. */
+    /**
+     * Walks [parts] from [i] on the subject [s]; reads are collected, committed only on success. [steps], when given,
+     * receives the hops taken (a renderer replays them — the one name walk, CN-P3 S3.4).
+     */
     internal fun walk(
         s: Concept,
         parts: List<String>,
         i: Int,
         concepts: MutableList<QualifiedName> = mutableListOf(),
         definitions: MutableList<QualifiedName> = mutableListOf(),
+        steps: MutableList<Step>? = null,
     ): Walk {
         if (i == parts.size) return Walk.Ok(Value.Instance(s), concepts, definitions)
         val p = parts[i]
@@ -379,7 +400,8 @@ internal class DefinitionResolver(
             val pc = of(pt.concept) ?: return Walk.Fail("`${owner.qname.name}`'s participant `$p` names no concept")
             concepts += owner.qname
             concepts += pc.qname
-            return walk(pc, parts, i + 1, concepts, definitions)
+            steps?.add(Step.Participant(owner, p, pc))
+            return walk(pc, parts, i + 1, concepts, definitions, steps)
         }
         quality(s, p)?.let { hit ->
             val def = hit.def
@@ -390,7 +412,8 @@ internal class DefinitionResolver(
             }
             if (rest == 0) return Walk.Ok(Value.Quality(hit.owner, p, def), concepts, definitions)
             val vs = of(def?.valueSpace) ?: return Walk.Fail("`$p` is a value — nothing follows it")
-            return walk(vs, parts, i + 1, concepts, definitions)
+            steps?.add(Step.ValueSpace(p, vs))
+            return walk(vs, parts, i + 1, concepts, definitions, steps)
         }
         phaseOn(s, p)?.let { ph ->
             if (ph.definition != null) definitions += ph.qname else concepts += ph.qname

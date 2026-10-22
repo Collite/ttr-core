@@ -1,1 +1,6 @@
-SELECT patient.patient_id FROM patient JOIN encounter ON encounter.patient_id = patient.patient_id WHERE encounter.admitted_at >= {window_lo} AND encounter.admitted_at <= {as_of} GROUP BY patient.patient_id HAVING COUNT(*) >= 2
+SELECT patient.patient_id
+FROM patient
+JOIN encounter ON encounter.patient_id = patient.patient_id
+WHERE encounter.admitted_at >= {window_lo} AND encounter.admitted_at <= {as_of}
+GROUP BY patient.patient_id
+HAVING COUNT(*) >= 2

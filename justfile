@@ -236,6 +236,12 @@ cn-hygiene *args:
     ./gradlew -q --console=plain :packages:kotlin:ttr-concept:installDist >&2
     packages/kotlin/ttr-concept/build/install/ttr/bin/ttr cn hygiene "$@"
 
+# A phase as model text (CN-D1): `just cn-materialize <model-dir> <cn.Phase> [--dialect …] [--out <dir>]`
+[positional-arguments]
+cn-materialize *args:
+    ./gradlew -q --console=plain :packages:kotlin:ttr-concept:installDist >&2
+    packages/kotlin/ttr-concept/build/install/ttr/bin/ttr cn materialize "$@"
+
 # ── Grammar regeneration ────────────────────────────────────────────────────────
 
 # Regenerate the TS parser from TTR.g4, then the TextMate grammar. See CLAUDE.md

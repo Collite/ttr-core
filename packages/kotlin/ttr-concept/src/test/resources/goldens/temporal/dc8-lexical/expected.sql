@@ -1,1 +1,7 @@
-SELECT "condition".condition_id FROM "condition" WHERE "condition".code IN (SELECT code_closure.descendant_code FROM code_closure WHERE code_closure.ancestor_code BETWEEN 'X20' AND 'X25')
+SELECT "condition".condition_id
+FROM "condition"
+WHERE "condition".code IN (
+  SELECT code_closure.descendant_code
+  FROM code_closure
+  WHERE code_closure.ancestor_code BETWEEN 'X20' AND 'X25'
+)

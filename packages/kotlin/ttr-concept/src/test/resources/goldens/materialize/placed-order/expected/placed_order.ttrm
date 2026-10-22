@@ -4,7 +4,9 @@ model er
 
 def query placed_order_q {
     sourceText: """sql
-SELECT "order".order_number FROM "order" WHERE "order".state = 'placed'
+SELECT "order".order_number
+FROM "order"
+WHERE "order".state = 'placed'
 """
 }
 def entity placed_order {

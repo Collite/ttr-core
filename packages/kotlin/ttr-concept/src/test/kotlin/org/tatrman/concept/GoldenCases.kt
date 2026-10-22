@@ -155,7 +155,17 @@ internal object GoldenCases {
 
     fun rendering(r: Rendering): JsonObject =
         buildJsonObject {
-            put("parametersRead", JsonArray(r.parametersRead.map { buildJsonObject { put("name", it) } }))
+            put(
+                "parametersRead",
+                JsonArray(
+                    r.parametersRead.map {
+                        buildJsonObject {
+                            put("name", it.name)
+                            it.derivation?.let { d -> put("derivation", d) }
+                        }
+                    },
+                ),
+            )
             put("definitionsInlined", JsonArray(r.definitionsInlined.map(::JsonPrimitive)))
             put("imprecisionMode", r.imprecisionMode.name)
             put("diagnostics", diagnostics(r.diagnostics))
@@ -217,7 +227,4 @@ internal object GoldenCases {
         }
         return out
     }
-
-    /** Whitespace runs collapsed — the er text's comparison until S3.4 pins the formatter (then: byte-equal). */
-    fun normalized(sql: String): String = sql.trim().replace(Regex("\\s+"), " ")
 }

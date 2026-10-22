@@ -1,1 +1,3 @@
-SELECT "order".order_number FROM "order" WHERE "order".state = 'held'
+SELECT "order".order_number
+FROM "order"
+WHERE "order".state = 'held'

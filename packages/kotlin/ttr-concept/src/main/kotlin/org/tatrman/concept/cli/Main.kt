@@ -18,6 +18,8 @@ import org.tatrman.concept.HygieneRender
 import org.tatrman.concept.HygieneReport
 import org.tatrman.concept.ResolvedCnModel
 import org.tatrman.concept.Severity
+import org.tatrman.concept.v1.ConceptRef
+import org.tatrman.ttr.metadata.model.Model
 import org.tatrman.ttr.metadata.model.ModelDescriptor
 import org.tatrman.ttr.metadata.reconcile.ModelReconciler
 import org.tatrman.ttr.metadata.source.BuiltinStockSource
@@ -27,8 +29,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.system.exitProcess
 
-/** The `ttr` command family. This module contributes `cn` (`hygiene`; `materialize` joins it at CN-P3). */
-fun ttr(): CliktCommand = TtrCommand().subcommands(CnCommand().subcommands(CnHygieneCommand()))
+/** The `ttr` command family. This module contributes `cn` (`hygiene`; `materialize` since CN-P3 S3.4). */
+fun ttr(): CliktCommand = TtrCommand().subcommands(CnCommand().subcommands(CnHygieneCommand(), CnMaterializeCommand()))
 
 fun main(args: Array<String>): Unit = exitProcess(runTtr(args.toList()))
 
@@ -97,16 +99,10 @@ class CnHygieneCommand : CliktCommand(name = "hygiene") {
             echo("ttr cn hygiene: '$dir' is not a directory", err = true)
             throw ProgramResult(2)
         }
-        val snapshot = FileBasedSource("cn", 100, LocalFsStorage(id = "cn", rootPath = root)).load()
-        // The stock `cnc.role.*` vocabulary rides ahead of the model, as at the metadata service's boot — without it
-        // every `roles: [fact]` is a load error (`ttr/unimported-reference`) the editor never shows.
-        val reconciled =
-            ModelReconciler(ModelDescriptor(id = "cn-hygiene", name = root.fileName?.toString() ?: "model"))
-                .reconcile(listOf(BuiltinStockSource().load(), snapshot))
-        val loadErrors = (snapshot.errors + reconciled.errors).distinct()
-        loadErrors.forEach { echo("ttr cn hygiene: ${it.file}:${it.line}: ${it.message}", err = true) }
+        val (model, loadErrors) = load(root, "cn-hygiene")
+        loadErrors.forEach { echo("ttr cn hygiene: $it", err = true) }
 
-        val report = CnConceptService(ResolvedCnModel.of(reconciled.model)).hygieneReport()
+        val report = CnConceptService(ResolvedCnModel.of(model)).hygieneReport()
         val fileName = { f: String -> relative(root, f) }
         when (format) {
             "json" -> echo(HygieneRender.jsonText(report, fileName), trailingNewline = false)
@@ -138,4 +134,74 @@ class CnHygieneCommand : CliktCommand(name = "hygiene") {
     private fun warnings(r: HygieneReport): Int =
         r.concepts.sumOf { it.phaseAsDefault.size + it.retiredCodes.size } +
             r.definitions.count { it.severity == Severity.WARNING }
+}
+
+/**
+ * The model under [root] loaded as one source (the way Veles loads one) and reconciled, with its load errors
+ * (`<file>:<line>: <message>`). The stock `cnc.role.*` vocabulary rides ahead of the model, as at the metadata
+ * service's boot — without it every `roles: [fact]` is a load error (`ttr/unimported-reference`) the editor never shows.
+ */
+internal fun load(
+    root: Path,
+    id: String,
+): Pair<Model, List<String>> {
+    val snapshot = FileBasedSource("cn", 100, LocalFsStorage(id = "cn", rootPath = root)).load()
+    val reconciled =
+        ModelReconciler(ModelDescriptor(id = id, name = root.fileName?.toString() ?: "model"))
+            .reconcile(listOf(BuiltinStockSource().load(), snapshot))
+    val errors = (snapshot.errors + reconciled.errors).distinct().map { "${it.file}:${it.line}: ${it.message}" }
+    return reconciled.model to errors
+}
+
+/**
+ * `ttr cn materialize <dir> <cn.Phase> [--dialect …] [--out <dir>]` (CN-P3 S3.4 T6; cn contracts §3, CN-D1, A-CN-16) —
+ * the phase's er rendering written as model text: a `def query <phase>_q` and the entity stacked on it, in the phase's
+ * package. Printed, or written under `--out` (`<phase>.ttrm`). The author then replaces the phase's `definition:` by a
+ * `cn2er_phase` grounding on the entity (AM-2). A definition reading a `:name` parameter or `:as_of` is refused
+ * (`cn/materialize-parametric`) — a logical query takes none.
+ *
+ * Exit: 0 — written · 1 — refused (the diagnostic on stderr) · 2 — usage, or the model could not be read.
+ */
+class CnMaterializeCommand : CliktCommand(name = "materialize") {
+    override fun help(context: Context) =
+        "Write a phase's er rendering as model text: a logical query and the entity stacked on it."
+
+    private val dir by argument("dir", help = "root dir of the TTR-M model (scanned for *.ttrm)")
+    private val phase by argument("phase", help = "the phase, `cn.<Name>`")
+    private val dialect by option(
+        "--dialect",
+        help = "the target dialect (the er text is the shared dialect's)",
+    ).default("postgresql")
+    private val out by option("--out", help = "write the files under this directory instead of printing them")
+
+    override fun run() {
+        val root = Path.of(dir).toAbsolutePath().normalize()
+        if (!Files.isDirectory(root)) {
+            echo("ttr cn materialize: '$dir' is not a directory", err = true)
+            throw ProgramResult(2)
+        }
+        val (model, loadErrors) = load(root, "cn-materialize")
+        loadErrors.forEach { echo("ttr cn materialize: $it", err = true) }
+        val ref =
+            ConceptRef
+                .newBuilder()
+                .setQname(if (phase.startsWith("cn.")) phase else "cn.$phase")
+                .build()
+        val text = CnConceptService(ResolvedCnModel.of(model)).materialize(ref, dialect)
+        if (text.files.isEmpty()) {
+            text.diagnostics.forEach { echo("ttr cn materialize: ${it.slug}: ${it.message}", err = true) }
+            throw ProgramResult(1)
+        }
+        val target = out?.let { Path.of(it).toAbsolutePath().normalize() }
+        for ((path, content) in text.files) {
+            if (target == null) {
+                echo(content, trailingNewline = false)
+            } else {
+                val file = target.resolve(path)
+                Files.createDirectories(file.parent)
+                Files.writeString(file, content)
+                echo("ttr cn materialize: wrote $file")
+            }
+        }
+    }
 }

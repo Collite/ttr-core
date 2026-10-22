@@ -9,14 +9,13 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 import org.tatrman.concept.v1.ConceptRef
 import java.nio.file.Files
+import java.time.Instant
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 
@@ -45,7 +44,7 @@ class ConceptGoldenSpec :
     }) {
     companion object {
         /** The stages whose cases `check` runs; each stage adds itself when it lands (S3.8: all, switch removed). */
-        val LANDED_STAGES: Set<String> = setOf("S3.2", "S3.3")
+        val LANDED_STAGES: Set<String> = setOf("S3.2", "S3.3", "S3.4")
 
         private val printer = JsonFormat.printer()
 
@@ -113,7 +112,8 @@ class ConceptGoldenSpec :
                             c.str("dialect")!!,
                             options,
                         )
-                    text("expected.sql", r.text, GoldenCases::normalized)
+                    // byte-equal: the formatting contract (contracts §3, A-CN-42); the file ends with one newline
+                    text("expected.sql", r.text) { it.removeSuffix("\n") }
                     val file = "expected.rendering.json"
                     val expected = if (c.has(file)) c.jsonFile(file).jsonObject else JsonObject(emptyMap())
                     out += GoldenCases.mismatches(expected, GoldenCases.rendering(r))
@@ -133,14 +133,7 @@ class ConceptGoldenSpec :
                         val shown = m.files.values.joinToString("\n---\n")
                         out += "files: expected ${expectedFiles.keys}\n  actual ${m.files.keys}\n$shown"
                     }
-                    if (c.has("expected.diagnostics.json")) {
-                        val expected = buildJsonObject { put("diagnostics", c.jsonFile("expected.diagnostics.json")) }
-                        out +=
-                            GoldenCases.mismatches(
-                                expected,
-                                buildJsonObject { put("files", JsonPrimitive(m.files.size)) },
-                            )
-                    }
+                    diagnosticsOf(m.diagnostics)
                 }
                 else -> out += "unknown call `${c.call}`"
             }
@@ -153,7 +146,7 @@ class ConceptGoldenSpec :
          * [RenderOptions] from a case's `options`. A key the type does not carry yet (S3.4 T1 adds `candidates`,
          * `columns`, `asOf`) is reported, not dropped — the case stays red until the option exists.
          */
-        private fun options(
+        internal fun options(
             o: JsonObject,
             out: MutableList<String>,
         ): RenderOptions {
@@ -164,6 +157,9 @@ class ConceptGoldenSpec :
                     "placeholderStyle" ->
                         r =
                             r.copy(placeholderStyle = PlaceholderStyle.valueOf(v.jsonPrimitive.content))
+                    "asOf" -> r = r.copy(asOf = Instant.parse(v.jsonPrimitive.content))
+                    "candidates" -> r = r.copy(candidates = ref(v.jsonPrimitive.content))
+                    "columns" -> r = r.copy(columns = v.jsonArray.map { it.jsonPrimitive.content })
                     else -> out += "option `$k` (${describe(v)}) is not a RenderOptions field yet"
                 }
             }

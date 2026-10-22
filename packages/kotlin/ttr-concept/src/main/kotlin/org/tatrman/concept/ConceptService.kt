@@ -79,8 +79,9 @@ interface ConceptService {
 /**
  * The service over a [ResolvedCnModel] (cn contracts §3). CN-P2 S2.7 pulls [hygieneReport] forward — model-only, no
  * consumer ([CnHygiene]); CN-P3 lands the families stage by stage (S3.2: the two validates — [StatementValidator],
- * [AssertionValidator]; S3.3: [statementLower] — [StatementLowerer]); a family not landed yet refuses as the scaffold
- * does. [clock] gives "now" — the evaluation day of a statement with no `as_of` (recorded in its provenance).
+ * [AssertionValidator]; S3.3: [statementLower] — [StatementLowerer]; S3.4: [definitionRender] and [materialize] —
+ * [DefinitionRenderer]); a family not landed yet refuses as the scaffold does. [clock] gives "now" — the evaluation day
+ * of a statement with no `as_of` (recorded in its provenance), and of an md rendering's window.
  */
 class CnConceptService(
     private val model: ResolvedCnModel,
@@ -89,12 +90,26 @@ class CnConceptService(
     private val statements = StatementValidator(model)
     private val assertions = AssertionValidator(model)
     private val lowerer = StatementLowerer(model, clock)
+    private val definitions = DefinitionRenderer(model, clock)
 
     override fun statementValidate(s: Statement): List<Diagnostic> = statements.validate(s)
 
     override fun statementLower(s: Statement): LowerResult = lowerer.lower(s)
 
     override fun assertionValidate(a: Assertion): List<Diagnostic> = assertions.validate(a)
+
+    /** The er text is the shared dialect's (S0.3 §3); the translator unparses it per engine, so [dialect] is not read. */
+    override fun definitionRender(
+        target: ConceptRef,
+        layer: Layer,
+        dialect: String,
+        options: RenderOptions,
+    ): Rendering = definitions.render(target, layer, options)
+
+    override fun materialize(
+        phase: ConceptRef,
+        dialect: String,
+    ): ModelText = definitions.materialize(phase)
 
     override fun hygieneReport(): HygieneReport = CnHygiene.report(model)
 }

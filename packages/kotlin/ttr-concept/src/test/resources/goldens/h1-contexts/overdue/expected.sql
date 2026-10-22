@@ -1,1 +1,4 @@
-SELECT "order".order_number, invoice.invoice_id, invoice.due, invoice.amount - invoice.paid AS open_amount FROM "order" JOIN invoice ON invoice.customer = "order".customer WHERE "order".state IN ('placed', 'held') AND invoice.status = 'open' AND invoice.due < {as_of}
+SELECT "order".order_number, invoice.invoice_id, invoice.due, invoice.amount - invoice.paid AS open_amount
+FROM "order"
+JOIN invoice ON invoice.customer = "order".customer
+WHERE "order".state IN ('placed', 'held') AND invoice.status = 'open' AND invoice.due < {as_of}

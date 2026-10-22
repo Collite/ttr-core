@@ -6,6 +6,7 @@ cn/definition-unreachable(md) HYGIENE cn.IschemicRecordLexical
 cn/definition-unreachable(md) HYGIENE cn.PostStemi
 cn/definition-unreachable(md) HYGIENE cn.PostStemiCertainly
 cn/definition-unreachable(md) HYGIENE cn.PostStemiPossibly
+cn/definition-unreachable(md) HYGIENE cn.PostStemiStoredBound
 cn/definition-unreachable(md) HYGIENE cn.Rehospitalized30d
 cn/definition-unreachable(md) HYGIENE cn.StemiPatient
 cn/definition-unreachable(md) HYGIENE cn.TransferredWithin24h

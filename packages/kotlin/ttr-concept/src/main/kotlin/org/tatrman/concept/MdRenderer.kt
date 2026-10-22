@@ -23,6 +23,7 @@ import org.tatrman.ttrp.expr.ParamRef
 import org.tatrman.ttrp.expr.TemporalPredicate
 import org.tatrman.ttrp.expr.ThisRef
 import java.time.LocalDate
+import java.util.IdentityHashMap
 
 /**
  * The md definition renderer (CN-P3 S3.3 T5; contracts §3 `definitionRender(…, MD)` — S3.4 dispatches to it): a
@@ -74,6 +75,13 @@ internal class MdRenderer(
         val parameters: Map<String, String> = emptyMap(),
         /** Whether it read `:as_of`. */
         val asOf: Boolean = false,
+        /**
+         * The member values a placeholder stands for (S3.4, `definitionRender(…, MD)`), by identity: a `:name` or `:as_of`
+         * value its name, a window's bounds `window_lo` (derived — [derivations]) and `as_of`.
+         */
+        val symbols: Map<PathComponent, String> = emptyMap(),
+        /** A derived placeholder → how the consumer computes it (A-CN-22: `as_of - days(365)`). */
+        val derivations: Map<String, String> = emptyMap(),
     )
 
     sealed interface Result {
@@ -135,12 +143,20 @@ internal class MdRenderer(
         val params = linkedMapOf<String, String>()
         var asOf = false
         val inlining = ArrayDeque<QualifiedName>()
+        val symbols = IdentityHashMap<PathComponent, String>()
+        val derivations = linkedMapOf<String, String>()
 
         fun phase(p: Concept): Predicate {
             val scope = inline(p, null)
             flush(scope)
-            return Predicate(scope.out, semiJoins, reads.toList(), inlined.toList(), params, asOf)
+            return Predicate(scope.out, semiJoins, reads.toList(), inlined.toList(), params, asOf, symbols, derivations)
         }
+
+        /** [c], remembered as the value of the placeholder [name]. */
+        fun symbol(
+            c: PathComponent,
+            name: String,
+        ): PathComponent = c.also { symbols[it] = name }
 
         /** [p]'s definition conjoined into [into] (a new scope on its bearer when null); the scope it went to. */
         fun inline(
@@ -288,12 +304,16 @@ internal class MdRenderer(
             if (last != null) {
                 asOf = true
                 val lo = back(asOfDay, last)
+                val name =
+                    derivations.entries.firstOrNull { it.value == "as_of - ${spelled(last)}" }?.key
+                        ?: "window_lo${if (derivations.isEmpty()) "" else "_${derivations.size + 1}"}"
+                derivations[name] = "as_of - ${spelled(last)}"
                 scope.out +=
                     Coord(
                         attribute,
                         PathComponent.RangeLit(
-                            PathComponent.Quoted(lo.toString()),
-                            PathComponent.Quoted(asOfDay.toString()),
+                            symbol(PathComponent.Quoted(lo.toString()), name),
+                            symbol(PathComponent.Quoted(asOfDay.toString()), "as_of"),
                         ),
                     )
                 return
@@ -459,9 +479,9 @@ internal class MdRenderer(
                 is ParamRef ->
                     if (e.name == "as_of") {
                         asOf = true
-                        PathComponent.Quoted(asOfDay.toString())
+                        symbol(PathComponent.Quoted(asOfDay.toString()), "as_of")
                     } else {
-                        member(parameter(e.name))
+                        symbol(member(parameter(e.name)), e.name)
                     }
                 else -> null
             }
@@ -497,6 +517,8 @@ internal class MdRenderer(
             when (e) {
                 is ThisRef -> (listOf("this") + e.path).joinToString(".")
                 is ColumnRef -> listOfNotNull(e.port, e.column).joinToString(".")
+                is DurationLiteral -> "${e.unit.spelling}(${e.amount})"
+                is DurationParam -> "${e.unit.spelling}(:${e.param})"
                 else -> e::class.simpleName ?: "?"
             }
     }

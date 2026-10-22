@@ -1,1 +1,11 @@
-SELECT patient.patient_id FROM patient WHERE EXISTS (SELECT 1 FROM "condition" WHERE "condition".patient_id = patient.patient_id AND "condition".code IN (SELECT code_closure.descendant_code FROM code_closure WHERE code_closure.ancestor_code = 'X21') AND "condition".certainty = 'confirmed' AND "condition".experiencer = 'patient')
+SELECT patient.patient_id
+FROM patient
+WHERE EXISTS (
+  SELECT 1
+  FROM "condition"
+  WHERE "condition".patient_id = patient.patient_id AND "condition".code IN (
+    SELECT code_closure.descendant_code
+    FROM code_closure
+    WHERE code_closure.ancestor_code = 'X21'
+  ) AND "condition".certainty = 'confirmed' AND "condition".experiencer = 'patient'
+)

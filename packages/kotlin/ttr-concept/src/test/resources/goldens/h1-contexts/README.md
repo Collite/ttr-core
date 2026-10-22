@@ -19,7 +19,8 @@ AU's spelling — the rule every DC-12 golden follows (`../temporal/README.md`).
 
 `price-differences`' `list_price` is a lookup — `max(CustomerPrice involving this.item, this.order.customer where period
 contains this.order.period.start).cp_price`, the same for `PriceList` — expected rendered flat (one LEFT JOIN each, as
-S0.3's `H1-price-cn`); S3.4 decides whether a lookup over a validity interval renders flat or as the grouped self-join,
-the row-set bar holds either way.
+S0.3's `H1-price-cn`). **S3.4 decided: flat** (A-CN-41) — a `max` / `min` over a validity interval (`… where period
+contains <instant>`) is a lookup, at most one row valid at an instant, so it is a LEFT JOIN of the ranged entity read
+directly; the row-set bar holds either way.
 
 Pending convention, case format and oracles: [`../README.md`](../README.md).

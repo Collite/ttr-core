@@ -40,6 +40,12 @@ def event ConditionOnset {                                                      
     period: { at: onset_at, precision: month },
     qualities: [onset_code, onset_at]
 }
+def event RecordedOnset {                                                        // the same records with the onset's stored upper bound (⚑CN-P10)
+    label: { en: "Recorded onset", cs: "Zaznamenaný začátek" },
+    involves: [Patient],
+    period: { at: recorded_onset_at, precision: month },
+    qualities: [recorded_code, recorded_onset_at]
+}
 def event Observation {                                                          // a measured value — its unit on the grounding (⚑CN-P10)
     label: { en: "Observation", cs: "Pozorování" },
     involves: [Patient],
@@ -67,6 +73,8 @@ def quality onset          { of: ConditionRecord }
 def quality abatement      { of: ConditionRecord }
 def quality onset_code     { of: ConditionOnset, value_space: Diagnosis }
 def quality onset_at       { of: ConditionOnset }
+def quality recorded_code     { of: RecordedOnset, value_space: Diagnosis }
+def quality recorded_onset_at { of: RecordedOnset }
 def quality observed_at    { of: Observation }
 def quality analyte        { of: Observation }
 def quality observed_value { of: Observation, label: { en: "observed value", cs: "naměřená hodnota" } }
@@ -100,6 +108,12 @@ def phase PostStemiCertainly {                                                  
     basis: occurrence,
     imprecision: certainly,
     definition: """exists ConditionOnset involving this where onset_code in descendants(Diagnosis, 'X21') and period.at at_or_before :as_of"""
+}
+def phase PostStemiStoredBound {                                                 // CERTAINLY over the stored upper bound (`at_hi:`, ⚑CN-P10)
+    of: Patient,
+    basis: occurrence,
+    imprecision: certainly,
+    definition: """exists RecordedOnset involving this where recorded_code in descendants(Diagnosis, 'X21') and period.at at_or_before :as_of"""
 }
 def phase IschemicRecord        { of: ConditionRecord, definition: """code in descendants(Diagnosis, 'X20-X25')""" }
 def phase IschemicRecordLexical { of: ConditionRecord, definition: """code in descendants(DiagnosisText, 'X20-X25')""" }

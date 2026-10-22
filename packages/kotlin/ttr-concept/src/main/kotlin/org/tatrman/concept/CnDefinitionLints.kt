@@ -22,7 +22,9 @@ import org.tatrman.ttr.metadata.model.QualifiedName
  *    that layer;
  *  - `cn/basis-mismatch` (error) — a condition's definition does not read its declared `basis:` ([BASIS_SHAPES]);
  *  - `cn/imprecise-comparison` (advisory) — under `imprecision: certainly` a comparison of two instants whose
- *    granularities are known and differ (AM-42; `period: { precision }`, else the attribute's type; `:as_of` is a day).
+ *    granularities are known and differ (AM-42; `period: { precision }`, else the attribute's type; `:as_of` is a day),
+ *    unless the coarser one is a period bound whose grounding stores its upper bound (`start_hi:` / `at_hi:`, ⚑CN-P10 —
+ *    the er renderer compares the stored bound, exactly; CN-P3 S3.4, A-CN-45).
  */
 object CnDefinitionLints {
     const val CYCLE = "cn/definition-cycle"
@@ -245,7 +247,7 @@ object CnDefinitionLints {
     /** Instant granularities, finest first; `:as_of` is a day (S0.3 §4). */
     enum class Granularity { SECOND, MINUTE, HOUR, DAY, WEEK, MONTH, QUARTER, YEAR }
 
-    private fun granularity(spelling: String?): Granularity? =
+    internal fun granularity(spelling: String?): Granularity? =
         when (spelling?.lowercase()) {
             "second" -> Granularity.SECOND
             "minute" -> Granularity.MINUTE
@@ -259,7 +261,7 @@ object CnDefinitionLints {
         }
 
     /** An attribute type's granularity: a date is a day, a timestamp a second; anything else is not known. */
-    private fun ofType(type: String?): Granularity? =
+    internal fun ofType(type: String?): Granularity? =
         when (type?.lowercase()?.substringBefore('(')) {
             "date" -> Granularity.DAY
             "datetime", "datetime2", "timestamp", "timestamptz", "smalldatetime" -> Granularity.SECOND
@@ -330,6 +332,20 @@ object CnDefinitionLints {
             }
         }
 
+    /** Whether [t] is a period bound whose grounding names a stored upper bound for it (⚑CN-P10). */
+    private fun storedBound(
+        cn: CnSchema,
+        t: InstantTerm?,
+    ): Boolean {
+        if (t !is InstantTerm.PeriodBound) return false
+        val p = cn.concepts[t.owner]?.grounding?.period ?: return false
+        return when (t.bound) {
+            "start" -> p.startHi != null
+            "at" -> p.atHi != null
+            else -> false
+        }
+    }
+
     private fun imprecise(
         cn: CnSchema,
         er: ErSchema?,
@@ -340,7 +356,7 @@ object CnDefinitionLints {
         return d.reads.comparisons.mapNotNull { c ->
             val l = granularity(cn, er, c.lhs) ?: return@mapNotNull null
             val r = granularity(cn, er, c.rhs) ?: return@mapNotNull null
-            if (l == r) return@mapNotNull null
+            if (l == r || storedBound(cn, if (l > r) c.lhs else c.rhs)) return@mapNotNull null
             val coarser = maxOf(l, r).name.lowercase()
             Diagnostic(
                 IMPRECISE,

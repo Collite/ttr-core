@@ -26,8 +26,8 @@ S3.5 assertion lower · S3.6 explain). Every expectation comes from an oracle in
 | `expected.provenance.json` | `LowerResult.provenance` — the keys it names |
 | `expected.txt` | the explanation's text |
 | `expected.rows.json` | `RowObjects` — the keys it names |
-| `expected.sql` · `expected.rendering.json` | `Rendering.text` (whitespace-collapsed until S3.4 pins the formatter, then byte-equal) · the rest of `Rendering`, the keys it names |
-| `expected/<path>` | `ModelText.files` |
+| `expected.sql` · `expected.rendering.json` | `Rendering.text`, byte-equal — the formatting contract (cn contracts §3, A-CN-42; one trailing newline in the file) · the rest of `Rendering`, the keys it names (`parametersRead` entries carry `derivation` for a derived bound, A-CN-22) |
+| `expected/<path>` | `ModelText.files` (and `expected.diagnostics.json` its `diagnostics`) |
 | `seed.sql` · `expected.live.json` | a `live` case: its invented rows (a `statementLower` case's go on top of ttrp-conform's `md_seed.sql`) · the rows the lowered plan returns on PostgreSQL (`{"rows": [["150.50"]]}`, numbers by value) |
 
 A key the expectation names that the result type does not carry yet (an S3.4 `RenderOptions` field, S3.5's

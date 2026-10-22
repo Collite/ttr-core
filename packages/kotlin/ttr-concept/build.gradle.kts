@@ -74,8 +74,9 @@ dependencies {
     testImplementation(libs.postgresql)
 }
 
-// CN-P2 S2.7 — `ttr cn hygiene <dir> [--format text|json] [--fail-on error|warning]` (`ttr cn materialize` joins it at
-// CN-P3 S3.4). `just cn-hygiene <dir>` runs it from the repo, with paths relative to the repo root.
+// CN-P2 S2.7 — `ttr cn hygiene <dir> [--format text|json] [--fail-on error|warning]`; CN-P3 S3.4 — `ttr cn materialize
+// <dir> <cn.Phase> [--dialect …] [--out <dir>]`. `just cn-hygiene` / `just cn-materialize` run them from the repo, with
+// paths relative to the repo root.
 application {
     applicationName = "ttr"
     mainClass = "org.tatrman.concept.cli.MainKt"

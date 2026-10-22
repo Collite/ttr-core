@@ -85,32 +85,59 @@ data class RowObjects(
 )
 
 /**
- * How a definition renders. ⚑ The two fields are the S0.3 spike's defaults, pending Bora (memo ⚑S03-10 / ⚑S03-1):
- * [mode] — `PREDICATE` (the bearer's keys under the predicate) or `CONTEXT` (sub-terms lifted to joins and projected,
- * the shape AU's recipe islands use); [placeholderStyle] — `CURLY` (`{name}`, the translator's) or `COLON` (`:name`,
- * AU's islands).
+ * How a definition renders (contracts §3, A-CN-11/20; CN-P3 S3.4 T1 adds the last three, additively). [mode] —
+ * `PREDICATE` (`SELECT <bearer key> FROM <bearer> WHERE …`) or `CONTEXT` (the bearer joined to the [candidates],
+ * sub-terms lifted to joins and projected — AU's recipe islands, A-CN-20); [placeholderStyle] — `CURLY` (`{name}`, the
+ * translator's) or `COLON` (`:name`, AU's islands); [asOf] — the evaluation instant, null = now (a `latest(…, by:)` is
+ * then unbounded, A-CN-17; given, it is bounded by `{as_of}`); [candidates] — CONTEXT: the phase whose bearer keys the
+ * context (H-1's `cn.PendingOrder`), joined to the target's bearer through a participant path, its predicate first in
+ * the WHERE; [columns] — what the projection carries after the keys: names in the definition's scope (a participant —
+ * its key column; a grounded quality — its column, bare; a defined quality — `AS <name>`).
  */
 data class RenderOptions(
     val mode: RenderMode = RenderMode.PREDICATE,
     val placeholderStyle: PlaceholderStyle = PlaceholderStyle.CURLY,
+    val asOf: java.time.Instant? = null,
+    val candidates: org.tatrman.concept.v1.ConceptRef? = null,
+    val columns: List<String> = emptyList(),
 )
 
 enum class RenderMode { PREDICATE, CONTEXT }
 
 enum class PlaceholderStyle { CURLY, COLON }
 
-/** `definitionRender`: the text, what it read, what it inlined, and how it compared instants. */
+/**
+ * A placeholder a rendering reads (A-CN-22): a `:name` parameter, `as_of`, or a bound the renderer DERIVES and names
+ * (`window_lo`, `as_of_hi`) — [derivation] says how the consumer computes it (`as_of - days(365)`); null for one bound
+ * as it is.
+ */
+data class ParameterRead(
+    val name: String,
+    val derivation: String? = null,
+)
+
+/**
+ * `definitionRender`: the [text] (ER — SQL over entities in the formatting contract's layout, contracts §3; MD — the PL
+ * predicate over the carrying cubelet's attributes), the placeholders it reads, in the order the text reads them, the
+ * definitions it inlined (phases and defined qualities, transitively — the target itself not included), how it
+ * compared instants, and why it did not render (an error-grade diagnostic, [text] empty) or what it degraded
+ * (advisory).
+ */
 data class Rendering(
     val text: String = "",
-    val parametersRead: List<String> = emptyList(),
+    val parametersRead: List<ParameterRead> = emptyList(),
     val definitionsInlined: List<String> = emptyList(),
     val imprecisionMode: ImprecisionMode = ImprecisionMode.CERTAINLY,
     val diagnostics: List<Diagnostic> = emptyList(),
 )
 
-/** `materialize`: model text, path → content (a `def query` + its stacked entity). Canon stays text (CN-D1). */
+/**
+ * `materialize`: model text, path → content (a `def query` + its stacked entity). Canon stays text (CN-D1). Refused —
+ * no files — with an error-grade diagnostic (`cn/materialize-parametric`, or why the er rendering failed).
+ */
 data class ModelText(
     val files: Map<String, String> = emptyMap(),
+    val diagnostics: List<Diagnostic> = emptyList(),
 )
 
 /** The hygiene grades of S-6 v2 — computed by the typed model, so in `ttr-metadata` since CN-P2 S2.5 (alias). */

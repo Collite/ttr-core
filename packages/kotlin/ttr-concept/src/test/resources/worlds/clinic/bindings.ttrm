@@ -42,6 +42,12 @@ def cn2er_event condition_onset_g {
     period: { at: er.entity.condition.onset },
     participants: { patient: [er.relation.condition_patient] }
 }
+def cn2er_event recorded_onset_g {                                               // `at_hi:` — the onset's stored upper bound, exclusive (⚑CN-P10)
+    event: cn.RecordedOnset,
+    target: er.entity.condition,
+    period: { at: er.entity.condition.onset, at_hi: er.entity.condition.onset_hi },
+    participants: { patient: [er.relation.condition_patient] }
+}
 def cn2er_event observation_g {
     event: cn.Observation,
     target: er.entity.observation,
@@ -67,6 +73,8 @@ def cn2er_quality onset_g          { quality: cn.onset, target: er.entity.condit
 def cn2er_quality abatement_g      { quality: cn.abatement, target: er.entity.condition.abatement }
 def cn2er_quality onset_code_g     { quality: cn.onset_code, target: er.entity.condition.code }
 def cn2er_quality onset_at_g       { quality: cn.onset_at, target: er.entity.condition.onset }
+def cn2er_quality recorded_code_g     { quality: cn.recorded_code, target: er.entity.condition.code }
+def cn2er_quality recorded_onset_at_g { quality: cn.recorded_onset_at, target: er.entity.condition.onset }
 def cn2er_quality observed_at_g    { quality: cn.observed_at, target: er.entity.observation.observed_at }
 def cn2er_quality analyte_g        { quality: cn.analyte, target: er.entity.observation.analyte }
 def cn2er_quality observed_value_g { quality: cn.observed_value, target: er.entity.observation.value, unit: "mmol/L" } // ⚑CN-P10
