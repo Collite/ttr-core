@@ -1,0 +1,22 @@
+model md
+def domain CustomerCode { type: string }
+def domain AddressCode { type: string }
+def domain State { type: string }
+def domain BirthYear { type: int }
+def domain ItemCode { type: string }
+def domain Day { type: date }
+def domain Money { type: decimal }
+def dimension Customer { key: customerCode, attributes: [def attribute customerCode { domain: md.CustomerCode }, def attribute state { domain: md.State }, def attribute birthYear { domain: md.BirthYear }] }
+def dimension Product { key: code, attributes: [def attribute code { domain: md.ItemCode }] }
+def dimension Calendar { key: day, attributes: [def attribute day { domain: md.Day }] }
+def measure revenue { domain: md.Money, aggregation: sum }
+def cubelet storeSales { grain: [Customer.customerCode, Product.code, Calendar.day], measures: [revenue] }
+def cubelet webSales { grain: [Customer.customerCode, Product.code, Calendar.day], measures: [revenue] }
+def cubelet catalogSales { grain: [Customer.customerCode, Product.code, Calendar.day], measures: [revenue] }
+def cubelet orphan { grain: [Customer.customerCode] }
+def map customer_to_addr { from: md.CustomerCode, to: md.AddressCode, cardinality: { from: "N", to: "1" } }
+def map customer_to_birthyear { from: md.CustomerCode, to: md.BirthYear, cardinality: { from: "N", to: "1" } }
+def map addr_to_state { from: md.AddressCode, to: md.State, cardinality: { from: "N", to: "1" } }
+def domain LinkFrom { type: string }
+def domain LinkTo { type: string }
+def map customer_items { from: md.LinkFrom, to: md.LinkTo, cardinality: { from: "N", to: "N" } }

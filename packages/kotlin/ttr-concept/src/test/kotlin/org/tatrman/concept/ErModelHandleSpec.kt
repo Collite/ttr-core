@@ -62,6 +62,38 @@ class ErModelHandleSpec :
             }
         }
 
+        test("nested query bodies compile outside cache updates; failed bodies are cached") {
+            val root =
+                java.nio.file.Files
+                    .createTempDirectory("query-cache")
+            try {
+                val path = root.resolve("queries.ttrm")
+                java.nio.file.Files.writeString(
+                    path,
+                    """
+                    model er
+                    def entity base { attributes: [def attribute id { type: int, isKey: true }] }
+                    def query inner_q { sourceText: "SELECT id FROM base" }
+                    def entity nested { binding: { target: { query: er.query.inner_q } }, attributes: [def attribute id { type: int }] }
+                    def relation base_nested { from: er.entity.base, to: er.entity.nested, join: [{ from: er.entity.base.id, to: er.entity.nested.id }] }
+                    def query outer_q { sourceText: "SELECT b.id FROM base b JOIN nested n" }
+                    def query broken { sourceText: "SELECT id FROM WHERE" }
+                    """.trimIndent(),
+                )
+                val model = DefinitionFixtures.load(mapOf("queries.ttrm" to path))
+                val handle = ErModelHandle(model)
+                val outer = qname(SchemaCode.ER, "query", "outer_q")
+                val first = handle.savedQueryBody(outer)
+                (handle.savedQueryBody(outer) === first) shouldBe true
+                val broken = qname(SchemaCode.ER, "query", "broken")
+                val failure = runCatching { handle.savedQueryBody(broken) }.exceptionOrNull()
+                (failure != null) shouldBe true
+                (runCatching { handle.savedQueryBody(broken) }.exceptionOrNull() === failure) shouldBe true
+            } finally {
+                root.toFile().deleteRecursively()
+            }
+        }
+
         test("an explicit er2db mapping: another table, the renamed columns; an unbound entity maps nowhere") {
             val dir =
                 DefinitionFixtures.repo.resolve(

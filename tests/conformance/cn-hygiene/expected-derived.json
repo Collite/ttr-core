@@ -1,0 +1,233 @@
+{
+  "derived": {
+    "concepts": [
+      {
+        "concept": "cn.Customer",
+        "package": "",
+        "stereotype": "kind",
+        "grade": "md-grounded",
+        "via": "md-hop",
+        "grounding": {
+          "layer": "md",
+          "binding": "cn2md_kind",
+          "target": "md.dimension.Customer"
+        },
+        "hop": {
+          "from": "md.dimension.Customer",
+          "to": "er.entity.customer",
+          "slug": null
+        },
+        "landsOn": "er.entity.customer",
+        "landingFrom": null,
+        "openEntries": [],
+        "relations": [],
+        "dangling": [],
+        "redundantTerms": [],
+        "phaseAsDefault": [],
+        "retiredCodes": []
+      },
+      {
+        "concept": "cn.Sale",
+        "package": "",
+        "stereotype": "kind",
+        "grade": "er-grounded",
+        "via": "direct",
+        "grounding": {
+          "layer": "er",
+          "binding": "cn2er_kind",
+          "target": "er.entity.sales"
+        },
+        "hop": null,
+        "landsOn": "er.entity.sales",
+        "landingFrom": null,
+        "openEntries": [],
+        "relations": [],
+        "dangling": [],
+        "redundantTerms": [],
+        "phaseAsDefault": [],
+        "retiredCodes": []
+      },
+      {
+        "concept": "cn.revenue",
+        "package": "",
+        "stereotype": "quality",
+        "grade": "md-grounded",
+        "via": "md-hop",
+        "grounding": {
+          "layer": "md",
+          "binding": "cn2md_quality",
+          "target": "md.measure.revenue"
+        },
+        "hop": {
+          "from": "md.measure.revenue",
+          "to": "er.entity.sales.ext_sales_price",
+          "slug": null
+        },
+        "landsOn": "er.entity.sales.ext_sales_price",
+        "landingFrom": null,
+        "openEntries": [],
+        "relations": [],
+        "dangling": [],
+        "redundantTerms": [],
+        "phaseAsDefault": [],
+        "retiredCodes": []
+      }
+    ],
+    "relationTypes": [],
+    "retiredCodes": "checked once vocabulary versions register (CN-P5 S5.3) — none yet"
+  },
+  "conflict": {
+    "concepts": [
+      {
+        "concept": "cn.Customer",
+        "package": "",
+        "stereotype": "kind",
+        "grade": "md-grounded-hop-missing",
+        "via": "md-hop",
+        "grounding": {
+          "layer": "md",
+          "binding": "cn2md_kind",
+          "target": "md.dimension.Customer"
+        },
+        "hop": {
+          "from": "md.dimension.Customer",
+          "to": null,
+          "slug": "md/er-ambiguous"
+        },
+        "landsOn": null,
+        "landingFrom": null,
+        "openEntries": [],
+        "relations": [],
+        "dangling": [],
+        "redundantTerms": [],
+        "phaseAsDefault": [],
+        "retiredCodes": []
+      },
+      {
+        "concept": "cn.Sale",
+        "package": "",
+        "stereotype": "kind",
+        "grade": "er-grounded",
+        "via": "direct",
+        "grounding": {
+          "layer": "er",
+          "binding": "cn2er_kind",
+          "target": "er.entity.sales"
+        },
+        "hop": null,
+        "landsOn": "er.entity.sales",
+        "landingFrom": null,
+        "openEntries": [],
+        "relations": [],
+        "dangling": [],
+        "redundantTerms": [],
+        "phaseAsDefault": [],
+        "retiredCodes": []
+      },
+      {
+        "concept": "cn.revenue",
+        "package": "",
+        "stereotype": "quality",
+        "grade": "md-grounded",
+        "via": "md-hop",
+        "grounding": {
+          "layer": "md",
+          "binding": "cn2md_quality",
+          "target": "md.measure.revenue"
+        },
+        "hop": {
+          "from": "md.measure.revenue",
+          "to": "er.entity.sales.ext_sales_price",
+          "slug": null
+        },
+        "landsOn": "er.entity.sales.ext_sales_price",
+        "landingFrom": null,
+        "openEntries": [],
+        "relations": [],
+        "dangling": [],
+        "redundantTerms": [],
+        "phaseAsDefault": [],
+        "retiredCodes": []
+      }
+    ],
+    "relationTypes": [],
+    "retiredCodes": "checked once vocabulary versions register (CN-P5 S5.3) — none yet"
+  },
+  "override": {
+    "concepts": [
+      {
+        "concept": "cn.Customer",
+        "package": "",
+        "stereotype": "kind",
+        "grade": "md-grounded",
+        "via": "md-hop",
+        "grounding": {
+          "layer": "md",
+          "binding": "cn2md_kind",
+          "target": "md.dimension.Customer"
+        },
+        "hop": {
+          "from": "md.dimension.Customer",
+          "to": "er.entity.household",
+          "slug": null
+        },
+        "landsOn": "er.entity.household",
+        "landingFrom": null,
+        "openEntries": [],
+        "relations": [],
+        "dangling": [],
+        "redundantTerms": [],
+        "phaseAsDefault": [],
+        "retiredCodes": []
+      },
+      {
+        "concept": "cn.Sale",
+        "package": "",
+        "stereotype": "kind",
+        "grade": "er-grounded",
+        "via": "direct",
+        "grounding": {
+          "layer": "er",
+          "binding": "cn2er_kind",
+          "target": "er.entity.sales"
+        },
+        "hop": null,
+        "landsOn": "er.entity.sales",
+        "landingFrom": null,
+        "openEntries": [],
+        "relations": [],
+        "dangling": [],
+        "redundantTerms": [],
+        "phaseAsDefault": [],
+        "retiredCodes": []
+      },
+      {
+        "concept": "cn.revenue",
+        "package": "",
+        "stereotype": "quality",
+        "grade": "md-grounded",
+        "via": "md-hop",
+        "grounding": {
+          "layer": "md",
+          "binding": "cn2md_quality",
+          "target": "md.measure.revenue"
+        },
+        "hop": {
+          "from": "md.measure.revenue",
+          "to": "er.entity.sales.ext_sales_price",
+          "slug": null
+        },
+        "landsOn": "er.entity.sales.ext_sales_price",
+        "landingFrom": null,
+        "openEntries": [],
+        "relations": [],
+        "dangling": [],
+        "redundantTerms": [],
+        "phaseAsDefault": [],
+        "retiredCodes": []
+      }
+    ],
+    "relationTypes": [],
+    "retiredCodes": "checked once vocabulary versions register (CN-P5 S5.3) — none yet"
+  }
+}

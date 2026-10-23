@@ -1426,7 +1426,7 @@ function idsWithSources(ctx: ListOfIdsContext, file: string): { path: string; so
 }
 
 /** Normalise the grammar's `cardinality` object to '1:1' | 'N:1' (default N:1, contracts §3.4). */
-function normalizeCardinality(ctx: Object_Context, file: string): '1:1' | 'N:1' {
+function normalizeCardinality(ctx: Object_Context, file: string): '1:1' | 'N:1' | 'N:N' {
   const obj = walkObject(ctx, file);
   const valueOf = (k: string): string | undefined => {
     const e = obj.entries.find((entry) => entry.key === k);
@@ -1436,6 +1436,8 @@ function normalizeCardinality(ctx: Object_Context, file: string): '1:1' | 'N:1' 
     if (e.value.kind === 'number') return String(e.value.value);
     return undefined;
   };
+  const many = (value: string | undefined) => ['N', 'M', '*', '0..*', '1..*'].includes(value ?? '');
+  if (many(valueOf('from')) && many(valueOf('to'))) return 'N:N';
   return valueOf('from') === '1' && valueOf('to') === '1' ? '1:1' : 'N:1';
 }
 
@@ -1445,7 +1447,7 @@ function walkMdMapDef(ctx: MdMapDefContext, name: string, source: SourceLocation
   let tags: string[] | undefined;
   let from: string[] = [];
   let to: string[] = [];
-  let cardinality: '1:1' | 'N:1' | undefined;
+  let cardinality: '1:1' | 'N:1' | 'N:N' | undefined;
   let calc: CalcRef | undefined;
   const crossRefs: CrossRef[] = [];
 

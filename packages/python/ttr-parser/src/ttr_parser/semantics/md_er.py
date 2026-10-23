@@ -23,6 +23,16 @@ from .symbol_table import SymbolEntry
 def resolve_md_er_ref(resolver: Resolver, doc: CnDocument, path: str) -> SymbolEntry | None:
     if not path:
         return None
+    if doc.package_name and path.split(".", 1)[0] in {"md", "er", "db"}:
+        same = resolver.resolve_reference(f"{doc.package_name}.{path}", ResolutionContext(
+            schema_code=doc.schema_code, namespace=doc.namespace, imports=doc.imports, package_name=doc.package_name,
+        ))
+        if isinstance(same, Resolved) and same.symbol.package_name == doc.package_name:
+            local = str(same.symbol.qname)[len(doc.package_name) + 1:]
+            parts = local.split(".")
+            physical = ".".join(parts[:2] + parts[3:]) if parts[0] == "db" and len(parts) >= 4 else local
+            if path in {local, physical}:
+                return same.symbol
     result = resolver.resolve_reference(path, ResolutionContext(
         schema_code=doc.schema_code, namespace=doc.namespace, imports=doc.imports, package_name=doc.package_name,
     ))

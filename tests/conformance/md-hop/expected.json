@@ -1,0 +1,323 @@
+{
+  "elements": [
+    {
+      "element": "md.cubelet.catalogSales",
+      "erTarget": "er.entity.catalog_sales",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.cubelet.catalogSales.Calendar.day",
+      "erTarget": "er.entity.catalog_sales.sold",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.cubelet.catalogSales.Customer.customerCode",
+      "erTarget": "er.entity.catalog_sales.customer",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.cubelet.catalogSales.Product.code",
+      "erTarget": "er.entity.catalog_sales.item",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.cubelet.orphan",
+      "erTarget": null,
+      "via": null,
+      "diagnostic": "md/er-unmapped"
+    },
+    {
+      "element": "md.cubelet.orphan.Customer.customerCode",
+      "erTarget": null,
+      "via": null,
+      "diagnostic": "md/er-unmapped"
+    },
+    {
+      "element": "md.cubelet.storeSales",
+      "erTarget": "er.entity.store_sales",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.cubelet.storeSales.Calendar.day",
+      "erTarget": "er.entity.store_sales.sold",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.cubelet.storeSales.Customer.customerCode",
+      "erTarget": "er.entity.store_sales.customer",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.cubelet.storeSales.Product.code",
+      "erTarget": "er.entity.store_sales.item",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.cubelet.webSales",
+      "erTarget": "er.entity.web_sales",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.cubelet.webSales.Calendar.day",
+      "erTarget": "er.entity.web_sales.sold",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.cubelet.webSales.Customer.customerCode",
+      "erTarget": "er.entity.web_sales.customer",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.cubelet.webSales.Product.code",
+      "erTarget": "er.entity.web_sales.item",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.dimension.Calendar",
+      "erTarget": "er.entity.date_dim",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.dimension.Calendar.day",
+      "erTarget": "er.entity.date_dim.sk",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.dimension.Customer",
+      "erTarget": "er.entity.customer",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.dimension.Customer.birthYear",
+      "erTarget": "er.entity.customer.birthYear",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.dimension.Customer.customerCode",
+      "erTarget": "er.entity.customer.sk",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.dimension.Customer.state",
+      "erTarget": "er.entity.customer_address.state",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.dimension.Product",
+      "erTarget": "er.entity.item",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.dimension.Product.code",
+      "erTarget": "er.entity.item.sk",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.domain.AddressCode",
+      "erTarget": null,
+      "via": null,
+      "diagnostic": "md/er-unmapped"
+    },
+    {
+      "element": "md.domain.BirthYear",
+      "erTarget": "er.entity.customer.birthYear",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.domain.CustomerCode",
+      "erTarget": "er.entity.customer.sk",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.domain.Day",
+      "erTarget": "er.entity.date_dim.sk",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.domain.ItemCode",
+      "erTarget": "er.entity.item.sk",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.domain.LinkFrom",
+      "erTarget": null,
+      "via": null,
+      "diagnostic": "md/er-unmapped"
+    },
+    {
+      "element": "md.domain.LinkTo",
+      "erTarget": null,
+      "via": null,
+      "diagnostic": "md/er-unmapped"
+    },
+    {
+      "element": "md.domain.Money",
+      "erTarget": null,
+      "via": null,
+      "diagnostic": "md/er-unmapped"
+    },
+    {
+      "element": "md.domain.State",
+      "erTarget": "er.entity.customer_address.state",
+      "via": "derived",
+      "diagnostic": null
+    },
+    {
+      "element": "md.measure.revenue",
+      "erTarget": null,
+      "via": null,
+      "diagnostic": "md/er-ambiguous"
+    }
+  ],
+  "roles": [
+    {
+      "entity": "er.entity.catalog_sales",
+      "role": "fact",
+      "why": [
+        "cubelet md.cubelet.catalogSales (R1)",
+        "measures and at least two many-to-one relations"
+      ]
+    },
+    {
+      "entity": "er.entity.customer",
+      "role": "dimension",
+      "why": [
+        "dimension md.dimension.Customer (R3)",
+        "one side of er.relation.catalog_sales_customer from a fact",
+        "one side of er.relation.store_sales_customer from a fact",
+        "one side of er.relation.web_sales_customer from a fact"
+      ]
+    },
+    {
+      "entity": "er.entity.customer_address",
+      "role": "unclassified",
+      "why": []
+    },
+    {
+      "entity": "er.entity.customer_item",
+      "role": "bridge",
+      "why": [
+        "N:N map md.map.customer_items; flagged, not classified"
+      ]
+    },
+    {
+      "entity": "er.entity.date_dim",
+      "role": "dimension",
+      "why": [
+        "dimension md.dimension.Calendar (R3)",
+        "one side of er.relation.catalog_sales_sold from a fact",
+        "one side of er.relation.store_sales_sold from a fact",
+        "one side of er.relation.web_sales_sold from a fact"
+      ]
+    },
+    {
+      "entity": "er.entity.household",
+      "role": "unclassified",
+      "why": []
+    },
+    {
+      "entity": "er.entity.item",
+      "role": "dimension",
+      "why": [
+        "dimension md.dimension.Product (R3)",
+        "one side of er.relation.catalog_sales_item from a fact",
+        "one side of er.relation.store_sales_item from a fact",
+        "one side of er.relation.web_sales_item from a fact"
+      ]
+    },
+    {
+      "entity": "er.entity.sales",
+      "role": "unclassified",
+      "why": []
+    },
+    {
+      "entity": "er.entity.store_sales",
+      "role": "fact",
+      "why": [
+        "cubelet md.cubelet.storeSales (R1)",
+        "measures and at least two many-to-one relations"
+      ]
+    },
+    {
+      "entity": "er.entity.view_sales",
+      "role": "unclassified",
+      "why": []
+    },
+    {
+      "entity": "er.entity.web_sales",
+      "role": "fact",
+      "why": [
+        "cubelet md.cubelet.webSales (R1)",
+        "measures and at least two many-to-one relations"
+      ]
+    }
+  ],
+  "issues": [
+    {
+      "element": "md.cubelet.orphan",
+      "slug": "md/er-unmapped",
+      "severity": "warning",
+      "message": "'md.cubelet.orphan' has no er counterpart — no er2db for table 'db.dbo.table.orphan'"
+    },
+    {
+      "element": "md.cubelet.orphan.Customer.customerCode",
+      "slug": "md/er-unmapped",
+      "severity": "warning",
+      "message": "'md.cubelet.orphan.Customer.customerCode' has no er counterpart — no md2db binding for the element"
+    },
+    {
+      "element": "md.domain.AddressCode",
+      "slug": "md/er-unmapped",
+      "severity": "warning",
+      "message": "'md.domain.AddressCode' has no er counterpart — no md2db binding for the element"
+    },
+    {
+      "element": "md.domain.LinkFrom",
+      "slug": "md/er-unmapped",
+      "severity": "warning",
+      "message": "'md.domain.LinkFrom' has no er counterpart — no md2db binding for the element"
+    },
+    {
+      "element": "md.domain.LinkTo",
+      "slug": "md/er-unmapped",
+      "severity": "warning",
+      "message": "'md.domain.LinkTo' has no er counterpart — no md2db binding for the element"
+    },
+    {
+      "element": "md.domain.Money",
+      "slug": "md/er-unmapped",
+      "severity": "warning",
+      "message": "'md.domain.Money' has no er counterpart — no md2db binding for the element"
+    },
+    {
+      "element": "md.measure.revenue",
+      "slug": "md/er-ambiguous",
+      "severity": "warning",
+      "message": "'md.measure.revenue' maps to er.entity.catalog_sales.ext_sales_price, er.entity.sales.ext_sales_price, er.entity.store_sales.ext_sales_price, er.entity.web_sales.ext_sales_price; author md2er_cubelet/md2er_dimension to pick"
+    }
+  ]
+}

@@ -147,3 +147,43 @@ def table return_request_line {
         def column amount { type: decimal }
     ]
 }
+
+// Physical sources of the in-model sales_union (HP-P2 / H-1).
+def table store_sales {
+    primaryKey: ["sale_id"]
+    columns: [
+        def column sale_id { type: int, isKey: true },
+        def column channel { type: text },
+        def column customer { type: int },
+        def column item { type: int },
+        def column sold_date { type: date },
+        def column ext_sales_price { type: decimal },
+        def column quantity { type: int }
+    ]
+}
+
+def table web_sales {
+    primaryKey: ["sale_id"]
+    columns: [
+        def column sale_id { type: int, isKey: true },
+        def column channel { type: text },
+        def column customer { type: int },
+        def column item { type: int },
+        def column sold_date { type: date },
+        def column ext_sales_price { type: decimal },
+        def column quantity { type: int }
+    ]
+}
+
+def table catalog_sales {
+    primaryKey: ["sale_id"]
+    columns: [
+        def column sale_id { type: int, isKey: true },
+        def column channel { type: text },
+        def column customer { type: int },
+        def column item { type: int },
+        def column sold_date { type: date },
+        def column ext_sales_price { type: decimal },
+        def column quantity { type: int }
+    ]
+}

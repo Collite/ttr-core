@@ -1,0 +1,2 @@
+model binding
+def md2er_dimension pinned { dimension: md.Customer, entity: er.entity.household, attributes: { customerCode: sk } }

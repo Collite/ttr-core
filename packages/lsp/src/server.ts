@@ -82,6 +82,7 @@ import {
   mdCrossRefsOf,
   calcNames,
   cnHygieneReport,
+  CompositeMdErHop, mdHopReport, renderMdHopMarkdown, type MdHopReport,
   renderCnHygieneMarkdown,
   validateCn,
   sugarDeclaringRef,
@@ -295,7 +296,7 @@ export function createServerConnection(
   let packageGraph: PackageGraph | null = null;
   // CN-P2 S2.7 — the project's cn analysis (the validation and the hygiene report), read by
   // `modeler/getCnHygiene` and the concept hover; dropped whenever the symbol table changes.
-  let cnCache: { validation: CnValidation; report: CnHygieneReport } | null = null;
+  let cnCache: { validation: CnValidation; report: CnHygieneReport; mdReport: MdHopReport } | null = null;
   let symbolGeneration = 0;
   let symbolPageCache: { key: string; symbols: ListedSymbol[] } | null = null;
   function invalidateSymbols(): void {
@@ -790,7 +791,7 @@ export function createServerConnection(
     });
   }
 
-  function cnProject(): { validation: CnValidation; report: CnHygieneReport } {
+  function cnProject(): { validation: CnValidation; report: CnHygieneReport; mdReport: MdHopReport } {
     if (cnCache) return cnCache;
     const texts = new Map<string, string>(diskDocs);
     for (const d of cachedDocuments()) texts.set(d.uri, d.getText());
@@ -807,7 +808,9 @@ export function createServerConnection(
       docs.push({ uri, ast, ...context });
     }
     const validation = validateCn(docs, resolver);
-    cnCache = { validation, report: cnHygieneReport(docs, resolver, validation) };
+    const hop = new CompositeMdErHop(docs, resolver);
+    let mdReport: MdHopReport | undefined;
+    cnCache = { validation, report: cnHygieneReport(docs, resolver, validation, hop), get mdReport() { return mdReport ??= mdHopReport(docs, resolver, true, hop); } };
     return cnCache;
   }
 
@@ -1129,6 +1132,11 @@ export function createServerConnection(
   // CN-P2 S2.7 T3 — the editor's cn hygiene report (cn contracts §7) over the whole project: the open buffers
   // (authoritative) and every scanned file. The definition-level findings are `ttr cn hygiene`'s (CN-D29); the
   // markdown's last section says so. The VS Code command "TTR: Concept hygiene report" previews `markdown`.
+  connection.onRequest('modeler/getMdHop', () => {
+    const report = cnProject().mdReport;
+    return { report, markdown: renderMdHopMarkdown(report) };
+  });
+
   connection.onRequest('modeler/getCnHygiene', (): { report: CnHygieneReport; markdown: string } => {
     const { report } = cnProject();
     return { report, markdown: renderCnHygieneMarkdown(report) };
@@ -1831,6 +1839,10 @@ export function createServerConnection(
     // 0.16 — a parameter's value/label, an action's columns/sinks.
     if (def) lines.push(...automationHoverLines(def));
     // 0.17 (CN-P2 S2.7 T4) — a concept: its stereotype, label, grounding and grade (the hygiene row).
+    if (symbol.kind === 'entity' && symbol.schemaCode === 'er') {
+      const row = cnProject().mdReport.roles.find((r) => r.entity === symbol.qname);
+      if (row) lines.push(`- **Derived warehouse role:** ${row.role}`, ...row.why.map((why) => `- ${why}`));
+    }
     if (symbol.kind === 'concept') {
       const { validation, report } = cnProject();
       lines.push(...conceptHoverLines(validation.concepts.get(symbol.qname), report, symbol.qname));

@@ -6,12 +6,12 @@ model binding
 def cn2er_role customer_g  { role: cn.Customer, target: er.entity.customer }
 def cn2er_kind item_g      { kind: cn.Item, target: er.entity.item }
 def cn2er_kind warehouse_g { kind: cn.Warehouse, target: er.entity.warehouse }
-def cn2er_kind channel_g   { kind: cn.Channel, target: er.entity.channel_sales.channel }
+def cn2er_kind channel_g   { kind: cn.Channel, target: er.entity.sales.channel }
 
 def cn2er_event sale_g {
     event: cn.Sale,
-    target: er.entity.channel_sales,
-    period: { at: er.entity.channel_sales.sold_date },
+    target: er.entity.sales,
+    period: { at: er.entity.sales.sold_date },
     participants: { customer: [er.relation.channel_sales_customer], item: [er.relation.channel_sales_item] }
 }
 def cn2er_event order_g {
@@ -79,7 +79,7 @@ def cn2er_event return_line_g {
 def cn2md_quality revenue_g  { quality: cn.revenue, target: md.revenue }
 def cn2md_quality quantity_g { quality: cn.quantity, target: md.quantity }
 
-def cn2er_quality sale_date_g { quality: cn.sale_date, target: er.entity.channel_sales.sold_date }
+def cn2er_quality sale_date_g { quality: cn.sale_date, target: er.entity.sales.sold_date }
 def cn2er_quality order_value_g { quality: cn.order_value, target: er.entity.order.value }
 def cn2er_quality state_g { quality: cn.state, target: er.entity.order.state }
 def cn2er_quality channel_g { quality: cn.channel, target: er.entity.order.channel }

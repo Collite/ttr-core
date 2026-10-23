@@ -148,6 +148,10 @@
         "description": "Opens the current TTR file in the graphical designer."
       },
       {
+        "command": "modeler.mdHopReport",
+        "title": "TTR: md → er hop report"
+      },
+      {
         "command": "modeler.cnHygieneReport",
         "title": "Concept hygiene report",
         "category": "TTR",

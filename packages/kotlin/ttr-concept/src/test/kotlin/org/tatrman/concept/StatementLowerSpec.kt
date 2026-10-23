@@ -30,6 +30,7 @@ class StatementLowerSpec :
         val clock = Clock.fixed(Instant.parse("2026-03-15T10:00:00Z"), ZoneOffset.UTC)
         val sales = GoldenWorlds["sales"].cn
         val hartland = GoldenWorlds["hartland"].cn
+        val reverse = GoldenWorlds["channel-reverse"].cn
         val plus = world("sales", PLUS)
 
         fun lower(
@@ -99,7 +100,7 @@ class StatementLowerSpec :
         }
 
         test("T1: a value kind reaches md through the reverse hop — via MD_HOP, the er grounding's def (⚑CN-P8)") {
-            val r = lowered(lower(hartland, ask, revenue, always, groupBy("cn.Channel")))
+            val r = lowered(lower(reverse, ask, revenue, always, groupBy("cn.Channel")))
             r.provenance.bindingPaths shouldContainExactly
                 listOf(
                     BindingPath("measures[0]", "cn.revenue", "revenue_g", "md.revenue", Via.DIRECT),
@@ -224,7 +225,7 @@ class StatementLowerSpec :
                 "\"time\": { \"range\": { \"from\": { \"value\": \"2026-01-01T08\", \"granularity\": \"HOUR\" }, " +
                     "\"to\": { \"value\": \"2026-01-02T08\", \"granularity\": \"HOUR\" } } }"
             refused(lower(sales, ask, revenue, hours)) shouldBe listOf("cn/not-analytically-reachable time.range.from")
-            refused(lower(hartland, ask, revenue, y2026)) shouldBe listOf("cn/not-analytically-reachable time")
+            refused(lower(reverse, ask, revenue, y2026)) shouldBe listOf("cn/not-analytically-reachable time")
         }
 
         // ---- T4 — resolve, lower, compose, provenance ---------------------------------------------------------------

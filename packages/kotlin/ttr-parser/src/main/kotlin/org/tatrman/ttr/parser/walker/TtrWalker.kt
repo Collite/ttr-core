@@ -1282,6 +1282,8 @@ class TtrWalker(
         when {
             isCalc -> "N:1"
             card == null -> null
+            card["from"] in setOf("N", "M", "*", "0..*", "1..*") &&
+                card["to"] in setOf("N", "M", "*", "0..*", "1..*") -> "N:N"
             card["from"] == "1" && card["to"] == "1" -> "1:1"
             else -> "N:1"
         }

@@ -1,0 +1,5 @@
+model binding
+def md2db_cubelet physical { cubelet: md.channelSales, target: db.dbo.channel_sales, shape: wide, attributes: { Channel.code: channel }, measures: { revenue: ext_sales_price } }
+def md2er_cubelet explicit { cubelet: md.channelSales, target: er.entity.channel_sales, attributes: { Channel.code: channel }, measures: { revenue: ext_sales_price } }
+def cn2er_kind channel_g { kind: cn.Channel, target: er.entity.channel_sales.channel }
+def cn2md_quality revenue_g { quality: cn.revenue, target: md.revenue }

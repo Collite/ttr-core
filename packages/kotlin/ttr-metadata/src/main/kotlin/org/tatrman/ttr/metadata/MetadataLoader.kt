@@ -43,7 +43,8 @@ class MetadataLoader(
             val result = ModelReconciler(descriptor, policy).reconcile(snapshots)
             val issues =
                 result.errors.map { LoadIssue.from(it, LoadIssue.Severity.ERROR) } +
-                    result.warnings.map { LoadIssue.from(it, LoadIssue.Severity.WARNING) }
+                    result.warnings.map { LoadIssue.from(it, LoadIssue.Severity.WARNING) } +
+                    snapshots.flatMap { it.mdHopIssues }
             LoadResult(
                 model = result.model,
                 issues = issues,

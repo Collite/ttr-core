@@ -1,14 +1,5 @@
-// CN-P3 S3.7 — the md face's physical binding: `channelSales` reads the `channel_sales` table (wide), the oracle's
-// lowering (`MdPathLowering`) and the S3.3 statement lowering read the same binding.
+// HP-P2: three fact cubelets, no authored md2er and no Channel dimension in their grain.
 model binding
-
-def md2db_cubelet channel_sales_binding {
-    cubelet: md.channelSales,
-    target: { table: db.dbo.channel_sales },
-    shape: wide,
-    attributes: { Channel.code: { column: channel } },
-    measures: {
-        revenue: { column: ext_sales_price },
-        quantity: { column: quantity }
-    }
-}
+def md2db_cubelet store_sales_binding { cubelet: md.storeSales, target: db.dbo.store_sales, shape: wide, measures: { revenue: ext_sales_price, quantity: quantity } }
+def md2db_cubelet web_sales_binding { cubelet: md.webSales, target: db.dbo.web_sales, shape: wide, measures: { revenue: ext_sales_price, quantity: quantity } }
+def md2db_cubelet catalog_sales_binding { cubelet: md.catalogSales, target: db.dbo.catalog_sales, shape: wide, measures: { revenue: ext_sales_price, quantity: quantity } }

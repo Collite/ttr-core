@@ -953,7 +953,7 @@ export interface MdMapDef {
   /** 1..n opaque domain refs (usually one). */
   to: string[];
   /** Normalised from the grammar's `cardinality` object; default N:1 (semantics). */
-  cardinality?: '1:1' | 'N:1';
+  cardinality?: '1:1' | 'N:1' | 'N:N';
   /** Absent ⇒ table-backed (case-table supplied by md2db_map). */
   calc?: CalcRef;
   /** Span-carrying view of `from`/`to` domain refs (editor-only). */

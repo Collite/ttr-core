@@ -15,6 +15,8 @@ kotlin {
 
 tasks.test {
     useJUnitPlatform()
+    inputs.dir("../ttr-metadata/src/test/resources/md-hop")
+    inputs.dir("../../../tests/conformance/cn-hygiene")
     // CN-P3 S3.7 — the goldens (`ConceptGoldenSpec`): every case runs in `check` (S3.8 removed the stage switch).
     // `-Pcn.goldens.regen` rewrites the oracle-made expectations; it reaches the test JVM only as a system property (a
     // `-D` on the Gradle command line does not).
@@ -68,6 +70,7 @@ dependencies {
     api(libs.kotlinx.ser.json)
     // `ttr cn hygiene` (the house `ttr <verb>` pattern — ttr-import-schema, ttr-security-gen).
     implementation(libs.clikt)
+    implementation(project(":packages:kotlin:ttr-metadata-cli")) // ttr md hop, beside ttr cn hygiene.
     implementation(project(":packages:kotlin:ttr-md-resolver"))
     implementation(project(":packages:kotlin:ttrp-emit"))
     // The er renderer's dialects and reserved words; api since S3.8 (A-CN-55): `ErModelHandle` is public, a translator
@@ -175,3 +178,11 @@ publishing {
         }
     }
 }
+
+// R129-R4: run outside the shared test JVM, before any other Calcite initialization.
+val verifyLineageCharset by tasks.registering(JavaExec::class) {
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "org.tatrman.concept.LineageCharsetFork"
+}
+tasks.named("check") { dependsOn(verifyLineageCharset) }

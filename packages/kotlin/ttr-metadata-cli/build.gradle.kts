@@ -15,6 +15,8 @@ kotlin {
 
 tasks.test {
     useJUnitPlatform()
+    inputs.dir("../ttr-metadata/src/test/resources/md-hop")
+    inputs.dir("../../../tests/conformance/md-hop")
     systemProperty("metadata.expectedVersion", project.version.toString())
 }
 

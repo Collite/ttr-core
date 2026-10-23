@@ -1,0 +1,2 @@
+model er
+def relation web_household { from: er.entity.web_sales, to: er.entity.household, cardinality: { from: "N", to: "1" }, join: [{ from: er.entity.web_sales.customer, to: er.entity.household.sk }] }

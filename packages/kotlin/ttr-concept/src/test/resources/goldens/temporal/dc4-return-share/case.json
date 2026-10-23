@@ -1,0 +1,12 @@
+{
+  "world": "hartland",
+  "call": "definitionRender",
+  "stage": "HP-P2",
+  "target": "cn.AbusiveReturner",
+  "layer": "ER",
+  "dialect": "postgresql",
+  "options": {
+    "mode": "PREDICATE",
+    "placeholderStyle": "CURLY"
+  }
+}

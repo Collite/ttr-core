@@ -26,6 +26,8 @@ translatability, not this rule — the goldens follow H-1.
 
 **Pending:** `dc12-post-stemi-certainly` (certainly from the granularity, no stored bound — G-ER-1) ·
 `transferred-within-24h`, `within-around-instant` (an interval over columns — G-ER-1) · `transfer-delay`, `length-of-stay`, `rehospitalized-30d`, `late-return-line`
-(datetime difference — G-ER-2) · `dc4-return-share` (`revenue`'s er landing is the measure hop — md/hop).
+(datetime difference — G-ER-2).
+
+`dc4-return-share` is active after HP-P2: revenue reaches the stacked sales entity through its bearer-restricted lineage hop.
 
 Pending convention, case format and oracles: [`../README.md`](../README.md).
