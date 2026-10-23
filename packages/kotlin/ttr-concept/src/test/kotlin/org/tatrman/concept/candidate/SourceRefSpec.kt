@@ -3,6 +3,7 @@ package org.tatrman.concept.candidate
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.nulls.shouldBeNull
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 
 /**
@@ -56,6 +57,21 @@ class SourceRefSpec :
                 "question://clinic/q-2031",
             )) {
                 SourceRefs.parse(ref)!!.text shouldBe ref
+            }
+        }
+
+        test("a locator the parser would refuse cannot be built (review-133 F11)") {
+            for (bad in listOf(
+                { Locator.Sentence(0) },
+                { Locator.Row(0) },
+                { Locator.Span(10, 10) },
+                { Locator.Span(-1, 3) },
+            )) {
+                io.kotest.assertions.throwables
+                    .shouldThrow<IllegalArgumentException> { bad() }
+            }
+            for (l in listOf(Locator.Sentence(1), Locator.Row(7), Locator.Span(0, 1))) {
+                SourceRefs.parse(SourceRefs.fromKallimachos("kallimachos://n/s/p", l)!!).shouldNotBeNull()
             }
         }
 

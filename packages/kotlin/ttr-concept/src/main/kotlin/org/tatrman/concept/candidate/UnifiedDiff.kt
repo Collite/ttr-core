@@ -75,7 +75,12 @@ internal object UnifiedDiff {
         return out
     }
 
-    /** The edit script: common prefix and suffix, an LCS over what lies between. */
+    /**
+     * The edit script: common prefix and suffix, then Myers' greedy diff over what lies between — O((N+M)·D) time and
+     * O(D²) memory, D the number of changed lines (review-133 F13: an LCS table was quadratic in the file, and a
+     * relation edits near the top AND appends at the end, so nothing common trims it). Within a change, deletions come
+     * before insertions, as git prints a changed line.
+     */
     private fun script(
         a: List<String>,
         b: List<String>,
@@ -84,29 +89,95 @@ internal object UnifiedDiff {
         while (pre < a.size && pre < b.size && a[pre] == b[pre]) pre++
         var suf = 0
         while (suf < a.size - pre && suf < b.size - pre && a[a.size - 1 - suf] == b[b.size - 1 - suf]) suf++
-        val n = a.size - pre - suf
-        val m = b.size - pre - suf
-        val lcs = Array(n + 1) { IntArray(m + 1) }
-        for (i in n - 1 downTo 0) {
-            for (j in m - 1 downTo 0) {
-                lcs[i][j] =
-                    if (a[pre + i] == b[pre + j]) lcs[i + 1][j + 1] + 1 else maxOf(lcs[i + 1][j], lcs[i][j + 1])
-            }
-        }
         val ops = mutableListOf<Op>()
         for (k in 0 until pre) ops += Op.Same(k, k)
-        var i = 0
-        var j = 0
-        while (i < n || j < m) {
-            when {
-                i < n && j < m && a[pre + i] == b[pre + j] -> ops += Op.Same(pre + i++, pre + j++)
-                // A tie deletes first: `-old` before `+new`, as git prints a changed line.
-                i < n && (j == m || lcs[i + 1][j] >= lcs[i][j + 1]) -> ops += Op.Del(pre + i++)
-                else -> ops += Op.Add(pre + j++)
-            }
-        }
+        ops += grouped(myers(a.subList(pre, a.size - suf), b.subList(pre, b.size - suf), pre))
         for (k in 0 until suf) ops += Op.Same(a.size - suf + k, b.size - suf + k)
         return ops
+    }
+
+    /** Myers' shortest edit script of [a] → [b]; indices shifted by [offset]. */
+    private fun myers(
+        a: List<String>,
+        b: List<String>,
+        offset: Int,
+    ): List<Op> {
+        val n = a.size
+        val m = b.size
+        val max = n + m
+        if (max == 0) return emptyList()
+        val off = max + 1
+        val v = IntArray(2 * max + 3)
+        // trace[d] = v over k ∈ [-d-1, d+1] BEFORE step d — all the backtrack reads.
+        val trace = mutableListOf<IntArray>()
+        var end = -1
+        search@ for (d in 0..max) {
+            trace += v.copyOfRange(off - d - 1, off + d + 2)
+            for (k in -d..d step 2) {
+                var x =
+                    if (k == -d ||
+                        (k != d && v[off + k - 1] < v[off + k + 1])
+                    ) {
+                        v[off + k + 1]
+                    } else {
+                        v[off + k - 1] + 1
+                    }
+                var y = x - k
+                while (x < n && y < m && a[x] == b[y]) {
+                    x++
+                    y++
+                }
+                v[off + k] = x
+                if (x >= n && y >= m) {
+                    end = d
+                    break@search
+                }
+            }
+        }
+        val ops = ArrayDeque<Op>()
+        var x = n
+        var y = m
+        for (d in end downTo 0) {
+            val before = trace[d]
+
+            fun at(k: Int) = before[k + d + 1]
+            val k = x - y
+            val prevK = if (k == -d || (k != d && at(k - 1) < at(k + 1))) k + 1 else k - 1
+            val prevX = at(prevK)
+            val prevY = prevX - prevK
+            while (x > prevX && y > prevY) {
+                ops.addFirst(Op.Same(offset + x - 1, offset + y - 1))
+                x--
+                y--
+            }
+            if (d > 0) {
+                if (x == prevX) ops.addFirst(Op.Add(offset + y - 1)) else ops.addFirst(Op.Del(offset + x - 1))
+            }
+            x = prevX
+            y = prevY
+        }
+        return ops
+    }
+
+    /** Each run of changes reordered deletions-first (a stable partition; the run means the same). */
+    private fun grouped(ops: List<Op>): List<Op> {
+        val out = mutableListOf<Op>()
+        var run = mutableListOf<Op>()
+
+        fun flush() {
+            out += run.filterIsInstance<Op.Del>() + run.filterIsInstance<Op.Add>()
+            run = mutableListOf()
+        }
+        for (op in ops) {
+            if (op is Op.Same) {
+                flush()
+                out += op
+            } else {
+                run += op
+            }
+        }
+        flush()
+        return out
     }
 
     /** Changes with [CONTEXT] lines around them; hunks whose context would touch are merged. */

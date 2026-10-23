@@ -53,8 +53,6 @@ sealed interface CandidateLoad {
  * **Every violation is reported**, not the first — a refused submission should be fixable in one round.
  */
 object CnCandidates {
-    const val SCHEMA_ID: String = "cn-candidate/v1"
-
     private val pretty = Json { prettyPrint = true }
 
     fun parse(json: String): CandidateLoad {
@@ -77,7 +75,7 @@ object CnCandidates {
         }
     }
 
-    /** The canonical JSON: the schema's key order, absent optionals left out. */
+    /** The canonical JSON: the schema's key order, label locales sorted, absent optionals left out. */
     fun toJson(c: CnCandidate): JsonObject =
         buildJsonObject {
             put("id", c.id)
@@ -110,7 +108,7 @@ object CnCandidates {
                             put("stereo", p.stereo.word)
                             put("name", p.name)
                             if (p.label.isNotEmpty()) {
-                                put("label", buildJsonObject { p.label.forEach { (k, v) -> put(k, v) } })
+                                put("label", buildJsonObject { p.label.toSortedMap().forEach { (k, v) -> put(k, v) } })
                             }
                             if (p.isA.isNotEmpty()) put("is_a", strings(p.isA))
                             if (p.involves.isNotEmpty()) {

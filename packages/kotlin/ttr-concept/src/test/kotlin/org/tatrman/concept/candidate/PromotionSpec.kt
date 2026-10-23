@@ -70,8 +70,11 @@ class PromotionSpec :
             }
         }
 
+        val temps = mutableListOf<Path>()
+        afterSpec { temps.forEach { it.toFile().deleteRecursively() } }
+
         fun materialize(files: Map<String, String>): Path {
-            val dir = Files.createTempDirectory("cn-promotion")
+            val dir = Files.createTempDirectory("cn-promotion").also { temps.add(it) }
             for ((rel, text) in files) {
                 dir.resolve(rel).also { it.parent.createDirectories() }.writeText(text)
             }
@@ -117,7 +120,7 @@ class PromotionSpec :
             dir: Path,
             diff: String,
         ) {
-            val patch = Files.createTempFile("cn-promotion", ".diff").also { it.writeText(diff) }
+            val patch = Files.createTempFile("cn-promotion", ".diff").also { it.writeText(diff) }.also { temps.add(it) }
             val p =
                 ProcessBuilder("git", "apply", "--whitespace=nowarn", patch.toString())
                     .directory(dir.toFile())
@@ -437,8 +440,8 @@ class PromotionSpec :
         }
 
         test("F6: the strict load report sees a duplicate def the plain snapshot does not") {
-            // Two files, one cn name: the snapshot keeps one silently; the strict report names both. (Within ONE file the
-            // loader reports nothing at all — the promotion's own name-space check is what refuses that case.)
+            // Two files, one cn name: the snapshot keeps one silently; the strict report names both. (Within ONE
+            // file the loader reports nothing at all — the promotion's own name-space check refuses that case.)
             val split =
                 pkg("hartland") + ("cn-a.ttrm" to "model cn\n\ndef relation_type stocks {}\n") +
                     ("cn-b.ttrm" to "model cn\n\ndef kind stocks {}\n")
@@ -487,6 +490,119 @@ class PromotionSpec :
                 .patch(rel.copy(proposal = Proposal.Relation("stocks", "cn.CreditNote", "cn.Item")), before)
                 .shouldBeInstanceOf<PromotionResult.Refused>()
                 .reason shouldContain "er-credit.ttrm"
+        }
+
+        test(
+            "F8: a new file joins its concept's package — its directory, its `package` line; a taken path steps aside",
+        ) {
+            val packaged = pkg("clinic").map { (rel, text) -> "clinic/$rel" to "package clinic\n\n$text" }.toMap()
+            val term = candidate("span-catalogue-term")
+            val english = (term.proposal as Proposal.Term).copy(locale = "en", forms = listOf("transfer"))
+            val (patch, loaded) = promote(term.copy(proposal = english), packaged)
+            patch.files.keys shouldBe setOf("clinic/lexicon-en.ttrm")
+            patch.files
+                .getValue(
+                    "clinic/lexicon-en.ttrm",
+                ).startsWith("package clinic\n\nmodel lexicon locale en\n") shouldBe
+                true
+            loaded.concept("Transfer").lexiconLinks.flatMap { it.forms } shouldContain "transfer"
+
+            val dbOnly = mapOf("cn.ttrm" to "model db\n")
+            val (thing, _) = promote(synthesized.copy(proposal = Proposal.Concept(Stereo.KIND, "Thing")), dbOnly)
+            thing.files.keys shouldBe setOf("cn-2.ttrm")
+        }
+
+        test("F9: a grounding the package does not define, a second default sense — refused") {
+            val nowhere =
+                synthesized.copy(
+                    proposal = Proposal.Concept(Stereo.KIND, "Depot", suggestedGrounding = "er.entity.nowhere"),
+                )
+            refused(nowhere, "hartland") shouldContain "er.entity.nowhere"
+            val somewhere =
+                synthesized.copy(
+                    proposal = Proposal.Concept(Stereo.KIND, "Depot", suggestedGrounding = "er.entity.warehouse"),
+                )
+            Promotion.patch(somewhere, pkg("hartland")).shouldBeInstanceOf<PromotionResult.Patched>()
+
+            val withDefault =
+                pkg("clinic") +
+                    (
+                        "lexicon-cs.ttrm" to
+                            "model lexicon locale cs\n\n" +
+                            "def term prelozeni { for: cn.Transfer, forms: [\"přeložení\"], default: true }\n"
+                    )
+            val term = candidate("span-catalogue-term")
+            val second =
+                (term.proposal as Proposal.Term).copy(
+                    targetQname = "cn.Encounter",
+                    forms = listOf("Přeložení"),
+                    default = true,
+                )
+            Promotion
+                .patch(
+                    term.copy(proposal = second),
+                    withDefault,
+                ).shouldBeInstanceOf<PromotionResult.Refused>()
+                .reason shouldContain
+                "default"
+        }
+
+        test("F10: producer text in the PR body is inert — no mention, link or image; a fence outlasts the rendering") {
+            val c = candidate("au-synthesizer-concept")
+            val loud =
+                EvidenceExample(
+                    ExampleKind.RECIPE_SENTENCE,
+                    "recipe://hartland.orders/order-review#s2",
+                    "@someone #12 ![x](http://t/) `code`",
+                )
+            val noisy =
+                c.copy(
+                    provenance =
+                        c.provenance.copy(
+                            confidence = c.provenance.confidence.copy(method = "*bold* @team"),
+                            evidence = Evidence(null, null, listOf(loud)),
+                        ),
+                )
+            val patch = Promotion.patch(noisy, pkg("hartland")).shouldBeInstanceOf<PromotionResult.Patched>().patch
+            val body = Promotion.pullRequest(noisy, patch, "SELECT '```' AS fence").body
+            body shouldContain "`` @someone #12 ![x](http://t/) `code` ``"
+            body shouldContain "`*bold* @team`"
+            body shouldContain "````sql\nSELECT '```' AS fence\n````"
+        }
+
+        test("F12: a refusal carries the parser's words; a non-model file in the map is ignored") {
+            val broken = pkg("hartland") + ("cn-broken.ttrm" to "model cn\n\ndef kind Broken {\n")
+            Promotion.patch(synthesized, broken).shouldBeInstanceOf<PromotionResult.Refused>().reason shouldContain
+                Regex("cn-broken.ttrm:\\d+:\\d+ \\S")
+            val withReadme = pkg("hartland") + ("README.md" to "# Hartland\n\nNot model text.\n")
+            val patch = Promotion.patch(synthesized, withReadme).shouldBeInstanceOf<PromotionResult.Patched>().patch
+            patch.files.keys shouldBe setOf("cn.ttrm")
+        }
+
+        test("F13: a relation on the first concept of a 20,000-line file — the diff stays linear") {
+            val big =
+                buildString {
+                    append("model cn\n\n")
+                    for (i in 0 until 20_000) append("def kind K$i {}\n")
+                }
+            val rel = candidate("manual-relation").copy(proposal = Proposal.Relation("next_to", "cn.K0", "cn.K1"))
+            val patch =
+                Promotion
+                    .patch(
+                        rel,
+                        mapOf("cn.ttrm" to big),
+                    ).shouldBeInstanceOf<PromotionResult.Patched>()
+                    .patch
+            val dir = materialize(mapOf("cn.ttrm" to big))
+            gitApply(dir, patch.diff)
+            dir.resolve("cn.ttrm").readText() shouldBe patch.files.getValue("cn.ttrm")
+        }
+
+        test("F14: the PR reads the candidate's own er_rendering when none is passed") {
+            val c = candidate("au-synthesizer-concept")
+            val rendered = c.copy(proposal = concept(c).copy(erRendering = "SELECT 1"))
+            val patch = Promotion.patch(rendered, pkg("hartland")).shouldBeInstanceOf<PromotionResult.Patched>().patch
+            Promotion.pullRequest(rendered, patch).body shouldContain "SELECT 1"
         }
 
         test("a candidate that is not proposed any more") {

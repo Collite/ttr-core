@@ -61,6 +61,7 @@ data class PullRequest(
 object Promotion {
     private const val INDENT = "    "
     private val NOT_ID = Regex("[^a-z0-9]+")
+    private val BACKTICKS = Regex("`+")
 
     /** `TTR.g4`'s `TAGGED_BLOCK_LITERAL` opening: a word, optional blanks, a line end — read as a language tag. */
     private val LONE_WORD_LINE = Regex("^[a-zA-Z][a-zA-Z0-9-]*[ \t]*\r?\n")
@@ -75,10 +76,12 @@ object Promotion {
                 "candidate ${candidate.id} is ${candidate.status.word}: only a proposed candidate is promoted",
             )
         }
-        val pkg =
-            Pkg.of(model) ?: return refused(
-                "the model package does not parse: ${Pkg.errors(model).joinToString("; ")}",
+        val pkg = Pkg.of(model)
+        if (pkg.errors.isNotEmpty()) {
+            return refused(
+                "the model package does not parse: ${pkg.errors.joinToString("; ")}",
             )
+        }
         return when (val p = candidate.proposal) {
             is Proposal.Concept -> concept(candidate, p, pkg)
             is Proposal.Term -> term(candidate, p, pkg, promoted)
@@ -101,9 +104,11 @@ object Promotion {
             }
         val body = StringBuilder()
         body.append("Promotes cn candidate `${candidate.id}` — ").append(what).append(" (`${patch.qname}`).\n\n")
-        body.append("- **producer:** `${p.producer}`\n")
-        p.sourceRef?.let { body.append("- **source:** `$it`\n") }
-        body.append("- **confidence:** ${p.confidence.value} (`${p.confidence.producer}` · ${p.confidence.method})\n")
+        body.append("- **producer:** ${code(p.producer)}\n")
+        p.sourceRef?.let { body.append("- **source:** ${code(it)}\n") }
+        body.append(
+            "- **confidence:** ${p.confidence.value} (${code(p.confidence.producer)} · ${code(p.confidence.method)})\n",
+        )
         body.append("- **proposed:** ${p.createdAt}\n")
         p.evidence?.let { e ->
             val counts =
@@ -115,15 +120,35 @@ object Promotion {
             if (counts.isNotEmpty()) body.append(" — ").append(counts.joinToString(" · "))
             body.append("\n\n")
             for (x in e.examples) {
-                body.append("- ${x.kind.word} `${x.ref}`: ").append(x.text.replace('\n', ' ')).append('\n')
+                body.append("- ${x.kind.word} ${code(x.ref)}: ").append(code(x.text.replace('\n', ' '))).append('\n')
             }
         }
-        if (erRendering != null) {
+        val er = erRendering ?: (candidate.proposal as? Proposal.Concept)?.erRendering
+        if (er != null) {
+            val fence = "`".repeat(maxOf(3, longestBacktickRun(er) + 1))
             body.append("\n### er rendering\n\nThe phase as SQL over entities (`definition.render`, er):\n\n")
-            body.append("```sql\n").append(erRendering.trimEnd()).append("\n```\n")
+            body
+                .append(fence)
+                .append("sql\n")
+                .append(er.trimEnd())
+                .append('\n')
+                .append(fence)
+                .append('\n')
         }
         return PullRequest("cn: promote $what", body.toString())
     }
+
+    /**
+     * Producer text as an inline code span (review-133 F10): no mention, link, image or emphasis can come alive in it —
+     * the fence one backtick longer than any run inside, padded when the text starts or ends with a backtick.
+     */
+    private fun code(text: String): String {
+        val fence = "`".repeat(longestBacktickRun(text) + 1)
+        val pad = if (text.startsWith('`') || text.endsWith('`')) " " else ""
+        return fence + pad + text + pad + fence
+    }
+
+    private fun longestBacktickRun(text: String): Int = BACKTICKS.findAll(text).maxOfOrNull { it.value.length } ?: 0
 
     /** `canon_ref`: the merged commit and the def's qname. */
     fun canonRef(
@@ -144,9 +169,29 @@ object Promotion {
         if (missing.isNotEmpty()) {
             return refused("cn.${p.name} names ${missing.joinToString()}, which this package does not define")
         }
-        // The anchor's file — unless the anchor is a sugar concept, whose file is er/md (review-133 ⚑R133-c).
+        p.suggestedGrounding?.let { g ->
+            if (g.substringAfterLast('.') !in pkg.elements) {
+                return refused(
+                    "grounds: $g — the package defines no er or md element named '${g.substringAfterLast('.')}'",
+                )
+            }
+        }
+        // The anchor's file — unless the anchor is a sugar concept, whose file is er/md (review-133 ⚑R133-c): then a cn
+        // file of its package, else a new one beside it (F8). No anchor: the first cn file.
+        val anchor = refs.firstOrNull()?.let(::bare)
+        val near = anchor?.let { pkg.fileOf(it) }
         val path =
-            refs.firstOrNull()?.let { pkg.concepts[bare(it)]?.path } ?: pkg.cnFiles.firstOrNull() ?: "cn.ttrm"
+            anchor?.let { pkg.concepts[it]?.path }
+                ?: (
+                    if (near !=
+                        null
+                    ) {
+                        pkg.cnFiles.firstOrNull { pkg.packages[it] == pkg.packages[near] }
+                    } else {
+                        pkg.cnFiles.firstOrNull()
+                    }
+                )
+                ?: pkg.newPath("cn", near)
         val props = mutableListOf<String>()
         p.of?.let { props += "of: ${bare(it)}" }
         p.event?.let { props += "event: ${bare(it)}" }
@@ -173,7 +218,8 @@ object Promotion {
             } else {
                 "def ${p.stereo.word} ${p.name} {\n" + props.joinToString(",\n") { INDENT + it } + "\n}"
             }
-        return patched("cn.${p.name}", mapOf(path to append(pkg.texts[path] ?: "model cn\n", def)), pkg)
+        val base = pkg.texts[path] ?: (pkg.header(near ?: pkg.texts.keys.firstOrNull()) + "model cn\n")
+        return patched("cn.${p.name}", mapOf(path to append(base, def)), pkg)
     }
 
     private fun term(
@@ -186,20 +232,29 @@ object Promotion {
             p.targetQname ?: promoted(p.proposedConceptRef!!)
                 ?: return refused("the term waits for candidate ${p.proposedConceptRef}, which is not promoted yet")
         if (!pkg.defined(bare(target))) return refused("the term targets $target, which this package does not define")
+        if (p.default == true) {
+            val folded = p.forms.map(TermNormalizer::fold).toSet()
+            pkg.defaults[p.locale].orEmpty().firstOrNull { it.second in folded }?.let { (entry, form) ->
+                return refused(
+                    "'$form' already has a default sense in locale ${p.locale} (def term $entry) — one per form " +
+                        "(cn/duplicate-default-sense)",
+                )
+            }
+        }
         val stem = termId(p.forms.first())
         val id = numbered(stem) { it !in pkg.lexiconIds && TtrId.isId(it) }
+        // The locale's lexicon file in the target's package, else a new one beside the target (review-133 F8).
+        val near = pkg.fileOf(bare(target))
         val path =
-            pkg.lexiconFiles[p.locale]
-                ?: generateSequence(1) { it + 1 }
-                    .map { if (it == 1) "lexicon-${p.locale}.ttrm" else "lexicon-${p.locale}-$it.ttrm" }
-                    .first { it !in pkg.texts }
+            pkg.lexiconFiles[p.locale].orEmpty().firstOrNull { pkg.packages[it] == pkg.packages[near] }
+                ?: pkg.newPath("lexicon-${p.locale}", near)
         val fields =
             listOf("for: $target", "forms: [${p.forms.joinToString { quote(it) }}]") +
                 listOfNotNull(p.default?.let { "default: $it" })
         val entry =
             (candidate.provenance.sourceRef?.let { "// sources: $it\n" } ?: "") +
                 "def term $id { ${fields.joinToString()} }"
-        val text = append(pkg.texts[path] ?: "model lexicon locale ${p.locale}\n", entry)
+        val text = append(pkg.texts[path] ?: (pkg.header(near) + "model lexicon locale ${p.locale}\n"), entry)
         return patched("lexicon.$id", mapOf(path to text), pkg)
     }
 
@@ -322,9 +377,8 @@ object Promotion {
     ): PromotionResult {
         for ((path, text) in changed.toSortedMap()) {
             val e = TtrLoader.parseString(text, path).errors.firstOrNull() ?: continue
-            return refused(
-                "the patch would not parse (a promotion bug): $path:${e.line}:${e.column} ${e.message.lineSequence().first()}",
-            )
+            val where = "$path:${e.line}:${e.column}"
+            return refused("the patch would not parse (a promotion bug): $where ${e.message.lineSequence().first()}")
         }
         val diff =
             changed.toSortedMap().entries.joinToString(
@@ -384,17 +438,25 @@ object Promotion {
     ): Int = text.offsetByCodePoints(0, codePoints)
 
     /**
-     * The package as the promotion reads it: which file defines what. One cn name space (review-133 F6): a concept def,
-     * a relation type and a concept declared by `concept { }` sugar in an er / md def (F5) each take a name.
+     * The package as the promotion reads it: which file defines what. Only its `.ttrm` files are model text (anything
+     * else in the map is ignored — review-133 F12). One cn name space (F6): a concept def, a relation type and a concept
+     * declared by `concept { }` sugar in an er / md def (F5) each take a name.
      */
     private class Pkg(
         val texts: Map<String, String>,
+        val taken: Set<String>,
+        val errors: List<String>,
+        val packages: Map<String, String?>,
         val concepts: Map<String, Located>,
         val sugar: Map<String, String>,
         val relationTypes: Map<String, String>,
         val cnFiles: List<String>,
-        val lexiconFiles: Map<String, String>,
+        val lexiconFiles: Map<String, List<String>>,
         val lexiconIds: Set<String>,
+        /** Per locale: (entry, folded form) for every form of an entry that says `default: true`. */
+        val defaults: Map<String, List<Pair<String, String>>>,
+        /** Every er entity / attribute and md element name — what a `grounds:` ref's last segment may name. */
+        val elements: Set<String>,
     ) {
         class Located(
             val path: String,
@@ -404,6 +466,9 @@ object Promotion {
         /** A concept the package defines — by a cn def or by sugar. */
         fun defined(name: String): Boolean = name in concepts || name in sugar
 
+        /** The file that defines concept [name] (its cn def, or the er / md def carrying its sugar). */
+        fun fileOf(name: String): String? = concepts[name]?.path ?: sugar[name]
+
         /** What already holds [name] in the cn name space, in words; null when it is free. */
         fun holder(name: String): String? =
             concepts[name]?.let { "(${it.path})" }
@@ -412,26 +477,53 @@ object Promotion {
                     "as a relation type ($it) — concepts and relation types share one cn name space"
                 }
 
+        /** A new file `<base>.ttrm` in [near]'s directory, stepping around a taken path (`<base>-2.ttrm`, …). */
+        fun newPath(
+            base: String,
+            near: String?,
+        ): String {
+            val dir = near?.substringBeforeLast('/', "")?.takeIf { it.isNotEmpty() }?.let { "$it/" } ?: ""
+            return generateSequence(1) { it + 1 }
+                .map { if (it == 1) "$dir$base.ttrm" else "$dir$base-$it.ttrm" }
+                .first { it !in taken }
+        }
+
+        /** A new file's `package` line — [near]'s package, so the def lands in its concept's package (F8). */
+        fun header(near: String?): String = near?.let { packages[it] }?.let { "package $it\n\n" } ?: ""
+
         companion object {
             private val SUGAR_KEYS = listOf("kind", "role", "event", "quality")
+            private const val MAX_ERRORS = 5
 
-            fun of(model: Map<String, String>): Pkg? {
+            fun of(model: Map<String, String>): Pkg {
+                val texts = model.filterKeys { it.endsWith(".ttrm") }.toSortedMap()
+                val errors = mutableListOf<String>()
+                val packages = linkedMapOf<String, String?>()
                 val concepts = linkedMapOf<String, Located>()
                 val sugar = linkedMapOf<String, String>()
                 val relationTypes = linkedMapOf<String, String>()
                 val cnFiles = mutableListOf<String>()
-                val lexiconFiles = linkedMapOf<String, String>()
+                val lexiconFiles = linkedMapOf<String, MutableList<String>>()
                 val lexiconIds = mutableSetOf<String>()
-                for ((path, text) in model.toSortedMap()) {
+                val defaults = linkedMapOf<String, MutableList<Pair<String, String>>>()
+                val elements = mutableSetOf<String>()
+                for ((path, text) in texts) {
                     val parsed = TtrLoader.parseString(text, path)
-                    if (parsed.errors.isNotEmpty()) return null
-                    for (s in parsed.definitions.flatMap(::sugarOf)) {
-                        SUGAR_KEYS
-                            .firstNotNullOfOrNull {
-                                s.body.ref(
-                                    it,
-                                )
-                            }?.let { sugar.putIfAbsent(it.parts.last(), path) }
+                    for (e in parsed.errors) {
+                        errors +=
+                            "${e.file}:${e.line}:${e.column} ${e.message.lineSequence().first()}"
+                    }
+                    packages[path] = parsed.packageName
+                    for (d in parsed.definitions) {
+                        for (s in sugarOf(d)) {
+                            SUGAR_KEYS
+                                .firstNotNullOfOrNull {
+                                    s.body.ref(
+                                        it,
+                                    )
+                                }?.let { sugar.putIfAbsent(it.parts.last(), path) }
+                        }
+                        elements += elementsOf(d, parsed.modelDirective?.modelCode)
                     }
                     val directive = parsed.modelDirective
                     when (directive?.modelCode) {
@@ -446,12 +538,33 @@ object Promotion {
                             }
                         }
                         "lexicon" -> {
-                            directive.locale?.let { lexiconFiles.putIfAbsent(it, path) }
-                            lexiconIds += parsed.definitions.filterIsInstance<LexiconEntryDef>().map { it.name }
+                            val locale = directive.locale
+                            val entries = parsed.definitions.filterIsInstance<LexiconEntryDef>()
+                            lexiconIds += entries.map { it.name }
+                            if (locale != null) {
+                                lexiconFiles.getOrPut(locale) { mutableListOf() } += path
+                                for (e in entries.filter { it.default == true }) {
+                                    defaults.getOrPut(locale) { mutableListOf() } +=
+                                        e.forms.map { e.name to TermNormalizer.fold(it) }
+                                }
+                            }
                         }
                     }
                 }
-                return Pkg(model, concepts, sugar, relationTypes, cnFiles, lexiconFiles, lexiconIds)
+                return Pkg(
+                    texts = texts,
+                    taken = model.keys,
+                    errors = errors.take(MAX_ERRORS),
+                    packages = packages,
+                    concepts = concepts,
+                    sugar = sugar,
+                    relationTypes = relationTypes,
+                    cnFiles = cnFiles,
+                    lexiconFiles = lexiconFiles,
+                    lexiconIds = lexiconIds,
+                    defaults = defaults,
+                    elements = elements,
+                )
             }
 
             /** Every `concept { }` an er or md def carries (cn contracts §1.4): its own, and its attributes'. */
@@ -465,9 +578,19 @@ object Promotion {
                     else -> emptyList()
                 }
 
-            fun errors(model: Map<String, String>): List<String> =
-                model.toSortedMap().flatMap { (path, text) ->
-                    TtrLoader.parseString(text, path).errors.map { "${it.file}:${it.line}:${it.column}" }
+            /**
+             * The names a `grounds:` ref may end in: er entities and their attributes, md elements and dimension
+             * attributes — a cheap check from the text (F9); the resolver's own reading is the S5.3 load gate's.
+             */
+            private fun elementsOf(
+                d: Definition,
+                model: String?,
+            ): List<String> =
+                when (d) {
+                    is EntityDef -> listOf(d.name) + d.attributes.map { it.name }
+                    is DimensionDef -> listOf(d.name) + d.attributes.map { it.name }
+                    is MdDomainDef, is MeasureDef, is CubeletDef -> listOf(d.name)
+                    else -> if (model == "md" || model == "er") listOf(d.name) else emptyList()
                 }
         }
     }

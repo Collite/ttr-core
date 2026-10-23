@@ -38,19 +38,30 @@ sealed interface SourceRef {
     }
 }
 
-/** A place inside a document: a sentence or a table row (1-based), or a code-point span (0-based, end exclusive). */
+/**
+ * A place inside a document: a sentence or a table row (1-based), or a code-point span (0-based, end exclusive). One
+ * that [SourceRefs.parse] would refuse cannot be built (review-133 F11), so every ref built from one parses.
+ */
 sealed interface Locator {
     val text: String
 
     data class Sentence(
         val n: Int,
     ) : Locator {
+        init {
+            require(n >= 1) { "a sentence is 1-based" }
+        }
+
         override val text: String get() = "s$n"
     }
 
     data class Row(
         val n: Int,
     ) : Locator {
+        init {
+            require(n >= 1) { "a row is 1-based" }
+        }
+
         override val text: String get() = "r$n"
     }
 
@@ -58,6 +69,10 @@ sealed interface Locator {
         val start: Int,
         val end: Int,
     ) : Locator {
+        init {
+            require(start >= 0 && end > start) { "a span is 0-based and ends after it starts" }
+        }
+
         override val text: String get() = "c$start-$end"
     }
 }

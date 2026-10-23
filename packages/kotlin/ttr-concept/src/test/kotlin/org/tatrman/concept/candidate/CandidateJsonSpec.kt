@@ -77,6 +77,23 @@ class CandidateJsonSpec :
                 listOf(ExampleKind.QUESTION, ExampleKind.DOCUMENT, ExampleKind.PROCESSOR_OUTPUT)
         }
 
+        test("the canonical form sorts label locales, so two equal candidates render the same bytes (review-133 F14)") {
+            val c = read(root.resolve("examples/evidence-phase.json").readText())
+            val p = c.proposal as Proposal.Concept
+            val flipped =
+                c.copy(
+                    proposal =
+                        p.copy(
+                            label =
+                                p.label.entries
+                                    .reversed()
+                                    .associate { it.toPair() },
+                        ),
+                )
+            flipped shouldBe c
+            CnCandidates.render(flipped) shouldBe CnCandidates.render(c)
+        }
+
         test("the canonical form writes keys in the schema's order, whatever order they were read in") {
             val shuffled =
                 """{"status":"proposed","provenance":{"created_at":"2026-10-23T09:14:00Z",""" +
