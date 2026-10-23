@@ -1,0 +1,3 @@
+// Synthetic Channel-grain model: retains CN-P3's reverse-hop coverage separately from the H-1 Sales model.
+model er
+def entity channel_sales { attributes: [def attribute channel { type: text }, def attribute ext_sales_price { type: decimal }] }

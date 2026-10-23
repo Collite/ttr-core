@@ -22,6 +22,7 @@ class FrameValidationSpec :
     FunSpec({
         val sales = GoldenWorlds["sales"].cn
         val hartland = GoldenWorlds["hartland"].cn
+        val reverse = GoldenWorlds["channel-reverse"].cn
         val clinic = GoldenWorlds["clinic"].cn
         val plus = world("clinic", PLUS)
         val twoPackages = model(TWO_PACKAGES)
@@ -162,7 +163,7 @@ class FrameValidationSpec :
         s("by an md role", sales, st(ask, revenue, jan, "\"groupBy\": [{ \"qname\": \"cn.Customer\" }]"))
         s(
             "by a value kind, through the reverse hop (⚑CN-P8)",
-            hartland,
+            reverse,
             st(ask, revenue, always, "\"groupBy\": [{ \"qname\": \"cn.Channel\" }]"),
         )
         s(
@@ -193,7 +194,7 @@ class FrameValidationSpec :
         )
         s(
             "a member of a value kind, through the reverse hop",
-            hartland,
+            reverse,
             st(ask, revenue, always, member("cn.Channel", "web")),
         )
         s(
@@ -251,7 +252,7 @@ class FrameValidationSpec :
         s("LargeSale (a measure predicate)", sales, st(ask, revenue, jan, phase("cn.LargeSale")))
         s(
             "WebSale (a value-kind phase, through the reverse hop)",
-            hartland,
+            reverse,
             st(ask, revenue, always, phase("cn.WebSale")),
         )
         s(

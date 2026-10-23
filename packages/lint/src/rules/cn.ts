@@ -13,7 +13,7 @@ import type { ProjectRuleContext, Rule } from '../rule.js';
 
 const CN_KEY = 'cn:validation';
 
-function validationFor(ctx: ProjectRuleContext): CnValidation {
+export function validationFor(ctx: ProjectRuleContext): CnValidation {
   const cached = ctx.cache.get(CN_KEY) as CnValidation | undefined;
   if (cached) return cached;
   const validation = validateCn(cnDocumentsFor(ctx), ctx.resolver);

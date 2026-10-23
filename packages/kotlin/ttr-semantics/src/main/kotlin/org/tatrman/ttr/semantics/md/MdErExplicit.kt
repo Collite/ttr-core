@@ -24,6 +24,25 @@ fun resolveMdErRef(
     path: String,
 ): SymbolEntry? {
     if (path.isEmpty()) return null
+    if (doc.packageName.isNotEmpty() && path.substringBefore('.') in setOf("md", "er", "db")) {
+        val qualified = "${doc.packageName}.$path"
+        val same =
+            resolver.resolveReference(
+                Resolver.Ref(qualified, qualified.split('.')),
+                ResolutionContext(doc.schemaCode, doc.namespace, null, doc.imports, doc.packageName),
+            )
+        if (same is ResolutionResult.Resolved && same.symbol.packageName == doc.packageName) {
+            val local = same.symbol.qname.removePrefix("${doc.packageName}.")
+            val parts = local.split('.')
+            val physical =
+                if (parts.firstOrNull() == "db" && parts.size >= 4) {
+                    (parts.take(2) + parts.drop(3)).joinToString(".")
+                } else {
+                    local
+                }
+            if (local == path || physical == path) return same.symbol
+        }
+    }
     val result =
         resolver.resolveReference(
             Resolver.Ref(path, path.split('.')),
@@ -54,7 +73,15 @@ fun resolveMdNs(
     ns: String,
 ): SymbolEntry? =
     mdPaths(path, ns).firstNotNullOfOrNull { candidate ->
-        resolveMdErRef(resolver, doc, candidate)?.takeIf { it.kind == ns && it.schemaCode == "md" }
+        resolveMdErRef(resolver, doc, candidate)?.takeIf {
+            it.kind ==
+                when (ns) {
+                    "domain" -> "mdDomain"
+                    "map" -> "mdMap"
+                    else -> ns
+                } &&
+                it.schemaCode == "md"
+        }
     }
 
 fun resolveMdAttribute(

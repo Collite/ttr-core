@@ -318,14 +318,15 @@ Where a concept lands on the er layer is its **grade**:
 |---|---|---|
 | none | ungrounded | — |
 | `cn2er_*` | er-grounded | its target |
-| `cn2md_*`, and an `md2er_*` maps the target | md-grounded | the mapped entity or attribute — through the **hop** |
-| `cn2md_*`, and no `md2er_*` maps it | md-grounded-hop-missing | — `md/er-unmapped` (`md/er-ambiguous` when two map it and the bearer's entity does not pick one) |
+| `cn2md_*`, and the hop resolves the target | md-grounded | the mapped entity or attribute — through the **hop** |
+| `cn2md_*`, and the hop cannot resolve it | md-grounded-hop-missing | — `md/er-unmapped` (`md/er-ambiguous` when two map it and the bearer's entity does not pick one) |
 | `cn2db_concept` | ungrounded | — documentation only |
 
-A defined phase with no grounding takes its bearer's grade and landing. In this release the hop reads explicit
-`md2er_cubelet` and `md2er_dimension` bindings: cubelets, dimensions, mapped attributes and structural measures.
-A grounding without an explicit mapping is md-grounded-hop-missing until the physical derivation lands in HP-P2.
-See [the explicit hop bindings](15-md-model.md#the-md--er-hop-what-you-pin-what-is-derived).
+A defined phase with no grounding takes its bearer's grade and landing. The hop first reads explicit
+`md2er_cubelet` and `md2er_dimension` bindings, then derives through shared MD/ER physical bindings and relations.
+A quality first restricts derived candidates to its bearer's entity, including stacked-query column origins.
+`ttr md hop <dir>` reports the same landings and derived roles for the whole MD model.
+See [the hop bindings and derivation](15-md-model.md#the-md--er-hop-what-you-pin-what-is-derived).
 
 ## Lexicon entries for concepts
 

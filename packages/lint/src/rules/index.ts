@@ -8,6 +8,7 @@ import { PACKAGE_RULES } from './packages.js';
 import { AREA_RULES } from './areas.js';
 import { GRAPH_RULES } from './graph.js';
 import { PROJECT_RULES } from './project.js';
+import { MD_HOP_RULES } from './md-hop.js';
 import { MD_RULES } from './md.js';
 import { SEMANTICS_RULES } from './semantics.js';
 import { LEXICON_RULES } from './lexicon.js';
@@ -25,6 +26,7 @@ export const ALL_RULES: Rule[] = [
   ...GRAPH_RULES,
   ...PROJECT_RULES,
   ...MD_RULES,
+  ...MD_HOP_RULES,
   ...SEMANTICS_RULES,
   ...LEXICON_RULES,
   ...DESCRIPTION_RULES,

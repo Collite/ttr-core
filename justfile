@@ -789,3 +789,9 @@ publish *args:
 # Build the Studio Viewer container image locally (ttr-core#169; CI: release-viewer.yml)
 viewer-image tag="ttr-viewer:dev":
     docker build -f packages/designer/Dockerfile -t {{tag}} .
+
+# MD landings and derived warehouse roles; diagnostics default to grounded MD elements.
+[positional-arguments]
+md-hop *args:
+    ./gradlew -q --console=plain :packages:kotlin:ttr-concept:installDist >&2
+    packages/kotlin/ttr-concept/build/install/ttr/bin/ttr md hop "$@"

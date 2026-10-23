@@ -112,8 +112,8 @@ def entity warehouse {
     ]
 }
 
-def entity channel_sales {
-    binding: { target: { table: db.dbo.table.channel_sales } },
+def entity store_sales {
+    binding: { target: db.dbo.store_sales, columns: { sale_id: sale_id, channel: channel, customer: customer, item: item, sold_date: sold_date, ext_sales_price: ext_sales_price, quantity: quantity } },
     attributes: [
         def attribute sale_id { type: int, isKey: true },
         def attribute channel { type: text },
@@ -124,6 +124,51 @@ def entity channel_sales {
         def attribute quantity { type: int }
     ]
 }
+
+def entity web_sales {
+    binding: { target: db.dbo.web_sales, columns: { sale_id: sale_id, channel: channel, customer: customer, item: item, sold_date: sold_date, ext_sales_price: ext_sales_price, quantity: quantity } },
+    attributes: [
+        def attribute sale_id { type: int, isKey: true },
+        def attribute channel { type: text },
+        def attribute customer { type: int },
+        def attribute item { type: int },
+        def attribute sold_date { type: date },
+        def attribute ext_sales_price { type: decimal },
+        def attribute quantity { type: int }
+    ]
+}
+
+def entity catalog_sales {
+    binding: { target: db.dbo.catalog_sales, columns: { sale_id: sale_id, channel: channel, customer: customer, item: item, sold_date: sold_date, ext_sales_price: ext_sales_price, quantity: quantity } },
+    attributes: [
+        def attribute sale_id { type: int, isKey: true },
+        def attribute channel { type: text },
+        def attribute customer { type: int },
+        def attribute item { type: int },
+        def attribute sold_date { type: date },
+        def attribute ext_sales_price { type: decimal },
+        def attribute quantity { type: int }
+    ]
+}
+
+def query sales_union { sourceText: """sql
+SELECT sale_id, 'store' AS channel, customer, item, sold_date, ext_sales_price, quantity FROM store_sales
+UNION ALL SELECT sale_id, 'web' AS channel, customer, item, sold_date, ext_sales_price, quantity FROM web_sales
+UNION ALL SELECT sale_id, 'catalog' AS channel, customer, item, sold_date, ext_sales_price, quantity FROM catalog_sales
+""" }
+def entity sales {
+    binding: { target: { query: er.query.sales_union } },
+    attributes: [
+        def attribute sale_id { type: int, isKey: true },
+        def attribute channel { type: text },
+        def attribute customer { type: int },
+        def attribute item { type: int },
+        def attribute sold_date { type: date },
+        def attribute ext_sales_price { type: decimal },
+        def attribute quantity { type: int }
+    ]
+}
+
 
 def entity return_request {
     binding: { target: { table: db.dbo.table.return_request } },
@@ -164,8 +209,8 @@ def relation customer_price_item { from: er.entity.customer_price, to: er.entity
 def relation customer_price_customer { from: er.entity.customer_price, to: er.entity.customer, join: [{ from: er.entity.customer_price.customer, to: er.entity.customer.sk }] }
 def relation invoice_customer { from: er.entity.invoice, to: er.entity.customer, join: [{ from: er.entity.invoice.customer, to: er.entity.customer.sk }] }
 def relation invoice_order { from: er.entity.invoice, to: er.entity.order, join: [{ from: er.entity.invoice.order_number, to: er.entity.order.order_number }] }
-def relation channel_sales_customer { from: er.entity.channel_sales, to: er.entity.customer, join: [{ from: er.entity.channel_sales.customer, to: er.entity.customer.sk }] }
-def relation channel_sales_item { from: er.entity.channel_sales, to: er.entity.item, join: [{ from: er.entity.channel_sales.item, to: er.entity.item.sk }] }
+def relation channel_sales_customer { from: er.entity.sales, to: er.entity.customer, join: [{ from: er.entity.sales.customer, to: er.entity.customer.sk }] }
+def relation channel_sales_item { from: er.entity.sales, to: er.entity.item, join: [{ from: er.entity.sales.item, to: er.entity.item.sk }] }
 def relation return_request_order { from: er.entity.return_request, to: er.entity.order, join: [{ from: er.entity.return_request.order_number, to: er.entity.order.order_number }] }
 def relation return_request_customer { from: er.entity.return_request, to: er.entity.customer, join: [{ from: er.entity.return_request.customer, to: er.entity.customer.sk }] }
 def relation return_line_request { from: er.entity.return_request_line, to: er.entity.return_request, join: [{ from: er.entity.return_request_line.request_id, to: er.entity.return_request.request_id }] }

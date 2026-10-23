@@ -6,6 +6,17 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **MD hop / HP-P2** — derive MD → ER landings through shared physical bindings, FK/join relations,
+  domain/map sources and stacked ER-query column origins (R1–R7). Explicit mappings retain priority;
+  qualities first restrict candidates to their bearer's entity. The TS/Kotlin CN tier reads the composite hop.
+  `ttr md hop` and the editor report every MD landing, diagnostics and derived fact/dimension/bridge roles;
+  entity hover shows the role reasons. Named lint rules respect configured severity and default to grounded MD
+  elements; `--all` expands report finding scope. Deprecated CNC role claims are checked for mismatch.
+  The optional ttr-concept lineage service uses the translator's configured Calcite pipeline; metadata retains a conservative syntactic default.
+  Parameter-free ER query bodies now expand through the CN renderer's model handle. The CN Sales-union fixture
+  activates return-share, with both SQL dialect oracles; remaining channel primitives are tracked under CN-P6.
+  N:N map cardinality is retained and excluded from grain coarsening. No grammar production changes.
+
 - **Connected loads carry the cn and automation tiers** (cn, CN-P4 S4.2 — cn contracts §5): `MetadataServerSource`
   (`ttrp-frontend`) joined its archives' snapshots without `cn` or `automation`, so a connected compile served no
   concept and no automation object although the archive carried their documents. Both merge now, the cn tier through

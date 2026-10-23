@@ -118,6 +118,7 @@ class GrainLattice private constructor(
         fun of(model: MdModel): GrainLattice {
             val edges =
                 model.maps.values.flatMap { m ->
+                    if (m.kind == MapKind.MANY_MANY) return@flatMap emptyList()
                     val toDom = m.to.firstOrNull()?.let { model.underlyingDomain(it) } ?: return@flatMap emptyList()
                     m.from.mapNotNull { f ->
                         model.underlyingDomain(f)?.let { fromDom ->

@@ -7,6 +7,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldStartWith
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.Json
 import org.tatrman.concept.cli.runTtr
 import org.tatrman.concept.cli.ttr
@@ -31,6 +32,30 @@ class CnHygieneSpec :
             return ResolvedCnModel.of(
                 ModelReconciler(ModelDescriptor(id = "h", name = "h")).reconcile(listOf(snapshot)).model,
             )
+        }
+        "HP-P2: derived, ambiguous and explicit-override CN hygiene agrees with the editor golden" {
+            val fixture = DefinitionFixtures.repo.resolve("packages/kotlin/ttr-metadata/src/test/resources/md-hop")
+            val expected = Json.parseToJsonElement(Files.readString(golden.resolve("expected-derived.json"))).jsonObject
+            for ((name, variant) in mapOf(
+                "derived" to null,
+                "conflict" to "conflicting.ttrm.variant",
+                "override" to "override.ttrm.variant",
+            )) {
+                val files =
+                    Files.list(fixture).use { paths ->
+                        paths.filter { it.toString().endsWith(".ttrm") }.toList().associateBy { it.fileName.toString() }
+                    }
+                val extra = variant?.let { mapOf("variant.ttrm" to fixture.resolve(it)) }.orEmpty()
+                val m = ResolvedCnModel.of(DefinitionFixtures.load(files + extra))
+                val actual = HygieneRender.json(CnHygiene.report(m)).jsonObject
+                kotlinx.serialization.json.JsonObject(actual - "definitions") shouldBe expected[name]
+                if (name ==
+                    "derived"
+                ) {
+                    Files.readString(golden.resolve("expected-derived-editor.md")) shouldStartWith
+                        HygieneRender.body(CnHygiene.report(m))
+                }
+            }
         }
         val model = load(golden)
         val report = CnHygiene.report(model)

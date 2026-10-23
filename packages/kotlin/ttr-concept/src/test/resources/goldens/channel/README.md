@@ -1,18 +1,12 @@
-# Channel — `revenue where WebSale` / `revenue by Channel` (A-H-7)
+# Channel — reverse hop and the H-1 Sales ruling
 
-Source: `design/11-recipes-over-concepts.md` §2 L16-5 and §8 A-H-7, world `hartland`.
+The positive `where-websale-dimension` and `by-channel-dimension` cases run on the synthetic
+`channel-reverse` world, which explicitly provides a Channel grain and its reverse hop. Their original
+MD dot-path and plan expectations are retained.
 
-**⚑CN-P8 (default, plan.md):** A-H-7's literal forms need facts Hartland states only inside the `channel_sales` view's
-SQL (`revenue where WebSale` → the `webSales` cubelet) and the measure hop (`revenue by Channel` → `channel_sales`) —
-both md/hop's. P3 lowers a value kind and a value-kind phase through the **md reverse hop**: the md attribute whose hop
-lands on `Channel`'s erTarget (`channel_sales.channel`; here the explicit `md2er_cubelet channel_sales_er`). The world's
-`channelSales` cubelet carries `Channel.code` as its grain.
+The Hartland world follows design §4 (H-1): three per-channel fact cubelets, no Channel grain,
+and a stacked `sales` entity over an in-model UNION ALL query. Its revenue quality resolves through
+R7 under the Sale bearer. A query's literal channel does not create an MD dimension or a carrier binding.
 
-| case | | stage / demand |
-|---|---|---|
-| `where-websale-dimension` | `revenue` filtered by the phase `WebSale` (`channel = 'web'`) → `channelSales[channel.code: "web"].revenue @ sum` | S3.3 |
-| `by-channel-dimension` | `revenue` grouped by `Channel` → `channelSales[channel.code: *].revenue @ sum` | S3.3 |
-| `where-websale-carrier.pending` | the phase selects the `webSales` carrier (L16-5 literally) | md/hop |
-| `by-channel-sales.pending` | `revenue by Channel` on `channel_sales` | md/hop |
-
-Pending convention, case format and oracles: [`../README.md`](../README.md).
+`by-channel-sales.pending` therefore waits on CN-P6's ER grouping / MD Channel-grain work;
+`where-websale-carrier.pending` waits on the phase-to-carrier binding. See `../PENDING.md`.

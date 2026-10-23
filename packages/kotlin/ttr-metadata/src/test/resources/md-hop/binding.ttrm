@@ -1,0 +1,37 @@
+model binding
+def er2db_entity e_store_sales { entity: er.entity.store_sales, target: { table: db.dbo.store_sales } }
+def er2db_attribute a_store_sales_customer { attribute: er.entity.store_sales.customer, target: { column: db.dbo.store_sales.cust } }
+def er2db_attribute a_store_sales_item { attribute: er.entity.store_sales.item, target: { column: db.dbo.store_sales.item } }
+def er2db_attribute a_store_sales_sold { attribute: er.entity.store_sales.sold, target: { column: db.dbo.store_sales.sold } }
+def er2db_attribute a_store_sales_ext_sales_price { attribute: er.entity.store_sales.ext_sales_price, target: { column: db.dbo.store_sales.amount } }
+def er2db_entity e_web_sales { entity: er.entity.web_sales, target: { table: db.dbo.web_sales } }
+def er2db_attribute a_web_sales_customer { attribute: er.entity.web_sales.customer, target: { column: db.dbo.web_sales.cust } }
+def er2db_attribute a_web_sales_item { attribute: er.entity.web_sales.item, target: { column: db.dbo.web_sales.item } }
+def er2db_attribute a_web_sales_sold { attribute: er.entity.web_sales.sold, target: { column: db.dbo.web_sales.sold } }
+def er2db_attribute a_web_sales_ext_sales_price { attribute: er.entity.web_sales.ext_sales_price, target: { column: db.dbo.web_sales.amount } }
+def er2db_entity e_catalog_sales { entity: er.entity.catalog_sales, target: { table: db.dbo.catalog_sales } }
+def er2db_attribute a_catalog_sales_customer { attribute: er.entity.catalog_sales.customer, target: { column: db.dbo.catalog_sales.cust } }
+def er2db_attribute a_catalog_sales_item { attribute: er.entity.catalog_sales.item, target: { column: db.dbo.catalog_sales.item } }
+def er2db_attribute a_catalog_sales_sold { attribute: er.entity.catalog_sales.sold, target: { column: db.dbo.catalog_sales.sold } }
+def er2db_attribute a_catalog_sales_ext_sales_price { attribute: er.entity.catalog_sales.ext_sales_price, target: { column: db.dbo.catalog_sales.amount } }
+def er2db_entity e_customer { entity: er.entity.customer, target: { table: db.dbo.customer } }
+def er2db_attribute a_customer_sk { attribute: er.entity.customer.sk, target: { column: db.dbo.customer.sk } }
+def er2db_attribute a_customer_address { attribute: er.entity.customer.address, target: { column: db.dbo.customer.addr } }
+def er2db_attribute a_customer_birthYear { attribute: er.entity.customer.birthYear, target: { column: db.dbo.customer.born } }
+def er2db_entity e_customer_address { entity: er.entity.customer_address, target: { table: db.dbo.customer_address } }
+def er2db_attribute a_customer_address_sk { attribute: er.entity.customer_address.sk, target: { column: db.dbo.customer_address.sk } }
+def er2db_attribute a_customer_address_state { attribute: er.entity.customer_address.state, target: { column: db.dbo.customer_address.state } }
+def er2db_entity e_item { entity: er.entity.item, target: { table: db.dbo.item } }
+def er2db_attribute a_item_sk { attribute: er.entity.item.sk, target: { column: db.dbo.item.sk } }
+def er2db_entity e_date_dim { entity: er.entity.date_dim, target: { table: db.dbo.date_dim } }
+def er2db_attribute a_date_dim_sk { attribute: er.entity.date_dim.sk, target: { column: db.dbo.date_dim.sk } }
+def er2db_entity e_household { entity: er.entity.household, target: { table: db.dbo.household } }
+def er2db_attribute a_household_sk { attribute: er.entity.household.sk, target: { column: db.dbo.household.sk } }
+def md2db_cubelet c_store_sales { cubelet: md.storeSales, target: db.dbo.store_sales, shape: wide, attributes: { Customer.customerCode: cust, Product.code: item, Calendar.day: sold }, measures: { revenue: amount } }
+def md2db_cubelet c_web_sales { cubelet: md.webSales, target: db.dbo.web_sales, shape: wide, attributes: { Customer.customerCode: cust, Product.code: item, Calendar.day: sold }, measures: { revenue: amount } }
+def md2db_cubelet c_catalog_sales { cubelet: md.catalogSales, target: db.dbo.catalog_sales, shape: wide, attributes: { Customer.customerCode: cust, Product.code: item, Calendar.day: sold }, measures: { revenue: amount } }
+def md2db_cubelet orphan { cubelet: md.orphan, target: db.dbo.orphan, shape: wide }
+def md2db_map ca { map: md.customer_to_addr, target: db.dbo.customer, columns: { CustomerCode: sk, AddressCode: addr } }
+def md2db_map cb { map: md.customer_to_birthyear, target: db.dbo.customer, columns: { CustomerCode: sk, BirthYear: born } }
+def md2db_map state { map: md.addr_to_state, target: db.dbo.customer_address, columns: { AddressCode: sk, State: state } }
+def md2db_map bridge { map: md.customer_items, target: db.dbo.customer_item, columns: { LinkFrom: cust, LinkTo: item } }

@@ -61,6 +61,11 @@ export function activate(context: vscode.ExtensionContext) {
     }),
     // CN-P2 S2.7 T3 — "TTR: Concept hygiene report": the LSP's editor report (`modeler/getCnHygiene`, cn
     // contracts §7) as a markdown preview. Definition-level findings stay `ttr cn hygiene`'s (CN-D29).
+    vscode.commands.registerCommand('modeler.mdHopReport', async () => {
+      const { markdown } = await client.sendRequest<{ markdown: string }>('modeler/getMdHop');
+      const doc = await vscode.workspace.openTextDocument({ language: 'markdown', content: markdown });
+      await vscode.commands.executeCommand('markdown.showPreview', doc.uri);
+    }),
     vscode.commands.registerCommand('modeler.cnHygieneReport', async () => {
       const { markdown } = await client.sendRequest<{ markdown: string }>('modeler/getCnHygiene');
       const doc = await vscode.workspace.openTextDocument({ language: 'markdown', content: markdown });

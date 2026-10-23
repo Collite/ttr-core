@@ -194,3 +194,8 @@ export {
 export type { MentionKind, ObjectFacts } from './semantics-block/mention-kinds.js';
 
 export { mdErBindingDiagnostics, explicitErAttributes, resolveMdErRef, buildMdErRelationIndex, mdErUsedRelations } from './md/explicit.js';
+
+export { PhysicalIndex, DerivedMdErHop, CompositeMdErHop, SyntacticQueryLineage, mdHopElements } from './md/hop.js';
+export type { MdHopIssue, MdErHop } from './md/hop.js';
+export { mdHopReport, deriveTableRoles, renderMdHopMarkdown } from './md/report.js';
+export type { MdHopReport, TableRole } from './md/report.js';

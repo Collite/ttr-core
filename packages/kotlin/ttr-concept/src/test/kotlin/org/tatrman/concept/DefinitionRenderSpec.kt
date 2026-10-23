@@ -175,7 +175,7 @@ class DefinitionRenderSpec :
 
         test("a value kind is a column of the event's own entity (AM-27)") {
             er(hartland, "WebSale").text shouldBe
-                "SELECT channel_sales.sale_id FROM channel_sales WHERE channel_sales.channel = 'web'"
+                "SELECT sales.sale_id FROM sales WHERE sales.channel = 'web'"
         }
 
         test("within(x, from:, to:) over constants is an inclusive range") {
@@ -240,8 +240,8 @@ class DefinitionRenderSpec :
                 "cn/definition-unreachable(er): an instant + a duration — interval arithmetic (G-ER-1)"
         }
 
-        test("a concept read with no E-R landing: its md hop missing is named (cn/not-recipe-reachable)") {
-            refusal(er(hartland, "AbusiveReturner")) shouldContain "cn/not-recipe-reachable"
+        test("the derived revenue hop makes the return-share definition renderable on ER") {
+            er(hartland, "AbusiveReturner").text shouldContain "SUM(sales.ext_sales_price)"
         }
 
         test("an unknown concept is refused on the layer asked") {
@@ -274,7 +274,7 @@ class DefinitionRenderSpec :
         }
 
         test("md: a value kind's phase through the reverse hop") {
-            md(hartland, "WebSale").text shouldBe "channel.code = 'web'"
+            md(GoldenWorlds["channel-reverse"].cn, "WebSale").text shouldBe "channel.code = 'web'"
         }
 
         test("md: what md cannot say is refused naming the construct; a bearer carried by two cubelets too") {

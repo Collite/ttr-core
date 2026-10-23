@@ -30,7 +30,12 @@ import java.nio.file.Path
 import kotlin.system.exitProcess
 
 /** The `ttr` command family. This module contributes `cn` (`hygiene`; `materialize` since CN-P3 S3.4). */
-fun ttr(): CliktCommand = TtrCommand().subcommands(CnCommand().subcommands(CnHygieneCommand(), CnMaterializeCommand()))
+fun ttr(): CliktCommand =
+    TtrCommand().subcommands(
+        CnCommand().subcommands(CnHygieneCommand(), CnMaterializeCommand()),
+        org.tatrman.ttr.metadata.cli
+            .mdCommand(),
+    )
 
 fun main(args: Array<String>): Unit = exitProcess(runTtr(args.toList()))
 

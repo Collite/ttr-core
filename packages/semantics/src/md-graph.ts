@@ -20,6 +20,7 @@ export function buildMdMapGraph(symbols: ProjectSymbolTable, maps: readonly MdMa
   const edges: MapEdge[] = [];
   const nodes = new Set<string>();
   for (const map of maps) {
+    if (map.cardinality === 'N:N') continue; // A bridge does not coarsen grain.
     const oneToOne = !map.calc && map.cardinality === '1:1';
     // review-071 T-P2: DROP an edge whose `from`/`to` ref does not resolve to a domain, instead of
     // falling back to the raw ref. Kotlin's `GrainLattice.of` is canonical (it is the runtime path)
