@@ -23,6 +23,11 @@ tasks.test {
         "fixtureEstate",
         rootProject.file("packages/kotlin/ttr-lexicon-compile/src/test/resources/estate").absolutePath,
     )
+    // CN-P4 S4.1 T6 — the v6 fixture estate (a `model cn` with its groundings and terms), the same way. Declared as an
+    // input too: a system property naming a directory is not one, so an edit there would leave this task up to date.
+    val cnEstate = rootProject.file("packages/kotlin/ttr-lexicon-compile/src/test/resources/cn")
+    inputs.dir(cnEstate).withPropertyName("cnEstate")
+    systemProperty("cnEstate", cnEstate.absolutePath)
 }
 
 // RV-P3.1 T3 — `ttr-lexicon build <repoRoot> --out <path>`. clikt + the `application` plugin,

@@ -101,6 +101,9 @@ object TtrmSugarExtractor {
                                 // still DECLARED, so it still gets a resolved profile — the one its
                                 // method means.
                                 profile = MatchProfile.ofSugar(LexiconValidator.DEFAULT_METHOD),
+                                // CN-P4 — grammar 0.17's default sense, per entry (cn contracts §1.5).
+                                defaultSense = def.default == true,
+                                sensePriority = def.sensePriority,
                             ),
                         )
                     }

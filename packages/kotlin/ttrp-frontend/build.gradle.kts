@@ -20,6 +20,11 @@ tasks.test {
     // Golden AST snapshots: run with `-DupdateSnapshots=true` to (re)write the
     // committed snapshots under src/test/resources/golden/snapshots/.
     systemProperty("updateSnapshots", System.getProperty("updateSnapshots") ?: "false")
+    // CN-P4 S4.2 T1 — the Hartland cn world (ttr-concept's golden), packed into a snapshot archive by
+    // `ConnectedCnChannelTest`. Declared as an input too: a system property naming a directory is not one.
+    val cnHartland = rootProject.file("packages/kotlin/ttr-concept/src/test/resources/worlds/hartland")
+    inputs.dir(cnHartland).withPropertyName("cnHartland")
+    systemProperty("cnHartland", cnHartland.absolutePath)
 }
 
 // The canonical TTR-P grammar lives in the pnpm workspace beside TTR.g4; the

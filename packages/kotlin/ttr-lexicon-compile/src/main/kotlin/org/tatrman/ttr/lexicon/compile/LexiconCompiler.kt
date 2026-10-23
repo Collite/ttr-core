@@ -54,7 +54,11 @@ object LexiconCompiler {
         modelSnapshotHash: String,
         builtAt: String,
     ): CompileResult {
-        val declared = AreaExtractor.rows(sources.area) + TtrmSugarExtractor.rows(sources.ttrm)
+        // CN-P4 — the cn tier, read once: its inline terms join the declared layer, its facts the `targets` map.
+        val cn = CnTargets.of(sources.model)
+        val declared =
+            AreaExtractor.rows(sources.area) + TtrmSugarExtractor.rows(sources.ttrm) +
+                CnLexiconExtractor.rows(cn, sources.repoRoot)
         // Both metadata tiers, in one layer: `ttr-metadata`'s Model covers db/er/cnc, and md
         // objects are reachable only from the parsed units (RV-P3.4). An estate whose nouns are
         // md-owned gets nothing from the first tier alone.
@@ -65,8 +69,8 @@ object LexiconCompiler {
         val warnings = mutableListOf<CompileWarning>()
         val classified = (declared + metadata).mapNotNull { classify(it, refs, warnings) }
 
-        val entries = merge(classified, warnings)
-        warnings += collisionWarnings(entries)
+        val entries = phaseDefaults(merge(classified, warnings), cn, warnings)
+        warnings += collisionWarnings(entries, cn)
 
         val lexicon =
             CompiledLexicon(
@@ -81,7 +85,7 @@ object LexiconCompiler {
                         builtAt = builtAt,
                     ),
                 entries = entries,
-                targets = targetFacts(entries, sources.model),
+                targets = targetFacts(entries, sources.model, cn),
             )
 
         return CompileResult(lexicon, operatorLibrary(sources, warnings), warnings.sortedWith(WARNING_ORDER))
@@ -102,11 +106,20 @@ object LexiconCompiler {
      * colliding with a term is not this warning (contracts §2.2/§3, the same boundary the lint
      * twin draws by skipping `valueLabels`).
      *
+     * CN-P4 (A-CN-8) — **R-cn-1 at compile time:** a concept and an element it grounds to are one
+     * thing named twice ("zákazník" on `cn.Customer` and `er.entity.customer`'s label, "tržby" on
+     * `cn.revenue` and `md.measure.revenue`), and the resolver picks the concept without asking —
+     * so no warning. On divergence it stays: `cn.Channel` lands on `channel_sales.channel`, so
+     * "kanál" on it and on `er.entity.channel_sales` is a real ambiguity ([CnTargets.groundsTo]).
+     *
      * One warning **per DECLARED row per other ref**, carrying the declared row's provenance: the
      * author of the alias is the one who can act on it. Two METADATA labels that collide raise
      * nothing here — a model-level duplicate label is real, but no term author can fix it.
      */
-    private fun collisionWarnings(entries: List<CompiledEntry>): List<CompileWarning> {
+    private fun collisionWarnings(
+        entries: List<CompiledEntry>,
+        cn: CnTargets?,
+    ): List<CompileWarning> {
         val byFold =
             entries
                 .filter { it.targetClass == TargetClass.MODEL_OBJECT }
@@ -120,6 +133,7 @@ object LexiconCompiler {
                 // needs to know which object took the word, not every row that object owns.
                 val others = group.filter { it.targetRef != row.targetRef }.groupBy { it.targetRef }
                 for (otherRef in others.keys) {
+                    if (cn != null && oneThing(row.targetRef, otherRef, cn)) continue
                     val other = others.getValue(otherRef).first()
                     out +=
                         CompileWarning(
@@ -135,6 +149,52 @@ object LexiconCompiler {
         }
         return out
     }
+
+    /** R-cn-1 — one of the two refs is a concept that grounds to the other. Two concepts are never one thing here. */
+    private fun oneThing(
+        a: String,
+        b: String,
+        cn: CnTargets,
+    ): Boolean = (a in cn.concepts && cn.groundsTo(a, b)) || (b in cn.concepts && cn.groundsTo(b, a))
+
+    /**
+     * CN-P4 (A-CN-8 step 3, AM-36) — a bare term never defaults to a phase. A `default: true` on a phase's row whose
+     * form a concept up the phase's `of:` chain also names (folded, in a language they share) is dropped here, so the
+     * resolver never sees it, and the build says so under the lint's own slug ([CompileWarning.PHASE_AS_DEFAULT]). A
+     * phase-only term keeps its default: "dlužník" naming `DebtorCustomer` alone is legal (the spike's row 5).
+     */
+    private fun phaseDefaults(
+        entries: List<CompiledEntry>,
+        cn: CnTargets?,
+        warnings: MutableList<CompileWarning>,
+    ): List<CompiledEntry> {
+        if (cn == null || entries.none { it.defaultSense && cn.isPhase(it.targetRef) }) return entries
+        val byFold = entries.groupBy { TermNormalizer.fold(it.termNormalized) }
+        return entries.map { e ->
+            if (!e.defaultSense || !cn.isPhase(e.targetRef)) return@map e
+            val chain = cn.bearers(e.targetRef)
+            val bearer =
+                byFold
+                    .getValue(TermNormalizer.fold(e.termNormalized))
+                    .firstOrNull { it.targetRef in chain && langsOverlap(it.lang, e.lang) } ?: return@map e
+            warnings +=
+                CompileWarning(
+                    code = CompileWarning.PHASE_AS_DEFAULT,
+                    message =
+                        "term \"${e.termNormalized}\" (for: ${e.targetRef}) is declared the default sense of a " +
+                            "phase, and ${bearer.targetRef} up its `of:` chain also names it — a bare term never " +
+                            "defaults to a phase (AM-36); the archive drops this default",
+                    provenance = e.provenance,
+                )
+            e.copy(defaultSense = false)
+        }
+    }
+
+    /** Two `lang` wires (`cs` · `en` · `cs|en`) share a language — the runtime meets both rows on one utterance. */
+    private fun langsOverlap(
+        a: String,
+        b: String,
+    ): Boolean = a.split('|').any { it in b.split('|') }
 
     /**
      * MS (contracts §5/§6) — the per-ref facts map.
@@ -161,20 +221,28 @@ object LexiconCompiler {
      * Members carry no reach of their own: they are reached through their owner (`ownerRef`), the
      * same rule the terms-derived attribute entries have always followed.
      *
+     * cn (archive v6, contracts §5, A-CN-3/4) — the map also carries every CONCEPT ([CnTargets.factsOf]), terms or
+     * not, and `liftsTo` on every er and md element a concept is grounded on or lands on — terms or not too: a member
+     * hit lifts from its category's OWNER, which nobody need have written a term for. An md element gets an entry of its
+     * own for the first time, carrying `liftsTo` alone (`objectKind` `""`: MS derives no md kind, and naming one here
+     * would change how an md ref reads in frame roles). An estate with no cn tier gets exactly the v5 entries.
+     *
      * Sorted by key: iteration order is byte order in the archive, and two builds over the same
      * inputs must produce the same bytes (contracts §2 determinism).
      */
     private fun targetFacts(
         entries: List<CompiledEntry>,
         model: Model?,
+        cn: CnTargets?,
     ): Map<String, TargetFacts> {
         if (model == null) return emptyMap()
         val objects = model.objectByQname().entries.associate { (qname, obj) -> qname.dotted() to obj }
         val reach = reachedFrom(model, objects.keys)
         val members = model.memberVocabularyCarriers().map { it.qname.dotted() }.toSet()
         val termRefs = entries.filter { it.targetClass == TargetClass.MODEL_OBJECT }.map { it.targetRef }
+        val lifted = cn?.erElements.orEmpty()
         val out = sortedMapOf<String, TargetFacts>()
-        for (ref in (termRefs + members).distinct()) {
+        for (ref in (termRefs + members + lifted).distinct()) {
             val facts =
                 when (val obj = objects[ref]) {
                     is Attribute -> memberFacts(obj.qname.name, objects[obj.entity.dotted()], obj.entity.dotted())
@@ -196,7 +264,12 @@ object LexiconCompiler {
                     codeRef = mention.codeRef,
                     codeFormat = mention.codeFormat,
                     memberVocabulary = ref in members,
+                    liftsTo = cn?.liftsTo(ref).orEmpty(),
                 )
+        }
+        if (cn != null) {
+            for (ref in cn.mdElements) out[ref] = TargetFacts(objectKind = "", liftsTo = cn.liftsTo(ref))
+            for ((ref, concept) in cn.concepts) out[ref] = cn.factsOf(concept)
         }
         return out
     }
@@ -507,6 +580,8 @@ object LexiconCompiler {
                     sourceTag = winner.first.sourceTag,
                     provenance = winner.first.provenance,
                     matchProfile = winner.first.profile,
+                    defaultSense = winner.first.defaultSense,
+                    sensePriority = winner.first.sensePriority,
                 )
         }
         return out.sortedWith(ENTRY_ORDER)
@@ -594,11 +669,21 @@ object LexiconCompiler {
                         it.provenance.file,
                         it.provenance.line.toString(),
                         it.profile?.let { p -> fingerprint(p) } ?: "-",
-                    ).joinToString(" ")
+                    ).joinToString(" ") + sense(it)
                 }.sorted()
                 .joinToString("\n")
                 .toByteArray(Charsets.UTF_8),
         )
+
+    /**
+     * CN-P4 — the default sense, for [layerHash]: appended only when written, so a layer without it hashes as it did
+     * before v6 (an estate with no cn content keeps its `sourceHashes`).
+     */
+    private fun sense(row: SourceRow): String =
+        buildString {
+            if (row.defaultSense) append("\u0000default")
+            row.sensePriority?.let { append("\u0000priority=").append(it) }
+        }
 
     /** DECLARED first, then widest method, then the earliest provenance — total and stable. */
     private val PRECEDENCE =

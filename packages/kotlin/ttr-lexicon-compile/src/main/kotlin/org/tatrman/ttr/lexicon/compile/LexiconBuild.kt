@@ -151,9 +151,9 @@ object LexiconBuild {
             )
 
         val sources = LexiconSources(area = area, ttrm = units, model = model, repoRoot = repoRoot)
-        // er/db/cnc first, md second — the two key spaces cannot collide (the schema token differs),
-        // so this order is precedence in principle only. RV-P3.4.
-        val refs = ModelRefIndex.of(model) orElse ModelRefIndex.ofMd(md)
+        // er/db/cnc first, md second, cn third (CN-P4: `cn.<Name>` for every concept) — the key spaces
+        // cannot collide (the schema token differs), so this order is precedence in principle only. RV-P3.4.
+        val refs = ModelRefIndex.of(model) orElse ModelRefIndex.ofMd(md) orElse ModelRefIndex.ofCn(model)
         val compiled = LexiconCompiler.compile(sources, refs, modelSnapshotId, builtAt)
         val result =
             if (authoringWarnings.isEmpty()) {
