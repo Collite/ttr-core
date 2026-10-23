@@ -86,6 +86,8 @@ class SnapshotModelLookupSpec :
                     """.trimIndent(),
                 )
             model.programExists("db.query.search_items") shouldBe true
+            model.declaredParameters("db.query.search_items") shouldBe
+                listOf(org.tatrman.report.QueryParameter("needle", "text"))
             model.outputColumns("db.query.search_items") shouldBe listOf("label")
         }
         "invalid SQL or unknown columns refuse rather than guessing an output list" {

@@ -145,7 +145,55 @@ val bytes = service.render(root, "returns_review_q", emptyMap(), runner)
 so a remote adapter runs the same named program for each anchor. The optional `Caller` is supplied
 by the host. Authentication, role enforcement and history are the consuming service's responsibility.
 
-## Template generation to follow
+## From a query
 
-S2.3 will add `ttr-report new --from er.query.report_returns_review_q --id returns_review_q --title "Returns review"`,
-which seeds the declaration and a deterministic one-sheet workbook from the program's output columns.
+`new` reads a saved query from one local metadata snapshot and generates the same pair the Platform
+BFF can create through the library. The optional checkout root defaults to the current directory.
+
+```sh
+ttr-report new . --from er.query.report_returns_review_q --id returns_review_q \
+  --title "Returns review, this quarter" --title-cs "Přehled reklamací, toto čtvrtletí" \
+  --role kantheon-role-finance
+# Optional: --out <directory> and --force
+```
+
+The default destination is `<root>/model/reports/<id>/`. `report.yaml` uses the query's ordered output
+columns, `refresh: daily`, `history: { keep: 90d }`, one `Summary` sheet and one `ROWS` table.
+Roles default to `[]`; pass each intended role with `--role`. The finance role above is an explicit
+demo input. The title must include the manifest's preferred language.
+
+The generated workbook has Calibri 11, a bold 14-point `{{title}}` at A1, `{{as_of}}` at A2, bold column
+headings at row 3 and the table marker at A4. Widths are header length plus two, clamped to 10–80
+characters. Properties and ZIP records use the same determinism pass as fill. The same inputs produce
+the same YAML and XLSX bytes; locale-map insertion order does not affect them.
+
+ER queries with declared parameters refuse with `query-has-parameters` (LQ-5). DB query declarations
+become required parameters: text/string/varchar → `text`, integer types → `int`, decimal/float types →
+`float`, bool/boolean → `bool`, and date/datetime/timestamp → `datetime`. An unknown type becomes `text`
+and emits `parameter-type-unknown` on stderr. No SQL is executed and no values are guessed.
+
+Columns must be unique and fit the workbook/table-marker syntax; names containing commas, braces,
+pipes, line breaks, or leading/trailing whitespace refuse with `generator-invalid`. Other YAML-sensitive
+names and titles are safely quoted. Invalid declarations retain the reader's `report-invalid` code.
+
+Both files are generated before writing. Either existing output refuses with `output-exists` unless
+`--force` is given. `--force` replaces only these two regular files and retains other directory contents;
+symlinks and non-file outputs refuse with `output-invalid`. Both files are staged first, with rollback
+on an ordinary replacement IO failure. Two file replacements are not a crash-atomic directory swap.
+Exit codes are the same as render: 0 success/help, 1 report/model/file failure, 64 usage.
+
+```kotlin
+val generated = TemplateGenerator.generate(
+    program = "db.query.search", columns = listOf("label"),
+    params = listOf(QueryParameter("needle", "text")),
+    id = "search", title = mapOf("en" to "Search"),
+)
+// generated.yaml, generated.xlsx, generated.warnings
+val pair = TemplateGenerator.fromQuery(queryModelLookup, "er.query.report_returns_review_q",
+    "returns_review_q", mapOf("en" to "Returns review"))
+```
+
+`QueryModelLookup` extends `ModelLookup` with `declaredParameters(qname)`. The CLI supplies a
+`SnapshotModelLookup`; the Platform supplies a Veles-backed adapter for that same interface. `generate`
+and `fromQuery` have no filesystem, metadata, wire or service dependency. The caller persists the pair
+and handles warnings; parameter values and execution stay in the renderer/runner path.

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.report.cli
 
-import org.tatrman.report.ModelLookup
+import org.tatrman.report.QueryModelLookup
+import org.tatrman.report.QueryParameter
 import org.tatrman.report.ReportException
 import org.tatrman.ttr.metadata.model.*
 import org.tatrman.translator.framework.*
@@ -16,13 +17,17 @@ import org.tatrman.translate.v1.Language
 /** Captures one non-strict metadata snapshot. Only compilation is used, never execution or a server. */
 class SnapshotModelLookup(
     private val model: Model,
-) : ModelLookup {
+) : QueryModelLookup {
     private val handle = SnapshotQueryHandle(model)
 
     override fun programExists(qname: String): Boolean = query(qname) != null
 
     override fun outputColumns(qname: String): List<String> =
         query(qname)?.let { Translator.outputColumnNames(handle.plan(it)) }
+            ?: throw ReportException("program-missing", "Program '$qname' does not exist")
+
+    override fun declaredParameters(qname: String): List<QueryParameter> =
+        query(qname)?.parameters?.map { QueryParameter(it.name, it.type) }
             ?: throw ReportException("program-missing", "Program '$qname' does not exist")
 
     private fun query(qname: String): Query? {

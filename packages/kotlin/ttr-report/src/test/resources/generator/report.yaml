@@ -1,0 +1,12 @@
+id: returns_review_q
+title: { en: "Returns review, this quarter", cs: "Přehled reklamací, toto čtvrtletí" }
+version: 1
+program: er.query.report_returns_review_q
+params: []
+refresh: daily
+sheets:
+  - sheet: Summary
+    scalars: { title: "{{title}}", as_of: "{{run.date}}" }
+    tables:  { ROWS: { columns: [category, requests, received, open, amount] } }
+history: { keep: 90d }
+roles: [kantheon-role-finance]

@@ -191,11 +191,12 @@ jobs:
           case "$TAG" in
             grammar/v*|ttr-parser/v*|ttr-semantics/v*|ttr-writer/v*)
               GRAMMAR_MM=$(grep -m1 -oE '@grammar-version:[[:space:]]*[0-9]+\.[0-9]+' packages/grammar/src/TTR.g4 | grep -oE '[0-9]+\.[0-9]+')
-              if [ "${VERSION%.*}" != "$GRAMMAR_MM" ]; then
-                echo "::error::$TAG → $VERSION: minor ${VERSION%.*} must equal the grammar version $GRAMMAR_MM (grammar-coupled artifacts share the grammar's <major.minor> — new-grammar-version-process.md §6). Bump the grammar marker first, or fix the tag."
+              CORE_VERSION="${VERSION%%-*}" # prerelease suffix is not part of the grammar minor
+              if [ "${CORE_VERSION%.*}" != "$GRAMMAR_MM" ]; then
+                echo "::error::$TAG → $VERSION: minor ${CORE_VERSION%.*} must equal the grammar version $GRAMMAR_MM (grammar-coupled artifacts share the grammar's <major.minor> — new-grammar-version-process.md §6). Bump the grammar marker first, or fix the tag."
                 exit 1
               fi
-              echo "Version sync OK: ${VERSION%.*} == grammar $GRAMMAR_MM"
+              echo "Version sync OK: ${CORE_VERSION%.*} == grammar $GRAMMAR_MM"
               ;;
           esac
           # SV-P1 S4 — the GH Packages step MUST target the GH-Packages-specific

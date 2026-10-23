@@ -49,7 +49,7 @@ mavenPublishing {
     coordinates("org.tatrman", "ttr-report-cli", version.toString())
     pom {
         name.set("TTR Report CLI")
-        description.set("Renders open report templates from offline CSV rows")
+        description.set("Creates report templates from saved queries and renders offline CSV rows")
         inceptionYear.set("2026")
         url.set("https://github.com/Collite/ttr-core")
         licenses {
@@ -90,4 +90,5 @@ publishing {
 // The distribution is consumable without rebuilding the repository.
 publishing.publications.withType<MavenPublication>().configureEach {
     artifact(tasks.named("distZip")) { classifier = "dist" }
+    artifact(tasks.named("distTar")) { classifier = "dist" }
 }

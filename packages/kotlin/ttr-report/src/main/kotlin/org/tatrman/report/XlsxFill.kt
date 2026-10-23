@@ -158,21 +158,26 @@ object XlsxFill {
             }
             // Expand bottom-up: a lower region is filled before an upper one shifts its whole rows.
             for (region in regions.asReversed()) expand(region)
-            book.properties.coreProperties.apply {
-                setCreated(Optional.empty())
-                setModified(Optional.empty())
-                setLastPrinted(Optional.empty())
-                creator = null
-                lastModifiedByUser = null
-            }
-            book.properties.extendedProperties.underlyingProperties.apply {
-                if (isSetApplication) unsetApplication()
-                if (isSetAppVersion) unsetAppVersion()
-            }
-            book.setForceFormulaRecalculation(true)
-            val out = ByteArrayOutputStream().also(book::write).toByteArray()
-            return deterministicPackage(out)
+            return writeDeterministic(book)
         }
+    }
+
+    /** Shared by generated templates and filled workbooks; does not close the caller's workbook. */
+    internal fun writeDeterministic(book: XSSFWorkbook): ByteArray {
+        book.properties.coreProperties.apply {
+            setCreated(Optional.empty())
+            setModified(Optional.empty())
+            setLastPrinted(Optional.empty())
+            creator = null
+            lastModifiedByUser = null
+        }
+        book.properties.extendedProperties.underlyingProperties.apply {
+            if (isSetApplication) unsetApplication()
+            if (isSetAppVersion) unsetAppVersion()
+        }
+        book.setForceFormulaRecalculation(true)
+        val out = ByteArrayOutputStream().also(book::write).toByteArray()
+        return deterministicPackage(out)
     }
 
     private fun expand(region: Region) {

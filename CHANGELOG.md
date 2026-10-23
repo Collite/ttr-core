@@ -6,6 +6,14 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — SO report authoring (S2.3)
+
+- Shared `TemplateGenerator.generate/fromQuery` with deterministic C-8 YAML/XLSX, declared DB parameter
+  mapping/warnings and LQ-5 ER refusal; `QueryModelLookup` is the snapshot/Veles authoring seam.
+- `ttr-report new` creates the pair, supports explicit roles/output and guarded force replacement.
+  The demo fixture now uses the generated template. CLI distributions include ZIP and tar;
+  grammar RC tags pass version validation and stay in the GitHub Packages staging lane.
+
 - **Studio reports / SO-core-P2 S2.2** — shared render service, typed parameters, CSV rows runner
   and standalone `ttr-report render` CLI with XLSX/HTML output. Snapshot validation compiles actual
   output columns through the existing translator; sheet anchors remain scoped. The installed CLI
