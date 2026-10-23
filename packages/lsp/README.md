@@ -168,7 +168,11 @@ console.log(relations.map((r) => r.qname));
 
 ### `modeler/applyGraphEdit`
 
-Edit-mode not available in v1. Returns `{ ok: false, reason: 'edit-mode-not-available-in-v1' }`.
+Deprecated alias of `modeler/edit { op: 'set-source', args: { nodeRef, text }, dryRun? }`.
+Responses add `deprecated: 'modeler/edit'`. The shared Node/Worker handler applies edits to its cache
+and returns post-edit worker diagnostics; the host still applies the returned edit to its own files.
+See [the request manual](../../docs/manual/lsp-requests.md#structured-authoring) for all six operations,
+refusals, dry runs, roster inputs and `modeler/applyWorkspaceEdit`.
 
 ## Diagnostics
 

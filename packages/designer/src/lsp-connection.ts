@@ -42,7 +42,7 @@ export async function lspClientOver(
     transportKind: opts.transportKind,
     async openDocument(uri, content) {
       await connection.sendNotification(DidOpenTextDocumentNotification.method, {
-        textDocument: { uri, languageId: 'ttr', version: 1, text: content },
+        textDocument: { uri, languageId: uri.endsWith('.mjs') ? 'javascript' : 'ttr', version: 1, text: content },
       });
     },
     async setProjectRoot(projectRoot, manifest) {
