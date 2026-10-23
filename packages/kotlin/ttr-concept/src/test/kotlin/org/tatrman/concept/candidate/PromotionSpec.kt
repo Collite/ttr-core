@@ -104,7 +104,7 @@ class PromotionSpec :
             val report =
                 result.report!!.issues.map { i ->
                     val file = i.file?.removePrefix("$dir/") ?: ""
-                    "${i.code} ${i.severity} $file ${i.message.replace("$dir/", "")}"
+                    "${i.code} ${i.severity} $file ${i.message.replace("$dir/", "").replace("${dir.fileName}/", "")}"
                 }
             return Loaded(
                 dir,
@@ -421,6 +421,72 @@ class PromotionSpec :
             val (patch, _) = promote(rel.copy(proposal = Proposal.Relation("stocks2", "cn.Depot2", "cn.Party")), before)
             patch.diff shouldContain
                 "+    label: { en: \"Depot\" },   // note: a, b\n+    relations: [ { type: stocks2, to: Party } ]\n"
+        }
+
+        test("F6: concepts and relation types share one cn name space — each refuses the other's names") {
+            val withType = pkg("hartland") + ("cn-types.ttrm" to "model cn\n\ndef relation_type stocks {}\n")
+            val kind = synthesized.copy(proposal = Proposal.Concept(Stereo.KIND, "stocks"))
+            Promotion.patch(kind, withType).shouldBeInstanceOf<PromotionResult.Refused>().reason shouldContain
+                "relation type"
+            val rel = candidate("manual-relation")
+            refused(
+                rel.copy(proposal = Proposal.Relation("Item", "cn.Warehouse", "cn.Party")),
+                "hartland",
+            ) shouldContain
+                "cn.Item is a concept"
+        }
+
+        test("F6: the strict load report sees a duplicate def the plain snapshot does not") {
+            // Two files, one cn name: the snapshot keeps one silently; the strict report names both. (Within ONE file the
+            // loader reports nothing at all — the promotion's own name-space check is what refuses that case.)
+            val split =
+                pkg("hartland") + ("cn-a.ttrm" to "model cn\n\ndef relation_type stocks {}\n") +
+                    ("cn-b.ttrm" to "model cn\n\ndef kind stocks {}\n")
+            val findings = load(materialize(split)).findings - load(materialize(pkg("hartland"))).findings
+            findings.count { it.startsWith("duplicate-qname ERROR") } shouldBe 2
+        }
+
+        test("F5: a concept declared by `concept { }` sugar is defined — an anchor, a term target, a relation's to") {
+            val sugar =
+                """
+                |model er
+                |
+                |def entity credit_note {
+                |    attributes: [ def attribute credit_note_id { type: int, isKey: true } ],
+                |    concept { kind: CreditNote }
+                |}
+                |
+                """.trimMargin()
+            val before = pkg("hartland") + ("er-credit.ttrm" to sugar)
+            val role =
+                synthesized.copy(
+                    proposal = Proposal.Concept(Stereo.ROLE, "Creditor", of = "cn.CreditNote", event = "cn.Order"),
+                )
+            val (rolePatch, roleLoaded) = promote(role, before)
+            rolePatch.files.keys shouldBe setOf("cn-qualities.ttrm") // the first `model cn` file, never the er file
+            roleLoaded.concept("Creditor").of?.name shouldBe "CreditNote"
+
+            val term = candidate("span-catalogue-term")
+            val words = (term.proposal as Proposal.Term).copy(targetQname = "cn.CreditNote", forms = listOf("dobropis"))
+            val (_, termLoaded) = promote(term.copy(proposal = words), before)
+            termLoaded.concept("CreditNote").lexiconLinks.flatMap { it.forms } shouldContain "dobropis"
+
+            val rel = candidate("manual-relation")
+            val (_, relLoaded) =
+                promote(
+                    rel.copy(proposal = Proposal.Relation("stocks", "cn.Warehouse", "cn.CreditNote")),
+                    before,
+                )
+            relLoaded.concept("Warehouse").relations.map { it.to?.name } shouldContain "CreditNote"
+
+            // Refused: re-declaring it, and a relation FROM it (no cn def carries its relations:).
+            val kind = synthesized.copy(proposal = Proposal.Concept(Stereo.KIND, "CreditNote"))
+            Promotion.patch(kind, before).shouldBeInstanceOf<PromotionResult.Refused>().reason shouldContain
+                "er-credit.ttrm"
+            Promotion
+                .patch(rel.copy(proposal = Proposal.Relation("stocks", "cn.CreditNote", "cn.Item")), before)
+                .shouldBeInstanceOf<PromotionResult.Refused>()
+                .reason shouldContain "er-credit.ttrm"
         }
 
         test("a candidate that is not proposed any more") {

@@ -3,8 +3,15 @@ package org.tatrman.concept.candidate
 
 import org.tatrman.ttr.parser.loader.TtrLoader
 import org.tatrman.ttr.parser.model.ConceptDef
+import org.tatrman.ttr.parser.model.ConceptSugar
+import org.tatrman.ttr.parser.model.CubeletDef
+import org.tatrman.ttr.parser.model.Definition
+import org.tatrman.ttr.parser.model.DimensionDef
+import org.tatrman.ttr.parser.model.EntityDef
 import org.tatrman.ttr.parser.model.ConceptProperty
 import org.tatrman.ttr.parser.model.LexiconEntryDef
+import org.tatrman.ttr.parser.model.MdDomainDef
+import org.tatrman.ttr.parser.model.MeasureDef
 import org.tatrman.ttr.parser.model.PropertyValue
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
@@ -131,14 +138,15 @@ object Promotion {
         p: Proposal.Concept,
         pkg: Pkg,
     ): PromotionResult {
-        pkg.concepts[p.name]?.let { return refused("cn.${p.name} is already defined (${it.path})") }
+        pkg.holder(p.name)?.let { return refused("cn.${p.name} is already defined $it") }
         val refs = listOfNotNull(p.of, p.event) + p.isA + p.involves.map { it.concept }
-        val missing = refs.filter { bare(it) !in pkg.concepts }.distinct()
+        val missing = refs.filterNot { pkg.defined(bare(it)) }.distinct()
         if (missing.isNotEmpty()) {
             return refused("cn.${p.name} names ${missing.joinToString()}, which this package does not define")
         }
+        // The anchor's file — unless the anchor is a sugar concept, whose file is er/md (review-133 ⚑R133-c).
         val path =
-            refs.firstOrNull()?.let { pkg.concepts.getValue(bare(it)).path } ?: pkg.cnFiles.firstOrNull() ?: "cn.ttrm"
+            refs.firstOrNull()?.let { pkg.concepts[bare(it)]?.path } ?: pkg.cnFiles.firstOrNull() ?: "cn.ttrm"
         val props = mutableListOf<String>()
         p.of?.let { props += "of: ${bare(it)}" }
         p.event?.let { props += "event: ${bare(it)}" }
@@ -177,11 +185,7 @@ object Promotion {
         val target =
             p.targetQname ?: promoted(p.proposedConceptRef!!)
                 ?: return refused("the term waits for candidate ${p.proposedConceptRef}, which is not promoted yet")
-        if (bare(target) !in
-            pkg.concepts
-        ) {
-            return refused("the term targets $target, which this package does not define")
-        }
+        if (!pkg.defined(bare(target))) return refused("the term targets $target, which this package does not define")
         val stem = termId(p.forms.first())
         val id = numbered(stem) { it !in pkg.lexiconIds && TtrId.isId(it) }
         val path =
@@ -203,11 +207,20 @@ object Promotion {
         p: Proposal.Relation,
         pkg: Pkg,
     ): PromotionResult {
-        val missing = listOf(p.from, p.to).filter { bare(it) !in pkg.concepts }.distinct()
+        if (pkg.defined(p.typeName)) {
+            return refused("cn.${p.typeName} is a concept, not a relation type — they share one cn name space")
+        }
+        val missing = listOf(p.from, p.to).filterNot { pkg.defined(bare(it)) }.distinct()
         if (missing.isNotEmpty()) {
             return refused("the relation names ${missing.joinToString()}, which this package does not define")
         }
-        val from = pkg.concepts.getValue(bare(p.from))
+        val from =
+            pkg.concepts[bare(p.from)] ?: return refused(
+                "${p.from} is declared by `concept { }` in ${pkg.sugar.getValue(
+                    bare(p.from),
+                )}: no cn def carries its " +
+                    "relations — state the relation there by hand",
+            )
         val existing = from.def.body["relations"] as? ConceptProperty.Entry
         val stated =
             (existing?.value as? PropertyValue.ListValue)?.items.orEmpty().any { item ->
@@ -219,6 +232,7 @@ object Promotion {
         val entry = "{ type: ${p.typeName}, to: ${bare(p.to)} }"
         var edited = insertRelation(text, from.def, existing, entry)
         if (p.typeName !in pkg.relationTypes) edited = append(edited, "def relation_type ${p.typeName} {}")
+
         return patched(p.from, mapOf(from.path to edited), pkg)
     }
 
@@ -369,11 +383,15 @@ object Promotion {
         codePoints: Int,
     ): Int = text.offsetByCodePoints(0, codePoints)
 
-    /** The package as the promotion reads it: which file defines what. */
+    /**
+     * The package as the promotion reads it: which file defines what. One cn name space (review-133 F6): a concept def,
+     * a relation type and a concept declared by `concept { }` sugar in an er / md def (F5) each take a name.
+     */
     private class Pkg(
         val texts: Map<String, String>,
         val concepts: Map<String, Located>,
-        val relationTypes: Set<String>,
+        val sugar: Map<String, String>,
+        val relationTypes: Map<String, String>,
         val cnFiles: List<String>,
         val lexiconFiles: Map<String, String>,
         val lexiconIds: Set<String>,
@@ -383,25 +401,45 @@ object Promotion {
             val def: ConceptDef,
         )
 
+        /** A concept the package defines — by a cn def or by sugar. */
+        fun defined(name: String): Boolean = name in concepts || name in sugar
+
+        /** What already holds [name] in the cn name space, in words; null when it is free. */
+        fun holder(name: String): String? =
+            concepts[name]?.let { "(${it.path})" }
+                ?: sugar[name]?.let { "(by `concept { }` in $it)" }
+                ?: relationTypes[name]?.let {
+                    "as a relation type ($it) — concepts and relation types share one cn name space"
+                }
+
         companion object {
+            private val SUGAR_KEYS = listOf("kind", "role", "event", "quality")
+
             fun of(model: Map<String, String>): Pkg? {
                 val concepts = linkedMapOf<String, Located>()
-                val relationTypes = mutableSetOf<String>()
+                val sugar = linkedMapOf<String, String>()
+                val relationTypes = linkedMapOf<String, String>()
                 val cnFiles = mutableListOf<String>()
                 val lexiconFiles = linkedMapOf<String, String>()
                 val lexiconIds = mutableSetOf<String>()
                 for ((path, text) in model.toSortedMap()) {
                     val parsed = TtrLoader.parseString(text, path)
                     if (parsed.errors.isNotEmpty()) return null
+                    for (s in parsed.definitions.flatMap(::sugarOf)) {
+                        SUGAR_KEYS
+                            .firstNotNullOfOrNull {
+                                s.body.ref(
+                                    it,
+                                )
+                            }?.let { sugar.putIfAbsent(it.parts.last(), path) }
+                    }
                     val directive = parsed.modelDirective
                     when (directive?.modelCode) {
                         "cn" -> {
                             cnFiles += path
                             for (d in parsed.definitions.filterIsInstance<ConceptDef>()) {
-                                if (d.stereotype ==
-                                    "relation_type"
-                                ) {
-                                    relationTypes += d.name
+                                if (d.stereotype == "relation_type") {
+                                    relationTypes.putIfAbsent(d.name, path)
                                 } else {
                                     concepts.putIfAbsent(d.name, Located(path, d))
                                 }
@@ -413,8 +451,19 @@ object Promotion {
                         }
                     }
                 }
-                return Pkg(model, concepts, relationTypes, cnFiles, lexiconFiles, lexiconIds)
+                return Pkg(model, concepts, sugar, relationTypes, cnFiles, lexiconFiles, lexiconIds)
             }
+
+            /** Every `concept { }` an er or md def carries (cn contracts §1.4): its own, and its attributes'. */
+            private fun sugarOf(d: Definition): List<ConceptSugar> =
+                when (d) {
+                    is EntityDef -> listOfNotNull(d.concept) + d.attributes.mapNotNull { it.concept }
+                    is DimensionDef -> listOfNotNull(d.concept) + d.attributes.mapNotNull { it.concept }
+                    is MdDomainDef -> listOfNotNull(d.concept)
+                    is MeasureDef -> listOfNotNull(d.concept)
+                    is CubeletDef -> listOfNotNull(d.concept)
+                    else -> emptyList()
+                }
 
             fun errors(model: Map<String, String>): List<String> =
                 model.toSortedMap().flatMap { (path, text) ->
