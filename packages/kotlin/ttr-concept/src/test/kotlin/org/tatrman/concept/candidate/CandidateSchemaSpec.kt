@@ -24,7 +24,8 @@ import kotlin.io.path.readText
  * ships no JSON-schema stack (networknt is test scope). Every fixture runs through BOTH:
  * - `examples/` and `valid/` — both accept;
  * - `invalid/` — both reject, except the `kotlin-only-*` ones, which the schema knowingly passes (a calendar-impossible
- *   date, a span whose end does not exceed its start, a term naming its own candidate) and Kotlin must not.
+ *   date, a span whose end does not exceed its start, a term naming its own candidate, a name the grammar reserves) and
+ *   Kotlin must not.
  *
  * The fixture lists are the directories: a new file is checked without anyone remembering to list it.
  */
@@ -80,6 +81,10 @@ class CandidateSchemaSpec :
                     "kotlin-only-calendar-date" to "timestamp",
                     "kotlin-only-reversed-span" to "source-ref",
                     "kotlin-only-term-targets-itself" to "self-reference",
+                    // review-133 F1 (⚑R133-a): the grammar's reserved words, by its own `id` rule (TtrId.isId)
+                    "kotlin-only-name-is-keyword" to "not-a-ttr-id",
+                    "kotlin-only-relation-type-keyword" to "not-a-ttr-id",
+                    "kotlin-only-label-keyword" to "not-a-ttr-id",
                 )
             files("invalid").map { it.nameWithoutExtension }.filter { it.startsWith("kotlin-only-") }.toSet() shouldBe
                 expected.keys

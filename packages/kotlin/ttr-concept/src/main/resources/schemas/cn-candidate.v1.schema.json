@@ -45,7 +45,7 @@
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$"
     },
     "name": {
-      "description": "A TTR identifier: the def name the promotion writes.",
+      "description": "A TTR identifier: a name the promotion writes as model text. A word the grammar reserves (`date`, `type`, `target`, …) matches this pattern and is refused by the JVM reader only — by the grammar's own `id` rule (`TtrId.isId`), so the list never drifts from `TTR.g4`.",
       "type": "string",
       "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
     },

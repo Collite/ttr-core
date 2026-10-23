@@ -6,7 +6,8 @@ import org.tatrman.ttr.parser.model.ConceptDef
 import org.tatrman.ttr.parser.model.ConceptProperty
 import org.tatrman.ttr.parser.model.LexiconEntryDef
 import org.tatrman.ttr.parser.model.PropertyValue
-import java.text.Normalizer
+import org.tatrman.ttr.lexicon.TermNormalizer
+import org.tatrman.ttr.parser.loader.TtrId
 
 /** What a promotion changes: the def it adds or changes ([qname]), the diff, and each changed file's new text. */
 data class PromotionPatch(
@@ -48,6 +49,10 @@ data class PullRequest(
  */
 object Promotion {
     private const val INDENT = "    "
+    private val NOT_ID = Regex("[^a-z0-9]+")
+
+    /** `TTR.g4`'s `TAGGED_BLOCK_LITERAL` opening: a word, optional blanks, a line end — read as a language tag. */
+    private val LONE_WORD_LINE = Regex("^[a-zA-Z][a-zA-Z0-9-]*[ \t]*\r?\n")
 
     fun patch(
         candidate: CnCandidate,
@@ -149,7 +154,7 @@ object Promotion {
         }
         candidate.provenance.sourceRef?.let { props += "sources: [${quote(it)}]" }
         p.suggestedGrounding?.let { props += "grounds: $it" }
-        p.definitionText?.let { props += "definition: \"\"\"$it\"\"\"" }
+        p.definitionText?.let { props += "definition: ${definitionBlock(it)}" }
         val def =
             if (props.isEmpty()) {
                 "def ${p.stereo.word} ${p.name} {}"
@@ -174,17 +179,7 @@ object Promotion {
             return refused("the term targets $target, which this package does not define")
         }
         val stem = termId(p.forms.first())
-        val id =
-            generateSequence(1) { it + 1 }
-                .map {
-                    if (it ==
-                        1
-                    ) {
-                        stem
-                    } else {
-                        "${stem}_$it"
-                    }
-                }.first { it !in pkg.lexiconIds }
+        val id = numbered(stem) { it !in pkg.lexiconIds && TtrId.isId(it) }
         val path =
             pkg.lexiconFiles[p.locale]
                 ?: generateSequence(1) { it + 1 }
@@ -274,11 +269,21 @@ object Promotion {
         return base + gap + block + "\n"
     }
 
+    /**
+     * The changed files as a patch — once each has been read back. Every write above is text surgery; parsing what it
+     * wrote is the net under all of it (review-133 F3): a patch the steward could not merge is never emitted.
+     */
     private fun patched(
         qname: String,
         changed: Map<String, String>,
         pkg: Pkg,
     ): PromotionResult {
+        for ((path, text) in changed.toSortedMap()) {
+            val e = TtrLoader.parseString(text, path).errors.firstOrNull() ?: continue
+            return refused(
+                "the patch would not parse (a promotion bug): $path:${e.line}:${e.column} ${e.message.lineSequence().first()}",
+            )
+        }
         val diff =
             changed.toSortedMap().entries.joinToString(
                 "",
@@ -295,21 +300,40 @@ object Promotion {
     /** A TTR string literal: `"` and `\` escaped (the values are single lines — the schema says so). */
     private fun quote(s: String): String = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
-    /** A term's def id from its first form: diacritics folded, lower case, `_` between words (`přeložení` → `prelozeni`). */
+    /**
+     * A term's def id from its first form: the lexicon's own fold (`TermNormalizer.fold` — lower case, diacritics off),
+     * `_` between words (`přeložení` → `prelozeni`); a word the grammar reserves takes `_term` (`date` → `date_term`).
+     */
     internal fun termId(form: String): String {
-        val folded =
-            Normalizer
-                .normalize(form, Normalizer.Form.NFD)
-                .replace(Regex("\\p{M}+"), "")
-                .lowercase()
-                .replace(Regex("[^a-z0-9]+"), "_")
-                .trim('_')
-        return when {
-            folded.isEmpty() -> "term"
-            folded.first().isDigit() -> "t_$folded"
-            else -> folded
-        }
+        val folded = TermNormalizer.fold(form).replace(NOT_ID, "_").trim('_')
+        val stem =
+            when {
+                folded.isEmpty() -> "term"
+                folded.first().isDigit() -> "t_$folded"
+                else -> folded
+            }
+        return if (TtrId.isId(stem)) stem else "${stem}_term"
     }
+
+    /** [stem], else `<stem>_2`, `<stem>_3`, … — the first that [free] takes. */
+    private fun numbered(
+        stem: String,
+        free: (String) -> Boolean,
+    ): String = generateSequence(1) { it + 1 }.map { if (it == 1) stem else "${stem}_$it" }.first(free)
+
+    /**
+     * `definition:`'s block, written so the lexer reads back exactly [text] (review-133 ⚑R133-b): `"""<text>"""`, the
+     * house spelling — unless [text] ends in `"` (the closing `"""` would take it) or its first line is a lone word (the
+     * lexer would read it as a block's language tag); then a `pl`-tagged block, the closing quotes on their own line.
+     */
+    internal fun definitionBlock(text: String): String =
+        if (text.endsWith('"') ||
+            LONE_WORD_LINE.containsMatchIn(text)
+        ) {
+            "\"\"\"pl\n$text\n\"\"\""
+        } else {
+            "\"\"\"$text\"\"\""
+        }
 
     /** A parser offset (code points) as a string index. */
     private fun chars(

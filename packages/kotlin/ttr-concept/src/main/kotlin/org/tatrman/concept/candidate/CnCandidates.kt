@@ -13,6 +13,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
+import org.tatrman.ttr.parser.loader.TtrId
 import java.time.OffsetDateTime
 import java.time.format.DateTimeParseException
 
@@ -44,9 +45,11 @@ sealed interface CandidateLoad {
  * (the store's `submit`, S5.3), hand-written so ttr-concept ships no JSON-schema stack. `CandidateSchemaSpec` runs every
  * fixture through both and fails if they disagree.
  *
- * Three rules are Kotlin-only, because JSON Schema cannot say them: a timestamp must be a real instant (`2026-02-30`
- * matches the pattern), a span's end must exceed its start (arithmetic between two numbers in one string), and a term
- * cannot name its own candidate as the concept it waits for.
+ * Four rules are Kotlin-only, because JSON Schema cannot say them: a timestamp must be a real instant (`2026-02-30`
+ * matches the pattern), a span's end must exceed its start (arithmetic between two numbers in one string), a term
+ * cannot name its own candidate as the concept it waits for, and a name the promotion writes as model text (a concept's
+ * `name`, a relation's `type_name`, a participant's `label`) must be a grammar `id` — not one of the words `TTR.g4`
+ * reserves (`date`, `type`, `target`, …), decided by the grammar's own rule ([TtrId.isId], review-133 ⚑R133-a).
  *
  * **Every violation is reported**, not the first — a refused submission should be fixable in one round.
  */
@@ -328,7 +331,7 @@ private class Reader {
             )
         val o = obj(e, path, fields, setOf("stereo", "name")) ?: return null
         val stereo = enumOf(o, "stereo", path, Stereo.entries, Stereo::word)
-        val name = string(o, "name", path, Shapes.NAME, "a TTR identifier")
+        val name = id(o, "name", path)
         val label = o["label"]?.let { label(it, "$path/label") }
         val isA = o["is_a"]?.let { refList(it, "$path/is_a") }
         val involves = o["involves"]?.let { participants(it, "$path/involves") }
@@ -401,7 +404,7 @@ private class Reader {
         path: String,
     ): Proposal.Relation? {
         val o = obj(e, path, setOf("type_name", "from", "to"), setOf("type_name", "from", "to")) ?: return null
-        val type = string(o, "type_name", path, Shapes.NAME, "a TTR identifier")
+        val type = id(o, "type_name", path)
         val from = string(o, "from", path, Shapes.CN_REF, "a concept ref (cn.X)")
         val to = string(o, "to", path, Shapes.CN_REF, "a concept ref (cn.X)")
         if (type == null || from == null || to == null) return null
@@ -533,6 +536,20 @@ private class Reader {
         return s
     }
 
+    /** A name the promotion writes as model text: the identifier shape, then the grammar's own `id` rule. */
+    private fun id(
+        o: JsonObject,
+        key: String,
+        path: String,
+    ): String? {
+        val s = string(o, key, path, Shapes.NAME, "a TTR identifier") ?: return null
+        if (!TtrId.isId(s)) {
+            fail("$path/$key", "not-a-ttr-id", "'$s' is a word the TTR grammar reserves — not a name")
+            return null
+        }
+        return s
+    }
+
     private fun <T> enumOf(
         o: JsonObject,
         key: String,
@@ -647,7 +664,7 @@ private class Reader {
             val p = "$path/$i"
             val o = obj(item, p, setOf("concept", "label"), setOf("concept")) ?: return@mapIndexedNotNull null
             val concept = string(o, "concept", p, Shapes.CN_REF, "a concept ref (cn.X)")
-            val label = string(o, "label", p, Shapes.NAME, "a TTR identifier")
+            val label = id(o, "label", p)
             concept?.let { Participant(it, label) }
         }
     }

@@ -14,12 +14,11 @@ import org.tatrman.concept.RenderOptions
 import org.tatrman.concept.ResolvedCnModel
 import org.tatrman.concept.Severity
 import org.tatrman.concept.v1.ConceptRef
+import org.tatrman.ttr.metadata.LoadOptions
+import org.tatrman.ttr.metadata.MetadataLoader
 import org.tatrman.ttr.metadata.model.CnSchema
-import org.tatrman.ttr.metadata.model.ModelDescriptor
-import org.tatrman.ttr.metadata.reconcile.ModelReconciler
 import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
-import org.tatrman.ttr.metadata.source.SourceSnapshot
 import org.tatrman.ttrp.resolve.MdRepo
 import java.nio.file.Files
 import java.nio.file.Path
@@ -42,7 +41,9 @@ import kotlin.io.path.writeText
  *
  * A golden that merely matches itself proves nothing, so each patch is also APPLIED (`git apply`, the way a reviewer's
  * checkout takes it) and the patched package LOADED: it must parse, resolve, gain exactly the def the candidate
- * proposed, and raise no load finding the package did not already have.
+ * proposed, and raise no finding the package did not already have — the strict load report (it carries
+ * `duplicate-qname`, which the plain snapshot cannot see) plus the cn definition errors (review-133 ⚑R133-d: the gate
+ * S5.3 runs before it opens a PR).
  */
 class PromotionSpec :
     FunSpec({
@@ -78,19 +79,38 @@ class PromotionSpec :
         }
 
         class Loaded(
-            val snapshot: SourceSnapshot,
+            val dir: Path,
+            val report: List<String>,
             val cn: ResolvedCnModel,
         ) {
             val schema: CnSchema get() = cn.model.schemas["cn"] as CnSchema
-            val issues: Set<String> get() = (snapshot.errors + snapshot.warnings).map { it.message }.toSet()
+
+            /** Every finding, paths relative to the package: the strict report, then the cn definition errors. */
+            val findings: Set<String>
+                get() =
+                    report.toSet() +
+                        cn
+                            .definitionDiagnostics()
+                            .filter { it.severity == Severity.ERROR }
+                            .map { "DEF ${it.slug} ${it.subject}" }
 
             fun concept(name: String) = schema.concepts.values.single { it.qname.name == name }
         }
 
         fun load(dir: Path): Loaded {
-            val snapshot = FileBasedSource("cn", 100, LocalFsStorage(id = "cn", rootPath = dir)).load()
-            val model = ModelReconciler(ModelDescriptor(id = "d", name = "d")).reconcile(listOf(snapshot)).model
-            return Loaded(snapshot, ResolvedCnModel.of(model, snapshotHash = "promotion", md = MdRepo.loadFrom(dir)))
+            val result =
+                MetadataLoader(FileBasedSource("cn", 100, LocalFsStorage(id = "cn", rootPath = dir)))
+                    .load(LoadOptions(strict = true))
+            val report =
+                result.report!!.issues.map { i ->
+                    val file = i.file?.removePrefix("$dir/") ?: ""
+                    "${i.code} ${i.severity} $file ${i.message.replace("$dir/", "")}"
+                }
+            return Loaded(
+                dir,
+                report,
+                ResolvedCnModel.of(result.model!!, snapshotHash = "promotion", md = MdRepo.loadFrom(dir)),
+            )
         }
 
         fun gitApply(
@@ -119,6 +139,27 @@ class PromotionSpec :
             } else {
                 f.readText() shouldBe actual
             }
+        }
+
+        /**
+         * [c] promoted against [before]: the patch, applied with `git apply` to a copy (yielding exactly the patched
+         * files), and the patched package loaded with no new finding — unless [newDefinitionErrors] says the definition
+         * itself is the test's subject.
+         */
+        fun promote(
+            c: CnCandidate,
+            before: Map<String, String>,
+            newDefinitionErrors: Boolean = false,
+        ): Pair<PromotionPatch, Loaded> {
+            val patch = Promotion.patch(c, before).shouldBeInstanceOf<PromotionResult.Patched>().patch
+            val dir = materialize(before)
+            gitApply(dir, patch.diff)
+            for ((rel, text) in patch.files) dir.resolve(rel).readText() shouldBe text
+            val original = load(materialize(before))
+            val patched = load(dir)
+            val fresh = patched.findings - original.findings
+            (if (newDefinitionErrors) fresh.filterNot { it.startsWith("DEF ") }.toSet() else fresh) shouldBe emptySet()
+            return patch to patched
         }
 
         data class Case(
@@ -159,28 +200,10 @@ class PromotionSpec :
             test("${case.example}: the patch is the golden, applies, and the package gains exactly the proposed def") {
                 val c = candidate(case.example)
                 val before = pkg(case.world)
-                val patch = Promotion.patch(c, before).shouldBeInstanceOf<PromotionResult.Patched>().patch
+                val (patch, patched) = promote(c, before)
                 patch.qname shouldBe case.qname
                 golden("${case.example}.diff", patch.diff)
                 Promotion.patch(c, before) shouldBe PromotionResult.Patched(patch) // deterministic
-
-                // Applied the way a reviewer's checkout takes it, the diff yields exactly the patched files.
-                val dir = materialize(before)
-                gitApply(dir, patch.diff)
-                for ((rel, text) in patch.files) dir.resolve(rel).readText() shouldBe text
-
-                // The patched package loads, gains the def, and raises nothing new.
-                val original = load(materialize(before))
-                val patched = load(dir)
-                (patched.issues - original.issues) shouldBe emptySet()
-
-                fun errors(l: Loaded) =
-                    l.cn
-                        .definitionDiagnostics()
-                        .filter { it.severity == Severity.ERROR }
-                        .map { "${it.slug} ${it.subject}" }
-                        .toSet()
-                (errors(patched) - errors(original)) shouldBe emptySet()
                 case.check(patched, c)
             }
         }
@@ -314,9 +337,42 @@ class PromotionSpec :
             gitApply(dir, first.diff)
             gitApply(dir, second.diff)
             val patched = load(dir)
-            (patched.issues - load(materialize(before)).issues) shouldBe emptySet()
+            (patched.findings - load(materialize(before)).findings) shouldBe emptySet()
             patched.concept("Order").relations.map { it.typeName to it.to?.name } shouldBe
                 listOf("ships_from" to "Warehouse", "ships_to" to "Party")
+        }
+
+        // ----- review-133 -----
+
+        test("F3: a write the grammar would refuse is refused, never emitted") {
+            // Built past the reader (which refuses the name, F1): the read-back is the net under every text write.
+            val keyword = synthesized.copy(proposal = Proposal.Concept(Stereo.KIND, "date"))
+            refused(keyword, "hartland") shouldContain "would not parse"
+        }
+
+        test("F1: a term whose first form is a keyword gets a legal id") {
+            val term = candidate("span-catalogue-term")
+            val p = term.proposal as Proposal.Term
+            val (patch, loaded) = promote(term.copy(proposal = p.copy(forms = listOf("date", "datum"))), pkg("clinic"))
+            patch.qname shouldBe "lexicon.date_term"
+            patch.diff shouldContain "def term date_term {"
+            loaded.concept("Transfer").lexiconLinks.flatMap { it.forms } shouldContain "date"
+        }
+
+        test(
+            "F2: a definition comes back as the candidate wrote it — a closing quote, a lone first word, a `pl` line",
+        ) {
+            for ((text, valid) in listOf(
+                "state = \"held\"" to true,
+                "state\n    = 'held'" to true,
+                "pl\nstate = 'held'" to false,
+            )) {
+                val c = synthesized.copy(proposal = concept(synthesized).copy(definitionText = text))
+                val (_, loaded) = promote(c, pkg("hartland"), newDefinitionErrors = !valid)
+                val definition = loaded.concept("LargeOrder").definition!!
+                definition.language shouldBe "pl"
+                definition.text shouldBe text // exactly: a tagged block's text ends before its closing line
+            }
         }
 
         test("a candidate that is not proposed any more") {
