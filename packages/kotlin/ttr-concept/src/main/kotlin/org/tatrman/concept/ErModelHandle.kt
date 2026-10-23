@@ -4,7 +4,6 @@ package org.tatrman.concept
 import org.tatrman.translate.v1.Language
 import org.tatrman.translator.orchestrator.Translator
 import org.tatrman.translator.orchestrator.ParseResult
-import java.util.concurrent.ConcurrentHashMap
 import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.translator.framework.EntityMapping
@@ -162,8 +161,7 @@ class ErModelHandle(
                 if (column == attribute) null else attribute to column
             }.toMap()
 
-    private val compiledQueries = ConcurrentHashMap<QualifiedName, Result<SavedQueryBody>>()
-    private val compilingQueries = ThreadLocal.withInitial { mutableSetOf<QualifiedName>() }
+    private val compiledQueries = SavedQueryBodyCache(::compileQuery)
     private val queries by lazy {
         model.queries.values
             .filter { it.qname.schemaCode == org.tatrman.ttr.metadata.model.SchemaCode.ER }
@@ -190,19 +188,7 @@ class ErModelHandle(
             emptyMap()
         }
 
-    override fun savedQueryBody(queryQname: QualifiedName): SavedQueryBody {
-        compiledQueries[queryQname]?.let { return it.getOrThrow() }
-        val visiting = compilingQueries.get()
-        check(visiting.add(queryQname)) { "Cyclic ER query body: $queryQname" }
-        val result =
-            try {
-                runCatching { compileQuery(queryQname) }
-            } finally {
-                visiting.remove(queryQname)
-                if (visiting.isEmpty()) compilingQueries.remove()
-            }
-        return (compiledQueries.putIfAbsent(queryQname, result) ?: result).getOrThrow()
-    }
+    override fun savedQueryBody(queryQname: QualifiedName): SavedQueryBody = compiledQueries.get(queryQname)
 
     private fun compileQuery(queryQname: QualifiedName): SavedQueryBody {
         val query = queries[queryQname] ?: error("Unknown ER query $queryQname")
@@ -218,10 +204,7 @@ class ErModelHandle(
         val plan =
             when (parsed) {
                 is ParseResult.Success -> parsed.plan
-                is ParseResult.Failure ->
-                    error(
-                        "Cannot compile ER query $queryQname: ${parsed.code}: ${parsed.message}",
-                    )
+                is ParseResult.Failure -> throw queryBodyFailure(queryQname, parsed.code, parsed.message)
             }
         return SavedQueryBody(plan, emptyList(), emptyList())
     }

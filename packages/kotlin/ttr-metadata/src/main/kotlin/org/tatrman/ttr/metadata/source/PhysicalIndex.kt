@@ -20,6 +20,41 @@ class PhysicalIndex(
     val relations = mutableListOf<PhysicalRelation>()
     val attributeColumns = linkedMapOf<String, String>()
 
+    /** The reconciler's DbSchema namespace, also used by ErModelHandle's implicit table binding. */
+    val defaultDbNamespace: String =
+        org.tatrman.ttr.metadata.model
+            .DbSchema()
+            .namespace
+    private val namedImports = mutableMapOf<String, Set<String>>()
+
+    /** Inverse discovery may not widen a binding into an unimported package. Entity imports include attributes. */
+    fun isVisible(
+        doc: SemanticDocument,
+        element: String,
+    ): Boolean {
+        val symbol = resolver.getSymbol(element) ?: return false
+        if (symbol.packageName.isEmpty() || symbol.packageName == doc.packageName) return true
+        if (doc.imports.any { it.wildcard && it.target.removeSuffix(".*") == symbol.packageName }) return true
+        val imported =
+            namedImports.getOrPut(doc.uri) {
+                doc.imports
+                    .filterNot { it.wildcard }
+                    .mapNotNull { resolver.getSymbol(it.target)?.qname }
+                    .toSet()
+            }
+        return symbol.qname in imported || symbol.parent in imported
+    }
+
+    fun entitiesOn(
+        doc: SemanticDocument,
+        table: String,
+    ): Set<String> = tableToErEntity[table].orEmpty().filter { isVisible(doc, it) }.toSet()
+
+    fun attributesOn(
+        doc: SemanticDocument,
+        column: String?,
+    ): Set<String> = columnToErAttr[column].orEmpty().filter { isVisible(doc, it) }.toSet()
+
     fun boundColumn(attribute: String): String = attributeColumns[attribute] ?: attribute.substringAfterLast('.')
 
     private val fks = linkedMapOf<String, Pair<SemanticDocument, FkDef>>()
@@ -96,15 +131,15 @@ class PhysicalIndex(
         for ((entity, pair) in entities) {
             if (entity !in entityToTable && entity !in queryEntities) {
                 val (doc, def) = pair
-                for (namespace in docs
-                    .filter { it.schemaCode == "db" }
-                    .map { it.namespace.ifEmpty { "dbo" } }
-                    .distinct()) {
-                    resolve(doc, "db.$namespace.${def.name}")?.takeIf { it.kind == "table" }?.let {
+                resolve(doc, "db.$defaultDbNamespace.${def.name}")
+                    ?.takeIf {
+                        it.kind == "table" &&
+                            it.namespace == defaultDbNamespace &&
+                            it.name == def.name
+                    }?.let {
                         tableToErEntity.getOrPut(it.qname) { linkedSetOf() }.add(entity)
                         entityToTable.getOrPut(entity) { linkedSetOf() }.add(it.qname)
                     }
-                }
             }
         }
         // Inline columns and per-attribute bindings are interpreted in the entity's physical table.

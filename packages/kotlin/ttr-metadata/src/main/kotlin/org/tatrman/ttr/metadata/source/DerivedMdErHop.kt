@@ -29,6 +29,7 @@ class DerivedMdErHop(
     private fun local(key: String): String = key
 
     private fun columns(
+        doc: SemanticDocument,
         md: String,
         column: String?,
         entities: Set<String>? = null,
@@ -38,11 +39,14 @@ class DerivedMdErHop(
             return
         }
         val attrs =
-            physical.columnToErAttr[column].orEmpty().filter {
+            physical.attributesOn(doc, column).filter {
                 entities == null ||
                     it.substringBeforeLast('.') in entities
             }
-        if (attrs.isEmpty()) causes[md] = "no er2db for column '$column'"
+        if (attrs.isEmpty()) {
+            val scope = if (physical.columnToErAttr[column].orEmpty().isNotEmpty()) "visible " else ""
+            causes[md] = "no ${scope}er2db for column '$column'"
+        }
         add(md, attrs.map(::local))
     }
 
@@ -95,7 +99,7 @@ class DerivedMdErHop(
                         mapTargets
                             .getOrPut(map.qname) {
                                 sortedSetOf()
-                            }.addAll(physical.columnToErAttr[physical.column(doc, table.qname, column)].orEmpty())
+                            }.addAll(physical.attributesOn(doc, physical.column(doc, table.qname, column)))
                     }
                 }
             }
@@ -106,9 +110,12 @@ class DerivedMdErHop(
                 val cubelet = def.cubeletRef?.path?.let { resolveMdNs(resolver, doc, it, "cubelet") } ?: continue
                 val md = cubelet.qname
                 val table = def.table?.path?.let { physical.resolve(doc, it) } ?: continue
-                val entities = physical.tableToErEntity[table.qname].orEmpty()
+                val entities = physical.entitiesOn(doc, table.qname)
                 add(md, entities.map(::local))
-                if (entities.isEmpty()) causes[md] = "no er2db for table '${table.qname}'"
+                if (entities.isEmpty()) {
+                    val scope = if (physical.tableToErEntity[table.qname].orEmpty().isNotEmpty()) "visible " else ""
+                    causes[md] = "no ${scope}er2db for table '${table.qname}'"
+                }
                 val measures = cubeletMeasureKeys(docs, resolver, cubelet)
                 for ((name, binding) in def.measures) {
                     val measure =
@@ -118,7 +125,7 @@ class DerivedMdErHop(
                             is MeasureColumnBinding.Column -> binding.column
                             is MeasureColumnBinding.Code -> (def.shape as? ShapeSpec.Long)?.valueColumn
                         }
-                    columns(measure.qname, col?.let { physical.column(doc, table.qname, it) })
+                    columns(doc, measure.qname, col?.let { physical.column(doc, table.qname, it) })
                 }
                 for ((name, binding) in def.attributes) {
                     val attr = resolveMdAttribute(resolver, doc, name) ?: continue
@@ -134,23 +141,41 @@ class DerivedMdErHop(
                     if (binding is AttrColumnBinding.Via) {
                         val map = resolveMdNs(resolver, doc, binding.via.path, "map")
                         // A via grain uses this map's target, not every map sharing its output domain.
-                        columns(grain, col)
+                        columns(doc, grain, col)
                         mapTargets[map?.qname]
-                            ?.takeIf {
-                                it.isNotEmpty()
-                            }?.let { candidates[grain] = it.toMutableSet() }
+                            ?.let { targets ->
+                                candidates[grain] =
+                                    targets.filter { physical.isVisible(doc, it) }.toMutableSet()
+                                if (candidates[grain].isNullOrEmpty()) {
+                                    causes[grain] =
+                                        "no visible er2db for via map target"
+                                }
+                            }
                     } else {
-                        columns(grain, col, entities)
+                        columns(doc, grain, col, entities)
                     }
                     // R3(a): only a dimension key, with a relation whose from side binds this FK attribute.
                     val dimension = dimensions[attr.parent] ?: continue
                     if (dimension.second.key != attr.name) continue
-                    val erAttrs = physical.columnToErAttr[col].orEmpty()
+                    val erAttrs = physical.attributesOn(doc, col)
                     for (relation in physical.relations) {
-                        if (relation.from !in entities || relation.pairs.none { it.first in erAttrs }) continue
+                        if (relation.from !in entities ||
+                            !physical.isVisible(doc, relation.key) ||
+                            !physical.isVisible(doc, relation.to) ||
+                            relation.pairs.none { it.first in erAttrs }
+                        ) {
+                            continue
+                        }
                         val dim = local(attr.parent!!)
                         add(dim, listOf(local(relation.to)))
-                        add(attr.qname, relation.pairs.filter { it.first in erAttrs }.map { local(it.second) })
+                        add(
+                            attr.qname,
+                            relation.pairs
+                                .filter {
+                                    it.first in erAttrs &&
+                                        physical.isVisible(doc, it.second)
+                                }.map { local(it.second) },
+                        )
                     }
                 }
             }
@@ -173,11 +198,15 @@ class DerivedMdErHop(
                         if (domain.qname in from && isKey) {
                             add(
                                 local(attr.substringBeforeLast('.')),
-                                physical.tableToErEntity[table.qname].orEmpty().map(::local),
+                                physical.entitiesOn(doc, table.qname).map(::local),
                             )
-                            columns(local(attr), physical.column(doc, table.qname, col))
+                            columns(doc, local(attr), physical.column(doc, table.qname, col))
                         }
-                        if (domain.qname in to && !isKey) columns(local(attr), physical.column(doc, table.qname, col))
+                        if (domain.qname in to &&
+                            !isKey
+                        ) {
+                            columns(doc, local(attr), physical.column(doc, table.qname, col))
+                        }
                     }
                 }
             }
@@ -191,13 +220,13 @@ class DerivedMdErHop(
                 val table = physical.resolve(doc, src.table.path) ?: continue
                 bound += domain.qname
                 val col = physical.column(doc, table.qname, src.column)
-                columns(domain.qname, col)
+                columns(doc, domain.qname, col)
                 for (attr in domainAttributes[domain.qname].orEmpty()) {
-                    columns(local(attr), col)
+                    columns(doc, local(attr), col)
                     if (dimensions[attr.substringBeforeLast('.')]?.second?.key == attr.substringAfterLast('.')) {
                         add(
                             local(attr.substringBeforeLast('.')),
-                            physical.tableToErEntity[table.qname].orEmpty().map(::local),
+                            physical.entitiesOn(doc, table.qname).map(::local),
                         )
                     }
                 }
@@ -311,16 +340,23 @@ class CompositeMdErHop(
             answer.copy(erTarget = answer.erTarget?.let { derived.resolver.getSymbol(it)?.let(::elementRefOf) ?: it })
         }
 
-    private fun pinnedEntities(md: String): Set<String>? {
+    private fun dimensionPin(md: String): String? {
         val attr = derived.resolver.getSymbol(md)?.takeIf { it.kind == "attribute" } ?: return null
         val dimension =
             derived.resolver.getSymbol(attr.parent.orEmpty())?.takeIf { it.kind == "dimension" } ?: return null
-        val pin = explicit.erTargetOf(dimension.qname).erTarget ?: return null
+        return explicit.erTargetOf(dimension.qname).erTarget
+    }
+
+    private fun pinnedEntities(md: String): Set<String>? {
+        val pin = dimensionPin(md) ?: return null
         val reached = linkedSetOf(pin)
         var size: Int
         do {
             size = reached.size
-            for (rel in derived.physical.relations) if (rel.from in reached) reached += rel.to
+            for (rel in derived.physical.relations) {
+                if (rel.from in reached && rel.toCardinality in setOf("1", "0..1", "1..1")) reached += rel.to
+                if (rel.to in reached && rel.fromCardinality in setOf("1", "0..1", "1..1")) reached += rel.from
+            }
         } while (reached.size != size)
         return reached
     }
@@ -362,7 +398,20 @@ class CompositeMdErHop(
         ) {
             pinned
         } else {
-            derived.qualifiedTargetOf(mdElement, bearerEntity, attributeCandidates(mdElement))
+            val allowed = attributeCandidates(mdElement)
+            val answer = derived.qualifiedTargetOf(mdElement, bearerEntity, allowed)
+            if (answer.diagnostic == HopResult.UNMAPPED &&
+                allowed != null &&
+                derived.candidates[mdElement].orEmpty().isNotEmpty()
+            ) {
+                HopResult.unmapped(
+                    "'$mdElement' has no er counterpart — the dimension pin to '${dimensionPin(
+                        mdElement,
+                    )}' excludes every derived landing",
+                )
+            } else {
+                answer
+            }
         }
     }
 

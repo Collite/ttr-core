@@ -39,7 +39,7 @@ export function deriveTableRoles(hop: CompositeMdErHop): TableRole[] {
     const logical = p.docs.find((d) => d.uri === map?.documentUri)?.ast.definitions.find((d) => d.kind === 'mdMap' && d.name === map?.name);
     if (logical?.kind !== 'mdMap' || logical.cardinality !== 'N:N') continue;
     const table = p.resolve(doc, binding.table); if (!table || !map) continue;
-    for (const entity of p.tableToErEntity.get(table.qname) ?? []) mark(local(entity), 'bridge', `N:N map ${local(map.qname)}; flagged, not classified`);
+    for (const entity of p.entitiesOn(doc, table.qname)) mark(local(entity), 'bridge', `N:N map ${local(map.qname)}; flagged, not classified`);
   }
   return [...new Set([...p.entities.keys()].map(local))].sort().map((entity) => {
     const reasons = why.get(entity) ?? new Map<string, Set<string>>();

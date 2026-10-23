@@ -279,3 +279,5 @@ keyword and `md/*` diagnostic list, and `docs/features/md/contracts.md` for the
 authoritative property tables.
 
 Query-backed attributes select output columns by their bound names, independent of attribute declaration order. Identity table/column bindings follow the translator convention. Reports retain package-qualified identities; shared dimensions can derive through cubelets in other visible packages. An explicit dimension pin constrains its derived attributes to reachable entities and reports excluded derived landings as override information.
+
+Inverse ER candidates are limited to the binding document's package, root package and explicit imports. Pin reach follows N:1 or 1:1 cardinality toward the one side, regardless of relation declaration order. Implicit entity/table lookup uses the translator's model DB namespace (`dbo` for reconciled document models); other physical namespaces require explicit entity bindings.

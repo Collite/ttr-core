@@ -17,7 +17,8 @@ Their CN hygiene rows are pinned in `tests/conformance/cn-hygiene/expected-deriv
 
 Kotlin's optional Calcite QueryLineage service and its syntactic default agree on all fixture columns.
 TS implements syntactic lineage; Python has no MD derivation model and retains structural validation only.
-Unsupported query projections are reported as `md/er-lineage-opaque` information.
+The syntactic providers treat `SELECT *` and duplicate output names as opaque; Calcite can derive them.
+This conservative difference is intentional. Unsupported query projections are reported as `md/er-lineage-opaque` information.
 
 Review-129 regressions share `review-129.json` beside the source fixture. They pin reordered/renamed/missing
 query outputs, malformed SQL, via-map targets (including an unrelated map to the same domain), implicit bindings,

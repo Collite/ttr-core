@@ -160,7 +160,7 @@ fun deriveTableRoles(hop: CompositeMdErHop): List<TableRole> {
                     ?: continue
             if (logical.cardinality != "N:N") continue
             val table = binding.table?.path?.let { p.resolve(doc, it) } ?: continue
-            for (entity in p.tableToErEntity[table.qname].orEmpty()) {
+            for (entity in p.entitiesOn(doc, table.qname)) {
                 mark(
                     local(entity),
                     "bridge",

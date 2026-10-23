@@ -2,6 +2,7 @@
 package org.tatrman.concept
 
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.shouldBe
 import org.tatrman.concept.metadata.CalciteQueryLineage
 import org.tatrman.ttr.metadata.source.PhysicalIndex
@@ -80,6 +81,16 @@ class CalciteMdHopLineageSpec :
                         .orEmpty()
                         .sorted() shouldBe
                         cols.jsonArray.map { it.jsonPrimitive.content }
+                }
+                for ((md, message) in c["messages"]?.jsonObject.orEmpty()) {
+                    hop.qualifiedTargetOf(md).message shouldContain
+                        message.jsonPrimitive.content
+                }
+                for ((entity, tables) in c["tables"]?.jsonObject.orEmpty()) {
+                    hop.derived.physical.entityToTable[entity]
+                        .orEmpty()
+                        .sorted() shouldBe
+                        tables.jsonArray.map { it.jsonPrimitive.content }
                 }
                 c["opaque"]?.jsonPrimitive?.content?.let { attr ->
                     hop.derived.lineageIssues.any { it.element == attr } shouldBe

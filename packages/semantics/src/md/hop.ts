@@ -36,6 +36,22 @@ export class PhysicalIndex {
   readonly queries = new Map<string, { doc: CnDocument; def: QueryDef }>();
   readonly queryEntities = new Map<string, string>();
   readonly relations: PhysicalRelation[] = [];
+  // ModelReconciler constructs DbSchema with this namespace; ErModelHandle uses the same one.
+  readonly defaultDbNamespace = 'dbo';
+  private readonly namedImports = new Map<string, Set<string>>();
+  isVisible(doc: CnDocument, element: string): boolean {
+    const sym = this.resolver.getSymbol(element); if (!sym) return false;
+    if (!sym.packageName || sym.packageName === doc.packageName) return true;
+    if (doc.ast.imports.some((imp) => imp.wildcard && imp.target.replace(/\.\*$/, '') === sym.packageName)) return true;
+    let named = this.namedImports.get(doc.uri);
+    if (!named) {
+      named = new Set(doc.ast.imports.filter((imp) => !imp.wildcard).map((imp) => this.resolver.getSymbol(imp.target)?.qname).filter((key): key is string => key !== undefined));
+      this.namedImports.set(doc.uri, named);
+    }
+    return named.has(sym.qname) || sym.parent !== undefined && named.has(sym.parent);
+  }
+  entitiesOn(doc: CnDocument, table: string): Set<string> { return new Set([...this.tableToErEntity.get(table) ?? []].filter((e) => this.isVisible(doc, e))); }
+  attributesOn(doc: CnDocument, column?: string): Set<string> { return new Set([...this.columnToErAttr.get(column ?? '') ?? []].filter((a) => this.isVisible(doc, a))); }
   readonly attributeColumns = new Map<string, string>();
   boundColumn(attr: string) { return this.attributeColumns.get(attr) ?? attr.split('.').at(-1)!; }
   resolve(doc: CnDocument, path: string) { return resolveMdErRef(this.resolver, doc, path); }
@@ -70,10 +86,8 @@ export class PhysicalIndex {
       if (sym?.kind === 'entity') this.bindEntity(sym.qname, def.target, doc);
     }
     for (const [key, { doc, def }] of this.entities) if (!this.entityToTable.has(key) && !this.queryEntities.has(key)) {
-      for (const namespace of new Set(docs.filter((d) => d.schemaCode === 'db').map((d) => d.namespace || 'dbo'))) {
-        const table = this.resolve(doc, `db.${namespace}.${def.name}`);
-        if (table?.kind === 'table') { add(this.tableToErEntity, table.qname, [key]); add(this.entityToTable, key, [table.qname]); }
-      }
+      const table = this.resolve(doc, `db.${this.defaultDbNamespace}.${def.name}`);
+      if (table?.kind === 'table' && elementRefOf(table) === `db.${this.defaultDbNamespace}.${def.name}`) { add(this.tableToErEntity, table.qname, [key]); add(this.entityToTable, key, [table.qname]); }
     }
     for (const [key, { doc, def }] of this.entities) {
       const columns = def.binding?.kind === 'block' ? def.binding.columns ?? [] : [];
@@ -228,10 +242,10 @@ export class DerivedMdErHop implements MdErHop {
   readonly physical: PhysicalIndex;
   private local(key: string) { return key; }
   private add(md: string, values: Iterable<string>) { add(this.candidates, md, values); }
-  private columns(md: string, column?: string, entities?: Set<string>) {
+  private columns(doc: CnDocument, md: string, column?: string, entities?: Set<string>) {
     if (!column) { this.causes.set(md, 'no md2db column'); return; }
-    const attrs = [...this.physical.columnToErAttr.get(column) ?? []].filter((a) => !entities || entities.has(parent(a)));
-    if (!attrs.length) this.causes.set(md, `no er2db for column '${column}'`);
+    const attrs = [...this.physical.attributesOn(doc, column)].filter((a) => !entities || entities.has(parent(a)));
+    if (!attrs.length) this.causes.set(md, `no ${this.physical.columnToErAttr.get(column)?.size ? 'visible ' : ''}er2db for column '${column}'`);
     this.add(md, attrs.map((a) => this.local(a)));
   }
   constructor(readonly docs: CnDocument[], readonly resolver: Resolver, physical?: PhysicalIndex) {
@@ -259,19 +273,19 @@ export class DerivedMdErHop implements MdErHop {
       const table = p.resolve(doc, binding.table);
       if (!map || !mapDoc || logical?.kind !== 'mdMap' || !table) continue;
       const targets = logical.to.map((d) => resolveMdNs(resolver, mapDoc, d, 'domain')?.qname);
-      for (const [name, column] of Object.entries(binding.columns)) if (targets.includes(resolveMdNs(resolver, doc, name, 'domain')?.qname)) add(mapTargets, map.qname, p.columnToErAttr.get(p.column(doc, table.qname, column) ?? '') ?? []);
+      for (const [name, column] of Object.entries(binding.columns)) if (targets.includes(resolveMdNs(resolver, doc, name, 'domain')?.qname)) add(mapTargets, map.qname, p.attributesOn(doc, p.column(doc, table.qname, column)));
     }
     for (const doc of docs) for (const def of doc.ast.definitions) if (def.kind === 'md2dbCubelet') {
       const cubelet = resolveMdNs(resolver, doc, def.cubeletRef, 'cubelet'); const table = p.resolve(doc, def.table);
       if (!cubelet || !table) continue;
-      const md = cubelet.qname; const entities = p.tableToErEntity.get(table.qname) ?? new Set<string>();
+      const md = cubelet.qname; const entities = p.entitiesOn(doc, table.qname);
       this.add(md, [...entities].map((e) => this.local(e)));
-      if (!entities.size) this.causes.set(md, `no er2db for table '${table.qname}'`);
+      if (!entities.size) this.causes.set(md, `no ${p.tableToErEntity.get(table.qname)?.size ? 'visible ' : ''}er2db for table '${table.qname}'`);
       const measures = cubeletMeasureKeys(docs, resolver, cubelet);
       for (const [name, binding] of Object.entries(def.measures)) {
         const m = resolveMdNs(resolver, doc, name, 'measure'); if (!m || !measures.has(m.qname)) continue;
         const col = 'column' in binding ? binding.column : def.shape.shape === 'long' ? def.shape.valueColumn : undefined;
-        this.columns(m.qname, col && p.column(doc, table.qname, col));
+        this.columns(doc, m.qname, col && p.column(doc, table.qname, col));
       }
       for (const [name, binding] of Object.entries(def.attributes)) {
         const attr = resolveMdAttribute(resolver, doc, name); if (!attr) continue;
@@ -279,16 +293,19 @@ export class DerivedMdErHop implements MdErHop {
         const col = 'column' in binding ? p.column(doc, table.qname, binding.column) : from && p.column(doc, from.qname, binding.from.column);
         const grain = `${md}.${elementRefOf(attr).replace(/^md.dimension\./, '')}`;
         if ('via' in binding) {
-          this.columns(grain, col);
+          this.columns(doc, grain, col);
           const map = resolveMdNs(resolver, doc, binding.via, 'map');
           const targets = mapTargets.get(map?.qname ?? '');
-          if (targets?.size) this.candidates.set(grain, new Set(targets));
-        } else this.columns(grain, col, entities);
+          if (targets) {
+            this.candidates.set(grain, new Set([...targets].filter((a) => p.isVisible(doc, a))));
+            if (!this.candidates.get(grain)?.size) this.causes.set(grain, 'no visible er2db for via map target');
+          }
+        } else this.columns(doc, grain, col, entities);
         const dim = dimensions.get(attr.parent ?? ''); if (dim?.def.key !== attr.name) continue;
-        const erAttrs = p.columnToErAttr.get(col ?? '') ?? new Set<string>();
-        for (const rel of p.relations) if (entities.has(rel.from) && rel.pairs.some(([a]) => erAttrs.has(a))) {
+        const erAttrs = p.attributesOn(doc, col);
+        for (const rel of p.relations) if (entities.has(rel.from) && p.isVisible(doc, rel.key) && p.isVisible(doc, rel.to) && rel.pairs.some(([a]) => erAttrs.has(a))) {
           this.add(this.local(attr.parent!), [this.local(rel.to)]);
-          this.add(attr.qname, rel.pairs.filter(([a]) => erAttrs.has(a)).map(([, b]) => this.local(b)));
+          this.add(attr.qname, rel.pairs.filter(([a, b]) => erAttrs.has(a) && p.isVisible(doc, b)).map(([, b]) => this.local(b)));
         }
       }
     }
@@ -305,10 +322,10 @@ export class DerivedMdErHop implements MdErHop {
           const dim = dimensions.get(parent(attr)); if (!dim) continue;
           const isKey = dim.def.key === attr.split('.').at(-1);
           if (from.includes(domain.qname) && isKey) {
-            this.add(this.local(parent(attr)), [...p.tableToErEntity.get(table.qname) ?? []].map((e) => this.local(e)));
-            this.columns(this.local(attr), p.column(doc, table.qname, col));
+            this.add(this.local(parent(attr)), [...p.entitiesOn(doc, table.qname)].map((e) => this.local(e)));
+            this.columns(doc, this.local(attr), p.column(doc, table.qname, col));
           }
-          if (to.includes(domain.qname) && !isKey) this.columns(this.local(attr), p.column(doc, table.qname, col));
+          if (to.includes(domain.qname) && !isKey) this.columns(doc, this.local(attr), p.column(doc, table.qname, col));
         }
       }
     }
@@ -317,10 +334,10 @@ export class DerivedMdErHop implements MdErHop {
       const domain = resolveMdNs(resolver, doc, def.domainRef, 'domain'); const table = p.resolve(doc, def.source_.table);
       if (!domain || !table) continue;
       bound.add(domain.qname); const col = p.column(doc, table.qname, def.source_.column);
-      this.columns(domain.qname, col);
+      this.columns(doc, domain.qname, col);
       for (const attr of domainAttrs.get(domain.qname) ?? []) {
-        this.columns(this.local(attr), col);
-        if (dimensions.get(parent(attr))?.def.key === attr.split('.').at(-1)) this.add(this.local(parent(attr)), [...p.tableToErEntity.get(table.qname) ?? []].map((e) => this.local(e)));
+        this.columns(doc, this.local(attr), col);
+        if (dimensions.get(parent(attr))?.def.key === attr.split('.').at(-1)) this.add(this.local(parent(attr)), [...p.entitiesOn(doc, table.qname)].map((e) => this.local(e)));
       }
     }
     for (const [key, { def }] of dimensions) {
@@ -360,14 +377,22 @@ export class CompositeMdErHop implements MdErHop {
     const sym = answer.erTarget && this.derived.resolver.getSymbol(answer.erTarget);
     return sym ? { ...answer, erTarget: elementRefOf(sym) } : answer;
   }
-  private pinnedEntities(md: string): Set<string> | undefined {
+  private dimensionPin(md: string): string | undefined {
     const attr = this.derived.resolver.getSymbol(md);
     const dimension = attr?.kind === 'attribute' ? this.derived.resolver.getSymbol(attr.parent ?? '') : undefined;
     if (dimension?.kind !== 'dimension') return undefined;
-    const pin = this.explicit.erTargetOf(dimension.qname).erTarget;
-    if (!pin) return undefined;
+    return this.explicit.erTargetOf(dimension.qname).erTarget;
+  }
+  private pinnedEntities(md: string): Set<string> | undefined {
+    const pin = this.dimensionPin(md); if (!pin) return undefined;
     const reached = new Set([pin]); let size: number;
-    do { size = reached.size; for (const rel of this.derived.physical.relations) if (reached.has(rel.from)) reached.add(rel.to); } while (size !== reached.size);
+    do {
+      size = reached.size;
+      for (const rel of this.derived.physical.relations) {
+        if (reached.has(rel.from) && ['1', '0..1', '1..1'].includes(rel.toCardinality ?? '')) reached.add(rel.to);
+        if (reached.has(rel.to) && ['1', '0..1', '1..1'].includes(rel.fromCardinality ?? '')) reached.add(rel.from);
+      }
+    } while (size !== reached.size);
     return reached;
   }
   private attributeCandidates(md: string): Set<string> | undefined {
@@ -381,7 +406,10 @@ export class CompositeMdErHop implements MdErHop {
   }
   qualifiedTargetOf(md: string, bearer?: string): HopAnswer {
     const pinned = this.explicit.erTargetOf(md, bearer);
-    return pinned.slug !== 'md/er-unmapped' ? { ...pinned, ...(pinned.erTarget ? { via: 'explicit' as const } : {}) } : this.derived.qualifiedTargetOf(md, bearer, this.attributeCandidates(md));
+    if (pinned.slug !== 'md/er-unmapped') return { ...pinned, ...(pinned.erTarget ? { via: 'explicit' as const } : {}) };
+    const allowed = this.attributeCandidates(md);
+    const answer = this.derived.qualifiedTargetOf(md, bearer, allowed);
+    return answer.slug === 'md/er-unmapped' && allowed && this.derived.candidates.get(md)?.size ? { ...answer, message: `'${md}' has no er counterpart — the dimension pin to '${this.dimensionPin(md)}' excludes every derived landing` } : answer;
   }
   issues(md: string, bearer?: string): MdHopIssue[] {
     const answer = this.qualifiedTargetOf(md, bearer); const out: MdHopIssue[] = [];
