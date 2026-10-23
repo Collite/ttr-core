@@ -195,7 +195,7 @@ private fun writePair(
             "template.xlsx" to generated.xlsx,
         )
     val noFollow = java.nio.file.LinkOption.NOFOLLOW_LINKS
-    if (Files.isSymbolicLink(target) || (Files.exists(target) && !Files.isDirectory(target))) {
+    if (target.parent == null || Files.isSymbolicLink(target) || (Files.exists(target) && !Files.isDirectory(target))) {
         throw ReportException("output-invalid", "Output must be a directory: $target")
     }
     for (name in files.keys) {

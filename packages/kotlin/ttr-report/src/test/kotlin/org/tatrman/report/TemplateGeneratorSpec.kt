@@ -132,7 +132,7 @@ class TemplateGeneratorSpec :
             }.code shouldBe "program-missing"
         }
         "quoted titles and unusual YAML column names round trip without injection" {
-            val values = mapOf("cs" to "Přehled", "en" to "A \"quote\"\n\tline \\ path")
+            val values = mapOf("cs" to "Přehled", "en" to "A \"quote\"\n\tline \\ path\u0085NEL\u2028LS\u2029PS")
             val pair =
                 TemplateGenerator.generate(
                     "db.query.x",

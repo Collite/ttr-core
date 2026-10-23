@@ -184,7 +184,12 @@ object TemplateGenerator {
         }
     }
 
-    private fun quote(value: String): String = mapper.writeValueAsString(value)
+    private fun quote(value: String): String =
+        mapper
+            .writeValueAsString(value)
+            .replace("\u0085", "\\u0085")
+            .replace("\u2028", "\\u2028")
+            .replace("\u2029", "\\u2029")
 
     private fun atom(value: String): String =
         if (plain.matches(value) &&
