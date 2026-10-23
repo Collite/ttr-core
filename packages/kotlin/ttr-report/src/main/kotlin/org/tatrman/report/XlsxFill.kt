@@ -1,0 +1,236 @@
+// SPDX-License-Identifier: Apache-2.0
+package org.tatrman.report
+
+import org.apache.poi.ss.SpreadsheetVersion
+import org.apache.poi.ss.usermodel.Cell
+import org.apache.poi.ss.usermodel.CellType
+import org.apache.poi.ss.usermodel.DateUtil
+import org.apache.poi.xssf.usermodel.XSSFWorkbook
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.util.Optional
+import java.util.zip.CRC32
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
+
+/** C-8 behaviour implemented here independently; no service, investment model or runtime dependency. */
+object XlsxFill {
+    private val tableMarker = Regex("\\{\\{table:([A-Za-z_][A-Za-z0-9_]*)(?:\\|([^{}]+))?}}")
+    private val scalarMarker = Regex("\\{\\{\\s*([A-Za-z_][A-Za-z0-9_.-]*)\\s*}}")
+
+    private data class Region(
+        val cell: Cell,
+        val table: Table,
+        val indices: List<Int>,
+    )
+
+    fun fill(
+        template: ByteArray,
+        data: ReportData,
+    ): ByteArray {
+        XSSFWorkbook(ByteArrayInputStream(template)).use { book ->
+            val seenScalars = mutableSetOf<String>()
+            val seenTables = mutableSetOf<String>()
+            val regions = mutableListOf<Region>()
+            for (sheet in book) {
+                for (row in sheet) {
+                    val rowRegions = mutableListOf<Region>()
+                    for (cell in row) {
+                        if (cell.cellType != CellType.STRING) continue
+                        val text = cell.stringCellValue
+                        val match = tableMarker.matchEntire(text)
+                        if (match != null) {
+                            val name = match.groupValues[1]
+                            val table =
+                                data.tables[name]
+                                    ?: throw ReportException("anchor-missing", "Template table '$name' has no data")
+                            val columns =
+                                match.groups[2]
+                                    ?.value
+                                    ?.split(',')
+                                    ?.map { it.trim() } ?: table.columns
+                            val indices =
+                                columns.map { column ->
+                                    table.columns.indexOf(column).also {
+                                        if (it <
+                                            0
+                                        ) {
+                                            throw ReportException(
+                                                "column-missing",
+                                                "Table '$name' has no column '$column'",
+                                            )
+                                        }
+                                    }
+                                }
+                            if (cell.columnIndex.toLong() + indices.size > SpreadsheetVersion.EXCEL2007.maxColumns) {
+                                throw ReportException("template-invalid", "Table '$name' exceeds the XLSX column limit")
+                            }
+                            seenTables += name
+                            rowRegions += Region(cell, table, indices)
+                        } else {
+                            if (text.contains(
+                                    "{{table:",
+                                )
+                            ) {
+                                throw ReportException(
+                                    "template-invalid",
+                                    "A table marker must occupy a whole cell: ${cell.address}",
+                                )
+                            }
+                            scalarMarker.findAll(text).forEach { seenScalars += it.groupValues[1] }
+                        }
+                    }
+                    if (rowRegions.size >
+                        1
+                    ) {
+                        throw ReportException(
+                            "template-invalid",
+                            "Tables must be stacked, not share a row in '${sheet.sheetName}'",
+                        )
+                    }
+                    regions += rowRegions
+                }
+            }
+            val missing = (data.tables.keys - seenTables) + (data.scalars.keys - seenScalars)
+            if (missing.isNotEmpty()) {
+                throw ReportException(
+                    "anchor-missing",
+                    "Template is missing anchors: ${missing.sorted().joinToString()}",
+                )
+            }
+            for (sheet in book) {
+                val growth =
+                    regions.filter { it.cell.sheet === sheet }.sumOf {
+                        (it.table.rows.size - 1)
+                            .coerceAtLeast(
+                                0,
+                            ).toLong()
+                    }
+                if (sheet.lastRowNum.toLong() + growth >= SpreadsheetVersion.EXCEL2007.maxRows) {
+                    throw ReportException(
+                        "template-invalid",
+                        "Tables exceed the XLSX row limit in '${sheet.sheetName}'",
+                    )
+                }
+                // Substitute only authored text. A value that happens to contain braces is data.
+                for (row in sheet) {
+                    for (cell in row) {
+                        if (cell.cellType == CellType.STRING && !tableMarker.matches(cell.stringCellValue)) {
+                            cell.setCellValue(
+                                scalarMarker.replace(
+                                    cell.stringCellValue,
+                                ) { data.scalars[it.groupValues[1]].orEmpty() },
+                            )
+                        }
+                    }
+                }
+            }
+            // Expand bottom-up: a lower region is filled before an upper one shifts its whole rows.
+            for (region in regions.asReversed()) expand(region)
+            book.properties.coreProperties.apply {
+                setCreated(Optional.empty())
+                setModified(Optional.empty())
+                setLastPrinted(Optional.empty())
+                creator = null
+                lastModifiedByUser = null
+            }
+            book.properties.extendedProperties.underlyingProperties.apply {
+                if (isSetApplication) unsetApplication()
+                if (isSetAppVersion) unsetAppVersion()
+            }
+            book.setForceFormulaRecalculation(true)
+            val out = ByteArrayOutputStream().also(book::write).toByteArray()
+            return deterministicPackage(out)
+        }
+    }
+
+    private fun expand(region: Region) {
+        val anchor = region.cell
+        val row = anchor.row
+        val sheet = anchor.sheet
+        val styles = region.indices.indices.map { row.getCell(anchor.columnIndex + it)?.cellStyle ?: anchor.cellStyle }
+        // Borrowed appearance does not confer a type. In particular, keep account codes' leading zeroes.
+        val typed = region.indices.indices.map { row.getCell(anchor.columnIndex + it) != null }
+        val height = row.height
+        if (region.table.rows.size > 1 && row.rowNum < sheet.lastRowNum) {
+            sheet.shiftRows(row.rowNum + 1, sheet.lastRowNum, region.table.rows.size - 1, true, false)
+        }
+        if (region.table.rows.isEmpty()) {
+            for (j in region.indices.indices) row.getCell(anchor.columnIndex + j)?.setBlank()
+            anchor.setBlank()
+        }
+        region.table.rows.forEachIndexed { i, values ->
+            val target = sheet.getRow(row.rowNum + i) ?: sheet.createRow(row.rowNum + i)
+            target.height = height
+            region.indices.forEachIndexed { j, index ->
+                val cell = target.getCell(anchor.columnIndex + j) ?: target.createCell(anchor.columnIndex + j)
+                cell.cellStyle = styles[j]
+                writeValue(cell, values[index], typed[j])
+            }
+        }
+    }
+
+    private fun writeValue(
+        cell: Cell,
+        value: String?,
+        typed: Boolean,
+    ) {
+        if (value.isNullOrEmpty()) {
+            cell.setBlank()
+            return
+        }
+        val format = cell.cellStyle.dataFormatString
+        when {
+            !typed || format == "General" || format == "@" -> cell.setCellValue(value)
+            DateUtil.isADateFormat(cell.cellStyle.dataFormat.toInt(), format) -> {
+                val date =
+                    runCatching {
+                        when {
+                            value.length == 10 -> LocalDate.parse(value).atStartOfDay()
+                            value.endsWith("Z") -> LocalDateTime.ofInstant(Instant.parse(value), ZoneOffset.UTC)
+                            else -> LocalDateTime.parse(value)
+                        }
+                    }.getOrNull()
+                if (date != null) cell.setCellValue(date) else cell.setCellValue(value)
+            }
+            else -> {
+                val number = value.toDoubleOrNull()?.takeIf { it.isFinite() }
+                if (number != null) cell.setCellValue(number) else cell.setCellValue(value)
+            }
+        }
+    }
+
+    /** Stable ZIP records across clocks/time zones/JDK compression versions; XML retains authored styles. */
+    internal fun deterministicPackage(bytes: ByteArray): ByteArray {
+        val parts = sortedMapOf<String, ByteArray>()
+        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                if (!entry.isDirectory) parts[entry.name] = zip.readBytes()
+            }
+        }
+        val out = ByteArrayOutputStream()
+        ZipOutputStream(out).use { zip ->
+            for ((name, content) in parts) {
+                val entry =
+                    ZipEntry(name).apply {
+                        // The DOS epoch boundary makes the JDK add a timezone-sensitive extended timestamp.
+                        setTimeLocal(LocalDateTime.of(1980, 1, 2, 0, 0))
+                        method = ZipEntry.STORED
+                        size = content.size.toLong()
+                        compressedSize = size
+                        crc = CRC32().apply { update(content) }.value
+                    }
+                zip.putNextEntry(entry)
+                zip.write(content)
+                zip.closeEntry()
+            }
+        }
+        return out.toByteArray()
+    }
+}

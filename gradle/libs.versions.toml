@@ -57,6 +57,8 @@ pgsql = "42.7.4"
 hikaricp = "7.0.2"
 testcontainers = "2.0.3"
 snakeyaml = "2.3"
+# SO-core-P2 — match kantheon report-renderer.
+apache-poi = "5.5.1"
 # PL-P0.S1 — E-5 bundle-manifest v2 JSON-Schema validation (draft 2020-12) in ttrp-emit tests.
 json-schema-validator = "1.5.4"
 # PL-P1.S1 — deterministic snapshot archives (ttr-snapshot). Versions PINNED for byte-determinism
@@ -113,6 +115,7 @@ mssql-jdbc                 = { module = "com.microsoft.sqlserver:mssql-jdbc",   
 postgresql                 = { module = "org.postgresql:postgresql",                       version.ref = "pgsql" }
 duckdb-jdbc                = { module = "org.duckdb:duckdb_jdbc",                          version.ref = "duckdb-jdbc" }
 hikaricp                   = { module = "com.zaxxer:HikariCP",                             version.ref = "hikaricp" }
+apache-poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "apache-poi" }
 snakeyaml                  = { module = "org.yaml:snakeyaml",                              version.ref = "snakeyaml" }
 # Testcontainers 2.x — DB modules moved to the `testcontainers-<db>` artifact prefix and
 # `org.testcontainers.<db>` packages (matches tatrman-server's component-testkit).
