@@ -6,7 +6,11 @@ import org.tatrman.ttr.parser.model.ConceptDef
 import org.tatrman.ttr.parser.model.ConceptProperty
 import org.tatrman.ttr.parser.model.LexiconEntryDef
 import org.tatrman.ttr.parser.model.PropertyValue
+import org.antlr.v4.runtime.CharStreams
+import org.antlr.v4.runtime.CommonTokenStream
+import org.antlr.v4.runtime.Token
 import org.tatrman.ttr.lexicon.TermNormalizer
+import org.tatrman.ttr.parser.generated.TTRLexer
 import org.tatrman.ttr.parser.loader.TtrId
 
 /** What a promotion changes: the def it adds or changes ([qname]), the diff, and each changed file's new text. */
@@ -220,43 +224,67 @@ object Promotion {
 
     // ----- text surgery -----
 
-    /** [entry] into [def]'s `relations:` list, or a new `relations:` property after its last one. */
+    /**
+     * [entry] into [def]'s `relations:` list, or a new `relations:` property after its last one — placed by the lexer's
+     * tokens, never by scanning characters, so a comment is never mistaken for code (review-133 F4): comments are on the
+     * hidden channel, and a trailing comment stays on the line it was written on.
+     */
     private fun insertRelation(
         text: String,
         def: ConceptDef,
         existing: ConceptProperty.Entry?,
         entry: String,
     ): String {
+        val tokens = tokens(text)
+        val code = tokens.filter { it.channel == Token.DEFAULT_CHANNEL }
+
+        fun after(t: Token) = chars(text, t.stopIndex + 1)
+
         if (existing != null) {
-            val close = chars(text, existing.source.offsetEnd) - 1 // the list's `]`
-            val before = text.substring(0, close).trimEnd()
-            val glue =
-                when {
-                    before.endsWith("[") -> " "
-                    before.endsWith(",") -> " "
-                    else -> ", "
-                }
-            return before + glue + entry + " " + text.substring(close)
+            val close = code.first { it.startIndex == existing.source.offsetEnd - 1 } // the list's `]`
+            val prev = code.last { it.stopIndex < close.startIndex }
+            val at = after(prev)
+            val pad = if (text[at] == ']') " " else ""
+            return text.substring(0, at) + (if (prev.text == "[" || prev.text == ",") " " else ", ") + entry + pad +
+                text.substring(at)
         }
         val property = "relations: [ $entry ]"
-        val close = chars(text, def.source.offsetEnd) - 1 // the def's `}`
+        val close = code.first { it.startIndex == def.source.offsetEnd - 1 } // the def's `}`
         val last = def.body.properties.lastOrNull()
         if (last == null) {
-            val open = text.lastIndexOf('{', close)
-            return text.substring(0, open + 1) + " $property " + text.substring(close)
+            val open = code.first { it.text == "{" && it.startIndex >= def.source.offsetStart }
+            val at = after(open)
+            return text.substring(0, at) + " $property" + (if (text[at] == '}') " " else "") + text.substring(at)
         }
-        val lastEnd = chars(text, last.source.offsetEnd)
-        val gap = text.substring(lastEnd, close)
-        val multiLine = gap.contains('\n')
+        val lastToken = code.last { it.stopIndex < last.source.offsetEnd }
+        val next = code.first { it.startIndex > lastToken.stopIndex }
+        val anchor = if (next.text == ",") next else lastToken
+        if (close.line == anchor.line) {
+            val at = after(anchor)
+            return text.substring(0, at) + (if (anchor === next) " $property," else ", $property") + text.substring(at)
+        }
+        // Multi-line: the new property on its own line, after any comment that ends the anchor's line.
+        val lineEnd =
+            tokens
+                .filter {
+                    it.line == anchor.line && it.startIndex > anchor.stopIndex && it.startIndex < close.startIndex
+                }.maxByOrNull { it.stopIndex } ?: anchor
         val lineStart = text.lastIndexOf('\n', chars(text, last.source.offsetStart)) + 1
         val indent = text.substring(lineStart).takeWhile { it == ' ' || it == '\t' }
-        val comma = gap.indexOf(',')
-        return if (comma >= 0) {
-            val at = lastEnd + comma + 1
-            text.substring(0, at) + (if (multiLine) "\n$indent" else " ") + "$property," + text.substring(at)
-        } else {
-            text.substring(0, lastEnd) + (if (multiLine) ",\n$indent" else ", ") + property + text.substring(lastEnd)
-        }
+        val atLine = after(lineEnd)
+        val edited =
+            text.substring(0, atLine) + "\n$indent$property" + (if (anchor === next) "," else "") +
+                text.substring(atLine)
+        if (anchor === next) return edited
+        val atComma = after(lastToken)
+        return edited.substring(0, atComma) + "," + edited.substring(atComma)
+    }
+
+    /** Every token of [text], hidden-channel comments included (whitespace is skipped by the lexer). */
+    private fun tokens(text: String): List<Token> {
+        val stream = CommonTokenStream(TTRLexer(CharStreams.fromString(text)))
+        stream.fill()
+        return stream.tokens.filter { it.type != Token.EOF }
     }
 
     /** [block] appended to [text], one blank line between, one newline at the end. */

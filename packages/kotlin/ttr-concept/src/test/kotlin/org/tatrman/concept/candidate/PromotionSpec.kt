@@ -375,6 +375,54 @@ class PromotionSpec :
             }
         }
 
+        test("F4: a relation lands by tokens — comments in the list, after the last property, in an empty body") {
+            // A cn file whose relation lists and bodies carry comments where a character scan goes wrong.
+            val depots =
+                """
+                |model cn
+                |
+                |def relation_type stocks {}
+                |def kind Depot {
+                |    relations: [
+                |        { type: stocks, to: Item },   // the main one
+                |    ]
+                |}
+                |def kind Depot2 {
+                |    label: { en: "Depot" }   // note: a, b
+                |}
+                |def kind Depot3 {
+                |    // nothing yet { not code }
+                |}
+                |def kind Depot4 { relations: [ { type: stocks, to: Item }, ] }
+                |def kind Depot5 { label: { en: "Depot" } /* a, b */ }
+                |
+                """.trimMargin()
+            val before = pkg("hartland") + ("cn-depots.ttrm" to depots)
+            val rel = candidate("manual-relation")
+            val expected =
+                mapOf(
+                    "Depot" to listOf("stocks" to "Item", "stocks2" to "Party"),
+                    "Depot2" to listOf("stocks2" to "Party"),
+                    "Depot3" to listOf("stocks2" to "Party"),
+                    "Depot4" to listOf("stocks" to "Item", "stocks2" to "Party"),
+                    "Depot5" to listOf("stocks2" to "Party"),
+                )
+            for ((depot, relations) in expected) {
+                val (patch, loaded) =
+                    promote(
+                        rel.copy(proposal = Proposal.Relation("stocks2", "cn.$depot", "cn.Party")),
+                        before,
+                    )
+                io.kotest.assertions.withClue(patch.diff) {
+                    loaded.concept(depot).relations.map { it.typeName to it.to?.name } shouldBe relations
+                }
+            }
+            // A comment stays on the line it was written on.
+            val (patch, _) = promote(rel.copy(proposal = Proposal.Relation("stocks2", "cn.Depot2", "cn.Party")), before)
+            patch.diff shouldContain
+                "+    label: { en: \"Depot\" },   // note: a, b\n+    relations: [ { type: stocks2, to: Party } ]\n"
+        }
+
         test("a candidate that is not proposed any more") {
             val rel = candidate("manual-relation")
             val done = rel.copy(status = Status.REJECTED, resolution = Resolution("a.steward", "2026-10-24T08:00:00Z"))
