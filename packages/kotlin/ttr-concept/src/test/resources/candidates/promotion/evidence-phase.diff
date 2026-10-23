@@ -1,0 +1,14 @@
+diff --git a/cn.ttrm b/cn.ttrm
+--- a/cn.ttrm
++++ b/cn.ttrm
+@@ -142,3 +142,10 @@
+     of: Patient,
+     definition: """exists Encounter e1, Encounter e2 involving this where e1 <> e2 and e2.period.start - e1.period.end <= days(30)"""
+ }
++
++def phase IschemicPatient {
++    of: Patient,
++    label: { en: "Ischemic heart disease patient", cs: "Pacient s ischemickou chorobou srdeční" },
++    sources: ["doc://clinic/du-48213#s4"],
++    definition: """exists ConditionRecord involving this where code in descendants(Diagnosis, 'X20-X25')"""
++}

@@ -1,0 +1,9 @@
+diff --git a/lexicon-cs.ttrm b/lexicon-cs.ttrm
+new file mode 100644
+--- /dev/null
++++ b/lexicon-cs.ttrm
+@@ -0,0 +1,4 @@
++model lexicon locale cs
++
++// sources: doc://clinic/du-50077#s2
++def term prelozeni { for: cn.Transfer, forms: ["přeložení", "přeložení pacienta"] }

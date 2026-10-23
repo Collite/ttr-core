@@ -1,0 +1,22 @@
+{
+  "id": "6f1d2c3a-0b4e-4f7a-9c21-3d5e8a1b7c40",
+  "proposal": {
+    "relation": {
+      "type_name": "stocks",
+      "from": "cn.Warehouse",
+      "to": "cn.Item"
+    }
+  },
+  "provenance": {
+    "producer": "manual:a.steward",
+    "source_ref": "doc://hartland/ops-handbook#s12",
+    "confidence": {
+      "value": 1.0,
+      "producer": "manual:a.steward",
+      "method": "steward"
+    },
+    "created_at": "2026-10-23T09:14:00Z"
+  },
+  "status": "proposed",
+  "priority": 2
+}

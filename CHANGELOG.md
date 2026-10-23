@@ -43,6 +43,17 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   escaped HTML preview capped at 500 rows. The report fill is implemented from the C-8 behaviour
   contract; no kantheon renderer implementation is copied. Template generation follows in S2.3.
 
+- **`cn-candidate.v1`** (cn, CN-P5 S5.2 — cn contracts §6, A-CN-81…84): `ttr-concept` publishes
+  `schemas/cn-candidate.v1.schema.json` — a proposal for the conceptual model (a concept, a term or an open-tier
+  relation), its provenance (`producer`, `source_ref`, `confidence`, AM-20 `evidence`) and its fate (`status`,
+  `resolution`). New package `org.tatrman.concept.candidate`: `CnCandidates` reads a candidate with every violation
+  reported and writes its canonical JSON (the schema's own rules, by hand — no JSON-schema runtime; a test-scope spec
+  holds the two together); `SourceRefs` is the `doc://` · `recipe://` · `question://` scheme (Kleio's
+  `kallimachos://` citation maps by one prefix swap); `ProducerRegistry` admits `kleio`, `au:synthesizer`,
+  `manual:<steward>` and a registered deployment's `evidence` / `span-catalogue` (terms only) producers, and never an
+  importer; `Promotion` writes a promoted candidate as model text — a unified diff `git apply` takes (a new def with
+  its `sources:` line, a lexicon `def term`, a `relations:` entry) — and its pull request, which carries a phase's er
+  rendering. The store that uses them is the server's (`services/metadata`, CN-P5 S5.3). Additive.
 - **MD hop / HP-P2** — derive MD → ER landings through shared physical bindings, FK/join relations,
   domain/map sources and stacked ER-query column origins (R1–R7). Explicit mappings retain priority;
   qualities first restrict candidates to their bearer's entity. The TS/Kotlin CN tier reads the composite hop.

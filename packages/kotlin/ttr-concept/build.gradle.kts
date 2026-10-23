@@ -84,6 +84,10 @@ dependencies {
     testImplementation(testFixtures(project(":packages:kotlin:ttr-translator")))
     // CN-P3 S3.3 T7 — the live suite (`ConceptLiveSpec`) runs the lowered plans on PostgreSQL (`TTR_CONN_ERP_PG`).
     testImplementation(libs.postgresql)
+    // CN-P5 S5.2 — `cn-candidate.v1.schema.json` is the published contract and `CandidateSchemaSpec` holds the Kotlin
+    // reader to it fixture by fixture. TEST scope, as in ttr-lexicon: networknt drags jackson-databind, and the reader
+    // already enforces the rules.
+    testImplementation(libs.json.schema.validator)
 }
 
 // CN-P2 S2.7 — `ttr cn hygiene <dir> [--format text|json] [--fail-on error|warning]`; CN-P3 S3.4 — `ttr cn materialize
