@@ -11,7 +11,6 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import org.tatrman.ttr.parser.loader.TtrId
 import java.time.OffsetDateTime
@@ -212,6 +211,16 @@ private object Shapes {
     val LINE = Regex("^[^\\u0000-\\u001f]+$")
     val GROUNDING = Regex("^(er|md)(\\.[A-Za-z_][A-Za-z0-9_]*)+$")
     val PRODUCER = Regex("^[a-z][a-z0-9-]*(:[A-Za-z0-9._@-]+)?$")
+
+    /**
+     * Whitespace, as the schema spells it — one explicit set, never `\s` (whose meaning differs between the JDK,
+     * ECMA-262 and Python validators): a definition made only of these is blank.
+     */
+    val BLANK: Set<Char> =
+        (
+            "\t\n\u000b\u000c\r \u0085\u00a0\u1680\u2028\u2029\u202f\u205f\u3000\ufeff" +
+                ('\u2000'..'\u200a').joinToString("")
+        ).toSet()
     val CANON_REF = Regex("^[0-9a-f]{7,64}:(cn|lexicon)\\.[A-Za-z][A-Za-z0-9_]*$")
 
     /** Which concept fields each stereotype refuses (cn contracts §1.1). */
@@ -338,7 +347,7 @@ private class Reader {
         val of = string(o, "of", path, Shapes.CN_REF, "a concept ref (cn.X)")
         val event = string(o, "event", path, Shapes.CN_REF, "a concept ref (cn.X)")
         val definition = string(o, "definition_text", path)
-        if (definition != null && (definition.isBlank() || definition.contains("\"\"\""))) {
+        if (definition != null && (definition.all { it in Shapes.BLANK } || definition.contains("\"\"\""))) {
             fail("$path/definition_text", "pattern", "a definition expression: not blank, no triple quote")
         }
         val basis = enumOf(o, "basis", path, Basis.entries, Basis::word)
@@ -680,11 +689,18 @@ private class Reader {
         e: JsonElement,
         path: String,
     ): Int? {
-        val n = (e as? JsonPrimitive)?.takeIf { !it.isString }?.intOrNull
+        // JSON Schema's integer: any integral number (`14.0` is 14), capped at 32 bits on both sides.
+        val n =
+            (e as? JsonPrimitive)
+                ?.takeIf { !it.isString && it.booleanOrNull == null }
+                ?.content
+                ?.toBigDecimalOrNull()
+                ?.takeIf { it.stripTrailingZeros().scale() <= 0 }
         return when {
             n == null -> null.also { fail(path, "type", "an integer is required") }
-            n < 0 -> null.also { fail(path, "range", "a count is not negative") }
-            else -> n
+            n.signum() < 0 -> null.also { fail(path, "range", "a count is not negative") }
+            n > Int.MAX_VALUE.toBigDecimal() -> null.also { fail(path, "range", "a count fits in 32 bits") }
+            else -> n.toInt()
         }
     }
 }

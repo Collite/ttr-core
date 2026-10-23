@@ -5,6 +5,10 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.tatrman.concept.DefinitionFixtures
 import java.nio.file.Files
 import kotlin.io.path.extension
@@ -16,6 +20,23 @@ import kotlin.io.path.readText
  * back as the same JSON (nothing dropped, nothing invented), and the written form is canonical — one key order, so the
  * store's copy of a candidate is byte-stable.
  */
+private fun byValue(e: JsonElement): JsonElement =
+    when (e) {
+        is JsonObject -> JsonObject(e.mapValues { byValue(it.value) })
+        is JsonArray -> JsonArray(e.map(::byValue))
+        is JsonPrimitive ->
+            if (e.isString || e.content == "true" || e.content == "false" || e.content == "null") {
+                e
+            } else {
+                JsonPrimitive(
+                    e.content
+                        .toBigDecimal()
+                        .stripTrailingZeros()
+                        .toPlainString(),
+                )
+            }
+    }
+
 class CandidateJsonSpec :
     FunSpec({
         val root = DefinitionFixtures.repo.resolve("packages/kotlin/ttr-concept/src/test/resources/candidates")
@@ -30,7 +51,8 @@ class CandidateJsonSpec :
             test("round trip: ${f.parent.name}/${f.name}") {
                 val text = f.readText()
                 val candidate = read(text)
-                CnCandidates.toJson(candidate) shouldBe Json.parseToJsonElement(text)
+                // Numbers by value: an integral count written `14.0` reads back as 14 (JSON Schema's integer).
+                byValue(CnCandidates.toJson(candidate)) shouldBe byValue(Json.parseToJsonElement(text))
                 read(CnCandidates.render(candidate)) shouldBe candidate
                 CnCandidates.render(read(CnCandidates.render(candidate))) shouldBe CnCandidates.render(candidate)
             }

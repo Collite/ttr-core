@@ -37,33 +37,33 @@
   "$defs": {
     "uuid": {
       "type": "string",
-      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![\\s\\S])"
     },
     "timestamp": {
       "description": "RFC 3339 with an explicit offset. A calendar-impossible date (`2026-02-30`) passes this pattern and is refused by the JVM validator only.",
       "type": "string",
-      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$"
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})(?![\\s\\S])"
     },
     "name": {
       "description": "A TTR identifier: a name the promotion writes as model text. A word the grammar reserves (`date`, `type`, `target`, …) matches this pattern and is refused by the JVM reader only — by the grammar's own `id` rule (`TtrId.isId`), so the list never drifts from `TTR.g4`.",
       "type": "string",
-      "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*(?![\\s\\S])"
     },
     "cnRef": {
       "description": "A concept, qualified: `cn.Customer`.",
       "type": "string",
-      "pattern": "^cn\\.[A-Za-z][A-Za-z0-9_]*$"
+      "pattern": "^cn\\.[A-Za-z][A-Za-z0-9_]*(?![\\s\\S])"
     },
     "locale": {
       "description": "A label key or a lexicon file's locale (`model lexicon locale cs`).",
       "type": "string",
-      "pattern": "^[a-z]{2,3}$"
+      "pattern": "^[a-z]{2,3}(?![\\s\\S])"
     },
     "line": {
       "description": "One line of model text: a label or a surface form.",
       "type": "string",
       "minLength": 1,
-      "pattern": "^[^\\u0000-\\u001f]+$"
+      "pattern": "^[^\\u0000-\\u001f]+(?![\\s\\S])"
     },
     "label": {
       "type": "object",
@@ -84,7 +84,7 @@
     "sourceRef": {
       "description": "Where a candidate or an evidence example came from (cn contracts §6, A-CN-82): `doc://<system>/<document>[#<locator>]` (a locator is `s<n>` — a sentence, 1-based; `r<n>` — a table row, 1-based; `c<start>-<end>` — a code-point span, 0-based, end exclusive), `recipe://<package>/<recipe>#s<n>` (a recipe sentence), `question://<system>/<question>`. A span whose end does not exceed its start passes this pattern and is refused by the JVM validator only.",
       "type": "string",
-      "pattern": "^(doc://[A-Za-z0-9._~%-]+(/[A-Za-z0-9._~%-]+)+(#(s[1-9][0-9]{0,8}|r[1-9][0-9]{0,8}|c(0|[1-9][0-9]{0,8})-(0|[1-9][0-9]{0,8})))?|recipe://[A-Za-z0-9._~%-]+/[A-Za-z0-9._~%-]+#s[1-9][0-9]{0,8}|question://[A-Za-z0-9._~%-]+(/[A-Za-z0-9._~%-]+)+)$"
+      "pattern": "^(doc://[A-Za-z0-9._~%-]+(/[A-Za-z0-9._~%-]+)+(#(s[1-9][0-9]{0,8}|r[1-9][0-9]{0,8}|c(0|[1-9][0-9]{0,8})-(0|[1-9][0-9]{0,8})))?|recipe://[A-Za-z0-9._~%-]+/[A-Za-z0-9._~%-]+#s[1-9][0-9]{0,8}|question://[A-Za-z0-9._~%-]+(/[A-Za-z0-9._~%-]+)+)(?![\\s\\S])"
     },
     "proposal": {
       "description": "Exactly one of `concept`, `term`, `relation`.",
@@ -121,15 +121,16 @@
         "of": { "$ref": "#/$defs/cnRef" },
         "event": { "$ref": "#/$defs/cnRef" },
         "definition_text": {
+          "description": "Not blank, no triple quote. Blank means every character is whitespace, and whitespace is one explicit set — tab, LF, VT, FF, CR, space, U+0085, U+00A0, U+1680, U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000, U+FEFF — never `\\s`, whose meaning differs between the JDK, ECMA-262 and Python validators.",
           "type": "string",
           "minLength": 1,
-          "pattern": "^(?![\\s\\S]*\"\"\")[\\s\\S]*\\S[\\s\\S]*$"
+          "pattern": "^(?![\\s\\S]*\"\"\")[\\s\\S]*[^\\t\\n\\u000b\\f\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff][\\s\\S]*(?![\\s\\S])"
         },
         "basis": { "enum": ["occurrence", "current_state", "past_state"] },
         "suggested_grounding": {
           "description": "An md or er element the concept would ground to (`grounds:`); for a phase, a query-backed entity only.",
           "type": "string",
-          "pattern": "^(er|md)(\\.[A-Za-z_][A-Za-z0-9_]*)+$"
+          "pattern": "^(er|md)(\\.[A-Za-z_][A-Za-z0-9_]*)+(?![\\s\\S])"
         },
         "er_rendering": { "type": "string", "minLength": 1 }
       },
@@ -217,7 +218,7 @@
         "producer": {
           "description": "The producer id (`kleio`, `au:synthesizer`, `manual:<steward>`, `<deployment>:evidence`, `<deployment>:span-catalogue`). This schema checks the id's shape; which producers a store admits — and that an importer never does (L15-5) — is its registry's (`ProducerRegistry`, A-CN-83).",
           "type": "string",
-          "pattern": "^[a-z][a-z0-9-]*(:[A-Za-z0-9._@-]+)?$"
+          "pattern": "^[a-z][a-z0-9-]*(:[A-Za-z0-9._@-]+)?(?![\\s\\S])"
         },
         "source_ref": { "$ref": "#/$defs/sourceRef" },
         "confidence": { "$ref": "#/$defs/confidence" },
@@ -242,8 +243,8 @@
       "additionalProperties": false,
       "required": ["examples"],
       "properties": {
-        "question_count": { "type": "integer", "minimum": 0 },
-        "document_count": { "type": "integer", "minimum": 0 },
+        "question_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "document_count": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
         "examples": { "type": "array", "items": { "$ref": "#/$defs/example" } }
       }
     },
@@ -282,7 +283,7 @@
         "canon_ref": {
           "description": "`<merged commit>:<qname>` — the def the promotion added (`cn.X`, `lexicon.<term>`) or changed (a relation's `from`).",
           "type": "string",
-          "pattern": "^[0-9a-f]{7,64}:(cn|lexicon)\\.[A-Za-z][A-Za-z0-9_]*$"
+          "pattern": "^[0-9a-f]{7,64}:(cn|lexicon)\\.[A-Za-z][A-Za-z0-9_]*(?![\\s\\S])"
         },
         "note": { "type": "string" }
       }

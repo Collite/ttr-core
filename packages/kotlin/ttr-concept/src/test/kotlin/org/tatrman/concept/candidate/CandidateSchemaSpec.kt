@@ -27,7 +27,9 @@ import kotlin.io.path.readText
  *   date, a span whose end does not exceed its start, a term naming its own candidate, a name the grammar reserves) and
  *   Kotlin must not.
  *
- * The fixture lists are the directories: a new file is checked without anyone remembering to list it.
+ * The fixture lists are the directories: a new file is checked without anyone remembering to list it. The two sides
+ * agree on the CORPUS — so the corpus grows from every divergence found (review-133 F7: a trailing newline under a
+ * `find()` regex, an integral `14.0`, a count past 32 bits, a definition of only no-break spaces), each a fixture.
  */
 class CandidateSchemaSpec :
     FunSpec({
