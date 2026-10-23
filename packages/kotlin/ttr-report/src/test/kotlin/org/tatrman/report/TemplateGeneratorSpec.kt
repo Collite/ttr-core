@@ -35,7 +35,7 @@ class TemplateGeneratorSpec :
             pair.yaml shouldBe requireNotNull(javaClass.getResource("/generator/report.yaml")).readText()
             pair.warnings shouldBe emptyList()
             pair.xlsx.toList() shouldBe demo().xlsx.toList()
-            pair.xlsx.sha256() shouldBe "c9fdc8e4aaeab04e6329be99c28e5501da765a1aff64d07e0f9bfdbdba7c9165"
+            pair.xlsx.sha256() shouldBe "e70ebf7eb85288394ab86031b1673a119ea23d4dfb7dc5835b1356b1a300af15"
             ReportYaml
                 .read(pair.yaml, "returns_review_q")
                 .sheets

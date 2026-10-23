@@ -38,6 +38,13 @@ class RenderCommandSpec :
                     sheet.getRow(0).getCell(0).stringCellValue shouldBe "Returns review, this quarter"
                     sheet.getRow(3).getCell(1).cellType shouldBe org.apache.poi.ss.usermodel.CellType.NUMERIC
                     sheet.getRow(3).getCell(4).numericCellValue shouldBe 1.5
+                    val amount = sheet.getRow(4).getCell(4)
+                    org.apache.poi.ss.format.CellFormat
+                        .getInstance(
+                            java.util.Locale.US,
+                            amount.cellStyle.dataFormatString,
+                        ).apply(amount.numericCellValue)
+                        .text shouldBe "20.0"
                     for (row in sheet) {
                         (row as org.apache.poi.xssf.usermodel.XSSFRow).ctRow.isSetHt shouldBe false
                         row.zeroHeight shouldBe false

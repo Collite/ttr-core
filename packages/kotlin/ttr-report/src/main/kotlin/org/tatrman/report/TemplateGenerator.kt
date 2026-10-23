@@ -156,8 +156,15 @@ object TemplateGenerator {
                                     book.createDataFormat().getFormat(
                                         when (ReportTypes.kind(columnTypes[column].orEmpty())) {
                                             ParamKind.INT -> "0"
-                                            ParamKind.FLOAT -> "0.###############"
-                                            ParamKind.DATETIME -> "yyyy-mm-dd hh:mm:ss"
+                                            ParamKind.FLOAT -> "0.0##############"
+                                            ParamKind.DATETIME ->
+                                                if (columnTypes[column]?.trim()?.equals("date", ignoreCase = true) ==
+                                                    true
+                                                ) {
+                                                    "yyyy-mm-dd"
+                                                } else {
+                                                    "yyyy-mm-dd hh:mm:ss"
+                                                }
                                             else -> "@"
                                         },
                                     )

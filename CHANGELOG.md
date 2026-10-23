@@ -6,6 +6,12 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — SO report review-133
+
+- Preserve automatic sizing for marker rows with stored heights unless customHeight is true.
+- Give generated decimals a mandatory fractional digit (20.0) and DATE outputs a date-only format.
+  Expanded regressions use Excel-emulating CellFormat; workbook fixtures are regenerated for RC.3.
+
 ### Fixed — SO report P2 exit review
 
 - Fill inline strings in saved XLSX cells, preserve automatic heights and untouched rich text; generated

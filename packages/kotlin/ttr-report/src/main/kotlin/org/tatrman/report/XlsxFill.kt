@@ -193,7 +193,15 @@ object XlsxFill {
         // Borrowed appearance does not confer a type. In particular, keep account codes' leading zeroes.
         val typed = region.indices.indices.map { row.getCell(anchor.columnIndex + it) != null }
         val authoredRow = (row as XSSFRow).ctRow
-        val height = if (authoredRow.isSetHt) authoredRow.ht else null
+        val height =
+            if (authoredRow.isSetHt &&
+                authoredRow.isSetCustomHeight &&
+                authoredRow.customHeight
+            ) {
+                authoredRow.ht
+            } else {
+                null
+            }
         if (region.table.rows.size > 1 && row.rowNum < sheet.lastRowNum) {
             sheet.shiftRows(row.rowNum + 1, sheet.lastRowNum, region.table.rows.size - 1, true, false)
         }

@@ -59,11 +59,19 @@ class ExitReviewSpec :
             }
         }
         "automatic row height stays automatic and explicit height is inherited" {
-            for (fixed in listOf(false, true)) {
+            for (mode in listOf("auto", "stored-auto", "stored-false", "manual")) {
+                val fixed = mode == "manual"
                 val input =
                     workbook {
                         createSheet("Summary").createRow(0).apply {
-                            if (fixed) heightInPoints = 32f
+                            when (mode) {
+                                "manual" -> heightInPoints = 32f
+                                "stored-auto" -> ctRow.ht = 45.0
+                                "stored-false" -> {
+                                    ctRow.ht = 45.0
+                                    ctRow.customHeight = false
+                                }
+                            }
                             createCell(0).setCellValue("{{table:ROWS}}")
                         }
                     }
@@ -79,7 +87,10 @@ class ExitReviewSpec :
                     )
                 XSSFWorkbook(ByteArrayInputStream(output)).use { book ->
                     for (row in book.getSheetAt(0)) {
-                        (row as org.apache.poi.xssf.usermodel.XSSFRow).ctRow.isSetHt shouldBe fixed
+                        val stored = (row as org.apache.poi.xssf.usermodel.XSSFRow).ctRow
+                        stored.isSetHt shouldBe fixed
+                        stored.isSetCustomHeight shouldBe fixed
+                        if (fixed) stored.customHeight shouldBe true
                         if (fixed) row.heightInPoints shouldBe 32f
                         row.zeroHeight shouldBe false
                     }
@@ -237,5 +248,48 @@ class ExitReviewSpec :
                     it.code
                 }.toSet() shouldBe
                 setOf("parameter-invalid", "parameter-missing")
+        }
+        "generated decimal and date formats match Excel display semantics" {
+            val columns = listOf("amount", "day", "stamp")
+            val pair =
+                TemplateGenerator.generate(
+                    "er.query.q",
+                    columns,
+                    id = "q",
+                    title = mapOf("en" to "Q"),
+                    columnTypes = mapOf("amount" to "DECIMAL", "day" to " DATE ", "stamp" to "TIMESTAMP"),
+                )
+            val values = listOf("20", "3", "0", "-20", "1.5", "1.2345")
+            val data =
+                ReportData(
+                    mapOf("title" to "Q", "as_of" to "2026-10-23"),
+                    mapOf(
+                        "ROWS" to
+                            Table(columns, values.map { listOf(it, "2026-10-01", "2026-10-01T10:20:30Z") }),
+                    ),
+                )
+            XSSFWorkbook(ByteArrayInputStream(XlsxFill.fill(pair.xlsx, data))).use { book ->
+                val sheet = book.getSheetAt(0)
+                val displayed =
+                    values.indices.map { i ->
+                        val cell = sheet.getRow(3 + i).getCell(0)
+                        org.apache.poi.ss.format.CellFormat
+                            .getInstance(
+                                java.util.Locale.US,
+                                cell.cellStyle.dataFormatString,
+                            ).apply(cell.numericCellValue)
+                            .text
+                    }
+                displayed shouldBe listOf("20.0", "3.0", "0.0", "-20.0", "1.5", "1.2345")
+                val day = sheet.getRow(3).getCell(1)
+                val stamp = sheet.getRow(3).getCell(2)
+                day.cellStyle.dataFormatString shouldBe "yyyy-mm-dd"
+                stamp.cellStyle.dataFormatString shouldBe "yyyy-mm-dd hh:mm:ss"
+                val formatter =
+                    org.apache.poi.ss.usermodel
+                        .DataFormatter(java.util.Locale.US)
+                formatter.formatCellValue(day) shouldBe "2026-10-01"
+                formatter.formatCellValue(stamp) shouldBe "2026-10-01 10:20:30"
+            }
         }
     })

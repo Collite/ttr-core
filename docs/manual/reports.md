@@ -62,7 +62,8 @@ with the expansion. Tables must be stacked vertically; two table markers on the 
   Missing data/anchors are `anchor-missing`; unknown projected columns are `column-missing`, including
   when there are zero rows. A partial or malformed table marker is `template-invalid`.
 - Put the font, border and number/date formats on the marker row's cells. Expanded rows inherit each
-  column's authored style and an explicitly authored marker-row height. Automatic height stays automatic,
+  column's authored style and a manually set marker-row height (`customHeight=true`). A stored auto-fit
+  height without that flag is discarded. Automatic height stays automatic,
   allowing wrapped data to grow; untouched text cells retain their rich-text runs and fonts. General/text styles keep values as text, including
   leading zeroes and formula-looking strings. Explicit number/date styles produce numeric/date cells
   when the value parses; null and empty values produce blank cells. An unstyled column can borrow
@@ -177,7 +178,8 @@ additional languages. An explicit output directory's final name must equal `--id
 The generated workbook has Calibri 11, a bold 14-point `{{title}}` at A1, `{{as_of}}` at A2, bold column
 headings at row 3 and the table marker at A4. Widths are header length plus two, clamped to 10–80
 characters. Every data column has a styled marker-row cell: compiled integer/decimal output types
-get number formats, dates get a date format, and text retains leading zeroes. Generated cells wrap text
+get number formats (decimals show at least one fractional digit, e.g. `20.0`), DATE outputs use
+`yyyy-mm-dd`, timestamps include time, and text retains leading zeroes. Generated cells wrap text
 with automatic row height. The pure `generate` API accepts a `columnTypes` map; absent/unknown types
 stay text. `fromQuery` obtains types through `QueryModelLookup.outputTypes(qname)`. Properties and ZIP
 records use the same determinism pass as fill. The same inputs produce
