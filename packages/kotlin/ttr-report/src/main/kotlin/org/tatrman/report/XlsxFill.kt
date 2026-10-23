@@ -6,6 +6,7 @@ import org.apache.poi.ss.usermodel.Cell
 import org.apache.poi.ss.usermodel.CellType
 import org.apache.poi.ss.usermodel.DateUtil
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
+import org.apache.poi.xssf.usermodel.XSSFRow
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.time.Instant
@@ -146,8 +147,12 @@ object XlsxFill {
                 // Substitute only authored text. A value that happens to contain braces is data.
                 for (row in sheet) {
                     for (cell in row) {
-                        if (cell.cellType == CellType.STRING && !tableMarker.matches(cell.stringCellValue)) {
-                            cell.setCellValue(
+                        if (cell.cellType == CellType.STRING &&
+                            !tableMarker.matches(cell.stringCellValue) &&
+                            scalarMarker.containsMatchIn(cell.stringCellValue)
+                        ) {
+                            writeText(
+                                cell,
                                 scalarMarker.replace(
                                     cell.stringCellValue,
                                 ) { data.scalars[it.groupValues[1]].orEmpty() },
@@ -187,7 +192,8 @@ object XlsxFill {
         val styles = region.indices.indices.map { row.getCell(anchor.columnIndex + it)?.cellStyle ?: anchor.cellStyle }
         // Borrowed appearance does not confer a type. In particular, keep account codes' leading zeroes.
         val typed = region.indices.indices.map { row.getCell(anchor.columnIndex + it) != null }
-        val height = row.height
+        val authoredRow = (row as XSSFRow).ctRow
+        val height = if (authoredRow.isSetHt) authoredRow.ht else null
         if (region.table.rows.size > 1 && row.rowNum < sheet.lastRowNum) {
             sheet.shiftRows(row.rowNum + 1, sheet.lastRowNum, region.table.rows.size - 1, true, false)
         }
@@ -197,9 +203,16 @@ object XlsxFill {
         }
         region.table.rows.forEachIndexed { i, values ->
             val target = sheet.getRow(row.rowNum + i) ?: sheet.createRow(row.rowNum + i)
-            target.height = height
+            val targetRow = (target as XSSFRow).ctRow
+            if (height != null) {
+                targetRow.ht = height
+                targetRow.customHeight = true
+            } else {
+                if (targetRow.isSetHt) targetRow.unsetHt()
+                if (targetRow.isSetCustomHeight) targetRow.unsetCustomHeight()
+            }
             region.indices.forEachIndexed { j, index ->
-                val cell = target.getCell(anchor.columnIndex + j) ?: target.createCell(anchor.columnIndex + j)
+                val cell: Cell = target.getCell(anchor.columnIndex + j) ?: target.createCell(anchor.columnIndex + j)
                 cell.cellStyle = styles[j]
                 writeValue(cell, values[index], typed[j])
             }
@@ -215,6 +228,9 @@ object XlsxFill {
             cell.setBlank()
             return
         }
+        checkTextLength(value)
+        // POI retains inlineStr storage on a string-to-string update. Clear it before assigning.
+        cell.setBlank()
         val format = cell.cellStyle.dataFormatString
         when {
             !typed || format == "General" || format == "@" -> cell.setCellValue(value)
@@ -234,6 +250,21 @@ object XlsxFill {
                 if (number != null) cell.setCellValue(number) else cell.setCellValue(value)
             }
         }
+    }
+
+    private fun checkTextLength(value: String) {
+        if (value.length > SpreadsheetVersion.EXCEL2007.maxTextLength) {
+            throw ReportException("value-too-long", "Cell value exceeds Excel's 32,767-character limit")
+        }
+    }
+
+    private fun writeText(
+        cell: Cell,
+        value: String,
+    ) {
+        checkTextLength(value)
+        cell.setBlank()
+        cell.setCellValue(value)
     }
 
     /** Stable ZIP records across clocks/time zones/JDK compression versions; XML retains authored styles. */

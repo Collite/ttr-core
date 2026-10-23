@@ -20,6 +20,14 @@ class TemplateGeneratorSpec :
                 id = "returns_review_q",
                 title = title,
                 roles = listOf("kantheon-role-finance"),
+                columnTypes =
+                    mapOf(
+                        "category" to "text",
+                        "requests" to "int",
+                        "received" to "int",
+                        "open" to "int",
+                        "amount" to "decimal",
+                    ),
             )
 
         "the C-8 demo declaration is an exact byte golden and template is deterministic" {
@@ -27,7 +35,7 @@ class TemplateGeneratorSpec :
             pair.yaml shouldBe requireNotNull(javaClass.getResource("/generator/report.yaml")).readText()
             pair.warnings shouldBe emptyList()
             pair.xlsx.toList() shouldBe demo().xlsx.toList()
-            pair.xlsx.sha256() shouldBe "72eb9de80820196aedd4e0a5c68f469b8accb06b837128b873537e3e7003129d"
+            pair.xlsx.sha256() shouldBe "c9fdc8e4aaeab04e6329be99c28e5501da765a1aff64d07e0f9bfdbdba7c9165"
             ReportYaml
                 .read(pair.yaml, "returns_review_q")
                 .sheets

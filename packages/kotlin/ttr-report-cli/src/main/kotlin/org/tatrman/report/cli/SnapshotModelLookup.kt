@@ -3,6 +3,9 @@ package org.tatrman.report.cli
 
 import org.tatrman.report.QueryModelLookup
 import org.tatrman.report.QueryParameter
+import org.tatrman.report.ReportTypes
+import org.tatrman.report.ParamKind
+import org.tatrman.translator.wire.PlanNodeDecoder
 import org.tatrman.report.ReportException
 import org.tatrman.ttr.metadata.model.*
 import org.tatrman.translator.framework.*
@@ -18,13 +21,26 @@ import org.tatrman.translate.v1.Language
 class SnapshotModelLookup(
     private val model: Model,
 ) : QueryModelLookup {
-    private val handle = SnapshotQueryHandle(model)
+    private val handles = mutableMapOf<SchemaCode, SnapshotQueryHandle>()
+
+    private fun handle(query: Query) =
+        handles.getOrPut(query.qname.schemaCode) {
+            SnapshotQueryHandle(model, query.qname.schemaCode)
+        }
 
     override fun programExists(qname: String): Boolean = query(qname) != null
 
     override fun outputColumns(qname: String): List<String> =
-        query(qname)?.let { Translator.outputColumnNames(handle.plan(it)) }
+        query(qname)?.let { Translator.outputColumnNames(handle(it).plan(it)) }
             ?: throw ReportException("program-missing", "Program '$qname' does not exist")
+
+    override fun outputTypes(qname: String): Map<String, String> {
+        val query = query(qname) ?: throw ReportException("program-missing", "Program '$qname' does not exist")
+        val handle = handle(query)
+        return PlanNodeDecoder.decode(handle.plan(query), TranslatorFramework(handle)).rowType.fieldList.associate {
+            it.name to it.type.sqlTypeName.name
+        }
+    }
 
     override fun declaredParameters(qname: String): List<QueryParameter> =
         query(qname)?.parameters?.map { QueryParameter(it.name, it.type) }
@@ -44,6 +60,7 @@ class SnapshotModelLookup(
 /** Small snapshot → translator SPI edge, kept out of the dependency-free report format/fill module. */
 private class SnapshotQueryHandle(
     private val model: Model,
+    private val lane: SchemaCode,
 ) : ModelHandle {
     private val db = model.schemas.values.filterIsInstance<DbSchema>()
     private val er = model.schemas.values.filterIsInstance<ErSchema>()
@@ -78,7 +95,10 @@ private class SnapshotQueryHandle(
                 )
             }
         }
-    private val queries = model.queries.values.groupBy { obj(it.qname.name) }
+    private val queries =
+        model.queries.values
+            .filter { it.qname.schemaCode == lane }
+            .groupBy { obj(it.qname.name) }
     private val plans = mutableMapOf<QualifiedName, PlanNode>()
     private val compiling = mutableSetOf<QualifiedName>()
 
@@ -108,7 +128,14 @@ private class SnapshotQueryHandle(
                     language,
                     targetSchema = lane,
                     sourceSchema = lane,
-                    parameters = query.parameters.map { SqlParam(it.name, it.type, null) },
+                    parameters =
+                        query.parameters.map {
+                            SqlParam(
+                                it.name,
+                                surface(it.type).name.lowercase(java.util.Locale.ROOT),
+                                null,
+                            )
+                        },
                     strictLane = true,
                 )
             return when (result) {
@@ -253,11 +280,11 @@ private class SnapshotQueryHandle(
             .build()
 
     private fun surface(type: String): SurfaceType =
-        when (type.substringBefore('(').lowercase(java.util.Locale.ROOT)) {
-            "int", "integer", "bigint", "smallint", "tinyint", "long" -> SurfaceType.INT
-            "float", "double", "real", "decimal", "numeric", "money" -> SurfaceType.FLOAT
-            "bool", "boolean", "bit" -> SurfaceType.BOOL
-            "date", "datetime", "datetime2", "timestamp", "time" -> SurfaceType.DATETIME
+        when (ReportTypes.kind(type)) {
+            ParamKind.INT -> SurfaceType.INT
+            ParamKind.FLOAT -> SurfaceType.FLOAT
+            ParamKind.BOOL -> SurfaceType.BOOL
+            ParamKind.DATETIME -> SurfaceType.DATETIME
             else -> SurfaceType.TEXT
         }
 }

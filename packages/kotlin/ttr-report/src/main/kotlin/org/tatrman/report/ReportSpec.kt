@@ -86,4 +86,7 @@ interface ModelLookup {
     fun programExists(qname: String): Boolean
 
     fun outputColumns(qname: String): List<String>
+
+    /** Parameterless by default; query adapters override with the actual declarations. */
+    fun declaredParameters(qname: String): List<QueryParameter> = emptyList()
 }

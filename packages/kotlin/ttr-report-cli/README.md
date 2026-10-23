@@ -11,3 +11,7 @@ no SQL. `--door` awaits a published `server-proto` with RunSavedQuery: [ttr-serv
 The grammar bundle prepares Maven `org.tatrman:ttr-report-cli` plus its `dist` ZIP and tar. RCs publish on the PR tag to GH Packages; Central waits for the next batched release.
 
 Tracking: [SO-core](../../../../project/platform/features/studio/implementation/ttr-core/).
+
+`new --title-lang LANG=title` supports additional languages. Explicit output folders must match `--id`.
+Generated numeric query outputs remain numeric Excel cells; text identifiers retain leading zeroes.
+Shared program results are reused across sheets; offline CSV inputs remain scoped by anchor.

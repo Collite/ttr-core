@@ -5,10 +5,9 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion
-import org.yaml.snakeyaml.LoaderOptions
-import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.constructor.SafeConstructor
-import org.yaml.snakeyaml.nodes.Tag
+import org.snakeyaml.engine.v2.api.Load
+import org.snakeyaml.engine.v2.api.LoadSettings
+import org.snakeyaml.engine.v2.schema.CoreSchema
 
 /** Strict shape validation uses the published C-8 schema; contextual rules follow it. */
 object ReportYaml {
@@ -28,19 +27,14 @@ object ReportYaml {
     ): ReportSpec {
         val root =
             try {
-                val options =
-                    LoaderOptions().apply {
-                        isAllowDuplicateKeys = false
-                        maxAliasesForCollections = 0
-                    }
-                val constructor =
-                    object : SafeConstructor(options) {
-                        init {
-                            // Defaults are JSON scalars. Preserve ISO text instead of YAML 1.1's java.util.Date.
-                            yamlConstructors[Tag.TIMESTAMP] = ConstructYamlStr()
-                        }
-                    }
-                mapper.valueToTree<JsonNode>(Yaml(constructor).load<Any?>(text))
+                val settings =
+                    LoadSettings
+                        .builder()
+                        .setAllowDuplicateKeys(false)
+                        .setMaxAliasesForCollections(0)
+                        .setSchema(CoreSchema())
+                        .build()
+                mapper.valueToTree<JsonNode>(Load(settings).loadFromString(text))
             } catch (e: Exception) {
                 throw ReportException("report-invalid", "Invalid report YAML: ${e.message}", e)
             }
@@ -80,6 +74,7 @@ object ReportYaml {
                     label = strings(p["label"]),
                 )
             }
+        params.forEach(ParameterValues::validateDefault)
         val sheets =
             root["sheets"].map { s ->
                 SheetSpec(
@@ -122,6 +117,23 @@ object ReportValidator {
             if (!model.programExists(spec.program)) {
                 add(ReportIssue("program-missing", "Program '${spec.program}' does not exist"))
             } else {
+                if (spec.program.startsWith("db.query.")) {
+                    val declared = model.declaredParameters(spec.program).map { it.name }.toSet()
+                    val supplied = spec.params.map { it.name }.toSet()
+                    for (name in supplied - declared) {
+                        add(
+                            ReportIssue(
+                                "parameter-invalid",
+                                "Report parameter '$name' is not declared by '${spec.program}'",
+                            ),
+                        )
+                    }
+                    for (name in declared - supplied) {
+                        add(
+                            ReportIssue("parameter-missing", "Report does not declare query parameter '$name'"),
+                        )
+                    }
+                }
                 val available = model.outputColumns(spec.program).toSet()
                 for (sheet in spec.sheets) {
                     for ((anchor, table) in sheet.tables) {

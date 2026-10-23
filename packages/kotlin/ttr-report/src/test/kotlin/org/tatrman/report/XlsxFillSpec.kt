@@ -313,7 +313,7 @@ class XlsxFillSpec :
             val data = ReportData(scalars = mapOf("title" to "Returns"))
             val first = XlsxFill.fill(bytes, data)
             first.sha256() shouldBe XlsxFill.fill(bytes, data).sha256()
-            first.sha256() shouldBe "b5ddb9393fbeebb3160017d18d13643dc96c8e260d158638ce905540f2f5d3c9"
+            first.sha256() shouldBe "03f110ebee4f96e1fe036e188147d1f290859f370de40c57df2c065c0f9af1c0"
             val entries = linkedMapOf<String, Pair<Long, String>>()
             ZipInputStream(ByteArrayInputStream(first)).use { zip ->
                 while (true) {

@@ -91,8 +91,20 @@ class RenderServiceSpec :
                         seen = params
                         table
                     }
+                val declared =
+                    object : ModelLookup by model {
+                        override fun declaredParameters(qname: String) =
+                            listOf(
+                                "when",
+                                "customer",
+                                "count",
+                                "ratio",
+                                "enabled",
+                                "note",
+                            ).map { QueryParameter(it, "text") }
+                    }
                 val bytes =
-                    RenderService(model, clock = clock).render(
+                    RenderService(declared, clock = clock).render(
                         root,
                         "returns_review_q",
                         mapOf(
@@ -203,7 +215,7 @@ class RenderServiceSpec :
                 cleanup(root)
             }
         }
-        "same-named anchors in different sheets are scoped and every anchor runs the shared program" {
+        "same-named anchors in different sheets share one execution of the program" {
             val extra = """  - sheet: Second
     scalars: { title: second, as_of: fixed }
     tables: { ROWS: { columns: [category, requests, received, open, amount], limit: 1 } }
@@ -225,7 +237,7 @@ class RenderServiceSpec :
                             table
                         },
                     )
-                calls shouldBe 2
+                calls shouldBe 1
                 XSSFWorkbook(ByteArrayInputStream(bytes)).use { book ->
                     book
                         .getSheet("Summary")
@@ -269,5 +281,56 @@ class RenderServiceSpec :
                 ).render(Path.of("."), "../other", emptyMap(), runner)
             }.code shouldBe
                 "report-invalid"
+        }
+        "HTML without a table refuses without reading the workbook or executing" {
+            val root =
+                world(
+                    example().replace(
+                        "tables:  { ROWS: { columns: [category, requests, received, open, amount] } }",
+                        "tables: {}",
+                    ),
+                )
+            try {
+                Files.delete(root.resolve("model/reports/returns_review_q/template.xlsx"))
+                shouldThrow<ReportException> {
+                    RenderService(model).render(
+                        root,
+                        "returns_review_q",
+                        emptyMap(),
+                        ProgramRunner {
+                            _,
+                            _,
+                            _,
+                            ->
+                            error("must not run")
+                        },
+                        html = true,
+                    )
+                }.code shouldBe "table-missing"
+            } finally {
+                cleanup(root)
+            }
+        }
+        "missing files and unreadable paths have distinct codes" {
+            val root = world()
+            try {
+                val yaml = root.resolve("model/reports/returns_review_q/report.yaml")
+                Files.delete(yaml)
+                shouldThrow<ReportException> {
+                    RenderService(
+                        model,
+                    ).render(root, "returns_review_q", emptyMap(), runner)
+                }.code shouldBe
+                    "report-missing"
+                Files.createDirectory(yaml)
+                shouldThrow<ReportException> {
+                    RenderService(
+                        model,
+                    ).render(root, "returns_review_q", emptyMap(), runner)
+                }.code shouldBe
+                    "io-error"
+            } finally {
+                cleanup(root)
+            }
         }
     })

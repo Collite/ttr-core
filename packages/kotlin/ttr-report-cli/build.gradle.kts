@@ -32,6 +32,7 @@ dependencies {
     implementation(project(":packages:kotlin:ttr-translator"))
     implementation(libs.slf4j.nop)
     testImplementation(libs.bundles.kotest)
+    testImplementation(libs.apache.poi.ooxml)
 }
 
 // SO P2 — rides the `bundle grammar` lockstep lane with the modules it calls. The lane

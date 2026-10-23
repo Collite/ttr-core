@@ -53,10 +53,11 @@ class NewCommandSpec :
         "either existing file refuses without creating its missing partner" {
             val root = Files.createTempDirectory("new-existing")
             try {
-                Files.writeString(root.resolve("template.xlsx"), "old")
-                runReportCommand(args(root)).exitCode shouldBe 1
-                Files.exists(root.resolve("report.yaml")) shouldBe false
-                Files.readString(root.resolve("template.xlsx")) shouldBe "old"
+                val target = Files.createDirectory(root.resolve("returns_review_q"))
+                Files.writeString(target.resolve("template.xlsx"), "old")
+                runReportCommand(args(target)).exitCode shouldBe 1
+                Files.exists(root.resolve("returns_review_q/report.yaml")) shouldBe false
+                Files.readString(root.resolve("returns_review_q/template.xlsx")) shouldBe "old"
             } finally {
                 root.toFile().deleteRecursively()
             }
@@ -179,12 +180,13 @@ class NewCommandSpec :
         "force refuses a non-file partner before replacing either output" {
             val root = Files.createTempDirectory("new-invalid-output")
             try {
-                Files.writeString(root.resolve("report.yaml"), "old")
-                Files.createDirectory(root.resolve("template.xlsx"))
-                val result = runReportCommand(args(root) + "--force")
+                val target = Files.createDirectory(root.resolve("returns_review_q"))
+                Files.writeString(target.resolve("report.yaml"), "old")
+                Files.createDirectory(target.resolve("template.xlsx"))
+                val result = runReportCommand(args(target) + "--force")
                 result.exitCode shouldBe 1
                 result.stderr shouldContain "output-invalid"
-                Files.readString(root.resolve("report.yaml")) shouldBe "old"
+                Files.readString(root.resolve("returns_review_q/report.yaml")) shouldBe "old"
             } finally {
                 root.toFile().deleteRecursively()
             }
@@ -192,5 +194,32 @@ class NewCommandSpec :
         "new requires identity and title and supports help" {
             runReportCommand(listOf("new", "--help")).exitCode shouldBe 0
             runReportCommand(listOf("new", world.toString())).exitCode shouldBe 64
+        }
+        "output folder must match id and third language titles are supported" {
+            val root = Files.createTempDirectory("new-locales")
+            try {
+                val copied = root.resolve("world")
+                world.toFile().copyRecursively(copied.toFile())
+                Files.writeString(copied.resolve("modeler.toml"), "[language]\npreferred = \"de\"\n")
+                val out = root.resolve("returns_review_q")
+                val input = args(out).toMutableList().apply { this[1] = copied.toString() }
+                val result = runReportCommand(input + listOf("--title-lang", "de=Retouren"))
+                result.stderr shouldBe ""
+                result.exitCode shouldBe 0
+                org.tatrman.report.ReportYaml
+                    .read(
+                        Files.readString(out.resolve("report.yaml")),
+                        "returns_review_q",
+                        "de",
+                    ).title["de"] shouldBe
+                    "Retouren"
+                val bad = args(root.resolve("different"))
+                val refused = runReportCommand(bad)
+                refused.exitCode shouldBe 1
+                refused.stderr shouldContain "id-mismatch"
+                Files.exists(root.resolve("different")) shouldBe false
+            } finally {
+                root.toFile().deleteRecursively()
+            }
         }
     })

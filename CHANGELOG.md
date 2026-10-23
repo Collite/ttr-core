@@ -6,6 +6,18 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — SO report P2 exit review
+
+- Fill inline strings in saved XLSX cells, preserve automatic heights and untouched rich text; generated
+  marker columns now use compiled output types so Excel sums/sorts numeric data correctly.
+- Read YAML 1.2 scalars, validate default kinds and DB parameter declarations; share parameter type
+  classification across generation/compilation, including number/timestamptz/smalldatetime and text time.
+- Execute a shared program once per render, scope saved-query compilation by lane, skip blank CSV lines,
+  and refuse tableless HTML. Distinguish missing files, IO failures and oversized values.
+- Validate output folder ids, support repeated `--title-lang LANG=title`, escape YAML control characters,
+  and preserve output permissions. Replace the erroneous workbook goldens with semantic checks and
+  Excel-verified fixtures. RC.1 is superseded by the planned RC.2.
+
 ### Added — SO report authoring (S2.3)
 
 - Shared `TemplateGenerator.generate/fromQuery` with deterministic C-8 YAML/XLSX, declared DB parameter

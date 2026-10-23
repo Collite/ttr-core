@@ -22,7 +22,9 @@ roles: [kantheon-role-finance]
 The [JSON Schema](../../packages/package-sdk/schemas/report.schema.json) is also exported as
 `@tatrman/package-sdk/schemas/report.schema.json` and packaged in `org.tatrman:ttr-report`.
 Unknown keys are errors, including keys inside parameters, pickers, sheets, tables and history.
-The YAML reader rejects duplicate keys, collection aliases, custom object tags and extra documents.
+The YAML 1.2 Core reader rejects duplicate keys, collection aliases, custom object tags and extra documents.
+Plain `NO` and `12:30` remain text; `0017` is decimal 17. Quote `"0017"` to retain leading zeroes.
+Defaults must match their declared kind; invalid defaults refuse with `parameter-invalid` before execution.
 
 The id must match its folder and use lowercase letters, digits and underscores, starting with a letter.
 Titles are locale maps and must include the manifest's preferred language (English when none is supplied).
@@ -37,11 +39,12 @@ Two program lanes are supported:
   LQ v1. A report cannot add parameters that the stored query does not accept.
 - `db.query.<name>` names a physical query. Its parameters declare `name`, `kind` (`text`, `int`, `float`,
   `bool`, `datetime` or `entity`), optional `required`, scalar `default`, localized `label`, and a
-  `picker: { program, label?, value? }`. Quote datetime and ambiguous YAML scalar defaults.
+  `picker: { program, label?, value? }`. Its parameter names must match the query declarations.
+  Unknown names are `parameter-invalid`; omitted query declarations are `parameter-missing`.
 
 Each table's `columns` is a nonempty, ordered subset of the program's output column names. A positive
 `limit` may cap its rows. `ReportValidator.validate(spec, model)` checks the program and columns through
-the two-method `ModelLookup` interface. It also checks picker programs and their label/value columns.
+`ModelLookup`. Query adapters supply `declaredParameters(qname)`; its default describes a parameterless query. It also checks picker programs and their label/value columns.
 Validation uses names, so a missing output cannot silently become a blank column.
 
 ## Workbook anchors
@@ -59,7 +62,8 @@ with the expansion. Tables must be stacked vertically; two table markers on the 
   Missing data/anchors are `anchor-missing`; unknown projected columns are `column-missing`, including
   when there are zero rows. A partial or malformed table marker is `template-invalid`.
 - Put the font, border and number/date formats on the marker row's cells. Expanded rows inherit each
-  column's authored style and the marker row's height. General/text styles keep values as text, including
+  column's authored style and an explicitly authored marker-row height. Automatic height stays automatic,
+  allowing wrapped data to grow; untouched text cells retain their rich-text runs and fonts. General/text styles keep values as text, including
   leading zeroes and formula-looking strings. Explicit number/date styles produce numeric/date cells
   when the value parses; null and empty values produce blank cells. An unstyled column can borrow
   appearance from the marker but remains text. Empty data clears the marker and leaves the header.
@@ -106,7 +110,8 @@ column missing from the snapshot or CSV result, refuses the render. Each anchor 
 single `program`; a per-anchor `program` override refuses with `anchor-program-unsupported`.
 
 CSV requires a header with unique nonblank column names and the same number of cells in every row.
-Quoted commas, CR/LF inside quoted fields, doubled quotes and a UTF-8 BOM are supported. Empty cells
+Quoted commas, CR/LF inside quoted fields, doubled quotes and a UTF-8 BOM are supported. Physical blank
+lines outside quoted fields are skipped; a quoted empty field is a real data row. Empty cells
 are empty text, not a separate SQL NULL representation; a header-only file is an empty table.
 Columns are selected in the declaration's order; each table's `limit` applies before filling.
 The same anchor name may be used on separate sheets with different projections, limits and scalars.
@@ -124,9 +129,12 @@ time. Workbook placeholders still follow the lower-level fill rules above. Deter
 require the same resolved data, including the run date; library callers can inject a `Clock`.
 
 XLSX defaults to `<id>.xlsx` in the current directory. The CLI renders completely before atomically
-replacing the output; a validation or execution refusal leaves an existing output untouched.
+replacing the output; a validation or execution refusal leaves an existing output untouched. Existing
+POSIX file permissions are preserved; new files use normal 0666 permissions filtered by the process umask.
 `--html` writes the first declared table to stdout, escapes all cells, and previews at most 500 rows;
-it needs no workbook and cannot be combined with `--out`. Exit codes: `0` success/help, `1` report/model/
+it needs no workbook and cannot be combined with `--out`. A declaration without tables refuses with
+`table-missing`. Missing files are `report-missing`, other IO failures are `io-error`, corrupt workbooks
+are `template-invalid`, and cell data over Excel's 32,767-character limit is `value-too-long`. Exit codes: `0` success/help, `1` report/model/
 file failure, `64` usage error. Coded failure messages go to stderr.
 
 `--door` and `--bearer` are reserved and currently refused. ttr-server publishes `server-proto`, but
@@ -142,7 +150,9 @@ val bytes = service.render(root, "returns_review_q", emptyMap(), runner)
 
 `ProgramRunner.run(program, params, caller)` receives typed values (`Long`, `Double`, `Boolean`,
 `Instant`, or text). `forAnchor(name)` selects an offline CSV; its default returns the same runner,
-so a remote adapter runs the same named program for each anchor. The optional `Caller` is supplied
+and `RenderService` executes each selected runner once per render, reusing its result for all projections
+and sheets. A remote adapter therefore executes the named program once. The CSV runner returns a
+stable distinct runner per anchor, preserving separate offline files and reading each only once. The optional `Caller` is supplied
 by the host. Authentication, role enforcement and history are the consuming service's responsibility.
 
 ## From a query
@@ -154,22 +164,30 @@ BFF can create through the library. The optional checkout root defaults to the c
 ttr-report new . --from er.query.report_returns_review_q --id returns_review_q \
   --title "Returns review, this quarter" --title-cs "Přehled reklamací, toto čtvrtletí" \
   --role kantheon-role-finance
-# Optional: --out <directory> and --force
+# Optional: --out <directory named returns_review_q> and --force
+# Additional title languages: --title-lang de="Retouren" (repeat for each language)
 ```
 
 The default destination is `<root>/model/reports/<id>/`. `report.yaml` uses the query's ordered output
 columns, `refresh: daily`, `history: { keep: 90d }`, one `Summary` sheet and one `ROWS` table.
 Roles default to `[]`; pass each intended role with `--role`. The finance role above is an explicit
-demo input. The title must include the manifest's preferred language.
+demo input. The title must include the manifest's preferred language; `--title-lang LANG=title` supports
+additional languages. An explicit output directory's final name must equal `--id` (`id-mismatch`).
 
 The generated workbook has Calibri 11, a bold 14-point `{{title}}` at A1, `{{as_of}}` at A2, bold column
 headings at row 3 and the table marker at A4. Widths are header length plus two, clamped to 10–80
-characters. Properties and ZIP records use the same determinism pass as fill. The same inputs produce
+characters. Every data column has a styled marker-row cell: compiled integer/decimal output types
+get number formats, dates get a date format, and text retains leading zeroes. Generated cells wrap text
+with automatic row height. The pure `generate` API accepts a `columnTypes` map; absent/unknown types
+stay text. `fromQuery` obtains types through `QueryModelLookup.outputTypes(qname)`. Properties and ZIP
+records use the same determinism pass as fill. The same inputs produce
 the same YAML and XLSX bytes; locale-map insertion order does not affect them.
 
 ER queries with declared parameters refuse with `query-has-parameters` (LQ-5). DB query declarations
 become required parameters: text/string/varchar → `text`, integer types → `int`, decimal/float types →
-`float`, bool/boolean → `bool`, and date/datetime/timestamp → `datetime`. An unknown type becomes `text`
+`float` (including `number`), bool/boolean → `bool`, and date/datetime/timestamp (including
+`timestamptz` and `smalldatetime`) → `datetime`. A time of day (`time`) remains `text`, since a report
+`datetime` requires an instant with a date and offset. An unknown type becomes `text`
 and emits `parameter-type-unknown` on stderr. No SQL is executed and no values are guessed.
 
 Columns must be unique and fit the workbook/table-marker syntax; names containing commas, braces,
@@ -193,7 +211,7 @@ val pair = TemplateGenerator.fromQuery(queryModelLookup, "er.query.report_return
     "returns_review_q", mapOf("en" to "Returns review"))
 ```
 
-`QueryModelLookup` extends `ModelLookup` with `declaredParameters(qname)`. The CLI supplies a
+`QueryModelLookup` requires `declaredParameters(qname)` and supplies `outputTypes(qname)` for typed generation. The CLI supplies a
 `SnapshotModelLookup`; the Platform supplies a Veles-backed adapter for that same interface. `generate`
 and `fromQuery` have no filesystem, metadata, wire or service dependency. The caller persists the pair
 and handles warnings; parameter values and execution stay in the renderer/runner path.

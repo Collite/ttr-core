@@ -4,7 +4,6 @@ package org.tatrman.report
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Clock
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 
@@ -40,11 +39,18 @@ class RenderService(
                     "run.date" to LocalDate.now(clock.withZone(ZoneOffset.UTC)).toString(),
                 ) +
                     bound.mapKeys { "param.${it.key}" }.mapValues { it.value?.toString().orEmpty() }
+            if (html &&
+                spec.sheets.all { it.tables.isEmpty() }
+            ) {
+                throw ReportException("table-missing", "HTML preview requires a declared table")
+            }
+            val results = java.util.IdentityHashMap<ProgramRunner, Table>()
             val data = linkedMapOf<String, ReportData>()
             for (sheet in spec.sheets) {
                 val tables = linkedMapOf<String, Table>()
                 for ((anchor, declaration) in sheet.tables) {
-                    val result = runner.forAnchor(anchor).run(spec.program, bound, caller)
+                    val selected = runner.forAnchor(anchor)
+                    val result = results.getOrPut(selected) { selected.run(spec.program, bound, caller) }
                     val indices =
                         declaration.columns.map { column ->
                             result.columns.indexOf(column).also {
@@ -87,8 +93,10 @@ class RenderService(
             } catch (e: Exception) {
                 throw ReportException("template-invalid", "Invalid template.xlsx: ${e.message}", e)
             }
+        } catch (e: java.nio.file.NoSuchFileException) {
+            throw ReportException("report-missing", "Cannot find report '$id': ${e.message}", e)
         } catch (e: java.io.IOException) {
-            throw ReportException("report-missing", "Cannot read report '$id': ${e.message}", e)
+            throw ReportException("io-error", "Cannot read report '$id': ${e.message}", e)
         }
     }
 
@@ -105,18 +113,7 @@ class RenderService(
                     continue
                 }
                 val text = raw.toString()
-                val typed: Any =
-                    when (param.kind) {
-                        ParamKind.TEXT, ParamKind.ENTITY -> text
-                        ParamKind.INT -> text.toLongOrNull() ?: invalid(param.name, "must be an integer")
-                        ParamKind.FLOAT ->
-                            text.toDoubleOrNull()?.takeIf { it.isFinite() }
-                                ?: invalid(param.name, "must be a finite float")
-                        ParamKind.BOOL -> text.toBooleanStrictOrNull() ?: invalid(param.name, "must be true or false")
-                        ParamKind.DATETIME ->
-                            runCatching { Instant.parse(text) }.getOrNull()
-                                ?: invalid(param.name, "must be an ISO instant with an offset")
-                    }
+                val typed = ParameterValues.parse(param.kind, text, param.name)
                 put(param.name, typed)
             }
         }

@@ -14,7 +14,10 @@ data class QueryParameter(
 
 /** Authoring adapters supply both output shape and declarations from the same snapshot. */
 interface QueryModelLookup : ModelLookup {
-    fun declaredParameters(qname: String): List<QueryParameter>
+    override fun declaredParameters(qname: String): List<QueryParameter>
+
+    /** Source type per output column; absent entries stay text to protect account codes. */
+    fun outputTypes(qname: String): Map<String, String> = emptyMap()
 }
 
 data class GeneratedTemplate(
@@ -32,6 +35,7 @@ object TemplateGenerator {
      * Pure shared authoring path for the CLI and Platform BFF. Columns retain query order. DB parameter types
      * map to required report inputs; unknown types become text with a returned warning. ER parameters refuse
      * (LQ-5). Roles are host-supplied, empty by default. Output contains no clock, path or service identity.
+     * Column source types select number/date formats; absent types stay text, preserving identifiers.
      * The host owns persisting the returned pair; this method never writes files or executes a query.
      */
     fun generate(
@@ -41,6 +45,7 @@ object TemplateGenerator {
         id: String,
         title: Map<String, String>,
         roles: List<String> = emptyList(),
+        columnTypes: Map<String, String> = emptyMap(),
     ): GeneratedTemplate {
         checkErParameters(program, params)
         if (columns.isEmpty() ||
@@ -54,26 +59,16 @@ object TemplateGenerator {
         val warnings = mutableListOf<ReportIssue>()
         val kinds =
             params.map { param ->
-                val type =
-                    param.type
-                        .trim()
-                        .substringBefore('(')
-                        .lowercase(Locale.ROOT)
-                when (type) {
-                    "text", "string", "varchar", "nvarchar", "char", "nchar", "clob", "uuid" -> "text"
-                    "int", "integer", "bigint", "smallint", "tinyint", "long" -> "int"
-                    "float", "double", "real", "decimal", "numeric", "money" -> "float"
-                    "bool", "boolean", "bit" -> "bool"
-                    "date", "datetime", "datetime2", "timestamp", "time" -> "datetime"
-                    else -> {
+                (
+                    ReportTypes.kind(param.type) ?: run {
                         warnings +=
                             ReportIssue(
                                 "parameter-type-unknown",
                                 "Parameter '${param.name}' has unknown type '${param.type}'; using text",
                             )
-                        "text"
+                        ParamKind.TEXT
                     }
-                }
+                ).wire
             }
         val yaml =
             buildString {
@@ -151,7 +146,25 @@ object TemplateGenerator {
                     }
                     sheet.setColumnWidth(i, (column.length + 2).coerceIn(10, 80) * 256)
                 }
-                sheet.createRow(3).createCell(0).setCellValue("{{table:ROWS|${columns.joinToString(",")}}}")
+                val marker = sheet.createRow(3)
+                columns.forEachIndexed { i, column ->
+                    marker.createCell(i).apply {
+                        cellStyle =
+                            book.createCellStyle().apply {
+                                wrapText = true
+                                dataFormat =
+                                    book.createDataFormat().getFormat(
+                                        when (ReportTypes.kind(columnTypes[column].orEmpty())) {
+                                            ParamKind.INT -> "0"
+                                            ParamKind.FLOAT -> "0.###############"
+                                            ParamKind.DATETIME -> "yyyy-mm-dd hh:mm:ss"
+                                            else -> "@"
+                                        },
+                                    )
+                            }
+                    }
+                }
+                marker.getCell(0).setCellValue("{{table:ROWS|${columns.joinToString(",")}}}")
                 XlsxFill.writeDeterministic(book)
             }
         return GeneratedTemplate(yaml, bytes, warnings)
@@ -172,7 +185,7 @@ object TemplateGenerator {
         if (!model.programExists(program)) throw ReportException("program-missing", "Program '$program' does not exist")
         val params = model.declaredParameters(program)
         checkErParameters(program, params)
-        return generate(program, model.outputColumns(program), params, id, title, roles)
+        return generate(program, model.outputColumns(program), params, id, title, roles, model.outputTypes(program))
     }
 
     private fun checkErParameters(
@@ -185,11 +198,16 @@ object TemplateGenerator {
     }
 
     private fun quote(value: String): String =
-        mapper
-            .writeValueAsString(value)
-            .replace("\u0085", "\\u0085")
-            .replace("\u2028", "\\u2028")
-            .replace("\u2029", "\\u2029")
+        buildString {
+            // JSON quoting plus YAML's additional forbidden raw code points and line separators.
+            for (ch in mapper.writeValueAsString(value)) {
+                if (ch.code in 0x7f..0x9f || ch == '\u2028' || ch == '\u2029' || ch == '\ufffe' || ch == '\uffff') {
+                    append("\\u").append(ch.code.toString(16).padStart(4, '0'))
+                } else {
+                    append(ch)
+                }
+            }
+        }
 
     private fun atom(value: String): String =
         if (plain.matches(value) &&

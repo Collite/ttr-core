@@ -4,6 +4,8 @@ package org.tatrman.report.cli
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import org.apache.poi.xssf.usermodel.XSSFWorkbook
+import java.io.ByteArrayInputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Clock
@@ -31,6 +33,16 @@ class RenderCommandSpec :
                 val result = runReportCommand(args() + listOf("--out", out.toString()), clock)
                 result.stderr shouldBe ""
                 result.exitCode shouldBe 0
+                XSSFWorkbook(ByteArrayInputStream(Files.readAllBytes(out))).use { book ->
+                    val sheet = book.getSheetAt(0)
+                    sheet.getRow(0).getCell(0).stringCellValue shouldBe "Returns review, this quarter"
+                    sheet.getRow(3).getCell(1).cellType shouldBe org.apache.poi.ss.usermodel.CellType.NUMERIC
+                    sheet.getRow(3).getCell(4).numericCellValue shouldBe 1.5
+                    for (row in sheet) {
+                        (row as org.apache.poi.xssf.usermodel.XSSFRow).ctRow.isSetHt shouldBe false
+                        row.zeroHeight shouldBe false
+                    }
+                }
                 val bytes = Files.readAllBytes(out).toList()
                 bytes shouldBe Files.readAllBytes(world.resolve("expected.xlsx")).toList()
                 runReportCommand(args() + listOf("--out", out.toString()), clock).exitCode shouldBe 0
@@ -71,6 +83,27 @@ class RenderCommandSpec :
                 result.stderr shouldContain "manifest-missing"
             } finally {
                 Files.delete(empty)
+            }
+        }
+        "render preserves shared file permissions" {
+            val root = Files.createTempDirectory("report-permissions")
+            try {
+                if (Files.getFileStore(root).supportsFileAttributeView("posix")) {
+                    val target = Files.writeString(root.resolve("shared.xlsx"), "old")
+                    val mode =
+                        java.nio.file.attribute.PosixFilePermissions
+                            .fromString("rw-rw-r--")
+                    Files.setPosixFilePermissions(target, mode)
+                    runReportCommand(args() + listOf("--out", target.toString()), clock).exitCode shouldBe 0
+                    Files.getPosixFilePermissions(target) shouldBe mode
+                    val fresh = root.resolve("fresh.xlsx")
+                    runReportCommand(args() + listOf("--out", fresh.toString()), clock).exitCode shouldBe 0
+                    // Compare to an ordinary new file under the process's actual umask.
+                    val normal = Files.writeString(root.resolve("normal.txt"), "new")
+                    Files.getPosixFilePermissions(fresh) shouldBe Files.getPosixFilePermissions(normal)
+                }
+            } finally {
+                root.toFile().deleteRecursively()
             }
         }
     })

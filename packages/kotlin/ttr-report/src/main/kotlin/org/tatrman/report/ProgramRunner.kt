@@ -16,14 +16,19 @@ fun interface ProgramRunner {
         caller: Caller?,
     ): Table
 
-    /** Offline files bind by report anchor; a door runner uses the same named program for each anchor. */
+    /** Offline files bind by anchor; the shared default runner executes once per render for all anchors. */
     fun forAnchor(anchor: String): ProgramRunner = this
 }
 
 class RowsProgramRunner(
     private val files: Map<String, Path>,
 ) : ProgramRunner {
-    override fun forAnchor(anchor: String): ProgramRunner = ProgramRunner { _, _, _ -> read(anchor) }
+    private val anchors = mutableMapOf<String, ProgramRunner>()
+
+    override fun forAnchor(anchor: String): ProgramRunner =
+        anchors.getOrPut(anchor) {
+            ProgramRunner { _, _, _ -> read(anchor) }
+        }
 
     override fun run(
         program: String,
@@ -93,9 +98,11 @@ class RowsProgramRunner(
                         if (c == '\r' && i < text.length && text[i] == '\n') {
                             i++
                         }
-                        endField()
-                        records += row.toList()
-                        row.clear()
+                        if (started || closed || row.isNotEmpty()) {
+                            endField()
+                            records += row.toList()
+                            row.clear()
+                        }
                     }
                     '"' -> {
                         require(!started && !closed) { "quote inside an unquoted field" }

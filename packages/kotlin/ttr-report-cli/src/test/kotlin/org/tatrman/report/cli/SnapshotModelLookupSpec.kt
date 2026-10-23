@@ -104,4 +104,30 @@ class SnapshotModelLookupSpec :
                 )
             shouldThrow<ReportException> { model.outputColumns("er.query.a") }.code shouldBe "program-invalid"
         }
+        "ER and DB saved queries with the same name resolve in their current lane" {
+            val model =
+                lookup(
+                    "def query base { sourceText: \"SELECT name AS er_name FROM item\" }\ndef query wrapped { sourceText: \"SELECT * FROM obj.query.base\" }",
+                    "model db schema query\ndef query base { sourceText: \"SELECT name AS db_name FROM db.dbo.item\" }\ndef query wrapped { sourceText: \"SELECT * FROM obj.query.base\" }",
+                )
+            model.outputColumns("er.query.wrapped") shouldBe listOf("er_name")
+            model.outputColumns("db.query.wrapped") shouldBe listOf("db_name")
+        }
+        "extended parameter spellings compile through the shared classification" {
+            val model =
+                lookup(
+                    "",
+                    """
+                    model db schema query
+                    def query typed_params {
+                        parameters: [{name: n, type: number}, {name: stamp, type: timestamptz},
+                            {name: small_stamp, type: smalldatetime}, {name: clock_text, type: time}]
+                        sourceText: "SELECT {n} AS n, {stamp} AS stamp, {small_stamp} AS small_stamp, {clock_text} AS clock_text FROM db.dbo.item"
+                    }
+                    """.trimIndent(),
+                )
+            model.outputColumns("db.query.typed_params") shouldBe listOf("n", "stamp", "small_stamp", "clock_text")
+            model.outputTypes("db.query.typed_params").keys.toList() shouldBe
+                listOf("n", "stamp", "small_stamp", "clock_text")
+        }
     })

@@ -17,7 +17,7 @@ tasks.test {
 }
 
 dependencies {
-    implementation(libs.snakeyaml)
+    implementation(libs.snakeyaml.engine)
     implementation(libs.json.schema.validator)
     implementation(libs.apache.poi.ooxml)
     testImplementation(libs.bundles.kotest)

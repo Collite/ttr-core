@@ -97,9 +97,12 @@ private class RenderCommand(
         } else {
             val target = Path.of(out ?: "$id.xlsx").toAbsolutePath().normalize()
             // Generate all bytes before touching the output. Refusals leave an existing file intact.
-            val temp = Files.createTempFile(target.parent, ".ttr-report-", ".xlsx")
+            val temp = Files.createTempFile(target.parent, ".ttr-report-", ".xlsx", *outputAttributes(target))
             try {
                 Files.write(temp, bytes)
+                if (Files.exists(target) && Files.getFileStore(target).supportsFileAttributeView("posix")) {
+                    Files.setPosixFilePermissions(temp, Files.getPosixFilePermissions(target))
+                }
                 Files.move(
                     temp,
                     target,
@@ -141,6 +144,10 @@ private class NewCommand(
     private val id by option("--id", help = "New report id").required()
     private val title by option("--title", help = "English report title").required()
     private val titleCs by option("--title-cs", help = "Optional Czech report title")
+    private val localizedTitles by option(
+        "--title-lang",
+        help = "Additional LANG=title; repeat for each language",
+    ).multiple()
     private val roles by option(
         "--role",
         help = "Explicit report role; repeat as needed; defaults to no roles",
@@ -152,9 +159,28 @@ private class NewCommand(
         val project = Path.of(root).toAbsolutePath().normalize()
         val (model, preferred) = loadCheckout(project)
         val titles = linkedMapOf("en" to title).apply { titleCs?.let { put("cs", it) } }
+        for (entry in localizedTitles) {
+            val language = entry.substringBefore('=')
+            if (!entry.contains('=') ||
+                language.isBlank() ||
+                entry.substringAfter('=').isBlank()
+            ) {
+                throw UsageError("--title-lang expects LANG=title")
+            }
+            if (titles.putIfAbsent(language, entry.substringAfter('=')) !=
+                null
+            ) {
+                throw UsageError("Title repeats '$language'")
+            }
+        }
         val generated = TemplateGenerator.fromQuery(model, program, id, titles, roles)
         ReportYaml.read(generated.yaml, id, preferred)
         val target = Path.of(out ?: project.resolve("model/reports/$id").toString()).toAbsolutePath().normalize()
+        if (target.fileName?.toString() !=
+            id
+        ) {
+            throw ReportException("id-mismatch", "Output folder must equal report id '$id'")
+        }
         writePair(target, generated, force)
         output(
             CliOutcome(0, stderr = generated.warnings.joinToString("") { "ttr-report: ${it.code}: ${it.message}\n" }),
@@ -270,4 +296,25 @@ private fun writePair(
         Files.list(stage).use { paths -> paths.forEach { Files.deleteIfExists(it) } }
         Files.deleteIfExists(stage)
     }
+}
+
+/** Preserve an existing POSIX mode; new output requests normal 0666 permissions filtered by umask. */
+private fun outputAttributes(target: Path): Array<java.nio.file.attribute.FileAttribute<*>> {
+    if (!Files.getFileStore(target.parent).supportsFileAttributeView("posix")) return emptyArray()
+    val permissions =
+        if (Files.exists(
+                target,
+            )
+        ) {
+            Files.getPosixFilePermissions(
+                target,
+            )
+        } else {
+            java.nio.file.attribute.PosixFilePermissions
+                .fromString("rw-rw-rw-")
+        }
+    return arrayOf(
+        java.nio.file.attribute.PosixFilePermissions
+            .asFileAttribute(permissions),
+    )
 }
