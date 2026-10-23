@@ -1,0 +1,14 @@
+diff --git a/cn.ttrm b/cn.ttrm
+--- a/cn.ttrm
++++ b/cn.ttrm
+@@ -156,3 +156,10 @@
+ // ---- refusals: a definition cycle (cn/definition-cycle) ----
+ def phase LoopA { of: Order, definition: """LoopB""" }
+ def phase LoopB { of: Order, definition: """LoopA""" }
++
++def phase LargeOrder {
++    of: Order,
++    label: { en: "Large order", cs: "Velká objednávka" },
++    sources: ["recipe://hartland.orders/order-review#s2"],
++    definition: """order_value > 1000"""
++}
