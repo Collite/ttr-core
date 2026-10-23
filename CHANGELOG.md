@@ -6,11 +6,16 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **Studio reports / SO-core-P2 S2.2** — shared render service, typed parameters, CSV rows runner
+  and standalone `ttr-report render` CLI with XLSX/HTML output. Snapshot validation compiles actual
+  output columns through the existing translator; sheet anchors remain scoped. The installed CLI
+  matches committed XLSX/HTML goldens. Door execution awaits published RunSavedQuery stubs (ttr-server#286).
+
 - **Studio reports / SO-core-P2 S2.1** — open `report.yaml` v1 JSON Schema and manual;
   `org.tatrman:ttr-report` reads and validates declarations against program output columns, fills
   scalar/table XLSX anchors with preserved styles and deterministic package bytes, and produces an
   escaped HTML preview capped at 500 rows. The report fill is implemented from the C-8 behaviour
-  contract; no kantheon renderer implementation is copied. CLI and template generation follow in S2.2/S2.3.
+  contract; no kantheon renderer implementation is copied. Template generation follows in S2.3.
 
 - **MD hop / HP-P2** — derive MD → ER landings through shared physical bindings, FK/join relations,
   domain/map sources and stacked ER-query column origins (R1–R7). Explicit mappings retain priority;

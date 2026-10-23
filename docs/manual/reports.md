@@ -84,15 +84,68 @@ val preview = HtmlTable.render(table) // first 500 rows, with a truncation note 
 and named `Table(columns, rows)` values; each row has exactly one nullable string per named column.
 `HtmlTable` preserves that column order, escapes both headings and cells, and emits no scripts or styles.
 
-## CLI work to follow
+## Render a report
 
-The format/fill stage supplies the library. The following commands are planned in subsequent stages:
+Build the standalone distribution with `just build-report-cli`. Its launcher is
+`packages/kotlin/ttr-report-cli/build/install/ttr-report/bin/ttr-report`.
+The design shorthand is `ttr report render`; this distribution uses **`ttr-report render`**.
+There is no shared umbrella launcher (other modules' `ttr` binaries are separate applications).
 
 ```sh
-# S2.2: offline CSV rows, or a query-door runner when its published contract is available
-ttr report render <root> <id> --rows ROWS=rows.csv --out report.xlsx
-# S2.3: seed report.yaml and a deterministic one-sheet workbook from output columns
-ttr report new --from er.query.report_returns_review_q --id returns_review_q --title "Returns review"
+ttr-report render <root> <id> --rows ROWS=rows.csv --out report.xlsx
+ttr-report render <root> <id> --rows ROWS=rows.csv --html
+# Repeat --rows for additional anchors; CSV paths are relative to the current directory.
+ttr-report render . monthly --param year=2026 --rows ROWS=rows.csv
 ```
 
-The service and CLI use the same fill; the service adds template sourcing, identity, roles and history.
+The checkout must contain `modeler.toml`, `model/`, and `model/reports/<id>/report.yaml`.
+XLSX output also requires `template.xlsx`. The CLI loads a permissive metadata snapshot and uses
+Tatrman's existing query compiler to obtain output column names (including aliases, aggregates,
+stars and saved-query dependencies). It executes no SQL. An unavailable or invalid program, or a
+column missing from the snapshot or CSV result, refuses the render. Each anchor reads the report's
+single `program`; a per-anchor `program` override refuses with `anchor-program-unsupported`.
+
+CSV requires a header with unique nonblank column names and the same number of cells in every row.
+Quoted commas, CR/LF inside quoted fields, doubled quotes and a UTF-8 BOM are supported. Empty cells
+are empty text, not a separate SQL NULL representation; a header-only file is an empty table.
+Columns are selected in the declaration's order; each table's `limit` applies before filling.
+The same anchor name may be used on separate sheets with different projections, limits and scalars.
+
+`--param k=v` binds a declared parameter. Unknown names, duplicates, missing required values and invalid
+values are refused. Defaults bind when an input is omitted; an optional parameter with no value is
+left unbound. Integers are signed 64-bit values, floats must be finite, booleans are `true` or `false`,
+and datetime values must be ISO instants with an offset (normalized to UTC). Entity values remain text,
+including leading zeroes. Parameter and result values are data; they are never interpolated into SQL.
+
+Scalar expressions resolve `{{title}}` in the preferred language, `{{run.date}}` as the current UTC
+date, and `{{param.<name>}}` as the bound value (or empty for an omitted optional parameter).
+Unknown expression variables refuse with `scalar-invalid`; supplied values are not expanded a second
+time. Workbook placeholders still follow the lower-level fill rules above. Deterministic XLSX bytes
+require the same resolved data, including the run date; library callers can inject a `Clock`.
+
+XLSX defaults to `<id>.xlsx` in the current directory. The CLI renders completely before atomically
+replacing the output; a validation or execution refusal leaves an existing output untouched.
+`--html` writes the first declared table to stdout, escapes all cells, and previews at most 500 rows;
+it needs no workbook and cannot be combined with `--out`. Exit codes: `0` success/help, `1` report/model/
+file failure, `64` usage error. Coded failure messages go to stderr.
+
+`--door` and `--bearer` are reserved and currently refused. ttr-server publishes `server-proto`, but
+released Central 0.11.9 and GH Packages 0.11.14 lack the newer `RunSavedQuery` RPC. The open door adapter
+waits for a suitable published artifact: [ttr-server#286](https://github.com/Collite/ttr-server/issues/286).
+A platform can supply its own `ProgramRunner`; the renderer does not infer a lane or execute SQL by text.
+
+```kotlin
+val runner = RowsProgramRunner(mapOf("ROWS" to Path.of("rows.csv")))
+val service = RenderService(modelLookup, preferredLanguage = "en", clock = Clock.systemUTC())
+val bytes = service.render(root, "returns_review_q", emptyMap(), runner)
+```
+
+`ProgramRunner.run(program, params, caller)` receives typed values (`Long`, `Double`, `Boolean`,
+`Instant`, or text). `forAnchor(name)` selects an offline CSV; its default returns the same runner,
+so a remote adapter runs the same named program for each anchor. The optional `Caller` is supplied
+by the host. Authentication, role enforcement and history are the consuming service's responsibility.
+
+## Template generation to follow
+
+S2.3 will add `ttr-report new --from er.query.report_returns_review_q --id returns_review_q --title "Returns review"`,
+which seeds the declaration and a deterministic one-sheet workbook from the program's output columns.

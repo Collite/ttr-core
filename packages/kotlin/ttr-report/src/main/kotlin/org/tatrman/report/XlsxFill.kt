@@ -32,12 +32,33 @@ object XlsxFill {
     fun fill(
         template: ByteArray,
         data: ReportData,
+    ): ByteArray = fillWorkbook(template, { data }, { "" }, mapOf("" to data))
+
+    fun fillSheets(
+        template: ByteArray,
+        sheets: Map<String, ReportData>,
+    ): ByteArray = fillWorkbook(template, { sheets[it] ?: ReportData() }, { "$it/" }, sheets.mapKeys { "${it.key}/" })
+
+    private fun fillWorkbook(
+        template: ByteArray,
+        dataFor: (String) -> ReportData,
+        scope: (String) -> String,
+        required: Map<String, ReportData>,
     ): ByteArray {
         XSSFWorkbook(ByteArrayInputStream(template)).use { book ->
+            for (sheet in required.keys.filter { it.isNotEmpty() }) {
+                if (book.getSheet(sheet.removeSuffix("/")) ==
+                    null
+                ) {
+                    throw ReportException("anchor-missing", "Template has no sheet '${sheet.removeSuffix("/")}'")
+                }
+            }
             val seenScalars = mutableSetOf<String>()
             val seenTables = mutableSetOf<String>()
             val regions = mutableListOf<Region>()
             for (sheet in book) {
+                val data = dataFor(sheet.sheetName)
+                val prefix = scope(sheet.sheetName)
                 for (row in sheet) {
                     val rowRegions = mutableListOf<Region>()
                     for (cell in row) {
@@ -70,7 +91,7 @@ object XlsxFill {
                             if (cell.columnIndex.toLong() + indices.size > SpreadsheetVersion.EXCEL2007.maxColumns) {
                                 throw ReportException("template-invalid", "Table '$name' exceeds the XLSX column limit")
                             }
-                            seenTables += name
+                            seenTables += prefix + name
                             rowRegions += Region(cell, table, indices)
                         } else {
                             if (text.contains(
@@ -82,7 +103,7 @@ object XlsxFill {
                                     "A table marker must occupy a whole cell: ${cell.address}",
                                 )
                             }
-                            scalarMarker.findAll(text).forEach { seenScalars += it.groupValues[1] }
+                            scalarMarker.findAll(text).forEach { seenScalars += prefix + it.groupValues[1] }
                         }
                     }
                     if (rowRegions.size >
@@ -96,7 +117,11 @@ object XlsxFill {
                     regions += rowRegions
                 }
             }
-            val missing = (data.tables.keys - seenTables) + (data.scalars.keys - seenScalars)
+            val missing =
+                required.flatMap { (prefix, data) ->
+                    (data.tables.keys.map { prefix + it } - seenTables) +
+                        (data.scalars.keys.map { prefix + it } - seenScalars)
+                }
             if (missing.isNotEmpty()) {
                 throw ReportException(
                     "anchor-missing",
@@ -104,6 +129,7 @@ object XlsxFill {
                 )
             }
             for (sheet in book) {
+                val data = dataFor(sheet.sheetName)
                 val growth =
                     regions.filter { it.cell.sheet === sheet }.sumOf {
                         (it.table.rows.size - 1)

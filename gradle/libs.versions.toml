@@ -80,6 +80,7 @@ kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref =
 antlr-runtime = { module = "org.antlr:antlr4-runtime", version.ref = "antlr-runtime" }
 antlr-tool    = { module = "org.antlr:antlr4",          version.ref = "antlr-runtime" }
 slf4j-api     = { module = "org.slf4j:slf4j-api",       version.ref = "slf4j" }
+slf4j-nop     = { module = "org.slf4j:slf4j-nop",       version.ref = "slf4j" }
 kotlinx-ser-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-ser" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 jgrapht-core            = { module = "org.jgrapht:jgrapht-core",              version.ref = "jgrapht" }

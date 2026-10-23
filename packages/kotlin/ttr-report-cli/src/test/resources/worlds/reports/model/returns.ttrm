@@ -1,0 +1,18 @@
+// SPDX-License-Identifier: Apache-2.0
+package hartland
+model er
+
+def entity return_request {
+  attributes: [
+    def attribute category { type: text }
+    def attribute requests { type: int }
+    def attribute received { type: int }
+    def attribute open { type: int }
+    def attribute amount { type: decimal }
+  ]
+}
+def query report_returns_review_q {
+  sourceText: """sql
+SELECT category, requests, received, "open", amount FROM return_request ORDER BY category
+"""
+}

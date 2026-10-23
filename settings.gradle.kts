@@ -29,6 +29,7 @@ include(":packages:kotlin:ttr-metadata")
 include(":packages:kotlin:ttr-metadata-cli")
 // SO-core-P2 — open report format and renderer; independent of model implementation.
 include(":packages:kotlin:ttr-report")
+include(":packages:kotlin:ttr-report-cli")
 include(":packages:kotlin:ttr-metadata-git")
 // PL-P1.S1 — deterministic snapshot archives + cache (the ② seam transport unit).
 include(":packages:kotlin:ttr-snapshot")

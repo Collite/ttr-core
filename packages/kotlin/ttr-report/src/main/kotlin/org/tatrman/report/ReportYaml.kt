@@ -44,6 +44,16 @@ object ReportYaml {
             } catch (e: Exception) {
                 throw ReportException("report-invalid", "Invalid report YAML: ${e.message}", e)
             }
+        if (root?.get("sheets")?.any { sheet ->
+                sheet
+                    .get("tables")
+                    ?.elements()
+                    ?.asSequence()
+                    ?.any { it.has("program") } == true
+            } == true
+        ) {
+            throw ReportException("anchor-program-unsupported", "Per-anchor programs require report format v2")
+        }
         val errors = schema.validate(root).map { it.message }.sorted()
         if (errors.isNotEmpty()) throw ReportException("report-invalid", errors.joinToString("; "))
         if (root["id"].asText() != folderName) {
