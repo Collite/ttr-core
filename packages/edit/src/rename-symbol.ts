@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { WorkspaceEdit, TextDocumentEdit, Position } from 'vscode-languageserver-types';
+import { parseString } from '@tatrman/parser';
+import { collectReferences } from '@tatrman/semantics';
 import type { SymbolEntry } from '@tatrman/semantics';
 
 function offsetToPosition(content: string, offset: number): Position {
@@ -126,6 +128,32 @@ export function buildRenameSymbolEdit(params: RenameSymbolEditParams): Workspace
       offsetToPosition(content, refEndOffset),
       replacement,
     ));
+  }
+
+  // Entity bindings name both the entity and its nested attributes. The reference
+  // index for the entity itself excludes attribute targets; walk parsed binding slots
+  // to rename their entity segment, keeping member suffixes and qualification.
+  if (defEntry.kind === 'entity') for (const [uri, content] of ttrgDocuments) {
+    if (!uri.endsWith('.ttrm')) continue;
+    const ast = parseString(content, uri).ast;
+    if (!ast) continue;
+    const pkg = ast.packageDecl?.name ?? '';
+    const local = defEntry.packageName && oldQname.startsWith(defEntry.packageName + '.')
+      ? oldQname.slice(defEntry.packageName.length + 1) : oldQname;
+    for (const def of ast.definitions) {
+      if (def.kind !== 'er2dbEntity' && def.kind !== 'er2dbAttribute') continue;
+      for (const ref of collectReferences(def)) {
+        let head: string | undefined;
+        if (ref.path === oldQname || ref.path.startsWith(oldQname + '.')) head = oldQname;
+        else if (pkg === defEntry.packageName && (ref.path === local || ref.path.startsWith(local + '.'))) head = local;
+        if (!head) continue;
+        const range = sourceLocationToRange(ref.source);
+        if (edits.some(e => e.textDocument.uri === uri && e.edits.some(t =>
+          t.range.start.line === range.start.line && t.range.start.character === range.start.character))) continue;
+        const replacement = head.slice(0, head.lastIndexOf('.') + 1) + newBareName + ref.path.slice(head.length);
+        edits.push(buildTextEdit(uri, range.start, range.end, replacement));
+      }
+    }
   }
 
   // Named imports of the renamed symbol (`import <oldQname>`) must follow it to

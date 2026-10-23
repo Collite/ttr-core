@@ -6,6 +6,14 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **Studio source authoring and hosted save seam (S1.3)** — the open drawer saves via `modeler/edit`,
+  shows worker diagnostics and refreshes the canvas. Local/BFF data sources keep a separate fetched base and
+  atomic editable cache; `changedFiles`, debounced `dirty`, synchronous `collect`, and saved-SHA re-init expose
+  whole file changes without writing to the BFF. Extensions use the same structured hook; commercial forms
+  remain extension-owned under amended FO-21. Entity rename follows six ER entity/member binding refs (#213).
+  `@tatrman/edit@0.1.0` gains a self-contained public tarball, consumer/dry-run CI and an `edit/v*` release lane;
+  actual publication waits for merge and npm auth. Kotlin twin tracked in #271. No release is cut here.
+
 - **Studio authoring LSP (S1.2)** — `modeler/edit` applies all six synthesizer operations to the Node/Worker
   document cache, returning post-edit diagnostics with `uri` and `source: 'worker'`. Dry runs leave cache,
   cursors and notifications unchanged; refusals remain atomic. `modeler/applyWorkspaceEdit` shares the

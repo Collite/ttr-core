@@ -1,4 +1,4 @@
-name: Publish TypeScript grammar (npm)
+name: Publish TypeScript packages (npm)
 
 # Tag-driven release of the canonical TTR grammar to PUBLIC npmjs under the
 # @tatrman scope — the open-kit registry per FO ⚑1 (RULED 2026-07-18: A-managed;
@@ -10,11 +10,12 @@ name: Publish TypeScript grammar (npm)
 # docs/features/grammar-master/new-grammar-version-process.md §§6-7.
 #
 # Tag → package:
+#   edit/v<x.y.z>         →   @tatrman/edit (packages/edit), public npmjs
 #   ts-grammar/v<x.y.z>   →   @tatrman/grammar   (packages/grammar), public npmjs
 #
 # EXTERNAL CUT IS GATED (FO ⚑2 ruling, Bora 2026-07-18: external publish only
 # after the whole pipeline is set up and VALIDATED). This workflow only fires on
-# a `ts-grammar/v*` tag push (a deliberate maintainer action) AND needs the
+# a `ts-grammar/v*` or `edit/v*` tag push (a deliberate maintainer action) AND needs the
 # `NPM_TOKEN` secret provisioned. FO-P0.S3 sets up + validates the machinery (the
 # grammar-consumer-smoke CI job packs + installs the tarball locally, no publish);
 # the first real public cut is a separate, deliberate step once Bora green-lights.
@@ -23,15 +24,21 @@ on:
   push:
     tags:
       - 'ts-grammar/v*'
+      - 'edit/v*'
 
 permissions:
   contents: read
 
 jobs:
   publish:
+    strategy:
+      matrix:
+        package: ${{ fromJSON(startsWith(github.ref_name, 'edit/v') && '["edit"]' || '["grammar"]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 
@@ -50,13 +57,15 @@ jobs:
       # Runs the package's `prebuild` (extract-property-map.ts → generated/
       # {property-map,version}.ts from TTR.g4) then `tsc` → dist/. grammar is a
       # leaf package, so building it alone needs nothing else built first.
-      - name: Build @tatrman/grammar
-        run: pnpm --filter @tatrman/grammar run build
+      - name: Build package and dependencies
+        run: pnpm --filter "@tatrman/${{ matrix.package }}..." run build
 
       - name: Derive version from the tag
         id: ver
         run: |
-          version="${GITHUB_REF_NAME#ts-grammar/v}"
+          prefix="ts-grammar/v"
+          if [ "${{ matrix.package }}" = edit ]; then prefix="edit/v"; fi
+          version="${GITHUB_REF_NAME#"$prefix"}"
           # -RELEASE is a tag-level marker only (2026-07-16, justfile sync) — the
           # published version must be a bare x.y.z.
           version="${version%-RELEASE}"
@@ -67,20 +76,32 @@ jobs:
           # Version sync: @tatrman/grammar's <major.minor> must equal the grammar's
           # own @grammar-version (the patch digit is code-only). See
           # new-grammar-version-process.md §6.
-          GRAMMAR_MM=$(grep -m1 -oE '@grammar-version:[[:space:]]*[0-9]+\.[0-9]+' packages/grammar/src/TTR.g4 | grep -oE '[0-9]+\.[0-9]+')
-          if [ "${version%.*}" != "$GRAMMAR_MM" ]; then
-            echo "::error::ts-grammar/v$version: minor ${version%.*} must equal @grammar-version $GRAMMAR_MM (new-grammar-version-process.md §6). Bump the grammar marker, or fix the tag."
-            exit 1
+          if [ "${{ matrix.package }}" = grammar ]; then
+            GRAMMAR_MM=$(grep -m1 -oE '@grammar-version:[[:space:]]*[0-9]+\.[0-9]+' packages/grammar/src/TTR.g4 | grep -oE '[0-9]+\.[0-9]+')
+            if [ "${version%.*}" != "$GRAMMAR_MM" ]; then
+              echo "::error::grammar package minor must equal @grammar-version $GRAMMAR_MM"
+              exit 1
+            fi
+          else
+            expected=$(node -p "require('./packages/edit/package.json').version")
+            if [ "$version" != "$expected" ]; then
+              echo "::error::edit tag version must equal package version $expected"
+              exit 1
+            fi
+            git fetch --no-tags origin master
+            git merge-base --is-ancestor HEAD origin/master || {
+              echo "::error::edit releases must come from merged master history"; exit 1;
+            }
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Publishing @tatrman/grammar $version (grammar $GRAMMAR_MM)"
+          echo "Publishing @tatrman/${{ matrix.package }} $version"
 
       # Inject the tag version into the 0.0.0 placeholder. The name is already the
       # published name (@tatrman/grammar) — no rewrite needed under the @tatrman
       # scope on npmjs. Uses `npm pkg set` — pnpm 11 does NOT implement `pnpm pkg`
       # (ERR_PNPM_NOT_IMPLEMENTED). The repo copy is never committed with this value.
       - name: Set published version
-        working-directory: packages/grammar
+        working-directory: packages/${{ matrix.package }}
         run: npm pkg set version='${{ steps.ver.outputs.version }}'
 
       # Self-contained tarball guard (mirrors publish-python.yml's `unzip -l | grep`):
@@ -88,7 +109,8 @@ jobs:
       # built exports (to import PROPERTY_MAP / TTR_GRAMMAR_VERSION). Fail loudly
       # if the `files` allow-list ever drops one. The grammar-consumer-smoke CI job
       # (ci.yml) runs this same pack + a real install on every PR, unpublished.
-      - name: Verify the tarball is self-contained
+      - name: Verify the grammar tarball is self-contained
+        if: matrix.package == 'grammar'
         working-directory: packages/grammar
         run: |
           tarball="$(pnpm pack | tail -1)"
@@ -103,11 +125,15 @@ jobs:
             || { echo "::error::dist/index.js does not re-export TTR_GRAMMAR_VERSION"; exit 1; }
           echo "Tarball is self-contained."
 
+      - name: Verify edit dry-run and external consumer
+        if: matrix.package == 'edit'
+        run: node scripts/edit-consumer-smoke.mjs --skip-build
+
       # Public scoped package: first publish needs --access public. NPM_TOKEN is an
       # npmjs automation token with publish rights on the @tatrman scope (Bora
       # provisions once the tatrman npm org is claimed — bora-legal side item).
       - name: Publish to npmjs
-        working-directory: packages/grammar
+        working-directory: packages/${{ matrix.package }}
         run: pnpm publish --no-git-checks --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -5,10 +5,9 @@
 //   - WorkerLspDataSource         — the existing browser-worker LSP path (edit: true)
 //   - WsDesignerServerDataSource  — the ttrm/* WS JSON-RPC path to ttr-designer-server (edit: false)
 //
-// §6 covers the READ contract only. Graph-list / edit operations stay on
-// `LspClient` and are reachable only when `capabilities.edit` is true (the gating
-// mechanism — see App.tsx read-only gating, T3.2.6). This is a recorded contracts
-// delta (contracts.md §v1.3 changelog), not a silent divergence.
+// Reads stay portable across backends. SO S1.3 adds optional structured authoring
+// and changed-file methods; Worker/local and BFF snapshots implement that save seam.
+// WS/Veles remain read-only. Commercial canvas forms retain their extension gate.
 //
 // `getLayout` is the one exception (TP-5 T1, C1-f): it's a genuine read (viewing
 // positions, not editing them) now that `ttr-designer-server` speaks it — so it
@@ -40,7 +39,7 @@ export type ModelKind = RenderableSchemaCode;
  * graph consumer in DM-P2).
  */
 export interface DataSourceCapabilities {
-  /** add/remove-object, applyGraphEdit — further gated by license in the commercial build. */
+  /** Source authoring available. Commercial canvas forms retain their own license gate. */
   readonly edit: boolean;
   /** model kinds this backend can serve at all (`getModelGraph(scope.schema)`). */
   readonly modelKinds: readonly ModelKind[];
@@ -105,6 +104,10 @@ export interface Disposable {
 }
 
 export interface ModelDataSource {
+  /** Open structured authoring; absent on read-only backends. Applies/acknowledges successful edits once. */
+  edit?(params: import('@tatrman/lsp').ModelerEditParams): Promise<import('@tatrman/lsp').ModelerEditResult>;
+  changedFiles?(): import('../fs/changed-files.js').ChangedFile[];
+  onFilesChanged?(cb: () => void): Disposable;
   getModelIndex(): Promise<ModelIndex>;
   getModelGraph(scope?: GraphScope): Promise<ModelGraphPayload>;
   /**

@@ -6,12 +6,14 @@ import {
 } from 'vscode-languageserver-protocol/browser.js';
 
 import type { ModelGraph, LayoutFile, SymbolDetail, RenderableSchemaCode, GraphMetadata, GetGraphResponse, PackageGraphResponse, BindingMapData, ProjectRootResult, SchemaSubject, ListSymbolsParams, ListedSymbol } from '@tatrman/lsp';
+import type { ModelerEditParams, ModelerEditResult } from '@tatrman/lsp';
 import type { WorkspaceEdit } from 'vscode-languageserver-types';
 import LspWorker from '@tatrman/lsp/browser?worker';
 import { lspClientOver } from './lsp-connection.js';
 export { lspClientOver, type LspConnection } from './lsp-connection.js';
 
 export interface LspClient {
+  edit(params: ModelerEditParams): Promise<ModelerEditResult>;
   transportKind: 'node' | 'browser';
   openDocument(uri: string, content: string): Promise<void>;
   setProjectRoot(projectRoot: string, manifest?: string): Promise<ProjectRootResult>;

@@ -1,0 +1,7 @@
+Tatrman — Table Transformation Manager
+Copyright 2026 Collite
+
+Licensed under the Apache License, Version 2.0; see the LICENSE file for the full text.
+
+The JavaScript distribution bundles the edit synthesizer and its ttr-core dependencies.
+Third-party copyright and license comments are retained inline in dist/package/index.js.

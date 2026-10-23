@@ -1,11 +1,15 @@
 # @tatrman/edit
 
+Apache-2.0 · public package `@tatrman/edit@0.1.0` (release tag `edit/v0.1.0`).
+
 Pure TTR-M edit synthesis shared by the Node and browser LSP. Text is canonical: callers apply the
 returned `WorkspaceEdit` and reparse their cache. The Studio plan and request contract live in
 [`project/platform/features/studio/implementation/ttr-core`](https://github.com/Collite/project/tree/master/platform/features/studio/implementation/ttr-core).
 Existing graph/layout/import/rename helpers remain exported.
 
 ```ts
+import { synthesize, parseManifest, resolveManifest } from '@tatrman/edit';
+const manifest = resolveManifest(parseManifest(files['modeler.toml']), rootUri);
 const result = synthesize('insert-entity', {
   name: 'returns_review',
   file: 'model/er/returns-review.ttrm',
@@ -16,7 +20,7 @@ const result = synthesize('insert-entity', {
 
 `files` is a complete immutable text snapshot, keyed consistently by document URI or repo-relative path
 (`rootUri: ''` for relative keys), including `model/tests/*.mjs`. `manifest` is the resolved branch
-manifest from `@tatrman/semantics`. All reads are in memory. New files have explicit `CreateFile` operations;
+manifest; `parseManifest` / `resolveManifest` are exported for standalone consumers. All reads are in memory. New files have explicit `CreateFile` operations;
 `touched` lists changed keys in deterministic order. Refusal returns no edits. Same-target duplicate terms
 return an empty successful edit. The pure API returns `diagnostics: []`; the LSP fills semantic diagnostics
 when it applies an edit to its cache (S1.2).
@@ -34,7 +38,7 @@ All operations can also refuse `invalid-args` or `ambiguous-reference`. Qualify 
 collide. Generated term IDs end in `_en`/`_cs` and receive numeric suffixes on name collisions. Inline
 `insert-entity.terms` uses the entity file's first hyphen-separated stem (`returns-review.ttrm` →
 `returns.ttrm`) under each locale. Standalone `add-term` chooses a matching existing locale/model file,
-then the locale's first file, otherwise `<model>.ttrm`; `file` overrides this choice. Binding files are
+then the locale's first file, otherwise `<model>.ttrm`; `file` is a locale-relative filename (for example `returns.ttrm`) and overrides this choice. Binding files are
 selected within the source package, preferring an existing `er2db_entity` carrier.
 
 The DB input is already parsed TTR-M, so column types, precision, optionality and keys are retained.
@@ -52,3 +56,9 @@ The 14 byte-for-byte vectors are in [`__tests__/synth/vectors`](./__tests__/synt
 The `insert-entity/on-query/expected/` files are the demo's portable output contract. Run `pnpm test` here;
 a read-only real-world check is `node packages/edit/scripts/studio-synth-smoke.mjs ../hartland` from the
 repository root after building dependencies and this package.
+
+The npm artifact bundles its runtime and declaration dependencies, so installing it requires no unpublished
+`@tatrman/*` packages. Workspace builds retain their unbundled entry points; `publishConfig` switches only the
+published `main`/`types`/`exports` to `dist/package/`. CI runs `node scripts/edit-consumer-smoke.mjs`: publish dry run,
+tarball install outside the workspace, a canonical four-file synthesis and strict TypeScript consumer compilation.
+The real public cut follows merge and a configured `NPM_TOKEN`; dry runs do not publish.

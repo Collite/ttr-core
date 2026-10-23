@@ -10,6 +10,7 @@ export interface HostInit {
   scope: HostScope;
   lang: 'en' | 'cs';
   theme: 'light';
+  sha?: string;
 }
 export type HostMessage =
   | HostInit
@@ -22,7 +23,7 @@ export type FrameMessage =
   | { type: 'ttr.frame.location'; location: string }
   | { type: 'ttr.frame.error'; code: string; message: string }
   | { type: 'ttr.frame.dirty'; changed: number }
-  | { type: 'ttr.frame.changedFiles'; files: Array<{ path: string; text: string }> };
+  | { type: 'ttr.frame.changedFiles'; files: Array<{ path: string; text: string | null }> };
 
 export function isHosted(): boolean {
   return (
@@ -53,6 +54,7 @@ function parseMessage(value: unknown): HostMessage | null {
         typeof m.token === 'string' &&
         (m.lang === 'en' || m.lang === 'cs') &&
         m.theme === 'light' &&
+        (m.sha === undefined || typeof m.sha === 'string') &&
         s &&
         (s.kind === 'served' ||
           (s.kind === 'change' && typeof s.id === 'string' && s.id.length > 0))
@@ -86,7 +88,7 @@ export class HostChannel {
     if (event.source !== window.parent || event.origin !== window.location.origin) return;
     const message = parseMessage(event.data);
     if (!message) return;
-    if (message.type === 'ttr.host.token') {
+    if (message.type === 'ttr.host.token' || message.type === 'ttr.host.collect') {
       void this.handle(message);
       return;
     }

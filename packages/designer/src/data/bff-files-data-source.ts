@@ -14,8 +14,9 @@ import type {
 import { openFileMap } from './open-file-map.js';
 import type { GetGraphResponse } from '@tatrman/lsp';
 
-/** A fetched SHA is immutable. Share schema/symbol reads across its layout catalog and canvas. */
+/** Share reads across catalog/canvas; authoring invalidates them without changing the fetched SHA. */
 class SnapshotWorker extends WorkerLspDataSource {
+  invalidate(): void { this.schemas.clear(); }
   private schemas = new Map<ModelKind, Promise<GetGraphResponse | null>>();
   override getSchemaGraph(schema: ModelKind) {
     let read = this.schemas.get(schema);
@@ -68,7 +69,7 @@ function snapshotOf(value: unknown): Snapshot {
 /** Atomic file-map snapshots over the same rich worker reads as local projects. */
 export class BffFilesDataSource implements ModelDataSource {
   readonly capabilities: DataSourceCapabilities = {
-    edit: false,
+    edit: true,
     modelKinds: ['db', 'er', 'md', 'cnc'],
     bindings: true,
     perspectives: true,
@@ -77,12 +78,13 @@ export class BffFilesDataSource implements ModelDataSource {
   };
   project: ProjectFiles | null = null;
   sha: string | null = null;
-  private worker: WorkerLspDataSource | null = null;
+  private worker: SnapshotWorker | null = null;
   private catalog: CatalogListing | null = null;
   private retired: LspClient[] = [];
   private disposed = false;
   private pending: Promise<boolean> | null = null;
   private abort = new AbortController();
+  private fileListeners = new Set<() => void>();
   private listeners = new Set<(sha: string) => void>();
   private readonly fetcher: typeof fetch;
   private readonly createClient: () => Promise<LspClient>;
@@ -136,6 +138,8 @@ export class BffFilesDataSource implements ModelDataSource {
       });
       // Validate the entire catalog before replacing any currently served state.
       const catalog = await worker.listCatalog();
+      worker.onFilesChanged(() => { worker.invalidate(); this.catalog = null; for (const cb of this.fileListeners) cb(); });
+      worker.onModelChanged(() => { worker.invalidate(); this.catalog = null; });
       if (this.disposed) throw new Error('Hosted source is disposed.');
       const previous = this.worker;
       this.worker = worker;
@@ -144,6 +148,7 @@ export class BffFilesDataSource implements ModelDataSource {
       this.sha = snapshot.sha;
       if (previous) this.retired.push(previous.lspClient);
       if (!deferDisposal) this.disposeRetired();
+      for (const cb of this.fileListeners) cb();
       for (const cb of this.listeners) cb(snapshot.sha);
       return true;
     } catch (error) {
@@ -154,6 +159,12 @@ export class BffFilesDataSource implements ModelDataSource {
   private get source(): WorkerLspDataSource {
     if (!this.worker) throw new Error('Hosted snapshot has not loaded.');
     return this.worker;
+  }
+  edit(params: import('@tatrman/lsp').ModelerEditParams) { return this.source.edit(params); }
+  changedFiles() { return this.worker?.changedFiles() ?? []; }
+  onFilesChanged(cb: () => void) {
+    this.fileListeners.add(cb);
+    return { dispose: () => { this.fileListeners.delete(cb); } };
   }
   getModelIndex() {
     return this.source.getModelIndex();
@@ -168,8 +179,7 @@ export class BffFilesDataSource implements ModelDataSource {
     return this.source.getSchemaGraph(schema);
   }
   async listCatalog(): Promise<CatalogListing> {
-    if (!this.catalog) throw new Error('Hosted snapshot has not loaded.');
-    return this.catalog;
+    return this.catalog ??= await this.source.listCatalog();
   }
   layoutIssues() {
     return this.source.layoutIssues();
@@ -212,5 +222,6 @@ export class BffFilesDataSource implements ModelDataSource {
     this.catalog = null;
     this.disposeRetired();
     this.listeners.clear();
+    this.fileListeners.clear();
   }
 }

@@ -8,8 +8,7 @@ CSS and worker assets. `/m/_designer/` is reserved for the iframe. A host on ano
 supported by this protocol.
 
 Set the iframe height in the host. Hosted roots fill that height, force light form controls, omit the
-local-project landing/FSA loader, and do not install a `beforeunload` prompt. The open P0 viewer is
-read-only; document dirty/collect messages arrive with the P1 save seam.
+local-project landing/FSA loader, and do not install a `beforeunload` prompt. The source drawer and structured edit seam are open (SO D-19); canvas forms are supplied by commercial extensions.
 
 Send init from the iframe's `load` handler. Configuration comes from this message, without a
 `config.json` round trip. The frame's parent listener is installed before `load` fires.
@@ -114,3 +113,33 @@ parent Copy links, token refresh, and a changed-SHA remount without errors. Scre
 Git provider is contacted.
 
 The container's hosted entry and asset paths are also checked by `release-viewer.yml` before release.
+
+### Saving authored source (S1.3)
+
+The fetched SHA and file map form the immutable base. The active data source owns an editable text cache;
+`changedFiles()` compares whole file contents by repo-rooted path, including newly created files and deletion
+tombstones `{path,text:null}`. Nothing writes to the BFF or disk from the frame.
+
+After cache changes the frame posts `{type:'ttr.frame.dirty',changed:N}` (200 ms debounce). Collect is an immediate
+read of completed cache writes: send `{type:'ttr.host.collect'}` and receive
+`{type:'ttr.frame.changedFiles',files:[{path,text}]}`. Repeated edits to one path count once. The host saves those
+whole files using its current base SHA. Collect does not wait for an in-flight edit; disable Save while authoring
+is pending or await the edit promise before collecting.
+
+After a successful save, re-send the original `ttr.host.init` with `sha:<new SHA>`, or send `ttr.host.refresh`.
+The frame fetches the saved snapshot, replaces its worker/cache, and posts dirty 0. Unchanged SHAs preserve local
+edits; failed refreshes preserve the previous cache and dirty count. Init's API/scope/workspace remain fixed for the
+iframe session. A different scope still requires a new iframe.
+
+The drawer saves exact definition text through `modeler/edit {op:'set-source'}`. Parse refusals leave the buffer
+and canvas intact; successful writes refresh the model and show returned diagnostics inline. Error diagnostics do
+not undo a successful edit; Propose has its own strict gate. The open build adds no canvas forms.
+
+An extension can import `editModel`, `ModelerEditParams` and `ModelerEditResult` from
+`@tatrman/designer/extensions` and call `editModel(ctx.dataSource,{op,args,dryRun?})`. The data source serializes
+requests, applies each returned edit exactly once to the pre-request text, then acknowledges full text to the LSP.
+Do not apply the response again. Read-only backends have no authoring hook.
+
+For the real Hartland/Chromium authoring smoke after a workspace build:
+`node packages/designer/scripts/studio-save-smoke.mjs ../hartland /tmp/so-save-smoke`.
+The runner serves a static parent with a test-only extension entry; production adds no test bridge.

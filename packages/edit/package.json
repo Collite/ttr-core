@@ -1,32 +1,59 @@
 {
   "name": "@tatrman/edit",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/build-package.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run"
   },
   "dependencies": {
-    "@tatrman/semantics": "workspace:*",
-    "vscode-languageserver-types": "^3.17.5",
-    "@tatrman/format": "workspace:*",
-    "@tatrman/parser": "workspace:*",
-    "@tatrman/sql": "workspace:*"
+    "vscode-languageserver-types": "^3.17.5"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "dts-bundle-generator": "^9.5.1",
+    "esbuild": "^0.27.7",
     "typescript": "^5.7.0",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.7",
+    "@tatrman/format": "workspace:*",
+    "@tatrman/parser": "workspace:*",
+    "@tatrman/semantics": "workspace:*",
+    "@tatrman/sql": "workspace:*"
+  },
+  "license": "Apache-2.0",
+  "description": "Pure TTR-M edit synthesis and WorkspaceEdit helpers for Node and browsers.",
+  "files": [
+    "dist/package/index.js",
+    "dist/package/index.d.ts",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public",
+    "main": "./dist/package/index.js",
+    "types": "./dist/package/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/package/index.d.ts",
+        "import": "./dist/package/index.js"
+      }
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Collite/ttr-core.git",
+    "directory": "packages/edit"
   }
 }

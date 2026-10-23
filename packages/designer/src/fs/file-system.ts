@@ -15,7 +15,7 @@ export async function loadProjectViaUpload(input: HTMLInputElement): Promise<Pro
 
   let rootName = 'project';
   for (const file of Array.from(entries)) {
-    if (!isProjectFile(file.name)) {
+    if (!isProjectFile(file.name) && !(file.name.endsWith('.mjs') && (file.webkitRelativePath ?? '').includes('/model/tests/'))) {
       continue;
     }
     const content = await file.text();
@@ -44,7 +44,7 @@ export async function loadProjectViaFileSystemAccessAPI(): Promise<ProjectFiles 
           // Tool caches / dependencies aren't project sources (and may be huge).
           if (name.startsWith('.') || name === 'node_modules') continue;
           await walk(handle as FileSystemDirectoryHandle, `${path}/`);
-        } else if (isProjectFile(name)) {
+        } else if (isProjectFile(name) || (path.startsWith('model/tests/') && name.endsWith('.mjs'))) {
           const file = await (handle as FileSystemFileHandle).getFile();
           files.set(path, await file.text());
         }

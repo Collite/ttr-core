@@ -12,7 +12,8 @@
 // and the `@tatrman/edit` WorkspaceEdit synthesizer (Bora ruling 2026-07-18);
 // the LSP browser-worker bundle (`server-browser-*.js`) legitimately carries
 // that synthesis and is EXCLUDED from this scan. What must be absent is the
-// Designer app chunk calling/rendering edit — the graphical authoring surface.
+// commercial graphical authoring surface. SO D-19 amends FO-21: the text drawer
+// and modeler/edit request forwarding are open; commercial forms remain absent.
 //
 // Red until FO-P0.S2.T4 removes the edit surface from the core. Wired into CI.
 //
