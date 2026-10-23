@@ -1,0 +1,291 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tatrman.org/schemas/cn-candidate.v1.schema.json",
+  "title": "cn-candidate/v1 — a proposal for the conceptual model",
+  "description": "One candidate in the cn promotion queue (cn contracts §6, AM-20): exactly one proposal (a concept, a term or an open-tier relation), where it came from, and what became of it. Source-agnostic: every producer (a document pipeline, a recipe synthesizer, an evidence miner, a steward) submits this one shape. A promoted candidate is a model TEXT change — `resolution.canon_ref` names the merged commit and the def it added or changed. The JVM enforcement is `org.tatrman.concept.candidate.CnCandidates` (ttr-concept); `CandidateSchemaSpec` holds the two to each other fixture by fixture.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "proposal", "provenance", "status"],
+  "properties": {
+    "id": { "$ref": "#/$defs/uuid" },
+    "proposal": { "$ref": "#/$defs/proposal" },
+    "provenance": { "$ref": "#/$defs/provenance" },
+    "status": {
+      "description": "`proposed` until a steward acts; `rejected` and `promoted` are final and carry a `resolution`.",
+      "enum": ["proposed", "rejected", "promoted"]
+    },
+    "resolution": { "$ref": "#/$defs/resolution" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "proposed" } } },
+      "then": { "not": { "required": ["resolution"] } }
+    },
+    {
+      "if": { "properties": { "status": { "enum": ["rejected", "promoted"] } } },
+      "then": { "required": ["resolution"] }
+    },
+    {
+      "if": { "properties": { "status": { "const": "promoted" } } },
+      "then": { "properties": { "resolution": { "required": ["canon_ref"] } } }
+    },
+    {
+      "if": { "properties": { "status": { "const": "rejected" } } },
+      "then": { "properties": { "resolution": { "not": { "required": ["canon_ref"] } } } }
+    }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "timestamp": {
+      "description": "RFC 3339 with an explicit offset. A calendar-impossible date (`2026-02-30`) passes this pattern and is refused by the JVM validator only.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "name": {
+      "description": "A TTR identifier: the def name the promotion writes.",
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+    },
+    "cnRef": {
+      "description": "A concept, qualified: `cn.Customer`.",
+      "type": "string",
+      "pattern": "^cn\\.[A-Za-z][A-Za-z0-9_]*$"
+    },
+    "locale": {
+      "description": "A label key or a lexicon file's locale (`model lexicon locale cs`).",
+      "type": "string",
+      "pattern": "^[a-z]{2,3}$"
+    },
+    "line": {
+      "description": "One line of model text: a label or a surface form.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u001f]+$"
+    },
+    "label": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/locale" },
+      "additionalProperties": { "$ref": "#/$defs/line" }
+    },
+    "participant": {
+      "description": "One labelled participant of an event (`Encounter as from` is `{ concept: cn.Encounter, label: from }`).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["concept"],
+      "properties": {
+        "concept": { "$ref": "#/$defs/cnRef" },
+        "label": { "$ref": "#/$defs/name" }
+      }
+    },
+    "sourceRef": {
+      "description": "Where a candidate or an evidence example came from (cn contracts §6, A-CN-82): `doc://<system>/<document>[#<locator>]` (a locator is `s<n>` — a sentence, 1-based; `r<n>` — a table row, 1-based; `c<start>-<end>` — a code-point span, 0-based, end exclusive), `recipe://<package>/<recipe>#s<n>` (a recipe sentence), `question://<system>/<question>`. A span whose end does not exceed its start passes this pattern and is refused by the JVM validator only.",
+      "type": "string",
+      "pattern": "^(doc://[A-Za-z0-9._~%-]+(/[A-Za-z0-9._~%-]+)+(#(s[1-9][0-9]{0,8}|r[1-9][0-9]{0,8}|c(0|[1-9][0-9]{0,8})-(0|[1-9][0-9]{0,8})))?|recipe://[A-Za-z0-9._~%-]+/[A-Za-z0-9._~%-]+#s[1-9][0-9]{0,8}|question://[A-Za-z0-9._~%-]+(/[A-Za-z0-9._~%-]+)+)$"
+    },
+    "proposal": {
+      "description": "Exactly one of `concept`, `term`, `relation`.",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "concept": { "$ref": "#/$defs/concept" },
+        "term": { "$ref": "#/$defs/term" },
+        "relation": { "$ref": "#/$defs/relation" }
+      }
+    },
+    "concept": {
+      "description": "A new concept def. Which fields a stereotype takes follows the grammar (cn contracts §1.1): a role names its defining `event`; a phase and a quality name their bearer (`of`) and are defined OR grounded, never both. `definition_text` is a TTR-P definition expression — the body of `definition: \"\"\"…\"\"\"`. `er_rendering` is filled at promotion, for a phase.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stereo", "name"],
+      "properties": {
+        "stereo": { "enum": ["kind", "role", "phase", "quality", "event"] },
+        "name": { "$ref": "#/$defs/name" },
+        "label": { "$ref": "#/$defs/label" },
+        "is_a": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/cnRef" }
+        },
+        "involves": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/participant" }
+        },
+        "of": { "$ref": "#/$defs/cnRef" },
+        "event": { "$ref": "#/$defs/cnRef" },
+        "definition_text": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?![\\s\\S]*\"\"\")[\\s\\S]*\\S[\\s\\S]*$"
+        },
+        "basis": { "enum": ["occurrence", "current_state", "past_state"] },
+        "suggested_grounding": {
+          "description": "An md or er element the concept would ground to (`grounds:`); for a phase, a query-backed entity only.",
+          "type": "string",
+          "pattern": "^(er|md)(\\.[A-Za-z_][A-Za-z0-9_]*)+$"
+        },
+        "er_rendering": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "stereo": { "const": "kind" } } },
+          "then": {
+            "properties": {
+              "of": false, "event": false, "involves": false,
+              "definition_text": false, "basis": false, "er_rendering": false
+            }
+          }
+        },
+        {
+          "if": { "properties": { "stereo": { "const": "role" } } },
+          "then": {
+            "required": ["event"],
+            "properties": { "involves": false, "definition_text": false, "basis": false, "er_rendering": false }
+          }
+        },
+        {
+          "if": { "properties": { "stereo": { "const": "event" } } },
+          "then": {
+            "properties": {
+              "of": false, "event": false, "definition_text": false, "basis": false, "er_rendering": false
+            }
+          }
+        },
+        {
+          "if": { "properties": { "stereo": { "const": "phase" } } },
+          "then": {
+            "required": ["of"],
+            "properties": { "event": false, "involves": false },
+            "not": { "required": ["definition_text", "suggested_grounding"] }
+          }
+        },
+        {
+          "if": { "properties": { "stereo": { "const": "quality" } } },
+          "then": {
+            "required": ["of"],
+            "properties": { "event": false, "involves": false, "basis": false, "er_rendering": false },
+            "not": { "required": ["definition_text", "suggested_grounding"] }
+          }
+        }
+      ]
+    },
+    "term": {
+      "description": "Words for a concept (`def term … { for: cn.X, forms: […] }` in the lexicon file of `locale`). The target is a concept in the model (`target_qname`) or one still in the queue (`proposed_concept_ref` — that candidate's `id`; promotable once it is).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["locale", "forms"],
+      "properties": {
+        "target_qname": { "$ref": "#/$defs/cnRef" },
+        "proposed_concept_ref": { "$ref": "#/$defs/uuid" },
+        "locale": { "$ref": "#/$defs/locale" },
+        "forms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/line" }
+        },
+        "default": { "type": "boolean" }
+      },
+      "oneOf": [
+        { "required": ["target_qname"] },
+        { "required": ["proposed_concept_ref"] }
+      ]
+    },
+    "relation": {
+      "description": "An open-tier relation (cn contracts §1.3): `relations: [ { type: <type_name>, to: <to> } ]` on `from`. It never lowers.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type_name", "from", "to"],
+      "properties": {
+        "type_name": { "$ref": "#/$defs/name" },
+        "from": { "$ref": "#/$defs/cnRef" },
+        "to": { "$ref": "#/$defs/cnRef" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["producer", "confidence", "created_at"],
+      "properties": {
+        "producer": {
+          "description": "The producer id (`kleio`, `au:synthesizer`, `manual:<steward>`, `<deployment>:evidence`, `<deployment>:span-catalogue`). This schema checks the id's shape; which producers a store admits — and that an importer never does (L15-5) — is its registry's (`ProducerRegistry`, A-CN-83).",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*(:[A-Za-z0-9._@-]+)?$"
+        },
+        "source_ref": { "$ref": "#/$defs/sourceRef" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "evidence": { "$ref": "#/$defs/evidence" },
+        "created_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "confidence": {
+      "description": "The resolver's Confidence shape: the number, who computed it, how.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "producer", "method"],
+      "properties": {
+        "value": { "type": "number", "minimum": 0, "maximum": 1 },
+        "producer": { "type": "string", "minLength": 1 },
+        "method": { "type": "string", "minLength": 1 }
+      }
+    },
+    "evidence": {
+      "description": "AM-20 — why a steward should care. `text` is verbatim; de-identifying it is the producer's duty before it submits.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["examples"],
+      "properties": {
+        "question_count": { "type": "integer", "minimum": 0 },
+        "document_count": { "type": "integer", "minimum": 0 },
+        "examples": { "type": "array", "items": { "$ref": "#/$defs/example" } }
+      }
+    },
+    "example": {
+      "description": "One piece of evidence. Its `ref` scheme follows its kind: a question is `question://`, a recipe sentence `recipe://`, a document and a processor's output (the span it read) `doc://`.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref", "text"],
+      "properties": {
+        "kind": { "enum": ["question", "document", "recipe_sentence", "processor_output"] },
+        "ref": { "$ref": "#/$defs/sourceRef" },
+        "text": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "question" } } },
+          "then": { "properties": { "ref": { "pattern": "^question://" } } }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "recipe_sentence" } } },
+          "then": { "properties": { "ref": { "pattern": "^recipe://" } } }
+        },
+        {
+          "if": { "properties": { "kind": { "enum": ["document", "processor_output"] } } },
+          "then": { "properties": { "ref": { "pattern": "^doc://" } } }
+        }
+      ]
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by", "at"],
+      "properties": {
+        "by": { "type": "string", "minLength": 1 },
+        "at": { "$ref": "#/$defs/timestamp" },
+        "canon_ref": {
+          "description": "`<merged commit>:<qname>` — the def the promotion added (`cn.X`, `lexicon.<term>`) or changed (a relation's `from`).",
+          "type": "string",
+          "pattern": "^[0-9a-f]{7,64}:(cn|lexicon)\\.[A-Za-z][A-Za-z0-9_]*$"
+        },
+        "note": { "type": "string" }
+      }
+    }
+  }
+}
