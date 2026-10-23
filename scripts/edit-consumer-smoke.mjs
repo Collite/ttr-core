@@ -16,6 +16,8 @@ try {
   run('pnpm', ['pack', '--pack-destination', scratch], pkg);
   const tarball = join(scratch, readdirSync(scratch).find(f => f.endsWith('.tgz')));
   const manifest = JSON.parse(run('tar', ['-xzOf', tarball, 'package/package.json']));
+  const notices = run('tar', ['-xzOf', tarball, 'package/NOTICE']);
+  assert.ok(notices.includes('The ANTLR Project') && notices.includes('Squirrel Chat'));
   assert.equal(manifest.private, false);
   assert.equal(manifest.version, '0.1.0');
   assert.ok(!Object.keys(manifest.dependencies ?? {}).some(d => d.startsWith('@tatrman/')));
