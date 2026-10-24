@@ -76,6 +76,7 @@ class BundleAssembler(
         val emitRequest: EmitRequest?,
         /** AU-core-P2: what the compile said beside the bundle (warnings, information) — `ttrp build --json` prints it. */
         val diagnostics: List<org.tatrman.ttrp.diagnostics.TtrpDiagnostic> = emptyList(),
+        val readme: String? = null,
     )
 
     /**
@@ -120,6 +121,7 @@ class BundleAssembler(
         recipeDir: Path? = null,
         documentTitle: String? = null,
         language: String = "en",
+        writeArtifacts: Boolean = true,
     ): BundleResult {
         val plan =
             TtrpPipeline(
@@ -137,6 +139,7 @@ class BundleAssembler(
             if (inspection.diagnostics.isNotEmpty()) throw BundleRefused(plan.diagnostics + inspection.diagnostics)
             return RecipeBundleAssembler(
                 toolchainVersion,
+                writeArtifacts,
             ).assemble(
                 plan,
                 fileName,
@@ -162,6 +165,7 @@ class BundleAssembler(
                 it.copy(diagnostics = plan.diagnostics + it.diagnostics)
             }
         }
+        require(writeArtifacts) { "read-only bundle inspection requires a recipe" }
         // AG-P0 S5: fingerprint each host-generated model root the program compiled against.
         val modelRoots =
             pipelineManifest.extraModelRoots

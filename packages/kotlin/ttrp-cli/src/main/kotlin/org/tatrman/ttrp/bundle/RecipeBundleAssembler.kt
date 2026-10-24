@@ -38,6 +38,7 @@ import java.security.MessageDigest
  */
 class RecipeBundleAssembler(
     private val toolchainVersion: String = "0.0.0-dev",
+    private val writeArtifacts: Boolean = true,
 ) {
     fun assemble(
         plan: TtrpPipeline.PlanResult,
@@ -56,8 +57,10 @@ class RecipeBundleAssembler(
         val graph = requireNotNull(plan.graph)
         val exec = requireNotNull(plan.exec)
         val bundleDir = outDir.resolve(model.name + ".bundle")
-        Files.createDirectories(bundleDir.resolve("islands"))
-        Files.createDirectories(bundleDir.resolve("catalog"))
+        if (writeArtifacts) {
+            Files.createDirectories(bundleDir.resolve("islands"))
+            Files.createDirectories(bundleDir.resolve("catalog"))
+        }
         val files = sortedMapOf<String, String>()
 
         // --- statements, one per output, grouped by island ---
@@ -271,13 +274,10 @@ class RecipeBundleAssembler(
                 tests = tests.ifEmpty { null },
             )
 
-        write(
-            bundleDir,
-            "README.md",
+        val readme =
             org.tatrman.ttrp.doc.ReadmeRenderer
-                .render(recipe, readmeLabels, documentTitle, language),
-            files,
-        )
+                .render(recipe, readmeLabels, documentTitle, language)
+        write(bundleDir, "README.md", readme, files)
         val manifest =
             RunManifest(
                 schemaVersion = 3,
@@ -296,9 +296,9 @@ class RecipeBundleAssembler(
                 recipe = recipe,
                 files = files.toMap(),
             )
-        Files.writeString(bundleDir.resolve("manifest.json"), manifest.toJson())
+        if (writeArtifacts) Files.writeString(bundleDir.resolve("manifest.json"), manifest.toJson())
         // no launcher: the Server runs the statements
-        return BundleAssembler.BundleResult(bundleDir, manifest, null, diagnostics)
+        return BundleAssembler.BundleResult(bundleDir, manifest, null, diagnostics, readme)
     }
 
     /**
@@ -371,9 +371,11 @@ class RecipeBundleAssembler(
         files: MutableMap<String, String>,
     ) {
         val p = dir.resolve(rel)
-        Files.createDirectories(p.parent)
         val bytes = text.toByteArray(Charsets.UTF_8)
-        Files.write(p, bytes)
+        if (writeArtifacts) {
+            Files.createDirectories(p.parent)
+            Files.write(p, bytes)
+        }
         files[rel] =
             "sha256:" + MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
     }

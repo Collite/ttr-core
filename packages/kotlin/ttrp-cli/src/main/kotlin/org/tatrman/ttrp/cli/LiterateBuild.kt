@@ -95,8 +95,6 @@ object LiterateBuild {
         if (check) {
             val drift = extraction.check(dir)
             if (drift.isNotEmpty()) refuse(drift, 3)
-            echo(if (json) "{\"diagnostics\":[]}" else "${file.fileName}: derived artifacts are current")
-            return
         }
         val project = TtrpManifestReader.resolve(file.parent).manifest
         val results =
@@ -111,12 +109,15 @@ object LiterateBuild {
                     documentTitle = extraction.title,
                     language = lang,
                     memberCatalog = memberCatalog,
+                    writeArtifacts = !check,
                 )
             }
-        extraction.write(dir)
-        extraction.recipes.zip(results).forEach { (recipe, result) ->
-            // The explanation is available beside the canonical recipe and in its distributable bundle.
-            val readmeDir =
+
+        fun readmePath(
+            recipe: org.tatrman.ttrp.doc.ExtractedRecipe,
+            result: BundleAssembler.BundleResult,
+        ): Path =
+            (
                 if (recipe.name !=
                     null
                 ) {
@@ -124,6 +125,26 @@ object LiterateBuild {
                 } else {
                     dir.resolve(result.manifest.recipe!!.name)
                 }
+            ).resolve("README.md")
+        if (check) {
+            val drift =
+                extraction.recipes.zip(results).flatMap { (recipe, result) ->
+                    listOf(readmePath(recipe, result), result.dir.resolve("README.md")).mapNotNull { path ->
+                        if (Files.isRegularFile(path) && Files.readString(path) == result.readme) {
+                            null
+                        } else {
+                            DocDiagnostic("TTRP-DOC-003", "derived README drifts: $path; run ttrp build", listOf(0, 0))
+                        }
+                    }
+                }
+            if (drift.isNotEmpty()) refuse(drift, 3)
+            echo(if (json) "{\"diagnostics\":[]}" else "${file.fileName}: derived artifacts are current")
+            return
+        }
+        extraction.write(dir)
+        extraction.recipes.zip(results).forEach { (recipe, result) ->
+            // The explanation is available beside the canonical recipe and in its distributable bundle.
+            val readmeDir = readmePath(recipe, result).parent
             Files.createDirectories(readmeDir)
             Files.copy(
                 result.dir.resolve("README.md"),

@@ -9,9 +9,8 @@ ttrp build releasing-a-placed-order.md --check
 ttrp build releasing-a-placed-order.cs.md --lang cs --out generated
 ```
 
-`--check` derives in memory, compares canonical bytes and the semantic `.ttrd` content, and exits **3** with
-`TTRP-DOC-003` on drift or missing artifacts. It writes no files. The document SHA is excluded from the sidecar
-comparison: a prose-only edit that preserves all positions and associations does not change the program.
+`--check` derives in memory, compares canonical bytes, semantic `.ttrd` content including `documentSha`, and every derived README's bytes in the requested `--lang`, and exits **3** with
+`TTRP-DOC-003` on drift or missing artifacts. It writes no files. Every Markdown edit requires a rebuild, including prose-only edits. Checks compile against the current model, render explanations in memory, and write no artifacts.
 
 Start with a `ttrp preamble` fence containing `uses world` and imports. Without a preamble, these lines are read
 from the first skeleton. Put a `ttrp` skeleton before its containers:

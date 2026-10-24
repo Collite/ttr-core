@@ -96,7 +96,7 @@ data class DocExtraction(
                     val committed = Json.parseToJsonElement(Files.readString(side)) as JsonObject
                     val derived = Json.parseToJsonElement(recipe.sidecar.toJson()) as JsonObject
                     Files.readString(path) == recipe.text &&
-                        committed.filterKeys { it != "documentSha" } == derived.filterKeys { it != "documentSha" }
+                        committed == derived
                 }.getOrDefault(false)
             if (equal) {
                 null

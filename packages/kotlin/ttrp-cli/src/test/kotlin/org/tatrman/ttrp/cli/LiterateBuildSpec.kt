@@ -39,7 +39,7 @@ class LiterateBuildSpec :
             val canonical = dir.resolve("release_order/release_order.ttrp")
             Files.exists(canonical) shouldBe true
             Files.readString(dir.resolve("release_order/README.md")) shouldContain "## Režim"
-            val checked = ttrp().test("build ${dir.resolve("release.md")} --check")
+            val checked = ttrp().test("build ${dir.resolve("release.md")} --check --lang cs")
             checked.statusCode shouldBe 0
             Files.writeString(canonical, "changed\n")
             val changed = ttrp().test("build ${dir.resolve("release.md")} --check --json")
@@ -121,6 +121,52 @@ class LiterateBuildSpec :
             side.sentences.single { it.span == node.paragraph }.nodes shouldBe emptyList()
             ttrp().test("build ${dir.resolve("release.md")} --out $output --check").statusCode shouldBe 0
             Files.delete(dir.resolve("release_order.annotations.json"))
+        }
+        test("check includes README bytes and document SHA without writing any artifacts") {
+            val output = dir.resolve("check-readmes")
+            val source = dir.resolve("check-readmes.md")
+            val text = Files.readString(dir.resolve("release.md"))
+            Files.writeString(source, text)
+
+            fun run(extra: String = "") = ttrp().test("build $source --out $output $extra")
+            run().statusCode shouldBe 0
+            run("--check").statusCode shouldBe 0
+            val readme = output.resolve("release_order/README.md")
+            Files.writeString(readme, "stale explanation")
+            val refused = run("--check --json")
+            refused.statusCode shouldBe 3
+            refused.stdout shouldContain "README.md"
+            Files.readString(readme) shouldBe "stale explanation"
+            run().statusCode shouldBe 0
+            Files.delete(output.resolve("release_order.bundle/README.md"))
+            run("--check --json").statusCode shouldBe 3
+            run().statusCode shouldBe 0
+            Files.writeString(source, text.replace("Every placed order", "Every stored order"))
+            run("--check --json").statusCode shouldBe 3
+            Files.readString(source) shouldContain "Every stored order"
+        }
+        test("check re-renders labels from the current model and leaves the model and README untouched") {
+            val project = dir.resolve("label-drift")
+            Files.createDirectories(project)
+            Files.writeString(project.resolve("modeler.toml"), "[ttrp]\nworld = \"hartland.worlds.demo\"\n")
+            val model = root.resolve("packages/kotlin/ttrp-graph/src/test/resources/fixtures/recipes/model")
+            Files.walk(model).use { files ->
+                files.forEach { path ->
+                    val target = project.resolve("models").resolve(model.relativize(path))
+                    if (Files.isDirectory(path)) Files.createDirectories(target) else Files.copy(path, target)
+                }
+            }
+            val source = project.resolve("release.md")
+            Files.writeString(source, Files.readString(dir.resolve("release.md")))
+            ttrp().test("build $source").statusCode shouldBe 0
+            val labels = project.resolve("models/hartland/automation/automation.ttrm")
+            Files.writeString(labels, Files.readString(labels).replace("Price tolerance", "Allowed variance"))
+            val readme = project.resolve("release_order/README.md")
+            val before = Files.readString(readme)
+            val checked = ttrp().test("build $source --check --json")
+            checked.statusCode shouldBe 3
+            checked.stdout shouldContain "README.md"
+            Files.readString(readme) shouldBe before
         }
         test("unsupported README languages are usage errors for both source formats") {
             for (name in listOf("release.md", "release.ttrp")) {
