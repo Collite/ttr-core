@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttrp.lsp
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -37,6 +38,39 @@ class LiterateRecipeLspSpec :
                 val uri = "file:///README.md"
                 h.open(uri, "# Notes\n\n```js\nconsole.log('hello')\n```\n\n```sql\nSELECT 1\n```\n", "markdown")
                 h.awaitDiagnostics(uri) shouldBe emptyList()
+            }
+        }
+        test("Markdown navigation refuses rename and never returns canonical positions") {
+            TtrpLspHarness(resolver).use { h ->
+                h.initialize()
+                val uri = "file:///release.md"
+                h.open(uri, md, "markdown")
+                h.awaitDiagnostics(uri) shouldBe emptyList()
+                val id = TextDocumentIdentifier(uri)
+                val at = Fixtures.positionOf(md, "candidates placed_orders")
+                val failure =
+                    shouldThrow<java.util.concurrent.ExecutionException> {
+                        h.remote.textDocumentService
+                            .prepareRename(PrepareRenameParams(id, at))
+                            .get()
+                    }
+                val error = failure.cause as org.eclipse.lsp4j.jsonrpc.ResponseErrorException
+                error.responseError.code shouldBe
+                    org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode.InvalidRequest.value
+                error.responseError.message shouldBe "rename is not available in a literate recipe yet"
+                val edits =
+                    h.remote.textDocumentService
+                        .rename(RenameParams(id, at, "changed"))
+                        .get()
+                edits.documentChanges.orEmpty() shouldBe emptyList()
+                edits.changes.orEmpty() shouldBe emptyMap()
+                h.remote.textDocumentService
+                    .definition(DefinitionParams(id, at))
+                    .get()
+                    .left shouldBe emptyList()
+                h.remote.textDocumentService
+                    .hover(HoverParams(id, Position(0, 2)))
+                    .get() shouldBe null
             }
         }
         test("Markdown receives DOC diagnostics on its fence and REC diagnostics on mapped blocks") {

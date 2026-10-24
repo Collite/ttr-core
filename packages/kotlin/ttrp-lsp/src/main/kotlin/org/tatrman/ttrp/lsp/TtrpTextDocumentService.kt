@@ -27,6 +27,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.ResponseError
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.services.TextDocumentService
+import org.tatrman.ttrp.lsp.analysis.RecipeEditorAnalysis
 import org.tatrman.ttrp.lsp.analysis.AnalysisEngine
 import org.tatrman.ttrp.lsp.analysis.AnalysisScheduler
 import org.tatrman.ttrp.lsp.docs.DocumentStore
@@ -119,7 +120,14 @@ class TtrpTextDocumentService(
             val doc = docs.get(params.textDocument.uri) ?: return@supplyAsync null
             val analysis = engine.analyze(doc)
             RecipeEditorFeatures.hover(doc, analysis, params.position)
-                ?: hoverService.hover(analysis.report, params.position)
+                ?: if (RecipeEditorAnalysis.markdown(
+                        doc,
+                    )
+                ) {
+                    null
+                } else {
+                    hoverService.hover(analysis.report, params.position)
+                }
         }
 
     override fun completion(
@@ -146,6 +154,7 @@ class TtrpTextDocumentService(
     ): CompletableFuture<Either<MutableList<out Location>, MutableList<out LocationLink>>> =
         CompletableFuture.supplyAsync {
             val doc = docs.get(params.textDocument.uri) ?: return@supplyAsync emptyLocations()
+            if (RecipeEditorAnalysis.markdown(doc)) return@supplyAsync emptyLocations()
             val analysis = engine.analyze(doc)
             // AG B5: on a `from "<file>"` clause, definition opens the fragment file.
             org.tatrman.ttrp.lsp.nav.FragmentLinks
@@ -166,6 +175,15 @@ class TtrpTextDocumentService(
     ): CompletableFuture<Either3<Range, PrepareRenameResult, PrepareRenameDefaultBehavior>> =
         CompletableFuture.supplyAsync {
             val doc = docs.get(params.textDocument.uri) ?: return@supplyAsync null
+            if (RecipeEditorAnalysis.markdown(doc)) {
+                throw ResponseErrorException(
+                    ResponseError(
+                        ResponseErrorCode.InvalidRequest,
+                        "rename is not available in a literate recipe yet",
+                        null,
+                    ),
+                )
+            }
             val analysis = engine.analyze(doc)
             when (val prep = renameService.prepareRename(doc.text, analysis.report.document, params.position)) {
                 is RenameService.Prepare.Valid -> Either3.forFirst(prep.range)
@@ -177,6 +195,7 @@ class TtrpTextDocumentService(
     override fun rename(params: RenameParams): CompletableFuture<WorkspaceEdit> =
         CompletableFuture.supplyAsync {
             val doc = docs.get(params.textDocument.uri) ?: return@supplyAsync WorkspaceEdit(emptyList())
+            if (RecipeEditorAnalysis.markdown(doc)) return@supplyAsync WorkspaceEdit(emptyList())
             val analysis = engine.analyze(doc)
             renameService.rename(
                 params.textDocument.uri,

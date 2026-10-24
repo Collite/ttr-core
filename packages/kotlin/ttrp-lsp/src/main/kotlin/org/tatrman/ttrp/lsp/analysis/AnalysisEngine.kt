@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap
 data class Analysis(
     val uri: String,
     val version: Int,
+    /** Canonical recipe positions are not valid positions in a Markdown document. */
     val report: TtrpChecker.Report,
     val literate: org.tatrman.ttrp.doc.DocExtraction? = null,
     val recipes: List<EditorRecipe> = emptyList(),
