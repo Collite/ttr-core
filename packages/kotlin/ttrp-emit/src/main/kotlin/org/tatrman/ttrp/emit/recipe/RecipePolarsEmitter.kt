@@ -103,7 +103,7 @@ class RecipePolarsEmitter(
                             }.map { it.name }
                         }
                     val renderer =
-                        PolarsExprRenderer(column = { r ->
+                        PolarsExprRenderer(bindings = "bindings", column = { r ->
                             if (r.port ==
                                 "right"
                             ) {
@@ -133,7 +133,7 @@ class RecipePolarsEmitter(
                 } else {
                     // Keep the established node emitter (including reject and aggregate semantics).
                     lines +=
-                        PolarsIslandEmitter()
+                        PolarsIslandEmitter(bindings = "bindings")
                             .emit("recipe", listOf(PolarsStep(v, node, ins)))
                             .text
                             .lineSequence()

@@ -77,8 +77,9 @@ data class PolarsPartition(
  */
 class PolarsIslandEmitter(
     mdStaging: Map<org.tatrman.ttrp.ast.SourceLocation, org.tatrman.ttrp.graph.model.MdStageRef> = emptyMap(),
+    bindings: String? = null,
 ) {
-    private val expr = PolarsExprRenderer(mdStaging)
+    private val expr = PolarsExprRenderer(mdStaging, bindings = bindings)
 
     companion object {
         /**

@@ -34,6 +34,7 @@ import org.tatrman.ttrp.graph.model.MdStageRef
 class PolarsExprRenderer(
     private val mdStaging: Map<SourceLocation, MdStageRef> = emptyMap(),
     private val column: (ColumnRef) -> String = { it.column },
+    private val bindings: String? = null,
 ) {
     fun render(e: Expression): String =
         when (e) {
@@ -59,7 +60,13 @@ class PolarsExprRenderer(
                     detail = "MD dot-path reached Polars emit unstaged (no md-source hoist for this placement)",
                     location = e.location,
                 )
-            is org.tatrman.ttrp.expr.ParamRef -> "pl.lit(bindings[${quote(e.name)}])"
+            is org.tatrman.ttrp.expr.ParamRef ->
+                bindings?.let { "pl.lit($it[${quote(e.name)}])" }
+                    ?: throw TtrpEmitException(
+                        EmitDiagnosticId.UNSUPPORTED_NODE,
+                        detail = "a parameter reference has no binding outside a recipe",
+                        location = e.location,
+                    )
             is org.tatrman.ttrp.expr.DurationExpr ->
                 throw TtrpEmitException(
                     EmitDiagnosticId.UNSUPPORTED_NODE,
