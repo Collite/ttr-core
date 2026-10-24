@@ -64,6 +64,10 @@ class BuildCommand : CliktCommand(name = "build") {
     private val file by argument()
     private val out by option("--out")
     private val check by option("--check", help = "verify derived document artifacts without writing").flag()
+    private val deriveOnly by option(
+        "--derive-only",
+        help = "Markdown only: derive/check canonical and provenance without compiling a bundle",
+    ).flag()
     private val language by option(
         "--lang",
         help = "README language: en or cs",
@@ -138,10 +142,15 @@ class BuildCommand : CliktCommand(name = "build") {
                     check,
                     language,
                     json,
+                    deriveOnly = deriveOnly,
                     memberCatalog = members,
                     warning = { echo(it, err = true) },
                 ) { echo(it) }
                 return@withBuildErrors
+            }
+            if (deriveOnly) {
+                echo("ttrp build: --derive-only requires a Markdown document", err = true)
+                throw ProgramResult(2)
             }
             if (check) {
                 val project = manifestResult.manifest

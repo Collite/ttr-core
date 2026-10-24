@@ -33,6 +33,43 @@ class LiterateBuildSpec :
         }
 
         fun ttrp() = TtrpCommand().subcommands(BuildCommand())
+        test("derive-only supports deferred models without compiling or hiding derivation drift") {
+            val deferred = dir.resolve("deferred")
+            Files.createDirectories(deferred)
+            val source = deferred.resolve("pending.md")
+            Files.writeString(
+                source,
+                """
+                # Deferred operational recipe
+
+                ```ttrp
+                uses world "not.served"
+                recipe {
+                    key: deployment.name
+                    as of: now
+                    parameters: []
+                    document: "pending.md"
+                }
+                ```
+                """.trimIndent(),
+            )
+            val output = deferred.resolve("output")
+            ttrp().test("build $source --derive-only --out $output").statusCode shouldBe 0
+            val canonical = output.resolve("pending.ttrp")
+            Files.exists(canonical) shouldBe true
+            Files.exists(output.resolve("pending.ttrd")) shouldBe true
+            Files.exists(output.resolve("pending.bundle")) shouldBe false
+            ttrp().test("build $source --derive-only --out $output --check").statusCode shouldBe 0
+            Files.writeString(canonical, "hand edit")
+            val checked = ttrp().test("build $source --derive-only --out $output --check --json")
+            checked.statusCode shouldBe 3
+            checked.stdout shouldContain "TTRP-DOC-003"
+            Files.readString(canonical) shouldBe "hand edit"
+            ttrp().test("build $canonical --derive-only").statusCode shouldBe 2
+            Files.writeString(source, "```ttrp\nrecipe { invalid syntax }\n```")
+            ttrp().test("build $source --derive-only --out $output").statusCode shouldBe 1
+            Files.readString(canonical) shouldBe "hand edit"
+        }
         test("multi-recipe documents keep bundles and golden fixtures beside each derived recipe") {
             val project = dir.resolve("returns")
             Files.createDirectories(project)
