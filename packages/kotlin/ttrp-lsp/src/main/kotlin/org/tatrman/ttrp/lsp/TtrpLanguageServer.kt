@@ -66,7 +66,7 @@ class TtrpLanguageServer(
     private val renameService = RenameService(renameParticipants)
     private val methods =
         org.tatrman.ttrp.lsp.methods
-            .TtrpMethods(docs, projects)
+            .TtrpMethods(docs, projects, engine)
 
     private val textDocumentService =
         TtrpTextDocumentService(this, docs, engine, scheduler, hoverService, definitionService, renameService)
@@ -82,6 +82,8 @@ class TtrpLanguageServer(
         val capabilities = ServerCapabilities()
         capabilities.setTextDocumentSync(TextDocumentSyncKind.Incremental)
         capabilities.setHoverProvider(true)
+        capabilities.completionProvider = org.eclipse.lsp4j.CompletionOptions(false, listOf(":", ".", "{"))
+        capabilities.codeLensProvider = org.eclipse.lsp4j.CodeLensOptions(false)
         capabilities.setDefinitionProvider(true)
         capabilities.renameProvider =
             org.eclipse.lsp4j.jsonrpc.messages.Either

@@ -3194,6 +3194,22 @@
       {
         "id": "TTRP-REC-090",
         "suggestedAlternative": "place the entity on exactly one storage: er2db/hosts, or writable for an unbound entity"
+      },
+      {
+        "id": "TTRP-DOC-001",
+        "suggestedAlternative": "place a valid container block after its recipe skeleton"
+      },
+      {
+        "id": "TTRP-DOC-002",
+        "suggestedAlternative": "give every recipe skeleton and container a unique name"
+      },
+      {
+        "id": "TTRP-DOC-003",
+        "suggestedAlternative": "run ttrp build to regenerate the derived artifacts"
+      },
+      {
+        "id": "TTRP-DOC-004",
+        "suggestedAlternative": "use ttrp, sql, ttrb, ttrb-cs or python as the fence tag"
       }
     ]
   },
@@ -4124,6 +4140,26 @@
       "id": "TTRP-DSP-005",
       "area": "DSP",
       "suggestedAlternative": "an action display's column must be a scalar every engine can produce — declare it as text, int, bigint, smallint, decimal (precision ≤ 38), float, bool, date, time, datetime or timestamp"
+    },
+    {
+      "id": "TTRP-DOC-001",
+      "area": "DOC",
+      "suggestedAlternative": "place a valid container block after its recipe skeleton"
+    },
+    {
+      "id": "TTRP-DOC-002",
+      "area": "DOC",
+      "suggestedAlternative": "give every recipe skeleton and container a unique name"
+    },
+    {
+      "id": "TTRP-DOC-003",
+      "area": "DOC",
+      "suggestedAlternative": "run ttrp build to regenerate the derived artifacts"
+    },
+    {
+      "id": "TTRP-DOC-004",
+      "area": "DOC",
+      "suggestedAlternative": "use ttrp, sql, ttrb, ttrb-cs or python as the fence tag"
     },
     {
       "id": "TTRP-CN-001",

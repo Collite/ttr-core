@@ -157,6 +157,7 @@
     "onLanguage:ttr-sql",
     "onLanguage:ttr-pandas",
     "onLanguage:ttrb",
-    "onLanguage:ttrb-cs"
+    "onLanguage:ttrb-cs",
+    "onLanguage:markdown"
   ]
 }

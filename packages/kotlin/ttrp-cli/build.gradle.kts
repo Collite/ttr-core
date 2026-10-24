@@ -66,6 +66,7 @@ dependencies {
     implementation(project(":packages:kotlin:ttrp-frontend"))
     implementation(project(":packages:kotlin:ttrp-graph"))
     implementation(project(":packages:kotlin:ttrp-emit"))
+    implementation(project(":packages:kotlin:ttrp-doc"))
     // PL-P5.S1 — the emit SPI + the built-in bash plugin (the launcher is emitted through the SPI, not inline).
     implementation(project(":packages:kotlin:ttrp-emit-spi"))
     runtimeOnly(project(":packages:kotlin:ttr-emit-bash"))

@@ -35,6 +35,7 @@ dependencies {
     // serializes their output, it never recomputes its own semantics).
     implementation(project(":packages:kotlin:ttrp-graph"))
     implementation(project(":packages:kotlin:ttrp-cli"))
+    implementation(project(":packages:kotlin:ttrp-doc"))
     // ResolvedWorld etc. — the authoring-context bundle serializes the resolved world (contracts §7).
     implementation(project(":packages:kotlin:ttr-metadata"))
     // `.ttrl` view-state sidecar (Stage 5.2): parse via ttr-parser's TtrlLoader, write

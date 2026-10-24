@@ -6,6 +6,16 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- **AU-core P3:** literate Markdown recipes derive canonical programs and `.ttrd` provenance with read-only
+  `build --check`, multi-skeleton output paths and located DOC diagnostics. New published `ttrp-doc` provides
+  bilingual explanation READMEs, metadata labels and immutable AU annotation types/schema; human link Verdicts
+  affect sentence associations only. TTR-B gains recipe time sentences, parameter-label mentions and decision
+  route lists; the LSP gains Markdown mapping, recipe lenses, parameter hover/action completion, and an additive
+  recipe summary consumed by the Designer's four-lane list. The reusable `ttrp-check.yml` checks consumer sources.
+- **AU Polars twins:** all four recipes and review-119 probes execute on native Polars, compared with PostgreSQL
+  and DuckDB. Recipe conform accepts `--engines pg,duckdb,polars`. Bindings, reason fills, calendar range joins,
+  aggregate expressions and typed Arrow staging are supported; decimal division uses the declared engine delta.
+
 - **`cn-candidate.v1`** (cn, CN-P5 S5.2 — cn contracts §6, A-CN-81…84): `ttr-concept` publishes
   `schemas/cn-candidate.v1.schema.json` — a proposal for the conceptual model (a concept, a term or an open-tier
   relation), its provenance (`producer`, `source_ref`, `confidence`, AM-20 `evidence`) and its fate (`status`,

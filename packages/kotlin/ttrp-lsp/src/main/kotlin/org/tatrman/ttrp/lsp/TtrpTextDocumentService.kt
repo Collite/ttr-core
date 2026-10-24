@@ -56,7 +56,7 @@ class TtrpTextDocumentService(
         const val TTRP_LANGUAGE_ID = "ttrp"
 
         fun analysed(languageId: String): Boolean =
-            languageId == TTRP_LANGUAGE_ID || languageId in AnalysisEngine.TTRB_LANGUAGES
+            languageId == "markdown" || languageId == TTRP_LANGUAGE_ID || languageId in AnalysisEngine.TTRB_LANGUAGES
     }
 
     override fun didOpen(params: DidOpenTextDocumentParams) {
@@ -118,7 +118,27 @@ class TtrpTextDocumentService(
         CompletableFuture.supplyAsync {
             val doc = docs.get(params.textDocument.uri) ?: return@supplyAsync null
             val analysis = engine.analyze(doc)
-            hoverService.hover(analysis.report, params.position)
+            RecipeEditorFeatures.hover(doc, analysis, params.position)
+                ?: hoverService.hover(analysis.report, params.position)
+        }
+
+    override fun completion(
+        params: org.eclipse.lsp4j.CompletionParams,
+    ): CompletableFuture<Either<MutableList<org.eclipse.lsp4j.CompletionItem>, org.eclipse.lsp4j.CompletionList>> =
+        CompletableFuture.supplyAsync {
+            val doc = docs.get(params.textDocument.uri)
+            Either.forLeft(
+                doc?.let { RecipeEditorFeatures.completions(it, engine.analyze(it), params.position) }
+                    ?: mutableListOf(),
+            )
+        }
+
+    override fun codeLens(
+        params: org.eclipse.lsp4j.CodeLensParams,
+    ): CompletableFuture<MutableList<out org.eclipse.lsp4j.CodeLens>> =
+        CompletableFuture.supplyAsync {
+            val doc = docs.get(params.textDocument.uri)
+            doc?.let { RecipeEditorFeatures.lenses(it, engine.analyze(it)) } ?: mutableListOf()
         }
 
     override fun definition(

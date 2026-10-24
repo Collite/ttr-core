@@ -45,6 +45,11 @@ class RecipeBundleAssembler(
         outDir: Path,
         statements: List<RecipeStatement> = RecipeStatements.plan(plan),
         recipeDir: Path? = null,
+        readmeLabels: org.tatrman.ttrp.doc.ReadmeLabels =
+            org.tatrman.ttrp.doc
+                .ReadmeLabels(),
+        documentTitle: String? = null,
+        language: String = "en",
     ): BundleAssembler.BundleResult {
         val model = requireNotNull(plan.recipe) { "$program holds no recipe" }
         val bound = requireNotNull(plan.bound)
@@ -266,6 +271,13 @@ class RecipeBundleAssembler(
                 tests = tests.ifEmpty { null },
             )
 
+        write(
+            bundleDir,
+            "README.md",
+            org.tatrman.ttrp.doc.ReadmeRenderer
+                .render(recipe, readmeLabels, documentTitle, language),
+            files,
+        )
         val manifest =
             RunManifest(
                 schemaVersion = 3,

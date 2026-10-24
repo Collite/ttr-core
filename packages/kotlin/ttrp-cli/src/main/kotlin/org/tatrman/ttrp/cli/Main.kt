@@ -61,7 +61,9 @@ class TtrpCommand : CliktCommand(name = "ttrp") {
 /** `ttrp build <file>.ttrp [--out <dir>]` → assemble the bundle; exit ≠ 0 on error diagnostics. */
 class BuildCommand : CliktCommand(name = "build") {
     private val file by argument()
-    private val out by option("--out").default(".")
+    private val out by option("--out")
+    private val check by option("--check", help = "verify derived document artifacts without writing").flag()
+    private val language by option("--lang", help = "README language: en or cs").default("en")
 
     // AU-core-P2 (contracts §9): the manifest + the compile's diagnostics as JSON on stdout — the hartland suites read it.
     private val json by option("--json", help = "print the bundle's manifest and the diagnostics as JSON").flag()
@@ -99,6 +101,36 @@ class BuildCommand : CliktCommand(name = "build") {
             echo("ttrp build: no such file: $file", err = true)
             throw ProgramResult(2)
         }
+        require(language in setOf("en", "cs")) { "--lang must be en or cs" }
+        if (abs.fileName.toString().endsWith(".md")) {
+            try {
+                LiterateBuild.run(abs, out?.let { Path.of(it).toAbsolutePath() }, check, language, json) { echo(it) }
+            } catch (
+                e: BundleAssembler.BundleRefused,
+            ) {
+                if (json) echo(BuildJson.failure(e.diagnostics)) else echo(e.message, err = true)
+                throw ProgramResult(1)
+            }
+            return
+        }
+        if (check) {
+            val project = TtrpManifestReader.resolve(abs.parent).manifest
+            val plan = TtrpPipeline(project, project.modelsRoot()).plan(Files.readString(abs), abs.toString())
+            val diagnostics =
+                plan.diagnostics +
+                    if (plan.ok &&
+                        plan.recipe != null
+                    ) {
+                        org.tatrman.ttrp.bundle.RecipeBundleCheck
+                            .inspect(plan)
+                            .diagnostics
+                    } else {
+                        emptyList()
+                    }
+            if (json) echo(BuildJson.failure(diagnostics)) else diagnostics.forEach { echo(it.render()) }
+            if (diagnostics.any { it.severity == Severity.ERROR }) throw ProgramResult(1)
+            return
+        }
         val manifestResult = TtrpManifestReader.resolve(abs.parent ?: abs)
         // Surface the H-6 signature knob: in v1 it can only be honored by the (not-yet-wired) isolated
         // third-party loader, so a project that sets it must be told it is currently inert — never silently.
@@ -120,7 +152,8 @@ class BuildCommand : CliktCommand(name = "build") {
                     fileName = abs.toString(),
                     pipelineManifest = manifestResult.manifest,
                     modelsRoot = manifestResult.manifest.modelsRoot(),
-                    outDir = Path.of(out),
+                    outDir = Path.of(out ?: "."),
+                    language = language,
                     memberCatalog = connected?.let { ConnectedMemberCatalog.forUrl(it) },
                 )
             } catch (e: org.tatrman.ttr.md.resolve.CatalogUnavailable) {

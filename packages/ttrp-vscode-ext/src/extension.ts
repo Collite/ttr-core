@@ -82,6 +82,7 @@ export function activate(context: vscode.ExtensionContext): void {
       { scheme: 'file', language: 'ttr-pandas' },
       { scheme: 'file', language: 'ttrb' },
       { scheme: 'file', language: 'ttrb-cs' },
+      { scheme: 'file', language: 'markdown' },
     ],
     outputChannelName: 'TTR-P Language Server',
     synchronize: {

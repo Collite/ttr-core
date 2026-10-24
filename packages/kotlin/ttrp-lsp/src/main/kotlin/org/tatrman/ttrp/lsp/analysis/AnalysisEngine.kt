@@ -12,6 +12,8 @@ data class Analysis(
     val uri: String,
     val version: Int,
     val report: TtrpChecker.Report,
+    val literate: org.tatrman.ttrp.doc.DocExtraction? = null,
+    val recipes: List<EditorRecipe> = emptyList(),
 )
 
 /**
@@ -31,11 +33,14 @@ class AnalysisEngine(
     fun analyze(doc: OpenDocument): Analysis {
         analysisCache[doc.uri]?.let { if (it.version == doc.version) return it }
         val ctx = projects.resolve(doc.uri)
+        if (RecipeEditorAnalysis.markdown(doc)) {
+            return RecipeEditorAnalysis.literate(doc, ctx).also { analysisCache[doc.uri] = it }
+        }
         val report =
             ttrbSentenceCheck(doc, ctx)
                 ?: checkerFor(ctx.modelsRoot) { TtrpChecker(ctx.manifest, ctx.modelsRoot) }
                     .check(doc.text, doc.uri, ctx.manifestDiagnostics)
-        val analysis = Analysis(doc.uri, doc.version, report)
+        val analysis = RecipeEditorAnalysis.checked(doc, ctx, report)
         analysisCache[doc.uri] = analysis
         return analysis
     }

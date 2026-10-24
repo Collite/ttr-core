@@ -118,6 +118,8 @@ class BundleAssembler(
         // which snapshots it once per pass and records the fingerprint in the run manifest's `md` block.
         memberCatalog: org.tatrman.ttr.md.resolve.MemberCatalog? = null,
         recipeDir: Path? = null,
+        documentTitle: String? = null,
+        language: String = "en",
     ): BundleResult {
         val plan =
             TtrpPipeline(
@@ -135,7 +137,28 @@ class BundleAssembler(
             if (inspection.diagnostics.isNotEmpty()) throw BundleRefused(plan.diagnostics + inspection.diagnostics)
             return RecipeBundleAssembler(
                 toolchainVersion,
-            ).assemble(plan, fileName, outDir, inspection.statements, recipeDir).let {
+            ).assemble(
+                plan,
+                fileName,
+                outDir,
+                inspection.statements,
+                recipeDir,
+                org.tatrman.ttrp.doc.ReadmeLabels.from(
+                    org.tatrman.ttrp.resolve.ModelRepo
+                        .snapshotOf(modelsRoot, pipelineManifest.extraModelRootPaths()),
+                    org.tatrman.ttrp.parser.TtrpParser
+                        .parseString(source)
+                        .document.statements
+                        .filterIsInstance<org.tatrman.ttrp.ast.ImportDecl>()
+                        .map {
+                            it.qname.parts.joinToString(
+                                ".",
+                            )
+                        }.toSet(),
+                ),
+                documentTitle,
+                language,
+            ).let {
                 it.copy(diagnostics = plan.diagnostics + it.diagnostics)
             }
         }
