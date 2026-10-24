@@ -12,6 +12,7 @@
   text-align: left;
   isolation: isolate;
   contain: layout style;
+  outline: none;
 }
 .ttr-designer, .ttr-designer *, .ttr-designer ::before, .ttr-designer ::after { box-sizing: border-box; }
 .ttr-designer :where(*), .ttr-designer ::before, .ttr-designer ::after { border-width: 0; border-style: solid; border-color: #e2e8f0; }

@@ -54,13 +54,14 @@ RUN pnpm install --offline --frozen-lockfile --filter "@tatrman/designer-core...
 RUN DESIGNER_BASE_URL=./ pnpm --filter "@tatrman/designer-core..." build
 # Split the output here, so the runtime stage below is COPY-only (no RUN ⇒ no emulation needed for
 # a foreign target platform). index.html is a TEMPLATE: the entrypoint renders it into /tmp.
-RUN mkdir -p /out/templates \
-    && cp -R packages/designer/dist /out/html \
-    && rm -rf /out/html/library /out/html/package \
-    && mv /out/html/index.html /out/templates/index.html \
+RUN mkdir -p /out/templates /out/html \
+    && cp packages/designer/dist/index.html /out/templates/index.html \
+    && cp -R packages/designer/dist/hosted packages/designer/dist/assets packages/designer/dist/samples /out/html/ \
     && test -f /out/templates/index.html \
     && test -f /out/html/hosted/index.html \
     && test -d /out/html/assets \
+    && test -d /out/html/samples \
+    && test -z "$(find /out/html -name '*.d.ts' -print)" \
     && test ! -e /out/html/library \
     && test ! -e /out/html/package
 

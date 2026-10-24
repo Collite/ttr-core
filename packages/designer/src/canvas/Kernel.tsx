@@ -151,7 +151,7 @@ function KernelInner({
   }
 
   return (
-    <div ref={hostRef} style={{ width: '100%', height: '100%', background: page ? SURFACE[theme] : skin.canvas.background, position: 'relative' }} data-testid="canvas-kernel" data-skin={skinId}>
+    <div ref={hostRef} style={{ width: '100%', height: '100%', background: page?.theme === 'dark' ? SURFACE[theme] : skin.canvas.background, position: 'relative' }} data-testid="canvas-kernel" data-skin={skinId}>
       {derived && <DerivedBanner />}
       <ReactFlow
         nodes={rfNodes}
