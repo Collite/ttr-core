@@ -323,7 +323,7 @@ object TtrRenderer {
 
     private fun renderAutoBody(b: AutoBody): String {
         val sb = StringBuilder()
-        b.type?.let { sb.append(" type: ${it.name},") }
+        b.type?.let { sb.append(" type: ${renderDataType(it)},") }
         b.label?.let { sb.append(" label: ${renderLocalizedString(it)},") }
         renderDescriptionIfAny(b.description, b.descriptionLocalized)?.let { sb.append(it) }
         renderTagsIfAny(b.tags)?.let { sb.append(" $it") }
