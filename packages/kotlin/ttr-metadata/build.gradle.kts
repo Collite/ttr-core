@@ -12,6 +12,7 @@ plugins {
 kotlin { jvmToolchain(21) }
 tasks.test {
     useJUnitPlatform()
+    inputs.file("../../grammar/src/generated/property-map.ts")
     // VL-P0: LayoutResolverSpec reads the shared layout vectors in place (never a copy).
     inputs.dir("../../package-sdk/schemas/layout-vectors")
     // CN-P2 S2.5: the cn specs load conformance fixtures 75–84 in place.

@@ -208,7 +208,15 @@ class ModelReconciler(
                 )
         }
 
-        return ReconciliationResult(model = model, warnings = warnings, errors = errors)
+        return ReconciliationResult(
+            model = model,
+            warnings = warnings,
+            errors = errors,
+            files =
+                sorted.flatMap {
+                    it.loadedFiles
+                },
+        )
     }
 
     /**
@@ -433,6 +441,7 @@ data class ReconciliationResult(
     val model: Model,
     val warnings: List<LoadWarning>,
     val errors: List<LoadWarning>,
+    val files: List<org.tatrman.ttr.metadata.source.LoadedFile> = emptyList(),
 ) {
     val ok: Boolean get() = errors.isEmpty()
 }

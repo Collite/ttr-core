@@ -5,6 +5,7 @@ import org.tatrman.ttr.metadata.model.Model
 import org.tatrman.ttr.metadata.model.ModelDescriptor
 import org.tatrman.ttr.metadata.reconcile.ModelReconciler
 import org.tatrman.ttr.metadata.reconcile.ReconciliationPolicy
+import org.tatrman.ttr.metadata.source.LoadedFile
 import org.tatrman.ttr.metadata.source.LoadWarning
 import org.tatrman.ttr.metadata.source.ModelSource
 
@@ -47,6 +48,7 @@ class MetadataLoader(
                     snapshots.flatMap { it.mdHopIssues }
             LoadResult(
                 model = result.model,
+                files = result.files,
                 issues = issues,
                 report = if (options.strict) LoadReport.collect(snapshots, issues, options) else null,
             )
@@ -70,6 +72,8 @@ data class LoadResult(
     val issues: List<LoadIssue>,
     /** Null unless [LoadOptions.strict] requested validation. */
     val report: LoadReport? = null,
+    /** Every parsed definition, including layers not represented by the typed model. */
+    val files: List<LoadedFile> = emptyList(),
 ) {
     val errors: List<LoadIssue> get() = issues.filter { it.severity == LoadIssue.Severity.ERROR }
     val warnings: List<LoadIssue> get() = issues.filter { it.severity == LoadIssue.Severity.WARNING }
