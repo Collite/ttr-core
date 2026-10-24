@@ -105,3 +105,17 @@ it('collect sees the whole new file while a transport acknowledgement waits, and
   await editing;
   expect(edit).toHaveBeenCalledOnce();
 });
+
+it('retries a failed worker write even when the whole-file text is already cached', async () => {
+  const { WorkerLspDataSource } = await import('../worker-lsp-data-source.js');
+  const open = vi.fn().mockRejectedValueOnce(new Error('worker unavailable')).mockResolvedValue(undefined);
+  const source = new WorkerLspDataSource(
+    { openDocument: open, setProjectRoot: async () => ({}) } as unknown as import('../../lsp-client.js').LspClient,
+    { projectRoot: 'file:///repo', files: new Map() }
+  );
+  const file = { path: 'model/er/new.ttrm', text: 'model er\ndef query created {}' };
+  await expect(source.writeSourceFile(file)).rejects.toThrow('worker unavailable');
+  expect(source.changedFiles()).toEqual([file]);
+  await expect(source.writeSourceFile(file)).resolves.toEqual([]);
+  expect(open).toHaveBeenCalledTimes(2);
+});

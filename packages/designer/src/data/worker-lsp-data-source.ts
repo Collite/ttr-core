@@ -99,7 +99,7 @@ export class WorkerLspDataSource implements ModelDataSource {
   writeSourceFile({ path, text }: { path: string; text: string }) {
     const run = this.edits.then(async () => {
       if (!isSourcePath(path)) throw new Error('Use a regular model/*.ttrm source path.');
-      if (this.docTextCache.get(path) === text) return this.lspClient.diagnostics?.() ?? [];
+      // Re-send unchanged cached text too: an earlier transport failure may not have reached the worker.
       this.docTextCache.set(path, text);
       const uri = this.ctx.projectRoot.replace(/\/$/, '') + '/' + path.split('/').map(encodeURIComponent).join('/');
       const opened = this.lspClient.openDocument(uri, text);
