@@ -146,7 +146,7 @@ body {margin:13px;background:#0c1828;color:#eee;font-family:Georgia} #navy-heade
     join(scratch, 'main.jsx'),
     `import React,{useState} from 'react';import{createRoot}from'react-dom/client';import{DesignerPage}from'@tatrman/designer-core';import'@tatrman/designer-core/designer.css';
 window.locations=[];window.failures=[];async function mount(){const snapshot=await fetch('/snapshot.json').then(r=>r.json());
-function Model(){const[location,setLocation]=useState('/w/hartland/s/md');return React.createElement(DesignerPage,{files:snapshot,workspace:'hartland',basePath:'/m/',lang:'en',theme:'dark',location,onLocation:p=>{window.locations.push(p);setLocation(p)},onError:e=>window.failures.push(e)})}
+function Model(){const[location,setLocation]=useState('/w/hartland/s/md');const[theme,setTheme]=useState('dark');window.setPageTheme=setTheme;return React.createElement(DesignerPage,{files:snapshot,workspace:'hartland',basePath:'/m/',lang:'en',theme,location,onLocation:p=>{window.locations.push(p);setLocation(p)},onError:e=>window.failures.push(e)})}
 createRoot(document.getElementById('mount')).render(React.createElement(Model));}mount();`
   );
   writeFileSync(
