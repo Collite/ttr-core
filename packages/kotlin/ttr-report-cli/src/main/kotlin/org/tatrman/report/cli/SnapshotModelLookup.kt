@@ -16,12 +16,30 @@ import org.tatrman.plan.v1.PlanNode
 import org.tatrman.plan.v1.QualifiedName as WireName
 import org.tatrman.plan.v1.SchemaCode as WireSchema
 import org.tatrman.translate.v1.Language
+import org.apache.calcite.rel.metadata.RelColumnOrigin
+import org.apache.calcite.sql.type.SqlTypeName
 
 /** Captures one non-strict metadata snapshot. Only compilation is used, never execution or a server. */
 class SnapshotModelLookup(
     private val model: Model,
 ) : QueryModelLookup {
     private val handles = mutableMapOf<SchemaCode, SnapshotQueryHandle>()
+
+    // SurfaceType folds date into datetime. Recover display precision only for unchanged columns.
+    private val dateColumns =
+        model.schemas.values
+            .asSequence()
+            .flatMap { it.objects() }
+            .mapNotNull { obj ->
+                val type =
+                    when (obj) {
+                        is Attribute -> obj.type
+                        is DbColumn -> obj.dataType
+                        else -> null
+                    }
+                obj.qname.takeIf { type?.trim()?.equals("date", ignoreCase = true) == true }
+            }.map { Triple(schemaCodeToToken(it.schemaCode), it.namespace, it.name) }
+            .toSet()
 
     private fun handle(query: Query) =
         handles.getOrPut(query.qname.schemaCode) {
@@ -37,9 +55,34 @@ class SnapshotModelLookup(
     override fun outputTypes(qname: String): Map<String, String> {
         val query = query(qname) ?: throw ReportException("program-missing", "Program '$qname' does not exist")
         val handle = handle(query)
-        return PlanNodeDecoder.decode(handle.plan(query), TranslatorFramework(handle)).rowType.fieldList.associate {
-            it.name to it.type.sqlTypeName.name
-        }
+        val rel = PlanNodeDecoder.decode(handle.plan(query), TranslatorFramework(handle))
+        return rel.rowType.fieldList
+            .mapIndexed { index, field ->
+                val type = field.type.sqlTypeName
+                val displayType =
+                    if (type == SqlTypeName.TIMESTAMP &&
+                        declaredDate(
+                            rel.cluster.metadataQuery
+                                .getColumnOrigins(rel, index)
+                                ?.singleOrNull(),
+                        )
+                    ) {
+                        SqlTypeName.DATE
+                    } else {
+                        type
+                    }
+                field.name to displayType.name
+            }.toMap()
+    }
+
+    private fun declaredDate(origin: RelColumnOrigin?): Boolean {
+        if (origin == null || origin.isDerived) return false
+        val path = origin.originTable.qualifiedName
+        if (path.size != 3) return false
+        val column =
+            origin.originTable.rowType.fieldList[origin.originColumnOrdinal]
+                .name
+        return Triple(path[0], path[1], "${path[2]}.$column") in dateColumns
     }
 
     override fun declaredParameters(qname: String): List<QueryParameter> =

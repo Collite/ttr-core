@@ -59,40 +59,51 @@ class ExitReviewSpec :
             }
         }
         "automatic row height stays automatic and explicit height is inherited" {
-            for (mode in listOf("auto", "stored-auto", "stored-false", "manual")) {
-                val fixed = mode == "manual"
-                val input =
-                    workbook {
-                        createSheet("Summary").createRow(0).apply {
-                            when (mode) {
-                                "manual" -> heightInPoints = 32f
-                                "stored-auto" -> ctRow.ht = 45.0
-                                "stored-false" -> {
-                                    ctRow.ht = 45.0
-                                    ctRow.customHeight = false
+            for (count in listOf(0, 1, 2)) {
+                for (mode in listOf("auto", "stored-auto", "stored-false", "manual")) {
+                    val fixed = mode == "manual"
+                    val input =
+                        workbook {
+                            createSheet("Summary").createRow(0).apply {
+                                when (mode) {
+                                    "manual" -> heightInPoints = 32f
+                                    "stored-auto" -> ctRow.ht = 45.0
+                                    "stored-false" -> {
+                                        ctRow.ht = 45.0
+                                        ctRow.customHeight = false
+                                    }
                                 }
+                                createCell(0).setCellValue("{{table:ROWS}}")
                             }
-                            createCell(0).setCellValue("{{table:ROWS}}")
                         }
-                    }
-                val output =
-                    XlsxFill.fill(
-                        input,
-                        ReportData(
-                            tables =
-                                mapOf(
-                                    "ROWS" to Table(listOf("a"), listOf(listOf("a\nb"), listOf("c"))),
-                                ),
-                        ),
-                    )
-                XSSFWorkbook(ByteArrayInputStream(output)).use { book ->
-                    for (row in book.getSheetAt(0)) {
-                        val stored = (row as org.apache.poi.xssf.usermodel.XSSFRow).ctRow
-                        stored.isSetHt shouldBe fixed
-                        stored.isSetCustomHeight shouldBe fixed
-                        if (fixed) stored.customHeight shouldBe true
-                        if (fixed) row.heightInPoints shouldBe 32f
-                        row.zeroHeight shouldBe false
+                    val output =
+                        XlsxFill.fill(
+                            input,
+                            ReportData(
+                                tables =
+                                    mapOf(
+                                        "ROWS" to Table(listOf("a"), listOf(listOf("a\nb"), listOf("c")).take(count)),
+                                    ),
+                            ),
+                        )
+                    XSSFWorkbook(ByteArrayInputStream(output)).use { book ->
+                        book.getSheetAt(0).physicalNumberOfRows shouldBe maxOf(1, count)
+                        if (count == 0) {
+                            book
+                                .getSheetAt(0)
+                                .getRow(0)
+                                .getCell(0)
+                                .cellType shouldBe
+                                org.apache.poi.ss.usermodel.CellType.BLANK
+                        }
+                        for (row in book.getSheetAt(0)) {
+                            val stored = (row as org.apache.poi.xssf.usermodel.XSSFRow).ctRow
+                            stored.isSetHt shouldBe fixed
+                            stored.isSetCustomHeight shouldBe fixed
+                            if (fixed) stored.customHeight shouldBe true
+                            if (fixed) row.heightInPoints shouldBe 32f
+                            row.zeroHeight shouldBe false
+                        }
                     }
                 }
             }
