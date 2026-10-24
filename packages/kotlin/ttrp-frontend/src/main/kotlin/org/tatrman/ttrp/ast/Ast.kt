@@ -276,6 +276,7 @@ data class FragmentDecomposition(
      * this. Empty without joins.
      */
     val refOperands: Map<SourceLocation, String> = emptyMap(),
+    val recipeSwitch: SwitchStmt? = null,
 )
 
 /** One TTR-B action's output: the container OUT [port] and the action display [display] it feeds. */

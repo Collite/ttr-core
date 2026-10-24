@@ -262,6 +262,7 @@ enum class TtrpDiagnosticId(
     B_108("TTRP-B-108", "Attach <table> to the result."),
     B_109("TTRP-B-109", "Choose another name — a keyword cannot name a column, a table or a result."),
     B_110("TTRP-B-110", "Join the conditions with `and` in one block: If <a> and <b>:"),
+    B_114("TTRP-B-114", "Put the block condition into the route condition with `and`."),
     B_111("TTRP-B-111", "Send that to output <port>."),
     B_112("TTRP-B-112", "Declare the port in the container header — container <name>(…, out <port>) …"),
     B_113(
@@ -648,6 +649,11 @@ enum class TtrpDiagnosticId(
 
     // ---- TTRP 0.5 (CN-P2 S2.6, CN-D29): the conceptual-model forms parse anywhere (the grammar stays
     // target-neutral) and only a cn `definition:` / `members:` / `filter:` block reads them. ----
+    DOC_001("TTRP-DOC-001", "place a valid container block after its recipe skeleton"),
+    DOC_002("TTRP-DOC-002", "give every recipe skeleton and container a unique name"),
+    DOC_003("TTRP-DOC-003", "run ttrp build to regenerate the derived artifacts"),
+    DOC_004("TTRP-DOC-004", "use ttrp, sql, ttrb, ttrb-cs or python as the fence tag"),
+    DOC_005("TTRP-DOC-005", "update the reader to act on the newer annotation type, if needed"),
     CN_001(
         "TTRP-CN-001",
         "a conceptual-model form (`exists … involving …`, `count(<Concept> involving …)`, `this`, `in <call>`, " +

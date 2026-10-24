@@ -54,9 +54,9 @@ class TtrpChecker(
     // of the pass" idiom. Null ⇒ disconnected (R13). `memberSnapshot` (direct) still wins, for the S3-A
     // unit fixtures that inject a snapshot without a catalog.
     private val memberCatalog: org.tatrman.ttr.md.resolve.MemberCatalog? = null,
+    /** A host may reuse an immutable loaded snapshot until the project's model files change. */
+    private val modelIndex: ModelIndex? = ModelRepo.indexOf(modelsRoot, manifest.extraModelRootPaths()),
 ) {
-    private val modelIndex: ModelIndex? =
-        ModelRepo.indexOf(modelsRoot, manifest.extraModelRootPaths())
     private val typechecker = ExpressionTypechecker()
 
     data class Report(
@@ -131,7 +131,38 @@ class TtrpChecker(
                 .synthesize(fileName, source, manifest)
         val effectiveSource = synth?.wrapperSource ?: source
 
-        val parsed = TtrpParser.parseString(effectiveSource, fileName)
+        val initialParse = TtrpParser.parseString(effectiveSource, fileName)
+        val importsForLabels =
+            initialParse.document.statements.filterIsInstance<ImportDecl>().map {
+                ModelIndex.importScope(it.qname.parts, it.qname.text)
+            }
+        val declaredParameters =
+            initialParse.document.statements
+                .filterIsInstance<org.tatrman.ttrp.ast.RecipeDecl>()
+                .flatMap {
+                    it.parameters
+                }.map { it.text }
+                .toSet()
+        val aliases =
+            modelIndex
+                ?.automationInScope(importsForLabels)
+                .orEmpty()
+                .filterIsInstance<org.tatrman.ttr.metadata.model.AutomationParameter>()
+                .filter {
+                    it.qname.name in
+                        declaredParameters
+                }.flatMap { p ->
+                    p.label.byLanguage.values.map { label ->
+                        org.tatrman.ttrp.dialect.b.TtrbSkin
+                            .fold(label) to
+                            p.qname.name
+                    }
+                }.groupBy(
+                    { it.first },
+                    { it.second },
+                ).filterValues { it.distinct().size == 1 }
+                .mapValues { it.value.first() }
+        val parsed = if (aliases.isEmpty()) initialParse else TtrpParser.parseString(effectiveSource, fileName, aliases)
         val diags = mutableListOf<TtrpDiagnostic>()
         diags += manifestDiagnostics
         synth?.let { diags += it.diagnostics }

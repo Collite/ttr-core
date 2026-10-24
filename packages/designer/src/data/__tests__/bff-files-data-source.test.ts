@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LspClient } from '../../lsp-client.js';
+import { WorkerLspDataSource } from '../worker-lsp-data-source.js';
 import { BffFilesDataSource } from '../bff-files-data-source.js';
 
 const manifest = '[packages]\nlayout = "off"';
@@ -163,4 +164,29 @@ describe('BFF snapshots in a worker', () => {
       ).toThrow(/same-origin/);
     }
   });
+});
+
+
+afterEach(()=>vi.restoreAllMocks());
+it.each(['snapshot','edit'])('R15 does not cache a catalog invalidated by a concurrent %s',async mode=>{
+  const h=harness();
+  const old={graphs:[],symbols:[{qname:'old',kind:'entity',name:'old',packageName:'shop'}]};
+  const fresh={graphs:[],symbols:[{qname:'fresh',kind:'entity',name:'fresh',packageName:'shop'}]};
+  let release!: (value: typeof old)=>void;
+  const held=new Promise<typeof old>(resolve=>{release=resolve;});
+  const listing=vi.spyOn(WorkerLspDataSource.prototype,'listCatalog').mockResolvedValueOnce(old).mockImplementationOnce(()=>held).mockResolvedValue(fresh);
+  try {
+    await h.source.refresh();
+    h.clients[0].edit=vi.fn(async()=>({ok:true as const,edit:{changes:{'file:///repo/model/er/item.ttrm':[{range:{start:{line:0,character:0},end:{line:0,character:0}},newText:'// changed\n'}]}},touched:[],diagnostics:[]}));
+    const change=()=>h.source.edit({op:'add-term',args:{lang:'en',term:'x',target:'er.entity.x'}});
+    await change();
+    const stale=h.source.listCatalog();
+    expect(listing).toHaveBeenCalledTimes(2);
+    if(mode==='snapshot') {
+      h.fetcher.mockResolvedValueOnce({ok:true,json:async()=>({sha:'two',files})} as Response);
+      await h.source.refresh({discard:true});
+    } else await change();
+    release(old);await stale;
+    expect(await h.source.listCatalog()).toEqual(fresh);
+  } finally {h.source.dispose();}
 });

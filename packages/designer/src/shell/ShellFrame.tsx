@@ -9,9 +9,8 @@
 //     against Worker (full) / WS / Veles (honestly degraded) behind the one interface.
 //   • view-state: layout persists through the injected `ViewStateStore` (DM-P2.S1), selected by the
 //     backend's `capabilities.layoutPersist` — Worker in-file / WS `.ttrl` / Veles `file` (the tab).
-//   • FO-21: edit affordances render ONLY through an injected `ShellEditContext` — ABSENT here, so
-//     the Viewer ships no edit code (add/remove/applyGraphEdit + pickers are DM-P3 authoring). The
-//     processing face (program tabs) is a placeholder until DM-P4.
+//   • FO-21 as amended by SO D-19: source editing is open. Canvas forms/pickers
+//     render through the injected commercial `ShellEditContext`; no forms ship here.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { BindingMapData, DisplayMode, GetGraphResponse, LineageRootRef, ModelGraphEdge } from '@tatrman/lsp';
@@ -533,7 +532,7 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
       return;
     }
     const detail = await dataSource.getSymbolDetail?.(qname).catch(() => null);
-    const src = detail?.sourceUri ? getSourceText?.(detail.sourceUri) : undefined;
+    const src = detail?.sourceText ?? (detail?.sourceUri ? getSourceText?.(detail.sourceUri) : undefined);
     setSelected({
       qname, kind: detail?.kind ?? 'object', label: detail?.name ?? qname.split('.').pop() ?? qname,
       description: detail?.description ?? undefined, sourceText: src,
@@ -544,6 +543,33 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
     });
     setDrawerOpen(true);
   }
+
+  useEffect(() => {
+    let live = true;
+    let generation = 0;
+    const sub = dataSource.onFilesChanged?.(() => {
+      const current = ++generation;
+      setBindings(null);
+      if (selected?.qname) void dataSource.getSymbolDetail?.(selected.qname).then(detail => {
+        if (!live || current !== generation || !detail) return;
+        setSelected(node => node?.qname === detail.qname
+          ? { ...node, kind: detail.kind, label: detail.name, description: detail.description ?? undefined, sourceText: detail.sourceText }
+          : node);
+      }).catch(e => onError?.(String(e)));
+      const schemas = [...new Set([...Object.keys(schemaGraphs), ...(tab?.subject.kind === 'schema' ? [tab.subject.schemaCode] : [])])];
+      // Read the whole changed model, keeping view state and node positions intact.
+      void Promise.all([
+        Promise.all(Object.keys(graphs).map(async ref => [ref, await dataSource.getGraph(ref)] as const)),
+        Promise.all(schemas.map(async code => [code, await dataSource.getSchemaGraph?.(code as ModelKind) ?? null] as const)),
+      ]).then(([freshGraphs, freshSchemas]) => {
+        if (!live || current !== generation) return;
+        schemaLoadingRef.current.clear();
+        setGraphs(Object.fromEntries(freshGraphs));
+        setSchemaGraphs(Object.fromEntries(freshSchemas));
+      }).catch(e => onError?.(String(e)));
+    });
+    return () => { live = false; sub?.dispose(); };
+  }, [dataSource, Object.keys(graphs).join('\n'), Object.keys(schemaGraphs).join('\n'), tab?.subject.ref, selected?.qname]);
 
   async function refetchGraph(ref: string) {
     const g = await dataSource.getGraph(ref);
@@ -1241,17 +1267,25 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
         onOpenLineage={openLineage}
         // member lineage needs Worker-side getSymbolDetail; WS/Veles degrade (A1-CAP-001, W2).
         memberLineageCapable={typeof dataSource.getSymbolDetail === 'function'}
-        editEnabled={canEdit}
-        // save routes through the ONE apply seam (the authoring context's generic saveNode) — the
-        // shell never names the underlying edit op (FO-21). W3.S2 round-trip: a clean save refreshes
-        // the canvas (onModelChanged → refetch); a rejected save returns the reason VERBATIM so the
-        // drawer keeps the editor open and shows it (never a paraphrase, canvas untouched).
+        editEnabled={canEdit || !!(dataSource.capabilities.save === 'host' && dataSource.edit && selected?.sourceText)}
+        // SO D-19: source saves use the open data-source seam. Commercial/processing
+        // backends can still supply their generic saveNode. Refusals keep the buffer;
+        // successful edits refresh reads and return worker diagnostics inline.
         onSaveEdit={async (n, text) => {
-          if (!editContext?.editable) return { ok: true };
-          const r = await editContext.saveNode(n.qname, text);
-          if (r && !r.ok) return { ok: false, error: r.reason ?? 'Edit not applied.' };
-          if (tab) await refetchGraph(tab.subject.ref); // onModelChanged → canvas refresh
-          return { ok: true };
+          if (editContext?.editable && editContext.saveNode) {
+            const r = await editContext.saveNode(n.qname, text);
+            if (r && !r.ok) return { ok: false, error: r.reason ?? 'Edit not applied.' };
+            if (tab) await refetchGraph(tab.subject.ref);
+            return { ok: true };
+          }
+          if (dataSource.capabilities.save === 'host' && dataSource.edit) {
+            const result = await dataSource.edit({ op: 'set-source', args: { nodeRef: n.qname, text } });
+            if (!result.ok) return { ok: false, error: result.message };
+            const detail = await dataSource.getSymbolDetail?.(n.qname);
+            setSelected(current => current?.qname === n.qname ? { ...current, sourceText: detail?.sourceText ?? text } : current);
+            return { ok: true, diagnostics: result.diagnostics.map(d => d.message) };
+          }
+          return { ok: false, error: 'This backend is read-only.' };
         }}
       />
       <CommandPalette registry={registry} open={cmdkOpen} onClose={() => setCmdkOpen(false)} />

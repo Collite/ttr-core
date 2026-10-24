@@ -1,0 +1,9 @@
+{
+  "op": "add-attribute",
+  "args": {
+    "entity": "er.entity.return_request",
+    "name": "note",
+    "type": "text",
+    "column": "db.dbo.return_request.note"
+  }
+}

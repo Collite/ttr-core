@@ -27,6 +27,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.ResponseError
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.services.TextDocumentService
+import org.tatrman.ttrp.lsp.analysis.RecipeEditorAnalysis
 import org.tatrman.ttrp.lsp.analysis.AnalysisEngine
 import org.tatrman.ttrp.lsp.analysis.AnalysisScheduler
 import org.tatrman.ttrp.lsp.docs.DocumentStore
@@ -56,7 +57,7 @@ class TtrpTextDocumentService(
         const val TTRP_LANGUAGE_ID = "ttrp"
 
         fun analysed(languageId: String): Boolean =
-            languageId == TTRP_LANGUAGE_ID || languageId in AnalysisEngine.TTRB_LANGUAGES
+            languageId == "markdown" || languageId == TTRP_LANGUAGE_ID || languageId in AnalysisEngine.TTRB_LANGUAGES
     }
 
     override fun didOpen(params: DidOpenTextDocumentParams) {
@@ -118,7 +119,34 @@ class TtrpTextDocumentService(
         CompletableFuture.supplyAsync {
             val doc = docs.get(params.textDocument.uri) ?: return@supplyAsync null
             val analysis = engine.analyze(doc)
-            hoverService.hover(analysis.report, params.position)
+            RecipeEditorFeatures.hover(doc, analysis, params.position)
+                ?: if (RecipeEditorAnalysis.markdown(
+                        doc,
+                    )
+                ) {
+                    null
+                } else {
+                    hoverService.hover(analysis.report, params.position)
+                }
+        }
+
+    override fun completion(
+        params: org.eclipse.lsp4j.CompletionParams,
+    ): CompletableFuture<Either<MutableList<org.eclipse.lsp4j.CompletionItem>, org.eclipse.lsp4j.CompletionList>> =
+        CompletableFuture.supplyAsync {
+            val doc = docs.get(params.textDocument.uri)
+            Either.forLeft(
+                doc?.let { RecipeEditorFeatures.completions(it, engine.analyze(it), params.position) }
+                    ?: mutableListOf(),
+            )
+        }
+
+    override fun codeLens(
+        params: org.eclipse.lsp4j.CodeLensParams,
+    ): CompletableFuture<MutableList<out org.eclipse.lsp4j.CodeLens>> =
+        CompletableFuture.supplyAsync {
+            val doc = docs.get(params.textDocument.uri)
+            doc?.let { RecipeEditorFeatures.lenses(it, engine.analyze(it)) } ?: mutableListOf()
         }
 
     override fun definition(
@@ -126,6 +154,7 @@ class TtrpTextDocumentService(
     ): CompletableFuture<Either<MutableList<out Location>, MutableList<out LocationLink>>> =
         CompletableFuture.supplyAsync {
             val doc = docs.get(params.textDocument.uri) ?: return@supplyAsync emptyLocations()
+            if (RecipeEditorAnalysis.markdown(doc)) return@supplyAsync emptyLocations()
             val analysis = engine.analyze(doc)
             // AG B5: on a `from "<file>"` clause, definition opens the fragment file.
             org.tatrman.ttrp.lsp.nav.FragmentLinks
@@ -146,6 +175,15 @@ class TtrpTextDocumentService(
     ): CompletableFuture<Either3<Range, PrepareRenameResult, PrepareRenameDefaultBehavior>> =
         CompletableFuture.supplyAsync {
             val doc = docs.get(params.textDocument.uri) ?: return@supplyAsync null
+            if (RecipeEditorAnalysis.markdown(doc)) {
+                throw ResponseErrorException(
+                    ResponseError(
+                        ResponseErrorCode.InvalidRequest,
+                        "rename is not available in a literate recipe yet",
+                        null,
+                    ),
+                )
+            }
             val analysis = engine.analyze(doc)
             when (val prep = renameService.prepareRename(doc.text, analysis.report.document, params.position)) {
                 is RenameService.Prepare.Valid -> Either3.forFirst(prep.range)
@@ -157,6 +195,7 @@ class TtrpTextDocumentService(
     override fun rename(params: RenameParams): CompletableFuture<WorkspaceEdit> =
         CompletableFuture.supplyAsync {
             val doc = docs.get(params.textDocument.uri) ?: return@supplyAsync WorkspaceEdit(emptyList())
+            if (RecipeEditorAnalysis.markdown(doc)) return@supplyAsync WorkspaceEdit(emptyList())
             val analysis = engine.analyze(doc)
             renameService.rename(
                 params.textDocument.uri,

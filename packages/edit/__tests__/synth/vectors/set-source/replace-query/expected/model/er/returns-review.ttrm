@@ -1,0 +1,7 @@
+package hartland
+
+model er
+
+def query returns_review { sourceText: """sql
+SELECT request_id FROM return_request
+""" }

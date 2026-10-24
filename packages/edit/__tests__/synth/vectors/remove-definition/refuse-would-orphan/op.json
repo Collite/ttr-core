@@ -1,0 +1,6 @@
+{
+  "op": "remove-definition",
+  "args": {
+    "qname": "er.entity.return_request"
+  }
+}

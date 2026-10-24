@@ -40,6 +40,7 @@ See [§ Maven Central — the public lane](#maven-central--the-public-lane-sv-p1
 | `:packages:kotlin:ttr-plan-proto` | `org.tatrman:ttr-plan-proto` | ttr-translator arc | Canonical `plan.v1`/`transdsl.v1`/`dfdsl.v1` wire formats (+ the `proteus.v1` enum stub and `plan.v1.SchemaCodes`), with the `.proto` files bundled as jar resources for the protoc include-path contract. tatrman owns the wire format (TR-3); consumed by kantheon `:shared:proto` + the translator |
 | `:packages:kotlin:ttr-translator` | `org.tatrman:ttr-translator` | ttr-translator arc | Calcite-backed translation core (island ↔ RelNode ↔ SQL / `plan.v1`); consumed by tatrman `ttrp-emit` and kantheon Proteus/Ariadne. `api` deps: `ttr-plan-proto` + `calcite-core`. Ships an `InMemoryModelHandle` test-fixtures jar (ModelHandle SPI double, contracts §3) |
 | `:packages:kotlin:ttrp-frontend` | `org.tatrman:ttrp-frontend` | TTR-P P3 | compiler front-half: parse → resolve → typecheck; serves `ttrp check`/`validate`/`authoringContext` (contracts §10) |
+| `:packages:kotlin:ttrp-doc` | `org.tatrman:ttrp-doc` | AU-core P3 | literate Markdown extraction, provenance, bilingual explanation rendering, annotation types and JSON schema |
 | `:packages:kotlin:ttrp-graph`    | `org.tatrman:ttrp-graph`    | TTR-P P3 | graph construction + normalizer (T8 rewrites) |
 | `:packages:kotlin:ttrp-emit`     | `org.tatrman:ttrp-emit`     | TTR-P P3 | island codegen, movement synthesis, bundle assembly |
 | `:packages:kotlin:ttrp-lsp`      | `org.tatrman:ttrp-lsp`      | TTR-P P4 | one TTR-P LSP; stdio + WS transports |
@@ -66,7 +67,7 @@ coordinate/version, so this rename is not a breaking change for consumers:
 
 | Tag | Modules published | `just publish` |
 |---|---|---|
-| `grammar/v<x.y.z>[-RELEASE]` | **THE unified TTR toolchain bundle** (2026-07-30): `ttr-parser` + `ttr-writer` + `ttr-semantics` + `ttr-metadata` + `ttr-metadata-git` + `ttr-snapshot` + `ttr-md-resolver` — plus `ttr-lexicon` + `ttr-lexicon-compile` + `ttr-lexicon-cli`, which joined the lane on 2026-08-03 (`publish.yml` also publishes `ttr-metadata-cli` since SO S0.3; the CLI distribution is `ttr-metadata-cli:<v>:dist@zip`; SO S2.1/S2.2 also prepare `ttr-report` and `ttr-report-cli` (`bin/ttr-report`, `ttr-report-cli:<v>:dist@zip` and `:dist@tar`) for this bundle; this row listed seven until MH-P0 corrected it). They are one **`api` closure**, so they share one version — see [Why one bundle](#why-one-bundle-2026-07-30) below. **Since 2026-10-02 (AG-14) also the TTR-P toolchain:** `ttrp-frontend`, `ttrp-graph`, `ttrp-emit`, `ttrp-emit-spi`, `ttrp-conform`, `ttrp-cli` (+ `ttrp-cli:<v>:dist@zip`, the self-contained CLI: `bin/ttrp-cli` + `lib/`) and the emit plugins `ttr-emit-bash`/`-kestra`/`-airflow3`. `ttrp-emit` `api`s **ttr-translator**, which keeps its own line: the grammar run pins it to the latest `translator/v*` tag in the POMs (`-PtranslatorVersion`, root `build.gradle.kts`) and fails if the translator sources changed since that tag — cut the translator first. `ttrp-lsp` is not published | `just publish bundle grammar` |
+| `grammar/v<x.y.z>[-RELEASE]` | **THE unified TTR toolchain bundle** (2026-07-30): `ttr-parser` + `ttr-writer` + `ttr-semantics` + `ttr-metadata` + `ttr-metadata-git` + `ttr-snapshot` + `ttr-md-resolver` — plus `ttr-lexicon` + `ttr-lexicon-compile` + `ttr-lexicon-cli`, which joined the lane on 2026-08-03 (`publish.yml` also publishes `ttr-metadata-cli` since SO S0.3; the CLI distribution is `ttr-metadata-cli:<v>:dist@zip`; SO S2.1/S2.2 also prepare `ttr-report` and `ttr-report-cli` (`bin/ttr-report`, `ttr-report-cli:<v>:dist@zip` and `:dist@tar`) for this bundle; this row listed seven until MH-P0 corrected it). They are one **`api` closure**, so they share one version — see [Why one bundle](#why-one-bundle-2026-07-30) below. **Since 2026-10-02 (AG-14) also the TTR-P toolchain:** `ttrp-frontend`, `ttrp-graph`, `ttrp-emit`, `ttrp-doc`, `ttrp-emit-spi`, `ttrp-conform`, `ttrp-cli` (+ `ttrp-cli:<v>:dist@zip`, the self-contained CLI: `bin/ttrp-cli` + `lib/`) and the emit plugins `ttr-emit-bash`/`-kestra`/`-airflow3`. `ttrp-emit` `api`s **ttr-translator**, which keeps its own line: the grammar run pins it to the latest `translator/v*` tag in the POMs (`-PtranslatorVersion`, root `build.gradle.kts`) and fails if the translator sources changed since that tag — cut the translator first. `ttrp-lsp` is not published | `just publish bundle grammar` |
 | `ttr-parser/v<x.y.z>[-RELEASE]` | `ttr-parser` only (rare; parser-only patch) | `just publish ttr-parser` |
 | `ttr-semantics/v<x.y.z>[-RELEASE]` | `ttr-semantics` only (Phase 2 cadence) | `just publish ttr-semantics` |
 | `metadata/v<x.y.z>[-RELEASE]` | **RETIRED 2026-07-30** — folded into `grammar/v*`. The workflow trigger is kept deliberately, so a stale tag **fails loudly** instead of falling through and publishing the wrong module set at a metadata version number | ~~`just publish bundle metadata`~~ → errors with a pointer |
@@ -277,6 +278,23 @@ Per [`contracts.md`](docs/grammar-master/contracts.md) §7:
   **prerelease suffix** (`-rc.N`, `-dev.N`) so they stay on the GH Packages
   staging lane and off the Central quota (§ Release lanes). Local builds
   without `-Pversion` get `0.0.1-LOCAL` (see below).
+
+### TypeScript edit synthesizer (public npmjs) — `@tatrman/edit`
+
+SO D-19 amends FO-21: structured definition synthesis/apply operations are open, while commercial canvas forms
+remain extension-owned. `edit/v0.1.0` publishes `@tatrman/edit@0.1.0` via the package matrix in `publish-ts.yml`.
+The tag version must equal `packages/edit/package.json`; the tag commit must be an ancestor of merged master.
+The release requires `NPM_TOKEN` with public publish rights for the scope. S1.3 preflight (2026-10-23) found no
+repository or inherited organization token; provision it before cutting the tag. Do not tag an unmerged phase PR.
+
+Build with `pnpm --filter "@tatrman/edit..." build`. The internal workspace entry stays unbundled for dependency
+deduplication; publish-only entry overrides select a self-contained runtime and declaration bundle in `dist/package`.
+Only the public `vscode-languageserver-types` dependency remains; the private workspace closure is bundled.
+
+Every PR runs `node scripts/edit-consumer-smoke.mjs`: `pnpm publish --dry-run`, pack/install in a temporary consumer,
+a four-file canonical vector and strict declaration compilation. To release after review/merge, tag the merged
+commit `edit/v0.1.0`, push that tag and verify both the publish workflow and `npm view @tatrman/edit@0.1.0`.
+The workflow retains the existing `ts-grammar/v*` version/minor and tarball guards.
 
 ## Local iteration — `publishToMavenLocal`
 

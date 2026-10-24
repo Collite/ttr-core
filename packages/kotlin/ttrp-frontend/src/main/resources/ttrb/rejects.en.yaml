@@ -170,3 +170,10 @@ rejects:
     message: "`==` is not equality in TTR-B."
     suggest: "use ="
     decision: S9
+
+  - id: TTRP-B-114
+    form: a route, decision mode or otherwise sentence inside an If block
+    example: "If amount > 100: Decide hold when n_short > 0."
+    message: "Decision sentences cannot appear inside an If block."
+    suggest: "Put the condition into the route: Decide hold when amount > 100 and n_short > 0."
+    decision: R136-R4

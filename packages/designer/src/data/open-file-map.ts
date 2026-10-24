@@ -16,8 +16,10 @@ export async function openFileMap(
   const paths = [...files.keys()].filter(
     (p) => isModelFile(p) && (!opts?.under || p.startsWith(opts.under))
   );
+  // The removal guard reads JS roster bytes, but the worker must never parse them as TTR.
+  const rosters = [...files.keys()].filter(p => /^model\/tests\/.+\.mjs$/.test(p));
   await Promise.all(
-    paths.map((p) => client.openDocument(`${root.replace(/\/$/, '')}/${p}`, files.get(p)!))
+    [...paths, ...rosters].map((p) => client.openDocument(`${root.replace(/\/$/, '')}/${p}`, files.get(p)!))
   );
   // Like loadProjectIntoSymbols' two-pass load: references can resolve only after all symbols exist.
   // This request is also the notification barrier and republishes final cross-file diagnostics.

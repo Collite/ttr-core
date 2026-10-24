@@ -121,6 +121,10 @@ class ModelIndex(
                 (imp.tier == null || obj.qname.schemaCode == imp.tier)
         }
 
+    /** Presentation uses the same package/tier scope as resolution, including automation package imports. */
+    fun objectsInScope(imports: List<ImportScope>): List<ModelObject> =
+        (objects.filter { inScope(it, imports) } + automationInScope(imports)).distinctBy { it.qname }
+
     /** Loadable model objects (db table / er entity) with the given simple name in import scope (D-b-iii). */
     fun findLoadable(
         name: String,

@@ -1,0 +1,6 @@
+[project]
+name = "hartland"
+[packages]
+layout = "off"
+[bindings]
+required = true

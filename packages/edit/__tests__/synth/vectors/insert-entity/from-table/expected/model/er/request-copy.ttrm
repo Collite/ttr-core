@@ -1,0 +1,11 @@
+package hartland
+
+model er
+
+def entity request_copy {
+    attributes: [
+        def attribute request_id { type: int, isKey: true },
+        def attribute amount { type: { type: decimal, length: 12, precision: 2 } },
+        def attribute note { type: text, optional: true }
+    ]
+}

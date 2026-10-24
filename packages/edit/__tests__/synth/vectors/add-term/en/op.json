@@ -1,0 +1,9 @@
+{
+  "op": "add-term",
+  "args": {
+    "lang": "en",
+    "term": "return request",
+    "target": "er.entity.return_request",
+    "file": "returns.ttrm"
+  }
+}

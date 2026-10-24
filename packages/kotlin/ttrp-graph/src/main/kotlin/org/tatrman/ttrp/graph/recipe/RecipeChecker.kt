@@ -161,6 +161,7 @@ class RecipeChecker(
                 keyAttributes = recipe.key.map { it.text },
                 keyColumns = keyColumns,
                 candidates = recipe.candidates.firstOrNull()?.name,
+                candidateKind = recipe.candidates.firstOrNull()?.let(::roleKind),
                 contexts = contexts,
                 decision = recipe.decisions.firstOrNull()?.name,
                 routes =
@@ -201,6 +202,7 @@ class RecipeChecker(
                 programs = programs.map { it.qname.name },
                 routeRow = routeRow,
                 calendarSkWithins = time.calendarSkWithins.toSet(),
+                implicitLatestDates = time.implicitLatestDates.toMap(),
                 dateArithmetic = time.dateArithmetic.toMap(),
                 elseNone = sw?.elseRoute?.let { it.name == null } ?: false,
                 kinds =
@@ -519,24 +521,26 @@ class RecipeChecker(
 
     // ---- key lineage + the mode verdict (REC-010…012) -----------------------------------------------------
 
+    private fun roleKind(role: RoleContainer): String =
+        when (val f = role.form) {
+            is IslandForm.Target ->
+                when (val b = role.body) {
+                    is org.tatrman.ttrp.ast.FragmentBody -> b.tag
+                    else -> "canonical"
+                }
+            is IslandForm.Builtin -> "builtin"
+            is IslandForm.Foreign -> "foreign:${f.language}"
+            is IslandForm.Call -> "call"
+            is IslandForm.Turn -> "turn"
+        }
+
     private fun classify(
         role: RoleContainer,
         rg: RecipeGraph,
         lineage: KeyLineage,
         rows: RecipeRows,
     ): ContextInfo {
-        val kind =
-            when (val f = role.form) {
-                is IslandForm.Target ->
-                    when (val b = role.body) {
-                        is org.tatrman.ttrp.ast.FragmentBody -> b.tag
-                        else -> "canonical"
-                    }
-                is IslandForm.Builtin -> "builtin"
-                is IslandForm.Foreign -> "foreign:${f.language}"
-                is IslandForm.Call -> "call"
-                is IslandForm.Turn -> "turn"
-            }
+        val kind = roleKind(role)
         val c = rg.roles[role.name]?.let { container(it) }
         val out = c?.let { outPort(it) }?.let { lineage.of(PortRef(c.id, it)) } ?: Lineage.LOOKUP
         val cls =

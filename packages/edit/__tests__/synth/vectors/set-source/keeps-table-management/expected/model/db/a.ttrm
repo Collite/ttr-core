@@ -1,0 +1,8 @@
+package shop
+model db schema dbo
+def table t {
+  management: canon, // preserve
+  changeSemantics: scd2 { validFrom: vf, validTo: vt },
+  writeback { mapping: vf },
+  columns: [def column id {type: bigint}, def column vf {type: date}, def column vt {type: date}]
+}

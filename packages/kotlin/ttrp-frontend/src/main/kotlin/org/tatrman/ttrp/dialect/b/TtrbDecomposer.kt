@@ -48,8 +48,10 @@ class TtrbDecomposer(
     private val inPorts: Set<String> = emptySet(),
     /** The container's declared OUT ports; null when unknown (a bare / corpus fragment — no check). */
     private val outPorts: Set<String>? = null,
+    private val decision: Boolean = false,
+    private val parameterAliases: Map<String, String> = emptyMap(),
 ) {
-    private val exprFolder = TtrbExpr(loc, catalog, skin)
+    private val exprFolder = TtrbExpr(loc, catalog, skin, parameterAliases)
     private val diags = mutableListOf<org.tatrman.ttrp.diagnostics.TtrpDiagnostic>()
     private val out = mutableListOf<Statement>()
     private val elems = mutableListOf<ChainElem>()
@@ -58,11 +60,16 @@ class TtrbDecomposer(
     private val derived = LinkedHashSet<String>()
     private var synth = 0
     private val actions = mutableListOf<org.tatrman.ttrp.ast.ActionOutput>()
+    private var decisionInput: String? = null
+    private var decisionMode: org.tatrman.ttrp.ast.SwitchMode? = null
+    private val routes = mutableListOf<org.tatrman.ttrp.ast.Route>()
+    private var otherwise: org.tatrman.ttrp.ast.ElseRoute? = null
     private val portCounts = HashMap<String, Int>()
     private val outputs = LinkedHashSet<String>()
 
     init {
         bound += inPorts
+        if (decision) curName = inPorts.firstOrNull()
     }
 
     data class Result(
@@ -71,6 +78,7 @@ class TtrbDecomposer(
         val diagnostics: List<org.tatrman.ttrp.diagnostics.TtrpDiagnostic> = emptyList(),
         val actionOutputs: List<org.tatrman.ttrp.ast.ActionOutput> = emptyList(),
         val outputPorts: List<String> = emptyList(),
+        val recipeSwitch: org.tatrman.ttrp.ast.SwitchStmt? = null,
     )
 
     fun decompose(
@@ -94,7 +102,19 @@ class TtrbDecomposer(
             elems.clear()
         }
         if (diags.isEmpty()) diags += unusedResults(outPort)
-        return Result(out, derived.toList(), diags.toList(), actions.toList(), outputs.toList())
+        val switch =
+            if (routes.isEmpty() || diags.any { it.severity == Severity.ERROR }) {
+                null
+            } else {
+                org.tatrman.ttrp.ast.SwitchStmt(
+                    DottedRef(listOf(requireNotNull(decisionInput)), loc.of(program)),
+                    decisionMode,
+                    routes.toList(),
+                    otherwise,
+                    loc.of(program),
+                )
+            }
+        return Result(out, derived.toList(), diags.toList(), actions.toList(), outputs.toList(), switch)
     }
 
     private fun item(
@@ -104,7 +124,18 @@ class TtrbDecomposer(
         item.sentence()?.let { sentence ->
             val mark = out.size
             origin = Origin(loc.of(sentence.statement()), sentence.start.text)
-            statement(sentence.statement())
+            val body = sentence.statement()
+            if (depth > 0 &&
+                (
+                    body is P.DecideSentenceContext ||
+                        body is P.DecisionModeSentenceContext ||
+                        body is P.DecisionElseSentenceContext
+                )
+            ) {
+                diags += reject("TTRP-B-114", TtrpDiagnosticId.B_114, loc.of(body))
+                return@let
+            }
+            statement(body)
             tagOrigins(mark)
         }
         item.block()?.let { block(it, depth) }
@@ -209,7 +240,172 @@ class TtrbDecomposer(
     }
 
     private fun statement(s: P.StatementContext) {
+        val routeSentence =
+            s is P.DecideSentenceContext || s is P.DecisionModeSentenceContext || s is P.DecisionElseSentenceContext
+        if ((routeSentence && !decision) || (!routeSentence && routes.isNotEmpty())) {
+            diags +=
+                TtrpDiagnostic(
+                    TtrpDiagnosticId.REC_070,
+                    Severity.ERROR,
+                    "a decision has its pipeline first, followed by Decide routes, mode and otherwise sentences",
+                    loc.of(s),
+                )
+            return
+        }
         when (s) {
+            is P.LatestSentenceContext -> {
+                val c = s.latestStmt()
+                val at = loc.of(c)
+                val args =
+                    listOfNotNull(c.date?.let { namedArg("by", ColumnRef(null, it.text, at), at) }) +
+                        c.columnsAnd().ident().mapIndexed { i, key ->
+                            namedArg(
+                                if (i ==
+                                    0
+                                ) {
+                                    "per"
+                                } else {
+                                    null
+                                },
+                                ColumnRef(null, key.text, at),
+                                at,
+                            )
+                        }
+                append(OpCall("latest", args, null, at))
+            }
+            is P.WithinSentenceContext -> {
+                val c = s.withinStmt()
+                val at = loc.of(c)
+                val duration =
+                    org.tatrman.ttrp.expr.DurationLiteral(
+                        c.amount.text.toLong(),
+                        org.tatrman.ttrp.expr.DurationUnit.DAYS,
+                        at,
+                    )
+                append(
+                    OpCall(
+                        "within",
+                        listOf(namedArg(null, ColumnRef(null, c.col.text, at), at), namedArg("last", duration, at)),
+                        null,
+                        at,
+                    ),
+                )
+            }
+            is P.WorkingDaysSentenceContext -> {
+                val c = s.workingDaysStmt()
+                val at = loc.of(c)
+                val value =
+                    FunctionCall(
+                        CatalogId("fn.working_days"),
+                        listOf(
+                            ColumnRef(null, c.col.text, at),
+                            org.tatrman.ttrp.expr
+                                .ParamRef("as_of", at),
+                        ),
+                        at,
+                        argNames = listOf("between", "and"),
+                    )
+                append(OpCall("calc", emptyList(), ConfigBlock(listOf(AssignEntry(c.name.text, value, at)), at), at))
+            }
+            is P.DecideSentenceContext -> {
+                val c = s.decideStmt()
+                val at = loc.of(c)
+                if (otherwise !=
+                    null
+                ) {
+                    diags +=
+                        TtrpDiagnostic(
+                            TtrpDiagnosticId.PRS_007,
+                            Severity.ERROR,
+                            "Otherwise is the final route sentence",
+                            at,
+                        )
+                    return
+                }
+                if (!decision) {
+                    diags +=
+                        TtrpDiagnostic(
+                            TtrpDiagnosticId.REC_070,
+                            Severity.ERROR,
+                            "Decide sentences belong in a decision container",
+                            at,
+                        )
+                    return
+                }
+                if (decisionInput == null) decisionInput = materialize(at)
+                routes +=
+                    org.tatrman.ttrp.ast.Route(
+                        c.route.text,
+                        exprFolder.foldBool(c.boolExpr()),
+                        c.reason
+                            ?.text
+                            ?.drop(1)
+                            ?.dropLast(1),
+                        c
+                            .columnsAnd()
+                            ?.ident()
+                            .orEmpty()
+                            .map {
+                                org.tatrman.ttrp.ast
+                                    .Name(it.text, loc.of(it))
+                            },
+                        at,
+                    )
+            }
+            is P.DecisionModeSentenceContext -> {
+                if (decisionMode !=
+                    null
+                ) {
+                    diags +=
+                        TtrpDiagnostic(
+                            TtrpDiagnosticId.PRS_007,
+                            Severity.ERROR,
+                            "a decision has one mode sentence",
+                            loc.of(s),
+                        )
+                    return
+                }
+                decisionMode =
+                    if (s.decisionModeStmt().EXCLUSIVELY() !=
+                        null
+                    ) {
+                        org.tatrman.ttrp.ast.SwitchMode.EXCLUSIVE
+                    } else {
+                        org.tatrman.ttrp.ast.SwitchMode.OVERLAPPING
+                    }
+            }
+            is P.DecisionElseSentenceContext -> {
+                val c = s.decisionElseStmt()
+                if (otherwise !=
+                    null
+                ) {
+                    diags +=
+                        TtrpDiagnostic(
+                            TtrpDiagnosticId.PRS_007,
+                            Severity.ERROR,
+                            "a decision has one Otherwise sentence",
+                            loc.of(c),
+                        )
+                    return
+                }
+                otherwise =
+                    org.tatrman.ttrp.ast.ElseRoute(
+                        c.route?.text,
+                        c.reason
+                            ?.text
+                            ?.drop(1)
+                            ?.dropLast(1),
+                        c
+                            .columnsAnd()
+                            ?.ident()
+                            .orEmpty()
+                            .map {
+                                org.tatrman.ttrp.ast
+                                    .Name(it.text, loc.of(it))
+                            },
+                        loc.of(c),
+                    )
+            }
             is P.LoadSentenceContext -> bindLoad(s.loadStmt())
             is P.JoinSentenceContext -> bindJoin(s.joinStmt())
             is P.KeepColumnsSentenceContext -> append(projectOf(s.keepColumnsStmt()))
@@ -783,7 +979,7 @@ class TtrbDecomposer(
      * final value; with the ports unknown (a corpus / bare first pass) the final value is not judged.
      */
     private fun unusedResults(outPort: String?): List<TtrpDiagnostic> {
-        val ports = outPorts.orEmpty() + outputs + actions.map { it.port }
+        val ports = outPorts.orEmpty() + outputs + actions.map { it.port } + listOfNotNull(decisionInput)
         val assigned = out.filterIsInstance<Assignment>().map { it.target }.toSet()
         val defaultOut = outPorts?.firstOrNull()
         val finalRead =

@@ -11,6 +11,20 @@
 lang: cs
 
 keywords:
+  DO: [proveď]
+  LATEST: [nejnovější]
+  SNAPSHOT: [snímek]
+  WITHIN: [během]
+  LAST: [posledních]
+  DAYS: [dní]
+  WORKING_DAYS: [pracovní dny]
+  SINCE: [od]
+  DECIDE: [rozhodni, rozhoduj]
+  BECAUSE: [protože]
+  SHOWING: [s detailem]
+  EXCLUSIVELY: [výlučně]
+  MULTI_ROUTE: [řádek může projít více cestami]
+  NOTHING: [nic]
   # ---- verbs (C4-b roster) ----
   LOAD: [načti, nahraj]
   KEEP: [ponech, zachovej, nech]
@@ -138,7 +152,7 @@ sequences:
   "se nerovná": [DOES, NOT, EQUAL]
 
 # No Czech word: articles and `of`; English-only synonyms; `typ` stays a column name.
-absent: [THE, OF, COL, COLS, FIELDS, LINE, LINES, EXCLUDING, EXCLUDE, GROUP, W_TYPE, ASC, DESC,
+absent: [PER, THE, OF, COL, COLS, FIELDS, LINE, LINES, EXCLUDING, EXCLUDE, GROUP, W_TYPE, ASC, DESC,
          LARGER, FEWER, DOES, ONE]
 
 functions:

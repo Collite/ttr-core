@@ -596,14 +596,20 @@ object AuthoringContextBuilder {
             add(
                 "diagnostics",
                 JsonArray().apply {
-                    TtrpDiagnosticId.entries.filter { it.id.startsWith("TTRP-REC-") }.forEach { d ->
-                        add(
-                            JsonObject().apply {
-                                addProperty("id", d.id)
-                                addNullable("suggestedAlternative", d.suggestedAlternative)
-                            },
-                        )
-                    }
+                    TtrpDiagnosticId.entries
+                        .filter {
+                            it.id.startsWith(
+                                "TTRP-REC-",
+                            ) ||
+                                it.id.startsWith("TTRP-DOC-")
+                        }.forEach { d ->
+                            add(
+                                JsonObject().apply {
+                                    addProperty("id", d.id)
+                                    addNullable("suggestedAlternative", d.suggestedAlternative)
+                                },
+                            )
+                        }
                 },
             )
         }

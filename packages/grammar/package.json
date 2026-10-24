@@ -17,11 +17,15 @@
       "types": "./dist/index.d.ts"
     },
     "./grammar": "./src/TTR.g4",
+    "./ttrp-grammar": "./src/TTRP.g4",
+    "./ttrb-grammar": "./src/TTRB.g4",
     "./generated/property-map": "./src/generated/property-map.ts"
   },
   "files": [
     "dist",
     "src/TTR.g4",
+    "src/TTRP.g4",
+    "src/TTRB.g4",
     "src/generated/property-map.ts",
     "src/generated/version.ts"
   ],

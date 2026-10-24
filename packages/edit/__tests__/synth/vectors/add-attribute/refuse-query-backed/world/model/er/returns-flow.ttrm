@@ -1,0 +1,5 @@
+package hartland
+
+model er
+
+def entity return_request { binding: { target: { query: er.query.q } } }
