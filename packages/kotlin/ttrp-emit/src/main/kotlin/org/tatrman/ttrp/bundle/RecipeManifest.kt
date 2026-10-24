@@ -52,7 +52,9 @@ data class RecipeManifest(
 /** Explicit coverage evidence, bound into text/2. Consumers must verify it against pinned action/ER metadata. */
 @Serializable
 data class RecipeApprovalDependencies(
-    val version: Int = 1,
+    val version: Int,
+    /** Checked recipe import qnames, sorted and unique; required for scoped offline verification. */
+    val imports: List<String>,
     /** The unchanged text/1 digest, not an independently approved fingerprint. */
     val textBase: String,
     /** Distinct directly wired action name → action-dependency/1 digest, in sorted name order. */

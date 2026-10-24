@@ -8,15 +8,15 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.tatrman.ttr.metadata.model.Attribute
 import org.tatrman.ttr.metadata.model.AutomationAction
-import org.tatrman.ttr.metadata.model.Entity
 import org.tatrman.ttr.metadata.model.QualifiedName
 import org.tatrman.ttr.parser.model.AutoValue
-import org.tatrman.ttrp.ast.ImportDecl
 import org.tatrman.ttrp.bundle.RecipeApprovalDependencies
 import org.tatrman.ttrp.graph.TtrpPipeline
 import org.tatrman.ttrp.graph.recipe.RecipeModel
-import org.tatrman.ttrp.resolve.ModelIndex
-import java.security.MessageDigest
+import org.tatrman.ttrp.resolve.ActionResolution
+import org.tatrman.ttrp.resolve.AutomationScope
+import org.tatrman.ttrp.resolve.TargetResolution
+import org.tatrman.ttr.metadata.world.AutomationFingerprints
 
 /**
  * Native preview approval dependencies v1 (AU contracts §2.3). Activated by a directly wired
@@ -34,69 +34,134 @@ object RecipeActionDependencies {
         model: RecipeModel,
         textBase: String,
     ): RecipeApprovalDependencies? {
-        val report = plan.frontendReport ?: return null
-        val index = report.modelIndex ?: return null
-        val imports =
-            report.document.statements.filterIsInstance<ImportDecl>().map {
-                ModelIndex.importScope(it.qname.parts, it.qname.text)
-            }
-        val visible = index.automationInScope(imports).filterIsInstance<AutomationAction>()
+        val scope = plan.frontendReport?.automationScope ?: return null
         val names =
             model.wirings
                 .map { it.action }
                 .distinct()
                 .sorted()
-        if (visible.none { it.qname.name in names && it.properties.any { p -> p.first == "writer_defaults" } }) {
-            return null
-        }
-        val actions = names.associateWith { name -> visible.single { it.qname.name == name } }
+        val actions =
+            names
+                .mapNotNull { name ->
+                    (scope.action(name) as? ActionResolution.Resolved)?.action?.let { name to it }
+                }.toMap()
+        if (actions.values.none(AutomationScope::hasDefaults)) return null
+        check(actions.size == names.size) { "checker accepted unresolved or ambiguous wired actions" }
         return RecipeApprovalDependencies(
+            version = 1,
+            imports =
+                scope.imports
+                    .map { it.raw }
+                    .distinct()
+                    .sorted(),
             textBase = textBase,
-            actions = fingerprints(actions) { index.entityInScope(it, imports) },
+            actions = fingerprints(actions, scope::target),
         )
     }
 
-    /** The text/2 binding is independently recomputable without recompiling graph or SQL. */
-    fun text(evidence: RecipeApprovalDependencies): String {
-        require(evidence.version == 1 && hash.matches(evidence.textBase)) { "unsupported approval evidence" }
-        require(
-            evidence.actions.isNotEmpty() && evidence.actions.all { it.key.isNotBlank() && hash.matches(it.value) },
-        ) {
-            "invalid action approval evidence"
-        }
-        return sha256("ttrp-recipe-text/2\n${evidence.textBase}\n${json(evidence.actions)}\n")
+    sealed interface Verification {
+        data object Ok : Verification
+
+        data class Stale(
+            val action: String?,
+        ) : Verification
+
+        data class Unresolved(
+            val ref: String,
+        ) : Verification
+
+        data class Ambiguous(
+            val ref: String,
+        ) : Verification
+
+        data class Malformed(
+            val reason: String,
+        ) : Verification
     }
 
-    /** Caller supplies exactly the distinct manifest wiring names, resolved in its pinned bundle scope. */
+    private class EvidenceException(
+        message: String,
+    ) : IllegalArgumentException(message)
+
+    private class TargetException(
+        val result: Verification,
+    ) : IllegalArgumentException()
+
+    /** The text/2 binding includes the checked import scope; changing scope cannot reuse old evidence. */
+    fun text(evidence: RecipeApprovalDependencies): String {
+        if (evidence.version != 1) throw EvidenceException("unsupported approval evidence version ${evidence.version}")
+        if (!hash.matches(evidence.textBase)) throw EvidenceException("invalid approval evidence textBase")
+        if (evidence.actions.isEmpty() || evidence.actions.any { it.key.isBlank() || !hash.matches(it.value) }) {
+            throw EvidenceException("invalid action approval evidence")
+        }
+        if (evidence.imports.any { it.isBlank() || it.split('.').any(String::isBlank) }) {
+            throw EvidenceException("invalid approval evidence import scope")
+        }
+        val dependencies = mapOf("actions" to evidence.actions, "imports" to evidence.imports.distinct().sorted())
+        return AutomationFingerprints.sha256("ttrp-recipe-text/2\n${evidence.textBase}\n${json(dependencies)}\n")
+    }
+
+    /** Caller supplies exactly the manifest wiring names, resolved in its recorded, pinned metadata scope. */
+    fun verify(
+        evidence: RecipeApprovalDependencies?,
+        approvedText: String,
+        actions: Map<String, AutomationAction>,
+        target: (String) -> TargetResolution,
+    ): Verification {
+        if (evidence == null) return Verification.Malformed("action approval evidence is missing")
+        val bound =
+            try {
+                text(evidence)
+            } catch (e: EvidenceException) {
+                return Verification.Malformed(requireNotNull(e.message))
+            }
+        if (bound != approvedText) return Verification.Malformed("approval evidence is not bound to recipe text/2")
+        if (evidence.actions.keys !=
+            actions.keys
+        ) {
+            return Verification.Malformed("action approval evidence names differ from wiring")
+        }
+        val actual =
+            try {
+                fingerprints(actions, target)
+            } catch (e: TargetException) {
+                return e.result
+            }
+        val stale = evidence.actions.keys.firstOrNull { evidence.actions[it] != actual[it] }
+        return if (stale == null) Verification.Ok else Verification.Stale(stale)
+    }
+
     fun matches(
         evidence: RecipeApprovalDependencies?,
         approvedText: String,
         actions: Map<String, AutomationAction>,
-        entity: (String) -> Entity?,
-    ): Boolean =
-        evidence != null &&
-            runCatching {
-                text(evidence) == approvedText && evidence.actions == fingerprints(actions, entity)
-            }.getOrDefault(false)
+        target: (String) -> TargetResolution,
+    ): Boolean = verify(evidence, approvedText, actions, target) == Verification.Ok
 
     fun fingerprints(
         actions: Map<String, AutomationAction>,
-        entity: (String) -> Entity?,
+        target: (String) -> TargetResolution,
     ): Map<String, String> =
         actions.toSortedMap().mapValues { (_, action) ->
-            val targets =
-                (action.columns.map { it.type } + listOfNotNull(action.set?.attribute, action.transition?.attribute))
-                    .filter { '.' in it }
-                    .map { it.substringBefore('.') }
-                    .distinct()
-                    .sorted()
-                    .associateWith { name ->
-                        val target = requireNotNull(entity(name)) { "unresolved action ER target: $name" }
-                        mapOf(
-                            "qname" to qname(target.qname),
-                            "attributes" to target.attributes.sortedBy { it.qname.name }.map(::attribute),
-                        )
+            val resolved =
+                AutomationScope.targetRefs(action).map { ref ->
+                    when (val result = target(ref)) {
+                        is TargetResolution.Resolved -> result
+                        is TargetResolution.Unresolved -> throw TargetException(Verification.Unresolved(result.ref))
+                        is TargetResolution.Ambiguous -> throw TargetException(Verification.Ambiguous(result.ref))
                     }
+                }
+            val targets =
+                resolved.groupBy { it.entity.qname.name }.toSortedMap().mapValues { (name, refs) ->
+                    if (refs.map { it.entity.qname }.distinct().size != 1) {
+                        throw TargetException(Verification.Ambiguous(name))
+                    }
+                    val entity = refs.first().entity
+                    mapOf(
+                        "qname" to qname(entity.qname),
+                        "attributes" to entity.attributes.sortedBy { it.qname.name }.map(::attribute),
+                    )
+                }
             val canonical =
                 mapOf(
                     "qname" to qname(action.qname),
@@ -111,7 +176,7 @@ object RecipeActionDependencies {
                     "properties" to entries(action.properties.filter { it.first !in setOf("label", "dry_run") }),
                     "targets" to targets,
                 )
-            sha256("ttrp-action-dependency/1\n${json(canonical)}\n")
+            AutomationFingerprints.sha256("ttrp-action-dependency/1\n${json(canonical)}\n")
         }
 
     private fun attribute(a: Attribute): Any =
@@ -165,12 +230,4 @@ object RecipeActionDependencies {
                 )
             else -> error("unsupported canonical value")
         }
-
-    private fun sha256(s: String): String =
-        "sha256:" +
-            MessageDigest
-                .getInstance(
-                    "SHA-256",
-                ).digest(s.toByteArray(Charsets.UTF_8))
-                .joinToString("") { "%02x".format(it) }
 }

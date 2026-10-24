@@ -14,6 +14,8 @@ import org.tatrman.ttr.metadata.model.parseSchemaCode
 import org.tatrman.ttr.metadata.query.ErBindingResult
 import org.tatrman.ttr.metadata.query.MetadataQuery
 import org.tatrman.ttr.metadata.registry.RegistrySnapshot
+import org.tatrman.ttrp.ast.ImportDecl
+import org.tatrman.ttrp.ast.TtrpDocument
 
 /** A resolved `import <pkg>(.<tier>)?.*` scope entry (D-b). */
 data class ImportScope(
@@ -204,6 +206,18 @@ class ModelIndex(
         imports: List<ImportScope>,
     ): Entity? = findEntities(name, imports).firstOrNull() ?: findStdlibEntities(name).firstOrNull()
 
+    fun automationScope(imports: List<ImportScope>): AutomationScope =
+        AutomationScope(
+            imports,
+            automationInScope(imports).filterIsInstance<org.tatrman.ttr.metadata.model.AutomationAction>(),
+            objects.filterIsInstance<Entity>().filter { inScope(it, imports) },
+            objects.filterIsInstance<Entity>().filter(::isAutomationStdlib),
+        ) { entity, prefix ->
+            // Reconciled ER qname.package is currently empty (#294); use the source-owned package/path.
+            val pkg = packageOf(entity)
+            if (pkg.isNotEmpty()) pkg == prefix || pkg.startsWith("$prefix.") else pathInPackage(entity, prefix)
+        }
+
     /** The calendars of the model — entities with an attribute whose `semantics { role: event_date }` (D-82). */
     fun calendars(): List<Entity> = objects.filterIsInstance<Entity>().filter { isCalendar(it) }
 
@@ -243,6 +257,9 @@ class ModelIndex(
     fun attributesOf(entity: Entity): List<Attribute> = entity.attributes
 
     companion object {
+        fun importsOf(document: TtrpDocument): List<ImportScope> =
+            document.statements.filterIsInstance<ImportDecl>().map { importScope(it.qname.parts, it.qname.text) }
+
         /** Where ttr-metadata roots the automation stdlib's one source file. */
         private const val STDLIB_ROOT = "/automation-stdlib/"
 

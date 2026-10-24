@@ -8,6 +8,16 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ### Added — Native writer-default approval dependencies
 
+- Review-145: checker/producer/export share scoped action and attribute resolution. Package-qualified and
+  canonical writer refs cover the real logical entity (last two segments), including type/provenance checks.
+  Default-covered unresolved/ambiguous targets report located REC-006; ambiguous wired actions report REC-007
+  for every recipe, replacing first-wins selection. Default-free unresolved target behavior is preserved.
+- Evidence requires explicit version and recorded imports; text/2 binds that scope for offline export checks.
+  The reason-bearing verifier distinguishes stale metadata, unresolved/ambiguous refs and malformed evidence,
+  and propagates programmer errors. Export recommends rebuilding only for stale metadata. This corrects the
+  unpublished v1 candidate before publication; #294 ER package collapse remains a separate issue.
+- Verifier/fingerprint callbacks now receive full authored attribute refs and return `TargetResolution`.
+  Consumers must rebuild and adapt those callbacks alongside the required version/import manifest fields.
 - Recipe bundles that directly wire `writer_defaults` now bind all directly wired action definitions and
   their logical ER target declarations into versioned `text/2` approvals. The manifest records verifiable
   `approvalDependencies` evidence. Default-free recipes keep the frozen `text/1` bytes; values and labels

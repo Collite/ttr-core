@@ -17,6 +17,8 @@ import org.tatrman.ttr.parser.model.AutoEntry
 import org.tatrman.ttr.parser.model.AutoValue
 import org.tatrman.ttr.parser.model.SourceLocation
 import org.tatrman.ttrp.bundle.RecipeApprovalDependencies
+import org.tatrman.ttrp.resolve.TargetResolution
+import io.kotest.assertions.throwables.shouldThrow
 
 class RecipeActionDependenciesSpec :
     StringSpec({
@@ -52,16 +54,25 @@ class RecipeActionDependenciesSpec :
         fun fingerprints(
             a: AutomationAction = action,
             e: Entity = entity,
-        ) = RecipeActionDependencies.fingerprints(mapOf("propose" to a)) { e.takeIf { it.qname.name == "proposal" } }
+        ) = RecipeActionDependencies.fingerprints(mapOf("propose" to a)) {
+            if (e.qname.name ==
+                "proposal"
+            ) {
+                TargetResolution.Resolved(e, e.attributes.first())
+            } else {
+                TargetResolution.Unresolved(it)
+            }
+        }
         val base = "sha256:" + "a".repeat(64)
-        val evidence = RecipeApprovalDependencies(textBase = base, actions = fingerprints())
+        val evidence =
+            RecipeApprovalDependencies(version = 1, imports = listOf("shop"), textBase = base, actions = fingerprints())
         val text = RecipeActionDependencies.text(evidence)
 
         "frozen native dependency and text2 byte vectors match an independent JSON SHA256 implementation" {
             // Independently derived with Python json.dumps(sort_keys=True, separators=(',', ':')) + hashlib.
             fingerprints() shouldBe
                 mapOf("propose" to "sha256:139a18984e89d8fd87dbee9c0c4908fc0a950c94ae56eb1369105cbfddfa7c95")
-            text shouldBe "sha256:1657f4c480805fe670bc3f69a2c326895a757c0e97e27abe68e5f8f070e5b55b"
+            text shouldBe "sha256:a83085ecb3d814f389aa93decc8161a3a0f5e4617fd756d4c067ed3e7177a049"
         }
 
         "pinned consumer verification refuses absent unknown malformed or mismatched coverage" {
@@ -72,7 +83,7 @@ class RecipeActionDependenciesSpec :
                     mapOf(
                         "propose" to action,
                     ),
-            ) = RecipeActionDependencies.matches(e, t, a) { entity }
+            ) = RecipeActionDependencies.matches(e, t, a) { TargetResolution.Resolved(entity, attr) }
             matches(evidence) shouldBe true
             matches(null) shouldBe false
             matches(evidence.copy(version = 2)) shouldBe false
@@ -89,7 +100,28 @@ class RecipeActionDependenciesSpec :
                 a = mapOf("propose" to action.copy(properties = listOf("writer_defaults" to obj()))),
             ) shouldBe
                 false
-            RecipeActionDependencies.matches(evidence, text, mapOf("propose" to action)) { null } shouldBe false
+            RecipeActionDependencies.matches(evidence, text, mapOf("propose" to action)) {
+                TargetResolution.Unresolved(it)
+            } shouldBe
+                false
+        }
+
+        "verification distinguishes resolution failures and never hides programmer errors" {
+            val actions = mapOf("propose" to action)
+            RecipeActionDependencies.verify(evidence, text, actions) { TargetResolution.Unresolved(it) } shouldBe
+                RecipeActionDependencies.Verification.Unresolved("proposal.id")
+            RecipeActionDependencies.verify(evidence, text, actions) { TargetResolution.Ambiguous(it) } shouldBe
+                RecipeActionDependencies.Verification.Ambiguous("proposal.id")
+            shouldThrow<AssertionError> {
+                RecipeActionDependencies.verify(
+                    evidence,
+                    text,
+                    actions,
+                ) { throw AssertionError("bug") }
+            }
+            shouldThrow<IllegalArgumentException> {
+                RecipeActionDependencies.verify(evidence, text, actions) { throw IllegalArgumentException("bug") }
+            }
         }
 
         "all native target assignment key state and transition declarations change coverage" {
