@@ -9,7 +9,7 @@ checked_1 = checked_branch_t.with_columns([pl.col("customer").str.strip_chars(" 
 checked_reject = checked_branch_f.with_columns([pl.when((~pl.col("_ttrp_v1"))).then(pl.lit("TTRP-RJ-001")).otherwise(None).alias("_ttrp_reject_code"), pl.when((~pl.col("_ttrp_v1"))).then(pl.lit("customer_id")).otherwise(None).alias("_ttrp_reject_expr")]).select(pl.all().exclude("^_ttrp_v[0-9]+$"))
 sales_1 = checked_1.filter(((pl.col("amount") > pl.lit(0)) & pl.col("customer").is_not_null()))
 j_1 = accounts.join(sales_1, left_on=["account_id", "branch_code"], right_on=["customer", "region"], how="inner")
-sums_1 = j_1.group_by(["region"]).agg([pl.col("amount").sum().alias("total"), pl.col("amount").mean().alias("avg_amt")])
+sums_1 = j_1.group_by(["region"]).agg([pl.when(pl.col("amount").count() > 0).then(pl.col("amount").sum()).otherwise(None).alias("total"), pl.col("amount").mean().alias("avg_amt")])
 b_1_t = sums_1.filter((pl.col("total") > pl.lit(100000)))
 b_1_f = sums_1.filter((~pl.coalesce([(pl.col("total") > pl.lit(100000)), pl.lit(False)])))
 b_1_t.write_ipc("out/main_result.arrow", compat_level=pl.CompatLevel.oldest())

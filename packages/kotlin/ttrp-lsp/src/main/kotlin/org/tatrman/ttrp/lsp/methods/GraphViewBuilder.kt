@@ -116,6 +116,55 @@ object GraphViewBuilder {
             derived = emptyList(), // bare-fragment derived sub-graphs land in P6
             orchestration = derivedView(exec),
             autoLayout = autoLayout,
+            recipe =
+                plan.recipe?.let { model ->
+                    org.tatrman.ttrp.lsp.protocol.RecipeSummary(
+                        model.name,
+                        model.mode.spelling,
+                        listOf(
+                            org.tatrman.ttrp.lsp.protocol.RecipeLane(
+                                "candidates",
+                                listOfNotNull(
+                                    model.candidates?.let {
+                                        org.tatrman.ttrp.lsp.protocol.RecipeIsland(
+                                            it,
+                                            model.candidateKind ?: "canonical",
+                                        )
+                                    },
+                                ),
+                            ),
+                            org.tatrman.ttrp.lsp.protocol.RecipeLane(
+                                "context",
+                                model.contexts.map {
+                                    org.tatrman.ttrp.lsp.protocol
+                                        .RecipeIsland(it.name, it.kind, it.contextClass.spelling)
+                                },
+                            ),
+                            org.tatrman.ttrp.lsp.protocol.RecipeLane(
+                                "decision",
+                                listOfNotNull(
+                                    model.decision?.let {
+                                        org.tatrman.ttrp.lsp.protocol.RecipeIsland(
+                                            it,
+                                            "decision",
+                                            routes =
+                                                model.routes.map { r ->
+                                                    r.name
+                                                },
+                                        )
+                                    },
+                                ),
+                            ),
+                            org.tatrman.ttrp.lsp.protocol.RecipeLane(
+                                "actions",
+                                model.wirings.map {
+                                    org.tatrman.ttrp.lsp.protocol
+                                        .RecipeIsland(it.action, "action", routes = it.routes)
+                                },
+                            ),
+                        ),
+                    )
+                },
         )
     }
 

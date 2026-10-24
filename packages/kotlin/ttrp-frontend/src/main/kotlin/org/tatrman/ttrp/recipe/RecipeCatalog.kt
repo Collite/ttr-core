@@ -14,16 +14,23 @@ import org.tatrman.ttrp.resolve.ModelIndex
  * earlier runs (AU 17 §4.2). Another recipe's verdicts come from its bundle's catalog, served by Veles.
  */
 object RecipeCatalog {
-    /** The recipe's name: its `recipe:` header, else the document's file name without `.ttrp`. */
+    /** The explicit `recipe:` name, else a stable identifier from the filename without language suffixes. */
     fun recipeName(
         recipe: RecipeDecl,
         fileName: String,
-    ): String =
-        recipe.name ?: fileName
-            .substringAfterLast('/')
-            .substringAfterLast('\\')
-            .removeSuffix(".ttrp")
-            .removeSuffix(".md")
+    ): String {
+        recipe.name?.let { return it }
+        val stem =
+            fileName
+                .substringAfterLast('/')
+                .substringAfterLast('\\')
+                .removeSuffix(".ttrp")
+                .removeSuffix(".md")
+                .removeSuffix(".cs")
+                .removeSuffix(".en")
+        val name = stem.replace(Regex("[^a-zA-Z0-9_\u00C0-\u024F]"), "_").ifEmpty { "recipe" }
+        return if (name.first().isDigit()) "_$name" else name
+    }
 
     fun ownEntities(
         doc: TtrpDocument,

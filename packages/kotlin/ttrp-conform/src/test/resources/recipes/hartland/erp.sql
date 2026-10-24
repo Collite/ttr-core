@@ -146,6 +146,8 @@ CREATE TABLE return_request (
     rr_state varchar
 );
 
+CREATE VIEW return_request_hdr AS SELECT * FROM return_request;
+
 INSERT INTO date_dim (d_date_sk, d_date, d_year, d_moy, d_qoy, d_week_seq, d_day_name, d_holiday, d_weekend, d_working_day)
 SELECT (d - DATE '1900-01-02') + 2415022, d, EXTRACT(YEAR FROM d), EXTRACT(MONTH FROM d), EXTRACT(QUARTER FROM d),
        FLOOR((d - DATE '1900-01-02') / 7.0) + 1,

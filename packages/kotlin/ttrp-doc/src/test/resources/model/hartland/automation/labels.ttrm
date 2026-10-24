@@ -1,0 +1,17 @@
+package hartland.automation
+model automation
+
+def parameter tolerance { type: decimal, value: 0.01, label: { en: "Tolerance", cs: "Tolerance ceny" } }
+def parameter threshold { type: int, value: 50000, label: { en: "Confirmation threshold", cs: "Hranice potvrzení" } }
+def action release {
+    columns: [def column order { type: text }]
+    label: { en: "Release order", cs: "Uvolnit objednávku" }
+    dry_run: { en: "Would release this order.", cs: "Objednávka by byla uvolněna." }
+}
+def recipe release_order {
+    label: { en: "Releasing a placed order", cs: "Uvolnění objednávky" }
+    key: order.order_number
+    candidates: placed_orders
+    decision: verdict
+    routes: [hold_sales, release]
+}

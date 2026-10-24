@@ -1,0 +1,250 @@
+{
+    "document": "handling-a-return-request.md",
+    "documentSha": "ae9cb8740219602c4a456a16dad768743dc6e89f02141db0a2464ba84940eafb",
+    "nodes": {
+        "bought_here": {
+            "block": 3,
+            "generatedSpan": [
+                1223,
+                1727
+            ],
+            "paragraph": [
+                1526,
+                1569
+            ],
+            "span": [
+                1571,
+                2075
+            ]
+        },
+        "received": {
+            "block": 2,
+            "generatedSpan": [
+                766,
+                1221
+            ],
+            "paragraph": [
+                1023,
+                1067
+            ],
+            "span": [
+                1069,
+                1524
+            ]
+        },
+        "request_value": {
+            "block": 5,
+            "generatedSpan": [
+                2616,
+                2823
+            ],
+            "paragraph": [
+                3010,
+                3055
+            ],
+            "span": [
+                3057,
+                3264
+            ]
+        },
+        "return_share": {
+            "block": 4,
+            "generatedSpan": [
+                1729,
+                2614
+            ],
+            "paragraph": [
+                2077,
+                2121
+            ],
+            "span": [
+                2123,
+                3008
+            ]
+        },
+        "stock_at_center": {
+            "block": 6,
+            "generatedSpan": [
+                2825,
+                3601
+            ],
+            "paragraph": [
+                3266,
+                3313
+            ],
+            "span": [
+                3315,
+                4107
+            ]
+        },
+        "way": {
+            "block": 7,
+            "generatedSpan": [
+                3603,
+                5517
+            ],
+            "paragraph": [
+                4109,
+                4151
+            ],
+            "span": [
+                4153,
+                6083
+            ]
+        }
+    },
+    "sentences": [
+        {
+            "nodes": [],
+            "span": [
+                29,
+                198
+            ]
+        },
+        {
+            "nodes": [
+                "received"
+            ],
+            "span": [
+                1023,
+                1067
+            ]
+        },
+        {
+            "nodes": [
+                "bought_here"
+            ],
+            "span": [
+                1526,
+                1569
+            ]
+        },
+        {
+            "nodes": [
+                "return_share"
+            ],
+            "span": [
+                2077,
+                2121
+            ]
+        },
+        {
+            "nodes": [
+                "request_value"
+            ],
+            "span": [
+                3010,
+                3055
+            ]
+        },
+        {
+            "nodes": [
+                "stock_at_center"
+            ],
+            "span": [
+                3266,
+                3313
+            ]
+        },
+        {
+            "nodes": [
+                "way"
+            ],
+            "span": [
+                4109,
+                4151
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                6085,
+                6174
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                8397,
+                8437
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                9023,
+                9063
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                9526,
+                9561
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                9871,
+                9911
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                10170,
+                10249
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                11342,
+                11431
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                12815,
+                12850
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                13163,
+                13211
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                13575,
+                13616
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                14085,
+                14129
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                14451,
+                14520
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                16135,
+                16224
+            ]
+        }
+    ]
+}

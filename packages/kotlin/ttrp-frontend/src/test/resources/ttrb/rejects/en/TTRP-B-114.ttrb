@@ -1,0 +1,3 @@
+Load orders.
+If amount > 100:
+    Decide hold when n_short > 0.

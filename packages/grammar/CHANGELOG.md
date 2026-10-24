@@ -12,6 +12,16 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
+## TTR-P 0.6 / TTR-B recipe sentences — 2026-10-24
+
+Additive AU-core P3 extension of the Kotlin-only TTR-P/TTR-B grammars. The main TTR-M grammar stays 0.18.
+A decision may carry a `ttrb`/`ttrb-cs` route list; other decision dialects remain REC-070. Recipe sentences cover
+latest snapshots (a unique model-declared temporal key, or explicit `by`), bounded dates, working-day counts,
+parameter labels, routes/reasons/details, mode and named/empty defaults. Optional action sentence parsing takes
+routes explicitly from the canonical skeleton. Declared output port `rows` is admitted in its positional slot;
+other existing keyword-as-name restrictions remain. Keyword skins preserve identifiers. The npm package exposes
+`./ttrp-grammar` and `./ttrb-grammar` alongside its unchanged main grammar export.
+
 ## 0.18 — 2026-10-22
 
 Additive (HP-P1, md → er hop). Every previously-valid file parses unchanged.

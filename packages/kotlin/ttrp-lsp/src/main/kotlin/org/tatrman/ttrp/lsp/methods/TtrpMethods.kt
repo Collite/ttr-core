@@ -63,6 +63,10 @@ import java.util.concurrent.CompletableFuture
 class TtrpMethods(
     private val docs: DocumentStore,
     private val projects: ProjectResolver,
+    private val analysis: org.tatrman.ttrp.lsp.analysis.AnalysisEngine =
+        org.tatrman.ttrp.lsp.analysis.AnalysisEngine(
+            projects,
+        ),
 ) {
     private val gson = Gson()
     private val layoutService = LayoutService()
@@ -74,7 +78,17 @@ class TtrpMethods(
         CompletableFuture.supplyAsync {
             val doc = requireVersion(params.uri, params.version)
             val ctx = projects.resolve(doc.uri)
-            val out = TtrpPipeline(ctx.manifest, ctx.modelsRoot).explain(doc.text, fileNameOf(doc.uri))
+            val recipe =
+                analysis
+                    .analyze(doc)
+                    .recipes
+                    .firstOrNull()
+                    ?.extracted
+            val out =
+                TtrpPipeline(ctx.manifest, ctx.modelsRoot).explain(
+                    recipe?.text ?: doc.text,
+                    recipe?.path ?: fileNameOf(doc.uri),
+                )
             ExplainResult(out.text, out.ok)
         }
 
@@ -83,7 +97,13 @@ class TtrpMethods(
             val doc = requireVersion(params.uri, params.version)
             val ctx = projects.resolve(doc.uri)
             val fileName = fileNameOf(doc.uri)
-            val plan = TtrpPipeline(ctx.manifest, ctx.modelsRoot).plan(doc.text, fileName)
+            val plan =
+                analysis
+                    .analyze(doc)
+                    .recipes
+                    .firstOrNull()
+                    ?.plan
+                    ?: TtrpPipeline(ctx.manifest, ctx.modelsRoot).plan(doc.text, fileName)
             GraphViewBuilder.build(fileName, plan, params.elaborated)
         }
 
@@ -211,6 +231,11 @@ class TtrpMethods(
                         ),
                     )
             val ctx = projects.resolve(uri)
+            if (uri.endsWith(".md")) {
+                val doc = OpenDocument(uri, text, 0, "markdown")
+                val report = analysis.analyzeSource(doc).report
+                return@supplyAsync ValidateResult(report.diagnostics.map { toValidateDiagnostic(it) })
+            }
             val report = TtrpChecker(ctx.manifest, ctx.modelsRoot).check(text, fileNameOf(uri))
             val recipe =
                 report.document.statements

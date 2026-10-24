@@ -43,6 +43,7 @@ class TtrpPipeline(
     // Connected-mode member catalog (S6-B): threaded to [TtrpChecker], which snapshots it once per pass.
     // Null ⇒ disconnected (R13), the prior behaviour.
     private val memberCatalog: org.tatrman.ttr.md.resolve.MemberCatalog? = null,
+    private val frontendChecker: TtrpChecker? = null,
 ) {
     /**
      * The project's MD tier (logical model + physical `md2db_*` bindings), loaded once from
@@ -52,6 +53,18 @@ class TtrpPipeline(
      * Member snapshot loading is a further seam (S6-B), so resolution runs disconnected (R13).
      */
     private val mdRepo: MdRepo.Loaded? by lazy { MdRepo.loadFrom(modelsRoot) }
+
+    // One immutable model snapshot for every plan produced by this pipeline instance.
+    private val checker by lazy {
+        frontendChecker ?: TtrpChecker(manifest, modelsRoot, mdModel = mdRepo?.model, memberCatalog = memberCatalog)
+    }
+
+    /** Front-half analysis with the same loaded checker used by [plan]. */
+    fun check(
+        source: String,
+        fileName: String,
+        initialDiagnostics: List<TtrpDiagnostic> = emptyList(),
+    ): TtrpChecker.Report = checker.check(source, fileName, initialDiagnostics)
 
     data class ExplainOutput(
         val text: String,
@@ -114,6 +127,8 @@ class TtrpPipeline(
          * verdict, routes, wiring) — null for a program without a recipe, or when the front half failed.
          */
         val recipe: org.tatrman.ttrp.graph.recipe.RecipeModel? = null,
+        /** The already-parsed imports and resolved metadata used by this plan. */
+        val frontendReport: TtrpChecker.Report? = null,
     )
 
     /**
@@ -129,20 +144,19 @@ class TtrpPipeline(
         source: String,
         fileName: String = "<memory>",
         targetOverrides: Map<String, String> = emptyMap(),
+        frontendReport: TtrpChecker.Report? = null,
     ): PlanResult {
         // MD front-half resolution fires only when the repo carries an [MdModel] (else the seam stays
         // inert). In connected mode [memberCatalog] supplies the member snapshot (S6-B); disconnected
         // (null) leaves MD paths to resolve per R13 (qualified members become deferred coordinates).
-        val report =
-            TtrpChecker(manifest, modelsRoot, mdModel = mdRepo?.model, memberCatalog = memberCatalog)
-                .check(source, fileName)
+        val report = frontendReport ?: checker.check(source, fileName)
         val diags = report.diagnostics.toMutableList()
         // MD dot-path S5C-B.4 (R30): model-level journal-role diagnostics (TTRP-MD-018) computed at MD
         // model load — an invalidate-journaled cubelet whose backing table declares no valid role.
         mdRepo?.journalRoleDiagnostics?.let { diags += it }
         val world = report.world
         if (report.errors.isNotEmpty() || world == null) {
-            return PlanResult(fileName, null, null, null, emptyList(), diags, ok = false)
+            return PlanResult(fileName, null, null, null, emptyList(), diags, ok = false, frontendReport = report)
         }
 
         val bound = WorldBinder(manifests).bind(world)
@@ -170,7 +184,17 @@ class TtrpPipeline(
             }
         recipe?.let { diags += it.diagnostics }
         if (diags.any { it.severity == Severity.ERROR }) {
-            return PlanResult(fileName, null, null, null, emptyList(), diags, ok = false, recipe = recipe?.model)
+            return PlanResult(
+                fileName,
+                null,
+                null,
+                null,
+                emptyList(),
+                diags,
+                ok = false,
+                recipe = recipe?.model,
+                frontendReport = report,
+            )
         }
         // AU-core-P2: a checked recipe's switch lowers to the node set (routes, verdict columns, detail) before
         // normalize, so every engine and emitter sees filters, calcs and joins. The authored graph keeps the switch.
@@ -189,7 +213,17 @@ class TtrpPipeline(
             diags += sugared.diagnostics
             recipeModel = recipeModel.copy(derivedParams = sugared.derived, reasonNodes = switched.reasonNodes)
             if (diags.any { it.severity == Severity.ERROR }) {
-                return PlanResult(fileName, null, null, null, emptyList(), diags, ok = false, recipe = recipeModel)
+                return PlanResult(
+                    fileName,
+                    null,
+                    null,
+                    null,
+                    emptyList(),
+                    diags,
+                    ok = false,
+                    recipe = recipeModel,
+                    frontendReport = report,
+                )
             }
             compiled = sugared.graph
         }
@@ -232,7 +266,17 @@ class TtrpPipeline(
                 )
         }
         if (diags.any { it.severity == Severity.ERROR }) {
-            return PlanResult(fileName, null, null, null, emptyList(), diags, ok = false, recipe = recipeModel)
+            return PlanResult(
+                fileName,
+                null,
+                null,
+                null,
+                emptyList(),
+                diags,
+                ok = false,
+                recipe = recipeModel,
+                frontendReport = report,
+            )
         }
         val norm: NormalizeResult = RewriteEngine(Rules.ALL, bound).normalize(compiled)
         // RJ-P1 elaboration authoring diagnostics (dead-wire RJ-101; fail-closed RJ-107 unsupported
@@ -276,6 +320,7 @@ class TtrpPipeline(
             memberFingerprint = report.memberFingerprint,
             params = report.document.statements.filterIsInstance<org.tatrman.ttrp.ast.ParamDecl>(),
             recipe = recipeModel,
+            frontendReport = report,
         )
     }
 

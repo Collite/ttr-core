@@ -1,0 +1,80 @@
+name: Check literate TTR-P recipes
+
+on:
+  workflow_call:
+    inputs:
+      toolchain-version:
+        description: Public org.tatrman ttrp-cli version on Maven Central
+        required: true
+        type: string
+      recipes:
+        description: Recursive glob of committed recipe sources in the consumer checkout
+        required: false
+        default: 'recipes/**/*.md'
+        type: string
+
+      exclude:
+        description: Recursive glob of generated Markdown files to exclude
+        required: false
+        default: '**/README.md'
+        type: string
+      lang:
+        description: Language used to render the committed READMEs (en or cs)
+        required: false
+        default: en
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install the pinned public toolchain
+        env:
+          TTRP_VERSION: ${{ inputs.toolchain-version }}
+        run: |
+          python3 - <<'PY'
+          import os, re, urllib.request, zipfile
+          from pathlib import Path
+          version = os.environ['TTRP_VERSION']
+          if not re.fullmatch(r'\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?', version):
+              raise SystemExit('toolchain-version must be a Maven version')
+          url = f'https://repo.maven.apache.org/maven2/org/tatrman/ttrp-cli/{version}/ttrp-cli-{version}-dist.zip'
+          archive = Path(os.environ['RUNNER_TEMP']) / 'ttrp-cli.zip'
+          urllib.request.urlretrieve(url, archive)
+          destination = Path(os.environ['RUNNER_TEMP']) / 'ttrp-cli'
+          with zipfile.ZipFile(archive) as bundle:
+              bundle.extractall(destination)
+          cli, = destination.glob('*/bin/ttrp-cli')
+          cli.chmod(0o755)
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write(f'TTRP_CLI={cli}\n')
+          PY
+      - name: Check every committed derived recipe
+        env:
+          RECIPE_GLOB: ${{ inputs.recipes }}
+          EXCLUDE_GLOB: ${{ inputs.exclude }}
+          README_LANG: ${{ inputs.lang }}
+        run: |
+          python3 - <<'PY'
+          import glob, os, subprocess
+          from pathlib import Path
+          excluded = {Path(path).resolve() for path in glob.glob(os.environ['EXCLUDE_GLOB'], recursive=True)}
+          sources = sorted({
+              Path(path).resolve(): path
+              for path in glob.glob(os.environ['RECIPE_GLOB'], recursive=True)
+              if Path(path).is_file() and Path(path).resolve() not in excluded
+          }.values())
+          if not sources:
+              raise SystemExit('recipe glob matched no source files')
+          for source in sources:
+              print(f'Checking {source}', flush=True)
+              subprocess.run([os.environ['TTRP_CLI'], 'build', source, '--check', '--lang', os.environ['README_LANG']], check=True)
+          PY

@@ -104,6 +104,11 @@
       "type": "object",
       "title": "TTR-P",
       "properties": {
+        "ttrp.literateRecipes.glob": {
+          "type": "string",
+          "default": "**/recipes/**/*.md",
+          "description": "Markdown recipe files sent to the language server. Custom globs outside recipes/ activate after opening a .ttrp file or running a TTR-P command. Reload the window after changing this setting."
+        },
         "ttrp.server.path": {
           "type": "string",
           "default": "",
@@ -157,6 +162,7 @@
     "onLanguage:ttr-sql",
     "onLanguage:ttr-pandas",
     "onLanguage:ttrb",
-    "onLanguage:ttrb-cs"
+    "onLanguage:ttrb-cs",
+    "workspaceContains:**/recipes/**/*.md"
   ]
 }

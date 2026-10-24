@@ -117,6 +117,7 @@ internal class TtrpWalker(
     private val source: String,
     private val tokens: CommonTokenStream,
     private val catalog: FunctionCatalog,
+    private val parameterAliases: Map<String, String> = emptyMap(),
 ) {
     // Token indices already claimed as a statement's trailing trivia, so the next
     // statement's leading scan does not double-count a same-line comment (C2-f).
@@ -915,7 +916,7 @@ internal class TtrpWalker(
         when {
             ctx.roleContainer() != null -> roleContainer(ctx.roleContainer())
             ctx.decisionBlock() != null ->
-                ctx.decisionBlock().takeIf { it.switchStmt() != null }?.let {
+                ctx.decisionBlock().takeIf { it.switchStmt() != null || it.TAGGED_BLOCK() != null }?.let {
                     decisionBlock(
                         it,
                     )
@@ -1037,6 +1038,62 @@ internal class TtrpWalker(
         val ports = ctx.portSig().portDecl().map { portDecl(it) }
         ports.filter { it.kind != PortKind.IN }.forEach {
             shape("a decision declares `in` ports only — its outputs are the switch's routes", it.location)
+        }
+        ctx.TAGGED_BLOCK()?.let { tagged ->
+            val body = fragmentBody(tagged.symbol)
+            val skin =
+                org.tatrman.ttrp.dialect.b.TtrbSkin
+                    .forTag(body.tag)
+            val decomposition =
+                skin?.let {
+                    org.tatrman.ttrp.dialect.b.TtrB.decompose(
+                        body.sourceText,
+                        body.interiorLocation,
+                        null,
+                        it,
+                        ports
+                            .map { p ->
+                                p.name
+                            }.toSet(),
+                        emptySet(),
+                        decision = true,
+                        parameterAliases = parameterAliases,
+                    )
+                }
+            if (decomposition == null) {
+                diagnostics +=
+                    TtrpDiagnostic(
+                        TtrpDiagnosticId.REC_070,
+                        Severity.ERROR,
+                        "a decision fragment must be ttrb or ttrb-cs",
+                        body.location,
+                    )
+            }
+            decomposition?.let { diagnostics += it.diagnostics }
+            val sw =
+                decomposition?.recipeSwitch
+                    ?: SwitchStmt(
+                        DottedRef(listOf(ports.firstOrNull()?.name ?: "_missing"), loc(ctx)),
+                        null,
+                        emptyList(),
+                        null,
+                        loc(ctx),
+                    )
+            if (decomposition != null &&
+                sw.routes.isEmpty() &&
+                decomposition.diagnostics.isEmpty()
+            ) {
+                shape("a decision needs at least one Decide route sentence", body.location)
+            }
+            return DecisionDecl(
+                ctx.identifier().text,
+                ports,
+                decomposition?.statements.orEmpty(),
+                sw,
+                loc(ctx),
+                loc(ctx.identifier()),
+                body,
+            )
         }
         return DecisionDecl(
             name = ctx.identifier().text,
