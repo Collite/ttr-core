@@ -33,7 +33,11 @@ object TtrbRecipeRenderer {
             when (sw.mode) {
                 SwitchMode.OVERLAPPING ->
                     append(
-                        if (cs) "Rozhodni; řádek může projít více cestami." else "Decide; a row may take several routes.",
+                        if (cs) {
+                            "Rozhodni; řádek může projít více cestami."
+                        } else {
+                            "Decide; a row may take several routes."
+                        },
                     )
                 SwitchMode.EXCLUSIVE -> append(if (cs) "Rozhoduj výlučně." else "Decide exclusively.")
                 null -> Unit

@@ -49,7 +49,8 @@ class RecipeAggregateNullSpec :
                         }
                         conform.compare(listOf(sql, polars)).exitCode shouldBe 0
                         if (RecipePlanted.pgEnabled) {
-                            RecipePlanted.pgEngine("r136_null_${if (grouped) "group" else "empty"}", scripts).use { pg ->
+                            val name = if (grouped) "r136_null_group" else "r136_null_empty"
+                            RecipePlanted.pgEngine(name, scripts).use { pg ->
                                 conform
                                     .compare(
                                         listOf(conform.runOn(pg, plan, RecipePlanted.AS_OF), sql, polars),
