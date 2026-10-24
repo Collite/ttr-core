@@ -713,6 +713,23 @@
         "protocol"
       ],
       "properties": {
+        "approvalDependencies": {
+          "description": "Native preview approval evidence v1, bound into recipe text/2; absent for default-free recipes. Verify against pinned metadata before executing defaults.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "imports", "textBase", "actions"],
+          "properties": {
+            "version": { "const": 1 },
+            "imports": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+            "textBase": { "$ref": "#/$defs/sha256" },
+            "actions": {
+              "type": "object",
+              "minProperties": 1,
+              "propertyNames": { "minLength": 1 },
+              "additionalProperties": { "$ref": "#/$defs/sha256" }
+            }
+          }
+        },
         "tests": { "type": "array", "items": { "type": "string", "pattern": "^tests/[^/]+\\.ya?ml$" } },
         "name": {
           "type": "string"

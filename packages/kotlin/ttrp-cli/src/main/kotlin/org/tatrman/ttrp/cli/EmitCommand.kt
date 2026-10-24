@@ -26,6 +26,12 @@ import org.tatrman.ttrp.bundle.EmitPluginLoader
 import org.tatrman.ttrp.bundle.ExportFolderWriter
 import org.tatrman.ttr.metadata.world.AutomationFingerprints
 import org.tatrman.ttrp.emit.recipe.RecipeGraphProjector
+import org.tatrman.ttrp.emit.recipe.RecipeActionDependencies
+import org.tatrman.ttr.metadata.layout.LayoutResolver
+import org.tatrman.ttrp.resolve.ActionResolution
+import org.tatrman.ttrp.resolve.AutomationScope
+import org.tatrman.ttrp.resolve.ModelIndex
+import org.tatrman.ttrp.resolve.TargetResolution
 import org.tatrman.ttrp.emit.spi.TtrEmitPlugin
 import org.tatrman.ttrp.emit.spi.RecipeEmitRequest
 import org.tatrman.ttrp.graph.capability.RecipeManifestSource
@@ -54,15 +60,11 @@ class EmitCommand : CliktCommand(name = "emit") {
                 config.diagnostics.none { it.severity.name == "ERROR" },
             ) { config.diagnostics.joinToString { it.render() } }
             val roots = listOf(config.manifest.modelsRoot()) + config.manifest.extraModelRootPaths()
-            val loaded =
-                ModelReconciler(ModelDescriptor("export", "export")).reconcile(
-                    roots.mapIndexed {
-                        i,
-                        path,
-                        ->
-                        FileBasedSource("export-$i", 0, LocalFsStorage("export-$i", path.toRealPath())).load()
-                    },
-                )
+            val snapshots =
+                roots.mapIndexed { i, path ->
+                    FileBasedSource("export-$i", 0, LocalFsStorage("export-$i", path.toRealPath())).load()
+                }
+            val loaded = ModelReconciler(ModelDescriptor("export", "export")).reconcile(snapshots)
             require(loaded.ok) { loaded.errors.joinToString { it.message } }
             val objects = loaded.model.objectByQname().values
             val worlds =
@@ -161,13 +163,70 @@ class EmitCommand : CliktCommand(name = "emit") {
                                 .joinToString("") { "%02x".format(it) }
                     require(actual == expected) { "bundle file hash mismatch: $relative" }
                 }
+                val recipe = requireNotNull(bundle.recipe) { "bundle has no recipe" }
+                val actionObjects = objects.filterIsInstance<AutomationAction>()
+                val actionGroups = actionObjects.groupBy { it.qname.name }
+                val evidence = recipe.approvalDependencies
+                // Validate the explicit evidence format before trying to reconstruct its scope.
+                evidence?.let { RecipeActionDependencies.validate(it)?.let { bad -> error(bad.reason) } }
+                val scope =
+                    evidence?.let {
+                        ModelIndex(registrySnapshot, LayoutResolver.packagesFromFiles(loaded.files)).automationScope(
+                            it.imports.map { raw -> ModelIndex.importScope(raw.split('.'), raw) },
+                        )
+                    }
+                scope?.missingImports?.firstOrNull()?.let { missing ->
+                    error("recorded import `$missing.*` resolves to no loader package in the export model")
+                }
+                val wiredActions =
+                    recipe.wiring.map { it.action }.distinct().associateWith { name ->
+                        val resolution =
+                            scope?.action(name) ?: AutomationScope.resolveAction(name, actionGroups[name].orEmpty())
+                        val location =
+                            if (evidence ==
+                                null
+                            ) {
+                                "export model (bundle records no approval scope)"
+                            } else {
+                                "recorded approval scope"
+                            }
+                        when (resolution) {
+                            is ActionResolution.Resolved -> resolution.action
+                            is ActionResolution.Unresolved ->
+                                error(
+                                    "action `$name` is unresolved in the $location",
+                                )
+                            is ActionResolution.Ambiguous ->
+                                error(
+                                    "action `$name` is ambiguous in the $location",
+                                )
+                        }
+                    }
+                if (evidence != null || wiredActions.values.any(AutomationScope::hasDefaults)) {
+                    val result =
+                        RecipeActionDependencies.verify(evidence, recipe.fingerprints.text, wiredActions) { ref ->
+                            scope?.target(ref) ?: TargetResolution.Unresolved(ref)
+                        }
+                    val reason =
+                        when (result) {
+                            RecipeActionDependencies.Verification.Ok -> null
+                            is RecipeActionDependencies.Verification.Stale ->
+                                "action approval dependencies are stale for `${result.action}`; rebuild the recipe bundle"
+                            is RecipeActionDependencies.Verification.Unresolved ->
+                                "unresolved action approval dependency `${result.ref}` in the recorded recipe import scope"
+                            is RecipeActionDependencies.Verification.Ambiguous ->
+                                "ambiguous action approval dependency `${result.ref}` in the recorded recipe import scope"
+                            is RecipeActionDependencies.Verification.Malformed -> result.reason
+                        }
+                    require(reason == null) { requireNotNull(reason) }
+                }
                 val graph =
                     RecipeGraphProjector.project(
                         bundle,
                         world,
                         program,
                         deployment,
-                        objects.filterIsInstance<AutomationAction>(),
+                        wiredActions.values.toList(),
                     )
                 val plugins = ServiceLoader.load(TtrEmitPlugin::class.java).toList()
                 val manifests =

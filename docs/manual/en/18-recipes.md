@@ -201,6 +201,8 @@ place in the recipe block it is an ordinary name, so existing columns and variab
 | `TTRP-REC-003` | a route nothing wires, or a wiring naming no route |
 | `TTRP-REC-004` | the candidates do not project the key |
 | `TTRP-REC-005` | the candidates filter on the key — the program's port picks single keys |
+| `TTRP-REC-006` | a default-covered action target is unresolved or ambiguous; import its package or correct/qualify the entity and attribute ref |
+| `TTRP-REC-007` | more than one visible action has the wired name (also without defaults); rename one action, or narrow the imports so only one is visible |
 | `TTRP-REC-010` | a set-level context without a `window` (a warning; an error under an on-event program), a `window` grouping by a column its rows lack, a decision whose switch reads rows not keyed |
 | `TTRP-REC-011` | a batch program's schedule does not cover whole windows |
 | `TTRP-REC-012` | a program with `port: key` runs a set-level recipe |

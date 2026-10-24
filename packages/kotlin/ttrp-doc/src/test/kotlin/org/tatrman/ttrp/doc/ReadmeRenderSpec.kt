@@ -37,16 +37,16 @@ class ReadmeRenderSpec :
                 mapOf("release" to mapOf("en" to "Would release this order.", "cs" to "Objednávka by byla uvolněna.")),
             )
         test("catalogue labels come from the published metadata snapshot in the imported package") {
-            val snapshot =
+            val index =
                 org.tatrman.ttrp.resolve.ModelRepo
-                    .snapshotOf(
+                    .indexOf(
                         java.nio.file.Path
                             .of("src/test/resources/model"),
                     )
-            check(snapshot != null)
+            check(index != null)
             val actual =
                 ReadmeLabels.from(
-                    org.tatrman.ttrp.resolve.ModelIndex(snapshot).objectsInScope(
+                    index.objectsInScope(
                         listOf(
                             org.tatrman.ttrp.resolve.ModelIndex.importScope(
                                 listOf("hartland", "automation"),
@@ -60,14 +60,11 @@ class ReadmeRenderSpec :
             ReadmeRenderer.render(recipe, actual, lang = "cs") shouldContain "Uvolnit objednávku"
         }
         test("tier imports retain entity labels in what the recipe reads") {
-            val snapshot =
-                org.tatrman.ttrp.resolve.ModelRepo.snapshotOf(
+            val index =
+                org.tatrman.ttrp.resolve.ModelRepo.indexOf(
                     java.nio.file.Path
                         .of("src/test/resources/model"),
                 )!!
-            val index =
-                org.tatrman.ttrp.resolve
-                    .ModelIndex(snapshot)
             val imports =
                 org.tatrman.ttrp.parser.TtrpParser
                     .parseString("import hartland.er.*")

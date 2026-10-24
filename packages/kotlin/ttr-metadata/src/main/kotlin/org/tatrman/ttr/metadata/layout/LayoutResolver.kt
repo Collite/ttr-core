@@ -6,6 +6,7 @@ import org.tatrman.ttr.metadata.model.ModelObject
 import org.tatrman.ttr.metadata.model.schemaCodeToToken
 import org.tatrman.ttr.metadata.registry.RegistrySnapshot
 import org.tatrman.ttr.metadata.source.SourceSnapshot
+import org.tatrman.ttr.metadata.source.LoadedFile
 import org.tatrman.ttr.parser.model.LayoutDocument
 
 /**
@@ -82,9 +83,13 @@ object LayoutResolver {
      * was reconciled from. The reconciled model does not keep packages (`QualifiedName.package` is
      * empty after a load), so [indexOf] needs this, or a server's own per-file package index.
      */
-    fun packagesFrom(snapshots: Collection<SourceSnapshot>): (ModelObject) -> String {
+    fun packagesFrom(snapshots: Collection<SourceSnapshot>): (ModelObject) -> String =
+        packagesFromFiles(snapshots.flatMap { it.loadedFiles })
+
+    /** Includes reconciler-injected files (notably the stdlib) when passed ReconciliationResult.files. */
+    fun packagesFromFiles(files: Collection<LoadedFile>): (ModelObject) -> String {
         val byFile =
-            snapshots.flatMap { it.loadedFiles }.associate {
+            files.associate {
                 it.storageFile.path to
                     (it.declaredPackage ?: it.computedPackage)
             }
