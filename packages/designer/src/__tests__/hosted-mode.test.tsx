@@ -90,7 +90,7 @@ describe('hosted mode through a parent window', () => {
     expect(fetcher).not.toHaveBeenCalled();
     post(init);
     await waitFor(() =>
-      expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin)
+      expect(sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ready' }), window.location.origin)
     );
     expect(client.setProjectRoot).toHaveBeenCalledWith('file:///repo', manifest);
     expect(client.openDocument).toHaveBeenCalledWith('file:///repo/model/er/item.ttrm', 'model er');
@@ -138,7 +138,7 @@ describe('hosted mode through a parent window', () => {
     render(<App />);
     post(init);
     await waitFor(() =>
-      expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin)
+      expect(sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ready' }), window.location.origin)
     );
     const response = {
       ok: true,
@@ -172,7 +172,7 @@ describe('hosted mode through a parent window', () => {
       render(<App />);
       post(init);
       await waitFor(() =>
-        expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin)
+        expect(sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ready' }), window.location.origin)
       );
       const locations = sent.mock.calls
         .map(([m]) => m)
@@ -190,7 +190,7 @@ describe('hosted mode through a parent window', () => {
     render(<App />);
     post(init);
     await waitFor(() =>
-      expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin)
+      expect(sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ready' }), window.location.origin)
     );
     const header = screen.getByTestId('studio-header');
     fetcher.mockResolvedValue({ ok: false, status: 500 });
@@ -217,7 +217,7 @@ describe('hosted mode through a parent window', () => {
     render(<App />);
     post(init);
     await waitFor(() =>
-      expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin)
+      expect(sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ready' }), window.location.origin)
     );
     post({
       type: 'ttr.host.navigate',
@@ -252,7 +252,7 @@ describe('hosted mode through a parent window', () => {
     render(<App />);
     post(init);
     await waitFor(() =>
-      expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin)
+      expect(sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ready' }), window.location.origin)
     );
     expect(messages.some((m) => m.includes('modeler.toml could not be parsed'))).toBe(true);
     expect(screen.getAllByTestId('catalog-item').map((e) => e.textContent)).toContain('er');

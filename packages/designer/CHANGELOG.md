@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add an open Source files drawer and whole-file worker-cache authoring so hosted changes can create query files before their single Studio Save. Preserve the existing six structured operations and server licence/lease/strict gates.
+
+- Hosted Studio: fixed licensed extension hook, worker binding policy, and exact saved-SHA acknowledgement with remaining dirty count.
+- Keep chosen subject skins in hosted URLs and Copy links; remove the skin query when selecting the default (#291).
+
+## Unreleased
+
 - Add the explicit `?backend=host` viewer: same-origin parent init/navigation/token/refresh messages,
   BFF file snapshots over a worker LSP, hash routes, and parent URLs for shared links.
 - Refresh changed SHAs with a replacement worker so deleted files and cached reads disappear;

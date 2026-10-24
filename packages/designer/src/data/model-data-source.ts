@@ -106,6 +106,9 @@ export interface Disposable {
 }
 
 export interface ModelDataSource {
+  /** Open whole-file text authoring; all bytes remain in the same changed-file cache. */
+  sourceFiles?(): Array<{ path: string; text: string }>;
+  writeSourceFile?(file: { path: string; text: string }): Promise<import('@tatrman/lsp').WorkerDiagnostic[]>;
   /** Open structured authoring; absent on read-only backends. Applies/acknowledges successful edits once. */
   edit?(params: import('@tatrman/lsp').ModelerEditParams): Promise<import('@tatrman/lsp').ModelerEditResult>;
   changedFiles?(): import('../fs/changed-files.js').ChangedFile[];

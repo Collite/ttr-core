@@ -34,7 +34,7 @@ it('collects whole changed files, coalesces edits, and accepts a new saved SHA',
   const refresh = vi.spyOn(BffFilesDataSource.prototype, 'refresh');
   const sent = vi.spyOn(window.parent, 'postMessage');
   render(<App />); post(init);
-  await waitFor(() => expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin));
+  await waitFor(() => expect(sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ready' }), window.location.origin));
   const source = refresh.mock.contexts[0] as BffFilesDataSource;
   const path = 'model/lexicon/en/returns.ttrm';
   expect((await source.edit({ op: 'add-term', args: { lang: 'en', term: 'dry term',
@@ -55,6 +55,7 @@ it('collects whole changed files, coalesces edits, and accepts a new saved SHA',
   post({ ...init, sha });
   await waitFor(() => expect(source.sha).toBe('two'));
   await waitFor(() => expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.dirty', changed: 0 }, window.location.origin));
+  expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ack', sha: 'two', changed: 0 }, window.location.origin);
   expect(source.changedFiles()).toEqual([]);
   expect((await source.edit({ op: 'add-term', args: { lang: 'en', term: 'returns triage',
     target: 'er.entity.return_request', file: 'returns.ttrm' } })).ok).toBe(true);
@@ -104,7 +105,7 @@ async function editableHost() {
   vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>({sha,files})})));
   const refresh=vi.spyOn(BffFilesDataSource.prototype,'refresh'),sent=vi.spyOn(window.parent,'postMessage');
   render(<App/>);post(init);
-  await waitFor(()=>expect(sent).toHaveBeenCalledWith({type:'ttr.frame.ready'},window.location.origin));
+  await waitFor(()=>expect(sent).toHaveBeenCalledWith(expect.objectContaining({type:'ttr.frame.ready'}),window.location.origin));
   const source=refresh.mock.contexts[0] as BffFilesDataSource;
   const edit=(value:string)=>act(async()=>{expect((await source.edit({op:'set-source',args:{nodeRef:'er.entity.a',text:`def entity a {description:"${value}"}`}})).ok).toBe(true);});
   return {source,sent,path,edit,snapshot:(text?:string)=>{files={...files,...(text?{[path]:text}:{})};sha='two';}};
@@ -125,6 +126,7 @@ it('R4 post-save init carries later authoring and emits dirty 1',async()=>{
  await waitFor(()=>expect(h.sent).toHaveBeenCalledWith(expect.objectContaining({type:'ttr.frame.changedFiles'}),window.location.origin));
  const collected=h.source.changedFiles()[0].text!;await h.edit('later');h.snapshot(collected);h.sent.mockClear();post({...init,sha:'two'});
  await waitFor(()=>expect(h.source.sha).toBe('two'));
+ expect(h.sent).toHaveBeenCalledWith({type:'ttr.frame.ack',sha:'two',changed:1},window.location.origin);
  expect(h.source.changedFiles()).toEqual([{path:h.path,text:expect.stringContaining('later')}]);
  await waitFor(()=>expect(h.sent).toHaveBeenCalledWith({type:'ttr.frame.dirty',changed:1},window.location.origin));
  expect(h.sent).not.toHaveBeenCalledWith({type:'ttr.frame.dirty',changed:0},window.location.origin);
@@ -135,4 +137,24 @@ it('R4 post-save conflicts report the specific code and retain the old snapshot'
  await waitFor(()=>expect(h.sent).toHaveBeenCalledWith(expect.objectContaining({type:'ttr.frame.error',code:'frame/edit-conflict'}),window.location.origin));
  expect(h.source.sha).toBe('one');expect(h.source.changedFiles()[0].text).toContain('later');
  expect(h.sent).not.toHaveBeenCalledWith(expect.objectContaining({code:'host/load-failed'}),window.location.origin);
+});
+
+it('refuses an unexpected post-save SHA before replacing the snapshot', async () => {
+ const h = await editableHost(); await h.edit('collected'); h.source.collectChangedFiles(); h.snapshot(h.source.changedFiles()[0].text!);
+ post({ ...init, sha: 'a-different-save' });
+ await waitFor(() => expect(h.sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.error', code: 'frame/edit-conflict' }), window.location.origin));
+ expect(h.source.sha).toBe('one'); expect(h.source.changedFiles()[0].text).toContain('collected');
+ expect(h.sent).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ack' }), window.location.origin);
+});
+
+it('the hosted open source drawer creates a whole file and reports it through dirty/collect', async () => {
+ const h=await editableHost();
+ expect(h.sent).toHaveBeenCalledWith(expect.objectContaining({type:'ttr.frame.ready',capabilities:expect.arrayContaining(['source-files'])}),window.location.origin);
+ fireEvent.click(screen.getByRole('button',{name:'Source files'}));
+ fireEvent.change(screen.getByLabelText('Source path'),{target:{value:'model/er/source-added.ttrm'}});
+ fireEvent.change(screen.getByLabelText('Source text'),{target:{value:'package shop\nmodel er\ndef entity source_added { attributes: [def attribute id { type: int }] }\n'}});
+ fireEvent.click(screen.getByRole('button',{name:'Apply to model'}));
+ await waitFor(()=>expect(screen.queryByRole('dialog',{name:'Source files'})).toBeNull());
+ expect(h.source.changedFiles()).toEqual([{path:'model/er/source-added.ttrm',text:expect.stringContaining('def entity source_added')}]);
+ post({type:'ttr.host.collect'});await waitFor(()=>expect(h.sent).toHaveBeenCalledWith(expect.objectContaining({type:'ttr.frame.changedFiles',files:h.source.changedFiles()}),window.location.origin));
 });

@@ -85,3 +85,14 @@ describe('the skin lives in the layout (V-28)', () => {
     expect(await saveYaml(saved, 'whole_er')).toMatch(/^skin: er\.crow$/m);
   });
 });
+
+it('hosted skin URLs and Copy retain a chosen skin, and selecting the default removes it (#291)', async () => {
+  window.history.replaceState(null, '', '/?backend=host#/w/w/s/er?skin=er.chen');
+  mount();
+  await screen.findByTestId('mock-kernel');
+  await waitFor(() => expect(window.location.hash).toContain('skin=er.chen'));
+  expect(screen.getByTestId('copy-federation-link')).toHaveAttribute('data-federation-url', expect.stringContaining('skin=er.chen'));
+  fireEvent.change(screen.getByTestId('skin-picker'), { target: { value: 'er.crow' } });
+  await waitFor(() => expect(window.location.hash).not.toContain('skin='));
+  expect(screen.getByTestId('copy-federation-link').getAttribute('data-federation-url')).not.toContain('skin=');
+});
