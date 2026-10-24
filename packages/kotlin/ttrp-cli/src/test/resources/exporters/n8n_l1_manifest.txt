@@ -1,0 +1,18 @@
+model world
+
+def world executor_types {
+def executor n8n_l1 {
+    fidelity: L1
+    modes: [batch, on_event]
+    ports: [none, key, keys, event]
+    kinds: { sql: door, canonical: door, builtin: door, foreign: door, call: door, turn: door }
+    sinks: { email: "n8n-nodes-base.emailSend", http: "n8n-nodes-base.httpRequest", transition: door, writer: door, obligation: door, task: door, ask: door, wait: "n8n-nodes-base.wait", message: door, start: "n8n-nodes-base.httpRequest" }
+    control: [sequence, exclusive, inclusive, parallel, wait, digest]
+    waiting: true
+    granularity: [recipe, parts, islands]
+    conformance: n8n_driver
+    idempotency: { on_event: derived, batch: execution_id }
+    nodeVersions: { webhook: 2, httpRequest: 4.2, switch: 3, wait: 1.1, emailSend: 2.1, scheduleTrigger: 1.2 }
+    manifestSchema: { accepts: [3] }
+}
+}

@@ -1,0 +1,16 @@
+model world
+
+def world executor_types {
+def executor camunda_8 {
+    fidelity: L1
+    modes: [batch, on_event]
+    ports: [none, key, keys, event]
+    kinds: { sql: door, canonical: door, builtin: door, foreign: door, call: door, turn: door }
+    sinks: { email: "send task", http: "service task", transition: door, writer: door, obligation: door, task: door, ask: "user task", wait: "message catch", message: door, start: door }
+    control: [sequence, exclusive, inclusive, parallel, wait]
+    waiting: true
+    granularity: [recipe, parts]
+    conformance: structure
+    manifestSchema: { accepts: [3] }
+}
+}

@@ -35,6 +35,7 @@ fun main(args: Array<String>) {
     TtrpCommand()
         .subcommands(
             BuildCommand(),
+            EmitCommand(),
             RunCommand(),
             ExplainCommand(),
             CheckCommand(),
@@ -205,7 +206,16 @@ class CheckCommand : CliktCommand(name = "check") {
  * (AU-core-P2 · S2.4) conforms across `--engines` over `--fixture` scripts at `--as-of` ([RecipeConformCli]).
  */
 class ConformCommand : CliktCommand(name = "conform") {
-    private val file by argument()
+    private val files by argument("FILE").multiple()
+    private val replay by option("--replay", help = "golden or replay YAML fixture")
+    private val cells by option(
+        "--cells",
+        help = "cell names, comma-separated or followed by positional cell names",
+    ).multiple()
+    private val server by option("--server")
+    private val tokenEnv by option("--token-env")
+    private val world by option("--world")
+    private val reportOut by option("--out", help = "replay JSON report")
     private val tolerance by option("--tolerance", help = "per-column float64 tolerance, <col>=<eps>").multiple()
     private val engines by option("--engines", help = "a recipe's engines, comma-separated: pg, duckdb").default(
         "pg,duckdb",
@@ -221,6 +231,26 @@ class ConformCommand : CliktCommand(name = "conform") {
     ).multiple()
 
     override fun run() {
+        if (replay != null) {
+            throw ProgramResult(
+                ReplayConformCli.run(
+                    replay!!,
+                    cells.flatMap {
+                        it.split(',')
+                    } + files,
+                    server,
+                    tokenEnv,
+                    world,
+                    reportOut,
+                ) { echo(it) },
+            )
+        }
+        val file =
+            files.singleOrNull()
+                ?: run {
+                    echo("ttrp conform: expected one program file or --replay", err = true)
+                    throw ProgramResult(2)
+                }
         val abs = Path.of(file).toAbsolutePath()
         if (!Files.isRegularFile(abs)) {
             echo("ttrp conform: no such file: $file", err = true)

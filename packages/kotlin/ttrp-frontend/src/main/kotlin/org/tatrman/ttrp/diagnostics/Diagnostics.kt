@@ -417,6 +417,12 @@ enum class TtrpDiagnosticId(
         "this world's executor does not support per-island `retries` (F-4-ii) — deploy to a platform " +
             "(tatrman) executor, or remove the retries attribute",
     ),
+    TGT_001("TTRP-TGT-001", "Recipe executor capability refusal"),
+    TGT_002("TTRP-TGT-002", "Recipe executor capability refusal"),
+    TGT_003("TTRP-TGT-003", "Recipe executor capability refusal"),
+    TGT_004("TTRP-TGT-004", "Recipe executor capability refusal"),
+    TGT_005("TTRP-TGT-005", "Recipe executor capability refusal"),
+
     CAP_204(
         "TTRP-CAP-204",
         "this world's executor is read-only and does not allow `store` — route the rows to a `display`, " +

@@ -1,0 +1,17 @@
+model world
+
+def world executor_types {
+def executor sql_job {
+    fidelity: L2
+    modes: [batch]
+    ports: [none, key, keys, event]
+    kinds: { sql: local, canonical: local, builtin: local, foreign: no, call: no, turn: no }
+    sinks: { email: no, http: no, transition: no, writer: no, obligation: no, task: no, ask: no, wait: no, message: no, start: no }
+    control: [sequence, exclusive, inclusive, parallel, wait, digest]
+    waiting: false
+    ungoverned: true
+    granularity: [recipe, parts, islands]
+    conformance: structure
+    manifestSchema: { accepts: [3] }
+}
+}

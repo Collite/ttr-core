@@ -194,8 +194,8 @@ object EmitPluginLoader {
                 matches.size > 1 -> error("more than one emit plugin for target '$targetId' — ambiguous classpath")
                 else -> matches.single()
             }
-        require(plugin.spiVersion == TtrEmitPlugin.SPI_VERSION) {
-            "emit plugin '$targetId' was built against SPI v${plugin.spiVersion}, host expects v${TtrEmitPlugin.SPI_VERSION}"
+        require(plugin.spiVersion in TtrEmitPlugin.SUPPORTED_VERSIONS) {
+            "emit plugin '$targetId' was built against SPI v${plugin.spiVersion}, host accepts ${TtrEmitPlugin.SUPPORTED_VERSIONS}"
         }
         return plugin
     }

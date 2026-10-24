@@ -1,0 +1,17 @@
+model world
+
+def world executor_types {
+def executor native {
+    fidelity: L0
+    modes: [batch, on_event, windowed]
+    ports: [none, key, keys, event]
+    kinds: { sql: native, canonical: native, builtin: native, foreign: native, call: native, turn: native }
+    sinks: { email: native, http: native, transition: native, writer: native, obligation: native, task: native, ask: native, wait: native, message: native, start: native, deliver: native }
+    control: [sequence, exclusive, inclusive, parallel, wait, digest]
+    waiting: true
+    windows: true
+    granularity: [recipe, parts, islands]
+    conformance: direct
+    manifestSchema: { accepts: [3] }
+}
+}

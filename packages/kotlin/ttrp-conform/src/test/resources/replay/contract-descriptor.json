@@ -1,0 +1,10 @@
+{
+  "programs": [
+    {"name":"daily","recipe":"release_order","mode":"batch"},
+    {"name":"event","recipe":"release_order","mode":"on_event"}
+  ],
+  "deployments": [
+    {"name":"daily_native","program":"daily","targetType":"native","enabled":true,"granted":true,"stale":false},
+    {"name":"event_native","program":"event","targetType":"native","enabled":true,"granted":true,"stale":false}
+  ]
+}

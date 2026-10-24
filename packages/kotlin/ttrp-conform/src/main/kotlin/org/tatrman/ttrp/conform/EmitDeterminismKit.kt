@@ -66,6 +66,19 @@ object EmitDeterminismKit {
         return Report(plugin = plugin.targetId, cases = requests.size, divergences = divergences)
     }
 
+    /** SPI v2 recipes use the same byte/file-set proof as ordinary program emitters. */
+    fun checkRecipes(
+        plugin: TtrEmitPlugin,
+        requests: List<org.tatrman.ttrp.emit.spi.RecipeEmitRequest>,
+    ): Report {
+        require(plugin.supportsRecipes) { "${plugin.targetId} does not support recipes" }
+        val differences =
+            requests.mapIndexedNotNull { i, request ->
+                compare("recipe#$i", plugin.emitRecipe(request).files, plugin.emitRecipe(request).files)
+            }
+        return Report(plugin.targetId, requests.size, differences)
+    }
+
     private fun compare(
         case: String,
         a: SortedMap<String, ByteArray>,

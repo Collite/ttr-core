@@ -33,6 +33,17 @@ class EmitPluginLoaderTest :
             p.spiVersion shouldBe TtrEmitPlugin.SPI_VERSION
         }
 
+        "a Java SPI v1 plugin needs no v2 methods and the host accepts it" {
+            val plugin = EmitPluginLoader.builtin("legacy-v1")
+            plugin.spiVersion shouldBe 1
+            plugin.supportsRecipes shouldBe false
+        }
+
+        "the v2 host still refuses an unsupported future SPI major" {
+            shouldThrow<IllegalArgumentException> { EmitPluginLoader.builtin("future-spi") }.message!! shouldContain
+                "SPI v99"
+        }
+
         "builtin throws for an unknown target" {
             shouldThrow<IllegalStateException> { EmitPluginLoader.builtin("no-such-target") }
         }
