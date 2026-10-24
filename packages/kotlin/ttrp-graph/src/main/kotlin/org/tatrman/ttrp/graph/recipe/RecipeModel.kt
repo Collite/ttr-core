@@ -61,6 +61,8 @@ data class RecipeModel(
      * review-119 M4). The manifest and the generated catalog print this one list.
      */
     val kinds: List<String> = emptyList(),
+    val candidateKind: String? = null,
+    val implicitLatestDates: Map<String, String> = emptyMap(),
     /** AU-core-P2: the switch ends `else: none` — its untaken rows get no verdict row (manifest `elseRoute: "none"`). */
     val elseNone: Boolean = false,
     /** AU-core-P2: every `+`/`-` with a date operand, by location — [RecipeTime.dateArithmetic]. */

@@ -255,7 +255,7 @@ object TtrRenderer {
                     "domain",
                     def,
                     buildList {
-                        def.type?.let { add("type: ${renderType(it)}") }
+                        def.type?.let { add("type: ${renderDataType(it)}") }
                         def.domainKind?.let { add("kind: $it") }
                         if (def.restrictMembers.isNotEmpty()) {
                             add(
@@ -385,21 +385,6 @@ object TtrRenderer {
         return "def $kind ${def.name} { ${(common + properties).joinToString(", ")} }"
     }
 
-    private fun renderType(type: DataType): String =
-        if (type.length == null && type.precision == null) {
-            type.name
-        } else {
-            "{ ${(
-                listOf(
-                    "type: ${type.name}",
-                ) +
-                    listOfNotNull(
-                        type.length?.let { "length: $it" },
-                        type.precision?.let { "precision: $it" },
-                    )
-            ).joinToString(", ")} }"
-        }
-
     private fun renderAggregation(agg: AggregationSpec): String =
         if (agg.perDimension.isEmpty()) {
             agg.default ?: "{}"
@@ -486,7 +471,7 @@ object TtrRenderer {
 
     private fun renderAutoBody(b: AutoBody): String {
         val sb = StringBuilder()
-        b.type?.let { sb.append(" type: ${renderType(it)},") }
+        b.type?.let { sb.append(" type: ${renderDataType(it)},") }
         b.label?.let { sb.append(" label: ${renderLocalizedString(it)},") }
         renderDescriptionIfAny(b.description, b.descriptionLocalized)?.let { sb.append(it) }
         renderTagsIfAny(b.tags)?.let { sb.append(" $it") }
@@ -684,7 +669,7 @@ object TtrRenderer {
         val sb = StringBuilder()
         sb.append("def attribute ${def.name} {")
         def.type?.let {
-            sb.append(" type: ${renderType(it)},")
+            sb.append(" type: ${renderDataType(it)},")
         }
         def.domainRef?.let { sb.append(" domain: ${it.path},") }
         def.aggregation?.let { sb.append(" aggregation: ${renderAggregation(it)},") }
@@ -830,18 +815,7 @@ object TtrRenderer {
         val sb = StringBuilder()
         sb.append("def column ${def.name} {")
         def.type?.let {
-            // The grammar has no `name(len, prec)` paren form — a structured type
-            // must render as the object form `{ type: X, length: N, precision: P }`
-            // so it round-trips. (The ai-platform renderer emitted unparseable
-            // paren syntax here; modeler fixes it.)
-            if (it.length != null || it.precision != null) {
-                val parts = mutableListOf("type: ${it.name}")
-                it.length?.let { l -> parts.add("length: $l") }
-                it.precision?.let { p -> parts.add("precision: $p") }
-                sb.append(" type: { ${parts.joinToString(", ")} },")
-            } else {
-                sb.append(" type: ${renderType(it)},")
-            }
+            sb.append(" type: ${renderDataType(it)},")
         }
         if (def.isKey) sb.append(" isKey: true,")
         if (def.optional) sb.append(" optional: true,")
@@ -852,6 +826,15 @@ object TtrRenderer {
         renderSemanticsIfAny(def.semantics)?.let { sb.append(it) }
         sb.append(" }")
         return sb.toString()
+    }
+
+    /** The grammar's structured spelling preserves bounds; parenthesized SQL types do not parse. */
+    private fun renderDataType(type: org.tatrman.ttr.parser.model.DataType): String {
+        if (type.length == null && type.precision == null) return type.name
+        val parts = mutableListOf("type: ${type.name}")
+        type.length?.let { parts.add("length: $it") }
+        type.precision?.let { parts.add("precision: $it") }
+        return "{ ${parts.joinToString(", ")} }"
     }
 
     private fun renderRelation(def: RelationDef): String {

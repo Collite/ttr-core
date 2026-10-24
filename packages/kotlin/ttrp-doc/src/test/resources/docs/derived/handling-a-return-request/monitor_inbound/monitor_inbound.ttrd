@@ -1,0 +1,233 @@
+{
+    "document": "handling-a-return-request.md",
+    "documentSha": "ae9cb8740219602c4a456a16dad768743dc6e89f02141db0a2464ba84940eafb",
+    "nodes": {
+        "age": {
+            "block": 13,
+            "generatedSpan": [
+                1769,
+                2059
+            ],
+            "paragraph": [
+                9526,
+                9561
+            ],
+            "span": [
+                9563,
+                9869
+            ]
+        },
+        "awaiting": {
+            "block": 11,
+            "generatedSpan": [
+                724,
+                1306
+            ],
+            "paragraph": [
+                8397,
+                8437
+            ],
+            "span": [
+                8439,
+                9021
+            ]
+        },
+        "inbound": {
+            "block": 15,
+            "generatedSpan": [
+                2318,
+                3391
+            ],
+            "paragraph": [
+                10170,
+                10249
+            ],
+            "span": [
+                10251,
+                11340
+            ]
+        },
+        "receipts": {
+            "block": 12,
+            "generatedSpan": [
+                1308,
+                1767
+            ],
+            "paragraph": [
+                9023,
+                9063
+            ],
+            "span": [
+                9065,
+                9524
+            ]
+        },
+        "reminded": {
+            "block": 14,
+            "generatedSpan": [
+                2061,
+                2316
+            ],
+            "paragraph": [
+                9871,
+                9911
+            ],
+            "span": [
+                9913,
+                10168
+            ]
+        }
+    },
+    "sentences": [
+        {
+            "nodes": [],
+            "span": [
+                29,
+                198
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                1023,
+                1067
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                1526,
+                1569
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                2077,
+                2121
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                3010,
+                3055
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                3266,
+                3313
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                4109,
+                4151
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                6085,
+                6174
+            ]
+        },
+        {
+            "nodes": [
+                "awaiting"
+            ],
+            "span": [
+                8397,
+                8437
+            ]
+        },
+        {
+            "nodes": [
+                "receipts"
+            ],
+            "span": [
+                9023,
+                9063
+            ]
+        },
+        {
+            "nodes": [
+                "age"
+            ],
+            "span": [
+                9526,
+                9561
+            ]
+        },
+        {
+            "nodes": [
+                "reminded"
+            ],
+            "span": [
+                9871,
+                9911
+            ]
+        },
+        {
+            "nodes": [
+                "inbound"
+            ],
+            "span": [
+                10170,
+                10249
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                11342,
+                11431
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                12815,
+                12850
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                13163,
+                13211
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                13575,
+                13616
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                14085,
+                14129
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                14451,
+                14520
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                16135,
+                16224
+            ]
+        }
+    ]
+}

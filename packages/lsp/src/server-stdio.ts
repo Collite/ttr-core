@@ -30,7 +30,8 @@ createServerConnection(connection, {
   },
   async scanProjectFiles(root: string) {
     const { pathToFileURL } = await import('node:url');
-    const { readFile } = await import('node:fs/promises');
+    const { readFile, readdir } = await import('node:fs/promises');
+    const { join } = await import('node:path');
     const project = await loadProject(root);
     const out: Array<{ uri: string; text: string }> = [];
     for (const file of project.ttrFiles) {
@@ -40,6 +41,20 @@ createServerConnection(connection, {
         // skip files that vanish between the walk and the read
       }
     }
+    // Keep non-TTR test rosters as source bytes for the synthesizer's orphan guard.
+    // Do not follow symlinks out of the checkout; a missing tests directory is normal.
+    const rosters = async (dir: string): Promise<void> => {
+      let entries;
+      try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
+      for (const entry of entries) {
+        const file = join(dir, entry.name);
+        if (entry.isDirectory()) await rosters(file);
+        else if (entry.isFile() && entry.name.endsWith('.mjs')) {
+          try { out.push({ uri: pathToFileURL(file).href, text: await readFile(file, 'utf-8') }); } catch { /* vanished */ }
+        }
+      }
+    };
+    await rosters(join(root, 'model', 'tests'));
     return out;
   },
   async readProjectFile(uri: string): Promise<string | undefined> {

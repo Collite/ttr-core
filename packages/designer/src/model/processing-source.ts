@@ -8,6 +8,7 @@
 import type { ProcessingGraph } from '@tatrman/canvas-core';
 
 export interface ProcessingGraphSource {
+  getRecipeSummary?(programRef: string): Promise<import('./ttrp/types.js').RecipeSummary | null>;
   getProgramGraph(programRef: string): Promise<ProcessingGraph>;
   getContainerGraph(containerRef: string): Promise<ProcessingGraph>;
 }

@@ -185,6 +185,7 @@ data class DecisionDecl(
     val switch: SwitchStmt,
     override val location: SourceLocation,
     val nameLocation: SourceLocation = location,
+    val sourceFragment: FragmentBody? = null,
 ) : RecipeMember
 
 enum class SwitchMode(

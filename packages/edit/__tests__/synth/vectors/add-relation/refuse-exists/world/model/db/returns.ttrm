@@ -1,0 +1,13 @@
+package hartland
+
+model db schema dbo
+
+def table return_request {
+    columns: [
+        def column request_id { type: int, isKey: true },
+        def column amount { type: { type: decimal, length: 12, precision: 2 } },
+        def column note { type: text, optional: true }
+    ]
+}
+
+def fk request_customer { from: [db.dbo.return_request.request_id], to: [db.dbo.customer.id] }

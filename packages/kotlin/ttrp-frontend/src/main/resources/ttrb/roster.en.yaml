@@ -15,6 +15,21 @@
 lang: en
 
 keywords:
+  DO: [do]
+  LATEST: [latest]
+  SNAPSHOT: [snapshot]
+  PER: [per]
+  WITHIN: [within]
+  LAST: [last]
+  DAYS: [days]
+  WORKING_DAYS: [working days]
+  SINCE: [since]
+  DECIDE: [decide]
+  BECAUSE: [because]
+  SHOWING: [showing]
+  EXCLUSIVELY: [exclusively]
+  MULTI_ROUTE: [a row may take several routes]
+  NOTHING: [nothing]
   # ---- verbs (C4-b roster) ----
   LOAD: [load]
   KEEP: [keep]

@@ -1,0 +1,15 @@
+package hartland
+
+model er
+
+def query returns_review {
+    sourceText: """sql
+SELECT r.request_number AS request_id, r.customer, i.category,
+       r.requested_date AS requested_at, rr.received_date AS received_at,
+       r.state AS status, l.quantity * l.unit_price AS amount
+FROM return_request r
+JOIN return_request_line l ON r.request_number = l.request_number
+JOIN item i ON l.item = i.sk
+LEFT JOIN return_receipt rr ON l.line_id = rr.line_id
+"""
+}

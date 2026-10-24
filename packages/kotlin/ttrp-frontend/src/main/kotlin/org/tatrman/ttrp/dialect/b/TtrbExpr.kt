@@ -27,6 +27,7 @@ class TtrbExpr(
     private val loc: TtrSqlLoc,
     private val catalog: FunctionCatalog,
     private val skin: TtrbSkin = TtrbSkin.EN,
+    private val parameterAliases: Map<String, String> = emptyMap(),
 ) {
     fun foldBool(
         ctx: P.BoolExprContext,
@@ -161,6 +162,12 @@ class TtrbExpr(
         when (ctx) {
             is P.LitPrimaryContext -> literal(ctx.literal())
             is P.CallPrimaryContext -> functionCall(ctx.funcCall(), ap)
+            is P.ParameterPrimaryContext -> {
+                val mention = ctx.ident().joinToString(" ") { it.text }
+                val name = if (ctx.THE() != null) parameterAliases[TtrbSkin.fold(mention)] ?: mention else mention
+                org.tatrman.ttrp.expr
+                    .ParamRef(name, loc.of(ctx))
+            }
             is P.ColPrimaryContext -> columnRef(ctx.dottedRef(), ap)
             is P.ParenPrimaryContext -> foldBool(ctx.boolExpr(), ap)
             else -> error("unhandled primary: ${ctx::class.simpleName}")
@@ -191,7 +198,14 @@ class TtrbExpr(
     ): ColumnRef {
         val parts = ctx.ident().map { it.text }
         return if (parts.size >= 2) {
-            ColumnRef(port = ap[parts[parts.size - 2]], column = parts.last(), location = loc.of(ctx))
+            ColumnRef(
+                port =
+                    ap[parts[parts.size - 2]] ?: parts[parts.size - 2].takeIf {
+                        it == "left" || it == "right"
+                    },
+                column = parts.last(),
+                location = loc.of(ctx),
+            )
         } else {
             ColumnRef(port = null, column = parts.last(), location = loc.of(ctx))
         }

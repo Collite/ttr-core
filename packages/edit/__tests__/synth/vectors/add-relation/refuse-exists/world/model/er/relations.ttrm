@@ -1,0 +1,10 @@
+package hartland
+
+model er
+
+def relation rel_return_receipt_return_request {
+    from: hartland.er.entity.return_receipt,
+    to: hartland.er.entity.return_request,
+    cardinality: { from: "0..*", to: "1" },
+    binding: { fk: hartland.db.dbo.fk.request_customer }
+}

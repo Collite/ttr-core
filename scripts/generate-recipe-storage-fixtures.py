@@ -55,7 +55,7 @@ def main():
     grouped = {"erp": [], "automation": []}
     for source in ("schema.sql", "sample.sql"):
         for statement in statements((FIXTURES / source).read_text()):
-            match = re.match(r"(?:CREATE TABLE|INSERT INTO)\s+(\w+)\b", statement, re.I)
+            match = re.match(r"(?:CREATE TABLE|CREATE VIEW|INSERT INTO)\s+(\w+)\b", statement, re.I)
             if not match:
                 raise ValueError(f"unclassified fixture statement: {statement[:80]}")
             storage = "automation" if match[1].lower() in LEDGER else "erp"

@@ -335,6 +335,7 @@ export interface SymbolDetail {
   tags: string[];
   sourceUri: string;
   sourceLine: number;
+  sourceText?: string;
   perKindData: PerKindData;
   referencedBy: Array<{ qname: string; sourceUri: string; sourceLine: number }>;
   /**
@@ -615,7 +616,11 @@ export function buildSymbolDetail(
   );
   // The builder already produces the canonical package-qualified key; keep the
   // asked-for qname verbatim so callers key the detail by the same id.
-  if (detail) detail.qname = qname;
+  if (detail) {
+    detail.qname = qname;
+    const text = getDocument(symbol.documentUri);
+    if (text !== null) detail.sourceText = Array.from(text).slice(realDef.source.offsetStart, realDef.source.offsetEnd).join('');
+  }
   return detail;
 }
 

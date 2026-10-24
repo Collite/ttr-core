@@ -940,6 +940,8 @@ class FileBasedSource(
                                     semantics = attrSemanticsOf(a.semantics, semanticsResolved),
                                     states = a.states,
                                     transitions = a.transitions.associate { t -> t.from to t.to },
+                                    length = a.type?.length,
+                                    precision = a.type?.precision,
                                 )
                             },
                         displayLabel = def.displayLabel.toLocalizedText(),

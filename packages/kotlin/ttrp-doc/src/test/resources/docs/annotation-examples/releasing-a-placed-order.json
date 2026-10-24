@@ -1,0 +1,324 @@
+{
+  "document": "releasing-a-placed-order.md",
+  "documentSha": "38786d6f142d7a8ae745386b4a6ba65520fc608c8c7370e7526632074a938d50",
+  "annotations": [
+    {
+      "type": "Section",
+      "id": "section",
+      "span": [
+        0,
+        26
+      ],
+      "title": "Releasing a placed order"
+    },
+    {
+      "type": "Sentence",
+      "id": "s_656",
+      "span": [
+        656,
+        721
+      ],
+      "text": "Every placed order is checked before it is released for shipping."
+    },
+    {
+      "type": "Sentence",
+      "id": "s_971",
+      "span": [
+        971,
+        1056
+      ],
+      "text": "Every line must be covered by current stock at the fulfilling center, with no outage."
+    },
+    {
+      "type": "Sentence",
+      "id": "s_1924",
+      "span": [
+        1924,
+        1996
+      ],
+      "text": "The price must match the customer or channel price within the tolerance."
+    },
+    {
+      "type": "Sentence",
+      "id": "s_3171",
+      "span": [
+        3171,
+        3228
+      ],
+      "text": "The customer must have no open invoice past its due date."
+    },
+    {
+      "type": "Sentence",
+      "id": "s_3503",
+      "span": [
+        3503,
+        3598
+      ],
+      "text": "Hold for Sales when stock or prices fail; hold for AR when receivables fail. Otherwise release."
+    },
+    {
+      "type": "Mention",
+      "id": "m1",
+      "span": [
+        21,
+        26
+      ],
+      "objectRef": "er.entity.order",
+      "lexiconMatch": "order",
+      "confidence": 1.0
+    },
+    {
+      "type": "Mention",
+      "id": "m2",
+      "span": [
+        1009,
+        1014
+      ],
+      "objectRef": "er.entity.inventory",
+      "lexiconMatch": "stock",
+      "confidence": 1.0
+    },
+    {
+      "type": "Mention",
+      "id": "m3",
+      "span": [
+        3202,
+        3209
+      ],
+      "objectRef": "er.entity.invoice",
+      "lexiconMatch": "invoice",
+      "confidence": 1.0
+    },
+    {
+      "type": "Coref",
+      "id": "coref",
+      "span": [
+        656,
+        721
+      ],
+      "mention": "m1"
+    },
+    {
+      "type": "Role",
+      "id": "role_overdue",
+      "span": [
+        3230,
+        3501
+      ],
+      "role": "context",
+      "container": "overdue"
+    },
+    {
+      "type": "Block",
+      "id": "block_overdue",
+      "span": [
+        3230,
+        3501
+      ],
+      "nodes": [
+        "overdue"
+      ]
+    },
+    {
+      "type": "Link",
+      "id": "link_overdue",
+      "span": [
+        3230,
+        3501
+      ],
+      "block": "block_overdue",
+      "sentences": [
+        "s_3171"
+      ]
+    },
+    {
+      "type": "Role",
+      "id": "role_placed_orders",
+      "span": [
+        723,
+        969
+      ],
+      "role": "candidates",
+      "container": "placed_orders"
+    },
+    {
+      "type": "Block",
+      "id": "block_placed_orders",
+      "span": [
+        723,
+        969
+      ],
+      "nodes": [
+        "placed_orders"
+      ]
+    },
+    {
+      "type": "Link",
+      "id": "link_placed_orders",
+      "span": [
+        723,
+        969
+      ],
+      "block": "block_placed_orders",
+      "sentences": [
+        "s_656"
+      ]
+    },
+    {
+      "type": "Role",
+      "id": "role_price_differences",
+      "span": [
+        1998,
+        3169
+      ],
+      "role": "context",
+      "container": "price_differences"
+    },
+    {
+      "type": "Block",
+      "id": "block_price_differences",
+      "span": [
+        1998,
+        3169
+      ],
+      "nodes": [
+        "price_differences"
+      ]
+    },
+    {
+      "type": "Link",
+      "id": "link_price_differences",
+      "span": [
+        1998,
+        3169
+      ],
+      "block": "block_price_differences",
+      "sentences": [
+        "s_1924"
+      ]
+    },
+    {
+      "type": "Role",
+      "id": "role_shortfall",
+      "span": [
+        1058,
+        1922
+      ],
+      "role": "context",
+      "container": "shortfall"
+    },
+    {
+      "type": "Block",
+      "id": "block_shortfall",
+      "span": [
+        1058,
+        1922
+      ],
+      "nodes": [
+        "shortfall"
+      ]
+    },
+    {
+      "type": "Link",
+      "id": "link_shortfall",
+      "span": [
+        1058,
+        1922
+      ],
+      "block": "block_shortfall",
+      "sentences": [
+        "s_971"
+      ]
+    },
+    {
+      "type": "Role",
+      "id": "role_verdict",
+      "span": [
+        3600,
+        5172
+      ],
+      "role": "decision",
+      "container": "verdict"
+    },
+    {
+      "type": "Block",
+      "id": "block_verdict",
+      "span": [
+        3600,
+        5172
+      ],
+      "nodes": [
+        "verdict"
+      ]
+    },
+    {
+      "type": "Link",
+      "id": "link_verdict",
+      "span": [
+        3600,
+        5172
+      ],
+      "block": "block_verdict",
+      "sentences": [
+        "s_3503"
+      ]
+    },
+    {
+      "type": "Parameter",
+      "id": "parameter_tolerance",
+      "span": [
+        567,
+        576
+      ],
+      "name": "tolerance",
+      "value": "0.01",
+      "valueType": "decimal"
+    },
+    {
+      "type": "Parameter",
+      "id": "parameter_confirmation_threshold",
+      "span": [
+        578,
+        600
+      ],
+      "name": "confirmation_threshold",
+      "value": "50000",
+      "valueType": "decimal"
+    },
+    {
+      "type": "Person",
+      "id": "sales",
+      "span": [
+        3512,
+        3517
+      ],
+      "role": "Sales"
+    },
+    {
+      "type": "Inexpressible",
+      "id": "restatement",
+      "span": [
+        0,
+        0
+      ],
+      "why": "A future policy may require an explicit restatement.",
+      "escapes": [
+        "restatement"
+      ]
+    },
+    {
+      "type": "Verdict",
+      "id": "review",
+      "span": [
+        1058,
+        1922
+      ],
+      "target": "link_shortfall",
+      "accepted": false,
+      "producer": "human@reviewer",
+      "derivedFrom": [
+        "link_shortfall"
+      ]
+    }
+  ]
+}

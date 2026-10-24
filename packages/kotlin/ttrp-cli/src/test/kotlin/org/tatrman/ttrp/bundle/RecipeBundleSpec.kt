@@ -576,7 +576,16 @@ class RecipeBundleSpec :
             r.manifest.recipe!!.tests shouldBe null
             // Baseline from f400192's CLI with its unconditional empty tests key removed: the pre-field wire shape.
             val baseline = Path.of("src/test/resources/fixtures/release-order-before-golden-field.json")
-            json shouldBe Files.readString(baseline)
+            // P3 adds the derived README to files; every other wire byte keeps the pre-field baseline.
+            val beforeReadme =
+                json
+                    .lineSequence()
+                    .filterNot {
+                        it.trimStart().startsWith(
+                            "\"README.md\":",
+                        )
+                    }.joinToString("\n")
+            beforeReadme shouldBe Files.readString(baseline)
         }
 
         "golden seeds beside a recipe are bundled, hashed and listed in path order" {

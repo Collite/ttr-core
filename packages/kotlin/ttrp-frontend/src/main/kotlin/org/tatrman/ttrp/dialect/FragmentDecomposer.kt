@@ -25,7 +25,10 @@ object FragmentDecomposer {
         val diagnostics: List<TtrpDiagnostic>,
     )
 
-    fun run(doc: TtrpDocument): Result {
+    fun run(
+        doc: TtrpDocument,
+        parameterAliases: Map<String, String> = emptyMap(),
+    ): Result {
         val diags = mutableListOf<TtrpDiagnostic>()
         val statements =
             doc.statements.map { stmt ->
@@ -34,13 +37,13 @@ object FragmentDecomposer {
                     stmt.copy(
                         members =
                             stmt.members.map { m ->
-                                (m as? RoleContainer)?.let { decomposeRole(it, diags) }
+                                (m as? RoleContainer)?.let { decomposeRole(it, diags, parameterAliases) }
                                     ?: m
                             },
                     )
                 } else if (stmt is ContainerDecl && stmt.body is FragmentBody && stmt.body.decomposition == null) {
                     val body = stmt.body as FragmentBody
-                    val decomp = decompose(stmt, body)
+                    val decomp = decompose(stmt, body, parameterAliases)
                     if (decomp != null) {
                         diags += decomp.diagnostics
                         stmt.copy(body = body.copy(decomposition = decomp))
@@ -58,11 +61,12 @@ object FragmentDecomposer {
     private fun decomposeRole(
         role: RoleContainer,
         diags: MutableList<TtrpDiagnostic>,
+        parameterAliases: Map<String, String>,
     ): RoleContainer {
         val body = role.body as? FragmentBody ?: return role
         if (body.decomposition != null) return role
         val decl = role.asContainer() ?: return role
-        val decomp = decompose(decl, body) ?: return role
+        val decomp = decompose(decl, body, parameterAliases) ?: return role
         diags += decomp.diagnostics
         return role.copy(body = body.copy(decomposition = decomp))
     }
@@ -70,6 +74,7 @@ object FragmentDecomposer {
     private fun decompose(
         decl: ContainerDecl,
         body: FragmentBody,
+        parameterAliases: Map<String, String>,
     ): org.tatrman.ttrp.ast.FragmentDecomposition? {
         val outPort = decl.ports.firstOrNull { it.kind == PortKind.OUT }?.name
         return when (body.tag) {
@@ -89,6 +94,7 @@ object FragmentDecomposer {
                                 .filter { it.kind == PortKind.IN }
                                 .map { it.name }
                                 .toSet(),
+                        parameterAliases = parameterAliases,
                         outPorts =
                             decl.ports
                                 .filter { it.kind == PortKind.OUT }

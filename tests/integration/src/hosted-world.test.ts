@@ -110,19 +110,22 @@ describe('the hosted worker world (shared Node/browser handlers)', () => {
     expect(page.symbols[0].qname).toBe('shop.sales.er.entity.item');
   });
 
-  it('builds member details once for a paged listing and rejects cursors after a change', async () => {
+  it('reuses parsed member details across pages and rejects cursors after a change', async () => {
     await load(MANIFEST);
     const parse = vi.spyOn(parser, 'parseString');
     try {
       let page = await client.sendRequest('modeler/listSymbols', { includeMembers: true, limit: 2 }) as SymbolPage;
       const firstCount = parse.mock.calls.length;
-      expect(firstCount).toBeGreaterThan(0);
+      expect(firstCount).toBe(0); // didOpen already parsed these unchanged documents
+      const listed = [...page.symbols];
       const cursor = page.nextCursor;
       let pages = 1;
       while (page.nextCursor) {
         page = await client.sendRequest('modeler/listSymbols', { includeMembers: true, limit: 2, cursor: page.nextCursor }) as SymbolPage;
+        listed.push(...page.symbols);
         pages++;
       }
+      expect(listed.map(symbol => symbol.kind)).toContain('member');
       expect(pages).toBeGreaterThanOrEqual(3);
       expect(parse.mock.calls.length).toBe(firstCount);
       await client.sendNotification('textDocument/didChange', { textDocument: { uri: `${ROOT}/model/er/items.ttrm`, version: 2 }, contentChanges: [{ text: FILES['model/er/items.ttrm'] + '\ndef entity another {}' }] });

@@ -1,0 +1,63 @@
+{
+  "ok": false,
+  "code": "would-orphan",
+  "message": "hartland.er.entity.return_request still has references.",
+  "refs": [
+    {
+      "uri": "model/binding/er2db.ttrm",
+      "kind": "binding",
+      "range": {
+        "start": {
+          "line": 4,
+          "character": 46
+        },
+        "end": {
+          "line": 4,
+          "character": 70
+        }
+      }
+    },
+    {
+      "uri": "model/er/relations.ttrm",
+      "kind": "relation",
+      "range": {
+        "start": {
+          "line": 6,
+          "character": 8
+        },
+        "end": {
+          "line": 6,
+          "character": 41
+        }
+      }
+    },
+    {
+      "uri": "model/lexicon/en/returns.ttrm",
+      "kind": "lexicon",
+      "range": {
+        "start": {
+          "line": 5,
+          "character": 9
+        },
+        "end": {
+          "line": 5,
+          "character": 33
+        }
+      }
+    },
+    {
+      "uri": "model/tests/er.test.mjs",
+      "kind": "roster",
+      "range": {
+        "start": {
+          "line": 1,
+          "character": 0
+        },
+        "end": {
+          "line": 2,
+          "character": 0
+        }
+      }
+    }
+  ]
+}

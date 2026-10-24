@@ -80,6 +80,18 @@ class SugarLowering(
 
     fun lower(graph: TtrpGraph): Result {
         g = graph
+        model.implicitLatestDates.forEach { (id, column) ->
+            val node = g.nodes[id] as? TimeSugar ?: return@forEach
+            g =
+                GraphOps.swapNode(
+                    g,
+                    id,
+                    node.copy(
+                        args =
+                            listOf("by" to ColumnRef(null, column, node.location)) + node.args,
+                    ),
+                )
+        }
         val members =
             (rg.roles.values + listOfNotNull(rg.decision))
                 .flatMap { g.containers[it]?.memberIds.orEmpty() }

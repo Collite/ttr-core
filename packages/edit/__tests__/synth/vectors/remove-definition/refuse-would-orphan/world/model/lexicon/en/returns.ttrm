@@ -1,0 +1,8 @@
+package hartland
+
+model lexicon locale en
+
+def term return_request {
+    for: er.entity.return_request,
+    forms: ["return request"]
+}

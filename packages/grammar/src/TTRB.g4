@@ -34,6 +34,7 @@
 //     is DROPPED for v1 (one closed binding spelling; `as` already carries Load/Join/
 //     Compute/Show naming). Reconsider both in a v1.x NL sweep.
 
+// AU-core-P3 (TTRP 0.6): recipe time sugar, parameter mentions and decision route sentences (additive).
 grammar TTRB;
 
 // Keyword token types — spelled by the active skin (roster.<lang>.yaml), never by the lexer.
@@ -61,7 +62,9 @@ tokens {
     // joins (B7): optional join, have / have no match, a model relation
     OPTIONALLY, MATCH_IN, NO_MATCH_IN, RELATION,
     // naming the current value (B8)
-    NAME_VERB
+    NAME_VERB,
+    LATEST, SNAPSHOT, PER, WITHIN, LAST, DAYS, WORKING_DAYS, SINCE,
+    DO, DECIDE, BECAUSE, SHOWING, EXCLUSIVELY, MULTI_ROUTE, NOTHING
 }
 
 // =============================================================================
@@ -69,6 +72,10 @@ tokens {
 // =============================================================================
 
 fragmentProgram : item+ EOF ;
+// Optional action sentence, used with the skeleton's explicit route references (D-30).
+wiringProgram : wiringSentence+ EOF ;
+wiringSentence : DO action=ident WITH wiringPair ((COMMA | AND) wiringPair)* DOT ;
+wiringPair : column=ident AS value=expr ;
 
 item : sentence | block ;
 
@@ -82,7 +89,13 @@ block : IF boolExpr COLON INDENT item+ DEDENT ;
 sentence : statement DOT ;
 
 statement
-    : loadStmt          # loadSentence
+    : latestStmt        # latestSentence
+    | withinStmt        # withinSentence
+    | workingDaysStmt   # workingDaysSentence
+    | decideStmt        # decideSentence
+    | decisionModeStmt  # decisionModeSentence
+    | decisionElseStmt  # decisionElseSentence
+    | loadStmt          # loadSentence
     | limitStmt         # limitSentence      // before keep* — `Keep … first n rows` disambiguates on FIRST
     | keepColumnsStmt   # keepColumnsSentence
     | keepExceptStmt    # keepExceptSentence
@@ -106,6 +119,15 @@ statement
     | outputStmt        # outputSentence
     | nameStmt          # nameSentence
     ;
+
+// Recipe vocabulary (AU contracts section 7). Identifiers are never translated.
+latestStmt : KEEP THE? LATEST SNAPSHOT (BY date=ident)? (PER | FOR | BY) columnsAnd ;
+withinStmt : KEEP ONLY? THE? rowWord? COMMA? whereWord? col=ident IS WITHIN THE? LAST amount=NUMBER DAYS ;
+workingDaysStmt : COMPUTE name=ident AS THE? WORKING_DAYS SINCE col=ident ;
+columnsAnd : ident ((COMMA | AND) ident)* ;
+decideStmt : DECIDE route=ident COMMA? IF boolExpr (COMMA? BECAUSE reason=str)? (COMMA? SHOWING columnsAnd)? ;
+decisionModeStmt : DECIDE (EXCLUSIVELY | SEMICOLON MULTI_ROUTE) ;
+decisionElseStmt : OTHERWISE COMMA? (DECIDE route=ident | NOTHING) (COMMA? BECAUSE reason=str)? (COMMA? SHOWING columnsAnd)? ;
 
 // ---- statements (C4-b roster) --------------------------------------------------
 
@@ -237,7 +259,8 @@ nameRef        : ident | str ;
 // `Send that|the result|<name> to output <port>.` / `Pošli to|výsledek|<jméno> na výstup <port>.` — the
 // container OUT port <port> carries the current value (or the named one). The port must be declared in
 // the container header (TTRP-B-112). A container's IN ports are plain names in every sentence.
-outputStmt   : SEND outputSource? TO OUTPUT port=ident ;
+outputStmt   : SEND outputSource? TO OUTPUT port=portIdent ;
+portIdent : ident | ROWS ;
 outputSource : refWord | THE? (RESULT | RESULTS) | qname ;
 
 // ---- naming the current value (B8) ------------------------------------------------
@@ -268,6 +291,8 @@ ident
     : IDENT
     | COUNT | COUNT_NOUN | ATTACH | SEND | SET | EMAIL | SUBJECT | TEMPLATE | KEY | ATTACHMENT
     | DEPARTMENT | OTHERWISE | REASON | DESCRIPTION | OUTPUT | RELATION | NAME_VERB
+    | LATEST | SNAPSHOT | PER | WITHIN | LAST | DAYS | WORKING_DAYS | SINCE
+    | DO | DECIDE | BECAUSE | SHOWING | EXCLUSIVELY | MULTI_ROUTE | NOTHING
     ;
 
 // ---- expression grammar — verbose skin over the ONE PL IR (S16, T5-e) ----------
@@ -307,7 +332,8 @@ addExpr  : mulExpr ((PLUS | MINUS) mulExpr)* ;
 mulExpr  : unaryExpr ((STAR | SLASH) unaryExpr)* ;
 unaryExpr : MINUS unaryExpr | primary ;
 primary
-    : literal                                               # litPrimary
+    : (THE ident+ | COLON ident)                           # parameterPrimary
+    | literal                                               # litPrimary
     | funcCall                                              # callPrimary
     | dottedRef                                             # colPrimary
     | LPAREN boolExpr RPAREN                                # parenPrimary   // any grouping (B8)
@@ -340,6 +366,7 @@ LPAREN      : '(' ;
 RPAREN      : ')' ;
 COMMA       : ',' ;
 DOT         : '.' ;
+SEMICOLON   : ';' ;
 COLON       : ':' ;                  // ends a block header (B3)
 
 STRING        : '"' (~["\r\n])* '"' ;
