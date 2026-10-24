@@ -279,6 +279,23 @@ Per [`contracts.md`](docs/grammar-master/contracts.md) §7:
   staging lane and off the Central quota (§ Release lanes). Local builds
   without `-Pversion` get `0.0.1-LOCAL` (see below).
 
+### TypeScript edit synthesizer (public npmjs) — `@tatrman/edit`
+
+SO D-19 amends FO-21: structured definition synthesis/apply operations are open, while commercial canvas forms
+remain extension-owned. `edit/v0.1.0` publishes `@tatrman/edit@0.1.0` via the package matrix in `publish-ts.yml`.
+The tag version must equal `packages/edit/package.json`; the tag commit must be an ancestor of merged master.
+The release requires `NPM_TOKEN` with public publish rights for the scope. S1.3 preflight (2026-10-23) found no
+repository or inherited organization token; provision it before cutting the tag. Do not tag an unmerged phase PR.
+
+Build with `pnpm --filter "@tatrman/edit..." build`. The internal workspace entry stays unbundled for dependency
+deduplication; publish-only entry overrides select a self-contained runtime and declaration bundle in `dist/package`.
+Only the public `vscode-languageserver-types` dependency remains; the private workspace closure is bundled.
+
+Every PR runs `node scripts/edit-consumer-smoke.mjs`: `pnpm publish --dry-run`, pack/install in a temporary consumer,
+a four-file canonical vector and strict declaration compilation. To release after review/merge, tag the merged
+commit `edit/v0.1.0`, push that tag and verify both the publish workflow and `npm view @tatrman/edit@0.1.0`.
+The workflow retains the existing `ts-grammar/v*` version/minor and tarball guards.
+
 ## Local iteration — `publishToMavenLocal`
 
 Tight cross-repo iteration uses Maven Local instead of a real publish:

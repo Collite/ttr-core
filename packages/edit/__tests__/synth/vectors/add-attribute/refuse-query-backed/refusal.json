@@ -1,0 +1,5 @@
+{
+  "ok": false,
+  "code": "entity-is-query-backed",
+  "message": "Edit the query with set-source; stacked attributes come from its outputs."
+}

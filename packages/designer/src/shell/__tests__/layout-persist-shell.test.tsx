@@ -50,9 +50,11 @@ async function openCatalogLayout(label: string) {
   const view = (displayMode: DisplayMode) => <ShellFrame dataSource={source} workspace="veles" catalog={catalog} files={[]} displayMode={displayMode} />;
   const { rerender } = render(view('just-names'));
   fireEvent.click(screen.getAllByTestId('catalog-item').find((b) => b.textContent === label)!);
-  await waitFor(() => expect(attr('nodes')).toBe('er.entity.item,er.entity.store,er.entity.store_sales'));
-  // Real ELK runs in this harness; a shared CI runner can exceed testing-library's 1 s default.
-  await waitFor(() => expect(Object.keys(positions())).toHaveLength(3), { timeout: 3000 });
+  // Kernel creation and ELK placement share one readiness boundary on a loaded CI runner.
+  await waitFor(() => {
+    expect(attr('nodes')).toBe('er.entity.item,er.entity.store,er.entity.store_sales');
+    expect(Object.keys(positions())).toHaveLength(3);
+  }, { timeout: 3000 });
   return { switchTo: (m: DisplayMode) => rerender(view(m)) };
 }
 

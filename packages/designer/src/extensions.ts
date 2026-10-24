@@ -14,3 +14,13 @@ export type {
   DesignerExtensionsResult,
 } from './ext/designer-extensions.js';
 export { loadDesignerExtensions } from './ext/designer-extensions.js';
+
+export type { ModelerEditParams, ModelerEditResult } from '@tatrman/lsp';
+export type { ChangedFile } from './fs/changed-files.js';
+export type { ModelDataSource } from './data/model-data-source.js';
+/** Forms call the active source; no separate client cache or synthesis implementation. */
+export function editModel(source: import('./data/model-data-source.js').ModelDataSource,
+  params: import('@tatrman/lsp').ModelerEditParams): Promise<import('@tatrman/lsp').ModelerEditResult> {
+  if (!source.capabilities.edit || !source.edit) return Promise.reject(new Error('This backend is read-only.'));
+  return source.edit(params);
+}

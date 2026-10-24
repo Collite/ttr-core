@@ -1,0 +1,12 @@
+package hartland
+
+model er
+
+def query returns_review {
+    parameters: [{ name: status, type: text }]
+    sourceText: """sql
+SELECT r.request_id, r.customer, r.category, r.requested_at,
+       rr.received_at, r.status, r.amount
+FROM return_request r JOIN return_receipt rr ON r.request_id = rr.request_id
+"""
+}

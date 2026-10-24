@@ -1,9 +1,7 @@
-// The text drawer (A-3 β) — v1 is the READ-ONLY half: the textual property panel escalates
-// to a full-text PEEK of the node's source (from the LSP document + sourceLocation). An edit
-// gesture routes to DS-EDIT-001 (peek + open-in-IDE handoff) — there is NO editable surface
-// in this phase (the embedded editor is DS-P6, gated on edit mode).
+// SPDX-License-Identifier: Apache-2.0
+// The open source drawer: exact definition text, structured set-source save and inline diagnostics.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DIAGNOSTICS } from '@tatrman/canvas-core';
 import type { LineageRootRef } from '@tatrman/lsp';
 
@@ -48,17 +46,21 @@ export function TextDrawer({
   /** save routes through the ONE WorkspaceEdit path (applyGraphEdit-class seam) — never a 2nd write.
    *  Returns `{ ok:false, error }` to keep the editor open with the LSP diagnostic shown VERBATIM
    *  (W3.S2 round-trip: a parse error never closes the drawer nor touches the canvas). */
-  onSaveEdit?: (node: DrawerNode, newText: string) => void | Promise<{ ok: boolean; error?: string }>;
+  onSaveEdit?: (node: DrawerNode, newText: string) => void | Promise<{ ok: boolean; error?: string; diagnostics?: string[] }>;
 }) {
   const [peeking, setPeeking] = useState(false);
   const [editHint, setEditHint] = useState(false);
   const [editing, setEditing] = useState<string | null>(null); // the editor buffer (null = not editing)
+  const [diagnostics, setDiagnostics] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null); // verbatim LSP diagnostic on a failed save
 
   // reset the editor buffer whenever the drawer's subject changes — otherwise an in-flight edit of
   // node A would be saved onto node B when the selection changes (cross-node write contamination).
   const qname = node?.qname;
-  useEffect(() => { setEditing(null); setEditHint(false); setSaveError(null); }, [qname]);
+  const subject = useRef(qname);
+  subject.current = qname;
+  useEffect(() => { setEditing(null); setEditHint(false); setSaveError(null); setDiagnostics([]); }, [qname]);
 
   if (!open || !node) return null;
 
@@ -82,6 +84,9 @@ export function TextDrawer({
         <span data-testid="drawer-label" style={{ fontSize: 15, fontWeight: 'bold', color: '#16283F' }}>{node.label}</span>
         <button data-testid="drawer-close" aria-label="Close details" onClick={onClose} style={{ marginLeft: 'auto', border: 'none', background: 'transparent', cursor: 'pointer', color: '#96989B' }}>×</button>
       </div>
+      {diagnostics.length > 0 && <div role="status" data-testid="drawer-diagnostics" style={{ padding: 8, fontSize: 12 }}>
+        {diagnostics.map((message, i) => <div key={i}>{message}</div>)}
+      </div>}
       {/* The model's own names stay visible under a localized label (ttr-core#170): the identifier
           and the qname it is reached by, and the plural label when the model has one. */}
       {(node.identifier !== undefined || node.labelPlural) && (
@@ -196,13 +201,17 @@ export function TextDrawer({
                 <button data-testid="drawer-cancel" onClick={() => { setEditing(null); setSaveError(null); }} style={{ border: '1px solid #CBD8E6', borderRadius: 6, background: '#fff', cursor: 'pointer', font: 'inherit', fontSize: 12, padding: '3px 10px' }}>Cancel</button>
                 <button
                   data-testid="drawer-save"
-                  disabled={editing === (node.sourceText ?? '')}
+                  disabled={saving || editing === (node.sourceText ?? '')}
                   onClick={async () => {
-                    const res = await onSaveEdit?.(node, editing);
-                    // W3.S2: a rejected save (parse/validate error) keeps the editor open + shows
-                    // the diagnostic verbatim; a clean save closes the editor (canvas refreshes host-side).
-                    if (res && !res.ok) setSaveError(res.error ?? 'Save failed.');
-                    else { setSaveError(null); setEditing(null); }
+                    const savedSubject = qname;
+                    setSaving(true);
+                    try {
+                      const res = await onSaveEdit?.(node, editing);
+                      if (subject.current !== savedSubject) return;
+                      if (res && !res.ok) setSaveError(res.error ?? 'Save failed.');
+                      else { setSaveError(null); setDiagnostics(res?.diagnostics ?? []); setEditing(null); }
+                    } catch (error) { if (subject.current === savedSubject) setSaveError(String(error)); }
+                    finally { setSaving(false); }
                   }}
                   title={editing === (node.sourceText ?? '') ? 'No changes to save' : 'Save'}
                   style={{ border: '1px solid #3E7D4E', borderRadius: 6, background: editing === (node.sourceText ?? '') ? '#A9C6B1' : '#3E7D4E', color: '#fff', cursor: editing === (node.sourceText ?? '') ? 'not-allowed' : 'pointer', font: 'inherit', fontSize: 12, padding: '3px 10px' }}

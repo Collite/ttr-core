@@ -1,0 +1,7 @@
+{
+  "op": "set-source",
+  "args": {
+    "nodeRef": "er.query.returns_review",
+    "text": "def query returns_review { sourceText: \"\"\"sql\nSELECT request_id FROM return_request\n\"\"\" }"
+  }
+}

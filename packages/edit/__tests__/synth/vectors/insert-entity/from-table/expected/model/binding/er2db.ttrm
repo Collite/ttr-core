@@ -1,0 +1,25 @@
+package hartland
+
+model binding
+
+def er2db_entity return_request_map { entity: er.entity.return_request, target: { table: db.dbo.return_request } }
+
+def er2db_entity request_copy_map {
+    entity: hartland.er.entity.request_copy,
+    target: { table: hartland.db.dbo.table.return_request }
+}
+
+def er2db_attribute request_copy_request_id_map {
+    attribute: hartland.er.entity.request_copy.request_id,
+    target: { column: hartland.db.dbo.table.return_request.request_id }
+}
+
+def er2db_attribute request_copy_amount_map {
+    attribute: hartland.er.entity.request_copy.amount,
+    target: { column: hartland.db.dbo.table.return_request.amount }
+}
+
+def er2db_attribute request_copy_note_map {
+    attribute: hartland.er.entity.request_copy.note,
+    target: { column: hartland.db.dbo.table.return_request.note }
+}

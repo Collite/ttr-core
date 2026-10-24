@@ -1,0 +1,5 @@
+{
+  "ok": false,
+  "code": "query-has-parameters",
+  "message": "A stacked entity requires a parameterless query."
+}

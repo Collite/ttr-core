@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // WorkerLspDataSource — wraps the existing browser-worker LSP path as a
-// ModelDataSource (contracts §6). capabilities.edit === true. The App keeps using
-// the raw `LspClient` for graph-list / layout / edit operations via the exposed
-// `lspClient` escape hatch (§6 is a READ contract; edit ops stay on LspClient,
-// gated by capabilities.edit — recorded contracts delta, contracts.md §v1.3).
+// ModelDataSource: rich reads plus the open structured edit/save seam. The source owns
+// the one editable file cache, applies returned patches and acknowledges host text once.
 //
 // This whole path is the offline fallback as of TP-5 T4 (`WsDesignerServerDataSource`
 // now has real `ttrm/*` edit methods too) — decided 2026-07-15 (T5.2) to keep both,
@@ -34,6 +32,10 @@ import type { TtrmNode, TtrmEdge } from './ttrm-types.js';
 import { readLayoutFiles, normalizeForTab, type OpenedLayout } from '../layout/open-files.js';
 import { resolveRefs } from '../layout/resolve.js';
 import { layoutIndexOf } from '../model/layout-projection.js';
+import type { ModelerEditParams, ModelerEditResult } from '@tatrman/lsp';
+import type { WorkspaceEdit } from 'vscode-languageserver-types';
+import { applyWorkspaceEdit } from '../lsp/apply-workspace-edit.js';
+import { changedFiles } from '../fs/changed-files.js';
 import { modeOf } from '@tatrman/parser/layout';
 
 export interface WorkerContext {
@@ -41,6 +43,8 @@ export interface WorkerContext {
   /** The currently open graph document uri (set as graphs are opened). */
   graphUri?: string;
   files?: ReadonlyMap<string, string>;
+  /** Initial authored bytes when rebasing onto a newly fetched immutable base. */
+  currentFiles?: ReadonlyMap<string, string>;
   directoryHandle?: FileSystemDirectoryHandle;
 }
 
@@ -76,7 +80,55 @@ export class WorkerLspDataSource implements ModelDataSource {
   constructor(
     readonly lspClient: LspClient,
     private readonly ctx: WorkerContext,
-  ) {}
+  ) {
+    this.baseFiles = new Map(ctx.files);
+    this.docTextCache = new Map(ctx.currentFiles ?? ctx.files);
+    // Layout reads must see authored bytes too; the fetched base remains immutable.
+    this.ctx.files = this.docTextCache;
+  }
+
+  private readonly baseFiles: Map<string, string>;
+  private readonly docTextCache: Map<string, string>;
+  private readonly fileListeners = new Set<() => void>();
+  private readonly modelListeners = new Set<(version: string) => void>();
+  private revision = 0;
+  private edits = Promise.resolve();
+
+  changedFiles() { return changedFiles(this.baseFiles, this.docTextCache); }
+  onFilesChanged(cb: () => void): Disposable {
+    this.fileListeners.add(cb);
+    return { dispose: () => { this.fileListeners.delete(cb); } };
+  }
+  /** Serial requests keep server edit ranges paired with the same pre-request host text. */
+  edit(params: ModelerEditParams): Promise<ModelerEditResult> {
+    const run = this.edits.then(async () => {
+      const result = await this.lspClient.edit(params);
+      if (result.ok && !params.dryRun) {
+        await this.applyEdit(result.edit);
+      }
+      return result;
+    });
+    this.edits = run.then(() => {}, () => {});
+    return run;
+  }
+  async applyEdit(edit: WorkspaceEdit): Promise<void> {
+    const root = this.ctx.projectRoot.replace(/\/$/, '') + '/';
+    const staged = new Map(this.docTextCache);
+    const affected = await applyWorkspaceEdit(edit,
+      uri => staged.get(decodeURIComponent(uri.slice(root.length))),
+      async (uri, text) => {
+        if (!uri.startsWith(root)) throw new Error('Edit outside project root.');
+        staged.set(decodeURIComponent(uri.slice(root.length)), text);
+      });
+    if (!affected.length) return;
+    // Commit the complete map synchronously: collect must never observe half an edit
+    // while a transport acknowledgement is pending.
+    for (const [path, text] of staged) this.docTextCache.set(path, text);
+    for (const uri of affected) await this.lspClient.openDocument(uri, this.docTextCache.get(decodeURIComponent(uri.slice(root.length)))!);
+    for (const cb of this.fileListeners) cb();
+    this.revision++;
+    for (const cb of this.modelListeners) cb(String(this.revision));
+  }
 
   setGraphUri(uri: string): void {
     this.ctx.graphUri = uri;
@@ -252,8 +304,8 @@ export class WorkerLspDataSource implements ModelDataSource {
       .slice(0, q.limit);
   }
 
-  onModelChanged(_cb: (version: string) => void): Disposable {
-    // The worker path has no file watching (documents are pushed via didOpen).
-    return { dispose() {} };
+  onModelChanged(cb: (version: string) => void): Disposable {
+    this.modelListeners.add(cb);
+    return { dispose: () => { this.modelListeners.delete(cb); } };
   }
 }

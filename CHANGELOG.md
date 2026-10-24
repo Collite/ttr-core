@@ -6,6 +6,40 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — Studio review-135
+
+- Preserve validated definition text without formatter loss; keep identity, neighboring definitions and referenced members.
+- Force removes only pure JS roster lines; manual matches refuse, including transitive dependents.
+- Preserve post-collect whole-file edits across save acknowledgements, detect conflicts and guard dirty refresh/navigation with explicit discard.
+
+- Keep CRLF files and edit ranges consistent; reuse existing encoded file URIs and the host's root URI.
+- Use manifest schema defaults in synthesized bindings. Isolate broken documents from unrelated safe edits;
+  writes to broken files and full-reference operations still refuse, and duplicate targets stay ambiguous.
+- Ignore inert entity bare-id bindings like the loader; reject inherited relation-cardinality keys.
+- Share watched-file project lint and cache parsed documents; rename member bindings in layout-derived packages.
+- Offer open source editing only with a host save path, honor extension saveNode first, and prevent stale catalog caching.
+
+
+- **Studio source authoring and hosted save seam (S1.3)** — the open drawer saves via `modeler/edit`,
+  shows worker diagnostics and refreshes the canvas. Local/BFF data sources keep a separate fetched base and
+  atomic editable cache; `changedFiles`, debounced `dirty`, synchronous `collect`, and saved-SHA re-init expose
+  whole file changes without writing to the BFF. Extensions use the same structured hook; commercial forms
+  remain extension-owned under amended FO-21. Entity rename follows six ER entity/member binding refs (#213).
+  `@tatrman/edit@0.1.0` gains a self-contained public tarball, consumer/dry-run CI and an `edit/v*` release lane;
+  actual publication waits for merge and npm auth. Kotlin twin tracked in #271. No release is cut here.
+
+- **Studio authoring LSP (S1.2)** — `modeler/edit` applies all six synthesizer operations to the Node/Worker
+  document cache, returning post-edit diagnostics with `uri` and `source: 'worker'`. Dry runs leave cache,
+  cursors and notifications unchanged; refusals remain atomic. `modeler/applyWorkspaceEdit` shares the
+  staging path; `applyGraphEdit` becomes a deprecated set-source alias. Both hosts carry JS rosters for
+  orphan checks without parsing them as TTR. Hosts still apply returned edits to their own files and
+  acknowledge through normal document notifications. No release is cut here.
+
+- **Studio synthesizer (S1.1)** — six pure `@tatrman/edit` operations create bound entities, attributes,
+  relations and bilingual terms, replace definition source, and remove definitions with orphan checks/force
+  cleanup. Fourteen byte-for-byte vectors pin the output, including Hartland's returns-review projection.
+  The formatter now retains inline entity/attribute/relation bindings and localized descriptions.
+  The hosted save seam follows in S1.3; no release is cut here.
 ### 0.18.6 — AU review-136 fixes (pending release)
 
 **Upgrade:** after moving the hartland or ai-models pin to 0.18.6, run `ttrp build` on every literate recipe
@@ -135,6 +169,7 @@ pin bump until rebuilt and committed, even when the recipe logic is unchanged.
   type (`entity_type_ref = cn.X` downstream), so lex-matcher and the resolver move to v6 first, and an estate's archives
   are rebuilt after — all of an estate's archives together (a reader skips an additive archive whose schema differs from
   the primary's). The lexicon hash covers the entries only, so caches key on the archive id.
+
 - **Reference indexing (#258)** — preserve MD slot kinds in reverse references, find-references and rename;
   prefer the current model, then top-level definitions for same-package names, and report remaining ambiguity
   at the reference. TypeScript, Kotlin and Python share the rule and MD slot-aware lookup, guarded by collision

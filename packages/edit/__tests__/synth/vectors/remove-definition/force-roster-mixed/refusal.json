@@ -1,0 +1,49 @@
+{
+  "ok": false,
+  "code": "would-orphan",
+  "message": "Edit manual JS references before removing this definition, even with force.",
+  "refs": [
+    {
+      "uri": "model/tests/a.mjs",
+      "kind": "roster",
+      "range": {
+        "start": {
+          "line": 1,
+          "character": 0
+        },
+        "end": {
+          "line": 2,
+          "character": 0
+        }
+      }
+    },
+    {
+      "uri": "model/tests/a.mjs",
+      "kind": "roster-manual",
+      "range": {
+        "start": {
+          "line": 2,
+          "character": 0
+        },
+        "end": {
+          "line": 3,
+          "character": 0
+        }
+      }
+    },
+    {
+      "uri": "model/tests/a.mjs",
+      "kind": "roster-manual",
+      "range": {
+        "start": {
+          "line": 4,
+          "character": 0
+        },
+        "end": {
+          "line": 5,
+          "character": 0
+        }
+      }
+    }
+  ]
+}

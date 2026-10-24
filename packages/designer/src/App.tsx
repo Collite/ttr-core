@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // The Studio Viewer entry (Designer Merge, DM-P2.S4). Selects a backend (P2, never sniffed),
 // builds the ModelDataSource + its ViewStateStore, loads the catalog, and mounts the DS ShellFrame.
-// The OPEN build ships NO edit code: `editContext` is undefined everywhere here, so the shell is
-// edit-absent (FO-21); the FO-P0.S4 license loader supplies an authoring context on the commercial
+// The OPEN build keeps the text drawer and structured LSP seam; commercial canvas forms use
+// the FO-P0.S4 licence loader and injected authoring context on the commercial
 // build (DM-P3). Cytoscape and the flat SV designer are retired (DM-⚑a) — React Flow is the engine.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -29,11 +29,10 @@ import { initialLanguage, saveLanguage } from './i18n/labels';
 import { setStickyParam } from './shell/app-location';
 import { loadDemoFiles } from './fs/demo-loader';
 import { loadProjectViaFileSystemAccessAPI, type ProjectFiles } from './fs/file-system';
-import { applyWorkspaceEdit } from './lsp/apply-workspace-edit';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastContainer, makeToast, type ToastMessage } from './Toast';
 import { openFileMap } from './data/open-file-map.js';
-import { BffFilesDataSource } from './data/bff-files-data-source';
+import { BffFilesDataSource, SnapshotEditError, type SnapshotRefreshOptions } from './data/bff-files-data-source';
 import { HostChannel } from './host/host-channel';
 import { APP_LOCATION_CHANGED, currentAppPath, navigateAppPath, replaceAppPath, hostAppLocation } from './shell/app-location';
 import { setRuntimeConfig } from './runtime-config';
@@ -86,6 +85,17 @@ function Studio({
   language?: LanguageChoice;
 }) {
   const editContext = useAuthoringContext(dataSource);
+  const [currentCatalog, setCurrentCatalog] = useState(catalog);
+  useEffect(() => { setCurrentCatalog(catalog); }, [catalog]);
+  useEffect(() => {
+    let live = true;
+    const subscription = dataSource.onFilesChanged?.(() => {
+      void dataSource.listCatalog().then(({ graphs, symbols }) => {
+        if (live) setCurrentCatalog(buildCatalog(graphs, symbols));
+      }).catch(() => {});
+    });
+    return () => { live = false; subscription?.dispose(); };
+  }, [dataSource]);
   const [displayMode, setDisplayMode] = useState<DisplayMode>('just-names');
   const [active, setActive] = useState<ActiveSubject | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -142,7 +152,7 @@ function Studio({
           dataSource={dataSource}
           workspace={workspace}
           initialAppPath={initialAppPath}
-          catalog={catalog}
+          catalog={currentCatalog}
           files={files}
           displayMode={displayMode}
           viewState={viewState}
@@ -178,15 +188,8 @@ function WorkerStudio({ demo }: { demo: string | null }) {
   const [clientReady, setClientReady] = useState(false);
   const clientRef = useRef<LspClient | null>(null);
   const diagnosticsRef = useRef<Array<{ uri: string; messages: string[] }>>([]);
-  const docTextCache = useRef<Map<string, string>>(new Map());
   const prefsMap = useRef<Map<string, PrefsRecord>>(new Map());
   const startedRef = useRef(false);
-
-  const getText = (uri: string) => docTextCache.current.get(uri);
-  const openDoc = async (uri: string, content: string) => {
-    docTextCache.current.set(uri, content);
-    await clientRef.current!.openDocument(uri, content);
-  };
 
   const buildStudio = async (client: LspClient, projectRoot: string, workspace: string, files: string[], project: ProjectFiles) => {
     const dataSource = new WorkerLspDataSource(client, { projectRoot, files: project.files, directoryHandle: project.directoryHandle });
@@ -196,7 +199,7 @@ function WorkerStudio({ demo }: { demo: string | null }) {
         getLayout: (key) => client.getLayout(key),
         setLayout: async (key, layout) => {
           const edit = await client.setLayout(key, layout);
-          if (edit) await applyWorkspaceEdit(edit, getText, openDoc);
+          if (edit) await dataSource.applyEdit(edit);
         },
       },
       prefs: {
@@ -244,7 +247,6 @@ function WorkerStudio({ demo }: { demo: string | null }) {
       try {
         const files = await loadDemoFiles(demo);
         const modelPaths = await openFileMap(client, `file:///${demo}`, files.files);
-        for (const p of modelPaths) docTextCache.current.set(`file:///${demo}/${p}`, files.files.get(p)!);
         await buildStudio(client, `file:///${demo}`, demo, modelPaths, files);
       } catch (e) {
         setError(`Failed to load demo: ${e}`);
@@ -263,7 +265,6 @@ function WorkerStudio({ demo }: { demo: string | null }) {
     setLoading(true);
     try {
       const modelPaths = await openFileMap(client, `file:///${files.rootName}`, files.files);
-      for (const p of modelPaths) docTextCache.current.set(`file:///${files.rootName}/${p}`, files.files.get(p)!);
       await buildStudio(client, `file:///${files.rootName}`, files.rootName, modelPaths, files);
     } catch (e) {
       setError(`Failed to load project: ${e}`);
@@ -438,9 +439,11 @@ function HostedStudio() {
     let latestToken: string | null = null;
     let renderedSha: string | null = null;
     let workspace: string | null = null;
+    let dirtyTimer: ReturnType<typeof setTimeout> | undefined;
+    let fileSubscription: { dispose(): void } | undefined;
     let lastLocation = '';
-    const syncSession = async (initialAppPath?: string) => {
-      const changed = await source!.refresh({ deferDisposal: true });
+    const syncSession = async (initialAppPath?: string, options: SnapshotRefreshOptions = {}) => {
+      const changed = await source!.refresh({ ...options, deferDisposal: true });
       if (disposed || (!changed && renderedSha === source!.sha)) return false;
       const { graphs, symbols } = await source!.listCatalog();
       if (disposed) return;
@@ -455,7 +458,10 @@ function HostedStudio() {
       try {
         if (message.type === 'ttr.host.init') {
           // init is idempotent; a scope change is a new iframe session.
-          if (source) return;
+          if (source) {
+            if (message.sha && message.sha !== source.sha) await syncSession(undefined, {reason:'save'});
+            return;
+          }
           document.documentElement.dataset.hosted = 'true';
           document.documentElement.lang = message.lang;
           setRuntimeConfig({ ...getRuntimeConfig(), basePath: message.basePath, lang: message.lang });
@@ -469,12 +475,18 @@ function HostedStudio() {
           }
           replaceAppPath(path);
           source = new BffFilesDataSource({ ...message, token: latestToken ?? message.token });
+          fileSubscription = source.onFilesChanged(() => {
+            clearTimeout(dirtyTimer);
+            dirtyTimer = setTimeout(() => channel.send({ type: 'ttr.frame.dirty', changed: source!.changedFiles().length }), 200);
+          });
           await syncSession(path);
+        } else if (message.type === 'ttr.host.collect') {
+          channel.send({ type: 'ttr.frame.changedFiles', files: source?.collectChangedFiles() ?? [] });
         } else if (message.type === 'ttr.host.token') {
           latestToken = message.token;
           source?.setToken(message.token);
         } else if (source && message.type === 'ttr.host.refresh') {
-          await syncSession();
+          await syncSession(undefined, {discard:message.discard});
         } else if (source && message.type === 'ttr.host.navigate') {
           let path: string;
           try { path = hostAppLocation(message.location, workspace!); }
@@ -482,12 +494,17 @@ function HostedStudio() {
           if (!message.sha || message.sha === source.sha) navigateAppPath(path);
           else {
             // Only change the hash: the old shell must not handle a request for the new snapshot.
+            const previousPath = currentAppPath();
             replaceAppPath(path);
-            try { if (!await syncSession(path)) navigateAppPath(path); }
-            catch (e) { navigateAppPath(path); throw e; } // keep navigating on the previous snapshot
+            try { if (!await syncSession(path, {discard:message.discard})) navigateAppPath(path); }
+            catch (e) { if (e instanceof SnapshotEditError) replaceAppPath(previousPath); else navigateAppPath(path); throw e; } // keep navigating on the previous snapshot
           }
         }
       } catch (e) {
+        if (e instanceof SnapshotEditError) {
+          channel.send({type:'ttr.frame.error',code:e.code,message:e.message});
+          return;
+        }
         if (!disposed) setError(true);
         throw e;
       }
@@ -512,6 +529,8 @@ function HostedStudio() {
     window.addEventListener('hashchange', hashChanged);
     return () => {
       disposed = true;
+      clearTimeout(dirtyTimer);
+      fileSubscription?.dispose();
       channel.dispose();
       source?.dispose();
       window.removeEventListener(APP_LOCATION_CHANGED, locationChanged);
