@@ -6,11 +6,14 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
-### Fixed — AU writer attribute constraints
+### Fixed — AU writer attribute constraints (binary-incompatible for JVM consumers)
 
 - Retain authored ER attribute type length/precision through metadata loading, export and TTR rendering.
   Decimal total digits/scale and text length survive reload; bare types retain undeclared bounds. The
   nullable metadata fields preserve source defaults; JVM consumers must rebuild with the new library.
+- The first release containing this change must be **0.19.0**, not the planned 0.18.6 patch. Cut 0.18.6
+  before merging this change if that patch is needed first; otherwise include it in the 0.19.0 minor.
+  AU Server must rebuild and pin the minor containing this metadata API change.
 
 ### Fixed — SO report review-133
 
