@@ -46,13 +46,13 @@ nothing. Edges touching either selected endpoint remain, and every other endpoin
 becomes a stub carrying only `id`, `kind` and `external`. `scope.header` supplies
 the deterministic C-4 header value.
 
-The in-memory source, graph, scope, JSON and Turtle writers are implemented. XMI,
-the CLI and the service route follow in later XM stages.
+The in-memory source, graph, scope, JSON, Turtle and XMI writers are implemented.
+The CLI and service route follow in S1.5.
 
 The XM `Exporter` facade returns either named UTF-8 files, a bundle for callers to archive,
 a stable cannot-carry lossiness id, an unknown-snapshot result, or `NotBuilt` for registered
 formats awaiting their writer. S1.2 builds `graph.json`, `defs.json`, `dot` and canonical TTR;
-S1.3 adds Turtle (`ttl`); XMI follows in S1.4, while canonical YAML waits for YS. Unknown model, format or
+S1.3 adds Turtle (`ttl`); S1.4 adds XMI (`ttr-mdg/1`), while canonical YAML waits for YS. Unknown model, format or
 profile names are usage errors. Binding families such as `cn2md` can be selected separately.
 Package selectors include descendants; package and area selectors form a union. Cross-scope
 endpoints in graph output have only `id`, `kind` and `external`.
@@ -83,3 +83,10 @@ are opaque text; lexicon forms and examples retain their language tags. See the
 [TTR RDF vocabulary](../../../docs/ns/ttr.md) for classes, properties, domain/range
 descriptions, aliases and serialization rules. Jena is test-only; runtime
 dependency rules ban it.
+
+XMI uses JDK StAX and UUIDv5 identities, one UML model with TTR packages, standard
+stereotype applications and EA extension tags/connectors. The versioned YAML
+profile generates the installable MDG through `:packages:kotlin:ttr-metadata:renderTtrMdg`.
+See [EA installation and verification](../../../docs/ea.md). Captured-export and
+live EA import acceptance remain pending; the local oracle covers UML/EA shapes,
+a Sparx MDG reference, byte goldens and all local references.

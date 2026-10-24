@@ -2,6 +2,7 @@
 package org.tatrman.ttr.metadata.export
 
 import org.tatrman.ttr.metadata.graph.ModelGraph
+import org.tatrman.ttr.metadata.export.xmi.XmiWriter
 import org.tatrman.ttr.writer.TtrRenderer
 
 /** File-system/HTTP concerns stay in callers. They read sidecars and archive Bundle files. */
@@ -69,7 +70,12 @@ class Exporter {
                     request.format,
                 )?.let { return ExportResult.CannotCarry(it) }
         }
-        if (request.format !in setOf("graph.json", "defs.json", "dot", "ttr", "ttl")) return ExportResult.NotBuilt
+        if (request.format !in
+            setOf("graph.json", "defs.json", "dot", "ttr", "ttl", "xmi")
+        ) {
+            return ExportResult.NotBuilt
+        }
+        if (request.format == "xmi" && request.profile == "ea-erd/1") return ExportResult.NotBuilt
         if (request.since != null && request.previousIds == null) return ExportResult.SinceUnknown
         val scope = ExportScope(request.packages, request.areas)
         val header = ExportHeader.from(set, scope, request.connections)
@@ -82,6 +88,12 @@ class Exporter {
                 ExportDelta.compute(requireNotNull(request.previousIds), selected, request.renames, it)
             }
         return when (request.format) {
+            "xmi" ->
+                ExportResult.Single(
+                    "model.xmi",
+                    "application/xmi+xml; charset=utf-8",
+                    XmiWriter.write(selected, set),
+                )
             "ttl" ->
                 ExportResult.Single(
                     "cn.ttl",
