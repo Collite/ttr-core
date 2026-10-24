@@ -47,6 +47,7 @@ import { modelKindHint } from '../data/capability-hints.js';
 import { pickFiles as pickFilesFromDisk, downloadFile as downloadToDisk } from '../fs/file-system.js';
 import { SaveAsDialog, layoutFileOf, layoutTextOf, type LayoutFormat } from './SaveAsDialog.js';
 import { usePageEnvironment } from '../page/page-context.js';
+import { useMenuPosition } from '../page/menu-position.js';
 import { getRuntimeConfig } from '../runtime-config.js';
 import type { ModelKind } from '../data/model-data-source.js';
 import { HopEdgeInspector } from './HopEdgeInspector.js';
@@ -185,6 +186,7 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
   const [saveAsTab, setSaveAsTab] = useState<string | null>(null);
   const [tabMenu, setTabMenu] = useState<{ tabId: string; x: number; y: number } | null>(null);
   const tabMenuRef = useRef<HTMLDivElement>(null);
+  const tabMenuPosition = useMenuPosition(tabMenu, tabMenuRef);
   // Expand all levels… asks first (V-27): the count, then apply or cancel
   const [confirm, setConfirm] = useState<{ text: string; onYes: () => void } | null>(null);
   // what the canvas shows the user, in canvas coordinates — where a card with no neighbour goes (V-19)
@@ -1298,7 +1300,7 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
       <CommandPalette registry={registry} open={cmdkOpen} onClose={() => setCmdkOpen(false)} />
       {tabMenu && (
         <div data-testid="tab-menu" ref={tabMenuRef} onMouseLeave={() => setTabMenu(null)}
-          style={{ position: 'fixed', left: tabMenu.x, top: tabMenu.y, background: '#fff', border: '1px solid #CBD8E6', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.15)', zIndex: 20 }}>
+          style={{ position: 'fixed', ...tabMenuPosition, background: '#fff', border: '1px solid #CBD8E6', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.15)', zIndex: 20 }}>
           <ViewMenu
             onClose={() => setTabMenu(null)}
             items={(() => {

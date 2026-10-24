@@ -192,6 +192,11 @@ trailing slashes; it controls shared rail links, while `location` and `onLocatio
 (`/w/:workspace/s/:subject`). The component neither changes browser history nor fetches config.json,
 and does not set document-level language or styles. The root's `lang` follows the prop. Each mount
 owns its worker, file cache, navigation and extension loader. A host may mount multiple pages.
+A mirrored `onLocation` value passed back as `location` is ignored when already current, preserving
+per-subject notation. Invalid locations report `host/bad-location` once per invalid input and keep the
+current location (the workspace root initially); valid input afterwards recovers normally.
+Invalid `basePath` or `workspace` props are programmer errors and throw during render.
+Keyboard shortcuts are scoped to the page containing the event target; host inputs stay untouched.
 
 `collect.current()` synchronously returns sorted whole-file changes (including null-text deletions)
 and records the exact collected base. Serialize collect, saving, and the next snapshot acknowledgement.
@@ -233,7 +238,7 @@ CommonJS entries (production uses Vite's ordinary asset handling):
 export default defineConfig({
   optimizeDeps: {
     exclude: ['@tatrman/designer-core'],
-    include: ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', 'elkjs/lib/elk.bundled.js'],
+    include: ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@tatrman/designer-core > @tatrman/canvas-core > elkjs/lib/elk.bundled.js'],
   },
 });
 ```
@@ -256,3 +261,42 @@ npm install ./tatrman-*.tgz react@^19 react-dom@^19
 
 `manifest.json` records the source commit, file lists and hashes. Bare Designer tags do not publish
 to npm. An explicit public release is a separate maintainer action; see `PUBLISHING.md`.
+
+
+### pnpm hosts: internal release artifacts
+
+Platform P4 consumes the internal release under ruling R144-A(a). Download all eight release
+assets into `vendor/designer-0.1.0/` in the host repository, verify their release hashes before
+installing, and retain the manifest/checksums with them:
+
+```sh
+mkdir -p vendor/designer-0.1.0
+gh release download designer/v0.1.0 --repo Collite/ttr-core --dir vendor/designer-0.1.0
+(cd vendor/designer-0.1.0 && shasum -a 256 -c SHA256SUMS)
+```
+
+In the host package.json, depend on the same eight `file:vendor/designer-0.1.0/tatrman-<name>-0.1.0.tgz`
+artifacts (use relative paths from each consuming package). Pin transitive references in the
+workspace root's **pnpm-workspace.yaml**, not `pnpm.overrides` in package.json (ignored by pnpm 11):
+
+```yaml
+overrides:
+  '@tatrman/designer-core': file:vendor/designer-0.1.0/tatrman-designer-core-0.1.0.tgz
+  '@tatrman/canvas-core': file:vendor/designer-0.1.0/tatrman-canvas-core-0.1.0.tgz
+  '@tatrman/lsp': file:vendor/designer-0.1.0/tatrman-lsp-0.1.0.tgz
+  '@tatrman/parser': file:vendor/designer-0.1.0/tatrman-parser-0.1.0.tgz
+  '@tatrman/tokens': file:vendor/designer-0.1.0/tatrman-tokens-0.1.0.tgz
+  '@tatrman/perspectives': file:vendor/designer-0.1.0/tatrman-perspectives-0.1.0.tgz
+  '@tatrman/deep-links': file:vendor/designer-0.1.0/tatrman-deep-links-0.1.0.tgz
+  '@tatrman/edit': file:vendor/designer-0.1.0/tatrman-edit-0.1.0.tgz
+```
+
+Run `pnpm install` after adding React/ReactDOM 19 peers to the host. This form is exercised by
+`scripts/designer-consumer-smoke.mjs` using isolated pnpm dependencies, the Vite settings above,
+strict declarations and both dev/production browsers. The nested ELK include works without npm
+hoisting. Exact public release-asset URLs may replace the tarball specs in **both** direct dependencies
+and overrides, for example
+`https://github.com/Collite/ttr-core/releases/download/designer/v0.1.0/tatrman-lsp-0.1.0.tgz`;
+verify the downloaded bytes against that release's SHA256SUMS first. ttr-core is public, so asset URLs
+need no registry auth. Only released, hash-checked tarball specs are permitted: source `file:` paths,
+`workspace:`, `link:` and git dependencies remain forbidden in Platform's dependency rules.

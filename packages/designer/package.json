@@ -20,7 +20,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vitest run && vitest run --config ../../scripts/publish-family.vitest.config.ts",
+    "test": "node ../../scripts/test-designer.mjs",
     "build:library": "DESIGNER_LIBRARY=1 vite build --config vite.library.config.ts"
   },
   "dependencies": {

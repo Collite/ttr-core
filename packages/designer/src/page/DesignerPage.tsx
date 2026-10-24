@@ -42,12 +42,14 @@ export function DesignerPage(props: DesignerPageProps) {
   if (!isBasePath(basePath)) throw new Error('DesignerPage basePath must start and end with /.');
   if (!workspace || workspace.includes('/')) throw new Error('DesignerPage needs a workspace name.');
   const latest = useRef(props);
+  const root = useRef<HTMLDivElement>(null);
   latest.current = props;
   const [session, setSession] = useState<Session | null>(null);
   const [failed, setFailed] = useState(false);
   const controller = useRef<{ workspace: string; source: BffFilesDataSource; load(): void } | null>(null);
   const route = useMemo(() => {
-    let current = hostAppLocation(latest.current.location ?? '/', workspace);
+    let current = hostAppLocation('/', workspace);
+    let lastBadLocation: string | null = null;
     const listeners = new Set<(path: string) => void>();
     return {
       current: () => current,
@@ -56,7 +58,16 @@ export function DesignerPage(props: DesignerPageProps) {
         if (path !== current) { current = path; latest.current.onLocation?.(path); }
       },
       navigate: (path: string) => {
-        current = hostAppLocation(path, workspace);
+        let normalized: string;
+        try { normalized = hostAppLocation(path, workspace); }
+        catch {
+          if (lastBadLocation !== path) latest.current.onError?.({ code: 'host/bad-location', message: 'Invalid app location.' });
+          lastBadLocation = path;
+          return;
+        }
+        lastBadLocation = null;
+        if (normalized === current) return;
+        current = normalized;
         for (const listener of listeners) listener(current);
       },
       subscribe: (handler: (path: string) => void) => { listeners.add(handler); return () => { listeners.delete(handler); }; },
@@ -76,6 +87,7 @@ export function DesignerPage(props: DesignerPageProps) {
     };
   }, [props.extensions]);
   const environment = useMemo<PageEnvironment>(() => ({
+    root,
     config: { basePath, lang, languages: ['en', 'cs'], veles: null, layoutFormat: 'yaml' },
     theme, authoringLoader,
     location: { ...route, absolute: path => window.location.origin + toBrowserPath(path.replace(/^\/w\//, '/'), basePath, []) },
@@ -98,15 +110,17 @@ export function DesignerPage(props: DesignerPageProps) {
       timer = setTimeout(() => host.send({ type: 'ttr.frame.dirty', changed: source.changedFiles().length }), 200);
     });
     let pending = Promise.resolve();
+    let renderedSha: string | null = null;
     const load = () => {
       pending = pending.then(async () => {
         if (disposed) return;
         const changed = await source.refresh({ reason: 'save', deferDisposal: true });
-        if (disposed || !changed) return;
+        if (disposed || (!changed && renderedSha === source.sha)) return;
         const { graphs, symbols } = await source.listCatalog();
         if (disposed) return;
         setFailed(false);
         setSession({ workspace, source, catalog: buildCatalog(graphs, symbols), sha: source.sha!, path: route.current() });
+        renderedSha = source.sha;
       }).catch(error => {
         if (disposed) return;
         setFailed(true);
@@ -136,7 +150,7 @@ export function DesignerPage(props: DesignerPageProps) {
   useEffect(() => { session?.source.disposeRetired(); }, [session]);
   const viewState = useMemo(() => makeViewStateStore('file', { kind: 'file' }), [workspace]);
   return <PageContext.Provider value={environment}>
-    <div className="ttr-designer" data-testid="designer-page" data-theme={theme} lang={lang}
+    <div ref={root} className="ttr-designer" data-testid="designer-page" data-theme={theme} lang={lang}
       style={{ height: '100%', width: '100%', minHeight: 0, colorScheme: theme }}>
       {session && session.workspace === workspace && session.source === controller.current?.source
         ? <Studio key={`${workspace}:${session.sha}`} dataSource={session.source} viewState={viewState} catalog={session.catalog}

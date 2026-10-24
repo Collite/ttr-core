@@ -10,7 +10,8 @@
     "lint": "pnpm -r lint",
     "format": "pnpm -r format",
     "typecheck": "pnpm -r typecheck",
-    "dev": "pnpm --filter @tatrman/designer-core dev"
+    "dev": "pnpm --filter @tatrman/designer-core dev",
+    "test:family": "vitest run --config scripts/publish-family.vitest.config.ts"
   },
   "engines": {
     "node": ">=20.0.0"

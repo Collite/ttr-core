@@ -29,6 +29,9 @@ it('scopes the real Tailwind, reset, shared and React Flow rules without global 
       if ('selectorText' in rule) expect(postcss.list.comma(String(rule.selectorText)).every(s => s.trim().startsWith('.ttr-designer')), String(rule.selectorText)).toBe(true);
     }
   } finally { sheet.remove(); }
+  const reset = result.root.nodes.filter(n => n.type === 'rule');
+  expect(reset.some(rule => rule.type === 'rule' && rule.selector.includes(':where(*)') && rule.selector.includes('::before') && rule.selector.includes('::after') && rule.nodes.some(d => d.type === 'decl' && d.prop === 'border-style' && d.value === 'solid'))).toBe(true);
+  expect(reset.some(rule => rule.type === 'rule' && rule.selector.includes('h6') && rule.nodes.some(d => d.type === 'decl' && d.prop === 'font-weight' && d.value === 'inherit'))).toBe(true);
   expect(count).toBeGreaterThan(100);
   expect(result.css).not.toContain('html,');
   expect(result.css).toContain('@keyframes ttr-designer-dashdraw');

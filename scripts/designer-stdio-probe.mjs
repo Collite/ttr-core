@@ -2,14 +2,13 @@
 // Copied into the fresh consumer so every import resolves from installed tarballs.
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
-import {
-  createMessageConnection,
-  StreamMessageReader,
-  StreamMessageWriter,
-} from 'vscode-jsonrpc/node.js';
 import { createServerConnection } from '@tatrman/lsp/server';
 import assert from 'node:assert/strict';
 const require = createRequire(import.meta.url);
+const lspRequire = createRequire(import.meta.resolve('@tatrman/lsp'));
+const { createMessageConnection, StreamMessageReader, StreamMessageWriter } = await import(
+  lspRequire.resolve('vscode-jsonrpc/node.js')
+);
 assert.equal(typeof createServerConnection, 'function');
 const child = spawn(process.execPath, [require.resolve('@tatrman/lsp/server-stdio')], {
   stdio: 'pipe',

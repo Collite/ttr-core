@@ -14,6 +14,8 @@
   contain: layout style;
 }
 .ttr-designer, .ttr-designer *, .ttr-designer ::before, .ttr-designer ::after { box-sizing: border-box; }
+.ttr-designer :where(*), .ttr-designer ::before, .ttr-designer ::after { border-width: 0; border-style: solid; border-color: #e2e8f0; }
+.ttr-designer :where(h1,h2,h3,h4,h5,h6) { font-size: inherit; font-weight: inherit; }
 .ttr-designer :where(h1,h2,h3,h4,p,ul,ol) { margin: 0; }
 .ttr-designer :where(button,input,select,textarea) { font: inherit; color: inherit; }
 .ttr-designer :where(button,select) { cursor: pointer; }

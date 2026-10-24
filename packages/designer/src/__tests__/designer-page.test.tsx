@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-import { createRef, StrictMode } from 'react';
+import { createRef, StrictMode, useState } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { DesignerPage, type CollectFiles } from '../page/DesignerPage.js';
 import { FakeWorker } from '../page/fake-worker.test-support.js';
-import type { BffFilesDataSource } from '../data/bff-files-data-source.js';
+import { BffFilesDataSource } from '../data/bff-files-data-source.js';
 import type { ModelDataSource } from '../data/model-data-source.js';
 
 beforeEach(() => { FakeWorker.urls = []; vi.stubGlobal('Worker', FakeWorker); });
@@ -48,12 +48,14 @@ it('mounts the real LSP catalog, navigates without host history, edits and colle
 it('keeps two page instances and their callbacks isolated', async () => {
   const a = vi.fn(), b = vi.fn();
   const host = render(<><DesignerPage files={files} basePath="/a/" lang="en" workspace="a" onLocation={a} />
-    <DesignerPage files={files} basePath="/b/" lang="cs" workspace="b" onLocation={b} /></>);
+    <DesignerPage files={files} basePath="/b/" lang="cs" workspace="b" location="/w/b/s/db" onLocation={b} /></>);
   await waitFor(() => expect(screen.getAllByTestId('studio-header')).toHaveLength(2));
   const roots = screen.getAllByTestId('designer-page');
+  await waitFor(() => expect(roots[1].querySelector('[role=tab][aria-selected=true]')).toHaveAttribute('title', 'db'));
   fireEvent.click([...roots[0].querySelectorAll('[data-testid="catalog-item"]')].find(e => e.textContent === 'md')!);
   await waitFor(() => expect(a).toHaveBeenCalledWith('/w/a/s/md'));
-  expect(b).not.toHaveBeenCalledWith('/w/a/s/md');
+  expect(b).not.toHaveBeenCalled();
+  expect(roots[1].querySelector('[role=tab][aria-selected=true]')).toHaveAttribute('title', 'db');
   host.unmount();
 });
 
@@ -109,4 +111,62 @@ it('reports a failed loader without fetching config or changing host state', asy
   await screen.findByText('Could not load the model.');
   expect(onError).toHaveBeenCalledWith({ code: 'host/load-failed', message: 'Could not load the model snapshot.' });
   expect(fetcher).not.toHaveBeenCalled();
+});
+
+
+it('ignores controlled location echoes and preserves a subject notation across tabs', async () => {
+  function Controlled() {
+    const [location, setLocation] = useState('/w/demo/s/md');
+    return <DesignerPage files={files} basePath="/m/" lang="en" workspace="demo" location={location} onLocation={setLocation} />;
+  }
+  render(<Controlled />);
+  const picker = await screen.findByTestId('skin-picker');
+  fireEvent.change(picker, { target: { value: 'md.er-dialect' } });
+  expect(picker).toHaveValue('md.er-dialect');
+  fireEvent.click(screen.getAllByTestId('catalog-item').find(e => e.textContent === 'er')!);
+  await waitFor(() => expect(screen.getByRole('tab', { selected: true })).toHaveAttribute('title', 'er'));
+  fireEvent.click(screen.getByRole('tab', { name: /md/ }));
+  await waitFor(() => expect(screen.getByTestId('skin-picker')).toHaveValue('md.er-dialect'));
+});
+
+it('reports malformed initial/later locations once and keeps the host mounted and navigable', async () => {
+  const onError = vi.fn();
+  const mount = (location: string) => <StrictMode><div data-testid="host-sibling" /><DesignerPage files={files} basePath="/m/" lang="en" workspace="x" location={location} onError={onError} /></StrictMode>;
+  const view = render(mount('/s/md'));
+  await screen.findByTestId('studio-header');
+  expect(onError).toHaveBeenCalledTimes(1);
+  expect(onError).toHaveBeenLastCalledWith({ code: 'host/bad-location', message: 'Invalid app location.' });
+  view.rerender(mount('/w/x/s/%E0'));
+  await waitFor(() => expect(onError).toHaveBeenCalledTimes(2));
+  expect(screen.getByTestId('host-sibling')).toBeInTheDocument();
+  view.rerender(mount('/w/x/s/md'));
+  await waitFor(() => expect(screen.getByRole('tab', { selected: true })).toHaveAttribute('title', 'md'));
+  expect(onError).toHaveBeenCalledTimes(2);
+});
+
+it('retries a post-refresh catalog failure even when the snapshot SHA is unchanged', async () => {
+  const original = BffFilesDataSource.prototype.listCatalog;
+  const catalog = vi.spyOn(BffFilesDataSource.prototype, 'listCatalog').mockRejectedValueOnce(new Error('catalog failed'))
+    .mockImplementation(function(this: BffFilesDataSource) { return original.call(this); });
+  try {
+    const onError = vi.fn();
+    const view = render(<DesignerPage files={files} basePath="/m/" lang="en" onError={onError} />);
+    await screen.findByText('Could not load the model.');
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ code: 'host/load-failed' }));
+    view.rerender(<DesignerPage files={{ ...files }} basePath="/m/" lang="en" onError={onError} />);
+    await screen.findByTestId('studio-header');
+    expect(catalog).toHaveBeenCalledTimes(2);
+  } finally { catalog.mockRestore(); }
+});
+
+it('scopes command shortcuts to one page and leaves a host input alone', async () => {
+  render(<><input data-testid="host-input" /><DesignerPage files={files} basePath="/a/" lang="en" workspace="a" />
+    <DesignerPage files={files} basePath="/b/" lang="en" workspace="b" /></>);
+  await waitFor(() => expect(screen.getAllByTestId('studio-header')).toHaveLength(2));
+  const input = screen.getByTestId('host-input'); input.focus();
+  expect(fireEvent.keyDown(input, { key: 'k', ctrlKey: true })).toBe(true);
+  expect(screen.queryAllByTestId('cmdk-input')).toHaveLength(0);
+  fireEvent.keyDown(screen.getAllByTestId('designer-page')[0], { key: 'k', metaKey: true });
+  expect(screen.getAllByTestId('cmdk-input')).toHaveLength(1);
+  expect(screen.getAllByTestId('designer-page')[0]).toContainElement(screen.getByTestId('cmdk-input'));
 });

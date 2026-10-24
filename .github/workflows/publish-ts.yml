@@ -33,6 +33,25 @@ on:
       - 'scripts/*designer*'
       - 'scripts/*family*'
       - 'scripts/prepare-*-package.mjs'
+      - 'scripts/scope-css.js'
+      - 'packages/designer/**'
+      - 'packages/lsp/src/**'
+      - 'packages/canvas-core/src/**'
+      - 'packages/parser/src/**'
+      - 'packages/tokens/src/**'
+      - 'packages/perspectives/src/**'
+      - 'packages/deep-links/src/**'
+      - 'packages/edit/src/**'
+      - 'packages/format/src/**'
+      - 'packages/lint/src/**'
+      - 'packages/semantics/src/**'
+      - 'packages/sql/src/**'
+      - 'packages/sql/vendor/**'
+      - 'packages/grammar/src/**'
+      - 'packages/md-catalog/src/**'
+      - 'postcss.config.js'
+      - 'tailwind.config.js'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/publish-ts.yml'
 
 permissions:
@@ -93,6 +112,9 @@ jobs:
               exit 1
             fi
           else
+            if [ -f scripts/designer-family.mjs ]; then
+              echo 'edit is now family-locked; use designer/v* instead'; exit 1
+            fi
             expected=$(node -p "require('./packages/edit/package.json').version")
             if [ "$version" != "$expected" ]; then
               echo "::error::edit tag version must equal package version $expected"
@@ -154,6 +176,7 @@ jobs:
     if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/designer/v')
     permissions:
       contents: write
+      packages: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -174,8 +197,16 @@ jobs:
           [ "$version" = "$expected" ] || { echo 'Tag must match the family manifests'; exit 1; }
           git fetch --no-tags origin master
           git merge-base --is-ancestor HEAD origin/master || { echo 'Release must come from merged master'; exit 1; }
+      - name: Log in to mirrored build base images
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.TATRMAN_PKG_USER != '' && secrets.TATRMAN_PKG_USER || github.actor }}
+          password: ${{ secrets.TATRMAN_PKG_TOKEN != '' && secrets.TATRMAN_PKG_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Build viewer image (includes standalone-output assertions)
+        run: docker build -f packages/designer/Dockerfile --target build .
       - run: pnpm --filter '@tatrman/designer-core...' build
-      - run: pnpm exec vitest run --config scripts/publish-family.vitest.config.ts
+      - run: pnpm test:family
       - run: node scripts/prepare-family-licenses.mjs
       - run: git diff --exit-code -- 'packages/*/LICENSE' 'packages/*/NOTICE'
       - run: node scripts/pack-designer-family.mjs
@@ -192,9 +223,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" build/designer-family/* --prerelease \
-            --title "Designer family ${GITHUB_REF_NAME#designer/v}" \
-            --notes 'Install all eight tarballs together with npm install ./tatrman-*.tgz. SHA256SUMS and manifest.json describe the artifacts. A bare tag is internal only; it does not publish to npm. See PUBLISHING.md for the external consumer recipe.'
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --prerelease \
+              --title "Designer family ${GITHUB_REF_NAME#designer/v}" \
+              --notes 'Install all eight tarballs together with npm install ./tatrman-*.tgz. SHA256SUMS and manifest.json describe the artifacts. A bare tag is internal only; it does not publish to npm. See PUBLISHING.md for the external consumer recipe.'
+          fi
+          gh release upload "$GITHUB_REF_NAME" build/designer-family/* --clobber
       - name: Public npm publication (explicit RELEASE tags only)
         if: github.event_name == 'push' && endsWith(github.ref_name, '-RELEASE')
         env:

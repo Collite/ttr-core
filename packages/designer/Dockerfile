@@ -43,6 +43,7 @@ RUN pnpm fetch --frozen-lockfile
 # Named, not `COPY . .`: the .dockerignore keeps node_modules/dist/build output out, and this keeps
 # the Kotlin/Python trees, docs and the IntelliJ plugin out of the layer altogether.
 COPY tsconfig.base.json ./
+COPY scripts/prepare-ts-package.mjs scripts/prepare-designer-package.mjs ./scripts/
 COPY packages ./packages
 COPY tests/integration/package.json ./tests/integration/package.json
 COPY tests/conformance/package.json ./tests/conformance/package.json
@@ -55,7 +56,13 @@ RUN DESIGNER_BASE_URL=./ pnpm --filter "@tatrman/designer-core..." build
 # a foreign target platform). index.html is a TEMPLATE: the entrypoint renders it into /tmp.
 RUN mkdir -p /out/templates \
     && cp -R packages/designer/dist /out/html \
-    && mv /out/html/index.html /out/templates/index.html
+    && rm -rf /out/html/library /out/html/package \
+    && mv /out/html/index.html /out/templates/index.html \
+    && test -f /out/templates/index.html \
+    && test -f /out/html/hosted/index.html \
+    && test -d /out/html/assets \
+    && test ! -e /out/html/library \
+    && test ! -e /out/html/package
 
 # ===== runtime: nginx, unprivileged =====
 FROM ${NGINX_IMAGE}

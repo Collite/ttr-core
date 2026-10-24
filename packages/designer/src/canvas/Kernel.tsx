@@ -77,7 +77,7 @@ function KernelInner({
   viewportCenterRef,
 }: KernelProps) {
   const page = usePageEnvironment();
-  if (page) theme = page.theme === 'dark' ? 'stage-navy' : 'ice';
+  if (page?.theme === 'dark') theme = 'stage-navy';
   const labelOf = (id: string) => graph.nodes.find((n) => n.id === id)?.label ?? id;
   const rf = useReactFlow();
   const hostRef = useRef<HTMLDivElement>(null);
@@ -151,7 +151,7 @@ function KernelInner({
   }
 
   return (
-    <div ref={hostRef} style={{ width: '100%', height: '100%', background: page?.theme === 'dark' ? SURFACE['stage-navy'] : skin.canvas.background, position: 'relative' }} data-testid="canvas-kernel" data-skin={skinId}>
+    <div ref={hostRef} style={{ width: '100%', height: '100%', background: page ? SURFACE[theme] : skin.canvas.background, position: 'relative' }} data-testid="canvas-kernel" data-skin={skinId}>
       {derived && <DerivedBanner />}
       <ReactFlow
         nodes={rfNodes}

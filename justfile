@@ -155,7 +155,7 @@ build-ts path="":
 test-ts path="":
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -z "{{path}}" ]; then pnpm -r test
+    if [ -z "{{path}}" ]; then pnpm -r test && pnpm test:family
     else name=$(node -p "require('./{{path}}/package.json').name"); pnpm --filter "$name" test
     fi
 
@@ -533,7 +533,7 @@ _release-ext kind release="false" level="" version="":
 # version is ALWAYS the bare `x.y.z` (the `-RELEASE` marker is stripped before it
 # ever reaches a registry/marketplace; see publish.yml/publish-python.yml/
 # release-extensions.yml).
-# The edit lane has only public npmjs: its bare tag already publishes publicly.
+# Historical edit/v0.1.0 used public npmjs; new edit releases are family-only.
 # This is the 2026-07-16 change: previously bare tags went public and `-rc`
 # suffixes stayed internal — inverted, because internal patches vastly outnumber
 # real releases, and a release now needs to be marked explicitly.
@@ -548,8 +548,7 @@ _release-ext kind release="false" level="" version="":
 #                    the Kotlin `bundle grammar` below despite the similar name; external cut
 #                    gated on Bora + NPM_TOKEN per FO ⚑2)
 #   designer         the eight-package Designer family (internal GitHub assets; public on RELEASE)
-#   edit             @tatrman/edit (public npmjs); version must match packages/edit/package.json
-#                    and the tagged commit must already be in origin/master
+#   edit             legacy alias: refuses; use designer (edit is family-locked)
 #   vscode | intellij  editor extensions (GitHub Release always; Marketplace on RELEASE)
 #   viewer           the Studio Viewer container image, ghcr.io/collite/ttr-viewer (release-viewer.yml;
 #                    GHCR is its only registry, so `release` gates nothing extra — the image tag is
@@ -581,7 +580,7 @@ _release-ext kind release="false" level="" version="":
 #   just publish packages/python/ttr-parser release       # PyPI release (path form)
 #   just publish ts-grammar set 4.4.0                       # TS grammar, explicit version
 #   just publish designer set 0.1.0                         # Designer family, internal GitHub assets
-#   just publish edit set 0.1.0                             # edit, public npmjs from merged master
+#   just publish edit set 0.1.0                             # legacy: refuses; use designer
 #   just publish bundle grammar release set 1.0.0            # Kotlin bundle release
 #   just publish vscode                                        # ext: internal build, patch bump
 #   just publish vscode minor                                   # ext: internal build, minor bump
@@ -687,8 +686,8 @@ publish *args:
             PREFIX=ts-grammar
             DESC="@tatrman/grammar (public npmjs)" ;;
         edit|packages/edit)
-            PREFIX=edit
-            DESC="@tatrman/edit (public npmjs)" ;;
+            echo "❌ edit is released only with the Designer family; use: just publish designer set <family-version>" >&2
+            exit 1 ;;
         designer|designer-core|packages/designer)
             PREFIX=designer
             DESC="Designer npm family (eight tarballs; internal GitHub Release by default)" ;;
@@ -808,7 +807,8 @@ publish *args:
     elif [ "$PREFIX" = designer ] && [ "$RELEASE" = false ]; then
         LANES="INTERNAL GitHub Release — eight installable npm tarballs; no public registry publication"
     elif [ "$PREFIX" = designer ]; then
-        LANES="GitHub Release + PUBLIC npmjs — Designer family (existing edit 0.1.0 reused)"
+        EDIT_VERSION=$(node -p "require('./packages/edit/package.json').version")
+        LANES="GitHub Release + PUBLIC npmjs — Designer family (edit@${EDIT_VERSION}; already published coordinates reused)"
     elif [ "$RELEASE" = true ]; then
         LANES="GH Packages/PyPI (internal) + the public registry (Maven Central / PyPI) — published as bare ${NEW_VERSION}"
     else
