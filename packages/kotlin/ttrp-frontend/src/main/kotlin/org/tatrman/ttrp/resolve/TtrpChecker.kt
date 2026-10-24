@@ -54,9 +54,9 @@ class TtrpChecker(
     // of the pass" idiom. Null ⇒ disconnected (R13). `memberSnapshot` (direct) still wins, for the S3-A
     // unit fixtures that inject a snapshot without a catalog.
     private val memberCatalog: org.tatrman.ttr.md.resolve.MemberCatalog? = null,
+    /** A host may reuse an immutable loaded snapshot until the project's model files change. */
+    private val modelIndex: ModelIndex? = ModelRepo.indexOf(modelsRoot, manifest.extraModelRootPaths()),
 ) {
-    private val modelIndex: ModelIndex? =
-        ModelRepo.indexOf(modelsRoot, manifest.extraModelRootPaths())
     private val typechecker = ExpressionTypechecker()
 
     data class Report(

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { literateRecipeSelector, DEFAULT_LITERATE_RECIPE_GLOB } from './literateRecipes';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -82,7 +83,9 @@ export function activate(context: vscode.ExtensionContext): void {
       { scheme: 'file', language: 'ttr-pandas' },
       { scheme: 'file', language: 'ttrb' },
       { scheme: 'file', language: 'ttrb-cs' },
-      { scheme: 'file', language: 'markdown' },
+      literateRecipeSelector(
+        vscode.workspace.getConfiguration('ttrp').get<string>('literateRecipes.glob', DEFAULT_LITERATE_RECIPE_GLOB),
+      ),
     ],
     outputChannelName: 'TTR-P Language Server',
     synchronize: {

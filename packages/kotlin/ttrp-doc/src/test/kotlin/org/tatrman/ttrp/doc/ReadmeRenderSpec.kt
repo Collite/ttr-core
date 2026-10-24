@@ -85,7 +85,11 @@ class ReadmeRenderSpec :
                 org.tatrman.ttrp.resolve
                     .TtrpChecker(
                         org.tatrman.ttrp.project
-                            .TtrpManifest(manifestDir = java.nio.file.Path.of(".")),
+                            .TtrpManifest(
+                                manifestDir =
+                                    java.nio.file.Path
+                                        .of("."),
+                            ),
                         java.nio.file.Path
                             .of("src/test/resources/model"),
                     ).check("import hartland.er.order")

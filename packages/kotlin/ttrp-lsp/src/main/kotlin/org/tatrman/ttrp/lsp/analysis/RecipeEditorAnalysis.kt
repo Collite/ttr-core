@@ -44,9 +44,10 @@ object RecipeEditorAnalysis {
         doc: OpenDocument,
         ctx: ProjectContext,
         report: TtrpChecker.Report,
+        pipeline: TtrpPipeline,
     ): Analysis {
         if (report.document.statements.none { it is RecipeDecl }) return Analysis(doc.uri, doc.version, report)
-        val plan = TtrpPipeline(ctx.manifest, ctx.modelsRoot).plan(doc.text, doc.uri)
+        val plan = pipeline.plan(doc.text, doc.uri, frontendReport = report)
         return Analysis(
             doc.uri,
             doc.version,
@@ -69,6 +70,7 @@ object RecipeEditorAnalysis {
     fun literate(
         doc: OpenDocument,
         ctx: ProjectContext,
+        pipeline: TtrpPipeline,
     ): Analysis {
         val extraction = DocExtractor.extract(doc.text, doc.uri.substringAfterLast('/'))
         val roleHeader = Regex("^(?:candidates|context|decision)\\s+[\\p{L}_]")
@@ -84,7 +86,6 @@ object RecipeEditorAnalysis {
         // Markdown activation also sees ordinary README/tutorial code fences. Recipe diagnostics belong only
         // to documents that opt into literate recipe authoring; the extractor remains strict when invoked directly.
         if (!recipeDocument) return Analysis(doc.uri, doc.version, emptyReport(doc))
-        val pipeline = TtrpPipeline(ctx.manifest, ctx.modelsRoot)
         val recipes = extraction.recipes.map { EditorRecipe(it, pipeline.plan(it.text, it.path)) }
         val findings =
             extraction.diagnostics.map { d ->
@@ -110,13 +111,8 @@ object RecipeEditorAnalysis {
                         finding.copy(location = location(doc.text, doc.uri, span))
                     }
                 }
-        val first = extraction.recipes.firstOrNull()
-        val report =
-            if (first != null) {
-                TtrpChecker(ctx.manifest, ctx.modelsRoot).check(first.text, first.path)
-            } else {
-                emptyReport(doc)
-            }
+        // Features still need imported metadata, but navigation never consumes canonical positions (R1).
+        val report = recipes.firstOrNull()?.plan?.frontendReport ?: emptyReport(doc)
         return Analysis(
             doc.uri,
             doc.version,

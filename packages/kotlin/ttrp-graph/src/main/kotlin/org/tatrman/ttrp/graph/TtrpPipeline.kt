@@ -43,6 +43,7 @@ class TtrpPipeline(
     // Connected-mode member catalog (S6-B): threaded to [TtrpChecker], which snapshots it once per pass.
     // Null ⇒ disconnected (R13), the prior behaviour.
     private val memberCatalog: org.tatrman.ttr.md.resolve.MemberCatalog? = null,
+    private val frontendChecker: TtrpChecker? = null,
 ) {
     /**
      * The project's MD tier (logical model + physical `md2db_*` bindings), loaded once from
@@ -55,8 +56,15 @@ class TtrpPipeline(
 
     // One immutable model snapshot for every plan produced by this pipeline instance.
     private val checker by lazy {
-        TtrpChecker(manifest, modelsRoot, mdModel = mdRepo?.model, memberCatalog = memberCatalog)
+        frontendChecker ?: TtrpChecker(manifest, modelsRoot, mdModel = mdRepo?.model, memberCatalog = memberCatalog)
     }
+
+    /** Front-half analysis with the same loaded checker used by [plan]. */
+    fun check(
+        source: String,
+        fileName: String,
+        initialDiagnostics: List<TtrpDiagnostic> = emptyList(),
+    ): TtrpChecker.Report = checker.check(source, fileName, initialDiagnostics)
 
     data class ExplainOutput(
         val text: String,
@@ -136,11 +144,12 @@ class TtrpPipeline(
         source: String,
         fileName: String = "<memory>",
         targetOverrides: Map<String, String> = emptyMap(),
+        frontendReport: TtrpChecker.Report? = null,
     ): PlanResult {
         // MD front-half resolution fires only when the repo carries an [MdModel] (else the seam stays
         // inert). In connected mode [memberCatalog] supplies the member snapshot (S6-B); disconnected
         // (null) leaves MD paths to resolve per R13 (qualified members become deferred coordinates).
-        val report = checker.check(source, fileName)
+        val report = frontendReport ?: checker.check(source, fileName)
         val diags = report.diagnostics.toMutableList()
         // MD dot-path S5C-B.4 (R30): model-level journal-role diagnostics (TTRP-MD-018) computed at MD
         // model load — an invalidate-journaled cubelet whose backing table declares no valid role.

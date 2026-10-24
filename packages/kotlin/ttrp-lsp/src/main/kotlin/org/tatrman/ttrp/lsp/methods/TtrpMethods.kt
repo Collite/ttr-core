@@ -233,10 +233,7 @@ class TtrpMethods(
             val ctx = projects.resolve(uri)
             if (uri.endsWith(".md")) {
                 val doc = OpenDocument(uri, text, 0, "markdown")
-                val report =
-                    org.tatrman.ttrp.lsp.analysis.RecipeEditorAnalysis
-                        .literate(doc, ctx)
-                        .report
+                val report = analysis.analyzeSource(doc).report
                 return@supplyAsync ValidateResult(report.diagnostics.map { toValidateDiagnostic(it) })
             }
             val report = TtrpChecker(ctx.manifest, ctx.modelsRoot).check(text, fileNameOf(uri))
