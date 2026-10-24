@@ -164,3 +164,10 @@ rejects:
     message: "`==` v TTR-B neznamená rovnost."
     suggest: "použijte ="
     decision: S9
+
+  - id: TTRP-B-114
+    form: a route, decision mode or otherwise sentence inside an If block
+    example: "If amount > 100: Decide hold when n_short > 0."
+    message: "Rozhodovací věty nelze psát uvnitř podmíněného bloku."
+    suggest: "Spojte podmínku bloku s podmínkou cesty pomocí a: Rozhodni hold, když amount > 100 a n_short > 0."
+    decision: R136-R4

@@ -103,7 +103,7 @@ class TtrbDecomposer(
         }
         if (diags.isEmpty()) diags += unusedResults(outPort)
         val switch =
-            if (routes.isEmpty()) {
+            if (routes.isEmpty() || diags.any { it.severity == Severity.ERROR }) {
                 null
             } else {
                 org.tatrman.ttrp.ast.SwitchStmt(
@@ -124,7 +124,18 @@ class TtrbDecomposer(
         item.sentence()?.let { sentence ->
             val mark = out.size
             origin = Origin(loc.of(sentence.statement()), sentence.start.text)
-            statement(sentence.statement())
+            val body = sentence.statement()
+            if (depth > 0 &&
+                (
+                    body is P.DecideSentenceContext ||
+                        body is P.DecisionModeSentenceContext ||
+                        body is P.DecisionElseSentenceContext
+                )
+            ) {
+                diags += reject("TTRP-B-114", TtrpDiagnosticId.B_114, loc.of(body))
+                return@let
+            }
+            statement(body)
             tagOrigins(mark)
         }
         item.block()?.let { block(it, depth) }

@@ -169,5 +169,32 @@ class TtrbRecipeSentencesSpec :
             again.elseRoute!!.because shouldBe "fallback"
             again.elseRoute!!.detail.map { it.text } shouldBe listOf("shortfall")
         }
+        test("route, mode and otherwise sentences in If blocks are rejected without a partial switch") {
+            val programs =
+                listOf(
+                    "If amount > 100:\n    Decide hold when n_short > 0.\nDecide release when n_short = 0.",
+                    "Decide release when n_short = 0.\nIf amount > 100:\n    Decide hold when n_short > 0.",
+                    "Decide hold when n_short > 0.\nIf amount > 100:\n    Decide exclusively.",
+                    "Decide hold when n_short > 0.\nIf amount > 100:\n    Otherwise decide release.",
+                )
+            for (text in programs) {
+                val result =
+                    TtrB.decompose(
+                        text,
+                        org.tatrman.ttrp.ast.SourceLocation("x", 1, 0, 1, 0, 0, 0),
+                        null,
+                        inPorts = setOf("orders"),
+                        decision = true,
+                    )
+                val diagnostic = result.diagnostics.single { it.id.id == "TTRP-B-114" }
+                text.substring(diagnostic.location.offsetStart, diagnostic.location.offsetEnd).trim() shouldBe
+                    text
+                        .lines()
+                        .last { it.startsWith("    ") }
+                        .trim()
+                        .removeSuffix(".")
+                result.recipeSwitch shouldBe null
+            }
+        }
         xtest("pending LM/NLS D-64: morphology-dependent Czech parameter labels and snapshot nouns") { }
     })
