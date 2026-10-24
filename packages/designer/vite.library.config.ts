@@ -22,7 +22,7 @@ export default defineConfig({
   }],
   build: {
     outDir: 'dist/library',
-    lib: { entry: { index: resolve(root, 'src/index.ts'), extensions: resolve(root, 'src/extensions.ts') }, formats: ['es'], cssFileName: 'designer' },
+    lib: { entry: { index: resolve(root, 'src/library-entry.ts'), extensions: resolve(root, 'src/extensions.ts') }, formats: ['es'], cssFileName: 'designer' },
     rollupOptions: { external: id => /^(react|react-dom)(\/|$)/.test(id) || /^@tatrman\//.test(id), output: { entryFileNames: '[name].js' } },
     sourcemap: true,
   },
