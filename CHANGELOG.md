@@ -16,6 +16,43 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   and DuckDB. Recipe conform accepts `--engines pg,duckdb,polars`. Bindings, reason fills, calendar range joins,
   aggregate expressions and typed Arrow staging are supported; decimal division uses the declared engine delta.
 
+### Fixed — SO report review-133
+
+- Preserve automatic sizing for marker rows with stored heights unless customHeight is true.
+- Give generated decimals a mandatory fractional digit (20.0) and DATE outputs a date-only format.
+  Expanded regressions use Excel-emulating CellFormat; workbook fixtures are regenerated for RC.3.
+
+### Fixed — SO report P2 exit review
+
+- Fill inline strings in saved XLSX cells, preserve automatic heights and untouched rich text; generated
+  marker columns now use compiled output types so Excel sums/sorts numeric data correctly.
+- Read YAML 1.2 scalars, validate default kinds and DB parameter declarations; share parameter type
+  classification across generation/compilation, including number/timestamptz/smalldatetime and text time.
+- Execute a shared program once per render, scope saved-query compilation by lane, skip blank CSV lines,
+  and refuse tableless HTML. Distinguish missing files, IO failures and oversized values.
+- Validate output folder ids, support repeated `--title-lang LANG=title`, escape YAML control characters,
+  and preserve output permissions. Replace the erroneous workbook goldens with semantic checks and
+  Excel-verified fixtures. RC.1 is superseded by the planned RC.2.
+
+### Added — SO report authoring (S2.3)
+
+- Shared `TemplateGenerator.generate/fromQuery` with deterministic C-8 YAML/XLSX, declared DB parameter
+  mapping/warnings and LQ-5 ER refusal; `QueryModelLookup` is the snapshot/Veles authoring seam.
+- `ttr-report new` creates the pair, supports explicit roles/output and guarded force replacement.
+  The demo fixture now uses the generated template. CLI distributions include ZIP and tar;
+  grammar RC tags pass version validation and stay in the GitHub Packages staging lane.
+
+- **Studio reports / SO-core-P2 S2.2** — shared render service, typed parameters, CSV rows runner
+  and standalone `ttr-report render` CLI with XLSX/HTML output. Snapshot validation compiles actual
+  output columns through the existing translator; sheet anchors remain scoped. The installed CLI
+  matches committed XLSX/HTML goldens. Door execution awaits published RunSavedQuery stubs (ttr-server#286).
+
+- **Studio reports / SO-core-P2 S2.1** — open `report.yaml` v1 JSON Schema and manual;
+  `org.tatrman:ttr-report` reads and validates declarations against program output columns, fills
+  scalar/table XLSX anchors with preserved styles and deterministic package bytes, and produces an
+  escaped HTML preview capped at 500 rows. The report fill is implemented from the C-8 behaviour
+  contract; no kantheon renderer implementation is copied. Template generation follows in S2.3.
+
 - **`cn-candidate.v1`** (cn, CN-P5 S5.2 — cn contracts §6, A-CN-81…84): `ttr-concept` publishes
   `schemas/cn-candidate.v1.schema.json` — a proposal for the conceptual model (a concept, a term or an open-tier
   relation), its provenance (`producer`, `source_ref`, `confidence`, AM-20 `evidence`) and its fate (`status`,

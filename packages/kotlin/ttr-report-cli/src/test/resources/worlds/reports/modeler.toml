@@ -1,0 +1,6 @@
+[project]
+name = "reports_fixture"
+[language]
+preferred = "en"
+[packages]
+layout = "off"
