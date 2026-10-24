@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { parseString, type Definition, type Document, type EntityDef, type ObjectValue, type Reference } from '@tatrman/parser';
-import { effectivePackage, ProjectSymbolTable, ReferenceIndex, Resolver, type SymbolEntry } from '@tatrman/semantics';
+import { effectivePackage, effectiveSchemaId, ProjectSymbolTable, ReferenceIndex, Resolver, type SymbolEntry } from '@tatrman/semantics';
 import type { SynthContext } from './types.js';
 import { compareCodePoints } from '@tatrman/parser/layout';
 import { Refusal } from './refusals.js';
@@ -14,6 +14,8 @@ export function targetOf(target: ObjectValue | Reference | undefined): { kind: s
   return undefined;
 }
 export class ModelIndex {
+  private readonly ambiguous = new Set<string>();
+  readonly broken: { uri: string; reason: string }[] = [];
   readonly documents: ModelDocument[] = [];
   readonly symbols = new ProjectSymbolTable();
   readonly resolver: Resolver;
@@ -22,13 +24,26 @@ export class ModelIndex {
     for (const [uri, text] of Object.entries(ctx.files).sort(([a], [b]) => compareCodePoints(a, b))) {
       if (!uri.endsWith('.ttrm')) continue;
       const parsed = parseString(text, uri);
-      if (!parsed.ast || parsed.errors.some(e => e.severity === 'error')) throw new Refusal('text-unparseable', `Repair ${uri} before editing it.`);
+      if (!parsed.ast || parsed.errors.some(e => e.severity === 'error')) { this.broken.push({uri, reason:'unparseable'}); continue; }
       const ast = parsed.ast;
-      const definitions = ast.definitions.map(d => `${d.kind}:${d.name}`);
-      if (new Set(definitions).size !== definitions.length) throw new Refusal('ambiguous-reference', `${uri} repeats a definition name and kind.`);
-      const doc = { uri, text, ast, pkg: effectivePackage(ast, uri, ctx.rootUri.startsWith('file://') ? new URL(ctx.rootUri).pathname : ctx.rootUri, ctx.manifest.packages), model: ast.modelDirective?.modelCode ?? '', schema: ast.modelDirective?.schema ?? '' };
+      const duplicates = new Set<number>();
+      const scan = (defs: Definition[]): void => {
+        const seen = new Map<string, Definition>();
+        for (const def of defs) {
+          const key = `${def.kind}:${def.name}`, first = seen.get(key);
+          if (first) { duplicates.add(first.source.offsetStart); duplicates.add(def.source.offsetStart); }
+          else seen.set(key, def);
+          if (def.kind === 'entity') scan(def.attributes ?? []);
+          else if (def.kind === 'table' || def.kind === 'view') scan(def.columns ?? []);
+        }
+      };
+      scan(ast.definitions);
+      if (duplicates.size) this.broken.push({uri, reason:'duplicate definitions'});
+      const doc = { uri, text, ast, pkg: effectivePackage(ast, uri, ctx.rootUri.startsWith('file://') ? new URL(ctx.rootUri).pathname : ctx.rootUri, ctx.manifest.packages), model: ast.modelDirective?.modelCode ?? '', schema: '' };
+      doc.schema = effectiveSchemaId(ast.modelDirective?.schema, doc.pkg, ctx.manifest);
       this.documents.push(doc);
       this.symbols.upsertDocument(uri, ast, doc.model, doc.schema, doc.pkg);
+      if (duplicates.size) for (const symbol of this.symbols.all()) if (symbol.documentUri === uri && duplicates.has(symbol.source.offsetStart)) this.ambiguous.add(symbol.qname);
     }
     this.resolver = new Resolver(this.symbols, ctx.manifest.packages.root, ctx.manifest);
     for (const d of this.documents) this.references.upsertDocument(d.uri, d.ast, d.model, d.schema, this.resolver, d.pkg);
@@ -49,7 +64,7 @@ export class ModelIndex {
   }
   lookup(ref: string, kinds?: SymbolEntry['kind'][], scope?: ModelDocument): IndexedNode | undefined {
     const direct = this.symbols.getAll(ref);
-    if (direct.length > 1) throw new Refusal('ambiguous-reference', `${ref} has multiple declarations.`);
+    if (direct.length > 1 || this.ambiguous.has(ref)) throw new Refusal('ambiguous-reference', `${ref} has multiple declarations.`);
     let found = direct[0];
     if (!found) {
       const packages = scope ? [scope.pkg] : [...new Set(this.documents.map(d => d.pkg))];
@@ -58,7 +73,7 @@ export class ModelIndex {
         const res = this.resolver.resolveReference({ path: ref, parts: ref.split('.') }, { schemaCode: scope?.model ?? '', namespace: scope?.schema ?? '', imports: scope?.ast.imports ?? [], packageName: pkg });
         if (!res.resolved && res.reason === 'ambiguous') throw new Refusal('ambiguous-reference', `${ref} is ambiguous; qualify it.`);
         if (res.resolved) {
-          if (this.symbols.getAll(res.symbol.qname).length > 1) throw new Refusal('ambiguous-reference', `${ref} has multiple declarations.`);
+          if (this.symbols.getAll(res.symbol.qname).length > 1 || this.ambiguous.has(res.symbol.qname)) throw new Refusal('ambiguous-reference', `${ref} has multiple declarations.`);
           hits.set(res.symbol.qname, res.symbol);
         }
       }
@@ -70,10 +85,6 @@ export class ModelIndex {
   binding(entity: IndexedNode): { kind: string; path: string } | undefined {
     const def = entity.def as EntityDef;
     if (def.binding?.kind === 'block') { const target = targetOf(def.binding.target); if (target) return target; }
-    if (def.binding?.kind === 'bareId') {
-      const target = this.lookup(def.binding.id.path, ['table', 'query', 'view'], entity.doc);
-      return target && { kind: target.def.kind, path: target.symbol.qname };
-    }
     for (const d of this.documents) for (const b of d.ast.definitions) if (b.kind === 'er2dbEntity' && b.entity) {
       if (this.lookup(b.entity.path, ['entity'], d)?.symbol.qname === entity.symbol.qname) return targetOf(b.target);
     }
@@ -81,7 +92,20 @@ export class ModelIndex {
   }
   uri(path: string): string {
     if (!path || path.startsWith('/') || path.includes('\\') || /[%?#\x00-\x1f]/.test(path) || path.split('/').some(p => p === '..' || p === '.') || /^[a-z]+:/i.test(path)) throw new Refusal('invalid-args', 'file must be a repository-relative path.');
-    return this.ctx.rootUri ? this.ctx.rootUri.replace(/\/$/, '') + '/' + path : path;
+    const candidate = this.ctx.rootUri ? this.ctx.rootUri.replace(/\/$/, '') + '/' + path : path;
+    const decoded = (key: string) => { try { return decodeURIComponent(key); } catch { return key; } };
+    const existing = Object.keys(this.ctx.files).find(key => decoded(key) === decoded(candidate));
+    if (existing) return existing;
+    if (this.ctx.rootUri.startsWith('file://') && new URL(this.ctx.rootUri).href === this.ctx.rootUri)
+      return this.ctx.rootUri.replace(/\/$/, '') + '/' + path.split('/').map(encodeURIComponent).join('/');
+    return candidate;
+  }
+  assertWritable(uri: string): void {
+    const broken = this.broken.find(d => d.uri === uri);
+    if (broken) throw new Refusal('text-unparseable', `Repair ${broken.uri} (${broken.reason}) before editing it.`);
+  }
+  assertComplete(): void {
+    if (this.broken.length) throw new Refusal('text-unparseable', 'Cannot prove references while files are broken: ' + this.broken.map(d => `${d.uri} (${d.reason})`).join(', '));
   }
   packageFor(uri: string): string {
     return effectivePackage(parseString('', uri).ast!, uri, this.ctx.rootUri.startsWith('file://') ? new URL(this.ctx.rootUri).pathname : this.ctx.rootUri, this.ctx.manifest.packages);

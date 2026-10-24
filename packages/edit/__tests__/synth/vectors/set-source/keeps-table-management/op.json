@@ -1,0 +1,7 @@
+{
+  "op": "set-source",
+  "args": {
+    "nodeRef": "db.dbo.t",
+    "text": "def table t {\n  management: canon, // preserve\n  changeSemantics: scd2 { validFrom: vf, validTo: vt },\n  writeback { mapping: vf },\n  columns: [def column id {type: bigint}, def column vf {type: date}, def column vt {type: date}]\n}"
+  }
+}

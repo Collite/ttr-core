@@ -6,6 +6,20 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — Studio review-135
+
+- Preserve validated definition text without formatter loss; keep identity, neighboring definitions and referenced members.
+- Force removes only pure JS roster lines; manual matches refuse, including transitive dependents.
+- Preserve post-collect whole-file edits across save acknowledgements, detect conflicts and guard dirty refresh/navigation with explicit discard.
+
+- Keep CRLF files and edit ranges consistent; reuse existing encoded file URIs and the host's root URI.
+- Use manifest schema defaults in synthesized bindings. Isolate broken documents from unrelated safe edits;
+  writes to broken files and full-reference operations still refuse, and duplicate targets stay ambiguous.
+- Ignore inert entity bare-id bindings like the loader; reject inherited relation-cardinality keys.
+- Share watched-file project lint and cache parsed documents; rename member bindings in layout-derived packages.
+- Offer open source editing only with a host save path, honor extension saveNode first, and prevent stale catalog caching.
+
+
 - **Studio source authoring and hosted save seam (S1.3)** — the open drawer saves via `modeler/edit`,
   shows worker diagnostics and refreshes the canvas. Local/BFF data sources keep a separate fetched base and
   atomic editable cache; `changedFiles`, debounced `dirty`, synchronous `collect`, and saved-SHA re-init expose

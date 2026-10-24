@@ -32,7 +32,7 @@ import { loadProjectViaFileSystemAccessAPI, type ProjectFiles } from './fs/file-
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastContainer, makeToast, type ToastMessage } from './Toast';
 import { openFileMap } from './data/open-file-map.js';
-import { BffFilesDataSource } from './data/bff-files-data-source';
+import { BffFilesDataSource, SnapshotEditError, type SnapshotRefreshOptions } from './data/bff-files-data-source';
 import { HostChannel } from './host/host-channel';
 import { APP_LOCATION_CHANGED, currentAppPath, navigateAppPath, replaceAppPath, hostAppLocation } from './shell/app-location';
 import { setRuntimeConfig } from './runtime-config';
@@ -442,8 +442,8 @@ function HostedStudio() {
     let dirtyTimer: ReturnType<typeof setTimeout> | undefined;
     let fileSubscription: { dispose(): void } | undefined;
     let lastLocation = '';
-    const syncSession = async (initialAppPath?: string) => {
-      const changed = await source!.refresh({ deferDisposal: true });
+    const syncSession = async (initialAppPath?: string, options: SnapshotRefreshOptions = {}) => {
+      const changed = await source!.refresh({ ...options, deferDisposal: true });
       if (disposed || (!changed && renderedSha === source!.sha)) return false;
       const { graphs, symbols } = await source!.listCatalog();
       if (disposed) return;
@@ -459,7 +459,7 @@ function HostedStudio() {
         if (message.type === 'ttr.host.init') {
           // init is idempotent; a scope change is a new iframe session.
           if (source) {
-            if (message.sha && message.sha !== source.sha) await syncSession();
+            if (message.sha && message.sha !== source.sha) await syncSession(undefined, {reason:'save'});
             return;
           }
           document.documentElement.dataset.hosted = 'true';
@@ -481,12 +481,12 @@ function HostedStudio() {
           });
           await syncSession(path);
         } else if (message.type === 'ttr.host.collect') {
-          channel.send({ type: 'ttr.frame.changedFiles', files: source?.changedFiles() ?? [] });
+          channel.send({ type: 'ttr.frame.changedFiles', files: source?.collectChangedFiles() ?? [] });
         } else if (message.type === 'ttr.host.token') {
           latestToken = message.token;
           source?.setToken(message.token);
         } else if (source && message.type === 'ttr.host.refresh') {
-          await syncSession();
+          await syncSession(undefined, {discard:message.discard});
         } else if (source && message.type === 'ttr.host.navigate') {
           let path: string;
           try { path = hostAppLocation(message.location, workspace!); }
@@ -494,12 +494,17 @@ function HostedStudio() {
           if (!message.sha || message.sha === source.sha) navigateAppPath(path);
           else {
             // Only change the hash: the old shell must not handle a request for the new snapshot.
+            const previousPath = currentAppPath();
             replaceAppPath(path);
-            try { if (!await syncSession(path)) navigateAppPath(path); }
-            catch (e) { navigateAppPath(path); throw e; } // keep navigating on the previous snapshot
+            try { if (!await syncSession(path, {discard:message.discard})) navigateAppPath(path); }
+            catch (e) { if (e instanceof SnapshotEditError) replaceAppPath(previousPath); else navigateAppPath(path); throw e; } // keep navigating on the previous snapshot
           }
         }
       } catch (e) {
+        if (e instanceof SnapshotEditError) {
+          channel.send({type:'ttr.frame.error',code:e.code,message:e.message});
+          return;
+        }
         if (!disposed) setError(true);
         throw e;
       }

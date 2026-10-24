@@ -105,7 +105,7 @@ The Designer's `openFileMap` supplies these roster documents automatically.
 File arguments are checkout-relative; edits and `touched` use document URIs. `from` and `on` are
 mutually exclusive. Physical sources and query outputs determine inserted entity attributes.
 Unsupported query projections refuse `source-unknown`; the synthesizer does not perform full SQL validation.
-Removal follows semantic references, transitive dependents and single-quoted roster entries (one per line).
+Removal follows semantic references and transitive dependents. Broad single-quoted roster matches are detected; force removes only pure one-entry lines. Other matches are `roster-manual` refs and refuse even with force.
 SQL text references and arbitrary JavaScript are outside this removal index.
 
 On success the server stages the edit in its document cache, rebuilds symbols/references, and returns
@@ -152,3 +152,13 @@ node packages/lsp/scripts/studio-edit-smoke.mjs ../hartland
 The smoke launches the stdio entry and a real Chromium Worker (use `PW_EXECUTABLE` to select Chromium),
 checks dry-run isolation, identical authored edits, immediate reads and roster guards. Desktop discovery also
 loads TTR manual examples outside `model/`; the hosted input remains scoped to `model/**` as its contract requires.
+
+Broken bystander documents no longer block unrelated creation operations. Writing a broken destination refuses
+`text-unparseable`; removal and `set-source` require complete references and name every broken bystander.
+Duplicate definition targets remain ambiguous. Generated db bindings use the effective manifest schema.
+Existing CRLF files and valid LSP ranges are preserved, and existing encoded file URI keys are reused.
+
+`set-source` preserves validated author text without formatter reprinting. It accepts one top-level definition,
+keeps kind/name, rejects headers/imports, and refuses `would-orphan` if referenced members disappear. Renames use
+`textDocument/rename`. File line endings and neighboring definitions are retained; trailing definition whitespace is
+trimmed. A current definition's own text produces an empty edit.

@@ -63,6 +63,7 @@ export interface RenameSymbolEditParams {
   defDocumentContent: string;
   references: Array<{ documentUri: string; source: { line: number; column: number; endLine: number; endColumn: number }; targetQname: string }>;
   ttrgDocuments: Map<string, string>;
+  packageOf?: (uri: string) => string;
 }
 
 export function buildRenameSymbolEdit(params: RenameSymbolEditParams): WorkspaceEdit {
@@ -137,7 +138,7 @@ export function buildRenameSymbolEdit(params: RenameSymbolEditParams): Workspace
     if (!uri.endsWith('.ttrm')) continue;
     const ast = parseString(content, uri).ast;
     if (!ast) continue;
-    const pkg = ast.packageDecl?.name ?? '';
+    const pkg = params.packageOf?.(uri) ?? ast.packageDecl?.name ?? '';
     const local = defEntry.packageName && oldQname.startsWith(defEntry.packageName + '.')
       ? oldQname.slice(defEntry.packageName.length + 1) : oldQname;
     for (const def of ast.definitions) {

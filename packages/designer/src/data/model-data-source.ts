@@ -41,6 +41,8 @@ export type ModelKind = RenderableSchemaCode;
 export interface DataSourceCapabilities {
   /** Source authoring available. Commercial canvas forms retain their own license gate. */
   readonly edit: boolean;
+  /** Open source saves need a host that persists collected files. */
+  readonly save?: 'host' | 'none';
   /** model kinds this backend can serve at all (`getModelGraph(scope.schema)`). */
   readonly modelKinds: readonly ModelKind[];
   /** `getBindings` available → binding/lineage perspectives can be generated. */

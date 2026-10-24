@@ -30,7 +30,7 @@ when it applies an edit to its cache (S1.2).
 | `insert-entity` | `name, file?, from?, on?, terms?` | Entity attributes from a table or parameterless query, entity/attribute mappings, optional EN/CS terms | `entity-needs-binding`, `entity-exists`, `source-unknown`, `query-has-parameters` |
 | `add-attribute` | `entity, name, type, column?` | Attribute and optional physical-column mapping | `attribute-needs-binding`, `attribute-exists`, `column-unknown`, `entity-is-query-backed` |
 | `add-relation` | `from, to, kind, fk?, name?` | Relation with cardinality and optional inline FK binding | `relation-exists`, `entity-unknown`, `fk-needs-binding`, `source-unknown` |
-| `set-source` | `nodeRef, text` | Replaces exactly one definition, printed canonically | `node-unknown`, `text-unparseable` |
+| `set-source` | `nodeRef, text` | Preserves one validated top-level definition verbatim, with identity and referenced-member guards | `node-unknown`, `text-unparseable` |
 | `remove-definition` | `qname, force?` | Removes a top-level definition; force also removes its dependent definitions, inline bindings and roster lines | `would-orphan`, `node-unknown` |
 | `add-term` | `lang, term, target, file?` | Canonical `def term` with `for` and `forms` | `term-exists`, `target-unknown` |
 
@@ -49,7 +49,7 @@ reason; arbitrary SQL expression typing is unavailable. This is projection analy
 
 Removal follows the semantic reference index, including member mappings and transitive dependents.
 The v1 roster check is the documented single-quoted local-name regex over `model/tests/**/*.mjs`, removing
-whole matching lines; keep one roster entry per line. SQL text references and arbitrary JavaScript are
+only pure one-entry roster lines. Any other match is a `roster-manual` ref and refuses even with force. SQL text references and arbitrary JavaScript are
 outside that index's coverage. A worker's diagnostics and the strict loader remain subsequent gates.
 
 The 14 byte-for-byte vectors are in [`__tests__/synth/vectors`](./__tests__/synth/vectors).
@@ -62,3 +62,13 @@ The npm artifact bundles its runtime and declaration dependencies, so installing
 published `main`/`types`/`exports` to `dist/package/`. CI runs `node scripts/edit-consumer-smoke.mjs`: publish dry run,
 tarball install outside the workspace, a canonical four-file synthesis and strict TypeScript consumer compilation.
 The real public cut follows merge and a configured `NPM_TOKEN`; dry runs do not publish.
+
+Schema resolution follows file schema → package `default-schema` → `[defaults].schema` → conventional db default.
+An entity-level bare-id binding is ignored, matching the runtime loader; use a block-form entity binding.
+Unrelated malformed/duplicated documents do not block safe creation operations. Writing a broken file refuses
+`text-unparseable`; `set-source` and removal require a complete reference picture and name any broken files.
+Lookups of duplicated definitions refuse `ambiguous-reference`. Existing CRLF files keep their line endings;
+new files inherit CRLF when the input snapshot consistently uses it. Existing file URI keys are reused across
+encoded/decoded path spellings.
+
+`set-source` keeps kind/name; renames use `textDocument/rename`. Generated text from the other five operations still uses the formatter. Author comments/properties/spacing survive source saves, with file line endings retained and trailing definition whitespace trimmed.

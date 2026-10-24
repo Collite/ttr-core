@@ -62,7 +62,7 @@ describe('Studio synthesizer safety', () => {
   it('uses UTF-16 ranges after non-BMP text and preserves neighbouring definitions', () => {
     const ctx=context('// 😀 before\ndef entity parent {description:"😀",attributes:[def attribute id {type:int}]}\n\ndef entity child {}\n');
     const out=apply(synthesize('set-source',{nodeRef:'er.entity.child',text:'def entity child {description:"changed"}'},ctx),ctx)['model/er/a.ttrm'];
-    expect(out.startsWith(ctx.files['model/er/a.ttrm'].split('def entity child')[0])).toBe(true); expect(out).toContain('description: "changed"');
+    expect(out.startsWith(ctx.files['model/er/a.ttrm'].split('def entity child')[0])).toBe(true); expect(out).toContain('description:"changed"');
   });
   it('creates files explicitly and leaves the input snapshot immutable', () => {
     const ctx=context('',{},false); const before=structuredClone(ctx.files);

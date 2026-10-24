@@ -1267,23 +1267,25 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
         onOpenLineage={openLineage}
         // member lineage needs Worker-side getSymbolDetail; WS/Veles degrade (A1-CAP-001, W2).
         memberLineageCapable={typeof dataSource.getSymbolDetail === 'function'}
-        editEnabled={canEdit || !!(dataSource.capabilities.edit && dataSource.edit && selected?.sourceText)}
+        editEnabled={canEdit || !!(dataSource.capabilities.save === 'host' && dataSource.edit && selected?.sourceText)}
         // SO D-19: source saves use the open data-source seam. Commercial/processing
         // backends can still supply their generic saveNode. Refusals keep the buffer;
         // successful edits refresh reads and return worker diagnostics inline.
         onSaveEdit={async (n, text) => {
-          if (dataSource.capabilities.edit && dataSource.edit) {
+          if (editContext?.editable && editContext.saveNode) {
+            const r = await editContext.saveNode(n.qname, text);
+            if (r && !r.ok) return { ok: false, error: r.reason ?? 'Edit not applied.' };
+            if (tab) await refetchGraph(tab.subject.ref);
+            return { ok: true };
+          }
+          if (dataSource.capabilities.save === 'host' && dataSource.edit) {
             const result = await dataSource.edit({ op: 'set-source', args: { nodeRef: n.qname, text } });
             if (!result.ok) return { ok: false, error: result.message };
             const detail = await dataSource.getSymbolDetail?.(n.qname);
             setSelected(current => current?.qname === n.qname ? { ...current, sourceText: detail?.sourceText ?? text } : current);
             return { ok: true, diagnostics: result.diagnostics.map(d => d.message) };
           }
-          if (!editContext?.editable) return { ok: false, error: 'This backend is read-only.' };
-          const r = await editContext.saveNode(n.qname, text);
-          if (r && !r.ok) return { ok: false, error: r.reason ?? 'Edit not applied.' };
-          if (tab) await refetchGraph(tab.subject.ref); // onModelChanged → canvas refresh
-          return { ok: true };
+          return { ok: false, error: 'This backend is read-only.' };
         }}
       />
       <CommandPalette registry={registry} open={cmdkOpen} onClose={() => setCmdkOpen(false)} />

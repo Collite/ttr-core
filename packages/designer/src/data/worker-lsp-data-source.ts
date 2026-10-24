@@ -43,6 +43,8 @@ export interface WorkerContext {
   /** The currently open graph document uri (set as graphs are opened). */
   graphUri?: string;
   files?: ReadonlyMap<string, string>;
+  /** Initial authored bytes when rebasing onto a newly fetched immutable base. */
+  currentFiles?: ReadonlyMap<string, string>;
   directoryHandle?: FileSystemDirectoryHandle;
 }
 
@@ -80,7 +82,7 @@ export class WorkerLspDataSource implements ModelDataSource {
     private readonly ctx: WorkerContext,
   ) {
     this.baseFiles = new Map(ctx.files);
-    this.docTextCache = new Map(ctx.files);
+    this.docTextCache = new Map(ctx.currentFiles ?? ctx.files);
     // Layout reads must see authored bytes too; the fetched base remains immutable.
     this.ctx.files = this.docTextCache;
   }

@@ -16,9 +16,9 @@ const paths = execFileSync('git', ['ls-files', '-z', '--', 'model/', 'modeler.to
   .filter(p => /\.(ttrm|ttrg|ttrl|toml|mjs)$/.test(p));
 const files = Object.fromEntries(paths.map(p => [p, readFileSync(join(checkout, p), 'utf8')]));
 const queryPath = 'model/er/returns-review.ttrm';
-// A canvas-visible draft solely to reach the existing drawer. The user replaces this
-// whole definition with the query; the production build gets no source-opening test hook.
-files[queryPath] = 'package hartland\nmodel er\ndef entity returns_review { attributes: [ def attribute draft { type: text } ] }\n';
+// A real query seed, edited without changing identity. A smoke-only graph card below
+// exposes this existing query in the drawer; production source/canvas APIs are unchanged.
+files[queryPath] = 'package hartland\nmodel er\ndef query returns_review { sourceText: "SELECT 1 AS draft" }\n';
 const vector = join(repo, 'packages/edit/__tests__/synth/vectors/insert-entity/on-query');
 const query = readFileSync(join(vector, 'world', queryPath), 'utf8').split('def query')[1];
 const queryText = 'def query' + query;
@@ -27,7 +27,7 @@ let currentFiles = { ...files };
 let sha = 'smoke-one';
 const source = 'hartland.er.entity.returns_review';
 const commands = [
-  { op: 'set-source', args: { nodeRef: source, text: queryText } },
+  { op: 'set-source', args: { nodeRef: 'hartland.er.query.returns_review', text: queryText } },
   { op: insert.op, args: { ...insert.args, terms: undefined } },
   ...['en', 'cs'].map(lang => ({ op: 'add-term', args: { lang, term: insert.args.terms[lang], target: source, file: 'returns.ttrm' } })),
 ];
@@ -54,9 +54,20 @@ import { defaultRuntimeConfig, setRuntimeConfig } from '/src/runtime-config.ts';
 import '/src/index.css';
 import { registerAuthoringLoader } from '/src/ext/authoring-registry.ts';
 import { editModel } from '/src/extensions.ts';
+import { BffFilesDataSource } from '/src/data/bff-files-data-source.ts';
+const seed=(graph,schema)=>schema==='er'&&graph&&!graph.nodes.some(n=>n.qname==='hartland.er.entity.returns_review')
+  ? {...graph,nodes:[...graph.nodes,{qname:'hartland.er.query.returns_review',kind:'entity',name:'returns_review',label:'returns_review query (test card)',schemaCode:'er',pkg:'hartland',rows:[]}]}
+  : graph;
+const readSchema=BffFilesDataSource.prototype.getSchemaGraph,readGraph=BffFilesDataSource.prototype.getGraph;
+BffFilesDataSource.prototype.getSchemaGraph=async function(schema) {return seed(await readSchema.call(this,schema),schema);};
+BffFilesDataSource.prototype.getGraph=async function(ref) {return seed(await readGraph.call(this,ref),ref);};
 registerAuthoringLoader(async ({dataSource}) => {
   window.__studio = dataSource;
-  return { editable: true, saveNode: async()=>({ok:true}), renderNodeMenu:()=>null, renderMissingObjects:()=>null,
+  return { editable: true, saveNode: async(qname,text)=>{
+    window.__extensionSaves=(window.__extensionSaves??0)+1;
+    const r=await editModel(dataSource,{op:'set-source',args:{nodeRef:qname,text}});
+    return r.ok?{ok:true}:{ok:false,reason:r.message};
+  }, renderNodeMenu:()=>null, renderMissingObjects:()=>null,
     renderToolbarActions:()=>React.createElement('button', { 'data-testid':'smoke-insert', onClick: async()=> {
       window.__slotResults = [];
       for (const command of ${JSON.stringify(commands.slice(1))}) window.__slotResults.push(await editModel(dataSource, command));
@@ -113,6 +124,7 @@ try {
   await frame.getByTestId('drawer-editor').fill(queryText);
   await frame.getByTestId('drawer-save').click();
   await frame.getByTestId('drawer-editor').waitFor({state:'detached'});
+  assert.equal(await frame.evaluate(()=>window.__extensionSaves),1);
   await frame.getByTestId('smoke-insert').click();
   await frame.waitForFunction(()=>window.__slotResults?.length===3,{},{timeout:60000});
   const results = await frame.evaluate(()=>window.__slotResults);
@@ -126,6 +138,7 @@ try {
   assert.deepEqual(collected.map(f=>f.path),expectedPaths);
   for(const file of collected) assert.equal(file.text,expected[file.path],file.path);
   await card.waitFor({timeout:30000});
+  await card.click();
   await frame.getByTestId('peek-source').filter({hasText:'def entity returns_review'}).waitFor();
   await frame.getByTestId('display-mode').selectOption('with-types');
   await card.getByText('request_id', {exact:true}).waitFor();
@@ -145,10 +158,49 @@ try {
   await frame.waitForFunction(()=>window.__studio.sha==='smoke-two');
   assert.deepEqual(await frame.evaluate(()=>window.__studio.changedFiles()),[]);
   await page.waitForFunction(()=>window.messages.filter(m=>m.type==='ttr.frame.dirty').at(-1)?.changed===0);
+  // Real-browser C(a): collect, author later, acknowledge, conflict, reject navigation, discard.
+  const addTerm=async term=>{
+    const result=await frame.evaluate(term=>window.__studio.edit({op:'add-term',args:{lang:'en',term,target:'hartland.er.entity.returns_review',file:'returns.ttrm'}}),term);
+    assert.equal(result.ok,true,JSON.stringify(result));
+  };
+  const collect=async()=>{
+    const count=await page.evaluate(()=>window.messages.filter(m=>m.type==='ttr.frame.changedFiles').length);
+    await page.evaluate(()=>document.querySelector('iframe').contentWindow.postMessage({type:'ttr.host.collect'},location.origin));
+    await page.waitForFunction(n=>window.messages.filter(m=>m.type==='ttr.frame.changedFiles').length>n,count);
+    return page.evaluate(()=>window.messages.filter(m=>m.type==='ttr.frame.changedFiles').at(-1).files);
+  };
+  await addTerm('Collected follow-up');
+  const saved=await collect();
+  await addTerm('After-collect follow-up');
+  for(const f of saved) currentFiles[f.path]=f.text;
+  sha='smoke-three';
+  await page.evaluate(init=>document.querySelector('iframe').contentWindow.postMessage(init,location.origin),{...init,sha});
+  await frame.waitForFunction(()=>window.__studio.sha==='smoke-three');
+  const retained=await frame.evaluate(()=>window.__studio.changedFiles());
+  assert.equal(retained.length,1);assert.ok(retained[0].text.includes('After-collect follow-up'));
+  await page.waitForFunction(()=>window.messages.filter(m=>m.type==='ttr.frame.dirty').at(-1)?.changed===1);
+  const collectedAgain=await collect();
+  await addTerm('Conflict pending');
+  for(const f of collectedAgain) currentFiles[f.path]=f.text+'\n// concurrent remote edit\n';
+  sha='smoke-four';
+  await page.evaluate(init=>document.querySelector('iframe').contentWindow.postMessage(init,location.origin),{...init,sha});
+  await page.waitForFunction(()=>window.messages.some(m=>m.type==='ttr.frame.error'&&m.code==='frame/edit-conflict'));
+  assert.equal(await frame.evaluate(()=>window.__studio.sha),'smoke-three');
+  assert.ok((await frame.evaluate(()=>window.__studio.changedFiles()))[0].text.includes('Conflict pending'));
+  const route=await frame.evaluate(()=>location.hash);
+  const navigate={type:'ttr.host.navigate',location:'/w/hartland/s/md',sha};
+  await page.evaluate(m=>document.querySelector('iframe').contentWindow.postMessage(m,location.origin),navigate);
+  await page.waitForFunction(()=>window.messages.some(m=>m.type==='ttr.frame.error'&&m.code==='frame/unsaved-edits'));
+  assert.equal(await frame.evaluate(()=>window.__studio.sha),'smoke-three');
+  assert.equal(await frame.evaluate(()=>location.hash),route);
+  await page.evaluate(m=>document.querySelector('iframe').contentWindow.postMessage(m,location.origin),{...navigate,discard:true});
+  await frame.waitForFunction(()=>window.__studio.sha==='smoke-four');
+  assert.deepEqual(await frame.evaluate(()=>window.__studio.changedFiles()),[]);
+  await page.waitForFunction(()=>window.messages.filter(m=>m.type==='ttr.frame.dirty').at(-1)?.changed===0);
   assert.deepEqual(errors,[]);
-  const report = { checkout, sha:execFileSync('git',['rev-parse','HEAD'],{cwd:checkout,encoding:'utf8'}).trim(),
+  const report = { snapshotGuards:{postCollectDirty:1,conflict:'frame/edit-conflict',navigation:'frame/unsaved-edits',discardDirty:0}, identityPreserved:true, extensionSaveCalls:1, checkout, sha:execFileSync('git',['rev-parse','HEAD'],{cwd:checkout,encoding:'utf8'}).trim(),
     paths:expectedPaths, byteEqualToPureVectors:true, afterSaveDirty:0, browserErrors:errors,
-    diagnostics:results.flatMap(r=>r.diagnostics??[]), seed:'In-memory canvas draft replaced with query through the real drawer; test-only extension slot authors entity and two terms.' };
+    diagnostics:results.flatMap(r=>r.diagnostics??[]), seed:'Existing query edited verbatim in the drawer via a smoke-only graph card; identity is unchanged. Test-only extension authors entity and two terms.' };
   writeFileSync(join(out,'report.json'),JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify(report,null,2));
 } finally { await browser?.close(); await vite?.close(); }

@@ -15,8 +15,8 @@ export interface HostInit {
 export type HostMessage =
   | HostInit
   | { type: 'ttr.host.token'; token: string }
-  | { type: 'ttr.host.navigate'; location: string; sha?: string }
-  | { type: 'ttr.host.refresh' }
+  | { type: 'ttr.host.navigate'; location: string; sha?: string; discard?: boolean }
+  | { type: 'ttr.host.refresh'; discard?: boolean }
   | { type: 'ttr.host.collect' }; // implemented with the P1 save seam
 export type FrameMessage =
   | { type: 'ttr.frame.ready' }
@@ -66,10 +66,12 @@ function parseMessage(value: unknown): HostMessage | null {
     case 'ttr.host.navigate':
       return typeof m.location === 'string' &&
         /^#?\/w\//.test(m.location) &&
-        (m.sha === undefined || typeof m.sha === 'string')
+        (m.sha === undefined || typeof m.sha === 'string') &&
+        (m.discard === undefined || typeof m.discard === 'boolean')
         ? (value as HostMessage)
         : null;
     case 'ttr.host.refresh':
+      return m.discard === undefined || typeof m.discard === 'boolean' ? value as HostMessage : null;
     case 'ttr.host.collect':
       return value as HostMessage;
     default:

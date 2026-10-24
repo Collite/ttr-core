@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
+import { changedFiles, type ChangedFile } from '../fs/changed-files.js';
+import type { ModelerEditParams } from '@tatrman/lsp';
 import type { LspClient } from '../lsp-client.js';
 import type { ProjectFiles } from '../fs/file-system.js';
 import { isHostPath, type HostScope } from '../host/host-channel.js';
@@ -66,10 +68,23 @@ function snapshotOf(value: unknown): Snapshot {
   return s;
 }
 
+export class SnapshotEditError extends Error {
+  constructor(readonly code: 'frame/unsaved-edits' | 'frame/edit-conflict', message: string) { super(message); }
+}
+export interface SnapshotRefreshOptions {
+  deferDisposal?: boolean;
+  reason?: 'save' | 'refresh';
+  discard?: boolean;
+}
+function sameFiles(a: ReadonlyMap<string,string>, b: ReadonlyMap<string,string>): boolean {
+  return a.size === b.size && [...a].every(([path,text]) => b.get(path) === text);
+}
+
 /** Atomic file-map snapshots over the same rich worker reads as local projects. */
 export class BffFilesDataSource implements ModelDataSource {
   readonly capabilities: DataSourceCapabilities = {
     edit: true,
+    save: 'host',
     modelKinds: ['db', 'er', 'md', 'cnc'],
     bindings: true,
     perspectives: true,
@@ -80,9 +95,12 @@ export class BffFilesDataSource implements ModelDataSource {
   sha: string | null = null;
   private worker: SnapshotWorker | null = null;
   private catalog: CatalogListing | null = null;
+  private catalogGen = 0;
   private retired: LspClient[] = [];
   private disposed = false;
   private pending: Promise<boolean> | null = null;
+  private activeEdits = 0;
+  private lastCollected: { sha: string | null; files: Map<string,string> } | null = null;
   private abort = new AbortController();
   private fileListeners = new Set<() => void>();
   private listeners = new Set<(sha: string) => void>();
@@ -102,15 +120,30 @@ export class BffFilesDataSource implements ModelDataSource {
   setToken(token: string): void {
     this.token = token;
   }
-  refresh(options: { deferDisposal?: boolean } = {}): Promise<boolean> {
+  refresh(options: SnapshotRefreshOptions = {}): Promise<boolean> {
     if (this.disposed) return Promise.reject(new Error('Hosted source is disposed.'));
     if (!this.pending)
-      this.pending = this.load(options.deferDisposal ?? false).finally(() => {
+      this.pending = this.load(options).finally(() => {
         this.pending = null;
       });
     return this.pending;
   }
-  private async load(deferDisposal: boolean): Promise<boolean> {
+  private currentFiles(): Map<string,string> {
+    const files = new Map(this.project?.files);
+    for (const change of this.changedFiles()) {
+      if (change.text === null) files.delete(change.path); else files.set(change.path, change.text);
+    }
+    return files;
+  }
+  /** Capture the exact collected map, including reverted and newly-created paths. */
+  collectChangedFiles(): ChangedFile[] {
+    const files = this.changedFiles();
+    this.lastCollected = { sha: this.sha, files: this.currentFiles() };
+    return files;
+  }
+  private async load(options: SnapshotRefreshOptions): Promise<boolean> {
+    // Pin this acknowledgement to the collection that existed when it started.
+    const collected = this.lastCollected;
     const scope = this.options.scope;
     const path =
       scope.kind === 'served' ? '/served/files' : `/changes/${encodeURIComponent(scope.id)}/files`;
@@ -124,43 +157,61 @@ export class BffFilesDataSource implements ModelDataSource {
     if (!response.ok) throw new Error(`Model snapshot request failed (${response.status}).`);
     const snapshot = snapshotOf(await response.json());
     if (snapshot.sha === this.sha) return false;
-    const project: ProjectFiles = {
-      rootName: 'repo',
-      files: new Map(Object.entries(snapshot.files)),
-    };
-    const client = await this.createClient();
-    try {
-      // Contract §4.1 — the BFF serves model/** only.
-      await openFileMap(client, 'file:///repo', project.files, { under: 'model/' });
-      const worker = new SnapshotWorker(client, {
-        projectRoot: 'file:///repo',
-        files: project.files,
-      });
-      // Validate the entire catalog before replacing any currently served state.
-      const catalog = await worker.listCatalog();
-      worker.onFilesChanged(() => { worker.invalidate(); this.catalog = null; for (const cb of this.fileListeners) cb(); });
-      worker.onModelChanged(() => { worker.invalidate(); this.catalog = null; });
-      if (this.disposed) throw new Error('Hosted source is disposed.');
-      const previous = this.worker;
-      this.worker = worker;
-      this.catalog = catalog;
-      this.project = project;
-      this.sha = snapshot.sha;
-      if (previous) this.retired.push(previous.lspClient);
-      if (!deferDisposal) this.disposeRetired();
-      for (const cb of this.fileListeners) cb();
-      for (const cb of this.listeners) cb(snapshot.sha);
-      return true;
-    } catch (error) {
-      client.dispose();
-      throw error;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const current = this.currentFiles();
+      const saved = collected?.sha === this.sha ? collected : null;
+      const pending = changedFiles(saved?.files ?? this.project?.files ?? new Map(), current);
+      if (!options.discard && this.worker) {
+        if (this.activeEdits || ((this.changedFiles().length || pending.length) && (options.reason !== 'save' || !saved)))
+          throw new SnapshotEditError('frame/unsaved-edits', 'Save or explicitly discard unsaved edits before changing snapshots.');
+        if (options.reason === 'save') for (const file of pending) {
+          // The collected text is the expected saved base, so our own save is not a conflict.
+          if (snapshot.files[file.path] !== saved?.files.get(file.path))
+            throw new SnapshotEditError('frame/edit-conflict', `Unsaved edits overlap changed snapshot file ${file.path}.`);
+        }
+      }
+      const project: ProjectFiles = {rootName:'repo', files:new Map(Object.entries(snapshot.files))};
+      const authored = new Map(project.files);
+      if (!options.discard && options.reason === 'save') for (const file of pending) {
+        if (file.text === null) authored.delete(file.path); else authored.set(file.path, file.text);
+      }
+      const client = await this.createClient();
+      try {
+        await openFileMap(client, 'file:///repo', authored, {under:'model/'});
+        const worker = new SnapshotWorker(client, {projectRoot:'file:///repo',files:project.files,currentFiles:authored});
+        const catalog = await worker.listCatalog();
+        if (this.disposed) throw new Error('Hosted source is disposed.');
+        if (!options.discard) {
+          if (this.activeEdits) throw new SnapshotEditError('frame/unsaved-edits', 'Wait for the pending edit before changing snapshots.');
+          if (!sameFiles(current, this.currentFiles())) { client.dispose(); continue; }
+        }
+        worker.onFilesChanged(() => { if (this.worker !== worker) return; worker.invalidate(); this.catalogGen++; this.catalog = null; for (const cb of this.fileListeners) cb(); });
+        worker.onModelChanged(() => { if (this.worker !== worker) return; worker.invalidate(); this.catalogGen++; this.catalog = null; });
+        const previous = this.worker;
+        this.worker = worker;
+        this.catalogGen++;
+        this.catalog = catalog;
+        this.project = project;
+        this.sha = snapshot.sha;
+        this.lastCollected = null;
+        if (previous) this.retired.push(previous.lspClient);
+        if (!options.deferDisposal) this.disposeRetired();
+        for (const cb of this.fileListeners) cb();
+        for (const cb of this.listeners) cb(snapshot.sha);
+        return true;
+      } catch (error) { client.dispose(); throw error; }
     }
+    throw new SnapshotEditError('frame/unsaved-edits', 'Edits changed while the snapshot loaded; retry after authoring settles.');
   }
   private get source(): WorkerLspDataSource {
     if (!this.worker) throw new Error('Hosted snapshot has not loaded.');
     return this.worker;
   }
-  edit(params: import('@tatrman/lsp').ModelerEditParams) { return this.source.edit(params); }
+  async edit(params: ModelerEditParams) {
+    if (!params.dryRun) this.activeEdits++;
+    try { return await this.source.edit(params); }
+    finally { if (!params.dryRun) this.activeEdits--; }
+  }
   changedFiles() { return this.worker?.changedFiles() ?? []; }
   onFilesChanged(cb: () => void) {
     this.fileListeners.add(cb);
@@ -179,7 +230,11 @@ export class BffFilesDataSource implements ModelDataSource {
     return this.source.getSchemaGraph(schema);
   }
   async listCatalog(): Promise<CatalogListing> {
-    return this.catalog ??= await this.source.listCatalog();
+    if (this.catalog) return this.catalog;
+    const gen = this.catalogGen, worker = this.source;
+    const catalog = await worker.listCatalog();
+    if (gen === this.catalogGen && worker === this.worker) this.catalog = catalog;
+    return catalog;
   }
   layoutIssues() {
     return this.source.layoutIssues();
@@ -219,6 +274,8 @@ export class BffFilesDataSource implements ModelDataSource {
     this.abort.abort();
     this.worker?.lspClient.dispose();
     this.worker = null;
+    this.lastCollected = null;
+    this.catalogGen++;
     this.catalog = null;
     this.disposeRetired();
     this.listeners.clear();

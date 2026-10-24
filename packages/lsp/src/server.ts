@@ -282,6 +282,7 @@ export function createServerConnection(
   const documents = new TextDocuments(TextDocument);
 
   const projectSymbols = new ProjectSymbolTable();
+  let authoringRootUri: string | undefined;
   let manifest: ResolvedManifest = resolveManifest(undefined, '');
   // `[sql]` config from modeler.toml (embedded-sql §3.3) — default dialect +
   // (database, schema) ⇄ namespace map for the §3.4 SQL resolver. Refreshed
@@ -423,9 +424,17 @@ export function createServerConnection(
     return [...fileSnapshot()].filter(([uri]) => isTtr(uri)).map(([uri]) => getDocument(uri)!);
   }
 
+  const parseCache = new Map<string, { text: string; result: ReturnType<typeof parseString> }>();
+  function parseCached(content: string, uri: string): ReturnType<typeof parseString> {
+    const cached = parseCache.get(uri);
+    if (cached?.text === content) return cached.result;
+    const result = parseString(content, uri);
+    parseCache.set(uri, {text: content, result});
+    return result;
+  }
   function parseDocument(content: string, uri: string): Document | undefined {
     if (!isTtr(uri)) return undefined;
-    const result = parseString(content, uri);
+    const result = parseCached(content, uri);
     return result.ast;
   }
 
@@ -642,7 +651,7 @@ export function createServerConnection(
     docs?: Map<string, Document>, pkgGraph?: PackageGraph): Diagnostic[] {
     if (!isTtr(uri)) return [];
 
-    const result = parseString(content, uri);
+    const result = parseCached(content, uri);
     const diagnostics: Diagnostic[] = result.errors.map((err: ParseError) => ({
       range: sourceLocationToRange(err.source),
       message: err.message,
@@ -846,7 +855,7 @@ export function createServerConnection(
     if (!isTtr(uri)) return;
     packageGraph = null;
     invalidateSymbols();
-    const result = parseString(content, uri);
+    const result = parseCached(content, uri);
     if (!result.ast) return;
     // '' (no directive) ⇒ the semantics layer derives the schema per definition
     // from its kind (modelForKind). Do NOT default to 'db' here. When the file
@@ -894,7 +903,7 @@ export function createServerConnection(
     for (const f of files) {
       diskDocs.set(f.uri, f.text);
       if (isOpen(f.uri) || editDocs.has(f.uri) || !isTtr(f.uri)) continue;
-      const result = parseString(f.text, f.uri);
+      const result = parseCached(f.text, f.uri);
       if (!result.ast) continue;
       const schemaCode = result.ast.modelDirective?.modelCode ?? '';
       const packageName = effPkg(f.uri, result.ast);
@@ -993,6 +1002,7 @@ export function createServerConnection(
       ?? (params.rootPath ? `file://${params.rootPath}` : null);
     supportsConfiguration = !!params.capabilities?.workspace?.configuration;
     if (wsUri) {
+      authoringRootUri = wsUri.startsWith('file://') ? wsUri.replace(/\/$/, '') : undefined;
       const projectRoot = wsUri.startsWith('file://') ? new URL(wsUri).pathname : wsUri;
       manifest = resolveManifest(undefined, projectRoot);
       // Load the real manifest (incl. `[packages]` root/layout) before seeding,
@@ -1102,6 +1112,7 @@ export function createServerConnection(
       if ((!isTtr(change.uri) && !/\/model\/tests\/.+\.mjs$/.test(change.uri)) || isOpen(change.uri) || editDocs.has(change.uri)) continue;
       if (change.type === FileChangeType.Deleted) {
         diskDocs.delete(change.uri);
+        parseCache.delete(change.uri);
         projectSymbols.removeDocument(change.uri);
         refIndex.removeDocument(change.uri);
         sqlRefIndex.removeDocument(change.uri);
@@ -1118,9 +1129,10 @@ export function createServerConnection(
     if (touched) {
       packageGraph = null;
     invalidateSymbols();
-      // Cross-file resolution changed; re-publish diagnostics for open docs.
+      // Reuse one project lint for every affected document in this batch.
+      const projectDiagnostics = lintProject(getProjectDocuments(), getPackageGraph(), { manifest, symbols: projectSymbols, resolver }, lintConfig());
       for (const doc of cachedDocuments()) {
-        publishDiagnostics(doc.uri, doc.getText());
+        publishDiagnostics(doc.uri, doc.getText(), projectDiagnostics);
       }
     }
   });
@@ -1214,6 +1226,7 @@ export function createServerConnection(
   // ttr/package-declaration-mismatch errors. Re-validates already-open docs so
   // it is order-independent with respect to didOpen.
   connection.onRequest('modeler/setProjectRoot', async (params: { projectRoot: string; manifest?: string }) => {
+    authoringRootUri = params.projectRoot.startsWith('file://') ? params.projectRoot.replace(/\/$/, '') : undefined;
     const root = params.projectRoot.startsWith('file://')
       ? new URL(params.projectRoot).pathname
       : params.projectRoot;
@@ -1284,7 +1297,7 @@ export function createServerConnection(
     const packages = new Map<Document, string>();
     for (const doc of allDocs) {
       const content = doc.getText();
-      const result = parseString(content, doc.uri);
+      const result = parseCached(content, doc.uri);
       if (result.ast) { asts.push(result.ast); packages.set(result.ast, effPkg(doc.uri, result.ast)); }
     }
 
@@ -1296,7 +1309,7 @@ export function createServerConnection(
     for (const doc of cachedDocuments()) docMap.set(doc.uri, doc.getText());
     const allDocs: import('@tatrman/parser').Document[] = [];
     for (const doc of cachedDocuments()) {
-      const result = parseString(doc.getText(), doc.uri);
+      const result = parseCached(doc.getText(), doc.uri);
       if (result.ast) allDocs.push(result.ast);
     }
     const qnameToDef = new Map<string, { def: import('@tatrman/parser').Definition; schemaCode: string; namespace: string }>();
@@ -1341,7 +1354,7 @@ export function createServerConnection(
     if (_params.graphUri) {
       const content = getDocument(_params.graphUri)?.getText();
       if (content) {
-        const result = parseString(content, _params.graphUri);
+        const result = parseCached(content, _params.graphUri);
         if (result.ast?.graph?.layout) {
           const layout = result.ast.graph.layout;
           const viewport = layout.viewport ? {
@@ -1387,6 +1400,7 @@ export function createServerConnection(
   });
 
   function authoringRoot(): string {
+    if (authoringRootUri) return authoringRootUri;
     const root = manifest.projectRoot.replace(/\/$/, '');
     if (!root) throw new ResponseError(ErrorCodes.InvalidParams, 'Set the project root before editing');
     return root.startsWith('/') ? new URL(`file://${root}`).href : root;
@@ -1521,7 +1535,7 @@ export function createServerConnection(
     return buildSymbolDetail(params.qname, projectSymbols, resolver, refIndex, manifest, (uri) => {
       const doc = getDocument(uri);
       return doc ? doc.getText() : null;
-    }, (content, uri) => parseString(content, uri));
+    }, (content, uri) => parseCached(content, uri));
   });
 
   connection.onRequest('modeler/listSymbols', (params: ListSymbolsParams = {}) => {
@@ -1547,7 +1561,7 @@ export function createServerConnection(
           const detail = buildSymbolDetail(s.qname, projectSymbols, resolver, refIndex, manifest, (uri) => {
             const doc = getDocument(uri);
             return doc ? doc.getText() : null;
-          }, (content, uri) => parseString(content, uri));
+          }, (content, uri) => parseCached(content, uri));
           if (!detail) continue;
           for (const m of memberRefsOf(detail, s.packageName ?? null)) out.push(m);
         }
@@ -1874,6 +1888,7 @@ export function createServerConnection(
       defDocumentContent: defContent,
       references: refIndex.findByQname(targetQname),
       ttrgDocuments: ttrgDocs,
+      packageOf: uri => projectSymbols.documentContext(uri)?.packageName ?? '',
     });
     const changes = (edit.documentChanges ?? []) as Array<{ textDocument: { uri: string; version: number | null }; edits: Array<{ range: unknown; newText: string }> }>;
     for (const loc of sqlRefIndex.findByQname(targetQname)) {
@@ -2265,7 +2280,7 @@ export function createServerConnection(
     if (!doc) return [];
 
     const content = doc.getText();
-    const result = parseString(content, uri);
+    const result = parseCached(content, uri);
     if (!result.ast) return [];
 
     return buildDocumentSymbols(result.ast, content.split('\n'));
@@ -2285,7 +2300,7 @@ export function createServerConnection(
     const doc = getDocument(uri);
     if (!doc) return [];
     const content = doc.getText();
-    const result = parseString(content, uri);
+    const result = parseCached(content, uri);
     if (!result.ast || result.errors.some((e) => e.severity === 'error')) {
       // Don't reformat a file that doesn't parse — we'd risk dropping content.
       return [];
@@ -2409,7 +2424,7 @@ export function createServerConnection(
     if (!doc) return { data: [] };
 
     const content = doc.getText();
-    const result = parseString(content, uri);
+    const result = parseCached(content, uri);
     if (!result.ast) return { data: [] };
 
     const ast = result.ast;
@@ -2517,7 +2532,7 @@ export function createServerConnection(
     if (!doc) return { isIncomplete: false, items: [] };
 
     const content = doc.getText();
-    const result = parseString(content, uri);
+    const result = parseCached(content, uri);
     if (!result.ast) return { isIncomplete: false, items: [] };
 
     // Embedded-SQL completion (§4.4): a cursor inside a SQL block offers tables

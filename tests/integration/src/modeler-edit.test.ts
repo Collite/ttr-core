@@ -128,15 +128,15 @@ describe.each(['node', 'browser'] as const)('modeler/edit (%s snapshot)', mode =
     const uri = `${ROOT}/model/er/a.ttrm`;
     if (mode === 'node') h.client.sendNotification('textDocument/didOpen', { textDocument: { uri, languageId: 'ttr', version: 1, text: physicalWorld['model/er/a.ttrm'] } });
     await h.symbols();
-    const a = await h.edit({ op: 'set-source', args: { nodeRef: 'er.entity.a', text: 'def entity first { attributes: [def attribute id { type: int }] }' } });
+    const a = await h.edit({ op: 'set-source', args: { nodeRef: 'er.entity.a', text: 'def entity a { attributes: [def attribute id { type: int }, def attribute first {type:text}] }' } });
     if (!a.ok) throw new Error(JSON.stringify(a));
-    const b = await h.edit({ op: 'set-source', args: { nodeRef: 'er.entity.first', text: 'def entity second { attributes: [def attribute id { type: int }] }' } });
+    const b = await h.edit({ op: 'set-source', args: { nodeRef: 'er.entity.a', text: 'def entity a { attributes: [def attribute id { type: int }, def attribute second {type:text}] }' } });
     if (!b.ok) throw new Error(JSON.stringify(b));
     const first = applyWorkspaceEditToText(physicalWorld['model/er/a.ttrm'], a.edit, uri);
     h.client.sendNotification('textDocument/didChange', { textDocument: { uri, version: 2 }, contentChanges: [{ text: first }] });
-    expect((await h.symbols()).symbols.some(s => s.qname === 'shop.er.entity.second')).toBe(true);
+    expect(await h.client.sendRequest('modeler/getSymbolDetail',{qname:'shop.er.entity.a'})).toMatchObject({sourceText:expect.stringContaining('def attribute second')});
     h.client.sendNotification('textDocument/didChange', { textDocument: { uri, version: 3 }, contentChanges: [{ text: applyWorkspaceEditToText(first, b.edit, uri) }] });
-    expect((await h.symbols()).symbols.some(s => s.qname === 'shop.er.entity.second')).toBe(true);
+    expect(await h.client.sendRequest('modeler/getSymbolDetail',{qname:'shop.er.entity.a'})).toMatchObject({sourceText:expect.stringContaining('def attribute second')});
   });
   it('applies WorkspaceEdits through the same atomic cache and validates document versions', async () => {
     const h = await boot(physicalWorld, mode);
@@ -181,26 +181,26 @@ describe.each(['node', 'browser'] as const)('modeler/edit (%s snapshot)', mode =
     if (mode === 'node') h.client.sendNotification('textDocument/didOpen', { textDocument: { uri, languageId: 'ttr', version: 1, text: world['model/er/a.ttrm'] } });
     await h.symbols();
     expect(await h.client.sendRequest('modeler/applyGraphEdit', { op: 'remove-definition', args: { nodeRef: 'shop.er.entity.old', text: 'def entity accidental {}' } })).toMatchObject({ ok: false, code: 'invalid-args', deprecated: 'modeler/edit' });
-    const args = { nodeRef: 'shop.er.entity.old', text: 'def entity renamed { nameAttribute: missing }' };
+    const args = { nodeRef: 'shop.er.entity.old', text: 'def entity old { nameAttribute: missing }' };
     const preview = await h.edit({ op: 'set-source', args, dryRun: true });
     const result = await h.client.sendRequest('modeler/applyGraphEdit', { op: 'set-source', args }) as Result & { deprecated: string };
     expect(result).toEqual({ ...preview, deprecated: 'modeler/edit' });
     if (!result.ok) throw new Error(JSON.stringify(result));
     expect(result.diagnostics.some(d => d.uri === uri && d.source === 'worker' && d.severity === 1 && d.code && d.range)).toBe(true);
-    expect((await h.symbols()).symbols.map(s => s.qname)).toEqual(['shop.er.entity.renamed']);
+    expect((await h.symbols()).symbols.map(s => s.qname)).toEqual(['shop.er.entity.old']);
     const text = applyWorkspaceEditToText(world['model/er/a.ttrm'], result.edit, uri);
     h.client.sendNotification('textDocument/didChange', { textDocument: { uri, version: 2 }, contentChanges: [{ text }] });
-    expect((await h.symbols()).symbols.map(s => s.qname)).toEqual(['shop.er.entity.renamed']);
+    expect((await h.symbols()).symbols.map(s => s.qname)).toEqual(['shop.er.entity.old']);
     // The returned patch is applied once by the host, never on top of the already staged text.
-    const final = await h.edit({ op: 'set-source', args: { nodeRef: 'shop.er.entity.renamed', text: 'def entity final { attributes: [def attribute id { type: int }] }' } });
+    const final = await h.edit({ op: 'set-source', args: { nodeRef: 'shop.er.entity.old', text: 'def entity old { attributes: [def attribute id { type: int }] }' } });
     expect(final.ok).toBe(true);
     if (final.ok) expect(final.diagnostics.filter(d => d.severity === 1)).toEqual([]);
   });
   it('edits an existing percent-encoded source URI', async () => {
     const world = { 'modeler.toml': '[packages]\nlayout="off"', 'model/er/a%20b.ttrm': 'package shop\nmodel er\ndef entity a { attributes: [def attribute id { type: int }] }' };
     const h = await boot(world, mode);
-    expect(await h.edit({ op: 'set-source', args: { nodeRef: 'er.entity.a', text: 'def entity renamed { attributes: [def attribute id { type: int }] }' } })).toMatchObject({ ok: true, touched: [`${ROOT}/model/er/a%20b.ttrm`] });
-    expect((await h.symbols()).symbols.some(s => s.qname === 'shop.er.entity.renamed')).toBe(true);
+    expect(await h.edit({ op: 'set-source', args: { nodeRef: 'er.entity.a', text: 'def entity a { description:"changed", attributes: [def attribute id { type: int }] }' } })).toMatchObject({ ok: true, touched: [`${ROOT}/model/er/a%20b.ttrm`] });
+    expect(await h.client.sendRequest('modeler/getSymbolDetail',{qname:'shop.er.entity.a'})).toMatchObject({sourceText:expect.stringContaining('changed')});
   });
   it('rejects malformed wire arguments without mutating the snapshot', async () => {
     const h = await boot(physicalWorld, mode); const before = await h.symbols();
@@ -223,7 +223,7 @@ describe.each(['node', 'browser'] as const)('modeler/edit (%s snapshot)', mode =
     const overlap = { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } };
     await expect(h.client.sendRequest('modeler/applyWorkspaceEdit', { edit: { changes: { [uri]: [{ range: overlap, newText: 'bad' }, { range: overlap, newText: 'bad' }] } } })).rejects.toMatchObject({ code: -32602 });
     expect(await h.symbols()).toEqual(before);
-    expect(await h.edit({ op: 'set-source', args: { nodeRef: 'er.entity.a', text: 'def entity preserved { attributes: [def attribute id { type: int }] }' } })).toMatchObject({ ok: true });
+    expect(await h.edit({ op: 'set-source', args: { nodeRef: 'er.entity.a', text: 'def entity a { description:"preserved", attributes: [def attribute id { type: int }] }' } })).toMatchObject({ ok: true });
   });
   it('roster-only references prevent removal and force removes the whole line', async () => {
     const h = await boot({ 'modeler.toml': '[packages]\nlayout="off"', 'model/er/a.ttrm': 'package shop\nmodel er\ndef entity a {}', 'model/tests/a.mjs': "const roster = [\n  'a',\n];\n" }, mode);

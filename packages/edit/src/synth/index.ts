@@ -18,7 +18,7 @@ class Synthesis {
   readonly texts = new Map<string, string>();
   constructor(readonly ctx: SynthContext) { this.index = new ModelIndex(ctx); }
   text(uri: string): string { return this.texts.get(uri) ?? this.ctx.files[uri] ?? ''; }
-  save(uri: string, text: string): void { this.texts.set(uri, text); }
+  save(uri: string, text: string): void { this.index.assertWritable(uri); this.texts.set(uri, text); }
   /** New documents are explicit WorkspaceEdit CreateFile operations; existing bytes outside patches survive. */
   append(uri: string, pkg: string, model: string, definitions: Definition[], f: Fragment, locale?: string): void {
     const existing = this.index.documents.find(d => d.uri === uri);
@@ -107,7 +107,7 @@ class Synthesis {
     if (!args.fk && this.ctx.manifest.bindings.required && physicallyBound(from) && physicallyBound(to)) throw new Refusal('fk-needs-binding', 'Choose the physical foreign key.');
     const fk = args.fk ? foreignKey(this.index, args.fk, from, to) : undefined;
     const cardinalities = { 'one-to-many': ['1', '0..*'], 'many-to-one': ['0..*', '1'], 'one-to-one': ['0..1', '1'] } as const;
-    if (!(args.kind in cardinalities)) throw new Refusal('invalid-args', 'Unsupported relation cardinality.');
+    if (!Object.hasOwn(cardinalities, args.kind)) throw new Refusal('invalid-args', 'Unsupported relation cardinality.');
     const pair = cardinalities[args.kind];
     const f = new Fragment();
     const def: RelationDef = { kind: 'relation', name, source: location, from: f.id(from.symbol.qname), to: f.id(to.symbol.qname), cardinality: f.object({ from: pair[0], to: pair[1] }, true) };
@@ -116,7 +116,9 @@ class Synthesis {
     this.append(uri, from.doc.pkg, 'er', [def], f);
   }
   source(args: EditArguments['set-source']): void {
+    this.index.assertComplete();
     const node = this.require(args.nodeRef, undefined, 'node-unknown');
+    if (node.symbol.parent) throw new Refusal('invalid-args', 'set-source accepts top-level definitions.');
     const parsed = parseString(args.text, node.doc.uri);
     const errors = parsed.errors.filter(e => e.severity === 'error');
     if (!parsed.ast || errors.length || parsed.ast.definitions.length !== 1 || parsed.ast.modelDirective || parsed.ast.packageDecl || parsed.ast.imports.length || parsed.ast.securityBlocks.length || parsed.ast.graph) {
@@ -126,8 +128,29 @@ class Synthesis {
       const refs = errors.map(e => this.ref(node.doc, { ...e.source, offsetStart: node.def.source.offsetStart + e.source.offsetStart, offsetEnd: node.def.source.offsetStart + e.source.offsetEnd }, 'parse-error', candidate));
       throw new Refusal('text-unparseable', errors.length ? errors.map(e => e.message).join('; ') : 'Provide exactly one parseable definition.', refs);
     }
-    const f = new Fragment(args.text);
-    this.replace(node, f.print(parsed.ast.definitions));
+    const def = parsed.ast.definitions[0];
+    if (def.kind !== node.def.kind || def.name !== node.def.name)
+      throw new Refusal('invalid-args', 'set-source keeps the definition kind and name; rename with textDocument/rename.');
+    this.replace(node, args.text);
+    if (this.text(node.doc.uri) === node.doc.text) return;
+    const candidate = new ModelIndex({ ...this.ctx, files: { ...this.ctx.files, ...Object.fromEntries(this.texts) } });
+    candidate.assertComplete();
+    for (const symbol of this.index.symbols.all()) {
+      if (symbol.documentUri !== node.doc.uri || symbol.qname === node.symbol.qname || symbol.qname.startsWith(node.symbol.qname + '.')) continue;
+      if (!candidate.symbols.get(symbol.qname)) throw new Refusal('text-unparseable', 'The replacement would consume a neighboring definition.');
+    }
+    const refs: RefusalRef[] = [];
+    for (const symbol of this.index.symbols.all()) {
+      if (symbol.qname !== node.symbol.qname && !symbol.qname.startsWith(node.symbol.qname + '.')) continue;
+      if (candidate.symbols.get(symbol.qname)) continue;
+      for (const ref of this.index.references.findByQname(symbol.qname)) {
+        // References inside the replaced definition are replaced with it.
+        if (ref.documentUri === node.doc.uri && ref.source.offsetStart >= node.def.source.offsetStart && ref.source.offsetEnd <= node.def.source.offsetEnd) continue;
+        const doc = this.index.documents.find(d => d.uri === ref.documentUri)!;
+        refs.push(this.ref(doc, ref.source, ref.viaMapping ? 'binding' : 'reference'));
+      }
+    }
+    if (refs.length) throw new Refusal('would-orphan', 'The replacement removes referenced members.', refs);
   }
   term(args: EditArguments['add-term'], inserted?: { qname: string; pkg: string; model: string; name: string }): void {
     if (!['en', 'cs'].includes(args.lang) || !args.term.trim() || /[\x00-\x1f]/.test(args.term)) throw new Refusal('invalid-args', 'Term needs a supported locale and non-empty text.');
@@ -151,6 +174,7 @@ class Synthesis {
     return { uri: doc.uri, kind, range: { start: position(text, utf16Offset(text, span.offsetStart)), end: position(text, utf16Offset(text, span.offsetEnd)) } };
   }
   remove(args: EditArguments['remove-definition']): void {
+    this.index.assertComplete();
     const node = this.require(args.qname, undefined, 'node-unknown');
     if (node.symbol.parent) throw new Refusal('invalid-args', 'remove-definition accepts top-level definitions.');
     const removals = new Map<string, { doc: ModelDocument; span: SourceLocation; kind: string }>();
@@ -159,10 +183,12 @@ class Synthesis {
     add(node.doc, node.def.source, 'definition');
     const refs: RefusalRef[] = [];
     const visited = new Set<string>();
+    const removedNames = new Set<string>();
     while (queue.length) {
       const current = queue.shift()!;
       if (visited.has(current.symbol.qname)) continue;
       visited.add(current.symbol.qname);
+      removedNames.add(current.def.name);
       const symbols = this.index.symbols.all().filter(s => s.qname === current.symbol.qname || s.qname.startsWith(current.symbol.qname + '.'));
       for (const symbol of symbols) for (const ref of this.index.references.findByQname(symbol.qname)) {
         const doc = this.index.documents.find(d => d.uri === ref.documentUri)!;
@@ -187,21 +213,27 @@ class Synthesis {
         }
       }
     }
-    // Deliberately v1: single-quoted roster entries, one entry per line, anywhere under model/tests/.
-    const escaped = node.def.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const roster = new RegExp("'" + escaped + "'");
+    // Detection is broad; only an entire single-entry roster line is safe to remove.
+    const rosters = [...removedNames].map(name => {
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return { hit: new RegExp("'" + escaped + "'"), pure: new RegExp("^\\s*'" + escaped + "'\\s*,?\\s*(?://[^\\r\\n]*)?(?:\\r?\\n)?$") };
+    });
     for (const [uri, text] of Object.entries(this.ctx.files)) if (/(?:^|\/)model\/tests\/.*\.mjs$/.test(uri)) {
       let start = 0;
       for (const line of text.split(/(?<=\n)/)) {
-        if (roster.test(line)) {
+        const matches = rosters.filter(roster => roster.hit.test(line));
+        if (matches.length) {
           const span = { ...location, offsetStart: [...text.slice(0, start)].length, offsetEnd: [...text.slice(0, start + line.length)].length };
           const doc = { ...node.doc, uri, text };
-          refs.push(this.ref(doc, span, 'roster')); add(doc, span, 'roster');
+          const kind = matches.every(roster => roster.pure.test(line)) ? 'roster' : 'roster-manual';
+          refs.push(this.ref(doc, span, kind));
+          if (kind === 'roster') add(doc, span, kind);
         }
         start += line.length;
       }
     }
     refs.sort((a, b) => compareCodePoints(a.uri, b.uri) || a.range.start.line - b.range.start.line);
+    if (refs.some(ref => ref.kind === 'roster-manual')) throw new Refusal('would-orphan', 'Edit manual JS references before removing this definition, even with force.', refs);
     if (refs.length && !args.force) throw new Refusal('would-orphan', `${node.symbol.qname} still has references.`, refs);
     const byFile = new Map<string, [number, number][]>();
     for (const { doc, span, kind } of removals.values()) {
@@ -212,8 +244,9 @@ class Synthesis {
         if (doc.text[end] === ',') end++;
         if (doc.text[end] === '\r') end++;
         if (doc.text[end] === '\n') end++;
-        // Consume the blank separator after a removed definition, keeping one final newline.
-        if (doc.text[end] === '\n') end++;
+        // Consume one blank separator without splitting CRLF.
+        if (doc.text.startsWith('\r\n', end)) end += 2;
+        else if (doc.text[end] === '\n') end++;
       }
       const spans = byFile.get(doc.uri) ?? []; spans.push([start, end]); byFile.set(doc.uri, spans);
     }
@@ -231,8 +264,11 @@ class Synthesis {
   result(): SynthResult {
     const documentChanges: (TextDocumentEdit | CreateFile)[] = [];
     const touched: string[] = [];
-    for (const [uri, after] of [...this.texts].sort(([a], [b]) => compareCodePoints(a, b))) {
+    for (const [uri, output] of [...this.texts].sort(([a], [b]) => compareCodePoints(a, b))) {
       const before = this.ctx.files[uri] ?? '';
+      const eolInputs = before ? [before] : Object.values(this.ctx.files);
+      const crlf = eolInputs.some(text => text.includes('\r\n')) && eolInputs.every(text => !/(?<!\r)\n/.test(text));
+      const after = crlf ? output.replace(/\r?\n/g, '\r\n') : output;
       if (before === after) continue;
       if (uri.endsWith('.ttrm') && parseString(after, uri).errors.some(e => e.severity === 'error')) throw new Refusal('text-unparseable', `The operation would leave ${uri} unparseable.`);
       // One minimal replacement per file, avoiding conflicting same-position insertions.
@@ -240,9 +276,11 @@ class Synthesis {
       while (start < before.length && start < after.length && before[start] === after[start]) start++;
       // Never split a UTF-16 surrogate pair in a WorkspaceEdit.
       if (start && /[\uD800-\uDBFF]/.test(before[start - 1] ?? after[start - 1])) start--;
+      if (start > 0 && before[start - 1] === '\r' && before[start] === '\n') start--;
       let end = before.length, afterEnd = after.length;
       while (end > start && afterEnd > start && before[end - 1] === after[afterEnd - 1]) { end--; afterEnd--; }
       if (end > start && /[\uD800-\uDBFF]/.test(before[end - 1])) { end++; afterEnd++; }
+      if (end > start && before[end - 1] === '\r' && before[end] === '\n') { end++; afterEnd++; }
       if (!(uri in this.ctx.files)) documentChanges.push({ kind: 'create', uri });
       documentChanges.push({ textDocument: { uri, version: null }, edits: [{ range: { start: position(before, start), end: position(before, end) }, newText: after.slice(start, afterEnd) }] });
       touched.push(uri);
