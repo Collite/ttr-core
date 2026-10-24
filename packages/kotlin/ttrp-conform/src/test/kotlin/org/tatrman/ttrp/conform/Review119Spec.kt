@@ -44,6 +44,7 @@ class Review119Spec :
         val engines =
             buildList {
                 add("duckdb")
+                if (RecipePolars.enabled) add("polars")
                 if (RecipePlanted.pgEnabled) add("pg")
             }
 
@@ -64,7 +65,13 @@ class Review119Spec :
                 }
             return e.use {
                 RecipePlanted.rows(
-                    RecipeConform().runOn(it, RecipePlanted.planSource(source), RecipePlanted.AS_OF),
+                    if (engine ==
+                        "polars"
+                    ) {
+                        RecipePolars.run(it.connection, RecipePlanted.planSource(source), RecipePlanted.AS_OF)
+                    } else {
+                        RecipeConform().runOn(it, RecipePlanted.planSource(source), RecipePlanted.AS_OF)
+                    },
                 )
             }
         }

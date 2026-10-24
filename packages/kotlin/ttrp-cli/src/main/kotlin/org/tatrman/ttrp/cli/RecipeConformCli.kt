@@ -4,6 +4,7 @@ package org.tatrman.ttrp.cli
 import org.tatrman.ttrp.conform.DuckDbRecipeEngine
 import org.tatrman.ttrp.conform.PostgresRecipeEngine
 import org.tatrman.ttrp.conform.RecipeConform
+import org.tatrman.ttrp.conform.RecipePolars
 import org.tatrman.ttrp.conform.RecipeEngine
 import org.tatrman.ttrp.graph.TtrpPipeline
 import java.net.URI
@@ -65,7 +66,9 @@ object RecipeConformCli {
                                             postgres(plan, env, scriptsForStorage, echo, engine, "_${i}_$storage")
                                                 ?: return 2
                                         else -> {
-                                            echo("ttrp conform: unknown engine '$e' (a recipe runs on pg, duckdb)")
+                                            echo(
+                                                "ttrp conform: unknown engine '$e' (a recipe runs on pg, duckdb, polars)",
+                                            )
                                             return 2
                                         }
                                     }
@@ -79,19 +82,22 @@ object RecipeConformCli {
             for (e in engines) {
                 opened +=
                     when (e.lowercase()) {
-                        "duckdb" -> DuckDbRecipeEngine(scripts)
+                        "duckdb", "polars" -> DuckDbRecipeEngine(scripts)
                         "pg", "postgres" -> postgres(plan, env, scripts, echo) ?: return 2
-                        "polars" -> {
-                            echo("ttrp conform: a recipe's Polars statements are deferred past the rc (AU-C-8)")
-                            return 2
-                        }
                         else -> {
-                            echo("ttrp conform: unknown engine '$e' (a recipe runs on pg, duckdb)")
+                            echo("ttrp conform: unknown engine '$e' (a recipe runs on pg, duckdb, polars)")
                             return 2
                         }
                     }
             }
-            val runs = opened.map { conform.runOn(it, plan, asOf) }
+            val runs =
+                opened.zip(engines).map { (engine, name) ->
+                    if (name.lowercase() == "polars") {
+                        RecipePolars.run(engine.connection, plan, asOf)
+                    } else {
+                        conform.runOn(engine, plan, asOf)
+                    }
+                }
             return report(conform, runs, echo)
         } catch (e: Exception) {
             echo("ttrp conform: ${e.message}")

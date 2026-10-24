@@ -207,7 +207,10 @@ class CheckCommand : CliktCommand(name = "check") {
 class ConformCommand : CliktCommand(name = "conform") {
     private val file by argument()
     private val tolerance by option("--tolerance", help = "per-column float64 tolerance, <col>=<eps>").multiple()
-    private val engines by option("--engines", help = "a recipe's engines, comma-separated: pg, duckdb").default(
+    private val engines by option(
+        "--engines",
+        help = "a recipe's engines, comma-separated: pg, duckdb, polars",
+    ).default(
         "pg,duckdb",
     )
     private val fixture by option(

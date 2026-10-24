@@ -133,12 +133,17 @@ class RecipeConformCliTest :
             r.stdout shouldContain "[PASS] Q9-2 row-multiset"
         }
 
-        test("a recipe needs an instant and a fixture; Polars is deferred (AU-C-8)") {
+        test("a recipe needs an instant and a fixture") {
             ttrp().test("conform $recipe --engines duckdb $fixtureArgs").statusCode shouldBe 2
             ttrp().test("conform $recipe --engines duckdb --as-of 2026-11-02T08:00").statusCode shouldBe 2
-            val polars = ttrp().test("conform $recipe --engines duckdb,polars $fixtureArgs --as-of 2026-11-02T08:00")
-            polars.statusCode shouldBe 2
-            polars.stdout shouldContain "AU-C-8"
+        }
+
+        test(
+            "Polars CLI: every output compared against DuckDB",
+        ).config(enabled = org.tatrman.ttrp.conform.RecipePolars.enabled) {
+            val r = ttrp().test("conform $recipe --engines duckdb,polars $fixtureArgs --as-of 2026-11-02T08:00")
+            io.kotest.assertions.withClue(r.stdout + r.stderr) { r.statusCode shouldBe 0 }
+            r.stdout shouldContain "every output agrees on duckdb, polars"
         }
 
         test("pg without its server named: exit 2, the variable it reads named")

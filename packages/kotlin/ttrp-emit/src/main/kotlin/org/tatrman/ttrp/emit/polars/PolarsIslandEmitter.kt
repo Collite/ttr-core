@@ -243,16 +243,9 @@ class PolarsIslandEmitter(
         val keys = n.groupBy.joinToString(", ") { quote(it) }
         val aggs =
             n.aggregations.joinToString(", ") { a ->
-                val call =
-                    a.value as? org.tatrman.ttrp.expr.AggregateCall
-                        ?: throw TtrpEmitException(
-                            EmitDiagnosticId.UNSUPPORTED_NODE,
-                            detail = "aggregation '${a.name}' is not an AggregateCall",
-                            location = n.location,
-                        )
-                "${expr.aggregate(call)}.alias(${quote(a.name)})"
+                "${expr.render(a.value)}.alias(${quote(a.name)})"
             }
-        return "$input.group_by([$keys]).agg([$aggs])"
+        return if (n.groupBy.isEmpty()) "$input.select([$aggs])" else "$input.group_by([$keys]).agg([$aggs])"
     }
 
     private fun sort(
