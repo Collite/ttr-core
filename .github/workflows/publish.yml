@@ -222,6 +222,18 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Render Enterprise Architect MDG Technology
+        if: startsWith(github.ref_name, 'grammar/v')
+        run: ./gradlew --no-configuration-cache :packages:kotlin:ttr-metadata:renderTtrMdg
+
+      - name: Attach Enterprise Architect MDG Technology
+        if: startsWith(github.ref_name, 'grammar/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: ttr-mdg-${{ steps.ver.outputs.version }}
+          path: packages/kotlin/ttr-metadata/build/distributions/ttr-mdg.xml
+          if-no-files-found: error
+
       # SV-P1 S4 — public lane (RO-17). Uploads a signed bundle to the Central
       # Portal and AUTO-RELEASES it (`publishAndReleaseToMavenCentral`, enabled
       # 2026-07-12 after the first manual releases). Skipped until the four

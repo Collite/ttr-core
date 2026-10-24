@@ -185,3 +185,41 @@ If you're suspicious that an extension change broke something, run `test:smoke` 
 * The extension's [README](packages/vscode-ext/README.md) documents the smoke test cases and how the package handles the CJS/ESM split with the LSP.
 * The [LSP README](packages/lsp/README.md) lists every method (standard + custom `modeler/*`) the server exposes.
 * [docs/v1/design/architecture.md](docs/v1/design/architecture.md) §11 has the Designer ↔ LSP control-flow diagram for the deployed shape.
+
+## Export a model (graph.json · defs.json · cn.ttl · xmi)
+
+Install the `ttr-metadata-cli` distribution from the internal grammar bundle, or build locally:
+
+```bash
+./gradlew :packages:kotlin:ttr-metadata-cli:installDist
+packages/kotlin/ttr-metadata-cli/build/install/ttr-metadata/bin/ttr-metadata export /path/to/world --format graph.json --out /tmp/model-export
+```
+
+The checkout must contain `modeler.toml` and `model/`. All formats use the same parsed definitions as Veles `/model/export`.
+Each successful export writes its files and `.snapshot` (one version line) under `--out`.
+
+```bash
+ttr-metadata export /path/to/world --model world --format defs.json --out /tmp/definitions
+ttr-metadata export /path/to/world --model cn --format ttl --profile owl --out /tmp/concepts
+ttr-metadata export /path/to/world --format xmi --profile ttr-mdg/1 --out /tmp/ea
+ttr-metadata export /path/to/world --format graph.json --since /tmp/previous/graph.json --out /tmp/current
+ttr-metadata export /path/to/world --model cn,er --format ttr --out /tmp/ttr --tar
+```
+
+`--model` defaults to `world`; selectors are `cn`, `md`, `er`, `db`, `lexicon`, `bindings`, the binding families
+`cn2md|cn2er|cn2db|md2er|md2db|er2db`, or comma-separated combinations. `--package` and `--area` scope before projection.
+`--format` and `--out` are required. `graph.json`, `defs.json`, `dot`, `ttl`, `xmi` and canonical `ttr` are implemented.
+Turtle profiles are `skos`, `owl`, `both` (default); XMI defaults to `ttr-mdg/1`. `yaml`, `ossie`, `uc`, `tmdl`,
+`pdm`, `ldm`, `cdm` and XMI `ea-erd/1` are registered for later implementation.
+
+Single files are named `graph.json`, `defs.json`, `model.dot`, `cn.ttl`, or `model.xmi`. TTR writes a directory tree;
+`--tar` additionally writes `model.tar.gz` for a bundle. Archives contain zero timestamps. `defs.json` includes only
+public connection descriptors (`id`, `database`, `schema`, `locators`) from the snapshot's `connections.toml`.
+Authored `renames.yaml` contributes to graph deltas; the CLI reads the previous graph's snapshot and ids.
+A delta describes removals from the whole snapshot, even when the new projection is scoped; requesting the current
+snapshot yields empty arrays. For complete removal tracking, save a world `graph.json` as the previous input.
+
+Exit codes: `0` success, `1` load/write/sidecar failure, `2` `xm/format-cannot-carry`, `3` `xm/since-unknown`,
+`64` usage or a reserved `xm/format-not-built`. Cannot-carry includes MD/ER/DB/bindings/lexicon as Turtle,
+lexicon as XMI, and scoped models as DOT (DOT supports `world`). Diagnostics go to stderr.
+See [TTR vocabulary](docs/ns/ttr.md) and [EA import and MDG installation](docs/ea.md).

@@ -138,6 +138,8 @@ data class SourceSnapshot(
     val droppedFiles: List<LoadWarning> = emptyList(),
     val mdHopIssues: List<org.tatrman.ttr.metadata.LoadIssue> = emptyList(),
     val mdHopAnalysis: MdHopAnalysis? = null,
+    /** Raw root export sidecars, captured with this source version; callers parse public fields only. */
+    val exportSidecars: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -310,7 +312,7 @@ class FileBasedSource(
     private val allMdHopIssues: Boolean = false,
 ) : ModelSource {
     override fun load(): SourceSnapshot {
-        val extensions = if (layouts) MODEL_AND_LAYOUT_EXTENSIONS else MODEL_EXTENSIONS
+        val extensions = (if (layouts) MODEL_AND_LAYOUT_EXTENSIONS else MODEL_EXTENSIONS) + listOf("toml", "yaml")
         val version = storage.fetchVersion(extensions)
         // Golem P4 S4.2 — area files carry a `.ttrm` extension (directive-less,
         // `def area` blocks). Walk both so they load alongside the model `.ttr` files.
@@ -318,6 +320,10 @@ class FileBasedSource(
         // second one could see another commit); they are collected, never parsed as model.
         val listed = storage.listFiles(extensions)
         val files = listed.filter { it.extension() in MODEL_EXTENSIONS }
+        val exportSidecars =
+            listed
+                .filter { it.underRoot() in setOf("connections.toml", "renames.yaml") }
+                .associate { it.underRoot() to storage.read(it) }
         val layoutFiles = if (layouts) collectLayoutFiles(listed, storage) else emptyList()
         val warnings = mutableListOf<LoadWarning>()
         val errors = mutableListOf<LoadWarning>()
@@ -599,6 +605,7 @@ class FileBasedSource(
             warnings = warnings,
             errors = errors,
             loadedFiles = loadedFiles.toList(),
+            exportSidecars = exportSidecars,
             layoutFiles = layoutFiles,
             droppedFiles = droppedFiles,
             mdHopAnalysis = cn.mdHopAnalysis,

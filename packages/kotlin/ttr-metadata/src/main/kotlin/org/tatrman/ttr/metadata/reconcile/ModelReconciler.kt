@@ -18,7 +18,7 @@ import org.tatrman.ttr.metadata.resolve.ReferenceResolutionPass
 import org.tatrman.ttr.metadata.source.LoadWarning
 import org.tatrman.ttr.metadata.source.SourceSnapshot
 import java.time.Instant
-import java.util.UUID
+import java.security.MessageDigest
 
 /**
  * Merges one or more [SourceSnapshot]s into a single [Model].
@@ -163,7 +163,22 @@ class ModelReconciler(
                 descriptor = descriptor,
                 version =
                     ModelVersion(
-                        value = (sorted.joinToString("|") { it.version } + ":" + UUID.randomUUID().toString().take(8)),
+                        // A snapshot of the same source versions must have the same ETag across CLI/HTTP loads.
+                        value =
+                            sorted.joinToString("|") { it.version } + ":" +
+                                MessageDigest
+                                    .getInstance("SHA-256")
+                                    .digest(
+                                        sorted
+                                            .joinToString(
+                                                "",
+                                            ) {
+                                                "${it.version.toByteArray(
+                                                    Charsets.UTF_8,
+                                                ).size}:${it.version}"
+                                            }.toByteArray(Charsets.UTF_8),
+                                    ).joinToString("") { "%02x".format(it) }
+                                    .take(16),
                         swappedAt = Instant.now(),
                     ),
                 schemas =
@@ -208,7 +223,15 @@ class ModelReconciler(
                 )
         }
 
-        return ReconciliationResult(model = model, warnings = warnings, errors = errors)
+        return ReconciliationResult(
+            model = model,
+            warnings = warnings,
+            errors = errors,
+            files =
+                sorted.flatMap {
+                    it.loadedFiles
+                },
+        )
     }
 
     /**
@@ -433,6 +456,7 @@ data class ReconciliationResult(
     val model: Model,
     val warnings: List<LoadWarning>,
     val errors: List<LoadWarning>,
+    val files: List<org.tatrman.ttr.metadata.source.LoadedFile> = emptyList(),
 ) {
     val ok: Boolean get() = errors.isEmpty()
 }

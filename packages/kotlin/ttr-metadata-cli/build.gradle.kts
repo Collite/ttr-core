@@ -16,6 +16,8 @@ kotlin {
 tasks.test {
     useJUnitPlatform()
     inputs.dir("../ttr-metadata/src/test/resources/md-hop")
+    inputs.dir("../ttr-metadata/src/testFixtures/resources/fixtures/xm-world")
+    inputs.dir("../ttr-metadata/src/test/resources/xm-goldens")
     inputs.dir("../../../tests/conformance/md-hop")
     systemProperty("metadata.expectedVersion", project.version.toString())
 }
@@ -44,6 +46,7 @@ dependencies {
     implementation(project(":packages:kotlin:ttr-metadata"))
     implementation(libs.clikt)
     implementation(libs.tomlj)
+    implementation(libs.apache.commons.compress)
     implementation(libs.kotlinx.ser.json)
     testImplementation(libs.bundles.kotest)
 }

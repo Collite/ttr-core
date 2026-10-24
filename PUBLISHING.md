@@ -681,3 +681,13 @@ published only to GitHub Packages. The grammar minor check ignores the prereleas
 Use the existing latest translator pin (and source-equality gate); no report-specific publisher or
 Central cut is introduced. The CLI attaches both `dist` ZIP and tar. Record the actual RC coordinate
 and independent-consumer evidence in the canonical SO-core STATUS; a planned version is not a release.
+
+### Enterprise Architect MDG Technology (XM)
+
+The grammar publish lane generates `ttr-mdg.xml` from the versioned profile data and
+attaches it as the workflow artifact `ttr-mdg-<version>` on both internal and public
+grammar tags. No separate publisher or version line. Download it from that publish
+run's Artifacts section. The source `profile.yaml` is included in the metadata jar.
+Locally run `./gradlew :packages:kotlin:ttr-metadata:renderTtrMdg`; the installable
+file is `packages/kotlin/ttr-metadata/build/distributions/ttr-mdg.xml`.
+See [EA installation and verification](docs/ea.md).

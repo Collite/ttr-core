@@ -104,6 +104,14 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
+      # XM KindListSpec compares export decisions with the generated grammar inventory.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile --filter @tatrman/grammar
+      - run: pnpm --filter @tatrman/grammar prebuild
       - run: ./gradlew build
 
   # SV-P4·S3·T6 — the import-schema determinism gate. The unit tier is the pure GI-2 instrument:

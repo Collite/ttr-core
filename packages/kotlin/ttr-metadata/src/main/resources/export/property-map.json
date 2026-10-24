@@ -1,0 +1,408 @@
+{
+  "project": [
+    "description",
+    "tags",
+    "version"
+  ],
+  "table": [
+    "description",
+    "tags",
+    "primaryKey",
+    "columns",
+    "indices",
+    "constraints",
+    "search",
+    "semantics",
+    "lexicon",
+    "management",
+    "changeSemantics",
+    "writebackReservation"
+  ],
+  "view": [
+    "description",
+    "tags",
+    "columns",
+    "definitionSql",
+    "search"
+  ],
+  "column": [
+    "description",
+    "tags",
+    "type",
+    "optional",
+    "isKey",
+    "indexed",
+    "search",
+    "semantics",
+    "lexicon"
+  ],
+  "index": [
+    "description",
+    "indexType",
+    "columnNames"
+  ],
+  "constraint": [
+    "description",
+    "constraintType",
+    "columnNames"
+  ],
+  "fk": [
+    "description",
+    "tags",
+    "from",
+    "to"
+  ],
+  "procedure": [
+    "description",
+    "tags",
+    "parameters",
+    "resultColumns"
+  ],
+  "entity": [
+    "description",
+    "tags",
+    "labelPlural",
+    "nameAttribute",
+    "codeAttribute",
+    "aliases",
+    "attributes",
+    "roles",
+    "displayLabel",
+    "search",
+    "semantics",
+    "lexicon",
+    "binding",
+    "concept"
+  ],
+  "attribute": [
+    "description",
+    "tags",
+    "type",
+    "isKey",
+    "optional",
+    "valueLabels",
+    "displayLabel",
+    "search",
+    "semantics",
+    "lexicon",
+    "binding",
+    "domainRef",
+    "aggregation",
+    "states",
+    "transitions",
+    "concept"
+  ],
+  "relation": [
+    "description",
+    "tags",
+    "from",
+    "to",
+    "cardinality",
+    "join",
+    "search",
+    "binding"
+  ],
+  "er2dbEntity": [
+    "description",
+    "tags",
+    "entity",
+    "target",
+    "whereFilter"
+  ],
+  "er2dbAttribute": [
+    "description",
+    "tags",
+    "attribute",
+    "target"
+  ],
+  "er2dbRelation": [
+    "description",
+    "tags",
+    "relation",
+    "fk"
+  ],
+  "query": [
+    "description",
+    "tags",
+    "language",
+    "parameters",
+    "sourceText",
+    "search"
+  ],
+  "role": [
+    "description",
+    "tags",
+    "label",
+    "search",
+    "resolve",
+    "delivery",
+    "members",
+    "event",
+    "grounds",
+    "lexicon"
+  ],
+  "er2cncRole": [
+    "description",
+    "tags",
+    "entity",
+    "role"
+  ],
+  "schema": [
+    "description",
+    "tags",
+    "columns"
+  ],
+  "parameter": [
+    "description",
+    "tags",
+    "label",
+    "type",
+    "columns",
+    "target",
+    "transition",
+    "set"
+  ],
+  "action": [
+    "description",
+    "tags",
+    "label",
+    "type",
+    "columns",
+    "target",
+    "transition",
+    "set"
+  ],
+  "service": [
+    "description",
+    "tags",
+    "label",
+    "type",
+    "columns",
+    "target",
+    "transition",
+    "set"
+  ],
+  "approval": [
+    "description",
+    "tags",
+    "label",
+    "type",
+    "columns",
+    "target",
+    "transition",
+    "set"
+  ],
+  "program": [
+    "description",
+    "tags",
+    "label",
+    "type",
+    "columns",
+    "target",
+    "transition",
+    "set"
+  ],
+  "recipe": [
+    "description",
+    "tags",
+    "label",
+    "type",
+    "columns",
+    "target",
+    "transition",
+    "set"
+  ],
+  "concept": [
+    "description",
+    "label",
+    "tags",
+    "event",
+    "grounds",
+    "involves",
+    "period",
+    "extent",
+    "basis",
+    "definition",
+    "members",
+    "value_space",
+    "lexicon"
+  ],
+  "conceptBinding": [
+    "description",
+    "tags",
+    "kind",
+    "role",
+    "quality",
+    "event",
+    "phase",
+    "concept",
+    "target",
+    "period"
+  ],
+  "drillMap": [
+    "description",
+    "tags",
+    "from",
+    "to",
+    "args",
+    "display",
+    "override"
+  ],
+  "area": [
+    "description",
+    "tags",
+    "areaPackages",
+    "areaEntities"
+  ],
+  "mdDomain": [
+    "description",
+    "tags",
+    "type",
+    "kind",
+    "restrict",
+    "publish",
+    "concept"
+  ],
+  "dimension": [
+    "description",
+    "tags",
+    "key",
+    "attributes",
+    "hierarchies",
+    "lexicon",
+    "concept"
+  ],
+  "mdMap": [
+    "description",
+    "tags",
+    "from",
+    "to",
+    "cardinality",
+    "calc"
+  ],
+  "hierarchy": [
+    "description",
+    "tags",
+    "dimensionRef",
+    "levels"
+  ],
+  "measure": [
+    "description",
+    "tags",
+    "domainRef",
+    "class",
+    "aggregation",
+    "validBy",
+    "lexicon",
+    "concept"
+  ],
+  "cubelet": [
+    "description",
+    "tags",
+    "grain",
+    "measures",
+    "lexicon",
+    "concept"
+  ],
+  "md2dbCubelet": [
+    "description",
+    "tags",
+    "cubeletRef",
+    "target",
+    "shape",
+    "attributesMap",
+    "measuresMap",
+    "journaling",
+    "allocation"
+  ],
+  "md2dbDomain": [
+    "description",
+    "tags",
+    "domainRef",
+    "source"
+  ],
+  "md2dbMap": [
+    "description",
+    "tags",
+    "mapRef",
+    "target",
+    "columnsMap"
+  ],
+  "md2erDimension": [
+    "description",
+    "tags",
+    "dimensionRef",
+    "entity",
+    "attributesMap"
+  ],
+  "md2erCubelet": [
+    "description",
+    "tags",
+    "cubeletRef",
+    "target",
+    "attributesMap",
+    "shape",
+    "measuresMap",
+    "journaling",
+    "allocation"
+  ],
+  "term": [
+    "description",
+    "tags",
+    "for",
+    "forms",
+    "match",
+    "text",
+    "default",
+    "sense_priority"
+  ],
+  "pattern": [
+    "description",
+    "tags",
+    "for",
+    "forms",
+    "match",
+    "text",
+    "default",
+    "sense_priority"
+  ],
+  "example": [
+    "description",
+    "tags",
+    "for",
+    "forms",
+    "match",
+    "text",
+    "default",
+    "sense_priority"
+  ],
+  "world": [
+    "description",
+    "tags",
+    "extends"
+  ],
+  "engine": [
+    "description",
+    "tags",
+    "type",
+    "version",
+    "extends"
+  ],
+  "executor": [
+    "description",
+    "tags",
+    "type",
+    "version",
+    "extends"
+  ],
+  "storage": [
+    "description",
+    "tags",
+    "type",
+    "extends",
+    "via",
+    "hosts",
+    "staging"
+  ],
+  "worldSchema": []
+}

@@ -1,0 +1,20 @@
+@prefix ttr: <https://tatrman.org/ns/ttr#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix w: <urn:ttr:sample:> .
+
+<urn:ttr:sample> a owl:Ontology ;
+    dct:identifier "s1" ;
+    owl:versionInfo "0.18" .
+
+w:cn.kind.Party a owl:Class, skos:Concept, ttr:Kind ;
+    skos:inScheme w:pkg.cn ;
+    ttr:tier "core" ;
+    skos:prefLabel "Party"@en ;
+    rdfs:label "Party"@en .
+
+w:pkg.cn a skos:ConceptScheme .

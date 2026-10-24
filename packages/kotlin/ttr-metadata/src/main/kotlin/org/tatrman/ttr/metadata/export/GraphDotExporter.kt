@@ -49,6 +49,19 @@ object GraphDotExporter {
             "USES" to "#1976d2",
         )
 
+    /** Scope-aware definition graph; minimal external endpoints remain visible. */
+    fun export(graph: DefinitionGraph): String =
+        buildString {
+            append("digraph metadata_model {\n")
+            for (node in graph.nodes.sortedWith(compareBy(bytewise) { it.id })) {
+                append("  ${quote(node.id)} [label=${quote(node.label ?: node.id)}];\n")
+            }
+            for (edge in graph.edges.sortedWith(edgeOrder)) {
+                append("  ${quote(edge.from)} -> ${quote(edge.to)} [label=${quote(edge.label ?: edge.kind)}];\n")
+            }
+            append("}\n")
+        }
+
     fun export(graph: ModelGraph): String {
         val sb = StringBuilder()
         sb.append("digraph metadata_model {\n")

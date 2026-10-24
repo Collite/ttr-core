@@ -6,14 +6,25 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — XM P1 external metadata projections
+
+- Complete parsed definition sets and deterministic `graph.json`/`defs.json`, SKOS/OWL Turtle, XMI 2.1 with
+  `ttr-mdg/1`, generated EA MDG technology, scoping, snapshot deltas and explicit lossiness results.
+- `ttr-metadata export` writes projection files, `.snapshot`, and optional TTR tar archives. Snapshot versions
+  are now deterministic for the same ordered source versions; the registry retains definitions, captured
+  export sidecars and the latest eight id sets for HTTP exports.
+- JVM consumers must rebuild: `LoadResult`, `SourceSnapshot`, `RegistrySnapshot` and `MetadataRegistry.swap`
+  gain fields/parameters. Grammar remains 0.18, so the internal bundle continues on 0.18.x. EA import and its
+  findings-driven fixes still need Bora's acceptance fixture and live check.
+
+
 ### Fixed — AU writer attribute constraints (binary-incompatible for JVM consumers)
 
 - Retain authored ER attribute type length/precision through metadata loading, export and TTR rendering.
   Decimal total digits/scale and text length survive reload; bare types retain undeclared bounds. The
   nullable metadata fields preserve source defaults; JVM consumers must rebuild with the new library.
-- The first release containing this change must be **0.19.0**, not the planned 0.18.6 patch. Cut 0.18.6
-  before merging this change if that patch is needed first; otherwise include it in the 0.19.0 minor.
-  AU Server must rebuild and pin the minor containing this metadata API change.
+- Shipped in **0.18.7** under Bora's 2026-10-24 ruling: bundle major/minor follows the grammar marker,
+  which remains 0.18. JVM consumers must rebuild and pin the containing 0.18.x bundle.
 
 ### Fixed — Studio review-135
 

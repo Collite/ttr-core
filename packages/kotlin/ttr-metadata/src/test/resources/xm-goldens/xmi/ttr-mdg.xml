@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MDG.Technology version="1.0">
+  <Documentation id="ttr-mdg" name="Tatrman TTR" version="1" notes="TTR metadata projections; no diagrams"/>
+  <UMLProfiles>
+    <UMLProfile profiletype="uml2">
+      <Documentation id="ttr-mdg" name="ttr-mdg" version="1" notes="http://tatrman.org/ns/ttr-mdg/1"/>
+      <Content>
+        <Stereotypes>
+          <Stereotype name="entity" notes="">
+            <AppliesTo>
+              <Apply type="Class"/>
+            </AppliesTo>
+            <TaggedValues>
+              <Tag name="qname" type="String" description="" unit="" values="" default=""/>
+              <Tag name="synonyms" type="String" description="" unit="" values="" default=""/>
+            </TaggedValues>
+            <Constraints/>
+          </Stereotype>
+          <Stereotype name="attribute" notes="">
+            <AppliesTo>
+              <Apply type="Property"/>
+            </AppliesTo>
+            <TaggedValues>
+              <Tag name="qname" type="String" description="" unit="" values="" default=""/>
+              <Tag name="synonyms" type="String" description="" unit="" values="" default=""/>
+              <Tag name="type" type="String" description="" unit="" values="" default=""/>
+              <Tag name="nullable" type="Boolean" description="" unit="" values="" default=""/>
+            </TaggedValues>
+            <Constraints/>
+          </Stereotype>
+          <Stereotype name="relation" notes="">
+            <AppliesTo>
+              <Apply type="Association"/>
+            </AppliesTo>
+            <TaggedValues>
+              <Tag name="qname" type="String" description="" unit="" values="" default=""/>
+              <Tag name="synonyms" type="String" description="" unit="" values="" default=""/>
+              <Tag name="cardinality" type="String" description="" unit="" values="" default=""/>
+            </TaggedValues>
+            <Constraints/>
+          </Stereotype>
+          <Stereotype name="table" notes="">
+            <AppliesTo>
+              <Apply type="Class"/>
+            </AppliesTo>
+            <TaggedValues>
+              <Tag name="qname" type="String" description="" unit="" values="" default=""/>
+              <Tag name="synonyms" type="String" description="" unit="" values="" default=""/>
+              <Tag name="schema" type="String" description="" unit="" values="" default=""/>
+            </TaggedValues>
+            <Constraints/>
+          </Stereotype>
+          <Stereotype name="view" notes="">
+            <AppliesTo>
+              <Apply type="Class"/>
+            </AppliesTo>
+            <TaggedValues>
+              <Tag name="qname" type="String" description="" unit="" values="" default=""/>
+              <Tag name="synonyms" type="String" description="" unit="" values="" default=""/>
+            </TaggedValues>
+            <Constraints/>
+          </Stereotype>
+          <Stereotype name="column" notes="">
+            <AppliesTo>
+              <Apply type="Property"/>
+            </AppliesTo>
+            <TaggedValues>
+              <Tag name="qname" type="String" description="" unit="" values="" default=""/>
+              <Tag name="synonyms" type="String" description="" unit="" values="" default=""/>
+              <Tag name="type" type="String" description="" unit="" values="" default=""/>
+            </TaggedValues>
+            <Constraints/>
+          </Stereotype>
+          <Stereotype name="concept" notes="">
+            <AppliesTo>
+              <Apply type="Class"/>
+            </AppliesTo>
+            <TaggedValues>
+              <Tag name="qname" type="String" description="" unit="" values="" default=""/>
+              <Tag name="synonyms" type="String" description="" unit="" values="" default=""/>
+              <Tag name="cnKind" type="enumeration" description="" unit="" values="kind,role,phase,quality,event,relation_type" default=""/>
+              <Tag name="extent" type="String" description="" unit="" values="" default=""/>
+              <Tag name="basis" type="String" description="" unit="" values="" default=""/>
+              <Tag name="period" type="String" description="" unit="" values="" default=""/>
+              <Tag name="tier" type="String" description="" unit="" values="" default=""/>
+              <Tag name="abstract" type="Boolean" description="" unit="" values="" default=""/>
+            </TaggedValues>
+            <Constraints/>
+          </Stereotype>
+          <Stereotype name="involves" notes="">
+            <AppliesTo>
+              <Apply type="Association"/>
+            </AppliesTo>
+            <TaggedValues>
+              <Tag name="qname" type="String" description="" unit="" values="" default=""/>
+              <Tag name="synonyms" type="String" description="" unit="" values="" default=""/>
+              <Tag name="label" type="String" description="" unit="" values="" default=""/>
+            </TaggedValues>
+            <Constraints/>
+          </Stereotype>
+          <Stereotype name="grounds" notes="">
+            <AppliesTo>
+              <Apply type="Dependency"/>
+            </AppliesTo>
+            <TaggedValues>
+              <Tag name="qname" type="String" description="" unit="" values="" default=""/>
+              <Tag name="synonyms" type="String" description="" unit="" values="" default=""/>
+              <Tag name="layer" type="String" description="" unit="" values="" default=""/>
+              <Tag name="via" type="String" description="" unit="" values="" default=""/>
+            </TaggedValues>
+            <Constraints/>
+          </Stereotype>
+          <Stereotype name="cubelet" notes="">
+            <AppliesTo>
+              <Apply type="Class"/>
+            </AppliesTo>
+            <TaggedValues>
+              <Tag name="qname" type="String" description="" unit="" values="" default=""/>
+              <Tag name="synonyms" type="String" description="" unit="" values="" default=""/>
+              <Tag name="grain" type="String" description="" unit="" values="" default=""/>
+            </TaggedValues>
+            <Constraints/>
+          </Stereotype>
+          <Stereotype name="metric" notes="">
+            <AppliesTo>
+              <Apply type="Class"/>
+            </AppliesTo>
+            <TaggedValues>
+              <Tag name="qname" type="String" description="" unit="" values="" default=""/>
+              <Tag name="synonyms" type="String" description="" unit="" values="" default=""/>
+              <Tag name="aggregation" type="String" description="" unit="" values="" default=""/>
+              <Tag name="additivity" type="String" description="" unit="" values="" default=""/>
+              <Tag name="validBy" type="String" description="" unit="" values="" default=""/>
+            </TaggedValues>
+            <Constraints/>
+          </Stereotype>
+          <Stereotype name="dimension" notes="">
+            <AppliesTo>
+              <Apply type="Class"/>
+            </AppliesTo>
+            <TaggedValues>
+              <Tag name="qname" type="String" description="" unit="" values="" default=""/>
+              <Tag name="synonyms" type="String" description="" unit="" values="" default=""/>
+              <Tag name="key" type="String" description="" unit="" values="" default=""/>
+            </TaggedValues>
+            <Constraints/>
+          </Stereotype>
+          <Stereotype name="hierarchy" notes="">
+            <AppliesTo>
+              <Apply type="Class"/>
+            </AppliesTo>
+            <TaggedValues>
+              <Tag name="qname" type="String" description="" unit="" values="" default=""/>
+              <Tag name="synonyms" type="String" description="" unit="" values="" default=""/>
+              <Tag name="levels" type="String" description="" unit="" values="" default=""/>
+            </TaggedValues>
+            <Constraints/>
+          </Stereotype>
+          <Stereotype name="domain" notes="">
+            <AppliesTo>
+              <Apply type="DataType"/>
+            </AppliesTo>
+            <TaggedValues>
+              <Tag name="qname" type="String" description="" unit="" values="" default=""/>
+              <Tag name="synonyms" type="String" description="" unit="" values="" default=""/>
+            </TaggedValues>
+            <Constraints/>
+          </Stereotype>
+        </Stereotypes>
+      </Content>
+    </UMLProfile>
+  </UMLProfiles>
+</MDG.Technology>
