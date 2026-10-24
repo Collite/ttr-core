@@ -29,7 +29,7 @@ Workspace uses pnpm 11 (see `packageManager`). Node 20+ required.
 | `pnpm -r lint` | Lint all packages |
 | `pnpm --filter @tatrman/<pkg> test` | Run one package's tests |
 | `pnpm --filter @tatrman/<pkg> test -- <pattern>` | Run a single test file/name |
-| `pnpm --filter @tatrman/designer dev` | Run the Designer dev server (Vite, http://localhost:5173) |
+| `pnpm --filter @tatrman/designer-core dev` | Run the Designer dev server (Vite, http://localhost:5173) |
 
 ### Grammar regeneration
 
@@ -108,7 +108,7 @@ grammar  →  parser  →  semantics  →  lsp  →  vscode-ext
   - `server-browser.ts` → Web Worker for the Designer
   Implements standard LSP methods plus custom `modeler/*` methods (`getModelGraph`, `applyGraphEdit`, `getLayout`/`setLayout`, `getProjectInfo`) for Designer use.
 - **`ttr-modeler-vsc`** — thin shim: language registration, TextMate grammar, LSP client wiring, one stub command. No business logic here — anything understanding TTR belongs in the LSP.
-- **`@tatrman/designer`** — React 19 + Vite + React Flow (`@xyflow/react`) + Tailwind, with layout and the shared canvas primitives in `@tatrman/canvas-core` (ELK `layered` via `elkjs`). Forked from the Ontology Playground project; the original Cytoscape.js render path was replaced by React Flow in DS-P0 and no `cytoscape` dependency remains. v1 is read-only render of `db` / `er` schemas; edit mode (round-tripping through `modeler/applyGraphEdit`) lands in v1.1.
+- **`@tatrman/designer-core`** — React 19 + Vite + React Flow (`@xyflow/react`) + Tailwind, with layout and the shared canvas primitives in `@tatrman/canvas-core` (ELK `layered` via `elkjs`). Forked from the Ontology Playground project; the original Cytoscape.js render path was replaced by React Flow in DS-P0 and no `cytoscape` dependency remains. v1 is read-only render of `db` / `er` schemas; edit mode (round-tripping through `modeler/applyGraphEdit`) lands in v1.1.
 
 ### Key invariants
 

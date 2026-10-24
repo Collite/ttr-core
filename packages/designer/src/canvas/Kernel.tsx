@@ -9,7 +9,8 @@ import {
   ReactFlow, ReactFlowProvider, Background, Controls, MarkerType, useReactFlow,
   type Node, type Edge,
 } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+import { usePageEnvironment } from '../page/page-context.js';
+import { SURFACE } from '@tatrman/canvas-core';
 import type { CanvasGraph, DiagnosticsState, NodeBaseState, Positions, RunStatus, SkinId, SkinRegistry, Theme } from '@tatrman/canvas-core';
 import type { DesignerSkin } from './skin-component.js';
 import { CanvasNodeView, type CNodeData } from './CanvasNode.js';
@@ -75,6 +76,8 @@ function KernelInner({
   graph, registry, skinId, positions, selectedId, selectedIds, selectedEdgeId, orphanIds, derived, theme = 'ice', runStates, previews, onSelect, onEdgeSelect, onEdgeContextMenu, onNodeDrag, onNodeContextMenu, onDrillIn,
   viewportCenterRef,
 }: KernelProps) {
+  const page = usePageEnvironment();
+  if (page?.theme === 'dark') theme = 'stage-navy';
   const labelOf = (id: string) => graph.nodes.find((n) => n.id === id)?.label ?? id;
   const rf = useReactFlow();
   const hostRef = useRef<HTMLDivElement>(null);
@@ -148,7 +151,7 @@ function KernelInner({
   }
 
   return (
-    <div ref={hostRef} style={{ width: '100%', height: '100%', background: skin.canvas.background, position: 'relative' }} data-testid="canvas-kernel" data-skin={skinId}>
+    <div ref={hostRef} style={{ width: '100%', height: '100%', background: page ? SURFACE[theme] : skin.canvas.background, position: 'relative' }} data-testid="canvas-kernel" data-skin={skinId}>
       {derived && <DerivedBanner />}
       <ReactFlow
         nodes={rfNodes}

@@ -38,7 +38,7 @@ export interface BffOptions {
   token: string;
   scope: HostScope;
 }
-interface Snapshot {
+export interface Snapshot {
   sha: string;
   files: Record<string, string>;
 }
@@ -109,11 +109,11 @@ export class BffFilesDataSource implements ModelDataSource {
   private token: string;
   constructor(
     private readonly options: BffOptions,
-    deps: { fetch?: typeof fetch; createClient?: () => Promise<LspClient> } = {}
+    private readonly deps: { fetch?: typeof fetch; createClient?: () => Promise<LspClient>; loadSnapshot?: () => Promise<Snapshot> } = {}
   ) {
     if (!isHostPath(options.api)) throw new Error('The BFF API must be a same-origin path.');
     this.token = options.token;
-    this.fetcher = deps.fetch ?? globalThis.fetch.bind(globalThis);
+    this.fetcher = deps.fetch ?? ((...args) => globalThis.fetch(...args));
     this.createClient =
       deps.createClient ?? (async () => (await import('../lsp-client.js')).createLspClient());
   }
@@ -147,15 +147,18 @@ export class BffFilesDataSource implements ModelDataSource {
     const scope = this.options.scope;
     const path =
       scope.kind === 'served' ? '/served/files' : `/changes/${encodeURIComponent(scope.id)}/files`;
-    const response = await this.fetcher(`${this.options.api.replace(/\/$/, '')}${path}`, {
-      headers: { Authorization: `Bearer ${this.token}`, Accept: 'application/json' },
-      cache: 'no-store',
-      credentials: 'same-origin',
-      redirect: 'error',
-      signal: this.abort.signal,
-    });
-    if (!response.ok) throw new Error(`Model snapshot request failed (${response.status}).`);
-    const snapshot = snapshotOf(await response.json());
+    const read = async () => {
+      const response = await this.fetcher(`${this.options.api.replace(/\/$/, '')}${path}`, {
+        headers: { Authorization: `Bearer ${this.token}`, Accept: 'application/json' },
+        cache: 'no-store',
+        credentials: 'same-origin',
+        redirect: 'error',
+        signal: this.abort.signal,
+      });
+      if (!response.ok) throw new Error(`Model snapshot request failed (${response.status}).`);
+      return response.json();
+    };
+    const snapshot = snapshotOf(await (this.deps.loadSnapshot ? this.deps.loadSnapshot() : read()));
     if (snapshot.sha === this.sha) return false;
     for (let attempt = 0; attempt < 8; attempt++) {
       const current = this.currentFiles();

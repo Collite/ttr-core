@@ -46,6 +46,8 @@ import { resolveRefs } from '../layout/resolve.js';
 import { modelKindHint } from '../data/capability-hints.js';
 import { pickFiles as pickFilesFromDisk, downloadFile as downloadToDisk } from '../fs/file-system.js';
 import { SaveAsDialog, layoutFileOf, layoutTextOf, type LayoutFormat } from './SaveAsDialog.js';
+import { usePageEnvironment } from '../page/page-context.js';
+import { useMenuPosition } from '../page/menu-position.js';
 import { getRuntimeConfig } from '../runtime-config.js';
 import type { ModelKind } from '../data/model-data-source.js';
 import { HopEdgeInspector } from './HopEdgeInspector.js';
@@ -57,7 +59,7 @@ import { Breadcrumb } from './Breadcrumb.js';
 import { TextDrawer, type DrawerNode } from './TextDrawer.js';
 import { CommandRegistry } from './commands.js';
 import { CommandPalette, useCmdKShortcut } from './CommandPalette.js';
-import { syncUrl, parsePath, formatPath } from './url.js';
+import { parsePath, formatPath } from './url.js';
 import { tabUrl } from './popout.js';
 import { federationIntentFromPath, federationPathForTab, askUrlForTab } from './federation-link.js';
 import { absoluteUrlFor, currentAppPath, replaceAppPath, APP_NAVIGATE } from './app-location.js';
@@ -184,6 +186,7 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
   const [saveAsTab, setSaveAsTab] = useState<string | null>(null);
   const [tabMenu, setTabMenu] = useState<{ tabId: string; x: number; y: number } | null>(null);
   const tabMenuRef = useRef<HTMLDivElement>(null);
+  const tabMenuPosition = useMenuPosition(tabMenu, tabMenuRef);
   // Expand all levels… asks first (V-27): the count, then apply or cancel
   const [confirm, setConfirm] = useState<{ text: string; onYes: () => void } | null>(null);
   // what the canvas shows the user, in canvas coordinates — where a card with no neighbour goes (V-19)
@@ -201,7 +204,12 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
   const [lineageState, setLineageState] = useState<Record<string, { scope: LineageScope; direction: LineageDirection; rootKind: ObjectKind; rootRef?: LineageRootRef }>>({});
   const loadingRef = useRef<Set<string>>(new Set());
   const bootedRef = useRef(false);
-  const hostedBootPending = useRef(isHosted());
+  const page = usePageEnvironment();
+  const hosted = !!page || isHosted();
+  const currentLocation = page?.location.current ?? currentAppPath;
+  const replaceLocation = page?.location.replace ?? replaceAppPath;
+  const absoluteLocation = page?.location.absolute ?? absoluteUrlFor;
+  const hostedBootPending = useRef(hosted);
   // the edit gate (FO-21) — true only when an authoring context is injected AND grants it.
   const canEdit = !!editContext?.editable;
   // Capture the boot route once. A hosted replacement supplies its requested route explicitly;
@@ -209,7 +217,7 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
   // APP path: base path stripped, session parameters (`?veles=`, `?lang=`) removed (ttr-core#171).
   const initialUrlRef = useRef<string | null>(null);
   if (initialUrlRef.current === null) {
-    initialUrlRef.current = initialAppPath ?? currentAppPath();
+    initialUrlRef.current = initialAppPath ?? currentLocation();
   }
 
   const tab = activeTab(shell);
@@ -420,7 +428,7 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
         const item = catalog.flatMap((g) => g.items).find((it) => it.ref === intent.program && it.kind === 'program');
         if (item) openItem(item, false);
         else setBootHint(`This link points to the process “${intent.program}”, which isn't in this workspace (DS-SHELL-001).`);
-      } else if (isHosted()) {
+      } else if (hosted) {
         setShell((s) => ({ ...s, activeTabId: null }));
       }
     }
@@ -432,6 +440,7 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
   }, [catalog]);
   // Keep the current catalog / tab closures when navigating a mounted hosted shell.
   useEffect(() => {
+    if (page) return page.location.subscribe(restorePath);
     const navigate = (e: Event) => restorePath((e as CustomEvent<string>).detail);
     window.addEventListener(APP_NAVIGATE, navigate);
     return () => window.removeEventListener(APP_NAVIGATE, navigate);
@@ -456,10 +465,10 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
     // Opening the initial tab can take an async layout read. Preserve its hash until it arrives.
     if (hostedBootPending.current && !tab) return;
     hostedBootPending.current = false;
-    if (!tab) { syncUrl({ kind: 'none', workspace }); return; }
+    if (!tab) { replaceLocation(formatPath({ kind: 'none', workspace })); return; }
     // App paths throughout: replaceAppPath keeps the base path and the session parameters, so the
     // rewritten URL reloads into this same backend and graph (ttr-core#171).
-    replaceAppPath(appPathForTab(tab));
+    replaceLocation(appPathForTab(tab));
   }, [tab, workspace, lineageState, bindingSel]);
 
   // ⌘K command registry — every toolbar action gets a command twin (E-4/D-6 parity)
@@ -839,7 +848,7 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
       const saved = window.localStorage.getItem(formatKey);
       if (saved === 'yaml' || saved === 'ttr') return saved;
     } catch { /* no storage — fall through */ }
-    return getRuntimeConfig().layoutFormat;
+    return (page?.config ?? getRuntimeConfig()).layoutFormat;
   }
 
   async function saveLayoutAs(tabId: string, name: string, format: LayoutFormat) {
@@ -880,7 +889,7 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
   // unsaved local work arms the browser's leave-page prompt (V-30); a catalog layout re-reads on reload
   const unsaved = hasUnsavedLocalLayout(shell);
   useEffect(() => {
-    if (!unsaved || isHosted()) return;
+    if (!unsaved || hosted) return;
     const guard = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', guard);
     return () => window.removeEventListener('beforeunload', guard);
@@ -1045,8 +1054,8 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
               if (tab.layout && tab.layout.source !== 'catalog') {
                 return <CopyLinkButton url="" disabledReason="Saved files are not on the server — commit it to share." />;
               }
-              const path = isHosted() ? appPathForTab(tab) : federationPathForTab(tab);
-              const url = path && typeof window !== 'undefined' ? absoluteUrlFor(path) : null;
+              const path = hosted ? appPathForTab(tab) : federationPathForTab(tab);
+              const url = path && typeof window !== 'undefined' ? absoluteLocation(path) : null;
               return url ? <CopyLinkButton url={url} /> : null;
             })()}
             {(() => {
@@ -1291,7 +1300,7 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
       <CommandPalette registry={registry} open={cmdkOpen} onClose={() => setCmdkOpen(false)} />
       {tabMenu && (
         <div data-testid="tab-menu" ref={tabMenuRef} onMouseLeave={() => setTabMenu(null)}
-          style={{ position: 'fixed', left: tabMenu.x, top: tabMenu.y, background: '#fff', border: '1px solid #CBD8E6', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.15)', zIndex: 20 }}>
+          style={{ position: 'fixed', ...tabMenuPosition, background: '#fff', border: '1px solid #CBD8E6', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.15)', zIndex: 20 }}>
           <ViewMenu
             onClose={() => setTabMenu(null)}
             items={(() => {

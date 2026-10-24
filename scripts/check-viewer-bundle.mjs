@@ -2,7 +2,7 @@
 // FO-P0.S2.T1 — proves the Studio Viewer build carries NO edit-surface code.
 //
 // The FO-21 wall is honesty-by-absence: "commercial code is simply absent from
-// open distributions" (FO contracts §2). The open `@tatrman/designer` build IS
+// open distributions" (FO contracts §2). The open `@tatrman/designer-core` build IS
 // the Studio Viewer. This greps its built bundle for edit markers — the
 // `@tatrman/edit` synthesizer, the user-facing edit affordances, and the edit
 // RPC method names (wire strings that survive minification). Any hit ⇒ exit 1.
@@ -10,7 +10,7 @@
 // SCOPE (important): the wall is the *graphical edit surface in the Designer
 // app*, NOT the LSP. The open tier keeps first-class IDE/LSP authoring (FO-27)
 // and the `@tatrman/edit` WorkspaceEdit synthesizer (Bora ruling 2026-07-18);
-// the LSP browser-worker bundle (`server-browser-*.js`) legitimately carries
+// the LSP browser-worker bundle (`browser.worker*.js`) legitimately carries
 // that synthesis and is EXCLUDED from this scan. What must be absent is the
 // commercial graphical authoring surface. SO D-19 amends FO-21: the text drawer
 // and modeler/edit request forwarding are open; commercial forms remain absent.
@@ -41,8 +41,8 @@ const FORBIDDEN = [
 ];
 
 if (process.argv.includes('--build')) {
-  console.log('[check-viewer-bundle] building @tatrman/designer …');
-  execSync('pnpm --filter @tatrman/designer build', { cwd: repoRoot, stdio: 'inherit' });
+  console.log('[check-viewer-bundle] building @tatrman/designer-core …');
+  execSync('pnpm --filter @tatrman/designer-core build', { cwd: repoRoot, stdio: 'inherit' });
 }
 
 if (!existsSync(distDir)) {
@@ -52,7 +52,7 @@ if (!existsSync(distDir)) {
 
 // The LSP browser worker is an open server capability (retains WorkspaceEdit
 // synthesis for IDE authoring) — not the graphical edit surface. Exclude it.
-const LSP_WORKER = /(^|[/\\])server-[^/\\]*\.m?js$/;
+const LSP_WORKER = /(^|[/\\])(?:server-[^/\\]*|browser\.worker(?:-[^/\\]*)?)\.m?js$/;
 
 /** Emitted app JS/HTML/CSS in the build, excluding the LSP worker bundle. */
 function bundleFiles(dir) {

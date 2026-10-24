@@ -44,8 +44,8 @@ idempotent. After a failed initial load, refresh retries it.
 | Frame → host | `{ type: 'ttr.frame.error', code: 'host/load-failed', message }` | Snapshot fetch/catalog failure. Response bodies and credentials are not included. |
 | Frame → host | `{ type: 'ttr.frame.error', code: 'host/bad-location', message }` | Malformed location; an initial bad hash falls back to the configured workspace and loading continues. |
 
-TypeScript unions are exported from `packages/designer/src/host/host-channel.ts`; the public
-`designer-core` package export comes in SO-core P3. Dirty/changedFiles/collect types are reserved for P1.
+TypeScript unions are exported from `@tatrman/designer-core`. Dirty/changedFiles/collect messages
+are implemented by the P1 save seam described below.
 
 ### BFF snapshot
 
@@ -97,7 +97,7 @@ and `lang` remain in the iframe document query. Do not echo an unchanged locatio
 
 ### Local smoke
 
-Build the LSP and Designer first, then start `pnpm --filter @tatrman/designer exec vite preview
+Build the LSP and Designer first, then start `pnpm --filter @tatrman/designer-core exec vite preview
 --host 127.0.0.1 --port 5187`. From the repository root:
 
 ```sh
@@ -135,7 +135,7 @@ and canvas intact; successful writes refresh the model and show returned diagnos
 not undo a successful edit; Propose has its own strict gate. The open build adds no canvas forms.
 
 An extension can import `editModel`, `ModelerEditParams` and `ModelerEditResult` from
-`@tatrman/designer/extensions` and call `editModel(ctx.dataSource,{op,args,dryRun?})`. The data source serializes
+`@tatrman/designer-core/extensions` and call `editModel(ctx.dataSource,{op,args,dryRun?})`. The data source serializes
 requests, applies each returned edit exactly once to the pre-request text, then acknowledges full text to the LSP.
 Do not apply the response again. Read-only backends have no authoring hook.
 
@@ -158,3 +158,145 @@ repeated after that acknowledgement settles. Same-SHA refresh preserves changes.
 Source saves retain validated author text without formatter reprinting, keeping top-level kind/name and
 refusing referenced-member removal. The enclosing file's line endings and neighboring definitions survive;
 trailing definition whitespace is trimmed at the splice. Renames use `textDocument/rename`.
+
+## Stage 2: embedded DesignerPage
+
+`@tatrman/designer-core` exports a React page, its TypeScript props, `ShellEditContext`, and the
+stage 1 message types. `@tatrman/designer-core/extensions` exports the open extension contracts
+and `editModel`. This stage supplies the built library for internal consumers; the family release
+is delivered as the Designer 0.1.0 family. Internal 0.x releases suffice unless a public release is explicitly requested.
+
+```tsx
+import { useRef } from 'react';
+import { DesignerPage, type CollectFiles } from '@tatrman/designer-core';
+import '@tatrman/designer-core/designer.css';
+
+function Model({ snapshot }) {
+  const collect = useRef<CollectFiles>(null);
+  return <div style={{ height: 700 }}>
+    <DesignerPage files={snapshot} workspace="hartland" basePath="/m/" lang="en"
+      theme="dark" location="/w/hartland/s/md" collect={collect}
+      onLocation={path => { /* update the host's router */ }}
+      onDirty={changed => { /* update the host's save affordance */ }}
+      onError={error => { /* show error.code / error.message */ }} />
+  </div>;
+}
+```
+
+`files` is `{ sha: string, files: Record<string,string> }`, or an async zero-argument loader
+returning that shape. Paths and file contents follow the BFF snapshot rules above. Optional
+`manifest` overrides `modeler.toml` in the supplied snapshot. Supply the complete repository
+snapshot, including layouts and JS rosters; only `model/**` model documents are opened in the LSP.
+`workspace` defaults to `repo` and changing it starts a new session. `basePath` has leading and
+trailing slashes; it controls shared rail links, while `location` and `onLocation` use app paths
+(`/w/:workspace/s/:subject`). The component neither changes browser history nor fetches config.json,
+and does not set document-level language or styles. The root's `lang` follows the prop. Each mount
+owns its worker, file cache, navigation and extension loader. A host may mount multiple pages.
+A mirrored `onLocation` value passed back as `location` is ignored when already current, preserving
+per-subject notation. Invalid locations report `host/bad-location` once per invalid input and keep the
+current location (the workspace root initially); valid input afterwards recovers normally.
+Invalid `basePath` or `workspace` props are programmer errors and throw during render.
+Keyboard shortcuts are scoped to the page containing the event target; host inputs stay untouched.
+
+`collect.current()` synchronously returns sorted whole-file changes (including null-text deletions)
+and records the exact collected base. Serialize collect, saving, and the next snapshot acknowledgement.
+After a successful save, pass a new snapshot object with a new immutable SHA, or a new loader function
+that returns it. Same-SHA updates are idempotent, so changed bytes or manifest settings require a new
+SHA. Late edits remain dirty after acknowledgement. Overlapping incoming changes report
+`frame/edit-conflict`; dirty replacement without a matching collection reports `frame/unsaved-edits`.
+The previous shell and files remain available on either refusal or loader failure. Prompt in the host;
+remount with a different React key only after an explicit discard choice. Dirty callbacks are debounced
+200 ms. Use a new input object/function to retry a failed loader; unmount terminates the worker.
+
+The `extensions` prop is a list of `{ manifest, licenseClient?, activate }`. A manifest contains
+`name`, `version`, `license: 'none' | 'platform'`, and `requires: string[]`. The core's existing
+license gate runs before `activate({ dataSource }, grants)`; activation resolves a `ShellEditContext`
+or null. The first supplied context is used. A missing grant/client or failed license request never
+activates the extension. Keep the extension array stable across renders. The page's loader is scoped
+to its React context, rather than registering a process-global loader that could affect another page.
+The standalone commercial entry may still use `registerAuthoringLoader`.
+
+Import the stylesheet once. Every library selector, including React Flow and Tailwind variables,
+is rooted under `.ttr-designer`; the library disables Tailwind preflight and supplies its own minimal
+reset. Its root fills the host's explicit height. `theme="light" | "dark"` controls root color-scheme,
+shell surfaces and canvas theme without changing host styles. The standalone viewer keeps its full reset.
+
+The LSP build exports the self-contained module asset `@tatrman/lsp/browser.worker.js`. The Designer
+library copies those exact bytes beside its entry and creates a module Worker from a relative URL
+using `import.meta.url`. No consumer imports `?worker`, compiles LSP sources, or supplies a worker plugin.
+Keep `browser.worker.js` beside the library's JavaScript when copying files manually. Vite and webpack
+asset pipelines must retain this URL asset; custom JS-only copy rules need to include it (and the CSS).
+The standalone Vite entry uses `?url` to reference the already-built asset. A bare package string inside
+`new URL('@tatrman/lsp/browser.worker.js', import.meta.url)` is not a native package resolver and is not
+used by the library. React and ReactDOM 19 are host peer dependencies; install them once in the host.
+
+For Vite hosts, preserve the package-relative worker URL during development and prebundle React's and ELK's
+CommonJS entries (production uses Vite's ordinary asset handling):
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  optimizeDeps: {
+    exclude: ['@tatrman/designer-core'],
+    include: ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@tatrman/designer-core > @tatrman/canvas-core > elkjs/lib/elk.bundled.js'],
+  },
+});
+```
+
+The exclusion prevents Vite from relocating `import.meta.url` into its `.vite/deps` cache without
+copying the worker. This is dependency optimization configuration; no worker plugin is required.
+Webpack hosts must keep the emitted worker as an asset when resolving `new URL(..., import.meta.url)`.
+
+The lockstep family is `designer-core`, `canvas-core`, `lsp`, `parser`, `tokens`, `perspectives`,
+`deep-links`, and `edit`, all at **0.1.0**. `perspectives` and `deep-links` are runtime imports.
+`canvas-core` is pure TypeScript; React is only a peer of Designer. The LSP tarball bundles its private
+compiler modules and their declaration types; consumers need no private workspace packages.
+
+After merge, `just publish designer set 0.1.0` creates the internal `designer/v0.1.0` GitHub release.
+Download all `.tgz` assets, verify `SHA256SUMS`, then install them together:
+
+```sh
+npm install ./tatrman-*.tgz react@^19 react-dom@^19
+```
+
+`manifest.json` records the source commit, file lists and hashes. Bare Designer tags do not publish
+to npm. An explicit public release is a separate maintainer action; see `PUBLISHING.md`.
+
+
+### pnpm hosts: internal release artifacts
+
+Platform P4 consumes the internal release under ruling R144-A(a). Download all eight release
+assets into `vendor/designer-0.1.0/` in the host repository, verify their release hashes before
+installing, and retain the manifest/checksums with them:
+
+```sh
+mkdir -p vendor/designer-0.1.0
+gh release download designer/v0.1.0 --repo Collite/ttr-core --dir vendor/designer-0.1.0
+(cd vendor/designer-0.1.0 && shasum -a 256 -c SHA256SUMS)
+```
+
+In the host package.json, depend on the same eight `file:vendor/designer-0.1.0/tatrman-<name>-0.1.0.tgz`
+artifacts (use relative paths from each consuming package). Pin transitive references in the
+workspace root's **pnpm-workspace.yaml**, not `pnpm.overrides` in package.json (ignored by pnpm 11):
+
+```yaml
+overrides:
+  '@tatrman/designer-core': file:vendor/designer-0.1.0/tatrman-designer-core-0.1.0.tgz
+  '@tatrman/canvas-core': file:vendor/designer-0.1.0/tatrman-canvas-core-0.1.0.tgz
+  '@tatrman/lsp': file:vendor/designer-0.1.0/tatrman-lsp-0.1.0.tgz
+  '@tatrman/parser': file:vendor/designer-0.1.0/tatrman-parser-0.1.0.tgz
+  '@tatrman/tokens': file:vendor/designer-0.1.0/tatrman-tokens-0.1.0.tgz
+  '@tatrman/perspectives': file:vendor/designer-0.1.0/tatrman-perspectives-0.1.0.tgz
+  '@tatrman/deep-links': file:vendor/designer-0.1.0/tatrman-deep-links-0.1.0.tgz
+  '@tatrman/edit': file:vendor/designer-0.1.0/tatrman-edit-0.1.0.tgz
+```
+
+Run `pnpm install` after adding React/ReactDOM 19 peers to the host. This form is exercised by
+`scripts/designer-consumer-smoke.mjs` using isolated pnpm dependencies, the Vite settings above,
+strict declarations and both dev/production browsers. The nested ELK include works without npm
+hoisting. Exact public release-asset URLs may replace the tarball specs in **both** direct dependencies
+and overrides, for example
+`https://github.com/Collite/ttr-core/releases/download/designer/v0.1.0/tatrman-lsp-0.1.0.tgz`;
+verify the downloaded bytes against that release's SHA256SUMS first. ttr-core is public, so asset URLs
+need no registry auth. Only released, hash-checked tarball specs are permitted: source `file:` paths,
+`workspace:`, `link:` and git dependencies remain forbidden in Platform's dependency rules.

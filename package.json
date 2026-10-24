@@ -10,7 +10,8 @@
     "lint": "pnpm -r lint",
     "format": "pnpm -r format",
     "typecheck": "pnpm -r typecheck",
-    "dev": "pnpm --filter @tatrman/designer dev"
+    "dev": "pnpm --filter @tatrman/designer-core dev",
+    "test:family": "vitest run --config scripts/publish-family.vitest.config.ts"
   },
   "engines": {
     "node": ">=20.0.0"
@@ -24,6 +25,7 @@
     "eslint-plugin-prettier": "^5.5.5",
     "playwright-core": "^1.60.0",
     "prettier": "^3.8.3",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.6"
   }
 }

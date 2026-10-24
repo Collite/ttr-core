@@ -1,6 +1,6 @@
-# @tatrman/designer
+# @tatrman/designer-core
 
-**Studio Viewer** — the open, read-only view of TTR (Tatrman) models (v1: schema renderer), backed by the Tatrman LSP running as a browser Web Worker, or by a Veles catalog (read-only). React 19 + Vite + React Flow (`@xyflow/react`) + Tailwind, with the shared canvas primitives and ELK layout in [`@tatrman/canvas-core`](../canvas-core). Ships as the `ghcr.io/collite/ttr-viewer` container image (see [Container image](#container-image-catalog-mode)). (`@tatrman/designer` is the package/codename; **Studio Viewer** is the product name — FO-33.)
+**Studio Viewer** — the open, read-only view of TTR (Tatrman) models (v1: schema renderer), backed by the Tatrman LSP running as a browser Web Worker, or by a Veles catalog (read-only). React 19 + Vite + React Flow (`@xyflow/react`) + Tailwind, with the shared canvas primitives and ELK layout in [`@tatrman/canvas-core`](../canvas-core). Ships as the `ghcr.io/collite/ttr-viewer` container image (see [Container image](#container-image-catalog-mode)). (`@tatrman/designer-core` is the package/codename; **Studio Viewer** is the product name — FO-33.)
 
 > **Screenshot:** `docs/img/designer.png` (capture from the dev server with `samples/v1.1-mini/` loaded — the screenshot lands here after the first deploy).
 
@@ -23,7 +23,7 @@
 # resolve them. Skipping this step fails with
 # "Failed to resolve entry for package @tatrman/canvas-core".
 pnpm install
-pnpm --filter "@tatrman/designer^..." build   # or: pnpm -r build
+pnpm --filter "@tatrman/designer-core^..." build   # or: pnpm -r build
 
 cd packages/designer
 pnpm run dev      # http://localhost:5173/?demo=v1.1-mini

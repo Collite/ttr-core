@@ -17,6 +17,7 @@ import {
 import { createSkinRegistry } from '../skins/index.js';
 import type { DesignerSkin } from './skin-component.js';
 import { CanvasKernel } from './Kernel.js';
+import { useMenuPosition } from '../page/menu-position.js';
 import type { ViewMenuTarget } from '../shell/ViewMenu.js';
 import { canvas as palette } from '@tatrman/tokens'; // canvas token family (contracts §6)
 
@@ -164,6 +165,8 @@ export function SkinnedCanvas({
 
   // the right-click menu: the view menu and/or the injected edit menu (FO-21), on a card or a hop edge
   const [menu, setMenu] = useState<{ target: ViewMenuTarget; x: number; y: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuStyle = useMenuPosition(menu, menuRef);
   const closeMenu = () => setMenu(null);
   // stable while the menus' presence is — the kernel rebuilds its React Flow edges when a handler changes
   const anyMenu = !!(renderNodeMenu || renderViewMenu);
@@ -241,8 +244,9 @@ export function SkinnedCanvas({
         {menu && (renderNodeMenu || renderViewMenu) && (
           <div
             data-testid="node-context-menu"
+            ref={menuRef}
             onClick={(e) => e.stopPropagation()}
-            style={{ position: 'fixed', left: menu.x, top: menu.y, background: palette.nodeFill, border: `1px solid ${palette.grid}`, borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.15)', zIndex: 20, fontSize: 13, overflow: 'hidden' }}
+            style={{ position: 'fixed', ...menuStyle, background: palette.nodeFill, border: `1px solid ${palette.grid}`, borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.15)', zIndex: 20, fontSize: 13 }}
           >
             {renderViewMenu?.(menu.target, closeMenu)}
             {renderViewMenu && renderNodeMenu && menu.target.kind === 'node' && (

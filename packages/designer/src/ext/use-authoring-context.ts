@@ -6,12 +6,14 @@
 import { useEffect, useState } from 'react';
 import type { ModelDataSource } from '../data/model-data-source.js';
 import type { ShellEditContext } from '../shell/edit-context.js';
+import { usePageEnvironment } from '../page/page-context.js';
 import { getAuthoringLoader } from './authoring-registry.js';
 
 export function useAuthoringContext(dataSource: ModelDataSource): ShellEditContext | null {
+  const page = usePageEnvironment();
+  const loader = page ? page.authoringLoader : getAuthoringLoader();
   const [context, setContext] = useState<ShellEditContext | null>(null);
   useEffect(() => {
-    const loader = getAuthoringLoader();
     if (!loader) {
       setContext(null);
       return;
@@ -27,6 +29,6 @@ export function useAuthoringContext(dataSource: ModelDataSource): ShellEditConte
     return () => {
       cancelled = true;
     };
-  }, [dataSource]);
+  }, [dataSource, loader]);
   return context;
 }

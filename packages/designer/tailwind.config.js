@@ -1,4 +1,5 @@
 export default {
+  ...(process.env.DESIGNER_LIBRARY === '1' ? { important: '.ttr-designer', corePlugins: { preflight: false } } : {}),
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {

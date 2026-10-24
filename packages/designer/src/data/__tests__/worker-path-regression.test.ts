@@ -16,6 +16,7 @@ vi.mock('vscode-languageserver-protocol/browser.js', () => ({
   BrowserMessageWriter: class {},
   createProtocolConnection: () => ({
     listen: vi.fn(),
+    dispose: vi.fn(),
     onNotification: vi.fn(),
     sendNotification: vi.fn(),
     sendRequest: (methodOrType: unknown, params: unknown) => {
@@ -26,7 +27,7 @@ vi.mock('vscode-languageserver-protocol/browser.js', () => ({
   }),
 }));
 
-vi.mock('@tatrman/lsp/browser?worker', () => ({ default: class { terminate() {} } }));
+vi.stubGlobal('Worker', class { terminate() {} });
 
 function defaultResult(method: string): unknown {
   switch (method) {

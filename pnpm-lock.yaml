@@ -35,6 +35,9 @@ importers:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
+      vitest:
+        specifier: ^4.1.6
+        version: 4.1.7(@types/node@22.19.19)(jsdom@29.1.1)(vite@6.4.2(@types/node@22.19.19)(jiti@1.21.7)(tsx@4.22.0)(yaml@2.9.1))
 
   packages/canvas-core:
     dependencies:
@@ -90,12 +93,6 @@ importers:
       apache-arrow:
         specifier: ^21.1.0
         version: 21.1.0
-      react:
-        specifier: ^19.0.0
-        version: 19.2.6
-      react-dom:
-        specifier: ^19.0.0
-        version: 19.2.6(react@19.2.6)
       vscode-jsonrpc:
         specifier: ^8.2.1
         version: 8.2.1
@@ -142,6 +139,12 @@ importers:
       postcss:
         specifier: ^8.4.0
         version: 8.5.14
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.6(react@19.2.6)
       tailwindcss:
         specifier: ^3.4.0
         version: 3.4.19(tsx@4.22.0)(yaml@2.9.1)
@@ -260,6 +263,34 @@ importers:
 
   packages/lsp:
     dependencies:
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
+      antlr4ng:
+        specifier: ^3.0.0
+        version: 3.0.16
+      fuzzysort:
+        specifier: ^3.1.0
+        version: 3.1.0
+      smol-toml:
+        specifier: ^1.6.1
+        version: 1.6.1
+      vscode-jsonrpc:
+        specifier: ^8.2.0
+        version: 8.2.1
+      vscode-languageserver:
+        specifier: ^9.0.1
+        version: 9.0.1
+      vscode-languageserver-protocol:
+        specifier: ^3.17.5
+        version: 3.17.5
+      vscode-languageserver-textdocument:
+        specifier: ^1.0.12
+        version: 1.0.12
+      vscode-languageserver-types:
+        specifier: ^3.17.5
+        version: 3.17.5
+    devDependencies:
       '@tatrman/edit':
         specifier: workspace:*
         version: link:../edit
@@ -281,31 +312,12 @@ importers:
       '@tatrman/sql':
         specifier: workspace:*
         version: link:../sql
-      ajv:
-        specifier: ^8.20.0
-        version: 8.20.0
-      antlr4ng:
-        specifier: ^3.0.0
-        version: 3.0.16
-      fuzzysort:
-        specifier: ^3.1.0
-        version: 3.1.0
-      vscode-jsonrpc:
-        specifier: ^8.2.0
-        version: 8.2.1
-      vscode-languageserver:
-        specifier: ^9.0.1
-        version: 9.0.1
-      vscode-languageserver-protocol:
-        specifier: ^3.17.5
-        version: 3.17.5
-      vscode-languageserver-textdocument:
-        specifier: ^1.0.12
-        version: 1.0.12
-    devDependencies:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.19
+      dts-bundle-generator:
+        specifier: ^9.5.1
+        version: 9.5.1
       esbuild:
         specifier: ^0.27.0
         version: 0.27.7

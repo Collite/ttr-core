@@ -26,6 +26,26 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - Shipped in **0.18.7** under Bora's 2026-10-24 ruling: bundle major/minor follows the grammar marker,
   which remains 0.18. JVM consumers must rebuild and pin the containing 0.18.x bundle.
 
+### Added — embedded Studio DesignerPage (P3 S3.1)
+
+- Rename the UI workspace package to `@tatrman/designer-core` and export `DesignerPage`, scoped CSS,
+  authoring/host types and the existing extension surface. Props supply snapshots, routing, language,
+  theme and callbacks; each page has its own worker, navigation and license-aware authoring loader.
+- Reuse the hosted collection and saved-SHA rebase guards; preserve late edits and report conflicts
+  without replacing the old model. Build the self-contained LSP `browser.worker.js` asset beside the
+  library entry; hosts do not compile worker sources. Keep the standalone viewer and iframe entries.
+- Scope Tailwind/reset and React Flow CSS to `.ttr-designer`, fit the host's height, and support dark
+  surfaces. Release-family packaging follows in S3.2; this change does not publish or deploy artifacts.
+
+### Added — Designer release family (P3 S3.2)
+
+- Prepare eight 0.1.0 npm artifacts with closed runtime/type dependencies, explicit exports, Apache
+  licenses and cumulative third-party notices. Reuse edit 0.1.0 unchanged; keep React 19 as host peers.
+- Bundle LSP's private compiler closure and preserve stock vocabulary resources. Ship only distribution
+  JavaScript/declarations/assets. Fix worker plugin ordering so the package uses its emitted sidecar.
+- Add internal `designer/v*` GitHub releases and `just publish designer set 0.1.0`; public npm remains
+  an explicit RELEASE action. Verify real tarballs in external Vite dev/production browser consumers.
+
 ### Fixed — Studio review-135
 
 - Preserve validated definition text without formatter loss; keep identity, neighboring definitions and referenced members.

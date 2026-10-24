@@ -13,8 +13,8 @@ The Designer is a static React app. Three ways to run it.
 ### 1.1 Local dev server (hot reload)
 
 ```bash
-pnpm --filter "@tatrman/designer^..." build   # once — builds the workspace deps into dist/
-pnpm --filter @tatrman/designer dev
+pnpm --filter "@tatrman/designer-core^..." build   # once — builds the workspace deps into dist/
+pnpm --filter @tatrman/designer-core dev
 ```
 
 Opens [http://localhost:5173](http://localhost:5173). Vite watches for source changes and reloads.
@@ -27,7 +27,7 @@ Opens [http://localhost:5173](http://localhost:5173). Vite watches for source ch
 ### 1.2 Local production build (serve the static bundle)
 
 ```bash
-pnpm --filter @tatrman/designer build      # outputs to packages/designer/dist/
+pnpm --filter @tatrman/designer-core build      # outputs to packages/designer/dist/
 npx http-server packages/designer/dist -p 8080
 ```
 
@@ -169,8 +169,8 @@ If you're suspicious that an extension change broke something, run `test:smoke` 
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Designer landing card never appears in dev mode | LSP worker failed to load — check the browser console | `pnpm --filter @tatrman/lsp build` and reload |
-| Designer demo button shows "Failed to load demo: Demo manifest not found" | `samples/v1.1-mini/index.json` missing from the build output, or a `?demo=` name other than `SAMPLE_NAME` | `pnpm --filter @tatrman/designer build` (the Vite plugin writes it on `closeBundle`); in dev, use `?demo=v1.1-mini` |
-| Dev server exits with `Failed to resolve entry for package "@tatrman/canvas-core"` | Workspace deps never built — Vite resolves them through `dist/`, which `pnpm install` does not create | `pnpm --filter "@tatrman/designer^..." build` from the repo root, then re-run `dev` |
+| Designer demo button shows "Failed to load demo: Demo manifest not found" | `samples/v1.1-mini/index.json` missing from the build output, or a `?demo=` name other than `SAMPLE_NAME` | `pnpm --filter @tatrman/designer-core build` (the Vite plugin writes it on `closeBundle`); in dev, use `?demo=v1.1-mini` |
+| Dev server exits with `Failed to resolve entry for package "@tatrman/canvas-core"` | Workspace deps never built — Vite resolves them through `dist/`, which `pnpm install` does not create | `pnpm --filter "@tatrman/designer-core^..." build` from the repo root, then re-run `dev` |
 | F5 in `packages/vscode-ext` doesn't open the dev host | Build artefacts missing | `pnpm -r build` first; F5 uses `dist/extension.js` |
 | Extension Development Host loads but `.ttrm` files show no diagnostics | LSP server failed to start — open **Output → TTR Language Server** to see why | Most often: forgot to `pnpm --filter @tatrman/lsp build` after pulling |
 | Symlink dev install isn't picked up | VS Code didn't pick up the symlink at startup | **Developer: Reload Window**; if still missing, restart VS Code entirely |

@@ -33,6 +33,7 @@ jobs:
       # after `pnpm -r build` so the designer dist exists.
       - run: node scripts/check-viewer-bundle.mjs
       - run: pnpm -r test
+      - run: pnpm test:family
       - run: pnpm -r lint
       - run: cd packages/vscode-ext && pnpm run regen-tmgrammar && git diff --exit-code syntaxes/ttrm.tmLanguage.json
       - run: cd packages/ttrp-vscode-ext && pnpm run regen-tmgrammar && git diff --exit-code syntaxes/ttrp.tmLanguage.json
