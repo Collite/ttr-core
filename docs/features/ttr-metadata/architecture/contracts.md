@@ -78,15 +78,6 @@ class MetadataQuery(snapshot: RegistrySnapshot) {
 
 Grounding-model fields (grammar 4.2, ttr-semantics `SEMANTICS_VOCABULARY_VERSION`): `Entity.semanticsKind` / `DbTable.semanticsKind` (`String?`, from `ResolvedEntitySemantics.kind`) and `Attribute.semantics` / `DbColumn.semantics` (`ResolvedAttributeSemantics?`). Populated by the source loader from a document-local `SemanticsAnalyzer.analyzeSemantics` pass; only diagnostics-free elements are populated (degrade, don't fail), and each `TTR-SEM-2xx` diagnostic surfaces as a `LoadIssue` of the new `Category.SEMANTICS_INVALID`.
 
-Attribute type declarations also retain nullable `length: Int?` and `precision: Int?`, appended with null
-defaults. `type` stays the original base name. These carry authored TTR-M `DataType` values: for text,
-`length` is the character limit; for decimal, `length` is total digits and `precision` is scale. Null means
-undeclared, including bare `decimal`; explicit zero scale remains zero. Loading, `ModelToDefinitions` export,
-and attribute rendering preserve both values, including partial declarations, without choosing engine
-defaults or validating physical storage bounds. Consumers interpret the type vocabulary and validate bounds
-at their own write boundary. Existing Kotlin source calls retain their defaults; published JVM consumers
-must rebuild against the coordinated library version because the data-class constructor/copy signatures change.
-
 `ResolveOutcome` and every error surface are **structured, id-free** (MD5): the library reports *what* (`NotFound`, `KindMismatch(expected, found)`, `Ambiguous(candidates)`, `BindingMissing(erQname, searchedPackages)`), consumers mint their own diagnostic ids (`TTRP-RES-003` etc.).
 
 ## 3. Library API — world resolution (new)
@@ -168,9 +159,6 @@ The world/model fixture project designed in TTR-P `tasks-p1-s1.3-resolution.md` 
 
 ## Changelog
 
-- **2026-10-24 · AU native writer prerequisite** — §2 retains authored attribute type length/precision
-  through load/export/render/reload. Base type spelling and undeclared values stay unchanged; no grammar
-  extension, executable writer default or release is implied.
 - **v1.5 · 2026-07-06 (grounding Phase 1, grammar 4.2, feature semantics-block T5)** — new grounding surface on the typed model + query facade. Four resolved-semantics fields: `Entity.semanticsKind` / `DbTable.semanticsKind` (`String?`) and `Attribute.semantics` / `DbColumn.semantics` (`ResolvedAttributeSemantics?` from `ttr-semantics`), populated by the loader from a document-local `SemanticsAnalyzer.analyzeSemantics` pass (diagnostics-free elements only — degrade, don't fail). Five `MetadataQuery` accessors: `periodTableFor`, `semanticRole`, `attributesByRole`, `poiEntities`, `fxRateTableFor` (the grounding lookups ai-platform's Ariadne / grounding services call). New `LoadIssue.Category.SEMANTICS_INVALID` categorizes the `TTR-SEM-2xx` diagnostics (id-free). Vocabulary syncs with `ttr-semantics` `SEMANTICS_VOCABULARY_VERSION = 1` and ai-platform's closed proto enums. Cross-ref: grammar [`CHANGELOG.md`](../../../packages/grammar/CHANGELOG.md) 4.2 entry. Additive — no version bump to parser/semantics pins (project deps, lockstep tag `kotlin/v*`).
 - **v1.4 · 2026-07-05 (M3.2)** — frontend data-source adapter (`packages/designer`).
   (a) **§4 `getModelGraph` DTO ≠ the renderable canvas `ModelGraph`.** §4's node/edge
