@@ -34,9 +34,11 @@ export async function lspClientOver(
     rootUri: null,
     capabilities: {},
   } satisfies InitializeParams);
+  const diagnosticCache = new Map<string, import('@tatrman/lsp').WorkerDiagnostic[]>();
   const diagnosticHandlers: Array<(uri: string, msgs: string[]) => void> = [];
   connection.onNotification(PublishDiagnosticsNotification.method, (raw) => {
-    const params = raw as { uri: string; diagnostics: Array<{ message: string }> };
+    const params = raw as { uri: string; diagnostics: import('vscode-languageserver-types').Diagnostic[] };
+    diagnosticCache.set(params.uri, params.diagnostics.map(diagnostic => ({ ...diagnostic, uri: params.uri, source: 'worker' })));
     const messages = params.diagnostics.map((d) => d.message);
     for (const h of diagnosticHandlers) h(params.uri, messages);
   });
@@ -109,6 +111,7 @@ export async function lspClientOver(
         }
       }
     },
+    diagnostics: () => [...diagnosticCache.values()].flat(),
     onDiagnostics(handler) {
       diagnosticHandlers.push(handler);
     },

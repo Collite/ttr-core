@@ -220,6 +220,12 @@ export class BffFilesDataSource implements ModelDataSource {
     try { return await this.source.edit(params); }
     finally { if (!params.dryRun) this.activeEdits--; }
   }
+  sourceFiles() { return this.worker?.sourceFiles() ?? []; }
+  async writeSourceFile(file: { path: string; text: string }) {
+    this.activeEdits++;
+    try { return await this.source.writeSourceFile(file); }
+    finally { this.activeEdits--; }
+  }
   changedFiles() { return this.worker?.changedFiles() ?? []; }
   onFilesChanged(cb: () => void) {
     this.fileListeners.add(cb);

@@ -146,3 +146,15 @@ it('refuses an unexpected post-save SHA before replacing the snapshot', async ()
  expect(h.source.sha).toBe('one'); expect(h.source.changedFiles()[0].text).toContain('collected');
  expect(h.sent).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ack' }), window.location.origin);
 });
+
+it('the hosted open source drawer creates a whole file and reports it through dirty/collect', async () => {
+ const h=await editableHost();
+ expect(h.sent).toHaveBeenCalledWith(expect.objectContaining({type:'ttr.frame.ready',capabilities:expect.arrayContaining(['source-files'])}),window.location.origin);
+ fireEvent.click(screen.getByRole('button',{name:'Source files'}));
+ fireEvent.change(screen.getByLabelText('Source path'),{target:{value:'model/er/source-added.ttrm'}});
+ fireEvent.change(screen.getByLabelText('Source text'),{target:{value:'package shop\nmodel er\ndef entity source_added { attributes: [def attribute id { type: int }] }\n'}});
+ fireEvent.click(screen.getByRole('button',{name:'Apply to model'}));
+ await waitFor(()=>expect(screen.queryByRole('dialog',{name:'Source files'})).toBeNull());
+ expect(h.source.changedFiles()).toEqual([{path:'model/er/source-added.ttrm',text:expect.stringContaining('def entity source_added')}]);
+ post({type:'ttr.host.collect'});await waitFor(()=>expect(h.sent).toHaveBeenCalledWith(expect.objectContaining({type:'ttr.frame.changedFiles',files:h.source.changedFiles()}),window.location.origin));
+});

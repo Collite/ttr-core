@@ -6,6 +6,7 @@
 // build (DM-P3). Cytoscape and the flat SV designer are retired (DM-⚑a) — React Flow is the engine.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { SourceFilesDrawer } from './shell/SourceFilesDrawer.js';
 import { hostedAuthoring } from './host/hosted-extension.js';
 import type { AuthoringLoader } from './ext/authoring-registry.js';
 import { PageContext } from './page/page-context.js';
@@ -77,7 +78,7 @@ interface LanguageChoice {
 }
 
 export function Studio({
-  dataSource, viewState, catalog, files, workspace, processingSource, language, initialAppPath,
+  dataSource, viewState, catalog, files, workspace, processingSource, language, initialAppPath, onSourceDiagnostics,
 }: {
   dataSource: ModelDataSource;
   viewState?: ViewStateStore;
@@ -88,6 +89,7 @@ export function Studio({
   processingSource?: ProcessingGraphSource;
   /** present on a catalog backend: model labels follow this language. */
   language?: LanguageChoice;
+  onSourceDiagnostics?: (diagnostics: import('@tatrman/lsp').WorkerDiagnostic[]) => void;
 }) {
   const page = usePageEnvironment();
   const config = page?.config ?? getRuntimeConfig();
@@ -103,6 +105,7 @@ export function Studio({
     });
     return () => { live = false; subscription?.dispose(); };
   }, [dataSource]);
+  const [sourceOpen, setSourceOpen] = useState(false);
   const [displayMode, setDisplayMode] = useState<DisplayMode>('just-names');
   const [active, setActive] = useState<ActiveSubject | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -120,7 +123,7 @@ export function Studio({
   };
 
   return (
-    <div className="studio-root flex flex-col h-screen bg-gray-50">
+    <div className="studio-root flex flex-col h-screen bg-gray-50" style={{position: 'relative'}}>
       <header className="flex items-center gap-4 px-4 py-2 border-b border-slate-200 bg-white" data-testid="studio-header">
         <span className="font-semibold text-slate-800">{active?.label ?? workspace}</span>
         <div className="ml-auto flex items-center gap-2 text-xs">
@@ -142,6 +145,7 @@ export function Studio({
               </select>
             </>
           )}
+          {dataSource.capabilities.edit && dataSource.sourceFiles && dataSource.writeSourceFile && <button type="button" onClick={() => setSourceOpen(true)}>Source files</button>}
           <span className="uppercase tracking-wide text-slate-400">Detail</span>
           <select
             data-testid="display-mode"
@@ -154,6 +158,7 @@ export function Studio({
           </select>
         </div>
       </header>
+      {sourceOpen && dataSource.sourceFiles && dataSource.writeSourceFile && <SourceFilesDrawer files={() => dataSource.sourceFiles!()} write={file => dataSource.writeSourceFile!(file)} onDiagnostics={onSourceDiagnostics} onClose={() => setSourceOpen(false)} />}
       <ErrorBoundary label="shell" resetKey={workspace}>
         <ShellFrame
           dataSource={dataSource}
@@ -575,11 +580,11 @@ function HostedStudio() {
     session?.source.disposeRetired();
     if (session && !readySent.current) {
       readySent.current = true;
-      channelRef.current?.send({ type: 'ttr.frame.ready', sha: session.sha, capabilities: ['save-ack'], manifest: { bindings: { required: session.source.bindingsRequired } } });
+      channelRef.current?.send({ type: 'ttr.frame.ready', sha: session.sha, capabilities: ['save-ack', 'source-files'], manifest: { bindings: { required: session.source.bindingsRequired } } });
       channelRef.current?.send({ type: 'ttr.frame.location', location: currentAppPath() });
     }
   }, [session]);
   const viewState = useMemo(() => makeViewStateStore('file', { kind: 'file' }), []);
   if (!session) return <div className="hosted-status" role="status">{error ? 'Could not load the model.' : 'Waiting for Studio…'}</div>;
-  return <PageContext.Provider value={{ root, config: getRuntimeConfig(), theme: 'light', authoringLoader: authoring.loader, location: { current: currentAppPath, replace: replaceAppPath, subscribe: handler => { const receive = () => handler(currentAppPath()); window.addEventListener(APP_NAVIGATE, receive); return () => window.removeEventListener(APP_NAVIGATE, receive); }, absolute: path => absoluteUrlFor(path) ?? window.location.origin } }}><div ref={root} style={{ height: '100%', minHeight: 0 }}><Studio key={session.sha} dataSource={session.source} viewState={viewState} catalog={session.catalog} files={[]} workspace={session.workspace} initialAppPath={session.initialAppPath} /></div></PageContext.Provider>;
+  return <PageContext.Provider value={{ root, config: getRuntimeConfig(), theme: 'light', authoringLoader: authoring.loader, location: { current: currentAppPath, replace: replaceAppPath, subscribe: handler => { const receive = () => handler(currentAppPath()); window.addEventListener(APP_NAVIGATE, receive); return () => window.removeEventListener(APP_NAVIGATE, receive); }, absolute: path => absoluteUrlFor(path) ?? window.location.origin } }}><div ref={root} style={{ height: '100%', minHeight: 0 }}><Studio key={session.sha} dataSource={session.source} viewState={viewState} catalog={session.catalog} files={[]} workspace={session.workspace} initialAppPath={session.initialAppPath} onSourceDiagnostics={values => channelRef.current?.send({ type: 'ttr.frame.diagnostics', diagnostics: values.map(value => ({ uri: value.uri, severity: value.severity === 1 ? 'error' : value.severity === 2 ? 'warning' : 'info', code: String(value.code ?? ''), message: value.message, source: 'worker' })) })} /></div></PageContext.Provider>;
 }

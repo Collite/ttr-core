@@ -321,3 +321,18 @@ and replies `{type:'ttr.frame.ack',sha,changed}`. An unexpected head or overlapp
 refuses with `frame/edit-conflict` before replacing the old snapshot. The host serializes
 collect/commit/ack and uses the acknowledged `changed` count; HTTP success alone never clears dirty.
 Successful refresh and SHA navigation also acknowledge the installed SHA and remaining dirty count.
+
+### Open source-file drawer
+
+Worker-backed Studio now exposes `sourceFiles()` and `writeSourceFile({path,text})` on the same data
+source used by the definition drawer and structured forms. The **Source files** drawer can create or edit
+regular `model/**/*.ttrm` files, including a new query. It applies whole text to the one worker cache,
+updates catalog/diagnostics, and leaves persistence to the existing collect → Studio Save path. It performs
+no HTTP mutation itself. Dependencies, paths outside model/, traversal, encoded paths and binary files refuse.
+Text and structured edits share the same serial queue; collect sees the whole new file while transport
+acknowledgements wait. Parse/lint diagnostics remain visible; applying text does not bypass the BFF's strict
+Propose gate. The commercial entity/attribute/relation/term forms remain a separate licensed extension.
+Ready advertises the additive `source-files` capability. The six modeler/edit operations are unchanged.
+
+The new source drawer belongs to the open viewer/library, so its next internal artifact cut is also needed
+when a stage-2 host consumes this addition; the already released Designer family 0.1.0 is unchanged.

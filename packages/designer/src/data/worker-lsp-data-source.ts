@@ -35,6 +35,7 @@ import { layoutIndexOf } from '../model/layout-projection.js';
 import type { ModelerEditParams, ModelerEditResult } from '@tatrman/lsp';
 import type { WorkspaceEdit } from 'vscode-languageserver-types';
 import { applyWorkspaceEdit } from '../lsp/apply-workspace-edit.js';
+import { isSourcePath } from '../fs/source-path.js';
 import { changedFiles } from '../fs/changed-files.js';
 import { modeOf } from '@tatrman/parser/layout';
 
@@ -94,6 +95,26 @@ export class WorkerLspDataSource implements ModelDataSource {
   private revision = 0;
   private edits = Promise.resolve();
 
+  sourceFiles() { return [...this.docTextCache].filter(([path]) => isSourcePath(path)).map(([path, text]) => ({ path, text })).sort((a, b) => a.path.localeCompare(b.path)); }
+  writeSourceFile({ path, text }: { path: string; text: string }) {
+    const run = this.edits.then(async () => {
+      if (!isSourcePath(path)) throw new Error('Use a regular model/*.ttrm source path.');
+      if (this.docTextCache.get(path) === text) return this.lspClient.diagnostics?.() ?? [];
+      this.docTextCache.set(path, text);
+      const uri = this.ctx.projectRoot.replace(/\/$/, '') + '/' + path.split('/').map(encodeURIComponent).join('/');
+      const opened = this.lspClient.openDocument(uri, text);
+      // Whole cache update precedes transport waits; collect never sees a partial file.
+      for (const callback of this.fileListeners) callback();
+      await opened;
+      await this.lspClient.setProjectRoot(this.ctx.projectRoot, this.docTextCache.get('modeler.toml'));
+      for (const callback of this.fileListeners) callback();
+      this.revision++;
+      for (const callback of this.modelListeners) callback(String(this.revision));
+      return this.lspClient.diagnostics?.() ?? [];
+    });
+    this.edits = run.then(() => {}, () => {});
+    return run;
+  }
   changedFiles() { return changedFiles(this.baseFiles, this.docTextCache); }
   onFilesChanged(cb: () => void): Disposable {
     this.fileListeners.add(cb);
