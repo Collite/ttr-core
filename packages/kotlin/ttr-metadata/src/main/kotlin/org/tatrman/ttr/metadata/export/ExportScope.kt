@@ -17,6 +17,33 @@ data class ExportScope(
                 }
             }
 
+    internal fun definitionIds(
+        set: DefinitionSet,
+        graph: DefinitionGraph,
+    ): Set<String> {
+        if (packages == null && areas == null) return set.entries.map { it.qname }.toSet()
+        val selectedAreas = areas.orEmpty().mapNotNull { set.areas[it] }
+        val pkgs = packages.orEmpty() + selectedAreas.flatMap { it.packages }
+        val selected = apply(graph, set)
+        val nodeIds =
+            selected.nodes
+                .filterNot { it.external }
+                .map { it.id }
+                .toSet()
+        val bindingIds = selected.edges.mapNotNull { it.id }.toSet()
+        val areaIds = areas.orEmpty().map { "area.$it" }.toSet()
+        return set.entries
+            .filter { entry ->
+                pkgs.any { entry.pkg == it || entry.pkg.startsWith("$it.") } ||
+                    entry.qname in areaIds ||
+                    entry.qname in nodeIds ||
+                    entry.parentQname in nodeIds ||
+                    entry.kind in ExportKinds.bindings &&
+                    entry.qname in bindingIds
+            }.map { it.qname }
+            .toSet()
+    }
+
     fun apply(
         graph: DefinitionGraph,
         set: DefinitionSet,
@@ -41,7 +68,7 @@ data class ExportScope(
         val inside =
             graph.nodes
                 .filter { n ->
-                    n.pkg in pkgs ||
+                    pkgs.any { n.pkg == it || n.pkg?.startsWith("$it.") == true } ||
                         entities.any { n.id == it || n.id.startsWith("$it.") } ||
                         n.id in areas.orEmpty().map { "area.$it" }
                 }.map { it.id }

@@ -58,6 +58,7 @@ private class GraphBuilder(
             .filter {
                 it.kind in ExportKinds.nodes && it.model !in setOf("cnc", "automation")
             }.toMutableList()
+    private val resolver by lazy { DefinitionResolver(entries) }
     private val sugarHosts = linkedMapOf<String, DefinedObject>()
     private val nodes = linkedMapOf<String, Node>()
     private val edges = mutableListOf<Edge>()
@@ -186,7 +187,19 @@ private class GraphBuilder(
             description = descriptions.toSortedMap(bytewise),
             synonyms = emptyMap(),
             hasDefinition = defined,
-            definitionRef = if (defined) "defs.json#${e.qname}" else null,
+            definitionRef =
+                if (defined) {
+                    val sourceId =
+                        if (set.entries.any { it.qname == e.qname }) {
+                            e.qname
+                        } else {
+                            sugarHosts[e.qname]?.qname
+                                ?: e.qname
+                        }
+                    "defs.json#$sourceId"
+                } else {
+                    null
+                },
             props = props.toSortedMap(bytewise),
         )
     }
@@ -464,40 +477,7 @@ private class GraphBuilder(
         context: DefinedObject,
         defaultModel: String,
         kind: String? = null,
-    ): String {
-        val direct = entries.firstOrNull { it.qname == raw }
-        if (direct != null) return direct.qname
-        val parts = raw.split('.')
-        val layer = parts.firstOrNull { it in setOf("cn", "md", "er", "db") } ?: defaultModel
-        val candidates =
-            entries.filter { e ->
-                e.model == layer && (kind == null || e.kind == kind) && raw in aliases(e)
-            }
-        val local = candidates.filter { it.pkg == context.pkg }
-        return (local.singleOrNull() ?: candidates.singleOrNull())?.qname ?: when {
-            raw.startsWith("$layer.") -> raw
-            layer == "cn" -> "cn.$raw"
-            kind != null -> "$layer.$kind.$raw"
-            else -> "$layer.$raw"
-        }
-    }
-
-    private fun aliases(e: DefinedObject): Set<String> {
-        val name =
-            when {
-                e.parentQname != null -> e.qname.substringAfter("${e.model}.").substringAfter('.')
-                else -> e.def.name
-            }
-        val short = if (e.parentQname == null) e.def.name else name
-        return setOf(
-            e.qname,
-            short,
-            "${e.model}.$short",
-            "${e.pkg}.$short",
-            "${e.model}.${e.pkg}.$short",
-            "${e.pkg}.${e.qname}",
-        )
-    }
+    ): String = resolver.resolve(raw, context, defaultModel, kind)
 
     private fun lexicon() {
         val synonyms = mutableMapOf<String, MutableMap<String, MutableSet<String>>>()

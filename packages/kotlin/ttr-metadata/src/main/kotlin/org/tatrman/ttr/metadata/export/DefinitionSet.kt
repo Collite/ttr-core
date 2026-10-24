@@ -19,6 +19,9 @@ data class DefinedObject(
     val schemaCode: String?,
     val locale: String? = null,
     val parentQname: String? = null,
+    val fileModel: String? = null,
+    val fileNamespace: String? = null,
+    val imports: List<String> = emptyList(),
 )
 
 /** Tier 0/1 source. Retains definitions even when the typed model has no representation for them. */
@@ -83,6 +86,9 @@ data class DefinitionSet(
                             file.namespace.takeIf { layer == "db" && it.isNotEmpty() },
                             file.locale,
                             parent?.qname,
+                            file.schemaCode.takeIf { it.isNotEmpty() },
+                            file.namespace.takeIf { it.isNotEmpty() },
+                            file.imports.map { it.target + if (it.wildcard) ".*" else "" },
                         )
                     entries += entry
                     when (def) {

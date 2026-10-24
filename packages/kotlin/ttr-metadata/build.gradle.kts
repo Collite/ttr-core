@@ -12,6 +12,7 @@ plugins {
 kotlin { jvmToolchain(21) }
 tasks.test {
     useJUnitPlatform()
+    systemProperty("updateGolden", System.getProperty("updateGolden") ?: "false")
     inputs.file("../../grammar/src/generated/property-map.ts")
     // VL-P0: LayoutResolverSpec reads the shared layout vectors in place (never a copy).
     inputs.dir("../../package-sdk/schemas/layout-vectors")
@@ -31,6 +32,7 @@ dependencies {
     // metadata → resolver is the one-way arrow (resolver never depends back). api, matching the
     // "one coherent ttr-* set" convention above.
     api(project(":packages:kotlin:ttr-md-resolver"))
+    implementation(libs.snakeyaml) // XM authored rename sidecars; safe data-only constructor.
     implementation(libs.jgrapht.core)
     implementation(libs.slf4j.api)
     implementation(libs.kotlinx.coroutines.core) // MetadataRefresher (M1.2)
@@ -39,6 +41,7 @@ dependencies {
     testImplementation(libs.mockk)
     // EN-P1.2 — parse the checked-in writability.schema.json fixture for the anti-drift parity spec.
     testImplementation(libs.kotlinx.ser.json)
+    testImplementation(libs.tomlj) // Fixture caller supplies public connection descriptors (XM C-22).
     testImplementation(libs.h2) // S6-A — DbMemberSource unit test (in-memory JDBC, test-only)
 
     // Fixture helper code (MetadataFixtures) references library + parser types.

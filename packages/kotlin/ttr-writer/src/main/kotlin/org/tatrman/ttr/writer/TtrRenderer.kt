@@ -3,6 +3,12 @@ package org.tatrman.ttr.writer
 
 import org.tatrman.ttr.parser.loader.ParseResult
 import org.tatrman.ttr.parser.loader.TtrId
+import org.tatrman.ttr.parser.model.AreaDef
+import org.tatrman.ttr.parser.model.LexiconEntryDef
+import org.tatrman.ttr.parser.model.Md2dbDomainDef
+import org.tatrman.ttr.parser.model.Md2dbMapDef
+import org.tatrman.ttr.parser.model.DataType
+import org.tatrman.ttr.parser.model.AggregationSpec
 import org.tatrman.ttr.parser.model.AttributeDef
 import org.tatrman.ttr.parser.model.ColumnDef
 import org.tatrman.ttr.parser.model.ConceptBindingDef
@@ -98,6 +104,14 @@ object TtrRenderer {
             DrillMapDef::class,
             WorldDef::class,
             // MD dot-path (S5C-B): the materialize-generated model + its binding.
+            MdDomainDef::class,
+            DimensionDef::class,
+            MdMapDef::class,
+            HierarchyDef::class,
+            AreaDef::class,
+            LexiconEntryDef::class,
+            Md2dbDomainDef::class,
+            Md2dbMapDef::class,
             MeasureDef::class,
             CubeletDef::class,
             Md2dbCubeletDef::class,
@@ -114,7 +128,8 @@ object TtrRenderer {
     fun render(
         definitions: List<Definition>,
         modelDirective: ModelDirective? = null,
-    ): String = renderFile(modelDirective?.modelCode, modelDirective?.schema, definitions)
+    ): String =
+        renderFile(modelDirective?.modelCode, modelDirective?.schema, definitions, locale = modelDirective?.locale)
 
     /** Contract §3 — convenience overload rendering a whole [ParseResult] (package, imports, schema, defs). */
     fun render(result: ParseResult): String =
@@ -124,6 +139,7 @@ object TtrRenderer {
             definitions = result.definitions,
             packageName = result.packageName,
             imports = result.imports.map { renderImport(it) },
+            locale = result.modelDirective?.locale,
         )
 
     /** Renders a file with optional package / imports / schema directive followed by sorted definitions. */
@@ -133,6 +149,7 @@ object TtrRenderer {
         definitions: List<Definition>,
         packageName: String? = null,
         imports: List<String> = emptyList(),
+        locale: String? = null,
     ): String {
         val sb = StringBuilder()
         if (packageName != null) {
@@ -145,6 +162,7 @@ object TtrRenderer {
         }
         if (schemaCode != null) {
             sb.append("model $schemaCode")
+            if (locale != null) sb.append(" locale $locale")
             if (namespace != null) sb.append(" schema $namespace")
             sb.appendLine()
             sb.appendLine()
@@ -155,21 +173,9 @@ object TtrRenderer {
 
     private fun renderImport(imp: ImportStatement): String = if (imp.wildcard) "${imp.target}.*" else imp.target
 
-    /**
-     * The v3.1 MD *logical* defs (domain/dimension/map/measure/cubelet/hierarchy). Before the MD
-     * dot-path arc these were dropped at parse (`ttr-parser` had no MD def types), so they never
-     * reached the renderer; there is no surface renderer for them yet. They are skipped here to
-     * preserve that effective behaviour until a real MD renderer lands (dot-path arc, later phase).
-     */
-    private fun isMdLogicalDef(def: Definition): Boolean =
-        def is MdDomainDef ||
-            def is DimensionDef ||
-            def is MdMapDef ||
-            def is HierarchyDef
-
     private fun renderDefinitions(definitions: List<Definition>): String {
         val sb = StringBuilder()
-        val grouped = definitions.filterNot { isMdLogicalDef(it) }.groupBy { it::class }
+        val grouped = definitions.groupBy { it::class }
         val sortedGroups = grouped.entries.sortedBy { (kind, _) -> KIND_ORDER.indexOf(kind) }
         for ((_, defs) in sortedGroups) {
             // Within a class: the automation kinds, the concept stereotypes and the cn binding kinds in grammar
@@ -244,11 +250,168 @@ object TtrRenderer {
             // Grammar 0.17 — the conceptual model.
             is ConceptDef -> renderConceptDef(def)
             is ConceptBindingDef -> renderConceptBinding(def)
-            // The remaining v3.1 MD logical defs (domain/dimension/map/hierarchy) have no surface
-            // renderer yet — see [isMdLogicalDef]. Emit nothing rather than throwing; `renderDefinitions`
-            // already filters them out of file output.
-            is MdDomainDef, is DimensionDef, is MdMapDef, is HierarchyDef -> ""
+            is MdDomainDef ->
+                renderMdLogical(
+                    "domain",
+                    def,
+                    buildList {
+                        def.type?.let { add("type: ${renderType(it)}") }
+                        def.domainKind?.let { add("kind: $it") }
+                        if (def.restrictMembers.isNotEmpty()) {
+                            add(
+                                "restrict: { members: { ${def.restrictMembers.joinToString(
+                                    ", ",
+                                ) { "${renderString(it)}: { en: ${renderString(it)} }" }} } }",
+                            )
+                        }
+                        if (def.publishMembers) add("publish: members")
+                        def.concept?.let { add(renderConceptSugar(it)) }
+                    },
+                )
+            is DimensionDef ->
+                renderMdLogical(
+                    "dimension",
+                    def,
+                    buildList {
+                        def.key?.let { add("key: $it") }
+                        add("attributes: [${def.attributes.joinToString(", ") { renderAttribute(it) }}]")
+                        if (def.hierarchies.isNotEmpty()) {
+                            add(
+                                "hierarchies: [${def.hierarchies.joinToString(", ") { it.path }}]",
+                            )
+                        }
+                        def.concept?.let { add(renderConceptSugar(it)) }
+                    },
+                )
+            is MdMapDef ->
+                renderMdLogical(
+                    "map",
+                    def,
+                    buildList {
+                        if (def.from.isNotEmpty()) add("from: [${def.from.joinToString(", ") { it.path }}]")
+                        if (def.to.isNotEmpty()) add("to: [${def.to.joinToString(", ") { it.path }}]")
+                        def.cardinality?.let {
+                            add(
+                                "cardinality: { from: ${renderString(
+                                    if (it.startsWith("1")) "1" else "0..*",
+                                )}, to: ${renderString(if (it.endsWith("N")) "0..*" else "1")} }",
+                            )
+                        }
+                        def.calc?.let { calc ->
+                            add(
+                                "calc: ${calc.name}" +
+                                    if (calc.args.isEmpty()) {
+                                        ""
+                                    } else {
+                                        "(${calc.args.entries.joinToString(
+                                            ", ",
+                                        ) { "${it.key}: ${it.value}" }})"
+                                    },
+                            )
+                        }
+                    },
+                )
+            is HierarchyDef ->
+                renderMdLogical(
+                    "hierarchy",
+                    def,
+                    buildList {
+                        def.dimensionRef?.let { add("dimension: ${it.path}") }
+                        add(
+                            "levels: [${def.levels.joinToString(", ") {
+                                it.attribute + (
+                                    it.via?.let { ref ->
+                                        " via ${ref.path}"
+                                    } ?: ""
+                                )
+                            }}]",
+                        )
+                    },
+                )
+            is AreaDef ->
+                renderMdLogical(
+                    "area",
+                    def,
+                    listOf(
+                        "packages: [${def.packages.joinToString(", ")}]",
+                        "entities: [${def.entities.joinToString(", ")}]",
+                    ),
+                )
+            is LexiconEntryDef ->
+                renderMdLogical(
+                    def.entryKind,
+                    def,
+                    buildList {
+                        def.target?.let { add("for: ${it.path}") }
+                        if (def.forms.isNotEmpty()) add("forms: [${def.forms.joinToString(", ") { renderString(it) }}]")
+                        def.match?.let { add("match: ${renderString(it)}") }
+                        def.text?.let { add("text: ${renderString(it)}") }
+                        def.default?.let { add("default: $it") }
+                        def.sensePriority?.let { add("sense_priority: $it") }
+                    },
+                )
+            is Md2dbDomainDef ->
+                renderMdLogical(
+                    "md2db_domain",
+                    def,
+                    buildList {
+                        def.domainRef?.let { add("domain: ${it.path}") }
+                        def.columnSource?.let { add("source: { table: ${it.table.path}, column: ${it.column} }") }
+                    },
+                )
+            is Md2dbMapDef ->
+                renderMdLogical(
+                    "md2db_map",
+                    def,
+                    buildList {
+                        def.mapRef?.let { add("map: ${it.path}") }
+                        def.table?.let { add("target: ${it.path}") }
+                        add("columns: { ${def.columns.entries.joinToString(", ") { "${it.key}: ${it.value}" }} }")
+                    },
+                )
             else -> error("Unsupported Definition subtype: ${def::class.simpleName}")
+        }
+
+    private fun renderMdLogical(
+        kind: String,
+        def: Definition,
+        properties: List<String>,
+    ): String {
+        val common =
+            buildList {
+                renderDescriptionValue(def.description, def.descriptionLocalized)?.let { add("description: $it") }
+                renderTagsIfAny(def.tags)?.let { add(it.removeSuffix(",")) }
+            }
+        return "def $kind ${def.name} { ${(common + properties).joinToString(", ")} }"
+    }
+
+    private fun renderType(type: DataType): String =
+        if (type.length == null && type.precision == null) {
+            type.name
+        } else {
+            "{ ${(
+                listOf(
+                    "type: ${type.name}",
+                ) +
+                    listOfNotNull(
+                        type.length?.let { "length: $it" },
+                        type.precision?.let { "precision: $it" },
+                    )
+            ).joinToString(", ")} }"
+        }
+
+    private fun renderAggregation(agg: AggregationSpec): String =
+        if (agg.perDimension.isEmpty()) {
+            agg.default ?: "{}"
+        } else {
+            "{ ${(
+                listOfNotNull(
+                    agg.default?.let { "default: $it" },
+                ) +
+                    agg.perDimension.entries
+                        .sortedBy { it.key }
+                        .map { "${it.key}: ${it.value}" }
+            ).joinToString(", ")} }"
         }
 
     // v4.1 world model. Members render in parse order (engines, executors,
@@ -323,7 +486,7 @@ object TtrRenderer {
 
     private fun renderAutoBody(b: AutoBody): String {
         val sb = StringBuilder()
-        b.type?.let { sb.append(" type: ${it.name},") }
+        b.type?.let { sb.append(" type: ${renderType(it)},") }
         b.label?.let { sb.append(" label: ${renderLocalizedString(it)},") }
         renderDescriptionIfAny(b.description, b.descriptionLocalized)?.let { sb.append(it) }
         renderTagsIfAny(b.tags)?.let { sb.append(" $it") }
@@ -521,8 +684,10 @@ object TtrRenderer {
         val sb = StringBuilder()
         sb.append("def attribute ${def.name} {")
         def.type?.let {
-            sb.append(" type: ${it.name},")
+            sb.append(" type: ${renderType(it)},")
         }
+        def.domainRef?.let { sb.append(" domain: ${it.path},") }
+        def.aggregation?.let { sb.append(" aggregation: ${renderAggregation(it)},") }
         if (def.isKey) sb.append(" isKey: true,")
         if (def.optional) sb.append(" optional: true,")
         renderDescriptionIfAny(def.description, def.descriptionLocalized)?.let { sb.append(it) }
@@ -675,7 +840,7 @@ object TtrRenderer {
                 it.precision?.let { p -> parts.add("precision: $p") }
                 sb.append(" type: { ${parts.joinToString(", ")} },")
             } else {
-                sb.append(" type: ${it.name},")
+                sb.append(" type: ${renderType(it)},")
             }
         }
         if (def.isKey) sb.append(" isKey: true,")

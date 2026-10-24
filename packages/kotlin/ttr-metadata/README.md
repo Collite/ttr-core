@@ -48,3 +48,28 @@ the deterministic C-4 header value.
 
 S1.1 provides the in-memory source, graph and scope. JSON, Turtle, XMI writers,
 the CLI and the service route follow in later XM stages.
+
+The XM `Exporter` facade returns either named UTF-8 files, a bundle for callers to archive,
+a stable cannot-carry lossiness id, an unknown-snapshot result, or `NotBuilt` for registered
+formats awaiting their writer. S1.2 builds `graph.json`, `defs.json`, `dot` and canonical TTR;
+Turtle/XMI follow in S1.3/S1.4, while canonical YAML waits for YS. Unknown model, format or
+profile names are usage errors. Binding families such as `cn2md` can be selected separately.
+Package selectors include descendants; package and area selectors form a union. Cross-scope
+endpoints in graph output have only `id`, `kind` and `external`.
+
+JSON writers use explicit builder insertion order, compact UTF-8 and one trailing LF.
+`defs.json` follows the checked-in grammar property order (guarded by an exact drift test),
+then sorts retained free-form and structural AST keys bytewise. Nested definitions carry
+`id` so their names survive; lexicon definitions carry `locale`. Embedded language text is
+opaque `{block, tag}` data. Reference resolution is shared with the graph, including implied
+concepts; scalar identifier enums remain scalars. This is a projection of the retained
+parsed AST, without source spans or trivia. The YS fixed-point test is explicitly pending.
+
+Callers read `connections.toml` and pass `ConnectionDescriptor` values containing only
+`id`, `database`, `schema` and public `locators`; the library has no TOML runtime dependency.
+They also read authored `renames.yaml` with `Rename.read` and supply the previous graph's
+node **and binding-edge** ids for `since`. `ExportDelta` compares snapshot version strings
+lexically: versions must be chosen so lexical order is version order (for example,
+zero-padded sequential ids). Renamed-from ids are excluded from `removed`. The service's
+snapshot ring and the CLI's previous-graph reader belong to the callers, as does tar.gz
+assembly. No timestamps are introduced by these writers.
