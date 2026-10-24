@@ -8,6 +8,42 @@ import io.kotest.assertions.throwables.shouldThrow
 
 class ExporterSpec :
     StringSpec({
+        "snapshot delta is global across model/package scopes and current snapshot is empty" {
+            val set = xmJsonSet()
+            val graph = DefinitionGraph.build(set)
+            val ids = (graph.nodes.map { it.id } + graph.edges.mapNotNull { it.id }).toSet()
+            for (since in listOf("fixture-0", set.snapshot)) {
+                val result =
+                    Exporter().export(
+                        set,
+                        null,
+                        ExportRequest(
+                            setOf("cn"),
+                            "graph.json",
+                            packages = setOf("cn"),
+                            since = since,
+                            previousIds = ids,
+                            renames =
+                                if (since ==
+                                    set.snapshot
+                                ) {
+                                    listOf(Rename("old", "new", set.snapshot))
+                                } else {
+                                    emptyList()
+                                },
+                        ),
+                    ) as ExportResult.Single
+                val delta =
+                    Json
+                        .parseToJsonElement(
+                            result.bytes.decodeToString(),
+                        ).jsonObject
+                        .getValue("delta")
+                        .jsonObject
+                delta.getValue("removed").jsonArray.size shouldBe 0
+                delta.getValue("renamed").jsonArray.size shouldBe 0
+            }
+        }
         "every model-format cell dispatches or reports its literal lossiness" {
             val loaded = loadXmWorld()
             val set = xmJsonSet()

@@ -63,6 +63,15 @@ private fun ttlGolden(
 
 class TurtleShapeSpec :
     StringSpec({
+        "unchanged XM fixture owl bytes for CLI and HTTP parity" {
+            val result =
+                Exporter().export(
+                    xmJsonSet(),
+                    null,
+                    ExportRequest(setOf("cn"), "ttl", "owl"),
+                ) as ExportResult.Single
+            ttlGolden("world-owl", result.bytes)
+        }
         "hand-authored one-concept contract golden" {
             val set = DefinitionSet(emptyList(), emptyMap(), "sample", "0.18", "s1")
             val graph =

@@ -49,6 +49,11 @@ class MetadataLoader(
             LoadResult(
                 model = result.model,
                 files = result.files,
+                exportSidecars =
+                    snapshots.sortedBy { it.priority }.flatMap { it.exportSidecars.entries }.associate {
+                        it
+                            .toPair()
+                    },
                 issues = issues,
                 report = if (options.strict) LoadReport.collect(snapshots, issues, options) else null,
             )
@@ -74,6 +79,7 @@ data class LoadResult(
     val report: LoadReport? = null,
     /** Every parsed definition, including layers not represented by the typed model. */
     val files: List<LoadedFile> = emptyList(),
+    val exportSidecars: Map<String, String> = emptyMap(),
 ) {
     val errors: List<LoadIssue> get() = issues.filter { it.severity == LoadIssue.Severity.ERROR }
     val warnings: List<LoadIssue> get() = issues.filter { it.severity == LoadIssue.Severity.WARNING }

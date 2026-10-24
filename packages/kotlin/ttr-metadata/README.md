@@ -47,7 +47,7 @@ becomes a stub carrying only `id`, `kind` and `external`. `scope.header` supplie
 the deterministic C-4 header value.
 
 The in-memory source, graph, scope, JSON, Turtle and XMI writers are implemented.
-The CLI and service route follow in S1.5.
+The CLI and service route are implemented in S1.5.
 
 The XM `Exporter` facade returns either named UTF-8 files, a bundle for callers to archive,
 a stable cannot-carry lossiness id, an unknown-snapshot result, or `NotBuilt` for registered
@@ -90,3 +90,9 @@ profile generates the installable MDG through `:packages:kotlin:ttr-metadata:ren
 See [EA installation and verification](../../../docs/ea.md). Captured-export and
 live EA import acceptance remain pending; the local oracle covers UML/EA shapes,
 a Sparx MDG reference, byte goldens and all local references.
+
+XM CLI: see [HOWTO](../../../HOWTO.md#export-a-model-graphjson--defsjson--cnttl--xmi).
+Registry callers must pass the reconciled `files` and merged `exportSidecars` to `swap`; `MetadataRefresher` does so
+on refresh. Capture one snapshot per request, including its eight-version id history. Snapshot ETags derive from
+ordered source versions. Export identity collisions remain errors on the projection path and do not block legacy
+model refresh; the id history deduplicates identities. Rebuild JVM consumers with this bundle.

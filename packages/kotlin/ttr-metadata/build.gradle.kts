@@ -149,3 +149,18 @@ val renderTtrMdg by tasks.registering(JavaExec::class) {
     outputs.file(output)
     args(output.get().asFile.absolutePath)
 }
+
+// XM: the export grammar header follows the canonical marker, never a hardcoded release pin.
+val exportGrammarResources by tasks.registering {
+    val grammar = file("../../grammar/src/TTR.g4")
+    val out = layout.buildDirectory.dir("generated/export-grammar")
+    inputs.file(grammar)
+    outputs.dir(out)
+    doLast {
+        val version = Regex("@grammar-version:\\s*(\\S+)").find(grammar.readText())!!.groupValues[1]
+        val target = out.get().file("org/tatrman/ttr/metadata/export/grammar.properties").asFile
+        target.parentFile.mkdirs()
+        target.writeText("grammar=$version\n")
+    }
+}
+sourceSets.main { resources.srcDir(exportGrammarResources) }

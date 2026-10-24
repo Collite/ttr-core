@@ -44,19 +44,7 @@ class Exporter {
         @Suppress("UNUSED_PARAMETER") typedGraph: ModelGraph?,
         request: ExportRequest,
     ): ExportResult {
-        require(
-            request.models.isNotEmpty() &&
-                request.models.all { it in models || it in bindingFamilies || it in ExportKinds.bindings },
-        ) { "Unknown export model: ${request.models}" }
-        require(request.format in formats) { "Unknown export format: ${request.format}" }
-        val profiles =
-            when (request.format) {
-                "ttl" -> setOf("skos", "owl", "both")
-                "xmi" -> setOf("ttr-mdg/1", "ea-erd/1")
-                "ttr" -> setOf("canonical")
-                else -> emptySet()
-            }
-        require(request.profile == null || request.profile in profiles) { "Unknown export profile: ${request.profile}" }
+        validate(request)
         for (model in request.models.sortedWith(bytewise)) {
             LossinessLedger
                 .cannotCarry(
@@ -85,7 +73,11 @@ class Exporter {
         val definitionIds by lazy { scope.definitionIds(set, allGraph) }
         val delta =
             request.since?.let {
-                ExportDelta.compute(requireNotNull(request.previousIds), selected, request.renames, it)
+                if (it == set.snapshot) {
+                    ExportDelta(it, emptyList(), emptyList())
+                } else {
+                    ExportDelta.compute(requireNotNull(request.previousIds), allGraph, request.renames, it)
+                }
             }
         return when (request.format) {
             "xmi" ->
@@ -198,6 +190,29 @@ class Exporter {
             e.kind.substringBefore('_') in selected
 
     companion object {
+        fun validate(request: ExportRequest) {
+            require(
+                request.models.isNotEmpty() &&
+                    request.models.all { it in models || it in bindingFamilies || it in ExportKinds.bindings },
+            ) { "Unknown export model: ${request.models}" }
+            require(
+                request.packages?.all { it.isNotBlank() } != false && request.areas?.all { it.isNotBlank() } != false,
+            ) {
+                "Empty package or area selector"
+            }
+            require(request.format in formats) { "Unknown export format: ${request.format}" }
+            val profiles =
+                when (request.format) {
+                    "ttl" -> setOf("skos", "owl", "both")
+                    "xmi" -> setOf("ttr-mdg/1", "ea-erd/1")
+                    "ttr" -> setOf("canonical")
+                    else -> emptySet()
+                }
+            require(
+                request.profile == null || request.profile in profiles,
+            ) { "Unknown export profile: ${request.profile}" }
+        }
+
         private val bindingFamilies = setOf("cn2md", "cn2er", "cn2db", "md2er", "md2db", "er2db")
         private val models = setOf("world", "cn", "md", "er", "db", "lexicon", "bindings")
         private val formats =
