@@ -33,6 +33,44 @@ class LiterateBuildSpec :
         }
 
         fun ttrp() = TtrpCommand().subcommands(BuildCommand())
+        test("multi-recipe documents keep bundles and golden fixtures beside each derived recipe") {
+            val project = dir.resolve("returns")
+            Files.createDirectories(project)
+            val source = project.resolve("handling-a-return-request.md")
+            Files.copy(
+                root.resolve("packages/kotlin/ttrp-doc/src/test/resources/docs/handling-a-return-request.md"),
+                source,
+            )
+            val names = listOf("decide_return", "monitor_inbound", "settle")
+            // A document-level fixture must not leak into any of its recipe bundles.
+            Files.createDirectories(project.resolve("tests"))
+            Files.writeString(project.resolve("tests/replay.yaml"), "recipes: []\n")
+            names.forEach { name ->
+                Files.createDirectories(project.resolve("$name/tests"))
+                Files.writeString(project.resolve("$name/tests/$name.yaml"), "recipe: $name\n")
+            }
+            val output = project.resolve("derived")
+            val built = ttrp().test("build $source --out $output")
+            check(built.statusCode == 0) { built.stdout + built.stderr }
+            names.forEach { name ->
+                val bundle = output.resolve("$name/$name.bundle")
+                val manifest =
+                    org.tatrman.ttrp.bundle.RunManifest.fromJson(
+                        Files.readString(bundle.resolve("manifest.json")),
+                    )
+                manifest.recipe!!.tests shouldBe listOf("tests/$name.yaml")
+                Files.readString(bundle.resolve("tests/$name.yaml")) shouldBe "recipe: $name\n"
+                Files.exists(output.resolve("$name.bundle")) shouldBe false
+                Files.exists(output.resolve("$name/$name.ttrp")) shouldBe true
+                Files.exists(output.resolve("$name/$name.ttrd")) shouldBe true
+                Files.exists(output.resolve("$name/README.md")) shouldBe true
+            }
+            ttrp().test("build $source --out $output --check").statusCode shouldBe 0
+            val readme = output.resolve("monitor_inbound/monitor_inbound.bundle/README.md")
+            Files.writeString(readme, "stale explanation")
+            ttrp().test("build $source --out $output --check --json").statusCode shouldBe 3
+            Files.readString(readme) shouldBe "stale explanation"
+        }
         test("build markdown, check the committed trio and refuse a changed canonical file with DOC-003") {
             val built = ttrp().test(listOf("build", dir.resolve("release.md").toString(), "--lang", "cs"))
             check(built.statusCode == 0) { built.stdout + built.stderr }

@@ -109,13 +109,16 @@ object LiterateBuild {
                 .TtrpPipeline(project, memberCatalog = memberCatalog)
         val results =
             extraction.recipes.map { recipe ->
+                // Multi-recipe documents own one directory per skeleton. Resolve source fixtures from
+                // that directory even with --out, and keep its bundle beside the canonical program.
+                val relativeDir = if (extraction.recipes.size > 1) Path.of(recipe.path).parent else Path.of("")
                 BundleAssembler(ToolchainVersion.current).build(
                     recipe.text,
                     dir.resolve(recipe.path).toString(),
                     project,
                     project.modelsRoot(),
-                    dir,
-                    recipeDir = file.parent,
+                    dir.resolve(relativeDir),
+                    recipeDir = file.parent.resolve(relativeDir),
                     documentTitle = extraction.title,
                     language = lang,
                     memberCatalog = memberCatalog,
