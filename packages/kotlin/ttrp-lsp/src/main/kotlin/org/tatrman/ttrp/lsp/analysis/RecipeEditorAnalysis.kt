@@ -50,7 +50,7 @@ object RecipeEditorAnalysis {
         return Analysis(
             doc.uri,
             doc.version,
-            report.copy(diagnostics = diagnostics(plan)),
+            report.copy(diagnostics = (ctx.manifestDiagnostics + diagnostics(plan)).distinct()),
             recipes = listOf(EditorRecipe(null, plan)),
         )
     }
@@ -117,6 +117,12 @@ object RecipeEditorAnalysis {
             } else {
                 emptyReport(doc)
             }
-        return Analysis(doc.uri, doc.version, report.copy(diagnostics = findings), extraction, recipes)
+        return Analysis(
+            doc.uri,
+            doc.version,
+            report.copy(diagnostics = (ctx.manifestDiagnostics + findings).distinct()),
+            extraction,
+            recipes,
+        )
     }
 }
