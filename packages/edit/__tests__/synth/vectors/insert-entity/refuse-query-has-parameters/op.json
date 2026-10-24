@@ -1,0 +1,7 @@
+{
+  "op": "insert-entity",
+  "args": {
+    "name": "x",
+    "on": "er.query.returns_review"
+  }
+}

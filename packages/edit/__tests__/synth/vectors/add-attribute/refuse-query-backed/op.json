@@ -1,0 +1,8 @@
+{
+  "op": "add-attribute",
+  "args": {
+    "entity": "er.entity.return_request",
+    "name": "x",
+    "type": "int"
+  }
+}

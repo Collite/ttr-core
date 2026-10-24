@@ -31,3 +31,13 @@ standard `editor.formatOnSave` (the server returns no edits when already canonic
 `syntaxes/ttrp.tmLanguage.json` is **generated** from `packages/grammar/src/TTRP.g4`:
 `pnpm run regen-tmgrammar`. The bare-fragment grammars (`ttr-sql`, `ttr-pandas`) are
 hand-written thin wrappers that delegate to `source.sql` / `source.python`.
+
+## Literate recipes
+
+Markdown attaches only when it matches `ttrp.literateRecipes.glob` (default
+`**/recipes/**/*.md`). The extension activates for a workspace containing those recipes,
+for a TTR-P file, or for a TTR-P command. A custom glob outside `recipes/` activates
+via a `.ttrp` file or command; reload the window after changing the setting.
+Diagnostics, code lenses, completion and recipe parameter hover work in Markdown.
+Rename refuses and definition/checker hover remain disabled until source navigation is
+mapped through `.ttrd` ([#282](https://github.com/Collite/ttr-core/issues/282)).

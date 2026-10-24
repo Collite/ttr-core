@@ -6,6 +6,145 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — XM P1 external metadata projections
+
+- Complete parsed definition sets and deterministic `graph.json`/`defs.json`, SKOS/OWL Turtle, XMI 2.1 with
+  `ttr-mdg/1`, generated EA MDG technology, scoping, snapshot deltas and explicit lossiness results.
+- `ttr-metadata export` writes projection files, `.snapshot`, and optional TTR tar archives. Snapshot versions
+  are now deterministic for the same ordered source versions; the registry retains definitions, captured
+  export sidecars and the latest eight id sets for HTTP exports.
+- JVM consumers must rebuild: `LoadResult`, `SourceSnapshot`, `RegistrySnapshot` and `MetadataRegistry.swap`
+  gain fields/parameters. Grammar remains 0.18, so the internal bundle continues on 0.18.x. EA import and its
+  findings-driven fixes still need Bora's acceptance fixture and live check.
+
+
+### Fixed — AU writer attribute constraints (binary-incompatible for JVM consumers)
+
+- Retain authored ER attribute type length/precision through metadata loading, export and TTR rendering.
+  Decimal total digits/scale and text length survive reload; bare types retain undeclared bounds. The
+  nullable metadata fields preserve source defaults; JVM consumers must rebuild with the new library.
+- Shipped in **0.18.7** under Bora's 2026-10-24 ruling: bundle major/minor follows the grammar marker,
+  which remains 0.18. JVM consumers must rebuild and pin the containing 0.18.x bundle.
+
+### Fixed — Studio review-135
+
+- Preserve validated definition text without formatter loss; keep identity, neighboring definitions and referenced members.
+- Force removes only pure JS roster lines; manual matches refuse, including transitive dependents.
+- Preserve post-collect whole-file edits across save acknowledgements, detect conflicts and guard dirty refresh/navigation with explicit discard.
+
+- Keep CRLF files and edit ranges consistent; reuse existing encoded file URIs and the host's root URI.
+- Use manifest schema defaults in synthesized bindings. Isolate broken documents from unrelated safe edits;
+  writes to broken files and full-reference operations still refuse, and duplicate targets stay ambiguous.
+- Ignore inert entity bare-id bindings like the loader; reject inherited relation-cardinality keys.
+- Share watched-file project lint and cache parsed documents; rename member bindings in layout-derived packages.
+- Offer open source editing only with a host save path, honor extension saveNode first, and prevent stale catalog caching.
+
+
+- **Studio source authoring and hosted save seam (S1.3)** — the open drawer saves via `modeler/edit`,
+  shows worker diagnostics and refreshes the canvas. Local/BFF data sources keep a separate fetched base and
+  atomic editable cache; `changedFiles`, debounced `dirty`, synchronous `collect`, and saved-SHA re-init expose
+  whole file changes without writing to the BFF. Extensions use the same structured hook; commercial forms
+  remain extension-owned under amended FO-21. Entity rename follows six ER entity/member binding refs (#213).
+  `@tatrman/edit@0.1.0` gains a self-contained public tarball, consumer/dry-run CI and an `edit/v*` release lane;
+  actual publication waits for merge and npm auth. Kotlin twin tracked in #271. No release is cut here.
+
+- **Studio authoring LSP (S1.2)** — `modeler/edit` applies all six synthesizer operations to the Node/Worker
+  document cache, returning post-edit diagnostics with `uri` and `source: 'worker'`. Dry runs leave cache,
+  cursors and notifications unchanged; refusals remain atomic. `modeler/applyWorkspaceEdit` shares the
+  staging path; `applyGraphEdit` becomes a deprecated set-source alias. Both hosts carry JS rosters for
+  orphan checks without parsing them as TTR. Hosts still apply returned edits to their own files and
+  acknowledge through normal document notifications. No release is cut here.
+
+- **Studio synthesizer (S1.1)** — six pure `@tatrman/edit` operations create bound entities, attributes,
+  relations and bilingual terms, replace definition source, and remove definitions with orphan checks/force
+  cleanup. Fourteen byte-for-byte vectors pin the output, including Hartland's returns-review projection.
+  The formatter now retains inline entity/attribute/relation bindings and localized descriptions.
+  The hosted save seam follows in S1.3; no release is cut here.
+### 0.18.6 — AU review-136 fixes (pending release)
+
+**Upgrade:** after moving the hartland or ai-models pin to 0.18.6, run `ttrp build` on every literate recipe
+(with its intended `--lang` and `--out`) and commit all derived artifacts before enabling `ttrp-check.yml`.
+`--check` now compares the full `.ttrd`, including `documentSha`, and both committed READMEs byte-for-byte;
+tier imports now retain entity labels in those READMEs. Existing generated files can therefore fail CI on the
+pin bump until rebuilt and committed, even when the recipe logic is unchanged.
+
+- The reusable `ttrp-check.yml` adds `exclude` (default `**/README.md`) and `lang` inputs, so generated READMEs
+  are skipped and checks use the committed explanation language (R2).
+- TTR-B rendering writes no mode sentence for an omitted decision mode, preserving overlapping routing (R3).
+- Decision, mode and default-route sentences inside an If block are refused with **TTRP-B-114** (R4).
+- Polars `sum` returns SQL NULL over empty input or an all-NULL group instead of zero (R5).
+- A `:name` parameter in a non-recipe Polars island is refused with **TTRP-EMT-006** at build time;
+  recipe parameters continue to work (R6).
+- Recipe conform refuses storage-scoped fixtures with Polars explicitly (exit 2: `polars does not run
+  cross-storage recipes yet`) before reading fixtures or opening engines. Polars supports the unscoped fixture
+  oracle; cross-storage fixtures support PostgreSQL and DuckDB. Staged-input support is tracked in
+  [#283](https://github.com/Collite/ttr-core/issues/283) (R7).
+- Unsupported `--lang` values produce a usage error with exit 2. Markdown builds honour `--connected`, compile
+  notices and structured `--json` failures like canonical builds (R8).
+- Literate `--check` compares `documentSha` and both derived/bundle READMEs without writing artifacts; any
+  Markdown edit or stale/missing README requires a rebuild (R9).
+- Fence errors keep their parser/fragment diagnostic, suggestion and Markdown position. A valid canonical
+  decision/actions/container block before its skeleton retains the single ownership **TTRP-DOC-001** (R10, N1).
+- Annotation readers ignore unknown fields and skip unknown types with a **TTRP-DOC-005** warning. Human
+  Verdict handling is unchanged and the producer JSON schema remains strict (R11).
+- README labels use the checker's package/tier import scope and the build's shared model snapshot (R14).
+- Markdown rename refuses and definition/checker hover remain disabled until source navigation is mapped;
+  source-position-based parameter hover remains available. Recipe manifest diagnostics stay visible (R1, R12).
+- The extension's `ttrp.literateRecipes.glob` setting defaults to `**/recipes/**/*.md`; arbitrary Markdown no
+  longer activates it. Editor recipe analyses reuse loaded project metadata and the parsed program (R15).
+- Polars `/` continues casting both operands to Float64 in every Polars program. This behaviour shipped in
+  0.18.5 and is retained by ruling R136-C; only the unreachable operator-table entry is removed here (R13).
+
+### 0.18.5 — AU-core P3 + Polars twins
+
+- **AU-core P3:** literate Markdown recipes derive canonical programs and `.ttrd` provenance with read-only
+  `build --check`, multi-skeleton output paths and located DOC diagnostics. New published `ttrp-doc` provides
+  bilingual explanation READMEs, metadata labels and immutable AU annotation types/schema; human link Verdicts
+  affect sentence associations only. TTR-B gains recipe time sentences, parameter-label mentions and decision
+  route lists; the LSP gains Markdown mapping, recipe lenses, parameter hover/action completion, and an additive
+  recipe summary consumed by the Designer's four-lane list. The reusable `ttrp-check.yml` checks consumer sources.
+- **AU Polars twins:** all four recipes and review-119 probes execute on native Polars, compared with PostgreSQL
+  and DuckDB. Recipe conform accepts `--engines pg,duckdb,polars` with unscoped fixtures only; storage-scoped
+  fixtures support `pg,duckdb`. Bindings, reason fills, calendar range joins,
+  aggregate expressions and typed Arrow staging are supported; decimal division uses the declared engine delta.
+
+### Fixed — SO report review-133
+
+- Preserve automatic sizing for marker rows with stored heights unless customHeight is true.
+- Give generated decimals a mandatory fractional digit (20.0) and DATE outputs a date-only format.
+  Expanded regressions use Excel-emulating CellFormat; workbook fixtures are regenerated for RC.3.
+
+### Fixed — SO report P2 exit review
+
+- Fill inline strings in saved XLSX cells, preserve automatic heights and untouched rich text; generated
+  marker columns now use compiled output types so Excel sums/sorts numeric data correctly.
+- Read YAML 1.2 scalars, validate default kinds and DB parameter declarations; share parameter type
+  classification across generation/compilation, including number/timestamptz/smalldatetime and text time.
+- Execute a shared program once per render, scope saved-query compilation by lane, skip blank CSV lines,
+  and refuse tableless HTML. Distinguish missing files, IO failures and oversized values.
+- Validate output folder ids, support repeated `--title-lang LANG=title`, escape YAML control characters,
+  and preserve output permissions. Replace the erroneous workbook goldens with semantic checks and
+  Excel-verified fixtures. RC.1 is superseded by the planned RC.2.
+
+### Added — SO report authoring (S2.3)
+
+- Shared `TemplateGenerator.generate/fromQuery` with deterministic C-8 YAML/XLSX, declared DB parameter
+  mapping/warnings and LQ-5 ER refusal; `QueryModelLookup` is the snapshot/Veles authoring seam.
+- `ttr-report new` creates the pair, supports explicit roles/output and guarded force replacement.
+  The demo fixture now uses the generated template. CLI distributions include ZIP and tar;
+  grammar RC tags pass version validation and stay in the GitHub Packages staging lane.
+
+- **Studio reports / SO-core-P2 S2.2** — shared render service, typed parameters, CSV rows runner
+  and standalone `ttr-report render` CLI with XLSX/HTML output. Snapshot validation compiles actual
+  output columns through the existing translator; sheet anchors remain scoped. The installed CLI
+  matches committed XLSX/HTML goldens. Door execution awaits published RunSavedQuery stubs (ttr-server#286).
+
+- **Studio reports / SO-core-P2 S2.1** — open `report.yaml` v1 JSON Schema and manual;
+  `org.tatrman:ttr-report` reads and validates declarations against program output columns, fills
+  scalar/table XLSX anchors with preserved styles and deterministic package bytes, and produces an
+  escaped HTML preview capped at 500 rows. The report fill is implemented from the C-8 behaviour
+  contract; no kantheon renderer implementation is copied. Template generation follows in S2.3.
+
 - **`cn-candidate.v1`** (cn, CN-P5 S5.2 — cn contracts §6, A-CN-81…84): `ttr-concept` publishes
   `schemas/cn-candidate.v1.schema.json` — a proposal for the conceptual model (a concept, a term or an open-tier
   relation), its provenance (`producer`, `source_ref`, `confidence`, AM-20 `evidence`) and its fate (`status`,
@@ -50,6 +189,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   type (`entity_type_ref = cn.X` downstream), so lex-matcher and the resolver move to v6 first, and an estate's archives
   are rebuilt after — all of an estate's archives together (a reader skips an additive archive whose schema differs from
   the primary's). The lexicon hash covers the entries only, so caches key on the archive id.
+
 - **Reference indexing (#258)** — preserve MD slot kinds in reverse references, find-references and rename;
   prefer the current model, then top-level definitions for same-package names, and report remaining ambiguity
   at the reference. TypeScript, Kotlin and Python share the rule and MD slot-aware lookup, guarded by collision

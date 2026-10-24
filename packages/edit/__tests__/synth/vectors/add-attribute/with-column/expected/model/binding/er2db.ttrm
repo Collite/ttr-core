@@ -1,0 +1,10 @@
+package hartland
+
+model binding
+
+def er2db_entity return_request_map { entity: er.entity.return_request, target: { table: db.dbo.return_request } }
+
+def er2db_attribute return_request_note_map {
+    attribute: hartland.er.entity.return_request.note,
+    target: { column: hartland.db.dbo.table.return_request.note }
+}

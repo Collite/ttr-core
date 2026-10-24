@@ -51,10 +51,17 @@ class RecipeLivePgSpec :
                         listOf(
                             conform.runOn(pg, plan, RecipePlanted.AS_OF),
                             conform.runOn(duck, plan, RecipePlanted.AS_OF),
+                            *if (RecipePolars.enabled) {
+                                arrayOf(
+                                    RecipePolars.run(duck.connection, plan, RecipePlanted.AS_OF),
+                                )
+                            } else {
+                                emptyArray()
+                            },
                         ),
                     )
                 withClue(outcome.summary()) { outcome.exitCode shouldBe 0 }
-                outcome.reports.size shouldBe RecipeStatements.plan(plan).size
+                outcome.reports.size shouldBe RecipeStatements.plan(plan).size * if (RecipePolars.enabled) 2 else 1
             }
         }
     })

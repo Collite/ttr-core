@@ -83,7 +83,20 @@ export interface DerivedView {
   waves: string[][];
 }
 
+export interface RecipeIsland {
+  name: string;
+  kind: string;
+  contextClass?: string | null;
+  routes: string[];
+}
+export interface RecipeSummary {
+  name: string;
+  mode: string;
+  lanes: { role: string; islands: RecipeIsland[] }[];
+}
+
 export interface GetGraphResult {
+  recipe?: RecipeSummary | null;
   graph: GraphView;
   provenance: Record<string, Provenance>;
   derived: string[];

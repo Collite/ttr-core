@@ -1,0 +1,233 @@
+{
+    "document": "handling-a-return-request.md",
+    "documentSha": "ae9cb8740219602c4a456a16dad768743dc6e89f02141db0a2464ba84940eafb",
+    "nodes": {
+        "documents": {
+            "block": 21,
+            "generatedSpan": [
+                1364,
+                1829
+            ],
+            "paragraph": [
+                13575,
+                13616
+            ],
+            "span": [
+                13618,
+                14083
+            ]
+        },
+        "open_obligations": {
+            "block": 20,
+            "generatedSpan": [
+                1002,
+                1362
+            ],
+            "paragraph": [
+                13163,
+                13211
+            ],
+            "span": [
+                13213,
+                13573
+            ]
+        },
+        "overdue_days": {
+            "block": 22,
+            "generatedSpan": [
+                1831,
+                2133
+            ],
+            "paragraph": [
+                14085,
+                14129
+            ],
+            "span": [
+                14131,
+                14449
+            ]
+        },
+        "settlement": {
+            "block": 23,
+            "generatedSpan": [
+                2135,
+                3730
+            ],
+            "paragraph": [
+                14451,
+                14520
+            ],
+            "span": [
+                14522,
+                16133
+            ]
+        },
+        "settling": {
+            "block": 19,
+            "generatedSpan": [
+                691,
+                1000
+            ],
+            "paragraph": [
+                12815,
+                12850
+            ],
+            "span": [
+                12852,
+                13161
+            ]
+        }
+    },
+    "sentences": [
+        {
+            "nodes": [],
+            "span": [
+                29,
+                198
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                1023,
+                1067
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                1526,
+                1569
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                2077,
+                2121
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                3010,
+                3055
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                3266,
+                3313
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                4109,
+                4151
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                6085,
+                6174
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                8397,
+                8437
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                9023,
+                9063
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                9526,
+                9561
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                9871,
+                9911
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                10170,
+                10249
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                11342,
+                11431
+            ]
+        },
+        {
+            "nodes": [
+                "settling"
+            ],
+            "span": [
+                12815,
+                12850
+            ]
+        },
+        {
+            "nodes": [
+                "open_obligations"
+            ],
+            "span": [
+                13163,
+                13211
+            ]
+        },
+        {
+            "nodes": [
+                "documents"
+            ],
+            "span": [
+                13575,
+                13616
+            ]
+        },
+        {
+            "nodes": [
+                "overdue_days"
+            ],
+            "span": [
+                14085,
+                14129
+            ]
+        },
+        {
+            "nodes": [
+                "settlement"
+            ],
+            "span": [
+                14451,
+                14520
+            ]
+        },
+        {
+            "nodes": [],
+            "span": [
+                16135,
+                16224
+            ]
+        }
+    ]
+}

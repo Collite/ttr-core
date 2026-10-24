@@ -10,19 +10,20 @@ export interface HostInit {
   scope: HostScope;
   lang: 'en' | 'cs';
   theme: 'light';
+  sha?: string;
 }
 export type HostMessage =
   | HostInit
   | { type: 'ttr.host.token'; token: string }
-  | { type: 'ttr.host.navigate'; location: string; sha?: string }
-  | { type: 'ttr.host.refresh' }
+  | { type: 'ttr.host.navigate'; location: string; sha?: string; discard?: boolean }
+  | { type: 'ttr.host.refresh'; discard?: boolean }
   | { type: 'ttr.host.collect' }; // implemented with the P1 save seam
 export type FrameMessage =
   | { type: 'ttr.frame.ready' }
   | { type: 'ttr.frame.location'; location: string }
   | { type: 'ttr.frame.error'; code: string; message: string }
   | { type: 'ttr.frame.dirty'; changed: number }
-  | { type: 'ttr.frame.changedFiles'; files: Array<{ path: string; text: string }> };
+  | { type: 'ttr.frame.changedFiles'; files: Array<{ path: string; text: string | null }> };
 
 export function isHosted(): boolean {
   return (
@@ -53,6 +54,7 @@ function parseMessage(value: unknown): HostMessage | null {
         typeof m.token === 'string' &&
         (m.lang === 'en' || m.lang === 'cs') &&
         m.theme === 'light' &&
+        (m.sha === undefined || typeof m.sha === 'string') &&
         s &&
         (s.kind === 'served' ||
           (s.kind === 'change' && typeof s.id === 'string' && s.id.length > 0))
@@ -64,10 +66,12 @@ function parseMessage(value: unknown): HostMessage | null {
     case 'ttr.host.navigate':
       return typeof m.location === 'string' &&
         /^#?\/w\//.test(m.location) &&
-        (m.sha === undefined || typeof m.sha === 'string')
+        (m.sha === undefined || typeof m.sha === 'string') &&
+        (m.discard === undefined || typeof m.discard === 'boolean')
         ? (value as HostMessage)
         : null;
     case 'ttr.host.refresh':
+      return m.discard === undefined || typeof m.discard === 'boolean' ? value as HostMessage : null;
     case 'ttr.host.collect':
       return value as HostMessage;
     default:
@@ -86,7 +90,7 @@ export class HostChannel {
     if (event.source !== window.parent || event.origin !== window.location.origin) return;
     const message = parseMessage(event.data);
     if (!message) return;
-    if (message.type === 'ttr.host.token') {
+    if (message.type === 'ttr.host.token' || message.type === 'ttr.host.collect') {
       void this.handle(message);
       return;
     }

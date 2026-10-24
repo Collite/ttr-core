@@ -173,6 +173,17 @@ const allKinds = [
   'conceptBinding',
 ];
 
+// XM: include every grammar definition body, including MD, areas and world plumbing.
+// The advertised subset used to omit those families, so it could not guard export kind drift.
+for (const match of grammar.matchAll(/^(\w+)Def\s*:/gm)) {
+  const kind = match[1];
+  if (kind === 'lexiconEntry') {
+    allKinds.push('term', 'pattern', 'example');
+  } else if (!allKinds.includes(kind)) {
+    allKinds.push(kind);
+  }
+}
+
 // 0.16 — kinds whose property rule is not `<kind>Property` (the automation kinds share `autoProperty`).
 const KIND_RULE: Record<string, string> = {
   parameter: 'autoProperty',
@@ -181,6 +192,11 @@ const KIND_RULE: Record<string, string> = {
   approval: 'autoProperty',
   program: 'autoProperty',
   recipe: 'autoProperty',
+  term: 'lexiconEntryProperty',
+  pattern: 'lexiconEntryProperty',
+  example: 'lexiconEntryProperty',
+  engine: 'enginePartProperty',
+  executor: 'enginePartProperty',
   concept: 'cnProperty',
   conceptBinding: 'cnBindingProperty',
 };

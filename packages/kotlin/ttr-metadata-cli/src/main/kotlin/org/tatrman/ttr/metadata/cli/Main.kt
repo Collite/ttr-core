@@ -24,7 +24,12 @@ fun main(args: Array<String>) {
 /** Parse through the real command tree while keeping usage errors separate from model failures. */
 fun runMetadataCommand(args: List<String>): CliOutcome {
     var outcome = CliOutcome(0, "", "")
-    val command = MetadataCommand().subcommands(LoadCommand { outcome = it }, mdCommand())
+    val command =
+        MetadataCommand().subcommands(
+            LoadCommand { outcome = it },
+            ExportCommand { outcome = it },
+            mdCommand(),
+        )
     return try {
         command.parse(args)
         outcome
@@ -37,7 +42,7 @@ fun runMetadataCommand(args: List<String>): CliOutcome {
 }
 
 class MetadataCommand : CliktCommand(name = "ttr-metadata") {
-    override fun help(context: Context) = "Load and validate a Tatrman model checkout."
+    override fun help(context: Context) = "Load, validate and export a Tatrman model checkout."
 
     override fun run() = Unit
 }

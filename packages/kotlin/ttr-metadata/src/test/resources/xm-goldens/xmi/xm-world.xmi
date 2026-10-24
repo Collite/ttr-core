@@ -1,0 +1,791 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1" xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:uml="http://schema.omg.org/spec/UML/2.1" xmlns:ttr-mdg="http://tatrman.org/ns/ttr-mdg/1">
+  <xmi:Documentation exporter="Tatrman" exporterVersion="ttr-mdg/1"/>
+  <uml:Model xmi:id="EAID_5B35B08D_CDB9_5BF7_A064_7977C6B59C79" name="northline">
+    <packagedElement xmi:type="uml:Package" xmi:id="EAID_8FB84557_635F_5518_A257_450EE66DF8EE" name="cn">
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_5201EB50_CA13_5476_84BB_49533907623C" name="Purchase" visibility="public" isAbstract="false">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_92B26720_4DFC_5A61_9355_AB2C2D685EAC" name="Party" visibility="public" isAbstract="false">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_682AACD0_2750_5568_A674_6C1287E46D85" name="Prospect" visibility="public" isAbstract="true">
+        <generalization xmi:type="uml:Generalization" xmi:id="EAID_B35A2662_94CF_5891_B515_DDA44128C6BC" general="EAID_92B26720_4DFC_5A61_9355_AB2C2D685EAC"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_37A84A2D_4CE0_5109_9D4C_8FE14AE3E2A4" name="LargePurchase" visibility="public" isAbstract="false">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_5414B38F_1698_5CF4_BD73_F3C7F9F5876E" name="sold_at" visibility="public" isAbstract="false">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_8882A869_3D80_512B_B4B7_C5C9C4E73BD3" name="recommends" visibility="public" isAbstract="false">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_54A188FF_D6ED_5E6A_8C04_67105518F17E" name="Customer" visibility="public" isAbstract="false">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Association" xmi:id="EAID_B6DC4322_A691_5CE6_9523_A4047E57D582" name="item">
+        <memberEnd xmi:idref="EAID_33DEEE1D_A72F_5493_BE2E_57970BACBDF6"/>
+        <memberEnd xmi:idref="EAID_BFDBB39A_058F_58BC_A292_F48DF959FB79"/>
+        <ownedEnd xmi:type="uml:Property" xmi:id="EAID_33DEEE1D_A72F_5493_BE2E_57970BACBDF6" name="Purchase" type="EAID_5201EB50_CA13_5476_84BB_49533907623C" association="EAID_B6DC4322_A691_5CE6_9523_A4047E57D582">
+        </ownedEnd>
+        <ownedEnd xmi:type="uml:Property" xmi:id="EAID_BFDBB39A_058F_58BC_A292_F48DF959FB79" name="item" type="EAID_448C904D_2A33_57EE_8D76_1FA53CB6961B" association="EAID_B6DC4322_A691_5CE6_9523_A4047E57D582">
+        </ownedEnd>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Association" xmi:id="EAID_853275A5_64E5_548C_A875_72F7324E2611" name="buyer">
+        <memberEnd xmi:idref="EAID_CC3D52EC_7671_5B2B_8EBF_DD043C557D20"/>
+        <memberEnd xmi:idref="EAID_1482C5C7_4A69_5B38_8C46_78B6F5F23928"/>
+        <ownedEnd xmi:type="uml:Property" xmi:id="EAID_CC3D52EC_7671_5B2B_8EBF_DD043C557D20" name="Purchase" type="EAID_5201EB50_CA13_5476_84BB_49533907623C" association="EAID_853275A5_64E5_548C_A875_72F7324E2611">
+        </ownedEnd>
+        <ownedEnd xmi:type="uml:Property" xmi:id="EAID_1482C5C7_4A69_5B38_8C46_78B6F5F23928" name="buyer" type="EAID_54A188FF_D6ED_5E6A_8C04_67105518F17E" association="EAID_853275A5_64E5_548C_A875_72F7324E2611">
+        </ownedEnd>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Dependency" xmi:id="EAID_3A16393F_209C_5342_9C99_41AF5E71FFB5" name="grounds" client="EAID_5201EB50_CA13_5476_84BB_49533907623C" supplier="EAID_F4D7C42A_8FC2_5027_9984_BD34AC86E882">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Dependency" xmi:id="EAID_43CDFED0_80DC_5F66_B44C_FBF2C07FE64F" name="grounds" client="EAID_92B26720_4DFC_5A61_9355_AB2C2D685EAC" supplier="EAID_801C022F_D804_532C_A25A_1AFA8BC94298">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Dependency" xmi:id="EAID_66F08DBF_A971_540B_88D2_0799300823BB" name="grounds" client="EAID_5414B38F_1698_5CF4_BD73_F3C7F9F5876E" supplier="EAID_F3772F20_A3DC_5FDB_B85F_05C2013C951A">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Dependency" xmi:id="EAID_5D7F36F0_BCAA_5590_9140_2FDED5BF1E59" name="grounds" client="EAID_54A188FF_D6ED_5E6A_8C04_67105518F17E" supplier="EAID_A7A23F64_F4F5_526F_A8C5_A57747CCC71B">
+      </packagedElement>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Package" xmi:id="EAID_FA254487_0B69_5869_9A41_7790638252FC" name="db.retail">
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_B30B5E19_7DB6_5F0F_AD6B_E90AF4D64E60" name="buyers" visibility="public" isAbstract="false">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_10589C71_C712_5AC0_92A6_F544676A587C" name="id" visibility="public" type="EAID_378F87C4_F6DC_5048_8D76_79AB7B43ECE2"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_FD07E4F6_6D2D_55FA_A088_9318300A275B" name="name" visibility="public" type="EAID_031F961D_DA62_59D0_86E5_B52A6C59F4A0"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_B6DF1A3F_5B35_512D_A8B5_CE9485E3B133" name="products" visibility="public" isAbstract="false">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_9BA13A40_F5B9_501A_B5D8_A1C823E616AC" name="id" visibility="public" type="EAID_378F87C4_F6DC_5048_8D76_79AB7B43ECE2"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_55EA5EA6_10B4_54D4_A026_B0DFEF6513E5" name="name" visibility="public" type="EAID_031F961D_DA62_59D0_86E5_B52A6C59F4A0"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_020C3CAC_0342_5B39_B451_1D48068FEB4F" name="recent_sales" visibility="public" isAbstract="false">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_CCC58960_4921_5FDC_A541_3902F606BD61" name="id" visibility="public" type="EAID_378F87C4_F6DC_5048_8D76_79AB7B43ECE2"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_A43BFC34_B4B0_5468_8C21_9762B9C03AF0" name="sales" visibility="public" isAbstract="false">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_2295B4E4_EF10_5220_8F5B_4BDE2BC81578" name="amount" visibility="public" type="EAID_5608B758_57E3_58EE_BD91_ED03D4899FC2"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_E8527968_D058_53EF_8987_E86BCEDBD6F8" name="buyer_id" visibility="public" type="EAID_378F87C4_F6DC_5048_8D76_79AB7B43ECE2"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_9B4C42DF_509A_5734_8AED_46970C9F2E92" name="id" visibility="public" type="EAID_378F87C4_F6DC_5048_8D76_79AB7B43ECE2"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_3FAB9314_EBE4_5E17_A8D0_117454637CF4" name="sold_at" visibility="public" type="EAID_6EA658DE_924F_524F_972B_A6BD45AA9CA0"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Association" xmi:id="EAID_FFDDCFA7_63B4_5BFC_976B_B02455F56A1D" name="sale_buyer">
+        <memberEnd xmi:idref="EAID_7B9AE691_4A08_53F1_B23F_94004F91223E"/>
+        <memberEnd xmi:idref="EAID_A110F196_017B_5F30_9067_740312CB6F5F"/>
+        <ownedEnd xmi:type="uml:Property" xmi:id="EAID_7B9AE691_4A08_53F1_B23F_94004F91223E" name="sales" type="EAID_A43BFC34_B4B0_5468_8C21_9762B9C03AF0" association="EAID_FFDDCFA7_63B4_5BFC_976B_B02455F56A1D">
+          <lowerValue xmi:type="uml:LiteralInteger" xmi:id="EAID_7163472F_3DE1_50CE_9FFD_E365739BAB1C" value="0"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="EAID_E926AE40_A0F8_5B2C_9B4E_D27BFB2B9DAF" value="*"/>
+        </ownedEnd>
+        <ownedEnd xmi:type="uml:Property" xmi:id="EAID_A110F196_017B_5F30_9067_740312CB6F5F" name="buyers" type="EAID_B30B5E19_7DB6_5F0F_AD6B_E90AF4D64E60" association="EAID_FFDDCFA7_63B4_5BFC_976B_B02455F56A1D">
+          <lowerValue xmi:type="uml:LiteralInteger" xmi:id="EAID_67424856_3580_5F24_BB68_5604B3BF8D41" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="EAID_5A885E44_DAD9_50F5_9148_4DA9E6A7370F" value="1"/>
+        </ownedEnd>
+      </packagedElement>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Package" xmi:id="EAID_699F757E_491D_5DE2_A5C6_BFCD3E33CE08" name="er">
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_448C904D_2A33_57EE_8D76_1FA53CB6961B" name="Product" visibility="public" isAbstract="false">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_801C022F_D804_532C_A25A_1AFA8BC94298" name="buyer" visibility="public" isAbstract="false">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_73EC6812_8E49_5806_A5E0_21537050F435" name="id" visibility="public" type="EAID_378F87C4_F6DC_5048_8D76_79AB7B43ECE2"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_24F9A0B7_B74B_58AE_B822_F8164D78B302" name="name" visibility="public" type="EAID_031F961D_DA62_59D0_86E5_B52A6C59F4A0"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_967027AF_2734_57AD_BD2B_DA4E6BCA3A7F" name="product" visibility="public" isAbstract="false">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_E5C6341A_BE49_5FF6_A9E0_9112C4A0B786" name="id" visibility="public" type="EAID_378F87C4_F6DC_5048_8D76_79AB7B43ECE2"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_F4D7C42A_8FC2_5027_9984_BD34AC86E882" name="sale" visibility="public" isAbstract="false">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_8291C3B4_4A02_5F97_88C8_12793A9779F4" name="amount" visibility="public" type="EAID_5608B758_57E3_58EE_BD91_ED03D4899FC2"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_BF03030D_E384_56C4_96B5_030CE5DB7A3A" name="buyer_id" visibility="public" type="EAID_378F87C4_F6DC_5048_8D76_79AB7B43ECE2"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_E581F5BD_F27E_5C5E_9C88_71782F13A1AD" name="id" visibility="public" type="EAID_378F87C4_F6DC_5048_8D76_79AB7B43ECE2"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_F3772F20_A3DC_5FDB_B85F_05C2013C951A" name="sold_at" visibility="public" type="EAID_6EA658DE_924F_524F_972B_A6BD45AA9CA0"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Dependency" xmi:id="EAID_E6BEE01E_FB28_5E01_9B0D_41D15451644B" name="grounds" client="EAID_448C904D_2A33_57EE_8D76_1FA53CB6961B" supplier="EAID_967027AF_2734_57AD_BD2B_DA4E6BCA3A7F">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Dependency" xmi:id="EAID_CCFCFD35_9850_509B_9D6A_B8BED3985024" name="er2db" client="EAID_801C022F_D804_532C_A25A_1AFA8BC94298" supplier="EAID_B30B5E19_7DB6_5F0F_AD6B_E90AF4D64E60">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Dependency" xmi:id="EAID_3B5C126E_77BA_5073_BB6E_C167F38963F3" name="er2db" client="EAID_73EC6812_8E49_5806_A5E0_21537050F435" supplier="EAID_10589C71_C712_5AC0_92A6_F544676A587C">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Dependency" xmi:id="EAID_BF7A0AB3_155D_51F7_96AC_211C85B1E61A" name="er2db" client="EAID_F4D7C42A_8FC2_5027_9984_BD34AC86E882" supplier="EAID_A43BFC34_B4B0_5468_8C21_9762B9C03AF0">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Association" xmi:id="EAID_E31484E0_1903_5B6D_BFB7_D9C644E780EA" name="sale_buyer">
+        <memberEnd xmi:idref="EAID_602ED62E_217A_5C8D_9C3F_E333F5896763"/>
+        <memberEnd xmi:idref="EAID_E7FE1995_F138_5F67_8EE4_EED9146946A4"/>
+        <ownedEnd xmi:type="uml:Property" xmi:id="EAID_602ED62E_217A_5C8D_9C3F_E333F5896763" name="sale" type="EAID_F4D7C42A_8FC2_5027_9984_BD34AC86E882" association="EAID_E31484E0_1903_5B6D_BFB7_D9C644E780EA">
+          <lowerValue xmi:type="uml:LiteralInteger" xmi:id="EAID_C97D539B_E725_5E8E_914F_466FA2E93903" value="0"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="EAID_B85BFDAB_D935_5697_8668_1075C951A390" value="*"/>
+        </ownedEnd>
+        <ownedEnd xmi:type="uml:Property" xmi:id="EAID_E7FE1995_F138_5F67_8EE4_EED9146946A4" name="buyer" type="EAID_801C022F_D804_532C_A25A_1AFA8BC94298" association="EAID_E31484E0_1903_5B6D_BFB7_D9C644E780EA">
+          <lowerValue xmi:type="uml:LiteralInteger" xmi:id="EAID_A98FD9CD_4619_5B24_BCF2_BF078CE322A8" value="1"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="EAID_52F8EC6A_5D40_550F_ACA0_75E3ED7E0E29" value="1"/>
+        </ownedEnd>
+      </packagedElement>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Package" xmi:id="EAID_90774BF1_0F1F_571E_9B46_70210C99BA9A" name="md">
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_610AAD11_C55C_5E1A_8BB5_629B788399BD" name="purchases" visibility="public" isAbstract="false">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_A7A23F64_F4F5_526F_A8C5_A57747CCC71B" name="Buyer" visibility="public" isAbstract="false">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_2ED67138_E4F8_5759_A991_7EB075F894E5" name="id" visibility="public" type="EAID_1BBD8159_99B8_5908_A128_086B50FEF464"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_0DDC2F6A_893C_5C66_913A_18AE121B7F76" name="Calendar" visibility="public" isAbstract="false">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_597333E2_25DC_5237_9AB4_22766E8AD813" name="day" visibility="public" type="EAID_1BBD8159_99B8_5908_A128_086B50FEF464"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EAID_4F668BBF_48C7_586B_BCA3_C4DFDEA36A50" name="month" visibility="public" type="EAID_1BBD8159_99B8_5908_A128_086B50FEF464"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:DataType" xmi:id="EAID_1BBD8159_99B8_5908_A128_086B50FEF464" name="Money" visibility="public" isAbstract="false">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_9EBF008E_A070_5E63_840D_51E6DBC44C40" name="CalendarRollup" visibility="public" isAbstract="false">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_011D8C19_5FD4_598C_B877_EE7E1DBE0919" name="balance" visibility="public" isAbstract="false">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_58CB9123_A85E_541D_B7A9_9C9AA6A8C85A" name="revenue" visibility="public" isAbstract="false">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EAID_727C8509_A999_5603_8096_6F3193346CA9" name="units" visibility="public" isAbstract="false">
+      </packagedElement>
+      <packagedElement xmi:type="uml:Dependency" xmi:id="EAID_62EADD5F_A7E8_5B43_A102_F48120C7FAA9" name="md2db" client="EAID_610AAD11_C55C_5E1A_8BB5_629B788399BD" supplier="EAID_A43BFC34_B4B0_5468_8C21_9762B9C03AF0">
+      </packagedElement>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Package" xmi:id="EAID_9C7772AE_9BAF_55C2_857A_CD7CC695BC67" name="Types">
+      <packagedElement xmi:type="uml:PrimitiveType" xmi:id="EAID_6EA658DE_924F_524F_972B_A6BD45AA9CA0" name="date"/>
+      <packagedElement xmi:type="uml:PrimitiveType" xmi:id="EAID_5608B758_57E3_58EE_BD91_ED03D4899FC2" name="decimal"/>
+      <packagedElement xmi:type="uml:PrimitiveType" xmi:id="EAID_378F87C4_F6DC_5048_8D76_79AB7B43ECE2" name="int"/>
+      <packagedElement xmi:type="uml:PrimitiveType" xmi:id="EAID_031F961D_DA62_59D0_86E5_B52A6C59F4A0" name="text"/>
+    </packagedElement>
+  </uml:Model>
+  <ttr-mdg:concept xmi:id="EAID_43BD7415_EAD4_580A_B300_032CBE068BA3" base_Class="EAID_5201EB50_CA13_5476_84BB_49533907623C" qname="cn.event.Purchase" synonyms="" cnKind="event" extent="instantaneous" period="at=sold_at" tier="core"/>
+  <ttr-mdg:concept xmi:id="EAID_068303E3_E19B_5A63_B6EE_C87C205769A7" base_Class="EAID_92B26720_4DFC_5A61_9355_AB2C2D685EAC" qname="cn.kind.Party" synonyms="cs:osoba;cs:partner;en:partner;en:party" cnKind="kind" tier="core"/>
+  <ttr-mdg:concept xmi:id="EAID_9798E570_5BEC_5034_9C17_AB5D191775A8" base_Class="EAID_448C904D_2A33_57EE_8D76_1FA53CB6961B" qname="cn.kind.Product" synonyms="" cnKind="kind" tier="core"/>
+  <ttr-mdg:concept xmi:id="EAID_E9997B9F_3792_591E_879B_2BD9D4D8F543" base_Class="EAID_682AACD0_2750_5568_A674_6C1287E46D85" qname="cn.kind.Prospect" synonyms="" cnKind="kind" tier="open" abstract="true"/>
+  <ttr-mdg:concept xmi:id="EAID_FE70E300_C9D8_5F09_8BE6_B1CA612920E2" base_Class="EAID_37A84A2D_4CE0_5109_9D4C_8FE14AE3E2A4" qname="cn.phase.LargePurchase" synonyms="" cnKind="phase" tier="core"/>
+  <ttr-mdg:concept xmi:id="EAID_96368936_4ACA_54A6_A756_A6AC7BF75763" base_Class="EAID_5414B38F_1698_5CF4_BD73_F3C7F9F5876E" qname="cn.quality.sold_at" synonyms="" cnKind="quality" tier="core"/>
+  <ttr-mdg:concept xmi:id="EAID_6A873A20_5E74_57CA_8019_CC616082932F" base_Class="EAID_8882A869_3D80_512B_B4B7_C5C9C4E73BD3" qname="cn.relation_type.recommends" synonyms="" cnKind="relation_type" tier="open"/>
+  <ttr-mdg:concept xmi:id="EAID_94FE7A01_EBD7_5810_A053_247804C5E163" base_Class="EAID_54A188FF_D6ED_5E6A_8C04_67105518F17E" qname="cn.role.Customer" synonyms="cs:zákazník;en:buyer;en:customer" cnKind="role" tier="core"/>
+  <ttr-mdg:table xmi:id="EAID_65813712_1F5C_5F89_83F2_4C10378A3F06" base_Class="EAID_B30B5E19_7DB6_5F0F_AD6B_E90AF4D64E60" qname="db.retail.buyers" synonyms="" schema="retail"/>
+  <ttr-mdg:column xmi:id="EAID_A75D8EAB_4C40_5C5C_B118_BDDE70A5D7C1" base_Property="EAID_10589C71_C712_5AC0_92A6_F544676A587C" qname="db.retail.buyers.id" synonyms="" type="int"/>
+  <ttr-mdg:column xmi:id="EAID_54D99E37_0C1E_53D7_8406_B669A968DDE8" base_Property="EAID_FD07E4F6_6D2D_55FA_A088_9318300A275B" qname="db.retail.buyers.name" synonyms="" type="text"/>
+  <ttr-mdg:table xmi:id="EAID_A24DE2D5_B6C6_5AA7_9743_760024D0FD33" base_Class="EAID_B6DF1A3F_5B35_512D_A8B5_CE9485E3B133" qname="db.retail.products" synonyms="" schema="retail"/>
+  <ttr-mdg:column xmi:id="EAID_B5D3F7BE_25F5_56AA_A52F_D8726541F7CF" base_Property="EAID_9BA13A40_F5B9_501A_B5D8_A1C823E616AC" qname="db.retail.products.id" synonyms="" type="int"/>
+  <ttr-mdg:column xmi:id="EAID_0D986212_1AED_5423_939B_E777ED88FF2D" base_Property="EAID_55EA5EA6_10B4_54D4_A026_B0DFEF6513E5" qname="db.retail.products.name" synonyms="" type="text"/>
+  <ttr-mdg:view xmi:id="EAID_211BEDAD_B4F4_5B8A_BDF2_A7F6CA028815" base_Class="EAID_020C3CAC_0342_5B39_B451_1D48068FEB4F" qname="db.retail.recent_sales" synonyms=""/>
+  <ttr-mdg:column xmi:id="EAID_918B5D22_A1CB_5B7D_A28A_946B4096CB1E" base_Property="EAID_CCC58960_4921_5FDC_A541_3902F606BD61" qname="db.retail.recent_sales.id" synonyms="" type="int"/>
+  <ttr-mdg:table xmi:id="EAID_B9EBF303_89B2_59C1_9B4B_6CE27A16EF69" base_Class="EAID_A43BFC34_B4B0_5468_8C21_9762B9C03AF0" qname="db.retail.sales" synonyms="" schema="retail"/>
+  <ttr-mdg:column xmi:id="EAID_8E2CC157_1556_5002_98A7_FB94C2139551" base_Property="EAID_2295B4E4_EF10_5220_8F5B_4BDE2BC81578" qname="db.retail.sales.amount" synonyms="" type="decimal"/>
+  <ttr-mdg:column xmi:id="EAID_EBCCEB63_2323_5002_97AF_65E975C125FA" base_Property="EAID_E8527968_D058_53EF_8987_E86BCEDBD6F8" qname="db.retail.sales.buyer_id" synonyms="" type="int"/>
+  <ttr-mdg:column xmi:id="EAID_8F779E1E_7628_5665_B285_6DB8EBECA498" base_Property="EAID_9B4C42DF_509A_5734_8AED_46970C9F2E92" qname="db.retail.sales.id" synonyms="" type="int"/>
+  <ttr-mdg:column xmi:id="EAID_1EB870BD_E497_5FB0_8008_3D551F8BEDFA" base_Property="EAID_3FAB9314_EBE4_5E17_A8D0_117454637CF4" qname="db.retail.sales.sold_at" synonyms="" type="date"/>
+  <ttr-mdg:entity xmi:id="EAID_20C06689_1E06_5E68_A074_E3AE8BE60CA5" base_Class="EAID_801C022F_D804_532C_A25A_1AFA8BC94298" qname="er.entity.buyer" synonyms=""/>
+  <ttr-mdg:attribute xmi:id="EAID_3C5BB721_5B2A_57CD_913B_149EB2FAF29A" base_Property="EAID_73EC6812_8E49_5806_A5E0_21537050F435" qname="er.entity.buyer.id" synonyms="" type="int" nullable="false"/>
+  <ttr-mdg:attribute xmi:id="EAID_10D1A9E0_D04B_57E6_9E28_84B15044C4A9" base_Property="EAID_24F9A0B7_B74B_58AE_B822_F8164D78B302" qname="er.entity.buyer.name" synonyms="" type="text" nullable="false"/>
+  <ttr-mdg:entity xmi:id="EAID_3430AA7E_5733_5880_9A10_09DFA4882447" base_Class="EAID_967027AF_2734_57AD_BD2B_DA4E6BCA3A7F" qname="er.entity.product" synonyms=""/>
+  <ttr-mdg:attribute xmi:id="EAID_8C06A2B6_6704_5AEC_92B1_41A977AAFD69" base_Property="EAID_E5C6341A_BE49_5FF6_A9E0_9112C4A0B786" qname="er.entity.product.id" synonyms="" type="int" nullable="false"/>
+  <ttr-mdg:entity xmi:id="EAID_958E8C52_92A1_5E1C_A09F_7577C0722496" base_Class="EAID_F4D7C42A_8FC2_5027_9984_BD34AC86E882" qname="er.entity.sale" synonyms=""/>
+  <ttr-mdg:attribute xmi:id="EAID_DC45F7FB_98C4_558E_A9F5_A4CBBD6AF4F1" base_Property="EAID_8291C3B4_4A02_5F97_88C8_12793A9779F4" qname="er.entity.sale.amount" synonyms="" type="decimal" nullable="false"/>
+  <ttr-mdg:attribute xmi:id="EAID_97E3F1D5_DC87_5FCA_9BAB_4004C91FC568" base_Property="EAID_BF03030D_E384_56C4_96B5_030CE5DB7A3A" qname="er.entity.sale.buyer_id" synonyms="" type="int" nullable="false"/>
+  <ttr-mdg:attribute xmi:id="EAID_BD60C3CE_6F5D_5B5C_A650_263CFA50FCFC" base_Property="EAID_E581F5BD_F27E_5C5E_9C88_71782F13A1AD" qname="er.entity.sale.id" synonyms="" type="int" nullable="false"/>
+  <ttr-mdg:attribute xmi:id="EAID_113609A4_0944_5654_B953_64A1A4204468" base_Property="EAID_F3772F20_A3DC_5FDB_B85F_05C2013C951A" qname="er.entity.sale.sold_at" synonyms="" type="date" nullable="false"/>
+  <ttr-mdg:cubelet xmi:id="EAID_8D3590EB_B38E_5D59_83D4_E8AB28B0DD01" base_Class="EAID_610AAD11_C55C_5E1A_8BB5_629B788399BD" qname="md.cubelet.purchases" synonyms="" grain="md.Buyer.id;md.Calendar.day"/>
+  <ttr-mdg:dimension xmi:id="EAID_0875A41D_B98E_54F7_9121_370003209C05" base_Class="EAID_A7A23F64_F4F5_526F_A8C5_A57747CCC71B" qname="md.dimension.Buyer" synonyms="en:buyer" key="id"/>
+  <ttr-mdg:attribute xmi:id="EAID_44C84F5C_D5D9_54B3_BBAB_CD70492CCC60" base_Property="EAID_2ED67138_E4F8_5759_A991_7EB075F894E5" qname="md.dimension.Buyer.id" synonyms="" type="md.Money" nullable="false"/>
+  <ttr-mdg:dimension xmi:id="EAID_31976490_75F0_5220_B6AD_E02DE2D2DF2E" base_Class="EAID_0DDC2F6A_893C_5C66_913A_18AE121B7F76" qname="md.dimension.Calendar" synonyms="" key="day"/>
+  <ttr-mdg:attribute xmi:id="EAID_4E8C2D61_BFBD_561A_B2DA_207BD4DFC5AC" base_Property="EAID_597333E2_25DC_5237_9AB4_22766E8AD813" qname="md.dimension.Calendar.day" synonyms="" type="md.Money" nullable="false"/>
+  <ttr-mdg:attribute xmi:id="EAID_76E4AD72_9C9C_5834_8CBE_1642DD32BA9F" base_Property="EAID_4F668BBF_48C7_586B_BCA3_C4DFDEA36A50" qname="md.dimension.Calendar.month" synonyms="" type="md.Money" nullable="false"/>
+  <ttr-mdg:domain xmi:id="EAID_A3DC3897_B64C_5D60_A89A_CB64935C97B2" base_DataType="EAID_1BBD8159_99B8_5908_A128_086B50FEF464" qname="md.domain.Money" synonyms=""/>
+  <ttr-mdg:hierarchy xmi:id="EAID_5AC73457_298B_5BFA_9408_A4EC604A2ED4" base_Class="EAID_9EBF008E_A070_5E63_840D_51E6DBC44C40" qname="md.hierarchy.CalendarRollup" synonyms="" levels="day;month"/>
+  <ttr-mdg:metric xmi:id="EAID_D8C94D2A_6556_55E3_88FF_E82D00479386" base_Class="EAID_011D8C19_5FD4_598C_B877_EE7E1DBE0919" qname="md.measure.balance" synonyms="" aggregation="sum" additivity="semiAdditive" validBy="Calendar.day"/>
+  <ttr-mdg:metric xmi:id="EAID_2C20FE9F_5E5A_523B_B6CC_D21C8198CA64" base_Class="EAID_58CB9123_A85E_541D_B7A9_9C9AA6A8C85A" qname="md.measure.revenue" synonyms="" aggregation="sum"/>
+  <ttr-mdg:metric xmi:id="EAID_8A8C4E5C_5F17_533E_96D3_26E5F008A6D6" base_Class="EAID_727C8509_A999_5603_8096_6F3193346CA9" qname="md.measure.units" synonyms="" aggregation="sum"/>
+  <ttr-mdg:involves xmi:id="EAID_1EE7BFD0_D588_5495_BE43_136C14A694B4" base_Association="EAID_B6DC4322_A691_5CE6_9523_A4047E57D582" qname="edge.bbfeb5f0a53022afd8683b7c6665ebe9d842fd7b357dd2967d58e99888d12ce2" synonyms="" label="item"/>
+  <ttr-mdg:involves xmi:id="EAID_6F24231D_36E7_54B8_859F_48E19AEB985E" base_Association="EAID_853275A5_64E5_548C_A875_72F7324E2611" qname="edge.ddb6a809fe9fb388ddd1d89a76b591462f1cbbee229dcfab463ed39dcd940d33" synonyms="" label="buyer"/>
+  <ttr-mdg:grounds xmi:id="EAID_492B17C2_416E_5CB5_B9AF_1EEDBBEAD0FD" base_Dependency="EAID_3A16393F_209C_5342_9C99_41AF5E71FFB5" qname="cn2er_event.purchase_entity" synonyms="" layer="er" via="direct"/>
+  <ttr-mdg:grounds xmi:id="EAID_255CF49C_6BB5_5F25_BB3E_0BB2F35E8A25" base_Dependency="EAID_43CDFED0_80DC_5F66_B44C_FBF2C07FE64F" qname="cn2er_kind.party_entity" synonyms="" layer="er" via="direct"/>
+  <ttr-mdg:grounds xmi:id="EAID_F8DD99E5_EAC2_5B21_8E69_BDE1E5ED1D84" base_Dependency="EAID_E6BEE01E_FB28_5E01_9B0D_41D15451644B" qname="edge.3ec6642a86c7feceabc667c1e702453de29219a0c9f2d9003ebc3927f1fbf773" synonyms="" layer="er" via="sugar"/>
+  <ttr-mdg:grounds xmi:id="EAID_08CEB52F_217F_58BD_BF12_C7884F178995" base_Dependency="EAID_66F08DBF_A971_540B_88D2_0799300823BB" qname="cn2er_quality.sold_at_attribute" synonyms="" layer="er" via="direct"/>
+  <ttr-mdg:grounds xmi:id="EAID_B533A998_1231_5094_9A03_E49E135B15BD" base_Dependency="EAID_5D7F36F0_BCAA_5590_9140_2FDED5BF1E59" qname="cn2md_role.customer_dimension" synonyms="" layer="md" via="direct"/>
+  <ttr-mdg:relation xmi:id="EAID_081E6BFD_7628_5F22_A6AD_A650B57393C1" base_Association="EAID_FFDDCFA7_63B4_5BFC_976B_B02455F56A1D" qname="db.retail.sale_buyer" synonyms="" cardinality="from=0..*;to=1"/>
+  <ttr-mdg:grounds xmi:id="EAID_7C461CC6_5E2A_5229_BA3A_04AFB1FF1EBC" base_Dependency="EAID_CCFCFD35_9850_509B_9D6A_B8BED3985024" qname="er2db_entity.buyer_table" synonyms="" layer="db" via="er2db"/>
+  <ttr-mdg:grounds xmi:id="EAID_4847F630_76C0_5B27_BD8C_2294CBE76562" base_Dependency="EAID_3B5C126E_77BA_5073_BB6E_C167F38963F3" qname="er2db_attribute.buyer_id" synonyms="" layer="db" via="er2db"/>
+  <ttr-mdg:grounds xmi:id="EAID_F51DF9AA_6CC4_5B96_B987_8CB22507CED4" base_Dependency="EAID_BF7A0AB3_155D_51F7_96AC_211C85B1E61A" qname="er2db_entity.sale_table" synonyms="" layer="db" via="er2db"/>
+  <ttr-mdg:relation xmi:id="EAID_17C66803_2F88_521A_BAC0_DFC028F02CA3" base_Association="EAID_E31484E0_1903_5B6D_BFB7_D9C644E780EA" qname="er.relation.sale_buyer" synonyms="" cardinality="from=0..*;to=1"/>
+  <ttr-mdg:grounds xmi:id="EAID_DD54F603_BB7F_56C3_BDB1_35C9068C23CE" base_Dependency="EAID_62EADD5F_A7E8_5B43_A102_F48120C7FAA9" qname="md2db_cubelet.purchases_table" synonyms="" layer="db" via="md2db"/>
+  <xmi:Extension extender="Enterprise Architect" extenderID="6.5">
+    <elements>
+      <element xmi:idref="EAID_5201EB50_CA13_5476_84BB_49533907623C" xmi:type="uml:Class" name="Purchase" scope="public">
+        <properties stereotype="concept" documentation=""/>
+        <tags>
+          <tag name="qname" value="cn.event.Purchase" modelElement="EAID_5201EB50_CA13_5476_84BB_49533907623C"/>
+          <tag name="synonyms" value="" modelElement="EAID_5201EB50_CA13_5476_84BB_49533907623C"/>
+          <tag name="cnKind" value="event" modelElement="EAID_5201EB50_CA13_5476_84BB_49533907623C"/>
+          <tag name="extent" value="instantaneous" modelElement="EAID_5201EB50_CA13_5476_84BB_49533907623C"/>
+          <tag name="period" value="at=sold_at" modelElement="EAID_5201EB50_CA13_5476_84BB_49533907623C"/>
+          <tag name="tier" value="core" modelElement="EAID_5201EB50_CA13_5476_84BB_49533907623C"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_92B26720_4DFC_5A61_9355_AB2C2D685EAC" xmi:type="uml:Class" name="Party" scope="public">
+        <properties stereotype="concept" documentation="A trading party"/>
+        <tags>
+          <tag name="qname" value="cn.kind.Party" modelElement="EAID_92B26720_4DFC_5A61_9355_AB2C2D685EAC"/>
+          <tag name="synonyms" value="cs:osoba;cs:partner;en:partner;en:party" modelElement="EAID_92B26720_4DFC_5A61_9355_AB2C2D685EAC"/>
+          <tag name="cnKind" value="kind" modelElement="EAID_92B26720_4DFC_5A61_9355_AB2C2D685EAC"/>
+          <tag name="tier" value="core" modelElement="EAID_92B26720_4DFC_5A61_9355_AB2C2D685EAC"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_448C904D_2A33_57EE_8D76_1FA53CB6961B" xmi:type="uml:Class" name="Product" scope="public">
+        <properties stereotype="concept" documentation=""/>
+        <tags>
+          <tag name="qname" value="cn.kind.Product" modelElement="EAID_448C904D_2A33_57EE_8D76_1FA53CB6961B"/>
+          <tag name="synonyms" value="" modelElement="EAID_448C904D_2A33_57EE_8D76_1FA53CB6961B"/>
+          <tag name="cnKind" value="kind" modelElement="EAID_448C904D_2A33_57EE_8D76_1FA53CB6961B"/>
+          <tag name="tier" value="core" modelElement="EAID_448C904D_2A33_57EE_8D76_1FA53CB6961B"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_682AACD0_2750_5568_A674_6C1287E46D85" xmi:type="uml:Class" name="Prospect" scope="public">
+        <properties stereotype="concept" documentation=""/>
+        <tags>
+          <tag name="qname" value="cn.kind.Prospect" modelElement="EAID_682AACD0_2750_5568_A674_6C1287E46D85"/>
+          <tag name="synonyms" value="" modelElement="EAID_682AACD0_2750_5568_A674_6C1287E46D85"/>
+          <tag name="cnKind" value="kind" modelElement="EAID_682AACD0_2750_5568_A674_6C1287E46D85"/>
+          <tag name="tier" value="open" modelElement="EAID_682AACD0_2750_5568_A674_6C1287E46D85"/>
+          <tag name="abstract" value="true" modelElement="EAID_682AACD0_2750_5568_A674_6C1287E46D85"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_37A84A2D_4CE0_5109_9D4C_8FE14AE3E2A4" xmi:type="uml:Class" name="LargePurchase" scope="public">
+        <properties stereotype="concept" documentation=""/>
+        <tags>
+          <tag name="qname" value="cn.phase.LargePurchase" modelElement="EAID_37A84A2D_4CE0_5109_9D4C_8FE14AE3E2A4"/>
+          <tag name="synonyms" value="" modelElement="EAID_37A84A2D_4CE0_5109_9D4C_8FE14AE3E2A4"/>
+          <tag name="cnKind" value="phase" modelElement="EAID_37A84A2D_4CE0_5109_9D4C_8FE14AE3E2A4"/>
+          <tag name="tier" value="core" modelElement="EAID_37A84A2D_4CE0_5109_9D4C_8FE14AE3E2A4"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_5414B38F_1698_5CF4_BD73_F3C7F9F5876E" xmi:type="uml:Class" name="sold_at" scope="public">
+        <properties stereotype="concept" documentation=""/>
+        <tags>
+          <tag name="qname" value="cn.quality.sold_at" modelElement="EAID_5414B38F_1698_5CF4_BD73_F3C7F9F5876E"/>
+          <tag name="synonyms" value="" modelElement="EAID_5414B38F_1698_5CF4_BD73_F3C7F9F5876E"/>
+          <tag name="cnKind" value="quality" modelElement="EAID_5414B38F_1698_5CF4_BD73_F3C7F9F5876E"/>
+          <tag name="tier" value="core" modelElement="EAID_5414B38F_1698_5CF4_BD73_F3C7F9F5876E"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_8882A869_3D80_512B_B4B7_C5C9C4E73BD3" xmi:type="uml:Class" name="recommends" scope="public">
+        <properties stereotype="concept" documentation=""/>
+        <tags>
+          <tag name="qname" value="cn.relation_type.recommends" modelElement="EAID_8882A869_3D80_512B_B4B7_C5C9C4E73BD3"/>
+          <tag name="synonyms" value="" modelElement="EAID_8882A869_3D80_512B_B4B7_C5C9C4E73BD3"/>
+          <tag name="cnKind" value="relation_type" modelElement="EAID_8882A869_3D80_512B_B4B7_C5C9C4E73BD3"/>
+          <tag name="tier" value="open" modelElement="EAID_8882A869_3D80_512B_B4B7_C5C9C4E73BD3"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_54A188FF_D6ED_5E6A_8C04_67105518F17E" xmi:type="uml:Class" name="Customer" scope="public">
+        <properties stereotype="concept" documentation=""/>
+        <tags>
+          <tag name="qname" value="cn.role.Customer" modelElement="EAID_54A188FF_D6ED_5E6A_8C04_67105518F17E"/>
+          <tag name="synonyms" value="cs:zákazník;en:buyer;en:customer" modelElement="EAID_54A188FF_D6ED_5E6A_8C04_67105518F17E"/>
+          <tag name="cnKind" value="role" modelElement="EAID_54A188FF_D6ED_5E6A_8C04_67105518F17E"/>
+          <tag name="tier" value="core" modelElement="EAID_54A188FF_D6ED_5E6A_8C04_67105518F17E"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_B30B5E19_7DB6_5F0F_AD6B_E90AF4D64E60" xmi:type="uml:Class" name="buyers" scope="public">
+        <properties stereotype="table" documentation=""/>
+        <tags>
+          <tag name="qname" value="db.retail.buyers" modelElement="EAID_B30B5E19_7DB6_5F0F_AD6B_E90AF4D64E60"/>
+          <tag name="synonyms" value="" modelElement="EAID_B30B5E19_7DB6_5F0F_AD6B_E90AF4D64E60"/>
+          <tag name="schema" value="retail" modelElement="EAID_B30B5E19_7DB6_5F0F_AD6B_E90AF4D64E60"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_10589C71_C712_5AC0_92A6_F544676A587C" xmi:type="uml:Property" name="id" scope="public">
+        <properties stereotype="column" documentation=""/>
+        <tags>
+          <tag name="qname" value="db.retail.buyers.id" modelElement="EAID_10589C71_C712_5AC0_92A6_F544676A587C"/>
+          <tag name="synonyms" value="" modelElement="EAID_10589C71_C712_5AC0_92A6_F544676A587C"/>
+          <tag name="type" value="int" modelElement="EAID_10589C71_C712_5AC0_92A6_F544676A587C"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_FD07E4F6_6D2D_55FA_A088_9318300A275B" xmi:type="uml:Property" name="name" scope="public">
+        <properties stereotype="column" documentation=""/>
+        <tags>
+          <tag name="qname" value="db.retail.buyers.name" modelElement="EAID_FD07E4F6_6D2D_55FA_A088_9318300A275B"/>
+          <tag name="synonyms" value="" modelElement="EAID_FD07E4F6_6D2D_55FA_A088_9318300A275B"/>
+          <tag name="type" value="text" modelElement="EAID_FD07E4F6_6D2D_55FA_A088_9318300A275B"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_B6DF1A3F_5B35_512D_A8B5_CE9485E3B133" xmi:type="uml:Class" name="products" scope="public">
+        <properties stereotype="table" documentation=""/>
+        <tags>
+          <tag name="qname" value="db.retail.products" modelElement="EAID_B6DF1A3F_5B35_512D_A8B5_CE9485E3B133"/>
+          <tag name="synonyms" value="" modelElement="EAID_B6DF1A3F_5B35_512D_A8B5_CE9485E3B133"/>
+          <tag name="schema" value="retail" modelElement="EAID_B6DF1A3F_5B35_512D_A8B5_CE9485E3B133"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_9BA13A40_F5B9_501A_B5D8_A1C823E616AC" xmi:type="uml:Property" name="id" scope="public">
+        <properties stereotype="column" documentation=""/>
+        <tags>
+          <tag name="qname" value="db.retail.products.id" modelElement="EAID_9BA13A40_F5B9_501A_B5D8_A1C823E616AC"/>
+          <tag name="synonyms" value="" modelElement="EAID_9BA13A40_F5B9_501A_B5D8_A1C823E616AC"/>
+          <tag name="type" value="int" modelElement="EAID_9BA13A40_F5B9_501A_B5D8_A1C823E616AC"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_55EA5EA6_10B4_54D4_A026_B0DFEF6513E5" xmi:type="uml:Property" name="name" scope="public">
+        <properties stereotype="column" documentation=""/>
+        <tags>
+          <tag name="qname" value="db.retail.products.name" modelElement="EAID_55EA5EA6_10B4_54D4_A026_B0DFEF6513E5"/>
+          <tag name="synonyms" value="" modelElement="EAID_55EA5EA6_10B4_54D4_A026_B0DFEF6513E5"/>
+          <tag name="type" value="text" modelElement="EAID_55EA5EA6_10B4_54D4_A026_B0DFEF6513E5"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_020C3CAC_0342_5B39_B451_1D48068FEB4F" xmi:type="uml:Class" name="recent_sales" scope="public">
+        <properties stereotype="view" documentation=""/>
+        <tags>
+          <tag name="qname" value="db.retail.recent_sales" modelElement="EAID_020C3CAC_0342_5B39_B451_1D48068FEB4F"/>
+          <tag name="synonyms" value="" modelElement="EAID_020C3CAC_0342_5B39_B451_1D48068FEB4F"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_CCC58960_4921_5FDC_A541_3902F606BD61" xmi:type="uml:Property" name="id" scope="public">
+        <properties stereotype="column" documentation=""/>
+        <tags>
+          <tag name="qname" value="db.retail.recent_sales.id" modelElement="EAID_CCC58960_4921_5FDC_A541_3902F606BD61"/>
+          <tag name="synonyms" value="" modelElement="EAID_CCC58960_4921_5FDC_A541_3902F606BD61"/>
+          <tag name="type" value="int" modelElement="EAID_CCC58960_4921_5FDC_A541_3902F606BD61"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_A43BFC34_B4B0_5468_8C21_9762B9C03AF0" xmi:type="uml:Class" name="sales" scope="public">
+        <properties stereotype="table" documentation=""/>
+        <tags>
+          <tag name="qname" value="db.retail.sales" modelElement="EAID_A43BFC34_B4B0_5468_8C21_9762B9C03AF0"/>
+          <tag name="synonyms" value="" modelElement="EAID_A43BFC34_B4B0_5468_8C21_9762B9C03AF0"/>
+          <tag name="schema" value="retail" modelElement="EAID_A43BFC34_B4B0_5468_8C21_9762B9C03AF0"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_2295B4E4_EF10_5220_8F5B_4BDE2BC81578" xmi:type="uml:Property" name="amount" scope="public">
+        <properties stereotype="column" documentation=""/>
+        <tags>
+          <tag name="qname" value="db.retail.sales.amount" modelElement="EAID_2295B4E4_EF10_5220_8F5B_4BDE2BC81578"/>
+          <tag name="synonyms" value="" modelElement="EAID_2295B4E4_EF10_5220_8F5B_4BDE2BC81578"/>
+          <tag name="type" value="decimal" modelElement="EAID_2295B4E4_EF10_5220_8F5B_4BDE2BC81578"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_E8527968_D058_53EF_8987_E86BCEDBD6F8" xmi:type="uml:Property" name="buyer_id" scope="public">
+        <properties stereotype="column" documentation=""/>
+        <tags>
+          <tag name="qname" value="db.retail.sales.buyer_id" modelElement="EAID_E8527968_D058_53EF_8987_E86BCEDBD6F8"/>
+          <tag name="synonyms" value="" modelElement="EAID_E8527968_D058_53EF_8987_E86BCEDBD6F8"/>
+          <tag name="type" value="int" modelElement="EAID_E8527968_D058_53EF_8987_E86BCEDBD6F8"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_9B4C42DF_509A_5734_8AED_46970C9F2E92" xmi:type="uml:Property" name="id" scope="public">
+        <properties stereotype="column" documentation=""/>
+        <tags>
+          <tag name="qname" value="db.retail.sales.id" modelElement="EAID_9B4C42DF_509A_5734_8AED_46970C9F2E92"/>
+          <tag name="synonyms" value="" modelElement="EAID_9B4C42DF_509A_5734_8AED_46970C9F2E92"/>
+          <tag name="type" value="int" modelElement="EAID_9B4C42DF_509A_5734_8AED_46970C9F2E92"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_3FAB9314_EBE4_5E17_A8D0_117454637CF4" xmi:type="uml:Property" name="sold_at" scope="public">
+        <properties stereotype="column" documentation=""/>
+        <tags>
+          <tag name="qname" value="db.retail.sales.sold_at" modelElement="EAID_3FAB9314_EBE4_5E17_A8D0_117454637CF4"/>
+          <tag name="synonyms" value="" modelElement="EAID_3FAB9314_EBE4_5E17_A8D0_117454637CF4"/>
+          <tag name="type" value="date" modelElement="EAID_3FAB9314_EBE4_5E17_A8D0_117454637CF4"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_801C022F_D804_532C_A25A_1AFA8BC94298" xmi:type="uml:Class" name="buyer" scope="public">
+        <properties stereotype="entity" documentation=""/>
+        <tags>
+          <tag name="qname" value="er.entity.buyer" modelElement="EAID_801C022F_D804_532C_A25A_1AFA8BC94298"/>
+          <tag name="synonyms" value="" modelElement="EAID_801C022F_D804_532C_A25A_1AFA8BC94298"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_73EC6812_8E49_5806_A5E0_21537050F435" xmi:type="uml:Property" name="id" scope="public">
+        <properties stereotype="attribute" documentation=""/>
+        <tags>
+          <tag name="qname" value="er.entity.buyer.id" modelElement="EAID_73EC6812_8E49_5806_A5E0_21537050F435"/>
+          <tag name="synonyms" value="" modelElement="EAID_73EC6812_8E49_5806_A5E0_21537050F435"/>
+          <tag name="type" value="int" modelElement="EAID_73EC6812_8E49_5806_A5E0_21537050F435"/>
+          <tag name="nullable" value="false" modelElement="EAID_73EC6812_8E49_5806_A5E0_21537050F435"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_24F9A0B7_B74B_58AE_B822_F8164D78B302" xmi:type="uml:Property" name="name" scope="public">
+        <properties stereotype="attribute" documentation=""/>
+        <tags>
+          <tag name="qname" value="er.entity.buyer.name" modelElement="EAID_24F9A0B7_B74B_58AE_B822_F8164D78B302"/>
+          <tag name="synonyms" value="" modelElement="EAID_24F9A0B7_B74B_58AE_B822_F8164D78B302"/>
+          <tag name="type" value="text" modelElement="EAID_24F9A0B7_B74B_58AE_B822_F8164D78B302"/>
+          <tag name="nullable" value="false" modelElement="EAID_24F9A0B7_B74B_58AE_B822_F8164D78B302"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_967027AF_2734_57AD_BD2B_DA4E6BCA3A7F" xmi:type="uml:Class" name="product" scope="public">
+        <properties stereotype="entity" documentation=""/>
+        <tags>
+          <tag name="qname" value="er.entity.product" modelElement="EAID_967027AF_2734_57AD_BD2B_DA4E6BCA3A7F"/>
+          <tag name="synonyms" value="" modelElement="EAID_967027AF_2734_57AD_BD2B_DA4E6BCA3A7F"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_E5C6341A_BE49_5FF6_A9E0_9112C4A0B786" xmi:type="uml:Property" name="id" scope="public">
+        <properties stereotype="attribute" documentation=""/>
+        <tags>
+          <tag name="qname" value="er.entity.product.id" modelElement="EAID_E5C6341A_BE49_5FF6_A9E0_9112C4A0B786"/>
+          <tag name="synonyms" value="" modelElement="EAID_E5C6341A_BE49_5FF6_A9E0_9112C4A0B786"/>
+          <tag name="type" value="int" modelElement="EAID_E5C6341A_BE49_5FF6_A9E0_9112C4A0B786"/>
+          <tag name="nullable" value="false" modelElement="EAID_E5C6341A_BE49_5FF6_A9E0_9112C4A0B786"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_F4D7C42A_8FC2_5027_9984_BD34AC86E882" xmi:type="uml:Class" name="sale" scope="public">
+        <properties stereotype="entity" documentation=""/>
+        <tags>
+          <tag name="qname" value="er.entity.sale" modelElement="EAID_F4D7C42A_8FC2_5027_9984_BD34AC86E882"/>
+          <tag name="synonyms" value="" modelElement="EAID_F4D7C42A_8FC2_5027_9984_BD34AC86E882"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_8291C3B4_4A02_5F97_88C8_12793A9779F4" xmi:type="uml:Property" name="amount" scope="public">
+        <properties stereotype="attribute" documentation=""/>
+        <tags>
+          <tag name="qname" value="er.entity.sale.amount" modelElement="EAID_8291C3B4_4A02_5F97_88C8_12793A9779F4"/>
+          <tag name="synonyms" value="" modelElement="EAID_8291C3B4_4A02_5F97_88C8_12793A9779F4"/>
+          <tag name="type" value="decimal" modelElement="EAID_8291C3B4_4A02_5F97_88C8_12793A9779F4"/>
+          <tag name="nullable" value="false" modelElement="EAID_8291C3B4_4A02_5F97_88C8_12793A9779F4"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_BF03030D_E384_56C4_96B5_030CE5DB7A3A" xmi:type="uml:Property" name="buyer_id" scope="public">
+        <properties stereotype="attribute" documentation=""/>
+        <tags>
+          <tag name="qname" value="er.entity.sale.buyer_id" modelElement="EAID_BF03030D_E384_56C4_96B5_030CE5DB7A3A"/>
+          <tag name="synonyms" value="" modelElement="EAID_BF03030D_E384_56C4_96B5_030CE5DB7A3A"/>
+          <tag name="type" value="int" modelElement="EAID_BF03030D_E384_56C4_96B5_030CE5DB7A3A"/>
+          <tag name="nullable" value="false" modelElement="EAID_BF03030D_E384_56C4_96B5_030CE5DB7A3A"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_E581F5BD_F27E_5C5E_9C88_71782F13A1AD" xmi:type="uml:Property" name="id" scope="public">
+        <properties stereotype="attribute" documentation=""/>
+        <tags>
+          <tag name="qname" value="er.entity.sale.id" modelElement="EAID_E581F5BD_F27E_5C5E_9C88_71782F13A1AD"/>
+          <tag name="synonyms" value="" modelElement="EAID_E581F5BD_F27E_5C5E_9C88_71782F13A1AD"/>
+          <tag name="type" value="int" modelElement="EAID_E581F5BD_F27E_5C5E_9C88_71782F13A1AD"/>
+          <tag name="nullable" value="false" modelElement="EAID_E581F5BD_F27E_5C5E_9C88_71782F13A1AD"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_F3772F20_A3DC_5FDB_B85F_05C2013C951A" xmi:type="uml:Property" name="sold_at" scope="public">
+        <properties stereotype="attribute" documentation=""/>
+        <tags>
+          <tag name="qname" value="er.entity.sale.sold_at" modelElement="EAID_F3772F20_A3DC_5FDB_B85F_05C2013C951A"/>
+          <tag name="synonyms" value="" modelElement="EAID_F3772F20_A3DC_5FDB_B85F_05C2013C951A"/>
+          <tag name="type" value="date" modelElement="EAID_F3772F20_A3DC_5FDB_B85F_05C2013C951A"/>
+          <tag name="nullable" value="false" modelElement="EAID_F3772F20_A3DC_5FDB_B85F_05C2013C951A"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_610AAD11_C55C_5E1A_8BB5_629B788399BD" xmi:type="uml:Class" name="purchases" scope="public">
+        <properties stereotype="cubelet" documentation=""/>
+        <tags>
+          <tag name="qname" value="md.cubelet.purchases" modelElement="EAID_610AAD11_C55C_5E1A_8BB5_629B788399BD"/>
+          <tag name="synonyms" value="" modelElement="EAID_610AAD11_C55C_5E1A_8BB5_629B788399BD"/>
+          <tag name="grain" value="md.Buyer.id;md.Calendar.day" modelElement="EAID_610AAD11_C55C_5E1A_8BB5_629B788399BD"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_A7A23F64_F4F5_526F_A8C5_A57747CCC71B" xmi:type="uml:Class" name="Buyer" scope="public">
+        <properties stereotype="dimension" documentation=""/>
+        <tags>
+          <tag name="qname" value="md.dimension.Buyer" modelElement="EAID_A7A23F64_F4F5_526F_A8C5_A57747CCC71B"/>
+          <tag name="synonyms" value="en:buyer" modelElement="EAID_A7A23F64_F4F5_526F_A8C5_A57747CCC71B"/>
+          <tag name="key" value="id" modelElement="EAID_A7A23F64_F4F5_526F_A8C5_A57747CCC71B"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_2ED67138_E4F8_5759_A991_7EB075F894E5" xmi:type="uml:Property" name="id" scope="public">
+        <properties stereotype="attribute" documentation=""/>
+        <tags>
+          <tag name="qname" value="md.dimension.Buyer.id" modelElement="EAID_2ED67138_E4F8_5759_A991_7EB075F894E5"/>
+          <tag name="synonyms" value="" modelElement="EAID_2ED67138_E4F8_5759_A991_7EB075F894E5"/>
+          <tag name="type" value="md.Money" modelElement="EAID_2ED67138_E4F8_5759_A991_7EB075F894E5"/>
+          <tag name="nullable" value="false" modelElement="EAID_2ED67138_E4F8_5759_A991_7EB075F894E5"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_0DDC2F6A_893C_5C66_913A_18AE121B7F76" xmi:type="uml:Class" name="Calendar" scope="public">
+        <properties stereotype="dimension" documentation=""/>
+        <tags>
+          <tag name="qname" value="md.dimension.Calendar" modelElement="EAID_0DDC2F6A_893C_5C66_913A_18AE121B7F76"/>
+          <tag name="synonyms" value="" modelElement="EAID_0DDC2F6A_893C_5C66_913A_18AE121B7F76"/>
+          <tag name="key" value="day" modelElement="EAID_0DDC2F6A_893C_5C66_913A_18AE121B7F76"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_597333E2_25DC_5237_9AB4_22766E8AD813" xmi:type="uml:Property" name="day" scope="public">
+        <properties stereotype="attribute" documentation=""/>
+        <tags>
+          <tag name="qname" value="md.dimension.Calendar.day" modelElement="EAID_597333E2_25DC_5237_9AB4_22766E8AD813"/>
+          <tag name="synonyms" value="" modelElement="EAID_597333E2_25DC_5237_9AB4_22766E8AD813"/>
+          <tag name="type" value="md.Money" modelElement="EAID_597333E2_25DC_5237_9AB4_22766E8AD813"/>
+          <tag name="nullable" value="false" modelElement="EAID_597333E2_25DC_5237_9AB4_22766E8AD813"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_4F668BBF_48C7_586B_BCA3_C4DFDEA36A50" xmi:type="uml:Property" name="month" scope="public">
+        <properties stereotype="attribute" documentation=""/>
+        <tags>
+          <tag name="qname" value="md.dimension.Calendar.month" modelElement="EAID_4F668BBF_48C7_586B_BCA3_C4DFDEA36A50"/>
+          <tag name="synonyms" value="" modelElement="EAID_4F668BBF_48C7_586B_BCA3_C4DFDEA36A50"/>
+          <tag name="type" value="md.Money" modelElement="EAID_4F668BBF_48C7_586B_BCA3_C4DFDEA36A50"/>
+          <tag name="nullable" value="false" modelElement="EAID_4F668BBF_48C7_586B_BCA3_C4DFDEA36A50"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_1BBD8159_99B8_5908_A128_086B50FEF464" xmi:type="uml:DataType" name="Money" scope="public">
+        <properties stereotype="domain" documentation=""/>
+        <tags>
+          <tag name="qname" value="md.domain.Money" modelElement="EAID_1BBD8159_99B8_5908_A128_086B50FEF464"/>
+          <tag name="synonyms" value="" modelElement="EAID_1BBD8159_99B8_5908_A128_086B50FEF464"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_9EBF008E_A070_5E63_840D_51E6DBC44C40" xmi:type="uml:Class" name="CalendarRollup" scope="public">
+        <properties stereotype="hierarchy" documentation=""/>
+        <tags>
+          <tag name="qname" value="md.hierarchy.CalendarRollup" modelElement="EAID_9EBF008E_A070_5E63_840D_51E6DBC44C40"/>
+          <tag name="synonyms" value="" modelElement="EAID_9EBF008E_A070_5E63_840D_51E6DBC44C40"/>
+          <tag name="levels" value="day;month" modelElement="EAID_9EBF008E_A070_5E63_840D_51E6DBC44C40"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_011D8C19_5FD4_598C_B877_EE7E1DBE0919" xmi:type="uml:Class" name="balance" scope="public">
+        <properties stereotype="metric" documentation=""/>
+        <tags>
+          <tag name="qname" value="md.measure.balance" modelElement="EAID_011D8C19_5FD4_598C_B877_EE7E1DBE0919"/>
+          <tag name="synonyms" value="" modelElement="EAID_011D8C19_5FD4_598C_B877_EE7E1DBE0919"/>
+          <tag name="aggregation" value="sum" modelElement="EAID_011D8C19_5FD4_598C_B877_EE7E1DBE0919"/>
+          <tag name="additivity" value="semiAdditive" modelElement="EAID_011D8C19_5FD4_598C_B877_EE7E1DBE0919"/>
+          <tag name="validBy" value="Calendar.day" modelElement="EAID_011D8C19_5FD4_598C_B877_EE7E1DBE0919"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_58CB9123_A85E_541D_B7A9_9C9AA6A8C85A" xmi:type="uml:Class" name="revenue" scope="public">
+        <properties stereotype="metric" documentation=""/>
+        <tags>
+          <tag name="qname" value="md.measure.revenue" modelElement="EAID_58CB9123_A85E_541D_B7A9_9C9AA6A8C85A"/>
+          <tag name="synonyms" value="" modelElement="EAID_58CB9123_A85E_541D_B7A9_9C9AA6A8C85A"/>
+          <tag name="aggregation" value="sum" modelElement="EAID_58CB9123_A85E_541D_B7A9_9C9AA6A8C85A"/>
+        </tags>
+      </element>
+      <element xmi:idref="EAID_727C8509_A999_5603_8096_6F3193346CA9" xmi:type="uml:Class" name="units" scope="public">
+        <properties stereotype="metric" documentation=""/>
+        <tags>
+          <tag name="qname" value="md.measure.units" modelElement="EAID_727C8509_A999_5603_8096_6F3193346CA9"/>
+          <tag name="synonyms" value="" modelElement="EAID_727C8509_A999_5603_8096_6F3193346CA9"/>
+          <tag name="aggregation" value="sum" modelElement="EAID_727C8509_A999_5603_8096_6F3193346CA9"/>
+        </tags>
+      </element>
+    </elements>
+    <connectors>
+      <connector xmi:idref="EAID_B6DC4322_A691_5CE6_9523_A4047E57D582">
+        <source xmi:idref="EAID_5201EB50_CA13_5476_84BB_49533907623C">
+          <model name="Purchase" type="Class"/>
+          <role name="Purchase" multiplicity=""/>
+        </source>
+        <target xmi:idref="EAID_448C904D_2A33_57EE_8D76_1FA53CB6961B">
+          <model name="Product" type="Class"/>
+          <role name="item" multiplicity=""/>
+        </target>
+        <properties ea_type="Association" stereotype="involves" documentation=""/>
+        <tags>
+          <tag name="qname" value="edge.bbfeb5f0a53022afd8683b7c6665ebe9d842fd7b357dd2967d58e99888d12ce2" modelElement="EAID_B6DC4322_A691_5CE6_9523_A4047E57D582"/>
+          <tag name="synonyms" value="" modelElement="EAID_B6DC4322_A691_5CE6_9523_A4047E57D582"/>
+          <tag name="label" value="item" modelElement="EAID_B6DC4322_A691_5CE6_9523_A4047E57D582"/>
+        </tags>
+      </connector>
+      <connector xmi:idref="EAID_853275A5_64E5_548C_A875_72F7324E2611">
+        <source xmi:idref="EAID_5201EB50_CA13_5476_84BB_49533907623C">
+          <model name="Purchase" type="Class"/>
+          <role name="Purchase" multiplicity=""/>
+        </source>
+        <target xmi:idref="EAID_54A188FF_D6ED_5E6A_8C04_67105518F17E">
+          <model name="Customer" type="Class"/>
+          <role name="buyer" multiplicity=""/>
+        </target>
+        <properties ea_type="Association" stereotype="involves" documentation=""/>
+        <tags>
+          <tag name="qname" value="edge.ddb6a809fe9fb388ddd1d89a76b591462f1cbbee229dcfab463ed39dcd940d33" modelElement="EAID_853275A5_64E5_548C_A875_72F7324E2611"/>
+          <tag name="synonyms" value="" modelElement="EAID_853275A5_64E5_548C_A875_72F7324E2611"/>
+          <tag name="label" value="buyer" modelElement="EAID_853275A5_64E5_548C_A875_72F7324E2611"/>
+        </tags>
+      </connector>
+      <connector xmi:idref="EAID_3A16393F_209C_5342_9C99_41AF5E71FFB5">
+        <source xmi:idref="EAID_5201EB50_CA13_5476_84BB_49533907623C">
+          <model name="Purchase" type="Class"/>
+          <role name="Purchase" multiplicity=""/>
+        </source>
+        <target xmi:idref="EAID_F4D7C42A_8FC2_5027_9984_BD34AC86E882">
+          <model name="sale" type="Class"/>
+          <role name="sale" multiplicity=""/>
+        </target>
+        <properties ea_type="Dependency" stereotype="grounds" documentation=""/>
+        <tags>
+          <tag name="qname" value="cn2er_event.purchase_entity" modelElement="EAID_3A16393F_209C_5342_9C99_41AF5E71FFB5"/>
+          <tag name="synonyms" value="" modelElement="EAID_3A16393F_209C_5342_9C99_41AF5E71FFB5"/>
+          <tag name="layer" value="er" modelElement="EAID_3A16393F_209C_5342_9C99_41AF5E71FFB5"/>
+          <tag name="via" value="direct" modelElement="EAID_3A16393F_209C_5342_9C99_41AF5E71FFB5"/>
+        </tags>
+      </connector>
+      <connector xmi:idref="EAID_43CDFED0_80DC_5F66_B44C_FBF2C07FE64F">
+        <source xmi:idref="EAID_92B26720_4DFC_5A61_9355_AB2C2D685EAC">
+          <model name="Party" type="Class"/>
+          <role name="Party" multiplicity=""/>
+        </source>
+        <target xmi:idref="EAID_801C022F_D804_532C_A25A_1AFA8BC94298">
+          <model name="buyer" type="Class"/>
+          <role name="buyer" multiplicity=""/>
+        </target>
+        <properties ea_type="Dependency" stereotype="grounds" documentation=""/>
+        <tags>
+          <tag name="qname" value="cn2er_kind.party_entity" modelElement="EAID_43CDFED0_80DC_5F66_B44C_FBF2C07FE64F"/>
+          <tag name="synonyms" value="" modelElement="EAID_43CDFED0_80DC_5F66_B44C_FBF2C07FE64F"/>
+          <tag name="layer" value="er" modelElement="EAID_43CDFED0_80DC_5F66_B44C_FBF2C07FE64F"/>
+          <tag name="via" value="direct" modelElement="EAID_43CDFED0_80DC_5F66_B44C_FBF2C07FE64F"/>
+        </tags>
+      </connector>
+      <connector xmi:idref="EAID_E6BEE01E_FB28_5E01_9B0D_41D15451644B">
+        <source xmi:idref="EAID_448C904D_2A33_57EE_8D76_1FA53CB6961B">
+          <model name="Product" type="Class"/>
+          <role name="Product" multiplicity=""/>
+        </source>
+        <target xmi:idref="EAID_967027AF_2734_57AD_BD2B_DA4E6BCA3A7F">
+          <model name="product" type="Class"/>
+          <role name="product" multiplicity=""/>
+        </target>
+        <properties ea_type="Dependency" stereotype="grounds" documentation=""/>
+        <tags>
+          <tag name="qname" value="edge.3ec6642a86c7feceabc667c1e702453de29219a0c9f2d9003ebc3927f1fbf773" modelElement="EAID_E6BEE01E_FB28_5E01_9B0D_41D15451644B"/>
+          <tag name="synonyms" value="" modelElement="EAID_E6BEE01E_FB28_5E01_9B0D_41D15451644B"/>
+          <tag name="layer" value="er" modelElement="EAID_E6BEE01E_FB28_5E01_9B0D_41D15451644B"/>
+          <tag name="via" value="sugar" modelElement="EAID_E6BEE01E_FB28_5E01_9B0D_41D15451644B"/>
+        </tags>
+      </connector>
+      <connector xmi:idref="EAID_B35A2662_94CF_5891_B515_DDA44128C6BC">
+        <source xmi:idref="EAID_682AACD0_2750_5568_A674_6C1287E46D85">
+          <model name="Prospect" type="Class"/>
+          <role name="Prospect" multiplicity=""/>
+        </source>
+        <target xmi:idref="EAID_92B26720_4DFC_5A61_9355_AB2C2D685EAC">
+          <model name="Party" type="Class"/>
+          <role name="Party" multiplicity=""/>
+        </target>
+        <properties ea_type="Generalization" stereotype="" documentation=""/>
+        <tags>
+          <tag name="qname" value="edge.a4fefeae4d18a6d781413295a9e0466d4b2385da33f583fd25441e500a1f10cd" modelElement="EAID_B35A2662_94CF_5891_B515_DDA44128C6BC"/>
+          <tag name="synonyms" value="" modelElement="EAID_B35A2662_94CF_5891_B515_DDA44128C6BC"/>
+        </tags>
+      </connector>
+      <connector xmi:idref="EAID_66F08DBF_A971_540B_88D2_0799300823BB">
+        <source xmi:idref="EAID_5414B38F_1698_5CF4_BD73_F3C7F9F5876E">
+          <model name="sold_at" type="Class"/>
+          <role name="sold_at" multiplicity=""/>
+        </source>
+        <target xmi:idref="EAID_F3772F20_A3DC_5FDB_B85F_05C2013C951A">
+          <model name="sold_at" type="Property"/>
+          <role name="sold_at" multiplicity=""/>
+        </target>
+        <properties ea_type="Dependency" stereotype="grounds" documentation=""/>
+        <tags>
+          <tag name="qname" value="cn2er_quality.sold_at_attribute" modelElement="EAID_66F08DBF_A971_540B_88D2_0799300823BB"/>
+          <tag name="synonyms" value="" modelElement="EAID_66F08DBF_A971_540B_88D2_0799300823BB"/>
+          <tag name="layer" value="er" modelElement="EAID_66F08DBF_A971_540B_88D2_0799300823BB"/>
+          <tag name="via" value="direct" modelElement="EAID_66F08DBF_A971_540B_88D2_0799300823BB"/>
+        </tags>
+      </connector>
+      <connector xmi:idref="EAID_5D7F36F0_BCAA_5590_9140_2FDED5BF1E59">
+        <source xmi:idref="EAID_54A188FF_D6ED_5E6A_8C04_67105518F17E">
+          <model name="Customer" type="Class"/>
+          <role name="Customer" multiplicity=""/>
+        </source>
+        <target xmi:idref="EAID_A7A23F64_F4F5_526F_A8C5_A57747CCC71B">
+          <model name="Buyer" type="Class"/>
+          <role name="Buyer" multiplicity=""/>
+        </target>
+        <properties ea_type="Dependency" stereotype="grounds" documentation=""/>
+        <tags>
+          <tag name="qname" value="cn2md_role.customer_dimension" modelElement="EAID_5D7F36F0_BCAA_5590_9140_2FDED5BF1E59"/>
+          <tag name="synonyms" value="" modelElement="EAID_5D7F36F0_BCAA_5590_9140_2FDED5BF1E59"/>
+          <tag name="layer" value="md" modelElement="EAID_5D7F36F0_BCAA_5590_9140_2FDED5BF1E59"/>
+          <tag name="via" value="direct" modelElement="EAID_5D7F36F0_BCAA_5590_9140_2FDED5BF1E59"/>
+        </tags>
+      </connector>
+      <connector xmi:idref="EAID_FFDDCFA7_63B4_5BFC_976B_B02455F56A1D">
+        <source xmi:idref="EAID_A43BFC34_B4B0_5468_8C21_9762B9C03AF0">
+          <model name="sales" type="Class"/>
+          <role name="sales" multiplicity="0..*"/>
+        </source>
+        <target xmi:idref="EAID_B30B5E19_7DB6_5F0F_AD6B_E90AF4D64E60">
+          <model name="buyers" type="Class"/>
+          <role name="buyers" multiplicity="1"/>
+        </target>
+        <properties ea_type="Association" stereotype="relation" documentation=""/>
+        <tags>
+          <tag name="qname" value="db.retail.sale_buyer" modelElement="EAID_FFDDCFA7_63B4_5BFC_976B_B02455F56A1D"/>
+          <tag name="synonyms" value="" modelElement="EAID_FFDDCFA7_63B4_5BFC_976B_B02455F56A1D"/>
+          <tag name="cardinality" value="from=0..*;to=1" modelElement="EAID_FFDDCFA7_63B4_5BFC_976B_B02455F56A1D"/>
+        </tags>
+      </connector>
+      <connector xmi:idref="EAID_CCFCFD35_9850_509B_9D6A_B8BED3985024">
+        <source xmi:idref="EAID_801C022F_D804_532C_A25A_1AFA8BC94298">
+          <model name="buyer" type="Class"/>
+          <role name="buyer" multiplicity=""/>
+        </source>
+        <target xmi:idref="EAID_B30B5E19_7DB6_5F0F_AD6B_E90AF4D64E60">
+          <model name="buyers" type="Class"/>
+          <role name="buyers" multiplicity=""/>
+        </target>
+        <properties ea_type="Dependency" stereotype="grounds" documentation=""/>
+        <tags>
+          <tag name="qname" value="er2db_entity.buyer_table" modelElement="EAID_CCFCFD35_9850_509B_9D6A_B8BED3985024"/>
+          <tag name="synonyms" value="" modelElement="EAID_CCFCFD35_9850_509B_9D6A_B8BED3985024"/>
+          <tag name="layer" value="db" modelElement="EAID_CCFCFD35_9850_509B_9D6A_B8BED3985024"/>
+          <tag name="via" value="er2db" modelElement="EAID_CCFCFD35_9850_509B_9D6A_B8BED3985024"/>
+        </tags>
+      </connector>
+      <connector xmi:idref="EAID_3B5C126E_77BA_5073_BB6E_C167F38963F3">
+        <source xmi:idref="EAID_73EC6812_8E49_5806_A5E0_21537050F435">
+          <model name="id" type="Property"/>
+          <role name="id" multiplicity=""/>
+        </source>
+        <target xmi:idref="EAID_10589C71_C712_5AC0_92A6_F544676A587C">
+          <model name="id" type="Property"/>
+          <role name="id" multiplicity=""/>
+        </target>
+        <properties ea_type="Dependency" stereotype="grounds" documentation=""/>
+        <tags>
+          <tag name="qname" value="er2db_attribute.buyer_id" modelElement="EAID_3B5C126E_77BA_5073_BB6E_C167F38963F3"/>
+          <tag name="synonyms" value="" modelElement="EAID_3B5C126E_77BA_5073_BB6E_C167F38963F3"/>
+          <tag name="layer" value="db" modelElement="EAID_3B5C126E_77BA_5073_BB6E_C167F38963F3"/>
+          <tag name="via" value="er2db" modelElement="EAID_3B5C126E_77BA_5073_BB6E_C167F38963F3"/>
+        </tags>
+      </connector>
+      <connector xmi:idref="EAID_BF7A0AB3_155D_51F7_96AC_211C85B1E61A">
+        <source xmi:idref="EAID_F4D7C42A_8FC2_5027_9984_BD34AC86E882">
+          <model name="sale" type="Class"/>
+          <role name="sale" multiplicity=""/>
+        </source>
+        <target xmi:idref="EAID_A43BFC34_B4B0_5468_8C21_9762B9C03AF0">
+          <model name="sales" type="Class"/>
+          <role name="sales" multiplicity=""/>
+        </target>
+        <properties ea_type="Dependency" stereotype="grounds" documentation=""/>
+        <tags>
+          <tag name="qname" value="er2db_entity.sale_table" modelElement="EAID_BF7A0AB3_155D_51F7_96AC_211C85B1E61A"/>
+          <tag name="synonyms" value="" modelElement="EAID_BF7A0AB3_155D_51F7_96AC_211C85B1E61A"/>
+          <tag name="layer" value="db" modelElement="EAID_BF7A0AB3_155D_51F7_96AC_211C85B1E61A"/>
+          <tag name="via" value="er2db" modelElement="EAID_BF7A0AB3_155D_51F7_96AC_211C85B1E61A"/>
+        </tags>
+      </connector>
+      <connector xmi:idref="EAID_E31484E0_1903_5B6D_BFB7_D9C644E780EA">
+        <source xmi:idref="EAID_F4D7C42A_8FC2_5027_9984_BD34AC86E882">
+          <model name="sale" type="Class"/>
+          <role name="sale" multiplicity="0..*"/>
+        </source>
+        <target xmi:idref="EAID_801C022F_D804_532C_A25A_1AFA8BC94298">
+          <model name="buyer" type="Class"/>
+          <role name="buyer" multiplicity="1"/>
+        </target>
+        <properties ea_type="Association" stereotype="relation" documentation=""/>
+        <tags>
+          <tag name="qname" value="er.relation.sale_buyer" modelElement="EAID_E31484E0_1903_5B6D_BFB7_D9C644E780EA"/>
+          <tag name="synonyms" value="" modelElement="EAID_E31484E0_1903_5B6D_BFB7_D9C644E780EA"/>
+          <tag name="cardinality" value="from=0..*;to=1" modelElement="EAID_E31484E0_1903_5B6D_BFB7_D9C644E780EA"/>
+        </tags>
+      </connector>
+      <connector xmi:idref="EAID_62EADD5F_A7E8_5B43_A102_F48120C7FAA9">
+        <source xmi:idref="EAID_610AAD11_C55C_5E1A_8BB5_629B788399BD">
+          <model name="purchases" type="Class"/>
+          <role name="purchases" multiplicity=""/>
+        </source>
+        <target xmi:idref="EAID_A43BFC34_B4B0_5468_8C21_9762B9C03AF0">
+          <model name="sales" type="Class"/>
+          <role name="sales" multiplicity=""/>
+        </target>
+        <properties ea_type="Dependency" stereotype="grounds" documentation=""/>
+        <tags>
+          <tag name="qname" value="md2db_cubelet.purchases_table" modelElement="EAID_62EADD5F_A7E8_5B43_A102_F48120C7FAA9"/>
+          <tag name="synonyms" value="" modelElement="EAID_62EADD5F_A7E8_5B43_A102_F48120C7FAA9"/>
+          <tag name="layer" value="db" modelElement="EAID_62EADD5F_A7E8_5B43_A102_F48120C7FAA9"/>
+          <tag name="via" value="md2db" modelElement="EAID_62EADD5F_A7E8_5B43_A102_F48120C7FAA9"/>
+        </tags>
+      </connector>
+    </connectors>
+  </xmi:Extension>
+</xmi:XMI>

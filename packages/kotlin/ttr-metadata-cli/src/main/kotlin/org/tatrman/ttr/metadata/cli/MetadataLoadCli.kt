@@ -85,7 +85,7 @@ object MetadataLoadCli {
 
     private const val CHECKOUT_SOURCE = "checkout"
 
-    private fun readManifest(manifest: Path): Pair<PackageLayout, List<LoadReportIssue>> {
+    internal fun readManifest(manifest: Path): Pair<PackageLayout, List<LoadReportIssue>> {
         val parsed =
             runCatching { Toml.parse(manifest) }.getOrElse { error ->
                 return PackageLayout.Flexible to

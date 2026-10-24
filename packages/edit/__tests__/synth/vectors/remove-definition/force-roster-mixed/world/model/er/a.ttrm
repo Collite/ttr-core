@@ -1,0 +1,3 @@
+package shop
+model er
+def entity customer {}

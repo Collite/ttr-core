@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: Apache-2.0
+id: ttr-mdg
+name: Tatrman TTR
+version: "1"
+commonTags:
+  - { name: qname, type: String }
+  - { name: synonyms, type: String }
+stereotypes:
+  - name: entity
+    metaclass: Class
+  - name: attribute
+    metaclass: Property
+    tags:
+      - { name: type, type: String }
+      - { name: nullable, type: Boolean }
+  - name: relation
+    metaclass: Association
+    tags:
+      - { name: cardinality, type: String }
+  - name: table
+    metaclass: Class
+    tags:
+      - { name: schema, type: String }
+  - name: view
+    metaclass: Class
+  - name: column
+    metaclass: Property
+    tags:
+      - { name: type, type: String }
+  - name: concept
+    metaclass: Class
+    tags:
+      - { name: cnKind, type: enumeration, values: "kind,role,phase,quality,event,relation_type" }
+      - { name: extent, type: String }
+      - { name: basis, type: String }
+      - { name: period, type: String }
+      - { name: tier, type: String }
+      - { name: abstract, type: Boolean }
+  - name: involves
+    metaclass: Association
+    tags:
+      - { name: label, type: String }
+  - name: grounds
+    metaclass: Dependency
+    tags:
+      - { name: layer, type: String }
+      - { name: via, type: String }
+  - name: cubelet
+    metaclass: Class
+    tags:
+      - { name: grain, type: String }
+  - name: metric
+    metaclass: Class
+    tags:
+      - { name: aggregation, type: String }
+      - { name: additivity, type: String }
+      - { name: validBy, type: String }
+  - name: dimension
+    metaclass: Class
+    tags:
+      - { name: key, type: String }
+  - name: hierarchy
+    metaclass: Class
+    tags:
+      - { name: levels, type: String }
+  - name: domain
+    metaclass: DataType

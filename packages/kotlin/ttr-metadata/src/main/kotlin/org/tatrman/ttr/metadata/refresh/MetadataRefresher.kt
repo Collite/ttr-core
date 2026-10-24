@@ -160,7 +160,22 @@ class MetadataRefresher(
             val graph = ModelGraph.build(reconciled.model)
             // VL V-37/V-38: the layouts of this model, from the same loads, in the same swap
             val layouts = LayoutIndex.build(freshOrCached, reconciled.model)
-            registry.swap(reconciled.model, graph, reconciled.warnings + reconciled.errors, layouts)
+            registry.swap(
+                reconciled.model,
+                graph,
+                reconciled.warnings + reconciled.errors,
+                layouts,
+                files = reconciled.files,
+                exportSidecars =
+                    freshOrCached
+                        .sortedBy {
+                            it.priority
+                        }.flatMap { it.exportSidecars.entries }
+                        .associate {
+                            it
+                                .toPair()
+                        },
+            )
             // Only reached when a source actually changed (the no-change short-circuit returns
             // earlier), so this won't re-spam the issue list every quiet refresh interval.
             log.info(

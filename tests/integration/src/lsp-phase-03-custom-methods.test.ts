@@ -131,12 +131,13 @@ describe('Phase 3 custom LSP methods', () => {
     }
   });
 
-  it('4.3 applyGraphEdit returns edit-mode-not-available-in-v1', async () => {
+  it('4.3 applyGraphEdit rejects unsupported legacy operations with a migration note', async () => {
     const result = await client.sendRequest('modeler/applyGraphEdit', {
       operations: [{ op: 'add-node', node: {} }],
-    }) as { ok: false; reason: string };
+    }) as { ok: false; code: string; deprecated: string };
     expect(result.ok).toBe(false);
-    expect(result.reason).toBe('edit-mode-not-available-in-v1');
+    expect(result.code).toBe('invalid-args');
+    expect(result.deprecated).toBe('modeler/edit');
   });
 
   it('4.4 getSymbolDetail for er.entity.item returns its label, description, perKindData, referencedBy', async () => {

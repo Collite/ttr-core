@@ -4,14 +4,18 @@ package org.tatrman.ttrp.lsp.analysis
 import org.tatrman.ttrp.lsp.docs.OpenDocument
 import org.tatrman.ttrp.lsp.project.ProjectResolver
 import org.tatrman.ttrp.resolve.TtrpChecker
-import java.nio.file.Path
+import org.tatrman.ttrp.graph.TtrpPipeline
+import org.tatrman.ttrp.lsp.project.ProjectContext
 import java.util.concurrent.ConcurrentHashMap
 
 /** A resolved front-half analysis of one document version. */
 data class Analysis(
     val uri: String,
     val version: Int,
+    /** Canonical recipe positions are not valid positions in a Markdown document. */
     val report: TtrpChecker.Report,
+    val literate: org.tatrman.ttrp.doc.DocExtraction? = null,
+    val recipes: List<EditorRecipe> = emptyList(),
 )
 
 /**
@@ -24,20 +28,27 @@ data class Analysis(
  */
 class AnalysisEngine(
     private val projects: ProjectResolver,
+    private val pipelineFactory: (ProjectContext) -> TtrpPipeline = { TtrpPipeline(it.manifest, it.modelsRoot) },
 ) {
     private val analysisCache = ConcurrentHashMap<String, Analysis>()
-    private val checkerCache = ConcurrentHashMap<String, TtrpChecker>()
+    private val pipelineCache = ConcurrentHashMap<String, TtrpPipeline>()
 
     fun analyze(doc: OpenDocument): Analysis {
         analysisCache[doc.uri]?.let { if (it.version == doc.version) return it }
+        return analyzeSource(doc).also { analysisCache[doc.uri] = it }
+    }
+
+    /** Validate supplied text without a document-version cache, while reusing project metadata. */
+    fun analyzeSource(doc: OpenDocument): Analysis {
         val ctx = projects.resolve(doc.uri)
+        val pipeline = pipelineCache.computeIfAbsent(ctx.manifest.manifestDir.toString()) { pipelineFactory(ctx) }
+        if (RecipeEditorAnalysis.markdown(doc)) {
+            return RecipeEditorAnalysis.literate(doc, ctx, pipeline)
+        }
         val report =
             ttrbSentenceCheck(doc, ctx)
-                ?: checkerFor(ctx.modelsRoot) { TtrpChecker(ctx.manifest, ctx.modelsRoot) }
-                    .check(doc.text, doc.uri, ctx.manifestDiagnostics)
-        val analysis = Analysis(doc.uri, doc.version, report)
-        analysisCache[doc.uri] = analysis
-        return analysis
+                ?: pipeline.check(doc.text, doc.uri, ctx.manifestDiagnostics)
+        return RecipeEditorAnalysis.checked(doc, ctx, report, pipeline)
     }
 
     /**
@@ -79,20 +90,13 @@ class AnalysisEngine(
 
     /**
      * Drop every cached checker and analysis. Called when a watched model / world / manifest
-     * file changes on disk: the per-modelsRoot [checkerCache] holds a snapshot loaded from
+     * file changes on disk: the per-project [pipelineCache] holds a snapshot loaded from
      * disk, so without this a model edit stays invisible until the server restarts.
      */
     fun invalidateAll() {
         analysisCache.clear()
-        checkerCache.clear()
+        pipelineCache.clear()
     }
-
-    // The model repo is loaded once per models root (an editor session touches one
-    // project); the front-half itself never caches resolution.
-    private fun checkerFor(
-        modelsRoot: Path,
-        build: () -> TtrpChecker,
-    ): TtrpChecker = checkerCache.getOrPut(modelsRoot.toString(), build)
 
     companion object {
         /** The TTR-B language ids (English / Czech skin) the editor analyses sentence by sentence. */

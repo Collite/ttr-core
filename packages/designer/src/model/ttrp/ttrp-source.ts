@@ -29,6 +29,10 @@ export interface TtrpReadRunClient {
 export class TtrpServerProcessingSource implements ProcessingGraphSource {
   constructor(private readonly client: TtrpReadRunClient, private readonly uri?: string) {}
 
+  async getRecipeSummary(_programRef: string): Promise<import('./types.js').RecipeSummary | null> {
+    return (await this.client.getGraph(this.uri)).recipe ?? null;
+  }
+
   async getProgramGraph(_programRef: string): Promise<ProcessingGraph> {
     const result = await this.client.getGraph(this.uri);
     return ttrpToProcessingGraph(result, 'program');

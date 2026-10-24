@@ -1,0 +1,8 @@
+package hartland
+
+model lexicon locale cs
+
+def term returns_review_cs {
+    for: hartland.er.entity.returns_review,
+    forms: ["přehled reklamací"]
+}

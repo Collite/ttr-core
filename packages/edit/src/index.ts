@@ -19,3 +19,9 @@ export {
 } from './lint-fixes.js';
 export type { GraphOp, PortRef, EdgeRole, EdgeInsertionTarget } from './graph-ops.js';
 export { buildInsertNodeOnEdge, buildSetArgOp, buildSetSourceOp, buildRemoveObjectOp, insertionNodeId } from './graph-ops.js';
+export { synthesize } from './synth/index.js';
+export type { EditArgs, EditArguments, EditOp, RefusalCode, RefusalRef, SynthContext, SynthResult } from './synth/index.js';
+
+// Standalone consumers can resolve their manifest without a private workspace dependency.
+export { parseManifest, resolveManifest } from '@tatrman/semantics';
+export type { ResolvedManifest } from '@tatrman/semantics';

@@ -46,6 +46,7 @@ data class GetGraphResult(
      * Empty until Stage 5.2 wires `AutoLayout`.
      */
     val autoLayout: Map<String, Map<String, AbstractCoord>> = emptyMap(),
+    val recipe: RecipeSummary? = null,
 )
 
 data class GraphView(
@@ -179,4 +180,23 @@ data class StorageView(
     val name: String,
     val type: String?,
     val staging: Boolean,
+)
+
+/** AU recipe list view; additive to the processing graph protocol. */
+data class RecipeSummary(
+    val name: String,
+    val mode: String,
+    val lanes: List<RecipeLane>,
+)
+
+data class RecipeLane(
+    val role: String,
+    val islands: List<RecipeIsland>,
+)
+
+data class RecipeIsland(
+    val name: String,
+    val kind: String,
+    val contextClass: String? = null,
+    val routes: List<String> = emptyList(),
 )

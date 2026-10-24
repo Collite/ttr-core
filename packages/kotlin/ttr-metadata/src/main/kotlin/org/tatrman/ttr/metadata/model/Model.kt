@@ -428,6 +428,10 @@ data class Attribute(
     val states: List<String> = emptyList(),
     /** Grammar 0.16 — `transitions: { placed: [held, …] }` (D-67), from-state → allowed targets; empty ⇒ any. */
     val transitions: Map<String, List<String>> = emptyMap(),
+    /** Authored type length: text characters, or total decimal digits. Null when undeclared. */
+    val length: Int? = null,
+    /** Authored decimal scale (TTR-M calls it `precision`). Null when undeclared; zero is explicit. */
+    val precision: Int? = null,
 ) : ModelObject {
     override val kind: String = "attribute"
 }

@@ -5,10 +5,12 @@
 import {
   InitializeRequest,
   DidOpenTextDocumentNotification,
+  DidChangeTextDocumentNotification,
   PublishDiagnosticsNotification,
   type InitializeParams,
 } from 'vscode-languageserver-protocol';
 import type { ModelGraph, LayoutFile, SymbolDetail, GraphMetadata, GetGraphResponse, PackageGraphResponse, BindingMapData, ProjectRootResult, SchemaSubject, SymbolPage, ListedSymbol } from '@tatrman/lsp';
+import type { ModelerEditParams, ModelerEditResult } from '@tatrman/lsp';
 import type { WorkspaceEdit } from 'vscode-languageserver-types';
 import type { LspClient } from './lsp-client.js';
 
@@ -38,11 +40,19 @@ export async function lspClientOver(
     const messages = params.diagnostics.map((d) => d.message);
     for (const h of diagnosticHandlers) h(params.uri, messages);
   });
+  const versions = new Map<string, number>();
   return {
+    edit: (params: ModelerEditParams) => connection.sendRequest('modeler/edit', params) as Promise<ModelerEditResult>,
     transportKind: opts.transportKind,
     async openDocument(uri, content) {
-      await connection.sendNotification(DidOpenTextDocumentNotification.method, {
-        textDocument: { uri, languageId: 'ttr', version: 1, text: content },
+      const previous = versions.get(uri);
+      const version = (previous ?? 0) + 1;
+      versions.set(uri, version);
+      if (previous === undefined) await connection.sendNotification(DidOpenTextDocumentNotification.method, {
+        textDocument: { uri, languageId: uri.endsWith('.mjs') ? 'javascript' : 'ttr', version, text: content },
+      });
+      else await connection.sendNotification(DidChangeTextDocumentNotification.method, {
+        textDocument: { uri, version }, contentChanges: [{ text: content }],
       });
     },
     async setProjectRoot(projectRoot, manifest) {
