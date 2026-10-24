@@ -79,7 +79,7 @@ pnpm -r typecheck
 ### Per-package commands
 
 ```bash
-pnpm --filter @tatrman/designer dev          # Vite dev server on http://localhost:5173
+pnpm --filter @tatrman/designer-core dev          # Vite dev server on http://localhost:5173
 pnpm --filter ttr-modeler-vsc test:smoke # boots VS Code, runs 5 smoke cases
 pnpm --filter @tatrman/integration-tests test
 ```
@@ -95,7 +95,7 @@ For the VS Code extension dev cycle, open `packages/vscode-ext` in VS Code and p
 | [`@tatrman/semantics`](packages/semantics/README.md) | Symbol table, resolver, validator, reference index — browser-safe core plus a Node-only subpath for disk I/O |
 | [`@tatrman/lsp`](packages/lsp/README.md) | LSP server (stdio + browser worker), Phase-3 custom `modeler/*` methods |
 | [`ttr-modeler-vsc`](packages/vscode-ext/README.md) | VS Code extension — thin shim, all language logic lives in the LSP |
-| [`@tatrman/designer`](packages/designer/README.md) | React + React Flow Designer; deployed via GitHub Pages |
+| [`@tatrman/designer-core`](packages/designer/README.md) | React + React Flow Designer; deployed via GitHub Pages |
 
 ## Documentation
 

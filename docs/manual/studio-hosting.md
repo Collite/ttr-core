@@ -44,8 +44,8 @@ idempotent. After a failed initial load, refresh retries it.
 | Frame → host | `{ type: 'ttr.frame.error', code: 'host/load-failed', message }` | Snapshot fetch/catalog failure. Response bodies and credentials are not included. |
 | Frame → host | `{ type: 'ttr.frame.error', code: 'host/bad-location', message }` | Malformed location; an initial bad hash falls back to the configured workspace and loading continues. |
 
-TypeScript unions are exported from `packages/designer/src/host/host-channel.ts`; the public
-`designer-core` package export comes in SO-core P3. Dirty/changedFiles/collect types are reserved for P1.
+TypeScript unions are exported from `@tatrman/designer-core`. Dirty/changedFiles/collect messages
+are implemented by the P1 save seam described below.
 
 ### BFF snapshot
 
@@ -97,7 +97,7 @@ and `lang` remain in the iframe document query. Do not echo an unchanged locatio
 
 ### Local smoke
 
-Build the LSP and Designer first, then start `pnpm --filter @tatrman/designer exec vite preview
+Build the LSP and Designer first, then start `pnpm --filter @tatrman/designer-core exec vite preview
 --host 127.0.0.1 --port 5187`. From the repository root:
 
 ```sh
@@ -135,7 +135,7 @@ and canvas intact; successful writes refresh the model and show returned diagnos
 not undo a successful edit; Propose has its own strict gate. The open build adds no canvas forms.
 
 An extension can import `editModel`, `ModelerEditParams` and `ModelerEditResult` from
-`@tatrman/designer/extensions` and call `editModel(ctx.dataSource,{op,args,dryRun?})`. The data source serializes
+`@tatrman/designer-core/extensions` and call `editModel(ctx.dataSource,{op,args,dryRun?})`. The data source serializes
 requests, applies each returned edit exactly once to the pre-request text, then acknowledges full text to the LSP.
 Do not apply the response again. Read-only backends have no authoring hook.
 

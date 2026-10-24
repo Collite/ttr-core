@@ -60,7 +60,7 @@ skills later.
   through their `dist/` entry points (`"main": "./dist/index.js"`), so
   `pnpm install` alone leaves them unresolvable — `pnpm run dev` dies at
   dep-scan with `Failed to resolve entry for package "@tatrman/canvas-core"`.
-- Run `pnpm --filter "@tatrman/designer^..." build` (or `pnpm -r build`) from
+- Run `pnpm --filter "@tatrman/designer-core^..." build` (or `pnpm -r build`) from
   the repo root once after cloning or after cleaning `dist/`.
 
 ### One `SAMPLE_NAME` drives both the dev server and the build
