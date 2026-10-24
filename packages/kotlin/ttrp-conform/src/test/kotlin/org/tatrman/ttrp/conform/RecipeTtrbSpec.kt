@@ -77,6 +77,57 @@ class RecipeTtrbSpec :
                 check(outcome.exitCode == 0) { outcome.summary() }
             }
         }
+        test("omitted mode retains both matching routes and the same lowered graph in EN and CS") {
+            val source =
+                """
+                uses world "hartland.worlds.demo"
+                import hartland.*
+                import hartland.automation.*
+                recipe {
+                    key: order.order_number
+                    candidates orders(out rows) target erp ${"\"\"\""}sql
+                        SELECT o.order_number FROM er.entity.order o
+                    ${"\"\"\""}
+                    decision verdict(in orders) { orders -> switch { route_a: true route_b: true } }
+                    actions { verdict.route_a, verdict.route_b -> release { order: order_number } }
+                }
+                """.trimIndent()
+            val original =
+                TtrpParser
+                    .parseString(
+                        source,
+                    ).document.statements
+                    .filterIsInstance<RecipeDecl>()
+                    .single()
+                    .decisions
+                    .single()
+            val canonical = RecipePlanted.planSource(source)
+            for ((language, tag) in listOf("en" to "ttrb", "cs" to "ttrb-cs")) {
+                val replacement = "decision verdict(in orders) \"\"\"$tag\n${TtrbRecipeRenderer.decision(
+                    original.switch,
+                    language,
+                )}\"\"\""
+                val translated =
+                    RecipePlanted.planSource(
+                        source.replaceRange(original.location.offsetStart, original.location.offsetEnd, replacement),
+                    )
+                org.tatrman.ttrp.graph.explain.NormalizedGraphJson
+                    .write(translated.graph!!) shouldBe
+                    org.tatrman.ttrp.graph.explain.NormalizedGraphJson
+                        .write(canonical.graph!!)
+                DuckDbRecipeEngine(RecipePlanted.scripts).use { engine ->
+                    val conform = RecipeConform()
+                    val outcome =
+                        conform.compare(
+                            listOf(
+                                conform.runOn(engine, canonical, RecipePlanted.AS_OF),
+                                conform.runOn(engine, translated, RecipePlanted.AS_OF),
+                            ),
+                        )
+                    outcome.exitCode shouldBe 0
+                }
+            }
+        }
         test("latest snapshot infers the unique calendar key attribute from metadata") {
             val source =
                 """

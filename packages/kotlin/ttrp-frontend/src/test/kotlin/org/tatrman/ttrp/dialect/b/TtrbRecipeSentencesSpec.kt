@@ -103,6 +103,28 @@ class TtrbRecipeSentencesSpec :
             again.mode shouldBe sw.mode
             again.elseRoute!!.name shouldBe sw.elseRoute!!.name
         }
+        test("an omitted switch mode round trips without becoming exclusive in EN and CS") {
+            val parsed = decision("Decide route_a when x > 0. Decide route_b when y > 0.")
+            val sw =
+                parsed.document.statements
+                    .filterIsInstance<RecipeDecl>()
+                    .single()
+                    .decisions
+                    .single()
+                    .switch
+            sw.mode shouldBe null
+            for ((lang, tag) in listOf("en" to "ttrb", "cs" to "ttrb-cs")) {
+                val roundtrip = decision(TtrbRecipeRenderer.decision(sw, lang), tag)
+                roundtrip.diagnostics shouldBe emptyList()
+                roundtrip.document.statements
+                    .filterIsInstance<RecipeDecl>()
+                    .single()
+                    .decisions
+                    .single()
+                    .switch.mode shouldBe
+                    null
+            }
+        }
         test("optional action sentence takes its routes explicitly from the canonical skeleton") {
             val at = org.tatrman.ttrp.ast.SourceLocation.UNKNOWN
             val wiring =

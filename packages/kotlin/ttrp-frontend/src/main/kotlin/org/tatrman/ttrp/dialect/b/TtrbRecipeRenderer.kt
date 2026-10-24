@@ -30,15 +30,14 @@ object TtrbRecipeRenderer {
                 }
                 append(".\n")
             }
-            append(
-                if (sw.mode == SwitchMode.OVERLAPPING) {
-                    if (cs) "Rozhodni; řádek může projít více cestami." else "Decide; a row may take several routes."
-                } else if (cs) {
-                    "Rozhoduj výlučně."
-                } else {
-                    "Decide exclusively."
-                },
-            )
+            when (sw.mode) {
+                SwitchMode.OVERLAPPING ->
+                    append(
+                        if (cs) "Rozhodni; řádek může projít více cestami." else "Decide; a row may take several routes.",
+                    )
+                SwitchMode.EXCLUSIVE -> append(if (cs) "Rozhoduj výlučně." else "Decide exclusively.")
+                null -> Unit
+            }
             sw.elseRoute?.let { other ->
                 append('\n')
                 append(
