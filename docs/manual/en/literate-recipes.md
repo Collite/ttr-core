@@ -75,14 +75,18 @@ jobs:
     with:
       toolchain-version: PUBLIC_VERSION
       recipes: 'recipes/**/*.md'
+      exclude: '**/README.md'
+      lang: en
 ```
+
+The `exclude` glob (default `**/README.md`) removes generated READMEs from the source matches; a literate recipe is not named README.md. The `lang` input (default `en`, also `cs`) must match the committed README language.
 
 The workflow installs the pinned public CLI distribution from Maven Central and executes every matched source;
 no matched files is an error. Hartland can point `recipes` at its literate automation directory; ai-models can point
 it at the corresponding package documents. For an already installed toolchain:
 
 ```sh
-find recipes -name '*.md' -print0 | while IFS= read -r -d '' file; do
+find recipes -name '*.md' ! -name README.md -print0 | while IFS= read -r -d '' file; do
   ttrp build "$file" --check
 done
 ```

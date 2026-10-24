@@ -13,6 +13,17 @@ on:
         default: 'recipes/**/*.md'
         type: string
 
+      exclude:
+        description: Recursive glob of generated Markdown files to exclude
+        required: false
+        default: '**/README.md'
+        type: string
+      lang:
+        description: Language used to render the committed READMEs (en or cs)
+        required: false
+        default: en
+        type: string
+
 permissions:
   contents: read
 
@@ -49,13 +60,21 @@ jobs:
       - name: Check every committed derived recipe
         env:
           RECIPE_GLOB: ${{ inputs.recipes }}
+          EXCLUDE_GLOB: ${{ inputs.exclude }}
+          README_LANG: ${{ inputs.lang }}
         run: |
           python3 - <<'PY'
           import glob, os, subprocess
-          sources = sorted(path for path in glob.glob(os.environ['RECIPE_GLOB'], recursive=True) if os.path.isfile(path))
+          from pathlib import Path
+          excluded = {Path(path).resolve() for path in glob.glob(os.environ['EXCLUDE_GLOB'], recursive=True)}
+          sources = sorted({
+              Path(path).resolve(): path
+              for path in glob.glob(os.environ['RECIPE_GLOB'], recursive=True)
+              if Path(path).is_file() and Path(path).resolve() not in excluded
+          }.values())
           if not sources:
               raise SystemExit('recipe glob matched no source files')
           for source in sources:
               print(f'Checking {source}', flush=True)
-              subprocess.run([os.environ['TTRP_CLI'], 'build', source, '--check'], check=True)
+              subprocess.run([os.environ['TTRP_CLI'], 'build', source, '--check', '--lang', os.environ['README_LANG']], check=True)
           PY
