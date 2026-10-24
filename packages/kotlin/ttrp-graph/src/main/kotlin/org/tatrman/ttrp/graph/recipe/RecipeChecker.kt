@@ -798,17 +798,15 @@ class RecipeChecker(
         action: AutomationAction,
         at: SourceLocation,
     ) {
-        val targets = mutableMapOf<String, org.tatrman.ttr.metadata.model.QualifiedName>()
-        for (ref in AutomationScope.targetRefs(action)) {
-            val result = actionScope?.target(ref)
+        for ((ref, result) in AutomationScope.targetsOf(action) {
+            actionScope?.target(it)
+                ?: TargetResolution.Unresolved(it)
+        }) {
             val reason =
                 when (result) {
-                    is TargetResolution.Resolved -> {
-                        val previous = targets.put(result.entity.qname.name, result.entity.qname)
-                        if (previous != null && previous != result.entity.qname) "ambiguous" else null
-                    }
+                    is TargetResolution.Resolved -> null
                     is TargetResolution.Ambiguous -> "ambiguous"
-                    else -> "unresolved"
+                    is TargetResolution.Unresolved -> "unresolved"
                 }
             if (reason != null) {
                 diags +=
@@ -970,11 +968,16 @@ class RecipeChecker(
                     // `action: start { process: "purchasing" }` — the asked action, partly applied: the answer to
                     // the ask completes it, so a column it leaves out is not missing (H-3's ask).
                     v is WiringValue.Call -> checkCall(v, ctx, partial = true)
-                    ref == null ||
-                        ref.port != null ||
-                        action(
-                            ref.column,
-                        ) == null -> mismatch("takes an action the imports define")
+                    ref == null || ref.port != null -> mismatch("takes an action the imports define")
+                    actionScope?.action(ref.column) is ActionResolution.Ambiguous -> {
+                        diags +=
+                            err(
+                                TtrpDiagnosticId.REC_007,
+                                "ambiguous action `${ref.column}` in the imported packages",
+                                arg.location,
+                            )
+                    }
+                    action(ref.column) == null -> mismatch("takes an action the imports define")
                 }
             else -> {
                 if (v is WiringValue.Call || v is WiringValue.Values) {

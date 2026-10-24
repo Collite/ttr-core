@@ -8,6 +8,15 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ### Added — Native writer-default approval dependencies
 
+- Re-review/Ruling 3: approval actions/entities and qualifiers now use the loader-owned declared package,
+  or model-root-relative directory when undeclared. Absolute checkout paths never affect approval scope;
+  unrelated legacy compiler import checks retain their path rules. Former path-only action matches now
+  refuse at build. ModelIndex requires an explicit package provider; consumers rebuild and supply a complete
+  loader map, including injected stdlib files (LayoutResolver.packagesFromFiles over reconciled files).
+- Qualified stdlib refs bypass project shadowing; bare refs still prefer the project. Export distinguishes
+  evidence-free model lookup failures and names missing recorded imports. Public fingerprint failures name
+  their target/ref; noncanonical import lists refuse. REC-007 now gives rename/narrow-import guidance,
+  including action-valued arguments; the manual and authoring example carry both new diagnostic rows.
 - Review-145: checker/producer/export share scoped action and attribute resolution. Package-qualified and
   canonical writer refs cover the real logical entity (last two segments), including type/provenance checks.
   Default-covered unresolved/ambiguous targets report located REC-006; ambiguous wired actions report REC-007

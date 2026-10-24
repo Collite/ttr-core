@@ -24,6 +24,9 @@ import org.tatrman.ttrp.cli.BuildCommand
 import org.tatrman.ttrp.cli.CheckCommand
 import org.tatrman.ttrp.emit.recipe.RecipeActionDependencies
 import org.tatrman.ttrp.project.TtrpManifest
+import org.tatrman.ttrp.resolve.ModelRepo
+import org.tatrman.ttrp.resolve.ModelIndex
+import org.tatrman.ttrp.resolve.ActionResolution
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -58,9 +61,11 @@ class WriterDefaultFingerprintsSpec :
         fun bundle(
             editModel: (Path) -> Unit = {},
             sourceText: String = recipe,
+            checkoutSubdir: String = "",
             transform: (String) -> String = { it },
         ): BundleAssembler.BundleResult {
-            val root = tempdir("writer-fingerprints").toPath()
+            val root = tempdir("writer-fingerprints").toPath().resolve(checkoutSubdir)
+            Files.createDirectories(root)
             Files.walk(fixtures).use { paths ->
                 paths.forEach { path ->
                     val target = root.resolve("model").resolve(fixtures.relativize(path))
@@ -92,6 +97,162 @@ class WriterDefaultFingerprintsSpec :
 
         fun build(transform: (String) -> String = { it }): RecipeManifest =
             bundle(transform = transform).manifest.recipe!!
+
+        fun exportProject(result: BundleAssembler.BundleResult): Path {
+            val root = result.dir.parent.parent
+            Files.move(root.resolve("model"), root.resolve("models"))
+            // The compiler's old shared fixture uses pre-package-parity directory layout and role hints.
+            // Normalize this private copy for the export CLI's strict metadata reader.
+            for (folder in listOf("binding", "db", "er")) {
+                val from = root.resolve("models/hartland/$folder")
+                Files.list(from).use { paths ->
+                    paths.forEach { file ->
+                        val text = Files.readString(file).replace(Regex("roles: \\[.*?\\]"), "")
+                        Files.writeString(root.resolve("models/hartland/${folder}_${file.fileName}"), text)
+                        Files.delete(file)
+                    }
+                }
+                Files.delete(from)
+            }
+            Files.deleteIfExists(root.resolve("models/hartland/automation/checker-probes.ttrm"))
+            Files.writeString(root.resolve("modeler.toml"), "[ttrp]\nworld = \"hartland.worlds.demo\"\n")
+            return root
+        }
+
+        "rereview R1 default approval verifies after moving metadata outside all package directories" {
+            val result = bundle()
+            val recipe = result.manifest.recipe!!
+            val evidence = recipe.approvalDependencies!!
+            val moved = tempdir("moved-approval").toPath().resolve("private/cache/model")
+            Files.createDirectories(moved)
+            Files
+                .walk(
+                    result.dir.parent.parent
+                        .resolve("model"),
+                ).use { paths ->
+                    paths.filter { Files.isRegularFile(it) }.toList().forEachIndexed { i, file ->
+                        Files.copy(file, moved.resolve("metadata-$i.ttrm"))
+                    }
+                }
+            val scope =
+                ModelRepo.indexOf(moved)!!.automationScope(
+                    evidence.imports.map { ModelIndex.importScope(it.split('.'), it) },
+                )
+            val actions =
+                evidence.actions.keys.associateWith { name ->
+                    (scope.action(name) as ActionResolution.Resolved).action
+                }
+            RecipeActionDependencies.verify(evidence, recipe.fingerprints.text, actions, scope::target) shouldBe
+                RecipeActionDependencies.Verification.Ok
+        }
+
+        "rereview R1 a path only action import becomes a located REC001 build refusal" {
+            val source =
+                recipe
+                    .replace("import hartland.*", "import private.*")
+                    .replace("import hartland.automation.*", "")
+            val failed =
+                shouldThrow<BundleAssembler.BundleRefused> {
+                    bundle(sourceText = source, checkoutSubdir = "private/cache")
+                }
+            failed.diagnostics.any { it.id.name == "REC_001" && it.location.line > 0 } shouldBe true
+        }
+
+        "rereview R3 an evidence free export identifies model ambiguity without inventing a recorded scope" {
+            val result = bundle { it.replace("writer_defaults: { state: { expression: \"'released'\" } }", "") }
+            val root = exportProject(result)
+            Files.createDirectories(root.resolve("models/other"))
+            Files.writeString(
+                root.resolve("models/other/action.ttrm"),
+                "package other\nmodel automation\ndef action release { " +
+                    "columns: [def column id { type: text, optional: true }], sinks: { native: writer } }",
+            )
+            val out = root.resolve("ambiguous-export")
+            val refused =
+                TtrpCommand().subcommands(EmitCommand()).test(
+                    listOf(
+                        "emit",
+                        "--deployment",
+                        "release_native_morning",
+                        "--project",
+                        root.toString(),
+                        "--bundle",
+                        result.dir.toString(),
+                        "--out",
+                        out.toString(),
+                    ),
+                )
+            refused.statusCode shouldBe 2
+            refused.output shouldContain "release"
+            refused.output shouldContain "ambiguous"
+            refused.output.contains("recorded scope") shouldBe false
+            Files.exists(out.resolve("release_native_morning.native.export")) shouldBe false
+        }
+
+        "rereview n4 an unknown recorded import is named before any export is written" {
+            val result = bundle()
+            val root = exportProject(result)
+            val recipe = result.manifest.recipe!!
+            val evidence =
+                recipe.approvalDependencies!!.copy(
+                    imports =
+                        (
+                            recipe.approvalDependencies!!.imports +
+                                "absent"
+                        ).sorted(),
+                )
+            val changed =
+                recipe.copy(
+                    approvalDependencies = evidence,
+                    fingerprints = recipe.fingerprints.copy(text = RecipeActionDependencies.text(evidence)),
+                )
+            val badBundle = root.resolve("missing-import-bundle")
+            Files.walk(result.dir).use { paths ->
+                paths.forEach { path ->
+                    val to = badBundle.resolve(result.dir.relativize(path))
+                    if (Files.isDirectory(path)) Files.createDirectories(to) else Files.copy(path, to)
+                }
+            }
+            Files.writeString(badBundle.resolve("manifest.json"), result.manifest.copy(recipe = changed).toJson())
+            val out = root.resolve("missing-import-export")
+            val refused =
+                TtrpCommand().subcommands(EmitCommand()).test(
+                    listOf(
+                        "emit",
+                        "--deployment",
+                        "release_native_morning",
+                        "--project",
+                        root.toString(),
+                        "--bundle",
+                        badBundle.toString(),
+                        "--out",
+                        out.toString(),
+                    ),
+                )
+            refused.statusCode shouldBe 2
+            refused.output shouldContain "recorded import `absent.*`"
+            refused.output.contains("rebuild") shouldBe false
+            Files.exists(out.resolve("release_native_morning.native.export")) shouldBe false
+        }
+
+        "rereview n3 an ambiguous action typed value has the actionable REC007 diagnostic" {
+            val declaration =
+                "def action value_action { columns: [def column id { type: text, optional: true }], " +
+                    "sinks: { native: writer } }"
+            val failed =
+                shouldThrow<BundleAssembler.BundleRefused> {
+                    bundle(sourceText = recipe.replace("action: release", "action: value_action"), editModel = { root ->
+                        val dir = root.resolve("hartland/automation/legacy")
+                        Files.createDirectories(dir)
+                        Files.writeString(
+                            dir.resolve("action.ttrm"),
+                            "package hartland.automation.legacy\nmodel automation\n$declaration",
+                        )
+                    }) { it + "\n$declaration\n" }
+                }
+            failed.diagnostics.any { it.id.name == "REC_007" && it.location.line > 0 } shouldBe true
+            failed.diagnostics.none { it.id.name == "REC_002" } shouldBe true
+        }
 
         for (prefix in listOf("hartland", "er.entity")) {
             "review145 B1 $prefix qualified targets cover the real entity even beside a package-named entity" {
@@ -381,23 +542,7 @@ class WriterDefaultFingerprintsSpec :
 
         "native export propagates text2 and refuses stale missing or unbound dependency evidence" {
             val result = bundle()
-            val root = result.dir.parent.parent
-            Files.move(root.resolve("model"), root.resolve("models"))
-            // The compiler's old shared fixture uses pre-package-parity directory layout and role hints.
-            // Normalize this private copy for the export CLI's strict metadata reader.
-            for (folder in listOf("binding", "db", "er")) {
-                val from = root.resolve("models/hartland/$folder")
-                Files.list(from).use { paths ->
-                    paths.forEach { file ->
-                        val text = Files.readString(file).replace(Regex("roles: \\[.*?\\]"), "")
-                        Files.writeString(root.resolve("models/hartland/${folder}_${file.fileName}"), text)
-                        Files.delete(file)
-                    }
-                }
-                Files.delete(from)
-            }
-            Files.deleteIfExists(root.resolve("models/hartland/automation/checker-probes.ttrm"))
-            Files.writeString(root.resolve("modeler.toml"), "[ttrp]\nworld = \"hartland.worlds.demo\"\n")
+            val root = exportProject(result)
 
             fun emit(
                 out: Path,

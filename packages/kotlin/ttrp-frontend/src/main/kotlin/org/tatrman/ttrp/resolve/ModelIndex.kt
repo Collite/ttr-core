@@ -31,7 +31,7 @@ data class ImportScope(
  */
 class ModelIndex(
     val snapshot: RegistrySnapshot,
-    private val packageOf: (ModelObject) -> String = { it.qname.`package` },
+    private val packageOf: (ModelObject) -> String,
 ) {
     private val query = MetadataQuery(snapshot)
     val objectsByQname = snapshot.model.objectByQname()
@@ -209,14 +209,29 @@ class ModelIndex(
     fun automationScope(imports: List<ImportScope>): AutomationScope =
         AutomationScope(
             imports,
-            automationInScope(imports).filterIsInstance<org.tatrman.ttr.metadata.model.AutomationAction>(),
-            objects.filterIsInstance<Entity>().filter { inScope(it, imports) },
+            objects.filterIsInstance<org.tatrman.ttr.metadata.model.AutomationAction>().filter { obj ->
+                imports.any { packageMatches(packageOf(obj), it.pkg) }
+            },
+            objects.filterIsInstance<Entity>().filter { obj ->
+                imports.any {
+                    packageMatches(packageOf(obj), it.pkg) &&
+                        (it.tier == null || it.tier == obj.qname.schemaCode)
+                }
+            },
             objects.filterIsInstance<Entity>().filter(::isAutomationStdlib),
+            imports
+                .filterNot { imp ->
+                    objects.any { packageMatches(packageOf(it), imp.pkg) } ||
+                        rowSchemas.any { packageMatches(it.pkg, imp.pkg) }
+                }.map { it.raw },
         ) { entity, prefix ->
-            // Reconciled ER qname.package is currently empty (#294); use the source-owned package/path.
-            val pkg = packageOf(entity)
-            if (pkg.isNotEmpty()) pkg == prefix || pkg.startsWith("$prefix.") else pathInPackage(entity, prefix)
+            packageMatches(packageOf(entity), prefix)
         }
+
+    private fun packageMatches(
+        pkg: String,
+        prefix: String,
+    ): Boolean = pkg == prefix || pkg.startsWith("$prefix.")
 
     /** The calendars of the model — entities with an attribute whose `semantics { role: event_date }` (D-82). */
     fun calendars(): List<Entity> = objects.filterIsInstance<Entity>().filter { isCalendar(it) }

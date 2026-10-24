@@ -63,7 +63,7 @@ object RecipeActionDependencies {
         data object Ok : Verification
 
         data class Stale(
-            val action: String?,
+            val action: String,
         ) : Verification
 
         data class Unresolved(
@@ -85,19 +85,32 @@ object RecipeActionDependencies {
 
     private class TargetException(
         val result: Verification,
-    ) : IllegalArgumentException()
+    ) : IllegalArgumentException(
+            when (result) {
+                is Verification.Unresolved -> "unresolved action target `${result.ref}`"
+                is Verification.Ambiguous -> "ambiguous action target `${result.ref}`"
+                else -> "invalid action target: $result"
+            },
+        )
+
+    /** Validate evidence without hashing; callers can reject its format before reconstructing its scope. */
+    fun validate(evidence: RecipeApprovalDependencies): Verification.Malformed? =
+        when {
+            evidence.version != 1 -> Verification.Malformed("unsupported approval evidence version ${evidence.version}")
+            !hash.matches(evidence.textBase) -> Verification.Malformed("invalid approval evidence textBase")
+            evidence.actions.isEmpty() || evidence.actions.any { it.key.isBlank() || !hash.matches(it.value) } ->
+                Verification.Malformed("invalid action approval evidence")
+            evidence.imports.any { it.isBlank() || it.split('.').any(String::isBlank) } ->
+                Verification.Malformed("invalid approval evidence import scope")
+            evidence.imports != evidence.imports.distinct().sorted() ->
+                Verification.Malformed("approval evidence imports must be sorted and unique")
+            else -> null
+        }
 
     /** The text/2 binding includes the checked import scope; changing scope cannot reuse old evidence. */
     fun text(evidence: RecipeApprovalDependencies): String {
-        if (evidence.version != 1) throw EvidenceException("unsupported approval evidence version ${evidence.version}")
-        if (!hash.matches(evidence.textBase)) throw EvidenceException("invalid approval evidence textBase")
-        if (evidence.actions.isEmpty() || evidence.actions.any { it.key.isBlank() || !hash.matches(it.value) }) {
-            throw EvidenceException("invalid action approval evidence")
-        }
-        if (evidence.imports.any { it.isBlank() || it.split('.').any(String::isBlank) }) {
-            throw EvidenceException("invalid approval evidence import scope")
-        }
-        val dependencies = mapOf("actions" to evidence.actions, "imports" to evidence.imports.distinct().sorted())
+        validate(evidence)?.let { throw EvidenceException(it.reason) }
+        val dependencies = mapOf("actions" to evidence.actions, "imports" to evidence.imports)
         return AutomationFingerprints.sha256("ttrp-recipe-text/2\n${evidence.textBase}\n${json(dependencies)}\n")
     }
 
@@ -144,18 +157,15 @@ object RecipeActionDependencies {
     ): Map<String, String> =
         actions.toSortedMap().mapValues { (_, action) ->
             val resolved =
-                AutomationScope.targetRefs(action).map { ref ->
-                    when (val result = target(ref)) {
+                AutomationScope.targetsOf(action, target).values.map { result ->
+                    when (result) {
                         is TargetResolution.Resolved -> result
                         is TargetResolution.Unresolved -> throw TargetException(Verification.Unresolved(result.ref))
                         is TargetResolution.Ambiguous -> throw TargetException(Verification.Ambiguous(result.ref))
                     }
                 }
             val targets =
-                resolved.groupBy { it.entity.qname.name }.toSortedMap().mapValues { (name, refs) ->
-                    if (refs.map { it.entity.qname }.distinct().size != 1) {
-                        throw TargetException(Verification.Ambiguous(name))
-                    }
+                resolved.groupBy { it.entity.qname.name }.toSortedMap().mapValues { (_, refs) ->
                     val entity = refs.first().entity
                     mapOf(
                         "qname" to qname(entity.qname),

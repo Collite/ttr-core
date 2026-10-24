@@ -3153,7 +3153,7 @@
       },
       {
         "id": "TTRP-REC-007",
-        "suggestedAlternative": "import exactly one action with the wired name; remove the ambiguous action import"
+        "suggestedAlternative": "rename one of the actions, or narrow the imports so only one is visible"
       },
       {
         "id": "TTRP-REC-010",
@@ -3373,7 +3373,7 @@
     {
       "id": "TTRP-REC-007",
       "area": "REC",
-      "suggestedAlternative": "import exactly one action with the wired name; remove the ambiguous action import"
+      "suggestedAlternative": "rename one of the actions, or narrow the imports so only one is visible"
     },
     {
       "id": "TTRP-REC-010",

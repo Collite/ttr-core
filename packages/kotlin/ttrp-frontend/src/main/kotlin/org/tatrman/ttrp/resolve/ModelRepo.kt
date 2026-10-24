@@ -51,7 +51,8 @@ object ModelRepo {
             }
         return runCatching {
             val snapshots = sources.map { it.load() }
-            val model = ModelReconciler(ModelDescriptor(id = "model", name = "model")).reconcile(snapshots).model
+            val reconciled = ModelReconciler(ModelDescriptor(id = "model", name = "model")).reconcile(snapshots)
+            val model = reconciled.model
             val snapshot =
                 RegistrySnapshot(
                     model = model,
@@ -59,7 +60,7 @@ object ModelRepo {
                     swappedAt = Instant.EPOCH,
                     warnings = emptyList(),
                 )
-            ModelIndex(snapshot, LayoutResolver.packagesFrom(snapshots))
+            ModelIndex(snapshot, LayoutResolver.packagesFromFiles(reconciled.files))
         }.getOrNull()
     }
 }

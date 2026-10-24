@@ -168,32 +168,37 @@ class EmitCommand : CliktCommand(name = "emit") {
                 val actionGroups = actionObjects.groupBy { it.qname.name }
                 val evidence = recipe.approvalDependencies
                 // Validate the explicit evidence format before trying to reconstruct its scope.
-                evidence?.let(RecipeActionDependencies::text)
+                evidence?.let { RecipeActionDependencies.validate(it)?.let { bad -> error(bad.reason) } }
                 val scope =
                     evidence?.let {
-                        ModelIndex(registrySnapshot, LayoutResolver.packagesFrom(snapshots)).automationScope(
+                        ModelIndex(registrySnapshot, LayoutResolver.packagesFromFiles(loaded.files)).automationScope(
                             it.imports.map { raw -> ModelIndex.importScope(raw.split('.'), raw) },
                         )
                     }
+                scope?.missingImports?.firstOrNull()?.let { missing ->
+                    error("recorded import `$missing.*` resolves to no loader package in the export model")
+                }
                 val wiredActions =
                     recipe.wiring.map { it.action }.distinct().associateWith { name ->
                         val resolution =
-                            scope?.action(name) ?: actionGroups[name].orEmpty().let { candidates ->
-                                when (candidates.size) {
-                                    0 -> ActionResolution.Unresolved(name)
-                                    1 -> ActionResolution.Resolved(candidates.single())
-                                    else -> ActionResolution.Ambiguous(name)
-                                }
+                            scope?.action(name) ?: AutomationScope.resolveAction(name, actionGroups[name].orEmpty())
+                        val location =
+                            if (evidence ==
+                                null
+                            ) {
+                                "export model (bundle records no approval scope)"
+                            } else {
+                                "recorded approval scope"
                             }
                         when (resolution) {
                             is ActionResolution.Resolved -> resolution.action
                             is ActionResolution.Unresolved ->
                                 error(
-                                    "unresolved action approval dependency `$name` in the recorded scope",
+                                    "action `$name` is unresolved in the $location",
                                 )
                             is ActionResolution.Ambiguous ->
                                 error(
-                                    "ambiguous action approval dependency `$name` in the recorded scope",
+                                    "action `$name` is ambiguous in the $location",
                                 )
                         }
                     }

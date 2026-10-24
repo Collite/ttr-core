@@ -5,6 +5,7 @@ import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import org.tatrman.ttr.metadata.model.Attribute
 import org.tatrman.ttr.metadata.model.AutomationAction
 import org.tatrman.ttr.metadata.model.AutomationColumn
@@ -121,6 +122,27 @@ class RecipeActionDependenciesSpec :
             }
             shouldThrow<IllegalArgumentException> {
                 RecipeActionDependencies.verify(evidence, text, actions) { throw IllegalArgumentException("bug") }
+            }
+        }
+
+        "rereview R5 public fingerprint exceptions name the ref and resolution failure" {
+            val actions = mapOf("propose" to action)
+            shouldThrow<IllegalArgumentException> {
+                RecipeActionDependencies.fingerprints(actions) { TargetResolution.Unresolved(it) }
+            }.message.orEmpty() shouldContain "unresolved action target `proposal.id`"
+            shouldThrow<IllegalArgumentException> {
+                RecipeActionDependencies.fingerprints(actions) { TargetResolution.Ambiguous(it) }
+            }.message.orEmpty() shouldContain "ambiguous action target `proposal.id`"
+        }
+
+        "rereview n1 noncanonical import lists are malformed even when their normalized text matches" {
+            for (imports in listOf(listOf("shop", "shop"), listOf("shop", "other"))) {
+                val changed = evidence.copy(imports = imports)
+                (
+                    RecipeActionDependencies.verify(changed, text, mapOf("propose" to action)) {
+                        TargetResolution.Resolved(entity, attr)
+                    } is RecipeActionDependencies.Verification.Malformed
+                ) shouldBe true
             }
         }
 
