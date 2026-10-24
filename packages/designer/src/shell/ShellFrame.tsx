@@ -387,6 +387,7 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
       if (item) {
         openItem(item, false);
         setSubjectSkins((s) => {
+          if (s[item.ref] === url.skin) return s;
           const next = { ...s };
           if (url.skin) next[item.ref] = url.skin;
           else delete next[item.ref];
