@@ -118,6 +118,31 @@ class AnnotationRecordSpec :
             actual.annotations.filterIsInstance<Mention>().size shouldBe 3
             actual.annotations.filterIsInstance<Parameter>().size shouldBe 2
         }
+        test("readers ignore extra fields and unknown types while preserving human verdicts") {
+            val text =
+                record
+                    .toJson()
+                    .replace("\"confidence\":1.0", "\"confidence\":1.0,\"futureField\":true,\"producer\":null")
+                    .dropLast(2) + ",{\"type\":\"Future\",\"id\":\"future\",\"span\":[0,1],\"newField\":true}]}"
+            val result = AnnotationRecord.read(text, "sha")
+            result.record shouldBe record
+            result.warnings.size shouldBe 1
+            check(result.warnings.single().contains("Future"))
+            val sidecar =
+                DocSidecar(
+                    "h1.md",
+                    "sha",
+                    mapOf(
+                        "placed_orders" to DocNode(0, listOf(21, 40), listOf(11, 20), listOf(0, 5)),
+                    ),
+                    listOf(DocSentence(listOf(11, 20), listOf("placed_orders"))),
+                )
+            result.record
+                .applyVerdicts(sidecar)
+                .sentences
+                .single()
+                .nodes shouldBe emptyList()
+        }
         test("human rejection removes only the rejected sentence-block association") {
             val side =
                 DocSidecar(

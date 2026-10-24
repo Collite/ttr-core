@@ -139,6 +139,7 @@ class BuildCommand : CliktCommand(name = "build") {
                     language,
                     json,
                     memberCatalog = members,
+                    warning = { echo(it, err = true) },
                 ) { echo(it) }
                 return@withBuildErrors
             }

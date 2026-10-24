@@ -181,7 +181,8 @@ class TtrbRecipeSentencesSpec :
                 val result =
                     TtrB.decompose(
                         text,
-                        org.tatrman.ttrp.ast.SourceLocation("x", 1, 0, 1, 0, 0, 0),
+                        org.tatrman.ttrp.ast
+                            .SourceLocation("x", 1, 0, 1, 0, 0, 0),
                         null,
                         inPorts = setOf("orders"),
                         decision = true,

@@ -59,7 +59,7 @@ receive the explanation README inside their bundle. READMEs list every route's r
 with catalogue labels, action wiring and dry-run descriptions, parameter values and labels, and the mode verdict.
 `--lang en|cs` changes presentation; identifiers and canonical recipe bytes remain unchanged.
 
-Annotations are immutable per document SHA. The optional `<recipe>.annotations.json` lives beside the source
+Annotations are immutable per document SHA. Readers ignore unknown fields and types; unknown types are skipped with a warning. The producer JSON schema remains strict. The optional `<recipe>.annotations.json` lives beside the source
 or derived recipe. Its published [schema](../../features/ttr-p/architecture/schemas/annotation-record.schema.json)
 and `org.tatrman:ttrp-doc` types describe proposals and human reviews. A human `Verdict` rejecting a `Link` removes
 only that block/sentence association from `.ttrd`; it cannot edit recipe code. A record for another document SHA

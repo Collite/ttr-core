@@ -3210,6 +3210,10 @@
       {
         "id": "TTRP-DOC-004",
         "suggestedAlternative": "use ttrp, sql, ttrb, ttrb-cs or python as the fence tag"
+      },
+      {
+        "id": "TTRP-DOC-005",
+        "suggestedAlternative": "update the reader to act on the newer annotation type, if needed"
       }
     ]
   },
@@ -3665,6 +3669,11 @@
       "id": "TTRP-B-110",
       "area": "B",
       "suggestedAlternative": "Join the conditions with `and` in one block: If <a> and <b>:"
+    },
+    {
+      "id": "TTRP-B-114",
+      "area": "B",
+      "suggestedAlternative": "Put the block condition into the route condition with `and`."
     },
     {
       "id": "TTRP-B-111",
@@ -4160,6 +4169,11 @@
       "id": "TTRP-DOC-004",
       "area": "DOC",
       "suggestedAlternative": "use ttrp, sql, ttrb, ttrb-cs or python as the fence tag"
+    },
+    {
+      "id": "TTRP-DOC-005",
+      "area": "DOC",
+      "suggestedAlternative": "update the reader to act on the newer annotation type, if needed"
     },
     {
       "id": "TTRP-CN-001",

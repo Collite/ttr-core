@@ -23,10 +23,12 @@ object LiterateBuild {
         lang: String,
         json: Boolean,
         memberCatalog: org.tatrman.ttr.md.resolve.MemberCatalog? = null,
+        warning: (String) -> Unit = {},
         echo: (String) -> Unit,
     ) {
         val source = Files.readString(file)
         val dir = output ?: file.parent
+        val warnings = mutableListOf<TtrpDiagnostic>()
         var extraction = DocExtractor.extract(source, file.fileName.toString())
 
         fun refuse(
@@ -79,20 +81,24 @@ object LiterateBuild {
                             ) {
                                 recipe
                             } else {
-                                recipe.copy(
-                                    sidecar =
-                                        AnnotationRecord
-                                            .load(
-                                                Files.readString(record),
-                                                recipe.sidecar.documentSha,
-                                            ).applyVerdicts(recipe.sidecar),
-                                )
+                                val read = AnnotationRecord.read(Files.readString(record), recipe.sidecar.documentSha)
+                                warnings +=
+                                    read.warnings.map { message ->
+                                        TtrpDiagnostic(
+                                            TtrpDiagnosticId.DOC_005,
+                                            Severity.WARNING,
+                                            "$record: $message",
+                                            SourceLocation.UNKNOWN.copy(file = file.toString()),
+                                        )
+                                    }
+                                recipe.copy(sidecar = read.record.applyVerdicts(recipe.sidecar))
                             }
                         },
                 )
         } catch (e: IllegalArgumentException) {
             refuse(listOf(DocDiagnostic("TTRP-DOC-003", e.message ?: "invalid annotation record", listOf(0, 0))), 3)
         }
+        if (!json) warnings.forEach { warning(it.render()) }
         if (check) {
             val drift = extraction.check(dir)
             if (drift.isNotEmpty()) refuse(drift, 3)
@@ -139,7 +145,7 @@ object LiterateBuild {
                     }
                 }
             if (drift.isNotEmpty()) refuse(drift, 3)
-            echo(if (json) "{\"diagnostics\":[]}" else "${file.fileName}: derived artifacts are current")
+            echo(if (json) BuildJson.failure(warnings) else "${file.fileName}: derived artifacts are current")
             return
         }
         extraction.write(dir)
@@ -154,7 +160,17 @@ object LiterateBuild {
             )
         }
         if (json) {
-            echo("{\"recipes\":[${results.joinToString(",") { BuildJson.success(it) }}],\"diagnostics\":[]}")
+            val diagnosticJson =
+                (
+                    kotlinx.serialization.json.Json.parseToJsonElement(
+                        BuildJson.failure(warnings),
+                    ) as kotlinx.serialization.json.JsonObject
+                ).getValue("diagnostics")
+            echo(
+                "{\"recipes\":[${results.joinToString(
+                    ",",
+                ) { BuildJson.success(it) }}],\"diagnostics\":$diagnosticJson}",
+            )
         } else {
             results.forEach { echo(it.dir.toString()) }
         }

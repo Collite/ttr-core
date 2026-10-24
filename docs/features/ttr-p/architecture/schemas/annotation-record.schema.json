@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tatrman.org/schemas/annotation-record/v1",
   "title": "AU annotation record",
+  "description": "Strict producer schema. Readers ignore unknown fields and types; unknown types are skipped with a warning.",
   "type": "object",
   "additionalProperties": false,
   "required": [

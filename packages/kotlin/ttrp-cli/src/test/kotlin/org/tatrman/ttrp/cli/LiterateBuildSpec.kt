@@ -200,13 +200,44 @@ class LiterateBuildSpec :
                 .parseToJsonElement(result.stdout)
         }
         test("Markdown JSON keeps the fragment reject id and original source line") {
-            val text = "```ttrp\nrecipe { key: order.order_number }\n```\n\n```ttrb decision verdict(in orders)\nDecde release when amount > 0.\n```\n"
+            val text =
+                "```ttrp\nrecipe { key: order.order_number }\n```\n\n" +
+                    "```ttrb decision verdict(in orders)\nDecde release when amount > 0.\n```\n"
             val source = dir.resolve("bad-sentence.md")
             Files.writeString(source, text)
             val result = ttrp().test("build $source --json")
             result.statusCode shouldBe 1
             result.stdout shouldContain "TTRP-B-004"
             result.stdout shouldContain "\"line\": 6"
+        }
+        test("unknown annotation types warn in JSON and stderr without changing a successful exit") {
+            val source = dir.resolve("release.md")
+            val sha =
+                org.tatrman.ttrp.doc.DocExtractor
+                    .extract(
+                        Files.readString(source),
+                        "release.md",
+                    ).recipes
+                    .single()
+                    .sidecar.documentSha
+            val annotations = dir.resolve("release_order.annotations.json")
+            Files.writeString(
+                annotations,
+                """{"document":"release.md","documentSha":"$sha","annotations":[{"type":"Future","id":"f","span":[0,1],"extra":true}]}""",
+            )
+            try {
+                val json = ttrp().test("build $source --out ${dir.resolve("unknown-json")} --json")
+                json.statusCode shouldBe 0
+                json.stdout shouldContain "TTRP-DOC-005"
+                json.stdout shouldContain "WARNING"
+                kotlinx.serialization.json.Json
+                    .parseToJsonElement(json.stdout)
+                val plain = ttrp().test("build $source --out ${dir.resolve("unknown-plain")}")
+                plain.statusCode shouldBe 0
+                plain.stderr shouldContain "Future"
+            } finally {
+                Files.deleteIfExists(annotations)
+            }
         }
         test("invalid fence tag is a located DOC-004 diagnostic") {
             Files.writeString(dir.resolve("bad.md"), "# Bad\n\n```js\n1\n```\n")

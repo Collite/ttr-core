@@ -653,6 +653,7 @@ enum class TtrpDiagnosticId(
     DOC_002("TTRP-DOC-002", "give every recipe skeleton and container a unique name"),
     DOC_003("TTRP-DOC-003", "run ttrp build to regenerate the derived artifacts"),
     DOC_004("TTRP-DOC-004", "use ttrp, sql, ttrb, ttrb-cs or python as the fence tag"),
+    DOC_005("TTRP-DOC-005", "update the reader to act on the newer annotation type, if needed"),
     CN_001(
         "TTRP-CN-001",
         "a conceptual-model form (`exists … involving …`, `count(<Concept> involving …)`, `this`, `in <call>`, " +

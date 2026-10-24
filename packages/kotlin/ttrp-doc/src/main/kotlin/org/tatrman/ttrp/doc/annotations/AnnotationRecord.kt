@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.polymorphic
 import org.tatrman.ttrp.doc.DocSidecar
 
 /**
@@ -158,6 +159,21 @@ data class Verdict(
 ) : Annotation
 
 @Serializable
+@SerialName("_Unknown")
+private data class UnknownAnnotation(
+    override val id: String = "",
+    override val span: List<Int> = emptyList(),
+    override val producer: String = "resolver",
+    override val derivedFrom: List<String> = emptyList(),
+    @kotlinx.serialization.Transient val ignoredType: String = "_Unknown",
+) : Annotation
+
+data class AnnotationReadResult(
+    val record: AnnotationRecord,
+    val warnings: List<String>,
+)
+
+@Serializable
 data class AnnotationRecord(
     val document: String,
     val documentSha: String,
@@ -194,8 +210,36 @@ data class AnnotationRecord(
         fun load(
             text: String,
             documentSha: String,
-        ): AnnotationRecord {
-            val record = Json.decodeFromString<AnnotationRecord>(text)
+        ): AnnotationRecord = read(text, documentSha).record
+
+        fun read(
+            text: String,
+            documentSha: String,
+        ): AnnotationReadResult {
+            val json =
+                Json {
+                    ignoreUnknownKeys = true
+                    coerceInputValues = true
+                    serializersModule =
+                        kotlinx.serialization.modules.SerializersModule {
+                            polymorphic(Annotation::class) {
+                                defaultDeserializer { name ->
+                                    object : kotlinx.serialization.DeserializationStrategy<UnknownAnnotation> {
+                                        override val descriptor = UnknownAnnotation.serializer().descriptor
+
+                                        override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder) =
+                                            UnknownAnnotation.serializer().deserialize(decoder).copy(
+                                                ignoredType =
+                                                    name ?: "<missing>",
+                                            )
+                                    }
+                                }
+                            }
+                        }
+                }
+            val decoded = json.decodeFromString<AnnotationRecord>(text)
+            val unknown = decoded.annotations.filterIsInstance<UnknownAnnotation>()
+            val record = decoded.copy(annotations = decoded.annotations.filterNot { it is UnknownAnnotation })
             require(record.documentSha == documentSha) { "annotation documentSha does not match the document" }
             require(
                 record.annotations
@@ -206,7 +250,7 @@ data class AnnotationRecord(
             record.annotations.forEach {
                 require(it.span.size == 2 && it.span[0] >= 0 && it.span[1] >= it.span[0]) { "invalid annotation span" }
             }
-            val byId = record.annotations.associateBy { it.id }
+            val byId = decoded.annotations.associateBy { it.id }
             record.annotations.forEach { a ->
                 when (a) {
                     is Role ->
@@ -215,19 +259,22 @@ data class AnnotationRecord(
                                 setOf("candidates", "context", "decision", "action", "parameter", "program", "people"),
                         ) { "invalid AU role" }
                     is Mention -> require(a.confidence in 0.0..1.0) { "invalid mention confidence" }
-                    is Coref -> require(byId[a.mention] is Mention) { "coreference must name a mention" }
+                    is Coref ->
+                        require(byId[a.mention] is Mention || byId[a.mention] is UnknownAnnotation) {
+                            "coreference must name a mention"
+                        }
                     is Link ->
                         require(
-                            byId[a.block] is Block &&
+                            (byId[a.block] is Block || byId[a.block] is UnknownAnnotation) &&
                                 a.sentences.all {
-                                    byId[it] is Sentence
+                                    (byId[it] is Sentence || byId[it] is UnknownAnnotation)
                                 },
                         ) { "link must name a block and sentences" }
                     is Verdict -> require(a.target in byId) { "verdict must name an annotation" }
                     else -> Unit
                 }
             }
-            return record
+            return AnnotationReadResult(record, unknown.map { "unknown annotation type \"${it.ignoredType}\" ignored" })
         }
     }
 }
