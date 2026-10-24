@@ -122,6 +122,37 @@ class LiterateBuildSpec :
             ttrp().test("build ${dir.resolve("release.md")} --out $output --check").statusCode shouldBe 0
             Files.delete(dir.resolve("release_order.annotations.json"))
         }
+        test("unsupported README languages are usage errors for both source formats") {
+            for (name in listOf("release.md", "release.ttrp")) {
+                if (name.endsWith(".ttrp")) Files.writeString(dir.resolve(name), "recipe {}")
+                val result = ttrp().test("build ${dir.resolve(name)} --lang de")
+                result.statusCode shouldBe 2
+                result.stderr shouldContain "en"
+            }
+        }
+        test("Markdown forwards connected catalogs and reports unavailability as structured failure") {
+            val result = ttrp().test("build ${dir.resolve("release.md")} --connected ws://127.0.0.1:1 --json")
+            result.statusCode shouldBe 1
+            result.stderr shouldContain "--connected"
+            kotlinx.serialization.json.Json
+                .parseToJsonElement(result.stdout)
+        }
+        test("Markdown emit refusal uses JSON diagnostics and flags surface their notices") {
+            val source =
+                Files
+                    .readString(dir.resolve("release.md"))
+                    .replace(
+                        "SELECT o.order_number, o.customer",
+                        "SELECT o.order_number, CAST(NULL AS object) AS unsupported, o.customer",
+                    )
+            Files.writeString(dir.resolve("refusal.md"), source)
+            val result = ttrp().test("build ${dir.resolve("refusal.md")} --json --offline")
+            result.statusCode shouldBe 1
+            result.stdout shouldContain "TTRP-EMT-006"
+            result.stderr shouldContain "compile mode = offline"
+            kotlinx.serialization.json.Json
+                .parseToJsonElement(result.stdout)
+        }
         test("invalid fence tag is a located DOC-004 diagnostic") {
             Files.writeString(dir.resolve("bad.md"), "# Bad\n\n```js\n1\n```\n")
             val r = ttrp().test("build ${dir.resolve("bad.md")} --json")

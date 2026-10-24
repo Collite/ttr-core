@@ -13,6 +13,7 @@ import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.options.versionOption
+import com.github.ajalt.clikt.parameters.options.convert
 import org.tatrman.ttrp.bundle.BundleAssembler
 import org.tatrman.ttrp.bundle.EmitPluginLoader
 import org.tatrman.ttrp.member.ConnectedMemberCatalog
@@ -63,7 +64,24 @@ class BuildCommand : CliktCommand(name = "build") {
     private val file by argument()
     private val out by option("--out")
     private val check by option("--check", help = "verify derived document artifacts without writing").flag()
-    private val language by option("--lang", help = "README language: en or cs").default("en")
+    private val language by option(
+        "--lang",
+        help = "README language: en or cs",
+    ).convert(
+        metavar = "(en|cs)",
+        completionCandidates =
+            com.github.ajalt.clikt.completion.CompletionCandidates
+                .Fixed(setOf("en", "cs")),
+    ) {
+        // Clikt 5.0.3 choice() exits 1; the build contract requires usage exit 2.
+        if (it !in
+            setOf("en", "cs")
+        ) {
+            throw com.github.ajalt.clikt.core
+                .UsageError("--lang must be en or cs", statusCode = 2)
+        }
+        it
+    }.default("en")
 
     // AU-core-P2 (contracts §9): the manifest + the compile's diagnostics as JSON on stdout — the hartland suites read it.
     private val json by option("--json", help = "print the bundle's manifest and the diagnostics as JSON").flag()
@@ -101,51 +119,50 @@ class BuildCommand : CliktCommand(name = "build") {
             echo("ttrp build: no such file: $file", err = true)
             throw ProgramResult(2)
         }
-        require(language in setOf("en", "cs")) { "--lang must be en or cs" }
-        if (abs.fileName.toString().endsWith(".md")) {
-            try {
-                LiterateBuild.run(abs, out?.let { Path.of(it).toAbsolutePath() }, check, language, json) { echo(it) }
-            } catch (
-                e: BundleAssembler.BundleRefused,
-            ) {
-                if (json) echo(BuildJson.failure(e.diagnostics)) else echo(e.message, err = true)
-                throw ProgramResult(1)
+        withBuildErrors {
+            val manifestResult = TtrpManifestReader.resolve(abs.parent ?: abs)
+            EmitPluginLoader.signaturePolicy(manifestResult.manifest.requireSignedPlugins) {
+                echo("ttrp build: $it", err = true)
             }
-            return
-        }
-        if (check) {
-            val project = TtrpManifestReader.resolve(abs.parent).manifest
-            val plan = TtrpPipeline(project, project.modelsRoot()).plan(Files.readString(abs), abs.toString())
-            val diagnostics =
-                plan.diagnostics +
-                    if (plan.ok &&
-                        plan.recipe != null
-                    ) {
-                        org.tatrman.ttrp.bundle.RecipeBundleCheck
-                            .inspect(plan)
-                            .diagnostics
-                    } else {
-                        emptyList()
-                    }
-            if (json) echo(BuildJson.failure(diagnostics)) else diagnostics.forEach { echo(it.render()) }
-            if (diagnostics.any { it.severity == Severity.ERROR }) throw ProgramResult(1)
-            return
-        }
-        val manifestResult = TtrpManifestReader.resolve(abs.parent ?: abs)
-        // Surface the H-6 signature knob: in v1 it can only be honored by the (not-yet-wired) isolated
-        // third-party loader, so a project that sets it must be told it is currently inert — never silently.
-        EmitPluginLoader.signaturePolicy(manifestResult.manifest.requireSignedPlugins) {
-            echo("ttrp build: $it", err = true)
-        }
-        if (frozen || offline) {
-            // PL-P1.S3 wires this into resolution (MetadataServerSource + compile-record staleness).
-            echo(
-                "ttrp build: compile mode = ${if (frozen) "frozen" else "offline"} (seam declared, S3 wires it)",
-                err = true,
-            )
-        }
-        val result =
-            try {
+            if (frozen || offline) {
+                echo(
+                    "ttrp build: compile mode = ${if (frozen) "frozen" else "offline"} (seam declared, S3 wires it)",
+                    err = true,
+                )
+            }
+            val members = connected?.let { ConnectedMemberCatalog.forUrl(it) }
+            if (abs.fileName.toString().endsWith(".md")) {
+                LiterateBuild.run(
+                    abs,
+                    out?.let { Path.of(it).toAbsolutePath() },
+                    check,
+                    language,
+                    json,
+                    memberCatalog = members,
+                ) { echo(it) }
+                return@withBuildErrors
+            }
+            if (check) {
+                val project = manifestResult.manifest
+                val plan =
+                    TtrpPipeline(project, project.modelsRoot(), memberCatalog = members)
+                        .plan(Files.readString(abs), abs.toString())
+                val diagnostics =
+                    plan.diagnostics +
+                        if (plan.ok &&
+                            plan.recipe != null
+                        ) {
+                            org.tatrman.ttrp.bundle.RecipeBundleCheck
+                                .inspect(plan)
+                                .diagnostics
+                        } else {
+                            emptyList()
+                        }
+                if (json) echo(BuildJson.failure(diagnostics)) else diagnostics.forEach { echo(it.render()) }
+                if (diagnostics.any { it.severity == Severity.ERROR }) throw ProgramResult(1)
+                return@withBuildErrors
+            }
+            val result =
                 BundleAssembler(ToolchainVersion.current).build(
                     source = Files.readString(abs),
                     recipeDir = abs.parent,
@@ -154,32 +171,34 @@ class BuildCommand : CliktCommand(name = "build") {
                     modelsRoot = manifestResult.manifest.modelsRoot(),
                     outDir = Path.of(out ?: "."),
                     language = language,
-                    memberCatalog = connected?.let { ConnectedMemberCatalog.forUrl(it) },
+                    memberCatalog = members,
                 )
-            } catch (e: org.tatrman.ttr.md.resolve.CatalogUnavailable) {
-                // GI-19 hard error: connected compile requested, but the catalog is unreachable.
-                echo(
-                    "ttrp build: ${e.message} — start the server, or omit --connected to compile disconnected",
-                    err = true,
-                )
-                throw ProgramResult(1)
-            } catch (e: BundleAssembler.BundleRefused) {
-                if (json) echo(BuildJson.failure(e.diagnostics))
-                echo(e.message ?: "build failed", err = true)
-                throw ProgramResult(1)
-            } catch (e: IllegalArgumentException) {
-                if (json) echo(BuildJson.failure(emptyList()))
-                echo(e.message ?: "build failed", err = true)
-                throw ProgramResult(1)
-            } catch (e: org.tatrman.ttrp.emit.TtrpEmitException) {
-                // An emit-time failure (a node an engine cannot run, a translator refusal) is a diagnostic,
-                // not a crash: print the TTRP-EMT line (+ its suggestion) and exit 1.
-                if (json) echo(BuildJson.failure(e))
-                echo(e.message ?: "build failed", err = true)
-                e.suggestedAlternative?.let { echo("  ↳ suggested: $it", err = true) }
-                throw ProgramResult(1)
-            }
-        if (json) echo(BuildJson.success(result)) else echo(result.dir.toString())
+            if (json) echo(BuildJson.success(result)) else echo(result.dir.toString())
+        }
+    }
+
+    /** The same failure contract applies to Markdown and canonical sources, including read-only checks. */
+    private fun withBuildErrors(action: () -> Unit) {
+        try {
+            action()
+        } catch (e: org.tatrman.ttr.md.resolve.CatalogUnavailable) {
+            if (json) echo(BuildJson.failure(emptyList()))
+            echo("ttrp build: ${e.message} — start the server, or omit --connected to compile disconnected", err = true)
+            throw ProgramResult(1)
+        } catch (e: BundleAssembler.BundleRefused) {
+            if (json) echo(BuildJson.failure(e.diagnostics))
+            echo(e.message ?: "build failed", err = true)
+            throw ProgramResult(1)
+        } catch (e: IllegalArgumentException) {
+            if (json) echo(BuildJson.failure(emptyList()))
+            echo(e.message ?: "build failed", err = true)
+            throw ProgramResult(1)
+        } catch (e: org.tatrman.ttrp.emit.TtrpEmitException) {
+            if (json) echo(BuildJson.failure(e))
+            echo(e.message ?: "build failed", err = true)
+            e.suggestedAlternative?.let { echo("  ↳ suggested: $it", err = true) }
+            throw ProgramResult(1)
+        }
     }
 }
 

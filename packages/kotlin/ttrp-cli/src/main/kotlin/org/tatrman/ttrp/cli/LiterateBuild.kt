@@ -22,6 +22,7 @@ object LiterateBuild {
         check: Boolean,
         lang: String,
         json: Boolean,
+        memberCatalog: org.tatrman.ttr.md.resolve.MemberCatalog? = null,
         echo: (String) -> Unit,
     ) {
         val source = Files.readString(file)
@@ -109,6 +110,7 @@ object LiterateBuild {
                     recipeDir = file.parent,
                     documentTitle = extraction.title,
                     language = lang,
+                    memberCatalog = memberCatalog,
                 )
             }
         extraction.write(dir)
