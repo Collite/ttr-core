@@ -3148,6 +3148,14 @@
         "suggestedAlternative": "filter the candidates by state, never by key — the program's `port:` selects single candidates (A-2)"
       },
       {
+        "id": "TTRP-REC-006",
+        "suggestedAlternative": "resolve every default-covered action target in the recipe imports or stdlib; qualify ambiguous refs"
+      },
+      {
+        "id": "TTRP-REC-007",
+        "suggestedAlternative": "import exactly one action with the wired name; remove the ambiguous action import"
+      },
+      {
         "id": "TTRP-REC-010",
         "suggestedAlternative": "declare a `window { by: … over: … }` on the context, or restate it per candidate (keep the key, read the other rows from the model, not from the candidates)"
       },
@@ -3356,6 +3364,16 @@
       "id": "TTRP-REC-005",
       "area": "REC",
       "suggestedAlternative": "filter the candidates by state, never by key — the program's `port:` selects single candidates (A-2)"
+    },
+    {
+      "id": "TTRP-REC-006",
+      "area": "REC",
+      "suggestedAlternative": "resolve every default-covered action target in the recipe imports or stdlib; qualify ambiguous refs"
+    },
+    {
+      "id": "TTRP-REC-007",
+      "area": "REC",
+      "suggestedAlternative": "import exactly one action with the wired name; remove the ambiguous action import"
     },
     {
       "id": "TTRP-REC-010",
