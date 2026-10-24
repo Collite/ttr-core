@@ -282,7 +282,13 @@ object DocExtractor {
                 continue
             }
             if (skeletons.isEmpty()) {
-                if (parsed != null && forwardErrors(parsed) { bodyStart + it.coerceIn(0, body.length) }) continue
+                val misplacedMember = parsedRecipe("recipe {\n$body\n}")?.members?.isNotEmpty() == true
+                if (!misplacedMember &&
+                    parsed != null &&
+                    forwardErrors(parsed) { bodyStart + it.coerceIn(0, body.length) }
+                ) {
+                    continue
+                }
                 refuse(1, block, "a container must follow its recipe skeleton")
                 continue
             }

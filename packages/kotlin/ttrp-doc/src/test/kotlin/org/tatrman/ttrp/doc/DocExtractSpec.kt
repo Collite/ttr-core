@@ -99,6 +99,25 @@ class DocExtractSpec :
                 .first()
                 .id shouldBe "TTRP-DOC-001"
         }
+        test("canonical recipe members before a skeleton give one located DOC-001 instead of parser errors") {
+            val members =
+                listOf(
+                    "decision verdict(in orders) { orders -> switch { release: true } }",
+                    "actions { verdict.release -> release { order: order_number } }",
+                    "context recent_orders(out rows) target erp { load(er.entity.order) -> rows }",
+                )
+            for (body in members) {
+                org.tatrman.ttrp.parser.TtrpParser
+                    .parseString("recipe {\n$body\n}")
+                    .diagnostics shouldBe emptyList()
+                val fence = "```ttrp\n$body\n```\n"
+                val source = "# 🚀 Misordered\n\n$fence\n$md"
+                val finding = DocExtractor.extract(source, "misordered.md").diagnostics.single()
+                finding.id shouldBe "TTRP-DOC-001"
+                finding.message shouldBe "a container must follow its recipe skeleton"
+                source.substring(finding.span[0], finding.span[1]).trimEnd() shouldBe fence.trimEnd()
+            }
+        }
         test("Czech prose with identical blocks derives identical canonical text") {
             val en = DocExtractor.extract(md, "release.md")
             val cs =
