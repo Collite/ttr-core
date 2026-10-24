@@ -1467,8 +1467,10 @@ sealed interface SecurityStatement {
 
 /**
  * Surface or physical type carrier. `name` is the canonical type token
- * (`text`, `int`, `varchar`, `decimal`, etc.). `length`/`precision` are
- * present on physical types only (e.g. `decimal(19, 5)`).
+ * (`text`, `int`, `varchar`, `decimal`, etc.). `length`/`precision` are the declared bounds
+ * of the structured form `{ type: …, length: …, precision: … }` on any typed def
+ * (attribute, column, automation member). For text, `length` is the character limit;
+ * for decimal, `length` is total digits and `precision` is scale. Null means undeclared.
  */
 data class DataType(
     val name: String,
