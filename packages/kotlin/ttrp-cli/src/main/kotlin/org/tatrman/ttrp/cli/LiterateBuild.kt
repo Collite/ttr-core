@@ -22,6 +22,7 @@ object LiterateBuild {
         check: Boolean,
         lang: String,
         json: Boolean,
+        deriveOnly: Boolean = false,
         memberCatalog: org.tatrman.ttr.md.resolve.MemberCatalog? = null,
         warning: (String) -> Unit = {},
         echo: (String) -> Unit,
@@ -103,19 +104,35 @@ object LiterateBuild {
             val drift = extraction.check(dir)
             if (drift.isNotEmpty()) refuse(drift, 3)
         }
+        // Authoring over a deferred model must still use the native extractor and drift check.
+        // This mode promises canonical/provenance only; it never compiles or publishes a bundle.
+        if (deriveOnly) {
+            if (!check) extraction.write(dir)
+            if (json) {
+                echo(BuildJson.failure(warnings))
+            } else {
+                echo(
+                    "${file.fileName}: canonical/provenance ${if (check) "checked" else "derived"}; no bundle compiled",
+                )
+            }
+            return
+        }
         val project = TtrpManifestReader.resolve(file.parent).manifest
         val pipeline =
             org.tatrman.ttrp.graph
                 .TtrpPipeline(project, memberCatalog = memberCatalog)
         val results =
             extraction.recipes.map { recipe ->
+                // Multi-recipe documents own one directory per skeleton. Resolve source fixtures from
+                // that directory even with --out, and keep its bundle beside the canonical program.
+                val relativeDir = if (extraction.recipes.size > 1) Path.of(recipe.path).parent else Path.of("")
                 BundleAssembler(ToolchainVersion.current).build(
                     recipe.text,
                     dir.resolve(recipe.path).toString(),
                     project,
                     project.modelsRoot(),
-                    dir,
-                    recipeDir = file.parent,
+                    dir.resolve(relativeDir),
+                    recipeDir = file.parent.resolve(relativeDir),
                     documentTitle = extraction.title,
                     language = lang,
                     memberCatalog = memberCatalog,
