@@ -184,7 +184,6 @@ class PolarsExprRenderer(
                 "add" to "+",
                 "sub" to "-",
                 "mul" to "*",
-                "div" to "/",
             )
     }
 }

@@ -6,6 +6,12 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### 0.18.6 — AU review-136 fixes (pending release)
+
+- Polars: `/` casts both operands to Float64 in every Polars program (was: Decimal/Decimal kept the source
+  scale); matches DuckDB, PostgreSQL is compared within the declared engine delta. This behaviour was introduced
+  in 0.18.5 and is retained by ruling R136-C. Removed the unreachable operator-table entry.
+
 - **AU-core P3:** literate Markdown recipes derive canonical programs and `.ttrd` provenance with read-only
   `build --check`, multi-skeleton output paths and located DOC diagnostics. New published `ttrp-doc` provides
   bilingual explanation READMEs, metadata labels and immutable AU annotation types/schema; human link Verdicts
