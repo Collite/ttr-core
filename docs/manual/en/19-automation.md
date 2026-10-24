@@ -125,3 +125,64 @@ an `expect`-style action and fulfilled by a later run), `state_history` (one row
 The values in these objects are checked by the validator (`ttr/automation-*`, `ttr/states-*` diagnostics): required
 properties, enumerated values, references (a program's recipe, an event's schema, a grant's identity), duration units,
 a deployment having a program **or** a process, and duplicate grants.
+
+## Exporting a deployment
+
+The native exporter writes a deterministic identity package for a deployment. The Server executes the
+original recipe bundle. Run this from the model project, or pass `--project <root>`:
+
+```sh
+ttrp emit --deployment release_native_morning --out exports
+# Reuse an existing compiler bundle:
+ttrp emit --deployment release_native_morning --bundle automation/release_order/release_order.bundle --out exports
+```
+
+The output directory is `release_native_morning.native.export/`: `manifest.json`, `README.md`,
+`conformance.json`, and the bundle's golden YAML files under `tests/`, when present. `--json` prints the
+export identity and stale rule as JSON. `--granularity recipe|parts|islands` overrides the deployment's
+export granularity; the default is `parts`. Existing export directories are refused. Files are checked
+against the bundle's hashes and a complete directory is published only after every file is written.
+
+An export becomes stale when its recipe text, parameter values, labels, program, deployment, world,
+toolchain or target version differs from the served bundle. Rebuild and export again after such a change.
+Executor manifests are plugin-owned TTR-M resources. All seven target manifests ship with the toolchain;
+n8n, Camunda and Python renderers arrive in their later exporter phases. Process export arrives with P1.
+
+## Conformance of a recipe
+
+Replay compares a pinned golden case with native dry-run evidence. Batch opens one `port: keys` run;
+on-event opens one `port: key` run per candidate. No connector action is performed.
+
+```sh
+export TTR_AUTOMATION_TOKEN='<bearer>'
+ttrp conform --replay automation/release_order/tests/release.yaml \
+  --cells native.batch native.on-event \
+  --server https://automation.example.org --token-env TTR_AUTOMATION_TOKEN \
+  --world us --out replay-report.json
+```
+
+`--cells` also accepts a comma-separated list or repeated options. The token is read from the named
+environment variable. The Server must expose exactly one enabled, granted, current native deployment
+for each recipe/mode. Fixture parameters must match the served recipe; replay cannot override approved
+parameter values. On-event fixtures need explicit keys; a batch fixture without `keys` selects all candidates.
+`--world` filters fixtures by their declared world; it does not change the Server's world or deployments.
+
+Golden YAML uses `recipe`, `world`, `as_of`, `parameters`, `keys`, `expected`, and optional `pinned_from`
+(`run`, `at`, `by`). A multi-recipe replay uses `recipes: [release_order, settle]` and stores each collection
+under its recipe name, for example `expected.verdicts.release_order: [...]`. Detail assertions use
+`{key, route, context, rows: [...]}` entries in `expected.details`; golden `detail_counts` is also supported.
+Omitting actions/details means the golden does not assert that collection; an empty list asserts zero rows.
+Demo dates and offset-free timestamps in `as_of` are interpreted as UTC.
+A case without `pinned_from` is reported as **seed**, exits zero and opens no run.
+
+Verdict, action and detail comparisons preserve duplicate rows, exact decimals, null values and UTC
+microseconds. Reasons compare after named `{fills}` from the fixture parameters or observed row's fill
+values. Final-state assertions use `expected.final_states: {entity: er.entity.order, attr: {state: {4711: released}}}`
+and compare the dry preview's ordered transition effects; they do not attest persisted model writes.
+This native replay does not simulate intermediate model writes between multiple recipe runs.
+Incomplete, truncated or failed evidence is a driver error. HTTP polling and paging are bounded.
+
+Exit codes are **0** for agreement/seeds/world skips, **3** for disagreement, and **2** for fixture, driver or
+HTTP errors. The JSON report identifies every cell and its missing/extra rows. The current local HTTP
+suite uses contract-derived responses; the captured Server H-1 responses and live Hartland certification
+are required before AU-export P0 exits.

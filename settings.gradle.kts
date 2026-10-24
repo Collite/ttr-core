@@ -84,3 +84,13 @@ include(":packages:kotlin:ttr-import-schema")
 // so Perun (S4, tatrman-platform) consumes it as a PUBLISHED artifact (P2). One
 // generator, two callers (I-2): the `ttr security-gen` CLI + Perun's build pipeline.
 include(":packages:kotlin:ttr-security-gen")
+
+include(":packages:kotlin:ttr-emit-native")
+
+include(":packages:kotlin:ttr-emit-n8n")
+
+include(":packages:kotlin:ttr-emit-camunda")
+
+include(":packages:kotlin:ttr-emit-python")
+
+include(":packages:kotlin:ttr-emit-sql-job")

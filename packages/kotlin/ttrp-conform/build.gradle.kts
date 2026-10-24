@@ -44,7 +44,11 @@ dependencies {
     testImplementation(libs.postgresql)
     // AU-core-P2 · S2.4 — the recipe statements' second engine, embedded (RecipeDuckDbSpec; RecipeConform is JDBC-only).
     testRuntimeOnly(libs.duckdb.jdbc)
-    testImplementation(libs.snakeyaml)
+    implementation(libs.snakeyaml)
+    implementation(libs.kotlinx.ser.json)
+    implementation(libs.ktor.client.cio)
+    implementation(libs.kotlinx.coroutines.core)
+    testImplementation(libs.ktor.server.cio)
     // MD dot-path S5-B write round-trip (tag `Spike`, off by default): lower an assignment to a
     // StoreNode (ttrp-emit) + unparse to DML (ttr-translator) + MD fixtures, then execute on live PG.
     testImplementation(project(":packages:kotlin:ttr-translator"))

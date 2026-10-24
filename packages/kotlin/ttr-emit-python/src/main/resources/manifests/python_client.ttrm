@@ -1,0 +1,16 @@
+model world
+
+def world executor_types {
+def executor python_client {
+    fidelity: L1
+    modes: [batch, on_event]
+    ports: [none, key, keys, event]
+    kinds: { sql: door, canonical: door, builtin: door, foreign: door, call: door, turn: door }
+    sinks: { all: door }
+    control: [sequence, exclusive, inclusive, parallel, wait, digest]
+    waiting: true
+    granularity: [recipe, parts, islands]
+    conformance: in_process
+    manifestSchema: { accepts: [3] }
+}
+}

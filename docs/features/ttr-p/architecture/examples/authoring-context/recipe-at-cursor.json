@@ -3859,6 +3859,31 @@
       "suggestedAlternative": "this world's executor does not support per-island `retries` (F-4-ii) — deploy to a platform (tatrman) executor, or remove the retries attribute"
     },
     {
+      "id": "TTRP-TGT-001",
+      "area": "TGT",
+      "suggestedAlternative": "Recipe executor capability refusal"
+    },
+    {
+      "id": "TTRP-TGT-002",
+      "area": "TGT",
+      "suggestedAlternative": "Recipe executor capability refusal"
+    },
+    {
+      "id": "TTRP-TGT-003",
+      "area": "TGT",
+      "suggestedAlternative": "Recipe executor capability refusal"
+    },
+    {
+      "id": "TTRP-TGT-004",
+      "area": "TGT",
+      "suggestedAlternative": "Recipe executor capability refusal"
+    },
+    {
+      "id": "TTRP-TGT-005",
+      "area": "TGT",
+      "suggestedAlternative": "Recipe executor capability refusal"
+    },
+    {
       "id": "TTRP-CAP-204",
       "area": "CAP",
       "suggestedAlternative": "this world's executor is read-only and does not allow `store` — route the rows to a `display`, or deploy to an executor that writes (bash / tatrman)"

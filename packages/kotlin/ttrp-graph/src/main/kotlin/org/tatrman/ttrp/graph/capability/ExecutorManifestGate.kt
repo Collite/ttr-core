@@ -23,6 +23,13 @@ import org.tatrman.ttrp.graph.model.TtrpGraph
  * a multi-executor world honest without over-constraining.)
  */
 object ExecutorManifestGate {
+    fun checkRecipe(
+        manifest: RecipeExecutorManifest,
+        program: org.tatrman.ttr.metadata.model.AutomationProgram,
+        deployment: org.tatrman.ttr.metadata.model.WorldDeployment,
+        recipe: RegistryRecipe,
+    ): List<TtrpDiagnostic> = recipeCellCheck(manifest, program, deployment, recipe)
+
     fun check(
         document: TtrpDocument,
         graph: TtrpGraph,

@@ -22,6 +22,7 @@ tasks.test {
 }
 
 dependencies {
+    api(project(":packages:kotlin:ttrp-emit-spi"))
     api(project(":packages:kotlin:ttrp-graph"))
     // The translation core (island → RelNode → SQL / plan.v1). Brings ttr-plan-proto
     // (plan.v1 wire types) transitively via its `api` dep. Calcite arrives transitively

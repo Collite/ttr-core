@@ -1,0 +1,14 @@
+decide_native_batch|decide_catch_up|native|batch|true
+decide_native_event|decide_on_request|native|on_event|true
+inbound_native_batch|inbound_daily|native|batch|true
+inbound_native_event|inbound_on_receipt|native|on_event|true
+release_bpmn|release_on_placement|camunda_8|on_event|true
+release_n8n|release_on_placement|n8n_l1|on_event|true
+release_native_event|release_on_placement|native|on_event|true
+release_native_morning|morning_release|native|batch|true
+release_py|release_on_placement|python_client|on_event|true
+returns_n8n|decide_on_request|n8n_l1|on_event|true
+returns_n8n|inbound_on_receipt|n8n_l1|on_event|true
+returns_n8n|settle_on_document|n8n_l1|on_event|true
+settle_native_batch|settle_daily|native|batch|true
+settle_native_event|settle_on_document|native|on_event|true

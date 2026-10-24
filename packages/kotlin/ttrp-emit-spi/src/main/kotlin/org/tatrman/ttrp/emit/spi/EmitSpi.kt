@@ -25,8 +25,13 @@ interface TtrEmitPlugin {
     /** The orchestration target this plugin emits for: `"bash"` | `"kestra"` | `"airflow3"` | … */
     val targetId: String
 
-    /** The SPI major version this plugin was built against; a host rejects a plugin whose version != [SPI_VERSION]. */
-    val spiVersion: Int
+    /** The SPI major version this plugin was built against; a host rejects a plugin whose version is outside [SUPPORTED_VERSIONS]. */
+    val spiVersion: Int get() = SPI_VERSION
+
+    val supportsRecipes: Boolean get() = false
+
+    fun emitRecipe(request: RecipeEmitRequest): EmitResult =
+        throw UnsupportedOperationException("$targetId does not support recipes")
 
     /** TTR-M text of the executor TYPE manifest this plugin ships (contracts §7, the T6-ownership amendment). */
     fun executorTypeManifest(): String
@@ -36,7 +41,8 @@ interface TtrEmitPlugin {
 
     companion object {
         /** The current SPI major version. */
-        const val SPI_VERSION: Int = 1
+        const val SPI_VERSION: Int = 2
+        val SUPPORTED_VERSIONS: Set<Int> = setOf(1, 2)
     }
 }
 
