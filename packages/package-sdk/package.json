@@ -13,7 +13,8 @@
       "types": "./dist/index.d.ts"
     },
     "./schema/package-manifest.schema.json": "./src/schema/package-manifest.schema.json",
-    "./schemas/layout.schema.json": "./schemas/layout.schema.json"
+    "./schemas/layout.schema.json": "./schemas/layout.schema.json",
+    "./schemas/report.schema.json": "./schemas/report.schema.json"
   },
   "files": [
     "dist",

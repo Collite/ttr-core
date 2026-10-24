@@ -26,6 +26,14 @@ default:
 build-metadata-cli:
     ./gradlew :packages:kotlin:ttr-metadata-cli:installDist
 
+# SO S2.1 — the open report contract and deterministic fill.
+test-report:
+    ./gradlew :packages:kotlin:ttr-report:test :packages:kotlin:ttr-report-cli:test
+
+# SO S2.2 — standalone binary (there is no shared umbrella launcher).
+build-report-cli:
+    ./gradlew :packages:kotlin:ttr-report-cli:installDist
+
 # ── Module resolution ─────────────────────────────────────────────────────────
 
 # Resolve a bare module name to its on-disk path (packages/<name>,
@@ -649,7 +657,7 @@ publish *args:
             #
             # JOINED at CN-P3 S3.1 (A-CN-1): ttr-concept — the cn layer; the ttrp-emit closure again.
             PREFIX=grammar
-            DESC="org.tatrman:{ttr-parser, ttr-writer, ttr-semantics, ttr-metadata, ttr-metadata-git, ttr-snapshot, ttr-md-resolver, ttr-lexicon, ttr-lexicon-compile, ttr-lexicon-cli, ttr-metadata-cli (+dist zip), ttrp-frontend, ttrp-graph, ttrp-emit, ttrp-emit-spi, ttrp-conform, ttrp-cli (+dist zip), ttr-emit-bash, ttr-emit-kestra, ttr-emit-airflow3, ttr-concept} — ttr-translator pinned to its latest tag" ;;
+            DESC="org.tatrman:{ttr-parser, ttr-writer, ttr-semantics, ttr-metadata, ttr-metadata-git, ttr-snapshot, ttr-md-resolver, ttr-lexicon, ttr-lexicon-compile, ttr-lexicon-cli, ttr-metadata-cli (+dist zip), ttr-report, ttrp-frontend, ttrp-graph, ttrp-emit, ttrp-emit-spi, ttrp-conform, ttrp-cli (+dist zip), ttr-emit-bash, ttr-emit-kestra, ttr-emit-airflow3, ttr-concept} — ttr-translator pinned to its latest tag" ;;
         "bundle metadata")
             echo "❌ The 'metadata' bundle no longer exists — it was folded into 'grammar' on 2026-07-30." >&2
             echo "   ttr-metadata \`api\`s the grammar artifacts, so the two MUST share a version;" >&2

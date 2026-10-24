@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tatrman.org/schemas/report/v1",
+  "title": "TTR Report v1",
+  "description": "model/reports/<id>/report.yaml. Folder identity, preferred title language, unique parameter/sheet names and model output columns are validated by the report reader/model validator.",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "version",
+    "program",
+    "params",
+    "sheets"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "title": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-z]{2}(-[A-Za-z0-9]+)*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "version": {
+      "const": 1
+    },
+    "program": {
+      "type": "string",
+      "pattern": "^(er|db)\\.query\\.[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+    },
+    "params": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "kind": {
+            "enum": [
+              "text",
+              "int",
+              "float",
+              "bool",
+              "datetime",
+              "entity"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "default": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "picker": {
+            "type": "object",
+            "required": [
+              "program"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "program": {
+                "type": "string",
+                "pattern": "^(er|db)\\.query\\.[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "label": {
+            "type": "object",
+            "minProperties": 1,
+            "propertyNames": {
+              "pattern": "^[a-z]{2}(-[A-Za-z0-9]+)*$"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "refresh": {
+      "enum": [
+        "daily",
+        "hourly",
+        "manual"
+      ]
+    },
+    "sheets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "sheet",
+          "tables"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "sheet": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 31,
+            "pattern": "^[^\\\\/?*\\[\\]:]+$"
+          },
+          "scalars": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$"
+            }
+          },
+          "tables": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "required": [
+                "columns"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "columns": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2147483647
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "history": {
+      "type": "object",
+      "required": [
+        "keep"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "keep": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*d$",
+          "default": "90d"
+        }
+      }
+    },
+    "roles": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "program": {
+            "pattern": "^er\\.query\\.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "program"
+        ]
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "maxItems": 0,
+            "type": "array"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+diff --git a/cn.ttrm b/cn.ttrm
+--- a/cn.ttrm
++++ b/cn.ttrm
+@@ -8,7 +8,7 @@
+ // ---- kinds ----
+ def kind Party     { label: { en: "Party", cs: "Strana" } }
+ def kind Item      { label: { en: "Product", cs: "Produkt" } }
+-def kind Warehouse { label: { en: "Distribution center", cs: "Distribuční centrum" } }
++def kind Warehouse { label: { en: "Distribution center", cs: "Distribuční centrum" }, relations: [ { type: stocks, to: Item } ] }
+ def kind Channel   { label: { en: "Channel", cs: "Kanál" } }                     // a value kind: store · web · marketplace
+ 
+ // ---- roles ----
+@@ -156,3 +156,5 @@
+ // ---- refusals: a definition cycle (cn/definition-cycle) ----
+ def phase LoopA { of: Order, definition: """LoopB""" }
+ def phase LoopB { of: Order, definition: """LoopA""" }
++
++def relation_type stocks {}
