@@ -58,11 +58,32 @@ object RecipeEditorAnalysis {
     private fun diagnostics(plan: TtrpPipeline.PlanResult) =
         plan.diagnostics + if (plan.ok) RecipeBundleCheck.check(plan) else emptyList()
 
+    private fun emptyReport(doc: OpenDocument) =
+        TtrpChecker.Report(
+            TtrpDocument(emptyList(), location(doc.text, doc.uri, listOf(0, 0))),
+            emptyList(),
+            null,
+            emptyList(),
+        )
+
     fun literate(
         doc: OpenDocument,
         ctx: ProjectContext,
     ): Analysis {
         val extraction = DocExtractor.extract(doc.text, doc.uri.substringAfterLast('/'))
+        val roleHeader = Regex("^(?:candidates|context|decision)\\s+[\\p{L}_]")
+        val recipeDocument =
+            extraction.model.blocks.any { block ->
+                (
+                    block.tag == "ttrp" &&
+                        (block.info == "preamble" || Regex("\\brecipe\\s*(?:\\{|:)").containsMatchIn(block.body))
+                ) ||
+                    roleHeader.containsMatchIn(block.info) ||
+                    roleHeader.containsMatchIn(block.body.trimStart())
+            }
+        // Markdown activation also sees ordinary README/tutorial code fences. Recipe diagnostics belong only
+        // to documents that opt into literate recipe authoring; the extractor remains strict when invoked directly.
+        if (!recipeDocument) return Analysis(doc.uri, doc.version, emptyReport(doc))
         val pipeline = TtrpPipeline(ctx.manifest, ctx.modelsRoot)
         val recipes = extraction.recipes.map { EditorRecipe(it, pipeline.plan(it.text, it.path)) }
         val findings =
@@ -93,12 +114,7 @@ object RecipeEditorAnalysis {
             if (first != null) {
                 TtrpChecker(ctx.manifest, ctx.modelsRoot).check(first.text, first.path)
             } else {
-                TtrpChecker.Report(
-                    TtrpDocument(emptyList(), location(doc.text, doc.uri, listOf(0, 0))),
-                    emptyList(),
-                    null,
-                    emptyList(),
-                )
+                emptyReport(doc)
             }
         return Analysis(doc.uri, doc.version, report.copy(diagnostics = findings), extraction, recipes)
     }

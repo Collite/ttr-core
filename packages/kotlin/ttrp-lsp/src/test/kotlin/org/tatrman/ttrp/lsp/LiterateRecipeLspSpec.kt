@@ -31,6 +31,14 @@ class LiterateRecipeLspSpec :
             Files.readString(
                 root.resolve("packages/kotlin/ttrp-doc/src/test/resources/docs/releasing-a-placed-order.md"),
             )
+        test("ordinary Markdown documents do not receive recipe diagnostics") {
+            TtrpLspHarness(resolver).use { h ->
+                h.initialize()
+                val uri = "file:///README.md"
+                h.open(uri, "# Notes\n\n```js\nconsole.log('hello')\n```\n\n```sql\nSELECT 1\n```\n", "markdown")
+                h.awaitDiagnostics(uri) shouldBe emptyList()
+            }
+        }
         test("Markdown receives DOC diagnostics on its fence and REC diagnostics on mapped blocks") {
             TtrpLspHarness(resolver).use { h ->
                 h.initialize()
@@ -39,7 +47,7 @@ class LiterateRecipeLspSpec :
                 val errors = h.awaitDiagnostics(uri)
                 val rec = errors.first { it.code.left == "TTRP-REC-001" }
                 md.lines()[rec.range.start.line] shouldContain "```ttrp"
-                h.replace(uri, 2, "# Bad\n\n```js\n1\n```\n")
+                h.replace(uri, 2, md + "\n```js\n1\n```\n")
                 h
                     .awaitDiagnostics(uri)
                     .single()
