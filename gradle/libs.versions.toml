@@ -61,6 +61,8 @@ testcontainers = "2.0.3"
 snakeyaml = "2.3"
 # SO-core-P2 — match kantheon report-renderer.
 apache-poi = "5.5.1"
+# report-cli runtime bridge: align with POI 5.5.1's Log4j API/BOM.
+log4j = "2.24.3"
 # PL-P0.S1 — E-5 bundle-manifest v2 JSON-Schema validation (draft 2020-12) in ttrp-emit tests.
 json-schema-validator = "1.5.4"
 # PL-P1.S1 — deterministic snapshot archives (ttr-snapshot). Versions PINNED for byte-determinism
@@ -85,6 +87,7 @@ antlr-runtime = { module = "org.antlr:antlr4-runtime", version.ref = "antlr-runt
 antlr-tool    = { module = "org.antlr:antlr4",          version.ref = "antlr-runtime" }
 slf4j-api     = { module = "org.slf4j:slf4j-api",       version.ref = "slf4j" }
 slf4j-nop     = { module = "org.slf4j:slf4j-nop",       version.ref = "slf4j" }
+log4j-to-slf4j = { module = "org.apache.logging.log4j:log4j-to-slf4j", version.ref = "log4j" }
 kotlinx-ser-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-ser" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 jgrapht-core            = { module = "org.jgrapht:jgrapht-core",              version.ref = "jgrapht" }

@@ -206,6 +206,10 @@ object XlsxFill {
             sheet.shiftRows(row.rowNum + 1, sheet.lastRowNum, region.table.rows.size - 1, true, false)
         }
         if (region.table.rows.isEmpty()) {
+            if (height == null) {
+                if (authoredRow.isSetHt) authoredRow.unsetHt()
+                if (authoredRow.isSetCustomHeight) authoredRow.unsetCustomHeight()
+            }
             for (j in region.indices.indices) row.getCell(anchor.columnIndex + j)?.setBlank()
             anchor.setBlank()
         }

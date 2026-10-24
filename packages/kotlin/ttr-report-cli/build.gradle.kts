@@ -31,6 +31,8 @@ dependencies {
     implementation(project(":packages:kotlin:ttr-report"))
     implementation(project(":packages:kotlin:ttr-translator"))
     implementation(libs.slf4j.nop)
+    // POI logs through Log4j; keep the executable's existing SLF4J/NOP policy out of the library.
+    runtimeOnly(libs.log4j.to.slf4j)
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.apache.poi.ooxml)
 }
