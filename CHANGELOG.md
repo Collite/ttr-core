@@ -6,6 +6,12 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — AU writer attribute constraints
+
+- Retain authored ER attribute type length/precision through metadata loading, export and TTR rendering.
+  Decimal total digits/scale and text length survive reload; bare types retain undeclared bounds. The
+  nullable metadata fields preserve source defaults; JVM consumers must rebuild with the new library.
+
 ### Fixed — SO report review-133
 
 - Preserve automatic sizing for marker rows with stored heights unless customHeight is true.

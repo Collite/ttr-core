@@ -507,7 +507,7 @@ object ModelToDefinitions {
             description = attr.description.takeIf { it.isNotEmpty() },
             descriptionLocalized = attr.descriptionLocalized.toLocalizedStringValue(),
             tags = attr.tags,
-            type = DataType(attr.type),
+            type = DataType(attr.type, attr.length, attr.precision),
             isKey = attr.isKey,
             optional = attr.nullable,
             displayLabel = attr.displayLabel.toLocalizedStringValue(),
