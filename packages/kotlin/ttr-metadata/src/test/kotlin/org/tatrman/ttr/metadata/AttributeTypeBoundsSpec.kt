@@ -28,7 +28,8 @@ class AttributeTypeBoundsSpec :
                             def attribute integral { type: { type: decimal, length: 8, precision: 0 } },
                             def attribute code { type: { type: text, length: 40 }, optional: true },
                             def attribute bare { type: decimal },
-                            def attribute partial { type: { type: decimal, length: 9 } }
+                            def attribute partial { type: { type: decimal, length: 9 } },
+                            def attribute scale_only { type: { type: decimal, precision: 3 } }
                         ]
                     }
                     """.trimIndent(),
@@ -55,9 +56,10 @@ class AttributeTypeBoundsSpec :
                         "code" to (40 to null),
                         "bare" to (null to null),
                         "partial" to (9 to null),
+                        "scale_only" to (null to 3),
                     )
                 entity.attributes.map { it.type } shouldBe
-                    listOf("int", "decimal", "decimal", "decimal", "text", "decimal", "decimal")
+                    listOf("int", "decimal", "decimal", "decimal", "text", "decimal", "decimal", "decimal")
                 val attributes = ModelToDefinitions.entityToEntityDef(entity).attributes.associateBy { it.name }
                 attributes.getValue("id").type shouldBe DataType("int")
                 attributes.getValue("id").isKey shouldBe true
@@ -68,6 +70,7 @@ class AttributeTypeBoundsSpec :
                 attributes.getValue("code").optional shouldBe true
                 attributes.getValue("bare").type shouldBe DataType("decimal")
                 attributes.getValue("partial").type shouldBe DataType("decimal", 9)
+                attributes.getValue("scale_only").type shouldBe DataType("decimal", precision = 3)
                 // Exercise the full producer chain, not just fields on a manually built model.
                 val rendered = TtrRenderer.renderDef(ModelToDefinitions.entityToEntityDef(entity))
                 Files.writeString(root.resolve("er.ttrm"), "model er\n$rendered")
