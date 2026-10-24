@@ -300,3 +300,24 @@ and overrides, for example
 verify the downloaded bytes against that release's SHA256SUMS first. ttr-core is public, so asset URLs
 need no registry auth. Only released, hash-checked tarball specs are permitted: source `file:` paths,
 `workspace:`, `link:` and git dependencies remain forbidden in Platform's dependency rules.
+
+### Hosted commercial extension and Save acknowledgement
+
+A Studio change session may add `features: ['modeler']` and `extensions: ['authoring']` to init.
+Only that combination on a change scope imports the fixed same-origin module
+`/m/_designer/ext/authoring.js`. The Studio image supplies it; the open viewer image does not.
+The module exports `activate({dataSource, bindingsRequired})`, returning a `ShellEditContext` or null.
+It uses `dataSource.edit` for the typed `modeler/edit` operations and `listCatalog` for picker data.
+The frame sets `globalThis.__ttrExtensionRuntime = {react, jsx}` before import, so the separate
+extension build can share the frame's React dispatcher. No bearer is supplied to the extension.
+Removing the grant from a repeated init immediately removes the mounted extension context.
+The BFF independently enforces the signed modeler licence on every persisted mutation.
+
+Ready has additive fields: `{sha, capabilities: ['save-ack'], manifest: {bindings: {required}}}`.
+The binding policy comes from the worker's resolved manifest, with a conservative true fallback
+when an older worker does not report it. After collect and a successful BFF save, repeat init
+with the returned `sha`. The frame fetches that exact head, preserves post-collect whole-file edits,
+and replies `{type:'ttr.frame.ack',sha,changed}`. An unexpected head or overlapping remote edit
+refuses with `frame/edit-conflict` before replacing the old snapshot. The host serializes
+collect/commit/ack and uses the acknowledged `changed` count; HTTP success alone never clears dirty.
+Successful refresh and SHA navigation also acknowledge the installed SHA and remaining dirty count.

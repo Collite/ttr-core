@@ -9,7 +9,7 @@ export async function openFileMap(
   client: LspClient,
   root: string,
   files: ReadonlyMap<string, string>,
-  opts?: { under?: string }
+  opts?: { under?: string; onManifest?: (manifest: import('@tatrman/lsp').ProjectRootResult['manifest']) => void }
 ): Promise<string[]> {
   const manifest = files.get('modeler.toml');
   await client.setProjectRoot(root, manifest);
@@ -23,6 +23,7 @@ export async function openFileMap(
   );
   // Like loadProjectIntoSymbols' two-pass load: references can resolve only after all symbols exist.
   // This request is also the notification barrier and republishes final cross-file diagnostics.
-  await client.setProjectRoot(root, manifest);
+  const result = await client.setProjectRoot(root, manifest);
+  if (result?.manifest) opts?.onManifest?.(result.manifest);
   return paths;
 }

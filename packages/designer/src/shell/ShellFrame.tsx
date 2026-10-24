@@ -454,7 +454,9 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
     } else if (t.perspective === 'binding') {
       path = formatPath({ kind: 'perspective', workspace, perspective: 'binding', params: { left: t.subject.ref, ...(bindingSel ? { sel: bindingSel } : {}) } });
     } else {
-      path = tabUrl(workspace, t);
+      const selected = subjectSkins[t.id] ?? t.skin;
+      const defaultSkin = t.subject.schemaCode ? createSkinRegistry().defaultSkin('modeling', t.subject.schemaCode) : undefined;
+      path = tabUrl(workspace, { ...t, skin: selected === defaultSkin ? undefined : selected });
     }
     return path;
   }
@@ -469,7 +471,7 @@ export function ShellFrame({ dataSource, workspace, initialAppPath, catalog, fil
     // App paths throughout: replaceAppPath keeps the base path and the session parameters, so the
     // rewritten URL reloads into this same backend and graph (ttr-core#171).
     replaceLocation(appPathForTab(tab));
-  }, [tab, workspace, lineageState, bindingSel]);
+  }, [tab, workspace, lineageState, bindingSel, subjectSkins]);
 
   // ⌘K command registry — every toolbar action gets a command twin (E-4/D-6 parity)
   const registry = useMemo(() => new CommandRegistry(), []);

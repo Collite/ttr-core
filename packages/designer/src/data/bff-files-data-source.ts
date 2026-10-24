@@ -74,6 +74,7 @@ export class SnapshotEditError extends Error {
 export interface SnapshotRefreshOptions {
   deferDisposal?: boolean;
   reason?: 'save' | 'refresh';
+  expectedSha?: string;
   discard?: boolean;
 }
 function sameFiles(a: ReadonlyMap<string,string>, b: ReadonlyMap<string,string>): boolean {
@@ -92,6 +93,7 @@ export class BffFilesDataSource implements ModelDataSource {
     graphShape: 'rich',
   };
   project: ProjectFiles | null = null;
+  bindingsRequired = true;
   sha: string | null = null;
   private worker: SnapshotWorker | null = null;
   private catalog: CatalogListing | null = null;
@@ -159,6 +161,7 @@ export class BffFilesDataSource implements ModelDataSource {
       return response.json();
     };
     const snapshot = snapshotOf(await (this.deps.loadSnapshot ? this.deps.loadSnapshot() : read()));
+    if (options.expectedSha && snapshot.sha !== options.expectedSha) throw new SnapshotEditError('frame/edit-conflict', 'The branch moved after Save. Local edits are retained.');
     if (snapshot.sha === this.sha) return false;
     for (let attempt = 0; attempt < 8; attempt++) {
       const current = this.currentFiles();
@@ -180,7 +183,8 @@ export class BffFilesDataSource implements ModelDataSource {
       }
       const client = await this.createClient();
       try {
-        await openFileMap(client, 'file:///repo', authored, {under:'model/'});
+        let required = true;
+        await openFileMap(client, 'file:///repo', authored, { under: 'model/', onManifest: manifest => { required = manifest.bindings.required; } });
         const worker = new SnapshotWorker(client, {projectRoot:'file:///repo',files:project.files,currentFiles:authored});
         const catalog = await worker.listCatalog();
         if (this.disposed) throw new Error('Hosted source is disposed.');
@@ -195,6 +199,7 @@ export class BffFilesDataSource implements ModelDataSource {
         this.catalogGen++;
         this.catalog = catalog;
         this.project = project;
+        this.bindingsRequired = required;
         this.sha = snapshot.sha;
         this.lastCollected = null;
         if (previous) this.retired.push(previous.lspClient);
