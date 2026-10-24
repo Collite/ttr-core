@@ -26,6 +26,8 @@ import org.tatrman.ttrp.bundle.EmitPluginLoader
 import org.tatrman.ttrp.bundle.ExportFolderWriter
 import org.tatrman.ttr.metadata.world.AutomationFingerprints
 import org.tatrman.ttrp.emit.recipe.RecipeGraphProjector
+import org.tatrman.ttrp.emit.recipe.RecipeActionDependencies
+import org.tatrman.ttr.metadata.model.Entity
 import org.tatrman.ttrp.emit.spi.TtrEmitPlugin
 import org.tatrman.ttrp.emit.spi.RecipeEmitRequest
 import org.tatrman.ttrp.graph.capability.RecipeManifestSource
@@ -160,6 +162,32 @@ class EmitCommand : CliktCommand(name = "emit") {
                                 ).digest(Files.readAllBytes(path))
                                 .joinToString("") { "%02x".format(it) }
                     require(actual == expected) { "bundle file hash mismatch: $relative" }
+                }
+                val recipe = requireNotNull(bundle.recipe) { "bundle has no recipe" }
+                val wiredActions =
+                    recipe.wiring.map { it.action }.distinct().associateWith { name ->
+                        requireNotNull(
+                            objects.filterIsInstance<AutomationAction>().singleOrNull { it.qname.name == name },
+                        ) {
+                            "unknown or ambiguous action $name"
+                        }
+                    }
+                if (recipe.approvalDependencies != null ||
+                    wiredActions.values.any { action ->
+                        action.properties.any { it.first == "writer_defaults" }
+                    }
+                ) {
+                    require(
+                        RecipeActionDependencies.matches(
+                            recipe.approvalDependencies,
+                            recipe.fingerprints.text,
+                            wiredActions,
+                        ) { name ->
+                            objects.filterIsInstance<Entity>().singleOrNull { it.qname.name == name }
+                        },
+                    ) {
+                        "action approval dependencies differ from deployment metadata or are unavailable; rebuild the recipe bundle"
+                    }
                 }
                 val graph =
                     RecipeGraphProjector.project(

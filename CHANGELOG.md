@@ -6,6 +6,19 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — Native writer-default approval dependencies
+
+- Recipe bundles that directly wire `writer_defaults` now bind all directly wired action definitions and
+  their logical ER target declarations into versioned `text/2` approvals. The manifest records verifiable
+  `approvalDependencies` evidence. Default-free recipes keep the frozen `text/1` bytes; values and labels
+  retain their existing approval rules. Metadata-only default/mapping/constraint edits require reapproval.
+- Native export checks the evidence against its loaded metadata and retains the resulting text fingerprint;
+  missing, stale, unknown-version or unbound evidence refuses before writing an export.
+- Producer prerequisite only: Server#280 retains its governed-default refusal until publication and
+  coordinated pinned-metadata verification. This covers native previews, not physical writes, connector
+  configuration or deferred action dispatch. Grammar stays 0.18; publish the next available internal 0.18.x
+  patch after review. JVM consumers of `RecipeManifest` must rebuild (constructor/copy signature changed).
+
 ### Added — XM P1 external metadata projections
 
 - Complete parsed definition sets and deterministic `graph.json`/`defs.json`, SKOS/OWL Turtle, XMI 2.1 with
