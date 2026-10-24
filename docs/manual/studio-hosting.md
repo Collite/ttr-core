@@ -158,3 +158,69 @@ repeated after that acknowledgement settles. Same-SHA refresh preserves changes.
 Source saves retain validated author text without formatter reprinting, keeping top-level kind/name and
 refusing referenced-member removal. The enclosing file's line endings and neighboring definitions survive;
 trailing definition whitespace is trimmed at the splice. Renames use `textDocument/rename`.
+
+## Stage 2: embedded DesignerPage
+
+`@tatrman/designer-core` exports a React page, its TypeScript props, `ShellEditContext`, and the
+stage 1 message types. `@tatrman/designer-core/extensions` exports the open extension contracts
+and `editModel`. This stage supplies the built library for internal consumers; the family release
+is S3.2. Internal 0.x releases suffice unless a public release is explicitly requested.
+
+```tsx
+import { useRef } from 'react';
+import { DesignerPage, type CollectFiles } from '@tatrman/designer-core';
+import '@tatrman/designer-core/designer.css';
+
+function Model({ snapshot }) {
+  const collect = useRef<CollectFiles>(null);
+  return <div style={{ height: 700 }}>
+    <DesignerPage files={snapshot} workspace="hartland" basePath="/m/" lang="en"
+      theme="dark" location="/w/hartland/s/md" collect={collect}
+      onLocation={path => { /* update the host's router */ }}
+      onDirty={changed => { /* update the host's save affordance */ }}
+      onError={error => { /* show error.code / error.message */ }} />
+  </div>;
+}
+```
+
+`files` is `{ sha: string, files: Record<string,string> }`, or an async zero-argument loader
+returning that shape. Paths and file contents follow the BFF snapshot rules above. Optional
+`manifest` overrides `modeler.toml` in the supplied snapshot. Supply the complete repository
+snapshot, including layouts and JS rosters; only `model/**` model documents are opened in the LSP.
+`workspace` defaults to `repo` and changing it starts a new session. `basePath` has leading and
+trailing slashes; it controls shared rail links, while `location` and `onLocation` use app paths
+(`/w/:workspace/s/:subject`). The component neither changes browser history nor fetches config.json,
+and does not set document-level language or styles. The root's `lang` follows the prop. Each mount
+owns its worker, file cache, navigation and extension loader. A host may mount multiple pages.
+
+`collect.current()` synchronously returns sorted whole-file changes (including null-text deletions)
+and records the exact collected base. Serialize collect, saving, and the next snapshot acknowledgement.
+After a successful save, pass a new snapshot object with a new immutable SHA, or a new loader function
+that returns it. Same-SHA updates are idempotent, so changed bytes or manifest settings require a new
+SHA. Late edits remain dirty after acknowledgement. Overlapping incoming changes report
+`frame/edit-conflict`; dirty replacement without a matching collection reports `frame/unsaved-edits`.
+The previous shell and files remain available on either refusal or loader failure. Prompt in the host;
+remount with a different React key only after an explicit discard choice. Dirty callbacks are debounced
+200 ms. Use a new input object/function to retry a failed loader; unmount terminates the worker.
+
+The `extensions` prop is a list of `{ manifest, licenseClient?, activate }`. A manifest contains
+`name`, `version`, `license: 'none' | 'platform'`, and `requires: string[]`. The core's existing
+license gate runs before `activate({ dataSource }, grants)`; activation resolves a `ShellEditContext`
+or null. The first supplied context is used. A missing grant/client or failed license request never
+activates the extension. Keep the extension array stable across renders. The page's loader is scoped
+to its React context, rather than registering a process-global loader that could affect another page.
+The standalone commercial entry may still use `registerAuthoringLoader`.
+
+Import the stylesheet once. Every library selector, including React Flow and Tailwind variables,
+is rooted under `.ttr-designer`; the library disables Tailwind preflight and supplies its own minimal
+reset. Its root fills the host's explicit height. `theme="light" | "dark"` controls root color-scheme,
+shell surfaces and canvas theme without changing host styles. The standalone viewer keeps its full reset.
+
+The LSP build exports the self-contained module asset `@tatrman/lsp/browser.worker.js`. The Designer
+library copies those exact bytes beside its entry and creates a module Worker from a relative URL
+using `import.meta.url`. No consumer imports `?worker`, compiles LSP sources, or supplies a worker plugin.
+Keep `browser.worker.js` beside the library's JavaScript when copying files manually. Vite and webpack
+asset pipelines must retain this URL asset; custom JS-only copy rules need to include it (and the CSS).
+The standalone Vite entry uses `?url` to reference the already-built asset. A bare package string inside
+`new URL('@tatrman/lsp/browser.worker.js', import.meta.url)` is not a native package resolver and is not
+used by the library. React/ReactDOM dependency and release-family packaging are finalized in S3.2.

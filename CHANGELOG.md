@@ -15,6 +15,17 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   before merging this change if that patch is needed first; otherwise include it in the 0.19.0 minor.
   AU Server must rebuild and pin the minor containing this metadata API change.
 
+### Added — embedded Studio DesignerPage (P3 S3.1)
+
+- Rename the UI workspace package to `@tatrman/designer-core` and export `DesignerPage`, scoped CSS,
+  authoring/host types and the existing extension surface. Props supply snapshots, routing, language,
+  theme and callbacks; each page has its own worker, navigation and license-aware authoring loader.
+- Reuse the hosted collection and saved-SHA rebase guards; preserve late edits and report conflicts
+  without replacing the old model. Build the self-contained LSP `browser.worker.js` asset beside the
+  library entry; hosts do not compile worker sources. Keep the standalone viewer and iframe entries.
+- Scope Tailwind/reset and React Flow CSS to `.ttr-designer`, fit the host's height, and support dark
+  surfaces. Release-family packaging follows in S3.2; this change does not publish or deploy artifacts.
+
 ### Fixed — Studio review-135
 
 - Preserve validated definition text without formatter loss; keep identity, neighboring definitions and referenced members.

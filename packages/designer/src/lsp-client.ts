@@ -8,7 +8,7 @@ import {
 import type { ModelGraph, LayoutFile, SymbolDetail, RenderableSchemaCode, GraphMetadata, GetGraphResponse, PackageGraphResponse, BindingMapData, ProjectRootResult, SchemaSubject, ListSymbolsParams, ListedSymbol } from '@tatrman/lsp';
 import type { ModelerEditParams, ModelerEditResult } from '@tatrman/lsp';
 import type { WorkspaceEdit } from 'vscode-languageserver-types';
-import LspWorker from '@tatrman/lsp/browser?worker';
+import workerUrl from './worker-url.js';
 import { lspClientOver } from './lsp-connection.js';
 export { lspClientOver, type LspConnection } from './lsp-connection.js';
 
@@ -34,10 +34,12 @@ export interface LspClient {
 }
 
 export async function createLspClient(): Promise<LspClient> {
-  const worker = new LspWorker();
+  const worker = new Worker(workerUrl, { type: 'module' });
   const reader = new BrowserMessageReader(worker);
   const writer = new BrowserMessageWriter(worker);
   const connection = createProtocolConnection(reader, writer);
   connection.listen();
-  return lspClientOver(connection, { transportKind: 'browser', dispose: () => worker.terminate() });
+  const dispose = () => { connection.dispose(); worker.terminate(); };
+  try { return await lspClientOver(connection, { transportKind: 'browser', dispose }); }
+  catch (error) { dispose(); throw error; }
 }

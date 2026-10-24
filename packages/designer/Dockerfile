@@ -47,10 +47,10 @@ COPY packages ./packages
 COPY tests/integration/package.json ./tests/integration/package.json
 COPY tests/conformance/package.json ./tests/conformance/package.json
 COPY samples/v1.1-mini ./samples/v1.1-mini
-RUN pnpm install --offline --frozen-lockfile --filter "@tatrman/designer..."
+RUN pnpm install --offline --frozen-lockfile --filter "@tatrman/designer-core..."
 # `./` — a RELATIVE asset base. The base path is a runtime choice: the entrypoint writes it into
 # index.html as `<base href>` (and into config.json), and every asset URL resolves against it.
-RUN DESIGNER_BASE_URL=./ pnpm --filter "@tatrman/designer..." build
+RUN DESIGNER_BASE_URL=./ pnpm --filter "@tatrman/designer-core..." build
 # Split the output here, so the runtime stage below is COPY-only (no RUN ⇒ no emulation needed for
 # a foreign target platform). index.html is a TEMPLATE: the entrypoint renders it into /tmp.
 RUN mkdir -p /out/templates \

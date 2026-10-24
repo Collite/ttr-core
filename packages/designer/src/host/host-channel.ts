@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import type { Host } from './host.js';
 /** Stage-1 Studio protocol. Bearers live only in memory, never in the iframe URL. */
 export type HostScope = { kind: 'served' } | { kind: 'change'; id: string };
 export interface HostInit {
@@ -80,7 +81,7 @@ function parseMessage(value: unknown): HostMessage | null {
 }
 
 /** Ordered async work; token updates bypass the queue so the next fetch sees the latest bearer. */
-export class HostChannel {
+export class HostChannel implements Host {
   private pending = Promise.resolve();
   private disposed = false;
   constructor(private readonly handle: (message: HostMessage) => void | Promise<void>) {

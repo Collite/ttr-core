@@ -1,18 +1,27 @@
 {
-  "name": "@tatrman/designer",
+  "name": "@tatrman/designer-core",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
   "exports": {
-    "./extensions": "./src/extensions.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/library/index.js"
+    },
+    "./extensions": {
+      "types": "./dist/extensions.d.ts",
+      "import": "./dist/library/extensions.js"
+    },
+    "./designer.css": "./dist/library/designer.css"
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc --noEmit && vite build && pnpm run build:library && tsc --emitDeclarationOnly",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:library": "DESIGNER_LIBRARY=1 vite build --config vite.library.config.ts"
   },
   "dependencies": {
     "@tatrman/canvas-core": "workspace:*",
@@ -48,5 +57,11 @@
     "vite": "^6.0.0",
     "vitest": "^4.1.6",
     "vscode-languageserver": "^9.0.1"
-  }
+  },
+  "main": "./dist/library/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/library",
+    "dist/**/*.d.ts"
+  ]
 }

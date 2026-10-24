@@ -24,6 +24,7 @@ import { ManifestProgramSource } from './model/ttrp/manifest-program-source';
 import type { ProcessingGraphSource } from './model/processing-source';
 import { useAuthoringContext } from './ext/use-authoring-context.js';
 import { createLspClient, type LspClient } from './lsp-client';
+import { usePageEnvironment } from './page/page-context.js';
 import { getRuntimeConfig } from './runtime-config';
 import { initialLanguage, saveLanguage } from './i18n/labels';
 import { setStickyParam } from './shell/app-location';
@@ -71,7 +72,7 @@ interface LanguageChoice {
   onChange: (lang: string) => void;
 }
 
-function Studio({
+export function Studio({
   dataSource, viewState, catalog, files, workspace, processingSource, language, initialAppPath,
 }: {
   dataSource: ModelDataSource;
@@ -84,6 +85,8 @@ function Studio({
   /** present on a catalog backend: model labels follow this language. */
   language?: LanguageChoice;
 }) {
+  const page = usePageEnvironment();
+  const config = page?.config ?? getRuntimeConfig();
   const editContext = useAuthoringContext(dataSource);
   const [currentCatalog, setCurrentCatalog] = useState(catalog);
   useEffect(() => { setCurrentCatalog(catalog); }, [catalog]);
@@ -129,7 +132,7 @@ function Studio({
                 onChange={(e) => language.onChange(e.target.value)}
                 className="border border-slate-300 rounded px-2 py-1 mr-3"
               >
-                {[...new Set([...getRuntimeConfig().languages, ...(dataSource.knownLanguages?.() ?? []), language.current, 'en'])]
+                {[...new Set([...config.languages, ...(dataSource.knownLanguages?.() ?? []), language.current, 'en'])]
                   .sort()
                   .map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
