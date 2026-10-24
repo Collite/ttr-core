@@ -15,7 +15,7 @@ import java.time.LocalDateTime
 /**
  * `ttrp conform <recipe>.ttrp --engines pg,duckdb --fixture <sql>… --as-of <instant>` (AU-core-P2 · S2.4 T3) — a
  * recipe conforms across engines. Scoped `<storage>=<sql>` fixtures use separate source databases and DuckDB
- * combines; unscoped fixtures retain the single-database oracle. Every engine gets its own
+ * combines; Polars currently accepts only the unscoped single-database oracle. Every engine gets its own
  * database loaded with the fixture scripts in order (Postgres: a scratch database on the server `TTR_CONN_<ENGINE>`
  * names, dropped afterwards; DuckDB: in memory), runs every output's statement with the run's bindings at `--as-of`,
  * and every engine's outputs are compared with the first's on the seven points. One engine: the statements run, and
@@ -36,6 +36,11 @@ object RecipeConformCli {
     ): Int {
         if (fixtures.isEmpty() && storageFixtures.isEmpty()) {
             echo("ttrp conform: a recipe conforms over a fixture — pass --fixture <script.sql> (schema, then rows)")
+            return 2
+        }
+        // Refuse the complete request before opening any fixture or engine, independent of engine order.
+        if (storageFixtures.isNotEmpty() && engines.any { it.equals("polars", ignoreCase = true) }) {
+            echo("ttrp conform: polars does not run cross-storage recipes yet")
             return 2
         }
         val scripts = fixtures.map { Files.readString(it) }
@@ -67,7 +72,7 @@ object RecipeConformCli {
                                                 ?: return 2
                                         else -> {
                                             echo(
-                                                "ttrp conform: unknown engine '$e' (a recipe runs on pg, duckdb, polars)",
+                                                "ttrp conform: unknown engine '$e' (storage-scoped recipes run on pg, duckdb)",
                                             )
                                             return 2
                                         }

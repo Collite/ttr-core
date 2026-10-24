@@ -262,7 +262,7 @@ class ConformCommand : CliktCommand(name = "conform") {
     private val tolerance by option("--tolerance", help = "per-column float64 tolerance, <col>=<eps>").multiple()
     private val engines by option(
         "--engines",
-        help = "a recipe's engines, comma-separated: pg, duckdb, polars",
+        help = "a recipe's engines, comma-separated: pg, duckdb, polars (Polars requires unscoped fixtures)",
     ).default(
         "pg,duckdb",
     )

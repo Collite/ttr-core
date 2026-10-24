@@ -69,6 +69,26 @@ class RecipeConformCliTest :
             io.kotest.assertions.withClue(r.stdout + r.stderr) { r.statusCode shouldBe 0 }
             r.stdout shouldContain "every output agrees on duckdb-parts, duckdb-parts"
         }
+        test("scoped Polars fixtures report the supported-scope refusal in either engine order") {
+            val args =
+                "--fixture erp_db=${sample.resolve("erp.sql")} " +
+                    "--fixture automation_db=${sample.resolve("automation.sql")}"
+            for (engines in listOf("duckdb,polars", "polars,duckdb")) {
+                val r = ttrp().test("conform $recipe --engines $engines $args --as-of 2026-11-02T08:00")
+                r.statusCode shouldBe 2
+                r.stdout.trim() shouldBe "ttrp conform: polars does not run cross-storage recipes yet"
+            }
+        }
+        test("scoped Polars refusal precedes fixture IO and database connections") {
+            val missing = project.resolve("must-not-read.sql")
+            Files.exists(missing) shouldBe false
+            val args = "--fixture erp_db=$missing --fixture automation_db=$missing"
+            for (engines in listOf("duckdb,polars", "pg,PoLaRs")) {
+                val r = ttrp().test("conform $recipe --engines $engines $args --as-of 2026-11-02T08:00")
+                r.statusCode shouldBe 2
+                r.stdout.trim() shouldBe "ttrp conform: polars does not run cross-storage recipes yet"
+            }
+        }
         test("scoped fixtures reject a missing storage before running") {
             val r =
                 ttrp().test(

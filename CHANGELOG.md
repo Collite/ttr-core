@@ -8,6 +8,11 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ### 0.18.6 — AU review-136 fixes (pending release)
 
+- Recipe conform now refuses storage-scoped fixtures with Polars explicitly (exit 2: `polars does not run
+  cross-storage recipes yet`) before reading fixtures or opening engines. Polars supports the unscoped fixture
+  oracle; cross-storage fixtures support PostgreSQL and DuckDB. Staged-input Polars support is tracked in
+  [#283](https://github.com/Collite/ttr-core/issues/283).
+
 - Polars: `/` casts both operands to Float64 in every Polars program (was: Decimal/Decimal kept the source
   scale); matches DuckDB, PostgreSQL is compared within the declared engine delta. This behaviour was introduced
   in 0.18.5 and is retained by ruling R136-C. Removed the unreachable operator-table entry.
@@ -19,7 +24,8 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   route lists; the LSP gains Markdown mapping, recipe lenses, parameter hover/action completion, and an additive
   recipe summary consumed by the Designer's four-lane list. The reusable `ttrp-check.yml` checks consumer sources.
 - **AU Polars twins:** all four recipes and review-119 probes execute on native Polars, compared with PostgreSQL
-  and DuckDB. Recipe conform accepts `--engines pg,duckdb,polars`. Bindings, reason fills, calendar range joins,
+  and DuckDB. Recipe conform accepts `--engines pg,duckdb,polars` with unscoped fixtures only; storage-scoped
+  fixtures support `pg,duckdb`. Bindings, reason fills, calendar range joins,
   aggregate expressions and typed Arrow staging are supported; decimal division uses the declared engine delta.
 
 ### Fixed — SO report review-133

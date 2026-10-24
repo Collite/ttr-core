@@ -65,6 +65,12 @@ and `org.tatrman:ttrp-doc` types describe proposals and human reviews. A human `
 only that block/sentence association from `.ttrd`; it cannot edit recipe code. A record for another document SHA
 is refused. The Platform resolver owns annotation synthesis.
 
+Recipe conformance with `--engines pg,duckdb,polars` uses unscoped SQL fixtures such as
+`--fixture schema.sql --fixture sample.sql`. Cross-storage fixtures such as `--fixture erp_db=erp.sql` and
+`--fixture automation_db=automation.sql` support `pg,duckdb`. Requesting Polars with storage-scoped fixtures
+returns exit 2 and `polars does not run cross-storage recipes yet` before any fixture is read or engine opened.
+Staged-input support is tracked in [#283](https://github.com/Collite/ttr-core/issues/283).
+
 For Hartland and ai-models CI, use the reusable `ttrp-check.yml` workflow with a pinned toolchain version. It checks
 all matching Markdown recipes after checking out the consumer repository. Both consumer repositories can use the same job (replace `TOOLCHAIN_TAG` and `PUBLIC_VERSION` with the reviewed release pin):
 
