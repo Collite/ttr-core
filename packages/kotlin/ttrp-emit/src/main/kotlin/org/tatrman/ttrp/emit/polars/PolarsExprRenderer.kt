@@ -80,7 +80,7 @@ class PolarsExprRenderer(
         val arg = e.args.singleOrNull() ?: error("aggregate expects one arg")
         val base = render(arg)
         return when (e.function.name) {
-            "sum" -> "$base.sum()"
+            "sum" -> "pl.when($base.count() > 0).then($base.sum()).otherwise(None)"
             "avg" -> "$base.mean()"
             "min" -> "$base.min()"
             "max" -> "$base.max()"

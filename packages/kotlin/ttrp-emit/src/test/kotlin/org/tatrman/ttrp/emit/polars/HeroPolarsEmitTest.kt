@@ -49,7 +49,7 @@ class HeroPolarsEmitTest :
             script shouldContain ".join("
             script shouldContain "left_on="
             script shouldContain ".group_by("
-            script shouldContain ".sum().alias(\"total\")"
+            script shouldContain ".sum()).otherwise(None).alias(\"total\")"
             script shouldContain "out/main_result.arrow"
 
             // The hero's rejects wire is now LIVE (RJ-P5 re-author): the guard's canonical int64 mask,
