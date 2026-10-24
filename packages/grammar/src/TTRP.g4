@@ -1,5 +1,5 @@
 // TTR-P canonical grammar — the C3-converged canonical surface (P1 Stage 1.1).
-// @grammar-version: 0.5  (TTR-P spec version is an integer cut via docs/grammar-master/ — S6)
+// @grammar-version: 0.6  (TTR-P spec version is an integer cut via docs/grammar-master/ — S6)
 //   0.1 → 0.2 (PL-P2.S1, additive minor): runtime params (F-4-i) + on-failure
 //   islands / retries (F-4-iv/F-4-ii) — see docs/features/grammar-master/pl-grammar-work-items.md.
 //   0.2 → 0.3 (AG B5, additive minor): a container body may live in a file —
@@ -73,6 +73,8 @@
 //   · Reserved port names (`in out err rejects true false else`) stay lexable as
 //     identifier/idPart fragments; reservation is a WALKER check (S10 → PRS-005).
 
+// 0.5 -> 0.6 (AU-core-P3, additive): a decision body may be a tagged TTR-B route list.
+// Other fragment dialects in decisions remain TTRP-REC-070; canonical decision syntax is unchanged.
 grammar TTRP;
 
 // 0.5 (review-119 M-2): the one parser mode. `TtrpParser.parseExpression` (a cn `definition:` / `members:` /
@@ -210,7 +212,7 @@ overSpec        : identifier (COLON (INT | durationLiteral))? ;    // day | week
 
 // The decision: ordinary statements, then exactly one `switch` statement (its routes are
 // the decision's outputs). `-> switch {` is a STATEMENT here, not the `switch` op of a chain.
-decisionBlock   : DECISION identifier portSig LBRACE statement* switchStmt RBRACE ;
+decisionBlock   : DECISION identifier portSig (LBRACE statement* switchStmt RBRACE | TAGGED_BLOCK) ;
 switchStmt      : dottedRef ARROW SWITCH LBRACE (MODE COLON identifier)? route* elseRoute? RBRACE ;
 route           : identifier COLON expr routeAttr* ;
 elseRoute       : ELSE COLON identifier routeAttr* ;             // a named default route, or `none` (no verdict row)

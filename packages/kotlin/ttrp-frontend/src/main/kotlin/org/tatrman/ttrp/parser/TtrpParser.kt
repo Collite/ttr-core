@@ -49,6 +49,7 @@ object TtrpParser {
     fun parseString(
         source: String,
         fileName: String = "<memory>",
+        parameterAliases: Map<String, String> = emptyMap(),
     ): TtrpParseResult {
         val syntax = mutableListOf<TtrpDiagnostic>()
         val listener = SyntaxErrorListener(fileName, syntax)
@@ -62,7 +63,7 @@ object TtrpParser {
         parser.addErrorListener(listener)
 
         val tree = parser.document()
-        val walker = TtrpWalker(fileName, source, tokens, catalog)
+        val walker = TtrpWalker(fileName, source, tokens, catalog, parameterAliases)
         // A syntactically broken document can leave ANTLR error-recovery holes the walker does not expect
         // (a missing sub-rule → a Kotlin null-check failure). Those programs already carry their PRS-001
         // syntax errors; never let the walk crash on top of them — report the syntax errors over an empty
@@ -77,7 +78,7 @@ object TtrpParser {
         // Phase 6: lower fragment interiors (`"""sql`/`"""pandas`) to canonical AST (C2-a-β).
         val decomposed =
             org.tatrman.ttrp.dialect.FragmentDecomposer
-                .run(walked)
+                .run(walked, parameterAliases)
         val document = decomposed.document
         val diagnostics =
             syntax + walker.diagnostics + decomposed.diagnostics + TtrpChecks.run(document) +

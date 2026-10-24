@@ -28,6 +28,7 @@ dependencies {
     implementation(project(":packages:kotlin:ttrp-emit"))
     // PL-P5.S2 — the H-6 emit-determinism kit operates over the emit SPI (TtrEmitPlugin/EmitRequest/EmitResult).
     implementation(project(":packages:kotlin:ttrp-emit-spi"))
+    implementation(libs.kotlinx.ser.json)
     implementation(libs.tomlj) // eval corpus (versioned fixture) loader
     implementation(libs.arrow.vector)
     runtimeOnly(libs.arrow.memory.netty)

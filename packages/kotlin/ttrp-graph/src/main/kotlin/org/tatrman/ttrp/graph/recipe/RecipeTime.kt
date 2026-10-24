@@ -112,6 +112,9 @@ class RecipeTime(
      */
     val calendarSkWithins = mutableSetOf<String>()
 
+    /** TTR-B snapshot sentences: only a unique temporal key attribute may supply an omitted by:. */
+    val implicitLatestDates = linkedMapOf<String, String>()
+
     /**
      * AU-core-P2 (review-119 M1): every `+`/`-` with a date operand, by location — `dates` for a date − date, `days`
      * for a date ± an integer number of days. The door does no date arithmetic: the sugar lowering turns the ones it
@@ -511,7 +514,36 @@ class RecipeTime(
     ) {
         when (node.kind) {
             "latest" -> {
-                val by = node.columnsOf("by")
+                val by =
+                    node.columnsOf("by").ifEmpty {
+                        val dates =
+                            if (graph.containerOf(node.id)?.fragment?.tag in
+                                setOf("ttrb", "ttrb-cs")
+                            ) {
+                                row.orEmpty().keys.filter { column ->
+                                    if (column in node.columnsOf("per")) return@filter false
+                                    val ref = origin[column] ?: return@filter false
+                                    val entity =
+                                        model?.entityInScope(ref.substringBefore('.'), imports) ?: return@filter false
+                                    val attribute =
+                                        model.attributesOf(entity).singleOrNull {
+                                            it.qname.name.substringAfterLast('.') ==
+                                                ref.substringAfter('.')
+                                        }
+                                    val type = row?.get(column) ?: return@filter false
+                                    attribute?.isKey == true &&
+                                        isDate(RecipeType.Scalar(type), ColumnRef(null, column, node.location), origin)
+                                }
+                            } else {
+                                emptyList()
+                            }
+                        dates
+                            .singleOrNull()
+                            ?.let {
+                                implicitLatestDates[node.id] = it
+                                listOf(it)
+                            }.orEmpty()
+                    }
                 if (by.size != 1) {
                     err(
                         TtrpDiagnosticId.FN_002,

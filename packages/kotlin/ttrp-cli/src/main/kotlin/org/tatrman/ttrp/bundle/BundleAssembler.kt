@@ -76,6 +76,7 @@ class BundleAssembler(
         val emitRequest: EmitRequest?,
         /** AU-core-P2: what the compile said beside the bundle (warnings, information) — `ttrp build --json` prints it. */
         val diagnostics: List<org.tatrman.ttrp.diagnostics.TtrpDiagnostic> = emptyList(),
+        val readme: String? = null,
     )
 
     /**
@@ -118,12 +119,18 @@ class BundleAssembler(
         // which snapshots it once per pass and records the fingerprint in the run manifest's `md` block.
         memberCatalog: org.tatrman.ttr.md.resolve.MemberCatalog? = null,
         recipeDir: Path? = null,
+        documentTitle: String? = null,
+        language: String = "en",
+        writeArtifacts: Boolean = true,
+        pipeline: TtrpPipeline? = null,
     ): BundleResult {
         val plan =
-            TtrpPipeline(
-                pipelineManifest,
-                modelsRoot,
-                memberCatalog = memberCatalog,
+            (
+                pipeline ?: TtrpPipeline(
+                    pipelineManifest,
+                    modelsRoot,
+                    memberCatalog = memberCatalog,
+                )
             ).plan(source, fileName, targetOverrides)
         if (!(plan.ok && plan.graph != null && plan.exec != null && plan.bound != null)) {
             throw BundleRefused(plan.diagnostics)
@@ -135,10 +142,31 @@ class BundleAssembler(
             if (inspection.diagnostics.isNotEmpty()) throw BundleRefused(plan.diagnostics + inspection.diagnostics)
             return RecipeBundleAssembler(
                 toolchainVersion,
-            ).assemble(plan, fileName, outDir, inspection.statements, recipeDir).let {
+                writeArtifacts,
+            ).assemble(
+                plan,
+                fileName,
+                outDir,
+                inspection.statements,
+                recipeDir,
+                org.tatrman.ttrp.doc.ReadmeLabels.from(
+                    plan.frontendReport
+                        ?.let { report ->
+                            val imports =
+                                report.document.statements.filterIsInstance<org.tatrman.ttrp.ast.ImportDecl>().map {
+                                    org.tatrman.ttrp.resolve.ModelIndex
+                                        .importScope(it.qname.parts, it.qname.text)
+                                }
+                            report.modelIndex?.objectsInScope(imports)
+                        }.orEmpty(),
+                ),
+                documentTitle,
+                language,
+            ).let {
                 it.copy(diagnostics = plan.diagnostics + it.diagnostics)
             }
         }
+        require(writeArtifacts) { "read-only bundle inspection requires a recipe" }
         // AG-P0 S5: fingerprint each host-generated model root the program compiled against.
         val modelRoots =
             pipelineManifest.extraModelRoots

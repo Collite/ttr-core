@@ -151,6 +151,9 @@ CREATE TABLE return_request (
     rr_state varchar
 );
 
+-- The computed return_request view reads its base header (MD-hop model evolution).
+CREATE VIEW return_request_hdr AS SELECT * FROM return_request;
+
 -- automation stdlib (ttr-parser automation/automation-stdlib.ttrm)
 CREATE TABLE obligation (
     id text,

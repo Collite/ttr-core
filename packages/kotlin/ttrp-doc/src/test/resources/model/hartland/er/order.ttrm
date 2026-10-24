@@ -1,0 +1,7 @@
+package hartland
+model er
+
+def entity order {
+    displayLabel: { en: "Order", cs: "Objednávka" }
+    attributes: [def attribute order_number { type: text }]
+}

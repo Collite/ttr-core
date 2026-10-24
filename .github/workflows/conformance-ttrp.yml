@@ -45,6 +45,7 @@ jobs:
         run: ./gradlew :packages:kotlin:ttrp-conform:test :packages:kotlin:ttrp-cli:test
         env:
           TTRP_CONFORM_PG: "1"
+          TTRP_CONFORM_POLARS: "1"
           TTR_CONN_ERP_PG: postgresql://postgres:ttrp@localhost:5432/ttrp
       - name: Verify the live PostgreSQL rounding regression ran
         run: |

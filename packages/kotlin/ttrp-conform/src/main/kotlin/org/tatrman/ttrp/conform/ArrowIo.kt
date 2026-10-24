@@ -70,6 +70,8 @@ object ArrowIo {
             is Float8Vector -> vector.get(row)
             is DecimalVector -> vector.getObject(row) as BigDecimal
             is BitVector -> vector.get(row) != 0
+            is org.apache.arrow.vector.DateDayVector -> vector.get(row).toLong()
+            is org.apache.arrow.vector.TimeStampMicroVector -> vector.get(row)
             is TimeStampMicroTZVector -> vector.get(row) // epoch micros
             is VarCharVector -> String(vector.get(row), Charsets.UTF_8)
             is LargeVarCharVector -> String(vector.get(row), Charsets.UTF_8)
@@ -87,6 +89,7 @@ object ArrowIo {
             is ArrowType.LargeUtf8 -> "utf8"
             is ArrowType.Bool -> "bool"
             is ArrowType.Decimal -> "decimal(${t.precision},${t.scale})"
+            is ArrowType.Date -> "date32"
             is ArrowType.Timestamp -> "timestamp(${t.unit.name.lowercase()},${t.timezone ?: "none"})"
             else -> t.toString()
         }

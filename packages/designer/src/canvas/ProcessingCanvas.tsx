@@ -19,6 +19,8 @@ import type { DesignerSkin } from './skin-component.js';
 import type { ProcessingGraphSource } from '../model/processing-source.js';
 import type { ArrowTable, RunSource } from '../model/run-source.js';
 import { CanvasKernel } from './Kernel.js';
+import { RecipeListView } from './RecipeListView.js';
+import type { RecipeSummary } from '../model/ttrp/types.js';
 import { ResultDrawer } from './ResultDrawer.js';
 import { ProcessingDrillContext } from '../skins/processing-nodes.js';
 import { canvas as palette } from '@tatrman/tokens'; // canvas token family (contracts §6)
@@ -106,6 +108,13 @@ export function ProcessingCanvas({
   // bumps to refetch after an applied edit (the doors slot's onApplied).
   const drillKey = drillPath.join('/');
   const [reload, setReload] = useState(0);
+  const [recipe, setRecipe] = useState<RecipeSummary | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setRecipe(null);
+    source.getRecipeSummary?.(programRef).then(value => { if (alive) setRecipe(value); }).catch(() => { if (alive) setRecipe(null); });
+    return () => { alive = false; };
+  }, [source, programRef, reload]);
   const [pg, setPg] = useState<ProcessingGraph | null>(null);
   useEffect(() => {
     let alive = true;
@@ -203,6 +212,8 @@ export function ProcessingCanvas({
   };
   // expose the trigger so the shell's ⌘K command fires the SAME run (E-4 parity).
   useEffect(() => { if (runRef) runRef.current = () => runProgram.current(); return () => { if (runRef) runRef.current = null; }; }, [runRef]);
+
+  if (recipe && drillPath.length === 0) return <RecipeListView recipe={recipe} />;
 
   if (!canvasGraph || !positions || !skin) {
     return <div data-testid="processing-canvas-empty" style={{ padding: 20, color: palette.muted }}>laying out…</div>;

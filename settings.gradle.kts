@@ -71,6 +71,7 @@ include(":packages:kotlin:ttr-emit-kestra")
 include(":packages:kotlin:ttr-emit-airflow3")
 include(":packages:kotlin:ttrp-lsp")
 include(":packages:kotlin:ttrp-cli")
+include(":packages:kotlin:ttrp-doc")
 include(":packages:kotlin:ttrp-conform")
 
 // `ttr import-schema` — the standard's brownfield front door (STRAT-8/RO-26; SV-P4·S3/S4).
