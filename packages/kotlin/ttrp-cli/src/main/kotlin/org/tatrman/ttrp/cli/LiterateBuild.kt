@@ -50,6 +50,7 @@ object LiterateBuild {
                             offset,
                             d.span[1],
                         ),
+                        d.suggestedAlternative,
                     )
                 }
             if (json) echo(BuildJson.failure(diagnostics)) else diagnostics.forEach { echo(it.render()) }

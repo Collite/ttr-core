@@ -122,6 +122,24 @@ class DocExtractSpec :
                 .single()
                 .sidecar.nodes.keys shouldBe setOf("placed_orders", "verdict")
         }
+        test("fence diagnostics retain their parser identity, suggestion and Markdown span") {
+            val base = md + "\n```ttrb decision verdict(in orders)\n%s\n```\n"
+            for ((body, id, word) in listOf(
+                Triple("Decde release when amount > 0.", "TTRP-B-004", "Decde"),
+                Triple("Decide release when amount > 0. Keep only rows where amount > 1.", "TTRP-REC-070", "Keep"),
+            )) {
+                val source = base.format(body).replace("Find the orders.", "Find 🚀 orders.")
+                val result = DocExtractor.extract(source, "bad.md")
+                val finding = result.diagnostics.first { it.id == id }
+                finding.span[0] shouldBe source.indexOf(word)
+                check(finding.suggestedAlternative != null)
+                result.diagnostics.none { it.id == "TTRP-DOC-001" } shouldBe true
+            }
+            val source = "```ttrp\nrecipe { key order.order_number }\n```\n"
+            val errors = DocExtractor.extract(source, "bad.md").diagnostics
+            errors.any { it.id == "TTRP-PRS-001" } shouldBe true
+            errors.none { it.message.contains("must follow") } shouldBe true
+        }
         test("three named skeletons derive separate nested paths and never mix members") {
             val multi =
                 listOf("decide", "monitor", "settle").joinToString("\n") { name ->

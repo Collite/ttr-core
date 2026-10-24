@@ -26,6 +26,7 @@ fun utf16Offset(
     val id: String,
     val message: String,
     val span: List<Int>,
+    val suggestedAlternative: String? = null,
 )
 
 @Serializable data class DocNode(
@@ -154,12 +155,36 @@ object DocExtractor {
                 .singleOrNull()
         }
 
+        fun forwardErrors(
+            parsed: org.tatrman.ttrp.parser.TtrpParseResult,
+            sourceOffset: (Int) -> Int,
+        ): Boolean {
+            val errors = parsed.diagnostics.filter { it.severity == Severity.ERROR }
+            errors.forEach { d ->
+                val start = sourceOffset(utf16Offset(parsed.source, d.location.offsetStart)).coerceIn(0, source.length)
+                val end = sourceOffset(utf16Offset(parsed.source, d.location.offsetEnd)).coerceIn(start, source.length)
+                diagnostics += DocDiagnostic(d.id.id, d.message, listOf(start, end), d.suggestedAlternative)
+            }
+            return errors.isNotEmpty()
+        }
+
         fun member(
             text: String,
             block: DocBlock,
+            sourceOffset: (Int) -> Int,
         ): List<Member>? {
             val prefix = "recipe {\n"
-            val recipe = parsedRecipe(prefix + text + "\n}") ?: return null
+            val parsed = TtrpParser.parseString(prefix + text + "\n}", document)
+            if (forwardErrors(
+                    parsed,
+                ) { sourceOffset((it - prefix.length).coerceIn(0, text.length)) }
+            ) {
+                return emptyList()
+            }
+            val recipe =
+                parsed.document.statements
+                    .filterIsInstance<RecipeDecl>()
+                    .singleOrNull() ?: return null
             if (recipe.members.isEmpty()) return null
             return recipe.members.map { m ->
                 val n =
@@ -170,8 +195,8 @@ object DocExtractor {
                     }
                 Member(
                     text.substring(
-                        utf16Offset(prefix + text + "\n}", m.location.offsetStart) - prefix.length,
-                        utf16Offset(prefix + text + "\n}", m.location.offsetEnd) - prefix.length,
+                        utf16Offset(parsed.source, m.location.offsetStart) - prefix.length,
+                        utf16Offset(parsed.source, m.location.offsetEnd) - prefix.length,
                     ),
                     n,
                     block,
@@ -184,14 +209,33 @@ object DocExtractor {
                 continue
             }
             if (block.tag == "ttrp" && block.info == "preamble") {
+                if (forwardErrors(TtrpParser.parseString(block.body, document)) { block.bodySpan[0] + it }) continue
                 if (preamble == null) preamble = block.body.trimEnd()
                 continue
             }
             val named = if (block.tag == "ttrp" && block.info.isEmpty()) nameHeader.find(block.body) else null
             val body = if (named != null) block.body.removeRange(named.range) else block.body
-            val recipe = if (block.tag == "ttrp" && block.info.isEmpty()) parsedRecipe(body) else null
+            val parsed =
+                if (block.tag == "ttrp" &&
+                    block.info.isEmpty()
+                ) {
+                    TtrpParser.parseString(body, document)
+                } else {
+                    null
+                }
+            val recipe =
+                parsed
+                    ?.document
+                    ?.statements
+                    ?.filterIsInstance<RecipeDecl>()
+                    ?.singleOrNull()
+            val bodyStart = block.bodySpan[0] + (named?.value?.length ?: 0)
             if (recipe != null) {
                 val name = named?.groupValues?.get(1) ?: recipe.name
+                if (forwardErrors(requireNotNull(parsed)) { bodyStart + it.coerceIn(0, body.length) }) {
+                    skeletons += Skeleton(name, "", mutableListOf(), block.span)
+                    continue
+                }
                 if (name != null &&
                     skeletons.any { it.name == name }
                 ) {
@@ -238,9 +282,14 @@ object DocExtractor {
                 continue
             }
             if (skeletons.isEmpty()) {
+                if (parsed != null && forwardErrors(parsed) { bodyStart + it.coerceIn(0, body.length) }) continue
                 refuse(1, block, "a container must follow its recipe skeleton")
                 continue
             }
+            var bodyInText = 0
+            var originalInteriorStart = block.bodySpan[0]
+            var interiorLength = body.length
+            var originalHeaderStart = block.bodySpan[0]
             val text =
                 if (block.tag == "ttrp" && block.info.isEmpty()) {
                     body
@@ -254,6 +303,20 @@ object DocExtractor {
                         header = body.lineSequence().firstOrNull().orEmpty()
                         interior = body.substringAfter('\n', "")
                     }
+                    originalHeaderStart =
+                        if (block.info.isNotBlank()) {
+                            source
+                                .indexOf(
+                                    header,
+                                    block.span[0],
+                                ).coerceAtLeast(block.span[0])
+                        } else {
+                            block.bodySpan[0]
+                        }
+                    originalInteriorStart = block.bodySpan[0] + if (block.info.isNotBlank()) 0 else header.length + 1
+                    interiorLength = interior.length
+                    bodyInText =
+                        if (block.tag == "ttrp") "$header {\n".length else "$header \"\"\"${block.tag}\n".length
                     // The parser validates the real role/decision header; no independent header grammar is maintained.
                     val probeBody =
                         if (header.trimStart().startsWith(
@@ -276,7 +339,14 @@ object DocExtractor {
                         "$header \"\"\"${block.tag}\n$interior\"\"\"\n"
                     }
                 }
-            val extracted = member(text, block)
+            val extracted =
+                member(text, block) { at ->
+                    if (at >= bodyInText) {
+                        originalInteriorStart + (at - bodyInText).coerceIn(0, interiorLength)
+                    } else {
+                        originalHeaderStart + at.coerceAtLeast(0)
+                    }
+                }
             if (extracted == null) {
                 refuse(1, block, "block has no valid container or skeleton header")
             } else {

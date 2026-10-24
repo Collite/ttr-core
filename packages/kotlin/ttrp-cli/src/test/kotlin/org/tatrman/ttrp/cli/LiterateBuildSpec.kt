@@ -199,6 +199,15 @@ class LiterateBuildSpec :
             kotlinx.serialization.json.Json
                 .parseToJsonElement(result.stdout)
         }
+        test("Markdown JSON keeps the fragment reject id and original source line") {
+            val text = "```ttrp\nrecipe { key: order.order_number }\n```\n\n```ttrb decision verdict(in orders)\nDecde release when amount > 0.\n```\n"
+            val source = dir.resolve("bad-sentence.md")
+            Files.writeString(source, text)
+            val result = ttrp().test("build $source --json")
+            result.statusCode shouldBe 1
+            result.stdout shouldContain "TTRP-B-004"
+            result.stdout shouldContain "\"line\": 6"
+        }
         test("invalid fence tag is a located DOC-004 diagnostic") {
             Files.writeString(dir.resolve("bad.md"), "# Bad\n\n```js\n1\n```\n")
             val r = ttrp().test("build ${dir.resolve("bad.md")} --json")

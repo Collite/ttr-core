@@ -95,6 +95,7 @@ object RecipeEditorAnalysis {
                     Severity.ERROR,
                     d.message,
                     location(doc.text, doc.uri, d.span),
+                    d.suggestedAlternative,
                 )
             } +
                 recipes.flatMap { entry ->
