@@ -44,10 +44,52 @@ class ReadmeRenderSpec :
                             .of("src/test/resources/model"),
                     )
             check(snapshot != null)
-            val actual = ReadmeLabels.from(snapshot, setOf("hartland.automation"))
+            val actual =
+                ReadmeLabels.from(
+                    org.tatrman.ttrp.resolve.ModelIndex(snapshot).objectsInScope(
+                        listOf(
+                            org.tatrman.ttrp.resolve.ModelIndex.importScope(
+                                listOf("hartland", "automation"),
+                                "hartland.automation",
+                            ),
+                        ),
+                    ),
+                )
             actual.labels.getValue("tolerance").getValue("cs") shouldBe "Tolerance ceny"
             actual.labels.getValue("release_order").getValue("cs") shouldBe "Uvolnění objednávky"
             ReadmeRenderer.render(recipe, actual, lang = "cs") shouldContain "Uvolnit objednávku"
+        }
+        test("tier imports retain entity labels in what the recipe reads") {
+            val snapshot =
+                org.tatrman.ttrp.resolve.ModelRepo.snapshotOf(
+                    java.nio.file.Path
+                        .of("src/test/resources/model"),
+                )!!
+            val index =
+                org.tatrman.ttrp.resolve
+                    .ModelIndex(snapshot)
+            val imports =
+                org.tatrman.ttrp.parser.TtrpParser
+                    .parseString("import hartland.er.*")
+                    .document.statements
+                    .filterIsInstance<org.tatrman.ttrp.ast.ImportDecl>()
+                    .map {
+                        org.tatrman.ttrp.resolve.ModelIndex
+                            .importScope(it.qname.parts, it.qname.text)
+                    }
+            val actual = ReadmeLabels.from(index.objectsInScope(imports))
+            ReadmeRenderer.render(recipe, actual) shouldContain "Order (`er.entity.order`)"
+        }
+        test("single-object imports are refused by the checker rather than inventing README scope") {
+            val report =
+                org.tatrman.ttrp.resolve
+                    .TtrpChecker(
+                        org.tatrman.ttrp.project
+                            .TtrpManifest(manifestDir = java.nio.file.Path.of(".")),
+                        java.nio.file.Path
+                            .of("src/test/resources/model"),
+                    ).check("import hartland.er.order")
+            report.errors.any { it.id == org.tatrman.ttrp.diagnostics.TtrpDiagnosticId.RES_006 } shouldBe true
         }
         for (lang in listOf("en", "cs")) {
             test("H-1 README $lang: routes, reasons, labeled reads, actions, parameter values and mode") {

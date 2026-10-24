@@ -104,6 +104,9 @@ object LiterateBuild {
             if (drift.isNotEmpty()) refuse(drift, 3)
         }
         val project = TtrpManifestReader.resolve(file.parent).manifest
+        val pipeline =
+            org.tatrman.ttrp.graph
+                .TtrpPipeline(project, memberCatalog = memberCatalog)
         val results =
             extraction.recipes.map { recipe ->
                 BundleAssembler(ToolchainVersion.current).build(
@@ -117,6 +120,7 @@ object LiterateBuild {
                     language = lang,
                     memberCatalog = memberCatalog,
                     writeArtifacts = !check,
+                    pipeline = pipeline,
                 )
             }
 

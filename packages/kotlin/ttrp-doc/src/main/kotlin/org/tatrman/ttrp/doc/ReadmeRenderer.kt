@@ -4,7 +4,7 @@ package org.tatrman.ttrp.doc
 import org.tatrman.ttr.metadata.model.AutomationAction
 import org.tatrman.ttr.metadata.model.AutomationObject
 import org.tatrman.ttr.metadata.model.Entity
-import org.tatrman.ttr.metadata.registry.RegistrySnapshot
+import org.tatrman.ttr.metadata.model.ModelObject
 import org.tatrman.ttrp.bundle.RecipeManifest
 
 /** Labels are presentation only: identifiers and approval fingerprints remain in the canonical language. */
@@ -13,22 +13,8 @@ data class ReadmeLabels(
     val dryRuns: Map<String, Map<String, String>> = emptyMap(),
 ) {
     companion object {
-        fun from(
-            snapshot: RegistrySnapshot?,
-            importedPackages: Set<String> = emptySet(),
-        ): ReadmeLabels {
-            val objects =
-                snapshot
-                    ?.model
-                    ?.objectByQname()
-                    ?.values
-                    .orEmpty()
-                    .filter { obj ->
-                        importedPackages.isEmpty() ||
-                            importedPackages.any { pkg ->
-                                obj.qname.`package` == pkg || obj.qname.`package`.startsWith("$pkg.")
-                            }
-                    }.sortedBy { it.qname.dotted() }
+        fun from(inScope: Collection<ModelObject>): ReadmeLabels {
+            val objects = inScope.sortedBy { it.qname.dotted() }
             val labels = linkedMapOf<String, Map<String, String>>()
             val dryRuns = linkedMapOf<String, Map<String, String>>()
             objects.forEach { obj ->

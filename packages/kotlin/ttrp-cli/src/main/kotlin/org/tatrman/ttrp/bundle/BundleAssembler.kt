@@ -122,12 +122,15 @@ class BundleAssembler(
         documentTitle: String? = null,
         language: String = "en",
         writeArtifacts: Boolean = true,
+        pipeline: TtrpPipeline? = null,
     ): BundleResult {
         val plan =
-            TtrpPipeline(
-                pipelineManifest,
-                modelsRoot,
-                memberCatalog = memberCatalog,
+            (
+                pipeline ?: TtrpPipeline(
+                    pipelineManifest,
+                    modelsRoot,
+                    memberCatalog = memberCatalog,
+                )
             ).plan(source, fileName, targetOverrides)
         if (!(plan.ok && plan.graph != null && plan.exec != null && plan.bound != null)) {
             throw BundleRefused(plan.diagnostics)
@@ -147,17 +150,15 @@ class BundleAssembler(
                 inspection.statements,
                 recipeDir,
                 org.tatrman.ttrp.doc.ReadmeLabels.from(
-                    org.tatrman.ttrp.resolve.ModelRepo
-                        .snapshotOf(modelsRoot, pipelineManifest.extraModelRootPaths()),
-                    org.tatrman.ttrp.parser.TtrpParser
-                        .parseString(source)
-                        .document.statements
-                        .filterIsInstance<org.tatrman.ttrp.ast.ImportDecl>()
-                        .map {
-                            it.qname.parts.joinToString(
-                                ".",
-                            )
-                        }.toSet(),
+                    plan.frontendReport
+                        ?.let { report ->
+                            val imports =
+                                report.document.statements.filterIsInstance<org.tatrman.ttrp.ast.ImportDecl>().map {
+                                    org.tatrman.ttrp.resolve.ModelIndex
+                                        .importScope(it.qname.parts, it.qname.text)
+                                }
+                            report.modelIndex?.objectsInScope(imports)
+                        }.orEmpty(),
                 ),
                 documentTitle,
                 language,
