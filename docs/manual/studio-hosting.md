@@ -164,7 +164,7 @@ trailing definition whitespace is trimmed at the splice. Renames use `textDocume
 `@tatrman/designer-core` exports a React page, its TypeScript props, `ShellEditContext`, and the
 stage 1 message types. `@tatrman/designer-core/extensions` exports the open extension contracts
 and `editModel`. This stage supplies the built library for internal consumers; the family release
-is S3.2. Internal 0.x releases suffice unless a public release is explicitly requested.
+is delivered as the Designer 0.1.0 family. Internal 0.x releases suffice unless a public release is explicitly requested.
 
 ```tsx
 import { useRef } from 'react';
@@ -223,4 +223,36 @@ Keep `browser.worker.js` beside the library's JavaScript when copying files manu
 asset pipelines must retain this URL asset; custom JS-only copy rules need to include it (and the CSS).
 The standalone Vite entry uses `?url` to reference the already-built asset. A bare package string inside
 `new URL('@tatrman/lsp/browser.worker.js', import.meta.url)` is not a native package resolver and is not
-used by the library. React/ReactDOM dependency and release-family packaging are finalized in S3.2.
+used by the library. React and ReactDOM 19 are host peer dependencies; install them once in the host.
+
+For Vite hosts, preserve the package-relative worker URL during development and prebundle React's and ELK's
+CommonJS entries (production uses Vite's ordinary asset handling):
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  optimizeDeps: {
+    exclude: ['@tatrman/designer-core'],
+    include: ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', 'elkjs/lib/elk.bundled.js'],
+  },
+});
+```
+
+The exclusion prevents Vite from relocating `import.meta.url` into its `.vite/deps` cache without
+copying the worker. This is dependency optimization configuration; no worker plugin is required.
+Webpack hosts must keep the emitted worker as an asset when resolving `new URL(..., import.meta.url)`.
+
+The lockstep family is `designer-core`, `canvas-core`, `lsp`, `parser`, `tokens`, `perspectives`,
+`deep-links`, and `edit`, all at **0.1.0**. `perspectives` and `deep-links` are runtime imports.
+`canvas-core` is pure TypeScript; React is only a peer of Designer. The LSP tarball bundles its private
+compiler modules and their declaration types; consumers need no private workspace packages.
+
+After merge, `just publish designer set 0.1.0` creates the internal `designer/v0.1.0` GitHub release.
+Download all `.tgz` assets, verify `SHA256SUMS`, then install them together:
+
+```sh
+npm install ./tatrman-*.tgz react@^19 react-dom@^19
+```
+
+`manifest.json` records the source commit, file lists and hashes. Bare Designer tags do not publish
+to npm. An explicit public release is a separate maintainer action; see `PUBLISHING.md`.

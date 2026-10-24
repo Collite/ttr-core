@@ -5,22 +5,22 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/library/index.js"
+      "types": "./dist/package/types/index.d.ts",
+      "import": "./dist/package/index.js"
     },
     "./extensions": {
-      "types": "./dist/extensions.d.ts",
-      "import": "./dist/library/extensions.js"
+      "types": "./dist/package/types/extensions.d.ts",
+      "import": "./dist/package/extensions.js"
     },
-    "./designer.css": "./dist/library/designer.css"
+    "./designer.css": "./dist/package/designer.css"
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && pnpm run build:library && tsc --emitDeclarationOnly",
+    "build": "tsc --noEmit && vite build && pnpm run build:library && tsc --emitDeclarationOnly && node ../../scripts/prepare-designer-package.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vitest run",
+    "test": "vitest run && vitest run --config ../../scripts/publish-family.vitest.config.ts",
     "build:library": "DESIGNER_LIBRARY=1 vite build --config vite.library.config.ts"
   },
   "dependencies": {
@@ -32,8 +32,6 @@
     "@tatrman/tokens": "workspace:*",
     "@xyflow/react": "^12.3.5",
     "apache-arrow": "^21.1.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
     "vscode-jsonrpc": "^8.2.1",
     "vscode-languageserver-protocol": "^3.17.5",
     "vscode-languageserver-textdocument": "^1.0.12",
@@ -56,12 +54,33 @@
     "typescript": "^5.7.0",
     "vite": "^6.0.0",
     "vitest": "^4.1.6",
-    "vscode-languageserver": "^9.0.1"
+    "vscode-languageserver": "^9.0.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
-  "main": "./dist/library/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/package/index.js",
+  "types": "./dist/package/types/index.d.ts",
   "files": [
-    "dist/library",
-    "dist/**/*.d.ts"
-  ]
+    "dist/package",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/Collite/ttr-core#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Collite/ttr-core.git",
+    "directory": "packages/designer"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  }
 }

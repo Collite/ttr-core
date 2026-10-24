@@ -547,6 +547,7 @@ _release-ext kind release="false" level="" version="":
 #                    (public npmjs, FO ⚑1 — note the tag prefix ts-grammar/v*, distinct from
 #                    the Kotlin `bundle grammar` below despite the similar name; external cut
 #                    gated on Bora + NPM_TOKEN per FO ⚑2)
+#   designer         the eight-package Designer family (internal GitHub assets; public on RELEASE)
 #   edit             @tatrman/edit (public npmjs); version must match packages/edit/package.json
 #                    and the tagged commit must already be in origin/master
 #   vscode | intellij  editor extensions (GitHub Release always; Marketplace on RELEASE)
@@ -579,6 +580,7 @@ _release-ext kind release="false" level="" version="":
 #   just publish ttr-parser release set 0.6.0            # RELEASE, explicit version
 #   just publish packages/python/ttr-parser release       # PyPI release (path form)
 #   just publish ts-grammar set 4.4.0                       # TS grammar, explicit version
+#   just publish designer set 0.1.0                         # Designer family, internal GitHub assets
 #   just publish edit set 0.1.0                             # edit, public npmjs from merged master
 #   just publish bundle grammar release set 1.0.0            # Kotlin bundle release
 #   just publish vscode                                        # ext: internal build, patch bump
@@ -598,7 +600,7 @@ publish *args:
         NEXT=2
     fi
     if [ -z "$WHAT" ] || [ "$WHAT" = "bundle " ]; then
-        echo "❌ Usage: just publish <module|path|ts-grammar|edit|vscode|intellij|viewer|bundle NAME> [release] [major|minor|patch|set VERSION]" >&2
+        echo "❌ Usage: just publish <module|path|ts-grammar|edit|designer|vscode|intellij|viewer|bundle NAME> [release] [major|minor|patch|set VERSION]" >&2
         exit 1
     fi
     REST=("${ARGS[@]:$NEXT}")
@@ -687,6 +689,9 @@ publish *args:
         edit|packages/edit)
             PREFIX=edit
             DESC="@tatrman/edit (public npmjs)" ;;
+        designer|designer-core|packages/designer)
+            PREFIX=designer
+            DESC="Designer npm family (eight tarballs; internal GitHub Release by default)" ;;
         viewer)
             PREFIX=viewer
             DESC="ghcr.io/collite/ttr-viewer (Studio Viewer container image, linux/amd64 + linux/arm64)" ;;
@@ -743,10 +748,10 @@ publish *args:
 
     # Match publish-ts.yml before creating a permanent release tag, including when
     # called from a branch whose own remote tip is current but is not merged yet.
-    if [ "$PREFIX" = edit ]; then
+    if [ "$PREFIX" = edit ] || [ "$PREFIX" = designer ]; then
         git fetch -q origin master
         if ! git merge-base --is-ancestor HEAD origin/master; then
-            echo "❌ edit releases must come from merged master history." >&2; exit 1
+            echo "❌ ${PREFIX} releases must come from merged master history." >&2; exit 1
         fi
     fi
 
@@ -780,6 +785,14 @@ publish *args:
         fi
     fi
 
+    if [ "$PREFIX" = designer ]; then
+        EXPECTED=$(node -p "require('./packages/designer/package.json').version")
+        if [ "$NEW_VERSION" != "$EXPECTED" ]; then
+            echo "❌ designer tag version must equal the family version ${EXPECTED}." >&2
+            echo "   Use: just publish designer set ${EXPECTED}" >&2; exit 1
+        fi
+    fi
+
     if git rev-parse -q --verify "refs/tags/${PREFIX}/v${NEW_VERSION}" >/dev/null || \
        git rev-parse -q --verify "refs/tags/${PREFIX}/v${NEW_VERSION}-RELEASE" >/dev/null; then
         echo "❌ Version ${NEW_VERSION} already used (as a bare or RELEASE tag) for ${PREFIX}."; exit 1
@@ -792,6 +805,10 @@ publish *args:
         LANES="GHCR — ghcr.io/collite/ttr-viewer:${NEW_VERSION} (the image's only registry; RELEASE gates nothing extra)"
     elif [ "$PREFIX" = edit ]; then
         LANES="PUBLIC npmjs — @tatrman/edit@${NEW_VERSION} (its only registry; bare tags also publish publicly)"
+    elif [ "$PREFIX" = designer ] && [ "$RELEASE" = false ]; then
+        LANES="INTERNAL GitHub Release — eight installable npm tarballs; no public registry publication"
+    elif [ "$PREFIX" = designer ]; then
+        LANES="GitHub Release + PUBLIC npmjs — Designer family (existing edit 0.1.0 reused)"
     elif [ "$RELEASE" = true ]; then
         LANES="GH Packages/PyPI (internal) + the public registry (Maven Central / PyPI) — published as bare ${NEW_VERSION}"
     else

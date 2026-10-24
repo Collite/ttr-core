@@ -279,6 +279,62 @@ Per [`contracts.md`](docs/grammar-master/contracts.md) §7:
   staging lane and off the Central quota (§ Release lanes). Local builds
   without `-Pversion` get `0.0.1-LOCAL` (see below).
 
+### Designer family — internal artifacts by default
+
+The eight-package closure is `@tatrman/{parser,tokens,canvas-core,deep-links,perspectives,edit,lsp,designer-core}`,
+all version **0.1.0**. `edit@0.1.0` is reused unchanged from its existing public release. The other
+packages have independent compiler-free distribution entries; LSP bundles private compiler modules and
+inlines their declaration dependencies. Designer ships its prebuilt module worker and scoped CSS.
+React/ReactDOM 19 are host peers. `canvas-core` has no React dependency.
+
+Use the usual recipe **after this PR is merged**, from a clean checkout at the remote branch tip:
+
+```sh
+just publish designer set 0.1.0
+# Alias: just publish packages/designer set 0.1.0
+```
+
+The recipe checks the version, remote tip, merged-master ancestry, and existing tags before asking
+for the tag push. The bare `designer/v0.1.0` tag creates an **internal GitHub Release** with all eight
+npm tarballs, `manifest.json`, and `SHA256SUMS`. It needs no npm publishing token and does not publish
+to a public registry. Download the assets together, verify hashes, then install them in one command:
+
+```sh
+gh release download designer/v0.1.0 --repo Collite/ttr-core --dir designer-0.1.0
+cd designer-0.1.0
+shasum -a 256 -c SHA256SUMS
+npm install ./tatrman-*.tgz react@^19 react-dom@^19
+```
+
+For a local cut without Git mutations or a release:
+
+```sh
+pnpm --filter '@tatrman/designer-core...' build
+node scripts/prepare-family-licenses.mjs
+node scripts/pack-designer-family.mjs
+node scripts/designer-consumer-smoke.mjs
+```
+
+The last command installs only the actual tarballs and public dependencies in a fresh directory
+outside the workspace. It checks runtime imports, public TypeScript declarations, and real-browser
+Vite development/production hosts, including the worker, dark MD canvas, CSS isolation and navigation.
+See `docs/manual/studio-hosting.md` for the Vite dependency-optimization configuration. Optional arguments
+are the artifact folder, evidence folder, and a model checkout (for example `../hartland`). Linux CI
+installs Chromium with `pnpm exec playwright-core install --with-deps chromium`; macOS uses Chrome,
+or set `CHROME_BIN`. Evidence includes screenshots and package hashes. No deployment is involved.
+
+`publish-ts.yml` performs the same artifact consumer check for relevant PRs and Designer tags. A single
+ordered family job avoids publishing partial per-package matrices before the closure is checked.
+`prepare-family-licenses.mjs` gathers the installed runtime license closure, including worker dependencies;
+CI fails if generated NOTICE/LICENSE files drift. Tarball checks reject private/workspace runtime deps,
+test declarations, source maps, and consumer-side worker transforms.
+
+Only an explicitly requested `just publish designer release set <version>` adds public npm publication
+using `NPM_TOKEN`. This lane is not required on 0.x. Public publication uses the verified tarballs;
+`edit@0.1.0` is not republished. All other family versions must be bumped together before a later cut,
+and an internal version cannot be reused as a second release tag. The existing grammar and edit tag
+publishers keep their established behavior.
+
 ### TypeScript edit synthesizer (public npmjs) — `@tatrman/edit`
 
 SO D-19 amends FO-21: structured definition synthesis/apply operations are open, while commercial canvas forms

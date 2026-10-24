@@ -1,7 +1,7 @@
 {
   "name": "@tatrman/lsp",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -26,7 +26,7 @@
     "./browser.worker.js": "./dist/browser.worker.js"
   },
   "scripts": {
-    "build": "tsc && pnpm run bundle-stdio && pnpm run bundle-browser",
+    "build": "tsc && pnpm run bundle-stdio && pnpm run bundle-browser && node scripts/build-package.mjs",
     "bundle-stdio": "esbuild src/server-stdio.ts --bundle --platform=node --format=esm --target=es2022 --outfile=dist/server-stdio.js --external:vscode-languageserver --external:vscode-languageserver-protocol --external:vscode-jsonrpc --external:node:fs --external:node:path --external:antlr4ng --external:@tatrman/parser --external:@tatrman/semantics --external:@tatrman/edit --external:@tatrman/sql",
     "bundle-browser": "esbuild src/server-browser.ts --bundle --platform=browser --format=esm --target=es2022 --outfile=dist/server-browser.js --external:node:fs --external:node:path --external:fs/promises --external:fs --external:path && cp dist/server-browser.js dist/browser.worker.js",
     "typecheck": "tsc --noEmit",
@@ -34,25 +34,66 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@tatrman/edit": "workspace:*",
-    "@tatrman/format": "workspace:*",
-    "@tatrman/grammar": "workspace:*",
-    "@tatrman/lint": "workspace:*",
-    "@tatrman/parser": "workspace:*",
-    "@tatrman/semantics": "workspace:*",
-    "@tatrman/sql": "workspace:*",
     "ajv": "^8.20.0",
     "antlr4ng": "^3.0.0",
     "fuzzysort": "^3.1.0",
     "vscode-jsonrpc": "^8.2.0",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-protocol": "^3.17.5",
-    "vscode-languageserver-textdocument": "^1.0.12"
+    "vscode-languageserver-textdocument": "^1.0.12",
+    "smol-toml": "^1.6.1",
+    "vscode-languageserver-types": "^3.17.5"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "esbuild": "^0.27.0",
     "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "dts-bundle-generator": "^9.5.1",
+    "@tatrman/edit": "workspace:*",
+    "@tatrman/format": "workspace:*",
+    "@tatrman/grammar": "workspace:*",
+    "@tatrman/lint": "workspace:*",
+    "@tatrman/parser": "workspace:*",
+    "@tatrman/semantics": "workspace:*",
+    "@tatrman/sql": "workspace:*"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/Collite/ttr-core#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Collite/ttr-core.git",
+    "directory": "packages/lsp"
+  },
+  "files": [
+    "dist/package",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "main": "./dist/package/index.js",
+    "types": "./dist/package/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/package/index.js",
+        "types": "./dist/package/index.d.ts"
+      },
+      "./browser": {
+        "import": "./dist/package/server-browser.js",
+        "types": "./dist/package/server-browser.d.ts"
+      },
+      "./server": {
+        "import": "./dist/package/server.js",
+        "types": "./dist/package/server.d.ts"
+      },
+      "./server-stdio": {
+        "types": "./dist/package/server-stdio.d.ts",
+        "import": "./dist/package/server-stdio.js",
+        "default": "./dist/package/server-stdio.js"
+      },
+      "./browser.worker.js": "./dist/package/browser.worker.js"
+    },
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
   }
 }

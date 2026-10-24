@@ -1,9 +1,9 @@
 {
   "name": "@tatrman/tokens",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
-  "description": "FO-P1.S6 — the shared Studio design tokens (PF F): one dependency-free source of the suite's semantic colors, spacing, and radii so the Viewer, the authoring extension, and the launcher cohere (P-2, 'suite coherence is earned').",
+  "description": "FO-P1.S6 \u2014 the shared Studio design tokens (PF F): one dependency-free source of the suite's semantic colors, spacing, and radii so the Viewer, the authoring extension, and the launcher cohere (P-2, 'suite coherence is earned').",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -13,7 +13,7 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node ../../scripts/prepare-ts-package.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint src"
@@ -22,5 +22,30 @@
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/Collite/ttr-core#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Collite/ttr-core.git",
+    "directory": "packages/tokens"
+  },
+  "files": [
+    "dist/package",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public",
+    "main": "./dist/package/index.js",
+    "types": "./dist/package/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/package/index.d.ts",
+        "import": "./dist/package/index.js"
+      }
+    }
   }
 }

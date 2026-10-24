@@ -1,7 +1,7 @@
 {
   "name": "@tatrman/parser",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -17,7 +17,7 @@
   },
   "scripts": {
     "prebuild": "bash ../grammar/scripts/generate-typescript-parser.sh",
-    "build": "tsc",
+    "build": "tsc && node ../../scripts/prepare-ts-package.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint src"
@@ -31,5 +31,34 @@
     "antlr-ng": "^1.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/Collite/ttr-core#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Collite/ttr-core.git",
+    "directory": "packages/parser"
+  },
+  "files": [
+    "dist/package",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public",
+    "main": "./dist/package/index.js",
+    "types": "./dist/package/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/package/index.d.ts",
+        "import": "./dist/package/index.js"
+      },
+      "./layout": {
+        "types": "./dist/package/layout/index.d.ts",
+        "import": "./dist/package/layout/index.js"
+      }
+    }
   }
 }
