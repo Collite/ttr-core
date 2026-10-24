@@ -24,7 +24,7 @@ class ExporterSpec :
                     val loss = LossinessLedger.cannotCarry(model, format)
                     when {
                         loss != null -> result shouldBe ExportResult.CannotCarry(loss)
-                        format in setOf("ttl", "xmi", "yaml") -> result shouldBe ExportResult.NotBuilt
+                        format in setOf("xmi", "yaml") -> result shouldBe ExportResult.NotBuilt
                         format == "ttr" -> (result is ExportResult.Bundle) shouldBe true
                         else -> (result is ExportResult.Single) shouldBe true
                     }

@@ -12,6 +12,8 @@
 # since the 2026-06-12 fork (Bora, 2026-07-20). Re-mirror if ai-platform ever catches up.
 
 [versions]
+# XM-P1 S1.3 — newest stable 5.x in Maven Central metadata, checked 2026-10-24 (6.x excluded).
+jena = "5.6.0"
 kotlin = "2.3.0"
 kotest = "6.1.2"
 mockk = "1.14.9"
@@ -76,6 +78,7 @@ bouncycastle = "1.85"
 snakeyaml-engine = "3.0.1"
 
 [libraries]
+jena-arq = { module = "org.apache.jena:jena-arq", version.ref = "jena" }
 kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
 antlr-runtime = { module = "org.antlr:antlr4-runtime", version.ref = "antlr-runtime" }
 antlr-tool    = { module = "org.antlr:antlr4",          version.ref = "antlr-runtime" }

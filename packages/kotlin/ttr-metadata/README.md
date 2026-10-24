@@ -46,13 +46,13 @@ nothing. Edges touching either selected endpoint remain, and every other endpoin
 becomes a stub carrying only `id`, `kind` and `external`. `scope.header` supplies
 the deterministic C-4 header value.
 
-S1.1 provides the in-memory source, graph and scope. JSON, Turtle, XMI writers,
+The in-memory source, graph, scope, JSON and Turtle writers are implemented. XMI,
 the CLI and the service route follow in later XM stages.
 
 The XM `Exporter` facade returns either named UTF-8 files, a bundle for callers to archive,
 a stable cannot-carry lossiness id, an unknown-snapshot result, or `NotBuilt` for registered
 formats awaiting their writer. S1.2 builds `graph.json`, `defs.json`, `dot` and canonical TTR;
-Turtle/XMI follow in S1.3/S1.4, while canonical YAML waits for YS. Unknown model, format or
+S1.3 adds Turtle (`ttl`); XMI follows in S1.4, while canonical YAML waits for YS. Unknown model, format or
 profile names are usage errors. Binding families such as `cn2md` can be selected separately.
 Package selectors include descendants; package and area selectors form a union. Cross-scope
 endpoints in graph output have only `id`, `kind` and `external`.
@@ -73,3 +73,13 @@ lexically: versions must be chosen so lexical order is version order (for exampl
 zero-padded sequential ids). Renamed-from ids are excluded from `removed`. The service's
 snapshot ring and the CLI's previous-graph reader belong to the callers, as does tar.gz
 assembly. No timestamps are introduced by these writers.
+
+`TurtleWriter` emits `cn.ttl` for `cn` or `world`, with profiles `both` (default),
+`owl`, and `skos`. Every profile retains the ontology header and asserted `ttr:`
+semantics; standard aliases follow the selected profile. Grounding targets remain
+IRIs only. Schemes and area membership are retained, and scoped-out concepts keep
+their authored identity without exposing their definition. Definitions/members
+are opaque text; lexicon forms and examples retain their language tags. See the
+[TTR RDF vocabulary](../../../docs/ns/ttr.md) for classes, properties, domain/range
+descriptions, aliases and serialization rules. Jena is test-only; runtime
+dependency rules ban it.

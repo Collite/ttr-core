@@ -39,6 +39,10 @@ dependencies {
 
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)
+    testImplementation(libs.jena.arq) {
+        // Turtle/SPARQL only; binary RDF Protobuf is outside the test oracle and the MD3 classpath.
+        exclude(group = "com.google.protobuf")
+    }
     // EN-P1.2 — parse the checked-in writability.schema.json fixture for the anti-drift parity spec.
     testImplementation(libs.kotlinx.ser.json)
     testImplementation(libs.tomlj) // Fixture caller supplies public connection descriptors (XM C-22).
@@ -52,6 +56,7 @@ dependencies {
 // MD3 / architecture §2.1: the core stays off heavy classpaths. Gate, not convention.
 val bannedDependencyGroups =
     setOf(
+        "org.apache.jena",
         "io.ktor",
         "io.grpc",
         "io.opentelemetry",

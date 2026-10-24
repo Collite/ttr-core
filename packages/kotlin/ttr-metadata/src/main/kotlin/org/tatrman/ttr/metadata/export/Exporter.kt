@@ -69,18 +69,30 @@ class Exporter {
                     request.format,
                 )?.let { return ExportResult.CannotCarry(it) }
         }
-        if (request.format !in setOf("graph.json", "defs.json", "dot", "ttr")) return ExportResult.NotBuilt
+        if (request.format !in setOf("graph.json", "defs.json", "dot", "ttr", "ttl")) return ExportResult.NotBuilt
         if (request.since != null && request.previousIds == null) return ExportResult.SinceUnknown
         val scope = ExportScope(request.packages, request.areas)
         val header = ExportHeader.from(set, scope, request.connections)
         val allGraph = DefinitionGraph.build(set)
-        val selected = scope.apply(allGraph, set).selectModels(request.models)
+        val scoped = scope.apply(allGraph, set)
+        val selected = scoped.selectModels(request.models)
         val definitionIds by lazy { scope.definitionIds(set, allGraph) }
         val delta =
             request.since?.let {
                 ExportDelta.compute(requireNotNull(request.previousIds), selected, request.renames, it)
             }
         return when (request.format) {
+            "ttl" ->
+                ExportResult.Single(
+                    "cn.ttl",
+                    "text/turtle; charset=utf-8",
+                    TurtleWriter.write(
+                        scoped,
+                        set,
+                        TtlProfile.valueOf((request.profile ?: "both").uppercase()),
+                        header,
+                    ),
+                )
             "graph.json" ->
                 ExportResult.Single(
                     "graph.json",
