@@ -13,7 +13,7 @@ export function SourceFilesDrawer({
 }: {
   visible?: boolean;
   files: () => SourceFile[];
-  write: (file: SourceFile) => Promise<WorkerDiagnostic[]>;
+  write: (file: SourceFile & { expectedText?: string }) => Promise<WorkerDiagnostic[]>;
   onDiagnostics?: (diagnostics: WorkerDiagnostic[]) => void;
   onClose: () => void;
 }) {
@@ -43,7 +43,7 @@ export function SourceFilesDrawer({
     }
     setBusy(true);
     try {
-      const values = await write({ path, text });
+      const values = await write({ path, text, ...(selected ? { expectedText: baseline } : {}) });
       setBaseline(text);
       setDiagnostics(values);
       onDiagnostics?.(values);

@@ -26,7 +26,7 @@ export type FrameMessage =
   | { type: 'ttr.frame.ack'; sha: string; changed: number }
   | { type: 'ttr.frame.diagnostics'; diagnostics: Array<{ uri: string; severity: string; code: string; message: string; source: string }> }
   | { type: 'ttr.frame.location'; location: string }
-  | { type: 'ttr.frame.error'; code: string; message: string }
+  | { type: 'ttr.frame.error'; sha?: string; code: string; message: string }
   | { type: 'ttr.frame.dirty'; changed: number }
   | { type: 'ttr.frame.changedFiles'; files: Array<{ path: string; text: string | null }> };
 

@@ -222,7 +222,7 @@ export class BffFilesDataSource implements ModelDataSource {
   }
   diagnostics() { return this.worker?.lspClient.diagnostics?.() ?? []; }
   sourceFiles() { return this.worker?.sourceFiles() ?? []; }
-  async writeSourceFile(file: { path: string; text: string }) {
+  async writeSourceFile(file: { path: string; text: string; expectedText?: string }) {
     this.activeEdits++;
     try { return await this.source.writeSourceFile(file); }
     finally { this.activeEdits--; }

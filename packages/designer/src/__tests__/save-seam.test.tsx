@@ -142,7 +142,7 @@ it('R4 post-save conflicts report the specific code and retain the old snapshot'
 it('refuses an unexpected post-save SHA before replacing the snapshot', async () => {
  const h = await editableHost(); await h.edit('collected'); h.source.collectChangedFiles(); h.snapshot(h.source.changedFiles()[0].text!);
  post({ ...init, sha: 'a-different-save' });
- await waitFor(() => expect(h.sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.error', code: 'frame/edit-conflict' }), window.location.origin));
+ await waitFor(() => expect(h.sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.error', code: 'frame/edit-conflict', sha: 'a-different-save' }), window.location.origin));
  expect(h.source.sha).toBe('one'); expect(h.source.changedFiles()[0].text).toContain('collected');
  expect(h.sent).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ack' }), window.location.origin);
 });

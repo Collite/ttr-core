@@ -97,9 +97,10 @@ export class WorkerLspDataSource implements ModelDataSource {
   private edits = Promise.resolve();
 
   sourceFiles() { return [...this.docTextCache].filter(([path]) => isSourcePath(path)).map(([path, text]) => ({ path, text })).sort((a, b) => a.path.localeCompare(b.path)); }
-  writeSourceFile({ path, text }: { path: string; text: string }) {
+  writeSourceFile({ path, text, expectedText }: { path: string; text: string; expectedText?: string }) {
     const run = this.edits.then(async () => {
       if (!isSourcePath(path)) throw new Error('Use a regular model/*.ttrm source path.');
+      if (expectedText !== undefined && this.docTextCache.get(path) !== expectedText) throw new Error('This file changed since you opened it — reload it into the editor.');
       // Re-send unchanged cached text too: an earlier transport failure may not have reached the worker.
       this.docTextCache.set(path, text);
       const uri = uriFor(this.ctx.projectRoot, path);

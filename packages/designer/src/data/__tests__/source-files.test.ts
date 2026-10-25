@@ -134,3 +134,12 @@ it('R148-R13 uses the initially loaded URI for source files with non-ASCII and s
     expect(new Set(open.mock.calls.map(([uri]) => uri))).toEqual(new Set(['file:///repo/' + path]));
   } finally { source.dispose(); }
 });
+
+it('R148-R11 checks the selected baseline inside the serialized write queue too', async()=>{
+ const {WorkerLspDataSource}=await import('../worker-lsp-data-source.js');
+ const source=new WorkerLspDataSource({openDocument:async()=>{},setProjectRoot:async()=>({})} as unknown as import('../../lsp-client.js').LspClient,{projectRoot:'file:///repo',files:new Map([['model/er/a.ttrm','old']])});
+ const earlier=source.writeSourceFile({path:'model/er/a.ttrm',text:'concurrent form bytes'});
+ const drawer=source.writeSourceFile({path:'model/er/a.ttrm',text:'stale drawer bytes',expectedText:'old'});
+ await earlier;await expect(drawer).rejects.toThrow('changed since you opened');
+ expect(source.sourceFiles()[0]?.text).toBe('concurrent form bytes');
+});

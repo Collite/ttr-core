@@ -552,7 +552,7 @@ function HostedStudio() {
         }
       } catch (e) {
         if (e instanceof SnapshotEditError) {
-          channel.send({type:'ttr.frame.error',code:e.code,message:e.message});
+          channel.send({type:'ttr.frame.error',code:e.code,message:e.message,...(message.type === 'ttr.host.init' && message.sha ? {sha:message.sha} : {})});
           return;
         }
         if (!disposed) setError(true);
