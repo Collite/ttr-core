@@ -162,13 +162,14 @@ internal class Select(
  * inside an `AND` too. [compact] prints the same tree on one line (`EXISTS (SELECT 1 …)`) — the spelling S3.7 authored
  * the goldens in, kept for a reader and the tests.
  *
- * The placeholders the text reads are collected in [params], in reading order. A placeholder [bound] names is written as
- * its value instead — a statement read is self-contained (CN-P6 ⚑S62-1); a definition's rendering binds nothing.
+ * The placeholders the text reads are collected in [params], in reading order. A [binder] writes each as its value
+ * instead, asked as it is printed — a statement read is self-contained (CN-P6 ⚑S62-1) and printed once (review-154
+ * E13); a definition's rendering binds nothing.
  */
 internal class SqlPrinter(
     private val style: PlaceholderStyle,
     private val compact: Boolean = false,
-    private val bound: Map<String, String> = emptyMap(),
+    private val binder: ((String) -> String)? = null,
 ) {
     val params = linkedSetOf<String>()
 
@@ -250,7 +251,7 @@ internal class SqlPrinter(
             is SqlExpr.Lit -> e.text
             is SqlExpr.Param -> {
                 params += e.name
-                bound[e.name] ?: if (style == PlaceholderStyle.COLON) ":${e.name}" else "{${e.name}}"
+                binder?.invoke(e.name) ?: if (style == PlaceholderStyle.COLON) ":${e.name}" else "{${e.name}}"
             }
             is SqlExpr.Bin -> {
                 val p = precedence(e)

@@ -1,0 +1,38 @@
+// review-154 E0 — the parity world on E-R: `sale` (the event's row), its `customer` (N:1 — a forward hop) and its
+// `shipment`s (1:N — a backward hop, E5's fan-out).
+model er
+def entity sale {
+    binding: { target: db.dbo.sale, columns: { sale_id: sale_id, channel: channel, customer: customer, sold_on: sold_on, due_on: due_on, created_at: created_at, ext_price: ext_price, quantity: quantity, unit_price: unit_price, stock: stock, top_price: top_price, refund: refund } },
+    attributes: [
+        def attribute sale_id { type: int, isKey: true },
+        def attribute channel { type: text, optional: true },        // a sale may have no channel (E4's NULL row)
+        def attribute customer { type: int },
+        def attribute sold_on { type: date },
+        def attribute due_on { type: date },
+        def attribute created_at { type: timestamp },
+        def attribute ext_price { type: decimal },
+        def attribute quantity { type: int },
+        def attribute unit_price { type: decimal },
+        def attribute stock { type: int },
+        def attribute top_price { type: decimal },
+        def attribute refund { type: decimal }
+    ]
+}
+def entity customer {
+    binding: { target: db.dbo.customer, columns: { sk: sk, name: name, region: region } },
+    attributes: [
+        def attribute sk { type: int, isKey: true },
+        def attribute name { type: text },
+        def attribute region { type: text, optional: true }
+    ]
+}
+def entity shipment {
+    binding: { target: db.dbo.shipment, columns: { shipment_id: shipment_id, sale_id: sale_id, carrier: carrier } },
+    attributes: [
+        def attribute shipment_id { type: int, isKey: true },
+        def attribute sale_id { type: int },
+        def attribute carrier { type: text }
+    ]
+}
+def relation rel_sale_customer { from: er.entity.sale, to: er.entity.customer, cardinality: { from: "0..*", to: "1" }, join: [{ from: er.entity.sale.customer, to: er.entity.customer.sk }] }
+def relation rel_shipment_sale { from: er.entity.shipment, to: er.entity.sale, cardinality: { from: "0..*", to: "1" }, join: [{ from: er.entity.shipment.sale_id, to: er.entity.sale.sale_id }] }

@@ -195,6 +195,23 @@ class StatementLowerSpec :
                 "sales[time.day: \"2026-01-01\"..\"2026-03-31\"].net @ sum"
         }
 
+        test(
+            "review-154 E3: a filter on a measure the read does not aggregate is refused by both lanes, never a WHERE",
+        ) {
+            val r =
+                lower(
+                    hartland,
+                    ask,
+                    "\"measures\": [{ \"qname\": \"cn.quantity\" }]",
+                    "\"time\": { \"periodCode\": \"2026-01\" }",
+                    filters(quality("cn.revenue", "GT", "{ \"intValue\": \"1000\" }")),
+                )
+            r.erSql shouldBe ""
+            refused(r) shouldBe
+                listOf("cn/ambiguous-statement measures[0]", "cn/not-analytically-reachable filters[0].quality.quality")
+            r.diagnostics.last().message shouldContain "on E-R: a having-filter on `cn.revenue`"
+        }
+
         test("T3: a range is half-open — its md range ends the day before `to`") {
             val range =
                 "\"time\": { \"range\": { \"from\": { \"value\": \"2026-01-01\", \"granularity\": \"DAY\" }, " +
@@ -225,9 +242,11 @@ class StatementLowerSpec :
                 "\"time\": { \"range\": { \"from\": { \"value\": \"2026-01-01T08\", \"granularity\": \"HOUR\" }, " +
                     "\"to\": { \"value\": \"2026-01-02T08\", \"granularity\": \"HOUR\" } } }"
             refused(lower(sales, ask, revenue, hours)) shouldBe listOf("cn/not-analytically-reachable time.range.from")
-            // E-R reads `channel_sales` too (CN-P6 ⚑S62-1), but its `Sale` has no period there either — both lanes refuse
-            refused(lower(reverse, ask, revenue, y2026)) shouldBe
-                listOf("cn/not-analytically-reachable time", "cn/definition-unreachable(er) cn.Sale")
+            // E-R reads `channel_sales` too (CN-P6 ⚑S62-1), but its `Sale` has no period there either — both lanes refuse,
+            // as one finding on the slot: E-R's reason folded into md's (review-154 E8)
+            val dateless = lower(reverse, ask, revenue, y2026)
+            refused(dateless) shouldBe listOf("cn/not-analytically-reachable time")
+            dateless.diagnostics.single().message shouldContain "— and on E-R: `cn.Sale` has no period on E-R"
         }
 
         // ---- T4 — resolve, lower, compose, provenance ---------------------------------------------------------------
