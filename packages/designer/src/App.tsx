@@ -530,7 +530,8 @@ function HostedStudio() {
           });
           await syncSession(path);
         } else if (message.type === 'ttr.host.collect') {
-          channel.send({ type: 'ttr.frame.changedFiles', files: source?.collectChangedFiles() ?? [] });
+          try { channel.send({ type: 'ttr.frame.changedFiles', files: source?.collectChangedFiles() ?? [] }); }
+          catch { channel.send({ type: 'ttr.frame.error', code: 'frame/collect-failed', message: 'Could not collect local changes. Your edits are retained.' }); }
         } else if (message.type === 'ttr.host.token') {
           latestToken = message.token;
           source?.setToken(message.token);
@@ -553,6 +554,10 @@ function HostedStudio() {
       } catch (e) {
         if (e instanceof SnapshotEditError) {
           channel.send({type:'ttr.frame.error',code:e.code,message:e.message,...(message.type === 'ttr.host.init' && message.sha ? {sha:message.sha} : {})});
+          return;
+        }
+        if (message.type === 'ttr.host.init' && message.sha) {
+          channel.send({ type: 'ttr.frame.error', code: 'host/load-failed', sha: message.sha, message: 'Could not load the saved model snapshot.' });
           return;
         }
         if (!disposed) setError(true);

@@ -111,6 +111,7 @@ export async function lspClientOver(
         }
       }
     },
+    revalidate: async () => { await connection.sendRequest('modeler/reloadLintConfig', {}); },
     diagnostics: () => [...diagnosticCache.values()].flat(),
     onDiagnostics(handler) {
       diagnosticHandlers.push(handler);

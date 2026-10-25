@@ -171,3 +171,15 @@ it('R148-R10 reports the complete worker diagnostics after edits and clears disc
  await waitFor(()=>expect(h.source.changedFiles()).toEqual([]));
  await waitFor(()=>expect(latest()?.some((d:{uri:string})=>d.uri.endsWith('/'+broken))).toBe(false));
 });
+
+it('N8 reports a collect failure immediately without an unhandled promise', async()=>{
+ const h=await editableHost();vi.spyOn(h.source,'collectChangedFiles').mockImplementationOnce(()=>{throw Error('collect failed')});
+ post({type:'ttr.host.collect'});
+ await waitFor(()=>expect(h.sent).toHaveBeenCalledWith(expect.objectContaining({type:'ttr.frame.error',code:'frame/collect-failed'}),window.location.origin));
+});
+it('N8 correlates a failed saved snapshot fetch with the acknowledged SHA', async()=>{
+ const h=await editableHost();vi.mocked(fetch).mockRejectedValueOnce(Error('offline'));
+ post({...init,sha:'two'});
+ await waitFor(()=>expect(h.sent).toHaveBeenCalledWith(expect.objectContaining({type:'ttr.frame.error',code:'host/load-failed',sha:'two'}),window.location.origin));
+ expect(h.source.sha).toBe('one');
+});

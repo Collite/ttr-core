@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-import { uriFor } from '../fs/source-uri.js';
 import { useId, useState } from 'react';
 import type { WorkerDiagnostic } from '@tatrman/lsp';
 type SourceFile = { path: string; text: string };
@@ -51,7 +50,7 @@ export function SourceFilesDrawer({
         !values.some(
           (value) =>
             value.severity === 1 &&
-            value.uri === uriFor('file:///repo', path)
+            value.uri.endsWith('/' + path)
         )
       )
         onClose();

@@ -33,6 +33,8 @@ export interface DesignerPageProps extends PropsHostCallbacks {
   location?: string;
   collect?: Ref<CollectFiles>;
   extensions?: readonly AuthoringExtension[];
+  /** Host-controlled source grant; enable only when this session can persist its edits. */
+  sourceAuthoring?: boolean;
 }
 interface Session { workspace: string; source: BffFilesDataSource; catalog: CatalogGroup[]; sha: string; path: string }
 
@@ -154,7 +156,7 @@ export function DesignerPage(props: DesignerPageProps) {
       style={{ height: '100%', width: '100%', minHeight: 0, colorScheme: theme }}>
       {session && session.workspace === workspace && session.source === controller.current?.source
         ? <Studio key={`${workspace}:${session.sha}`} dataSource={session.source} viewState={viewState} catalog={session.catalog}
-          files={[]} workspace={workspace} initialAppPath={session.path} />
+          files={[]} workspace={workspace} initialAppPath={session.path} canAuthorSource={props.sourceAuthoring ?? false} />
         : <div className="hosted-status" role="status">{failed ? 'Could not load the model.' : 'Loading Studio…'}</div>}
     </div>
   </PageContext.Provider>;

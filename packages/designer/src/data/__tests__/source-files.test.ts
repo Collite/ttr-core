@@ -143,3 +143,12 @@ it('R148-R11 checks the selected baseline inside the serialized write queue too'
  await earlier;await expect(drawer).rejects.toThrow('changed since you opened');
  expect(source.sourceFiles()[0]?.text).toBe('concurrent form bytes');
 });
+
+it('N13 forwards one hosted file notification per completed revision', async()=>{
+ const source=new BffFilesDataSource({api:'/api/model',scope:{kind:'change',id:'revision'},token:''},{createClient:createTestClient,loadSnapshot:async()=>({sha:'one',files})});
+ try {
+  await source.refresh();const changed=vi.fn();source.onFilesChanged(changed);
+  expect((await source.edit({op:'add-term',args:{lang:'en',term:'one revision',target:'er.entity.return_request'}})).ok).toBe(true);
+  expect(changed).toHaveBeenCalledOnce();
+ } finally {source.dispose()}
+});

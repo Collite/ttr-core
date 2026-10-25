@@ -59,3 +59,12 @@ it('R148-R11 refuses Apply when a structured edit changed the selected file', as
   expect(write).not.toHaveBeenCalled();
   expect(screen.getByLabelText('Source text')).toHaveValue('drawer edit');
 });
+
+it('N10 keeps local project source errors visible regardless of the worker root', async () => {
+  const close = vi.fn();
+  render(<SourceFilesDrawer files={() => []} write={async () => [{ uri: 'file:///local-project/model/er/new.ttrm', severity: 1, message: 'Broken source', range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } }, source: 'worker' }]} onClose={close} />);
+  fireEvent.change(screen.getByLabelText('Source text'), { target: { value: 'broken source' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Apply to model' }));
+  expect(await screen.findByText(/Broken source/)).toBeInTheDocument();
+  expect(close).not.toHaveBeenCalled();
+});

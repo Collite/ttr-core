@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep source errors visible for local roots, require an explicit embedded source-authoring grant, report collect/saved-snapshot failures directly, and avoid redundant project reloads/catalog notifications after edits.
+
 - Fix review-148 hosted source grants, stale drawer Apply, full worker diagnostics/discard, optional extension recovery and source URI identity.
 
 - Add an open Source files drawer and whole-file worker-cache authoring so hosted changes can create query files before their single Studio Save. Preserve the existing six structured operations and server licence/lease/strict gates.

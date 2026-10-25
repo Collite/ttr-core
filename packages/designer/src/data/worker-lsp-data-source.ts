@@ -108,7 +108,7 @@ export class WorkerLspDataSource implements ModelDataSource {
       // Whole cache update precedes transport waits; collect never sees a partial file.
       for (const callback of this.fileListeners) callback();
       await opened;
-      await this.lspClient.setProjectRoot(this.ctx.projectRoot, this.docTextCache.get('modeler.toml'));
+      await (this.lspClient.revalidate?.() ?? this.lspClient.setProjectRoot(this.ctx.projectRoot, this.docTextCache.get('modeler.toml')));
       for (const callback of this.fileListeners) callback();
       this.revision++;
       for (const callback of this.modelListeners) callback(String(this.revision));
@@ -148,7 +148,7 @@ export class WorkerLspDataSource implements ModelDataSource {
     // while a transport acknowledgement is pending.
     for (const [path, text] of staged) this.docTextCache.set(path, text);
     for (const uri of affected) await this.lspClient.openDocument(uriFor(this.ctx.projectRoot, decodeURIComponent(uri.slice(root.length))), this.docTextCache.get(decodeURIComponent(uri.slice(root.length)))!);
-    await this.lspClient.setProjectRoot(this.ctx.projectRoot, this.docTextCache.get('modeler.toml'));
+    await (this.lspClient.revalidate?.() ?? this.lspClient.setProjectRoot(this.ctx.projectRoot, this.docTextCache.get('modeler.toml')));
     for (const cb of this.fileListeners) cb();
     this.revision++;
     for (const cb of this.modelListeners) cb(String(this.revision));

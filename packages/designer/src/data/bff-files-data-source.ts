@@ -192,7 +192,6 @@ export class BffFilesDataSource implements ModelDataSource {
           if (this.activeEdits) throw new SnapshotEditError('frame/unsaved-edits', 'Wait for the pending edit before changing snapshots.');
           if (!sameFiles(current, this.currentFiles())) { client.dispose(); continue; }
         }
-        worker.onFilesChanged(() => { if (this.worker !== worker) return; worker.invalidate(); this.catalogGen++; this.catalog = null; for (const cb of this.fileListeners) cb(); });
         worker.onModelChanged(() => { if (this.worker !== worker) return; worker.invalidate(); this.catalogGen++; this.catalog = null; for (const cb of this.fileListeners) cb(); });
         const previous = this.worker;
         this.worker = worker;

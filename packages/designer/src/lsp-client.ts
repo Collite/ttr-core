@@ -29,6 +29,7 @@ export interface LspClient {
   getSymbolDetail(qname: string): Promise<SymbolDetail | null>;
   /** Reads every page; `limit` is the size of a page, not a cap on the result. */
   listSymbols(options?: Omit<ListSymbolsParams, 'cursor'>): Promise<ListedSymbol[]>;
+  revalidate?(): Promise<void>;
   diagnostics?(): import('@tatrman/lsp').WorkerDiagnostic[];
   onDiagnostics(handler: (uri: string, messages: string[]) => void): void;
   dispose(): void;
