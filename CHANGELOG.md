@@ -6,6 +6,28 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — the er statement lane places; it does not re-decide (review-154 of #304)
+
+The er lane read statements md refuses on principle, and gave wrong numbers with no error. It now answers what md would
+if it had a carrier, and nothing more:
+- **Refused, for md's reason (one finding, E-R's reason folded in):** a non-additive measure with no declared
+  aggregation, or a semi-additive one (it was summed); a filter on a measure the read does not aggregate (it became a
+  row-level `WHERE`); a negated phase whose inlining joins (its NULL rows and unjoined rows vanished from both sides).
+- **The rows stay the event's:** a phase joining a relation from its many side is refused (each event was counted once
+  per detail row); a join-free negated phase reads `NOT COALESCE((…), FALSE)`, so X plus not-X is the total.
+- **Time:** every `latest(…, by:)` is capped at the statement's evaluation day (it read today's snapshot); a phase's
+  `period.at` on an integer calendar key reads the calendar's date, through the statement's one calendar join (it
+  compared the key with a `DATE`); an event whose period is declared on the concept alone is read.
+- **Slots:** a narrower sub-concept than the participant (a kind `is_a: Customer` with `members:`) is refused (it was
+  widened to every customer); a member a numeric key cannot take is `cn/slot-mismatch` (it was quoted into the SQL);
+  an instant in a quality filter is its interval, compared by its bounds (`TIMESTAMP '2026-01'` was printed).
+- **Findings:** every er-lane refusal names its frame slot (`groupBy[0]`, `filters[1].member.member`, `time`) with
+  `cn/not-analytically-reachable`, plus `cn/definition-unreachable(er)` when a phase does not render — it named the
+  event (`cn.Sale`). `statementValidate` validates once and shows the er lane's own refusal.
+- Internals: one `ErRenderer` per lowerer, one print per statement; the period-code, window and day rules written once
+  for both lanes. `ErLaneParitySpec` classifies every md refusal (27), a new test world `er-parity` carries the frames.
+  JVM consumers of the internal `ErStatement` are none outside this module; the public surface is unchanged.
+
 ### Added — the er statement lane (CN-P6 ⚑S62-1, binary-incompatible for JVM consumers)
 
 - `statementLower` reads a statement on E-R when md carries no single read of it (no carrier, several, a slot md cannot
