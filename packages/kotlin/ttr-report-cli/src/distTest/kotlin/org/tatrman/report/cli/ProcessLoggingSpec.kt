@@ -5,6 +5,7 @@ import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
@@ -19,7 +20,7 @@ class ProcessLoggingSpec :
             val slf4jProviders = mutableListOf<String>()
             val log4jProviders = mutableListOf<String>()
             Files.list(distribution().resolve("lib")).use { paths ->
-                paths.filter { it.toString().endsWith(".jar") }.forEach { path ->
+                paths.filter { it.toString().endsWith(".jar", ignoreCase = true) }.forEach { path ->
                     JarFile(path.toFile()).use { jar ->
                         for ((group, artifact) in listOf(
                             "org.slf4j" to "slf4j-api",
@@ -33,6 +34,24 @@ class ProcessLoggingSpec :
                                 requireNotNull(properties.getProperty("version")) { "$path has no $artifact version" }
                             version.isNotBlank() shouldBe true
                             components.getOrPut(artifact) { mutableListOf() }.add(version)
+                        }
+                        withClue(path) {
+                            jar.getJarEntry("org/slf4j/impl/StaticLoggerBinder.class") shouldBe null
+                            for (entry in jar.entries().asSequence().filter {
+                                it.name.startsWith("META-INF/maven/") && it.name.endsWith("/pom.properties")
+                            }) {
+                                val metadata = Properties().apply { jar.getInputStream(entry).use { load(it) } }
+                                val coordinate = entry.name.split('/')
+                                for ((group, artifact) in listOf(
+                                    coordinate.getOrNull(2) to coordinate.getOrNull(3),
+                                    metadata.getProperty("groupId") to metadata.getProperty("artifactId"),
+                                )) {
+                                    (group == "ch.qos.logback") shouldBe false
+                                    if (group == "org.slf4j") {
+                                        (artifact == "slf4j-api" || artifact == "slf4j-nop") shouldBe true
+                                    }
+                                }
+                            }
                         }
                         slf4jProviders += providers(jar, "org.slf4j.spi.SLF4JServiceProvider")
                         log4jProviders += providers(jar, "org.apache.logging.log4j.spi.Provider")
@@ -53,7 +72,9 @@ class ProcessLoggingSpec :
 
         "fresh CLI processes generate and render quietly while refusals remain visible" {
             val distribution = distribution()
-            val world = Path.of(requireNotNull(javaClass.getResource("/worlds/reports/modeler.toml")).toURI()).parent
+            val world = Path.of(requiredProperty("ttr.report.world"))
+            val mainClass = requiredProperty("ttr.report.main")
+            val jvmArgs = Json.decodeFromString<List<String>>(requiredProperty("ttr.report.jvmArgs"))
             val root = Files.createTempDirectory("report-process")
 
             fun run(args: List<String>): CliOutcome {
@@ -68,18 +89,17 @@ class ProcessLoggingSpec :
                                     "bin",
                                     if (System.getProperty("os.name").startsWith("Windows")) "java.exe" else "java",
                                 ).toString(),
-                            "-cp",
-                            distribution.resolve("lib").toString() + java.io.File.separator + "*",
-                            "org.tatrman.report.cli.MainKt",
-                        ) + args,
+                        ) + jvmArgs +
+                            listOf(
+                                "-cp",
+                                distribution.resolve("lib").toString() + java.io.File.separator + "*",
+                                mainClass,
+                            ) + args,
                     ).apply {
-                        environment()["JAVA_HOME"] = System.getProperty("java.home")
                         for (key in listOf(
                             "JAVA_TOOL_OPTIONS",
                             "_JAVA_OPTIONS",
                             "JDK_JAVA_OPTIONS",
-                            "JAVA_OPTS",
-                            "TTR_REPORT_OPTS",
                         )) {
                             environment().remove(key)
                         }
@@ -150,12 +170,14 @@ class ProcessLoggingSpec :
         }
     })
 
-private fun distribution(): Path =
-    Path.of(
-        checkNotNull(System.getProperty("ttr.report.dist")) {
-            "Run :packages:kotlin:ttr-report-cli:distTest, or set -Dttr.report.dist=<installDist directory> in the IDE runner."
-        },
-    )
+private fun distribution(): Path = Path.of(requiredProperty("ttr.report.dist"))
+
+private fun requiredProperty(name: String): String =
+    checkNotNull(System.getProperty(name)) {
+        "Run :packages:kotlin:ttr-report-cli:distTest, or supply -Dttr.report.dist=<installDist directory>, " +
+            "-Dttr.report.world=<report fixture directory>, -Dttr.report.main=<application main class> and " +
+            "-Dttr.report.jvmArgs=[] (JSON array) in the IDE runner. Missing: $name"
+    }
 
 private fun providers(
     jar: JarFile,

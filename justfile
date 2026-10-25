@@ -28,7 +28,7 @@ build-metadata-cli:
 
 # SO S2.1 — the open report contract and deterministic fill.
 test-report:
-    ./gradlew :packages:kotlin:ttr-report:test :packages:kotlin:ttr-report-cli:test
+    ./gradlew :packages:kotlin:ttr-report:test :packages:kotlin:ttr-report-cli:test :packages:kotlin:ttr-report-cli:distTest
 
 # SO S2.2 — standalone binary (there is no shared umbrella launcher).
 build-report-cli:

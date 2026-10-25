@@ -188,8 +188,8 @@ saved-query passthroughs, and set operations whose every branch qualifies. Any o
 its time, including computed values and set operations with a constant or function branch. An explicit
 `CAST(... AS DATE)` also selects the date format. The rule reads the compiled query, so identity expressions
 the compiler folds away count as passthroughs. Other `QueryModelLookup` adapters must apply the same rule.
-The display rule is conservative: if the compiler replaces an empty filtered result with a value-only plan, or a
-set operation includes a literal NULL branch, source-date precision is not recovered and the timestamp format remains.
+The rule is conservative: when the compiler proves a query empty (a false filter such as `WHERE 1 = 0`, or
+`LIMIT 0`) and replaces it with a value-only plan, the timestamp format remains.
 
 Properties and ZIP records use the same determinism pass as fill. The same inputs produce the same YAML and XLSX
 bytes; locale-map insertion order does not affect them.

@@ -22,6 +22,12 @@ class DateColumnSpec :
                         if (lane == "er") {
                             """
                             model er
+                            def entity carrier {
+                                attributes: [
+                                    def attribute opened { type: datetime, optional: true }
+                                    def attribute signed { type: date, optional: true }
+                                ]
+                            }
                             def entity shipment {
                                 attributes: [
                                     def attribute shipped { type: date, optional: true }
@@ -33,6 +39,12 @@ class DateColumnSpec :
                         } else {
                             """
                             model db schema dbo
+                            def table carrier {
+                                columns: [
+                                    def column opened { type: datetime, optional: true }
+                                    def column signed { type: date, optional: true }
+                                ]
+                            }
                             def table shipment {
                                 columns: [
                                     def column shipped { type: date, optional: true }
@@ -42,6 +54,7 @@ class DateColumnSpec :
                             }
                             """.trimIndent()
                         }
+                    val carrier = if (lane == "er") "carrier" else "db.dbo.carrier"
                     Files.writeString(dir.resolve("shipment.ttrm"), definition)
                     Files.writeString(
                         dir.resolve("queries.ttrm"),
@@ -55,6 +68,10 @@ class DateColumnSpec :
                         def query grouped {
                             sourceText: "SELECT shipped AS shipped_on, MAX(shipped) AS latest FROM $subject GROUP BY shipped"
                         }
+                        def query heterogeneous_join { sourceText: "SELECT a.shipped, c.opened, c.signed FROM $subject a LEFT JOIN $carrier c ON a.recorded = c.opened" }
+                        def query heterogeneous_grouped { sourceText: "SELECT a.recorded, MAX(c.opened) AS latest_opened, MAX(c.signed) AS latest_signed FROM $subject a LEFT JOIN $carrier c ON a.recorded = c.opened GROUP BY a.recorded" }
+                        def query limit_zero { sourceText: "SELECT shipped FROM $subject ORDER BY shipped LIMIT 0" }
+                        def query limit_one { sourceText: "SELECT shipped FROM $subject ORDER BY shipped LIMIT 1" }
                         def query semi { sourceText: "SELECT a.shipped, a.recorded FROM $subject a WHERE EXISTS (SELECT 1 FROM $subject b WHERE a.recorded = b.recorded)" }
                         def query anti { sourceText: "SELECT a.shipped, a.recorded FROM $subject a WHERE NOT EXISTS (SELECT 1 FROM $subject b WHERE a.recorded = b.recorded)" }
                         def query multi_keys { sourceText: "SELECT recorded, shipped, COUNT(*) AS n FROM $subject GROUP BY shipped, recorded" }
@@ -78,6 +95,12 @@ class DateColumnSpec :
                             MetadataLoader(FileBasedSource("dates", 100, LocalFsStorage("dates", dir))).load().model,
                         )
                     val lookup = SnapshotModelLookup(model)
+                    lookup.outputTypes("$lane.query.heterogeneous_join") shouldBe
+                        mapOf("shipped" to "DATE", "opened" to "TIMESTAMP", "signed" to "DATE")
+                    lookup.outputTypes("$lane.query.heterogeneous_grouped") shouldBe
+                        mapOf("recorded" to "TIMESTAMP", "latest_opened" to "TIMESTAMP", "latest_signed" to "DATE")
+                    lookup.outputTypes("$lane.query.limit_zero") shouldBe mapOf("shipped" to "TIMESTAMP")
+                    lookup.outputTypes("$lane.query.limit_one") shouldBe mapOf("shipped" to "DATE")
                     lookup.outputTypes("$lane.query.direct") shouldBe
                         mapOf("shipped_on" to "DATE", "recorded" to "TIMESTAMP")
                     lookup.outputTypes("$lane.query.wrapped") shouldBe
