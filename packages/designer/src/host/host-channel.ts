@@ -12,6 +12,8 @@ export interface HostInit {
   lang: 'en' | 'cs';
   theme: 'light';
   sha?: string;
+  features?: readonly string[];
+  extensions?: readonly string[];
 }
 export type HostMessage =
   | HostInit
@@ -20,9 +22,11 @@ export type HostMessage =
   | { type: 'ttr.host.refresh'; discard?: boolean }
   | { type: 'ttr.host.collect' }; // implemented with the P1 save seam
 export type FrameMessage =
-  | { type: 'ttr.frame.ready' }
+  | { type: 'ttr.frame.ready'; sha?: string; capabilities?: string[]; manifest?: { bindings: { required: boolean } } }
+  | { type: 'ttr.frame.ack'; sha: string; changed: number }
+  | { type: 'ttr.frame.diagnostics'; diagnostics: Array<{ uri: string; severity: string; code: string; message: string; source: string }> }
   | { type: 'ttr.frame.location'; location: string }
-  | { type: 'ttr.frame.error'; code: string; message: string }
+  | { type: 'ttr.frame.error'; sha?: string; code: string; message: string }
   | { type: 'ttr.frame.dirty'; changed: number }
   | { type: 'ttr.frame.changedFiles'; files: Array<{ path: string; text: string | null }> };
 
@@ -56,6 +60,8 @@ function parseMessage(value: unknown): HostMessage | null {
         (m.lang === 'en' || m.lang === 'cs') &&
         m.theme === 'light' &&
         (m.sha === undefined || typeof m.sha === 'string') &&
+        (m.features === undefined || (Array.isArray(m.features) && m.features.every(f => typeof f === 'string'))) &&
+        (m.extensions === undefined || (Array.isArray(m.extensions) && m.extensions.every(f => f === 'authoring'))) &&
         s &&
         (s.kind === 'served' ||
           (s.kind === 'change' && typeof s.id === 'string' && s.id.length > 0))

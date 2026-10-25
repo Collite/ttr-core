@@ -6,6 +6,11 @@
 // build (DM-P3). Cytoscape and the flat SV designer are retired (DM-⚑a) — React Flow is the engine.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { SourceFilesDrawer } from './shell/SourceFilesDrawer.js';
+import { hostedAuthoring } from './host/hosted-extension.js';
+import type { AuthoringLoader } from './ext/authoring-registry.js';
+import { PageContext } from './page/page-context.js';
+import type { HostInit } from './host/host-channel.js';
 import type { DisplayMode } from '@tatrman/lsp';
 import type { ViewStateStore } from '@tatrman/canvas-core';
 import { ShellFrame, type ActiveSubject } from './shell/ShellFrame';
@@ -35,7 +40,7 @@ import { ToastContainer, makeToast, type ToastMessage } from './Toast';
 import { openFileMap } from './data/open-file-map.js';
 import { BffFilesDataSource, SnapshotEditError, type SnapshotRefreshOptions } from './data/bff-files-data-source';
 import { HostChannel } from './host/host-channel';
-import { APP_LOCATION_CHANGED, currentAppPath, navigateAppPath, replaceAppPath, hostAppLocation } from './shell/app-location';
+import { APP_NAVIGATE, absoluteUrlFor, APP_LOCATION_CHANGED, currentAppPath, navigateAppPath, replaceAppPath, hostAppLocation } from './shell/app-location';
 import { setRuntimeConfig } from './runtime-config';
 
 function resolveBackend(): BackendSelection | { kind: 'error'; message: string } {
@@ -73,7 +78,7 @@ interface LanguageChoice {
 }
 
 export function Studio({
-  dataSource, viewState, catalog, files, workspace, processingSource, language, initialAppPath,
+  dataSource, viewState, catalog, files, workspace, processingSource, language, initialAppPath, canAuthorSource = true,
 }: {
   dataSource: ModelDataSource;
   viewState?: ViewStateStore;
@@ -84,6 +89,7 @@ export function Studio({
   processingSource?: ProcessingGraphSource;
   /** present on a catalog backend: model labels follow this language. */
   language?: LanguageChoice;
+  canAuthorSource?: boolean;
 }) {
   const page = usePageEnvironment();
   const config = page?.config ?? getRuntimeConfig();
@@ -99,6 +105,8 @@ export function Studio({
     });
     return () => { live = false; subscription?.dispose(); };
   }, [dataSource]);
+  const [sourceOpen, setSourceOpen] = useState(false);
+  useEffect(() => { if (!canAuthorSource) setSourceOpen(false); }, [canAuthorSource]);
   const [displayMode, setDisplayMode] = useState<DisplayMode>('just-names');
   const [active, setActive] = useState<ActiveSubject | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -116,7 +124,7 @@ export function Studio({
   };
 
   return (
-    <div className="studio-root flex flex-col h-screen bg-gray-50">
+    <div className="studio-root flex flex-col h-screen bg-gray-50" style={{position: 'relative'}}>
       <header className="flex items-center gap-4 px-4 py-2 border-b border-slate-200 bg-white" data-testid="studio-header">
         <span className="font-semibold text-slate-800">{active?.label ?? workspace}</span>
         <div className="ml-auto flex items-center gap-2 text-xs">
@@ -138,6 +146,7 @@ export function Studio({
               </select>
             </>
           )}
+          {canAuthorSource && dataSource.capabilities.edit && dataSource.sourceFiles && dataSource.writeSourceFile && <button type="button" onClick={() => setSourceOpen(true)}>Source files</button>}
           <span className="uppercase tracking-wide text-slate-400">Detail</span>
           <select
             data-testid="display-mode"
@@ -150,6 +159,7 @@ export function Studio({
           </select>
         </div>
       </header>
+      {dataSource.capabilities.edit && dataSource.sourceFiles && dataSource.writeSourceFile && <SourceFilesDrawer visible={sourceOpen && canAuthorSource} files={() => dataSource.sourceFiles!()} write={file => dataSource.writeSourceFile!(file)} onClose={() => setSourceOpen(false)} />}
       <ErrorBoundary label="shell" resetKey={workspace}>
         <ShellFrame
           dataSource={dataSource}
@@ -434,10 +444,35 @@ export default App;
 function HostedStudio() {
   const [session, setSession] = useState<{ source: BffFilesDataSource; catalog: CatalogGroup[]; workspace: string; sha: string; initialAppPath: string } | null>(null);
   const [error, setError] = useState(false);
+  const [canAuthorSource, setCanAuthorSource] = useState(false);
+  const [authoring, setAuthoring] = useState<{ loader: AuthoringLoader | null }>({ loader: null });
+  const root = useRef<HTMLDivElement>(null);
   const channelRef = useRef<HostChannel | null>(null);
   const readySent = useRef(false);
   useEffect(() => {
     let source: BffFilesDataSource | null = null;
+    let policy: HostInit | null = null;
+    let grantKey = '';
+    let required = true;
+    const updateAuthoring = async () => {
+      if (!policy || !source?.project) return;
+      setCanAuthorSource(policy.scope.kind === 'change' && !!policy.features?.includes('modeler'));
+      required = source.bindingsRequired;
+      const key = JSON.stringify([policy.features ?? [], policy.extensions ?? [], required]);
+      if (key === grantKey) return;
+      grantKey = key;
+      // Revoke immediately, including while a previous dynamic import is outstanding.
+      setAuthoring({ loader: null });
+      try {
+        const loader = await hostedAuthoring(policy, required);
+        if (!disposed && grantKey === key) setAuthoring({ loader });
+      } catch {
+        if (!disposed && grantKey === key) {
+          grantKey = '';
+          channelRef.current?.send({ type: 'ttr.frame.error', code: 'frame/extension-unavailable', message: 'Authoring is unavailable. The model remains readable; retry by reopening editing.' });
+        }
+      }
+    };
     let disposed = false;
     let latestToken: string | null = null;
     let renderedSha: string | null = null;
@@ -445,15 +480,25 @@ function HostedStudio() {
     let dirtyTimer: ReturnType<typeof setTimeout> | undefined;
     let fileSubscription: { dispose(): void } | undefined;
     let lastLocation = '';
+    const publishDiagnostics = async () => {
+      try {
+        const values = await source?.validatedDiagnostics() ?? [];
+        if (!disposed) channelRef.current?.send({ type: 'ttr.frame.diagnostics', diagnostics: values.map(value => ({ uri: value.uri, severity: value.severity === 1 ? 'error' : value.severity === 2 ? 'warning' : 'info', code: String(value.code ?? ''), message: value.message, source: 'worker' })) });
+      } catch {
+        if (!disposed) channelRef.current?.send({ type: 'ttr.frame.diagnostics', diagnostics: [{ uri: '', severity: 'error', code: 'worker/validation-unavailable', message: 'Worker validation did not finish. Refresh the model before proposing.', source: 'worker' }] });
+      }
+    };
     const syncSession = async (initialAppPath?: string, options: SnapshotRefreshOptions = {}) => {
       const changed = await source!.refresh({ ...options, deferDisposal: true });
       if (disposed || (!changed && renderedSha === source!.sha)) return false;
+      publishDiagnostics();
       const { graphs, symbols } = await source!.listCatalog();
       if (disposed) return;
       setError(false);
       renderedSha = source!.sha;
       // The old shell may sync its URL while this snapshot loads. Carry the requested route
       // into the new shell instead of letting it boot from that mutable address bar.
+      await updateAuthoring();
       setSession({ source: source!, catalog: buildCatalog(graphs, symbols), workspace: workspace!, sha: source!.sha!, initialAppPath: initialAppPath ?? currentAppPath() });
       return true;
     };
@@ -462,9 +507,17 @@ function HostedStudio() {
         if (message.type === 'ttr.host.init') {
           // init is idempotent; a scope change is a new iframe session.
           if (source) {
-            if (message.sha && message.sha !== source.sha) await syncSession(undefined, {reason:'save'});
+            policy = message;
+            await updateAuthoring();
+            if (message.sha) {
+              if (message.sha !== source.sha) await syncSession(undefined, { reason: 'save', expectedSha: message.sha });
+              if (source.sha !== message.sha) throw new SnapshotEditError('frame/edit-conflict', 'The branch moved after Save. Local edits are retained.');
+              publishDiagnostics();
+              channel.send({ type: 'ttr.frame.ack', sha: source.sha, changed: source.changedFiles().length });
+            }
             return;
           }
+          policy = message;
           document.documentElement.dataset.hosted = 'true';
           document.documentElement.lang = message.lang;
           setRuntimeConfig({ ...getRuntimeConfig(), basePath: message.basePath, lang: message.lang });
@@ -480,16 +533,18 @@ function HostedStudio() {
           source = new BffFilesDataSource({ ...message, token: latestToken ?? message.token });
           fileSubscription = source.onFilesChanged(() => {
             clearTimeout(dirtyTimer);
-            dirtyTimer = setTimeout(() => channel.send({ type: 'ttr.frame.dirty', changed: source!.changedFiles().length }), 200);
+            dirtyTimer = setTimeout(() => { channel.send({ type: 'ttr.frame.dirty', changed: source!.changedFiles().length }); publishDiagnostics(); }, 200);
           });
           await syncSession(path);
         } else if (message.type === 'ttr.host.collect') {
-          channel.send({ type: 'ttr.frame.changedFiles', files: source?.collectChangedFiles() ?? [] });
+          try { channel.send({ type: 'ttr.frame.changedFiles', files: source?.collectChangedFiles() ?? [] }); }
+          catch { channel.send({ type: 'ttr.frame.error', code: 'frame/collect-failed', message: 'Could not collect local changes. Your edits are retained.' }); }
         } else if (message.type === 'ttr.host.token') {
           latestToken = message.token;
           source?.setToken(message.token);
         } else if (source && message.type === 'ttr.host.refresh') {
           await syncSession(undefined, {discard:message.discard});
+          channel.send({ type: 'ttr.frame.ack', sha: source.sha!, changed: source.changedFiles().length });
         } else if (source && message.type === 'ttr.host.navigate') {
           let path: string;
           try { path = hostAppLocation(message.location, workspace!); }
@@ -499,13 +554,17 @@ function HostedStudio() {
             // Only change the hash: the old shell must not handle a request for the new snapshot.
             const previousPath = currentAppPath();
             replaceAppPath(path);
-            try { if (!await syncSession(path, {discard:message.discard})) navigateAppPath(path); }
+            try { if (!await syncSession(path, {discard:message.discard})) navigateAppPath(path); channel.send({ type: 'ttr.frame.ack', sha: source.sha!, changed: source.changedFiles().length }); }
             catch (e) { if (e instanceof SnapshotEditError) replaceAppPath(previousPath); else navigateAppPath(path); throw e; } // keep navigating on the previous snapshot
           }
         }
       } catch (e) {
         if (e instanceof SnapshotEditError) {
-          channel.send({type:'ttr.frame.error',code:e.code,message:e.message});
+          channel.send({type:'ttr.frame.error',code:e.code,message:e.message,...(message.type === 'ttr.host.init' && message.sha ? {sha:message.sha} : {})});
+          return;
+        }
+        if (message.type === 'ttr.host.init' && message.sha) {
+          channel.send({ type: 'ttr.frame.error', code: 'host/load-failed', sha: message.sha, message: 'Could not load the saved model snapshot.' });
           return;
         }
         if (!disposed) setError(true);
@@ -546,11 +605,11 @@ function HostedStudio() {
     session?.source.disposeRetired();
     if (session && !readySent.current) {
       readySent.current = true;
-      channelRef.current?.send({ type: 'ttr.frame.ready' });
+      channelRef.current?.send({ type: 'ttr.frame.ready', sha: session.sha, capabilities: ['save-ack', 'source-files'], manifest: { bindings: { required: session.source.bindingsRequired } } });
       channelRef.current?.send({ type: 'ttr.frame.location', location: currentAppPath() });
     }
   }, [session]);
   const viewState = useMemo(() => makeViewStateStore('file', { kind: 'file' }), []);
   if (!session) return <div className="hosted-status" role="status">{error ? 'Could not load the model.' : 'Waiting for Studio…'}</div>;
-  return <Studio key={session.sha} dataSource={session.source} viewState={viewState} catalog={session.catalog} files={[]} workspace={session.workspace} initialAppPath={session.initialAppPath} />;
+  return <PageContext.Provider value={{ root, config: getRuntimeConfig(), theme: 'light', authoringLoader: authoring.loader, location: { current: currentAppPath, replace: replaceAppPath, subscribe: handler => { const receive = () => handler(currentAppPath()); window.addEventListener(APP_NAVIGATE, receive); return () => window.removeEventListener(APP_NAVIGATE, receive); }, absolute: path => absoluteUrlFor(path) ?? window.location.origin } }}><div ref={root} style={{ height: '100%', minHeight: 0 }}><Studio key={session.sha} dataSource={session.source} viewState={viewState} catalog={session.catalog} files={[]} workspace={session.workspace} initialAppPath={session.initialAppPath} canAuthorSource={canAuthorSource} /></div></PageContext.Provider>;
 }

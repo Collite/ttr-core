@@ -2,7 +2,7 @@
 // the registry and a results list. Enter runs the top result; clicking a row runs that command;
 // Escape closes. `useCmdKShortcut` wires the global ⌘K / Ctrl+K opener.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { usePageEnvironment } from '../page/page-context.js';
 import type { CommandRegistry } from './commands.js';
 
@@ -79,7 +79,7 @@ export function CommandPalette({
 /** Registers a window keydown listener for ⌘K / Ctrl+K that calls `onOpen`; cleans up on unmount. */
 export function useCmdKShortcut(onOpen: () => void): void {
   const page = usePageEnvironment();
-  useEffect(() => {
+  useLayoutEffect(() => {
     const handler = (event: KeyboardEvent): void => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         if (page && (!(event.target instanceof Node) || !page.root.current?.contains(event.target))) return;

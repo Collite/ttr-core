@@ -171,6 +171,14 @@ it('scopes command shortcuts to one page and leaves a host input alone', async (
   expect(screen.getAllByTestId('designer-page')[0]).toContainElement(screen.getByTestId('cmdk-input'));
 });
 
+it('N11 source authoring is opt-in on the embedded page', async () => {
+  const view = render(<DesignerPage files={files} basePath="/m/" lang="en" />);
+  await screen.findByTestId('studio-header');
+  expect(screen.queryByRole('button', { name: 'Source files' })).toBeNull();
+  view.rerender(<DesignerPage files={files} basePath="/m/" lang="en" sourceAuthoring />);
+  expect(await screen.findByRole('button', { name: 'Source files' })).toBeInTheDocument();
+});
+
 it('focuses each page after an empty canvas click without stealing control focus', async () => {
   render(<><input data-testid="host-input" /><DesignerPage files={files} basePath="/a/" lang="en" workspace="a" location="/w/a/s/er" />
     <DesignerPage files={files} basePath="/b/" lang="en" workspace="b" location="/w/b/s/er" /></>);

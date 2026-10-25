@@ -90,7 +90,7 @@ describe('hosted mode through a parent window', () => {
     expect(fetcher).not.toHaveBeenCalled();
     post(init);
     await waitFor(() =>
-      expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin)
+      expect(sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ready' }), window.location.origin)
     );
     expect(client.setProjectRoot).toHaveBeenCalledWith('file:///repo', manifest);
     expect(client.openDocument).toHaveBeenCalledWith('file:///repo/model/er/item.ttrm', 'model er');
@@ -138,7 +138,7 @@ describe('hosted mode through a parent window', () => {
     render(<App />);
     post(init);
     await waitFor(() =>
-      expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin)
+      expect(sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ready' }), window.location.origin)
     );
     const response = {
       ok: true,
@@ -172,7 +172,7 @@ describe('hosted mode through a parent window', () => {
       render(<App />);
       post(init);
       await waitFor(() =>
-        expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin)
+        expect(sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ready' }), window.location.origin)
       );
       const locations = sent.mock.calls
         .map(([m]) => m)
@@ -190,7 +190,7 @@ describe('hosted mode through a parent window', () => {
     render(<App />);
     post(init);
     await waitFor(() =>
-      expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin)
+      expect(sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ready' }), window.location.origin)
     );
     const header = screen.getByTestId('studio-header');
     fetcher.mockResolvedValue({ ok: false, status: 500 });
@@ -217,7 +217,7 @@ describe('hosted mode through a parent window', () => {
     render(<App />);
     post(init);
     await waitFor(() =>
-      expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin)
+      expect(sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ready' }), window.location.origin)
     );
     post({
       type: 'ttr.host.navigate',
@@ -252,9 +252,35 @@ describe('hosted mode through a parent window', () => {
     render(<App />);
     post(init);
     await waitFor(() =>
-      expect(sent).toHaveBeenCalledWith({ type: 'ttr.frame.ready' }, window.location.origin)
+      expect(sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ready' }), window.location.origin)
     );
     expect(messages.some((m) => m.includes('modeler.toml could not be parsed'))).toBe(true);
     expect(screen.getAllByTestId('catalog-item').map((e) => e.textContent)).toContain('er');
   });
+});
+
+it('R148-R7 source authoring follows every hosted grant and closes on revocation', async () => {
+  render(<App />); post(init);
+  await screen.findByTestId('studio-header');
+  expect(screen.queryByRole('button', { name: 'Source files' })).toBeNull();
+  const change = { ...init, scope: { kind: 'change', id: '42' } };
+  post(change);
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Source files' })).toBeNull());
+  post({ ...change, features: ['modeler'] });
+  fireEvent.click(await screen.findByRole('button', { name: 'Source files' }));
+  expect(screen.getByRole('dialog', { name: 'Source files' })).toBeInTheDocument();
+  post(change);
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Source files' })).toBeNull());
+  expect(screen.queryByRole('dialog', { name: 'Source files' })).toBeNull();
+});
+
+it('R148-R12 optional extension failure preserves the model and retries on init', async () => {
+  const extension = await import('../host/hosted-extension.js');
+  const load = vi.spyOn(extension, 'hostedAuthoring').mockRejectedValueOnce(new Error('offline')).mockResolvedValue(null);
+  render(<App />); post(init);
+  await waitFor(() => expect(sent).toHaveBeenCalledWith(expect.objectContaining({ type: 'ttr.frame.ready' }), window.location.origin));
+  expect(screen.getByTestId('studio-header')).toBeInTheDocument();
+  expect(sent).toHaveBeenCalledWith(expect.objectContaining({ code: 'frame/extension-unavailable' }), window.location.origin);
+  post(init);
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
 });

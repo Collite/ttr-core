@@ -74,6 +74,7 @@ export class SnapshotEditError extends Error {
 export interface SnapshotRefreshOptions {
   deferDisposal?: boolean;
   reason?: 'save' | 'refresh';
+  expectedSha?: string;
   discard?: boolean;
 }
 function sameFiles(a: ReadonlyMap<string,string>, b: ReadonlyMap<string,string>): boolean {
@@ -92,6 +93,7 @@ export class BffFilesDataSource implements ModelDataSource {
     graphShape: 'rich',
   };
   project: ProjectFiles | null = null;
+  bindingsRequired = true;
   sha: string | null = null;
   private worker: SnapshotWorker | null = null;
   private catalog: CatalogListing | null = null;
@@ -159,7 +161,8 @@ export class BffFilesDataSource implements ModelDataSource {
       return response.json();
     };
     const snapshot = snapshotOf(await (this.deps.loadSnapshot ? this.deps.loadSnapshot() : read()));
-    if (snapshot.sha === this.sha) return false;
+    if (options.expectedSha && snapshot.sha !== options.expectedSha) throw new SnapshotEditError('frame/edit-conflict', 'The branch moved after Save. Local edits are retained.');
+    if (snapshot.sha === this.sha && !(options.discard && this.changedFiles().length)) return false;
     for (let attempt = 0; attempt < 8; attempt++) {
       const current = this.currentFiles();
       const saved = collected?.sha === this.sha ? collected : null;
@@ -180,7 +183,8 @@ export class BffFilesDataSource implements ModelDataSource {
       }
       const client = await this.createClient();
       try {
-        await openFileMap(client, 'file:///repo', authored, {under:'model/'});
+        let required = true;
+        await openFileMap(client, 'file:///repo', authored, { under: 'model/', onManifest: manifest => { required = manifest.bindings.required; } });
         const worker = new SnapshotWorker(client, {projectRoot:'file:///repo',files:project.files,currentFiles:authored});
         const catalog = await worker.listCatalog();
         if (this.disposed) throw new Error('Hosted source is disposed.');
@@ -188,13 +192,13 @@ export class BffFilesDataSource implements ModelDataSource {
           if (this.activeEdits) throw new SnapshotEditError('frame/unsaved-edits', 'Wait for the pending edit before changing snapshots.');
           if (!sameFiles(current, this.currentFiles())) { client.dispose(); continue; }
         }
-        worker.onFilesChanged(() => { if (this.worker !== worker) return; worker.invalidate(); this.catalogGen++; this.catalog = null; for (const cb of this.fileListeners) cb(); });
-        worker.onModelChanged(() => { if (this.worker !== worker) return; worker.invalidate(); this.catalogGen++; this.catalog = null; });
+        worker.onModelChanged(() => { if (this.worker !== worker) return; worker.invalidate(); this.catalogGen++; this.catalog = null; for (const cb of this.fileListeners) cb(); });
         const previous = this.worker;
         this.worker = worker;
         this.catalogGen++;
         this.catalog = catalog;
         this.project = project;
+        this.bindingsRequired = required;
         this.sha = snapshot.sha;
         this.lastCollected = null;
         if (previous) this.retired.push(previous.lspClient);
@@ -214,6 +218,22 @@ export class BffFilesDataSource implements ModelDataSource {
     if (!params.dryRun) this.activeEdits++;
     try { return await this.source.edit(params); }
     finally { if (!params.dryRun) this.activeEdits--; }
+  }
+  async validatedDiagnostics() {
+    for (;;) {
+      const worker = this.worker;
+      const generation = this.catalogGen;
+      try { await worker?.whenValidated(); }
+      catch (error) { if (worker !== this.worker || generation !== this.catalogGen) continue; throw error; }
+      if (worker === this.worker && generation === this.catalogGen) return worker?.lspClient.diagnostics?.() ?? [];
+    }
+  }
+  diagnostics() { return this.worker?.lspClient.diagnostics?.() ?? []; }
+  sourceFiles() { return this.worker?.sourceFiles() ?? []; }
+  async writeSourceFile(file: { path: string; text: string; expectedText?: string }) {
+    this.activeEdits++;
+    try { return await this.source.writeSourceFile(file); }
+    finally { this.activeEdits--; }
   }
   changedFiles() { return this.worker?.changedFiles() ?? []; }
   onFilesChanged(cb: () => void) {
