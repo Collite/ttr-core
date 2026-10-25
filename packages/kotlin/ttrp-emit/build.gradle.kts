@@ -43,6 +43,7 @@ dependencies {
     implementation(libs.kotlinx.ser.json)
 
     testImplementation(libs.bundles.kotest)
+    testRuntimeOnly(libs.duckdb.jdbc) // Execute emitted quarter-label SQL and NULL behavior without a server.
     // PL-P0.S1 — validate the E-5 bundle-manifest v2 fixture against its JSON Schema (draft 2020-12).
     testImplementation(libs.json.schema.validator)
     testImplementation(testFixtures(project(":packages:kotlin:ttr-metadata")))

@@ -447,6 +447,11 @@ class ExpressionTypechecker(
                     location,
                 )
         }
+        // concat is deliberately text-only: callers must author numeric/temporal casts explicitly.
+        // Do not widen legacy builtins' parameter checking as part of this additive function.
+        if (entry.id.value == "fn.concat" && argTypes.any { it != null && it.kind != TtrpType.Kind.STRING }) {
+            diags += diag(TtrpDiagnosticId.TYP_001, "`concat` requires two string operands", location)
+        }
         return returnType(entry, argTypes)
     }
 

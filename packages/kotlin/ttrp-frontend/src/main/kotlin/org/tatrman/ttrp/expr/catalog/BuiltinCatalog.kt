@@ -49,6 +49,8 @@ object BuiltinCatalog : FunctionCatalog {
             // an error (review-001 1.2-H). Cross-arg unification is a Stage-2 refinement
             // (it needs a "unify all args" return rule); the v1 roster stays minimal (P1).
             scalar("fn.coalesce", "coalesce", listOf(str, str), ReturnTypeRule.SameAsArg(0), NullRule.CUSTOM),
+            // Two operands, strict NULL propagation; SQL lowers to || and Polars to concat_str.
+            scalar("fn.concat", "concat", listOf(str, str), ReturnTypeRule.Fixed(str), NullRule.STRICT),
             scalar("fn.substring", "substring", listOf(str, int, int), ReturnTypeRule.Fixed(str), NullRule.STRICT),
             scalar("fn.upper", "upper", listOf(str), ReturnTypeRule.Fixed(str), NullRule.STRICT),
             scalar("fn.lower", "lower", listOf(str), ReturnTypeRule.Fixed(str), NullRule.STRICT),
