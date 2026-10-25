@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # The layers
 
-*Explanation. `db`, `er`, `cnc`, `md`: what each layer is for, why the mirror of your database is
+*Explanation. `db`, `er`, `md`, `cn`: what each layer is for, why the mirror of your database is
 not yet a model, and who owns which layer.*
 
 A TTR-M model is layered on purpose. Each layer answers a different question, and the separation is
@@ -30,19 +30,26 @@ act on. This is where you spend your judgement, and it is the layer worth protec
 The `er` layer binds down to `db` — an entity maps to a table, an attribute to a column — so the
 meaning stays anchored to the physical truth without repeating it.
 
-## `cnc` — the conceptual roles
-
-The `cnc` layer carries conceptual roles over the `er` model — fact and dimension roles, and the
-role assignments that let the platform reason about your entities as more than a flat graph. It is
-also where **governance is expressed**: roles and role bindings, not a magic keyword, are how the
-model says which parts are sensitive. The validator enforces the resulting row-level filters and
-column masks at query time, and reports what it applied in `pipelineWarnings`.
-
 ## `md` — the multidimensional view
 
 The `md` layer is the analytical projection: domains, dimensions, hierarchies, measures and
 cubelets, bound down through `md2db` / `md2er`. It is optional — reach for it when you want a
-cube-shaped view over the same governed model.
+cube-shaped view over the same governed model. Which entities are facts and which are dimensions
+follows from it: a cubelet's entity is a fact, a dimension's entity a dimension.
+
+## `cn` — the conceptual model
+
+The `cn` layer names what the business talks about — a product, a customer, a sale, an overdue
+invoice — apart from how the other layers store it. Each concept is grounded once, to an `er` or an
+`md` element, and a defined one (`OverdueInvoice`: an open invoice past its due date) carries the
+expression that says which rows it means. Agents and recipes speak in concepts; the server turns
+what they say into a governed query through the groundings, and new concepts arrive as candidates
+a steward promotes in a pull request. The [user manual's conceptual-model chapter](https://github.com/Collite/ttr-core/blob/master/docs/manual/en/20-conceptual-model.md)
+is the full reference.
+
+The older `cnc` layer of warehouse roles (`fact`, `dimension`, …) is deprecated: those roles now
+derive from `md`. Access policy — row filters, masked columns — is not a model layer: it lives in
+the validator's store ([Policy in git](../operate/policy-in-git.md)).
 
 ## Who owns what
 
@@ -50,8 +57,8 @@ cube-shaped view over the same governed model.
 |---|---|---|
 | `db` | machine | regenerated / diffed on every import re-run |
 | `er` | you | born once from the import, hand-owned forever after |
-| `cnc` | you | authored; carries roles and governance |
 | `md` | you | optional analytical projection |
+| `cn` | you | authored; new concepts promoted from candidates by pull request |
 
 The layers live in **packages** (a directory of `.ttrm` files) and can be grouped into **areas**
 (subject areas that span packages). One model, several layers, each with an owner — so the tool can

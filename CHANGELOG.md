@@ -6,6 +6,15 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Docs — the conceptual model chapter complete (CN-P6 S6.3)
+
+- The manual's conceptual-model chapter adds time (instant · interval · duration · occurrence · state · episode ·
+  as-of, and conditions by basis), the md → er hop on the Hartland demo (no `md2er` authored), concepts at run time
+  (the v6 lexicon's concept rows, the server's frame doors and their model pin) and the promotion loop (candidates →
+  steward → pull request). The `cnc` chapter is rewritten around the derived warehouse roles, with what is landed and
+  what is planned marked. The docs site gains the `cn` layer and the resolver's conceptual-model tools, and no longer
+  says that `cnc` roles carry access policy. No artifact changes.
+
 ### Added — Native writer-default approval dependencies
 
 - Re-review/Ruling 3: approval actions/entities and qualifiers now use the loader-owned declared package,

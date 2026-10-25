@@ -12,6 +12,10 @@ concepts; the bindings tell them where the data is.
 >
 > **Toolchain 0.17.5 — used.** `org.tatrman:ttr-concept` lowers what agents say in concepts to data operations:
 > [statements, assertions and rendering](#statements-assertions-rendering), and `ttr cn materialize`.
+>
+> **0.18.1–0.18.3 — served.** The compiled lexicon carries the concepts, and a Tatrman server reads them when it
+> matches a question and answers frames over its doors ([Concepts at run time](#concepts-at-run-time)). Candidates
+> become concepts through a steward's pull request ([The promotion loop](#the-promotion-loop)).
 
 | where | what |
 |---|---|
@@ -215,6 +219,42 @@ def event StockTransfer {
 }
 ```
 
+## Time
+
+Seven words carry time through the model and the frames:
+
+| word | means | in cn |
+|---|---|---|
+| **instant** | a point on the time line, at a granularity (minute · day · month · year) | an instantaneous event's `period: { at, precision }`; `:as_of` |
+| **interval** | the time from a begin instant to an end, closed-open `[begin, end)`; an absent end is either still running or unknown | a durative event's `period: { start, end, end_open: open \| unknown }` |
+| **duration** | a length of time with no position | `days(365)`, `hours(24)` |
+| **occurrence** | one happening of an event, with its time | a row of the event's grounding |
+| **state** | something that holds of a subject at instants | a phase; a quality with `valued_state: true` |
+| **episode** | the longest interval a state holds, from the occurrence that starts it to the one that ends it (either may be unknown) | a durative event whose period is the episode |
+| **as-of** | the instant a definition is evaluated at, or a claim is made at | `:as_of` in a definition; a statement's `as_of`; an assertion's `asserted_as_of` |
+
+A **condition** is a phase whose definition reads occurrences or episodes at `:as_of`; its `basis:` says which
+comparison makes it hold (see [the `basis:` shapes](#diagnostics)). `occurrence` holds forever once the occurrence
+happened (*post-infarction*), `current_state` while an episode contains the day (*has a broken leg*), `past_state`
+once an episode has ended (*history of a fracture*). No construct is added for conditions: the basis is visible in
+the definition, and the hygiene report checks that the definition has the comparison its `basis:` names.
+
+```ttrm
+model cn
+
+def phase OverdueInvoice {
+    of: Invoicing,
+    definition: """invoice_status = 'open' and period.end < :as_of"""
+}
+def phase LateReturnLine {
+    of: ReturnLine,
+    definition: """this.request.order.period.end < :as_of - :return_window"""
+}
+```
+
+An order not delivered yet has no end (`end_open: open`), so `LateReturnLine` never calls it late: an open end is
+later than every day.
+
 ## Bindings
 
 Every concept is grounded **once** — to the md layer (what analysts aggregate) or to the er layer (the base). The
@@ -327,6 +367,30 @@ A defined phase with no grounding takes its bearer's grade and landing. The hop 
 A quality first restricts derived candidates to its bearer's entity, including stacked-query column origins.
 `ttr md hop <dir>` reports the same landings and derived roles for the whole MD model.
 See [the hop bindings and derivation](15-md-model.md#the-md--er-hop-what-you-pin-what-is-derived).
+
+### The hop in practice
+
+The Hartland demo model grounds its analytic concepts to md and authors **no `md2er` binding**: every md-grounded
+concept lands on the er layer through a derived hop, the md element's physical binding read back through the er
+layer's. Its hygiene summary:
+
+```
+83 concepts — 65 er-grounded · 11 md-grounded · 7 ungrounded
+```
+
+and no `md-grounded-hop-missing` row. Two of the derived landings:
+
+| concept | grounding | lands on |
+|---|---|---|
+| `cn.revenue` (a quality of `Sale`) | `md.measure.revenue` | `er.entity.sales.ext_sales_price` |
+| `cn.return_amount` (a quality of `Return`) | `md.measure.returnAmount` | `er.entity.channel_returns.return_amt` |
+
+Each md measure is bound to columns of several physical tables (one per channel), and more than one er attribute
+maps those columns. The quality's bearer settles it: `Sale` lands on `er.entity.sales`, so `revenue` takes the
+attribute of `sales`, and `Return` lands on the stacked `channel_returns`, so `return_amount` takes the attribute of
+that. A concept whose bearer does not pick one is `md/er-ambiguous`, and pinning it with an `md2er_*` binding is the
+fix. A phase with a definition and no grounding inherits its bearer's landing: `cn.DebtorCustomer` lands on
+`er.entity.customer` because `cn.Customer` does.
 
 ## Lexicon entries for concepts
 
@@ -566,6 +630,72 @@ def entity placed_order {
 }
 ```
 
+## Concepts at run time
+
+The compiled lexicon (`ttr-lexicon build`, archive `ttr-lexicon-compiled/v6` from grammar 0.18.1) carries the
+concepts. Each concept gets one entry, with its stereotype, its landing and how it lands, and every er and md element a
+concept is grounded on gets a `liftsTo` list. A Tatrman server reads it two ways:
+
+- **Matching a question.** A concept's lexicon terms are matched like an element's. A word that matches an element
+  also *lifts* to the concepts grounded on it, so *customer* reads as `cn.Customer` from the concept's own term and
+  from the customer entity's word alike, as one reading. A concept is resolved as its er landing. `default: true`
+  decides a bare form two concepts share: *customer* is `Customer`, not `DebtorCustomer`.
+- **The doors.** The server answers frames over MCP: `statement.validate` · `statement.lower` ·
+  `statement.explain`, the three `assertion.*` tools, `concept.search` (a span → the concepts it may mean) and
+  `definition.render`. They are the functions of [Statements, assertions, rendering](#statements-assertions-rendering),
+  over the deployment's model. A deployment serves them only when the model it mounts has the content id the lexicon
+  was compiled from (`modelSnapshotHash`), so a door never answers from a model the vocabulary does not describe. A
+  deployment that mounts no model answers them `CN_MODEL_UNAVAILABLE`; `concept.search` reads the vocabulary alone
+  and answers either way.
+
+The content id is `sha256` over every `.ttr` / `.ttrm` file under the estate's `model/`, in path order, each as its
+relative path and its bytes. A deployment mounts the `model/` tree itself, or a snapshot archive of it
+(`snapshot.json` plus `docs/<path>`). The Hartland demo ships its archive beside the lexicon, in one ConfigMap, so
+one update moves both.
+
+## The promotion loop
+
+Concepts start as **candidates**. A producer that meets a word or a phrase no concept covers submits one: a recipe
+sentence the authoring surface could not express (`au:synthesizer`), a span a document processor read (`kleio`), a
+steward's own (`manual:<steward>`), or a deployment's evidence pipeline (`<deployment>:evidence`, and
+`<deployment>:span-catalogue` for terms only). An importer never submits. The candidate is a `cn-candidate.v1`
+document (`ttr-concept`'s `schemas/cn-candidate.v1.schema.json`) that proposes one thing: a concept, a term, or an
+open-tier relation. It also records where it came from and why it matters. A recipe that says *customers who pay
+badly* finds no concept for the phrase, though the model has one for the idea; the candidate proposes the words:
+
+```json
+{ "id": "6f1c…", "status": "proposed",
+  "proposal": { "term": { "target_qname": "cn.DebtorCustomer", "locale": "en",
+                          "forms": ["customers who pay badly", "bad payers"] } },
+  "provenance": { "producer": "au:synthesizer", "source_ref": "recipe://hartland/collections#s2",
+                  "confidence": { "value": 0.7, "producer": "au:synthesizer", "method": "no-concept" },
+                  "evidence": { "examples": [ { "kind": "recipe_sentence", "ref": "recipe://hartland/collections#s2",
+                                                "text": "customers who pay badly" } ] },
+                  "created_at": "2026-10-25T09:00:00+02:00" } }
+```
+
+A concept proposal carries `stereo`, `name`, `of` / `event` / `involves` as its stereotype takes them, and either a
+`definition_text` or a `suggested_grounding`.
+
+A **steward** rejects it or promotes it. Promotion writes model text, never a model object: the def, the term or the
+relation appended to the right file of the package. A def carries `sources: ["<source_ref>"]`; a term, which takes no
+`sources:`, gets a `// sources:` comment line above it. The patched package
+must load cleanly before anything leaves: the strict load report and the definition checks, and a new error refuses
+the promotion. The change goes out as a pull request whose body carries, for a phase, its er rendering. Nothing is
+live until a person merges it. The first model load that carries the def marks the candidate `promoted`, with
+`canon_ref` = `<commit>:cn.<Name>`. The store is the metadata service's (off unless a database and a token issuer are
+configured; every call carries a verified bearer, and the caller is the token):
+
+| call | who |
+|---|---|
+| `POST /v1/cn/candidates` — submit; the same proposal twice is one candidate | a producer's principal |
+| `GET /v1/cn/candidates?status=…&sort=newest\|evidence` — the queue | stewards, producers |
+| `POST /v1/cn/candidates/{id}/promote` · `…/reject` | the `cn-steward` role |
+| `POST /v1/vocabularies/{id}/version` — register a code-system version | the `cn-importer` role |
+
+A promotion refuses rather than guesses: a name already taken in the package's cn name space, a reference the package
+does not define, a second default sense for one form, a term whose concept is still a candidate.
+
 ## The hygiene report
 
 Nothing in the conceptual model gates on completeness; the hygiene report shows where it stands. Per concept: its
@@ -616,8 +746,9 @@ which the editor does not check.
 `model cnc`, `def role` in it, and an entity's `roles:` still parse in grammar 0.17; `cn/cnc-deprecated` warns on
 the `model cnc` line of each such file and on each `roles:` (never on the stock vocabulary), and a later major release
 removes them. There is **nothing to migrate to**: the
-classification `cnc` recorded (fact, dimension, …) is derived from the md bindings and the entities' `semantics { }`
-kinds, so a model drops its `cnc` files and `roles:` rather than rewriting them.
+classification `cnc` recorded is derived — fact, dimension and bridge from the md bindings (`ttr md hop`, grammar
+0.18.2); `master` / `transaction` / `structural` are planned as entity kinds in `semantics { }` — so a model drops its
+`cnc` files and `roles:` rather than rewriting them. [CNC roles](09-cnc-roles.md) has the table.
 
 ## Words that stay names
 
