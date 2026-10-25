@@ -1,0 +1,17 @@
+model binding
+def cn2er_event   sale_g      { event: cn.Sale, target: er.entity.sale, period: { at: er.entity.sale.sold_on }, participants: { customer: [er.relation.rel_sale_customer], shipment: [er.relation.rel_shipment_sale] } }
+def cn2er_role    customer_g  { role: cn.Customer, target: er.entity.customer }
+def cn2er_kind    shipment_g  { kind: cn.Shipment, target: er.entity.shipment }
+def cn2md_quality revenue_g   { quality: cn.revenue, target: md.revenue }
+def cn2md_quality quantity_g  { quality: cn.quantity, target: md.quantity }
+def cn2md_quality unit_g      { quality: cn.unit_price, target: md.unit_price }
+def cn2md_quality stock_g     { quality: cn.stock, target: md.stock }
+def cn2md_quality top_g       { quality: cn.top_price, target: md.top_price }
+def cn2md_quality refund_g    { quality: cn.refund, target: md.refund }
+def cn2md_quality buyer_g     { quality: cn.buyer_code, target: md.Buyer.code }
+def cn2md_quality sold_on_g   { quality: cn.sold_on, target: md.Time.day }
+def cn2er_quality due_on_g    { quality: cn.due_on, target: er.entity.sale.due_on }
+def cn2er_quality created_g   { quality: cn.created_at, target: er.entity.sale.created_at }
+def cn2er_quality channel_g   { quality: cn.channel, target: er.entity.sale.channel }
+def cn2er_quality region_g    { quality: cn.region, target: er.entity.customer.region }
+def cn2er_quality carrier_g   { quality: cn.carrier, target: er.entity.shipment.carrier }

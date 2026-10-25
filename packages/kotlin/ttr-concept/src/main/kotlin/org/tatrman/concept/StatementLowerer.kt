@@ -67,6 +67,12 @@ import java.time.ZoneOffset
  *    period's day. The result carries [LowerResult.erSql] and the advisory `cn/lowered-on-er` saying why md did not; a
  *    statement neither lane reads is refused with both lanes' findings, md's first.
  *
+ *    **The er lane places; it does not re-decide (⚑R152-a, review-154 E0).** It reads what md would read if it had a
+ *    carrier. md's principled refusals stay refusals on E-R, for md's reason: a non-additive measure with no declared
+ *    aggregation, and a semi-additive one (E1); a filter on a measure the statement does not read — md's HAVING on
+ *    another measure (E3); a negated phase whose inlining joins (E4 — a join-free one is the same question, read
+ *    `NOT COALESCE((…), FALSE)`). `ErLaneParitySpec` classifies every md refusal, so a new one is classified there.
+ *
  * The evaluation day is the frame's `as_of`, else today on [clock] (recorded when read). Everything here is a pure
  * function of the model and the frame (architecture §7) — the clock is the one input beside them.
  */
@@ -76,10 +82,16 @@ internal class StatementLowerer(
 ) {
     private val validator = StatementValidator(model)
     private val renderer = MdRenderer(model)
+    private val erRenderer = ErRenderer(model)
     private val chain = ConceptChain(model.cn)
 
-    fun lower(s: Statement): LowerResult {
-        val findings = validator.validate(s)
+    fun lower(s: Statement): LowerResult = lower(s, validator.validate(s))
+
+    /** [s] lowered over the validator's [findings] — `statementValidate`'s, so it validates once (review-154 E12). */
+    internal fun lower(
+        s: Statement,
+        findings: List<Diagnostic>,
+    ): LowerResult {
         val errors = findings.filter { it.severity == Severity.ERROR }
         // a slot md cannot reach is no refusal yet — E-R may read the statement (A-CN-101); any other error is one
         if (errors.any { it.slug !in MD_REACH }) return LowerResult(diagnostics = findings)
@@ -167,10 +179,7 @@ internal class StatementLowerer(
         var asOfRead = false
 
         /** The evaluation day: the frame's `as_of` (its last day when coarser than a day), else today on the clock. */
-        val asOfDay: LocalDate by lazy {
-            if (!s.hasAsOf()) return@lazy LocalDate.now(clock)
-            checkNotNull(FrameTime.evaluationDay(s.asOf)) { "as_of validated" }
-        }
+        val asOfDay: LocalDate by lazy { evaluationDay(s) }
 
         fun run(warnings: List<Diagnostic>): LowerResult {
             if (s.hasCompare()) {
@@ -600,10 +609,10 @@ internal class StatementLowerer(
             val year = code.take(4).toInt()
             val yearAttr = calc(dim, date, "yearOfDate")
             val monthAttr = calc(dim, date, "monthOfDate")
+            val (lo, hi) = periodRange(code)
+            val days = listOf(range(attribute, lo, hi.minusDays(1))) // half-open → the md range's inclusive bound
             return when {
-                code.length == 4 ->
-                    yearAttr?.let { listOf(Coord(it, PathComponent.IntLit("$year"))) }
-                        ?: listOf(range(attribute, LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31)))
+                code.length == 4 -> yearAttr?.let { listOf(Coord(it, PathComponent.IntLit("$year"))) } ?: days
                 'Q' in code -> {
                     // only a map from the date itself: md lowers no chained calc (`quarterOfMonth` over a computed month)
                     val q = code.substringAfter('Q').toInt()
@@ -614,8 +623,7 @@ internal class StatementLowerer(
                             Coord(yearAttr, PathComponent.IntLit("$year")),
                         )
                     } else {
-                        val first = LocalDate.of(year, 3 * q - 2, 1)
-                        listOf(range(attribute, first, first.plusMonths(3).minusDays(1)))
+                        days
                     }
                 }
                 else -> {
@@ -626,8 +634,7 @@ internal class StatementLowerer(
                             Coord(yearAttr, PathComponent.IntLit("$year")),
                         )
                     } else {
-                        val first = LocalDate.of(year, month, 1)
-                        listOf(range(attribute, first, first.plusMonths(1).minusDays(1)))
+                        days
                     }
                 }
             }
@@ -661,42 +668,10 @@ internal class StatementLowerer(
         fun day(
             i: org.tatrman.concept.v1.Instant,
             subject: String,
-        ): LocalDate {
-            if (i.granularity == Granularity.HOUR || i.granularity == Granularity.MINUTE) {
-                refuse(
-                    FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
-                    subject,
-                    "the md time coordinate counts days — `${i.value}` is ${i.granularity.name.lowercase()}-granular",
-                )
-            }
-            return FrameTime
-                .interval(i)
-                .getOrThrow()
-                .lo
-                .toLocalDate()
-        }
+        ): LocalDate = instantDay(i, subject)
 
-        /** `last(<n>,<unit>)`'s first day, back from the evaluation day (days, weeks, months). */
-        fun relative(r: String): LocalDate {
-            val (amount, unit) = checkNotNull(FrameTime.relative(r)) { "time.relative validated" }
-            return when (unit) {
-                "days" -> asOfDay.minusDays(amount)
-                "weeks" -> asOfDay.minusWeeks(amount)
-                "months" -> asOfDay.minusMonths(amount)
-                "working_days" ->
-                    refuse(
-                        FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
-                        "time.relative",
-                        "a working-day window — md has no working-day calendar (G-MD-3)",
-                    )
-                else ->
-                    refuse(
-                        FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
-                        "time.relative",
-                        "a sub-day window on a day (G-MD-4)",
-                    )
-            }
-        }
+        /** `last(<n>,<unit>)`'s first day, back from the evaluation day. */
+        fun relative(r: String): LocalDate = relativeStart(r, asOfDay)
 
         fun range(
             attribute: String,
@@ -943,7 +918,8 @@ internal class StatementLowerer(
                 }
             if (landsOnEntity != true) return LowerResult(diagnostics = kept + because)
 
-            // a finding md already made (one slug, one subject) stands for both lanes, E-R's reason folded into it
+            // a finding md already made (one slug, one subject) stands for both lanes, E-R's reason folded into it; E-R's
+            // own findings say they are E-R's (review-154 E8)
             fun refusal(er: List<Diagnostic>): LowerResult {
                 val same = er.groupBy { it.slug to it.subject }
                 val merged =
@@ -957,7 +933,13 @@ internal class StatementLowerer(
                             ?: d
                     }
                 val said = because.map { it.slug to it.subject }.toSet()
-                return LowerResult(diagnostics = kept + merged + er.filter { (it.slug to it.subject) !in said })
+                val own =
+                    er.filter { (it.slug to it.subject) !in said }.map {
+                        it.copy(
+                            message = "on E-R: " + it.message,
+                        )
+                    }
+                return LowerResult(diagnostics = kept + merged + own)
             }
             val spec =
                 try {
@@ -965,7 +947,7 @@ internal class StatementLowerer(
                 } catch (r: Refused) {
                     return refusal(r.diagnostics)
                 }
-            val r = ErRenderer(model).statement(spec)
+            val r = erRenderer.statement(spec)
             if (r.diagnostics.any { it.severity == Severity.ERROR }) return refusal(r.diagnostics)
             val entity = spec.event.erTarget ?: ""
             val mdReason = because.firstOrNull()?.message ?: "no md read"
@@ -1019,6 +1001,7 @@ internal class StatementLowerer(
                     when (c) {
                         is ErCondition.Member -> path(c.slot, c.concept)
                         is ErCondition.Quality -> path(c.slot, c.concept)
+                        is ErCondition.Within -> path(c.slot, c.concept)
                     }
                 }
         }
@@ -1040,14 +1023,7 @@ internal class StatementLowerer(
                         "measures[1]",
                         "the measures are qualities of different events — an E-R read is one event's rows",
                     )
-            if (event == null) {
-                refuse(
-                    FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
-                    "measures[0]",
-                    "`${measures.first().ref}` is a quality of no event — an E-R read is an event's rows",
-                )
-            }
-            val phases = mutableListOf<Pair<Concept, Boolean>>()
+            val phases = mutableListOf<ErPhase>()
             val conditions = mutableListOf<ErCondition>()
             val havings = mutableListOf<Triple<Int, String, String>>()
 
@@ -1064,23 +1040,47 @@ internal class StatementLowerer(
                         val op =
                             SPELLING[q.op] ?: refuse(FrameSlugs.MALFORMED_FRAME, "$slot.quality.op", "no comparison")
                         val i = measures.indexOfFirst { it.qname == c.qname }
-                        if (i >= 0) {
-                            havings +=
-                                Triple(
-                                    i,
-                                    op,
-                                    sqlLiteral(q.value, slot)
-                                        ?: refuse(
-                                            FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
-                                            "$slot.quality.value",
-                                            "a measure compared with null",
-                                        ),
+                        when {
+                            i >= 0 -> {
+                                if (q.value.hasInstantValue()) {
+                                    refuse(
+                                        FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                                        "$slot.quality.value",
+                                        "the measure `${c.ref}` compared with an instant",
+                                    )
+                                }
+                                havings +=
+                                    Triple(
+                                        i,
+                                        op,
+                                        sqlLiteral(q.value, slot)
+                                            ?: refuse(
+                                                FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                                                "$slot.quality.value",
+                                                "a measure compared with null",
+                                            ),
+                                    )
+                            }
+                            // md reads a filter on any md measure as a HAVING, and one the read does not aggregate is
+                            // refused — on E-R it would filter rows, another question (⚑R152-a, review-154 E3)
+                            MdFace.of(c).any { it.element is MdElement.Measure } ->
+                                refuse(
+                                    FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                                    "$slot.quality.quality",
+                                    "a having-filter on `${c.ref}` — the read aggregates " +
+                                        measures.joinToString(", ") { "`${it.ref}`" } + " only",
                                 )
-                        } else {
-                            conditions += ErCondition.Quality(c, op, sqlLiteral(q.value, slot), slot)
+                            // an instant is its interval, compared by its bounds (⚑R152-f, review-154 E9)
+                            q.value.hasInstantValue() -> {
+                                val t = FrameTime.interval(q.value.instantValue).getOrThrow()
+                                conditions += ErCondition.Within(c, op, t.lo, t.hi, slot)
+                            }
+                            else -> conditions += ErCondition.Quality(c, op, sqlLiteral(q.value, slot), slot)
                         }
                     }
-                    Filter.FormCase.PHASE -> phases += concept(f.phase.phase) to f.phase.negated
+                    Filter.FormCase.PHASE ->
+                        phases +=
+                            ErPhase(concept(f.phase.phase), f.phase.negated, "$slot.phase.phase")
                     Filter.FormCase.GROUP ->
                         when (f.group.op) {
                             BoolOp.ALL ->
@@ -1149,7 +1149,26 @@ internal class StatementLowerer(
                         slot,
                         "`${q.ref}` grounds no md measure — an E-R read takes its aggregate from one (an E-R-only measure is a follow-up)",
                     )
-            return when (val fn = measure.aggregation?.default?.lowercase() ?: "sum") {
+            // md's `defaultAggFor`, and what A-CN-101 promised (⚑R152-a, review-154 E1): an aggregation per dimension is no
+            // plain aggregate; a declared default wins; a non-additive measure with none is not summed
+            val per = measure.aggregation?.perDimension.orEmpty()
+            if (per.isNotEmpty() || measure.measureClass?.equals("semiAdditive", ignoreCase = true) == true) {
+                val how = per.entries.joinToString(", ") { "${it.key}: ${it.value}" }.ifEmpty { "semi-additive" }
+                refuse(
+                    FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                    slot,
+                    "`${q.ref}` aggregates per dimension (`$how`) — not a plain aggregate on E-R (a follow-up)",
+                )
+            }
+            val declared = measure.aggregation?.default?.lowercase()
+            if (declared == null && measure.measureClass?.equals("nonAdditive", ignoreCase = true) == true) {
+                refuse(
+                    FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                    slot,
+                    "`${q.ref}` is non-additive and declares no aggregation — not summed on E-R either",
+                )
+            }
+            return when (val fn = declared ?: "sum") {
                 "sum", "avg", "min", "max", "count" -> fn.uppercase()
                 else ->
                     refuse(
@@ -1164,56 +1183,12 @@ internal class StatementLowerer(
         fun time(): Pair<LocalDate, LocalDate>? {
             val t = s.time
             return when (t.specCase) {
-                TimeSpec.SpecCase.PERIOD_CODE -> {
-                    val code = t.periodCode
-                    val year = code.take(4).toInt()
-                    when {
-                        code.length == 4 -> LocalDate.of(year, 1, 1).let { it to it.plusYears(1) }
-                        'Q' in code ->
-                            LocalDate.of(year, 3 * code.substringAfter('Q').toInt() - 2, 1).let {
-                                it to
-                                    it.plusMonths(3)
-                            }
-                        else -> LocalDate.of(year, code.substring(5).toInt(), 1).let { it to it.plusMonths(1) }
-                    }
-                }
-                TimeSpec.SpecCase.RANGE -> day(t.range.from, "time.range.from") to day(t.range.to, "time.range.to")
-                TimeSpec.SpecCase.RELATIVE -> {
-                    val (amount, unit) = checkNotNull(FrameTime.relative(t.relative)) { "time.relative validated" }
-                    val lo =
-                        when (unit) {
-                            "days" -> asOfDay.minusDays(amount)
-                            "weeks" -> asOfDay.minusWeeks(amount)
-                            "months" -> asOfDay.minusMonths(amount)
-                            else ->
-                                refuse(
-                                    FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
-                                    "time.relative",
-                                    "a `$unit` window on E-R — a follow-up",
-                                )
-                        }
-                    lo to asOfDay.plusDays(1)
-                }
+                TimeSpec.SpecCase.PERIOD_CODE -> periodRange(t.periodCode)
+                TimeSpec.SpecCase.RANGE ->
+                    instantDay(t.range.from, "time.range.from") to instantDay(t.range.to, "time.range.to")
+                TimeSpec.SpecCase.RELATIVE -> relativeStart(t.relative, asOfDay) to asOfDay.plusDays(1)
                 else -> null
             }
-        }
-
-        fun day(
-            i: org.tatrman.concept.v1.Instant,
-            subject: String,
-        ): LocalDate {
-            if (i.granularity == Granularity.HOUR || i.granularity == Granularity.MINUTE) {
-                refuse(
-                    FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
-                    subject,
-                    "the E-R read counts days — `${i.value}` is finer",
-                )
-            }
-            return FrameTime
-                .interval(i)
-                .getOrThrow()
-                .lo
-                .toLocalDate()
         }
 
         /** [v] spelled as an SQL literal; null for a null. */
@@ -1227,14 +1202,52 @@ internal class StatementLowerer(
                 v.hasIntValue() -> "${v.intValue}"
                 v.hasFloatValue() -> "${v.floatValue}"
                 v.hasBoolValue() -> if (v.boolValue) "TRUE" else "FALSE"
-                v.hasInstantValue() ->
-                    if (v.instantValue.granularity == Granularity.DAY) {
-                        "DATE '${v.instantValue.value}'"
-                    } else {
-                        "TIMESTAMP '${v.instantValue.value.replace('T', ' ')}'"
-                    }
                 else -> refuse(FrameSlugs.MALFORMED_FRAME, "$slot.quality.value", "a quality filter with no value")
             }
+    }
+
+    /** `last(<n>,<unit>)`'s first day, back from [day] — both lanes' rule (days, weeks, months; review-154 E14). */
+    private fun relativeStart(
+        r: String,
+        day: LocalDate,
+    ): LocalDate {
+        val (amount, unit) = checkNotNull(FrameTime.relative(r)) { "time.relative validated" }
+        return when (unit) {
+            "days" -> day.minusDays(amount)
+            "weeks" -> day.minusWeeks(amount)
+            "months" -> day.minusMonths(amount)
+            "working_days" ->
+                refuse(
+                    FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                    "time.relative",
+                    "a working-day window — there is no working-day calendar (G-MD-3)",
+                )
+            else ->
+                refuse(
+                    FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                    "time.relative",
+                    "a sub-day window on a day (G-MD-4)",
+                )
+        }
+    }
+
+    /** An instant's first day — both lanes count days, so an hour or a minute is refused (review-154 E14). */
+    private fun instantDay(
+        i: org.tatrman.concept.v1.Instant,
+        subject: String,
+    ): LocalDate {
+        if (i.granularity == Granularity.HOUR || i.granularity == Granularity.MINUTE) {
+            refuse(
+                FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                subject,
+                "the time counts days — `${i.value}` is ${i.granularity.name.lowercase()}-granular",
+            )
+        }
+        return FrameTime
+            .interval(i)
+            .getOrThrow()
+            .lo
+            .toLocalDate()
     }
 
     /** The world's `def parameter` values as SQL literals — what a phase's `:name` reads on the er lane. */
@@ -1295,5 +1308,15 @@ internal class StatementLowerer(
             condition: Expression,
         ): PlanNode =
             PlanNode.newBuilder().setFilter(FilterNode.newBuilder().setInput(input).setCondition(condition)).build()
+    }
+}
+
+/** A period code (`YYYY`, `YYYY-MM`, `YYYYQn`) as its half-open day range `[first, next)` — both lanes' (review-154 E14). */
+private fun periodRange(code: String): Pair<LocalDate, LocalDate> {
+    val year = code.take(4).toInt()
+    return when {
+        code.length == 4 -> LocalDate.of(year, 1, 1).let { it to it.plusYears(1) }
+        'Q' in code -> LocalDate.of(year, 3 * code.substringAfter('Q').toInt() - 2, 1).let { it to it.plusMonths(3) }
+        else -> LocalDate.of(year, code.substring(5).toInt(), 1).let { it to it.plusMonths(1) }
     }
 }

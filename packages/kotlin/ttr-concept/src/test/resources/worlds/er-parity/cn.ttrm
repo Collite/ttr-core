@@ -1,0 +1,30 @@
+// review-154 E0 — the concepts: `Sale` lands on E-R (`sale`), its measures on md (`sales`), its customer on E-R.
+model cn
+def role Customer { label: { en: "Customer" }, event: Sale }
+def kind VipCustomer { is_a: Customer, members: """region = 'vip'""" }        // E7: narrower than the participant
+def kind Shipment {}
+def event Sale {
+    label: { en: "Sale" },
+    involves: [Customer, Shipment],
+    period: { at: sold_on },
+    qualities: [revenue, quantity, unit_price, stock, top_price, refund, sold_on, due_on, created_at, channel, buyer_code]
+}
+def quality revenue    { of: Sale }
+def quality quantity   { of: Sale }
+def quality unit_price { of: Sale }
+def quality stock      { of: Sale }
+def quality top_price  { of: Sale }
+def quality refund     { of: Sale }
+def quality buyer_code { of: Sale }                                              // an md attribute with an E-R landing
+def quality sold_on    { of: Sale }
+def quality due_on     { of: Sale }
+def quality created_at { of: Sale }
+def quality channel    { of: Sale }
+def quality region     { of: Customer }
+def quality carrier    { of: Shipment }
+
+def phase WebSale    { of: Sale, definition: """channel = 'web'""" }                  // join-free
+def phase WestSale   { of: Sale, definition: """customer.region = 'west'""" }         // joins `customer` (N:1)
+def phase DhlSale    { of: Sale, definition: """shipment.carrier = 'dhl'""" }         // joins `shipment` (1:N) — E5
+def phase RecentSale { of: Sale, definition: """within(period.at, last: days(30))""" }
+def phase LateSale   { of: Sale, definition: """period.at >= '2026-06-01'""" }       // one-sided: md cannot render it

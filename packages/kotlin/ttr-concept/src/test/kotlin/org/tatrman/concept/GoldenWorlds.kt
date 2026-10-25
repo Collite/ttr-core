@@ -18,7 +18,7 @@ import kotlin.io.path.isRegularFile
 internal object GoldenWorlds {
     val root: Path = DefinitionFixtures.repo.resolve("packages/kotlin/ttr-concept/src/test/resources/worlds")
 
-    val names: List<String> = listOf("hartland", "clinic", "sales", "channel-reverse", "calendar-key")
+    val names: List<String> = listOf("hartland", "clinic", "sales", "channel-reverse", "calendar-key", "er-parity")
 
     class World(
         val name: String,

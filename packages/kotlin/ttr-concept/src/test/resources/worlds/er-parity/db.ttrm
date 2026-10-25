@@ -1,0 +1,33 @@
+// review-154 E0 — the er lane's parity world: one fact md carries alone (so md's principled refusals are reached, not
+// pre-empted by "several carriers"), landing on E-R too (so the er lane runs behind every md refusal). Invented data.
+model db schema dbo
+def table sale {
+    columns: [
+        def column sale_id { type: int, isKey: true },
+        def column channel { type: text, optional: true },
+        def column customer { type: int },
+        def column sold_on { type: date },
+        def column due_on { type: date },
+        def column created_at { type: timestamp },
+        def column ext_price { type: decimal },
+        def column quantity { type: int },
+        def column unit_price { type: decimal },
+        def column stock { type: int },
+        def column top_price { type: decimal },
+        def column refund { type: decimal }
+    ]
+}
+def table customer {
+    columns: [
+        def column sk { type: int, isKey: true },
+        def column name { type: text },
+        def column region { type: text, optional: true }
+    ]
+}
+def table shipment {
+    columns: [
+        def column shipment_id { type: int, isKey: true },
+        def column sale_id { type: int },
+        def column carrier { type: text }
+    ]
+}
