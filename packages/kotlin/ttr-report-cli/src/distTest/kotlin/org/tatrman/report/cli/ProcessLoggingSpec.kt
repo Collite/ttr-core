@@ -69,7 +69,7 @@ class ProcessLoggingSpec :
                                     if (System.getProperty("os.name").startsWith("Windows")) "java.exe" else "java",
                                 ).toString(),
                             "-cp",
-                            distribution.resolve("lib/*").toString(),
+                            distribution.resolve("lib").toString() + java.io.File.separator + "*",
                             "org.tatrman.report.cli.MainKt",
                         ) + args,
                     ).apply {
