@@ -8,5 +8,7 @@ The Hartland world follows design §4 (H-1): three per-channel fact cubelets, no
 and a stacked `sales` entity over an in-model UNION ALL query. Its revenue quality resolves through
 R7 under the Sale bearer. A query's literal channel does not create an MD dimension or a carrier binding.
 
-`by-channel-sales.pending` therefore waits on CN-P6's ER grouping / MD Channel-grain work;
-`where-websale-carrier.pending` waits on the phase-to-carrier binding. See `../PENDING.md`.
+`by-channel-sales` and `where-websale-sales` are read on E-R (CN-P6 ⚑S62-1, the er statement lane, Bora 2026-10-25):
+md carries no single read of either — three cubelets carry revenue and none has the channel — so the statement reads
+the stacked `sales`, grouping by or filtering on its `channel` column. The phase-to-carrier binding the
+`where-websale-carrier` demand named is withdrawn: the er lane answers the question without one. See `../PENDING.md`.

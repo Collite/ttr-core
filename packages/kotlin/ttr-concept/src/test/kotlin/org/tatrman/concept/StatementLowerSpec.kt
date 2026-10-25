@@ -225,7 +225,9 @@ class StatementLowerSpec :
                 "\"time\": { \"range\": { \"from\": { \"value\": \"2026-01-01T08\", \"granularity\": \"HOUR\" }, " +
                     "\"to\": { \"value\": \"2026-01-02T08\", \"granularity\": \"HOUR\" } } }"
             refused(lower(sales, ask, revenue, hours)) shouldBe listOf("cn/not-analytically-reachable time.range.from")
-            refused(lower(reverse, ask, revenue, y2026)) shouldBe listOf("cn/not-analytically-reachable time")
+            // E-R reads `channel_sales` too (CN-P6 ⚑S62-1), but its `Sale` has no period there either — both lanes refuse
+            refused(lower(reverse, ask, revenue, y2026)) shouldBe
+                listOf("cn/not-analytically-reachable time", "cn/definition-unreachable(er) cn.Sale")
         }
 
         // ---- T4 — resolve, lower, compose, provenance ---------------------------------------------------------------

@@ -63,6 +63,12 @@ data class LowerResult(
     val dotPath: String = "",
     val provenance: LowerProvenance = LowerProvenance(),
     val diagnostics: List<Diagnostic> = emptyList(),
+    /**
+     * The er lane's read (CN-P6 ⚑S62-1, A-CN-101): SQL over entities in the formatting contract's layout, every
+     * placeholder bound — set when md carries no single read of the statement and E-R does; [plan] and [dotPath] are
+     * then empty. A lowered statement carries exactly one of the two.
+     */
+    val erSql: String = "",
 )
 
 /** A localized explanation (statement or assertion). */

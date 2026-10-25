@@ -1,0 +1,3 @@
+SELECT SUM(sales.ext_sales_price) AS revenue
+FROM sales
+WHERE sales.sold_date >= DATE '2026-01-01' AND sales.sold_date < DATE '2026-02-01'

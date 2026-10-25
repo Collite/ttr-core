@@ -60,6 +60,13 @@ import java.time.ZoneOffset
  *     `cn/not-analytically-reachable` naming the md code; a same-cubelet existence composes as ⚑CN-P9's grain-key
  *     semi-join; `order_limit` sorts and limits on the measure.
  *
+ * 5. **The er lane** (CN-P6 ⚑S62-1, A-CN-101): when md carries no single read — the validator finds a slot md cannot
+ *    reach (`cn/not-analytically-reachable`, `cn/definition-unreachable(md)`) and nothing else, or the md lowering refuses
+ *    (no carrier, several, …) — the statement is read on E-R instead ([ErRenderer.statement]): the grain event's landing,
+ *    the measures aggregated by their md measure's aggregation, phases inlined on the event's row, the time on its
+ *    period's day. The result carries [LowerResult.erSql] and the advisory `cn/lowered-on-er` saying why md did not; a
+ *    statement neither lane reads is refused with both lanes' findings, md's first.
+ *
  * The evaluation day is the frame's `as_of`, else today on [clock] (recorded when read). Everything here is a pure
  * function of the model and the frame (architecture §7) — the clock is the one input beside them.
  */
@@ -73,19 +80,25 @@ internal class StatementLowerer(
 
     fun lower(s: Statement): LowerResult {
         val findings = validator.validate(s)
-        if (findings.any { it.severity == Severity.ERROR }) return LowerResult(diagnostics = findings)
-        return try {
-            val md =
-                model.md
-                    ?: refuse(
-                        FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
-                        "measures[0]",
-                        "the model declares no md tier (no cubelet) — a statement lowers through md (AM-4)",
-                    )
-            Lowering(s, md).run(findings)
-        } catch (r: Refused) {
-            LowerResult(diagnostics = findings + r.diagnostics)
-        }
+        val errors = findings.filter { it.severity == Severity.ERROR }
+        // a slot md cannot reach is no refusal yet — E-R may read the statement (A-CN-101); any other error is one
+        if (errors.any { it.slug !in MD_REACH }) return LowerResult(diagnostics = findings)
+        val kept = findings - errors.toSet()
+        if (errors.isNotEmpty()) return ErLane(s).lower(kept, because = errors)
+        val mdRefusal =
+            try {
+                val md =
+                    model.md
+                        ?: refuse(
+                            FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                            "measures[0]",
+                            "the model declares no md tier (no cubelet) — a statement lowers through md (AM-4)",
+                        )
+                return Lowering(s, md).run(findings)
+            } catch (r: Refused) {
+                r.diagnostics
+            }
+        return ErLane(s).lower(kept, because = mdRefusal)
     }
 
     private class Refused(
@@ -104,6 +117,21 @@ internal class StatementLowerer(
         return model.cn.concepts.values
             .single { it.qname.name == name } // validated: one, unambiguous
     }
+
+    /** The measure's bearer event (`of:`, else the one event listing it in `qualities:`). */
+    private fun grainEvent(measure: Concept): Concept? {
+        measure.of
+            ?.let { model.cn.concepts[it] }
+            ?.takeIf { it.stereotype == "event" }
+            ?.let { return it }
+        return model.cn.concepts.values
+            .filter { it.stereotype == "event" && measure.qname.name in it.qualities }
+            .singleOrNull()
+    }
+
+    /** The frame's evaluation day: its `as_of` (the last day when coarser than a day), else today on the clock. */
+    private fun evaluationDay(s: Statement): LocalDate =
+        if (s.hasAsOf()) checkNotNull(FrameTime.evaluationDay(s.asOf)) { "as_of validated" } else LocalDate.now(clock)
 
     /** One slot's ask of the carrier, in frame order: a coordinate, a phase to render, or a HAVING on the measure. */
     private sealed interface Ask {
@@ -401,17 +429,6 @@ internal class StatementLowerer(
                 )
             }
             return faces
-        }
-
-        /** The measure's bearer event (`of:`, else the one event listing it in `qualities:`). */
-        fun grainEvent(measure: Concept): Concept? {
-            measure.of
-                ?.let { model.cn.concepts[it] }
-                ?.takeIf { it.stereotype == "event" }
-                ?.let { return it }
-            return model.cn.concepts.values
-                .filter { it.stereotype == "event" && measure.qname.name in it.qualities }
-                .singleOrNull()
         }
 
         /** The quality carrying [event]'s instant — its `period:`'s `at`, else `start` — as a concept, or null. */
@@ -902,8 +919,346 @@ internal class StatementLowerer(
         }
     }
 
-    private companion object {
-        val OPS =
+    /**
+     * The er lane (CN-P6 ⚑S62-1, A-CN-101): [s] as an [ErStatement] — the grain event, its measures with their
+     * aggregate, the phases, the member / quality conditions (a quality filter on a measure a HAVING), the group-bys, the
+     * time as a half-open day range, the order — rendered by [ErRenderer.statement]. [because] is why md did not read it.
+     */
+    private inner class ErLane(
+        val s: Statement,
+    ) {
+        val asOfDay: LocalDate by lazy { evaluationDay(s) }
+
+        fun lower(
+            kept: List<Diagnostic>,
+            because: List<Diagnostic>,
+        ): LowerResult {
+            // the lane applies to one grain event that lands on E-R; else md's refusal stands alone
+            val events = s.measuresList.map { grainEvent(concept(it)) }.distinct()
+            val landsOnEntity =
+                events.singleOrNull()?.erTarget?.split('.')?.let {
+                    it.size == 3 &&
+                        it[0] == "er" &&
+                        it[1] == "entity"
+                }
+            if (landsOnEntity != true) return LowerResult(diagnostics = kept + because)
+
+            // a finding md already made (one slug, one subject) stands for both lanes, E-R's reason folded into it
+            fun refusal(er: List<Diagnostic>): LowerResult {
+                val same = er.groupBy { it.slug to it.subject }
+                val merged =
+                    because.map { d ->
+                        same[d.slug to d.subject]?.let { e ->
+                            d.copy(
+                                message =
+                                    d.message + " — and on E-R: " + e.joinToString("; ") { it.message },
+                            )
+                        }
+                            ?: d
+                    }
+                val said = because.map { it.slug to it.subject }.toSet()
+                return LowerResult(diagnostics = kept + merged + er.filter { (it.slug to it.subject) !in said })
+            }
+            val spec =
+                try {
+                    spec()
+                } catch (r: Refused) {
+                    return refusal(r.diagnostics)
+                }
+            val r = ErRenderer(model).statement(spec)
+            if (r.diagnostics.any { it.severity == Severity.ERROR }) return refusal(r.diagnostics)
+            val entity = spec.event.erTarget ?: ""
+            val mdReason = because.firstOrNull()?.message ?: "no md read"
+            val why =
+                Diagnostic(
+                    FrameSlugs.LOWERED_ON_ER,
+                    Severity.ADVISORY,
+                    "md carries no single read of the statement ($mdReason) — lowered on E-R over `$entity`",
+                    because.firstOrNull()?.subject ?: "measures[0]",
+                )
+            val read = r.parametersRead.map { it.name }
+            val provenance =
+                LowerProvenance(
+                    snapshotHash = model.snapshotHash,
+                    grammarVersion = GRAMMAR_VERSION,
+                    catalogVersion = MD_CATALOG_VERSION,
+                    bindingPaths = bindingPaths(spec),
+                    inlinedDefinitions = r.definitionsInlined,
+                    parametersBound = spec.values.filterKeys { it in read },
+                    asOf =
+                        when {
+                            s.hasAsOf() -> s.asOf.value
+                            "as_of" in read ||
+                                r.parametersRead.any { it.derivation?.startsWith("as_of") == true } ||
+                                s.time.specCase == TimeSpec.SpecCase.RELATIVE -> asOfDay.toString()
+                            else -> ""
+                        },
+                    imprecisionMode = r.imprecisionMode,
+                )
+            return LowerResult(
+                provenance = provenance,
+                diagnostics = kept + why + r.diagnostics,
+                erSql = r.text,
+            )
+        }
+
+        fun bindingPaths(spec: ErStatement): List<BindingPath> {
+            fun path(
+                slot: String,
+                c: Concept,
+            ) = BindingPath(
+                slot,
+                c.ref,
+                c.grounding?.qname?.name ?: "",
+                c.erTarget ?: "",
+                c.via ?: org.tatrman.ttr.metadata.model.Via.DIRECT,
+            )
+            return spec.measures.mapIndexed { i, m -> path("measures[$i]", m.quality) } +
+                spec.groupBy.mapIndexed { i, g -> path("groupBy[$i]", g) } +
+                spec.conditions.map { c ->
+                    when (c) {
+                        is ErCondition.Member -> path(c.slot, c.concept)
+                        is ErCondition.Quality -> path(c.slot, c.concept)
+                    }
+                }
+        }
+
+        fun spec(): ErStatement {
+            if (s.hasCompare()) {
+                refuse(
+                    FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                    "compare",
+                    "a `compare` — not read on E-R either (a follow-up)",
+                )
+            }
+            val measures = s.measuresList.map(::concept)
+            val events = measures.map { grainEvent(it) }
+            val event =
+                events.distinct().singleOrNull()
+                    ?: refuse(
+                        FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                        "measures[1]",
+                        "the measures are qualities of different events — an E-R read is one event's rows",
+                    )
+            if (event == null) {
+                refuse(
+                    FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                    "measures[0]",
+                    "`${measures.first().ref}` is a quality of no event — an E-R read is an event's rows",
+                )
+            }
+            val phases = mutableListOf<Pair<Concept, Boolean>>()
+            val conditions = mutableListOf<ErCondition>()
+            val havings = mutableListOf<Triple<Int, String, String>>()
+
+            fun filter(
+                f: Filter,
+                slot: String,
+            ) {
+                when (f.formCase) {
+                    Filter.FormCase.MEMBER ->
+                        conditions += ErCondition.Member(concept(f.member.concept), f.member.member.resolvedValue, slot)
+                    Filter.FormCase.QUALITY -> {
+                        val q = f.quality
+                        val c = concept(q.quality)
+                        val op =
+                            SPELLING[q.op] ?: refuse(FrameSlugs.MALFORMED_FRAME, "$slot.quality.op", "no comparison")
+                        val i = measures.indexOfFirst { it.qname == c.qname }
+                        if (i >= 0) {
+                            havings +=
+                                Triple(
+                                    i,
+                                    op,
+                                    sqlLiteral(q.value, slot)
+                                        ?: refuse(
+                                            FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                                            "$slot.quality.value",
+                                            "a measure compared with null",
+                                        ),
+                                )
+                        } else {
+                            conditions += ErCondition.Quality(c, op, sqlLiteral(q.value, slot), slot)
+                        }
+                    }
+                    Filter.FormCase.PHASE -> phases += concept(f.phase.phase) to f.phase.negated
+                    Filter.FormCase.GROUP ->
+                        when (f.group.op) {
+                            BoolOp.ALL ->
+                                f.group.filtersList.forEachIndexed {
+                                    j,
+                                    x,
+                                    ->
+                                    filter(x, "$slot.group.filters[$j]")
+                                }
+                            else ->
+                                refuse(
+                                    FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                                    "$slot.group",
+                                    "an `${f.group.op.name}` group on E-R — a follow-up (the conjunction reads)",
+                                )
+                        }
+                    else ->
+                        refuse(
+                            FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                            "$slot.expr",
+                            "an expression filter (the E-2 hatch) on E-R — a follow-up",
+                        )
+                }
+            }
+            s.filtersList.forEachIndexed { i, f -> filter(f, "filters[$i]") }
+            return ErStatement(
+                event = event,
+                measures = measures.mapIndexed { i, m -> ErMeasure(m, aggregate(m, "measures[$i]")) },
+                phases = phases,
+                conditions = conditions,
+                groupBy = s.groupByList.map(::concept),
+                havings = havings,
+                time = time(),
+                orderBy =
+                    s.orderLimit.byList.map { k ->
+                        measures.indexOfFirst { it.qname.name == k.by.qname.removePrefix("cn.") } to k.descending
+                    },
+                limit = s.orderLimit.limit.takeIf { it > 0 },
+                asOf = { asOfDay },
+                values = parameterValues,
+            )
+        }
+
+        /** The measure's aggregate: its md measure's (`sum` when it names none); an E-R-only quality has none to read. */
+        fun aggregate(
+            q: Concept,
+            slot: String,
+        ): String {
+            val g = q.grounding
+            val name =
+                g
+                    ?.target
+                    ?.takeIf { g.layer == org.tatrman.ttr.metadata.model.GroundingLayer.MD }
+                    ?.substringAfterLast(
+                        '.',
+                    )
+            val measure =
+                name?.let {
+                    model.md
+                        ?.model
+                        ?.measures
+                        ?.get(it)
+                }
+                    ?: refuse(
+                        FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                        slot,
+                        "`${q.ref}` grounds no md measure — an E-R read takes its aggregate from one (an E-R-only measure is a follow-up)",
+                    )
+            return when (val fn = measure.aggregation?.default?.lowercase() ?: "sum") {
+                "sum", "avg", "min", "max", "count" -> fn.uppercase()
+                else ->
+                    refuse(
+                        FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                        slot,
+                        "`${q.ref}` aggregates by `$fn` — not a plain aggregate on E-R (a follow-up)",
+                    )
+            }
+        }
+
+        /** The statement's time as a half-open day range, or null for all time. */
+        fun time(): Pair<LocalDate, LocalDate>? {
+            val t = s.time
+            return when (t.specCase) {
+                TimeSpec.SpecCase.PERIOD_CODE -> {
+                    val code = t.periodCode
+                    val year = code.take(4).toInt()
+                    when {
+                        code.length == 4 -> LocalDate.of(year, 1, 1).let { it to it.plusYears(1) }
+                        'Q' in code ->
+                            LocalDate.of(year, 3 * code.substringAfter('Q').toInt() - 2, 1).let {
+                                it to
+                                    it.plusMonths(3)
+                            }
+                        else -> LocalDate.of(year, code.substring(5).toInt(), 1).let { it to it.plusMonths(1) }
+                    }
+                }
+                TimeSpec.SpecCase.RANGE -> day(t.range.from, "time.range.from") to day(t.range.to, "time.range.to")
+                TimeSpec.SpecCase.RELATIVE -> {
+                    val (amount, unit) = checkNotNull(FrameTime.relative(t.relative)) { "time.relative validated" }
+                    val lo =
+                        when (unit) {
+                            "days" -> asOfDay.minusDays(amount)
+                            "weeks" -> asOfDay.minusWeeks(amount)
+                            "months" -> asOfDay.minusMonths(amount)
+                            else ->
+                                refuse(
+                                    FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                                    "time.relative",
+                                    "a `$unit` window on E-R — a follow-up",
+                                )
+                        }
+                    lo to asOfDay.plusDays(1)
+                }
+                else -> null
+            }
+        }
+
+        fun day(
+            i: org.tatrman.concept.v1.Instant,
+            subject: String,
+        ): LocalDate {
+            if (i.granularity == Granularity.HOUR || i.granularity == Granularity.MINUTE) {
+                refuse(
+                    FrameSlugs.NOT_ANALYTICALLY_REACHABLE,
+                    subject,
+                    "the E-R read counts days — `${i.value}` is finer",
+                )
+            }
+            return FrameTime
+                .interval(i)
+                .getOrThrow()
+                .lo
+                .toLocalDate()
+        }
+
+        /** [v] spelled as an SQL literal; null for a null. */
+        fun sqlLiteral(
+            v: Value,
+            slot: String,
+        ): String? =
+            when {
+                v.isNull -> null
+                v.hasStringValue() -> "'" + v.stringValue.replace("'", "''") + "'"
+                v.hasIntValue() -> "${v.intValue}"
+                v.hasFloatValue() -> "${v.floatValue}"
+                v.hasBoolValue() -> if (v.boolValue) "TRUE" else "FALSE"
+                v.hasInstantValue() ->
+                    if (v.instantValue.granularity == Granularity.DAY) {
+                        "DATE '${v.instantValue.value}'"
+                    } else {
+                        "TIMESTAMP '${v.instantValue.value.replace('T', ' ')}'"
+                    }
+                else -> refuse(FrameSlugs.MALFORMED_FRAME, "$slot.quality.value", "a quality filter with no value")
+            }
+    }
+
+    /** The world's `def parameter` values as SQL literals — what a phase's `:name` reads on the er lane. */
+    private val parameterValues: Map<String, String> by lazy {
+        (model.model.schemas["automation"] as? org.tatrman.ttr.metadata.model.AutomationSchema)
+            ?.parameters
+            ?.mapNotNull { p ->
+                when (val v = p.value) {
+                    is org.tatrman.ttr.parser.model.AutoValue.Num -> p.qname.name to v.text
+                    is org.tatrman.ttr.parser.model.AutoValue.Bool -> p.qname.name to (if (v.raw) "TRUE" else "FALSE")
+                    is org.tatrman.ttr.parser.model.AutoValue.Str ->
+                        p.qname.name to
+                            ("'" + v.raw.replace("'", "''") + "'")
+                    else -> null
+                }
+            }?.toMap()
+            .orEmpty()
+    }
+
+    internal companion object {
+        /** The validator's findings that say md cannot reach a slot — the er lane may still read it (A-CN-101). */
+        val MD_REACH = setOf(FrameSlugs.NOT_ANALYTICALLY_REACHABLE, FrameSlugs.definitionUnreachable(Layer.MD))
+
+        private val OPS =
             mapOf(
                 ComparisonOp.EQ to "eq",
                 ComparisonOp.NEQ to "ne",
@@ -913,7 +1268,7 @@ internal class StatementLowerer(
                 ComparisonOp.GTE to "ge",
             )
 
-        val SPELLING =
+        private val SPELLING =
             mapOf(
                 ComparisonOp.EQ to "=",
                 ComparisonOp.NEQ to "<>",
@@ -923,10 +1278,10 @@ internal class StatementLowerer(
                 ComparisonOp.GTE to ">=",
             )
 
-        fun column(name: String): Expression =
+        private fun column(name: String): Expression =
             Expression.newBuilder().setColumnRef(ColumnRef.newBuilder().setName(name)).build()
 
-        fun call(
+        private fun call(
             op: String,
             vararg operands: Expression,
         ): Expression =
@@ -935,7 +1290,7 @@ internal class StatementLowerer(
                 .setFunction(FunctionCall.newBuilder().setOperation(op).addAllOperands(operands.toList()))
                 .build()
 
-        fun filter(
+        private fun filter(
             input: PlanNode,
             condition: Expression,
         ): PlanNode =

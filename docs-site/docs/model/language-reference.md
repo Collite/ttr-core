@@ -21,7 +21,7 @@ model   <code> [schema <id>]   // the layer this file defines
 def <kind> <name> { … }   // one or more definitions
 ```
 
-`<code>` is the layer: `db`, `er`, `binding` (er↔db and other mappings), `cnc`, `md`. Identifiers
+`<code>` is the layer: `db`, `er`, `binding` (er↔db and other mappings), `md`, `cn` (`cnc` is deprecated). Identifiers
 allow Latin-1/Extended letters, so real Czech names are valid verbatim.
 
 ## Definition kinds _(from grammar)_
@@ -31,7 +31,8 @@ allow Latin-1/Extended letters, so real Czech names are valid verbatim.
 | `db` | `table`, `column` (inline), `view`, `index`, `constraint`, `fk`, `procedure` |
 | `er` | `entity`, `attribute` (inline), `relation` |
 | `binding` | `er2db_entity`, `er2db_attribute`, `er2db_relation` |
-| `cnc` | `role`, `er2cnc_role` |
+| `cn` | `kind`, `role`, `event`, `quality`, `phase`, `relation_type`; grounded by `cn2md_*` / `cn2er_*` in `binding` |
+| `cnc` _(deprecated)_ | `role`, `er2cnc_role` |
 | `md` | `domain`, `dimension`, `hierarchy`, `measure`, `cubelet`, `map`, `md2db_*`, `md2er_*` |
 | structure | `package`, `import`, `area` (`packages:` / `entities:`), `graph`, `drill_map`, `query`, `world` |
 
@@ -214,13 +215,13 @@ shipped list rather than replacing it — but the eight predicates themselves ar
   bare `JOIN`s conditioned from the relations, no parameters), and an entity can be stacked on it
   (`binding: { target: { query: er.query.<name> } }`) — agents then ask over that entity.
 
-## Governance — roles, not a `security` block
+## Governance — policy, not a `security` block
 
 !!! warning "There is no `security {}` construct"
-    Governance in TTR-M is expressed through the **`cnc` layer** — `role` and `er2cnc_role`
-    definitions (fact/dimension roles and role bindings) — **not** a single `security` keyword. The
-    row-level filters and column masks are enforced downstream by the validator and reported in
-    `pipelineWarnings` on every governed answer. Model the roles; the platform enforces them.
+    Access policy is not part of the model text: row-level filters, column masks and the roles a
+    question requires live in the validator's store, versioned in git beside the model
+    ([Policy in git](../operate/policy-in-git.md)). The validator enforces them downstream and reports
+    what it applied in `pipelineWarnings` on every governed answer.
 
 ## Worlds and composition _(from grammar)_
 

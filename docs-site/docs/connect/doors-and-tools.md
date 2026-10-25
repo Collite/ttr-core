@@ -19,7 +19,7 @@ construction.
 | `query-mcp` | The governed query path | `query`, `compile` |
 | `lex-matcher-mcp` | Fuzzy candidate matching over searchable fields | `match` |
 | `grounding-mcp` | Deterministic grounding of universal spans | `ground_time`, `ground_geo`, `ground_money` |
-| `resolver` | Deterministic entity resolution against model vocabulary | `resolve.bind:v1` |
+| `resolver` | Deterministic entity resolution against model vocabulary, and frames over concepts | `resolve.bind:v1`; `statement.*`, `assertion.*`, `concept.search:v1`, `definition.render:v1` |
 
 The **two-call shape** most agents follow: *resolve and ground* the user's words into model
 vocabulary (`search` / `match` / `resolve.bind:v1` / `ground_*`), then express the intent as a
@@ -99,6 +99,15 @@ guarantees. Surface it to your user; do not swallow it.
   resolution). Its refusal discipline is the point: a below-threshold match becomes a clarifying
   question, never a fabricated binding. See [The identity contract](identity.md) for who the
   resolution runs as.
+- **The conceptual-model tools** — on the same door and behind the same identity gate.
+  `statement.validate:v1` · `statement.lower:v1` · `statement.explain:v1` take a statement frame over
+  concepts (measures, filters, grouping, a time) and check it, lower it to the md query it means, or
+  say it as a sentence. The three `assertion.*:v1` tools do the same for a recorded event.
+  `definition.render:v1` renders a defined concept (`cn.OverdueInvoice`) as SQL over entities or as an
+  md predicate, and `concept.search:v1` returns the concepts a span may mean. A refused frame is a
+  result carrying its `cn/*` findings, never a partial plan. The frame tools answer
+  `CN_MODEL_UNAVAILABLE` until the deployment mounts its model (the one its lexicon was compiled
+  from); `concept.search:v1` reads the vocabulary alone.
 
 ## Refusal modes
 

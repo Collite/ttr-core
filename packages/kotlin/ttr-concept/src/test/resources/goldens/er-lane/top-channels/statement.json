@@ -1,0 +1,28 @@
+{
+  "ask": "ASK_VALUE",
+  "measures": [
+    {
+      "qname": "cn.revenue"
+    }
+  ],
+  "groupBy": [
+    {
+      "qname": "cn.Channel"
+    }
+  ],
+  "time": {
+    "periodCode": "2026"
+  },
+  "orderLimit": {
+    "by": [
+      {
+        "by": {
+          "qname": "cn.revenue"
+        },
+        "descending": true
+      }
+    ],
+    "limit": 2
+  },
+  "locale": "en"
+}
