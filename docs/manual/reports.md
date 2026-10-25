@@ -188,8 +188,11 @@ saved-query passthroughs, and set operations whose every branch qualifies. Any o
 its time, including computed values and set operations with a constant or function branch. An explicit
 `CAST(... AS DATE)` also selects the date format. The rule reads the compiled query, so identity expressions
 the compiler folds away count as passthroughs. Other `QueryModelLookup` adapters must apply the same rule.
-Properties and ZIP records use the same determinism pass as fill.
-The same inputs produce the same YAML and XLSX bytes; locale-map insertion order does not affect them.
+The display rule is conservative: if the compiler replaces an empty filtered result with a value-only plan, or a
+set operation includes a literal NULL branch, source-date precision is not recovered and the timestamp format remains.
+
+Properties and ZIP records use the same determinism pass as fill. The same inputs produce the same YAML and XLSX
+bytes; locale-map insertion order does not affect them.
 
 ER queries with declared parameters refuse with `query-has-parameters` (LQ-5). DB query declarations
 become required parameters: text/string/varchar → `text`, integer types → `int`, decimal/float types →

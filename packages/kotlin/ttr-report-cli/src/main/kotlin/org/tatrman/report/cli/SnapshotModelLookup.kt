@@ -27,6 +27,7 @@ import org.apache.calcite.rel.core.TableScan as RelTableScan
 import org.apache.calcite.rex.RexInputRef
 import org.apache.calcite.sql.SqlKind
 import org.apache.calcite.sql.type.SqlTypeName
+import java.util.EnumSet
 
 /** Captures one non-strict metadata snapshot. Only compilation is used, never execution or a server. */
 class SnapshotModelLookup(
@@ -97,7 +98,7 @@ class SnapshotModelLookup(
                     dateOnly(rel.input, keys[index])
                 } else {
                     val call = rel.aggCallList[index - keys.size]
-                    call.aggregation.kind in setOf(SqlKind.MIN, SqlKind.MAX, SqlKind.ANY_VALUE) &&
+                    call.aggregation.kind in dateAggregates &&
                         call.argList.size == 1 &&
                         dateOnly(rel.input, call.argList[0])
                 }
@@ -105,6 +106,10 @@ class SnapshotModelLookup(
             is RelSetOp -> rel.inputs.all { dateOnly(it, index) }
             else -> false
         }
+
+    private companion object {
+        val dateAggregates: Set<SqlKind> = EnumSet.of(SqlKind.MIN, SqlKind.MAX)
+    }
 
     override fun declaredParameters(qname: String): List<QueryParameter> =
         query(qname)?.parameters?.map { QueryParameter(it.name, it.type) }

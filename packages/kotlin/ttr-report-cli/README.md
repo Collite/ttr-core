@@ -15,3 +15,8 @@ Tracking: [SO-core](../../../../project/platform/features/studio/implementation/
 `new --title-lang LANG=title` supports additional languages. Explicit output folders must match `--id`.
 Generated numeric query outputs remain numeric Excel cells; text identifiers retain leading zeroes.
 Shared program results are reused across sheets; offline CSV inputs remain scoped by anchor.
+
+Run `./gradlew :packages:kotlin:ttr-report-cli:test` for unit tests. The shipped-jar logging and
+fresh-process checks run separately with `:packages:kotlin:ttr-report-cli:distTest`, which builds
+`installDist` and is included in `check`/`build`. The process test invokes Java against `<dist>/lib/*`
+on all platforms. IDE runners can supply `-Dttr.report.dist=<installDist directory>` for that spec.

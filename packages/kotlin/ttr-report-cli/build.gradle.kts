@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
+import org.gradle.process.CommandLineArgumentProvider
+
 plugins {
     base
     alias(libs.plugins.kotlin.jvm)
@@ -20,13 +22,43 @@ application {
 
 tasks.jar { archiveBaseName.set("ttr-report-cli") }
 
-val installedDistribution = tasks.named<Sync>("installDist")
 tasks.test {
     useJUnitPlatform()
-    dependsOn(installedDistribution)
-    inputs.dir(installedDistribution.map { it.destinationDir })
-    systemProperty("ttr.report.dist", installedDistribution.get().destinationDir.absolutePath)
 }
+
+val distTestSourceSet =
+    sourceSets.create("distTest") {
+        compileClasspath += sourceSets["main"].output
+        runtimeClasspath += sourceSets["main"].output
+        resources.srcDir("src/test/resources")
+    }
+configurations["distTestImplementation"].extendsFrom(configurations["testImplementation"])
+configurations["distTestRuntimeOnly"].extendsFrom(configurations["testRuntimeOnly"])
+
+abstract class ReportDistributionArguments : CommandLineArgumentProvider {
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val distribution: DirectoryProperty
+
+    override fun asArguments(): Iterable<String> = listOf("-Dttr.report.dist=${distribution.get().asFile.absolutePath}")
+}
+
+val installedDistribution = tasks.named<Sync>("installDist")
+val distTest by tasks.registering(Test::class) {
+    description = "Checks the shipped report CLI jars in fresh JVMs."
+    group = "verification"
+    testClassesDirs = distTestSourceSet.output.classesDirs
+    classpath = distTestSourceSet.runtimeClasspath
+    useJUnitPlatform()
+    dependsOn(installedDistribution)
+    shouldRunAfter(tasks.test)
+    jvmArgumentProviders.add(
+        objects.newInstance<ReportDistributionArguments>().apply {
+            distribution.set(layout.dir(installedDistribution.map { it.destinationDir }))
+        },
+    )
+}
+tasks.check { dependsOn(distTest) }
 
 dependencies {
     implementation(project(":packages:kotlin:ttr-metadata"))

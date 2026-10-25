@@ -55,6 +55,12 @@ class DateColumnSpec :
                         def query grouped {
                             sourceText: "SELECT shipped AS shipped_on, MAX(shipped) AS latest FROM $subject GROUP BY shipped"
                         }
+                        def query semi { sourceText: "SELECT a.shipped, a.recorded FROM $subject a WHERE EXISTS (SELECT 1 FROM $subject b WHERE a.recorded = b.recorded)" }
+                        def query anti { sourceText: "SELECT a.shipped, a.recorded FROM $subject a WHERE NOT EXISTS (SELECT 1 FROM $subject b WHERE a.recorded = b.recorded)" }
+                        def query multi_keys { sourceText: "SELECT recorded, shipped, COUNT(*) AS n FROM $subject GROUP BY shipped, recorded" }
+                        def query join_grouped { sourceText: "SELECT a.recorded, b.founded, MAX(a.shipped) AS latest, COUNT(*) AS n FROM $subject a LEFT JOIN $subject b ON a.recorded = b.recorded GROUP BY b.founded, a.recorded" }
+                        def query empty_plan { sourceText: "SELECT shipped FROM $subject WHERE 1 = 0" }
+                        def query null_union { sourceText: "SELECT shipped AS d FROM $subject UNION ALL SELECT NULL AS d FROM $subject" }
                         def query left_side { sourceText: "SELECT a.shipped AS a, b.shipped AS b FROM $subject a LEFT JOIN $subject b ON a.recorded = b.recorded" }
                         def query union_now { sourceText: "SELECT shipped AS d FROM $subject UNION ALL SELECT CURRENT_TIMESTAMP AS d FROM $subject" }
                         def query union_lit { sourceText: "SELECT shipped AS d FROM $subject UNION ALL SELECT CAST('2026-10-01 14:37:12' AS TIMESTAMP) AS d FROM $subject" }
@@ -89,6 +95,16 @@ class DateColumnSpec :
                     lookup.outputTypes("$lane.query.minmax") shouldBe
                         mapOf("lo" to "DATE", "hi" to "DATE", "n" to "BIGINT")
                     lookup.outputTypes("$lane.query.sub") shouldBe mapOf("shipped" to "DATE")
+                    lookup.outputTypes("$lane.query.semi") shouldBe
+                        mapOf("shipped" to "DATE", "recorded" to "TIMESTAMP")
+                    lookup.outputTypes("$lane.query.anti") shouldBe
+                        mapOf("shipped" to "DATE", "recorded" to "TIMESTAMP")
+                    lookup.outputTypes("$lane.query.multi_keys") shouldBe
+                        mapOf("recorded" to "TIMESTAMP", "shipped" to "DATE", "n" to "BIGINT")
+                    lookup.outputTypes("$lane.query.join_grouped") shouldBe
+                        mapOf("recorded" to "TIMESTAMP", "founded" to "DATE", "latest" to "DATE", "n" to "BIGINT")
+                    lookup.outputTypes("$lane.query.empty_plan") shouldBe mapOf("shipped" to "TIMESTAMP")
+                    lookup.outputTypes("$lane.query.null_union") shouldBe mapOf("d" to "TIMESTAMP")
                     val timed =
                         runReportCommand(
                             listOf(
