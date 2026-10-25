@@ -128,7 +128,7 @@ class RecipeAuthoringContextSpec :
             val grammar = bundle.getAsJsonObject("recipeGrammar")
             grammar.get("statementSummary").asString shouldContain "switch"
             grammar.getAsJsonArray("diagnostics").map { it.asJsonObject.get("id").asString } shouldContainAll
-                listOf("TTRP-REC-000", "TTRP-REC-001", "TTRP-REC-010", "TTRP-REC-050")
+                listOf("TTRP-REC-000", "TTRP-REC-001", "TTRP-REC-006", "TTRP-REC-007", "TTRP-REC-010", "TTRP-REC-050")
         }
 
         "no cursor, or a cursor outside the recipe: no `recipe` section" {

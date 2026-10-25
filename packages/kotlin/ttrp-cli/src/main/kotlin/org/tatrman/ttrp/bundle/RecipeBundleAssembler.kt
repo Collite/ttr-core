@@ -138,7 +138,8 @@ class RecipeBundleAssembler(
             }
 
         // --- the recipe object: fingerprints, the verdict schema, the generated catalog ---
-        val fingerprints = RecipeFingerprints.of(plan, model, model.protocol, model.asOf)
+        val captured = RecipeFingerprints.capture(plan, model, model.protocol, model.asOf)
+        val fingerprints = captured.fingerprints
         val keyTypes = keyTypes(model, statements)
         val verdictColumns =
             listOf(OutputColumn("run", "text"), OutputColumn("as_of", "timestamp")) +
@@ -272,6 +273,7 @@ class RecipeBundleAssembler(
                 protocol = model.protocol,
                 parts = parts.ifEmpty { null },
                 tests = tests.ifEmpty { null },
+                approvalDependencies = captured.approvalDependencies,
             )
 
         val readme =

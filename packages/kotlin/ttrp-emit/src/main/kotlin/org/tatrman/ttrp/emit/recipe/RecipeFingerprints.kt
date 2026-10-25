@@ -2,6 +2,7 @@
 package org.tatrman.ttrp.emit.recipe
 
 import org.tatrman.ttrp.bundle.RecipeFingerprints
+import org.tatrman.ttrp.bundle.RecipeApprovalDependencies
 import org.tatrman.ttrp.expr.Literal
 import org.tatrman.ttrp.expr.LiteralValue
 import org.tatrman.ttrp.graph.TtrpPipeline
@@ -31,14 +32,58 @@ import java.security.MessageDigest
  *
  * Every field is escaped (review-119 m7): `\` → `\\`, and tab, newline, `|`, `,`, `=` as `\t`, `\n`, `\|`, `\,`,
  * `\=` — no two different recipes write the same bytes. Each is spelled `sha256:<64 hex>`.
+ * Recipes with directly wired writer defaults use [RecipeActionDependencies]' versioned text/2 binding
+ * over this unchanged text/1 base. Values and labels retain their existing byte recipes.
  */
 object RecipeFingerprints {
+    data class Result(
+        val fingerprints: RecipeFingerprints,
+        val approvalDependencies: RecipeApprovalDependencies?,
+    )
+
     fun of(
         plan: TtrpPipeline.PlanResult,
         model: RecipeModel,
         protocol: String,
         asOf: String,
-    ): RecipeFingerprints {
+    ): RecipeFingerprints = capture(plan, model, protocol, asOf).fingerprints
+
+    /** Compute the digest and the exact evidence serialized beside it once, from the same metadata snapshot. */
+    fun capture(
+        plan: TtrpPipeline.PlanResult,
+        model: RecipeModel,
+        protocol: String,
+        asOf: String,
+    ): Result {
+        val base = legacyText(plan, model, protocol, asOf)
+        val values = StringBuilder("ttrp-recipe-values/1\n")
+        model.parameterDecls.sortedBy { it.name }.forEach { p ->
+            values.append("${esc(p.name)}\t${esc(p.type ?: "")}\t${esc(p.value ?: "")}\n")
+        }
+        val labels = StringBuilder("ttrp-recipe-labels/1\n")
+        model.routes.sortedBy { it.name }.forEach { r -> labels.append("${esc(r.name)}\t${esc(r.because ?: "")}\n") }
+        model.dryRuns.toSortedMap().forEach { (action, texts) ->
+            val byLang = texts.toSortedMap().entries.joinToString(",") { "${esc(it.key)}=${esc(it.value)}" }
+            labels.append("${esc(action)}\t$byLang\n")
+        }
+        val dependencies = RecipeActionDependencies.of(plan, model, base)
+        return Result(
+            RecipeFingerprints(
+                dependencies?.let(RecipeActionDependencies::text) ?: base,
+                sha256(values),
+                sha256(labels),
+            ),
+            dependencies,
+        )
+    }
+
+    /** Frozen text/1 digest; do not change these bytes when adding approval dependencies. */
+    fun legacyText(
+        plan: TtrpPipeline.PlanResult,
+        model: RecipeModel,
+        protocol: String,
+        asOf: String,
+    ): String {
         val masked = masked(requireNotNull(plan.graph), model.reasonNodes)
         val text = StringBuilder("ttrp-recipe-text/1\n")
         text.append(NormalizedGraphJson.write(masked)).append('\n')
@@ -72,17 +117,7 @@ object RecipeFingerprints {
         }
         sqlFiles.toSortedMap().forEach { (file, sql) -> text.append("$file\n$sql\n") }
 
-        val values = StringBuilder("ttrp-recipe-values/1\n")
-        model.parameterDecls.sortedBy { it.name }.forEach { p ->
-            values.append("${esc(p.name)}\t${esc(p.type ?: "")}\t${esc(p.value ?: "")}\n")
-        }
-        val labels = StringBuilder("ttrp-recipe-labels/1\n")
-        model.routes.sortedBy { it.name }.forEach { r -> labels.append("${esc(r.name)}\t${esc(r.because ?: "")}\n") }
-        model.dryRuns.toSortedMap().forEach { (action, texts) ->
-            val byLang = texts.toSortedMap().entries.joinToString(",") { "${esc(it.key)}=${esc(it.value)}" }
-            labels.append("${esc(action)}\t$byLang\n")
-        }
-        return RecipeFingerprints(sha256(text), sha256(values), sha256(labels))
+        return sha256(text)
     }
 
     /** A byte-recipe field: `\\`, tab, newline and the separators `|`, `,`, `=` escaped. */

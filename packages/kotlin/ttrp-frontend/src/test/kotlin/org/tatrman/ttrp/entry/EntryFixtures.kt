@@ -18,7 +18,7 @@ object EntryFixtures {
     fun modelsRoot(): Path = Paths.get(EntryFixtures::class.java.getResource("/entry/models")!!.toURI())
 
     /** A [ModelIndex] over the fixture model. */
-    fun modelIndex(): ModelIndex = ModelIndex(ModelRepo.snapshotOf(modelsRoot())!!)
+    fun modelIndex(): ModelIndex = ModelRepo.indexOf(modelsRoot())!!
 
     /** The resolved [DbTable] with simple name [name] (fixture models are all in package `entry`). */
     fun table(name: String): DbTable =
