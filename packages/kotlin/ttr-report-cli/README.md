@@ -15,3 +15,19 @@ Tracking: [SO-core](../../../../project/platform/features/studio/implementation/
 `new --title-lang LANG=title` supports additional languages. Explicit output folders must match `--id`.
 Generated numeric query outputs remain numeric Excel cells; text identifiers retain leading zeroes.
 Shared program results are reused across sheets; offline CSV inputs remain scoped by anchor.
+
+Run `./gradlew :packages:kotlin:ttr-report-cli:test` for unit tests. The shipped-jar logging and
+fresh-process checks run separately with `:packages:kotlin:ttr-report-cli:distTest`, which builds
+`installDist` and is included in `check`/`build`. The process test invokes Java against `<dist>/lib/*`
+on all platforms, using the main class and default JVM arguments from `application {}`.
+`just test-report` runs both report suites and these distribution checks; ordinary `just test` stays a unit gate.
+
+The distribution spec has no shared test-resource root. For an IDE runner, build `installDist` and supply these VM options:
+
+- `-Dttr.report.dist=<installDist directory>`
+- `-Dttr.report.world=<module>/src/test/resources/worlds/reports`
+- `-Dttr.report.main=org.tatrman.report.cli.MainKt` (the configured application main class)
+- `-Dttr.report.jvmArgs=[]` (the configured default JVM arguments as a JSON array)
+
+Only `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS` and `JDK_JAVA_OPTIONS` are removed from the child JVM's environment.
+The direct Java invocation does not read the start script's `JAVA_HOME`, `JAVA_OPTS` or `TTR_REPORT_OPTS` settings.

@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
+import org.gradle.process.CommandLineArgumentProvider
+import groovy.json.JsonOutput
+
 plugins {
     base
     alias(libs.plugins.kotlin.jvm)
@@ -20,13 +23,61 @@ application {
 
 tasks.jar { archiveBaseName.set("ttr-report-cli") }
 
-val installedDistribution = tasks.named<Sync>("installDist")
 tasks.test {
     useJUnitPlatform()
-    dependsOn(installedDistribution)
-    inputs.dir(installedDistribution.map { it.destinationDir })
-    systemProperty("ttr.report.dist", installedDistribution.get().destinationDir.absolutePath)
 }
+
+val distTestSourceSet =
+    sourceSets.create("distTest") {
+        compileClasspath += sourceSets["main"].output
+        runtimeClasspath += sourceSets["main"].output
+    }
+configurations["distTestImplementation"].extendsFrom(configurations["testImplementation"])
+configurations["distTestRuntimeOnly"].extendsFrom(configurations["testRuntimeOnly"])
+
+abstract class ReportDistributionArguments : CommandLineArgumentProvider {
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val distribution: DirectoryProperty
+
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val world: DirectoryProperty
+
+    @get:Input
+    abstract val mainClass: Property<String>
+
+    @get:Input
+    abstract val defaultJvmArgs: ListProperty<String>
+
+    override fun asArguments(): Iterable<String> =
+        listOf(
+            "-Dttr.report.dist=${distribution.get().asFile.absolutePath}",
+            "-Dttr.report.world=${world.get().asFile.absolutePath}",
+            "-Dttr.report.main=${mainClass.get()}",
+            "-Dttr.report.jvmArgs=${JsonOutput.toJson(defaultJvmArgs.get())}",
+        )
+}
+
+val installedDistribution = tasks.named<Sync>("installDist")
+val distTest by tasks.registering(Test::class) {
+    description = "Checks the shipped report CLI jars in fresh JVMs."
+    group = "verification"
+    testClassesDirs = distTestSourceSet.output.classesDirs
+    classpath = distTestSourceSet.runtimeClasspath
+    useJUnitPlatform()
+    dependsOn(installedDistribution)
+    shouldRunAfter(tasks.test)
+    jvmArgumentProviders.add(
+        objects.newInstance<ReportDistributionArguments>().apply {
+            distribution.set(layout.dir(installedDistribution.map { it.destinationDir }))
+            world.set(layout.projectDirectory.dir("src/test/resources/worlds/reports"))
+            mainClass.set(application.mainClass)
+            defaultJvmArgs.set(providers.provider { application.applicationDefaultJvmArgs.toList() })
+        },
+    )
+}
+tasks.check { dependsOn(distTest) }
 
 dependencies {
     implementation(project(":packages:kotlin:ttr-metadata"))
@@ -39,6 +90,7 @@ dependencies {
     runtimeOnly(libs.log4j.to.slf4j)
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.apache.poi.ooxml)
+    add("distTestImplementation", libs.kotlinx.ser.json)
 }
 
 // SO P2 — rides the `bundle grammar` lockstep lane with the modules it calls. The lane
