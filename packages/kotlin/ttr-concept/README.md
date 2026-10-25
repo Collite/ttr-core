@@ -121,11 +121,15 @@ the repo root). The manual's chapter 20 has the first two.
 `Statement[<entity>]` (one extracted assertion: `spans`, `verbatim`, `concept`, `attributes`, `modifiers`,
 `confidence`) and `Record.<entity>` (the consolidated, gold-feeding shape: `attributes`, `modifiers`, `evidence` with
 roles, `history`, `conflicts`, `consolidationRun`) — from the model, never by hand. Attributes are typed from the er
-(keys excluded; a single-column relation join becomes a `Ref`; a closed vocabulary an `enum`, a data-backed one
-`x-ttr-vocabulary`); `modifiers` are the attributes behind the grounded concept's qualities tagged
-`tags: ["modifier"]`. `TypeRegistryRenderer.renderPack` writes `types/generated/Statement.<e>.schema.json`,
-`Record.<e>.schema.json` and an `index.json` (each file's sha256, the model snapshot hash). Pure, deterministic,
-canonical JSON (`SchemaJson.canonical` = `json.dumps(sort_keys=True, indent=2)`). Designed in the DX effort
+(keys excluded; a decimal's scale as `x-ttr-scale`, not `multipleOf`; a single-column relation join — a `join:` pair,
+or an fk-only relation's FK read through the `er2db` bindings — becomes a `Ref`; a closed vocabulary an `enum`, a
+data-backed one `x-ttr-vocabulary`); `modifiers` are the attributes behind the grounded concept's qualities tagged
+`tags: ["modifier"]`, its own or inherited, that land on the entity. Entities are named `review` or
+`er.entity.review`; the identities are bare, so a name two entities share is refused. `TypeRegistryRenderer.renderPack`
+writes `types/generated/Statement.<e>.schema.json`, `Record.<e>.schema.json` and an `index.json` (each file's sha256,
+and the model's content hash — `cli.ModelContentHash.of(<model root>)`, the same on every clone). Pure,
+deterministic, canonical JSON (`SchemaJson.canonical` = `json.dumps(sort_keys=True, indent=2)`: keys in code-point
+order, no exponent numerals; `src/test/resources/canonical.sample.json` pins the bytes). Designed in the DX effort
 (`project/kantheon/features/hermes/`, outside this repo); goldens in `src/test/resources/worlds/hartland-dx/expected/`.
 
 **Law order.** This module implements `project/tatrman/features/conceptual/` (outside this repo): `design/design.md`

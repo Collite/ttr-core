@@ -140,9 +140,9 @@
           "x-ttr-references": "er.entity.item"
         },
         "price_paid": {
-          "multipleOf": 0.01,
           "type": "number",
-          "x-ttr-attribute": "er.entity.review.price_paid"
+          "x-ttr-attribute": "er.entity.review.price_paid",
+          "x-ttr-scale": 2
         },
         "rating": {
           "description": "Stars, 1 to 5.",

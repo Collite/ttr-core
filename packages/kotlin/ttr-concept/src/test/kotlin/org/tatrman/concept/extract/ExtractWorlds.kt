@@ -21,13 +21,25 @@ internal object ExtractWorlds {
     }
 
     /** A world written from [files] (path → model text) into a fresh temp dir. */
-    fun of(files: Map<String, String>): ResolvedCnModel {
+    fun of(files: Map<String, String>): ResolvedCnModel = model(write(files))
+
+    /** [files] (path → model text) written into a fresh temp dir — its root. */
+    fun write(files: Map<String, String>): Path {
         val root = Files.createTempDirectory("extract-world")
         for ((rel, text) in files) {
             val p = root.resolve(rel)
             Files.createDirectories(p.parent)
             Files.writeString(p, text)
         }
-        return model(root)
+        return root
+    }
+
+    /** A copy of the slice world's model files (not its `expected/`) under a fresh temp dir — its root. */
+    fun copy(): Path {
+        val root = Files.createTempDirectory("extract-copy")
+        Files.list(dir).use { s -> s.filter { it.fileName.toString().endsWith(".ttrm") }.toList() }.forEach {
+            Files.copy(it, root.resolve(it.fileName.toString()))
+        }
+        return root
     }
 }

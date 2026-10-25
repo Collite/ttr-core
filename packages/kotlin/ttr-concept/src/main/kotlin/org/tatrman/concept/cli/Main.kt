@@ -223,8 +223,11 @@ class CnMaterializeCommand : CliktCommand(name = "materialize") {
 /**
  * `ttr cn render-types --model <dir> --entities review,claim --out <pack-dir>` (DX-P0 S0.3; ⚑DX-P-2) — render the
  * extraction pack's model-generated annotation types from the model: per entity `Statement.<e>.schema.json` and
- * `Record.<e>.schema.json`, plus `index.json` (each file's sha256, the model snapshot hash), all under
- * `<pack-dir>/types/generated/`, in the canonical JSON form (two runs write identical bytes).
+ * `Record.<e>.schema.json`, plus `index.json` (each file's sha256, and the model's content hash — [ModelContentHash]
+ * of `--model`, ⚑R158-A), all under `<pack-dir>/types/generated/`, in the canonical JSON form (two runs write identical
+ * bytes, from any clone of the model). An entity named twice is rendered once. A `*.schema.json` in
+ * `types/generated/` the new index does not list (an entity dropped from `--entities`) is deleted first, so a loader
+ * globbing the directory sees only what the index vouches for; nothing else under `--out` is touched.
  *
  * Exit: 0 — written · 2 — usage, the model could not be read (or read only in part), or an entity is unknown or cannot
  * be rendered (named on stderr, nothing written).
@@ -256,12 +259,28 @@ class CnRenderTypesCommand : CliktCommand(name = "render-types") {
         }
         val files =
             try {
-                TypeRegistryRenderer.renderPack(ResolvedCnModel.of(model), names)
+                TypeRegistryRenderer.renderPack(ResolvedCnModel.of(model), names, ModelContentHash.of(root))
             } catch (e: SchemaRenderException) {
                 echo("ttr cn render-types: ${e.slug}: ${e.message}", err = true)
                 throw ProgramResult(2)
             }
         val target = Path.of(out).toAbsolutePath().normalize()
+        val generated = target.resolve(TypeRegistryRenderer.DIR)
+        if (Files.isDirectory(generated)) {
+            val listed = files.keys.map { target.resolve(it).normalize() }.toSet()
+            val stale =
+                Files.list(generated).use { s ->
+                    s
+                        .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".schema.json") }
+                        .filter { it.normalize() !in listed }
+                        .sorted()
+                        .toList()
+                }
+            for (file in stale) {
+                Files.delete(file)
+                echo("ttr cn render-types: removed $file (not in the index)")
+            }
+        }
         for ((path, json) in files) {
             val file = target.resolve(path)
             Files.createDirectories(file.parent)
