@@ -16,7 +16,16 @@ import org.tatrman.plan.v1.PlanNode
 import org.tatrman.plan.v1.QualifiedName as WireName
 import org.tatrman.plan.v1.SchemaCode as WireSchema
 import org.tatrman.translate.v1.Language
-import org.apache.calcite.rel.metadata.RelColumnOrigin
+import org.apache.calcite.rel.RelNode
+import org.apache.calcite.rel.core.Aggregate as RelAggregate
+import org.apache.calcite.rel.core.Filter as RelFilter
+import org.apache.calcite.rel.core.Join as RelJoin
+import org.apache.calcite.rel.core.Project as RelProject
+import org.apache.calcite.rel.core.SetOp as RelSetOp
+import org.apache.calcite.rel.core.Sort as RelSort
+import org.apache.calcite.rel.core.TableScan as RelTableScan
+import org.apache.calcite.rex.RexInputRef
+import org.apache.calcite.sql.SqlKind
 import org.apache.calcite.sql.type.SqlTypeName
 
 /** Captures one non-strict metadata snapshot. Only compilation is used, never execution or a server. */
@@ -26,7 +35,7 @@ class SnapshotModelLookup(
     private val handles = mutableMapOf<SchemaCode, SnapshotQueryHandle>()
 
     // SurfaceType folds date into datetime. Recover display precision only for unchanged columns.
-    private val dateColumns =
+    private val dateColumns by lazy {
         model.schemas.values
             .asSequence()
             .flatMap { it.objects() }
@@ -37,9 +46,10 @@ class SnapshotModelLookup(
                         is DbColumn -> obj.dataType
                         else -> null
                     }
-                obj.qname.takeIf { type?.trim()?.equals("date", ignoreCase = true) == true }
+                obj.qname.takeIf { type != null && ReportTypes.isDate(type) }
             }.map { Triple(schemaCodeToToken(it.schemaCode), it.namespace, it.name) }
             .toSet()
+    }
 
     private fun handle(query: Query) =
         handles.getOrPut(query.qname.schemaCode) {
@@ -59,31 +69,42 @@ class SnapshotModelLookup(
         return rel.rowType.fieldList
             .mapIndexed { index, field ->
                 val type = field.type.sqlTypeName
-                val displayType =
-                    if (type == SqlTypeName.TIMESTAMP &&
-                        declaredDate(
-                            rel.cluster.metadataQuery
-                                .getColumnOrigins(rel, index)
-                                ?.singleOrNull(),
-                        )
-                    ) {
-                        SqlTypeName.DATE
-                    } else {
-                        type
-                    }
+                val displayType = if (type == SqlTypeName.TIMESTAMP && dateOnly(rel, index)) SqlTypeName.DATE else type
                 field.name to displayType.name
             }.toMap()
     }
 
-    private fun declaredDate(origin: RelColumnOrigin?): Boolean {
-        if (origin == null || origin.isDerived) return false
-        val path = origin.originTable.qualifiedName
-        if (path.size != 3) return false
-        val column =
-            origin.originTable.rowType.fieldList[origin.originColumnOrdinal]
-                .name
-        return Triple(path[0], path[1], "${path[2]}.$column") in dateColumns
-    }
+    // Every value of the output comes unchanged from a declared date column.
+    private fun dateOnly(
+        rel: RelNode,
+        index: Int,
+    ): Boolean =
+        when (rel) {
+            is RelTableScan -> {
+                val path = rel.table?.qualifiedName.orEmpty()
+                path.size == 3 &&
+                    Triple(path[0], path[1], "${path[2]}.${rel.rowType.fieldList[index].name}") in dateColumns
+            }
+            is RelProject -> rel.projects[index].let { it is RexInputRef && dateOnly(rel.input, it.index) }
+            is RelFilter, is RelSort -> dateOnly(rel.getInput(0), index)
+            is RelJoin -> {
+                val left = rel.left.rowType.fieldCount
+                if (index < left) dateOnly(rel.left, index) else dateOnly(rel.right, index - left)
+            }
+            is RelAggregate -> {
+                val keys = rel.groupSet.asList()
+                if (index < keys.size) {
+                    dateOnly(rel.input, keys[index])
+                } else {
+                    val call = rel.aggCallList[index - keys.size]
+                    call.aggregation.kind in setOf(SqlKind.MIN, SqlKind.MAX, SqlKind.ANY_VALUE) &&
+                        call.argList.size == 1 &&
+                        dateOnly(rel.input, call.argList[0])
+                }
+            }
+            is RelSetOp -> rel.inputs.all { dateOnly(it, index) }
+            else -> false
+        }
 
     override fun declaredParameters(qname: String): List<QueryParameter> =
         query(qname)?.parameters?.map { QueryParameter(it.name, it.type) }

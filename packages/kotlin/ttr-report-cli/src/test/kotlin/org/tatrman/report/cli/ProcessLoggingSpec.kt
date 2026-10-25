@@ -12,6 +12,22 @@ import java.util.concurrent.TimeUnit
 /** runReportCommand returns coded diagnostics, but cannot capture third-party process stderr. */
 class ProcessLoggingSpec :
     StringSpec({
+        val distribution = Path.of(requireNotNull(System.getProperty("ttr.report.dist")))
+
+        "shipped logging bridge matches the API and uses only the existing NOP backend" {
+            val jars =
+                Files.list(distribution.resolve("lib")).use { paths ->
+                    paths.map { it.fileName.toString() }.toList()
+                }
+            val api = jars.single { it.startsWith("log4j-api-") }
+            val version = api.removePrefix("log4j-api-").removeSuffix(".jar")
+            jars.filter { it.startsWith("log4j-") }.sorted() shouldBe
+                listOf(api, "log4j-to-slf4j-$version.jar").sorted()
+            jars.filter { it.startsWith("slf4j-") }.map { it.substringBeforeLast('-') }.sorted() shouldBe
+                listOf("slf4j-api", "slf4j-nop")
+            jars.none { it.startsWith("logback-") } shouldBe true
+        }
+
         "fresh CLI processes generate and render quietly while refusals remain visible" {
             val world = Path.of(requireNotNull(javaClass.getResource("/worlds/reports/modeler.toml")).toURI()).parent
             val root = Files.createTempDirectory("report-process")
@@ -21,13 +37,21 @@ class ProcessLoggingSpec :
                 val stderr = root.resolve("stderr.txt")
                 val process =
                     ProcessBuilder(
-                        listOf(
-                            Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                            "-cp",
-                            System.getProperty("java.class.path"),
-                            "org.tatrman.report.cli.MainKt",
-                        ) + args,
-                    ).redirectOutput(stdout.toFile()).redirectError(stderr.toFile()).start()
+                        listOf(distribution.resolve("bin/ttr-report").toString()) + args,
+                    ).apply {
+                        environment()["JAVA_HOME"] = System.getProperty("java.home")
+                        for (key in listOf(
+                            "JAVA_TOOL_OPTIONS",
+                            "_JAVA_OPTIONS",
+                            "JDK_JAVA_OPTIONS",
+                            "JAVA_OPTS",
+                            "TTR_REPORT_OPTS",
+                        )) {
+                            environment().remove(key)
+                        }
+                    }.redirectOutput(stdout.toFile())
+                        .redirectError(stderr.toFile())
+                        .start()
                 try {
                     process.waitFor(60, TimeUnit.SECONDS) shouldBe true
                     return CliOutcome(process.exitValue(), Files.readString(stdout), Files.readString(stderr))

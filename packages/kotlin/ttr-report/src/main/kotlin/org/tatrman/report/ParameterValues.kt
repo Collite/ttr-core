@@ -6,8 +6,12 @@ import java.util.Locale
 
 /** Source spelling classification shared by generation and the CLI's compiler adapter. */
 object ReportTypes {
+    private fun normalized(type: String): String = type.substringBefore('(').trim().lowercase(Locale.ROOT)
+
+    fun isDate(type: String): Boolean = normalized(type) == "date"
+
     fun kind(type: String): ParamKind? =
-        when (type.substringBefore('(').trim().lowercase(Locale.ROOT)) {
+        when (normalized(type)) {
             "text", "string", "varchar", "nvarchar", "char", "nchar", "clob", "uuid", "time" -> ParamKind.TEXT
             "int", "integer", "bigint", "smallint", "tinyint", "long" -> ParamKind.INT
             "float", "double", "real", "decimal", "numeric", "number", "money" -> ParamKind.FLOAT

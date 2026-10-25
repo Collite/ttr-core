@@ -13,16 +13,20 @@ kotlin {
     jvmToolchain(21)
 }
 
-tasks.test {
-    useJUnitPlatform()
-}
-
 application {
     mainClass = "org.tatrman.report.cli.MainKt"
     applicationName = "ttr-report"
 }
 
 tasks.jar { archiveBaseName.set("ttr-report-cli") }
+
+val installedDistribution = tasks.named<Sync>("installDist")
+tasks.test {
+    useJUnitPlatform()
+    dependsOn(installedDistribution)
+    inputs.dir(installedDistribution.map { it.destinationDir })
+    systemProperty("ttr.report.dist", installedDistribution.get().destinationDir.absolutePath)
+}
 
 dependencies {
     implementation(project(":packages:kotlin:ttr-metadata"))

@@ -25,6 +25,7 @@ class DateColumnSpec :
                             def entity shipment {
                                 attributes: [
                                     def attribute shipped { type: date, optional: true }
+                                    def attribute founded { type: date, optional: true }
                                     def attribute recorded { type: datetime, optional: true }
                                 ]
                             }
@@ -35,6 +36,7 @@ class DateColumnSpec :
                             def table shipment {
                                 columns: [
                                     def column shipped { type: date, optional: true }
+                                    def column founded { type: date, optional: true }
                                     def column recorded { type: datetime, optional: true }
                                 ]
                             }
@@ -53,6 +55,13 @@ class DateColumnSpec :
                         def query grouped {
                             sourceText: "SELECT shipped AS shipped_on, MAX(shipped) AS latest FROM $subject GROUP BY shipped"
                         }
+                        def query left_side { sourceText: "SELECT a.shipped AS a, b.shipped AS b FROM $subject a LEFT JOIN $subject b ON a.recorded = b.recorded" }
+                        def query union_now { sourceText: "SELECT shipped AS d FROM $subject UNION ALL SELECT CURRENT_TIMESTAMP AS d FROM $subject" }
+                        def query union_lit { sourceText: "SELECT shipped AS d FROM $subject UNION ALL SELECT CAST('2026-10-01 14:37:12' AS TIMESTAMP) AS d FROM $subject" }
+                        def query union_same { sourceText: "SELECT shipped AS d FROM $subject UNION SELECT shipped AS d FROM $subject WHERE recorded IS NULL" }
+                        def query union_dates { sourceText: "SELECT shipped AS d FROM $subject UNION ALL SELECT founded AS d FROM $subject" }
+                        def query minmax { sourceText: "SELECT MIN(shipped) AS lo, MAX(shipped) AS hi, COUNT(*) AS n FROM $subject" }
+                        def query sub { sourceText: "SELECT x.shipped FROM (SELECT DISTINCT shipped FROM $subject WHERE recorded IS NOT NULL) x ORDER BY x.shipped" }
                         def query mixed_union {
                             sourceText: "SELECT shipped AS shipped_on FROM $subject UNION ALL SELECT recorded AS shipped_on FROM $subject"
                         }
@@ -69,9 +78,51 @@ class DateColumnSpec :
                         mapOf("shipped_on" to "DATE", "recorded" to "TIMESTAMP")
                     lookup.outputTypes("$lane.query.computed") shouldBe
                         mapOf("stamp" to "TIMESTAMP", "mixed" to "TIMESTAMP", "cast_day" to "DATE")
-                    lookup.outputTypes("$lane.query.grouped") shouldBe
-                        mapOf("shipped_on" to "DATE", "latest" to "TIMESTAMP")
                     lookup.outputTypes("$lane.query.mixed_union") shouldBe mapOf("shipped_on" to "TIMESTAMP")
+                    lookup.outputTypes("$lane.query.grouped") shouldBe
+                        mapOf("shipped_on" to "DATE", "latest" to "DATE")
+                    lookup.outputTypes("$lane.query.left_side") shouldBe mapOf("a" to "DATE", "b" to "DATE")
+                    lookup.outputTypes("$lane.query.union_now") shouldBe mapOf("d" to "TIMESTAMP")
+                    lookup.outputTypes("$lane.query.union_lit") shouldBe mapOf("d" to "TIMESTAMP")
+                    lookup.outputTypes("$lane.query.union_same") shouldBe mapOf("d" to "DATE")
+                    lookup.outputTypes("$lane.query.union_dates") shouldBe mapOf("d" to "DATE")
+                    lookup.outputTypes("$lane.query.minmax") shouldBe
+                        mapOf("lo" to "DATE", "hi" to "DATE", "n" to "BIGINT")
+                    lookup.outputTypes("$lane.query.sub") shouldBe mapOf("shipped" to "DATE")
+                    val timed =
+                        runReportCommand(
+                            listOf(
+                                "new",
+                                root.toString(),
+                                "--from",
+                                "$lane.query.union_now",
+                                "--id",
+                                "times",
+                                "--title",
+                                "Times",
+                            ),
+                        )
+                    timed.exitCode shouldBe 0
+                    val timedCsv = Files.writeString(root.resolve("times.csv"), "d\n2026-10-01\n2026-10-01T14:37:12Z\n")
+                    val timedOut = root.resolve("times.xlsx")
+                    runReportCommand(
+                        listOf(
+                            "render",
+                            root.toString(),
+                            "times",
+                            "--rows",
+                            "ROWS=$timedCsv",
+                            "--out",
+                            timedOut.toString(),
+                        ),
+                    ).exitCode shouldBe 0
+                    XSSFWorkbook(Files.newInputStream(timedOut)).use { book ->
+                        val formatter =
+                            org.apache.poi.ss.usermodel
+                                .DataFormatter(java.util.Locale.US)
+                        formatter.formatCellValue(book.getSheetAt(0).getRow(4).getCell(0)) shouldBe
+                            "2026-10-01 14:37:12"
+                    }
                     val result =
                         runReportCommand(
                             listOf(

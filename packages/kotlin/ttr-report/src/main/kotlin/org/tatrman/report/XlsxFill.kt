@@ -7,6 +7,7 @@ import org.apache.poi.ss.usermodel.CellType
 import org.apache.poi.ss.usermodel.DateUtil
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import org.apache.poi.xssf.usermodel.XSSFRow
+import org.openxmlformats.schemas.spreadsheetml.x2006.main.CTRow
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.time.Instant
@@ -206,28 +207,32 @@ object XlsxFill {
             sheet.shiftRows(row.rowNum + 1, sheet.lastRowNum, region.table.rows.size - 1, true, false)
         }
         if (region.table.rows.isEmpty()) {
-            if (height == null) {
-                if (authoredRow.isSetHt) authoredRow.unsetHt()
-                if (authoredRow.isSetCustomHeight) authoredRow.unsetCustomHeight()
-            }
+            applyHeight(authoredRow, height)
             for (j in region.indices.indices) row.getCell(anchor.columnIndex + j)?.setBlank()
             anchor.setBlank()
         }
         region.table.rows.forEachIndexed { i, values ->
             val target = sheet.getRow(row.rowNum + i) ?: sheet.createRow(row.rowNum + i)
             val targetRow = (target as XSSFRow).ctRow
-            if (height != null) {
-                targetRow.ht = height
-                targetRow.customHeight = true
-            } else {
-                if (targetRow.isSetHt) targetRow.unsetHt()
-                if (targetRow.isSetCustomHeight) targetRow.unsetCustomHeight()
-            }
+            applyHeight(targetRow, height)
             region.indices.forEachIndexed { j, index ->
                 val cell: Cell = target.getCell(anchor.columnIndex + j) ?: target.createCell(anchor.columnIndex + j)
                 cell.cellStyle = styles[j]
                 writeValue(cell, values[index], typed[j])
             }
+        }
+    }
+
+    private fun applyHeight(
+        row: CTRow,
+        height: Double?,
+    ) {
+        if (height != null) {
+            row.ht = height
+            row.customHeight = true
+        } else {
+            if (row.isSetHt) row.unsetHt()
+            if (row.isSetCustomHeight) row.unsetCustomHeight()
         }
     }
 
