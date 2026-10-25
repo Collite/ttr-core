@@ -9,7 +9,6 @@ import org.tatrman.ttr.metadata.model.AutomationProgram
 import org.tatrman.ttr.metadata.model.AutomationRole
 import org.tatrman.ttr.metadata.model.AutomationService
 import org.tatrman.ttr.metadata.model.Relation
-import org.tatrman.ttrp.ast.ImportDecl
 import org.tatrman.ttrp.ast.IslandForm
 import org.tatrman.ttrp.ast.RecipeDecl
 import org.tatrman.ttrp.ast.RoleContainer
@@ -47,6 +46,9 @@ import org.tatrman.ttrp.recipe.RecipeCatalog
 import org.tatrman.ttrp.resolve.ImportScope
 import org.tatrman.ttrp.resolve.ModelIndex
 import org.tatrman.ttrp.resolve.TtrpChecker
+import org.tatrman.ttrp.resolve.ActionResolution
+import org.tatrman.ttrp.resolve.AutomationScope
+import org.tatrman.ttrp.resolve.TargetResolution
 
 /**
  * The recipe checker (AU-core-P1; AU contracts §4): a pass over the built graph and the resolved model, run after
@@ -76,10 +78,8 @@ class RecipeChecker(
     private val diags = mutableListOf<TtrpDiagnostic>()
     private val model: ModelIndex? = report.modelIndex
     private val graph: TtrpGraph = build.graph
-    private val imports: List<ImportScope> =
-        report.document.statements
-            .filterIsInstance<ImportDecl>()
-            .map { ModelIndex.importScope(it.qname.parts, it.qname.text) }
+    private val imports: List<ImportScope> = report.imports
+    private val actionScope = report.automationScope
 
     fun check(): Result {
         val rg = build.recipe ?: return Result(null, emptyList())
@@ -743,6 +743,7 @@ class RecipeChecker(
         val sw = decision?.switch
         val routeNames = if (decision == null) listOf(IDENTITY) else sw?.routeNames.orEmpty()
         val consumed = mutableSetOf<String>()
+        val covered = recipe.wirings.any { action(it.action)?.let(AutomationScope::hasDefaults) == true }
         for (w in recipe.wirings) {
             for (r in w.routes) {
                 if (!knownRoute(r, decision?.name, routeNames, recipe)) {
@@ -759,12 +760,11 @@ class RecipeChecker(
                 }
                 if (r.isAll) consumed += routeNames else consumed += r.route
             }
-            val action = action(w.action)
+            val action = resolveAction(w.action, w.actionLocation)
             if (action == null) {
-                diags +=
-                    err(TtrpDiagnosticId.REC_001, "no action `${w.action}` in the imported packages", w.actionLocation)
                 continue
             }
+            if (covered) checkActionTargets(action, w.actionLocation)
             val ctx = WiringContext(routeRow, routeOrigin)
             checkArgs(action, w.args, ctx, w.actionLocation)
             checkTransition(action, w.args, routeRow, w.actionLocation)
@@ -775,6 +775,47 @@ class RecipeChecker(
                 sw?.routes?.firstOrNull { it.name == r }?.nameLocation ?: sw?.elseRoute?.location ?: recipe.location
             val what = if (r == IDENTITY) "the recipe's identity verdict (`<candidates>.all`)" else "route `$r`"
             diags += err(TtrpDiagnosticId.REC_003, "$what is wired to no action", loc)
+        }
+    }
+
+    private fun resolveAction(
+        name: String,
+        at: SourceLocation,
+    ): AutomationAction? =
+        when (val resolved = actionScope?.action(name)) {
+            is ActionResolution.Resolved -> resolved.action
+            is ActionResolution.Ambiguous -> {
+                diags += err(TtrpDiagnosticId.REC_007, "ambiguous action `$name` in the imported packages", at)
+                null
+            }
+            else -> {
+                diags += err(TtrpDiagnosticId.REC_001, "no action `$name` in the imported packages", at)
+                null
+            }
+        }
+
+    private fun checkActionTargets(
+        action: AutomationAction,
+        at: SourceLocation,
+    ) {
+        for ((ref, result) in AutomationScope.targetsOf(action) {
+            actionScope?.target(it)
+                ?: TargetResolution.Unresolved(it)
+        }) {
+            val reason =
+                when (result) {
+                    is TargetResolution.Resolved -> null
+                    is TargetResolution.Ambiguous -> "ambiguous"
+                    is TargetResolution.Unresolved -> "unresolved"
+                }
+            if (reason != null) {
+                diags +=
+                    err(
+                        TtrpDiagnosticId.REC_006,
+                        "$reason default-covered action target `$ref` on `${action.qname.name}` in the recipe scope",
+                        at,
+                    )
+            }
         }
     }
 
@@ -872,9 +913,8 @@ class RecipeChecker(
         ctx: WiringContext,
         partial: Boolean = false,
     ) {
-        val action = action(call.action)
+        val action = resolveAction(call.action, call.location)
         if (action == null) {
-            diags += err(TtrpDiagnosticId.REC_001, "no action `${call.action}` in the imported packages", call.location)
             return
         }
         checkArgs(action, call.args, ctx, call.location, partial)
@@ -928,11 +968,16 @@ class RecipeChecker(
                     // `action: start { process: "purchasing" }` — the asked action, partly applied: the answer to
                     // the ask completes it, so a column it leaves out is not missing (H-3's ask).
                     v is WiringValue.Call -> checkCall(v, ctx, partial = true)
-                    ref == null ||
-                        ref.port != null ||
-                        action(
-                            ref.column,
-                        ) == null -> mismatch("takes an action the imports define")
+                    ref == null || ref.port != null -> mismatch("takes an action the imports define")
+                    actionScope?.action(ref.column) is ActionResolution.Ambiguous -> {
+                        diags +=
+                            err(
+                                TtrpDiagnosticId.REC_007,
+                                "ambiguous action `${ref.column}` in the imported packages",
+                                arg.location,
+                            )
+                    }
+                    action(ref.column) == null -> mismatch("takes an action the imports define")
                 }
             else -> {
                 if (v is WiringValue.Call || v is WiringValue.Values) {
@@ -1207,18 +1252,11 @@ class RecipeChecker(
         model?.automationInScope(imports)?.filterIsInstance<T>().orEmpty()
 
     private fun action(name: String): AutomationAction? =
-        automation<AutomationAction>().firstOrNull {
-            it.qname.name ==
-                name
-        }
+        (actionScope?.action(name) as? ActionResolution.Resolved)?.action
 
     /** `order.state` → the attribute of the entity the recipe sees by that name (imports, then the stdlib). */
-    private fun attribute(path: String): Attribute? {
-        val parts = path.split('.')
-        if (parts.size != 2) return null
-        val entity = model?.entityInScope(parts[0], imports) ?: return null
-        return model.attributesOf(entity).firstOrNull { it.qname.name.substringAfterLast('.') == parts[1] }
-    }
+    private fun attribute(path: String): Attribute? =
+        (actionScope?.target(path) as? TargetResolution.Resolved)?.attribute
 
     /** A `def column`'s type spelling as a type: a scalar, or an `<entity>.<attr>` reference's type. */
     private fun columnType(spelling: String): TtrpType? =
@@ -1237,13 +1275,19 @@ class RecipeChecker(
         src: String,
         want: String,
     ): Boolean {
-        if (src == want) return true
+        fun canonical(path: String): String =
+            (actionScope?.target(path) as? TargetResolution.Resolved)?.let {
+                "${it.entity.qname.name}.${it.attribute.qname.name.substringAfterLast('.')}"
+            } ?: path
+        val from = canonical(src)
+        val to = canonical(want)
+        if (from == to) return true
         val links = attributeLinks
-        val seen = mutableSetOf(src)
-        var frontier = setOf(src)
+        val seen = mutableSetOf(from)
+        var frontier = setOf(from)
         repeat(3) {
             frontier = frontier.flatMap { links[it].orEmpty() }.filter { seen.add(it) }.toSet()
-            if (want in frontier) return true
+            if (to in frontier) return true
         }
         return false
     }

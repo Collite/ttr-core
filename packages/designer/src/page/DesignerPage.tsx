@@ -152,7 +152,14 @@ export function DesignerPage(props: DesignerPageProps) {
   useEffect(() => { session?.source.disposeRetired(); }, [session]);
   const viewState = useMemo(() => makeViewStateStore('file', { kind: 'file' }), [workspace]);
   return <PageContext.Provider value={environment}>
-    <div ref={root} className="ttr-designer" data-testid="designer-page" data-theme={theme} lang={lang}
+    <div ref={root} className="ttr-designer" data-testid="designer-page" data-theme={theme} lang={lang} tabIndex={-1}
+      onClick={event => {
+        if (event.defaultPrevented || !(event.target instanceof Element)) return;
+        // Non-focusable canvas clicks should keep subsequent shortcuts in this page.
+        // Let buttons, fields, links and other focusable descendants retain their focus.
+        const control = event.target.closest('a[href],button,input,select,textarea,summary,[tabindex],[contenteditable]:not([contenteditable="false"])');
+        if (!control || control === event.currentTarget) event.currentTarget.focus({ preventScroll: true });
+      }}
       style={{ height: '100%', width: '100%', minHeight: 0, colorScheme: theme }}>
       {session && session.workspace === workspace && session.source === controller.current?.source
         ? <Studio key={`${workspace}:${session.sha}`} dataSource={session.source} viewState={viewState} catalog={session.catalog}

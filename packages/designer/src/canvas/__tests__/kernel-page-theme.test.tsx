@@ -63,3 +63,21 @@ it.each([
     expect(screen.getByTestId('canvas-kernel')).toHaveStyle({ background: '#16283F' });
   }
 );
+
+it.each([
+  ['light', 'md.star-glyph', '#EEF4FB'],
+  ['light', 'cnc.bubbles', '#F3F7FC'],
+  ['dark', 'md.star-glyph', '#16283F'],
+  ['dark', 'cnc.bubbles', '#16283F'],
+] as const)('uses the %s page background for %s', (theme, skinId, background) => {
+  const environment: PageEnvironment = {
+    root: createRef(), theme, authoringLoader: null,
+    config: { basePath: '/m/', lang: 'en', languages: ['en'], veles: null, layoutFormat: 'yaml' },
+    location: { current: () => '/', replace() {}, subscribe: () => () => {}, absolute: p => p },
+  };
+  render(<PageContext.Provider value={environment}>
+    <CanvasKernel skinId={skinId} positions={{}} registry={createSkinRegistry()}
+      graph={{ id: 'background', face: 'modeling', containers: [], nodes: [], edges: [] }} />
+  </PageContext.Provider>);
+  expect(screen.getByTestId('canvas-kernel')).toHaveStyle({ background });
+});

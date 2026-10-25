@@ -117,6 +117,8 @@ class TtrpChecker(
         val loadSchemas: Map<org.tatrman.ttrp.ast.SourceLocation, List<Column>> = emptyMap(),
     ) {
         val errors: List<TtrpDiagnostic> get() = diagnostics.filter { it.severity == Severity.ERROR }
+        val imports: List<ImportScope> get() = ModelIndex.importsOf(document)
+        val automationScope: AutomationScope? by lazy { modelIndex?.automationScope(imports) }
     }
 
     fun check(
@@ -132,10 +134,7 @@ class TtrpChecker(
         val effectiveSource = synth?.wrapperSource ?: source
 
         val initialParse = TtrpParser.parseString(effectiveSource, fileName)
-        val importsForLabels =
-            initialParse.document.statements.filterIsInstance<ImportDecl>().map {
-                ModelIndex.importScope(it.qname.parts, it.qname.text)
-            }
+        val importsForLabels = ModelIndex.importsOf(initialParse.document)
         val declaredParameters =
             initialParse.document.statements
                 .filterIsInstance<org.tatrman.ttrp.ast.RecipeDecl>()

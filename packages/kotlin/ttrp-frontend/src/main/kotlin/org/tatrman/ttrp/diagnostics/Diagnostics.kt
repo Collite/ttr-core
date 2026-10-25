@@ -117,6 +117,11 @@ enum class TtrpDiagnosticId(
         "TTRP-REC-005",
         "filter the candidates by state, never by key — the program's `port:` selects single candidates (A-2)",
     ),
+    REC_006(
+        "TTRP-REC-006",
+        "resolve every default-covered action target in the recipe imports or stdlib; qualify ambiguous refs",
+    ),
+    REC_007("TTRP-REC-007", "rename one of the actions, or narrow the imports so only one is visible"),
     REC_010(
         "TTRP-REC-010",
         "declare a `window { by: … over: … }` on the context, or restate it per candidate (keep the key, read " +

@@ -178,3 +178,34 @@ it('N11 source authoring is opt-in on the embedded page', async () => {
   view.rerender(<DesignerPage files={files} basePath="/m/" lang="en" sourceAuthoring />);
   expect(await screen.findByRole('button', { name: 'Source files' })).toBeInTheDocument();
 });
+
+it('focuses each page after an empty canvas click without stealing control focus', async () => {
+  render(<><input data-testid="host-input" /><DesignerPage files={files} basePath="/a/" lang="en" workspace="a" location="/w/a/s/er" />
+    <DesignerPage files={files} basePath="/b/" lang="en" workspace="b" location="/w/b/s/er" /></>);
+  await waitFor(() => expect(screen.getAllByTestId('mock-kernel')).toHaveLength(2));
+  const input = screen.getByTestId('host-input');
+  for (const root of screen.getAllByTestId('designer-page')) {
+    input.focus();
+    fireEvent.click(root.querySelector('[data-testid="mock-kernel"]')!);
+    expect(root).toHaveFocus();
+    expect(root).toHaveAttribute('tabindex', '-1');
+    fireEvent.keyDown(document.activeElement!, { key: 'k', ctrlKey: true });
+    expect(screen.getAllByTestId('cmdk-input')).toHaveLength(1);
+    expect(root).toContainElement(screen.getByTestId('cmdk-input'));
+    fireEvent.keyDown(screen.getByTestId('cmdk-input'), { key: 'Escape' });
+    expect(screen.queryAllByTestId('cmdk-input')).toHaveLength(0);
+    const button = root.querySelector<HTMLButtonElement>('[data-testid="mock-node"]')!;
+    button.focus();
+    fireEvent.click(button);
+    expect(button).toHaveFocus();
+    const picker = root.querySelector<HTMLSelectElement>('[data-testid="skin-picker"]')!;
+    picker.focus();
+    fireEvent.click(picker);
+    expect(picker).toHaveFocus();
+  }
+  input.focus();
+  fireEvent.click(input);
+  expect(fireEvent.keyDown(input, { key: 'k', ctrlKey: true })).toBe(true);
+  expect(input).toHaveFocus();
+  expect(screen.queryAllByTestId('cmdk-input')).toHaveLength(0);
+});

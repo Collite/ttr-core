@@ -45,6 +45,20 @@ data class RecipeManifest(
      * Null (and omitted) without fixtures, keeping manifests byte-compatible with grammar/v0.17.3.
      */
     val tests: List<String>? = null,
+    /** Native preview dependencies v1; absent for recipes with no directly wired writer defaults. */
+    val approvalDependencies: RecipeApprovalDependencies? = null,
+)
+
+/** Explicit coverage evidence, bound into text/2. Consumers must verify it against pinned action/ER metadata. */
+@Serializable
+data class RecipeApprovalDependencies(
+    val version: Int,
+    /** Checked recipe import qnames, sorted and unique; required for scoped offline verification. */
+    val imports: List<String>,
+    /** The unchanged text/1 digest, not an independently approved fingerprint. */
+    val textBase: String,
+    /** Distinct directly wired action name → action-dependency/1 digest, in sorted name order. */
+    val actions: Map<String, String>,
 )
 
 @Serializable
@@ -134,6 +148,8 @@ data class VerdictSchema(
  * D-13/D-60 (contracts §5.1): [text] the logic — the recipe's lowered graph, canonical, and its statements, with
  * every `because:` taken out; [values] the parameter values; [labels] the `because:` texts. A value change moves
  * [values] only (approval kind `values`); a `because:` change moves [labels] only (no approval gates it).
+ * A directly wired writer default additionally binds native action/ER dependencies into text/2;
+ * [RecipeManifest.approvalDependencies] records the evidence a governed consumer verifies.
  */
 @Serializable
 data class RecipeFingerprints(

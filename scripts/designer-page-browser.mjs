@@ -48,6 +48,15 @@ export async function checkEmbeddedPage(page) {
   });
   assert.equal(reset.style, 'solid');
   assert.ok(parseFloat(reset.border) > 0);
+  await page.locator('.react-flow__pane').click({ position: { x: 4, y: 4 } });
+  assert.equal(await page.locator('.ttr-designer').evaluate(element => element === document.activeElement), true);
+  await page.keyboard.press('Control+k');
+  assert.equal(await page.getByTestId('cmdk-input').count(), 1);
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => window.setPageTheme('light'));
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="canvas-kernel"]')).backgroundColor === 'rgb(238, 244, 251)');
+  await page.evaluate(() => window.setPageTheme('dark'));
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="canvas-kernel"]')).backgroundColor === 'rgb(22, 40, 63)');
   await page.locator('#host-button').focus();
   await page.keyboard.press('Control+k');
   assert.equal(await page.getByTestId('cmdk-input').count(), 0);
@@ -56,6 +65,9 @@ export async function checkEmbeddedPage(page) {
     tabMenu: 'at pointer',
     nodeMenu: 'clamped to page',
     borderReset: reset,
+    emptyCanvasShortcut: 'one palette',
+    lightStarBackground: '#EEF4FB',
+    darkBackground: '#16283F',
     hostShortcut: 'untouched',
   };
 }

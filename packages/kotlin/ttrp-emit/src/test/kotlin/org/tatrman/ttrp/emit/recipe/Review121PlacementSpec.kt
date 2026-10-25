@@ -68,7 +68,11 @@ class Review121PlacementSpec :
                                 if (it == mapping) mapping.copy(target = MappingTarget.Table(target)) else it
                             },
                     )
-                val index = ModelIndex(original.snapshot.copy(model = model, graph = ModelGraph.build(model)))
+                val index =
+                    ModelIndex(
+                        original.snapshot.copy(model = model, graph = ModelGraph.build(model)),
+                        original::packageOf,
+                    )
                 LoadSourceResolver.resolve(entity, index, allowUnbound = true) shouldBe null
             }
         }
