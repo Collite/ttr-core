@@ -25,7 +25,7 @@
     "op.eq", "op.neq", "op.lt", "op.lte", "op.gt", "op.gte",
     "op.and", "op.or", "op.not", "op.add", "op.sub", "op.mul", "op.div", "op.neg",
     "agg.sum", "agg.avg", "agg.min", "agg.max", "agg.count",
-    "fn.coalesce", "fn.abs", "fn.round", "fn.ceil", "fn.length", "fn.lower", "fn.upper", "fn.substring",
+    "fn.coalesce", "fn.abs", "fn.round", "fn.ceil", "fn.length", "fn.lower", "fn.upper", "fn.substring", "fn.concat",
     "fn.regexp_match",
     "fn.period_start", "fn.period_end", "fn.geo_distance_m",
     "op.concat", "nullif"

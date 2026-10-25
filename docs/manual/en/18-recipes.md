@@ -123,6 +123,11 @@ price_differences`) or another action (`on_due: hold { order: order_number }`). 
   `working_days(between: due, and: :as_of)`. Every other function is called positionally (`TTRP-PRS-008`).
 - A SQL island reads the same forms: `:as_of - days(365)`, `:as_of - :return_window`.
 
+`concat(left, right)` joins exactly two strings. It returns NULL if either operand is NULL;
+cast numbers or dates explicitly before concatenating. Nest calls for more parts, for example
+`concat(concat(substring(cast(:as_of as text), 1, 4), '-Q'), '4')`.
+This scalar function is available in canonical and SQL bodies on PostgreSQL, SQL Server and Polars.
+
 ## Time
 
 `:as_of` is the run's instant (a `timestamp`); it is never a parameter. A `:name` is a parameter the recipe declares
