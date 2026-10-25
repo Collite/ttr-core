@@ -152,3 +152,14 @@ it('N13 forwards one hosted file notification per completed revision', async()=>
   expect(changed).toHaveBeenCalledOnce();
  } finally {source.dispose()}
 });
+
+it('N13 acknowledges the text revision without publishing diagnostics before validation finishes',async()=>{
+ let release!:()=>void;const held=new Promise<void>(r=>{release=r});
+ const source=new BffFilesDataSource({api:'/api/model',scope:{kind:'change',id:'validation'},token:''},{createClient:()=>createTestClient(async method=>{if(method==='modeler/reloadLintConfig')await held}),loadSnapshot:async()=>({sha:'one',files})});
+ try {
+  await source.refresh();expect((await source.edit({op:'add-term',args:{lang:'en',term:'validated later',target:'er.entity.return_request'}})).ok).toBe(true);
+  expect(source.changedFiles().length).toBeGreaterThan(0);
+  let complete=false;const validated=source.validatedDiagnostics().then(d=>{complete=true;return d});
+  await Promise.resolve();expect(complete).toBe(false);release();await validated;expect(complete).toBe(true);
+ }finally{release();source.dispose()}
+});

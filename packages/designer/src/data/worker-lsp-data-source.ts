@@ -95,6 +95,9 @@ export class WorkerLspDataSource implements ModelDataSource {
   private readonly modelListeners = new Set<(version: string) => void>();
   private revision = 0;
   private edits = Promise.resolve();
+  private validation: Promise<void> = Promise.resolve();
+  whenValidated(): Promise<void> { return this.validation; }
+  private revalidate() { return this.lspClient.revalidate?.() ?? this.lspClient.setProjectRoot(this.ctx.projectRoot, this.docTextCache.get('modeler.toml')); }
 
   sourceFiles() { return [...this.docTextCache].filter(([path]) => isSourcePath(path)).map(([path, text]) => ({ path, text })).sort((a, b) => a.path.localeCompare(b.path)); }
   writeSourceFile({ path, text, expectedText }: { path: string; text: string; expectedText?: string }) {
@@ -108,7 +111,7 @@ export class WorkerLspDataSource implements ModelDataSource {
       // Whole cache update precedes transport waits; collect never sees a partial file.
       for (const callback of this.fileListeners) callback();
       await opened;
-      await (this.lspClient.revalidate?.() ?? this.lspClient.setProjectRoot(this.ctx.projectRoot, this.docTextCache.get('modeler.toml')));
+      await this.revalidate();
       for (const callback of this.fileListeners) callback();
       this.revision++;
       for (const callback of this.modelListeners) callback(String(this.revision));
@@ -148,7 +151,10 @@ export class WorkerLspDataSource implements ModelDataSource {
     // while a transport acknowledgement is pending.
     for (const [path, text] of staged) this.docTextCache.set(path, text);
     for (const uri of affected) await this.lspClient.openDocument(uriFor(this.ctx.projectRoot, decodeURIComponent(uri.slice(root.length))), this.docTextCache.get(decodeURIComponent(uri.slice(root.length)))!);
-    await (this.lspClient.revalidate?.() ?? this.lspClient.setProjectRoot(this.ctx.projectRoot, this.docTextCache.get('modeler.toml')));
+    // Notify the completed text revision now; full validation must not block the form response.
+    // Schedule it after catalog readers have enqueued their requests, and expose a publication barrier.
+    this.validation = Promise.resolve().then(async () => { await this.revalidate(); });
+    void this.validation.catch(() => {});
     for (const cb of this.fileListeners) cb();
     this.revision++;
     for (const cb of this.modelListeners) cb(String(this.revision));

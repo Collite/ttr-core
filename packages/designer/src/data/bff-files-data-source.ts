@@ -219,6 +219,15 @@ export class BffFilesDataSource implements ModelDataSource {
     try { return await this.source.edit(params); }
     finally { if (!params.dryRun) this.activeEdits--; }
   }
+  async validatedDiagnostics() {
+    for (;;) {
+      const worker = this.worker;
+      const generation = this.catalogGen;
+      try { await worker?.whenValidated(); }
+      catch (error) { if (worker !== this.worker || generation !== this.catalogGen) continue; throw error; }
+      if (worker === this.worker && generation === this.catalogGen) return worker?.lspClient.diagnostics?.() ?? [];
+    }
+  }
   diagnostics() { return this.worker?.lspClient.diagnostics?.() ?? []; }
   sourceFiles() { return this.worker?.sourceFiles() ?? []; }
   async writeSourceFile(file: { path: string; text: string; expectedText?: string }) {

@@ -480,7 +480,14 @@ function HostedStudio() {
     let dirtyTimer: ReturnType<typeof setTimeout> | undefined;
     let fileSubscription: { dispose(): void } | undefined;
     let lastLocation = '';
-    const publishDiagnostics = () => channelRef.current?.send({ type: 'ttr.frame.diagnostics', diagnostics: (source?.diagnostics() ?? []).map(value => ({ uri: value.uri, severity: value.severity === 1 ? 'error' : value.severity === 2 ? 'warning' : 'info', code: String(value.code ?? ''), message: value.message, source: 'worker' })) });
+    const publishDiagnostics = async () => {
+      try {
+        const values = await source?.validatedDiagnostics() ?? [];
+        if (!disposed) channelRef.current?.send({ type: 'ttr.frame.diagnostics', diagnostics: values.map(value => ({ uri: value.uri, severity: value.severity === 1 ? 'error' : value.severity === 2 ? 'warning' : 'info', code: String(value.code ?? ''), message: value.message, source: 'worker' })) });
+      } catch {
+        if (!disposed) channelRef.current?.send({ type: 'ttr.frame.diagnostics', diagnostics: [{ uri: '', severity: 'error', code: 'worker/validation-unavailable', message: 'Worker validation did not finish. Refresh the model before proposing.', source: 'worker' }] });
+      }
+    };
     const syncSession = async (initialAppPath?: string, options: SnapshotRefreshOptions = {}) => {
       const changed = await source!.refresh({ ...options, deferDisposal: true });
       if (disposed || (!changed && renderedSha === source!.sha)) return false;

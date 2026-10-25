@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Acknowledge structured text revisions without blocking the form on full validation; keep complete diagnostic publication behind a current-worker/revision barrier.
+
 - Keep source errors visible for local roots, require an explicit embedded source-authoring grant, report collect/saved-snapshot failures directly, and avoid redundant project reloads/catalog notifications after edits.
 
 - Fix review-148 hosted source grants, stale drawer Apply, full worker diagnostics/discard, optional extension recovery and source URI identity.
