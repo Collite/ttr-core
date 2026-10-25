@@ -158,9 +158,7 @@ object TemplateGenerator {
                                             ParamKind.INT -> "0"
                                             ParamKind.FLOAT -> "0.0##############"
                                             ParamKind.DATETIME ->
-                                                if (columnTypes[column]?.trim()?.equals("date", ignoreCase = true) ==
-                                                    true
-                                                ) {
+                                                if (ReportTypes.isDate(columnTypes[column].orEmpty())) {
                                                     "yyyy-mm-dd"
                                                 } else {
                                                     "yyyy-mm-dd hh:mm:ss"

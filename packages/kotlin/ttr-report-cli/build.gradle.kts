@@ -13,16 +13,20 @@ kotlin {
     jvmToolchain(21)
 }
 
-tasks.test {
-    useJUnitPlatform()
-}
-
 application {
     mainClass = "org.tatrman.report.cli.MainKt"
     applicationName = "ttr-report"
 }
 
 tasks.jar { archiveBaseName.set("ttr-report-cli") }
+
+val installedDistribution = tasks.named<Sync>("installDist")
+tasks.test {
+    useJUnitPlatform()
+    dependsOn(installedDistribution)
+    inputs.dir(installedDistribution.map { it.destinationDir })
+    systemProperty("ttr.report.dist", installedDistribution.get().destinationDir.absolutePath)
+}
 
 dependencies {
     implementation(project(":packages:kotlin:ttr-metadata"))
@@ -31,6 +35,8 @@ dependencies {
     implementation(project(":packages:kotlin:ttr-report"))
     implementation(project(":packages:kotlin:ttr-translator"))
     implementation(libs.slf4j.nop)
+    // POI logs through Log4j; keep the executable's existing SLF4J/NOP policy out of the library.
+    runtimeOnly(libs.log4j.to.slf4j)
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.apache.poi.ooxml)
 }

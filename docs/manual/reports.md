@@ -181,9 +181,15 @@ characters. Every data column has a styled marker-row cell: compiled integer/dec
 get number formats (decimals show at least one fractional digit, e.g. `20.0`), DATE outputs use
 `yyyy-mm-dd`, timestamps include time, and text retains leading zeroes. Generated cells wrap text
 with automatic row height. The pure `generate` API accepts a `columnTypes` map; absent/unknown types
-stay text. `fromQuery` obtains types through `QueryModelLookup.outputTypes(qname)`. Properties and ZIP
-records use the same determinism pass as fill. The same inputs produce
-the same YAML and XLSX bytes; locale-map insertion order does not affect them.
+stay text. `fromQuery` obtains types through `QueryModelLookup.outputTypes(qname)`. The CLI shows an output as
+a date when every value of it comes unchanged from columns declared `date` in the snapshot: through aliases,
+filters, sorting, either side of a join (outer joins included), group keys, `MIN`/`MAX` of such a column,
+saved-query passthroughs, and set operations whose every branch qualifies. Any other timestamp output keeps
+its time, including computed values and set operations with a constant or function branch. An explicit
+`CAST(... AS DATE)` also selects the date format. The rule reads the compiled query, so identity expressions
+the compiler folds away count as passthroughs. Other `QueryModelLookup` adapters must apply the same rule.
+Properties and ZIP records use the same determinism pass as fill.
+The same inputs produce the same YAML and XLSX bytes; locale-map insertion order does not affect them.
 
 ER queries with declared parameters refuse with `query-has-parameters` (LQ-5). DB query declarations
 become required parameters: text/string/varchar → `text`, integer types → `int`, decimal/float types →
