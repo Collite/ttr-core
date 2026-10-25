@@ -12,12 +12,16 @@ import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.choice
 import org.tatrman.concept.CnConceptService
 import org.tatrman.concept.HygieneRender
 import org.tatrman.concept.HygieneReport
 import org.tatrman.concept.ResolvedCnModel
 import org.tatrman.concept.Severity
+import org.tatrman.concept.extract.SchemaJson
+import org.tatrman.concept.extract.SchemaRenderException
+import org.tatrman.concept.extract.TypeRegistryRenderer
 import org.tatrman.concept.v1.ConceptRef
 import org.tatrman.ttr.metadata.model.Model
 import org.tatrman.ttr.metadata.model.ModelDescriptor
@@ -29,10 +33,13 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.system.exitProcess
 
-/** The `ttr` command family. This module contributes `cn` (`hygiene`; `materialize` since CN-P3 S3.4). */
+/**
+ * The `ttr` command family. This module contributes `cn` (`hygiene`; `materialize` since CN-P3 S3.4; `render-types`
+ * since DX-P0 S0.3).
+ */
 fun ttr(): CliktCommand =
     TtrCommand().subcommands(
-        CnCommand().subcommands(CnHygieneCommand(), CnMaterializeCommand()),
+        CnCommand().subcommands(CnHygieneCommand(), CnMaterializeCommand(), CnRenderTypesCommand()),
         org.tatrman.ttr.metadata.cli
             .mdCommand(),
     )
@@ -209,6 +216,57 @@ class CnMaterializeCommand : CliktCommand(name = "materialize") {
                 Files.writeString(file, content)
                 echo("ttr cn materialize: wrote $file")
             }
+        }
+    }
+}
+
+/**
+ * `ttr cn render-types --model <dir> --entities review,claim --out <pack-dir>` (DX-P0 S0.3; ⚑DX-P-2) — render the
+ * extraction pack's model-generated annotation types from the model: per entity `Statement.<e>.schema.json` and
+ * `Record.<e>.schema.json`, plus `index.json` (each file's sha256, the model snapshot hash), all under
+ * `<pack-dir>/types/generated/`, in the canonical JSON form (two runs write identical bytes).
+ *
+ * Exit: 0 — written · 2 — usage, the model could not be read (or read only in part), or an entity is unknown or cannot
+ * be rendered (named on stderr, nothing written).
+ */
+class CnRenderTypesCommand : CliktCommand(name = "render-types") {
+    override fun help(context: Context) =
+        "Render the extraction types (Statement[<e>], Record.<e>) of er entities as JSON Schema files."
+
+    private val dir by option("--model", help = "root dir of the TTR-M model (scanned for *.ttrm)").required()
+    private val entities by option(
+        "--entities",
+        help = "comma-separated er entities (`review`, `er.entity.review`)",
+    ).required()
+    private val out by option("--out", help = "the pack directory; files go to <out>/types/generated/").required()
+
+    override fun run() {
+        val root = Path.of(dir).toAbsolutePath().normalize()
+        if (!Files.isDirectory(root)) {
+            echo("ttr cn render-types: '$dir' is not a directory", err = true)
+            throw ProgramResult(2)
+        }
+        val (model, loadErrors) = load(root, "cn-render-types")
+        loadErrors.forEach { echo("ttr cn render-types: $it", err = true) }
+        if (loadErrors.isNotEmpty()) throw ProgramResult(2)
+        val names = entities.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        if (names.isEmpty()) {
+            echo("ttr cn render-types: --entities names no entity", err = true)
+            throw ProgramResult(2)
+        }
+        val files =
+            try {
+                TypeRegistryRenderer.renderPack(ResolvedCnModel.of(model), names)
+            } catch (e: SchemaRenderException) {
+                echo("ttr cn render-types: ${e.slug}: ${e.message}", err = true)
+                throw ProgramResult(2)
+            }
+        val target = Path.of(out).toAbsolutePath().normalize()
+        for ((path, json) in files) {
+            val file = target.resolve(path)
+            Files.createDirectories(file.parent)
+            Files.writeString(file, SchemaJson.canonical(json))
+            echo("ttr cn render-types: wrote $file")
         }
     }
 }

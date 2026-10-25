@@ -10,6 +10,7 @@ content. `definition-diagnostics.txt` pins each world's definition-level finding
 | `hartland` | design `11` §1's package in the 0.5 spellings: the AU extension's recipe vocabulary (H-1, DC-2/3/5/9/10/11, materialize) on er; `revenue` / `quantity` on a channel cubelet (⚑CN-P8) | er + db, md + `md2er_cubelet`, cn, automation |
 | `clinic` | invented clinical rows (DC-1/4/8/12, the Transfer assertion): transfers with two labelled relations to one encounter entity, condition records over a closure, fracture episodes, observations whose value grounding declares a `unit:` (⚑CN-P10) | er + db, cn |
 | `sales` | the md hero (ttrp-cli's md-project `sales-model`) with concepts over it (E-0, ActiveCustomer ⚑CN-P9, LargeSale); nothing lands on er, so it also holds the er refusals | md + db, cn, automation |
+| `hartland-dx` | DX-P0 S0.3: the extraction slice in Hartland's names — `item`, `customer` and the document-derived `review` · `claim` · `product_sheet` (not in Hartland's model yet; minimal, here only), concepts `Review` · `Claim` · `ProductSheet` with phases, and qualities tagged `"modifier"`. `expected/` holds the hand-written `Statement.review` / `Record.review` goldens (`extract/SchemaRendererSpec`) | er, cn, binding |
 
 In `hartland` `Customer` is **er**-grounded: H-1 renders `DebtorCustomer` on er, and the hop for an md dimension is
 md/hop's (P2's `ExplicitMdErHop` answers an explicit `md2er_cubelet` only). The md-grounded `Customer` of E-0 is

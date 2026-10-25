@@ -6,6 +6,16 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — extraction types from the model (`ttr-concept`, DX-P0 S0.3; additive)
+
+- `org.tatrman.concept.extract`: `SchemaRenderer` renders an er entity's `Statement[<entity>]` and `Record.<entity>` JSON
+  Schema (2020-12) from the resolved cn + er model — er types mapped to JSON Schema, keys left out, relation joins as
+  refs, closed vocabularies as `enum`, and the grounded concept's qualities tagged `tags: ["modifier"]` as the
+  statement's `modifiers`; `TypeRegistryRenderer` writes a pack's `types/generated/` files plus an `index.json` with
+  each file's sha256 and the model snapshot hash. Deterministic, canonical JSON. No grammar change.
+- `ttr cn render-types --model <dir> --entities a,b --out <pack-dir>` (exit 2 on an unknown entity, naming it) and
+  `just render-types`.
+
 ### Added — the er statement lane (CN-P6 ⚑S62-1, binary-incompatible for JVM consumers)
 
 - `statementLower` reads a statement on E-R when md carries no single read of it (no carrier, several, a slot md cannot
