@@ -1,0 +1,15 @@
+model binding
+def md2db_cubelet sales_binding {
+  cubelet: md.sales,
+  target: { table: db.dbo.sale },
+  shape: wide,
+  attributes: { Buyer.code: { column: customer }, Time.day: { column: sold_on } },
+  measures: { revenue: { column: ext_price }, quantity: { column: quantity }, unit_price: { column: unit_price }, stock: { column: stock }, top_price: { column: top_price } }
+}
+def md2db_cubelet refunds_binding {
+  cubelet: md.refunds,
+  target: { table: db.dbo.sale },
+  shape: wide,
+  attributes: { Time.day: { column: sold_on } },
+  measures: { refund: { column: refund } }
+}

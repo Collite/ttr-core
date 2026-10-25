@@ -42,17 +42,17 @@ import org.tatrman.ttrp.expr.ThisRef
 
 /**
  * A statement read on E-R (CN-P6 ⚑S62-1, A-CN-101) — what [StatementLowerer]'s er lane hands [ErRenderer.statement]:
- * the grain [event] (the query reads its landing), the [measures] with their aggregate functions, the phase filters (each
- * with whether it is negated), member / quality [conditions] on the event's row, the [groupBy] concepts, the HAVINGs
- * (a measure's index, an operator, a literal), the time as a half-open day range `[lo, hi)`, the order (a measure's
- * index, descending) and the limit. [asOf] gives the evaluation day every `:as_of` (and a bound derived from it) reads —
- * asked only when a placeholder needs it, so a frame that fixes its time reads no clock; [values] binds the `:name`
- * parameters a phase reads.
+ * the grain [event] (the query reads its landing), the [measures] with their aggregate functions (`measures[i]` in frame
+ * order), the [phases], member / quality [conditions] on the event's row, the [groupBy] concepts (`groupBy[i]`), the
+ * HAVINGs (a measure's index, an operator, a literal), the time as a half-open day range `[lo, hi)`, the order (a
+ * measure's index, descending) and the limit. [asOf] gives the evaluation day every `:as_of` (and a bound derived from
+ * it) reads — asked only when a placeholder needs it, so a frame that fixes its time reads no clock; [values] binds the
+ * `:name` parameters a phase reads. A refusal names the frame slot it is about (review-154 E8).
  */
 internal data class ErStatement(
     val event: Concept,
     val measures: List<ErMeasure>,
-    val phases: List<Pair<Concept, Boolean>> = emptyList(),
+    val phases: List<ErPhase> = emptyList(),
     val conditions: List<ErCondition> = emptyList(),
     val groupBy: List<Concept> = emptyList(),
     val havings: List<Triple<Int, String, String>> = emptyList(),
@@ -69,11 +69,21 @@ internal data class ErMeasure(
     val function: String,
 )
 
-/** A condition of an [ErStatement] on the event's row; [slot] names it in a refusal. */
+/** A phase filter of an [ErStatement]: the phase, whether it is negated, and its frame [slot] (`filters[i].phase.phase`). */
+internal data class ErPhase(
+    val phase: Concept,
+    val negated: Boolean = false,
+    val slot: String = "filters[0].phase.phase",
+)
+
+/** A condition of an [ErStatement] on the event's row; [slot] is its filter's frame path (`filters[i]`, nested ones too). */
 internal sealed interface ErCondition {
     val slot: String
 
-    /** [concept] is [value] — its column on the event's row, or the key the event holds to it. */
+    /**
+     * [concept] is [value] — its column on the event's row, or the key the event holds to it: a participant's member IS
+     * that key (A-CN-47's reading, ⚑R152-c), so a value the key's type cannot take is `cn/slot-mismatch`.
+     */
     data class Member(
         val concept: Concept,
         val value: String,
@@ -85,6 +95,19 @@ internal sealed interface ErCondition {
         val concept: Concept,
         val op: String,
         val literal: String?,
+        override val slot: String,
+    ) : ErCondition
+
+    /**
+     * [concept] `<op>` an instant — read as its interval `[lo, hi)` (`FrameTime.interval`, ⚑R152-f): `=` is `>= lo AND
+     * < hi`, `<>` its complement, `>` is `>= hi`, `>=` is `>= lo`, `<` is `< lo`, `<=` is `< hi`. A bound is a `DATE`
+     * on a date column when it falls on a day, else a full `TIMESTAMP`.
+     */
+    data class Within(
+        val concept: Concept,
+        val op: String,
+        val lo: java.time.LocalDateTime,
+        val hi: java.time.LocalDateTime,
         override val slot: String,
     ) : ErCondition
 }
@@ -166,18 +189,39 @@ internal class ErRenderer(
     /**
      * CN-P6 ⚑S62-1 (A-CN-101) — [spec] read on E-R: `FROM` the grain event's landing; the group-bys (a column of that
      * row, or the key it holds to a participant) and the measures aggregated; each phase filter's definition inlined on
-     * the event's row (`NOT (…)` when negated); member / quality conditions on its columns; the time on its period's
-     * instant — the column itself when it is a date, else the entity a date-key relation reaches, at its `event_date`
-     * column; then `HAVING`, `ORDER BY`, `LIMIT`. Every placeholder is bound ([ErStatement.asOf], [ErStatement.values],
-     * a derived bound computed from the day); one that cannot be is a refusal. A refusal is an empty text and one
-     * error-grade diagnostic, as [render]'s.
+     * the event's row; member / quality conditions on its columns; the time on its period's day ([dayOf]); then
+     * `HAVING`, `ORDER BY`, `LIMIT`. Every placeholder is bound ([ErStatement.asOf], [ErStatement.values], a derived
+     * bound computed from the day), and every `latest(…, by:)` is capped at the evaluation day (⚑R152-d, the md lane's
+     * `asOfDay` parity); a placeholder that cannot be bound is a refusal.
+     *
+     * The rows stay the event's rows (⚑R152-b): a phase whose inlining joins a relation from its many side (the event's
+     * rows would repeat under the aggregate) is refused; a negated phase is read `NOT COALESCE((…), FALSE)` — two-valued,
+     * so a row where the phase is NULL counts as "not" — and only while its inlining joins nothing (a joining one needs a
+     * complement over the event's key, G-MD-1).
+     *
+     * A refusal is an empty text and frame findings on the slot it is about (⚑R152-e): `cn/not-analytically-reachable`
+     * (or `cn/slot-mismatch` for a member the key's type cannot take), plus `cn/definition-unreachable(er)` on the same
+     * slot when a phase's definition does not render — md's pair (`StatementLowerer`).
      */
     fun statement(spec: ErStatement): Rendering {
-        val run = Run(spec.event, RenderOptions())
+        val run = Run(spec.event, RenderOptions(), statementRead = true)
         return try {
             run.statement(spec)
         } catch (r: Refused) {
-            refused(spec.event, r)
+            val subject = r.subject ?: "measures[0]"
+            val frame = Diagnostic(r.frame ?: FrameSlugs.NOT_ANALYTICALLY_REACHABLE, Severity.ERROR, r.message, subject)
+            Rendering(
+                imprecisionMode = mode(spec.event),
+                diagnostics =
+                    if (r.phase) {
+                        listOf(
+                            frame,
+                            Diagnostic(r.slug, Severity.ERROR, r.message, subject),
+                        )
+                    } else {
+                        listOf(frame)
+                    },
+            )
         }
     }
 
@@ -189,9 +233,16 @@ internal class ErRenderer(
         diagnostics = listOf(Diagnostic(r.slug, Severity.ERROR, r.message, target.ref)),
     )
 
+    /**
+     * A refusal: [slug] the definition finding; on a statement read also the frame [subject] it is about, the frame slug
+     * when it is not `cn/not-analytically-reachable` ([frame]), and whether a phase's definition failed to render ([phase]).
+     */
     private class Refused(
         val slug: String,
         override val message: String,
+        val subject: String? = null,
+        val phase: Boolean = false,
+        val frame: String? = null,
     ) : RuntimeException(message, null, false, false)
 
     /** A derived table's `where` read outside its rows — the caller picks another shape or refuses (G-ER-3). */
@@ -324,8 +375,20 @@ internal class ErRenderer(
     private inner class Run(
         val target: Concept,
         val options: RenderOptions,
+        /** A statement read ([statement]): every `latest(…, by:)` is capped at the evaluation day (⚑R152-d). */
+        val statementRead: Boolean = false,
     ) {
         val context = options.mode == RenderMode.CONTEXT
+
+        /** A statement read's own `SELECT` — the one its aggregates are over ([fannedOut] watches it). */
+        var outer: Select? = null
+
+        /** The relations joined from their many side on [outer] — each repeats the event's rows (⚑R152-b, E5). */
+        val fannedOut = mutableListOf<String>()
+
+        /** The frame slot being rendered, and the slot that first read each placeholder — where a refusal points. */
+        var slot: String? = null
+        val paramSlots = mutableMapOf<String, String>()
         val aliases = mutableSetOf<String>()
         val rows = mutableMapOf<String, Row>()
         val inlined = linkedSetOf<String>()
@@ -535,68 +598,42 @@ internal class ErRenderer(
         // ---- a statement read (CN-P6 ⚑S62-1) --------------------------------------------------------------------
 
         fun statement(spec: ErStatement): Rendering {
-            val entity = entityOf(spec.event) ?: unreachable(spec.event)
+            val entity = at("measures[0]") { entityOf(spec.event) ?: unreachable(spec.event) }
             val select = Select(Source.Entity(entity.qname.name, fresh(entity.qname.name)))
+            outer = select
             val row = row(entity, select, select.from.alias)
             val self = Bound(row, spec.event)
-            for (g in spec.groupBy) {
-                val c = slotColumn(g, self, "a group-by")
-                select.items += Item(c, snake(g.qname.name))
-                select.groupBy += c
+            spec.groupBy.forEachIndexed { i, g ->
+                at("groupBy[$i]") {
+                    val c = slotColumn(g, self, "a group-by")
+                    select.items += Item(c, snake(g.qname.name))
+                    select.groupBy += c
+                }
             }
             val aggregates =
-                spec.measures.map { m ->
-                    val (on, attribute) =
-                        ParticipantPaths.attributeRef(m.quality.erTarget)
-                            ?: refuse("the measure `${m.quality.ref}` lands on no attribute of E-R")
-                    if (on != entity.qname.name) {
-                        refuse(
-                            "the measure `${m.quality.ref}` lands on `$on`, not on the event's `${entity.qname.name}`",
-                        )
-                    }
-                    SqlExpr.Fn(m.function, listOf(SqlExpr.Col(row.alias, attribute))).also {
-                        select.items += Item(it, m.quality.qname.name)
-                    }
-                }
-            for ((phase, negated) in spec.phases) {
-                val block =
-                    model.definitions.of(phase.qname).firstOrNull { it.kind == BlockKind.DEFINITION }
-                        ?: refuse(
-                            "`${phase.ref}` has no `definition:` to inline (a stacked-entity phase is a follow-up)",
-                        )
-                val bearer = block.bearer?.let { cn.concepts[it] } ?: refuse("`${phase.ref}` has no bearer")
-                if (entityOf(bearer)?.qname != entity.qname) {
-                    refuse(
-                        "`${phase.ref}` is a phase of `${bearer.ref}`, which does not land on the event's `${entity.qname.name}`",
-                    )
-                }
-                val expression = block.expression ?: refuse("`${phase.ref}`'s definition does not parse")
-                val sql = inline(phase, expression, Bound(row, bearer), select, record = true)
-                select.where += if (negated) SqlExpr.Not(sql) else sql
-            }
-            for (c in spec.conditions) {
-                select.where +=
-                    when (c) {
-                        is ErCondition.Member -> {
-                            val col = slotColumn(c.concept, self, "a member filter")
-                            SqlExpr.Bin("=", col, typed(c.value, col, entity))
+                spec.measures.mapIndexed { i, m ->
+                    at("measures[$i]") {
+                        val (on, attribute) =
+                            ParticipantPaths.attributeRef(m.quality.erTarget)
+                                ?: refuse("the measure `${m.quality.ref}` lands on no attribute of E-R")
+                        if (on != entity.qname.name) {
+                            refuse(
+                                "the measure `${m.quality.ref}` lands on `$on`, not on the event's `${entity.qname.name}`",
+                            )
                         }
-                        is ErCondition.Quality -> {
-                            val col = slotColumn(c.concept, self, "a quality filter")
-                            if (c.literal ==
-                                null
-                            ) {
-                                SqlExpr.IsNull(col, c.op == "<>")
-                            } else {
-                                SqlExpr.Bin(c.op, col, SqlExpr.Lit(c.literal))
-                            }
+                        SqlExpr.Fn(m.function, listOf(SqlExpr.Col(row.alias, attribute))).also {
+                            select.items += Item(it, m.quality.qname.name)
                         }
                     }
-            }
+                }
+            for (p in spec.phases) phase(p, row, select)
+            for (c in spec.conditions) select.where += condition(c, self)
             spec.time?.let { (lo, hi) ->
-                val day = instantColumn(spec.event, row, select)
-                select.where += SqlExpr.Bin(">=", day, SqlExpr.Lit("DATE '$lo'"))
-                select.where += SqlExpr.Bin("<", day, SqlExpr.Lit("DATE '$hi'"))
+                at("time") {
+                    val day = instantColumn(spec.event, row)
+                    select.where += SqlExpr.Bin(">=", day, SqlExpr.Lit("DATE '$lo'"))
+                    select.where += SqlExpr.Bin("<", day, SqlExpr.Lit("DATE '$hi'"))
+                }
             }
             select.having =
                 SqlExpr.and(
@@ -617,6 +654,101 @@ internal class ErRenderer(
             return print(select, spec)
         }
 
+        /** [block] rendered as frame slot [s]: a refusal inside names [s] — and, [phase], a phase that does not render. */
+        private fun <T> at(
+            s: String,
+            phase: Boolean = false,
+            block: () -> T,
+        ): T {
+            val was = slot
+            slot = s
+            try {
+                return block()
+            } catch (r: Refused) {
+                throw if (r.subject != null) r else Refused(r.slug, r.message, s, phase, r.frame)
+            } finally {
+                slot = was
+            }
+        }
+
+        /** [p]'s definition inlined on the event's [row] — while the rows stay the event's rows (⚑R152-b). */
+        private fun phase(
+            p: ErPhase,
+            row: Row,
+            select: Select,
+        ) {
+            val ph = p.phase
+            val (bearer, block) =
+                at(p.slot) {
+                    val block =
+                        model.definitions.of(ph.qname).firstOrNull { it.kind == BlockKind.DEFINITION }
+                            ?: refuse(
+                                "`${ph.ref}` has no `definition:` to inline (a stacked-entity phase is a follow-up)",
+                            )
+                    val bearer = block.bearer?.let { cn.concepts[it] } ?: refuse("`${ph.ref}` has no bearer")
+                    if (entityOf(bearer)?.qname != row.entity.qname) {
+                        refuse(
+                            "`${ph.ref}` is a phase of `${bearer.ref}`, which does not land on the event's `${row.entity.qname.name}`",
+                        )
+                    }
+                    bearer to block
+                }
+            val joins = select.joins.size
+            val fanned = fannedOut.size
+            val sql =
+                at(p.slot, phase = true) {
+                    val expression = block.expression ?: refuse("`${ph.ref}`'s definition does not parse")
+                    inline(ph, expression, Bound(row, bearer), select, record = true)
+                }
+            at(p.slot) {
+                if (fannedOut.size > fanned) {
+                    refuse(
+                        "`${ph.ref}` joins `${fannedOut.drop(fanned).joinToString("`, `")}` from its many side — the " +
+                            "event's rows would repeat under the aggregate (a follow-up: an `EXISTS` over the event's key)",
+                    )
+                }
+                if (p.negated && select.joins.size > joins) {
+                    val joined =
+                        select.joins.drop(joins).joinToString("`, `") {
+                            when (val s = it.source) {
+                                is Source.Entity -> s.name
+                                is Source.Derived -> s.alias
+                            }
+                        }
+                    refuse(
+                        "a negated phase (`not ${ph.ref}`) that joins `$joined` needs a complement over the event's " +
+                            "key — not read on E-R (G-MD-1; a follow-up)",
+                    )
+                }
+            }
+            // two-valued (the wire has no `IS NOT TRUE`): where the phase is NULL the row counts as "not"
+            select.where +=
+                if (p.negated) SqlExpr.Not(SqlExpr.Fn("COALESCE", listOf(sql, SqlExpr.Lit("FALSE")))) else sql
+        }
+
+        /** A member / quality condition on the event's row, its refusals on the filter's own part of the slot. */
+        private fun condition(
+            c: ErCondition,
+            self: Bound,
+        ): SqlExpr =
+            when (c) {
+                is ErCondition.Member -> {
+                    val col = at("${c.slot}.member.concept") { slotColumn(c.concept, self, "a member filter") }
+                    SqlExpr.Bin("=", col, at("${c.slot}.member.member") { typed(c, col, self.row.entity) })
+                }
+                is ErCondition.Quality -> {
+                    val col = at("${c.slot}.quality.quality") { slotColumn(c.concept, self, "a quality filter") }
+                    if (c.literal ==
+                        null
+                    ) {
+                        SqlExpr.IsNull(col, c.op == "<>")
+                    } else {
+                        SqlExpr.Bin(c.op, col, SqlExpr.Lit(c.literal))
+                    }
+                }
+                is ErCondition.Within -> at("${c.slot}.quality.quality") { within(c, self.row) }
+            }
+
         /** [c] as a column of the event's row: its own attribute (a value kind, a quality), or the key it holds to [c]. */
         private fun slotColumn(
             c: Concept,
@@ -632,6 +764,18 @@ internal class ErRenderer(
                     ?: refuse(
                         "`${c.ref}` as $slot is no column of `$entity` and no participant of `${self.concept.ref}`",
                     )
+            // the participant's key reads the participant as declared, or a broader concept — a narrower one's
+            // restriction (`members:`, a definition) would be dropped (review-154 E7)
+            val declared =
+                lattice
+                    .chain(self.concept)
+                    .flatMap { it.involves }
+                    .firstOrNull { it.label == label }
+                    ?.concept
+                    ?.let { cn.concepts[it] }
+            if (declared != null && lattice.chain(declared).none { it.qname == c.qname }) {
+                refuse("`${c.ref}` narrows `${declared.ref}` — its restriction is not read on E-R (a follow-up)")
+            }
             val rels = path(self.concept, label)
             val r =
                 rels.singleOrNull()
@@ -649,42 +793,111 @@ internal class ErRenderer(
             )
         }
 
-        /** A member's text as the literal [col]'s type takes: digits for a numeric column, else quoted. */
+        /**
+         * A member's value as the literal its column takes: digits for a numeric column, else quoted. A participant's
+         * member is the key the event holds (⚑R152-c), so a value a numeric key cannot take is `cn/slot-mismatch`.
+         */
         private fun typed(
-            value: String,
+            m: ErCondition.Member,
             col: SqlExpr,
             entity: Entity,
         ): SqlExpr {
             val name = (col as? SqlExpr.Col)?.name
             val type = entity.attributes.firstOrNull { simple(it) == name }?.let { ErType.of(it.type) }
-            val numeric = type == ErType.INTEGER || type == ErType.DECIMAL
-            return SqlExpr.Lit(if (numeric && value.toBigDecimalOrNull() != null) value else quote(value))
+            if (type != ErType.INTEGER && type != ErType.DECIMAL) return SqlExpr.Lit(quote(m.value))
+            if (m.value.toBigDecimalOrNull() == null) {
+                throw Refused(
+                    UNREACHABLE,
+                    "`${m.value}` is no ${type.name.lowercase()} — `${m.concept.ref}`'s member is the key " +
+                        "`${entity.qname.name}.$name` holds",
+                    frame = FrameSlugs.SLOT_MISMATCH,
+                )
+            }
+            return SqlExpr.Lit(m.value)
+        }
+
+        /** An instant filter as bounds on its interval (⚑R152-f) — on the column's day when it keys a calendar. */
+        private fun within(
+            c: ErCondition.Within,
+            row: Row,
+        ): SqlExpr {
+            val (on, attribute) =
+                ParticipantPaths.attributeRef(c.concept.erTarget)?.takeIf { it.first == row.entity.qname.name }
+                    ?: refuse("`${c.concept.ref}` compared with an instant is no column of `${row.entity.qname.name}`")
+            val day = dayOf(row, attribute)
+            val dated = day.moment?.granularity == Granularity.DAY
+
+            fun bound(t: java.time.LocalDateTime): SqlExpr =
+                SqlExpr.Lit(
+                    if (dated && t.toLocalTime() == java.time.LocalTime.MIDNIGHT) {
+                        "DATE '${t.toLocalDate()}'"
+                    } else {
+                        "TIMESTAMP '${TIMESTAMP.format(t)}'"
+                    },
+                )
+            val lo = bound(c.lo)
+            val hi = bound(c.hi)
+            val col = day.sql
+            return when (c.op) {
+                "=" -> SqlExpr.and(listOf(SqlExpr.Bin(">=", col, lo), SqlExpr.Bin("<", col, hi)))!!
+                "<>" -> SqlExpr.or(listOf(SqlExpr.Bin("<", col, lo), SqlExpr.Bin(">=", col, hi)))!!
+                ">" -> SqlExpr.Bin(">=", col, hi)
+                ">=" -> SqlExpr.Bin(">=", col, lo)
+                "<" -> SqlExpr.Bin("<", col, lo)
+                "<=" -> SqlExpr.Bin("<", col, hi)
+                else -> refuse("`${c.op}` on an instant")
+            }
         }
 
         /**
-         * The day [event]'s period instant falls on, read on [row]: its column when that is a date; else — a key into a
-         * calendar (`sold_date → date_dim.sk`) — the entity the one relation keyed by it reaches, joined, at its
-         * `semantics { role: event_date }` column.
+         * The day [event]'s period instant falls on, read on [row] — its `at`, else its `start` ([periodBound], so the
+         * grounding's `period:` first, else the cn period's quality; through [dayOf] either way).
          */
         private fun instantColumn(
             event: Concept,
             row: Row,
-            select: Select,
         ): SqlExpr {
-            val period = grounding(event) { it.period != null }?.period
-            val ref =
-                period?.at ?: period?.start
-                    ?: refuse("`${event.ref}` has no period on E-R — the statement's time has nothing to read")
-            val (on, instant) =
-                ParticipantPaths.attributeRef(ref)
-                    ?: refuse("`${event.ref}`'s period `$ref` is no attribute")
-            if (on !=
-                row.entity.qname.name
-            ) {
-                refuse("`${event.ref}`'s period `$ref` is not on `${row.entity.qname.name}`")
+            val owner = lattice.chain(event).firstOrNull { it.period != null }
+            val p = owner?.period
+            val gp = grounding(event) { it.period != null }?.period
+            val bound =
+                when {
+                    gp?.at != null -> "at"
+                    gp?.start != null -> "start"
+                    p?.at != null -> "at"
+                    p?.start != null -> "start"
+                    else -> refuse("`${event.ref}` has no period on E-R — the statement's time has nothing to read")
+                }
+            return periodBound(
+                Bound(row, event),
+                owner ?: event,
+                bound,
+                (
+                    if (bound ==
+                        "at"
+                    ) {
+                        p?.at
+                    } else {
+                        p?.start
+                    }
+                ) ?: "",
+            ).sql
+        }
+
+        /**
+         * The day [attr] of [row] dates (review-154 E6): the column when it is a date or a timestamp (or of no known type);
+         * else — a key into a calendar (`sold_date → date_dim.sk`) — the calendar the one relation keyed by it reaches,
+         * joined through [hop] (so a second read reuses the join), at its `semantics { role: event_date }` column.
+         */
+        private fun dayOf(
+            row: Row,
+            attr: String,
+        ): Scalar {
+            val a = attribute(row.entity, attr)
+            val type = a?.let { ErType.of(it.type) }
+            if (type == null || type == ErType.DATE || type == ErType.TIMESTAMP) {
+                return Scalar(SqlExpr.Col(row.alias, attr), CnDefinitionLints.ofType(a?.type)?.let { Moment(it) })
             }
-            val type = attribute(row.entity, instant)?.let { ErType.of(it.type) }
-            if (type == ErType.DATE || type == ErType.TIMESTAMP) return SqlExpr.Col(row.alias, instant)
             val keyed =
                 er?.relations?.values.orEmpty().filter { r ->
                     r.fromEntity.name == row.entity.qname.name &&
@@ -692,52 +905,48 @@ internal class ErRenderer(
                         r.joinPairs
                             .single()
                             .fromAttr.name
-                            .substringAfterLast('.') == instant
+                            .substringAfterLast('.') == attr
                 }
             val r =
                 keyed.singleOrNull()
-                    ?: refuse("`${event.ref}`'s period `$ref` is no date, and no one relation keys a calendar by it")
+                    ?: refuse(
+                        "`${row.entity.qname.name}.$attr` is no date, and no one relation keys a calendar by it",
+                    )
             val calendar = entityNamed(r.toEntity.name) ?: refuse("no entity behind `${r.qname.name}`")
             val day =
                 calendar.attributes.singleOrNull { it.semantics?.role == "event_date" }
                     ?: refuse("`${calendar.qname.name}` (by `${r.qname.name}`) marks no `event_date` column")
-            val c = row(calendar, select)
-            select.joins +=
-                Join(
-                    false,
-                    Source.Entity(calendar.qname.name, c.alias),
-                    SqlExpr.Bin(
-                        "=",
-                        col(
-                            c,
-                            r.joinPairs
-                                .single()
-                                .toAttr.name,
-                        ),
-                        col(row, instant),
-                    ),
-                )
-            return SqlExpr.Col(c.alias, simple(day))
+            return Scalar(
+                SqlExpr.Col(hop(row, r).alias, simple(day)),
+                Moment(
+                    CnDefinitionLints.ofType(day.type) ?: Granularity.DAY,
+                ),
+            )
         }
 
-        /** The read printed with every placeholder bound: `as_of` the day, a derived bound computed, a `:name` from [ErStatement.values]. */
+        /**
+         * The read printed once, every placeholder bound as it is printed (review-154 E13): `as_of` the day, a derived
+         * bound computed, a `:name` from [ErStatement.values]; one that cannot be bound refuses on the slot that read it.
+         */
         private fun print(
             select: Select,
             spec: ErStatement,
         ): Rendering {
-            val probe = SqlPrinter(PlaceholderStyle.CURLY, compact)
-            probe.print(select)
-            val bound =
-                probe.params.associateWith { name ->
-                    when {
-                        name == "as_of" -> "DATE '${spec.asOf()}'"
-                        name in derived -> "DATE '${derivedDay(derived.getValue(name), spec.asOf(), name)}'"
-                        else ->
-                            spec.values[name]
-                                ?: refuse("`:$name` has no value in the world — a `def parameter` with `value:`")
+            val printer =
+                SqlPrinter(PlaceholderStyle.CURLY, compact) { name ->
+                    val at = paramSlots[name]
+                    try {
+                        when {
+                            name == "as_of" -> "DATE '${spec.asOf()}'"
+                            name in derived -> "DATE '${derivedDay(derived.getValue(name), spec.asOf(), name)}'"
+                            else ->
+                                spec.values[name]
+                                    ?: refuse("`:$name` has no value in the world — a `def parameter` with `value:`")
+                        }
+                    } catch (r: Refused) {
+                        throw Refused(r.slug, r.message, r.subject ?: at, phase = at?.endsWith(".phase.phase") == true)
                     }
                 }
-            val printer = SqlPrinter(PlaceholderStyle.CURLY, compact, bound)
             return Rendering(
                 text = printer.print(select),
                 parametersRead = printer.params.map { ParameterRead(it, derived[it]) },
@@ -963,8 +1172,10 @@ internal class ErRenderer(
                 is Literal -> Scalar(SqlExpr.Lit(literal(e.value)))
                 is ParamRef ->
                     if (e.name == "as_of") {
+                        slot?.let { paramSlots.putIfAbsent(e.name, it) }
                         Scalar(SqlExpr.Param("as_of"), Moment(Granularity.DAY, asOf = true))
                     } else {
+                        slot?.let { paramSlots.putIfAbsent(e.name, it) }
                         Scalar(SqlExpr.Param(e.name))
                     }
                 is DurationExpr ->
@@ -1229,6 +1440,7 @@ internal class ErRenderer(
                 }
             row.select.joins += Join(false, Source.Entity(entity.qname.name, next.alias), SqlExpr.and(on)!!)
             row.hops[r.qname.name] = next
+            if (!forward && row.select === outer) fannedOut += r.qname.name
             return next
         }
 
@@ -1440,7 +1652,7 @@ internal class ErRenderer(
                 }
             val base =
                 if (attr != null) {
-                    column(row, attr)
+                    periodColumn(row, attr)
                 } else {
                     val q =
                         cn.concepts.values.firstOrNull {
@@ -1451,7 +1663,7 @@ internal class ErRenderer(
                             ?: refuse(
                                 "`${owner.ref}`'s `period.$bound` reads `$qualityName`, which nothing grounds on E-R",
                             )
-                    column(row, q.erTarget ?: unreachable(q))
+                    periodColumn(row, q.erTarget ?: unreachable(q))
                 }
             val hi =
                 when (bound) {
@@ -1461,6 +1673,20 @@ internal class ErRenderer(
                 }?.let { column(row, it).sql }
             val granularity = CnDefinitionLints.granularity(periodOf(owner)?.precision) ?: base.moment?.granularity
             return Scalar(base.sql, Moment(granularity, hi))
+        }
+
+        /** A period's `er.entity.<e>.<a>` on [row]'s entity, read as the day it dates ([dayOf], review-154 E6). */
+        private fun periodColumn(
+            row: Row,
+            ref: String,
+        ): Scalar {
+            val (entity, attr) = attributeRef(ref) ?: refuse("`$ref` is no E-R attribute")
+            if (entity !=
+                row.entity.qname.name
+            ) {
+                refuse("`$ref` is not on `${row.entity.qname.name}`, the row it is read on")
+            }
+            return dayOf(row, attr)
         }
 
         private fun phase(
@@ -1661,7 +1887,7 @@ internal class ErRenderer(
                     )
                 a.where?.let { d.where += predicateOf(it, sealed) }
                 val order = value(by, sealed) as? Scalar ?: refuse("`latest(…, by:)` orders by no value")
-                if (options.asOf != null) {
+                if (options.asOf != null || statementRead) {
                     if (order.moment?.granularity == null) {
                         refuse(
                             "`latest(…, by: ${spelled(
@@ -1792,6 +2018,7 @@ internal class ErRenderer(
             var i = 2
             while (name in derived) name = "${base}_${i++}"
             derived[name] = derivation
+            slot?.let { paramSlots.putIfAbsent(name, it) }
             return SqlExpr.Param(name)
         }
 
@@ -2004,6 +2231,12 @@ internal class ErRenderer(
         val FLIPPED = mapOf("=" to "=", "<>" to "<>", "<" to ">", "<=" to ">=", ">" to "<", ">=" to "<=")
 
         val GROUPED = setOf("count", "sum", "avg", "min", "max")
+
+        /** A full timestamp literal's text — never a shorter one (⚑R152-f). */
+        val TIMESTAMP: java.time.format.DateTimeFormatter =
+            java.time.format.DateTimeFormatter.ofPattern(
+                "yyyy-MM-dd HH:mm:ss",
+            )
 
         fun quote(s: String): String = "'" + s.replace("'", "''") + "'"
 

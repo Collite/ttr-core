@@ -105,9 +105,14 @@ class CnConceptService(
         val findings = statements.validate(s)
         val errors = findings.filter { it.severity == Severity.ERROR }
         if (errors.isEmpty() || errors.any { it.slug !in StatementLowerer.MD_REACH }) return findings
-        val lowered = lowerer.lower(s)
-        if (lowered.erSql.isEmpty()) return findings
-        return findings - errors.toSet() + lowered.diagnostics.filter { it.slug == FrameSlugs.LOWERED_ON_ER }
+        // validated once: the lowering takes these findings (review-154 E12); validate ⊇ lower's refusals (A-CN-49)
+        val lowered = lowerer.lower(s, findings)
+        if (lowered.erSql.isNotEmpty()) {
+            return findings - errors.toSet() + lowered.diagnostics.filter { it.slug == FrameSlugs.LOWERED_ON_ER }
+        }
+        val said = findings.map { it.slug to it.subject }.toSet()
+        return findings +
+            lowered.diagnostics.filter { it.severity == Severity.ERROR && (it.slug to it.subject) !in said }
     }
 
     override fun statementLower(s: Statement): LowerResult = lowerer.lower(s)

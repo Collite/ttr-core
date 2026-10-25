@@ -1,0 +1,34 @@
+// review-154 E0 — one cubelet carries every md statement of this world (no "several carriers"). `unit_price` is
+// non-additive with no aggregation (md refuses it; E1), `stock` semi-additive per Time, `top_price` non-additive with a
+// declared `max`.
+model md
+def domain Money { type: decimal }
+def domain Count { type: int }
+def domain Code  { type: int }
+def domain Date  { type: date }
+def domain Month { type: int, kind: calc, restrict: { range: 1..12 } }
+def domain Year  { type: int, kind: calc }
+
+def dimension Buyer { key: code, attributes: [ def attribute code { domain: md.Code, isKey: true } ] }
+def dimension Time {
+  key: day,
+  attributes: [
+    def attribute day   { domain: md.Date, isKey: true },
+    def attribute month { domain: md.Month },
+    def attribute year  { domain: md.Year }
+  ]
+}
+def map date_to_month { from: md.Date, to: md.Month, calc: monthOfDate }
+def map date_to_year  { from: md.Date, to: md.Year,  calc: yearOfDate }
+
+def measure revenue    { domain: md.Money, class: additive, aggregation: sum }
+def measure quantity   { domain: md.Count, class: additive, aggregation: sum }
+def measure unit_price { domain: md.Money, class: nonAdditive }
+def measure stock      { domain: md.Count, class: semiAdditive, aggregation: { default: sum, Time: latestValid } }
+def measure top_price  { domain: md.Money, class: nonAdditive, aggregation: { default: max } }
+
+def measure refund     { domain: md.Money, class: additive, aggregation: sum }
+
+def cubelet sales { grain: [Buyer.code, Time.day], measures: [revenue, quantity, unit_price, stock, top_price] }
+// no Buyer grain: "refund by Customer" has no md carrier (a placement refusal the er lane reads)
+def cubelet refunds { grain: [Time.day], measures: [refund] }

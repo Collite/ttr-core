@@ -543,18 +543,39 @@ JOIN date_dim ON date_dim.sk = sales.sold_date
 WHERE sales.channel = 'web' AND date_dim.cal_date >= DATE '2026-01-01' AND date_dim.cal_date < DATE '2026-02-01'
 ```
 
-- **md first.** E-R reads a statement only when md cannot: no carrier, several, or a slot md cannot reach. The result
-  then carries SQL over entities (`erSql`) instead of a plan, and the advisory `cn/lowered-on-er` says why md did not.
-- **Measures** aggregate by their md measure's aggregation (`sum`, `avg`, `min`, `max`, `count`); a quality with no md
-  measure has no aggregation to take.
-- **Phase filters** inline their definition on the event's row (`NOT (…)` when negated); member and quality filters
-  read the event's columns, or the key it holds to a participant; a group-by likewise.
-- **Time** reads the event's period instant: the column itself when it is a date, else the calendar a date-key relation
-  reaches, at its `semantics { role: event_date }` column. The bounds are written as literals, and so is every
-  placeholder a phase reads (`:as_of` the evaluation day, a `def parameter`'s value).
-- `statementValidate` predicts it: a slot only md cannot reach is no error when E-R reads the statement.
+- **md first.** E-R reads a statement only when md cannot place it: no carrier, several, or a slot md cannot reach. The
+  result then carries SQL over entities (`erSql`) instead of a plan, and the advisory `cn/lowered-on-er` says why md did
+  not.
+- **E-R places; it does not re-decide.** A question md refuses on principle stays refused on E-R, for md's reason — one
+  finding, E-R's reason folded into it:
+  - a **non-additive** measure that declares no aggregation, and a **semi-additive** one (`aggregation: { default: sum,
+    Time: latestValid }`) — neither is a plain aggregate;
+  - a filter on a measure the statement does not read — md's HAVING on another measure; on E-R it would filter rows,
+    which is another question;
+  - a **negated phase whose definition joins** another entity (G-MD-1).
+- **Measures** aggregate by their md measure's aggregation: a declared default (`sum`, `avg`, `min`, `max`, `count`),
+  else `sum` for an additive measure. A quality with no md measure has no aggregation to take.
+- **Phase filters** inline their definition on the event's row, while the rows stay the event's: a phase that joins a
+  relation from its many side (each sale's shipments, say) is refused — the sum would count a sale once per shipment. A
+  negated phase is read `NOT COALESCE((…), FALSE)`: two-valued, so a row where the phase is NULL (no channel) counts as
+  "not web", and `revenue where WebSale` plus `revenue where not WebSale` is the total.
+- **Members and group-bys of a participant are keys.** A member filter compares the key the event holds
+  (`sales.item = 1017`) — the member's `resolved_value` *is* that key (as an assertion writes it); a value the key's type
+  cannot take is `cn/slot-mismatch`. A group-by on a participant returns its keys, not its names: whoever shows the
+  result (the door, Golem) labels them. A narrower concept than the participant (a kind `is_a: Customer` with a
+  `members:` restriction) is refused — its restriction is not read on E-R.
+- **Quality filters** read the event's columns; an instant is its interval — `due_on = 2026-01` is `due_on >= DATE
+  '2026-01-01' AND due_on < DATE '2026-02-01'`, and a day on a timestamp column is that day's range.
+- **Time** reads the event's period instant on its day: the column itself when it is a date, else the calendar a
+  date-key relation reaches, at its `semantics { role: event_date }` column — the statement's time and a phase's window
+  (`within(period.at, last: days(30))`) alike, through one join. The bounds are written as literals, and so is every
+  placeholder a phase reads (`:as_of` the evaluation day, a `def parameter`'s value); a `latest(…, by:)` is capped at
+  the evaluation day.
+- `statementValidate` predicts it: a slot only md cannot reach is no error when E-R reads the statement, and E-R's own
+  refusal (a slot mismatch) shows there too.
 - Refused on E-R too: a `compare`, an `ANY` / `NOT` group, an expression filter, measures of different events, a window
-  in working days. A statement neither lane reads is refused with both lanes' findings, md's first.
+  in working days. A statement neither lane reads is refused with both lanes' findings, md's first; every finding names
+  the frame slot it is about (`groupBy[0]`, `filters[1].member.member`, `time`).
 
 ### Assertions
 

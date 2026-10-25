@@ -200,10 +200,17 @@ class FrameValidationSpec :
             st(ask, revenue, always, member("cn.Channel", "web")),
         )
         s(
-            "a member of an er kind no md element hops to", // E-R reads it (above)
+            "a member of an er kind no md element hops to", // E-R reads it: the key `sales.item` holds (A-CN-47)
+            hartland,
+            st(ask, revenue, always, member("cn.Item", "1017")),
+            "cn/lowered-on-er filters[0].member.concept",
+        )
+        s(
+            "a member no er key can take — validate shows the lowering's refusal (review-154 E10, E12)",
             hartland,
             st(ask, revenue, always, member("cn.Item", "SKU-1")),
-            "cn/lowered-on-er filters[0].member.concept",
+            "cn/not-analytically-reachable filters[0].member.concept",
+            "cn/slot-mismatch filters[0].member.member",
         )
 
         fun quality(body: String) = filter("{ \"quality\": { $body } }")
