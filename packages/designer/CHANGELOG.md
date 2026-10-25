@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix review-148 hosted source grants, stale drawer Apply, full worker diagnostics/discard, optional extension recovery and source URI identity.
+
 - Add an open Source files drawer and whole-file worker-cache authoring so hosted changes can create query files before their single Studio Save. Preserve the existing six structured operations and server licence/lease/strict gates.
 
 - Hosted Studio: fixed licensed extension hook, worker binding policy, and exact saved-SHA acknowledgement with remaining dirty count.

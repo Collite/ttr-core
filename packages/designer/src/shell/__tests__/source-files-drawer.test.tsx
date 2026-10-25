@@ -46,3 +46,16 @@ it('retains the text on refusal and does not overwrite an existing file from New
   expect(screen.getByLabelText('Source text')).toHaveValue('model er\nnew text');
   expect(close).not.toHaveBeenCalled();
 });
+
+it('R148-R11 refuses Apply when a structured edit changed the selected file', async () => {
+  const file = { path: 'model/er/a.ttrm', text: 'model er\nold' };
+  const write = vi.fn(async () => []);
+  render(<SourceFilesDrawer files={() => [file]} write={write} onClose={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText('File'), { target: { value: file.path } });
+  fireEvent.change(screen.getByLabelText('Source text'), { target: { value: 'drawer edit' } });
+  file.text = 'form edit';
+  fireEvent.click(screen.getByRole('button', { name: 'Apply to model' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('changed since you opened');
+  expect(write).not.toHaveBeenCalled();
+  expect(screen.getByLabelText('Source text')).toHaveValue('drawer edit');
+});

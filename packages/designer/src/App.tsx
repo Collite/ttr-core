@@ -78,7 +78,7 @@ interface LanguageChoice {
 }
 
 export function Studio({
-  dataSource, viewState, catalog, files, workspace, processingSource, language, initialAppPath, onSourceDiagnostics,
+  dataSource, viewState, catalog, files, workspace, processingSource, language, initialAppPath, canAuthorSource = true,
 }: {
   dataSource: ModelDataSource;
   viewState?: ViewStateStore;
@@ -89,7 +89,7 @@ export function Studio({
   processingSource?: ProcessingGraphSource;
   /** present on a catalog backend: model labels follow this language. */
   language?: LanguageChoice;
-  onSourceDiagnostics?: (diagnostics: import('@tatrman/lsp').WorkerDiagnostic[]) => void;
+  canAuthorSource?: boolean;
 }) {
   const page = usePageEnvironment();
   const config = page?.config ?? getRuntimeConfig();
@@ -106,6 +106,7 @@ export function Studio({
     return () => { live = false; subscription?.dispose(); };
   }, [dataSource]);
   const [sourceOpen, setSourceOpen] = useState(false);
+  useEffect(() => { if (!canAuthorSource) setSourceOpen(false); }, [canAuthorSource]);
   const [displayMode, setDisplayMode] = useState<DisplayMode>('just-names');
   const [active, setActive] = useState<ActiveSubject | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -145,7 +146,7 @@ export function Studio({
               </select>
             </>
           )}
-          {dataSource.capabilities.edit && dataSource.sourceFiles && dataSource.writeSourceFile && <button type="button" onClick={() => setSourceOpen(true)}>Source files</button>}
+          {canAuthorSource && dataSource.capabilities.edit && dataSource.sourceFiles && dataSource.writeSourceFile && <button type="button" onClick={() => setSourceOpen(true)}>Source files</button>}
           <span className="uppercase tracking-wide text-slate-400">Detail</span>
           <select
             data-testid="display-mode"
@@ -158,7 +159,7 @@ export function Studio({
           </select>
         </div>
       </header>
-      {sourceOpen && dataSource.sourceFiles && dataSource.writeSourceFile && <SourceFilesDrawer files={() => dataSource.sourceFiles!()} write={file => dataSource.writeSourceFile!(file)} onDiagnostics={onSourceDiagnostics} onClose={() => setSourceOpen(false)} />}
+      {dataSource.capabilities.edit && dataSource.sourceFiles && dataSource.writeSourceFile && <SourceFilesDrawer visible={sourceOpen && canAuthorSource} files={() => dataSource.sourceFiles!()} write={file => dataSource.writeSourceFile!(file)} onClose={() => setSourceOpen(false)} />}
       <ErrorBoundary label="shell" resetKey={workspace}>
         <ShellFrame
           dataSource={dataSource}
@@ -443,6 +444,7 @@ export default App;
 function HostedStudio() {
   const [session, setSession] = useState<{ source: BffFilesDataSource; catalog: CatalogGroup[]; workspace: string; sha: string; initialAppPath: string } | null>(null);
   const [error, setError] = useState(false);
+  const [canAuthorSource, setCanAuthorSource] = useState(false);
   const [authoring, setAuthoring] = useState<{ loader: AuthoringLoader | null }>({ loader: null });
   const root = useRef<HTMLDivElement>(null);
   const channelRef = useRef<HostChannel | null>(null);
@@ -454,14 +456,22 @@ function HostedStudio() {
     let required = true;
     const updateAuthoring = async () => {
       if (!policy || !source?.project) return;
+      setCanAuthorSource(policy.scope.kind === 'change' && !!policy.features?.includes('modeler'));
       required = source.bindingsRequired;
       const key = JSON.stringify([policy.features ?? [], policy.extensions ?? [], required]);
       if (key === grantKey) return;
       grantKey = key;
       // Revoke immediately, including while a previous dynamic import is outstanding.
       setAuthoring({ loader: null });
-      const loader = await hostedAuthoring(policy, required);
-      if (!disposed && grantKey === key) setAuthoring({ loader });
+      try {
+        const loader = await hostedAuthoring(policy, required);
+        if (!disposed && grantKey === key) setAuthoring({ loader });
+      } catch {
+        if (!disposed && grantKey === key) {
+          grantKey = '';
+          channelRef.current?.send({ type: 'ttr.frame.error', code: 'frame/extension-unavailable', message: 'Authoring is unavailable. The model remains readable; retry by reopening editing.' });
+        }
+      }
     };
     let disposed = false;
     let latestToken: string | null = null;
@@ -470,9 +480,11 @@ function HostedStudio() {
     let dirtyTimer: ReturnType<typeof setTimeout> | undefined;
     let fileSubscription: { dispose(): void } | undefined;
     let lastLocation = '';
+    const publishDiagnostics = () => channelRef.current?.send({ type: 'ttr.frame.diagnostics', diagnostics: (source?.diagnostics() ?? []).map(value => ({ uri: value.uri, severity: value.severity === 1 ? 'error' : value.severity === 2 ? 'warning' : 'info', code: String(value.code ?? ''), message: value.message, source: 'worker' })) });
     const syncSession = async (initialAppPath?: string, options: SnapshotRefreshOptions = {}) => {
       const changed = await source!.refresh({ ...options, deferDisposal: true });
       if (disposed || (!changed && renderedSha === source!.sha)) return false;
+      publishDiagnostics();
       const { graphs, symbols } = await source!.listCatalog();
       if (disposed) return;
       setError(false);
@@ -493,6 +505,7 @@ function HostedStudio() {
             if (message.sha) {
               if (message.sha !== source.sha) await syncSession(undefined, { reason: 'save', expectedSha: message.sha });
               if (source.sha !== message.sha) throw new SnapshotEditError('frame/edit-conflict', 'The branch moved after Save. Local edits are retained.');
+              publishDiagnostics();
               channel.send({ type: 'ttr.frame.ack', sha: source.sha, changed: source.changedFiles().length });
             }
             return;
@@ -513,7 +526,7 @@ function HostedStudio() {
           source = new BffFilesDataSource({ ...message, token: latestToken ?? message.token });
           fileSubscription = source.onFilesChanged(() => {
             clearTimeout(dirtyTimer);
-            dirtyTimer = setTimeout(() => channel.send({ type: 'ttr.frame.dirty', changed: source!.changedFiles().length }), 200);
+            dirtyTimer = setTimeout(() => { channel.send({ type: 'ttr.frame.dirty', changed: source!.changedFiles().length }); publishDiagnostics(); }, 200);
           });
           await syncSession(path);
         } else if (message.type === 'ttr.host.collect') {
@@ -586,5 +599,5 @@ function HostedStudio() {
   }, [session]);
   const viewState = useMemo(() => makeViewStateStore('file', { kind: 'file' }), []);
   if (!session) return <div className="hosted-status" role="status">{error ? 'Could not load the model.' : 'Waiting for Studio…'}</div>;
-  return <PageContext.Provider value={{ root, config: getRuntimeConfig(), theme: 'light', authoringLoader: authoring.loader, location: { current: currentAppPath, replace: replaceAppPath, subscribe: handler => { const receive = () => handler(currentAppPath()); window.addEventListener(APP_NAVIGATE, receive); return () => window.removeEventListener(APP_NAVIGATE, receive); }, absolute: path => absoluteUrlFor(path) ?? window.location.origin } }}><div ref={root} style={{ height: '100%', minHeight: 0 }}><Studio key={session.sha} dataSource={session.source} viewState={viewState} catalog={session.catalog} files={[]} workspace={session.workspace} initialAppPath={session.initialAppPath} onSourceDiagnostics={values => channelRef.current?.send({ type: 'ttr.frame.diagnostics', diagnostics: values.map(value => ({ uri: value.uri, severity: value.severity === 1 ? 'error' : value.severity === 2 ? 'warning' : 'info', code: String(value.code ?? ''), message: value.message, source: 'worker' })) })} /></div></PageContext.Provider>;
+  return <PageContext.Provider value={{ root, config: getRuntimeConfig(), theme: 'light', authoringLoader: authoring.loader, location: { current: currentAppPath, replace: replaceAppPath, subscribe: handler => { const receive = () => handler(currentAppPath()); window.addEventListener(APP_NAVIGATE, receive); return () => window.removeEventListener(APP_NAVIGATE, receive); }, absolute: path => absoluteUrlFor(path) ?? window.location.origin } }}><div ref={root} style={{ height: '100%', minHeight: 0 }}><Studio key={session.sha} dataSource={session.source} viewState={viewState} catalog={session.catalog} files={[]} workspace={session.workspace} initialAppPath={session.initialAppPath} canAuthorSource={canAuthorSource} /></div></PageContext.Provider>;
 }

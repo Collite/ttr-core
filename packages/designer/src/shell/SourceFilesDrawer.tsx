@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
+import { uriFor } from '../fs/source-uri.js';
 import { useId, useState } from 'react';
 import type { WorkerDiagnostic } from '@tatrman/lsp';
 type SourceFile = { path: string; text: string };
 /** Open text authoring. Apply changes the one worker cache; Studio Save persists that cache. */
 export function SourceFilesDrawer({
+  visible = true,
   files,
   write,
   onDiagnostics,
   onClose,
 }: {
+  visible?: boolean;
   files: () => SourceFile[];
   write: (file: SourceFile) => Promise<WorkerDiagnostic[]>;
   onDiagnostics?: (diagnostics: WorkerDiagnostic[]) => void;
@@ -28,7 +31,11 @@ export function SourceFilesDrawer({
     if (!busy && canLeave()) onClose();
   };
   const apply = async () => {
-    if (busy) return;
+    if (busy || !visible) return;
+    if (selected && files().find((file) => file.path === selected)?.text !== baseline) {
+      setError("This file changed since you opened it — reload it into the editor.");
+      return;
+    }
     setError(undefined);
     if (!selected && options.some((file) => file.path === path)) {
       setError('That source path already exists. Select it to edit the file.');
@@ -44,7 +51,7 @@ export function SourceFilesDrawer({
         !values.some(
           (value) =>
             value.severity === 1 &&
-            value.uri.endsWith('/' + path.split('/').map(encodeURIComponent).join('/'))
+            value.uri === uriFor('file:///repo', path)
         )
       )
         onClose();
@@ -68,7 +75,7 @@ export function SourceFilesDrawer({
         colorScheme: 'light',
         borderLeft: '1px solid #cbd8e6',
         padding: 16,
-        display: 'flex',
+        display: visible ? 'flex' : 'none',
         flexDirection: 'column',
         gap: 8,
         overflowY: 'auto',

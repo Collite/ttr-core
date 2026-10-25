@@ -18,7 +18,7 @@ const post = (data: unknown) => window.dispatchEvent(new MessageEvent('message',
   data, origin: window.location.origin, source: window.parent,
 }));
 const init = { type: 'ttr.host.init', api: '/api/model', basePath: '/m/', workspace: 'hartland',
-  token: 'secret', scope: { kind: 'change', id: 'review' }, lang: 'en', theme: 'light' };
+  token: 'secret', features: ['modeler'], scope: { kind: 'change', id: 'review' }, lang: 'en', theme: 'light' };
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); setRuntimeConfig(null); });
 it('collects whole changed files, coalesces edits, and accepts a new saved SHA', async () => {
   window.history.replaceState(null, '', '/m/_designer/index.html?backend=host#/w/hartland/s/er');
@@ -86,7 +86,7 @@ it('collect sees a whole multi-file edit while transport acknowledgements are pe
   const openDocument = vi.fn(async () => { await held; });
   const edit = { changes: Object.fromEntries(['a', 'b'].map(name => [`file:///repo/${name}.ttrm`,
     [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } }, newText: 'new-' + name }]])) };
-  const client = { edit: async () => ({ ok: true, edit, touched: [], diagnostics: [] }), openDocument } as unknown as LspClient;
+  const client = { edit: async () => ({ ok: true, edit, touched: [], diagnostics: [] }), openDocument, setProjectRoot: async () => ({}) } as unknown as LspClient;
   const source = new WorkerLspDataSource(client, { projectRoot: 'file:///repo', files: new Map([['a.ttrm', 'old'], ['b.ttrm', 'old']]) });
   const applying = source.edit({ op: 'add-term', args: { lang: 'en', term: 'x', target: 'er.entity.x' } });
   await waitFor(() => expect(openDocument).toHaveBeenCalledTimes(1));
@@ -157,4 +157,17 @@ it('the hosted open source drawer creates a whole file and reports it through di
  await waitFor(()=>expect(screen.queryByRole('dialog',{name:'Source files'})).toBeNull());
  expect(h.source.changedFiles()).toEqual([{path:'model/er/source-added.ttrm',text:expect.stringContaining('def entity source_added')}]);
  post({type:'ttr.host.collect'});await waitFor(()=>expect(h.sent).toHaveBeenCalledWith(expect.objectContaining({type:'ttr.frame.changedFiles',files:h.source.changedFiles()}),window.location.origin));
+});
+
+it('R148-R10 reports the complete worker diagnostics after edits and clears discarded errors', async () => {
+ const h=await editableHost();
+ const broken='model/er/broken.ttrm';
+ await act(async()=>{await h.source.writeSourceFile({path:broken,text:'package shop\nmodel er\ndef entity broken {}'});});
+ const latest=()=>h.sent.mock.calls.map(([m])=>m).filter(m=>m.type==='ttr.frame.diagnostics').at(-1)?.diagnostics;
+ await waitFor(()=>expect(latest()).toEqual(expect.arrayContaining([expect.objectContaining({uri:'file:///repo/'+broken,severity:'error'})])));
+ await h.edit('another file');
+ await waitFor(()=>expect(latest()).toEqual(expect.arrayContaining([expect.objectContaining({uri:'file:///repo/'+broken,severity:'error'})])));
+ post({type:'ttr.host.refresh',discard:true});
+ await waitFor(()=>expect(h.source.changedFiles()).toEqual([]));
+ await waitFor(()=>expect(latest()?.some((d:{uri:string})=>d.uri.endsWith('/'+broken))).toBe(false));
 });

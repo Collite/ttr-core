@@ -35,6 +35,7 @@ import { layoutIndexOf } from '../model/layout-projection.js';
 import type { ModelerEditParams, ModelerEditResult } from '@tatrman/lsp';
 import type { WorkspaceEdit } from 'vscode-languageserver-types';
 import { applyWorkspaceEdit } from '../lsp/apply-workspace-edit.js';
+import { uriFor } from '../fs/source-uri.js';
 import { isSourcePath } from '../fs/source-path.js';
 import { changedFiles } from '../fs/changed-files.js';
 import { modeOf } from '@tatrman/parser/layout';
@@ -101,7 +102,7 @@ export class WorkerLspDataSource implements ModelDataSource {
       if (!isSourcePath(path)) throw new Error('Use a regular model/*.ttrm source path.');
       // Re-send unchanged cached text too: an earlier transport failure may not have reached the worker.
       this.docTextCache.set(path, text);
-      const uri = this.ctx.projectRoot.replace(/\/$/, '') + '/' + path.split('/').map(encodeURIComponent).join('/');
+      const uri = uriFor(this.ctx.projectRoot, path);
       const opened = this.lspClient.openDocument(uri, text);
       // Whole cache update precedes transport waits; collect never sees a partial file.
       for (const callback of this.fileListeners) callback();
@@ -145,7 +146,8 @@ export class WorkerLspDataSource implements ModelDataSource {
     // Commit the complete map synchronously: collect must never observe half an edit
     // while a transport acknowledgement is pending.
     for (const [path, text] of staged) this.docTextCache.set(path, text);
-    for (const uri of affected) await this.lspClient.openDocument(uri, this.docTextCache.get(decodeURIComponent(uri.slice(root.length)))!);
+    for (const uri of affected) await this.lspClient.openDocument(uriFor(this.ctx.projectRoot, decodeURIComponent(uri.slice(root.length))), this.docTextCache.get(decodeURIComponent(uri.slice(root.length)))!);
+    await this.lspClient.setProjectRoot(this.ctx.projectRoot, this.docTextCache.get('modeler.toml'));
     for (const cb of this.fileListeners) cb();
     this.revision++;
     for (const cb of this.modelListeners) cb(String(this.revision));

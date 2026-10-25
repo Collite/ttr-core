@@ -119,3 +119,18 @@ it('retries a failed worker write even when the whole-file text is already cache
   await expect(source.writeSourceFile(file)).resolves.toEqual([]);
   expect(open).toHaveBeenCalledTimes(2);
 });
+
+it('R148-R13 uses the initially loaded URI for source files with non-ASCII and special names', async () => {
+  const client = await createTestClient();
+  const open = vi.spyOn(client, 'openDocument');
+  const path = 'model/er/zákazník @+=.ttrm';
+  const source = new BffFilesDataSource(
+    { api: '/api/model', scope: { kind: 'change', id: 'review' }, token: '' },
+    { createClient: async () => client, loadSnapshot: async () => ({ sha: 'one', files: { 'modeler.toml': '[packages]\nlayout="off"', [path]: 'package shop\nmodel er\ndef entity a {}' } }) }
+  );
+  try {
+    await source.refresh();
+    await source.writeSourceFile({ path, text: 'package shop\nmodel er\ndef entity b {}' });
+    expect(new Set(open.mock.calls.map(([uri]) => uri))).toEqual(new Set(['file:///repo/' + path]));
+  } finally { source.dispose(); }
+});

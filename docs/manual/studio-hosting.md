@@ -336,3 +336,5 @@ Ready advertises the additive `source-files` capability. The six modeler/edit op
 
 The new source drawer belongs to the open viewer/library, so its next internal artifact cut is also needed
 when a stage-2 host consumes this addition; the already released Designer family 0.1.0 is unchanged.
+
+Hosted source authoring follows `scope.kind === "change"` plus the current `features: ["modeler"]` grant on every init. Revocation hides the drawer without applying its draft. Optional extension failures emit nonfatal `frame/extension-unavailable` and retry on the next init. `ttr.frame.diagnostics` always replaces the complete worker set after a revision or snapshot install, including same-SHA discard. The extension must not publish touched-file subsets. Source Apply refuses a file changed since it was opened; loaded and edited source use the same raw document URI.

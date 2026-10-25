@@ -162,7 +162,7 @@ export class BffFilesDataSource implements ModelDataSource {
     };
     const snapshot = snapshotOf(await (this.deps.loadSnapshot ? this.deps.loadSnapshot() : read()));
     if (options.expectedSha && snapshot.sha !== options.expectedSha) throw new SnapshotEditError('frame/edit-conflict', 'The branch moved after Save. Local edits are retained.');
-    if (snapshot.sha === this.sha) return false;
+    if (snapshot.sha === this.sha && !(options.discard && this.changedFiles().length)) return false;
     for (let attempt = 0; attempt < 8; attempt++) {
       const current = this.currentFiles();
       const saved = collected?.sha === this.sha ? collected : null;
@@ -193,7 +193,7 @@ export class BffFilesDataSource implements ModelDataSource {
           if (!sameFiles(current, this.currentFiles())) { client.dispose(); continue; }
         }
         worker.onFilesChanged(() => { if (this.worker !== worker) return; worker.invalidate(); this.catalogGen++; this.catalog = null; for (const cb of this.fileListeners) cb(); });
-        worker.onModelChanged(() => { if (this.worker !== worker) return; worker.invalidate(); this.catalogGen++; this.catalog = null; });
+        worker.onModelChanged(() => { if (this.worker !== worker) return; worker.invalidate(); this.catalogGen++; this.catalog = null; for (const cb of this.fileListeners) cb(); });
         const previous = this.worker;
         this.worker = worker;
         this.catalogGen++;
@@ -220,6 +220,7 @@ export class BffFilesDataSource implements ModelDataSource {
     try { return await this.source.edit(params); }
     finally { if (!params.dryRun) this.activeEdits--; }
   }
+  diagnostics() { return this.worker?.lspClient.diagnostics?.() ?? []; }
   sourceFiles() { return this.worker?.sourceFiles() ?? []; }
   async writeSourceFile(file: { path: string; text: string }) {
     this.activeEdits++;
