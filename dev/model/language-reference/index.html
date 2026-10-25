@@ -878,10 +878,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#governance-roles-not-a-security-block" class="md-nav__link">
+  <a href="#governance-policy-not-a-security-block" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Governance — roles, not a security block
+        Governance — policy, not a security block
       
     </span>
   </a>
@@ -1596,10 +1596,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#governance-roles-not-a-security-block" class="md-nav__link">
+  <a href="#governance-policy-not-a-security-block" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Governance — roles, not a security block
+        Governance — policy, not a security block
       
     </span>
   </a>
@@ -1671,7 +1671,7 @@ are migrating in from the user manual.</p>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>model   &lt;code&gt; [schema &lt;id&gt;]   // the layer this file defines
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>def &lt;kind&gt; &lt;name&gt; { … }   // one or more definitions
 </code></pre></div>
-<p><code>&lt;code&gt;</code> is the layer: <code>db</code>, <code>er</code>, <code>binding</code> (er↔db and other mappings), <code>cnc</code>, <code>md</code>. Identifiers
+<p><code>&lt;code&gt;</code> is the layer: <code>db</code>, <code>er</code>, <code>binding</code> (er↔db and other mappings), <code>md</code>, <code>cn</code> (<code>cnc</code> is deprecated). Identifiers
 allow Latin-1/Extended letters, so real Czech names are valid verbatim.</p>
 <h2 id="definition-kinds-from-grammar">Definition kinds <em>(from grammar)</em><a class="headerlink" href="#definition-kinds-from-grammar" title="Permanent link">&para;</a></h2>
 <table>
@@ -1695,7 +1695,11 @@ allow Latin-1/Extended letters, so real Czech names are valid verbatim.</p>
 <td><code>er2db_entity</code>, <code>er2db_attribute</code>, <code>er2db_relation</code></td>
 </tr>
 <tr>
-<td><code>cnc</code></td>
+<td><code>cn</code></td>
+<td><code>kind</code>, <code>role</code>, <code>event</code>, <code>quality</code>, <code>phase</code>, <code>relation_type</code>; grounded by <code>cn2md_*</code> / <code>cn2er_*</code> in <code>binding</code></td>
+</tr>
+<tr>
+<td><code>cnc</code> <em>(deprecated)</em></td>
 <td><code>role</code>, <code>er2cnc_role</code></td>
 </tr>
 <tr>
@@ -1956,13 +1960,13 @@ exactly that text.</p>
   bare <code>JOIN</code>s conditioned from the relations, no parameters), and an entity can be stacked on it
   (<code>binding: { target: { query: er.query.&lt;name&gt; } }</code>) — agents then ask over that entity.</li>
 </ul>
-<h2 id="governance-roles-not-a-security-block">Governance — roles, not a <code>security</code> block<a class="headerlink" href="#governance-roles-not-a-security-block" title="Permanent link">&para;</a></h2>
+<h2 id="governance-policy-not-a-security-block">Governance — policy, not a <code>security</code> block<a class="headerlink" href="#governance-policy-not-a-security-block" title="Permanent link">&para;</a></h2>
 <div class="admonition warning">
 <p class="admonition-title">There is no <code>security {}</code> construct</p>
-<p>Governance in TTR-M is expressed through the <strong><code>cnc</code> layer</strong> — <code>role</code> and <code>er2cnc_role</code>
-definitions (fact/dimension roles and role bindings) — <strong>not</strong> a single <code>security</code> keyword. The
-row-level filters and column masks are enforced downstream by the validator and reported in
-<code>pipelineWarnings</code> on every governed answer. Model the roles; the platform enforces them.</p>
+<p>Access policy is not part of the model text: row-level filters, column masks and the roles a
+question requires live in the validator's store, versioned in git beside the model
+(<a href="../../operate/policy-in-git/">Policy in git</a>). The validator enforces them downstream and reports
+what it applied in <code>pipelineWarnings</code> on every governed answer.</p>
 </div>
 <h2 id="worlds-and-composition-from-grammar">Worlds and composition <em>(from grammar)</em><a class="headerlink" href="#worlds-and-composition-from-grammar" title="Permanent link">&para;</a></h2>
 <p><code>def world &lt;name&gt; { … }</code> (with <code>engine</code>/<code>executor</code>/<code>storage</code> nouns) describes a composition of

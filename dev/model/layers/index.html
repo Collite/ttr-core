@@ -767,10 +767,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cnc-the-conceptual-roles" class="md-nav__link">
+  <a href="#md-the-multidimensional-view" class="md-nav__link">
     <span class="md-ellipsis">
       
-        cnc — the conceptual roles
+        md — the multidimensional view
       
     </span>
   </a>
@@ -778,10 +778,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#md-the-multidimensional-view" class="md-nav__link">
+  <a href="#cn-the-conceptual-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        md — the multidimensional view
+        cn — the conceptual model
       
     </span>
   </a>
@@ -1430,10 +1430,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cnc-the-conceptual-roles" class="md-nav__link">
+  <a href="#md-the-multidimensional-view" class="md-nav__link">
     <span class="md-ellipsis">
       
-        cnc — the conceptual roles
+        md — the multidimensional view
       
     </span>
   </a>
@@ -1441,10 +1441,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#md-the-multidimensional-view" class="md-nav__link">
+  <a href="#cn-the-conceptual-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        md — the multidimensional view
+        cn — the conceptual model
       
     </span>
   </a>
@@ -1489,7 +1489,7 @@
 
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <h1 id="the-layers">The layers<a class="headerlink" href="#the-layers" title="Permanent link">&para;</a></h1>
-<p><em>Explanation. <code>db</code>, <code>er</code>, <code>cnc</code>, <code>md</code>: what each layer is for, why the mirror of your database is
+<p><em>Explanation. <code>db</code>, <code>er</code>, <code>md</code>, <code>cn</code>: what each layer is for, why the mirror of your database is
 not yet a model, and who owns which layer.</em></p>
 <p>A TTR-M model is layered on purpose. Each layer answers a different question, and the separation is
 what lets a faithful copy of your database coexist with the meaning you add on top of it — without
@@ -1510,16 +1510,22 @@ edit the <code>er</code> layer is <strong>human-owned</strong>. Re-runs never re
 act on. This is where you spend your judgement, and it is the layer worth protecting.</p>
 <p>The <code>er</code> layer binds down to <code>db</code> — an entity maps to a table, an attribute to a column — so the
 meaning stays anchored to the physical truth without repeating it.</p>
-<h2 id="cnc-the-conceptual-roles"><code>cnc</code> — the conceptual roles<a class="headerlink" href="#cnc-the-conceptual-roles" title="Permanent link">&para;</a></h2>
-<p>The <code>cnc</code> layer carries conceptual roles over the <code>er</code> model — fact and dimension roles, and the
-role assignments that let the platform reason about your entities as more than a flat graph. It is
-also where <strong>governance is expressed</strong>: roles and role bindings, not a magic keyword, are how the
-model says which parts are sensitive. The validator enforces the resulting row-level filters and
-column masks at query time, and reports what it applied in <code>pipelineWarnings</code>.</p>
 <h2 id="md-the-multidimensional-view"><code>md</code> — the multidimensional view<a class="headerlink" href="#md-the-multidimensional-view" title="Permanent link">&para;</a></h2>
 <p>The <code>md</code> layer is the analytical projection: domains, dimensions, hierarchies, measures and
 cubelets, bound down through <code>md2db</code> / <code>md2er</code>. It is optional — reach for it when you want a
-cube-shaped view over the same governed model.</p>
+cube-shaped view over the same governed model. Which entities are facts and which are dimensions
+follows from it: a cubelet's entity is a fact, a dimension's entity a dimension.</p>
+<h2 id="cn-the-conceptual-model"><code>cn</code> — the conceptual model<a class="headerlink" href="#cn-the-conceptual-model" title="Permanent link">&para;</a></h2>
+<p>The <code>cn</code> layer names what the business talks about — a product, a customer, a sale, an overdue
+invoice — apart from how the other layers store it. Each concept is grounded once, to an <code>er</code> or an
+<code>md</code> element, and a defined one (<code>OverdueInvoice</code>: an open invoice past its due date) carries the
+expression that says which rows it means. Agents and recipes speak in concepts; the server turns
+what they say into a governed query through the groundings, and new concepts arrive as candidates
+a steward promotes in a pull request. The <a href="https://github.com/Collite/ttr-core/blob/master/docs/manual/en/20-conceptual-model.md">user manual's conceptual-model chapter</a>
+is the full reference.</p>
+<p>The older <code>cnc</code> layer of warehouse roles (<code>fact</code>, <code>dimension</code>, …) is deprecated: those roles now
+derive from <code>md</code>. Access policy — row filters, masked columns — is not a model layer: it lives in
+the validator's store (<a href="../../operate/policy-in-git/">Policy in git</a>).</p>
 <h2 id="who-owns-what">Who owns what<a class="headerlink" href="#who-owns-what" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1541,14 +1547,14 @@ cube-shaped view over the same governed model.</p>
 <td>born once from the import, hand-owned forever after</td>
 </tr>
 <tr>
-<td><code>cnc</code></td>
-<td>you</td>
-<td>authored; carries roles and governance</td>
-</tr>
-<tr>
 <td><code>md</code></td>
 <td>you</td>
 <td>optional analytical projection</td>
+</tr>
+<tr>
+<td><code>cn</code></td>
+<td>you</td>
+<td>authored; new concepts promoted from candidates by pull request</td>
 </tr>
 </tbody>
 </table>

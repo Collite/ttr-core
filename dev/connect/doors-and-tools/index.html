@@ -1629,8 +1629,8 @@ construction.</p>
 </tr>
 <tr>
 <td><code>resolver</code></td>
-<td>Deterministic entity resolution against model vocabulary</td>
-<td><code>resolve.bind:v1</code></td>
+<td>Deterministic entity resolution against model vocabulary, and frames over concepts</td>
+<td><code>resolve.bind:v1</code>; <code>statement.*</code>, <code>assertion.*</code>, <code>concept.search:v1</code>, <code>definition.render:v1</code></td>
 </tr>
 </tbody>
 </table>
@@ -1705,6 +1705,15 @@ guarantees. Surface it to your user; do not swallow it.</p>
   resolution). Its refusal discipline is the point: a below-threshold match becomes a clarifying
   question, never a fabricated binding. See <a href="../identity/">The identity contract</a> for who the
   resolution runs as.</li>
+<li><strong>The conceptual-model tools</strong> — on the same door and behind the same identity gate.
+  <code>statement.validate:v1</code> · <code>statement.lower:v1</code> · <code>statement.explain:v1</code> take a statement frame over
+  concepts (measures, filters, grouping, a time) and check it, lower it to the md query it means, or
+  say it as a sentence. The three <code>assertion.*:v1</code> tools do the same for a recorded event.
+  <code>definition.render:v1</code> renders a defined concept (<code>cn.OverdueInvoice</code>) as SQL over entities or as an
+  md predicate, and <code>concept.search:v1</code> returns the concepts a span may mean. A refused frame is a
+  result carrying its <code>cn/*</code> findings, never a partial plan. The frame tools answer
+  <code>CN_MODEL_UNAVAILABLE</code> until the deployment mounts its model (the one its lexicon was compiled
+  from); <code>concept.search:v1</code> reads the vocabulary alone.</li>
 </ul>
 <h2 id="refusal-modes">Refusal modes<a class="headerlink" href="#refusal-modes" title="Permanent link">&para;</a></h2>
 <p>A well-behaved answer sometimes says <em>no</em>, and your agent must handle it rather than paper over it:</p>
