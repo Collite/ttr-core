@@ -474,6 +474,7 @@ Each `cn/*` diagnostic fires in one of three places:
 | `cn/malformed-frame` | error | consumer | a frame field out of its shape: a time the vocabulary lacks, a filter with no form, an end before the start, one attribute asserted with two values, … |
 | `cn/missing-as-of` | error | consumer | a state claim (the event bears a current- or past-state phase) asserted without `asserted_as_of` |
 | `cn/snapshot-mismatch` | warning | consumer | the frame was built on another snapshot of the model |
+| `cn/lowered-on-er` | advisory | consumer | md carries no single read of the statement; it was read on E-R (the message says why md did not) |
 | `cn/explain-locale-fallback` | warning | consumer | an explanation asked for in a locale it does not speak (it speaks en and cs) — the text is English |
 | `cn/materialize-parametric` | error | `ttr cn materialize` | a definition reading `:name` or `:as_of` cannot become a stacked entity |
 | `cn/no-concept` | — | consumer | no concept or element matched a mention |
@@ -505,7 +506,7 @@ when the frame names its day.
 
 | frame | validate | lower | explain |
 |---|---|---|---|
-| statement (read) | `statementValidate` | `statementLower` → a `plan.v1` through the md path | `statementExplain` |
+| statement (read) | `statementValidate` | `statementLower` → a `plan.v1` through the md path, else SQL over entities (the er lane) | `statementExplain` |
 | assertion (write) | `assertionValidate` | `assertionLower` → the E-R row payload | `assertionExplain` |
 | a phase, by name | — | `definitionRender` → md predicate or er SQL; `materialize` → model text | — |
 
@@ -529,6 +530,31 @@ parameters take the world's values, `:as_of` the statement's day. "Net revenue f
 lowers through the md dot-path `sales[customer.name: "Kaufland", time.month: 1, time.year: 2026].net @ sum` to a
 plan, with its provenance beside it: which binding each slot went through, the definitions inlined, the parameters
 bound, the as-of, the model snapshot.
+
+**The er lane.** md reads a statement only when one cubelet carries it. The Hartland demo keeps one cubelet per sales
+channel and no channel dimension, so "revenue on the web in January 2026" has no single md read: three cubelets carry
+revenue, and none of them knows the channel. Such a statement is read on E-R instead, over the grain event's landing —
+`Sale` lands on the stacked `sales` entity:
+
+```sql
+SELECT SUM(sales.ext_sales_price) AS revenue
+FROM sales
+JOIN date_dim ON date_dim.sk = sales.sold_date
+WHERE sales.channel = 'web' AND date_dim.cal_date >= DATE '2026-01-01' AND date_dim.cal_date < DATE '2026-02-01'
+```
+
+- **md first.** E-R reads a statement only when md cannot: no carrier, several, or a slot md cannot reach. The result
+  then carries SQL over entities (`erSql`) instead of a plan, and the advisory `cn/lowered-on-er` says why md did not.
+- **Measures** aggregate by their md measure's aggregation (`sum`, `avg`, `min`, `max`, `count`); a quality with no md
+  measure has no aggregation to take.
+- **Phase filters** inline their definition on the event's row (`NOT (…)` when negated); member and quality filters
+  read the event's columns, or the key it holds to a participant; a group-by likewise.
+- **Time** reads the event's period instant: the column itself when it is a date, else the calendar a date-key relation
+  reaches, at its `semantics { role: event_date }` column. The bounds are written as literals, and so is every
+  placeholder a phase reads (`:as_of` the evaluation day, a `def parameter`'s value).
+- `statementValidate` predicts it: a slot only md cannot reach is no error when E-R reads the statement.
+- Refused on E-R too: a `compare`, an `ANY` / `NOT` group, an expression filter, measures of different events, a window
+  in working days. A statement neither lane reads is refused with both lanes' findings, md's first.
 
 ### Assertions
 

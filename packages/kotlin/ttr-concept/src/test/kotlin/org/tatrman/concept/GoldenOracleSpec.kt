@@ -68,6 +68,9 @@ class GoldenOracleSpec :
                         }
                     }
             }
+            if (c.call == "statementLower" && c.has("expected.sql") && c.text("expected.sql").isNotBlank()) {
+                test("${c.id} — the er-lane statement's SQL translates") { translate(c.world, c.text("expected.sql")) }
+            }
             if (c.call == "definitionRender" && c.has("expected.sql") && c.text("expected.sql").isNotBlank()) {
                 test("${c.id} — the expected SQL translates") {
                     val plan = translate(c.world, c.text("expected.sql"))

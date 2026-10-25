@@ -167,10 +167,12 @@ class FrameValidationSpec :
             st(ask, revenue, always, "\"groupBy\": [{ \"qname\": \"cn.Channel\" }]"),
         )
         s(
+            // no md element hops to it, but the statement reads on E-R (a participant's key) — validate predicts the er
+            // lane (CN-P6 ⚑S62-1, A-CN-101); the refusal it gave before is `ErStatementLaneSpec`'s E-R-only measure
             "by an er kind no md element hops to",
             hartland,
             st(ask, revenue, always, "\"groupBy\": [{ \"qname\": \"cn.Item\" }]"),
-            "cn/not-analytically-reachable groupBy[0]",
+            "cn/lowered-on-er groupBy[0]",
         )
 
         fun member(
@@ -198,10 +200,10 @@ class FrameValidationSpec :
             st(ask, revenue, always, member("cn.Channel", "web")),
         )
         s(
-            "a member of an er kind no md element hops to",
+            "a member of an er kind no md element hops to", // E-R reads it (above)
             hartland,
             st(ask, revenue, always, member("cn.Item", "SKU-1")),
-            "cn/not-analytically-reachable filters[0].member.concept",
+            "cn/lowered-on-er filters[0].member.concept",
         )
 
         fun quality(body: String) = filter("{ \"quality\": { $body } }")

@@ -55,8 +55,6 @@ class ConceptGoldenSpec :
                 "activecustomer/phase-filter-has-broken-leg" to "G-MD-6",
                 "activecustomer/phase-filter-post-stemi" to "G-MD-6",
                 "activecustomer/phase-filter-stemi-patient" to "G-MD-2",
-                "channel/by-channel-sales" to "CN-P6 A-H-7 (ER statement grouping; MD needs Channel grain)",
-                "channel/where-websale-carrier" to "CN-P6 A-H-7 (phase-to-carrier binding)",
                 "refusals/retired-code" to "CN-P5 S5.3",
                 "temporal/dc12-post-stemi-certainly" to "G-ER-1",
                 "temporal/late-return-line" to "G-ER-2",
@@ -96,10 +94,21 @@ class ConceptGoldenSpec :
                 "assertionValidate" -> diagnosticsOf(svc.assertionValidate(c.assertion()))
                 "statementLower" -> {
                     val r = svc.statementLower(c.statement())
-                    text("expected.dotpath.txt", r.dotPath)
-                    val plan = r.plan?.let { Json.parseToJsonElement(printer.print(it)) }
-                    val expectedPlan = c.jsonFile("expected.plan.json")
-                    if (plan != expectedPlan) out += "plan: expected $expectedPlan\n  actual $plan"
+                    if (c.has("expected.sql")) {
+                        // the er lane (CN-P6 ⚑S62-1, A-CN-101): SQL over entities, and no md read beside it
+                        text("expected.sql", r.erSql) { it.removeSuffix("\n") }
+                        if (r.plan != null ||
+                            r.dotPath.isNotEmpty()
+                        ) {
+                            out += "an er-lane read carries an md read too: ${r.dotPath}"
+                        }
+                    } else {
+                        text("expected.dotpath.txt", r.dotPath)
+                        val plan = r.plan?.let { Json.parseToJsonElement(printer.print(it)) }
+                        val expectedPlan = c.jsonFile("expected.plan.json")
+                        if (plan != expectedPlan) out += "plan: expected $expectedPlan\n  actual $plan"
+                        if (r.erSql.isNotEmpty()) out += "an md case lowered on E-R:\n  ${r.erSql}"
+                    }
                     if (c.has("expected.provenance.json")) {
                         out +=
                             GoldenCases.mismatches(

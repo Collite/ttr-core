@@ -52,6 +52,12 @@ object FrameSlugs {
     /** WARNING — the frame names a model snapshot other than the one validating it (A-CN-34). */
     const val SNAPSHOT_MISMATCH = "cn/snapshot-mismatch"
 
+    /**
+     * ADVISORY — md carries no single read of the statement (no carrier, several, a slot md cannot reach) and it was
+     * lowered on E-R instead, over the grain event's landing (CN-P6 ⚑S62-1, A-CN-101); the message says why md did not.
+     */
+    const val LOWERED_ON_ER = "cn/lowered-on-er"
+
     /** The consumer's refusal for a definition that cannot render on [layer] (contracts §7 — a hygiene row model-side). */
     fun definitionUnreachable(layer: Layer): String = "${CnDefinitionLints.UNREACHABLE}(${layer.name.lowercase()})"
 }

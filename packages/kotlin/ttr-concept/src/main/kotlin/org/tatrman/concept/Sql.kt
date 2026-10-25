@@ -146,6 +146,12 @@ internal class Select(
     val where = mutableListOf<SqlExpr>()
     val groupBy = mutableListOf<SqlExpr>()
     var having: SqlExpr? = null
+
+    /** A statement read's order (CN-P6 ⚑S62-1): each key and whether it is descending; a definition never orders. */
+    val orderBy = mutableListOf<Pair<SqlExpr, Boolean>>()
+
+    /** A statement read's row limit; a definition never limits. */
+    var limit: Int? = null
 }
 
 /**
@@ -156,11 +162,13 @@ internal class Select(
  * inside an `AND` too. [compact] prints the same tree on one line (`EXISTS (SELECT 1 …)`) — the spelling S3.7 authored
  * the goldens in, kept for a reader and the tests.
  *
- * The placeholders the text reads are collected in [params], in reading order.
+ * The placeholders the text reads are collected in [params], in reading order. A placeholder [bound] names is written as
+ * its value instead — a statement read is self-contained (CN-P6 ⚑S62-1); a definition's rendering binds nothing.
  */
 internal class SqlPrinter(
     private val style: PlaceholderStyle,
     private val compact: Boolean = false,
+    private val bound: Map<String, String> = emptyMap(),
 ) {
     val params = linkedSetOf<String>()
 
@@ -182,6 +190,12 @@ internal class SqlPrinter(
         SqlExpr.and(s.where)?.let { lines += "WHERE " + expr(it, indent, 0) }
         if (s.groupBy.isNotEmpty()) lines += "GROUP BY " + s.groupBy.joinToString(", ") { expr(it, indent, 0) }
         s.having?.let { lines += "HAVING " + expr(it, indent, 0) }
+        if (s.orderBy.isNotEmpty()) {
+            lines +=
+                "ORDER BY " +
+                s.orderBy.joinToString(", ") { (e, desc) -> expr(e, indent, 0) + if (desc) " DESC" else "" }
+        }
+        s.limit?.let { lines += "LIMIT $it" }
         return if (compact) lines.joinToString(" ") else lines.joinToString("\n") { pad(indent) + it }
     }
 
@@ -236,7 +250,7 @@ internal class SqlPrinter(
             is SqlExpr.Lit -> e.text
             is SqlExpr.Param -> {
                 params += e.name
-                if (style == PlaceholderStyle.COLON) ":${e.name}" else "{${e.name}}"
+                bound[e.name] ?: if (style == PlaceholderStyle.COLON) ":${e.name}" else "{${e.name}}"
             }
             is SqlExpr.Bin -> {
                 val p = precedence(e)

@@ -27,6 +27,8 @@ interface ConceptService {
      * Structural + referential + ambiguity (`cn/ambiguous-statement`) + time (`cn/missing-time`) + reachability PER
      * CONSUMER (AM-4): an aggregating slot (measures, group_by, compare) needs an md grounding
      * (`cn/not-analytically-reachable`); a PhaseFilter needs the md renderer or the stacked entity's md grounding (AM-5).
+     * It predicts [statementLower] (CN-P6 ⚑S62-1, A-CN-101): when md cannot reach a slot but the er lane reads the
+     * statement, those findings give way to the lowering's advisory `cn/lowered-on-er`.
      */
     fun statementValidate(s: Statement): List<Diagnostic>
 
@@ -99,7 +101,14 @@ class CnConceptService(
     private val definitions = DefinitionRenderer(model, clock)
     private val explainer = Explainer(model, clock)
 
-    override fun statementValidate(s: Statement): List<Diagnostic> = statements.validate(s)
+    override fun statementValidate(s: Statement): List<Diagnostic> {
+        val findings = statements.validate(s)
+        val errors = findings.filter { it.severity == Severity.ERROR }
+        if (errors.isEmpty() || errors.any { it.slug !in StatementLowerer.MD_REACH }) return findings
+        val lowered = lowerer.lower(s)
+        if (lowered.erSql.isEmpty()) return findings
+        return findings - errors.toSet() + lowered.diagnostics.filter { it.slug == FrameSlugs.LOWERED_ON_ER }
+    }
 
     override fun statementLower(s: Statement): LowerResult = lowerer.lower(s)
 

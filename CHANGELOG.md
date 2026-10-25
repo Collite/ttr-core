@@ -6,6 +6,19 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — the er statement lane (CN-P6 ⚑S62-1, binary-incompatible for JVM consumers)
+
+- `statementLower` reads a statement on E-R when md carries no single read of it (no carrier, several, a slot md cannot
+  reach): SQL over the grain event's landing, in the formatting contract's layout, every placeholder bound — measures
+  by their md measure's aggregation, phases inlined on the event's row, member / quality / group-by on its columns or a
+  participant's key, the time on the period's day (through a date-key relation to a `semantics { role: event_date }`
+  column when the instant is a key), `HAVING` / `ORDER BY` / `LIMIT`. md stays first.
+- `LowerResult` gains `erSql`; such a result carries the advisory `cn/lowered-on-er` and no plan. `statementValidate`
+  predicts the lane. JVM consumers must rebuild (`LowerResult`'s constructor / `copy` signature changed).
+- Goldens: `channel/by-channel-sales` and `channel/where-websale-sales` (A-H-7, pending since md/hop HP-P2) and
+  `er-lane/*` on the Hartland world and a new `calendar-key` world, each one's SQL translated by the production
+  translator.
+
 ### Docs — the conceptual model chapter complete (CN-P6 S6.3)
 
 - The manual's conceptual-model chapter adds time (instant · interval · duration · occurrence · state · episode ·
