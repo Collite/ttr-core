@@ -155,6 +155,48 @@ it.each(['loader', 'object'] as const)('refuses a %s refresh after a failed Save
   await waitFor(() => expect(snapshot).toHaveBeenLastCalledWith({ sha: 'one', changed: 1 }));
   expect(collect.current!()[0].text).toContain('collected-but-not-saved');
 });
+it.each(['loader', 'object'] as const)('treats an empty Save marker on a %s as a refresh, retaining failed-Save edits', async kind => {
+  const p = probe(), collect = createRef<CollectFiles>(), error = vi.fn(), snapshot = vi.fn();
+  const props = { basePath: '/m/', lang: 'en' as const, extensions: p.extensions, collect, onError: error, onSnapshot: snapshot, expectedSha: '' };
+  const view = render(<DesignerPage {...props} files={files} />);
+  await waitFor(() => expect(p.source()).toBeDefined());
+  await edit(p.source(), 'collected-but-not-saved');
+  collect.current!();
+  const moved = { ...files, sha: 'two' };
+  view.rerender(<DesignerPage {...props} files={kind === 'loader' ? async () => moved : moved} />);
+  await waitFor(() => expect(error).toHaveBeenCalledWith(expect.objectContaining({ code: 'frame/unsaved-edits', sha: 'two' })));
+  expect(snapshot).toHaveBeenCalledTimes(1);
+  expect(collect.current!()[0].text).toContain('collected-but-not-saved');
+});
+it.each(['failed', 'mismatched'] as const)('publishes no diagnostics or ready before a %s first input is installed', async kind => {
+  const error = vi.fn(), diagnostics = vi.fn(), ready = vi.fn(), snapshot = vi.fn();
+  render(<DesignerPage files={kind === 'failed' ? async () => { throw new Error('transport'); } : files}
+    expectedSha={kind === 'mismatched' ? 'other' : undefined} basePath="/m/" lang="en"
+    onError={error} onDiagnostics={diagnostics} onReady={ready} onSnapshot={snapshot} />);
+  await waitFor(() => expect(error).toHaveBeenCalledWith(expect.objectContaining({ code: kind === 'failed' ? 'host/load-failed' : 'frame/edit-conflict' })));
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 300)); });
+  expect(diagnostics).not.toHaveBeenCalled();
+  expect(ready).not.toHaveBeenCalled();
+  expect(snapshot).not.toHaveBeenCalled();
+});
+it('keeps a queued Save acknowledgement when a later render clears its marker', async () => {
+  const p = probe(), collect = createRef<CollectFiles>(), error = vi.fn(), snapshot = vi.fn();
+  const props = { basePath: '/m/', lang: 'en' as const, extensions: p.extensions, collect, onError: error, onSnapshot: snapshot };
+  const view = render(<DesignerPage {...props} files={files} />);
+  await waitFor(() => expect(p.source()).toBeDefined());
+  await edit(p.source(), 'saved');
+  const saved = collect.current!();
+  const held = deferred<typeof files>(), blocker = vi.fn(() => held.promise);
+  view.rerender(<DesignerPage {...props} files={blocker} />);
+  await waitFor(() => expect(blocker).toHaveBeenCalledTimes(1));
+  const committed = { sha: 'two', files: { ...files.files, [saved[0].path]: saved[0].text! } };
+  view.rerender(<DesignerPage {...props} files={committed} expectedSha="two" />);
+  view.rerender(<DesignerPage {...props} files={committed} />);
+  await act(async () => held.resolve(files));
+  await waitFor(() => expect(snapshot).toHaveBeenLastCalledWith({ sha: 'two', changed: 0 }));
+  expect(error).not.toHaveBeenCalled();
+  expect(collect.current!()).toEqual([]);
+});
 it('captures expectedSha with an input without treating changes to it as new inputs', async () => {
   const loader = vi.fn(async () => files), snapshot = vi.fn();
   const view = render(<DesignerPage files={loader} expectedSha="one" basePath="/m/" lang="en" onSnapshot={snapshot} />);

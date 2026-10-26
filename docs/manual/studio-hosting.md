@@ -203,9 +203,11 @@ and records the exact collected base. Serialize collect, saving, and the next sn
 After a successful Save, pass a new snapshot object or loader **with `expectedSha` set to the
 committed SHA in the same render**. This explicitly marks the input as a Save acknowledgement and
 fences the returned snapshot to that SHA; later edits remain dirty after acknowledgement. An input
-without `expectedSha` is a refresh: a different SHA refuses with `frame/unsaved-edits` while dirty,
-even after collection if the Save failed. A Save with overlapping later edits reports
-`frame/edit-conflict`. Same-SHA inputs are idempotent and preserve local changes, so changed bytes
+without `expectedSha` is a refresh; an empty `expectedSha` counts as none. A different SHA refuses
+with `frame/unsaved-edits` while dirty, even after collection if the Save failed. A Save input refuses
+with `frame/edit-conflict` when a file edited again after collection differs between the collected text
+and the committed snapshot, and with `frame/unsaved-edits` when the page is dirty but nothing was
+collected at the installed SHA. Same-SHA inputs are idempotent and preserve local changes, so changed bytes
 or manifest settings require a new SHA.
 The previous shell and files remain available on either refusal or loader failure. Prompt in the host;
 remount with a different React key only after an explicit discard choice. Dirty callbacks are debounced
@@ -364,8 +366,8 @@ acknowledgements wait. Parse/lint diagnostics remain visible; applying text does
 Propose gate. The commercial entity/attribute/relation/term forms remain a separate licensed extension.
 Ready advertises the additive `source-files` capability. The six modeler/edit operations are unchanged.
 
-The new source drawer belongs to the open viewer/library, so its next internal artifact cut is also needed
-when a stage-2 host consumes this addition; the already released Designer family 0.1.0 is unchanged.
+The source drawer belongs to the open viewer/library. Designer family 0.1.1 is the first family cut
+that includes it; a stage-2 host needs that version or later.
 
 Hosted source authoring follows `scope.kind === "change"` plus the current `features: ["modeler"]` grant on every init. Revocation hides the drawer without applying its draft. Optional extension failures emit nonfatal `frame/extension-unavailable` and retry on the next init. `ttr.frame.diagnostics` always replaces the complete worker set after a revision or snapshot install, including same-SHA discard. The extension must not publish touched-file subsets. Source Apply refuses a file changed since it was opened; loaded and edited source use the same raw document URI.
 

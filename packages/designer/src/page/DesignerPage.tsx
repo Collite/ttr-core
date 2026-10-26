@@ -24,7 +24,7 @@ export interface AuthoringExtension {
 export interface DesignerPageProps extends PropsHostCallbacks {
   files: Snapshot | (() => Promise<Snapshot>);
   manifest?: string;
-  /** Mark this input as a Save acknowledgement and fence it to the committed SHA. */
+  /** Mark this input as a Save acknowledgement and fence it to the committed SHA. An empty marker counts as none. */
   expectedSha?: string;
   basePath: string;
   lang: 'en' | 'cs';
@@ -150,13 +150,14 @@ export function DesignerPage(props: DesignerPageProps) {
     let committedSha: string | null = null;
     const load = () => {
       const input = latest.current;
-      const current = { input, sha: input.expectedSha ?? (typeof input.files === 'function' ? undefined : input.files.sha) };
+      const save = !!input.expectedSha;
+      const current = { input, sha: (save ? input.expectedSha : undefined) ?? (typeof input.files === 'function' ? undefined : input.files.sha) };
       pending = pending.then(async () => {
         if (disposed) return;
         ++diagnosticsVersion;
         request = current;
-        const changed = await source.refresh({ reason: input.expectedSha === undefined ? 'refresh' : 'save',
-          deferDisposal: true, expectedSha: input.expectedSha });
+        const changed = await source.refresh({ reason: save ? 'save' : 'refresh',
+          deferDisposal: true, expectedSha: save ? input.expectedSha : undefined });
         if (disposed) return;
         const { graphs, symbols } = await source.listCatalog();
         if (disposed) return;
@@ -188,7 +189,7 @@ export function DesignerPage(props: DesignerPageProps) {
           message: error instanceof SnapshotEditError ? error.message : 'Could not load the model snapshot.',
           ...(current.sha ? { sha: current.sha } : {}) });
         // A refused/failed replacement leaves this worker installed. Its validation is still current.
-        void publishDiagnostics();
+        if (committedSha !== null && source.sha === committedSha) void publishDiagnostics();
       });
     };
     controller.current = { workspace, source, load };
