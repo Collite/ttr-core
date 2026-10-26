@@ -24,6 +24,8 @@ export interface AuthoringExtension {
 export interface DesignerPageProps extends PropsHostCallbacks {
   files: Snapshot | (() => Promise<Snapshot>);
   manifest?: string;
+  /** Mark this input as a Save acknowledgement and fence it to the committed SHA. An empty marker counts as none. */
+  expectedSha?: string;
   basePath: string;
   lang: 'en' | 'cs';
   theme?: 'light' | 'dark';
@@ -36,7 +38,7 @@ export interface DesignerPageProps extends PropsHostCallbacks {
   /** Host-controlled source grant; enable only when this session can persist its edits. */
   sourceAuthoring?: boolean;
 }
-interface Session { workspace: string; source: BffFilesDataSource; catalog: CatalogGroup[]; sha: string; path: string }
+interface Session { workspace: string; source: BffFilesDataSource; catalog: CatalogGroup[]; sha: string; path: string; installed(): void }
 
 /** A worker-backed Studio surface with instance-scoped routing, config and extensions. */
 export function DesignerPage(props: DesignerPageProps) {
@@ -79,10 +81,17 @@ export function DesignerPage(props: DesignerPageProps) {
     if (!props.extensions?.length) return null;
     return async context => {
       for (const extension of props.extensions!) {
+        if (!root.current || latest.current.extensions !== props.extensions) return null;
         const gate = await gateExtension(extension.manifest, { licenseClient: extension.licenseClient });
+        if (!root.current || latest.current.extensions !== props.extensions) return null;
         if (gate.allowed) {
-          const result = await extension.activate(context, gate.grants);
-          if (result) return result;
+          try {
+            const result = await extension.activate(context, gate.grants);
+            if (result) return result;
+          } catch {
+            // Optional authoring must never take model reading down.
+            if (root.current && latest.current.extensions === props.extensions) latest.current.onError?.({ code: 'frame/extension-unavailable', message: 'Authoring is unavailable. The model remains readable; retry by reopening editing.' });
+          }
         }
       }
       return null;
@@ -99,35 +108,88 @@ export function DesignerPage(props: DesignerPageProps) {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const host = new PropsHost(() => latest.current);
+    let request: { input: DesignerPageProps; sha?: string };
     const source = new BffFilesDataSource({ api: '/', token: '', scope: { kind: 'served' } }, {
       createClient: createLspClient,
       loadSnapshot: async () => {
-        const input = latest.current;
+        // The queue captures each input. A newer render cannot retarget an older Save.
+        const current = request;
+        const input = current.input;
         const snapshot = typeof input.files === 'function' ? await input.files() : input.files;
+        current.sha ??= snapshot.sha;
         return input.manifest === undefined ? snapshot : { ...snapshot, files: { ...snapshot.files, 'modeler.toml': input.manifest } };
       },
     });
+    let diagnosticsVersion = 0;
+    const publishDiagnostics = async () => {
+      const version = ++diagnosticsVersion;
+      try {
+        const values = await source.validatedDiagnostics();
+        if (!disposed && version === diagnosticsVersion) host.send({ type: 'ttr.frame.diagnostics', diagnostics: values.map(value => ({
+          uri: value.uri, severity: value.severity === 1 ? 'error' : value.severity === 2 ? 'warning' : 'info',
+          code: String(value.code ?? ''), message: value.message, source: 'worker',
+        })) });
+      } catch {
+        if (!disposed && version === diagnosticsVersion) host.send({ type: 'ttr.frame.diagnostics', diagnostics: [{
+          uri: '', severity: 'error', code: 'worker/validation-unavailable',
+          message: 'Worker validation did not finish. Check the worker connection before proposing.', source: 'worker',
+        }] });
+      }
+    };
     const subscription = source.onFilesChanged(() => {
+      ++diagnosticsVersion; // Invalidate an older validation even before the debounce fires.
       clearTimeout(timer);
-      timer = setTimeout(() => host.send({ type: 'ttr.frame.dirty', changed: source.changedFiles().length }), 200);
+      timer = setTimeout(() => {
+        host.send({ type: 'ttr.frame.dirty', changed: source.changedFiles().length });
+        void publishDiagnostics();
+      }, 200);
     });
     let pending = Promise.resolve();
     let renderedSha: string | null = null;
+    let readySent = false;
+    let committedSha: string | null = null;
     const load = () => {
+      const input = latest.current;
+      const save = !!input.expectedSha;
+      const current = { input, sha: (save ? input.expectedSha : undefined) ?? (typeof input.files === 'function' ? undefined : input.files.sha) };
       pending = pending.then(async () => {
         if (disposed) return;
-        const changed = await source.refresh({ reason: 'save', deferDisposal: true });
-        if (disposed || (!changed && renderedSha === source.sha)) return;
+        ++diagnosticsVersion;
+        request = current;
+        const changed = await source.refresh({ reason: save ? 'save' : 'refresh',
+          deferDisposal: true, expectedSha: save ? input.expectedSha : undefined });
+        if (disposed) return;
         const { graphs, symbols } = await source.listCatalog();
         if (disposed) return;
         setFailed(false);
-        setSession({ workspace, source, catalog: buildCatalog(graphs, symbols), sha: source.sha!, path: route.current() });
-        renderedSha = source.sha;
+        const sha = source.sha!;
+        const installed = () => {
+          if (disposed || renderedSha !== sha || source.sha !== sha) return;
+          committedSha = sha;
+          clearTimeout(timer);
+          if (!readySent) {
+            readySent = true;
+            host.send({ type: 'ttr.frame.ready', sha, manifest: { bindings: { required: source.bindingsRequired } } });
+          }
+          const changed = source.changedFiles().length;
+          host.send({ type: 'ttr.frame.dirty', changed });
+          host.send({ type: 'ttr.frame.ack', sha, changed });
+          void publishDiagnostics();
+        };
+        if (!changed && renderedSha === sha && committedSha === sha) {
+          installed(); // Same-SHA refresh/retry still acknowledges its input and revalidates.
+          return;
+        }
+        renderedSha = sha;
+        setSession({ workspace, source, catalog: buildCatalog(graphs, symbols), sha, path: route.current(), installed });
       }).catch(error => {
         if (disposed) return;
         setFailed(true);
         host.send({ type: 'ttr.frame.error', code: error instanceof SnapshotEditError ? error.code : 'host/load-failed',
-          message: error instanceof SnapshotEditError ? error.message : 'Could not load the model snapshot.' });
+          message: error instanceof SnapshotEditError ? error.message : 'Could not load the model snapshot.',
+          ...(current.sha ? { sha: current.sha } : {}) });
+        // A refused/failed replacement leaves this worker installed. Its validation is still current.
+        if (committedSha !== null && source.sha === committedSha) void publishDiagnostics();
       });
     };
     controller.current = { workspace, source, load };
@@ -149,7 +211,7 @@ export function DesignerPage(props: DesignerPageProps) {
     controller.current?.load();
   }, [props.files, props.manifest]);
   useEffect(() => { if (props.location !== undefined) route.navigate(props.location); }, [route, props.location]);
-  useEffect(() => { session?.source.disposeRetired(); }, [session]);
+  useEffect(() => { session?.source.disposeRetired(); session?.installed(); }, [session]);
   const viewState = useMemo(() => makeViewStateStore('file', { kind: 'file' }), [workspace]);
   return <PageContext.Provider value={environment}>
     <div ref={root} className="ttr-designer" data-testid="designer-page" data-theme={theme} lang={lang} tabIndex={-1}

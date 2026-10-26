@@ -19,7 +19,7 @@ try {
   const notices = run('tar', ['-xzOf', tarball, 'package/NOTICE']);
   assert.ok(notices.includes('The ANTLR Project') && notices.includes('Squirrel Chat'));
   assert.equal(manifest.private, false);
-  assert.equal(manifest.version, '0.1.0');
+  assert.equal(manifest.version, JSON.parse(readFileSync(join(pkg, 'package.json'), 'utf8')).version);
   assert.ok(!Object.keys(manifest.dependencies ?? {}).some(d => d.startsWith('@tatrman/')));
   writeFileSync(join(scratch, 'package.json'), JSON.stringify({ type: 'module', private: true }));
   run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', tarball], scratch);

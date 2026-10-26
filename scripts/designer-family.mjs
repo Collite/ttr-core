@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// One ordered release closure; edit 0.1.0 is already public and is reused unchanged.
+// One ordered release closure; every internal cut pins all eight packages together.
 export const family = [
   'parser',
   'tokens',

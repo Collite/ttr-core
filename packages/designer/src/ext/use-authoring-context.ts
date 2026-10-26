@@ -12,23 +12,23 @@ import { getAuthoringLoader } from './authoring-registry.js';
 export function useAuthoringContext(dataSource: ModelDataSource): ShellEditContext | null {
   const page = usePageEnvironment();
   const loader = page ? page.authoringLoader : getAuthoringLoader();
-  const [context, setContext] = useState<ShellEditContext | null>(null);
+  const [resolved, setResolved] = useState<{ loader: typeof loader; dataSource: ModelDataSource; context: ShellEditContext | null } | null>(null);
   useEffect(() => {
     if (!loader) {
-      setContext(null);
+      setResolved(null);
       return;
     }
     let cancelled = false;
     void loader({ dataSource })
       .then((resolved) => {
-        if (!cancelled) setContext(resolved);
+        if (!cancelled) setResolved({ loader, dataSource, context: resolved });
       })
       .catch(() => {
-        if (!cancelled) setContext(null);
+        if (!cancelled) setResolved(null);
       });
     return () => {
       cancelled = true;
     };
   }, [dataSource, loader]);
-  return context;
+  return resolved?.loader === loader && resolved.dataSource === dataSource ? resolved.context : null;
 }

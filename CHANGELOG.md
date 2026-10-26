@@ -6,6 +6,20 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — embedded Designer host lifecycle (Designer family 0.1.1)
+
+- Optional `DesignerPage.onReady`, `onSnapshot` and `onDiagnostics` callbacks expose the installed
+  immutable snapshot, remaining local changes and complete validated worker diagnostics to embedding hosts.
+  `expectedSha` explicitly marks a Save acknowledgement and fences its snapshot; error callbacks
+  retain the requested SHA. Unlike 0.1.0, a new input without `expectedSha` is a refresh and refuses
+  while dirty, including after a failed Save, instead of dropping collected edits. Set or clear it
+  alongside its input; changing it alone does not reload. Successful Save inputs preserve later edits.
+  Failed/refused loads republish the installed worker's complete diagnostics.
+- Optional authoring failures keep model reads available; changing or removing a grant immediately
+  removes the previous extension context. All eight Designer family artifacts advance together to 0.1.1.
+  The internal release is cut after review/merge; no grammar or JVM artifact version changes.
+
+
 ### Added — extraction types from the model (`ttr-concept`, DX-P0 S0.3; additive)
 
 - `org.tatrman.concept.extract`: `SchemaRenderer` renders an er entity's `Statement[<entity>]` and `Record.<entity>` JSON
