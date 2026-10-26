@@ -6,6 +6,23 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — extraction types from the model (`ttr-concept`, DX-P0 S0.3; additive)
+
+- `org.tatrman.concept.extract`: `SchemaRenderer` renders an er entity's `Statement[<entity>]` and `Record.<entity>` JSON
+  Schema (2020-12) from the resolved cn + er model — er types mapped to JSON Schema (a decimal's scale as
+  `x-ttr-scale`, never `multipleOf`), keys left out, single-column relation joins as refs (a `join:` pair, or an
+  fk-only relation's FK followed through the `er2db` bindings), closed vocabularies as `enum`, and the grounded
+  concept's qualities tagged `tags: ["modifier"]` that land on the entity as the statement's `modifiers`;
+  `TypeRegistryRenderer.renderPack(model, entities, snapshotHash)` writes a pack's `types/generated/` files plus an
+  `index.json` with each file's sha256 and the model's content hash. Identities are bare (`er.entity.<name>`): a name
+  two entities share is refused (`extract/ambiguous-entity`). Deterministic, canonical JSON (`SchemaJson`: keys in
+  code-point order, no exponent numerals — Python's `json.dumps(sort_keys=True, indent=2)` bytes). No grammar change.
+- `org.tatrman.concept.cli.ModelContentHash.of(root)`: `sha256:<hex>` over the model files (`.ttr`/`.ttrm`) under a
+  root, by relative path — the same on every clone; what `index.json` pins and a pack loader recomputes.
+- `ttr cn render-types --model <dir> --entities a,b --out <pack-dir>` (exit 2 on an unknown or ambiguous entity,
+  naming it; an entity named twice renders once; a stale `types/generated/*.schema.json` the new index does not list is
+  removed) and `just render-types`.
+
 ### Fixed — the er statement lane places; it does not re-decide (review-154 of #304)
 
 The er lane read statements md refuses on principle, and gave wrong numbers with no error. It now answers what md would

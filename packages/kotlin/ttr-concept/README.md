@@ -109,10 +109,28 @@ G-ER-2 (#201), G-MD-1/2/6, `md/hop` (⚑CN-P8), CN-P5 S5.3. The `live` cases als
 ```
 ttr cn hygiene <model-dir> [--format text|json] [--fail-on error|warning]
 ttr cn materialize <model-dir> <cn.Phase> [--dialect postgresql] [--out <dir>]
+ttr cn render-types --model <model-dir> --entities review,claim --out <pack-dir>
 ```
 
-From the ttr-core repository: `just cn-hygiene …` / `just cn-materialize …` (paths relative to the repo root). The
-manual's chapter 20 has both.
+From the ttr-core repository: `just cn-hygiene …` / `just cn-materialize …` / `just render-types …` (paths relative to
+the repo root). The manual's chapter 20 has the first two.
+
+## Extraction types (`org.tatrman.concept.extract`)
+
+`SchemaRenderer` renders an er entity's document-extraction annotation types as JSON Schema 2020-12 —
+`Statement[<entity>]` (one extracted assertion: `spans`, `verbatim`, `concept`, `attributes`, `modifiers`,
+`confidence`) and `Record.<entity>` (the consolidated, gold-feeding shape: `attributes`, `modifiers`, `evidence` with
+roles, `history`, `conflicts`, `consolidationRun`) — from the model, never by hand. Attributes are typed from the er
+(keys excluded; a decimal's scale as `x-ttr-scale`, not `multipleOf`; a single-column relation join — a `join:` pair,
+or an fk-only relation's FK read through the `er2db` bindings — becomes a `Ref`; a closed vocabulary an `enum`, a
+data-backed one `x-ttr-vocabulary`); `modifiers` are the attributes behind the grounded concept's qualities tagged
+`tags: ["modifier"]`, its own or inherited, that land on the entity. Entities are named `review` or
+`er.entity.review`; the identities are bare, so a name two entities share is refused. `TypeRegistryRenderer.renderPack`
+writes `types/generated/Statement.<e>.schema.json`, `Record.<e>.schema.json` and an `index.json` (each file's sha256,
+and the model's content hash — `cli.ModelContentHash.of(<model root>)`, the same on every clone). Pure,
+deterministic, canonical JSON (`SchemaJson.canonical` = `json.dumps(sort_keys=True, indent=2)`: keys in code-point
+order, no exponent numerals; `src/test/resources/canonical.sample.json` pins the bytes). Designed in the DX effort
+(`project/kantheon/features/hermes/`, outside this repo); goldens in `src/test/resources/worlds/hartland-dx/expected/`.
 
 **Law order.** This module implements `project/tatrman/features/conceptual/` (outside this repo): `design/design.md`
 v2 and the decision log › `plan/contracts.md` (§3 is this module's API) › `plan/architecture.md` › `plan/plan.md` ›

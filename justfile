@@ -262,6 +262,13 @@ cn-materialize *args:
     ./gradlew -q --console=plain :packages:kotlin:ttr-concept:installDist >&2
     packages/kotlin/ttr-concept/build/install/ttr/bin/ttr cn materialize "$@"
 
+# The extraction types (DX-P0 S0.3): `just render-types --model <model-dir> --entities review,claim --out <pack-dir>`
+# writes Statement.<e> / Record.<e> JSON Schema + index.json under <pack-dir>/types/generated/.
+[positional-arguments]
+render-types *args:
+    ./gradlew -q --console=plain :packages:kotlin:ttr-concept:installDist >&2
+    packages/kotlin/ttr-concept/build/install/ttr/bin/ttr cn render-types "$@"
+
 # ── Grammar regeneration ────────────────────────────────────────────────────────
 
 # Regenerate the TS parser from TTR.g4, then the TextMate grammar. See CLAUDE.md
