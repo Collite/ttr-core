@@ -20,8 +20,8 @@ class SourceRefSpec :
                 SourceRef.Doc("hartland", listOf("price-list-2026"), Locator.Row(17))
             SourceRefs.parse("doc://clinic/du-50077#c118-164") shouldBe
                 SourceRef.Doc("clinic", listOf("du-50077"), Locator.Span(118, 164))
-            SourceRefs.parse("doc://kallimachos/hartland-ops/1042/7") shouldBe
-                SourceRef.Doc("kallimachos", listOf("hartland-ops", "1042", "7"), null)
+            SourceRefs.parse("doc://docwh/hartland-ops/1042/7") shouldBe
+                SourceRef.Doc("docwh", listOf("hartland-ops", "1042", "7"), null)
         }
 
         test("a recipe sentence and a question") {
@@ -52,7 +52,7 @@ class SourceRefSpec :
             for (ref in listOf(
                 "doc://clinic/du-48213#s4",
                 "doc://clinic/du-50077#c0-164",
-                "doc://kallimachos/hartland-ops/1042/7",
+                "doc://docwh/hartland-ops/1042/7",
                 "recipe://hartland.orders/order-review#s2",
                 "question://clinic/q-2031",
             )) {
@@ -71,16 +71,21 @@ class SourceRefSpec :
                     .shouldThrow<IllegalArgumentException> { bad() }
             }
             for (l in listOf(Locator.Sentence(1), Locator.Row(7), Locator.Span(0, 1))) {
-                SourceRefs.parse(SourceRefs.fromKallimachos("kallimachos://n/s/p", l)!!).shouldNotBeNull()
+                SourceRefs.parse(SourceRefs.fromDocwh("docwh://n/s/p", l)!!).shouldNotBeNull()
             }
         }
 
-        test("Kleio's citation ref maps by one prefix swap: kallimachos://{notebook}/{source}/{part}") {
-            SourceRefs.fromKallimachos("kallimachos://hartland-ops/1042/7") shouldBe
-                "doc://kallimachos/hartland-ops/1042/7"
-            SourceRefs.fromKallimachos("kallimachos://hartland-ops/1042/7", Locator.Sentence(3)) shouldBe
-                "doc://kallimachos/hartland-ops/1042/7#s3"
-            SourceRefs.fromKallimachos("kallimachos://hartland-ops/1042").shouldBeNull()
-            SourceRefs.fromKallimachos("doc://kallimachos/hartland-ops/1042/7").shouldBeNull()
+        test("Kleio's citation ref maps by one prefix swap: docwh://{notebook}/{source}/{part}") {
+            SourceRefs.fromDocwh("docwh://hartland-ops/1042/7") shouldBe "doc://docwh/hartland-ops/1042/7"
+            SourceRefs.fromDocwh("docwh://hartland-ops/1042/7", Locator.Sentence(3)) shouldBe
+                "doc://docwh/hartland-ops/1042/7#s3"
+            SourceRefs.parse(SourceRefs.fromDocwh("docwh://hartland-ops/1042/7")!!) shouldBe
+                SourceRef.Doc("docwh", listOf("hartland-ops", "1042", "7"), null)
+            SourceRefs.fromDocwh("docwh://hartland-ops/1042").shouldBeNull()
+            SourceRefs.fromDocwh("doc://docwh/hartland-ops/1042/7").shouldBeNull()
+        }
+
+        test("the pre-rename kallimachos:// citation form is not read: nothing stored it, so there is no alias") {
+            SourceRefs.fromDocwh("kallimachos://a/b/c").shouldBeNull()
         }
     })
