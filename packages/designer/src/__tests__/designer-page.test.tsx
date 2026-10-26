@@ -64,7 +64,7 @@ it('accepts a saved SHA and keeps late edits dirty, while refusing a conflicting
   let source!: ModelDataSource;
   const extensions = [{ manifest: { name: 'probe', version: '1', license: 'none' as const, requires: [] },
     activate: async (context: { dataSource: ModelDataSource }) => { source = context.dataSource; return null; } }];
-  const mount = (snapshot: typeof files) => <DesignerPage files={snapshot} basePath="/m/" lang="en" collect={collect}
+  const mount = (snapshot: typeof files, expectedSha?: string) => <DesignerPage files={snapshot} expectedSha={expectedSha} basePath="/m/" lang="en" collect={collect}
     extensions={extensions} onDirty={onDirty} onError={onError} />;
   const view = render(mount(files));
   await waitFor(() => expect(source).toBeDefined());
@@ -76,13 +76,13 @@ it('accepts a saved SHA and keeps late edits dirty, while refusing a conflicting
   const saved = collect.current!();
   await edit('late');
   const snapshot = { sha: 'two', files: { ...files.files, [saved[0].path]: saved[0].text! } };
-  view.rerender(mount(snapshot));
+  view.rerender(mount(snapshot, 'two'));
   await waitFor(() => expect((source as BffFilesDataSource).sha).toBe('two'));
   await waitFor(() => expect(onDirty).toHaveBeenLastCalledWith(1));
   await waitFor(() => expect(collect.current!()[0].text).toContain('late'));
   // A second collection pins the expected base for conflict detection.
   await edit('pending');
-  view.rerender(mount({ sha: 'three', files: { ...snapshot.files, [saved[0].path]: saved[0].text! + '\n// concurrent edit' } }));
+  view.rerender(mount({ sha: 'three', files: { ...snapshot.files, [saved[0].path]: saved[0].text! + '\n// concurrent edit' } }, 'three'));
   await waitFor(() => expect(onError).toHaveBeenCalledWith(expect.objectContaining({ code: 'frame/edit-conflict' })));
   expect(collect.current!()[0].text).toContain('pending');
 });

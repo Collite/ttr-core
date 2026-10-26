@@ -281,7 +281,7 @@ regen-grammar:
 
 # Build the self-contained .vsix at the version already in package.json (no bump,
 # no git). `just publish vscode` calls this after bumping; call it directly for a
-# plain local build, e.g. `just _build-vsix 0.1.0`.
+# plain local build, e.g. `just _build-vsix 0.18.7`.
 #
 # vsce can't follow pnpm's symlinked node_modules, so instead of shipping the
 # dependency tree we inline everything into self-contained bundles and package
@@ -586,14 +586,14 @@ _release-ext kind release="false" level="" version="":
 #   just publish ttr-parser release set 0.6.0            # RELEASE, explicit version
 #   just publish packages/python/ttr-parser release       # PyPI release (path form)
 #   just publish ts-grammar set 4.4.0                       # TS grammar, explicit version
-#   just publish designer set 0.1.0                         # Designer family, internal GitHub assets
+#   just publish designer set 0.1.1                         # Designer family, internal GitHub assets
 #   just publish edit set 0.1.0                             # legacy: refuses; use designer
 #   just publish bundle grammar release set 1.0.0            # Kotlin bundle release
 #   just publish vscode                                        # ext: internal build, patch bump
 #   just publish vscode minor                                   # ext: internal build, minor bump
 #   just publish vscode release                                  # ext: promote current x.y.z → Marketplace
 #   just publish intellij release minor                          # ext: bump minor, publish to Marketplace
-#   just publish viewer set 0.1.0                                  # ttr-viewer image, explicit version
+#   just publish viewer set 0.11.4                                  # ttr-viewer image, explicit version
 publish *args:
     #!/usr/bin/env bash
     set -euo pipefail

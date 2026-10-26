@@ -6,6 +6,7 @@ import { DesignerPage, type CollectFiles } from '../page/DesignerPage.js';
 import { BffFilesDataSource } from '../data/bff-files-data-source.js';
 import { FakeWorker } from '../page/fake-worker.test-support.js';
 import type { WorkerDiagnostic } from '@tatrman/lsp';
+import type { ShellEditContext } from '../shell/edit-context.js';
 import type { ModelDataSource } from '../data/model-data-source.js';
 
 vi.mock('../canvas/Kernel.js', async () => (await import('../shell/__tests__/layout-harness.js')).kernelMock);
@@ -40,13 +41,13 @@ it('reports ready after the shell commits, acknowledges every successful input, 
 });
 it('acknowledges a saved SHA with later edits still dirty', async () => {
   const p = probe(), collect = createRef<CollectFiles>(), snapshot = vi.fn();
-  const mount = (value: typeof files) => <DesignerPage files={value} basePath="/m/" lang="en" extensions={p.extensions} collect={collect} onSnapshot={snapshot} />;
+  const mount = (value: typeof files, expectedSha?: string) => <DesignerPage files={value} expectedSha={expectedSha} basePath="/m/" lang="en" extensions={p.extensions} collect={collect} onSnapshot={snapshot} />;
   const view = render(mount(files));
   await waitFor(() => expect(p.source()).toBeDefined());
   await edit(p.source(), 'saved');
   const saved = collect.current!();
   await edit(p.source(), 'later');
-  view.rerender(mount({ sha: 'two', files: { ...files.files, [saved[0].path]: saved[0].text! } }));
+  view.rerender(mount({ sha: 'two', files: { ...files.files, [saved[0].path]: saved[0].text! } }, 'two'));
   await waitFor(() => expect(snapshot).toHaveBeenLastCalledWith({ sha: 'two', changed: 1 }));
   expect(collect.current!()[0].text).toContain('later');
 });
@@ -134,4 +135,85 @@ it('keeps installed versions and diagnostics isolated between embedded instances
   expect(b).not.toHaveBeenCalledWith(expect.objectContaining({ sha: 'one' }));
   await waitFor(() => expect(da).toHaveBeenCalled());
   await waitFor(() => expect(db).toHaveBeenCalled());
+});
+
+it.each(['loader', 'object'] as const)('refuses a %s refresh after a failed Save and keeps the collected edits', async kind => {
+  const p = probe(), collect = createRef<CollectFiles>(), error = vi.fn(), snapshot = vi.fn();
+  const props = { basePath: '/m/', lang: 'en' as const, extensions: p.extensions, collect, onError: error, onSnapshot: snapshot };
+  const view = render(<DesignerPage {...props} files={files} />);
+  await waitFor(() => expect(p.source()).toBeDefined());
+  await edit(p.source(), 'collected-but-not-saved');
+  expect(collect.current!()[0].text).toContain('collected-but-not-saved');
+  // The commit failed. A refresh must not treat the outside push as our Save result.
+  const moved = { ...files, sha: 'two' };
+  view.rerender(<DesignerPage {...props} files={kind === 'loader' ? async () => moved : moved} />);
+  await waitFor(() => expect(error).toHaveBeenCalledWith(expect.objectContaining({ code: 'frame/unsaved-edits', sha: 'two' })));
+  expect(snapshot).toHaveBeenCalledTimes(1);
+  expect(collect.current!()[0].text).toContain('collected-but-not-saved');
+  // Same-SHA refresh remains idempotent while dirty, including a failed Save's collection.
+  view.rerender(<DesignerPage {...props} files={{ ...files }} />);
+  await waitFor(() => expect(snapshot).toHaveBeenLastCalledWith({ sha: 'one', changed: 1 }));
+  expect(collect.current!()[0].text).toContain('collected-but-not-saved');
+});
+it('captures expectedSha with an input without treating changes to it as new inputs', async () => {
+  const loader = vi.fn(async () => files), snapshot = vi.fn();
+  const view = render(<DesignerPage files={loader} expectedSha="one" basePath="/m/" lang="en" onSnapshot={snapshot} />);
+  await waitFor(() => expect(snapshot).toHaveBeenCalledTimes(1));
+  view.rerender(<DesignerPage files={loader} expectedSha="two" basePath="/m/" lang="en" onSnapshot={snapshot} />);
+  await act(async () => {});
+  view.rerender(<DesignerPage files={loader} basePath="/m/" lang="en" onSnapshot={snapshot} />);
+  await act(async () => {});
+  expect(loader).toHaveBeenCalledTimes(1);
+  expect(snapshot).toHaveBeenCalledTimes(1);
+});
+it.each(['refused', 'failed'] as const)('republishes current edit diagnostics after a %s replacement', async kind => {
+  const inFlight = deferred<WorkerDiagnostic[]>();
+  const validate = vi.spyOn(BffFilesDataSource.prototype, 'validatedDiagnostics')
+    .mockResolvedValueOnce([]).mockReturnValueOnce(inFlight.promise).mockResolvedValue([diagnostic]);
+  const p = probe(), error = vi.fn(), diagnostics = vi.fn();
+  const props = { basePath: '/m/', lang: 'en' as const, extensions: p.extensions, onError: error, onDiagnostics: diagnostics };
+  const view = render(<DesignerPage {...props} files={files} />);
+  await waitFor(() => expect(diagnostics).toHaveBeenCalledWith([]));
+  await waitFor(() => expect(p.source()).toBeDefined());
+  await edit(p.source(), 'broken');
+  await waitFor(() => expect(validate).toHaveBeenCalledTimes(2));
+  view.rerender(<DesignerPage {...props} files={kind === 'refused' ? { ...files, sha: 'two' } : async () => { throw new Error('transport'); }} />);
+  await waitFor(() => expect(error).toHaveBeenCalledWith(expect.objectContaining({ code: kind === 'refused' ? 'frame/unsaved-edits' : 'host/load-failed' })));
+  await act(async () => inFlight.resolve([diagnostic]));
+  await waitFor(() => expect(diagnostics).toHaveBeenLastCalledWith([expect.objectContaining({ code: 'example' })]));
+});
+it('uses every queued loader even when a third input arrives before the first settles', async () => {
+  const first = deferred<typeof files>(), second = deferred<typeof files>(), snapshot = vi.fn();
+  const one = vi.fn(() => first.promise), two = vi.fn(() => second.promise), three = vi.fn(async () => ({ ...files, sha: 'three' }));
+  const props = { basePath: '/m/', lang: 'en' as const, onSnapshot: snapshot };
+  const view = render(<DesignerPage {...props} files={one} expectedSha="one" />);
+  await waitFor(() => expect(one).toHaveBeenCalledTimes(1));
+  view.rerender(<DesignerPage {...props} files={two} expectedSha="two" />);
+  view.rerender(<DesignerPage {...props} files={three} expectedSha="three" />);
+  await act(async () => first.resolve(files));
+  await waitFor(() => expect(two).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(snapshot).toHaveBeenCalledWith({ sha: 'one', changed: 0 }));
+  expect(three).not.toHaveBeenCalled();
+  await act(async () => second.resolve({ ...files, sha: 'two' }));
+  await waitFor(() => expect(snapshot).toHaveBeenLastCalledWith({ sha: 'three', changed: 0 }));
+  expect(three).toHaveBeenCalledTimes(1);
+  expect(snapshot.mock.calls.map(([value]) => value.sha)).toEqual(['one', 'two', 'three']);
+});
+it.each(['removed', 'pending'] as const)('removes active page authoring immediately when its grant is %s', async kind => {
+  const context: ShellEditContext = {
+    editable: true, removeNode: async () => true, saveNode: async () => ({ ok: true }),
+    renderToolbarActions: vi.fn(() => <span data-testid="active-authoring">Granted editing</span>),
+    renderNodeMenu: () => null, renderMissingObjects: () => null,
+  };
+  const extensions = [{ manifest: { name: 'active', version: '1', license: 'none' as const, requires: [] }, activate: async () => context }];
+  const props = { files, basePath: '/m/', lang: 'en' as const, location: '/w/repo/s/er', sourceAuthoring: true };
+  const view = render(<DesignerPage {...props} extensions={extensions} />);
+  await waitFor(() => expect(screen.getByTestId('active-authoring')).toBeInTheDocument());
+  vi.mocked(context.renderToolbarActions).mockClear();
+  const pending = [{ ...extensions[0], activate: () => new Promise<ShellEditContext>(() => {}) }];
+  view.rerender(<DesignerPage {...props} sourceAuthoring={false} extensions={kind === 'removed' ? undefined : pending} />);
+  expect(context.renderToolbarActions).not.toHaveBeenCalled();
+  expect(screen.queryByTestId('active-authoring')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Source files' })).toBeNull();
+  expect(screen.getByTestId('studio-header')).toBeInTheDocument();
 });

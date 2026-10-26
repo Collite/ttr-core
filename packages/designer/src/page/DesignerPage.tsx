@@ -24,7 +24,7 @@ export interface AuthoringExtension {
 export interface DesignerPageProps extends PropsHostCallbacks {
   files: Snapshot | (() => Promise<Snapshot>);
   manifest?: string;
-  /** Fence a loader to the requested immutable version, especially after a host Save. */
+  /** Mark this input as a Save acknowledgement and fence it to the committed SHA. */
   expectedSha?: string;
   basePath: string;
   lang: 'en' | 'cs';
@@ -155,7 +155,8 @@ export function DesignerPage(props: DesignerPageProps) {
         if (disposed) return;
         ++diagnosticsVersion;
         request = current;
-        const changed = await source.refresh({ reason: 'save', deferDisposal: true, expectedSha: current.sha });
+        const changed = await source.refresh({ reason: input.expectedSha === undefined ? 'refresh' : 'save',
+          deferDisposal: true, expectedSha: input.expectedSha });
         if (disposed) return;
         const { graphs, symbols } = await source.listCatalog();
         if (disposed) return;
@@ -186,6 +187,8 @@ export function DesignerPage(props: DesignerPageProps) {
         host.send({ type: 'ttr.frame.error', code: error instanceof SnapshotEditError ? error.code : 'host/load-failed',
           message: error instanceof SnapshotEditError ? error.message : 'Could not load the model snapshot.',
           ...(current.sha ? { sha: current.sha } : {}) });
+        // A refused/failed replacement leaves this worker installed. Its validation is still current.
+        void publishDiagnostics();
       });
     };
     controller.current = { workspace, source, load };
@@ -201,12 +204,11 @@ export function DesignerPage(props: DesignerPageProps) {
   }, [workspace, route]);
   const firstInput = useRef(props.files);
   const firstManifest = useRef(props.manifest);
-  const firstExpectedSha = useRef(props.expectedSha);
   useEffect(() => {
-    if (props.files === firstInput.current && props.manifest === firstManifest.current && props.expectedSha === firstExpectedSha.current) return;
-    firstInput.current = props.files; firstManifest.current = props.manifest; firstExpectedSha.current = props.expectedSha;
+    if (props.files === firstInput.current && props.manifest === firstManifest.current) return;
+    firstInput.current = props.files; firstManifest.current = props.manifest;
     controller.current?.load();
-  }, [props.files, props.manifest, props.expectedSha]);
+  }, [props.files, props.manifest]);
   useEffect(() => { if (props.location !== undefined) route.navigate(props.location); }, [route, props.location]);
   useEffect(() => { session?.source.disposeRetired(); session?.installed(); }, [session]);
   const viewState = useMemo(() => makeViewStateStore('file', { kind: 'file' }), [workspace]);

@@ -164,7 +164,7 @@ trailing definition whitespace is trimmed at the splice. Renames use `textDocume
 `@tatrman/designer-core` exports a React page, its TypeScript props, `ShellEditContext`, and the
 stage 1 message types. `@tatrman/designer-core/extensions` exports the open extension contracts
 and `editModel`. This stage supplies the built library for internal consumers; the family release
-is delivered as the Designer 0.1.0 family. Internal 0.x releases suffice unless a public release is explicitly requested.
+is delivered as the Designer 0.1.1 family. Internal 0.x releases suffice unless a public release is explicitly requested.
 
 ```tsx
 import { useRef } from 'react';
@@ -200,10 +200,13 @@ Keyboard shortcuts are scoped to the page containing the event target; host inpu
 
 `collect.current()` synchronously returns sorted whole-file changes (including null-text deletions)
 and records the exact collected base. Serialize collect, saving, and the next snapshot acknowledgement.
-After a successful save, pass a new snapshot object with a new immutable SHA, or a new loader function
-that returns it. Same-SHA updates are idempotent, so changed bytes or manifest settings require a new
-SHA. Late edits remain dirty after acknowledgement. Overlapping incoming changes report
-`frame/edit-conflict`; dirty replacement without a matching collection reports `frame/unsaved-edits`.
+After a successful Save, pass a new snapshot object or loader **with `expectedSha` set to the
+committed SHA in the same render**. This explicitly marks the input as a Save acknowledgement and
+fences the returned snapshot to that SHA; later edits remain dirty after acknowledgement. An input
+without `expectedSha` is a refresh: a different SHA refuses with `frame/unsaved-edits` while dirty,
+even after collection if the Save failed. A Save with overlapping later edits reports
+`frame/edit-conflict`. Same-SHA inputs are idempotent and preserve local changes, so changed bytes
+or manifest settings require a new SHA.
 The previous shell and files remain available on either refusal or loader failure. Prompt in the host;
 remount with a different React key only after an explicit discard choice. Dirty callbacks are debounced
 200 ms. Use a new input object/function to retry a failed loader; unmount terminates the worker.
@@ -220,12 +223,16 @@ Designer family **0.1.1** adds explicit embedded host lifecycle callbacks:
   Validation failure produces a blocking `worker/validation-unavailable` diagnostic. A later successful
   validation replaces it. Retired validation results and unmounted pages cannot publish callbacks.
 - `onError({code, message, sha?})` includes the requested SHA for a failed/refused snapshot replacement.
-  For loader inputs, set `expectedSha` to the immutable version the host expects after Save. A loader
-  returning another SHA is refused without changing the old model. Direct snapshot objects imply their
-  own expected SHA. Failed inputs acknowledge nothing; errors unrelated to that SHA cannot fail Save.
+  `expectedSha` marks a Save input and fences both objects and loaders to its committed SHA. An input
+  returning another SHA is refused without changing the old model. Refresh errors carry the direct
+  object's SHA or the SHA returned by its loader; a loader failure before returning has no SHA unless
+  `expectedSha` was supplied. Failed inputs acknowledge nothing; unrelated errors cannot fail Save.
 
 Keep files/loader identity stable between host renders. Each new input captures its loader, manifest
-and expected SHA when queued, even if a newer render arrives while it loads. Retry a failed input with
+and expected SHA when queued, even if a newer render arrives while it loads. Only files/loader or
+manifest identity changes start a load; changing or clearing `expectedSha` alone does not. Set or clear
+`expectedSha` in the same render as the input it belongs to: head refreshes pass none. Unlike 0.1.0,
+a Save input without `expectedSha` now refuses while dirty instead of rebasing. Retry a failed input with
 new object/function identity. A same-SHA retry republishes the current validation state without discarding authored bytes.
 The host serializes collection, persistence and snapshot acknowledgement, and retains exclusion across
 its own HTTP timeout until that persistence request settles. `collect.current()` remains synchronous
@@ -271,11 +278,11 @@ copying the worker. This is dependency optimization configuration; no worker plu
 Webpack hosts must keep the emitted worker as an asset when resolving `new URL(..., import.meta.url)`.
 
 The lockstep family is `designer-core`, `canvas-core`, `lsp`, `parser`, `tokens`, `perspectives`,
-`deep-links`, and `edit`, all at **0.1.0**. `perspectives` and `deep-links` are runtime imports.
+`deep-links`, and `edit`, all at **0.1.1**. `perspectives` and `deep-links` are runtime imports.
 `canvas-core` is pure TypeScript; React is only a peer of Designer. The LSP tarball bundles its private
 compiler modules and their declaration types; consumers need no private workspace packages.
 
-After merge, `just publish designer set 0.1.0` creates the internal `designer/v0.1.0` GitHub release.
+After merge, `just publish designer set 0.1.1` creates the internal `designer/v0.1.1` GitHub release.
 Download all `.tgz` assets, verify `SHA256SUMS`, then install them together:
 
 ```sh
@@ -289,29 +296,29 @@ to npm. An explicit public release is a separate maintainer action; see `PUBLISH
 ### pnpm hosts: internal release artifacts
 
 Platform P4 consumes the internal release under ruling R144-A(a). Download all eight release
-assets into `vendor/designer-0.1.0/` in the host repository, verify their release hashes before
+assets into `vendor/designer-0.1.1/` in the host repository, verify their release hashes before
 installing, and retain the manifest/checksums with them:
 
 ```sh
-mkdir -p vendor/designer-0.1.0
-gh release download designer/v0.1.0 --repo Collite/ttr-core --dir vendor/designer-0.1.0
-(cd vendor/designer-0.1.0 && shasum -a 256 -c SHA256SUMS)
+mkdir -p vendor/designer-0.1.1
+gh release download designer/v0.1.1 --repo Collite/ttr-core --dir vendor/designer-0.1.1
+(cd vendor/designer-0.1.1 && shasum -a 256 -c SHA256SUMS)
 ```
 
-In the host package.json, depend on the same eight `file:vendor/designer-0.1.0/tatrman-<name>-0.1.0.tgz`
+In the host package.json, depend on the same eight `file:vendor/designer-0.1.1/tatrman-<name>-0.1.1.tgz`
 artifacts (use relative paths from each consuming package). Pin transitive references in the
 workspace root's **pnpm-workspace.yaml**, not `pnpm.overrides` in package.json (ignored by pnpm 11):
 
 ```yaml
 overrides:
-  '@tatrman/designer-core': file:vendor/designer-0.1.0/tatrman-designer-core-0.1.0.tgz
-  '@tatrman/canvas-core': file:vendor/designer-0.1.0/tatrman-canvas-core-0.1.0.tgz
-  '@tatrman/lsp': file:vendor/designer-0.1.0/tatrman-lsp-0.1.0.tgz
-  '@tatrman/parser': file:vendor/designer-0.1.0/tatrman-parser-0.1.0.tgz
-  '@tatrman/tokens': file:vendor/designer-0.1.0/tatrman-tokens-0.1.0.tgz
-  '@tatrman/perspectives': file:vendor/designer-0.1.0/tatrman-perspectives-0.1.0.tgz
-  '@tatrman/deep-links': file:vendor/designer-0.1.0/tatrman-deep-links-0.1.0.tgz
-  '@tatrman/edit': file:vendor/designer-0.1.0/tatrman-edit-0.1.0.tgz
+  '@tatrman/designer-core': file:vendor/designer-0.1.1/tatrman-designer-core-0.1.1.tgz
+  '@tatrman/canvas-core': file:vendor/designer-0.1.1/tatrman-canvas-core-0.1.1.tgz
+  '@tatrman/lsp': file:vendor/designer-0.1.1/tatrman-lsp-0.1.1.tgz
+  '@tatrman/parser': file:vendor/designer-0.1.1/tatrman-parser-0.1.1.tgz
+  '@tatrman/tokens': file:vendor/designer-0.1.1/tatrman-tokens-0.1.1.tgz
+  '@tatrman/perspectives': file:vendor/designer-0.1.1/tatrman-perspectives-0.1.1.tgz
+  '@tatrman/deep-links': file:vendor/designer-0.1.1/tatrman-deep-links-0.1.1.tgz
+  '@tatrman/edit': file:vendor/designer-0.1.1/tatrman-edit-0.1.1.tgz
 ```
 
 Run `pnpm install` after adding React/ReactDOM 19 peers to the host. This form is exercised by
@@ -319,7 +326,7 @@ Run `pnpm install` after adding React/ReactDOM 19 peers to the host. This form i
 strict declarations and both dev/production browsers. The nested ELK include works without npm
 hoisting. Exact public release-asset URLs may replace the tarball specs in **both** direct dependencies
 and overrides, for example
-`https://github.com/Collite/ttr-core/releases/download/designer/v0.1.0/tatrman-lsp-0.1.0.tgz`;
+`https://github.com/Collite/ttr-core/releases/download/designer/v0.1.1/tatrman-lsp-0.1.1.tgz`;
 verify the downloaded bytes against that release's SHA256SUMS first. ttr-core is public, so asset URLs
 need no registry auth. Only released, hash-checked tarball specs are permitted: source `file:` paths,
 `workspace:`, `link:` and git dependencies remain forbidden in Platform's dependency rules.
