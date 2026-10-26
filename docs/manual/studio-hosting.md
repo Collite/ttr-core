@@ -208,6 +208,29 @@ The previous shell and files remain available on either refusal or loader failur
 remount with a different React key only after an explicit discard choice. Dirty callbacks are debounced
 200 ms. Use a new input object/function to retry a failed loader; unmount terminates the worker.
 
+Designer family **0.1.1** adds explicit embedded host lifecycle callbacks:
+
+- `onReady({sha, manifest: {bindings: {required}}})` runs once per workspace session after the first
+  worker/catalog and shell are installed. A failed initial load emits no ready or snapshot notification.
+- `onSnapshot({sha, changed})` acknowledges every successful snapshot input, including a same-SHA retry.
+  It runs after installation; `changed` includes edits made after the last collection. Only this callback
+  confirms installation of a saved version. Host HTTP success alone must not clear local dirty state.
+- `onDiagnostics(values)` replaces the complete validated worker set, including `[]`. Each entry has
+  `{uri, severity, code, message, source: 'worker'}` with string severity (`error`, `warning`, `info`).
+  Validation failure produces a blocking `worker/validation-unavailable` diagnostic. A later successful
+  validation replaces it. Retired validation results and unmounted pages cannot publish callbacks.
+- `onError({code, message, sha?})` includes the requested SHA for a failed/refused snapshot replacement.
+  For loader inputs, set `expectedSha` to the immutable version the host expects after Save. A loader
+  returning another SHA is refused without changing the old model. Direct snapshot objects imply their
+  own expected SHA. Failed inputs acknowledge nothing; errors unrelated to that SHA cannot fail Save.
+
+Keep files/loader identity stable between host renders. Each new input captures its loader, manifest
+and expected SHA when queued, even if a newer render arrives while it loads. Retry a failed input with
+new object/function identity. A same-SHA retry republishes the current validation state without discarding authored bytes.
+The host serializes collection, persistence and snapshot acknowledgement, and retains exclusion across
+its own HTTP timeout until that persistence request settles. `collect.current()` remains synchronous
+and may throw while an edit is pending; catch that refusal and retain edits.
+
 The `extensions` prop is a list of `{ manifest, licenseClient?, activate }`. A manifest contains
 `name`, `version`, `license: 'none' | 'platform'`, and `requires: string[]`. The core's existing
 license gate runs before `activate({ dataSource }, grants)`; activation resolves a `ShellEditContext`

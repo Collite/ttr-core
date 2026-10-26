@@ -83,3 +83,20 @@ describe('useAuthoringContext — the injection seam', () => {
     await waitFor(() => expect(loader).toHaveBeenCalledWith({ dataSource: ds }));
   });
 });
+
+it('drops the old context synchronously when a new loader or source is pending', async () => {
+  const original = fakeCtx(), ds = fakeDs(), renders: Array<ShellEditContext | null> = [];
+  registerAuthoringLoader(async () => original);
+  function Observed({ source }: { source: ModelDataSource }) {
+    const context = useAuthoringContext(source);
+    renders.push(context);
+    return <div>{context ? 'on' : 'off'}</div>;
+  }
+  const view = render(<Observed source={ds} />);
+  await waitFor(() => expect(renders.at(-1)).toBe(original));
+  registerAuthoringLoader(() => new Promise(() => {}));
+  renders.length = 0;
+  view.rerender(<Observed source={ds} />);
+  expect(renders.length).toBeGreaterThan(0);
+  expect(renders.every(context => context === null)).toBe(true);
+});

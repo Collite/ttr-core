@@ -282,7 +282,7 @@ Per [`contracts.md`](docs/grammar-master/contracts.md) §7:
 ### Designer family — internal artifacts by default
 
 The eight-package closure is `@tatrman/{parser,tokens,canvas-core,deep-links,perspectives,edit,lsp,designer-core}`,
-all version **0.1.0**. `edit@0.1.0` is reused unchanged from its existing public release. The other
+all version **0.1.1**. The initial 0.1.0 cut reused the already public `edit@0.1.0`; subsequent cuts version all eight together. The
 packages have independent compiler-free distribution entries; LSP bundles private compiler modules and
 inlines their declaration dependencies. Designer ships its prebuilt module worker and scoped CSS.
 React/ReactDOM 19 are host peers. `canvas-core` has no React dependency.
@@ -290,18 +290,18 @@ React/ReactDOM 19 are host peers. `canvas-core` has no React dependency.
 Use the usual recipe **after this PR is merged**, from a clean checkout at the remote branch tip:
 
 ```sh
-just publish designer set 0.1.0
-# Alias: just publish packages/designer set 0.1.0
+just publish designer set 0.1.1
+# Alias: just publish packages/designer set 0.1.1
 ```
 
 The recipe checks the version, remote tip, merged-master ancestry, and existing tags before asking
-for the tag push. The bare `designer/v0.1.0` tag creates an **internal GitHub Release** with all eight
+for the tag push. The bare `designer/v0.1.1` tag creates an **internal GitHub Release** with all eight
 npm tarballs, `manifest.json`, and `SHA256SUMS`. It needs no npm publishing token and does not publish
 to a public registry. Download the assets together, verify hashes, then install them in one command:
 
 ```sh
-gh release download designer/v0.1.0 --repo Collite/ttr-core --dir designer-0.1.0
-cd designer-0.1.0
+gh release download designer/v0.1.1 --repo Collite/ttr-core --dir designer-0.1.1
+cd designer-0.1.1
 shasum -a 256 -c SHA256SUMS
 npm install ./tatrman-*.tgz react@^19 react-dom@^19
 ```

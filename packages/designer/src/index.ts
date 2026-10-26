@@ -5,3 +5,4 @@ export type { HostInit, HostScope, HostMessage, FrameMessage } from './host/host
 export type { ShellEditContext, AuthoringCommand, EditSlotProps, ProcessingDoorsSlotProps } from './shell/edit-context.js';
 export type { Snapshot } from './data/bff-files-data-source.js';
 export type { ChangedFile } from './fs/changed-files.js';
+export type { DesignerReady, SnapshotInstalled, DesignerDiagnostic, DesignerError, PropsHostCallbacks } from './host/props-host.js';

@@ -145,15 +145,15 @@ body {margin:13px;background:#0c1828;color:#eee;font-family:Georgia} #navy-heade
   writeFileSync(
     join(scratch, 'main.jsx'),
     `import React,{useState} from 'react';import{createRoot}from'react-dom/client';import{DesignerPage}from'@tatrman/designer-core';import'@tatrman/designer-core/designer.css';
-window.locations=[];window.failures=[];async function mount(){const snapshot=await fetch('/snapshot.json').then(r=>r.json());
-function Model(){const[location,setLocation]=useState('/w/hartland/s/md');const[theme,setTheme]=useState('dark');window.setPageTheme=setTheme;return React.createElement(DesignerPage,{files:snapshot,workspace:'hartland',basePath:'/m/',lang:'en',theme,location,onLocation:p=>{window.locations.push(p);setLocation(p)},onError:e=>window.failures.push(e)})}
+window.locations=[];window.failures=[];window.installations=[];window.readiness=[];window.diagnosticSets=[];async function mount(){const snapshot=await fetch('/snapshot.json').then(r=>r.json());
+function Model(){const[location,setLocation]=useState('/w/hartland/s/md');const[theme,setTheme]=useState('dark');window.setPageTheme=setTheme;return React.createElement(DesignerPage,{files:snapshot,workspace:'hartland',basePath:'/m/',lang:'en',theme,location,onReady:v=>window.readiness.push(v),onSnapshot:v=>window.installations.push(v),onDiagnostics:v=>window.diagnosticSets.push(v),onLocation:p=>{window.locations.push(p);setLocation(p)},onError:e=>window.failures.push(e)})}
 createRoot(document.getElementById('mount')).render(React.createElement(Model));}mount();`
   );
   writeFileSync(
     join(scratch, 'type-probe.ts'),
     `import {DesignerPage,type DesignerPageProps,type ShellEditContext,type Host} from '@tatrman/designer-core';
 import type {AuthoringExtension} from '@tatrman/designer-core/extensions';
-const props:DesignerPageProps={files:{sha:'types',files:{}},basePath:'/m/',lang:'en'};DesignerPage(props);
+const props:DesignerPageProps={files:async()=>({sha:'types',files:{}}),expectedSha:'types',sourceAuthoring:false,basePath:'/m/',lang:'en',onReady:v=>{const sha:string=v.sha;const required:boolean=v.manifest.bindings.required;void sha;void required;},onSnapshot:v=>{const sha:string=v.sha;const count:number=v.changed;void sha;void count;},onDiagnostics:values=>{for(const d of values){const message:string=d.message;void message;}},onError:e=>{const sha:string|undefined=e.sha;void sha;}};DesignerPage(props);
 const host:Host={send:()=>{},dispose:()=>{}};host.send({type:'ttr.frame.ready'});
 const extension:AuthoringExtension={manifest:{name:'probe',version:'1',license:'none',requires:[]},activate:async()=>null};void extension;
 function context(c:ShellEditContext){return c.editable}void context;`
@@ -215,6 +215,12 @@ function context(c:ShellEditContext){return c.editable}void context;`
     await page.getByTestId('catalog-spine').waitFor();
     await page.getByTestId('star-cube').first().waitFor();
     await page.waitForFunction(() => document.querySelectorAll('.react-flow__node').length > 0);
+    await page.waitForFunction(() => window.installations.length === 1 && window.readiness.length === 1 && window.diagnosticSets.length > 0);
+    const lifecycle = await page.evaluate(() => ({ snapshot: window.installations[0], ready: window.readiness[0], diagnostics: window.diagnosticSets.at(-1) }));
+    assert.equal(lifecycle.snapshot.sha, kind === 'host-dev' ? 'artifact-smoke' : 'prod');
+    assert.equal(lifecycle.ready.sha, lifecycle.snapshot.sha);
+    assert.equal(lifecycle.snapshot.changed, 0);
+    assert.equal(typeof lifecycle.ready.manifest.bindings.required, 'boolean');
     const state = await page.evaluate(() => {
       const root = document.querySelector('.ttr-designer'),
         mount = document.getElementById('mount'),
@@ -297,6 +303,7 @@ function context(c:ShellEditContext){return c.editable}void context;`
     assert.ok(['er', 'db', 'md'].every((x) => state.catalog.includes(x)));
     assert.equal(state.url, '/');
     await page.screenshot({ path: join(out, kind + '.png'), fullPage: true });
+    state.lifecycle = lifecycle;
     state.interactions = await checkEmbeddedPage(page);
     await page.locator('[data-testid="catalog-item"][data-ref="er"]').click();
     await page.waitForFunction(() => window.locations.includes('/w/hartland/s/er'));
