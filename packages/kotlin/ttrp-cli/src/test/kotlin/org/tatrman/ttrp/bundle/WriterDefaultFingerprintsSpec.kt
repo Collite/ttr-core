@@ -185,7 +185,7 @@ class WriterDefaultFingerprintsSpec :
                 RecipeActionDependencies.Verification.Ok
         }
 
-        "a path only import becomes a located RES006 refusal before action checking" {
+        "a path only import becomes a located RES006 refusal" {
             val source =
                 recipe
                     .replace("import hartland.*", "import private.*")

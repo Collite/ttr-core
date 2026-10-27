@@ -2,6 +2,7 @@
 package org.tatrman.ttr.metadata.world
 
 import org.tatrman.ttr.metadata.model.ModelObject
+import org.tatrman.ttr.metadata.model.PackageNames
 import org.tatrman.ttr.metadata.model.QualifiedName
 import org.tatrman.ttr.metadata.model.SchemaCode
 import org.tatrman.ttr.metadata.model.World
@@ -42,16 +43,28 @@ class WorldResolver(
     private val storageByQname: Map<QualifiedName, WorldStorage> =
         worlds.values.flatMap { it.storages }.associateBy { it.qname }
 
-    // Older snapshot-only callers have no loader package map. Keep that constructor's legacy
-    // behavior; package-aware consumers must supply the complete reconciled loader provider.
+    private val loadedPackages: Set<String> by lazy {
+        val provider = packageOf
+        if (provider == null) {
+            emptySet()
+        } else {
+            snapshot.model
+                .objectByQname()
+                .values
+                .map(provider)
+                .toSet()
+        }
+    }
+
+    // Snapshot-only callers retain path-based matching, with dotted packages read as directories.
+    // A supplied loader provider is authoritative; missing entries never fall back to paths.
     private fun packageLoaded(pkg: String): Boolean =
-        snapshot.model.objectByQname().values.any { obj ->
-            if (packageOf == null) {
-                obj.sourceFile.contains("/$pkg/")
-            } else {
-                val declared = packageOf.invoke(obj)
-                declared == pkg || declared.startsWith("$pkg.")
+        if (packageOf == null) {
+            snapshot.model.objectByQname().values.any { obj ->
+                obj.sourceFile.contains("/" + pkg.replace('.', '/') + "/")
             }
+        } else {
+            loadedPackages.any { PackageNames.covers(pkg, it) }
         }
 
     fun listWorlds(): List<QualifiedName> = worlds.keys.sortedBy { it.dotted() }

@@ -4,6 +4,7 @@ package org.tatrman.ttrp.resolve
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
+import org.tatrman.ttrp.project.TtrpManifest
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -86,6 +87,47 @@ class DeclaredPackageScopeSpec :
             loaded.packageExists("correct.pkg") shouldBe true
             loaded.packageExists("wrong") shouldBe false
             loaded.findEntities("item", imports("wrong")).size shouldBe 0
+        }
+        val tierRoot = tempdir("qualified-tier-scope").toPath()
+        write(
+            tierRoot,
+            "acme/db/orders.ttrm",
+            "package acme\nmodel db schema dbo\ndef table orders { columns: [def column id { type: int }] }",
+        )
+        write(
+            tierRoot,
+            "acme/binding/extra.ttrm",
+            "package acme\nmodel db schema dbo\ndef table extra { columns: [] }",
+        )
+        write(
+            tierRoot,
+            "world.ttrm",
+            """
+            package acme.worlds
+            model world
+            def world dev {
+                def engine pg { type: postgres }
+                def storage data { type: postgres, via: pg, hosts: [acme] }
+            }
+            """.trimIndent(),
+        )
+
+        fun checkTier(source: String) =
+            TtrpChecker(TtrpManifest(world = "acme.worlds.dev", manifestDir = tierRoot), tierRoot)
+                .check(source, "qualified.ttrp")
+
+        "a qualified db tier load resolves a table by its declared package" {
+            val report = checkTier("container c target pg { s = load(acme.db.orders) }")
+            report.errors.map { it.render() } shouldBe emptyList()
+            report.schemas["c"]?.get("s")?.map { it.name } shouldBe listOf("id")
+        }
+        "a qualified er tier load cannot resolve a db table" {
+            val report = checkTier("container c target pg { s = load(acme.er.orders) }")
+            report.errors.map { it.id.name } shouldBe listOf("RES_001")
+        }
+        "a non-tier directory cannot add a package import" {
+            val report = checkTier("import acme.binding.*\ncontainer c target pg { }")
+            report.errors.map { it.id.name } shouldBe listOf("RES_006")
         }
         "undeclared files retain the loader's computed package" {
             val legacy = tempdir("legacy-packages").toPath()

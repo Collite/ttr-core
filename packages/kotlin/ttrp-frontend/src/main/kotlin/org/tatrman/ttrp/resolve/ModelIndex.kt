@@ -6,6 +6,7 @@ import org.tatrman.ttr.metadata.model.DbColumn
 import org.tatrman.ttr.metadata.model.DbTable
 import org.tatrman.ttr.metadata.model.Entity
 import org.tatrman.ttr.metadata.model.ModelObject
+import org.tatrman.ttr.metadata.model.PackageNames
 import org.tatrman.ttr.metadata.model.QualifiedName
 import org.tatrman.ttr.metadata.model.Relation
 import org.tatrman.ttr.metadata.model.RowSchemaRecord
@@ -54,14 +55,14 @@ class ModelIndex(
 
     /** A package import reaches that package and its descendants, on segment boundaries. */
     fun packageExists(pkg: String): Boolean =
-        objects.any { inPackage(it, pkg) } || rowSchemas.any { packageMatches(it.pkg, pkg) }
+        objects.any { inPackage(it, pkg) } || rowSchemas.any { PackageNames.covers(pkg, it.pkg) }
 
     // The loader already resolves declaredPackage ?: computedPackage, including legacy files.
     // Neither an enclosing checkout directory nor an ER object's empty qname.package is identity.
     private fun inPackage(
         obj: ModelObject,
         pkg: String,
-    ): Boolean = packageMatches(packageOf(obj), pkg)
+    ): Boolean = PackageNames.covers(pkg, packageOf(obj))
 
     /** Grammar 0.14 `def schema` row schemas (not model objects — carried on the model beside them). */
     private val rowSchemas: List<RowSchemaRecord> =
@@ -77,15 +78,7 @@ class ModelIndex(
     fun findRowSchemas(
         name: String,
         imports: List<ImportScope>,
-    ): List<RowSchemaRecord> =
-        rowSchemas
-            .filter { rs ->
-                rs.name == name &&
-                    imports.any { imp ->
-                        (imp.tier == null || imp.tier == SchemaCode.DB) &&
-                            packageMatches(rs.pkg, imp.pkg)
-                    }
-            }.sortedBy { it.qualifiedName }
+    ): List<RowSchemaRecord> = rowSchemasInScope(imports).filter { it.name == name }
 
     /** Every row schema an import brings into scope (the [findRowSchemas] rule, any name), by qualified name. */
     fun rowSchemasInScope(imports: List<ImportScope>): List<RowSchemaRecord> =
@@ -93,7 +86,7 @@ class ModelIndex(
             .filter { rs ->
                 imports.any { imp ->
                     (imp.tier == null || imp.tier == SchemaCode.DB) &&
-                        packageMatches(rs.pkg, imp.pkg)
+                        PackageNames.covers(imp.pkg, rs.pkg)
                 }
             }.sortedBy { it.qualifiedName }
 
@@ -193,28 +186,19 @@ class ModelIndex(
         AutomationScope(
             imports,
             objects.filterIsInstance<org.tatrman.ttr.metadata.model.AutomationAction>().filter { obj ->
-                imports.any { packageMatches(packageOf(obj), it.pkg) }
+                imports.any { inPackage(obj, it.pkg) }
             },
             objects.filterIsInstance<Entity>().filter { obj ->
                 imports.any {
-                    packageMatches(packageOf(obj), it.pkg) &&
+                    inPackage(obj, it.pkg) &&
                         (it.tier == null || it.tier == obj.qname.schemaCode)
                 }
             },
             objects.filterIsInstance<Entity>().filter(::isAutomationStdlib),
-            imports
-                .filterNot { imp ->
-                    objects.any { packageMatches(packageOf(it), imp.pkg) } ||
-                        rowSchemas.any { packageMatches(it.pkg, imp.pkg) }
-                }.map { it.raw },
+            imports.filterNot { packageExists(it.pkg) }.map { it.raw },
         ) { entity, prefix ->
-            packageMatches(packageOf(entity), prefix)
+            inPackage(entity, prefix)
         }
-
-    private fun packageMatches(
-        pkg: String,
-        prefix: String,
-    ): Boolean = pkg == prefix || pkg.startsWith("$prefix.")
 
     /** The calendars of the model — entities with an attribute whose `semantics { role: event_date }` (D-82). */
     fun calendars(): List<Entity> = objects.filterIsInstance<Entity>().filter { isCalendar(it) }

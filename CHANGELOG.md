@@ -10,11 +10,15 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 - TTR-P imports, qualified loads, automation objects and row schemas use loader
   declared-or-computed package identity, with segment-boundary descendants, independently
-  of checkout paths. A directory name cannot add import scope.
+  of checkout paths. Qualified loads accept the same trailing tier as imports.
+  An import of a directory that is not a declared package (for example
+  `import hartland.binding.*` when the files declare `hartland`) now refuses with
+  RES-006; import the declared package or its tier instead.
 - `WorldResolver(snapshot, packageOf)` accepts the same loader provider for host
   validation; checker/build and native export use it. Existing snapshot-only JVM
-  callers retain their constructor and legacy behavior. Storage placement and overlay
-  rules are unchanged. This enables bound calendar source planning in the automation
+  callers retain their constructor and path-based validation, with dotted host names
+  read as directories. The TTR-P wrapper requires its provider argument explicitly.
+  Storage placement and overlay rules are unchanged. This enables bound calendar source planning in the automation
   consumer; calendar runtime integration is a separate change.
 - No grammar change or release tag is included. The next grammar bundle remains on
   the **0.18.x** line; consumers need the reviewed internal release before adoption.

@@ -26,13 +26,16 @@ object TtrpWorldResolver {
         val diagnostics: List<TtrpDiagnostic>,
     )
 
-    @JvmOverloads
+    /**
+     * [packageOf] must be supplied explicitly. Null selects the legacy path rule and is only for
+     * snapshot-only callers without loader identity; checker/build pass the reconciled provider.
+     */
     fun resolve(
         snapshot: RegistrySnapshot?,
         manifest: TtrpManifest,
         pin: String?,
         pinLocation: SourceLocation?,
-        packageOf: ((org.tatrman.ttr.metadata.model.ModelObject) -> String)? = null,
+        packageOf: ((org.tatrman.ttr.metadata.model.ModelObject) -> String)?,
     ): Selection {
         val loc =
             pinLocation

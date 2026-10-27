@@ -13,9 +13,10 @@ checkout directories never add scope. Engine/storage overlays and world fingerpr
 keep their existing rules.
 
 The one-argument `WorldResolver(snapshot)` JVM constructor remains available for
-existing consumers. It retains legacy path-based host validation because the snapshot
-alone does not retain loader package identity. Rebuild and opt into the provider
-constructor to resolve worlds independently of checkout paths. The TTR-P checker and
+existing consumers. It retains legacy path-based host validation: whole directory
+segments match, with dots read as directories (`acme.sales` matches `/acme/sales/`).
+It remains checkout-dependent because the snapshot alone does not retain loader package
+identity. Rebuild and opt into the provider constructor to resolve worlds independently of checkout paths. The TTR-P checker and
 native export CLI pass the reconciled loader provider.
 
 ## export/ — projections (XM)

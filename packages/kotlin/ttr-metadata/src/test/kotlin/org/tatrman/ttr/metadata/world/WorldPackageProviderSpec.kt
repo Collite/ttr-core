@@ -61,6 +61,34 @@ class WorldPackageProviderSpec :
             val original = MetadataFixtures.loadErpSnapshot()
             WorldResolver(original) { "" }.resolve(world).shouldBeInstanceOf<WorldResolution.HostsUnknownPackage>()
         }
+        "the snapshot-only constructor reads dotted hosts as whole directory segments" {
+            for ((host, matches) in listOf("acme.sales" to true, "acme.sale" to false)) {
+                val legacy = tempdir("legacy-dotted-host").toPath()
+                val table = legacy.resolve("x/acme/sales/table.ttrm")
+                Files.createDirectories(table.parent)
+                Files.writeString(table, "package acme.sales\nmodel db\ndef table orders { columns: [] }")
+                Files.writeString(
+                    legacy.resolve("world.ttrm"),
+                    """
+                    package worlds
+                    model world
+                    def world dev { def storage data { type: postgres, hosts: [$host] } }
+                    """.trimIndent(),
+                )
+                val reconciled =
+                    ModelReconciler(ModelDescriptor("test", "test")).reconcile(
+                        listOf(FileBasedSource("test", 100, LocalFsStorage("test", legacy)).load()),
+                    )
+                val snap =
+                    RegistrySnapshot(reconciled.model, ModelGraph.build(reconciled.model), Instant.EPOCH, emptyList())
+                val result = WorldResolver(snap).resolve(QualifiedName(SchemaCode.WORLD, "", "dev", "worlds"))
+                if (matches) {
+                    result.shouldBeInstanceOf<WorldResolution.Ok>()
+                } else {
+                    result.shouldBeInstanceOf<WorldResolution.HostsUnknownPackage>()
+                }
+            }
+        }
         "the snapshot-only JVM constructor remains available for existing binaries" {
             val original = MetadataFixtures.loadErpSnapshot()
             val constructor = WorldResolver::class.java.getConstructor(RegistrySnapshot::class.java)

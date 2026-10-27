@@ -689,9 +689,12 @@ class TtrpChecker(
         if (storage != null) {
             return resolveStorageLoad(storage, member, schemaArg.firstOrNull(), loc, ctx)
         }
-        // Full-qname model object (e.g. erp.accounts): pkg = all-but-last, name = last.
-        val pkg = parts.dropLast(1).joinToString(".")
-        val objs = modelIndex?.findByPackage(pkg, parts.last()) ?: emptyList()
+        // Qualified model loads use the same optional trailing tier as imports.
+        val scope = ModelIndex.importScope(parts.dropLast(1), parts.joinToString("."))
+        val objs =
+            modelIndex?.findByPackage(scope.pkg, parts.last())?.filter {
+                scope.tier == null || it.qname.schemaCode == scope.tier
+            } ?: emptyList()
         if (objs.size == 1) return loadModelObject(objs[0], loc, ctx, op.location)
         ctx.diags +=
             diag(TtrpDiagnosticId.RES_001, "no storage or model object named `${parts.joinToString(".")}`", loc)
