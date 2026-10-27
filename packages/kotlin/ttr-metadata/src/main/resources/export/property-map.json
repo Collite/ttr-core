@@ -139,6 +139,8 @@
     "members",
     "event",
     "grounds",
+    "involves",
+    "period",
     "lexicon"
   ],
   "er2cncRole": [
@@ -224,6 +226,9 @@
     "basis",
     "definition",
     "members",
+    "from",
+    "until",
+    "per",
     "value_space",
     "lexicon"
   ],
