@@ -52,33 +52,16 @@ class ModelIndex(
         }
     }
 
-    /**
-     * True iff some model object lives in package [pkg] (dir-path convention: `.` → `/`).
-     *
-     * review-001 1.3-C: db/er model objects are matched to a package by their SOURCE-FILE
-     * path, not `qname.package`. This is deliberate and currently unavoidable — ttr-metadata
-     * populates `qname.package` only for WORLD objects; for db tables and er entities it is
-     * empty (verified against the shared fixture). The path segment `/<pkg>/` is slash-
-     * delimited so the match is boundary-safe (`/erp/` never matches `/erproot/`). What is
-     * NOT settled is the wildcard semantics: `import erp.*` (tier=null) currently reaches the
-     * `erp.er` sub-package (its file lives under `/erp/er/`), which the RES-002 ambiguity
-     * fixture relies on. Whether a bare-package wildcard should include tier sub-packages is a
-     * D-b decision for Stage 2.1; the precise fix also needs an UPSTREAM ttr-metadata change to
-     * populate `qname.package` for db/er objects. Flagged in tasks-overview.md §Blockers.
-     */
+    /** A package import reaches that package and its descendants, on segment boundaries. */
     fun packageExists(pkg: String): Boolean =
-        objects.any { pathInPackage(it, pkg) } || rowSchemas.any { fileInPackage(it.sourceFile, pkg) }
+        objects.any { inPackage(it, pkg) } || rowSchemas.any { packageMatches(it.pkg, pkg) }
 
-    /** Segment-boundary path match: object's source file lies under the `/<pkg>/` directory. */
-    private fun pathInPackage(
+    // The loader already resolves declaredPackage ?: computedPackage, including legacy files.
+    // Neither an enclosing checkout directory nor an ER object's empty qname.package is identity.
+    private fun inPackage(
         obj: ModelObject,
         pkg: String,
-    ): Boolean = fileInPackage(obj.sourceFile, pkg)
-
-    private fun fileInPackage(
-        sourceFile: String,
-        pkg: String,
-    ): Boolean = sourceFile.contains("/" + pkg.replace('.', '/') + "/")
+    ): Boolean = packageMatches(packageOf(obj), pkg)
 
     /** Grammar 0.14 `def schema` row schemas (not model objects — carried on the model beside them). */
     private val rowSchemas: List<RowSchemaRecord> =
@@ -87,8 +70,8 @@ class ModelIndex(
 
     /**
      * Row schemas named [name] that an import brings into scope (action displays, grammar 0.14). Scoped the
-     * way loadable objects are — the declaring file lies under an imported package's directory (so a
-     * wildcard reaches sub-packages, the entity rule) — and tier-neutral: a bare `import <pkg>.*` or a
+     * way loadable objects are — loader package identity with segment-boundary descendants — and tier-neutral:
+     * a bare `import <pkg>.*` or a
      * `db`-tier one reaches them. More than one hit is an ambiguity the caller reports (no first-wins).
      */
     fun findRowSchemas(
@@ -100,7 +83,7 @@ class ModelIndex(
                 rs.name == name &&
                     imports.any { imp ->
                         (imp.tier == null || imp.tier == SchemaCode.DB) &&
-                            (fileInPackage(rs.sourceFile, imp.pkg) || rs.pkg == imp.pkg)
+                            packageMatches(rs.pkg, imp.pkg)
                     }
             }.sortedBy { it.qualifiedName }
 
@@ -110,7 +93,7 @@ class ModelIndex(
             .filter { rs ->
                 imports.any { imp ->
                     (imp.tier == null || imp.tier == SchemaCode.DB) &&
-                        (fileInPackage(rs.sourceFile, imp.pkg) || rs.pkg == imp.pkg)
+                        packageMatches(rs.pkg, imp.pkg)
                 }
             }.sortedBy { it.qualifiedName }
 
@@ -119,7 +102,7 @@ class ModelIndex(
         imports: List<ImportScope>,
     ): Boolean =
         imports.any { imp ->
-            pathInPackage(obj, imp.pkg) &&
+            inPackage(obj, imp.pkg) &&
                 (imp.tier == null || obj.qname.schemaCode == imp.tier)
         }
 
@@ -155,7 +138,7 @@ class ModelIndex(
         name: String,
     ): List<ModelObject> =
         objects.filter {
-            (it is DbTable || it is Entity) && it.qname.name == name && pathInPackage(it, pkg)
+            (it is DbTable || it is Entity) && it.qname.name == name && inPackage(it, pkg)
         }
 
     /** Entities in import scope by simple name (used to resolve a load's underlying entity). */
@@ -186,12 +169,12 @@ class ModelIndex(
 
     /**
      * The automation objects (`def parameter · action · service · role · approval · program`) the imports bring into
-     * scope — a recipe's `import <pkg>.automation.*` (AU-core-P1). Package by source path, as for loadable objects.
+     * scope — a recipe's `import <pkg>.automation.*` (AU-core-P1). Loader package identity, as for loadable objects.
      */
     fun automationInScope(imports: List<ImportScope>): List<org.tatrman.ttr.metadata.model.AutomationObject> =
         objects
             .filterIsInstance<org.tatrman.ttr.metadata.model.AutomationObject>()
-            .filter { o -> imports.any { imp -> pathInPackage(o, imp.pkg) } }
+            .filter { o -> imports.any { imp -> inPackage(o, imp.pkg) } }
 
     /** Every automation object of the model, imported or not — a `def program` names its recipe, not the reverse. */
     fun automationAll(): List<org.tatrman.ttr.metadata.model.AutomationObject> =

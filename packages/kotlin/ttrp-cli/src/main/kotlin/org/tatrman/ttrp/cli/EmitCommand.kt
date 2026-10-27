@@ -128,9 +128,10 @@ class EmitCommand : CliktCommand(name = "emit") {
                         swappedAt = java.time.Instant.EPOCH,
                         warnings = emptyList(),
                     )
+                val packageOf = LayoutResolver.packagesFromFiles(loaded.files)
                 val resolved =
                     org.tatrman.ttr.metadata.world
-                        .WorldResolver(registrySnapshot)
+                        .WorldResolver(registrySnapshot, packageOf)
                         .resolve(world.qname)
                 require(
                     resolved is org.tatrman.ttr.metadata.world.WorldResolution.Ok,
@@ -171,7 +172,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                 evidence?.let { RecipeActionDependencies.validate(it)?.let { bad -> error(bad.reason) } }
                 val scope =
                     evidence?.let {
-                        ModelIndex(registrySnapshot, LayoutResolver.packagesFromFiles(loaded.files)).automationScope(
+                        ModelIndex(registrySnapshot, packageOf).automationScope(
                             it.imports.map { raw -> ModelIndex.importScope(raw.split('.'), raw) },
                         )
                     }

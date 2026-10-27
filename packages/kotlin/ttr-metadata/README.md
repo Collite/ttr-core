@@ -2,6 +2,22 @@
 
 The Kotlin model loader, reconciler, typed model graph and metadata query library.
 
+## World host packages
+
+A consumer with reconciled loader files should construct
+`WorldResolver(snapshot, LayoutResolver.packagesFromFiles(files))`.
+The provider uses each file's declared package, or the loader's computed package
+for legacy files without a declaration. Host prefixes match whole package segments,
+including descendants. A supplied provider is authoritative: missing entries refuse;
+checkout directories never add scope. Engine/storage overlays and world fingerprints
+keep their existing rules.
+
+The one-argument `WorldResolver(snapshot)` JVM constructor remains available for
+existing consumers. It retains legacy path-based host validation because the snapshot
+alone does not retain loader package identity. Rebuild and opt into the provider
+constructor to resolve worlds independently of checkout paths. The TTR-P checker and
+native export CLI pass the reconciled loader provider.
+
 ## export/ — projections (XM)
 
 There are two export sources. `GraphDotExporter` reads the typed `ModelGraph` for

@@ -176,7 +176,13 @@ class TtrpChecker(
         // ---- world selection + resolution (WLD) ----
         val pin = doc.statements.filterIsInstance<UsesWorld>().firstOrNull()
         val selection =
-            TtrpWorldResolver.resolve(modelIndex?.snapshot, manifest, pin?.world, pin?.location)
+            TtrpWorldResolver.resolve(
+                modelIndex?.snapshot,
+                manifest,
+                pin?.world,
+                pin?.location,
+                modelIndex?.let { it::packageOf },
+            )
         diags += selection.diagnostics
         val world = selection.world
 

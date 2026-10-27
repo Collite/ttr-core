@@ -6,6 +6,19 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — declared package resolution (#251)
+
+- TTR-P imports, qualified loads, automation objects and row schemas use loader
+  declared-or-computed package identity, with segment-boundary descendants, independently
+  of checkout paths. A directory name cannot add import scope.
+- `WorldResolver(snapshot, packageOf)` accepts the same loader provider for host
+  validation; checker/build and native export use it. Existing snapshot-only JVM
+  callers retain their constructor and legacy behavior. Storage placement and overlay
+  rules are unchanged. This enables bound calendar source planning in the automation
+  consumer; calendar runtime integration is a separate change.
+- No grammar change or release tag is included. The next grammar bundle remains on
+  the **0.18.x** line; consumers need the reviewed internal release before adoption.
+
 ### Added — embedded Designer host lifecycle (Designer family 0.1.1)
 
 - Optional `DesignerPage.onReady`, `onSnapshot` and `onDiagnostics` callbacks expose the installed
