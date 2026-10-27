@@ -215,7 +215,7 @@ internal class DefinitionResolver(
         kind: BlockKind,
         block: EmbeddedBlock,
     ): CnDefinition {
-        val bearer = if (kind == BlockKind.MEMBERS) of(c.isA.firstOrNull()) else of(c.of)
+        val bearer = if (kind == BlockKind.MEMBERS) of(c.of ?: c.isA.firstOrNull()) else of(c.of)
         val ctx = Ctx(c.ref, c.qname.`package`, bearer, block)
         val parsed =
             ctx.parse() ?: return CnDefinition(c.qname, kind, block, bearer?.qname, null, diagnostics = ctx.diags)
@@ -335,6 +335,16 @@ internal class DefinitionResolver(
         val def: Concept?,
     )
 
+    internal fun qualityOn(
+        s: Concept,
+        name: String,
+    ): Concept? =
+        chain(s).firstNotNullOfOrNull { c ->
+            byName[name]?.filter { it.stereotype == "quality" && it.of == c.qname }?.let { matches ->
+                matches.singleOrNull { it.qname.`package` == c.qname.`package` } ?: matches.singleOrNull()
+            }
+        }
+
     private fun quality(
         s: Concept,
         name: String,
@@ -363,7 +373,7 @@ internal class DefinitionResolver(
         name: String,
     ): Concept? {
         val owners = chain(s).map { it.qname }.toSet()
-        return byName[name]?.firstOrNull { it.stereotype == "phase" && it.of in owners }
+        return byName[name]?.firstOrNull { it.stereotype in setOf("phase", "subkind") && it.of in owners }
     }
 
     /**
@@ -623,6 +633,9 @@ internal class DefinitionResolver(
                 return Value.Opaque
             }
             val name = e.function.name
+            scope.implicit?.let { subject ->
+                projectedCall(e, subject, this@DefinitionResolver)?.let { return aggregate(it, scope) }
+            }
             if (name == "descendants") return descendants(e, scope)
             if (name !in TIME_FUNCTIONS && TtrpParser.catalog.resolve(name).isEmpty()) {
                 e.args.forEach { visit(it, scope) }

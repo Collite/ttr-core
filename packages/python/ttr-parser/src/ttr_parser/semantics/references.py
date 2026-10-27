@@ -19,11 +19,14 @@ from ..model import (
     ConceptBody,
     ConceptDef,
     ConceptEntry,
+    ConceptFrom,
     ConceptGrounds,
     ConceptInvolves,
+    ConceptPer,
     ConceptPeriod,
     ConceptRef,
     ConceptTarget,
+    ConceptUntil,
     ConceptValueSpace,
     CubeletDef,
     Definition,
@@ -214,6 +217,11 @@ def _collect_concept_body(body: ConceptBody, mode: str, owner: Definition, out: 
         if isinstance(p, ConceptRef):
             if p.key != declaring:
                 cn(p.ref.path, p.ref.parts, p.ref.source)
+        elif isinstance(p, ConceptFrom):
+            if len(p.ref.parts) == 1:
+                cn(p.ref.path, p.ref.parts, p.ref.source)
+        elif isinstance(p, (ConceptUntil, ConceptPer)):
+            cn(p.ref.path, p.ref.parts, p.ref.source)
         elif isinstance(p, ConceptGrounds):
             out.append(_ref_of(p.ref, owner))
         elif isinstance(p, ConceptValueSpace):
@@ -267,9 +275,20 @@ def _collect_concept_body(body: ConceptBody, mode: str, owner: Definition, out: 
                         cn(f"{ev.path}.{key}", (*ev.parts, key), value.source)
                     for v in ids_of(value):
                         plain(v)
-            elif p.key == "via":
+            elif p.key == "episodes":
                 for v in ids_of(p.value):
                     plain(v)
+            elif p.key == "bounds":
+                for key in ("from", "until"):
+                    for v in ids_of(entry_of(p.value, key)):
+                        cn(id_path(v), v.parts, v.source)
+            elif p.key == "via":
+                for v in ids_of(p.value):
+                    if mode == "binding" and body.ref("quality") is not None and v.parts[0] not in ("er", "md", "db"):
+                        parts = v.parts[:-1]
+                        cn(".".join(parts), parts, v.source)
+                    else:
+                        plain(v)
 
 
 def _push_id_value(

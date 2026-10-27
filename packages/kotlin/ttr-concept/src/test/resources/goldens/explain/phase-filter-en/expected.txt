@@ -1,1 +1,1 @@
-Net revenue · large sale: net revenue > large_sale (= 10000) · January 2026.
+Net revenue · large sale while net revenue > large_sale (= 10000) · January 2026.

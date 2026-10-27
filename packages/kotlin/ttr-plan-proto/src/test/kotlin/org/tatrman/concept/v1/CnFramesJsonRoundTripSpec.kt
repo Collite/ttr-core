@@ -208,7 +208,7 @@ class CnFramesJsonRoundTripSpec :
         val assertion =
             Assertion
                 .newBuilder()
-                .setEvent(ConceptRef.newBuilder().setQname("cn.Transfer"))
+                .setConcept(ConceptRef.newBuilder().setQname("cn.Transfer"))
                 .setIdentity(Identity.newBuilder().setKnown(known))
                 .addParticipants(participant)
                 .addQualities(qualityValue)

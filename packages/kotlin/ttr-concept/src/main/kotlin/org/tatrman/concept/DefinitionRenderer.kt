@@ -85,10 +85,27 @@ internal class DefinitionRenderer(
                 imprecisionMode = mode(c),
                 diagnostics = listOf(Diagnostic(MD_UNREACHABLE, Severity.ERROR, message, c.ref)),
             )
-        if (c.stereotype != "phase") return refused("the md renderer renders a phase — `${c.ref}` is a ${c.stereotype}")
+        val temporalSource =
+            when {
+                c.projection != null -> "valued-state projection"
+                c.fromEvent != null -> "event-bounded episode"
+                c.grounding?.episodes != null -> "episode-table phase"
+                c.stereotype in setOf("kind", "role") && c.involves.isNotEmpty() -> "relator"
+                else -> null
+            }
+        if (temporalSource != null) return refused("`${c.ref}` is a $temporalSource — ER only (G-MD-1)")
+        if (c.stereotype !in
+            setOf("phase", "subkind")
+        ) {
+            return refused("the md renderer renders a phase — `${c.ref}` is a ${c.stereotype}")
+        }
         if (options.mode == RenderMode.CONTEXT) return refused("CONTEXT mode is an er rendering (A-CN-20)")
         val def =
-            model.definitions.of(c.qname).firstOrNull { it.kind == BlockKind.DEFINITION }
+            model.definitions.of(c.qname).firstOrNull {
+                it.kind == BlockKind.DEFINITION ||
+                    c.stereotype == "subkind" &&
+                    it.kind == BlockKind.MEMBERS
+            }
                 ?: return refused("`${c.ref}` has no `definition:`")
         val bearer = def.bearer?.let { cn.concepts[it] } ?: return refused("`${c.ref}` has no bearer")
         val carrier = carrier(bearer) ?: return refused("`${bearer.ref}` is carried by no one cubelet")
@@ -193,10 +210,17 @@ internal class DefinitionRenderer(
         ) = ModelText(diagnostics = listOf(Diagnostic(slug, Severity.ERROR, message, ref.qname)))
         val (found, why) = concept(ref.qname)
         val c = found ?: return refused(ER_UNREACHABLE, why)
-        if (c.stereotype !=
-            "phase"
-        ) {
+        if (c.stereotype !in setOf("phase", "subkind")) {
             return refused(ER_UNREACHABLE, "`${c.ref}` is a ${c.stereotype} — materialize writes a phase")
+        }
+        if (c.stereotype ==
+            "subkind"
+        ) {
+            model
+                .definitionDiagnostics()
+                .firstOrNull {
+                    it.subject == c.ref && it.severity == Severity.ERROR
+                }?.let { return ModelText(diagnostics = listOf(it)) }
         }
         val (tree, rendering) = er.select(c)
         rendering.diagnostics.firstOrNull { it.severity == Severity.ERROR }?.let {

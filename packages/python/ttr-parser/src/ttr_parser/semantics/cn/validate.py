@@ -12,6 +12,7 @@ TS-only; the definition-level slugs are Kotlin's.
 
 from __future__ import annotations
 
+import re
 from collections import deque
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -23,11 +24,16 @@ from ...model import (
     ConceptDef,
     ConceptDefinition,
     ConceptEntry,
+    ConceptExtent,
+    ConceptFrom,
     ConceptInvolves,
     ConceptMembers,
+    ConceptPer,
     ConceptPeriod,
     ConceptProperty,
     ConceptRef,
+    ConceptUntil,
+    ConceptValueSpace,
     CubeletDef,
     Definition,
     EntityDef,
@@ -256,6 +262,7 @@ class _CnValidator:
             self._check_involves(c)
             self._check_antirigid(c)
             self._check_relation_types(c)
+        self._check_things_in_time()
         self._check_hierarchies()
         self._check_participant_paths()
         return tuple(sorted(self._out, key=lambda d: by_place(d.uri, d.source)))
@@ -369,7 +376,7 @@ class _CnValidator:
                 known = self.concepts.get(placed.concept_key)
                 sym = self._resolver.get_symbol(placed.concept_key)
                 st = known.stereotype if known is not None else (sym.stereotype if sym is not None else None)
-                if st is not None and st != expected:
+                if st is not None and st != expected and not (st == "subkind" and expected in {"kind", "phase"}):
                     self._report(
                         DiagnosticCode.CN_GROUNDING_TARGET_KIND,
                         DiagnosticSeverity.ERROR,
@@ -380,7 +387,7 @@ class _CnValidator:
             target = placed.target_symbol
             if target is not None:
                 what, ok = _TARGETS[bk]
-                if not ok(target, self._stacked):
+                if not ok(target, self._stacked) and not (bk == "cn2er_phase" and target.kind == "entity" and (owner := self.concepts.get(placed.concept_key or "")) and (owner.stated(ConceptPeriod) or any(isinstance(p, ConceptPeriod) for p in g.properties))):
                     is_what = (
                         "an entity no query backs"
                         if bk == "cn2er_phase" and target.kind == "entity"
@@ -416,6 +423,155 @@ class _CnValidator:
 
     # --- the def-shape slugs -------------------------------------------------
 
+    def _check_things_in_time(self) -> None:
+        def prop(c: CnConcept, key: str) -> StatedProperty | None:
+            own = next((s for s in c.properties if s.property.key == key), None)
+            if own is not None:
+                return own
+            group = self._groundings_of(c)
+            if not group:
+                return None
+            g = group[0]
+            doc = self._doc_by_uri[g.uri]
+            properties = g.grounding.properties
+            direct = next((p for p in properties if p.key == key), None)
+            if direct is not None:
+                return StatedProperty(direct, doc)
+            bounds = next((p.value for p in properties if isinstance(p, ConceptEntry) and p.key == "bounds"), None)
+            value = bounds.entries.get(key) if isinstance(bounds, ObjectValue) else None
+            if key == "from" and c.stereotype == "quality" and value is None:
+                value = next((p.value for p in properties if isinstance(p, ConceptEntry) and p.key == "via"), None)
+            if isinstance(value, IdValue) and value.ref is not None:
+                cls = ConceptUntil if key == "until" else ConceptFrom
+                return StatedProperty(cls(key=key, ref=value.ref, source=value.source), doc)
+            return None
+
+        def named(c: CnConcept, key: str) -> CnConcept | None:
+            s = prop(c, key)
+            if s is None:
+                return None
+            p = s.property
+            ref = p.value.ref if isinstance(p, ConceptEntry) and isinstance(p.value, IdValue) else p.ref if isinstance(p, (ConceptFrom, ConceptUntil, ConceptPer, ConceptRef, ConceptValueSpace)) else None
+            symbol = self._concept(ref.path, s.doc) if ref else None
+            return self.concepts.get(symbol.qname.value) if symbol else None
+
+        def chain(c: CnConcept) -> set[str]:
+            seen: set[str] = set()
+            at: CnConcept | None = c
+            while at is not None and at.key not in seen:
+                seen.add(at.key)
+                at = named(at, "of") or named(at, "is_a")
+            return seen
+
+        def participates(c: CnConcept, bearer: CnConcept) -> bool:
+            for key in chain(c):
+                s = prop(self.concepts[key], "involves")
+                if s is None or not isinstance(s.property, ConceptInvolves):
+                    continue
+                for pt in s.property.participants:
+                    sym = self._concept(pt.ref.path, s.doc)
+                    got = self.concepts.get(sym.qname.value) if sym else None
+                    if got and (bearer.key in chain(got) or got.key in chain(bearer)):
+                        return True
+            return False
+
+        def emit(c: CnConcept, code: DiagnosticCode, message: str, warning: bool = False, key: str | None = None) -> None:
+            s = prop(c, key) if key else None
+            self._report(code, DiagnosticSeverity.WARNING if warning else DiagnosticSeverity.ERROR, s.doc.uri if s else c.uri, s.property.source if s else c.source, message)
+
+        def temporal(c: CnConcept, visiting: set[str]) -> bool:
+            if c.key in visiting:
+                return False
+            visiting.add(c.key)
+            if c.stereotype == "phase" or _is_true(prop(c, "valued_state")):
+                return True
+            s = prop(c, "definition") or prop(c, "members")
+            if s is None or not isinstance(s.property, (ConceptDefinition, ConceptMembers)):
+                return False
+            text = re.sub(r"'(''|[^'])*'|\"(\\.|[^\"])*\"", " ", s.property.block.text)
+            if re.search(r"(?<![a-z0-9_]):[a-z_][a-z0-9_]*|\b(period|at_or_before|before|contains|ended_before|overlaps|within|parameter)\b", text, re.I):
+                return True
+            words = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text))
+            return any(x.key != c.key and x.name in words and temporal(x, visiting) for x in self.concepts.values())
+
+        for c in self.concepts.values():
+            if c.stereotype == "subkind" and temporal(c, set()):
+                emit(c, DiagnosticCode.CN_SUBKIND_TEMPORAL_DEFINITION, f"subkind '{c.name}' has a temporal or parametric definition", key="definition" if prop(c, "definition") else "members")
+            if c.stereotype == "kind" and prop(c, "members") and prop(c, "is_a"):
+                emit(c, DiagnosticCode.CN_SUBKIND_AS_KIND, f"kind '{c.name}' with members and is_a is a subkind — use 'def subkind'", True)
+            event = named(c, "event")
+            if c.stereotype == "role" and event and event.stereotype != "event":
+                emit(c, DiagnosticCode.CN_ROLE_NO_EVENT, f"role '{c.name}' requires an event as its defining event", key="event")
+            bearer = named(c, "of")
+            if c.stereotype == "subkind" and bearer and bearer.stereotype not in {"kind", "subkind", "role", "event"}:
+                emit(c, DiagnosticCode.CN_SUBKIND_TEMPORAL_DEFINITION, f"subkind '{c.name}' requires a rigid bearer", key="of")
+            ep = prop(c, "extent")
+            extent = ep.property.value if ep and isinstance(ep.property, ConceptExtent) else None
+            if ep:
+                emit(c, DiagnosticCode.CN_EXTENT_RETIRED, "extent is retired — events are instantaneous; kinds and phases carry intervals", True, "extent")
+            pp = prop(c, "period")
+            period = pp.property.value.entries if pp and isinstance(pp.property, ConceptPeriod) else None
+            if c.stereotype == "event" and (extent == "durative" or (period is not None and ("start" in period or "end" in period))):
+                emit(c, DiagnosticCode.CN_DURATIVE_EVENT, f"event '{c.name}' is durative — model a kind with a lifetime or a phase", key="extent" if ep else "period")
+            if c.stereotype in {"kind", "role", "subkind", "phase"} and period is not None and ("at" in period or "start" not in period or "end" not in period):
+                emit(c, DiagnosticCode.CN_LIFETIME_PERIOD, f"'{c.name}' needs a start/end interval", key="period")
+            from_ = prop(c, "from") is not None
+            until = prop(c, "until") is not None
+            if c.stereotype == "phase":
+                sources = sum([prop(c, "definition") is not None, any(g.grounding.target or g.grounding.target_key for g in self._groundings_of(c)), from_ or until])
+                if sources > 1 or from_ != until:
+                    emit(c, DiagnosticCode.CN_PHASE_SOURCE_CONFLICT, f"phase '{c.name}' needs exactly one source: definition, grounding, or both from and until")
+                if from_ and until and bearer:
+                    for key in ("from", "until"):
+                        bound = named(c, key)
+                        if bound is None or bound.stereotype != "event" or not participates(bound, bearer):
+                            emit(c, DiagnosticCode.CN_PHASE_BOUNDS_PARTICIPANT, f"phase '{c.name}' {key} bound must be an event involving '{bearer.name}'", key=key)
+                if period is not None and bearer:
+                    group = self._groundings_of(c)
+                    target = group[0].target_symbol if group else None
+                    subject = next((q for key in chain(bearer) if (q := self._direct_er_entity(key))), None)
+                    if target and subject:
+                        paths = [ends for d in self._docs for r in d.definitions if isinstance(r, RelationDef) if (sym := self._element(f"er.relation.{r.name}", d)) if (ends := self._ends_of(sym))]
+                        if not any(a == target.qname.value and b == subject for a, b in paths):
+                            emit(c, DiagnosticCode.CN_EPISODE_SUBJECT_MISSING, f"episode phase '{c.name}' has no relation to its subject '{bearer.name}'")
+            if c.stereotype == "quality" and (from_ or prop(c, "per")):
+                s = prop(c, "from")
+                ref = s.property.ref if s and isinstance(s.property, ConceptFrom) else None
+                parts = ref.parts[:-1] if ref else ()
+                sym = self._concept(".".join(parts), s.doc) if parts and s else None
+                source = self.concepts.get(sym.qname.value) if sym else None
+                quality = next((q for q in self.concepts.values() if ref and q.name == ref.parts[-1] and q.stereotype == "quality" and (qb := named(q, "of")) and source and qb.key == source.key), None)
+                per = named(c, "per")
+                if not _is_true(prop(c, "valued_state")) or source is None or source.stereotype not in {"kind", "subkind", "role"} or bearer is None or not participates(source, bearer) or quality is None or (prop(c, "per") is not None and (per is None or not participates(source, per))):
+                    emit(c, DiagnosticCode.CN_PROJECTION_SOURCE, f"quality '{c.name}' needs a valued-state projection of a relator quality involving its bearer and per participant")
+        groups: dict[tuple[str, str], list[tuple[CnConcept, CnConcept, str, str]]] = {}
+        for c in self.concepts.values():
+            s = prop(c, "definition")
+            if c.stereotype != "subkind" or s is None or not isinstance(s.property, ConceptDefinition):
+                continue
+            match = re.fullmatch(r"\s*(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*'([^']*)'\s*", s.property.block.text)
+            bearer = named(c, "of")
+            if match and bearer:
+                attr, value = match.groups()
+                groups.setdefault((bearer.key, attr), []).append((c, bearer, attr, value))
+        for partition in groups.values():
+            seen: dict[str, CnConcept] = {}
+            for c, _bearer, attr, value in partition:
+                if value in seen:
+                    emit(c, DiagnosticCode.CN_PARTITION_OVERLAP, f"subkind '{c.name}' overlaps '{seen[value].name}' on '{attr}'", key="definition")
+                else:
+                    seen[value] = c
+            first, partition_bearer, attr, _ = partition[0]
+            quality = next((q for q in self.concepts.values() if q.name == attr and (qb := named(q, "of")) and qb.key == partition_bearer.key), None)
+            space = named(quality, "value_space") if quality else None
+            landed = self._groundings_of(space) if space else ()
+            target = landed[0].target_symbol if landed else None
+            if target:
+                attribute = next((a for d in self._docs for e in d.definitions if isinstance(e, EntityDef) for a in e.attributes if a.source == target.site), None)
+                missing = set(attribute.value_labels if attribute else ()) - seen.keys()
+                if missing:
+                    emit(first, DiagnosticCode.CN_PARTITION_INCOMPLETE, f"subkind partition on '{attr}' misses {', '.join(sorted(missing))}", True)
+
     def _check_shape(self, c: CnConcept) -> None:
         grounded = len(self._groundings_of(c)) > 0
         definition = c.stated(ConceptDefinition)
@@ -426,7 +582,7 @@ class _CnValidator:
                     DiagnosticCode.CN_ROLE_NO_EVENT, DiagnosticSeverity.ERROR, c.uri, c.source,
                     f"role '{c.name}' names no defining event — add 'event: <Event>' (CN-D6)",
                 )
-        elif c.stereotype in ("quality", "phase") and c.stated_entry("of") is None:
+        elif c.stereotype in ("quality", "phase", "subkind") and c.stated_entry("of") is None:
             self._report(
                 DiagnosticCode.REQUIRED_PROPERTY_MISSING, DiagnosticSeverity.ERROR, c.uri, c.source,
                 f"{c.stereotype} '{c.name}' names no bearer — 'of:' is required",
@@ -440,7 +596,7 @@ class _CnValidator:
                     f"phase '{c.name}' has a 'definition:' and a grounding — a phase is defined, or grounded to a "
                     "stacked entity, never both (AM-2)",
                 )
-            if definition is None and not grounded and not abstract:
+            if definition is None and not grounded and not abstract and c.stated(ConceptFrom) is None:
                 self._report(
                     DiagnosticCode.CN_PHASE_NO_DEFINITION, DiagnosticSeverity.INFORMATION, c.uri, c.source,
                     f"phase '{c.name}' has neither a 'definition:' nor a grounding — no consumer can tell its "
@@ -452,7 +608,8 @@ class _CnValidator:
                 f"event '{c.name}' has no 'period:' — no consumer can place it in time",
             )
         exempt = (
-            c.stereotype in ("relation_type", "phase")
+            c.stereotype in ("relation_type", "phase", "subkind")
+            or c.stated(ConceptFrom) is not None
             or definition is not None
             or c.stated(ConceptMembers) is not None
             or abstract
@@ -466,7 +623,7 @@ class _CnValidator:
     # --- cn/involves-unlabelled-duplicate -----------------------------------
 
     def _check_involves(self, c: CnConcept) -> None:
-        if c.stereotype != "event":
+        if c.stereotype not in {"event", "kind", "subkind", "role"}:
             return
         involves = c.stated(ConceptInvolves)
         if involves is None or not isinstance(involves.property, ConceptInvolves):
@@ -632,7 +789,7 @@ class _CnValidator:
         for placed in self.groundings.groundings:
             g = placed.grounding
             target = placed.target_symbol
-            if g.binding_kind != "cn2er_event" or target is None or target.kind != "entity":
+            if g.binding_kind not in {"cn2er_event", "cn2er_kind", "cn2er_role", "cn2er_phase"} or target is None or target.kind != "entity":
                 continue
             participants = next((p for p in g.properties if isinstance(p, ConceptEntry) and p.key == "participants"), None)
             doc = self._doc_by_uri.get(placed.uri)

@@ -193,6 +193,11 @@ data class Concept(
      * own target) and when no md element lands there.
      */
     val reverseHop: List<String> = emptyList(),
+    /** CN-P8: the two event streams bounding a phase's episodes. */
+    val fromEvent: QualifiedName? = null,
+    val untilEvent: QualifiedName? = null,
+    /** CN-P8: a valued state's one source row and quality, optionally indexed by a participant. */
+    val projection: CnProjection? = null,
     val sourceLocation: SourceLocation? = null,
 ) : ModelObject {
     override val kind: String = "concept"
@@ -214,6 +219,17 @@ data class Concept(
                 }
             }
 }
+
+data class CnBounds(
+    val from: QualifiedName,
+    val until: QualifiedName,
+)
+
+data class CnProjection(
+    val source: QualifiedName,
+    val quality: String,
+    val per: QualifiedName? = null,
+)
 
 /** One `involves:` participant: its [label] (as written, else the concept's name lower-cased) and its concept. */
 data class CnParticipant(
@@ -329,6 +345,10 @@ data class Grounding(
     val viaPath: List<String> = emptyList(),
     /** A valued state's series selector (A-CN-18) — text and source map. */
     val filter: EmbeddedBlock? = null,
+    /** CN-P8 canonical source variants (mutually exclusive). */
+    val episodes: String? = null,
+    val bounds: CnBounds? = null,
+    val projection: CnProjection? = null,
     /** The refs written in this grounding that do not resolve, as written — the hygiene report's dangling ones. */
     val dangling: List<String> = emptyList(),
     val sourceLocation: SourceLocation? = null,

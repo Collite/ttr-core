@@ -1,7 +1,10 @@
 {
     "diagnostics": [
+        "cn/durative-event",
         "cn/phase-double-definition",
-        "cn/phase-double-definition"
+        "cn/phase-double-definition",
+        "cn/phase-source-conflict",
+        "cn/phase-source-conflict"
     ],
     "resolved": [
         "Order => hartland.stores.cn.concept.Order",

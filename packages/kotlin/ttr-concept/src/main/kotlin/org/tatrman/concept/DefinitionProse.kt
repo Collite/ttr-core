@@ -46,7 +46,40 @@ internal class DefinitionProse(
 
     /** [phase]'s definition as prose; null when it has none. */
     fun of(phase: Concept): String? {
-        val def = model.definitions.of(phase.qname).firstOrNull { it.kind == BlockKind.DEFINITION } ?: return null
+        val en = words.code == "en"
+        val base = phase.of?.let { model.cn.concepts[it] }
+        if (phase.stereotype == "phase" && base != null && phase.grounding?.episodes != null) {
+            return if (en) {
+                "${ExplainLabels.lowerFirst(
+                    labels.of(base),
+                )} is ${ExplainLabels.lowerFirst(
+                    labels.of(phase),
+                )} during an episode"
+            } else {
+                "${labels.of(
+                    base,
+                )} je ${ExplainLabels.lowerFirst(labels.of(phase))} během epizody"
+            }
+        }
+        if (phase.fromEvent != null && phase.untilEvent != null && base != null) {
+            val start = model.cn.concepts[phase.fromEvent]?.let { labels.of(it) } ?: return null
+            val end = model.cn.concepts[phase.untilEvent]?.let { labels.of(it) } ?: return null
+            return if (en) {
+                "${ExplainLabels.lowerFirst(
+                    labels.of(phase),
+                )} holds from ${ExplainLabels.lowerFirst(
+                    start,
+                )} until ${ExplainLabels.lowerFirst(end)}"
+            } else {
+                "${labels.of(phase)} platí od $start do $end"
+            }
+        }
+        val def =
+            model.definitions.of(phase.qname).firstOrNull {
+                it.kind == BlockKind.DEFINITION ||
+                    it.kind == BlockKind.MEMBERS
+            }
+                ?: return null
         val quoted = "\"" + def.block.text.trim() + "\""
         val e = def.expression ?: return quoted
         val bearer = def.bearer?.let { model.cn.concepts[it] }
@@ -56,6 +89,18 @@ internal class DefinitionProse(
             } catch (_: Unsaid) {
                 return quoted
             }
+        if (phase.stereotype == "subkind" && bearer != null) {
+            val name = ExplainLabels.lowerFirst(labels.of(phase))
+            val parent = ExplainLabels.lowerFirst(labels.of(bearer))
+            return if (en) {
+                "a $name is a $parent whose ${prose.replace(
+                    " = ",
+                    " is ",
+                )}"
+            } else {
+                "$name je $parent, jehož ${prose.replace(" = ", " je ")}"
+            }
+        }
         val imprecision = phase.imprecision
         if (imprecision == null || def.reads.comparisons.isEmpty()) return prose
         return "$prose (${words.reading(imprecision == Imprecision.CERTAINLY)})"
@@ -155,6 +200,39 @@ internal class DefinitionProse(
         bearer: Concept?,
     ): Said {
         val id = e.function.value
+        if (bearer != null && id.contains('.') && !id.startsWith("op.") && !id.startsWith("fn.")) {
+            val resolver =
+                DefinitionResolver(
+                    model.cn,
+                    model.model.schemas["er"] as? org.tatrman.ttr.metadata.model.ErSchema,
+                    emptySet(),
+                )
+            val quality =
+                projectionReceiver(e, bearer, resolver)?.quality?.takeIf {
+                    projectedCall(e, bearer, resolver) !=
+                        null
+                }
+            if (quality != null) {
+                val projection = quality.projection!!
+                val owner =
+                    model.cn.concepts[quality.of]?.let { ExplainLabels.lowerFirst(labels.of(it)) } ?: throw Unsaid()
+                val per = projection.per?.let { model.cn.concepts[it] }?.let { ExplainLabels.lowerFirst(labels.of(it)) }
+                val atIndex = e.argNames.indexOf("at")
+                val instant = if (atIndex >= 0) said(e.args[atIndex], bearer).text else param("as_of")
+                val qualityLabel = ExplainLabels.lowerFirst(labels.of(quality))
+                val text =
+                    if (words.code ==
+                        "en"
+                    ) {
+                        "$owner's $qualityLabel" + (per?.let { " for the $it" } ?: "") + " as of $instant"
+                    } else {
+                        "$qualityLabel pro $owner" +
+                            (per?.let { " podle $it" } ?: "") +
+                            " k $instant"
+                    }
+                return Said(text, ATOM)
+            }
+        }
         BINARY[id]?.let { (symbol, precedence) ->
             if (e.args.size != 2) throw Unsaid()
             // non-associative: a right operand of the same precedence keeps its parentheses (`a - (b - c)`)

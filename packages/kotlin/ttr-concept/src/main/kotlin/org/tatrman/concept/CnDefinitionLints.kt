@@ -70,6 +70,35 @@ object CnDefinitionLints {
         for (d in conceptDefs) {
             val owner = cn.concepts[d.owner] ?: continue
             val closure = closure(d, byOwner)
+            if (owner.stereotype == "subkind") {
+                val temporal =
+                    closure.any { block ->
+                        block.reads.asOf ||
+                            block.reads.parameters.isNotEmpty() ||
+                            block.reads.comparisons.any {
+                                it.op in
+                                    setOf("before", "at_or_before", "contains", "ended_before", "overlaps")
+                            } ||
+                            (block.reads.concepts + block.reads.definitions).any { q ->
+                                cn.concepts[q]?.let {
+                                    it.stereotype ==
+                                        "phase" ||
+                                        it.valuedState
+                                } ==
+                                    true
+                            }
+                    }
+                if (temporal) {
+                    out +=
+                        Diagnostic(
+                            "cn/subkind-temporal-definition",
+                            Severity.ERROR,
+                            "`${owner.ref}` has a temporal or parametric definition",
+                            owner.ref,
+                            d.block.source,
+                        )
+                }
+            }
             out += unresolved(cn, owner, d, closure)
             out += unreachable(cn, owner, d, closure)
             if (d.kind == BlockKind.DEFINITION) {

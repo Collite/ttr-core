@@ -40,8 +40,8 @@ const STEREOTYPE_KEYS: ReadonlySet<string> = new Set(['kind', 'role', 'quality',
  * synthesized bindings alike.
  */
 export function bindingKindFor(stereotype: ConceptStereotype, layer: CnLayer): ConceptBindingKind | undefined {
-  // CN-P8 S8.1 parses subkinds; S8.2 supplies their grounding semantics.
-  if (stereotype === 'subkind' || stereotype === 'relation_type') return undefined;
+  if (stereotype === 'subkind') return layer === 'er' ? 'cn2er_phase' : undefined;
+  if (stereotype === 'relation_type') return undefined;
   if (layer === 'db') return stereotype === 'phase' ? undefined : 'cn2db_concept';
   if (layer === 'md') return stereotype === 'phase' ? undefined : `cn2md_${stereotype}`;
   return `cn2er_${stereotype}`;
@@ -190,7 +190,7 @@ export function desugarConcepts(doc: Document, packageName = doc.packageDecl?.na
         bindingKind: def.bindingKind,
         name: def.name,
         conceptRef: conceptRef(def, slot)?.ref,
-        target: target && !('kind' in target) ? target : undefined,
+        target: target && !('kind' in target) ? target : (() => { const p = def.properties.find((p) => p.kind === 'entry' && p.key === 'episodes'); return p?.kind === 'entry' && p.value.kind === 'id' ? { path: p.value.path, parts: p.value.parts, source: p.value.source } : undefined; })(),
         properties: def.properties.filter(
           (p) => !(p.kind === 'ref' && p.key === slot) && p.kind !== 'target' && !DOC_PROPERTY_KINDS.has(p.kind),
         ),
@@ -201,7 +201,19 @@ export function desugarConcepts(doc: Document, packageName = doc.packageDecl?.na
 
     if (def.kind === 'concept') {
       const grounds = conceptProperty(def, 'grounds');
-      if (!grounds) continue;
+      if (!grounds) {
+        const from = conceptProperty(def, 'from'), until = conceptProperty(def, 'until');
+        if (from && (def.stereotype === 'quality' || def.stereotype === 'phase' && until)) {
+          const id = (ref: Reference) => ({ kind: 'id' as const, path: ref.path, parts: ref.parts, source: ref.source });
+          const source: ConceptProperty = def.stereotype === 'quality'
+            ? { kind: 'entry', key: 'via', value: id(from.ref), source: from.source }
+            : { kind: 'entry', key: 'bounds', value: { kind: 'object', entries: [{key: 'from', value: id(from.ref), source: from.source}, {key: 'until', value: id(until!.ref), source: until!.source}], source: from.source }, source: from.source };
+          const per = conceptProperty(def, 'per');
+          groundings.push({ origin: 'grounds', bindingKind: def.stereotype === 'quality' ? 'cn2er_quality' : 'cn2er_phase', stereotype: def.stereotype,
+            name: synthesizedBindingName(def.name, 'grounds'), conceptName: def.name, properties: per ? [source, per] : [source], source: from.source });
+        }
+        continue;
+      }
       const layer = layerOf(grounds.ref);
       const hierarchy = def.properties.find((p) => p.kind === 'entry' && p.key === 'hierarchy');
       groundings.push({
@@ -211,7 +223,7 @@ export function desugarConcepts(doc: Document, packageName = doc.packageDecl?.na
         name: synthesizedBindingName(def.name, 'grounds'),
         conceptName: def.name,
         target: grounds.ref,
-        properties: hierarchy ? [hierarchy] : [],
+        properties: def.properties.filter((p) => p === hierarchy || layer === 'er' && def.stereotype === 'phase' && p.kind === 'period'),
         source: grounds.source,
       });
       continue;

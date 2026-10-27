@@ -6,13 +6,25 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — things in time (CN-P8 S8.2, grammar bundle 0.20.x)
+
+- Typed subkinds, relator lifetimes, episode tables, event-bounded phases and valued-state
+  projections, with portable lints and canonical source bindings. Hartland's fixture model
+  uses the new forms; overdue, shortfall and price-difference SQL oracles stay unchanged.
+- DC-13 qualified calls use TTR-P 0.7 and the existing validity lookup. ER rendering,
+  materialization, hygiene and English/Czech prose support the new families; unsupported
+  MD temporal reads retain explicit G-MD-1 refusals.
+- `assertion.v1` field 1 is renamed `concept` and accepts events, validity rows and phase
+  episodes. Binary encoding is unchanged; JSON clients must rename their key and JVM/Python
+  consumers must rebuild. State claims need an as-of. Transfer row output is unchanged.
+
 ### Added — conceptual-model grammar 0.20 (CN-P8 S8.1)
 
 - Rigid `subkind` definitions, relator/lifetime properties on CN roles, phase
   episode bounds (`from` / `until`), and valued-state projection references
   (`per` / `from`) in TypeScript, Kotlin and Python, with formatter and writer
   support. Kinds already accept participants and periods through the shared body.
-- This Stage adds syntax; validation and lowering follow in CN-P8 S8.2.
+- S8.1 added syntax; validation and lowering are included by S8.2.
   `extent:` remains accepted during retirement. JVM consumers must rebuild
   against the extended parser model. Grammar bundle releases use 0.20.x.
 

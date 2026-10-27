@@ -12,6 +12,13 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
+## TTR-P 0.7 — 2026-10-27
+
+Qualified calls with named arguments (`this.list_price(channel: 'web', at: :as_of)`)
+parse in CN expressions. A TTR-P program refuses them with `TTRP-CN-001`; duplicate
+argument names remain errors. No new token. TTR-M stays 0.20; the grammar bundle stays 0.20.x.
+Canonical `cn2er_quality` bindings accept `per:` as well as the existing `via:` entry.
+
 ## 0.20 — 2026-10-27
 
 Additive CN-P8 S8.1 syntax: `def subkind`, typed `from:` / `until:` phase bounds,

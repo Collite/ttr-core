@@ -13,6 +13,7 @@ import org.tatrman.ttr.parser.model.DimensionDef
 import org.tatrman.ttr.parser.model.EntityDef
 import org.tatrman.ttr.parser.model.MdDomainDef
 import org.tatrman.ttr.parser.model.MeasureDef
+import org.tatrman.ttr.parser.model.PropertyValue
 import org.tatrman.ttr.parser.model.Reference
 import org.tatrman.ttr.parser.model.SourceLocation
 import org.tatrman.ttr.parser.model.TargetReferenceValue
@@ -43,7 +44,8 @@ fun bindingKindFor(
     layer: String,
 ): String? =
     when {
-        stereotype == "subkind" || stereotype == "relation_type" -> null
+        stereotype == "relation_type" -> null
+        stereotype == "subkind" -> if (layer == "er") "cn2er_phase" else null
         layer == "db" -> if (stereotype == "phase") null else "cn2db_concept"
         layer == "md" -> if (stereotype == "phase") null else "cn2md_$stereotype"
         else -> "cn2er_$stereotype"
@@ -218,7 +220,9 @@ fun desugarConcepts(
                     stereotype = null,
                     name = def.name,
                     conceptRef = conceptRefOf(def.body, slot)?.ref,
-                    target = (target as? TargetReferenceValue)?.ref,
+                    target =
+                        (target as? TargetReferenceValue)?.ref
+                            ?: (def.body.entry("episodes") as? PropertyValue.IdValue)?.ref,
                     properties =
                         def.body.properties.filter {
                             !(it is ConceptProperty.Ref && it.key == slot) &&
@@ -231,7 +235,62 @@ fun desugarConcepts(
         }
 
         if (def is ConceptDef) {
-            val grounds = def.body.properties.firstNotNullOfOrNull { it as? ConceptProperty.Grounds } ?: continue
+            val grounds = def.body.properties.firstNotNullOfOrNull { it as? ConceptProperty.Grounds }
+            if (grounds == null) {
+                val from =
+                    def.body.properties
+                        .filterIsInstance<ConceptProperty.From>()
+                        .firstOrNull()
+                val until =
+                    def.body.properties
+                        .filterIsInstance<ConceptProperty.Until>()
+                        .firstOrNull()
+                if (from != null && (def.stereotype == "quality" || def.stereotype == "phase" && until != null)) {
+                    fun id(ref: Reference) = PropertyValue.IdValue(ref, ref.parts, ref.source)
+                    val source =
+                        if (def.stereotype ==
+                            "quality"
+                        ) {
+                            ConceptProperty.Entry("via", id(from.ref), from.source)
+                        } else {
+                            ConceptProperty.Entry(
+                                "bounds",
+                                PropertyValue.ObjectValue(
+                                    linkedMapOf(
+                                        "from" to id(from.ref),
+                                        "until" to id(until!!.ref),
+                                    ),
+                                    from.source,
+                                ),
+                                from.source,
+                            )
+                        }
+                    groundings +=
+                        CnGrounding(
+                            origin = GroundingOrigin.Grounds,
+                            bindingKind =
+                                if (def.stereotype ==
+                                    "quality"
+                                ) {
+                                    "cn2er_quality"
+                                } else {
+                                    "cn2er_phase"
+                                },
+                            stereotype = def.stereotype,
+                            name = synthesizedBindingName(def.name, GroundingOrigin.Grounds),
+                            conceptName = def.name,
+                            properties =
+                                listOfNotNull(
+                                    source,
+                                    def.body.properties
+                                        .filterIsInstance<ConceptProperty.Per>()
+                                        .firstOrNull(),
+                                ),
+                            source = from.source,
+                        )
+                }
+                continue
+            }
             val layer = layerOf(grounds.ref)
             val hierarchy = def.body.properties.firstOrNull { it is ConceptProperty.Entry && it.key == "hierarchy" }
             groundings +=
@@ -242,7 +301,15 @@ fun desugarConcepts(
                     name = synthesizedBindingName(def.name, GroundingOrigin.Grounds),
                     conceptName = def.name,
                     target = grounds.ref,
-                    properties = listOfNotNull(hierarchy),
+                    properties =
+                        listOfNotNull(
+                            hierarchy,
+                            def.body.properties.firstOrNull {
+                                layer == "er" &&
+                                    def.stereotype == "phase" &&
+                                    it is ConceptProperty.Period
+                            },
+                        ),
                     source = grounds.source,
                 )
             continue

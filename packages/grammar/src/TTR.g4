@@ -767,6 +767,7 @@ cnBindingProperty
   : descriptionProperty | tagsProperty
   | cnRefProperty                     // kind: | role: | quality: | event: | phase: | concept: cn.<X>
   | targetProperty                    // target: md.Product | er.entity.category_code | er.entity.order.value | db.dbo.x
+  | cnPerProperty                     // 0.20 — valued-state projection binding index
   | periodProperty                    // cn2er_event — period: { at: er.entity.transfer.shipped_at }
   | cnEntry                           // hierarchy · participants · via · filter
   ;

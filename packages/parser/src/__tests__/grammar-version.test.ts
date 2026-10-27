@@ -36,7 +36,7 @@ describe('grammar version', () => {
     ]);
     expect(PROPERTY_MAP.concept.find((p) => p.name === 'members')?.type).toBe('expression block');
     expect(PROPERTY_MAP.conceptBinding.map((p) => p.name)).toEqual([
-      'description', 'tags', 'kind', 'role', 'quality', 'event', 'phase', 'concept', 'target', 'period',
+      'description', 'tags', 'kind', 'role', 'quality', 'event', 'phase', 'concept', 'target', 'per', 'period',
     ]);
     expect(PROPERTY_MAP.conceptBinding.find((p) => p.name === 'concept')?.type).toBe('reference');
   });

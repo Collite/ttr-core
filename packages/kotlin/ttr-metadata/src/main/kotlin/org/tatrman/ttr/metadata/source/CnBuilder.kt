@@ -5,6 +5,8 @@ import org.tatrman.ttr.metadata.model.Basis
 import org.tatrman.ttr.metadata.model.Binding
 import org.tatrman.ttr.metadata.model.CnHierarchy
 import org.tatrman.ttr.metadata.model.CnParticipant
+import org.tatrman.ttr.metadata.model.CnBounds
+import org.tatrman.ttr.metadata.model.CnProjection
 import org.tatrman.ttr.metadata.model.CnPeriod
 import org.tatrman.ttr.metadata.model.CnRelation
 import org.tatrman.ttr.metadata.model.CnRelationType
@@ -28,6 +30,7 @@ import org.tatrman.ttr.metadata.model.SchemaCode
 import org.tatrman.ttr.metadata.model.Via
 import org.tatrman.ttr.parser.model.ConceptBindingDef
 import org.tatrman.ttr.parser.model.ConceptDef
+import org.tatrman.ttr.parser.model.RelationDef
 import org.tatrman.ttr.parser.model.ConceptProperty
 import org.tatrman.ttr.parser.model.Definition
 import org.tatrman.ttr.parser.model.LexiconEntryDef
@@ -160,7 +163,38 @@ private class CnTierBuilder(
                 relationTypes.putIfAbsent(rt.qname, rt)
                 continue
             }
-            val concept = concept(c, bindings)
+            var concept = concept(c, bindings)
+            if (concept.grounding == null &&
+                (concept.projection != null || (concept.fromEvent != null && concept.untilEvent != null))
+            ) {
+                val kind = if (concept.projection != null) "cn2er_quality" else "cn2er_phase"
+                val name = QualifiedName(SchemaCode.CN, kind, "${concept.qname.name}.source", concept.qname.`package`)
+                val source =
+                    Grounding(
+                        internalId = FileBasedSource.idFor("cn.binding", name),
+                        qname = name,
+                        bindingKind = kind,
+                        concept = concept.qname,
+                        layer = GroundingLayer.ER,
+                        origin = GroundingOrigin.Grounds,
+                        sourceFile = concept.sourceFile,
+                        binding = Binding.BoundSynthetic("derived from temporal source"),
+                        target = concept.erTarget,
+                        targetKind = if (concept.projection != null) "attribute" else "entity",
+                        bounds =
+                            if (concept.fromEvent != null &&
+                                concept.untilEvent != null
+                            ) {
+                                CnBounds(concept.fromEvent!!, concept.untilEvent!!)
+                            } else {
+                                null
+                            },
+                        projection = concept.projection,
+                        sourceLocation = concept.sourceLocation,
+                    )
+                bindings.putIfAbsent(name, source)
+                concept = concept.copy(grounding = source)
+            }
             out.putIfAbsent(concept.qname, concept)
         }
         val mdIssues = mutableListOf<MdHopIssue>()
@@ -234,7 +268,15 @@ private class CnTierBuilder(
         return Concept(
             internalId = FileBasedSource.idFor("cn.concept", cnName(c.key)),
             qname = cnName(c.key),
-            stereotype = c.stereotype,
+            stereotype =
+                if (c.stereotype == "kind" &&
+                    first(c, "members") != null &&
+                    entry(c, "is_a") != null
+                ) {
+                    "subkind"
+                } else {
+                    c.stereotype
+                },
             description = description?.value?.let(::text) ?: "",
             descriptionLocalized = description?.localized?.toLocalizedText() ?: LocalizedText.EMPTY,
             tags = (first(c, "tags")?.property as? ConceptProperty.Tags)?.value ?: emptyList(),
@@ -243,7 +285,10 @@ private class CnTierBuilder(
             sources = entry(c, "sources")?.first?.let(::strings) ?: emptyList(),
             isA = entry(c, "is_a")?.let { (v, d) -> ids(v).mapNotNull { conceptOf(it, d) } } ?: emptyList(),
             abstract = (entry(c, "abstract")?.first as? PropertyValue.BoolValue)?.raw == true,
-            of = entry(c, "of")?.let { (v, d) -> (v as? PropertyValue.IdValue)?.let { conceptOf(it, d) } },
+            of =
+                (entry(c, "of") ?: entry(c, "is_a")?.takeIf { first(c, "members") != null })?.let { (v, d) ->
+                    ids(v).firstOrNull()?.let { conceptOf(it, d) }
+                },
             event =
                 first(c, "event")?.let { s ->
                     (s.property as? ConceptProperty.Ref)?.ref?.let { r ->
@@ -254,8 +299,26 @@ private class CnTierBuilder(
                 (first(c, "extent")?.property as? ConceptProperty.Extent)?.value?.let {
                     enumOf<Extent>(it)
                 },
-            involves = involves(c),
-            period = (first(c, "period")?.property as? ConceptProperty.Period)?.value?.let(::period),
+            involves =
+                involves(c).ifEmpty {
+                    if (c.stereotype == "phase" && sourceProperty(c, "period") != null) {
+                        entry(c, "of")
+                            ?.let { (v, d) ->
+                                ids(
+                                    v,
+                                ).firstOrNull()
+                                    ?.let {
+                                        conceptOf(
+                                            it,
+                                            d,
+                                        )
+                                    }?.let { listOf(CnParticipant(it.name.lowercase(), it)) }
+                            }.orEmpty()
+                    } else {
+                        emptyList()
+                    }
+                },
+            period = (sourceProperty(c, "period")?.property as? ConceptProperty.Period)?.value?.let(::period),
             qualities = entry(c, "qualities")?.first?.let { v -> ids(v).map { it.ref.path } } ?: emptyList(),
             valueSpace =
                 first(c, "value_space")?.let { s ->
@@ -282,8 +345,81 @@ private class CnTierBuilder(
             hop = landing.hop,
             reverseHop =
                 landing.erTarget?.takeIf { landing.via == Via.DIRECT }?.let { hop.mdElementsOn(it) } ?: emptyList(),
+            fromEvent = typedRef(c, "from")?.takeIf { c.stereotype == "phase" },
+            untilEvent = typedRef(c, "until"),
+            projection = projection(c),
             sourceLocation = c.source,
         )
+    }
+
+    private fun sourceProperty(
+        c: CnConcept,
+        key: String,
+    ): StatedProperty? {
+        first(c, key)?.let { return it }
+        val g = validation.groundings.byConcept[c.key]?.firstOrNull() ?: return null
+        val doc = docByUri[g.uri] ?: return null
+        val properties = g.grounding.properties
+        properties.firstOrNull { it.key == key }?.let { return StatedProperty(it, doc) }
+        val bounds =
+            (
+                properties.firstOrNull {
+                    it.key == "bounds"
+                } as? ConceptProperty.Entry
+            )?.value as? PropertyValue.ObjectValue
+        if (key == "from" || key == "until") {
+            val value = bounds?.entries?.get(key) as? PropertyValue.IdValue
+            if (value !=
+                null
+            ) {
+                return StatedProperty(
+                    if (key ==
+                        "from"
+                    ) {
+                        ConceptProperty.From(key, value.ref, value.source)
+                    } else {
+                        ConceptProperty.Until(key, value.ref, value.source)
+                    },
+                    doc,
+                )
+            }
+        }
+        if (key == "from" && c.stereotype == "quality") {
+            val via =
+                (
+                    properties.firstOrNull {
+                        it.key == "via"
+                    } as? ConceptProperty.Entry
+                )?.value as? PropertyValue.IdValue
+            if (via != null) return StatedProperty(ConceptProperty.From(key, via.ref, via.source), doc)
+        }
+        return null
+    }
+
+    private fun typedRef(
+        c: CnConcept,
+        key: String,
+    ): QualifiedName? {
+        val s = sourceProperty(c, key) ?: return null
+        val ref =
+            when (val p = s.property) {
+                is ConceptProperty.From -> p.ref
+                is ConceptProperty.Until -> p.ref
+                is ConceptProperty.Per -> p.ref
+                else -> return null
+            }
+        return resolve(ref.path, ref.parts, s.doc, cn = true)?.takeIf { it.kind == "concept" }?.let(::cnName)
+    }
+
+    private fun projection(c: CnConcept): CnProjection? {
+        if (c.stereotype != "quality") return null
+        val s = sourceProperty(c, "from") ?: return null
+        val ref = (s.property as? ConceptProperty.From)?.ref ?: return null
+        if (ref.parts.size < 2) return null
+        val owner = ref.parts.dropLast(1)
+        val source =
+            resolve(owner.joinToString("."), owner, s.doc, cn = true)?.takeIf { it.kind == "concept" } ?: return null
+        return CnProjection(cnName(source), ref.parts.last(), typedRef(c, "per"))
     }
 
     private fun relationType(c: CnConcept): CnRelationType {
@@ -375,9 +511,22 @@ private class CnTierBuilder(
     private fun computeLanding(key: String): Landing {
         val c = concepts[key] ?: return Landing()
         val placed = validation.groundings.byConcept[key]?.firstOrNull()
-        if (placed == null) {
-            if (c.stereotype != "phase" || first(c, "definition") == null) return Landing()
-            val (v, d) = entry(c, "of") ?: return Landing()
+        if (placed == null || placed.targetSymbol == null) {
+            projection(c)?.let { p ->
+                val q =
+                    concepts.values.firstOrNull { x ->
+                        x.stereotype == "quality" &&
+                            x.name == p.quality &&
+                            entry(x, "of")?.let { (v, d) -> ids(v).firstOrNull()?.let { conceptOf(it, d) } } == p.source
+                    }
+                if (q != null) return landingOf(q.key).copy(from = p.source, hop = null)
+            }
+            val inherited =
+                c.stereotype == "subkind" ||
+                    (c.stereotype == "kind" && first(c, "members") != null) ||
+                    (c.stereotype == "phase" && (first(c, "definition") != null || typedRef(c, "from") != null))
+            if (!inherited) return Landing()
+            val (v, d) = entry(c, "of") ?: entry(c, "is_a") ?: return Landing()
             val bearer =
                 (v as? PropertyValue.IdValue)?.let { resolve(it.ref.path, it.parts, d, cn = true) }?.takeIf {
                     it.kind == "concept"
@@ -474,10 +623,21 @@ private class CnTierBuilder(
         val dangling = mutableListOf<String>()
         if (p.targetSymbol == null) (g.target?.path ?: g.targetKey)?.let { dangling += it }
 
-        fun element(id: PropertyValue.IdValue): String? =
-            resolve(id.ref.path, id.parts, doc, enclosing = enclosing)?.let(::elementRefOf).also {
-                if (it == null) dangling += id.ref.path
-            }
+        fun element(id: PropertyValue.IdValue): String? {
+            val local =
+                if (id.parts.size == 1 && p.targetSymbol?.kind == "entity") {
+                    resolver.getSymbol("${p.targetSymbol!!.qname}.${id.ref.path}")
+                } else {
+                    null
+                }
+            val symbol = local ?: resolve(id.ref.path, id.parts, doc, enclosing = enclosing)
+            val answer =
+                symbol?.let(::elementRefOf) ?: resolve(id.ref.path, id.parts, doc, cn = true)
+                    ?.takeIf { it.kind == "concept" && it.stereotype == "quality" }
+                    ?.let { landingOf(it.qname).erTarget }
+            if (answer == null) dangling += id.ref.path
+            return answer
+        }
 
         fun entryOf(key: String): PropertyValue? =
             (g.properties.firstOrNull { it.key == key } as? ConceptProperty.Entry)?.value
@@ -511,8 +671,47 @@ private class CnTierBuilder(
             val path = ids(value).map { element(it) }
             if (path.isNotEmpty() && path.all { it != null }) participants[label] = path.map { it!! }
         }
+        val stated = concepts[conceptKey]
+        if (stated?.stereotype == "phase" && sourceProperty(stated, "period") != null && participants.isEmpty()) {
+            val bearer = entry(stated, "of")?.let { (v, d) -> ids(v).firstOrNull()?.let { conceptOf(it, d) } }
+            val subject =
+                bearer
+                    ?.let { q ->
+                        concepts.entries.firstOrNull { cnName(it.key) == q }?.key
+                    }?.let { landingOf(it).erTarget }
+            val candidates =
+                docs.flatMap { d -> d.definitions.filterIsInstance<RelationDef>().map { it to d } }.filter { (r, d) ->
+                    val from =
+                        ids(r.from)
+                            .firstOrNull()
+                            ?.let {
+                                resolve(it.ref.path, it.parts, d)?.let(::elementRefOf)
+                            }?.split('.')
+                            ?.take(3)
+                            ?.joinToString(".")
+                    val to =
+                        ids(r.to)
+                            .firstOrNull()
+                            ?.let {
+                                resolve(it.ref.path, it.parts, d)?.let(::elementRefOf)
+                            }?.split('.')
+                            ?.take(3)
+                            ?.joinToString(".")
+                    from == p.targetSymbol?.let(::elementRefOf) && to == subject
+                }
+            candidates.singleOrNull()?.let { (r, d) ->
+                val sym = resolve("er.relation.${r.name}", listOf("er", "relation", r.name), d)
+                if (sym != null && bearer != null) participants[bearer.name.lowercase()] = listOf(elementRefOf(sym))
+            }
+        }
         val period =
-            ((g.properties.firstOrNull { it.key == "period" } as? ConceptProperty.Period)?.value)?.let { v ->
+            (
+                (g.properties.firstOrNull { it.key == "period" } as? ConceptProperty.Period)?.value
+                    ?: stated
+                        ?.takeIf {
+                            layerOf(bindingKind) == GroundingLayer.ER
+                        }?.let { (first(it, "period")?.property as? ConceptProperty.Period)?.value }
+            )?.let { v ->
                 fun at(key: String) = (v.entries[key] as? PropertyValue.IdValue)?.let(::element)
                 GroundingPeriod(
                     start = at("start"),
@@ -522,7 +721,11 @@ private class CnTierBuilder(
                     atHi = at("at_hi"),
                 )
             }
-        val viaPath = entryOf("via")?.let { v -> ids(v).mapNotNull { element(it) } } ?: emptyList()
+        val viaPath =
+            entryOf("via")?.takeUnless { stated?.let(::projection) != null }?.let { v ->
+                ids(v).mapNotNull { element(it) }
+            }
+                ?: emptyList()
         val synthesized = g.origin != GroundingOrigin.Binding
         return Grounding(
             internalId = FileBasedSource.idFor("cn.binding", bindingName(p)),
@@ -549,8 +752,16 @@ private class CnTierBuilder(
                 } else {
                     Binding.BoundReal
                 },
-            target = p.targetSymbol?.let(::elementRefOf),
-            targetKind = p.targetSymbol?.kind,
+            target =
+                p.targetSymbol?.let(::elementRefOf)
+                    ?: stated
+                        ?.takeIf {
+                            projection(
+                                it,
+                            ) != null ||
+                                typedRef(it, "from") != null
+                        }?.let { landingOf(it.key).erTarget },
+            targetKind = p.targetSymbol?.kind ?: if (stated?.let { projection(it) } != null) "attribute" else "entity",
             hierarchy = hierarchy,
             participants = participants,
             period = period,
@@ -559,6 +770,29 @@ private class CnTierBuilder(
                     text(u) ?: (u as? PropertyValue.IdValue)?.ref?.path
                 },
             viaPath = viaPath,
+            episodes =
+                if (stated?.stereotype == "phase" &&
+                    (first(stated, "period") != null || entryOf("episodes") != null)
+                ) {
+                    p.targetSymbol?.let(::elementRefOf)
+                } else {
+                    null
+                },
+            bounds =
+                stated?.let { c ->
+                    val start = typedRef(c, "from")
+                    val end = typedRef(c, "until")
+                    if (c.stereotype ==
+                        "phase" &&
+                        start != null &&
+                        end != null
+                    ) {
+                        CnBounds(start, end)
+                    } else {
+                        null
+                    }
+                },
+            projection = stated?.let(::projection),
             filter =
                 (g.properties.firstOrNull { it is ConceptProperty.FilterBlock } as? ConceptProperty.FilterBlock)
                     ?.block,

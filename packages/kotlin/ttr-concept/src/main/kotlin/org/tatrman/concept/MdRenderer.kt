@@ -165,7 +165,11 @@ internal class MdRenderer(
         ): Scope {
             if (p.qname in inlining) stop("the definitions inline each other at `${p.ref}` (cn/definition-cycle)")
             val def =
-                model.definitions.of(p.qname).firstOrNull { it.kind == BlockKind.DEFINITION }
+                model.definitions.of(p.qname).firstOrNull {
+                    it.kind == BlockKind.DEFINITION ||
+                        p.stereotype == "subkind" &&
+                        it.kind == BlockKind.MEMBERS
+                }
                     ?: stop("`${p.ref}` has no `definition:` — a grounded phase reads its stacked entity's md face")
             val expression = def.expression ?: stop("`${p.ref}`'s definition does not parse")
             val bearer = def.bearer?.let { cn.concepts[it] } ?: stop("`${p.ref}` has no bearer")

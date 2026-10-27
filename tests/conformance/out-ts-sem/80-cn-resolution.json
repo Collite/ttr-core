@@ -1,5 +1,7 @@
 {
     "diagnostics": [
+        "cn/durative-event",
+        "cn/extent-retired",
         "cn/ungrounded",
         "cn/ungrounded",
         "cn/ungrounded",

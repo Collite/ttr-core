@@ -75,7 +75,28 @@ internal class AssertionValidator(
         val planned = mutableListOf<PlannedParticipant>()
         val plannedQualities = mutableListOf<PlannedQuality>()
         val refs = FrameRefs(model, FrameSlugs.AMBIGUOUS_ASSERTION, f)
-        val event = refs.concept(a.event, "event", "event", setOf("event"))
+        val candidate =
+            refs.concept(
+                a.concept,
+                "concept",
+                "claim bearer",
+                setOf("event", "kind", "subkind", "role", "phase"),
+            )
+        val event = candidate?.takeIf { c -> lattice.chain(c).any { it.stereotype == "event" || it.period != null } }
+        if (candidate != null && event == null) {
+            f.error(
+                FrameSlugs.SLOT_MISMATCH,
+                "concept",
+                "`${candidate.ref}` names no row with validity or phase episode",
+            )
+        }
+        if (event?.stereotype == "phase" && event.grounding?.episodes == null) {
+            f.error(
+                FrameSlugs.NOT_ASSERTABLE,
+                "concept",
+                "`${event.ref}` is a derived phase — no episode entity holds its asserted row",
+            )
+        }
         val landed = event?.let { landing(it, f) } ?: false
         identity(a.identity, event?.takeIf { landed }, f)
         val labels = mutableSetOf<String>()
@@ -138,7 +159,11 @@ internal class AssertionValidator(
         if (event != null) period(a, event, f)
         val asOf = if (a.hasAssertedAsOf()) instant(a.assertedAsOf, "assertedAsOf", f) else null
         if (event != null &&
-            (lattice.chain(event).any { it.qname in stateEvents } || asserted.any { it.valuedState })
+            (
+                event.stereotype == "phase" ||
+                    lattice.chain(event).any { it.qname in stateEvents } ||
+                    asserted.any { it.valuedState }
+            )
         ) {
             if (!a.hasAssertedAsOf()) {
                 f.error(
@@ -169,7 +194,7 @@ internal class AssertionValidator(
         if (event != null && entity == null && !f.hasErrors()) {
             f.error(
                 FrameSlugs.NOT_ASSERTABLE,
-                "event",
+                "concept",
                 "`${event.ref}` lands on `${event.erTarget}` — no entity holds its row",
             )
         }
@@ -193,7 +218,7 @@ internal class AssertionValidator(
                 ?: " — it has no grounding"
         f.error(
             FrameSlugs.NOT_ASSERTABLE,
-            "event",
+            "concept",
             "`${e.ref}` has no E-R landing (${FrameRefs.grade(e.grade)})$why: an assertion writes E-R rows",
         )
         return false
@@ -520,6 +545,6 @@ internal class AssertionValidator(
         }
 
     private companion object {
-        val PARTICIPANT = setOf("kind", "role", "event", "phase")
+        val PARTICIPANT = setOf("kind", "role", "subkind", "event", "phase")
     }
 }

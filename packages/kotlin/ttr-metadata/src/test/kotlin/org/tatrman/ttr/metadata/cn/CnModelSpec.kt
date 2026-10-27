@@ -121,8 +121,12 @@ class CnModelSpec :
         "the model-level cn errors are load errors; hygiene and advisory ones ride the grades" {
             // 76 grounds eight concepts 75 already grounds — the second of each is the error, in 76's file
             concepts.result.errors.map { it.message.substringBefore(':') } shouldBe
-                List(8) { "cn/duplicate-grounding" }
-            concepts.result.errors.all { it.file.endsWith("d-bindings.ttrm") } shouldBe true
+                List(3) { "cn/durative-event" } + List(8) { "cn/duplicate-grounding" }
+            concepts.result.errors
+                .filter {
+                    it.message.startsWith("cn/duplicate-grounding")
+                }.all { it.file.endsWith("d-bindings.ttrm") } shouldBe
+                true
             (concepts.result.warnings + concepts.result.errors).none {
                 it.message.startsWith("cn/ungrounded") || it.message.startsWith("cn/db-grounding")
             } shouldBe true
@@ -218,7 +222,8 @@ class CnModelSpec :
                     "Party" to Row(null, null, UNGROUNDED),
                     "Supplier" to Row(null, null, UNGROUNDED),
                     "WarehouseOutage" to Row(null, null, UNGROUNDED),
-                    "HomeCategory" to Row(null, null, UNGROUNDED),
+                    "HomeCategory" to
+                        Row("er.entity.category_code", Via.DIRECT, GroundingGrade.ER_GROUNDED, "ProductCategory"),
                     "open_amount" to Row(null, null, UNGROUNDED),
                     "transfer_delay" to Row(null, null, UNGROUNDED),
                     "StockCondition" to Row(null, null, UNGROUNDED),

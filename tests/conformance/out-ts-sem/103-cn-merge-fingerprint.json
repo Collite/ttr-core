@@ -1,7 +1,8 @@
 {
     "diagnostics": [
         "cn/duplicate-grounding",
-        "cn/duplicate-grounding"
+        "cn/duplicate-grounding",
+        "cn/durative-event"
     ],
     "resolved": [],
     "symbols": [

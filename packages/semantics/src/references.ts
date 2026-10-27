@@ -205,6 +205,13 @@ function collectConceptBodyRefs(body: ConceptBody, mode: 'def' | 'binding' | 'su
       case 'ref':
         if (p.key !== declaring) out.push(cnRef(p.ref));
         break;
+      case 'from':
+        if (p.ref.parts.length === 1) out.push(cnRef(p.ref));
+        break;
+      case 'until':
+      case 'per':
+        out.push(cnRef(p.ref));
+        break;
       case 'grounds':
         out.push(p.ref);
         break;
@@ -263,8 +270,18 @@ function collectConceptBodyRefs(body: ConceptBody, mode: 'def' | 'binding' | 'su
               for (const id of idsOf(e.value)) out.push(idRef(id));
             }
             break;
-          case 'via':
+          case 'episodes':
             for (const id of idsOf(p.value)) out.push(idRef(id));
+            break;
+          case 'bounds':
+            for (const key of ['from', 'until']) for (const id of idsOf(entryOf(p.value, key)?.value)) out.push(cnRef(idRef(id)));
+            break;
+          case 'via':
+            for (const id of idsOf(p.value)) {
+              if (mode === 'binding' && body.properties.some((p) => p.kind === 'ref' && p.key === 'quality') && !['er', 'md', 'db'].includes(id.parts[0])) {
+                const parts = id.parts.slice(0, -1); out.push(cnRef({path: parts.join('.'), parts, source: id.source}));
+              } else out.push(idRef(id));
+            }
             break;
           default:
             break;

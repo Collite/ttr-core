@@ -214,6 +214,9 @@ private fun collectConceptBody(
     for (p in body.properties) {
         when (p) {
             is ConceptProperty.Ref -> if (p.key != declaring) cn(p.ref.path, p.ref.parts, p.ref.source)
+            is ConceptProperty.From -> if (p.ref.parts.size == 1) cn(p.ref.path, p.ref.parts, p.ref.source)
+            is ConceptProperty.Until -> cn(p.ref.path, p.ref.parts, p.ref.source)
+            is ConceptProperty.Per -> cn(p.ref.path, p.ref.parts, p.ref.source)
             is ConceptProperty.Grounds -> out += refOf(p.ref, owner)
             is ConceptProperty.ValueSpace -> cn(p.ref.path, p.ref.parts, p.ref.source)
             is ConceptProperty.Involves -> p.participants.forEach { cn(it.ref.path, it.ref.parts, it.ref.source) }
@@ -259,7 +262,20 @@ private fun collectConceptBody(
                             }
                         }
                     }
-                    "via" -> idsOf(p.value).forEach { plain(it) }
+                    "episodes" -> idsOf(p.value).forEach { plain(it) }
+                    "bounds" -> for (key in listOf("from", "until")) idsOf(entryOf(p.value, key)).forEach { cn(it) }
+                    "via" ->
+                        idsOf(p.value).forEach { id ->
+                            if (mode == BodyMode.Binding &&
+                                body.ref("quality") != null &&
+                                id.parts.firstOrNull() !in setOf("er", "md", "db")
+                            ) {
+                                val parts = id.parts.dropLast(1)
+                                cn(parts.joinToString("."), parts, id.source)
+                            } else {
+                                plain(id)
+                            }
+                        }
                     else -> {}
                 }
             else -> {}

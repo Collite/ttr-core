@@ -82,6 +82,12 @@ internal sealed interface SqlExpr {
         val order: SqlExpr,
     ) : SqlExpr
 
+    data class Lead(
+        val value: SqlExpr,
+        val partition: List<SqlExpr>,
+        val order: SqlExpr,
+    ) : SqlExpr
+
     data class Case(
         val branches: List<Pair<SqlExpr, SqlExpr>>,
         val otherwise: SqlExpr?,
@@ -273,6 +279,12 @@ internal class SqlPrinter(
             is SqlExpr.Exists -> (if (e.negated) "NOT EXISTS " else "EXISTS ") + sub(e.select, indent)
             is SqlExpr.Between ->
                 expr(e.e, indent, 5) + " BETWEEN " + expr(e.lo, indent, 5) + " AND " + expr(e.hi, indent, 5)
+            is SqlExpr.Lead ->
+                "LEAD(" + expr(e.value, indent, 0) + ") OVER (PARTITION BY " +
+                    e.partition.joinToString(", ") { expr(it, indent, 0) } +
+                    " ORDER BY " +
+                    expr(e.order, indent, 0) +
+                    ")"
             is SqlExpr.RowNumber ->
                 "ROW_NUMBER() OVER (PARTITION BY " + e.partition.joinToString(", ") { expr(it, indent, 0) } +
                     " ORDER BY " + expr(e.order, indent, 0) + " DESC)"

@@ -226,6 +226,7 @@ private class CnValidator(
             checkAntirigid(c)
             checkRelationTypes(c)
         }
+        checkThingsInTime()
         checkHierarchies()
         checkParticipantPaths()
         return out.sortedWith(compareBy(BY_PLACE) { it.uri to it.source })
@@ -383,7 +384,7 @@ private class CnValidator(
                 placed.conceptKey != null
             ) {
                 val st = concepts[placed.conceptKey]?.stereotype ?: resolver.getSymbol(placed.conceptKey)?.stereotype
-                if (st != null && st != expected) {
+                if (st != null && st != expected && !(st == "subkind" && expected in setOf("kind", "phase"))) {
                     report(
                         DiagnosticCode.CnGroundingTargetKind,
                         DiagnosticSeverity.Error,
@@ -396,7 +397,9 @@ private class CnValidator(
             val sym = placed.targetSymbol
             if (sym != null) {
                 val t = TARGETS.getValue(bindingKind)
-                if (!t.ok(sym, stacked)) {
+                if (!t.ok(sym, stacked) &&
+                    !(bindingKind == "cn2er_phase" && cEpisode(placed.conceptKey) && sym.kind == "entity")
+                ) {
                     val isWhat =
                         if (bindingKind == "cn2er_phase" &&
                             sym.kind == "entity"
@@ -425,6 +428,16 @@ private class CnValidator(
             }
         }
     }
+
+    private fun cEpisode(key: String?): Boolean =
+        key?.let { concepts[it] }?.let { c ->
+            c.stereotype == "phase" &&
+                (
+                    c.properties.any { it.property is ConceptProperty.Period } ||
+                        groundingsOf(c).any { it.grounding.properties.any { p -> p is ConceptProperty.Period } }
+                )
+        } ==
+            true
 
     private fun noBindingKind(
         g: CnGrounding,
@@ -456,7 +469,7 @@ private class CnValidator(
                         "role '${c.name}' names no defining event — add 'event: <Event>' (CN-D6)",
                     )
                 }
-            "quality", "phase" ->
+            "quality", "phase", "subkind" ->
                 if (c.statedEntry("of") == null) {
                     report(
                         DiagnosticCode.RequiredPropertyMissing,
@@ -479,7 +492,11 @@ private class CnValidator(
                         "stacked entity, never both (AM-2)",
                 )
             }
-            if (definition == null && !grounded && !abstract) {
+            if (definition == null &&
+                !grounded &&
+                !abstract &&
+                c.properties.none { it.property is ConceptProperty.From }
+            ) {
                 report(
                     DiagnosticCode.CnPhaseNoDefinition,
                     DiagnosticSeverity.Information,
@@ -501,7 +518,8 @@ private class CnValidator(
         }
         val exempt =
             c.stereotype == "relation_type" ||
-                c.stereotype == "phase" ||
+                c.stereotype in setOf("phase", "subkind") ||
+                c.properties.any { it.property is ConceptProperty.From } ||
                 definition != null ||
                 c.stated<ConceptProperty.MembersBlock>() != null ||
                 abstract
@@ -519,7 +537,7 @@ private class CnValidator(
     // --- cn/involves-unlabelled-duplicate ----------------------------------------------------------------------
 
     private fun checkInvolves(c: CnConcept) {
-        if (c.stereotype != "event") return
+        if (c.stereotype !in setOf("event", "kind", "subkind", "role")) return
         val involves = c.stated<ConceptProperty.Involves>() ?: return
         val seen = mutableSetOf<String>()
         for (p in (involves.property as ConceptProperty.Involves).participants) {
@@ -708,7 +726,11 @@ private class CnValidator(
         for (placed in groundings.groundings) {
             val g = placed.grounding
             val target = placed.targetSymbol
-            if (g.bindingKind != "cn2er_event" || target?.kind != "entity") continue
+            if (g.bindingKind !in setOf("cn2er_event", "cn2er_kind", "cn2er_role", "cn2er_phase") ||
+                target?.kind != "entity"
+            ) {
+                continue
+            }
             val participants =
                 g.properties.firstOrNull {
                     it is ConceptProperty.Entry && it.key == "participants"
@@ -782,6 +804,379 @@ private class CnValidator(
                         )}', but '${concept.name}' is grounded to '${shortName(lands)}'",
                     )
                 }
+            }
+        }
+    }
+
+    /** CN-P8 AM-45…49: portable checks over the authored, reconciled CN graph. */
+    private fun checkThingsInTime() {
+        fun prop(
+            c: CnConcept,
+            key: String,
+        ): StatedProperty? {
+            c.properties.firstOrNull { it.property.key == key }?.let { return it }
+            val g = groundingsOf(c).firstOrNull() ?: return null
+            val doc = docByUri[g.uri] ?: return null
+            val properties = g.grounding.properties
+            properties.firstOrNull { it.key == key }?.let { return StatedProperty(it, doc) }
+            val bounds =
+                (
+                    properties.firstOrNull {
+                        it.key == "bounds"
+                    } as? ConceptProperty.Entry
+                )?.value as? PropertyValue.ObjectValue
+            val id =
+                (bounds?.entries?.get(key) as? PropertyValue.IdValue)
+                    ?: if (key == "from" &&
+                        c.stereotype == "quality"
+                    ) {
+                        (
+                            properties.firstOrNull {
+                                it.key == "via"
+                            } as? ConceptProperty.Entry
+                        )?.value as? PropertyValue.IdValue
+                    } else {
+                        null
+                    }
+            return id?.let {
+                StatedProperty(
+                    if (key ==
+                        "until"
+                    ) {
+                        ConceptProperty.Until(key, it.ref, it.source)
+                    } else {
+                        ConceptProperty.From(key, it.ref, it.source)
+                    },
+                    doc,
+                )
+            }
+        }
+
+        fun named(
+            c: CnConcept,
+            key: String,
+        ): CnConcept? {
+            val s = prop(c, key) ?: return null
+            val ref =
+                when (val p = s.property) {
+                    is ConceptProperty.Entry -> (p.value as? PropertyValue.IdValue)?.ref
+                    is ConceptProperty.From -> p.ref
+                    is ConceptProperty.Until -> p.ref
+                    is ConceptProperty.Per -> p.ref
+                    is ConceptProperty.ValueSpace -> p.ref
+                    is ConceptProperty.Ref -> p.ref
+                    else -> null
+                } ?: return null
+            return concept(ref, s.doc)?.qname?.let { concepts[it] }
+        }
+
+        fun chain(c: CnConcept): Set<String> {
+            val seen = mutableSetOf<String>()
+            var at: CnConcept? = c
+            while (at != null && seen.add(at.key)) at = named(at, "of") ?: named(at, "is_a")
+            return seen
+        }
+
+        fun participates(
+            c: CnConcept,
+            bearer: CnConcept,
+        ): Boolean =
+            chain(c).any { key ->
+                val owner = concepts.getValue(key)
+                val s = prop(owner, "involves") ?: return@any false
+                val p = s.property as? ConceptProperty.Involves ?: return@any false
+                p.participants.any { pt ->
+                    concept(pt.ref, s.doc)?.qname?.let { concepts[it] }?.let { got ->
+                        bearer.key in chain(got) || got.key in chain(bearer)
+                    } ==
+                        true
+                }
+            }
+
+        fun emit(
+            c: CnConcept,
+            code: DiagnosticCode,
+            message: String,
+            warning: Boolean = false,
+            key: String? = null,
+        ) {
+            val s = key?.let { prop(c, it) }
+            report(
+                code,
+                if (warning) DiagnosticSeverity.Warning else DiagnosticSeverity.Error,
+                s?.doc?.uri ?: c.uri,
+                s?.property?.source ?: c.source,
+                message,
+            )
+        }
+
+        fun temporal(
+            c: CnConcept,
+            visiting: MutableSet<String>,
+        ): Boolean {
+            if (!visiting.add(c.key)) return false
+            if (c.stereotype == "phase" || prop(c, "valued_state").isTrue()) return true
+            val block =
+                (prop(c, "definition")?.property as? ConceptProperty.DefinitionBlock)?.block
+                    ?: (prop(c, "members")?.property as? ConceptProperty.MembersBlock)?.block ?: return false
+            val text = block.text.replace(Regex("'(''|[^'])*'|\"(\\\\.|[^\"])*\""), " ")
+            if (Regex(
+                    "(?i)(?<![a-z0-9_]):[a-z_][a-z0-9_]*|\\b(period|at_or_before|before|contains|ended_before|overlaps|within|parameter)\\b",
+                ).containsMatchIn(text)
+            ) {
+                return true
+            }
+            return concepts.values.any { x ->
+                x.key != c.key &&
+                    Regex("\\b${Regex.escape(x.name)}\\b").containsMatchIn(text) &&
+                    temporal(x, visiting)
+            }
+        }
+        for (c in concepts.values) {
+            if (c.stereotype == "subkind" &&
+                temporal(c, mutableSetOf())
+            ) {
+                emit(
+                    c,
+                    DiagnosticCode.CnSubkindTemporalDefinition,
+                    "subkind '${c.name}' has a temporal or parametric definition",
+                    key =
+                        if (prop(c, "definition") !=
+                            null
+                        ) {
+                            "definition"
+                        } else {
+                            "members"
+                        },
+                )
+            }
+            if (c.stereotype == "kind" &&
+                prop(c, "members") != null &&
+                prop(c, "is_a") != null
+            ) {
+                emit(
+                    c,
+                    DiagnosticCode.CnSubkindAsKind,
+                    "kind '${c.name}' with members and is_a is a subkind — use 'def subkind'",
+                    true,
+                )
+            }
+            if (c.stereotype == "role" &&
+                named(c, "event")?.stereotype?.let { it != "event" } == true
+            ) {
+                emit(
+                    c,
+                    DiagnosticCode.CnRoleNoEvent,
+                    "role '${c.name}' requires an event as its defining event",
+                    key = "event",
+                )
+            }
+            if (c.stereotype == "subkind" &&
+                named(c, "of")?.stereotype?.let { it !in setOf("kind", "subkind", "role", "event") } == true
+            ) {
+                emit(
+                    c,
+                    DiagnosticCode.CnSubkindTemporalDefinition,
+                    "subkind '${c.name}' requires a rigid bearer",
+                    key = "of",
+                )
+            }
+            val extent = prop(c, "extent")?.property as? ConceptProperty.Extent
+            if (extent !=
+                null
+            ) {
+                emit(
+                    c,
+                    DiagnosticCode.CnExtentRetired,
+                    "extent is retired — events are instantaneous; kinds and phases carry intervals",
+                    true,
+                    "extent",
+                )
+            }
+            val period = (prop(c, "period")?.property as? ConceptProperty.Period)?.value
+            if (c.stereotype == "event" &&
+                (extent?.value == "durative" || period?.entries?.keys?.any { it == "start" || it == "end" } == true)
+            ) {
+                emit(
+                    c,
+                    DiagnosticCode.CnDurativeEvent,
+                    "event '${c.name}' is durative — model a kind with a lifetime or a phase",
+                    key =
+                        if (extent !=
+                            null
+                        ) {
+                            "extent"
+                        } else {
+                            "period"
+                        },
+                )
+            }
+            if (c.stereotype in setOf("kind", "role", "subkind", "phase") &&
+                period != null &&
+                ("at" in period.entries || "start" !in period.entries || "end" !in period.entries)
+            ) {
+                emit(c, DiagnosticCode.CnLifetimePeriod, "'${c.name}' needs a start/end interval", key = "period")
+            }
+            val from = prop(c, "from") != null
+            val until = prop(c, "until") != null
+            if (c.stereotype == "phase") {
+                val sources =
+                    listOf(
+                        prop(c, "definition") != null,
+                        groundingsOf(c).any { g ->
+                            g.grounding.target !=
+                                null ||
+                                g.grounding.targetKey != null
+                        },
+                        from || until,
+                    ).count { it }
+                if (sources > 1 ||
+                    from != until
+                ) {
+                    emit(
+                        c,
+                        DiagnosticCode.CnPhaseSourceConflict,
+                        "phase '${c.name}' needs exactly one source: definition, grounding, or both from and until",
+                    )
+                }
+                val bearer = named(c, "of")
+                if (from && until && bearer != null) {
+                    for (key in listOf("from", "until")) {
+                        val event = named(c, key)
+                        if (event == null ||
+                            event.stereotype != "event" ||
+                            !participates(event, bearer)
+                        ) {
+                            emit(
+                                c,
+                                DiagnosticCode.CnPhaseBoundsParticipant,
+                                "phase '${c.name}' $key bound must be an event involving '${bearer.name}'",
+                                key = key,
+                            )
+                        }
+                    }
+                }
+                if (period != null && bearer != null) {
+                    val target = groundingsOf(c).firstOrNull()?.targetSymbol
+                    val subject = chain(bearer).firstNotNullOfOrNull { directErEntity(it) }
+                    if (target != null && subject != null) {
+                        val paths =
+                            docs.flatMap { d ->
+                                d.definitions.filterIsInstance<RelationDef>().mapNotNull { r ->
+                                    element(
+                                        "er.relation.${r.name}",
+                                        listOf("er", "relation", r.name),
+                                        d,
+                                    )?.let { endsOf(it) }
+                                }
+                            }
+                        val reaches = paths.any { (a, b) -> a == target.qname && b == subject }
+                        if (!reaches) {
+                            emit(
+                                c,
+                                DiagnosticCode.CnEpisodeSubjectMissing,
+                                "episode phase '${c.name}' has no relation to its subject '${bearer.name}'",
+                            )
+                        }
+                    }
+                }
+            }
+            if (c.stereotype == "quality" && (from || prop(c, "per") != null)) {
+                val s = prop(c, "from")
+                val ref = (s?.property as? ConceptProperty.From)?.ref
+                val parts = ref?.parts?.dropLast(1).orEmpty()
+                val source =
+                    if (parts.isNotEmpty() &&
+                        s != null
+                    ) {
+                        concept(parts.joinToString("."), parts, s.doc)?.qname?.let { concepts[it] }
+                    } else {
+                        null
+                    }
+                val bearer = named(c, "of")
+                val quality =
+                    concepts.values.firstOrNull { q ->
+                        q.name == ref?.parts?.last() &&
+                            q.stereotype == "quality" &&
+                            named(q, "of")?.key == source?.key
+                    }
+                val per = named(c, "per")
+                if (!prop(c, "valued_state").isTrue() ||
+                    source == null ||
+                    source.stereotype !in setOf("kind", "subkind", "role") ||
+                    bearer == null ||
+                    !participates(source, bearer) ||
+                    quality == null ||
+                    (prop(c, "per") != null && (per == null || !participates(source, per)))
+                ) {
+                    emit(
+                        c,
+                        DiagnosticCode.CnProjectionSource,
+                        "quality '${c.name}' needs a valued-state projection of a relator quality involving its bearer and per participant",
+                    )
+                }
+            }
+        }
+
+        data class Partition(
+            val concept: CnConcept,
+            val bearer: CnConcept,
+            val attribute: String,
+            val value: String,
+        )
+        val eq = Regex("^\\s*(?:this\\.)?([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*'([^']*)'\\s*$")
+        val partitions =
+            concepts.values
+                .mapNotNull { c ->
+                    if (c.stereotype != "subkind") return@mapNotNull null
+                    val text =
+                        (prop(c, "definition")?.property as? ConceptProperty.DefinitionBlock)?.block?.text
+                            ?: return@mapNotNull null
+                    val m = eq.matchEntire(text) ?: return@mapNotNull null
+                    val bearer = named(c, "of") ?: return@mapNotNull null
+                    Partition(c, bearer, m.groupValues[1], m.groupValues[2])
+                }.groupBy { it.bearer.key to it.attribute }
+        for ((_, group) in partitions) {
+            for ((_, same) in group.groupBy { it.value }) {
+                if (same.size >
+                    1
+                ) {
+                    same.drop(1).forEach {
+                        emit(
+                            it.concept,
+                            DiagnosticCode.CnPartitionOverlap,
+                            "subkind '${it.concept.name}' overlaps '${same.first().concept.name}' on '${it.attribute}'",
+                            key = "definition",
+                        )
+                    }
+                }
+            }
+            val first = group.first()
+            val quality =
+                concepts.values.firstOrNull {
+                    it.name == first.attribute &&
+                        named(it, "of")?.key == first.bearer.key
+                }
+            val space = quality?.let { named(it, "value_space") } ?: continue
+            val target = groundingsOf(space).firstOrNull()?.targetSymbol ?: continue
+            val values =
+                docs
+                    .flatMap { it.definitions.filterIsInstance<EntityDef>() }
+                    .flatMap { it.attributes }
+                    .firstOrNull {
+                        it.source ==
+                            target.source
+                    }?.valueLabels
+                    ?.keys
+                    .orEmpty()
+            val missing = values - group.map { it.value }.toSet()
+            if (missing.isNotEmpty()) {
+                emit(
+                    first.concept,
+                    DiagnosticCode.CnPartitionIncomplete,
+                    "subkind partition on '${first.attribute}' misses ${missing.sorted().joinToString(", ")}",
+                    true,
+                )
             }
         }
     }

@@ -57,10 +57,19 @@ internal class ParticipantPaths(
     ): Path? {
         val g = grounding(owner) { label in it.participants }
         val names = g?.participants?.get(label).orEmpty()
-        if (g != null && names.isNotEmpty()) return Relations(g, names.map { relation(it) ?: return null })
+        if (g != null) return Relations(g, names.map { relation(it) ?: return null })
         val declared = lattice.participant(owner, label)?.second?.concept
         val stands = concept ?: declared?.let { cn.concepts[it] }
-        val (entity, attribute) = attributeRef(stands?.erTarget) ?: return null
+        val projected =
+            lattice.chain(owner).firstNotNullOfOrNull { c ->
+                cn.concepts.values
+                    .firstOrNull {
+                        it.stereotype == "quality" &&
+                            it.of == c.qname &&
+                            it.valueSpace == stands?.qname
+                    }?.erTarget
+            }
+        val (entity, attribute) = attributeRef(projected ?: stands?.erTarget) ?: return null
         return Column(entity, attribute)
     }
 

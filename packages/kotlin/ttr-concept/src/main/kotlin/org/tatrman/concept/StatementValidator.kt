@@ -315,8 +315,8 @@ internal class StatementValidator(
 
     private companion object {
         val QUALITY = setOf("quality")
-        val PHASE = setOf("phase")
-        val MEMBERED = setOf("kind", "role")
-        val GROUPABLE = setOf("kind", "role", "quality")
+        val PHASE = setOf("phase", "subkind")
+        val MEMBERED = setOf("kind", "role", "subkind")
+        val GROUPABLE = setOf("kind", "role", "subkind", "quality")
     }
 }

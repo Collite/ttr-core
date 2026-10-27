@@ -63,6 +63,18 @@ export const CN_HYGIENE_RULE_IDS: ReadonlySet<string> = new Set([
 ]);
 
 export const CN_RULES: Rule[] = [
+  cnRule('cn-subkind-temporal-definition', DiagnosticCode.CnSubkindTemporalDefinition, 'error', 'CN-P8 things-in-time validation: subkind temporal definition.'),
+  cnRule('cn-partition-overlap', DiagnosticCode.CnPartitionOverlap, 'error', 'CN-P8 things-in-time validation: partition overlap.'),
+  cnRule('cn-partition-incomplete', DiagnosticCode.CnPartitionIncomplete, 'warning', 'CN-P8 things-in-time validation: partition incomplete.'),
+  cnRule('cn-subkind-as-kind', DiagnosticCode.CnSubkindAsKind, 'warning', 'CN-P8 things-in-time validation: subkind as kind.'),
+  cnRule('cn-extent-retired', DiagnosticCode.CnExtentRetired, 'warning', 'CN-P8 things-in-time validation: extent retired.'),
+  cnRule('cn-durative-event', DiagnosticCode.CnDurativeEvent, 'error', 'CN-P8 things-in-time validation: durative event.'),
+  cnRule('cn-episode-subject-missing', DiagnosticCode.CnEpisodeSubjectMissing, 'error', 'CN-P8 things-in-time validation: episode subject missing.'),
+  cnRule('cn-phase-bounds-participant', DiagnosticCode.CnPhaseBoundsParticipant, 'error', 'CN-P8 things-in-time validation: phase bounds participant.'),
+  cnRule('cn-phase-source-conflict', DiagnosticCode.CnPhaseSourceConflict, 'error', 'CN-P8 things-in-time validation: phase source conflict.'),
+  cnRule('cn-projection-source', DiagnosticCode.CnProjectionSource, 'error', 'CN-P8 things-in-time validation: projection source.'),
+  cnRule('cn-lifetime-period', DiagnosticCode.CnLifetimePeriod, 'error', 'CN-P8 things-in-time validation: lifetime period.'),
+
   cnRule(
     'cn-duplicate-grounding',
     DiagnosticCode.CnDuplicateGrounding,

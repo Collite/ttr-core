@@ -1,1 +1,1 @@
-Čistý obrat · velký prodej: čistý obrat > large_sale (= 10000) · leden 2026.
+Čistý obrat · velký prodej dokud čistý obrat > large_sale (= 10000) · leden 2026.

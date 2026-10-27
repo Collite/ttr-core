@@ -2,8 +2,8 @@
 
 ## Grammar 0.20 — things in time
 
-Grammar 0.20 adds the syntax below. CN-P8 S8.1 provides parsing, formatting and
-writer round-trips; the corresponding validation and lowering arrive in S8.2.
+Grammar 0.20 supports the temporal forms below, including portable validation,
+ER lowering, assertion rows and English/Czech explanations.
 
 `subkind` declares a rigid specialization with an `of:` bearer, beside an
 anti-rigid `phase`. Kinds (including subkinds and roles) may have participants and
@@ -59,6 +59,41 @@ concepts; the bindings tell them where the data is.
 
 A concept is referred to as `cn.<Name>` from other models (`kind: cn.Item`, `for: cn.Customer`), and by its bare
 name inside a `model cn` file — see [Names and references](#names-and-references).
+
+
+DC-13 reads a projected value with a qualified call: `this.list_price(channel: 'web', at: :as_of)`.
+`at:` defaults to `:as_of`; arguments are named. The receiver can follow participant paths,
+for example `this.order.customer.agreed_price(item: this.item, at: this.order.placed_date)`.
+The source is a quality of a relator involving the bearer and the `per:` concept; the ER
+renderer uses the existing validity lookup. These calls require TTR-P expression grammar 0.7.
+
+A subkind inherits its bearer's landing and can materialize when its definition is rigid.
+A temporal or parametric definition is `cn/subkind-temporal-definition`. Equality definitions
+on one value-space attribute are checked for overlap and missing finite members. The legacy
+`kind { is_a: …, members: … }` form remains readable with `cn/subkind-as-kind`.
+
+Episode phases use either an entity-backed interval or `from:` / `until:` events involving
+the subject. Event bounds are half-open: an occurrence starts the state and the first strictly
+later termination for that subject ends it; no termination leaves it open. The renderer uses a
+subject-partitioned `LEAD` stream and grouped first termination. An episode predicate selects
+each subject once, including when episodes overlap. Episodes, relators and projected qualities
+are ER constructs; unsupported MD reads name `G-MD-1`.
+
+Explicit source bindings are equivalent to the top-down forms:
+
+```ttrm
+model binding
+def cn2er_phase outages {
+    phase: cn.OutOfService, episodes: er.entity.warehouse_outage,
+    period: { start: er.entity.warehouse_outage.from_date, end: er.entity.warehouse_outage.to_date }
+}
+def cn2er_phase open_order { phase: cn.OpenOrder, bounds: { from: cn.OrderPlaced, until: cn.OrderDelivered } }
+def cn2er_quality projected_price { quality: cn.list_price, via: ListPrice.price, per: Channel }
+```
+
+`extent: instantaneous` is a retired no-op (`cn/extent-retired`, warning).
+`extent: durative` or an interval on an event is `cn/durative-event`; use a kind or an episode phase.
+A non-event lifetime needs both `start` and `end` (`cn/lifetime-period`).
 
 ## Concept kinds
 
@@ -612,8 +647,12 @@ WHERE sales.channel = 'web' AND date_dim.cal_date >= DATE '2026-01-01' AND date_
 
 ### Assertions
 
-An assertion records an event — its participants by label, its period, its qualities — and lowers to **one row, the
-event's**, for a writer to store. cn itself never writes.
+An assertion names `concept`: an event occurrence, a kind row with validity, or an entity-backed phase episode.
+Its participants, interval and qualities lower to one row for a writer to store. A phase claim also requires
+`assertedAsOf`; a derived phase has no writable episode row. cn itself never writes.
+
+Field 1 was renamed from `event` to `concept` without changing its binary encoding. JSON producers must use
+`concept`; JVM/Python callers must rebuild against the updated proto artifact.
 
 ```json
 { "rows": [{ "entity": "transfer",

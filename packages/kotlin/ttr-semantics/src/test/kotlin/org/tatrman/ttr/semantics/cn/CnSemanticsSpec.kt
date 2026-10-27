@@ -102,7 +102,10 @@ class CnSemanticsSpec :
                     ),
                 "89-cn-phase-double-definition" to
                     listOf(
+                        "b-concepts.ttrm:4 cn/durative-event",
                         "b-concepts.ttrm:5 cn/phase-double-definition",
+                        "b-concepts.ttrm:5 cn/phase-source-conflict",
+                        "b-concepts.ttrm:6 cn/phase-source-conflict",
                         "c-bindings.ttrm:4 cn/phase-double-definition",
                     ),
                 "90-cn-phase-no-definition" to listOf("b-concepts.ttrm:5 cn/phase-no-definition"),
@@ -110,6 +113,7 @@ class CnSemanticsSpec :
                     listOf("a-er.ttrm:17 cn/event-no-period", "b-concepts.ttrm:4 cn/event-no-period"),
                 "92-cn-ungrounded" to
                     listOf(
+                        "b-concepts.ttrm:10 cn/subkind-as-kind",
                         "b-concepts.ttrm:4 cn/ungrounded",
                         "b-concepts.ttrm:5 cn/ungrounded",
                         "b-concepts.ttrm:6 cn/ungrounded",

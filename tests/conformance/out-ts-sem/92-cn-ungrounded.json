@@ -1,5 +1,6 @@
 {
     "diagnostics": [
+        "cn/subkind-as-kind",
         "cn/ungrounded",
         "cn/ungrounded",
         "cn/ungrounded",

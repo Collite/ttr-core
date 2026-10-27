@@ -63,7 +63,7 @@ class FrameJsonSpec :
             it("a misspelled nested field fails") {
                 shouldThrow<InvalidProtocolBufferException> {
                     parser.merge(
-                        """{ "event": { "qname": "cn.Transfer" }, "assertedAsof": {} }""",
+                        """{ "concept": { "qname": "cn.Transfer" }, "assertedAsof": {} }""",
                         Assertion.newBuilder(),
                     )
                 }

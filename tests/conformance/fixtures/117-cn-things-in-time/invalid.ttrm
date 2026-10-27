@@ -1,0 +1,16 @@
+// CN-P8 portable AM-45…49 diagnostic corpus; every negative is intentional.
+model cn
+def subkind TemporalTicket { of: Ticket, definition: """created < :as_of""" }
+def subkind DuplicateWeb { of: Ticket, definition: """code = 'web'""" }
+def kind OtherTicket { grounds: er.entity.ticket }
+def quality other_code { of: OtherTicket, value_space: Channel, grounds: er.entity.ticket.channel }
+def subkind OnlyWeb { of: OtherTicket, definition: """other_code = 'web'""" }
+def kind LegacyWeb { is_a: Ticket, members: """code = 'web'""" }
+def event Duration { extent: durative, period: { start: created, end: closed } }
+def event Instant { extent: instantaneous, period: { at: created } }
+def phase BrokenBounds { of: Ticket, from: Started }
+def phase WrongParticipant { of: Warehouse, from: Started, until: Finished }
+def phase MissingSubject { of: Item, grounds: er.entity.outage, period: { start: since, end: until } }
+def quality InvalidProjection { of: Item, per: Channel, from: ListPrice.amount }
+def quality MissingQuality { of: Item, valued_state: true, from: ListPrice.absent }
+def kind InvalidLifetime { period: { at: created } }

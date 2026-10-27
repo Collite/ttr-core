@@ -37,6 +37,23 @@ class TtrpConceptFormsSpec :
         fun errors(source: String) =
             TtrpParser.parseExpression(source).diagnostics.filter { it.severity == Severity.ERROR }
 
+        "DC-13 qualified calls keep named arguments and stay in CN definitions" {
+            val e = parse("this.item.list_price(channel: 'web', at: :as_of)").shouldBeInstanceOf<FunctionCall>()
+            e.function.value shouldBe "this.item.list_price"
+            e.argNames shouldBe listOf("channel", "at")
+            errors("this.list_price(channel: 'web', channel: 'store')").isNotEmpty() shouldBe true
+            val doc =
+                TtrpFrontend.check(
+                    "f = filter(s, this.list_price(channel: 'web') > 0)",
+                    DeclaredSchemaSource(
+                        mapOf(
+                            "s" to listOf(Column("id", TtrpType.Str)),
+                        ),
+                    ),
+                )
+            doc.diagnostics.any { it.id == TtrpDiagnosticId.CN_001 } shouldBe true
+        }
+
         "exists … involving this as <label> where <phase> (DC-2, fixture 75's DebtorCustomer)" {
             val e =
                 parse(

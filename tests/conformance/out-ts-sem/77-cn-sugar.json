@@ -1,5 +1,6 @@
 {
     "diagnostics": [
+        "cn/durative-event",
         "cn/event-no-period",
         "ttr/required-property-missing",
         "ttr/required-property-missing",

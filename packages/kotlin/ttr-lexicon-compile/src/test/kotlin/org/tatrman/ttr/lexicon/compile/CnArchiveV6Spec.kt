@@ -121,7 +121,7 @@ class CnArchiveV6Spec :
                     "cn.Customer" to concept("role", "er.entity.customer", "er.entity.customer", direct, "cn.Party"),
                     "cn.DebtorCustomer" to
                         concept("phase", "er.entity.customer", "er.entity.customer", direct, "cn.Customer"),
-                    "cn.Invoice" to concept("event", "er.entity.invoice", "er.entity.invoice", direct),
+                    "cn.Invoice" to concept("kind", "er.entity.invoice", "er.entity.invoice", direct),
                     "cn.Item" to concept("kind", "er.entity.item", "er.entity.item", direct),
                     "cn.OverdueInvoice" to
                         concept("phase", "er.entity.invoice", "er.entity.invoice", direct, "cn.Invoice"),

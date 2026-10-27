@@ -1,0 +1,4 @@
+model binding
+def cn2er_event started { event: cn.Started, target: er.entity.started, period: { at: er.entity.started.occurred }, participants: { ticket: [er.relation.started_ticket] } }
+def cn2er_event finished { event: cn.Finished, target: er.entity.finished, period: { at: er.entity.finished.occurred }, participants: { ticket: [er.relation.finished_ticket] } }
+def cn2er_kind price { kind: cn.ListPrice, target: er.entity.price, period: { start: er.entity.price.since, end: er.entity.price.until }, participants: { item: [er.relation.price_item] } }

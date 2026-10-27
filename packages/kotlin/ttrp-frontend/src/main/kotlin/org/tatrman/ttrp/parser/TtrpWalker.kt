@@ -719,7 +719,8 @@ internal class TtrpWalker(
      * (TTRP-FN-002); the surface name rides in the [CatalogId] for re-resolution.
      */
     private fun functionCall(ctx: TTRPParser.FunctionCallContext): Expression {
-        val name = ctx.identifier().text
+        val name = (listOf(ctx.identifier().text) + ctx.idPart().map { it.text }).joinToString(".")
+        if (ctx.idPart().isNotEmpty()) conceptForms += ThisRef(emptyList(), loc(ctx))
         val fnArgs = ctx.fnArg()
         val args = fnArgs.map { expr(it.expr()) }
         // AU-core-P0: a call may name its arguments (`age(since: x)`); all-positional calls keep
@@ -735,7 +736,7 @@ internal class TtrpWalker(
                     .groupBy { it }
                     .filterValues { it.size > 1 }
                     .keys
-            if (name !in NAMED_ARGUMENT_FUNCTIONS || dup.isNotEmpty()) {
+            if ((ctx.idPart().isEmpty() && name !in NAMED_ARGUMENT_FUNCTIONS) || dup.isNotEmpty()) {
                 diagnostics +=
                     TtrpDiagnostic(
                         TtrpDiagnosticId.PRS_008,

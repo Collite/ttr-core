@@ -10,9 +10,9 @@ diff --git a/cn.ttrm b/cn.ttrm
  def kind Channel   { label: { en: "Channel", cs: "Kanál" } }                     // a value kind: store · web · marketplace
  
  // ---- roles ----
-@@ -156,3 +156,5 @@
- // ---- refusals: a definition cycle (cn/definition-cycle) ----
- def phase LoopA { of: Order, definition: """LoopB""" }
- def phase LoopB { of: Order, definition: """LoopA""" }
+@@ -161,3 +161,5 @@
+ def phase OpenOrder { of: Order, from: OrderPlaced, until: OrderDelivered }
+ def quality item_list_price { of: Item, valued_state: true, per: Channel, from: ListPrice.pl_price }
+ def quality agreed_price { of: Customer, valued_state: true, per: Item, from: PriceAgreement.cp_price }
 +
 +def relation_type stocks {}

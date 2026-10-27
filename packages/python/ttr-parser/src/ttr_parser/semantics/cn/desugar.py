@@ -20,19 +20,25 @@ from ...model import (
     ConceptDef,
     ConceptDescription,
     ConceptEntry,
+    ConceptFrom,
     ConceptGrounds,
     ConceptLabel,
+    ConceptPer,
+    ConceptPeriod,
     ConceptProperty,
     ConceptRef,
     ConceptSugar,
     ConceptTags,
     ConceptTarget,
+    ConceptUntil,
     CubeletDef,
     Definition,
     DimensionDef,
     EntityDef,
+    IdValue,
     MdDomainDef,
     MeasureDef,
+    ObjectValue,
     Reference,
     SourceLocation,
     TargetReferenceValue,
@@ -52,7 +58,9 @@ def binding_kind_for(stereotype: str, layer: str) -> str | None:
     """The binding kind a grounding of a `stereotype` concept on `layer` desugars to (cn contracts §1.2),
     or None where the table has none: a phase grounds only to an er entity (AM-2), an open-tier relation
     type never grounds."""
-    if stereotype in {"subkind", "relation_type"}:
+    if stereotype == "subkind":
+        return "cn2er_phase" if layer == "er" else None
+    if stereotype == "relation_type":
         return None
     if layer == "db":
         return None if stereotype == "phase" else "cn2db_concept"
@@ -194,6 +202,7 @@ def desugar_concepts(definitions: tuple[Definition, ...], package_name: str) -> 
             slot = binding_concept_key(definition.binding_kind)
             target = next((p.value for p in definition.body.properties if isinstance(p, ConceptTarget)), None)
             declared = concept_ref_of(definition.body, slot)
+            episodes = definition.body.entry("episodes")
             groundings.append(
                 CnGrounding(
                     origin=BINDING,
@@ -202,7 +211,7 @@ def desugar_concepts(definitions: tuple[Definition, ...], package_name: str) -> 
                     name=definition.name,
                     source=definition.source,
                     concept_ref=declared.ref if declared is not None else None,
-                    target=target.ref if isinstance(target, TargetReferenceValue) else None,
+                    target=target.ref if isinstance(target, TargetReferenceValue) else (episodes.ref if isinstance(episodes, IdValue) else None),
                     properties=tuple(
                         p
                         for p in definition.body.properties
@@ -217,6 +226,20 @@ def desugar_concepts(definitions: tuple[Definition, ...], package_name: str) -> 
         if isinstance(definition, ConceptDef):
             grounds = next((p for p in definition.body.properties if isinstance(p, ConceptGrounds)), None)
             if grounds is None:
+                from_ = next((p for p in definition.body.properties if isinstance(p, ConceptFrom)), None)
+                until = next((p for p in definition.body.properties if isinstance(p, ConceptUntil)), None)
+                if from_ is not None and (definition.stereotype == "quality" or definition.stereotype == "phase" and until is not None):
+                    def id_value(ref: Reference) -> IdValue:
+                        return IdValue(ref=ref, parts=ref.parts, source=ref.source)
+                    if definition.stereotype == "quality":
+                        source = ConceptEntry(key="via", value=id_value(from_.ref), source=from_.source)
+                    else:
+                        assert until is not None
+                        source = ConceptEntry(key="bounds", value=ObjectValue(entries={"from": id_value(from_.ref), "until": id_value(until.ref)}, source=from_.source), source=from_.source)
+                    per = next((p for p in definition.body.properties if isinstance(p, ConceptPer)), None)
+                    groundings.append(CnGrounding(origin=GROUNDS, binding_kind="cn2er_quality" if definition.stereotype == "quality" else "cn2er_phase",
+                        stereotype=definition.stereotype, name=synthesized_binding_name(definition.name, GROUNDS), concept_name=definition.name,
+                        properties=(source, per) if per is not None else (source,), source=from_.source))
                 continue
             layer = layer_of(grounds.ref)
             hierarchy = next(
@@ -231,7 +254,7 @@ def desugar_concepts(definitions: tuple[Definition, ...], package_name: str) -> 
                     source=grounds.source,
                     concept_name=definition.name,
                     target=grounds.ref,
-                    properties=(hierarchy,) if hierarchy is not None else (),
+                    properties=tuple(p for p in definition.body.properties if p is hierarchy or layer == "er" and definition.stereotype == "phase" and isinstance(p, ConceptPeriod)),
                 )
             )
             continue

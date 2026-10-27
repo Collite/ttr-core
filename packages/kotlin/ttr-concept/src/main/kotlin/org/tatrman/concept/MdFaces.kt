@@ -77,6 +77,13 @@ internal data class MdFace(
          * (`MD_HOP`, in [Concept.reverseHop]'s sorted order — the carrier picks one); else none.
          */
         fun of(c: Concept): List<MdFace> {
+            if (c.stereotype == "subkind" ||
+                c.projection != null ||
+                c.fromEvent != null ||
+                c.grounding?.episodes != null
+            ) {
+                return emptyList() // coordinates cannot discard the subset predicate
+            }
             val g = c.grounding
             if (g?.layer == GroundingLayer.MD) {
                 val e = g.target?.let(MdElement::parse) ?: return emptyList()

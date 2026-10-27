@@ -1,0 +1,18 @@
+model cn
+def kind Warehouse { grounds: er.entity.warehouse }
+def kind Item { grounds: er.entity.item }
+def kind Channel { grounds: er.entity.price.channel }
+def kind Ticket { grounds: er.entity.ticket, qualities: [code, created, closed] }
+def quality code { of: Ticket, value_space: Channel, grounds: er.entity.ticket.channel }
+def quality created { of: Ticket, grounds: er.entity.ticket.created }
+def quality closed { of: Ticket, grounds: er.entity.ticket.closed }
+def subkind WebTicket { of: Ticket, definition: """code = 'web'""" }
+def subkind StoreTicket { of: Ticket, definition: """code = 'store'""" }
+def event Started { involves: [Ticket], period: { at: occurred } }
+def event Finished { involves: [Ticket], period: { at: occurred } }
+def phase OpenTicket { of: Ticket, abstract: true }
+def phase OutOfService { of: Warehouse, abstract: true, qualities: [reason] }
+def kind ListPrice { involves: [Item, Channel], period: { start: since, end: until, end_open: open }, qualities: [amount] }
+def quality amount { of: ListPrice, grounds: er.entity.price.amount }
+def quality list_price { of: Item, valued_state: true, abstract: true }
+def quality quoted_price { of: Item, definition: """this.list_price(channel: 'web')""" }

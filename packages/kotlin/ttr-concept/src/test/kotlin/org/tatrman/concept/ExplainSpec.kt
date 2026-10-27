@@ -102,13 +102,15 @@ class ExplainSpec :
         // ---- T2: a phase slot, its definition as prose -------------------------------------------------------
         test("a phase filter says its definition; negated; in an `or` group") {
             said(sales, st(revenue, "\"filters\": [${phase("ActiveCustomer")}]", jan), "en") shouldBe
-                "Net revenue · active customer: exists sale involving customer where time within the last 365 days · " +
+                "Net revenue · active customer while exists sale involving customer " +
+                "where time within the last 365 days · " +
                 "January 2026."
             said(sales, st(revenue, "\"filters\": [${phase("ActiveCustomer")}]", jan), "cs") shouldBe
-                "Čistý obrat · aktivní zákazník: existuje prodej, účastník zákazník, kde čas za posledních 365 dní · " +
+                "Čistý obrat · aktivní zákazník dokud existuje prodej, účastník zákazník, " +
+                "kde čas za posledních 365 dní · " +
                 "leden 2026."
             said(sales, st(revenue, "\"filters\": [${phase("LargeSale", negated = true)}]", jan), "en") shouldBe
-                "Net revenue · not large sale: net revenue > large_sale (= 10000) · January 2026."
+                "Net revenue · not large sale while net revenue > large_sale (= 10000) · January 2026."
             val kaufland =
                 "{ \"member\": { \"concept\": { \"qname\": \"cn.Customer\" }, " +
                     "\"member\": { \"label\": \"Kaufland\", \"resolvedValue\": \"Kaufland\" } } }"
@@ -116,9 +118,9 @@ class ExplainSpec :
             val all = "{ \"group\": { \"op\": \"ALL\", \"filters\": [$any, $kaufland] } }"
             val not = "{ \"group\": { \"op\": \"NOT\", \"filters\": [$kaufland] } }"
             said(sales, st(revenue, "\"filters\": [$any]", jan), "en") shouldBe
-                "Net revenue · large sale: net revenue > large_sale (= 10000) or customer Kaufland · January 2026."
+                "Net revenue · large sale while net revenue > large_sale (= 10000) or customer Kaufland · January 2026."
             said(sales, st(revenue, "\"filters\": [$all]", jan), "cs") shouldBe
-                "Čistý obrat · (velký prodej: čistý obrat > large_sale (= 10000) nebo zákazník Kaufland) a " +
+                "Čistý obrat · (velký prodej dokud čistý obrat > large_sale (= 10000) nebo zákazník Kaufland) a " +
                 "zákazník Kaufland · leden 2026."
             said(sales, st(revenue, "\"filters\": [$not]", jan), "en") shouldBe
                 "Net revenue · not (customer Kaufland) · January 2026."
@@ -143,7 +145,7 @@ class ExplainSpec :
             prose(hartland, "DebtorCustomer") shouldBe
                 "exists invoice involving customer as customer where overdue invoice"
             prose(hartland, "LateReturnLine") shouldBe
-                "request time - request order end > return_window (= 30) days"
+                "request requested date - request order end > return_window (= 30) days"
             prose(hartland, "ShortLine") shouldBe "outage or on hand < line quantity"
             // a construct the verbaliser lacks (`abs`) — the source text, quoted
             prose(hartland, "MispricedLine") shouldBe
@@ -279,7 +281,7 @@ class ExplainSpec :
         test("a known identity, a quality with its unit, a boolean; refused — what it claims, then why") {
             claimed(
                 clinic,
-                "{ \"event\": { \"qname\": \"cn.Transfer\" }, " +
+                "{ \"concept\": { \"qname\": \"cn.Transfer\" }, " +
                     "\"identity\": { \"known\": { \"values\": { \"transfer_id\": \"77\" } } }, " +
                     "\"participants\": [{ \"label\": \"from\", " +
                     "\"member\": { \"label\": \"E-501\", \"resolvedValue\": \"501\" } }], " +
@@ -288,7 +290,7 @@ class ExplainSpec :
             ) shouldBe "Transfer 77 · from: Encounter E-501 · at 2026-03-14 09:30"
             claimed(
                 clinic,
-                "{ \"event\": { \"qname\": \"cn.Observation\" }, \"identity\": { \"new\": true }, " +
+                "{ \"concept\": { \"qname\": \"cn.Observation\" }, \"identity\": { \"new\": true }, " +
                     "\"participants\": [{ \"label\": \"patient\", \"member\": { \"resolvedValue\": \"1001\" } }], " +
                     "\"qualities\": [{ \"quality\": { \"qname\": \"cn.observed_value\" }, " +
                     "\"value\": { \"floatValue\": 5.40 }, " +
@@ -297,7 +299,7 @@ class ExplainSpec :
             ) shouldBe "Pozorování · patient: Pacient 1001 · 14. 3. 2026 09:30 · naměřená hodnota: 5.4 mmol/L"
             claimed(
                 clinic,
-                "{ \"event\": { \"qname\": \"cn.Transfer\" }, \"identity\": { \"new\": true }, " +
+                "{ \"concept\": { \"qname\": \"cn.Transfer\" }, \"identity\": { \"new\": true }, " +
                     "\"participants\": [{ \"label\": \"from\", \"member\": { \"label\": \"E-9\" } }], $minute }",
                 "en",
             ) shouldBe
@@ -311,7 +313,7 @@ class ExplainSpec :
             val start = "\"start\": { \"value\": \"2026-03-01T08:00\", \"granularity\": \"MINUTE\" }"
 
             fun encounter(period: String) =
-                "{ \"event\": { \"qname\": \"cn.Encounter\" }, \"identity\": { \"new\": true }, $patient, $period }"
+                "{ \"concept\": { \"qname\": \"cn.Encounter\" }, \"identity\": { \"new\": true }, $patient, $period }"
             claimed(clinic, encounter("\"period\": { $start }"), "en") shouldBe
                 "Encounter · patient: Patient P-1001 · from 2026-03-01 08:00 (ongoing)"
             claimed(clinic, encounter("\"period\": { $start }"), "cs") shouldBe
@@ -322,7 +324,7 @@ class ExplainSpec :
             val plus = FrameValidationSpec.world("clinic", AssertionLowerSpec.PLUS)
             claimed(
                 plus,
-                "{ \"event\": { \"qname\": \"cn.Stay\" }, \"identity\": { \"new\": true }, \"period\": { $start } }",
+                "{ \"concept\": { \"qname\": \"cn.Stay\" }, \"identity\": { \"new\": true }, \"period\": { $start } }",
                 "en",
             ) shouldBe
                 "Stay · from 2026-03-01 08:00 (end unknown)"

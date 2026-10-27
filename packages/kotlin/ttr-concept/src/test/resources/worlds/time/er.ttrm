@@ -1,0 +1,12 @@
+model er
+def entity warehouse { binding: { target: { table: db.dbo.table.warehouse } }, attributes: [def attribute id { type: text, isKey: true }] }
+def entity item { binding: { target: { table: db.dbo.table.item } }, attributes: [def attribute id { type: text, isKey: true }] }
+def entity ticket { binding: { target: { table: db.dbo.table.ticket } }, attributes: [def attribute id { type: text, isKey: true }, def attribute channel { type: text, valueLabels: { "web": { en: "Web" }, "store": { en: "Store" } } }, def attribute created { type: date }, def attribute closed { type: date, optional: true }] }
+def entity started { binding: { target: { table: db.dbo.table.started } }, attributes: [def attribute id { type: text, isKey: true }, def attribute subject { type: text }, def attribute occurred { type: datetime }] }
+def entity finished { binding: { target: { table: db.dbo.table.finished } }, attributes: [def attribute id { type: text, isKey: true }, def attribute subject { type: text }, def attribute occurred { type: datetime }] }
+def entity outage { binding: { target: { table: db.dbo.table.outage } }, attributes: [def attribute id { type: text, isKey: true }, def attribute warehouse { type: text }, def attribute since { type: datetime }, def attribute until { type: datetime, optional: true }, def attribute reason { type: text }] }
+def entity price { binding: { target: { table: db.dbo.table.price } }, attributes: [def attribute id { type: text, isKey: true }, def attribute item { type: text }, def attribute channel { type: text, valueLabels: { "web": { en: "Web" }, "store": { en: "Store" } } }, def attribute since { type: date }, def attribute until { type: date, optional: true }, def attribute amount { type: decimal }] }
+def relation started_ticket { from: er.entity.started, to: er.entity.ticket, join: [{ from: er.entity.started.subject, to: er.entity.ticket.id }] }
+def relation finished_ticket { from: er.entity.finished, to: er.entity.ticket, join: [{ from: er.entity.finished.subject, to: er.entity.ticket.id }] }
+def relation outage_warehouse { from: er.entity.outage, to: er.entity.warehouse, join: [{ from: er.entity.outage.warehouse, to: er.entity.warehouse.id }] }
+def relation price_item { from: er.entity.price, to: er.entity.item, join: [{ from: er.entity.price.item, to: er.entity.item.id }] }

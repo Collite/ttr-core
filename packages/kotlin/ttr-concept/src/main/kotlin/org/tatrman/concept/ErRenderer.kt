@@ -462,11 +462,25 @@ internal class ErRenderer(
                 model.definitions.of(target.qname).firstOrNull {
                     it.kind == BlockKind.DEFINITION || it.kind == BlockKind.MEMBERS
                 }
+            if (def == null && target.stereotype == "phase" && (target.fromEvent != null || target.period != null)) {
+                val bearer = target.of?.let { cn.concepts[it] } ?: refuse("`${target.ref}` has no episode subject")
+                val expression =
+                    ColumnRef(null, target.qname.name, location = org.tatrman.ttrp.ast.SourceLocation.UNKNOWN)
+                return if (context) context(bearer, expression, false) else predicate(bearer, expression, false)
+            }
             if (def == null) {
                 // a stacked-entity phase (`cn2er_phase`) renders FROM its entity, nothing more
                 val g = target.grounding
                 val entity =
-                    (if (target.stereotype == "phase" && g?.layer == GroundingLayer.ER) entityOf(g.target) else null)
+                    (
+                        if (target.stereotype in setOf("phase", "subkind") &&
+                            g?.layer == GroundingLayer.ER
+                        ) {
+                            entityOf(g.target)
+                        } else {
+                            null
+                        }
+                    )
                         ?: refuse("`${target.ref}` has no definition to render and no stacked entity on E-R")
                 val select = Select(Source.Entity(entity.qname.name, fresh(entity.qname.name)))
                 select.items += keys(entity).map { Item(SqlExpr.Col(select.from.alias, it)) }
@@ -1230,6 +1244,9 @@ internal class ErRenderer(
             scope: Scope,
         ): V {
             val id = e.function.value
+            (scope.implicit?.concept ?: scope.self?.concept)?.let { subject ->
+                projectedCall(e, subject, resolver)?.let { return aggregate(it, scope) }
+            }
             COMPARISONS[id]?.let { op ->
                 return Scalar(compare(op, value(e.args[0], scope), value(e.args[1], scope), scope))
             }
@@ -1478,6 +1495,10 @@ internal class ErRenderer(
                     }
                     is ParticipantPaths.Relations -> p.relations
                 }
+            if (rels.isEmpty()) {
+                if (entityOf(concept)?.qname != row.entity.qname) refuse("an empty participant path crosses entities")
+                return RowV(Bound(row, concept))
+            }
             var cur = row
             for (r in rels.dropLast(1)) cur = hop(cur, r)
             val last = rels.last()
@@ -1693,8 +1714,30 @@ internal class ErRenderer(
             ref: Ref,
             phase: Concept,
         ): SqlExpr {
+            if (phase.fromEvent != null && phase.untilEvent != null) return boundedEpisode(ref, phase)
+            if (phase.period != null && phase.grounding?.layer == GroundingLayer.ER) {
+                val loc = org.tatrman.ttrp.ast.SourceLocation.UNKNOWN
+                val expression =
+                    ExistsExpr(
+                        listOf(ConceptBinding(phase.qname.name, null, loc)),
+                        listOf(Participant(ThisRef(emptyList(), loc), phase.of?.name?.lowercase(), loc)),
+                        TemporalPredicate(
+                            TemporalOp.CONTAINS,
+                            ColumnRef(null, "period", location = loc),
+                            ParamRef("as_of", loc),
+                            loc,
+                        ),
+                        false,
+                        loc,
+                    )
+                inlined += phase.ref
+                return correlated(expression, Scope(null, emptyList(), ref, ref, phase, bound(ref).select))
+            }
             val block =
-                model.definitions.of(phase.qname).firstOrNull { it.kind == BlockKind.DEFINITION }
+                model.definitions.of(phase.qname).firstOrNull {
+                    it.kind == BlockKind.DEFINITION ||
+                        it.kind == BlockKind.MEMBERS
+                }
                     ?: refuse("`${phase.ref}` has no `definition:` — a stacked entity read inside a definition")
             return inline(
                 phase,
@@ -1703,6 +1746,78 @@ internal class ErRenderer(
                 bound(ref).select,
                 record = true,
             )
+        }
+
+        /** CN-P8: one episode per start occurrence, ending at the first later termination for its subject. */
+        private fun boundedEpisode(
+            ref: Ref,
+            phase: Concept,
+        ): SqlExpr {
+            val bearer = phase.of?.let { cn.concepts[it] } ?: refuse("an episode without its subject")
+            val started = phase.fromEvent?.let { cn.concepts[it] } ?: refuse("an episode without its start event")
+            val finished = phase.untilEvent?.let { cn.concepts[it] } ?: refuse("an episode without its until event")
+            val outerKeys = keyColumns(ref)
+
+            fun stream(
+                event: Concept,
+                window: Boolean,
+            ): Select {
+                val entity = entityOf(event) ?: unreachable(event)
+                val query =
+                    Select(
+                        Source.Entity(entity.qname.name, fresh(entity.qname.name)),
+                        bound(ref).select.depth + 3,
+                    )
+                val eventRef = Bound(row(entity, query, query.from.alias), event)
+                val label = participantOn(event, bearer) ?: refuse("`${event.ref}` does not involve `${bearer.ref}`")
+                val subject =
+                    (participant(eventRef, label, bearer) as? RowV)?.ref
+                        ?: refuse("an episode subject is not an entity")
+                val keys = keyColumns(subject)
+                if (keys.size != outerKeys.size) refuse("an episode subject has incompatible keys")
+                val period = periodOf(event) ?: refuse("an episode bound has no instant")
+                val at =
+                    periodBound(
+                        eventRef,
+                        event,
+                        "at",
+                        period.at ?: refuse("an episode bound is not instantaneous"),
+                    ).sql
+                query.items += keys.mapIndexed { i, key -> Item(key, "subject_$i") }
+                query.items += Item(at, "at")
+                if (window) query.items += Item(SqlExpr.Lead(at, keys, at), "next_start")
+                return query
+            }
+            val start = stream(started, true)
+            val stop = stream(finished, false)
+            val sa = fresh("starts")
+            val ea = fresh("terminations")
+            val episodes = Select(Source.Derived(start, sa), bound(ref).select.depth + 2)
+            val subjects = outerKeys.indices.map { SqlExpr.Col(sa, "subject_$it") }
+            val firstAt = SqlExpr.Col(sa, "at")
+            val stopAt = SqlExpr.Col(ea, "at")
+            val on =
+                subjects.mapIndexed { i, key -> SqlExpr.Bin("=", key, SqlExpr.Col(ea, "subject_$i")) } +
+                    SqlExpr.Bin(">", stopAt, firstAt)
+            episodes.joins += Join(true, Source.Derived(stop, ea), SqlExpr.and(on)!!)
+            episodes.items += subjects.mapIndexed { i, key -> Item(key, "subject_$i") }
+            episodes.items += Item(firstAt, "start_at")
+            episodes.items += Item(SqlExpr.Fn("MIN", listOf(stopAt)), "end_at")
+            episodes.groupBy += subjects + firstAt + SqlExpr.Col(sa, "next_start")
+            val alias = fresh("episodes")
+            val active = Select(Source.Derived(episodes, alias), bound(ref).select.depth + 1)
+            active.items += Item(SqlExpr.Lit("1"))
+            active.where += outerKeys.mapIndexed { i, key -> SqlExpr.Bin("=", SqlExpr.Col(alias, "subject_$i"), key) }
+            active.where += SqlExpr.Bin("<=", SqlExpr.Col(alias, "start_at"), SqlExpr.Param("as_of"))
+            active.where +=
+                SqlExpr.or(
+                    listOf(
+                        SqlExpr.IsNull(SqlExpr.Col(alias, "end_at"), false),
+                        SqlExpr.Bin(">", SqlExpr.Col(alias, "end_at"), SqlExpr.Param("as_of")),
+                    ),
+                )!!
+            inlined += phase.ref
+            return SqlExpr.Exists(active, false)
         }
 
         /** [p]'s definition [expression] as a predicate on [ref] — `this` is [ref]; recorded as inlined. */
