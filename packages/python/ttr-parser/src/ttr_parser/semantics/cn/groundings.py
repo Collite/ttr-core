@@ -24,16 +24,19 @@ from ...model import (
     ConceptEntry,
     ConceptExtent,
     ConceptFilter,
+    ConceptFrom,
     ConceptGrounds,
     ConceptInvolves,
     ConceptLabel,
     ConceptLexicon,
     ConceptMembers,
+    ConceptPer,
     ConceptPeriod,
     ConceptProperty,
     ConceptRef,
     ConceptTags,
     ConceptTarget,
+    ConceptUntil,
     ConceptValueSpace,
     Definition,
     EmbeddedBlock,
@@ -171,7 +174,7 @@ def property_fingerprint(p: ConceptProperty) -> str:
         body = _loc_fp(p.value)
     elif isinstance(p, ConceptTags):
         body = list(p.value)
-    elif isinstance(p, (ConceptRef, ConceptGrounds, ConceptValueSpace)):
+    elif isinstance(p, (ConceptRef, ConceptFrom, ConceptUntil, ConceptPer, ConceptGrounds, ConceptValueSpace)):
         body = _ref_path(p.ref.path)
     elif isinstance(p, ConceptInvolves):
         body = [[_ref_path(x.ref.path), x.label] for x in p.participants]

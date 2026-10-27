@@ -1,0 +1,24 @@
+// CN-P8 S8.1: syntax only; AM-45…49 semantics land in S8.2.
+package workshop.concepts
+model cn
+
+def kind Document { abstract: true }
+def subkind Invoice { of: Document, involves: [Customer, Order], qualities: [amount, paid, status, issued, due] }
+def subkind WebSale { of: Sale, definition: """channel = 'web'""" }
+def subkind CodeRange { of: Diagnosis, members: """descendants(Diagnosis, 'R10-R19')""" }
+def subkind StoredSale { of: Sale, grounds: er.entity.stored_sale }
+def kind Order {
+    involves: [Customer, Warehouse as fulfilling, Warehouse as receiving],
+    period: { start: placed_date, end: delivered_date, end_open: open }
+}
+def kind InstantKind { period: { at: issued } } // S8.2 refuses instant lifetimes.
+def role Supplier { of: Customer, event: OrderPlaced, involves: [Customer, Item], period: { start: since, end: until } }
+def event InvoiceIssued { involves: [Invoice], period: { at: issued } }
+def event LegacyDuration { extent: durative } // S8.2: cn/durative-event.
+def phase OutOfService { of: Warehouse, grounds: er.entity.warehouse_outage,
+    period: { start: from_date, end: to_date }, qualities: [reason] }
+def phase OpenOrder { of: Order, from: OrderPlaced, until: OrderDelivered }
+def kind ListPrice { label: { en: "List price", cs: "Ceníková cena" },
+    involves: [Item, Channel], period: { start: valid_from, end: valid_to, end_open: open }, qualities: [price] }
+def quality list_price { of: Item, valued_state: true, per: Channel, from: ListPrice.price }
+def quality agreed_price { of: Customer, valued_state: true, per: Item, from: PriceAgreement.price }

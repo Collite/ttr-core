@@ -43,7 +43,7 @@ fun bindingKindFor(
     layer: String,
 ): String? =
     when {
-        stereotype == "relation_type" -> null
+        stereotype == "subkind" || stereotype == "relation_type" -> null
         layer == "db" -> if (stereotype == "phase") null else "cn2db_concept"
         layer == "md" -> if (stereotype == "phase") null else "cn2md_$stereotype"
         else -> "cn2er_$stereotype"

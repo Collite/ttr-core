@@ -338,6 +338,9 @@ private class AstJson(
                     is ConceptProperty.Label -> it.value
                     is ConceptProperty.Tags -> it.value
                     is ConceptProperty.Ref -> it.ref
+                    is ConceptProperty.From -> it.ref
+                    is ConceptProperty.Until -> it.ref
+                    is ConceptProperty.Per -> it.ref
                     is ConceptProperty.Grounds -> it.ref
                     is ConceptProperty.ValueSpace -> it.ref
                     is ConceptProperty.Involves -> it.participants

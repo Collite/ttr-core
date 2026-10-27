@@ -1,0 +1,3 @@
+// Syntax accepted; S8.2 must report cn/phase-source-conflict for incomplete bounds.
+model cn
+def phase MissingEnd { of: Order, from: OrderPlaced }

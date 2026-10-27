@@ -1450,7 +1450,8 @@ class TtrWalker(
         // automation role keeps its 0.16 surface and a typo (`lable:`) is still a parse error (review-114 M5).
         props.forEach { p ->
             val cnOnly: ParserRuleContext =
-                p.cnEntry() ?: p.cnRefProperty() ?: p.groundsProperty() ?: p.lexiconBlockProperty()
+                p.cnEntry() ?: p.cnRefProperty() ?: p.groundsProperty()
+                    ?: p.involvesProperty() ?: p.periodProperty() ?: p.lexiconBlockProperty()
                     ?: return@forEach
             val key = p.cnEntry()?.cnKey()?.text ?: cnOnly.getChild(0).text
             err(
@@ -1712,6 +1713,7 @@ class TtrWalker(
 
     private fun conceptStereotypeOf(od: TTRParser.ObjectDefinitionContext): String? =
         when {
+            od.SUBKIND() != null -> "subkind"
             od.KIND() != null -> "kind"
             od.EVENT() != null -> "event"
             od.PHASE() != null -> "phase"
@@ -1854,6 +1856,9 @@ class TtrWalker(
                     )
                 }
             is TTRParser.CnRefPropertyContext -> referenceOf(c.id())?.let { ConceptProperty.Ref(key, it, source) }
+            is TTRParser.CnFromPropertyContext -> referenceOf(c.id())?.let { ConceptProperty.From(key, it, source) }
+            is TTRParser.CnUntilPropertyContext -> referenceOf(c.id())?.let { ConceptProperty.Until(key, it, source) }
+            is TTRParser.CnPerPropertyContext -> referenceOf(c.id())?.let { ConceptProperty.Per(key, it, source) }
             is TTRParser.GroundsPropertyContext -> referenceOf(c.id())?.let { ConceptProperty.Grounds(key, it, source) }
             is TTRParser.ValueSpacePropertyContext ->
                 referenceOf(c.id())?.let { ConceptProperty.ValueSpace(key, it, source) }

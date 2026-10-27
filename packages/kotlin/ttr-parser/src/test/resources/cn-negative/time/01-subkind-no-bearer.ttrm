@@ -1,0 +1,3 @@
+// Syntax accepted by the permissive cn body; S8.2 must report cn/concept-bearer-missing.
+model cn
+def subkind MissingBearer { definition: """channel = 'web'""" }

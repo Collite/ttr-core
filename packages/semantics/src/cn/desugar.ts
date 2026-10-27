@@ -40,7 +40,8 @@ const STEREOTYPE_KEYS: ReadonlySet<string> = new Set(['kind', 'role', 'quality',
  * synthesized bindings alike.
  */
 export function bindingKindFor(stereotype: ConceptStereotype, layer: CnLayer): ConceptBindingKind | undefined {
-  if (stereotype === 'relation_type') return undefined;
+  // CN-P8 S8.1 parses subkinds; S8.2 supplies their grounding semantics.
+  if (stereotype === 'subkind' || stereotype === 'relation_type') return undefined;
   if (layer === 'db') return stereotype === 'phase' ? undefined : 'cn2db_concept';
   if (layer === 'md') return stereotype === 'phase' ? undefined : `cn2md_${stereotype}`;
   return `cn2er_${stereotype}`;

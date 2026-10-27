@@ -52,7 +52,7 @@ def binding_kind_for(stereotype: str, layer: str) -> str | None:
     """The binding kind a grounding of a `stereotype` concept on `layer` desugars to (cn contracts §1.2),
     or None where the table has none: a phase grounds only to an er entity (AM-2), an open-tier relation
     type never grounds."""
-    if stereotype == "relation_type":
+    if stereotype in {"subkind", "relation_type"}:
         return None
     if layer == "db":
         return None if stereotype == "phase" else "cn2db_concept"

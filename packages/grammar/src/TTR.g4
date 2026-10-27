@@ -1,7 +1,9 @@
 // =============================================================================
 // TTR (Tatrman) grammar
 //
-// @grammar-version: 0.18
+// @grammar-version: 0.20
+// 0.20 (CN-P8): subkind; involves/period on kinds; phase episodes
+// (grounds+period, from/until); valued-state projection (per/from).
 // 0.18 (HP-P1): md2er_dimension; structural md2er_cubelet measures.
 // Every previously-valid file parses unchanged.
 //
@@ -540,6 +542,7 @@ objectDefinition
   | RECIPE         id  autoBody           // 0.16 — the GENERATED recipe catalog object (contracts §5.3)
   // ----- 0.17 cn model — concept def kinds (`model cn`); one shared permissive body -----
   // `def role` is NOT here: it stays the one ROLE alternative above (⚑CN-P6, CN-D28).
+  | SUBKIND        id  cnBody             // 0.20 — rigid specialization; of: is required semantically
   | KIND           id  cnBody             // 0.17 — rigid things; may bind a vocabulary (KIND token reused from MD)
   | EVENT          id  cnBody             // 0.17 — occurrences: labelled `involves`, a `period:`, an `extent:`
   | PHASE          id  cnBody             // 0.17 — anti-rigid: a `definition:` OR a grounding to a stacked entity
@@ -715,6 +718,7 @@ cnProperty
   | basisProperty                     // basis: occurrence | current_state | past_state
   | definitionProperty                // definition: """state in ('placed', 'held')"""  (an embeddedBlock, ⚑CN-P5)
   | conceptMembersProperty            // members: """descendants(ProductCategory, 'H10-H19')"""  (an embeddedBlock)
+  | cnFromProperty | cnUntilProperty | cnPerProperty // 0.20 — bounds / projection refs, validity is semantic
   | valueSpaceProperty                // value_space: ProductCategory
   | lexiconBlockProperty              // lexicon { terms: [ … ] } — the 4.4 inline sugar, a cn.* target
   | cnEntry                           // of · is_a · sources · qualities · relations · hierarchy · imprecision · valued_state · abstract
@@ -722,6 +726,9 @@ cnProperty
 // The stereotype-ref keys: a cn role's `event:`, the sugar's `kind:`/`role:`/`quality:`/`event:` and a
 // binding's `kind:`/`role:`/`quality:`/`event:`/`phase:`/`concept:` — one rule, the key is the token.
 cnRefProperty          : ( KIND | ROLE | QUALITY | EVENT | PHASE | CONCEPT ) propSep? id ;
+cnFromProperty         : FROM  propSep? id ;
+cnUntilProperty        : UNTIL propSep? id ;
+cnPerProperty          : PER   propSep? id ;
 groundsProperty        : GROUNDS     propSep? id ;
 involvesProperty       : INVOLVES    propSep? LBRACK participant ( COMMA participant )* COMMA? RBRACK ;
 participant            : id ( AS id )? ;                      // a concept ref, optionally labelled: `Warehouse as from`
@@ -812,7 +819,7 @@ queryProperty            : descriptionProperty | tagsProperty | languageProperty
 // `model` directive and keeps review-114 M5 there: outside `model cn` a free-form entry is a parse error,
 // so a typo (`lable:`) in a cnc or automation role is still rejected.
 roleProperty             : descriptionProperty | tagsProperty | labelProperty | searchBlockProperty | resolveProperty | deliveryProperty | membersProperty
-                         | cnRefProperty | groundsProperty | lexiconBlockProperty | cnEntry ;
+                         | cnRefProperty | groundsProperty | involvesProperty | periodProperty | lexiconBlockProperty | cnEntry ;
 resolveProperty          : RESOLVE  propSep? autoValue ;   // resolve: keycloak_group "hartland-sales"
 deliveryProperty         : DELIVERY propSep? autoValue ;   // delivery: { email: "…" }
 membersProperty          : MEMBERS  propSep? autoValue ;   // members: ["ana", "bo"] (MEMBERS reused from MD)
@@ -1264,6 +1271,7 @@ id : idPart ( DOT idPart )* ;
 
 idPart
   : IDENT
+  | SUBKIND | PER | UNTIL                                // 0.20 — soft keywords
   | DB | ER | BINDING | MAP | QUERY | CNC                 // schema codes (MAP retained as id fragment only)
   | ROLE | ER2CNC_ROLE                                   // Phase 2.2 kinds
   | TABLE | VIEW | COLUMN | INDEX | CONSTRAINT
@@ -1435,6 +1443,9 @@ DELIVERY         : 'delivery' ;        // 0.16 — automation role `delivery: { 
 // `qualities`, `definitions`, `periods`, `events` stay IDENTs.
 CN               : 'cn' ;              // 0.17 — model code `model cn`; the `cn.` ref head
 EVENT            : 'event' ;           // 0.17 — `def event`; also a role's / binding's `event:` key
+SUBKIND          : 'subkind' ;         // 0.20
+PER              : 'per' ;             // 0.20
+UNTIL            : 'until' ;           // 0.20
 PHASE            : 'phase' ;           // 0.17 — `def phase`; also a binding's `phase:` key
 QUALITY          : 'quality' ;         // 0.17 — `def quality`; also a binding's `quality:` key
 RELATION_TYPE    : 'relation_type' ;   // 0.17 — `def relation_type` (open tier)

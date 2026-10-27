@@ -1,0 +1,7 @@
+package workshop.concepts
+model db schema dbo
+def table subkind {
+    columns: [def column per { type: text }, def column until { type: text }, def column subkind { type: text }],
+    primaryKey: [per], writeback: { per: until, until: subkind, subkind: per }
+}
+def fk until { from: [db.dbo.subkind.per], to: [db.dbo.until.subkind] }

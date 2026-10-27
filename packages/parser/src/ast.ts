@@ -1562,7 +1562,7 @@ export interface StepDef extends AutoBody {
  * The concept stereotypes — the def keyword of a concept def. A `def role` in a `model cn` file is
  * a concept role (⚑CN-P6: one `roleDef` production; the walker reads it by the file's model).
  */
-export type ConceptStereotype = 'kind' | 'role' | 'event' | 'phase' | 'quality' | 'relation_type';
+export type ConceptStereotype = 'subkind' | 'kind' | 'role' | 'event' | 'phase' | 'quality' | 'relation_type';
 
 /** The ten cn binding kinds (`model binding`) — one grounding per concept (cn contracts §1.2). */
 export type ConceptBindingKind =
@@ -1649,6 +1649,24 @@ export interface ConceptRefProperty extends ConceptPropertyBase {
   key: ConceptRefKey;
   ref: Reference;
 }
+/** Grammar 0.20 — `from:` reference, interpreted by the semantic consumer. */
+export interface ConceptFromProperty extends ConceptPropertyBase {
+  kind: 'from';
+  ref: Reference;
+}
+
+/** Grammar 0.20 — `until:` reference, interpreted by the semantic consumer. */
+export interface ConceptUntilProperty extends ConceptPropertyBase {
+  kind: 'until';
+  ref: Reference;
+}
+
+/** Grammar 0.20 — `per:` reference, interpreted by the semantic consumer. */
+export interface ConceptPerProperty extends ConceptPropertyBase {
+  kind: 'per';
+  ref: Reference;
+}
+
 export interface ConceptGroundsProperty extends ConceptPropertyBase {
   kind: 'grounds';
   ref: Reference;
@@ -1714,6 +1732,9 @@ export type ConceptProperty =
   | ConceptLabelProperty
   | ConceptTagsProperty
   | ConceptRefProperty
+  | ConceptFromProperty
+  | ConceptUntilProperty
+  | ConceptPerProperty
   | ConceptGroundsProperty
   | ConceptInvolvesProperty
   | ConceptPeriodProperty

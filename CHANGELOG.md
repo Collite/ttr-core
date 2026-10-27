@@ -6,6 +6,16 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — conceptual-model grammar 0.20 (CN-P8 S8.1)
+
+- Rigid `subkind` definitions, relator/lifetime properties on CN roles, phase
+  episode bounds (`from` / `until`), and valued-state projection references
+  (`per` / `from`) in TypeScript, Kotlin and Python, with formatter and writer
+  support. Kinds already accept participants and periods through the shared body.
+- This Stage adds syntax; validation and lowering follow in CN-P8 S8.2.
+  `extent:` remains accepted during retirement. JVM consumers must rebuild
+  against the extended parser model. Grammar bundle releases use 0.20.x.
+
 ### Added — embedded Designer host lifecycle (Designer family 0.1.1)
 
 - Optional `DesignerPage.onReady`, `onSnapshot` and `onDiagnostics` callbacks expose the installed

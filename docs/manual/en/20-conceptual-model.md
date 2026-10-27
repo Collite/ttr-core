@@ -1,5 +1,38 @@
 # Conceptual model (cn)
 
+## Grammar 0.20 — things in time
+
+Grammar 0.20 adds the syntax below. CN-P8 S8.1 provides parsing, formatting and
+writer round-trips; the corresponding validation and lowering arrive in S8.2.
+
+`subkind` declares a rigid specialization with an `of:` bearer, beside an
+anti-rigid `phase`. Kinds (including subkinds and roles) may have participants and
+a lifetime. The four time shapes are an event's instant, a kind's lifetime or
+validity, a phase's episodes, and a quality's changing value.
+
+```ttrm
+model cn
+def subkind WebSale { of: Sale, definition: """channel = 'web'""" }
+def event OrderPlaced { involves: [Order], period: { at: placed_date } }
+def kind ListPrice {
+    involves: [Item, Channel],
+    period: { start: valid_from, end: valid_to, end_open: open },
+    qualities: [price]
+}
+def phase OutOfService {
+    of: Warehouse, grounds: er.entity.warehouse_outage,
+    period: { start: from_date, end: to_date }, qualities: [reason]
+}
+def phase OpenOrder { of: Order, from: OrderPlaced, until: OrderDelivered }
+def quality list_price { of: Item, valued_state: true, per: Channel, from: ListPrice.price }
+```
+
+The parser preserves `from`, `until` and `per` as distinct reference properties;
+semantic validation distinguishes event bounds from a projected quality. The CN
+body accepts incomplete combinations so an editor can retain them for diagnostics.
+`extent:` remains accepted during retirement. CN-P8's semantics restrict events
+to instants; duration belongs to a kind's lifetime or a phase's episode.
+
 The **conceptual model** names what the business talks about — products, customers, orders, sales, an overdue
 invoice — apart from how the `db`, `er` and `md` layers store it. A **concept** is grounded to exactly one place in
 those layers, and a defined concept carries the expression that says which rows it means. Agents and recipes speak in

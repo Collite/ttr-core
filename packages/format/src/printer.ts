@@ -470,7 +470,7 @@ function isVerbatimDef(def: Definition): boolean {
 const CN_BODY_ORDER = [
   'description', 'label', 'tags', 'sources',
   'is_a', 'abstract', 'of', 'event',
-  'extent', 'grounds', 'hierarchy', 'involves', 'period',
+  'extent', 'grounds', 'hierarchy', 'involves', 'period', 'from', 'until', 'per',
   'qualities', 'value_space', 'valued_state',
   'definition', 'imprecision', 'basis', 'members',
   'relations', 'lexicon',

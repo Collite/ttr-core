@@ -270,6 +270,9 @@ export function tokenToScope(name: string, literal: string): string | null {
     // AS (`Warehouse as from`) is an operator word, the TTRP spelling.
     case 'CN': return 'keyword.other.schema.ttrm';
     case 'EVENT': return 'keyword.other.kind.ttrm';
+    case 'SUBKIND': return 'keyword.other.kind.ttrm';
+    case 'PER': return 'keyword.other.property.ttrm';
+    case 'UNTIL': return 'keyword.other.property.ttrm';
     case 'PHASE': return 'keyword.other.kind.ttrm';
     case 'QUALITY': return 'keyword.other.kind.ttrm';
     case 'RELATION_TYPE': return 'keyword.other.kind.ttrm';

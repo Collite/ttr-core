@@ -318,7 +318,7 @@
       "patterns": [
         {
           "name": "keyword.other.kind.ttrm",
-          "match": "\\b(project|area|map|table|view|column|index|constraint|fk|procedure|entity|attribute|relation|er2db_entity|er2db_attribute|er2db_relation|role|er2cnc_role|drill_map|domain|dimension|hierarchy|measure|cubelet|md2db_cubelet|md2db_domain|md2db_map|md2er_dimension|md2er_cubelet|engine|executor|storage|parameter|action|service|approval|program|recipe|identity|deployment|process|step|event|phase|quality|relation_type|cn2md_kind|cn2md_role|cn2md_quality|cn2md_event|cn2er_kind|cn2er_role|cn2er_event|cn2er_quality|cn2er_phase|cn2db_concept|term|pattern|example)\\b"
+          "match": "\\b(project|area|map|table|view|column|index|constraint|fk|procedure|entity|attribute|relation|er2db_entity|er2db_attribute|er2db_relation|role|er2cnc_role|drill_map|domain|dimension|hierarchy|measure|cubelet|md2db_cubelet|md2db_domain|md2db_map|md2er_dimension|md2er_cubelet|engine|executor|storage|parameter|action|service|approval|program|recipe|identity|deployment|process|step|event|subkind|phase|quality|relation_type|cn2md_kind|cn2md_role|cn2md_quality|cn2md_event|cn2er_kind|cn2er_role|cn2er_event|cn2er_quality|cn2er_phase|cn2db_concept|term|pattern|example)\\b"
         }
       ]
     },
@@ -326,7 +326,7 @@
       "patterns": [
         {
           "name": "keyword.other.property.ttrm",
-          "match": "\\b(objects|layout|args|display|override|restrict|members|publish|kind|calc|key|hierarchies|levels|via|class|aggregation|validBy|grain|measures|shape|journaling|allocation|source|extends|hosts|staging|steps|transitions|transition|states|set|resolve|delivery|concept|involves|period|grounds|definition|value_space|extent|basis|default|sense_priority|description|tags|version|primaryKey|columns|indices|constraints|attributes|parameters|resultColumns|definitionSql|type|optional|isKey|searchable|indexed|labelPlural|nameAttribute|codeAttribute|aliases|cardinality|join|target|whereFilter|language|sourceText|length|precision|label|name|direction|displayLabel|valueLabels|roles|search|semantics|keywords|patterns|descriptions|examples|fuzzy|method|for|forms|match|from|to)\\b"
+          "match": "\\b(objects|layout|args|display|override|restrict|members|publish|kind|calc|key|hierarchies|levels|via|class|aggregation|validBy|grain|measures|shape|journaling|allocation|source|extends|hosts|staging|steps|transitions|transition|states|set|resolve|delivery|per|until|concept|involves|period|grounds|definition|value_space|extent|basis|default|sense_priority|description|tags|version|primaryKey|columns|indices|constraints|attributes|parameters|resultColumns|definitionSql|type|optional|isKey|searchable|indexed|labelPlural|nameAttribute|codeAttribute|aliases|cardinality|join|target|whereFilter|language|sourceText|length|precision|label|name|direction|displayLabel|valueLabels|roles|search|semantics|keywords|patterns|descriptions|examples|fuzzy|method|for|forms|match|from|to)\\b"
         }
       ]
     },

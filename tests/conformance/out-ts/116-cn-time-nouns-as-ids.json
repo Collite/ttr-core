@@ -1,0 +1,94 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "table",
+            "name": "subkind",
+            "properties": {
+                "columns": [
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "per",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "until",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "subkind",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    }
+                ],
+                "primaryKey": [
+                    "per"
+                ]
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "fk",
+            "name": "until",
+            "properties": {
+                "from": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "db",
+                                "dbo",
+                                "subkind",
+                                "per"
+                            ],
+                            "path": "db.dbo.subkind.per"
+                        }
+                    ],
+                    "kind": "list"
+                },
+                "to": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "db",
+                                "dbo",
+                                "until",
+                                "subkind"
+                            ],
+                            "path": "db.dbo.until.subkind"
+                        }
+                    ],
+                    "kind": "list"
+                }
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": "workshop.concepts",
+    "schemaDirective": {
+        "code": "db",
+        "namespace": "dbo"
+    }
+}

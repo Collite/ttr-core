@@ -84,6 +84,9 @@ fun propertyFingerprint(p: ConceptProperty): String =
             is ConceptProperty.Label -> append(locFp(p.value))
             is ConceptProperty.Tags -> append(p.value.joinToString(",") { quoted(it) })
             is ConceptProperty.Ref -> append(refPath(p.ref.path))
+            is ConceptProperty.From -> append(refPath(p.ref.path))
+            is ConceptProperty.Until -> append(refPath(p.ref.path))
+            is ConceptProperty.Per -> append(refPath(p.ref.path))
             is ConceptProperty.Grounds -> append(refPath(p.ref.path))
             is ConceptProperty.ValueSpace -> append(refPath(p.ref.path))
             is ConceptProperty.Involves ->

@@ -125,6 +125,9 @@ import {
   BasisPropertyContext,
   DefinitionPropertyContext,
   ConceptMembersPropertyContext,
+  CnFromPropertyContext,
+  CnUntilPropertyContext,
+  CnPerPropertyContext,
   CnEntryContext,
   CnValueContext,
   CnObjectContext,
@@ -919,6 +922,7 @@ function walkProcessDef(ctx: ProcessBodyContext, name: string, source: SourceLoc
 // ============================================================================
 
 const STEREOTYPE_OF_TOKEN: ReadonlyArray<[(o: ObjectDefinitionContext) => unknown, ConceptStereotype]> = [
+  [(o) => o.SUBKIND(), 'subkind'],
   [(o) => o.KIND(), 'kind'],
   [(o) => o.EVENT(), 'event'],
   [(o) => o.PHASE(), 'phase'],
@@ -1058,6 +1062,11 @@ function walkConceptProperty(
   if (c instanceof CnRefPropertyContext) {
     const ref = referenceOf(c.id(), file);
     return ref ? { kind: 'ref', key: key as ConceptRefKey, ref, source } : undefined;
+  }
+  if (c instanceof CnFromPropertyContext || c instanceof CnUntilPropertyContext || c instanceof CnPerPropertyContext) {
+    const ref = referenceOf(c.id(), file);
+    const kind = c instanceof CnFromPropertyContext ? 'from' : c instanceof CnUntilPropertyContext ? 'until' : 'per';
+    return ref ? { kind, key, ref, source } : undefined;
   }
   if (c instanceof GroundsPropertyContext) {
     const ref = referenceOf(c.id(), file);
@@ -3103,7 +3112,7 @@ function walkRoleDef(
     // 0.17 (⚑CN-P6) — the cn role's properties ride the one `roleProperty` production; a `model cn`
     // role is walked as a concept (walkDefinition), so here they are rejected: a cnc / automation role
     // keeps its 0.16 surface and a typo (`lable:`) is still a parse error (review-114 M5).
-    const cnOnly = p.cnEntry() ?? p.cnRefProperty() ?? p.groundsProperty() ?? p.lexiconBlockProperty();
+    const cnOnly = p.cnEntry() ?? p.cnRefProperty() ?? p.groundsProperty() ?? p.involvesProperty() ?? p.periodProperty() ?? p.lexiconBlockProperty();
     if (cnOnly) {
       const key = p.cnEntry()?.cnKey().getText() ?? cnOnly.getChild(0)?.getText() ?? '';
       errors.push({

@@ -12,6 +12,23 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
+## 0.20 — 2026-10-27
+
+Additive CN-P8 S8.1 syntax: `def subkind`, typed `from:` / `until:` phase bounds,
+and `per:` / `from:` quality projections. Kind and subkind bodies retain labelled
+`involves:` and `period:`; CN roles gain those properties with the existing
+non-CN role guard. `SUBKIND`, `PER` and `UNTIL` are soft keywords; `FROM` is reused,
+and `EXTENT` stays accepted. Required bearers and source exclusivity remain semantic.
+
+TypeScript, Kotlin and Python readers preserve ordered properties and reference
+spans. The writer and formatter order the shape keys as `involves`, `period`,
+`from`, `until`, `per`, then `qualities`, `value_space`, `valued_state`.
+Existing parser dumps are unchanged. CN-P8 S8.2 implements validation and lowering;
+subkinds have no operational grounding in this syntax-only Stage.
+
+JVM consumers must rebuild against the extended sealed parser property model.
+The grammar marker and grammar bundle major/minor are both 0.20.
+
 ## TTR-P 0.6 / TTR-B recipe sentences — 2026-10-24
 
 Additive AU-core P3 extension of the Kotlin-only TTR-P/TTR-B grammars. The main TTR-M grammar stays 0.18.
