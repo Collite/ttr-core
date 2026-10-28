@@ -284,7 +284,11 @@ class CnModelSpec :
         }
 
         "F12: a period written only on the cn2er_phase binding still makes the phase an episode table" {
-            CnFixtures.review175().concept("Down").grounding!!.episodes shouldBe "er.entity.site_outage"
+            CnFixtures
+                .review175()
+                .concept("Down")
+                .grounding!!
+                .episodes shouldBe "er.entity.site_outage"
         }
 
         "the grounding read: its target, kind and layer; a desugared one is synthetic" {

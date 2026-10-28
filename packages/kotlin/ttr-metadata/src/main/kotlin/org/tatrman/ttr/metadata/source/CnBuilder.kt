@@ -689,7 +689,12 @@ private class CnTierBuilder(
             if (written.isEmpty()) {
                 // `label: []` — the participant is the binding's own row; it holds only when the participant's concept
                 // lands on the target entity, else the empty path is dangling (hygiene lists it).
-                if (sameRow(stated, label, p.targetSymbol)) participants[label] = emptyList() else dangling += "$label: []"
+                if (sameRow(stated, label, p.targetSymbol)) {
+                    participants[label] = emptyList()
+                } else {
+                    dangling +=
+                        "$label: []"
+                }
                 return@forEach
             }
             val path = written.map { element(it) }

@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.concept
 
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.collections.shouldContain as shouldContainElement
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.tatrman.concept.v1.ConceptRef
 import org.tatrman.assertion.v1.Assertion
 import com.google.protobuf.util.JsonFormat
@@ -38,16 +41,17 @@ class ThingsInTimeSpec :
             result.text shouldContain "outage.until IS NULL"
         }
 
-        "event-bounded episodes use the subject stream and first subsequent termination" {
+        "event-bounded episodes: a start at or before the as-of with no termination in [start, as-of] (⚑A)" {
             val result = service.definitionRender(ref("OpenTicket"), Layer.ER, "postgresql", RenderOptions())
             result.diagnostics.filter { it.severity == Severity.ERROR } shouldBe emptyList()
             result.text.trim() shouldBe
                 Files.readString(GoldenCases.root.resolve("things-in-time/open-ticket.sql")).trim()
-            result.text shouldContain "LEAD("
-            result.text shouldContain "MIN("
-            result.text shouldContain "terminations"
+            // review-175 F4/F13: `>=` closes a same-instant termination; no window, no grouped derived table
+            result.text shouldContain "NOT EXISTS"
+            result.text shouldContain "terminations.\"at\" >= starts.\"at\""
+            result.text shouldNotContain "LEAD("
+            result.text shouldNotContain "GROUP BY"
             result.text shouldContain "FROM finished"
-            result.text shouldContain "{as_of}"
         }
 
         "a valued-state call is the existing validity lookup with a default as-of" {
@@ -197,6 +201,170 @@ class ThingsInTimeSpec :
             rows.flatMap { it.danglingGroundings } shouldBe emptyList()
             val actual = rows.joinToString("\n") { "${it.qname} ${it.stereotype} ${it.grade} ${it.erTarget}" }
             actual shouldBe Files.readString(GoldenCases.root.resolve("things-in-time/hartland-hygiene.txt")).trim()
+            // review-175: a grade proves nothing about rendering — every graded family must also render on E-R; a
+            // relator kind has no definition of its own, so it renders as the existential over it from a participant
+            val q = "\"\"\""
+            val existentials =
+                "model cn\n" +
+                    "def phase HasOrder { of: Customer, definition: ${q}exists Order involving this$q }\n" +
+                    "def phase HasListPrice { of: Item, definition: ${q}exists ListPrice involving this$q }\n" +
+                    "def phase HasAgreement { of: Customer," +
+                    " definition: ${q}exists PriceAgreement involving this$q }\n" +
+                    "def quality listed { of: Item, definition: ${q}this.item_list_price(channel: 'web')$q }\n" +
+                    "def quality line_agreed { of: OrderLine, definition: ${q}this.order.customer.agreed_price(item: this.item)$q }\n"
+            val hartland =
+                CnConceptService(StatementLowerSpec.world("hartland", mapOf("review175.ttrm" to existentials)))
+            val relators =
+                mapOf(
+                    "Order" to "HasOrder",
+                    "ListPrice" to "HasListPrice",
+                    "PriceAgreement" to "HasAgreement",
+                    "item_list_price" to "listed",
+                    "agreed_price" to "line_agreed",
+                )
+            for (name in names) {
+                val rendered =
+                    hartland.definitionRender(ref(relators[name] ?: name), Layer.ER, "postgresql", RenderOptions())
+                withClue(name) {
+                    rendered.diagnostics.filter { it.severity == Severity.ERROR } shouldBe emptyList()
+                    rendered.text.isNotBlank() shouldBe true
+                }
+            }
+        }
+
+        // ---- review-175 ------------------------------------------------------------------------------------------
+
+        "F1: Hartland's OpenOrder renders over the order row itself — `order: []` takes no relation hop" {
+            val hartland = CnConceptService(GoldenWorlds["hartland"].cn)
+            val result = hartland.definitionRender(ref("OpenOrder"), Layer.ER, "postgresql", RenderOptions())
+            result.diagnostics.filter { it.severity == Severity.ERROR } shouldBe emptyList()
+            result.text shouldContain "NOT EXISTS"
+            result.text shouldContain "placed_date"
+            result.text shouldContain "delivered_date"
+            result.text shouldNotContain "JOIN"
+        }
+
+        "F1: `exists` and `count` over an event whose participant is its own row" {
+            val extra =
+                "model cn\n" +
+                    "def phase Placed { of: Order, definition: \"\"\"exists OrderPlaced involving this\"\"\" }\n" +
+                    "def quality placements { of: Order, definition: \"\"\"count(OrderPlaced involving this)\"\"\" }\n"
+            val model = StatementLowerSpec.world("hartland", mapOf("review175.ttrm" to extra))
+            val s = CnConceptService(model)
+            for (name in listOf("Placed", "placements")) {
+                val result = s.definitionRender(ref(name), Layer.ER, "postgresql", RenderOptions())
+                withClue(name) {
+                    result.diagnostics.filter { it.severity == Severity.ERROR } shouldBe emptyList()
+                    result.text shouldContain "\"order\""
+                }
+            }
+        }
+
+        "F2: a `this.` projection in an inner scope reads the bearer; an unknown one refuses, not a SQL function" {
+            val extra =
+                "model cn\n" +
+                    "def phase PricedWeb { of: Item," +
+                    " definition: \"\"\"exists ListPrice involving this" +
+                    " where amount >= this.list_price(channel: 'web')\"\"\" }\n" +
+                    "def phase NopeWeb { of: Item," +
+                    " definition: \"\"\"exists ListPrice involving this" +
+                    " where amount >= this.nope(channel: 'web')\"\"\" }\n" +
+                    "def phase Repriced { of: ListPrice, definition: \"\"\"exists ListPrice involving this.item as item where this.item.list_price(channel: 'web') > 0\"\"\" }\n"
+            val model = StatementLowerSpec.world("time", mapOf("review175.ttrm" to extra))
+            val s = CnConceptService(model)
+            val priced = s.definitionRender(ref("PricedWeb"), Layer.ER, "postgresql", RenderOptions())
+            priced.diagnostics.filter { it.severity == Severity.ERROR } shouldBe emptyList()
+            priced.text shouldNotContain "LIST_PRICE("
+            // the lookup is correlated to the OUTER item, on the web channel, at the as-of
+            priced.text shouldContain "LEFT JOIN price"
+            priced.text shouldContain "channel = 'web'"
+            // the inner row can walk `item` too: `this.item` still reads the OUTER price's item
+            val outer = s.definitionRender(ref("Repriced"), Layer.ER, "postgresql", RenderOptions())
+            outer.diagnostics.filter { it.severity == Severity.ERROR } shouldBe emptyList()
+            outer.text shouldContain "LEFT JOIN price price_3 ON price_3.item = price.item AND"
+            outer.text shouldNotContain "price_3.item = price_2.item"
+            val nope = s.definitionRender(ref("NopeWeb"), Layer.ER, "postgresql", RenderOptions())
+            nope.text shouldNotContain "NOPE("
+            nope.diagnostics.map { it.message }.single { "names no projected quality" in it }
+            model.definitionDiagnostics().filter { it.subject == "cn.NopeWeb" }.map { it.message } shouldContainElement
+                "`this.nope(…)` names no projected quality (DC-13) in scope"
+        }
+
+        "F3 + F5: an authored episode label joins its relation; an ambiguous value-kind participant refuses" {
+            val extra =
+                "model cn\n" +
+                    "def phase SiteDown { of: Warehouse, involves: [Warehouse as site], qualities: [site_note] }\n" +
+                    "def quality site_note { of: SiteDown }\n" +
+                    "def kind Quote { involves: [Item, Channel], qualities: [first_channel, second_channel] }\n" +
+                    "def quality first_channel { of: Quote, value_space: Channel }\n" +
+                    "def quality second_channel { of: Quote, value_space: Channel }\n" +
+                    "def phase WebQuoted { of: Item, definition: \"\"\"exists Quote involving this where channel = 'web'\"\"\" }\n"
+            val binding =
+                "model binding\n" +
+                    "def cn2er_phase site_down { phase: cn.SiteDown, episodes: er.entity.outage," +
+                    " period: { start: er.entity.outage.since, end: er.entity.outage.until, end_open: open }," +
+                    " participants: { site: [er.relation.outage_warehouse] } }\n" +
+                    "def cn2er_quality site_note_g { quality: cn.site_note, target: er.entity.outage.reason }\n" +
+                    "def cn2er_kind quote_g { kind: cn.Quote, target: er.entity.price," +
+                    " participants: { item: [er.relation.price_item] } }\n" +
+                    "def cn2er_quality first_g { quality: cn.first_channel, target: er.entity.price.channel }\n" +
+                    "def cn2er_quality second_g { quality: cn.second_channel, target: er.entity.price.id }\n"
+            val model =
+                StatementLowerSpec.world(
+                    "time",
+                    mapOf("review175.ttrm" to extra, "review175-b.ttrm" to binding),
+                )
+            val s = CnConceptService(model)
+            val down = s.definitionRender(ref("SiteDown"), Layer.ER, "postgresql", RenderOptions())
+            down.diagnostics.filter { it.severity == Severity.ERROR } shouldBe emptyList()
+            down.text shouldContain "outage.warehouse = warehouse.id"
+            down.text shouldNotContain "outage.reason ="
+            val quoted = s.definitionRender(ref("WebQuoted"), Layer.ER, "postgresql", RenderOptions())
+            quoted.text shouldBe ""
+            quoted.diagnostics.single().message shouldContain "cn/participant-path-broken"
+        }
+
+        "F12: a stacked-entity subkind is a subset test; a binding-only period phase is an episode table" {
+            val extra =
+                "model er\n" +
+                    "def entity flagged { binding: { target: { table: db.dbo.table.flagged } }, attributes: [def attribute id { type: text, isKey: true }, def attribute since { type: date }, def attribute until { type: date, optional: true }] }\n"
+            val cn =
+                "model cn\n" +
+                    "def subkind Flagged { of: Ticket, grounds: er.entity.flagged," +
+                    " period: { start: since, end: until, end_open: open } }\n" +
+                    "def phase Watched { of: Ticket, definition: \"\"\"Flagged\"\"\" }\n"
+            val model = StatementLowerSpec.world("time", mapOf("review175-er.ttrm" to extra, "review175.ttrm" to cn))
+            val watched =
+                CnConceptService(
+                    model,
+                ).definitionRender(ref("Watched"), Layer.ER, "postgresql", RenderOptions())
+            watched.diagnostics.filter { it.severity == Severity.ERROR } shouldBe emptyList()
+            watched.text shouldContain "FROM flagged"
+            watched.text shouldContain "flagged.id = ticket.id"
+            watched.text shouldNotContain "{as_of}"
+            // the period written on the binding only: the same episode table as the concept's own `grounds:` + period
+            val source =
+                Files
+                    .readString(world.dir.resolve("cn.ttrm"))
+                    .replace(
+                        "grounds: er.entity.outage, period: { start: since, end: until, end_open: open }",
+                        "involves: [Warehouse]",
+                    )
+            val bindings =
+                Files.readString(world.dir.resolve("bindings.ttrm")) +
+                    "\ndef cn2er_phase outage_g { phase: cn.OutOfService, target: er.entity.outage, period: { start: er.entity.outage.since, end: er.entity.outage.until, end_open: open }, participants: { warehouse: [er.relation.outage_warehouse] } }\n"
+            val bound = StatementLowerSpec.world("time", mapOf("cn.ttrm" to source, "bindings.ttrm" to bindings))
+            bound.cn
+                .byName("OutOfService")!!
+                .grounding!!
+                .episodes shouldBe "er.entity.outage"
+            CnConceptService(
+                bound,
+            ).definitionRender(ref("OutOfService"), Layer.ER, "postgresql", RenderOptions()).text shouldBe
+                service.definitionRender(ref("OutOfService"), Layer.ER, "postgresql", RenderOptions()).text
+            val words = ExplainWords.of("en")!!
+            DefinitionProse(bound, words, ExplainLabels(bound, words), java.time.LocalDate.of(2026, 10, 12))
+                .of(bound.cn.byName("OutOfService")!!)!! shouldContain "during an episode"
         }
 
         "canonical bindings and top-down temporal sources render identically" {

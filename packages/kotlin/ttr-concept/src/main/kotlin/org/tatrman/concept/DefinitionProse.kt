@@ -39,6 +39,13 @@ internal class DefinitionProse(
 ) {
     private class Unsaid : RuntimeException(null, null, false, false)
 
+    /** One resolver for every DC-13 read (as `ErRenderer` / `MdRenderer` hold theirs). */
+    private val resolver =
+        DefinitionResolver(model.cn, model.model.schemas["er"] as? org.tatrman.ttr.metadata.model.ErSchema, emptySet())
+
+    /** Inside an `exists` / aggregate body: a receiver that is not `this.` would read its implicit row, not the bearer. */
+    private var nested = 0
+
     private class Said(
         val text: String,
         val precedence: Int,
@@ -190,9 +197,14 @@ internal class DefinitionProse(
             involving.joinToString(", ") { p ->
                 said(p.path, bearer).text + (p.label?.let { " ${words.asLabel} $it" } ?: "")
             }
-        return ranged +
-            (if (involving.isEmpty()) "" else words.involvingClause(who)) +
-            (where?.let { words.whereClause(said(it, bearer).text) } ?: "")
+        nested++
+        val clause =
+            try {
+                where?.let { words.whereClause(said(it, bearer).text) } ?: ""
+            } finally {
+                nested--
+            }
+        return ranged + (if (involving.isEmpty()) "" else words.involvingClause(who)) + clause
     }
 
     private fun call(
@@ -201,17 +213,11 @@ internal class DefinitionProse(
     ): Said {
         val id = e.function.value
         if (bearer != null && id.contains('.') && !id.startsWith("op.") && !id.startsWith("fn.")) {
-            val resolver =
-                DefinitionResolver(
-                    model.cn,
-                    model.model.schemas["er"] as? org.tatrman.ttr.metadata.model.ErSchema,
-                    emptySet(),
-                )
-            val quality =
-                projectionReceiver(e, bearer, resolver)?.quality?.takeIf {
-                    projectedCall(e, bearer, resolver) !=
-                        null
-                }
+            // the renderer's rule: `this.` walks from the bearer; a bare receiver nested in a body reads the body's row,
+            // which the prose does not track — it is left unsaid (the definition is quoted) rather than said wrong
+            if (nested > 0 && !id.startsWith("this.")) throw Unsaid()
+            val receiver = projectionReceiver(e, bearer, resolver)
+            val quality = receiver?.quality?.takeIf { projectedCall(e, bearer, resolver, receiver) != null }
             if (quality != null) {
                 val projection = quality.projection!!
                 val owner =

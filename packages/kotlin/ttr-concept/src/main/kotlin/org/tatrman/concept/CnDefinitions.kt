@@ -338,11 +338,15 @@ internal class DefinitionResolver(
     internal fun qualityOn(
         s: Concept,
         name: String,
+    ): Concept? = chain(s).firstNotNullOfOrNull { qualityOwnOn(it, name) }
+
+    /** The quality [name] stated `of:` [c] itself — no chain walk. */
+    internal fun qualityOwnOn(
+        c: Concept,
+        name: String,
     ): Concept? =
-        chain(s).firstNotNullOfOrNull { c ->
-            byName[name]?.filter { it.stereotype == "quality" && it.of == c.qname }?.let { matches ->
-                matches.singleOrNull { it.qname.`package` == c.qname.`package` } ?: matches.singleOrNull()
-            }
+        byName[name]?.filter { it.stereotype == "quality" && it.of == c.qname }?.let { matches ->
+            matches.singleOrNull { it.qname.`package` == c.qname.`package` } ?: matches.singleOrNull()
         }
 
     private fun quality(
@@ -633,8 +637,28 @@ internal class DefinitionResolver(
                 return Value.Opaque
             }
             val name = e.function.name
-            scope.implicit?.let { subject ->
-                projectedCall(e, subject, this@DefinitionResolver)?.let { return aggregate(it, scope) }
+            // DC-13: a `this.` receiver walks from the bearer; a bare one from the innermost implicit subject with the
+            // projection, else the bearer (as the er renderer reads it)
+            val roots =
+                if (id.substringBefore('.') == "this" && '.' in id) {
+                    listOfNotNull(bearer)
+                } else {
+                    (scope.outward().mapNotNull { it.implicit } + listOfNotNull(bearer)).distinct().toList()
+                }
+            for (subject in roots) {
+                val receiver = projectionReceiver(e, subject, this@DefinitionResolver) ?: continue
+                val a =
+                    projectedCall(e, subject, this@DefinitionResolver, receiver)
+                        ?: return unknown(
+                            "`$id(…)` — name `at:` and the projection's `per:` participant only",
+                            e.location,
+                        )
+                // the receiver row is the subject itself; only a bearer's is re-read through `this`
+                return aggregate(if (subject == bearer) a else a.copy(involving = a.involving.drop(1)), scope)
+            }
+            if ('.' in id && !id.startsWith("fn.") && !id.startsWith("agg.")) {
+                e.args.forEach { visit(it, scope) }
+                return unknown("`$id(…)` names no projected quality (DC-13) in scope", e.location)
             }
             if (name == "descendants") return descendants(e, scope)
             if (name !in TIME_FUNCTIONS && TtrpParser.catalog.resolve(name).isEmpty()) {

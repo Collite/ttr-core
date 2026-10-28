@@ -9,9 +9,9 @@ internal fun projectedCall(
     e: FunctionCall,
     bearer: Concept,
     resolver: DefinitionResolver,
+    receiver: ProjectionReceiver? = projectionReceiver(e, bearer, resolver),
 ): ConceptAggregate? {
-    val receiver = projectionReceiver(e, bearer, resolver) ?: return null
-    val (quality, owner, path) = receiver
+    val (quality, owner, path) = receiver ?: return null
     val projection = quality.projection ?: return null
     val source = resolver.named(projection.source.name, projection.source.`package`) ?: return null
     val names = e.argNames
@@ -77,7 +77,7 @@ internal fun projectionReceiver(
         }
     val quality =
         resolver.chain(owner).firstNotNullOfOrNull { c ->
-            resolver.qualityOn(c, name)?.takeIf { it.projection != null }
+            resolver.qualityOwnOn(c, name)?.takeIf { it.projection != null }
         } ?: return null
     return ProjectionReceiver(quality, owner, path)
 }

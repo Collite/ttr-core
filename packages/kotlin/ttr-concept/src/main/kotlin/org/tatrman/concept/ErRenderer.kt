@@ -791,6 +791,13 @@ internal class ErRenderer(
                 refuse("`${c.ref}` narrows `${declared.ref}` — its restriction is not read on E-R (a follow-up)")
             }
             val rels = path(self.concept, label)
+            if (rels.isEmpty()) {
+                // `label: []` — the participant is the event's own row, read by its (one) key
+                val key =
+                    keys(self.row.entity).singleOrNull()
+                        ?: refuse("`${c.ref}` as $slot is the `$entity` row itself, which has no single key")
+                return col(self.row, key)
+            }
             val r =
                 rels.singleOrNull()
                     ?: refuse(
@@ -1017,6 +1024,12 @@ internal class ErRenderer(
             }
             participantOn(root.concept, bearer)?.let { label ->
                 val rels = path(root.concept, label)
+                // `label: []` names the candidates' own row, and the bearer is not on it (the same-row case is above)
+                if (rels.isEmpty()) {
+                    refuse(
+                        "`${root.concept.ref}`'s participant `$label` is its own row — the bearer `${bearer.ref}` is not on it",
+                    )
+                }
                 var cur = root.row
                 for (r in rels.dropLast(1)) cur = hop(cur, r)
                 return Held(cur, rels.last(), bearer)
@@ -1244,9 +1257,7 @@ internal class ErRenderer(
             scope: Scope,
         ): V {
             val id = e.function.value
-            (scope.implicit?.concept ?: scope.self?.concept)?.let { subject ->
-                projectedCall(e, subject, resolver)?.let { return aggregate(it, scope) }
-            }
+            projection(e, scope)?.let { return it }
             COMPARISONS[id]?.let { op ->
                 return Scalar(compare(op, value(e.args[0], scope), value(e.args[1], scope), scope))
             }
@@ -1276,9 +1287,47 @@ internal class ErRenderer(
                         "within" -> Scalar(window(e, scope))
                         "age", "working_days" -> refuse("`${e.function.name}(…)` — a datetime difference", "G-ER-2")
                         "descendants" -> refuse("`descendants(…)` outside `in`")
-                        else -> Scalar(SqlExpr.Fn(e.function.name.uppercase(), e.args.map { scalar(value(it, scope)) }))
+                        else -> {
+                            // a dotted name is a projection read or nothing — never a SQL function of its last segment
+                            if ('.' in id && CATALOG_PREFIXES.none { id.startsWith(it) }) {
+                                refuse("`$id(…)` names no projected quality (DC-13) in scope")
+                            }
+                            Scalar(SqlExpr.Fn(e.function.name.uppercase(), e.args.map { scalar(value(it, scope)) }))
+                        }
                     }
             }
+        }
+
+        /**
+         * DC-13: `this.q(…)`, `this.<path>.q(…)` or a bare `q(…)` read through [projectedCall]. A `this.` receiver walks
+         * from the bearer (`self`); a bare one from the innermost implicit subject that has the projection, else from
+         * `self`. The participant is bound to the row the receiver was resolved on, so the two never disagree.
+         */
+        private fun projection(
+            e: FunctionCall,
+            scope: Scope,
+        ): V? {
+            val parts = e.function.value.split('.')
+            if (parts.first() == "this" && scope.self == null) {
+                if (scope.outward().any { it.sealed }) throw Correlated()
+                return null
+            }
+            val roots =
+                if (parts.first() == "this") {
+                    listOfNotNull(scope.self)
+                } else {
+                    (scope.outward().mapNotNull { it.implicit } + listOfNotNull(scope.self)).toList()
+                }
+            for (root in roots) {
+                val receiver = projectionReceiver(e, root.concept, resolver) ?: continue
+                val a =
+                    projectedCall(e, root.concept, resolver, receiver)
+                        ?: refuse(
+                            "`${e.function.value}(…)` reads `${receiver.quality.ref}` — name `at:` and its `per:` participant only",
+                        )
+                return flat(a, scope, bound = walkFrom(root, receiver.path, 0).first)
+            }
+            return null
         }
 
         /** A comparison; two instants of different granularities under `certainly` are advised (degraded to as written). */
@@ -1559,6 +1608,16 @@ internal class ErRenderer(
                     is ParticipantPaths.Relations -> p.relations
                 }
             if (ref == null) refuse("`${ranged.ref}`'s participant `$l` is a row — a value cannot stand for it")
+            if (rels.isEmpty()) {
+                // `l: []` — the ranged row is the participant itself: its key meets the key the outer row stands for
+                val entity = r.entity.qname.name
+                if (entityOf(ref.concept)?.qname?.name != entity) {
+                    refuse("`${ranged.ref}`'s participant `$l` is its own `$entity` row — `${ref.concept.ref}` is not")
+                }
+                val pairs =
+                    keys(r.entity).zip(keyColumns(ref)).map { (k, o) -> SqlExpr.Bin("=", SqlExpr.Col(r.alias, k), o) }
+                return pairs to (ref as? Bound)?.row
+            }
             var cur = r
             for (x in rels.dropLast(1)) cur = hop(cur, x)
             val last = rels.last()
@@ -1715,12 +1774,20 @@ internal class ErRenderer(
             phase: Concept,
         ): SqlExpr {
             if (phase.fromEvent != null && phase.untilEvent != null) return boundedEpisode(ref, phase)
-            if (phase.period != null && phase.grounding?.layer == GroundingLayer.ER) {
+            val grounding = phase.grounding
+            if (phase.stereotype == "phase" && grounding?.layer == GroundingLayer.ER && grounding.episodes != null) {
                 val loc = org.tatrman.ttrp.ast.SourceLocation.UNKNOWN
+                val bearer = phase.of?.let { cn.concepts[it] } ?: refuse("an episode table without its subject")
+                // the label the episode's grounding names its subject by — as written, never guessed from a name
+                val label =
+                    participantOn(phase, bearer)
+                        ?: refuse(
+                            "`${phase.ref}` involves no one participant `${bearer.ref}` can be (cn/episode-subject-missing)",
+                        )
                 val expression =
                     ExistsExpr(
                         listOf(ConceptBinding(phase.qname.name, null, loc)),
-                        listOf(Participant(ThisRef(emptyList(), loc), phase.of?.name?.lowercase(), loc)),
+                        listOf(Participant(ThisRef(emptyList(), loc), label, loc)),
                         TemporalPredicate(
                             TemporalOp.CONTAINS,
                             ColumnRef(null, "period", location = loc),
@@ -1738,7 +1805,7 @@ internal class ErRenderer(
                     it.kind == BlockKind.DEFINITION ||
                         it.kind == BlockKind.MEMBERS
                 }
-                    ?: refuse("`${phase.ref}` has no `definition:` — a stacked entity read inside a definition")
+                    ?: return stacked(ref, phase)
             return inline(
                 phase,
                 block.expression ?: refuse("`${phase.ref}`'s definition does not parse"),
@@ -1748,7 +1815,38 @@ internal class ErRenderer(
             )
         }
 
-        /** CN-P8: one episode per start occurrence, ending at the first later termination for its subject. */
+        /**
+         * A stacked-entity subkind or phase (its own `cn2er_*` target, no definition) as a predicate: the subset test —
+         * the row is one of its entity's rows, `EXISTS (SELECT 1 FROM <entity> WHERE <its key> = <the row's key>)`.
+         */
+        private fun stacked(
+            ref: Ref,
+            phase: Concept,
+        ): SqlExpr {
+            val g = phase.grounding
+            if (g?.layer != GroundingLayer.ER) {
+                refuse("`${phase.ref}` has no `definition:` and no stacked entity on E-R")
+            }
+            val own = entityOf(phase) ?: unreachable(phase)
+            val outer = keyColumns(ref)
+            val inner = keys(own)
+            if (inner.size != outer.size) {
+                refuse("`${phase.ref}`'s entity `${own.qname.name}` shares no key with the row it is read on")
+            }
+            val query = Select(Source.Entity(own.qname.name, fresh(own.qname.name)), bound(ref).select.depth + 1)
+            query.items += Item(SqlExpr.Lit("1"))
+            query.where += inner.zip(outer).map { (k, o) -> SqlExpr.Bin("=", SqlExpr.Col(query.from.alias, k), o) }
+            inlined += phase.ref
+            return SqlExpr.Exists(query, false)
+        }
+
+        /**
+         * CN-P8 (A-CN-106, ⚑A): the subject is in [phase] at `:as_of` when one of its start occurrences is at or before
+         * it and no termination of the subject falls in `[start, :as_of]` — a termination at the start's own instant
+         * closes the episode (`[t, t)` is empty), and so does one at the instant a new start reopens it.
+         * `EXISTS (SELECT 1 FROM <starts> s WHERE s.subject = <key> AND s.at <= :as_of AND NOT EXISTS (SELECT 1 FROM
+         * <terminations> f WHERE f.subject = s.subject AND f.at >= s.at AND f.at <= :as_of))`.
+         */
         private fun boundedEpisode(
             ref: Ref,
             phase: Concept,
@@ -1757,17 +1855,15 @@ internal class ErRenderer(
             val started = phase.fromEvent?.let { cn.concepts[it] } ?: refuse("an episode without its start event")
             val finished = phase.untilEvent?.let { cn.concepts[it] } ?: refuse("an episode without its until event")
             val outerKeys = keyColumns(ref)
+            val depth = bound(ref).select.depth
 
+            /** `SELECT <subject key> AS subject_<i>, <instant> AS at FROM <event's entity> …` — one row per occurrence. */
             fun stream(
                 event: Concept,
-                window: Boolean,
+                at: Int,
             ): Select {
                 val entity = entityOf(event) ?: unreachable(event)
-                val query =
-                    Select(
-                        Source.Entity(entity.qname.name, fresh(entity.qname.name)),
-                        bound(ref).select.depth + 3,
-                    )
+                val query = Select(Source.Entity(entity.qname.name, fresh(entity.qname.name)), at)
                 val eventRef = Bound(row(entity, query, query.from.alias), event)
                 val label = participantOn(event, bearer) ?: refuse("`${event.ref}` does not involve `${bearer.ref}`")
                 val subject =
@@ -1776,7 +1872,7 @@ internal class ErRenderer(
                 val keys = keyColumns(subject)
                 if (keys.size != outerKeys.size) refuse("an episode subject has incompatible keys")
                 val period = periodOf(event) ?: refuse("an episode bound has no instant")
-                val at =
+                val instant =
                     periodBound(
                         eventRef,
                         event,
@@ -1784,40 +1880,26 @@ internal class ErRenderer(
                         period.at ?: refuse("an episode bound is not instantaneous"),
                     ).sql
                 query.items += keys.mapIndexed { i, key -> Item(key, "subject_$i") }
-                query.items += Item(at, "at")
-                if (window) query.items += Item(SqlExpr.Lead(at, keys, at), "next_start")
+                query.items += Item(instant, "at")
                 return query
             }
-            val start = stream(started, true)
-            val stop = stream(finished, false)
             val sa = fresh("starts")
+            val starts = Select(Source.Derived(stream(started, depth + 2), sa), depth + 1)
+            starts.items += Item(SqlExpr.Lit("1"))
+            starts.where += outerKeys.mapIndexed { i, key -> SqlExpr.Bin("=", SqlExpr.Col(sa, "subject_$i"), key) }
+            starts.where += SqlExpr.Bin("<=", SqlExpr.Col(sa, "at"), SqlExpr.Param("as_of"))
             val ea = fresh("terminations")
-            val episodes = Select(Source.Derived(start, sa), bound(ref).select.depth + 2)
-            val subjects = outerKeys.indices.map { SqlExpr.Col(sa, "subject_$it") }
-            val firstAt = SqlExpr.Col(sa, "at")
-            val stopAt = SqlExpr.Col(ea, "at")
-            val on =
-                subjects.mapIndexed { i, key -> SqlExpr.Bin("=", key, SqlExpr.Col(ea, "subject_$i")) } +
-                    SqlExpr.Bin(">", stopAt, firstAt)
-            episodes.joins += Join(true, Source.Derived(stop, ea), SqlExpr.and(on)!!)
-            episodes.items += subjects.mapIndexed { i, key -> Item(key, "subject_$i") }
-            episodes.items += Item(firstAt, "start_at")
-            episodes.items += Item(SqlExpr.Fn("MIN", listOf(stopAt)), "end_at")
-            episodes.groupBy += subjects + firstAt + SqlExpr.Col(sa, "next_start")
-            val alias = fresh("episodes")
-            val active = Select(Source.Derived(episodes, alias), bound(ref).select.depth + 1)
-            active.items += Item(SqlExpr.Lit("1"))
-            active.where += outerKeys.mapIndexed { i, key -> SqlExpr.Bin("=", SqlExpr.Col(alias, "subject_$i"), key) }
-            active.where += SqlExpr.Bin("<=", SqlExpr.Col(alias, "start_at"), SqlExpr.Param("as_of"))
-            active.where +=
-                SqlExpr.or(
-                    listOf(
-                        SqlExpr.IsNull(SqlExpr.Col(alias, "end_at"), false),
-                        SqlExpr.Bin(">", SqlExpr.Col(alias, "end_at"), SqlExpr.Param("as_of")),
-                    ),
-                )!!
+            val stops = Select(Source.Derived(stream(finished, depth + 3), ea), depth + 2)
+            stops.items += Item(SqlExpr.Lit("1"))
+            stops.where +=
+                outerKeys.indices.map { i ->
+                    SqlExpr.Bin("=", SqlExpr.Col(ea, "subject_$i"), SqlExpr.Col(sa, "subject_$i"))
+                }
+            stops.where += SqlExpr.Bin(">=", SqlExpr.Col(ea, "at"), SqlExpr.Col(sa, "at"))
+            stops.where += SqlExpr.Bin("<=", SqlExpr.Col(ea, "at"), SqlExpr.Param("as_of"))
+            starts.where += SqlExpr.Exists(stops, true)
             inlined += phase.ref
-            return SqlExpr.Exists(active, false)
+            return SqlExpr.Exists(starts, false)
         }
 
         /** [p]'s definition [expression] as a predicate on [ref] — `this` is [ref]; recorded as inlined. */
@@ -1956,12 +2038,18 @@ internal class ErRenderer(
         private fun flat(
             a: ConceptAggregate,
             scope: Scope,
+            /** The first participant's row, already resolved (a DC-13 receiver, [projection]). */
+            bound: V? = null,
         ): V {
             val b = a.concepts.single()
             val c = named(b, scope)
             val entity = entityOf(c) ?: unreachable(c)
             val r = row(entity, scope.select, fresh(b.variable ?: entity.qname.name))
-            val on = a.involving.flatMap { p -> correlate(r, c, p.label, value(p.path, scope)).first }.toMutableList()
+            val on =
+                a.involving
+                    .flatMapIndexed { i, p ->
+                        correlate(r, c, p.label, if (i == 0 && bound != null) bound else value(p.path, scope)).first
+                    }.toMutableList()
             val inner =
                 Scope(
                     scope,
@@ -2346,6 +2434,9 @@ internal class ErRenderer(
         val FLIPPED = mapOf("=" to "=", "<>" to "<>", "<" to ">", "<=" to ">=", ">" to "<", ">=" to "<=")
 
         val GROUPED = setOf("count", "sum", "avg", "min", "max")
+
+        /** The catalogue's own dotted ids; any other dotted call is a receiver path (DC-13). */
+        val CATALOG_PREFIXES = listOf("op.", "fn.", "agg.")
 
         /** A full timestamp literal's text — never a shorter one (⚑R152-f). */
         val TIMESTAMP: java.time.format.DateTimeFormatter =

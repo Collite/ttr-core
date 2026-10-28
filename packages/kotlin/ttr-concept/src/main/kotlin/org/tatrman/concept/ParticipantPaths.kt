@@ -59,18 +59,47 @@ internal class ParticipantPaths(
         val names = g?.participants?.get(label).orEmpty()
         if (g != null) return Relations(g, names.map { relation(it) ?: return null })
         val declared = lattice.participant(owner, label)?.second?.concept
-        val stands = concept ?: declared?.let { cn.concepts[it] }
-        val projected =
-            lattice.chain(owner).firstNotNullOfOrNull { c ->
-                cn.concepts.values
-                    .firstOrNull {
-                        it.stereotype == "quality" &&
-                            it.of == c.qname &&
-                            it.valueSpace == stands?.qname
-                    }?.erTarget
+        val stands = concept ?: declared?.let { cn.concepts[it] } ?: return null
+        val column =
+            when (val v = valued(owner, label, stands)) {
+                Valued.None -> stands.erTarget
+                Valued.Ambiguous -> return null
+                is Valued.One -> v.quality.erTarget ?: return null
             }
-        val (entity, attribute) = attributeRef(projected ?: stands?.erTarget) ?: return null
+        val (entity, attribute) = attributeRef(column) ?: return null
         return Column(entity, attribute)
+    }
+
+    private sealed interface Valued {
+        data object None : Valued
+
+        data object Ambiguous : Valued
+
+        data class One(
+            val quality: Concept,
+        ) : Valued
+    }
+
+    /**
+     * The owner's quality valued in [stands] (a value-kind participant read through it, AM-27): the one named [label],
+     * else the only one, at the nearest level of the chain that has any. Several with no label match read no column —
+     * `cn/participant-path-broken`, never the first of them.
+     */
+    private fun valued(
+        owner: Concept,
+        label: String,
+        stands: Concept,
+    ): Valued {
+        for (c in lattice.chain(owner)) {
+            val candidates =
+                cn.concepts.values.filter {
+                    it.stereotype == "quality" && it.of == c.qname && it.valueSpace == stands.qname
+                }
+            if (candidates.isEmpty()) continue
+            val pick = candidates.firstOrNull { it.qname.name == label } ?: candidates.singleOrNull()
+            return pick?.let(Valued::One) ?: Valued.Ambiguous
+        }
+        return Valued.None
     }
 
     companion object {
