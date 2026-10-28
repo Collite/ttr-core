@@ -98,25 +98,64 @@ class WriterDefaultFingerprintsSpec :
         fun build(transform: (String) -> String = { it }): RecipeManifest =
             bundle(transform = transform).manifest.recipe!!
 
-        fun exportProject(result: BundleAssembler.BundleResult): Path {
+        fun exportProject(
+            result: BundleAssembler.BundleResult,
+            packageName: String = "hartland",
+        ): Path {
             val root = result.dir.parent.parent
+            val packagePath = packageName.replace('.', '/')
             Files.move(root.resolve("model"), root.resolve("models"))
             // The compiler's old shared fixture uses pre-package-parity directory layout and role hints.
             // Normalize this private copy for the export CLI's strict metadata reader.
             for (folder in listOf("binding", "db", "er")) {
-                val from = root.resolve("models/hartland/$folder")
+                val from = root.resolve("models/$packagePath/$folder")
                 Files.list(from).use { paths ->
                     paths.forEach { file ->
                         val text = Files.readString(file).replace(Regex("roles: \\[.*?\\]"), "")
-                        Files.writeString(root.resolve("models/hartland/${folder}_${file.fileName}"), text)
+                        Files.writeString(root.resolve("models/$packagePath/${folder}_${file.fileName}"), text)
                         Files.delete(file)
                     }
                 }
                 Files.delete(from)
             }
-            Files.deleteIfExists(root.resolve("models/hartland/automation/checker-probes.ttrm"))
-            Files.writeString(root.resolve("modeler.toml"), "[ttrp]\nworld = \"hartland.worlds.demo\"\n")
+            Files.deleteIfExists(root.resolve("models/$packagePath/automation/checker-probes.ttrm"))
+            Files.writeString(root.resolve("modeler.toml"), "[ttrp]\nworld = \"$packageName.worlds.demo\"\n")
             return root
+        }
+
+        "native export validates dotted host packages using the loader provider" {
+            val result =
+                bundle(
+                    sourceText = recipe.replace("hartland", "acme.sales"),
+                    editModel = { model ->
+                        val oldPackage = model.resolve("hartland")
+                        Files.walk(oldPackage).use { paths ->
+                            paths.filter { Files.isRegularFile(it) }.toList().forEach { file ->
+                                Files.writeString(file, Files.readString(file).replace("hartland", "acme.sales"))
+                            }
+                        }
+                        Files.createDirectories(model.resolve("acme"))
+                        Files.move(oldPackage, model.resolve("acme/sales"))
+                    },
+                )
+            val root = exportProject(result, "acme.sales")
+            val emitted =
+                TtrpCommand().subcommands(EmitCommand()).test(
+                    listOf(
+                        "emit",
+                        "--deployment",
+                        "release_native_morning",
+                        "--project",
+                        root.toString(),
+                        "--bundle",
+                        result.dir.toString(),
+                        "--out",
+                        root.resolve("export").toString(),
+                        "--json",
+                    ),
+                )
+            withClue(emitted.output) { emitted.statusCode shouldBe 0 }
+            Files.exists(root.resolve("export/release_native_morning.native.export/manifest.json")) shouldBe true
         }
 
         "rereview R1 default approval verifies after moving metadata outside all package directories" {
@@ -146,7 +185,7 @@ class WriterDefaultFingerprintsSpec :
                 RecipeActionDependencies.Verification.Ok
         }
 
-        "rereview R1 a path only action import becomes a located REC001 build refusal" {
+        "a path only import becomes a located RES006 refusal" {
             val source =
                 recipe
                     .replace("import hartland.*", "import private.*")
@@ -155,7 +194,10 @@ class WriterDefaultFingerprintsSpec :
                 shouldThrow<BundleAssembler.BundleRefused> {
                     bundle(sourceText = source, checkoutSubdir = "private/cache")
                 }
-            failed.diagnostics.any { it.id.name == "REC_001" && it.location.line > 0 } shouldBe true
+            failed.diagnostics.any {
+                it.id.name == "RES_006" && it.location.line == 6 && "private" in it.message
+            } shouldBe
+                true
         }
 
         "rereview R3 an evidence free export identifies model ambiguity without inventing a recorded scope" {
