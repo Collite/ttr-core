@@ -5,7 +5,7 @@ package org.tatrman.concept.candidate
  * CN-P5 S5.2 T2 (cn contracts §6, A-CN-82; the S-7 pin) — where a candidate, or one piece of its evidence, came from.
  * Three schemes, one spelling each, so a promoted def's `sources:` line compares as text:
  * - `doc://<system>/<document…>[#<locator>]` — a document in a producer's store; `<system>` names the store
- *   (`kallimachos` for Kleio's), the rest is that store's own document identity;
+ *   (`docwh` for the document warehouse Kleio cites), the rest is that store's own document identity;
  * - `recipe://<package>/<recipe>#s<n>` — a sentence of a recipe (the recipe authoring surface as a producer, Q14-7);
  * - `question://<system>/<question…>` — a question a user asked, by the asking system's own id.
  */
@@ -87,7 +87,7 @@ object SourceRefs {
     private val SENTENCE = Regex("^s($ORDINAL)$")
     private val ROW = Regex("^r($ORDINAL)$")
     private val SPAN = Regex("^c($OFFSET)-($OFFSET)$")
-    private val KALLIMACHOS = Regex("^kallimachos://($SEG)/($SEG)/($SEG)$")
+    private val DOCWH = Regex("^docwh://($SEG)/($SEG)/($SEG)$")
 
     /** The ref [text] spells, or null when it is not one (a span whose end does not exceed its start included). */
     fun parse(text: String): SourceRef? {
@@ -106,15 +106,16 @@ object SourceRefs {
     }
 
     /**
-     * Kleio's citation ref (`Citation.source_ref`, kleio contracts §4: `kallimachos://{notebook}/{source}/{part}`) as a
-     * cn source ref — one prefix swap, a locator relative to the part. Null when [kallimachos] is not one.
+     * Kleio's citation ref (`Citation.source_ref`, kleio contracts §4: `docwh://{notebook}/{source}/{part}`) as a
+     * cn source ref — one prefix swap, a locator relative to the part. Null when [docwh] is not one, the pre-rename
+     * `kallimachos://` form included: no stored candidate carries it, so there is no alias (DX-RN T4b).
      */
-    fun fromKallimachos(
-        kallimachos: String,
+    fun fromDocwh(
+        docwh: String,
         locator: Locator? = null,
     ): String? {
-        val m = KALLIMACHOS.matchEntire(kallimachos) ?: return null
-        return SourceRef.Doc("kallimachos", m.groupValues.drop(1), locator).text
+        val m = DOCWH.matchEntire(docwh) ?: return null
+        return SourceRef.Doc("docwh", m.groupValues.drop(1), locator).text
     }
 
     private fun locator(fragment: String): Locator? {

@@ -14,7 +14,7 @@
   },
   "provenance": {
     "producer": "clinic:evidence",
-    "source_ref": "doc://kallimachos/hartland-ops/1042/7",
+    "source_ref": "doc://docwh/hartland-ops/1042/7",
     "confidence": {
       "value": 0.82,
       "producer": "clinic:evidence",
