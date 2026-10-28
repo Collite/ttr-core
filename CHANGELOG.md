@@ -6,6 +6,17 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Changed — BREAKING: `assertion.v1` field 1 is `concept` (translator 0.13.0)
+
+- `org.tatrman.assertion.v1.Assertion` field 1 is renamed `event` → `concept` (number and type kept). The **binary
+  encoding is unchanged** (old wire bytes parse as `concept`, pinned by a test), but the **JSON key** (`"event"` →
+  `"concept"`) and the **generated accessors** (Kotlin/Java `getEvent`/`setEvent`/`hasEvent` → `…Concept`, Python
+  `.event` → `.concept`) are renamed, with **no alias**: a strict `JsonFormat.parser()` now refuses `{"event": …}`
+  (pinned by a test). Ships as translator **0.13.0** (a pre-1.0 minor, PUBLISHING.md § Semver); JVM and Python
+  consumers rebuild. tatrman-server migrates its door fixtures in the same bump PR (Collite/ttr-server#331).
+- The field accepts events, validity rows, phase episodes and (review-175 ⚑D) subkinds. State claims need an as-of.
+  Transfer row output is unchanged.
+
 ### Added — things in time (CN-P8 S8.2, grammar bundle 0.20.x)
 
 - Typed subkinds, relator lifetimes, episode tables, event-bounded phases and valued-state
@@ -14,9 +25,39 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - DC-13 qualified calls use TTR-P 0.7 and the existing validity lookup. ER rendering,
   materialization, hygiene and English/Czech prose support the new families; unsupported
   MD temporal reads retain explicit G-MD-1 refusals.
-- `assertion.v1` field 1 is renamed `concept` and accepts events, validity rows and phase
-  episodes. Binary encoding is unchanged; JSON clients must rename their key and JVM/Python
-  consumers must rebuild. State claims need an as-of. Transfer row output is unchanged.
+
+### Fixed — things in time (review-175 of #315)
+
+- **Same-row participants** (`order: []`): kept at model load when the participant's concept lands on the binding's own
+  target entity (else listed as a dangling `order: []`), rendered as a key correlation and lowered as the row's key.
+  Hartland's `OpenOrder` and every same-row event participant rendered nothing before. No archive or export
+  serializes `Grounding.participants`, so nothing is re-cut.
+- **Event-bounded episodes** (⚑A): an `until` at or after the start closes the episode (`[t, t)` is empty; a restart at
+  the instant of a termination is closed too). Rendered as `EXISTS` start / `NOT EXISTS` termination in
+  `[start, :as_of]` — no `LEAD` window, no `GROUP BY`. A same-day order no longer stays open forever.
+- **DC-13 receivers:** `this.q(…)` reads the bearer inside an `exists` / aggregate body (it read the inner row and fell
+  through to a SQL function `Q(…)`); a dotted call that names no projection refuses. A value-kind participant read
+  through a quality picks the one its label names, else the only one — never the first of several, and never one with
+  no value space for an undeclared label. The episode table's subject label is the phase's participant, not the
+  lowercased bearer name.
+- **Episode tables and landings:** only a phase whose grounding has episodes is an episode table (a binding-only
+  `period:` counts); a stacked-entity subkind read as a predicate is a key subset test. A binding whose written target
+  does not resolve keeps its layer's landing (md: `MD_GROUNDED_HOP_MISSING`) instead of inheriting its bearer's.
+- **Subkind claims** (⚑D): a subkind claim lands through the grounding it lands on, and each settable discriminator up
+  its chain is written on the row (another value is `cn/slot-mismatch`; any other definition is `cn/not-assertable`).
+- **New slug `cn/subkind-bearer`** (error; lint rule `cn-subkind-bearer`, TS/Kotlin/Python): a subkind whose `of:` is
+  not a kind, subkind, role or event. It was reported as `cn/subkind-temporal-definition`, so suppressing that rule hid it.
+- **`cn/projection-source`** (⚑C) requires `per:` to cover every relator participant other than the bearer; a per-less
+  projection over a multi-participant relator read several rows per bearer.
+- **`cn/subkind-temporal-definition`** reads words by `TTR.g4` IDENT on all three runtimes (a non-ASCII phase name was
+  flagged by Kotlin only), and agrees with `ttr-concept`'s lint: `within(…)` and `age(…)` are temporal; a bare `period`
+  read and the old `parameter` word are not.
+- **An empty participant path** must name a participant whose concept lands on the binding's own row
+  (`cn/participant-path-broken` on all three runtimes).
+- **A quality's dotted `from:`** and a binding's `via:` head are references (head span only), so rename,
+  find-references and `ttr/unresolved-reference` reach them; a phase's dotted `from:` resolves. Conformance dump 115
+  gains an honest `ttr/unresolved-reference`.
+- The browser LSP Worker bundle ceiling is 720 KB gz (696,864 B at grammar 0.20; 680 KB before).
 
 ### Added — conceptual-model grammar 0.20 (CN-P8 S8.1)
 

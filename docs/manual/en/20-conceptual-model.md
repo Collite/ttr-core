@@ -64,19 +64,27 @@ name inside a `model cn` file — see [Names and references](#names-and-referenc
 DC-13 reads a projected value with a qualified call: `this.list_price(channel: 'web', at: :as_of)`.
 `at:` defaults to `:as_of`; arguments are named. The receiver can follow participant paths,
 for example `this.order.customer.agreed_price(item: this.item, at: this.order.placed_date)`.
-The source is a quality of a relator involving the bearer and the `per:` concept; the ER
-renderer uses the existing validity lookup. These calls require TTR-P expression grammar 0.7.
+The source is a quality of a relator involving the bearer and the `per:` concept, and `per:`
+must cover every other participant of the relator (`cn/projection-source`), so a read gives one
+row per bearer. The ER renderer uses the existing validity lookup. Its period test is inclusive
+(`until >= :as_of`): when one row's closed `end` equals the next row's `start`, both rows match at
+that instant. Use `end_open: open` or bounds that do not touch; no lint can check this, since it is
+a property of the data. A `this.` receiver always reads the bearer, also inside an `exists` or
+aggregate body. A dotted call that names no projected quality is refused. These calls require TTR-P
+expression grammar 0.7.
 
 A subkind inherits its bearer's landing and can materialize when its definition is rigid.
-A temporal or parametric definition is `cn/subkind-temporal-definition`. Equality definitions
+A temporal or parametric definition is `cn/subkind-temporal-definition`; a subkind whose `of:`
+is not rigid (a phase, quality or relation type) is `cn/subkind-bearer`. Equality definitions
 on one value-space attribute are checked for overlap and missing finite members. The legacy
 `kind { is_a: …, members: … }` form remains readable with `cn/subkind-as-kind`.
 
 Episode phases use either an entity-backed interval or `from:` / `until:` events involving
-the subject. Event bounds are half-open: an occurrence starts the state and the first strictly
-later termination for that subject ends it; no termination leaves it open. The renderer uses a
-subject-partitioned `LEAD` stream and grouped first termination. An episode predicate selects
-each subject once, including when episodes overlap. Episodes, relators and projected qualities
+the subject. Event bounds are half-open: an occurrence starts the state and the first termination
+for that subject at or after it ends it, so a termination at the start's own instant closes it, and
+so does one at the instant a new start reopens it. No termination leaves it open. The renderer reads
+"a start at or before the as-of with no termination between it and the as-of" (`EXISTS` /
+`NOT EXISTS`). An episode predicate selects each subject once, including when episodes overlap. Episodes, relators and projected qualities
 are ER constructs; unsupported MD reads name `G-MD-1`.
 
 Explicit source bindings are equivalent to the top-down forms:
