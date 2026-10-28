@@ -2,6 +2,7 @@
 package org.tatrman.concept
 
 import org.tatrman.assertion.v1.Assertion
+import org.tatrman.assertion.v1.Identity
 import org.tatrman.assertion.v1.Participant
 import org.tatrman.assertion.v1.QualityValue
 import org.tatrman.concept.v1.EndState
@@ -65,6 +66,17 @@ internal class PlannedQuality(
     val attribute: String,
 )
 
+/**
+ * A subkind's settable discriminator (⚑D, review-175 F7): its definition `<name> = '<value>'` read as the claimed row's
+ * attribute [attribute] — the lowering sets it; a claim writing another value is `cn/slot-mismatch`.
+ */
+internal class Discriminator(
+    val subkind: Concept,
+    val name: String,
+    val attribute: String,
+    val value: String,
+)
+
 /** The event's row, planned: [values] by attribute, in writing order (identity, participants, period, qualities). */
 internal class RowPlan(
     val entity: String,
@@ -107,6 +119,7 @@ internal class RowPlanner(
         participants: List<PlannedParticipant>,
         qualities: List<PlannedQuality>,
         f: Findings,
+        discriminators: List<Discriminator> = emptyList(),
     ): RowPlan {
         val row = Row(entity, f)
         val keys =
@@ -117,18 +130,74 @@ internal class RowPlanner(
                 emptyMap()
             }
         for ((k, v) in keys) row.text(k, v, "identity.known")
-        val obligations = participants(participants, row, f)
+        val obligations = participants(participants, a.identity.howCase == Identity.HowCase.NEW, row, f)
         val endState = period(a, event, row, f)
         val verbatims = linkedMapOf<String, String>()
         for (q in qualities) {
             row.value(q.attribute, q.quality.value, "qualities[${q.index}].value")
             if (q.quality.verbatim.isNotEmpty()) verbatims[q.attribute] = q.quality.verbatim
         }
+        for (d in discriminators) {
+            val by = row.writer(d.attribute)
+            if (by != null && row.values[d.attribute] != d.value) {
+                val written = row.values[d.attribute]?.let { "`$it`" } ?: "NULL"
+                f.error(
+                    FrameSlugs.SLOT_MISMATCH,
+                    by,
+                    "`${d.subkind.ref}` is `${d.name} = '${d.value}'` (its definition) — the claim writes $written",
+                )
+            } else {
+                row.text(d.attribute, d.value, "concept")
+            }
+        }
         return RowPlan(entity.qname.name, row.values, obligations, endState, verbatims)
+    }
+
+    /**
+     * A same-row participant (`label: []`, review-175 F1): the participant is the claim's own row, so its member is the
+     * row's key — written to the entity's one key attribute. A `new` identity has no key yet (consolidation assigns
+     * it), and a composite key takes more than a member's one value: both refuse.
+     */
+    private fun sameRow(
+        p: PlannedParticipant,
+        identityNew: Boolean,
+        row: Row,
+        f: Findings,
+    ) {
+        val subject = "participants[${p.index}]"
+        val label = p.participant.label
+        val name = row.entity.qname.name
+        val keys = row.entity.attributes.filter { it.isKey }
+        when {
+            identityNew ->
+                f.error(
+                    FrameSlugs.MALFORMED_FRAME,
+                    subject,
+                    "`$label` is the claim's own `$name` row (`$label: []`) — its member names the row's key, " +
+                        "but the identity is `new`",
+                )
+            keys.size != 1 ->
+                f.error(
+                    FrameSlugs.PARTICIPANT_PATH_BROKEN,
+                    subject,
+                    "`$label` is the claim's own `$name` row (`$label: []`), whose key is ${keys.size} attributes — " +
+                        "a member carries one value",
+                )
+            else ->
+                row.text(
+                    keys
+                        .single()
+                        .qname.name
+                        .substringAfterLast('.'),
+                    p.participant.member.resolvedValue,
+                    "$subject.member",
+                )
+        }
     }
 
     private fun participants(
         ps: List<PlannedParticipant>,
+        identityNew: Boolean,
         row: Row,
         f: Findings,
     ): List<Obligation> {
@@ -151,7 +220,11 @@ internal class RowPlanner(
                         row.text(path.attribute, value, "$subject.member")
                     }
                 is ParticipantPaths.Relations -> {
-                    val first = path.relations.first()
+                    val first = path.relations.firstOrNull()
+                    if (first == null) {
+                        sameRow(p, identityNew, row, f)
+                        continue
+                    }
                     val r = first.qname.name
                     when {
                         first.fromEntity.name != name ->
@@ -291,6 +364,9 @@ internal class RowPlanner(
     ) {
         val values = linkedMapOf<String, String?>()
         private val by = mutableMapOf<String, String>()
+
+        /** The frame subject that wrote [attr]; null when nothing has. */
+        fun writer(attr: String): String? = by[attr]
 
         private fun attribute(name: String): Attribute? =
             entity.attributes.firstOrNull { it.qname.name.substringAfterLast('.') == name }
