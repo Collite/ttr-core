@@ -757,7 +757,7 @@ private class CnValidator(
             for ((key, value) in entries.entries) {
                 val path = idsOf(value)
                 val rels = path.map { element(it, doc, enclosing) }
-                if (path.isEmpty() || rels.any { it == null }) continue // `ttr/unresolved-reference`
+                if (rels.any { it == null }) continue // `ttr/unresolved-reference`
                 var at = target.qname
                 var broken = false
                 for (i in path.indices) {
@@ -808,14 +808,19 @@ private class CnValidator(
                 val concept = participant?.let { concept(it.ref, involves.doc) } ?: continue
                 val lands = directErEntity(concept.qname)
                 if (lands != null && lands != at) {
+                    // An empty path (`order: []`) says the participant IS the binding's own row: its concept must land there.
                     report(
                         DiagnosticCode.CnParticipantPathBroken,
                         DiagnosticSeverity.Error,
                         placed.uri,
-                        path.last().source,
-                        "the path of '$key' ends on '${shortName(
-                            at,
-                        )}', but '${concept.name}' is grounded to '${shortName(lands)}'",
+                        path.lastOrNull()?.source ?: value.source,
+                        if (path.isEmpty()) {
+                            "the empty path of '$key' reads the binding's own row '${shortName(at)}', but " +
+                                "'${concept.name}' is grounded to '${shortName(lands)}'"
+                        } else {
+                            "the path of '$key' ends on '${shortName(at)}', but '${concept.name}' is grounded to " +
+                                "'${shortName(lands)}'"
+                        },
                     )
                 }
             }

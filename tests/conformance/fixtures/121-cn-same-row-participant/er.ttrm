@@ -1,0 +1,4 @@
+model er
+def entity order { attributes: [def attribute id { type: text, isKey: true }, def attribute customer { type: text }, def attribute placed { type: date }] }
+def entity customer { attributes: [def attribute id { type: text, isKey: true }] }
+def relation order_customer { from: er.entity.order, to: er.entity.customer, join: [{ from: er.entity.order.customer, to: er.entity.customer.id }] }

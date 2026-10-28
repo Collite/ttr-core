@@ -716,7 +716,7 @@ class CnValidator {
       for (const entry of participants.value.entries) {
         const path = idsOf(entry.value);
         const rels = path.map((id) => this.element(idRef(id), doc, enclosing));
-        if (path.length === 0 || rels.some((r) => !r)) continue; // `ttr/unresolved-reference`
+        if (rels.some((r) => !r)) continue; // `ttr/unresolved-reference`
         let at = g.targetSymbol.qname;
         let broken = false;
         for (let i = 0; i < path.length && !broken; i++) {
@@ -749,12 +749,15 @@ class CnValidator {
         const concept = participant ? this.concept(participant.ref, involves.doc) : undefined;
         const lands = concept ? this.directErEntity(concept.qname) : undefined;
         if (lands && lands !== at) {
+          // An empty path (`order: []`) says the participant IS the binding's own row: its concept must land there.
           this.report(
             DiagnosticCode.CnParticipantPathBroken,
             'error',
             g.uri,
-            path[path.length - 1].source,
-            `the path of '${entry.key}' ends on '${shortName(at)}', but '${concept!.name}' is grounded to '${shortName(lands)}'`,
+            path.length ? path[path.length - 1].source : entry.value.source,
+            path.length
+              ? `the path of '${entry.key}' ends on '${shortName(at)}', but '${concept!.name}' is grounded to '${shortName(lands)}'`
+              : `the empty path of '${entry.key}' reads the binding's own row '${shortName(at)}', but '${concept!.name}' is grounded to '${shortName(lands)}'`,
           );
         }
       }

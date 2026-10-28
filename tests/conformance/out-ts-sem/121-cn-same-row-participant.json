@@ -1,0 +1,44 @@
+{
+    "diagnostics": [
+        "cn/participant-path-broken"
+    ],
+    "resolved": [
+        "Customer => cn.concept.Customer",
+        "Customer => cn.concept.Customer",
+        "Order => cn.concept.Order",
+        "cn.OrderFlagged => cn.concept.OrderFlagged",
+        "cn.OrderFlagged.customer => cn.concept.OrderFlagged.customer",
+        "cn.OrderPlaced => cn.concept.OrderPlaced",
+        "cn.OrderPlaced.customer => cn.concept.OrderPlaced.customer",
+        "cn.OrderPlaced.order => cn.concept.OrderPlaced.order",
+        "er.entity.customer => er.entity.customer",
+        "er.entity.customer => er.entity.customer",
+        "er.entity.order => er.entity.order",
+        "er.entity.order => er.entity.order",
+        "er.entity.order => er.entity.order",
+        "er.entity.order => er.entity.order",
+        "er.entity.order.placed => er.entity.order.placed",
+        "er.entity.order.placed => er.entity.order.placed",
+        "er.relation.order_customer => er.relation.order_customer"
+    ],
+    "symbols": [
+        "binding.cn2er_event.flagged",
+        "binding.cn2er_event.placed",
+        "binding.cn2er_kind.Customer.grounds",
+        "binding.cn2er_kind.Order.grounds",
+        "cn.concept.Customer",
+        "cn.concept.Order",
+        "cn.concept.OrderFlagged",
+        "cn.concept.OrderFlagged.customer",
+        "cn.concept.OrderPlaced",
+        "cn.concept.OrderPlaced.customer",
+        "cn.concept.OrderPlaced.order",
+        "er.entity.customer",
+        "er.entity.customer.id",
+        "er.entity.order",
+        "er.entity.order.customer",
+        "er.entity.order.id",
+        "er.entity.order.placed",
+        "er.relation.order_customer"
+    ]
+}

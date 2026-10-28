@@ -838,7 +838,7 @@ class _CnValidator:
             for key, value in participants.value.entries.items():
                 path = ids_of(value)
                 rels = [self._element(id_path(v), doc, enclosing) for v in path]
-                if not path or any(r is None for r in rels):
+                if any(r is None for r in rels):
                     continue  # `ttr/unresolved-reference`
                 at = target.qname.value
                 broken = False
@@ -878,8 +878,13 @@ class _CnValidator:
                     continue
                 lands = self._direct_er_entity(concept.qname.value)
                 if lands is not None and lands != at:
+                    # An empty path (`order: []`) says the participant IS the binding's own row: its concept must land there.
                     self._report(
-                        DiagnosticCode.CN_PARTICIPANT_PATH_BROKEN, DiagnosticSeverity.ERROR, placed.uri, path[-1].source,
+                        DiagnosticCode.CN_PARTICIPANT_PATH_BROKEN, DiagnosticSeverity.ERROR, placed.uri,
+                        path[-1].source if path else value.source,
                         f"the path of '{key}' ends on '{_short_name(at)}', but '{concept.name}' is grounded to "
-                        f"'{_short_name(lands)}'",
+                        f"'{_short_name(lands)}'"
+                        if path
+                        else f"the empty path of '{key}' reads the binding's own row '{_short_name(at)}', but "
+                        f"'{concept.name}' is grounded to '{_short_name(lands)}'",
                     )
