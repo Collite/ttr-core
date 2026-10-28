@@ -1116,6 +1116,34 @@ private class CnValidator(
                         DiagnosticCode.CnProjectionSource,
                         "quality '${c.name}' needs a valued-state projection of a relator quality involving its bearer and per participant",
                     )
+                } else {
+                    // ⚑C (review-175 F6): one row per bearer — every other participant of the relator is the `per:` one.
+                    fun covers(
+                        got: CnConcept,
+                        by: CnConcept?,
+                    ) = by != null && (by.key in chain(got) || got.key in chain(by))
+                    val uncovered =
+                        chain(source).flatMap { key ->
+                            val s = prop(concepts.getValue(key), "involves") ?: return@flatMap emptyList()
+                            val p = s.property as? ConceptProperty.Involves ?: return@flatMap emptyList()
+                            p.participants.mapNotNull { pt ->
+                                concept(pt.ref, s.doc)
+                                    ?.qname
+                                    ?.let { concepts[it] }
+                                    ?.takeIf { got ->
+                                        !covers(got, bearer) && !covers(got, per)
+                                    }?.name
+                            }
+                        }
+                    if (uncovered.isNotEmpty()) {
+                        emit(
+                            c,
+                            DiagnosticCode.CnProjectionSource,
+                            "quality '${c.name}' projects '${source.name}', whose participant " +
+                                "'${uncovered.first()}' is neither its bearer nor its per: — one '${bearer.name}' " +
+                                "reads several rows; add 'per: ${uncovered.first()}'",
+                        )
+                    }
                 }
             }
         }

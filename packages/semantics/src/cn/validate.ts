@@ -457,6 +457,15 @@ class CnValidator {
         const source = sym && this.concepts.get(sym.qname), bearer = named(c, 'of'), per = named(c, 'per');
         const quality = [...this.concepts.values()].find((q) => q.name === ref?.parts.at(-1) && q.stereotype === 'quality' && named(q, 'of')?.key === source?.key);
         if (!isTrue(prop(c, 'valued_state')) || !source || !['kind', 'subkind', 'role'].includes(source.stereotype) || !bearer || !participates(source, bearer) || !quality || (!!prop(c, 'per') && (!per || !participates(source, per)))) emit(c, DiagnosticCode.CnProjectionSource, `quality '${c.name}' needs a valued-state projection of a relator quality involving its bearer and per participant`);
+        else {
+          // ⚑C (review-175 F6): one row per bearer — every other participant of the relator is the `per:` one.
+          const covers = (got: CnConcept, by: CnConcept | undefined) => !!by && (chain(got).has(by.key) || chain(by).has(got.key));
+          const uncovered = [...chain(source)].flatMap((key) => {
+            const s = prop(this.concepts.get(key)!, 'involves'); if (s?.property.kind !== 'involves') return [];
+            return s.property.participants.flatMap((pt) => { const sym = this.concept(pt.ref, s.doc); const got = sym && this.concepts.get(sym.qname); return got && !covers(got, bearer) && !covers(got, per) ? [got.name] : []; });
+          });
+          if (uncovered.length) emit(c, DiagnosticCode.CnProjectionSource, `quality '${c.name}' projects '${source.name}', whose participant '${uncovered[0]}' is neither its bearer nor its per: — one '${bearer.name}' reads several rows; add 'per: ${uncovered[0]}'`);
+        }
       }
     }
     const groups = new Map<string, Array<{c: CnConcept; bearer: CnConcept; attr: string; value: string}>>();

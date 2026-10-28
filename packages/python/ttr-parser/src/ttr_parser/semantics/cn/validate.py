@@ -475,6 +475,27 @@ class _CnValidator:
                         return True
             return False
 
+        def covers(got: CnConcept, by: CnConcept | None) -> bool:
+            return by is not None and (by.key in chain(got) or got.key in chain(by))
+
+        def uncovered_participants(source: CnConcept, bearer: CnConcept, per: CnConcept | None) -> list[str]:
+            out: list[str] = []
+            walk: list[CnConcept] = []
+            at: CnConcept | None = source
+            while at is not None and all(w.key != at.key for w in walk):  # the chain in order, as TS / Kotlin read it
+                walk.append(at)
+                at = named(at, "of") or named(at, "is_a")
+            for owner in walk:
+                s = prop(owner, "involves")
+                if s is None or not isinstance(s.property, ConceptInvolves):
+                    continue
+                for pt in s.property.participants:
+                    sym = self._concept(pt.ref.path, s.doc)
+                    got = self.concepts.get(sym.qname.value) if sym else None
+                    if got is not None and not covers(got, bearer) and not covers(got, per):
+                        out.append(got.name)
+            return out
+
         def emit(c: CnConcept, code: DiagnosticCode, message: str, warning: bool = False, key: str | None = None) -> None:
             s = prop(c, key) if key else None
             self._report(code, DiagnosticSeverity.WARNING if warning else DiagnosticSeverity.ERROR, s.doc.uri if s else c.uri, s.property.source if s else c.source, message)
@@ -544,6 +565,11 @@ class _CnValidator:
                 per = named(c, "per")
                 if not _is_true(prop(c, "valued_state")) or source is None or source.stereotype not in {"kind", "subkind", "role"} or bearer is None or not participates(source, bearer) or quality is None or (prop(c, "per") is not None and (per is None or not participates(source, per))):
                     emit(c, DiagnosticCode.CN_PROJECTION_SOURCE, f"quality '{c.name}' needs a valued-state projection of a relator quality involving its bearer and per participant")
+                else:
+                    # ⚑C (review-175 F6): one row per bearer — every other participant of the relator is the `per:` one.
+                    uncovered = uncovered_participants(source, bearer, per)
+                    if uncovered:
+                        emit(c, DiagnosticCode.CN_PROJECTION_SOURCE, f"quality '{c.name}' projects '{source.name}', whose participant '{uncovered[0]}' is neither its bearer nor its per: — one '{bearer.name}' reads several rows; add 'per: {uncovered[0]}'")
         groups: dict[tuple[str, str], list[tuple[CnConcept, CnConcept, str, str]]] = {}
         for c in self.concepts.values():
             s = prop(c, "definition")
