@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttrp.resolve
 
+import org.tatrman.ttr.metadata.model.PackageNames
 import org.tatrman.ttr.metadata.world.ResolvedWorld
 import org.tatrman.ttr.metadata.world.writable
 
@@ -29,7 +30,7 @@ object RecipePlacement {
         // Prefixes are package segments, and the most specific host wins. Equal specificity is ambiguous.
         val hosts =
             world.storages.flatMap { s ->
-                s.hosts.filter { pkg == it || pkg.startsWith("$it.") }.map { it to s.qname.name }
+                s.hosts.filter { PackageNames.covers(it, pkg) }.map { it to s.qname.name }
             }
         val longest = hosts.maxOfOrNull { it.first.split('.').size } ?: return emptyList()
         return hosts.filter { it.first.split('.').size == longest }.map { it.second }.distinct()

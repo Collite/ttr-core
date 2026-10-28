@@ -26,11 +26,16 @@ object TtrpWorldResolver {
         val diagnostics: List<TtrpDiagnostic>,
     )
 
+    /**
+     * [packageOf] must be supplied explicitly. Null selects the legacy path rule and is only for
+     * snapshot-only callers without loader identity; checker/build pass the reconciled provider.
+     */
     fun resolve(
         snapshot: RegistrySnapshot?,
         manifest: TtrpManifest,
         pin: String?,
         pinLocation: SourceLocation?,
+        packageOf: ((org.tatrman.ttr.metadata.model.ModelObject) -> String)?,
     ): Selection {
         val loc =
             pinLocation
@@ -50,7 +55,7 @@ object TtrpWorldResolver {
                 listOf(diag(TtrpDiagnosticId.WLD_002, "world `$worldString` — no model repo to resolve it in", loc)),
             )
         }
-        val resolver = MetadataWorldResolver(snapshot)
+        val resolver = MetadataWorldResolver(snapshot, packageOf)
         val worldQ = worldQname(worldString)
 
         return when (val r = resolver.resolve(worldQ)) {

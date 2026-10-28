@@ -69,6 +69,32 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   `extent:` remains accepted during retirement. JVM consumers must rebuild
   against the extended parser model. Grammar bundle releases use 0.20.x.
 
+### Fixed — declared package resolution (#251)
+
+- TTR-P imports, qualified loads, automation objects and row schemas use loader
+  declared-or-computed package identity, with segment-boundary descendants, independently
+  of checkout paths. Qualified loads accept the same trailing tier as imports.
+  An import of a directory that is not a declared package (for example
+  `import hartland.binding.*` when the files declare `hartland`) now refuses with
+  RES-006; import the declared package or its tier instead.
+- `WorldResolver(snapshot, packageOf)` accepts the same loader provider for host
+  validation; checker/build and native export use it. Existing snapshot-only JVM
+  callers retain their constructor and path-based validation, with dotted host names
+  read as directories. The TTR-P wrapper requires its provider argument explicitly.
+  Storage placement and overlay rules are unchanged. This enables bound calendar source planning in the automation
+  consumer; calendar runtime integration is a separate change.
+- No grammar change or release tag is included. The next grammar bundle remains on
+  the **0.18.x** line; consumers need the reviewed internal release before adoption.
+### Changed — the document-warehouse source ref (`ttr-concept`, DX-RN T4b; breaking for one function)
+
+- `SourceRefs.fromKallimachos` → `SourceRefs.fromDocwh`: Kleio's citation refs are now
+  `docwh://{notebook}/{source}/{part}` (the warehouse took the technical name `docwh`), and map to
+  `doc://docwh/…`. No alias: `kallimachos://` input returns null, since no stored candidate carries the old
+  authority. The `doc://` scheme itself is unchanged.
+- Ships in a 0.18.x patch as a recorded exception to [`PUBLISHING.md`](PUBLISHING.md)'s semver rule (a patch
+  changes no public API): no caller of `fromKallimachos` exists outside this repo's specs. The exception
+  covers this function only; any other public removal in the same cut still needs a minor.
+
 ### Added — embedded Designer host lifecycle (Designer family 0.1.1)
 
 - Optional `DesignerPage.onReady`, `onSnapshot` and `onDiagnostics` callbacks expose the installed

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.metadata.world
 
+import org.tatrman.ttr.metadata.model.ModelObject
+import org.tatrman.ttr.metadata.model.PackageNames
 import org.tatrman.ttr.metadata.model.QualifiedName
 import org.tatrman.ttr.metadata.model.SchemaCode
 import org.tatrman.ttr.metadata.model.World
@@ -19,7 +21,12 @@ import org.tatrman.ttr.parser.model.PropertyValue
  */
 class WorldResolver(
     private val snapshot: RegistrySnapshot,
+    /** Loader-owned declared-or-computed packages. When supplied, checkout paths never grant host scope. */
+    private val packageOf: ((ModelObject) -> String)?,
 ) {
+    /** Compatibility constructor for snapshot-only consumers without loader package identity. */
+    constructor(snapshot: RegistrySnapshot) : this(snapshot, null)
+
     private val worldSchema: WorldSchema? =
         snapshot.model.schemas["world"] as? WorldSchema
 
@@ -36,15 +43,29 @@ class WorldResolver(
     private val storageByQname: Map<QualifiedName, WorldStorage> =
         worlds.values.flatMap { it.storages }.associateBy { it.qname }
 
-    // Model object qnames don't carry the package (the ported metadata service keeps it out of
-    // the qname); the reconciler records it only via sourceFile. So a hosts package
-    // is "loaded" iff some object's sourceFile sits under `/<pkg>/` — the same
-    // convention MetadataQuery.listObjects uses for its package filter.
+    private val loadedPackages: Set<String> by lazy {
+        val provider = packageOf
+        if (provider == null) {
+            emptySet()
+        } else {
+            snapshot.model
+                .objectByQname()
+                .values
+                .map(provider)
+                .toSet()
+        }
+    }
+
+    // Snapshot-only callers retain path-based matching, with dotted packages read as directories.
+    // A supplied loader provider is authoritative; missing entries never fall back to paths.
     private fun packageLoaded(pkg: String): Boolean =
-        snapshot.model
-            .objectByQname()
-            .values
-            .any { it.sourceFile.contains("/$pkg/") }
+        if (packageOf == null) {
+            snapshot.model.objectByQname().values.any { obj ->
+                obj.sourceFile.contains("/" + pkg.replace('.', '/') + "/")
+            }
+        } else {
+            loadedPackages.any { PackageNames.covers(pkg, it) }
+        }
 
     fun listWorlds(): List<QualifiedName> = worlds.keys.sortedBy { it.dotted() }
 
