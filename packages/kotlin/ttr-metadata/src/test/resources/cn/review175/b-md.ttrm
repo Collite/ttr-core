@@ -1,0 +1,5 @@
+package hartland.rv
+model md
+
+def domain Code { type: string }
+def dimension Region { key: code, attributes: [ def attribute code { domain: md.Code, isKey: true } ] }

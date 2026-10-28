@@ -1,0 +1,21 @@
+package hartland.rv
+model binding
+
+def cn2er_kind shipment_g { kind: cn.Shipment, target: er.entity.shipment }
+def cn2er_kind customer_g { kind: cn.Customer, target: er.entity.customer }
+def cn2er_kind site_g     { kind: cn.Site, target: er.entity.site }
+// same row: the shipment is the event's own row; the customer is not (its empty path is dangling)
+def cn2er_event shipped_g   { event: cn.Shipped, target: er.entity.shipment, period: { at: er.entity.shipment.shipped }, participants: { shipment: [], customer: [er.relation.shipment_customer] } }
+def cn2er_event misplaced_g { event: cn.Misplaced, target: er.entity.shipment, period: { at: er.entity.shipment.shipped }, participants: { shipment: [], customer: [] } }
+// written targets that do not resolve
+def cn2md_kind region_g  { kind: cn.Region, target: md.Nowhere }
+def cn2er_phase closed_g { phase: cn.Closed, target: er.entity.nowhere }
+// the period only on the binding: still an episode table
+def cn2er_quality began_g { quality: cn.began, target: er.entity.site_outage.began }
+def cn2er_quality ended_g { quality: cn.ended, target: er.entity.site_outage.ended }
+def cn2er_phase down_g {
+    phase: cn.Down,
+    target: er.entity.site_outage,
+    period: { start: er.entity.site_outage.began, end: er.entity.site_outage.ended },
+    participants: { site: [er.relation.outage_site] }
+}

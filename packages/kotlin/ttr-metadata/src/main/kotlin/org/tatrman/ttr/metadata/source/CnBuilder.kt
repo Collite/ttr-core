@@ -511,7 +511,10 @@ private class CnTierBuilder(
     private fun computeLanding(key: String): Landing {
         val c = concepts[key] ?: return Landing()
         val placed = validation.groundings.byConcept[key]?.firstOrNull()
-        if (placed == null || placed.targetSymbol == null) {
+        // Only a target-less source binding (bounds, `from`/`until`, `via` + `per`) projects or inherits; a written
+        // target that does not resolve stays on its layer's path (an md one is HOP_MISSING, A-CN-65).
+        val sourceOnly = placed != null && placed.grounding.target == null && placed.grounding.targetKey == null
+        if (placed == null || sourceOnly) {
             projection(c)?.let { p ->
                 val q =
                     concepts.values.firstOrNull { x ->
@@ -586,6 +589,19 @@ private class CnTierBuilder(
             }
             GroundingLayer.DB -> Landing()
         }
+    }
+
+    /** Whether [stated]'s participant [label] is [target]'s own row: its concept lands on that entity (`label: []`). */
+    private fun sameRow(
+        stated: CnConcept?,
+        label: String,
+        target: SymbolEntry?,
+    ): Boolean {
+        if (stated == null || target?.kind != "entity") return false
+        val concept = involves(stated).firstOrNull { it.label == label }?.concept ?: return false
+        val key = concepts.keys.firstOrNull { cnName(it) == concept } ?: return false
+        val landing = landingOf(key)
+        return landing.qualifiedErTarget == target.qname || landing.erTarget == elementRefOf(target)
     }
 
     /** The er entity a quality's bearer lands on — rule 2 of the hop (AM-29). */
@@ -666,12 +682,19 @@ private class CnTierBuilder(
                         } ?: HierarchyRanges.NODE,
                 )
             }
+        val stated = concepts[conceptKey]
         val participants = linkedMapOf<String, List<String>>()
         (entryOf("participants") as? PropertyValue.ObjectValue)?.entries?.forEach { (label, value) ->
-            val path = ids(value).map { element(it) }
-            if (path.isNotEmpty() && path.all { it != null }) participants[label] = path.map { it!! }
+            val written = ids(value)
+            if (written.isEmpty()) {
+                // `label: []` — the participant is the binding's own row; it holds only when the participant's concept
+                // lands on the target entity, else the empty path is dangling (hygiene lists it).
+                if (sameRow(stated, label, p.targetSymbol)) participants[label] = emptyList() else dangling += "$label: []"
+                return@forEach
+            }
+            val path = written.map { element(it) }
+            if (path.all { it != null }) participants[label] = path.map { it!! }
         }
-        val stated = concepts[conceptKey]
         if (stated?.stereotype == "phase" && sourceProperty(stated, "period") != null && participants.isEmpty()) {
             val bearer = entry(stated, "of")?.let { (v, d) -> ids(v).firstOrNull()?.let { conceptOf(it, d) } }
             val subject =
@@ -772,7 +795,7 @@ private class CnTierBuilder(
             viaPath = viaPath,
             episodes =
                 if (stated?.stereotype == "phase" &&
-                    (first(stated, "period") != null || entryOf("episodes") != null)
+                    (sourceProperty(stated, "period") != null || entryOf("episodes") != null)
                 ) {
                     p.targetSymbol?.let(::elementRefOf)
                 } else {

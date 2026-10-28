@@ -75,6 +75,9 @@ internal object CnFixtures {
     /** The hop-present project (`resources/cn/hop`, package `hartland.web`). */
     fun hop(): CnProject = load(dir(resources.resolve("hop"), "hartland/web"))
 
+    /** review-175's metadata cases (`resources/cn/review175`, package `hartland.rv`): `label: []`, dangling targets. */
+    fun review175(): CnProject = load(dir(resources.resolve("review175"), "hartland/rv"))
+
     /** The CN-P3 consumer facts (`resources/cn/consumer`, package `hartland.consumer`): reverse hop, unit, bounds. */
     fun consumer(): CnProject = load(dir(resources.resolve("consumer"), "hartland/consumer"))
 

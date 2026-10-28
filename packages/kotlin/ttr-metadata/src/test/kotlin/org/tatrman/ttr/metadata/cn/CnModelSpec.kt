@@ -256,6 +256,37 @@ class CnModelSpec :
             hop.result.errors shouldBe emptyList()
         }
 
+        // ---- review-175 ------------------------------------------------------------------------------------------
+
+        "F1: an empty participant path is kept when the participant is the binding's own row, else it is dangling" {
+            val rv = CnFixtures.review175()
+            rv.concept("Shipped").grounding!!.let {
+                it.participants shouldBe
+                    mapOf("shipment" to emptyList(), "customer" to listOf("er.relation.shipment_customer"))
+                it.dangling shouldBe emptyList()
+            }
+            rv.concept("Misplaced").grounding!!.let {
+                it.participants shouldBe mapOf("shipment" to emptyList())
+                it.dangling shouldBe listOf("customer: []")
+            }
+        }
+
+        "F10: a written target that does not resolve stays on its layer's landing; it is not inherited" {
+            val rv = CnFixtures.review175()
+            rv.concept("Region").let { Triple(it.erTarget, it.via, it.grade) } shouldBe
+                Triple(null, MD_HOP, MD_GROUNDED_HOP_MISSING)
+            // a subkind inherits its bearer's landing (er.entity.site) — but not when its own binding is broken
+            rv.concept("Site").erTarget shouldBe "er.entity.site"
+            rv.concept("Closed").let {
+                it.erTarget.shouldBeNull()
+                it.landingFrom.shouldBeNull()
+            }
+        }
+
+        "F12: a period written only on the cn2er_phase binding still makes the phase an episode table" {
+            CnFixtures.review175().concept("Down").grounding!!.episodes shouldBe "er.entity.site_outage"
+        }
+
         "the grounding read: its target, kind and layer; a desugared one is synthetic" {
             val g = concepts.concept("ProductCategory").grounding!!
             g.qname shouldBe QualifiedName(SchemaCode.CN, "cn2er_kind", "ProductCategory.grounds", pkg)
