@@ -11,7 +11,7 @@ reference's own source span.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from ..model import (
     AttributeDef,
@@ -160,7 +160,7 @@ def _collect_into(
         out.extend(_ref_of(r, owner, "measure") for r in definition.measure_refs)
     # 0.17 - the cn model: a concept def's and a binding's slots.
     elif isinstance(definition, ConceptDef):
-        _collect_concept_body(definition.body, "def", owner, out)
+        _collect_concept_body(definition.body, "def", owner, out, definition.stereotype)
     elif isinstance(definition, ConceptBindingDef):
         _collect_concept_body(definition.body, "binding", owner, out)
     # 0.17 - the `concept { }` sugar on an md / er host.
@@ -194,7 +194,9 @@ def id_path(v: IdValue) -> str:
     return v.ref.path if v.ref is not None else ".".join(v.parts)
 
 
-def _collect_concept_body(body: ConceptBody, mode: str, owner: Definition, out: list[CollectedRef]) -> None:
+def _collect_concept_body(
+    body: ConceptBody, mode: str, owner: Definition, out: list[CollectedRef], stereotype: str | None = None
+) -> None:
     """The references of one cn body, in authored order. `mode` says whose body it is: a concept def
     (`period:` names the bearer's qualities), a binding (`period:` names er attributes, `participants:`
     keys name the event's labels) or the sugar (its stereotype slot declares - no reference). Groundings
@@ -208,6 +210,7 @@ def _collect_concept_body(body: ConceptBody, mode: str, owner: Definition, out: 
         out.append(CollectedRef(id_path(v), v.parts, v.source, owner))
 
     declaring = sugar_stereotype_key(body) if mode == "sugar" else None
+    quality = (stereotype or declaring) == "quality"
     event_ref = (
         next((p for p in body.properties if isinstance(p, ConceptRef) and p.key == "event"), None)
         if mode == "binding"
@@ -218,7 +221,11 @@ def _collect_concept_body(body: ConceptBody, mode: str, owner: Definition, out: 
             if p.key != declaring:
                 cn(p.ref.path, p.ref.parts, p.ref.source)
         elif isinstance(p, ConceptFrom):
-            if len(p.ref.parts) == 1:
+            # A quality's `from: ListPrice.amount` names its relator (the quality is the relator's, checked by
+            # `cn/projection-source`); a phase's `from:` names its starting event, dotted or not (review-175 F11).
+            if quality and len(p.ref.parts) > 1:
+                cn(*_head_of(p.ref.path, p.ref.parts, p.ref.source))
+            else:
                 cn(p.ref.path, p.ref.parts, p.ref.source)
         elif isinstance(p, (ConceptUntil, ConceptPer)):
             cn(p.ref.path, p.ref.parts, p.ref.source)
@@ -285,10 +292,24 @@ def _collect_concept_body(body: ConceptBody, mode: str, owner: Definition, out: 
             elif p.key == "via":
                 for v in ids_of(p.value):
                     if mode == "binding" and body.ref("quality") is not None and v.parts[0] not in ("er", "md", "db"):
-                        parts = v.parts[:-1]
-                        cn(".".join(parts), parts, v.source)
+                        cn(*_head_of(id_path(v), v.parts, v.source))
                     else:
                         plain(v)
+
+
+def _head_of(path: str, parts: tuple[str, ...], source: SourceLocation) -> tuple[str, tuple[str, ...], SourceLocation]:
+    """`ListPrice` of `ListPrice.amount` - the reference to a relator whose quality a projection reads. Its span
+    covers the head only, so a rename of the relator rewrites `ListPrice` and keeps `.amount` (a span with whitespace
+    inside keeps the whole span). Mirrors TS `headRef` (`references.ts`)."""
+    head = parts[:-1]
+    head_path = ".".join(head)
+    tight = source.offset_end - source.offset_start == len(path) and source.line == source.end_line
+    span = (
+        replace(source, end_column=source.column + len(head_path), offset_end=source.offset_start + len(head_path))
+        if tight
+        else source
+    )
+    return head_path, head, span
 
 
 def _push_id_value(

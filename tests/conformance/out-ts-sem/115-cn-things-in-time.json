@@ -35,11 +35,13 @@
         "ttr/unresolved-reference",
         "ttr/unresolved-reference",
         "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
         "ttr/unresolved-reference"
     ],
     "resolved": [
         "Document => workshop.concepts.cn.concept.Document",
         "Invoice => workshop.concepts.cn.concept.Invoice",
+        "ListPrice => workshop.concepts.cn.concept.ListPrice",
         "Order => workshop.concepts.cn.concept.Order",
         "Order => workshop.concepts.cn.concept.Order"
     ],

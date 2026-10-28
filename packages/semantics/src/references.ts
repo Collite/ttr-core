@@ -109,7 +109,7 @@ export function collectReferences(def: Definition): Reference[] {
       break;
     // 0.17 — the cn model: a concept def's and a binding's slots.
     case 'concept':
-      collectConceptBodyRefs(def, 'def', refs);
+      collectConceptBodyRefs(def, 'def', refs, def.stereotype);
       break;
     case 'conceptBinding':
       collectConceptBodyRefs(def, 'binding', refs);
@@ -160,6 +160,20 @@ function cnRef(ref: Reference, soft = false): CnSlotReference {
   return soft ? { path, parts, source, cnContext: true, soft: true } : { path, parts, source, cnContext: true };
 }
 
+/**
+ * `ListPrice` of `ListPrice.amount` — the reference to a relator whose quality a projection reads. Its span covers the
+ * head only, so a rename of the relator rewrites `ListPrice` and keeps `.amount` (a span with whitespace inside keeps
+ * the whole span).
+ */
+function headRef(ref: Reference): Reference {
+  const parts = ref.parts.slice(0, -1);
+  const path = parts.join('.');
+  const s = ref.source;
+  const tight = s.offsetEnd - s.offsetStart === ref.path.length && s.line === s.endLine;
+  const source = tight ? { ...s, endColumn: s.column + path.length, offsetEnd: s.offsetStart + path.length } : s;
+  return { path, parts, source };
+}
+
 function idRef(v: IdValue): Reference {
   return { path: v.path, parts: v.parts, source: v.source };
 }
@@ -195,8 +209,9 @@ const BINDING_PERIOD_INSTANTS: ReadonlySet<string> = new Set([...PERIOD_INSTANTS
  * Groundings and binding targets name an md / er / db element and resolve the generic way;
  * `hierarchy:`'s `ancestor` / `descendant` are read relative to its `closure` entity.
  */
-function collectConceptBodyRefs(body: ConceptBody, mode: 'def' | 'binding' | 'sugar', out: Reference[]): void {
+function collectConceptBodyRefs(body: ConceptBody, mode: 'def' | 'binding' | 'sugar', out: Reference[], stereotype?: string): void {
   const declaring = mode === 'sugar' ? sugarStereotypeKey(body) : undefined;
+  const quality = (stereotype ?? declaring) === 'quality';
   const eventRef = mode === 'binding'
     ? body.properties.find((p) => p.kind === 'ref' && p.key === 'event')
     : undefined;
@@ -206,7 +221,9 @@ function collectConceptBodyRefs(body: ConceptBody, mode: 'def' | 'binding' | 'su
         if (p.key !== declaring) out.push(cnRef(p.ref));
         break;
       case 'from':
-        if (p.ref.parts.length === 1) out.push(cnRef(p.ref));
+        // A quality's `from: ListPrice.amount` names its relator (the quality is the relator's, checked by
+        // `cn/projection-source`); a phase's `from:` names its starting event, dotted or not (review-175 F11).
+        out.push(cnRef(quality && p.ref.parts.length > 1 ? headRef(p.ref) : p.ref));
         break;
       case 'until':
       case 'per':
@@ -279,7 +296,7 @@ function collectConceptBodyRefs(body: ConceptBody, mode: 'def' | 'binding' | 'su
           case 'via':
             for (const id of idsOf(p.value)) {
               if (mode === 'binding' && body.properties.some((p) => p.kind === 'ref' && p.key === 'quality') && !['er', 'md', 'db'].includes(id.parts[0])) {
-                const parts = id.parts.slice(0, -1); out.push(cnRef({path: parts.join('.'), parts, source: id.source}));
+                out.push(cnRef(headRef(idRef(id))));
               } else out.push(idRef(id));
             }
             break;
