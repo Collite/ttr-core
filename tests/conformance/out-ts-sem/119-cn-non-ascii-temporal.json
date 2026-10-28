@@ -1,0 +1,24 @@
+{
+    "diagnostics": [
+        "cn/subkind-temporal-definition",
+        "cn/subkind-temporal-definition",
+        "cn/ungrounded",
+        "cn/ungrounded"
+    ],
+    "resolved": [
+        "Sklad => cn.concept.Sklad",
+        "Sklad => cn.concept.Sklad",
+        "Sklad => cn.concept.Sklad",
+        "Sklad => cn.concept.Sklad",
+        "Sklad => cn.concept.Sklad",
+        "stav => cn.concept.stav"
+    ],
+    "symbols": [
+        "cn.concept.NedávnýSklad",
+        "cn.concept.PostiženýSklad",
+        "cn.concept.Sklad",
+        "cn.concept.StaršíSklad",
+        "cn.concept.Výpadek",
+        "cn.concept.stav"
+    ]
+}

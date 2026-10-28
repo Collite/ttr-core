@@ -9,6 +9,23 @@ import org.tatrman.ttr.metadata.model.GroundingGrade
 import org.tatrman.ttr.metadata.model.GroundingLayer
 import org.tatrman.ttr.metadata.model.Imprecision
 import org.tatrman.ttr.metadata.model.QualifiedName
+import org.tatrman.ttrp.expr.AggregateCall
+import org.tatrman.ttrp.expr.CaseWhen
+import org.tatrman.ttrp.expr.Cast
+import org.tatrman.ttrp.expr.ColumnRef
+import org.tatrman.ttrp.expr.ConceptAggregate
+import org.tatrman.ttrp.expr.DurationExpr
+import org.tatrman.ttrp.expr.ExistsExpr
+import org.tatrman.ttrp.expr.Expression
+import org.tatrman.ttrp.expr.FunctionCall
+import org.tatrman.ttrp.expr.InCall
+import org.tatrman.ttrp.expr.InList
+import org.tatrman.ttrp.expr.IsNull
+import org.tatrman.ttrp.expr.Literal
+import org.tatrman.ttrp.expr.MdPath
+import org.tatrman.ttrp.expr.ParamRef
+import org.tatrman.ttrp.expr.TemporalPredicate
+import org.tatrman.ttrp.expr.ThisRef
 
 /**
  * The definition-level `cn/…` slugs (contracts §7; CN-D29 — Kotlin's, reported by `ttr cn hygiene`, never in the
@@ -71,9 +88,13 @@ object CnDefinitionLints {
             val owner = cn.concepts[d.owner] ?: continue
             val closure = closure(d, byOwner)
             if (owner.stereotype == "subkind") {
+                // The same rule as the semantic layer's portable text check (review-175 F9): `:as_of` (written, or read
+                // by `within(…, last:)` / `age(…)`), a `:name`, a DC-12 predicate — `within(…)` in either form is one —
+                // or a phase / valued-state read. A bare `period` read is rigid in both.
                 val temporal =
                     closure.any { block ->
                         block.reads.asOf ||
+                            callsWithin(block.expression) ||
                             block.reads.parameters.isNotEmpty() ||
                             block.reads.comparisons.any {
                                 it.op in
@@ -108,6 +129,26 @@ object CnDefinitionLints {
         }
         return out
     }
+
+    /** Whether [e] calls `within(…)` anywhere — a DC-12 predicate whatever its bounds (`from:`/`to:` or `last:`). */
+    private fun callsWithin(e: Expression?): Boolean =
+        when (e) {
+            null -> false
+            is FunctionCall -> e.function.name == "within" || e.args.any(::callsWithin)
+            is AggregateCall -> e.args.any(::callsWithin)
+            is Cast -> callsWithin(e.expr)
+            is CaseWhen -> e.branches.any { callsWithin(it.first) || callsWithin(it.second) } || callsWithin(e.elseExpr)
+            is InList -> callsWithin(e.expr) || e.items.any(::callsWithin)
+            is IsNull -> callsWithin(e.expr)
+            is ExistsExpr -> e.involving.any { callsWithin(it.path) } || callsWithin(e.where)
+            is ConceptAggregate ->
+                e.involving.any { callsWithin(it.path) } ||
+                    callsWithin(e.where) ||
+                    e.namedArgs.any { callsWithin(it.second) }
+            is InCall -> callsWithin(e.expr) || callsWithin(e.call)
+            is TemporalPredicate -> callsWithin(e.lhs) || callsWithin(e.rhs)
+            is ColumnRef, is Literal, is MdPath, is ParamRef, is DurationExpr, is ThisRef -> false
+        }
 
     /** What [d] reads with every definition it names inlined, transitively (cycle-safe). */
     private fun closure(

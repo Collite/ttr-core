@@ -145,6 +145,15 @@ def cnc_deprecations(doc: CnDocument) -> list[CnDiagnostic]:
 # Small readers
 # ---------------------------------------------------------------------------
 
+#: `cn/subkind-temporal-definition`'s word rule (review-175 F9; TS `validate.ts` and Kotlin say the same): a
+#: definition's words are `TTR.g4`'s `IDENT` (`À-ɏ` included). It is temporal when it reads `:as_of` or a `:name`
+#: parameter — written, or implied by `within(…)` / `age(…)` — or a DC-12 word; `period` alone is not temporal.
+_DEFINITION_WORD = re.compile(r"[A-Za-zÀ-ɏ_][A-Za-z0-9_À-ɏ]*")
+_TEMPORAL_READ = re.compile(
+    r"(?<![A-Za-z0-9_À-ɏ]):[A-Za-zÀ-ɏ_]|(?<![.A-Za-z0-9_À-ɏ])(?:within|age)\s*\(", re.I
+)
+_TEMPORAL_WORDS = frozenset({"at_or_before", "before", "contains", "ended_before", "overlaps"})
+
 
 def _is_true(s: StatedProperty | None) -> bool:
     return (
@@ -510,9 +519,11 @@ class _CnValidator:
             if s is None or not isinstance(s.property, (ConceptDefinition, ConceptMembers)):
                 return False
             text = re.sub(r"'(''|[^'])*'|\"(\\.|[^\"])*\"", " ", s.property.block.text)
-            if re.search(r"(?<![a-z0-9_]):[a-z_][a-z0-9_]*|\b(period|at_or_before|before|contains|ended_before|overlaps|within|parameter)\b", text, re.I):
+            if _TEMPORAL_READ.search(text):
                 return True
-            words = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text))
+            words = set(_DEFINITION_WORD.findall(text))
+            if any(w.lower() in _TEMPORAL_WORDS for w in words):
+                return True
             return any(x.key != c.key and x.name in words and temporal(x, visiting) for x in self.concepts.values())
 
         for c in self.concepts.values():
@@ -575,7 +586,7 @@ class _CnValidator:
             s = prop(c, "definition")
             if c.stereotype != "subkind" or s is None or not isinstance(s.property, ConceptDefinition):
                 continue
-            match = re.fullmatch(r"\s*(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*'([^']*)'\s*", s.property.block.text)
+            match = re.fullmatch(r"\s*(?:this\.)?([A-Za-z\u00C0-\u024F_][A-Za-z0-9_\u00C0-\u024F]*)\s*=\s*'([^']*)'\s*", s.property.block.text)
             bearer = named(c, "of")
             if match and bearer:
                 attr, value = match.groups()

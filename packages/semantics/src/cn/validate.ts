@@ -109,6 +109,16 @@ function idRef(v: IdValue): Reference {
   return { path: v.path, parts: v.parts, source: v.source };
 }
 
+/**
+ * `cn/subkind-temporal-definition`'s word rule (review-175 F9), shared with Kotlin and Python: a definition's words are
+ * `TTR.g4`'s `IDENT` (`À-ɏ` included). It is temporal when it reads `:as_of` or a `:name` parameter — written, or
+ * implied by `within(…)` / `age(…)`, which `ttr-concept`'s reads count as an as-of read and DC-12 lists as a temporal
+ * predicate — or a DC-12 word. `period` alone is not temporal (a period bound against a constant is rigid).
+ */
+const DEFINITION_WORD = /[A-Za-zÀ-ɏ_][A-Za-z0-9_À-ɏ]*/g;
+const TEMPORAL_READ = /(?<![A-Za-z0-9_À-ɏ]):[A-Za-zÀ-ɏ_]|(?<![.A-Za-z0-9_À-ɏ])(?:within|age)\s*\(/i;
+const TEMPORAL_WORDS: ReadonlySet<string> = new Set(['at_or_before', 'before', 'contains', 'ended_before', 'overlaps']);
+
 /** The last segment of a key — how a message names a concept or an element. */
 function shortName(qname: string): string {
   return qname.slice(qname.lastIndexOf('.') + 1);
@@ -422,8 +432,9 @@ class CnValidator {
       const p = prop(c, 'definition')?.property ?? prop(c, 'members')?.property;
       if (!p || !('block' in p) || !('text' in p.block)) return false;
       const text = p.block.text.replace(/'(''|[^'])*'|"(\\.|[^"])*"/g, ' ');
-      if (/(?<![a-z0-9_]):[a-z_][a-z0-9_]*|\b(period|at_or_before|before|contains|ended_before|overlaps|within|parameter)\b/i.test(text)) return true;
-      const words = new Set(text.match(/[A-Za-z_][A-Za-z0-9_]*/g));
+      if (TEMPORAL_READ.test(text)) return true;
+      const words = new Set(text.match(DEFINITION_WORD));
+      if ([...words].some((w) => TEMPORAL_WORDS.has(w.toLowerCase()))) return true;
       return [...this.concepts.values()].some((x) => x.key !== c.key && words.has(x.name) && temporal(x, visiting));
     };
     for (const c of this.concepts.values()) {
@@ -471,7 +482,7 @@ class CnValidator {
     const groups = new Map<string, Array<{c: CnConcept; bearer: CnConcept; attr: string; value: string}>>();
     for (const c of this.concepts.values()) {
       if (c.stereotype !== 'subkind') continue;
-      const p = prop(c, 'definition')?.property; const match = p?.kind === 'definition' ? /^\s*(?:this\.)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*'([^']*)'\s*$/.exec(p.block.text) : null;
+      const p = prop(c, 'definition')?.property; const match = p?.kind === 'definition' ? /^\s*(?:this\.)?([A-Za-z\u00C0-\u024F_][A-Za-z0-9_\u00C0-\u024F]*)\s*=\s*'([^']*)'\s*$/.exec(p.block.text) : null;
       const bearer = named(c, 'of'); if (!match || !bearer) continue;
       const key = `${bearer.key}|${match[1]}`; const group = groups.get(key) ?? []; group.push({c, bearer, attr: match[1], value: match[2]}); groups.set(key, group);
     }

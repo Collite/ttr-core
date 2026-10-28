@@ -1,0 +1,10 @@
+// review-175 F9: a definition's words are TTR.g4's IDENT (À-ɏ included) on all three runtimes.
+model cn
+def kind Sklad { label: { cs: "Sklad", en: "Warehouse" }, qualities: [stav] }
+def quality stav { of: Sklad }
+def phase Výpadek { of: Sklad, definition: """stav = 'mimo'""" }
+// names the phase `Výpadek` — temporal (TS / Python used to split it into `V` + `padek`)
+def subkind PostiženýSklad { of: Sklad, definition: """exists Výpadek involving this""" }
+// a bare `period` read is rigid; `within(…)` is a DC-12 predicate
+def subkind StaršíSklad { of: Sklad, definition: """this.period.start < '2020-01-01'""" }
+def subkind NedávnýSklad { of: Sklad, definition: """within(this.period.start, from: '2026-01-01', to: '2026-12-31')""" }

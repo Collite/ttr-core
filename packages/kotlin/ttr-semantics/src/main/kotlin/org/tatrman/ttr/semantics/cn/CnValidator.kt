@@ -165,6 +165,20 @@ private fun article(stereotype: String): String =
 private fun stereotypeOfBinding(bindingKind: String): String? =
     if (bindingKind == "cn2db_concept") null else bindingKind.substringAfter('_')
 
+/**
+ * `cn/subkind-temporal-definition`'s word rule (review-175 F9; TS `validate.ts` and Python say the same): a definition's
+ * words are `TTR.g4`'s `IDENT` (`À-ɏ` included). It is temporal when it reads `:as_of` or a `:name` parameter —
+ * written, or implied by `within(…)` / `age(…)`, which `ttr-concept`'s reads count as an as-of read and DC-12 lists as a
+ * temporal predicate — or a DC-12 word. `period` alone is not temporal (a period bound against a constant is rigid).
+ */
+private val STRING_LITERAL = Regex("'(''|[^'])*'|\"(\\\\.|[^\"])*\"")
+private val DEFINITION_WORD = Regex("[A-Za-z\\u00C0-\\u024F_][A-Za-z0-9_\\u00C0-\\u024F]*")
+private val TEMPORAL_READ =
+    Regex(
+        "(?i)(?<![A-Za-z0-9_\\u00C0-\\u024F]):[A-Za-z\\u00C0-\\u024F_]|(?<![.A-Za-z0-9_\\u00C0-\\u024F])(?:within|age)\\s*\\(",
+    )
+private val TEMPORAL_WORDS = setOf("at_or_before", "before", "contains", "ended_before", "overlaps")
+
 /** What a binding kind may target, as a predicate and as words (design `09` §2, cn contracts §1.2). */
 private class TargetRule(
     val what: String,
@@ -919,18 +933,11 @@ private class CnValidator(
             val block =
                 (prop(c, "definition")?.property as? ConceptProperty.DefinitionBlock)?.block
                     ?: (prop(c, "members")?.property as? ConceptProperty.MembersBlock)?.block ?: return false
-            val text = block.text.replace(Regex("'(''|[^'])*'|\"(\\\\.|[^\"])*\""), " ")
-            if (Regex(
-                    "(?i)(?<![a-z0-9_]):[a-z_][a-z0-9_]*|\\b(period|at_or_before|before|contains|ended_before|overlaps|within|parameter)\\b",
-                ).containsMatchIn(text)
-            ) {
-                return true
-            }
-            return concepts.values.any { x ->
-                x.key != c.key &&
-                    Regex("\\b${Regex.escape(x.name)}\\b").containsMatchIn(text) &&
-                    temporal(x, visiting)
-            }
+            val text = block.text.replace(STRING_LITERAL, " ")
+            if (TEMPORAL_READ.containsMatchIn(text)) return true
+            val words = DEFINITION_WORD.findAll(text).map { it.value }.toSet()
+            if (words.any { it.lowercase() in TEMPORAL_WORDS }) return true
+            return concepts.values.any { x -> x.key != c.key && x.name in words && temporal(x, visiting) }
         }
         for (c in concepts.values) {
             if (c.stereotype == "subkind" &&
@@ -1154,7 +1161,7 @@ private class CnValidator(
             val attribute: String,
             val value: String,
         )
-        val eq = Regex("^\\s*(?:this\\.)?([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*'([^']*)'\\s*$")
+        val eq = Regex("^\\s*(?:this\\.)?([A-Za-z\\u00C0-\\u024F_][A-Za-z0-9_\\u00C0-\\u024F]*)\\s*=\\s*'([^']*)'\\s*$")
         val partitions =
             concepts.values
                 .mapNotNull { c ->
