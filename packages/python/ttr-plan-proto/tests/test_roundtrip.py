@@ -130,3 +130,15 @@ def test_assertion_concept_keeps_wire_field_one() -> None:
     assert parsed.concept.qname == "cn.Transfer"
     assert parsed.SerializeToString() == legacy
     assert assertion_pb2.Assertion.DESCRIPTOR.fields_by_name["concept"].number == 1
+
+
+def test_assertion_event_json_key_is_gone() -> None:
+    # review-175 F8 (⚑B): the field-1 rename is BREAKING for JSON — no `event` alias; the strict parser refuses it.
+    import pytest
+    from google.protobuf import json_format
+
+    from org.tatrman.assertion.v1 import assertion_pb2
+
+    old = '{ "event": { "qname": "cn.Transfer" }, "identity": { "new": true } }'
+    with pytest.raises(json_format.ParseError, match="event"):
+        json_format.Parse(old, assertion_pb2.Assertion())

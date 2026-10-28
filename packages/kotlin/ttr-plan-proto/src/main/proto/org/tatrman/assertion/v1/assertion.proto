@@ -10,7 +10,9 @@
 //
 // JSON mapping: protobuf JsonFormat, canonical. FROZEN at CN-P3 S3.1 (2026-10-22): `Assertion` and `Identity` as
 // contracts §2.3 pins them, and the sub-messages it sketches (KeyValues, Participant, QualityValue, Provenance) as
-// written here. CN-P8 S8.2 renames field 1 from event to concept, preserving binary wire encoding; JSON/API clients migrate.
+// written here — J-v2 additive-only from that freeze, except the CN-P8 field-1 rename (translator 0.13.0): field 1
+// `event` became `concept`. The binary encoding is unchanged; the JSON key (`event` → `concept`) and the generated
+// accessors are not — a BREAKING change for JSON and API clients, with no `event` alias.
 // =============================================================================
 syntax = "proto3";
 
