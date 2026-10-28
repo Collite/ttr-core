@@ -74,6 +74,7 @@ class DiagnosticCode(Enum):
     CN_GROUNDING_TARGET_KIND = "cn/grounding-target-kind"  # a target the stereotype x layer table does not allow
     CN_ROLE_NO_EVENT = "cn/role-no-event"  # a role without its defining event (CN-D6)
     CN_SUBKIND_TEMPORAL_DEFINITION = "cn/subkind-temporal-definition"
+    CN_SUBKIND_BEARER = "cn/subkind-bearer"  # a subkind whose `of:` is not rigid (a phase, quality, ...)
     CN_PARTITION_OVERLAP = "cn/partition-overlap"
     CN_PARTITION_INCOMPLETE = "cn/partition-incomplete"
     CN_SUBKIND_AS_KIND = "cn/subkind-as-kind"

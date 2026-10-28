@@ -160,6 +160,7 @@ export enum DiagnosticCode {
   CnGroundingTargetKind = 'cn/grounding-target-kind',             // a grounding's target is not what the stereotype × layer table allows
   CnRoleNoEvent = 'cn/role-no-event',                             // a role without its defining event (CN-D6)
   CnSubkindTemporalDefinition = 'cn/subkind-temporal-definition',
+  CnSubkindBearer = 'cn/subkind-bearer',                         // a subkind whose `of:` is not rigid (a phase, quality, …)
   CnPartitionOverlap = 'cn/partition-overlap',
   CnPartitionIncomplete = 'cn/partition-incomplete',
   CnSubkindAsKind = 'cn/subkind-as-kind',

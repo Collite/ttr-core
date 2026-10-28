@@ -64,6 +64,7 @@ export const CN_HYGIENE_RULE_IDS: ReadonlySet<string> = new Set([
 
 export const CN_RULES: Rule[] = [
   cnRule('cn-subkind-temporal-definition', DiagnosticCode.CnSubkindTemporalDefinition, 'error', 'CN-P8 things-in-time validation: subkind temporal definition.'),
+  cnRule('cn-subkind-bearer', DiagnosticCode.CnSubkindBearer, 'error', 'CN-P8 things-in-time validation: a subkind specializes a rigid bearer (kind, subkind, role or event).'),
   cnRule('cn-partition-overlap', DiagnosticCode.CnPartitionOverlap, 'error', 'CN-P8 things-in-time validation: partition overlap.'),
   cnRule('cn-partition-incomplete', DiagnosticCode.CnPartitionIncomplete, 'warning', 'CN-P8 things-in-time validation: partition incomplete.'),
   cnRule('cn-subkind-as-kind', DiagnosticCode.CnSubkindAsKind, 'warning', 'CN-P8 things-in-time validation: subkind as kind.'),

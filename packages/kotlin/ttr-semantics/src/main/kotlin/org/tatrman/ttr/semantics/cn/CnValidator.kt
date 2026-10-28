@@ -971,13 +971,15 @@ private class CnValidator(
                     key = "event",
                 )
             }
+            val bearerStereotype = named(c, "of")?.stereotype
             if (c.stereotype == "subkind" &&
-                named(c, "of")?.stereotype?.let { it !in setOf("kind", "subkind", "role", "event") } == true
+                bearerStereotype != null &&
+                bearerStereotype !in setOf("kind", "subkind", "role", "event")
             ) {
                 emit(
                     c,
-                    DiagnosticCode.CnSubkindTemporalDefinition,
-                    "subkind '${c.name}' requires a rigid bearer",
+                    DiagnosticCode.CnSubkindBearer,
+                    "subkind '${c.name}' requires a rigid bearer — a kind, subkind, role or event, not a $bearerStereotype",
                     key = "of",
                 )
             }

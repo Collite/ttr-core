@@ -152,6 +152,7 @@ describe('CN-P2 S2.3 — the cn rules in the registry and the presets', () => {
       'cn/projection-source',
       'cn/role-no-event',
       'cn/subkind-as-kind',
+      'cn/subkind-bearer',
       'cn/subkind-temporal-definition',
       'cn/ungrounded',
       'cn/unknown-relation-type',

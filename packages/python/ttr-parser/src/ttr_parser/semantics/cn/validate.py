@@ -504,7 +504,7 @@ class _CnValidator:
                 emit(c, DiagnosticCode.CN_ROLE_NO_EVENT, f"role '{c.name}' requires an event as its defining event", key="event")
             bearer = named(c, "of")
             if c.stereotype == "subkind" and bearer and bearer.stereotype not in {"kind", "subkind", "role", "event"}:
-                emit(c, DiagnosticCode.CN_SUBKIND_TEMPORAL_DEFINITION, f"subkind '{c.name}' requires a rigid bearer", key="of")
+                emit(c, DiagnosticCode.CN_SUBKIND_BEARER, f"subkind '{c.name}' requires a rigid bearer — a kind, subkind, role or event, not a {bearer.stereotype}", key="of")
             ep = prop(c, "extent")
             extent = ep.property.value if ep and isinstance(ep.property, ConceptExtent) else None
             if ep:

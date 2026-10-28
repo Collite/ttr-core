@@ -14,3 +14,5 @@ def phase MissingSubject { of: Item, grounds: er.entity.outage, period: { start:
 def quality InvalidProjection { of: Item, per: Channel, from: ListPrice.amount }
 def quality MissingQuality { of: Item, valued_state: true, from: ListPrice.absent }
 def kind InvalidLifetime { period: { at: created } }
+// review-175 F15: a subkind specializes a rigid bearer; a phase is not one.
+def subkind OpenWeb { of: OpenTicket, definition: """code = 'web'""" }

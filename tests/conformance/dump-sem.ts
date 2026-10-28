@@ -73,6 +73,7 @@ const PORTABLE_RULE_IDS = new Set([
   'cn-antirigid-supertype',
   'cn-cnc-deprecated',
   'cn-subkind-temporal-definition',
+  'cn-subkind-bearer',
   'cn-partition-overlap',
   'cn-partition-incomplete',
   'cn-subkind-as-kind',
