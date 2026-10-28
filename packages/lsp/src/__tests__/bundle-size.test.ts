@@ -24,14 +24,18 @@ import path from 'node:path';
  * Grammar 0.17 (CN-P2, 2026-10-21): the base reached ≈ 641 KB gz — the cn model's parser rules, semantics
  * (desugar, groundings, validation, the hygiene report) and LSP features (hover, rename); still no SQL
  * parser. Ceiling 680 KB: a parser leak (≈ +400 KB) still trips it.
+ *
+ * Grammar 0.20 (CN-P8 review-175, 2026-10-28): the base reached ≈ 681 KB gz — the things-in-time parser rules and
+ * the semantic layer's P8 lints (the IDENT word rule, `per:` coverage, same-row participant paths, dotted `from:`
+ * references); still no SQL parser. Ceiling 720 KB: a parser leak (≈ +400 KB) still trips it.
  */
-const CEILING_BYTES = 680 * 1024;
+const CEILING_BYTES = 720 * 1024;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const bundle = path.resolve(here, '../../dist/server-browser.js');
 
 describe('browser Worker bundle size (S0.3 / E11)', () => {
-  it('server-browser.js gzips under the 680 KB ceiling (no parser leak)', () => {
+  it('server-browser.js gzips under the 720 KB ceiling (no parser leak)', () => {
     if (!existsSync(bundle)) {
       throw new Error(
         `dist/server-browser.js missing — run \`pnpm --filter @tatrman/lsp build\` before this test`,
