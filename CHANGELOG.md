@@ -6,6 +6,16 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Changed — the document-warehouse source ref (`ttr-concept`, DX-RN T4b; breaking for one function)
+
+- `SourceRefs.fromKallimachos` → `SourceRefs.fromDocwh`: Kleio's citation refs are now
+  `docwh://{notebook}/{source}/{part}` (the warehouse took the technical name `docwh`), and map to
+  `doc://docwh/…`. No alias: `kallimachos://` input returns null, since no stored candidate carries the old
+  authority. The `doc://` scheme itself is unchanged.
+- Ships in a 0.18.x patch as a recorded exception to [`PUBLISHING.md`](PUBLISHING.md)'s semver rule (a patch
+  changes no public API): no caller of `fromKallimachos` exists outside this repo's specs. The exception
+  covers this function only; any other public removal in the same cut still needs a minor.
+
 ### Added — embedded Designer host lifecycle (Designer family 0.1.1)
 
 - Optional `DesignerPage.onReady`, `onSnapshot` and `onDiagnostics` callbacks expose the installed
