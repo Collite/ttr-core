@@ -5,17 +5,20 @@ invoice — apart from how the `db`, `er` and `md` layers store it. A **concept*
 those layers, and a defined concept carries the expression that says which rows it means. Agents and recipes speak in
 concepts; the bindings tell them where the data is.
 
-> **Grammar 0.17.1 — checked.** The editor resolves every cn reference, desugars `grounds:` and the `concept { }`
+> **Grammar 0.17.2 — checked.** The editor resolves every cn reference, desugars `grounds:` and the `concept { }`
 > sugar into bindings, and reports the model-level `cn/*` diagnostics as you type. `ttr cn hygiene` adds the checks on
 > `definition:` / `members:` / `filter:` blocks and prints the [hygiene report](#the-hygiene-report).
 > [Diagnostics](#diagnostics) says which check fires where.
 >
-> **Toolchain 0.17.5 — used.** `org.tatrman:ttr-concept` lowers what agents say in concepts to data operations:
+> **Toolchain 0.17.6 — used.** `org.tatrman:ttr-concept` lowers what agents say in concepts to data operations:
 > [statements, assertions and rendering](#statements-assertions-rendering), and `ttr cn materialize`.
 >
 > **0.18.1–0.18.3 — served.** The compiled lexicon carries the concepts, and a Tatrman server reads them when it
 > matches a question and answers frames over its doors ([Concepts at run time](#concepts-at-run-time)). Candidates
 > become concepts through a steward's pull request ([The promotion loop](#the-promotion-loop)).
+>
+> **0.18.10–0.18.12 — the er lane.** A statement md has no single read of is read on E-R
+> ([Statements](#statements)).
 
 | where | what |
 |---|---|
@@ -60,7 +63,7 @@ def kind HomeCategory {
     members: """descendants(ProductCategory, 'H10-H19')"""
 }
 
-def kind Channel { grounds: er.entity.channel_sales.channel }
+def kind Channel { grounds: er.entity.sales.channel }
 
 def role Customer { event: Order, of: Party, grounds: md.Customer }
 
@@ -280,7 +283,7 @@ def cn2md_kind    item_g     { kind: cn.Item, target: md.Product }
 def cn2md_quality revenue_g  { quality: cn.revenue, target: md.revenue }
 def cn2md_event   return_g   { event: cn.Return, target: md.storeReturns }
 
-def cn2er_kind channel_g { kind: cn.Channel, target: er.entity.channel_sales.channel }
+def cn2er_kind channel_g { kind: cn.Channel, target: er.entity.sales.channel }
 def cn2er_role orderer_g { role: cn.Orderer, target: er.entity.party, via: [er.relation.rel_order_customer] }
 def cn2er_event transfer_g {
     event: cn.StockTransfer,
@@ -375,10 +378,11 @@ concept lands on the er layer through a derived hop, the md element's physical b
 layer's. Its hygiene summary:
 
 ```
-83 concepts — 65 er-grounded · 11 md-grounded · 7 ungrounded
+84 concepts — 66 er-grounded · 11 md-grounded · 7 ungrounded
 ```
 
-and no `md-grounded-hop-missing` row. Two of the derived landings:
+and no `md-grounded-hop-missing` row (the 84th, `LargeOrder`, came in through [the promotion loop](#the-promotion-loop)).
+Two of the derived landings:
 
 | concept | grounding | lands on |
 |---|---|---|
@@ -430,7 +434,7 @@ Each `cn/*` diagnostic fires in one of three places:
   Kotlin toolchain — the editor's error rows but the lexicon pair (`cn/duplicate-default-sense` is the editor's
   alone) — and loading errors such as a file whose `package` does not match its directory. Warnings and hygiene
   findings it does not print;
-- **consumer** — `ttr-concept` (toolchain 0.17.5) refuses a statement, an assertion or a recipe with it: its validates
+- **consumer** — `ttr-concept` (toolchain 0.17.6) refuses a statement, an assertion or a recipe with it: its validates
   and lowers, which the tools that read the model at run time call (see
   [Statements, assertions, rendering](#statements-assertions-rendering)).
 
@@ -461,8 +465,8 @@ Each `cn/*` diagnostic fires in one of three places:
 | `cn/definition-unresolved` | hygiene | `ttr cn hygiene` | a definition reading an ungrounded concept |
 | `cn/definition-unreachable(md)` · `(er)` | hygiene · refusal | `ttr cn hygiene` · consumer | a concept the definition reads has no grounding on that layer |
 | `cn/imprecise-comparison` | advisory | `ttr cn hygiene` | instants of different granularity compared under `imprecision: certainly` |
-| `cn/retired-code` | warning | report | a textual code no longer valid in the current vocabulary (once vocabulary versions register) |
-| `cn/not-analytically-reachable` | error | consumer | an aggregating statement slot on a concept with no md grounding |
+| `cn/retired-code` | warning | report | a textual code no longer valid in the current vocabulary — not checked yet: versions register, but only a code-system importer knows which codes a version retires |
+| `cn/not-analytically-reachable` | error | consumer | an aggregating statement slot that neither lane reads: md cannot reach it and E-R does not read the statement (when E-R does, it is `cn/lowered-on-er` instead), or E-R refuses the slot |
 | `cn/not-recipe-reachable` | error | consumer | a recipe's concept with no landing on the er layer |
 | `cn/not-assertable` | error | consumer | an asserted event with no landing on the er layer |
 | `cn/unit-mismatch` | error | consumer | an asserted value's unit differs from the attribute's |
