@@ -20,6 +20,14 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   the same files as the inline vector. Before, `add-term` without `file` used the locale's first file that
   had any term for the same model.
 
+### Changed — provenance attributes stay out of the extraction types (`ttr-concept`, DX PX T2b)
+
+- `SchemaRenderer` leaves an er attribute tagged `"provenance"` (`tags: ["provenance"]`) out of both
+  `Statement[<entity>]` and `Record.<entity>`, as it already does keys. Such an attribute is a column the record ETL
+  writes from the run itself (the annotations a row came from, the consolidation run), so it is queryable on the
+  entity but is neither extracted nor consolidated. Models with no such tag render byte-identically. The tag is
+  declared with no grammar change. `SchemaRenderer.PROVENANCE_TAG` names it.
+
 ### Fixed — the conceptual model chapter (CN-P6 S6.4)
 
 - [Conceptual model (cn)](docs/manual/en/20-conceptual-model.md) names the releases that shipped each part (the cn
