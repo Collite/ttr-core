@@ -29,7 +29,8 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   Inline `insert-entity.terms` take the same rule and see each other's new file and term, so the Studio's
   two-step path writes the same files as the inline vector. Before, `add-term` without `file` used the locale's
   first file that had any term for the same model. A raw root URI over encoded file keys no longer refuses a new
-  file, and the new key is encoded like the others.
+  file, and the new key is encoded like the others. All eight Designer family artifacts advance together to 0.1.2,
+  which carries this `@tatrman/edit`; the internal release is cut after merge.
 
 ### Fixed — native obligation-transition read scope (#319)
 
