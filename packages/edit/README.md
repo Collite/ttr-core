@@ -36,10 +36,14 @@ when it applies an edit to its cache (S1.2).
 | `add-term` | `lang, term, target, file?` | Canonical `def term` with `for` and `forms` | `term-exists`, `target-unknown` |
 
 All operations can also refuse `invalid-args` or `ambiguous-reference`. Qualify references when packages
-collide. Generated term IDs end in `_en`/`_cs` and receive numeric suffixes on name collisions. Inline
-`insert-entity.terms` uses the entity file's first hyphen-separated stem (`returns-review.ttrm` →
-`returns.ttrm`) under each locale. Standalone `add-term` chooses a matching existing locale/model file,
-then the locale's first file, otherwise `<model>.ttrm`; `file` is a locale-relative filename (for example `returns.ttrm`) and overrides this choice. Binding files are
+collide. Generated term IDs end in `_en`/`_cs` and receive numeric suffixes on name collisions.
+`insert-entity` without `file` puts an `on:` entity in its query's own file (an LQ file holds both); with
+`from:` or no source it uses the package's first er file, otherwise `model/er/<name>.ttrm`. A term without
+`file`, inline `insert-entity.terms` and `add-term` alike, goes beside the target's terms in that locale,
+else into the file holding them in another locale (`en/automation.ttrm` → `cs/automation.ttrm`), else under
+the target file's first hyphen-separated stem (`returns-review.ttrm` → `returns.ttrm`), created if absent.
+The two-step path (entity, then one `add-term` per locale) therefore writes the same files as the inline one.
+`file` is a locale-relative filename (for example `returns.ttrm`) and overrides this choice. Binding files are
 selected within the source package, preferring an existing `er2db_entity` carrier.
 
 The DB input is already parsed TTR-M, so column types, precision, optionality and keys are retained.
@@ -53,7 +57,7 @@ The v1 roster check is the documented single-quoted local-name regex over `model
 only pure one-entry roster lines. Any other match is a `roster-manual` ref and refuses even with force. SQL text references and arbitrary JavaScript are
 outside that index's coverage. A worker's diagnostics and the strict loader remain subsequent gates.
 
-The 14 byte-for-byte vectors are in [`__tests__/synth/vectors`](./__tests__/synth/vectors).
+The 20 byte-for-byte vectors are in [`__tests__/synth/vectors`](./__tests__/synth/vectors).
 The `insert-entity/on-query/expected/` files are the demo's portable output contract. Run `pnpm test` here;
 a read-only real-world check is `node packages/edit/scripts/studio-synth-smoke.mjs ../hartland` from the
 repository root after building dependencies and this package.

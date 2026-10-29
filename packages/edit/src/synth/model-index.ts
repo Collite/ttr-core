@@ -114,9 +114,22 @@ export class ModelIndex {
     const docs = this.documents.filter(d => d.pkg === pkg && d.model === 'binding');
     return docs.find(d => d.ast.definitions.some(b => b.kind === 'er2dbEntity'))?.uri ?? docs[0]?.uri ?? this.uri('model/binding/er2db.ttrm');
   }
-  lexiconFile(lang: string, pkg: string, model: string, file?: string): string {
+  /**
+   * Without `file`, a term goes beside the target's terms in this locale, else into the file holding them in
+   * another locale (twin files), else under the target file's first hyphen-separated stem
+   * (`returns-review.ttrm` → `returns.ttrm`). Inline `insert-entity.terms` use this too, so both paths agree.
+   */
+  lexiconFile(lang: string, target: { qname: string; pkg: string; uri: string }, file?: string): string {
     if (file) return this.uri(`model/lexicon/${lang}/${file}`);
-    const docs = this.documents.filter(d => d.pkg === pkg && d.model === 'lexicon' && d.ast.modelDirective?.locale === lang);
-    return docs.find(d => d.ast.definitions.some(t => t.kind === 'term' && t.target?.parts.includes(model)))?.uri ?? docs[0]?.uri ?? this.uri(`model/lexicon/${lang}/${model}.ttrm`);
+    const holders = [...new Set(this.references.findByQname(target.qname).map(r => r.documentUri))].sort(compareCodePoints)
+      .flatMap(uri => this.documents.filter(d => d.uri === uri && d.model === 'lexicon' && d.pkg === target.pkg));
+    const same = holders.find(d => d.ast.modelDirective?.locale === lang);
+    if (same) return same.uri;
+    const name = holders.length ? fileName(holders[0].uri) : fileName(target.uri).replace(/\.ttrm$/, '').split('-')[0] + '.ttrm';
+    return this.uri(`model/lexicon/${lang}/${name}`);
   }
+}
+function fileName(uri: string): string {
+  const name = uri.split('/').at(-1)!;
+  try { return decodeURIComponent(name); } catch { return name; }
 }

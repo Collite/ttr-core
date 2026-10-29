@@ -1,0 +1,8 @@
+package hartland
+
+model lexicon locale cs
+
+def term return_request_cs {
+    for: hartland.er.entity.return_request,
+    forms: ["žádost o vrácení"]
+}

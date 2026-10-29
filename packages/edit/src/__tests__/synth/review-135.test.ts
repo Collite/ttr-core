@@ -32,8 +32,9 @@ describe('review-135 synthesis regressions', () => {
     expect(remove).toMatchObject({ok:false,code:'text-unparseable',message:expect.stringContaining('draft.ttrm')});
   });
   it('R9 refuses writing a broken destination', () => {
-    const ctx=context({'model/lexicon/en/er.ttrm':'package shop\nmodel lexicon locale en\ndef term half {'});
-    expect(synthesize('add-term',{lang:'en',term:'A',target:'er.entity.a'},ctx)).toMatchObject({ok:false,code:'text-unparseable',message:expect.stringContaining('er.ttrm')});
+    // ttr-core#326: `er/a.ttrm`'s stem names the destination.
+    const ctx=context({'model/lexicon/en/a.ttrm':'package shop\nmodel lexicon locale en\ndef term half {'});
+    expect(synthesize('add-term',{lang:'en',term:'A',target:'er.entity.a'},ctx)).toMatchObject({ok:false,code:'text-unparseable',message:expect.stringContaining('lexicon/en/a.ttrm')});
   });
   it('R7 reuses an encoded existing file key for an explicit Unicode path', () => {
     const root='file:///My%20Model';

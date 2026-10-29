@@ -46,4 +46,29 @@ describe.each(['LF', 'CRLF'])('Studio synthesizer vectors (%s)', ending => {
       expect(actual).toEqual(expected);
     });
   }
+  // ttr-core#326 — the Studio's forms pass no `file`: the entity, then one add-term per locale. That path must
+  // write exactly what the inline vector writes, files and bytes.
+  it('insert-entity/on-query two-step (no file, then add-term per locale)', () => {
+    const dir = join(vectors, 'insert-entity', 'on-query');
+    const convert = (texts: Record<string,string>) => Object.fromEntries(Object.entries(texts).map(([uri,text]) => [uri,ending === 'CRLF' ? text.replace(/\r?\n/g,'\r\n') : text]));
+    let world = convert(files(join(dir, 'world')));
+    const manifest = resolveManifest(parseManifest(world['modeler.toml']), '');
+    const target = 'hartland.er.entity.returns_review';
+    const steps: { op: EditOp; args: EditArgs }[] = [
+      { op: 'insert-entity', args: { name: 'returns_review', on: 'er.query.returns_review' } },
+      { op: 'add-term', args: { lang: 'en', term: 'returns review', target } },
+      { op: 'add-term', args: { lang: 'cs', term: 'přehled reklamací', target } },
+    ];
+    const touched = new Set<string>();
+    for (const step of steps) {
+      const result = synthesize(step.op, step.args, { files: world, rootUri: '', manifest });
+      expect(result.ok, JSON.stringify(result)).toBe(true);
+      if (!result.ok) return;
+      world = { ...world };
+      for (const path of result.touched) { world[path] = applyWorkspaceEditToText(world[path] ?? '', result.edit, path); touched.add(path); }
+    }
+    const expected = convert(files(join(dir, 'expected')));
+    expect([...touched].sort()).toEqual(Object.keys(expected).sort());
+    expect(Object.fromEntries(Object.keys(expected).map(path => [path, world[path]]))).toEqual(expected);
+  });
 });
