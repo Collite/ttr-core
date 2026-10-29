@@ -37,13 +37,22 @@ when it applies an edit to its cache (S1.2).
 
 All operations can also refuse `invalid-args` or `ambiguous-reference`. Qualify references when packages
 collide. Generated term IDs end in `_en`/`_cs` and receive numeric suffixes on name collisions.
-`insert-entity` without `file` puts an `on:` entity in its query's own file (an LQ file holds both); with
-`from:` or no source it uses the package's first er file, otherwise `model/er/<name>.ttrm`. A term without
-`file`, inline `insert-entity.terms` and `add-term` alike, goes beside the target's terms in that locale,
-else into the file holding them in another locale (`en/automation.ttrm` → `cs/automation.ttrm`), else under
-the target file's first hyphen-separated stem (`returns-review.ttrm` → `returns.ttrm`), created if absent.
-The two-step path (entity, then one `add-term` per locale) therefore writes the same files as the inline one.
-`file` is a locale-relative filename (for example `returns.ttrm`) and overrides this choice. Binding files are
+`insert-entity` without `file` puts an entity stacked `on:` an er query in that query's file (an LQ file holds
+both). On a db query, `from:` a table, or with no source it uses the package's first er file, otherwise
+`model/er/<name>.ttrm`. A term without `file`, inline `insert-entity.terms` and `add-term` alike, goes to the
+first of:
+
+1. the target package's file that already has a `def term` for the target in that locale;
+2. the same path under that locale's folder as such a file in another locale (`en/topics/sales.ttrm` →
+   `cs/topics/sales.ttrm`);
+3. the target file's first hyphen-separated stem (`returns-review.ttrm` → `returns.ttrm`; the target's model
+   code, as in `er.ttrm`, when the stem is empty or holds `%`, `?` or `#`), in the folder of the package's first
+   lexicon file in that locale, or `model/lexicon/<lang>/` when it has none; created if absent.
+
+A path from rule 2 or 3 that a file of another package, model or locale already holds gives way to the
+package's first lexicon file in that locale. For a new entity only rule 3 applies, so the two-step path
+(entity, then one `add-term` per locale) writes the same files as the inline one. `file` is a locale-relative
+filename (for example `returns.ttrm`) and overrides this choice. Binding files are
 selected within the source package, preferring an existing `er2db_entity` carrier.
 
 The DB input is already parsed TTR-M, so column types, precision, optionality and keys are retained.

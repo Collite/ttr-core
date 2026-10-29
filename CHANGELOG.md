@@ -8,17 +8,24 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ### Fixed — package-qualified lexicon targets, and where the Studio's edits land (#325, #326)
 
-- `ttr-lexicon-compile`: a term whose `for:` carries its package (`for: hartland.er.entity.returns_review`)
-  no longer drops with `RG-LEXC-001` while the build exits 0. When a ref does not resolve as written, the
-  compiler removes a package the estate declares and keeps the row under the package-less ref the archive
-  spells (`er.entity.returns_review`), so both spellings compile to one row. A prefix nothing declares
-  still dangles. Archives whose estates already spell every ref package-less are byte-identical.
-- `@tatrman/edit`: `insert-entity` with `on:` and no `file` puts the entity in its query's file, not in the
-  package's first er file. A term without `file` goes beside the target's terms in that locale, else into
-  the file holding them in another locale, else under the target file's stem (`returns-review.ttrm` →
-  `returns.ttrm`). Inline `insert-entity.terms` take the same rule, so the Studio's two-step path writes
-  the same files as the inline vector. Before, `add-term` without `file` used the locale's first file that
-  had any term for the same model.
+- `ttr-lexicon-compile`: a term whose `for:` is spelled the way `@tatrman/edit` writes it, package first
+  (`for: hartland.er.entity.returns_review`), no longer drops with `RG-LEXC-001` while the build exits 0.
+  When a ref does not resolve as written, the compiler removes a package the estate declares (a model
+  object's, a `.ttrm` unit's own `package`, or `modeler.toml`'s `[packages] root` and `[packages."<name>"]`
+  tables) and rewrites the rest to the archive's key: `er.entity.x` and `md.measure.x` unchanged,
+  `db.<schema>.table.<t>` to `db.<schema>.<t>`, `cn.concept.<Name>` to `cn.<Name>`. Every spelling of one
+  target compiles to one row, and a prefix nothing declares still dangles. A `cn.concept.<Name>` ref,
+  qualified or not, now compiles under `cn.<Name>`, the key the cn tier reads. Unqualified, it used to
+  compile under `cn.concept.<Name>`, which no cn consumer reads; no known estate spells it so. Archives whose
+  estates spell every ref the archive's way are byte-identical.
+- `@tatrman/edit`: `insert-entity` stacked `on:` an er query, with no `file`, puts the entity in that query's
+  file, not in the package's first er file. A term without `file` goes beside the target's `def term`s in
+  that locale, else into the same path under that locale's folder as the file holding them in another
+  locale, else under the target file's stem (`returns-review.ttrm` → `returns.ttrm`; the model code when the
+  stem is unusable) in the package's own lexicon folder for that locale. A path another package, model or
+  locale holds gives way to the package's first lexicon file there. Inline `insert-entity.terms` take the
+  same rule, so the Studio's two-step path writes the same files as the inline vector. Before, `add-term`
+  without `file` used the locale's first file that had any term for the same model.
 
 ### Changed — provenance attributes stay out of the extraction types (`ttr-concept`, DX PX T2b)
 

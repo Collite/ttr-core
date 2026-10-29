@@ -449,15 +449,17 @@ than the vocabulary.
 
 ### Target refs — the shape, for every schema
 
-Every target ref is **kinded**: `<schema>.<kind>.<name>`, then attribute depth, then the member
+An er or md target ref is **kinded**: `<schema>.<kind>.<name>`, then attribute depth, then the member
 code. This is what `QualifiedName.dotted()` renders and what TTR-M's own cross-refs use
-(`from: er.entity.store_sales`), so there is one rule, not one per schema.
+(`from: er.entity.store_sales`). A db ref has the db schema where the kind would be
+(`db.<schema>.<table>`: `dotted()` renders the namespace, and a db object's namespace is its schema), and a
+concept is `cn.<Name>` (A-CN-9).
 
-| depth | er / db | md |
-|---|---|---|
-| object | `er.entity.customer` | `md.measure.revenue` · `md.dimension.Product` · `md.cubelet.storeSales` |
-| attribute | `er.entity.customer.status` | `md.dimension.Customer.state` |
-| member | `er.entity.customer.status.1` | `md.dimension.DistributionCentre.dcCode.5` |
+| depth | er | db | md |
+|---|---|---|---|
+| object | `er.entity.customer` | `db.dbo.customer` | `md.measure.revenue` · `md.dimension.Product` · `md.cubelet.storeSales` |
+| attribute | `er.entity.customer.status` | `db.dbo.customer.status` | `md.dimension.Customer.state` |
+| member | `er.entity.customer.status.1` | — | `md.dimension.DistributionCentre.dcCode.5` |
 
 Two shapes that look right and are **not**:
 
@@ -473,11 +475,23 @@ addressable. `domain`, `hierarchy` and `map` are **deliberately** not: a domain 
 than something a query selects, a hierarchy is a navigation structure, and a map is binding
 plumbing. A ref naming one dangles like any other unknown.
 
-A ref may also carry its package in front (`hartland.er.entity.customer`), as TTR-M accepts it and
-`@tatrman/edit` writes it. When the ref does not resolve as written, the compiler removes a package
-the estate declares (a model object's, or a `.ttrm` unit's own `package`) and stores the row under
-the package-less ref, so both spellings compile to one row (ttr-core#325). A prefix nothing declares
-still dangles.
+A ref may also carry its package in front, as TTR-M accepts it and `@tatrman/edit` writes it: the
+TypeScript canonical key, which also keeps a db object's kind and a concept's `concept`. When the ref
+does not resolve as written, the compiler removes a package the estate declares (a model object's, a
+`.ttrm` unit's own `package`, or `modeler.toml`'s `[packages] root` and `[packages."<name>"]` tables) and
+rewrites the rest to the archive's key, so every spelling of one target compiles to one row
+(ttr-core#325):
+
+| `@tatrman/edit` writes | the row's ref |
+|---|---|
+| `hartland.er.entity.customer.status` | `er.entity.customer.status` |
+| `hartland.md.measure.revenue` | `md.measure.revenue` |
+| `hartland.db.dbo.table.customer.status` | `db.dbo.customer.status` |
+| `hartland.cn.concept.Party` | `cn.Party` |
+
+A db ref is tried as written before its kind is removed (`db.dbo.table.x` is also column `x` of a table
+named `table`). A `cn.concept.<Name>` ref always becomes `cn.<Name>`, even unqualified, because the cn tier
+reads only that key. A prefix nothing declares still dangles.
 
 Getting a ref wrong is not an error — RV-20 drops the row with an `RG-LEXC-001` warning and the
 build still succeeds. So an authoring pass with the wrong shape "works" and indexes nothing. Read
