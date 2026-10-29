@@ -3,6 +3,7 @@ package org.tatrman.ttr.lexicon.compile
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.collections.shouldNotBeEmpty
@@ -214,6 +215,138 @@ class LexiconCompilerSpec :
             result.lexicon.entries shouldBe emptyList()
             result.warnings shouldHaveSize 1
             result.lexicon.header.modelSnapshotHash shouldBe snapshotHash
+        }
+
+        test("a package-qualified target compiles to the package-less row (ttr-core#325)") {
+            // What `@tatrman/edit` writes, beside the spelling hartland authors by hand: one row, under the ref the
+            // archive spells. md and attribute depth take the same path. (Member depth has no TTR-M spelling: the
+            // grammar takes no numeric segment in `for:`.)
+            val qualified =
+                """
+                package hartland
+                model lexicon locale en
+                def term returns_review_en { for: hartland.er.entity.returns_review, forms: ["returns review"] }
+                def term revenue_en { for: hartland.md.measure.revenue, forms: ["revenue"] }
+                def term status_en { for: hartland.er.entity.customer.status, forms: ["status"] }
+                """.trimIndent()
+            val bare =
+                """
+                package hartland
+                model lexicon locale en
+                def term returns_review { for: er.entity.returns_review, forms: ["returns review"] }
+                """.trimIndent()
+
+            val result =
+                LexiconCompiler.compile(
+                    LexiconSources(
+                        ttrm =
+                            listOf(
+                                ttrm("model/lexicon/en/returns.ttrm", qualified),
+                                ttrm("model/lexicon/en/reviews.ttrm", bare),
+                            ),
+                    ),
+                    index(
+                        objects = setOf("er.entity.returns_review", "md.measure.revenue", "er.entity.customer.status"),
+                    ),
+                    snapshotHash,
+                    builtAt,
+                )
+
+            result.warnings shouldBe emptyList()
+            result.lexicon.entries.map { it.termNormalized to it.targetRef } shouldContainExactlyInAnyOrder
+                listOf(
+                    "returns review" to "er.entity.returns_review",
+                    "revenue" to "md.measure.revenue",
+                    "status" to "er.entity.customer.status",
+                )
+        }
+
+        test("db and cn refs in the edit's spelling compile to the archive's key (ttr-core#325)") {
+            // `@tatrman/edit` writes the TypeScript key: a db object keeps its kind, a concept its `concept`. The
+            // archive has neither. This index answers `cn.concept.Party` as well as `cn.Party`, as the real one does
+            // (`ModelRefIndex.of(model)` lists concepts as model objects), so the first hit must be the cn tier's key.
+            val qualified =
+                """
+                package shop
+                model lexicon locale en
+                def term invoice_en { for: shop.db.dbo.table.invoice, forms: ["invoice"] }
+                def term invoice_id_en { for: shop.db.dbo.table.invoice.id, forms: ["invoice number"] }
+                def term party_en { for: shop.cn.concept.Party, forms: ["party"] }
+                """.trimIndent()
+            val bare =
+                """
+                package shop
+                model lexicon locale en
+                def term invoice { for: db.dbo.invoice, forms: ["invoice"] }
+                def term party { for: cn.Party, forms: ["party"] }
+                def term party_concept { for: cn.concept.Party, forms: ["party"] }
+                """.trimIndent()
+
+            val result =
+                LexiconCompiler.compile(
+                    LexiconSources(
+                        ttrm =
+                            listOf(
+                                ttrm("model/lexicon/en/qualified.ttrm", qualified),
+                                ttrm("model/lexicon/en/bare.ttrm", bare),
+                            ),
+                    ),
+                    index(objects = setOf("db.dbo.invoice", "db.dbo.invoice.id", "cn.Party", "cn.concept.Party")),
+                    snapshotHash,
+                    builtAt,
+                )
+
+            result.warnings shouldBe emptyList()
+            result.lexicon.entries.map { it.termNormalized to it.targetRef } shouldContainExactlyInAnyOrder
+                listOf(
+                    "invoice" to "db.dbo.invoice",
+                    "invoice number" to "db.dbo.invoice.id",
+                    "party" to "cn.Party",
+                )
+        }
+
+        test("a package the manifest declares is removed too (ttr-core#325)") {
+            // A file with no `package` line is in `[packages] root` on the TypeScript side, so the edit qualifies the
+            // ref with it; nothing in the parsed units says so.
+            val src =
+                """
+                model lexicon locale en
+                def term foo_en { for: acme.er.entity.foo, forms: ["foo"] }
+                """.trimIndent()
+
+            val result =
+                LexiconCompiler.compile(
+                    LexiconSources(
+                        ttrm = listOf(ttrm("model/lexicon/en/x.ttrm", src)),
+                        manifestPackages = listOf("acme"),
+                    ),
+                    index(objects = setOf("er.entity.foo")),
+                    snapshotHash,
+                    builtAt,
+                )
+
+            result.warnings shouldBe emptyList()
+            result.lexicon.entries.map { it.termNormalized to it.targetRef } shouldBe listOf("foo" to "er.entity.foo")
+        }
+
+        test("a ref qualified with a package nothing declares still dangles") {
+            val src =
+                """
+                package hartland
+                model lexicon locale en
+                def term typo_en { for: hartlnd.er.entity.returns_review, forms: ["returns review"] }
+                """.trimIndent()
+
+            val result =
+                LexiconCompiler.compile(
+                    LexiconSources(ttrm = listOf(ttrm("model/lexicon/en/returns.ttrm", src))),
+                    index(objects = setOf("er.entity.returns_review")),
+                    snapshotHash,
+                    builtAt,
+                )
+
+            result.lexicon.entries shouldBe emptyList()
+            result.warnings.single().code shouldBe CompileWarning.DANGLING_REF
         }
 
         // ---- (c) RV-38/RV-42: target_class derivation ------------------------------------------

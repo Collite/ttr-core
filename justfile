@@ -586,7 +586,7 @@ _release-ext kind release="false" level="" version="":
 #   just publish ttr-parser release set 0.6.0            # RELEASE, explicit version
 #   just publish packages/python/ttr-parser release       # PyPI release (path form)
 #   just publish ts-grammar set 4.4.0                       # TS grammar, explicit version
-#   just publish designer set 0.1.1                         # Designer family, internal GitHub assets
+#   just publish designer set 0.1.2                         # Designer family, internal GitHub assets
 #   just publish edit set 0.1.0                             # legacy: refuses; use designer
 #   just publish bundle grammar release set 1.0.0            # Kotlin bundle release
 #   just publish vscode                                        # ext: internal build, patch bump

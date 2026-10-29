@@ -26,7 +26,8 @@ async function boot(root: string, files: Record<string,string>, manifest='[packa
  return client;
 }
 it.each(['My Model','Účetnictví'])('R7 edits existing files under the raw browser root %s',async name=>{
- const root=`file:///${name}`,uri=root+'/model/lexicon/en/er.ttrm';
+ // ttr-core#326: `er/a.ttrm`'s stem names the existing destination.
+ const root=`file:///${name}`,uri=root+'/model/lexicon/en/a.ttrm';
  const client=await boot(root,{[root+'/model/er/a.ttrm']:'package shop\nmodel er\ndef entity a {}\n',[uri]:'package shop\nmodel lexicon locale en\n'});
  const result=await client.sendRequest('modeler/edit',{op:'add-term',args:{lang:'en',term:'A',target:'er.entity.a'}}) as {ok:boolean;touched:string[]};
  expect(result).toMatchObject({ok:true,touched:[uri]});

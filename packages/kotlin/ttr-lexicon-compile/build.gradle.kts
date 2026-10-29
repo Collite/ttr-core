@@ -30,6 +30,8 @@ dependencies {
     // (a3) — the compiled lexicon is packed as its own `kind: "lexicon"` archive, by the
     // same deterministic writer the model snapshot uses.
     implementation(project(":packages:kotlin:ttr-snapshot"))
+    // ttr-core#325 — the `[packages]` names in the estate's `modeler.toml`.
+    implementation(libs.tomlj)
 
     testImplementation(libs.bundles.kotest)
 }

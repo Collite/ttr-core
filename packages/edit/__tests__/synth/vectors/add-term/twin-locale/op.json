@@ -1,0 +1,8 @@
+{
+  "op": "add-term",
+  "args": {
+    "lang": "cs",
+    "term": "žádost o vrácení",
+    "target": "er.entity.return_request"
+  }
+}

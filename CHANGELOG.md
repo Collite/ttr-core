@@ -6,6 +6,32 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — package-qualified lexicon targets, and where the Studio's edits land (#325, #326)
+
+- `ttr-lexicon-compile`: a term whose `for:` is spelled the way `@tatrman/edit` writes it, package first
+  (`for: hartland.er.entity.returns_review`), no longer drops with `RG-LEXC-001` while the build exits 0.
+  When a ref does not resolve as written, the compiler removes a package the estate declares (a model
+  object's, a `.ttrm` unit's own `package`, or `modeler.toml`'s `[packages] root` and `[packages."<name>"]`
+  tables) and rewrites the rest to the archive's key: `er.entity.x` and `md.measure.x` unchanged,
+  `db.<schema>.table.<t>` to `db.<schema>.<t>`, `cn.concept.<Name>` to `cn.<Name>`. Every spelling of one
+  target compiles to one row, and a prefix nothing declares still dangles. A `cn.concept.<Name>` ref,
+  qualified or not, now compiles under `cn.<Name>`, the key the cn tier reads. Unqualified, it used to
+  compile under `cn.concept.<Name>`, which no cn consumer reads; no known estate spells it so. Archives whose
+  estates spell every ref the archive's way are byte-identical. A `modeler.toml` that does not parse, or whose
+  `packages` is not a table, no longer stops the build: it warns `RG-LEXC-005` and reads no manifest packages.
+- `@tatrman/edit`: `insert-entity` stacked `on:` an er query, with no `file`, puts the entity in that query's
+  file, not in the package's first er file. A term without `file` goes beside the target's `def term`s in
+  that locale, else into the same path under that locale's folder as the file holding them in another
+  locale, else under the target file's stem (`returns-review.ttrm` → `returns.ttrm`; the model code when the
+  stem is unusable) in the package's own lexicon folder for that locale: the folder of its first lexicon file
+  there, else of its first one in another locale with the locale swapped. A path another package, model or
+  locale holds gives way to the package's first lexicon file there, else to `<model code>.ttrm` in that folder.
+  Inline `insert-entity.terms` take the same rule and see each other's new file and term, so the Studio's
+  two-step path writes the same files as the inline vector. Before, `add-term` without `file` used the locale's
+  first file that had any term for the same model. A raw root URI over encoded file keys no longer refuses a new
+  file, and the new key is encoded like the others. All eight Designer family artifacts advance together to 0.1.2,
+  which carries this `@tatrman/edit`; the internal release is cut after merge.
+
 ### Fixed — native obligation-transition read scope (#319)
 
 - Recipe bundles include `er.entity.obligation` in `objectsRead` when a directly wired action has

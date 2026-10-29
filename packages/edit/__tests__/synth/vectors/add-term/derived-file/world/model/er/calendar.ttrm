@@ -1,0 +1,5 @@
+package hartland
+
+model er
+
+def entity date_dim { attributes: [def attribute full_date { type: date }] }

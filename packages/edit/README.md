@@ -36,10 +36,29 @@ when it applies an edit to its cache (S1.2).
 | `add-term` | `lang, term, target, file?` | Canonical `def term` with `for` and `forms` | `term-exists`, `target-unknown` |
 
 All operations can also refuse `invalid-args` or `ambiguous-reference`. Qualify references when packages
-collide. Generated term IDs end in `_en`/`_cs` and receive numeric suffixes on name collisions. Inline
-`insert-entity.terms` uses the entity file's first hyphen-separated stem (`returns-review.ttrm` →
-`returns.ttrm`) under each locale. Standalone `add-term` chooses a matching existing locale/model file,
-then the locale's first file, otherwise `<model>.ttrm`; `file` is a locale-relative filename (for example `returns.ttrm`) and overrides this choice. Binding files are
+collide. Generated term IDs end in `_en`/`_cs` and receive numeric suffixes on name collisions.
+`insert-entity` without `file` puts an entity stacked `on:` an er query in that query's file (an LQ file holds
+both). On a db query, `from:` a table, or with no source it uses the package's first er file, otherwise
+`model/er/<name>.ttrm`. A term without `file`, inline `insert-entity.terms` and `add-term` alike, goes to the
+first of:
+
+1. the target package's file that already has a `def term` for the target in that locale;
+2. the same path under that locale's folder as such a file in another locale (`en/topics/sales.ttrm` →
+   `cs/topics/sales.ttrm`);
+3. the target file's first hyphen-separated stem (`returns-review.ttrm` → `returns.ttrm`; the target's model
+   code, as in `er.ttrm`, when the stem is empty or would make a path `file` refuses: one holding `%`, `?`,
+   `#`, `/`, a backslash or a control character, or starting like a URI scheme, as `c:x` does), created if
+   absent. It goes in the folder of the package's first lexicon file in that locale. Without one, it goes in
+   the folder of the package's first lexicon file in another locale, with that locale's folder swapped
+   (`model/b/lexicon/cs/terms.ttrm` → `model/b/lexicon/en/`), and in `model/lexicon/<lang>/` when the package
+   has no lexicon file at all.
+
+A path from rule 2 or 3 that a file of another package, model or locale already holds gives way to the
+package's first lexicon file in that locale. Without one, it gives way to `<folder>/<model code>.ttrm`, and
+when another package, model or locale holds that path too, the edit refuses `invalid-args`. Inline terms are
+placed en first, then cs, and the cs term sees what the en term wrote in the same edit (a new file, a term),
+so the two-step path (entity, then one `add-term` per locale) writes the same files as the inline one. `file`
+is a locale-relative filename (for example `returns.ttrm`) and overrides this choice. Binding files are
 selected within the source package, preferring an existing `er2db_entity` carrier.
 
 The DB input is already parsed TTR-M, so column types, precision, optionality and keys are retained.
@@ -53,7 +72,7 @@ The v1 roster check is the documented single-quoted local-name regex over `model
 only pure one-entry roster lines. Any other match is a `roster-manual` ref and refuses even with force. SQL text references and arbitrary JavaScript are
 outside that index's coverage. A worker's diagnostics and the strict loader remain subsequent gates.
 
-The 14 byte-for-byte vectors are in [`__tests__/synth/vectors`](./__tests__/synth/vectors).
+The 20 byte-for-byte vectors are in [`__tests__/synth/vectors`](./__tests__/synth/vectors).
 The `insert-entity/on-query/expected/` files are the demo's portable output contract. Run `pnpm test` here;
 a read-only real-world check is `node packages/edit/scripts/studio-synth-smoke.mjs ../hartland` from the
 repository root after building dependencies and this package.
