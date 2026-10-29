@@ -124,6 +124,13 @@ data class CompileWarning(
         const val FORM_COLLISION: String = "RG-LEXC-004"
 
         /**
+         * ttr-core#325 — `modeler.toml` is there but its `[packages]` could not be read (it does not parse, or
+         * `packages` is not a table). The build carries on with no manifest packages, so a `for:` qualified with one
+         * of them drops as RG-LEXC-001; this says why.
+         */
+        const val MANIFEST_UNREADABLE: String = "RG-LEXC-005"
+
+        /**
          * CN-P4 (A-CN-8, AM-36) — a `default: true` on a PHASE's term whose form a concept up the phase's `of:` chain
          * also names: the archive drops that default, so the resolver never sees it. The code is the lint's own slug —
          * the same condition `ttr cn hygiene` reports, and two codes for one condition is what the area loader's

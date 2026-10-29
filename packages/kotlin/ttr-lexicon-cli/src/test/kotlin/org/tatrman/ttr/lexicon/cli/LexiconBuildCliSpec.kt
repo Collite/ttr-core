@@ -193,6 +193,30 @@ class LexiconBuildCliSpec :
                 listOf("er.entity.customer")
         }
 
+        test("(a) a modeler.toml whose packages cannot be read warns, names the file and exits zero (ttr-core#325)") {
+            for ((label, manifest) in listOf(
+                "not a table" to "packages = \"acme\"\n",
+                "broken" to "[packages\nroot = \"acme\"\n",
+            )) {
+                val root =
+                    estate(
+                        Files.createTempDirectory("estate-manifest-$label".replace(' ', '-')),
+                        modelFiles = mapOf("lexicon/cs/terms.ttrm" to sugar),
+                    )
+                root.resolve("modeler.toml").writeText(manifest)
+                val out = root.resolve("generated/lexicon.tar.zst")
+
+                val outcome = run(root, out)
+
+                withClue("$label: ${outcome.stderr}${outcome.stdout}") {
+                    outcome.exitCode shouldBe LexiconBuildCli.EXIT_OK
+                    outcome.warnings.map { it.code } shouldContainElement "RG-LEXC-005"
+                    outcome.stderr shouldContain "RG-LEXC-005 modeler.toml:"
+                    out.exists() shouldBe true
+                }
+            }
+        }
+
         // ---- (b) determinism ------------------------------------------------------------------
 
         test("(b) two runs over the same estate emit byte-identical archives") {
