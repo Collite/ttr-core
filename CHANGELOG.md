@@ -17,7 +17,10 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - Frozen text/1 and text/2 approval algorithms are unchanged. The README's artifact hash covers the
   derived read list; existing action dependency evidence, when present, already covers native sinks
   and transitions. This adds no broader metadata approval guarantee to default-free recipes.
-  No grammar or API change; the next internal grammar bundle stays on **0.18.x**.
+  The additive public `AutomationScope.needsObligationLookup` helper keeps this predicate shared with
+  runtimes; `RecipeActionDependencies.wiredActions` and an additive `RecipeFingerprints.capture` overload
+  let the assembler resolve every wired action once for scope and evidence. Existing JVM entry points remain.
+  No grammar change; the next internal grammar bundle stays on **0.18.x**.
 
 ### Changed — provenance attributes stay out of the extraction types (`ttr-concept`, DX PX T2b)
 

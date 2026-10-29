@@ -2,6 +2,7 @@
 package org.tatrman.ttrp.bundle
 
 import io.kotest.assertions.withClue
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.collections.shouldContainExactly
@@ -9,6 +10,8 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import org.tatrman.ttrp.project.TtrpManifest
+import org.tatrman.ttrp.emit.recipe.RecipeActionDependencies
+import org.tatrman.ttrp.graph.TtrpPipeline
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -47,26 +50,31 @@ class ObligationReadScopeSpec :
             }
             """.trimIndent()
 
-        fun build(
-            text: String = source,
-            name: String = "implicit_obligation.ttrp",
-            transform: (String) -> String = { it },
-        ): BundleAssembler.BundleResult {
+        fun project(transform: (String) -> String = { it }): Path {
             val root = tempdir("obligation-read-scope").toPath().resolve("cache/private-checkout")
             val models = root.resolve("models")
             Files.createDirectories(models)
             Files.walk(fixtures).use { paths ->
-                paths.filter { Files.isRegularFile(it) }.toList().forEachIndexed { index, file ->
+                paths.filter { Files.isRegularFile(it) }.sorted().toList().forEachIndexed { index, file ->
                     val contents = Files.readString(file)
                     // Flat files deliberately have no hartland directory; declared packages own scope.
                     Files.writeString(models.resolve("metadata-$index.ttrm"), transform(contents))
                 }
             }
+            return root
+        }
+
+        fun build(
+            text: String = source,
+            name: String = "implicit_obligation.ttrp",
+            transform: (String) -> String = { it },
+        ): BundleAssembler.BundleResult {
+            val root = project(transform)
             return BundleAssembler("read-scope-test").build(
                 source = text,
                 fileName = name,
                 pipelineManifest = TtrpManifest(world = "hartland.worlds.demo", manifestDir = root),
-                modelsRoot = models,
+                modelsRoot = root.resolve("models"),
                 outDir = root.resolve("out"),
                 recipeDir = root,
             )
@@ -193,53 +201,97 @@ class ObligationReadScopeSpec :
             statements(withLookup) shouldBe statements(insertOnly)
         }
 
-        "unaffected bundles retain every pre-fix artifact byte" {
-            val controls =
-                mapOf(
-                    "insert-only" to build(transform = { it.replace("transition: obligation.state -> {to}", "") }),
-                    "other-executor" to
-                        build(
-                            transform = {
-                                it.replace(
-                                    "sinks:      { native: obligation }",
-                                    "sinks: { n8n: obligation }",
-                                )
-                            },
-                        ),
-                    "unwired" to
-                        build(
-                            text =
-                                source.replace(
-                                    "fulfil { line: line_id, kind: payment, to: fulfilled }",
-                                    "set_state { line: line_id, to: closed }",
-                                ),
-                        ),
-                ) +
-                    listOf("release_order.ttrp", "settle.ttrp").associateWith { name ->
-                        build(
-                            text =
-                                Files.readString(
-                                    locate("packages/kotlin/ttrp-frontend/src/test/resources/recipes/$name"),
-                                ),
-                            name = name,
-                        )
-                    }
-            val hashes =
-                controls.toSortedMap().map { (name, result) ->
-                    val artifacts =
-                        result.manifest.files +
-                            ("manifest.json" to sha256(Files.readString(result.dir.resolve("manifest.json"))))
-                    val digest =
-                        sha256(artifacts.toSortedMap().entries.joinToString("") { (path, hash) -> "$path\t$hash\n" })
-                    "$name $digest"
+        "wired action resolution validates every name and names the recipe on failure" {
+            val root = project()
+            val plan =
+                TtrpPipeline(
+                    TtrpManifest(world = "hartland.worlds.demo", manifestDir = root),
+                    root.resolve("models"),
+                ).plan(source, "implicit_obligation.ttrp")
+            plan.ok shouldBe true
+            val model = plan.recipe!!
+            val wiring = model.wirings.single()
+            val repeated = model.copy(wirings = listOf(wiring.copy(action = "set_state"), wiring, wiring))
+            RecipeActionDependencies.wiredActions(plan, repeated)!!.keys.toList() shouldContainExactly
+                listOf("fulfil", "set_state")
+            val missing = model.copy(wirings = listOf(wiring, wiring.copy(action = "zz_missing")))
+            val failure = shouldThrow<IllegalStateException> { RecipeActionDependencies.wiredActions(plan, missing) }
+            failure.message.orEmpty() shouldContain "recipe `${model.name}`"
+            failure.message.orEmpty() shouldContain "wired action `zz_missing`"
+            RecipeActionDependencies.wiredActions(plan.copy(frontendReport = null), model) shouldBe null
+            RecipeActionDependencies.of(plan.copy(frontendReport = null), model, "unused") shouldBe null
+        }
+
+        "controls retain exact read scopes README disclosure and unchanged statement SQL" {
+            fun statements(result: BundleAssembler.BundleResult): Map<String, String> =
+                result.manifest.files.keys.filter { it.endsWith(".sql") }.associateWith { path ->
+                    Files.readString(result.dir.resolve(path))
                 }
-            val expected =
-                javaClass
-                    .getResourceAsStream("/obligation-read-scope/unaffected.sha256")!!
-                    .bufferedReader()
-                    .useLines { lines ->
-                        lines.filter { it.isNotBlank() && !it.startsWith("#") }.toList()
+
+            fun checkReads(
+                name: String,
+                expected: List<String>,
+                text: String = source,
+                transform: (String) -> String = { it },
+            ): BundleAssembler.BundleResult {
+                val result = build(text, name, transform)
+                val withoutLookup =
+                    build(text, name) {
+                        transform(it).replace("transition: obligation.state -> {to}", "")
                     }
-            hashes shouldContainExactly expected
+                withClue(name) {
+                    result.manifest.recipe!!.objectsRead shouldContainExactly expected
+                    val readme = Files.readString(result.dir.resolve("README.md"))
+                    val readsSection = readme.substringAfter("## What it reads\n\n").substringBefore("\n## ")
+                    Regex("`([^`]+)`").findAll(readsSection).map { it.groupValues[1] }.toList() shouldContainExactly
+                        expected
+                    statements(result) shouldBe statements(withoutLookup)
+                }
+                return result
+            }
+            val lineOnly = listOf("er.entity.return_request_line")
+            checkReads("insert-only.ttrp", lineOnly) { it.replace("transition: obligation.state -> {to}", "") }
+            checkReads("other-executor.ttrp", lineOnly) {
+                it.replace("sinks:      { native: obligation }", "sinks: { n8n: obligation }")
+            }
+            checkReads(
+                "unwired.ttrp",
+                lineOnly,
+                source.replace(
+                    "fulfil { line: line_id, kind: payment, to: fulfilled }",
+                    "set_state { line: line_id, to: closed }",
+                ),
+            )
+            val recipes = locate("packages/kotlin/ttrp-frontend/src/test/resources/recipes")
+            checkReads(
+                "release_order.ttrp",
+                listOf(
+                    "er.entity.customer_price",
+                    "er.entity.inventory",
+                    "er.entity.invoice",
+                    "er.entity.order",
+                    "er.entity.price_list",
+                    "er.entity.sales_line",
+                    "er.entity.warehouse_outage",
+                ),
+                Files.readString(recipes.resolve("release_order.ttrp")),
+            )
+            val settle =
+                checkReads(
+                    "settle.ttrp",
+                    listOf(
+                        "er.entity.credit_note",
+                        "er.entity.date_dim",
+                        "er.entity.obligation",
+                        "er.entity.refund_payment",
+                        "er.entity.replacement_shipment",
+                        "er.entity.return_request",
+                        "er.entity.return_request_line",
+                    ),
+                    Files.readString(recipes.resolve("settle.ttrp")),
+                )
+            settle.manifest.recipe!!
+                .objectsRead
+                .count { it == "er.entity.obligation" } shouldBe 1
         }
     })

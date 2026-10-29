@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttrp.emit.recipe
 
+import org.tatrman.ttr.metadata.model.AutomationAction
 import org.tatrman.ttrp.bundle.RecipeFingerprints
 import org.tatrman.ttrp.bundle.RecipeApprovalDependencies
 import org.tatrman.ttrp.expr.Literal
@@ -54,6 +55,15 @@ object RecipeFingerprints {
         model: RecipeModel,
         protocol: String,
         asOf: String,
+    ): Result = capture(plan, model, protocol, asOf, RecipeActionDependencies.wiredActions(plan, model))
+
+    /** Reuse [RecipeActionDependencies.wiredActions] when the assembler also derives implicit reads. */
+    fun capture(
+        plan: TtrpPipeline.PlanResult,
+        model: RecipeModel,
+        protocol: String,
+        asOf: String,
+        actions: Map<String, AutomationAction>?,
     ): Result {
         val base = legacyText(plan, model, protocol, asOf)
         val values = StringBuilder("ttrp-recipe-values/1\n")
@@ -66,7 +76,7 @@ object RecipeFingerprints {
             val byLang = texts.toSortedMap().entries.joinToString(",") { "${esc(it.key)}=${esc(it.value)}" }
             labels.append("${esc(action)}\t$byLang\n")
         }
-        val dependencies = RecipeActionDependencies.of(plan, model, base)
+        val dependencies = RecipeActionDependencies.of(plan, base, actions)
         return Result(
             RecipeFingerprints(
                 dependencies?.let(RecipeActionDependencies::text) ?: base,

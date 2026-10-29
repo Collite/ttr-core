@@ -1,21 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttrp.bundle
 
+import org.tatrman.ttr.metadata.model.AutomationAction
 import org.tatrman.ttrp.ast.SourceLocation
 import org.tatrman.ttrp.diagnostics.Severity
 import org.tatrman.ttrp.diagnostics.TtrpDiagnostic
 import org.tatrman.ttrp.diagnostics.TtrpDiagnosticId
 import org.tatrman.ttrp.emit.recipe.RecipeCatalogEmitter
+import org.tatrman.ttrp.emit.recipe.RecipeActionDependencies
 import org.tatrman.ttrp.emit.recipe.RecipeFingerprints
 import org.tatrman.ttrp.emit.recipe.RecipeStatement
 import org.tatrman.ttrp.emit.recipe.RecipeStatements
 import org.tatrman.ttrp.graph.TtrpPipeline
 import org.tatrman.ttrp.graph.capability.BoundWorld
 import org.tatrman.ttrp.graph.model.Load
+import org.tatrman.ttrp.graph.model.TtrpGraph
 import org.tatrman.ttrp.graph.recipe.ContextClass
 import org.tatrman.ttrp.graph.recipe.RecipeModel
 import org.tatrman.ttrp.graph.recipe.SwitchLowering
-import org.tatrman.ttrp.resolve.ActionResolution
+import org.tatrman.ttrp.resolve.AutomationScope
 import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
 import java.nio.file.Files
@@ -139,7 +142,11 @@ class RecipeBundleAssembler(
             }
 
         // --- the recipe object: fingerprints, the verdict schema, the generated catalog ---
-        val captured = RecipeFingerprints.capture(plan, model, model.protocol, model.asOf)
+        val actions =
+            checkNotNull(RecipeActionDependencies.wiredActions(plan, model)) {
+                "recipe `${model.name}` has no checked automation scope"
+            }
+        val captured = RecipeFingerprints.capture(plan, model, model.protocol, model.asOf, actions)
         val fingerprints = captured.fingerprints
         val keyTypes = keyTypes(model, statements)
         val verdictColumns =
@@ -269,7 +276,7 @@ class RecipeBundleAssembler(
                         detail = "${model.name}_verdict_detail",
                         current = "${model.name}_verdict_current",
                     ),
-                objectsRead = objectsRead(plan, model),
+                objectsRead = objectsRead(graph, actions),
                 fingerprints = fingerprints,
                 protocol = model.protocol,
                 parts = parts.ifEmpty { null },
@@ -340,12 +347,15 @@ class RecipeBundleAssembler(
             else -> "text"
         }
 
-    /** Statement reads plus native action lookups (D-94), in the same governed scope. */
+    /**
+     * The model objects the recipe reads (D-94's out-of-scope-read check): every statement's load
+     * (an entity as `er.entity.<name>`, a table by its qname), plus `er.entity.obligation` when a
+     * directly wired action [AutomationScope.needsObligationLookup].
+     */
     private fun objectsRead(
-        plan: TtrpPipeline.PlanResult,
-        model: RecipeModel,
+        graph: TtrpGraph,
+        actions: Map<String, AutomationAction>,
     ): List<String> {
-        val graph = requireNotNull(plan.graph)
         val statementReads =
             graph.nodes.values
                 .filterIsInstance<Load>()
@@ -360,15 +370,7 @@ class RecipeBundleAssembler(
                         src.objectQname
                     }
                 }
-        val scope = requireNotNull(plan.frontendReport?.automationScope)
-        val needsObligationLookup =
-            model.wirings.map { it.action }.distinct().any { name ->
-                val action =
-                    checkNotNull((scope.action(name) as? ActionResolution.Resolved)?.action) {
-                        "checker accepted unresolved or ambiguous wired action `$name`"
-                    }
-                action.sinks["native"] == "obligation" && action.transition != null
-            }
+        val needsObligationLookup = actions.values.any(AutomationScope::needsObligationLookup)
         val actionReads = if (needsObligationLookup) listOf("er.entity.obligation") else emptyList()
         return (statementReads + actionReads).distinct().sorted()
     }

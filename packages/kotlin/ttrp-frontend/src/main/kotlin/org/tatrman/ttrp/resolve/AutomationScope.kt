@@ -106,5 +106,13 @@ class AutomationScope internal constructor(
             ).distinct().sorted()
 
         fun hasDefaults(action: AutomationAction): Boolean = action.properties.any { it.first == "writer_defaults" }
+
+        /**
+         * Native fulfilment reads an existing obligation: native sink `obligation` plus a transition.
+         * A bundle's `objectsRead` declares `er.entity.obligation` for this predicate; runtimes must use
+         * the same function. The transition target does not narrow the predicate.
+         */
+        fun needsObligationLookup(action: AutomationAction): Boolean =
+            action.sinks["native"] == "obligation" && action.transition != null
     }
 }

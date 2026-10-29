@@ -33,20 +33,31 @@ object RecipeActionDependencies {
         plan: TtrpPipeline.PlanResult,
         model: RecipeModel,
         textBase: String,
+    ): RecipeApprovalDependencies? = of(plan, textBase, wiredActions(plan, model))
+
+    /**
+     * Checked, sorted wiring names resolved once for approval evidence and implicit read scope.
+     * Returns null without a checked automation scope; every name is validated before returning a map.
+     */
+    fun wiredActions(
+        plan: TtrpPipeline.PlanResult,
+        model: RecipeModel,
+    ): Map<String, AutomationAction>? {
+        val scope = plan.frontendReport?.automationScope ?: return null
+        return model.wirings.map { it.action }.distinct().sorted().associateWith { name ->
+            checkNotNull((scope.action(name) as? ActionResolution.Resolved)?.action) {
+                "recipe `${model.name}`: checker accepted unresolved or ambiguous wired action `$name`"
+            }
+        }
+    }
+
+    internal fun of(
+        plan: TtrpPipeline.PlanResult,
+        textBase: String,
+        actions: Map<String, AutomationAction>?,
     ): RecipeApprovalDependencies? {
         val scope = plan.frontendReport?.automationScope ?: return null
-        val names =
-            model.wirings
-                .map { it.action }
-                .distinct()
-                .sorted()
-        val actions =
-            names
-                .mapNotNull { name ->
-                    (scope.action(name) as? ActionResolution.Resolved)?.action?.let { name to it }
-                }.toMap()
-        if (actions.values.none(AutomationScope::hasDefaults)) return null
-        check(actions.size == names.size) { "checker accepted unresolved or ambiguous wired actions" }
+        if (actions == null || actions.values.none(AutomationScope::hasDefaults)) return null
         return RecipeApprovalDependencies(
             version = 1,
             imports =
