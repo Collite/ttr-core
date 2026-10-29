@@ -34,7 +34,11 @@ data class RecipeManifest(
     val mode: String,
     val windows: List<RecipeWindow> = emptyList(),
     val verdictSchema: VerdictSchema,
-    /** The model objects the statements read (`er.entity.order`, …) — D-94's out-of-scope-read check. */
+    /**
+     * The model objects the recipe reads (D-94's out-of-scope-read check): every statement's load
+     * (an entity as `er.entity.<name>`, a table by its qname), plus `er.entity.obligation` when a
+     * directly wired action [org.tatrman.ttrp.resolve.AutomationScope.needsObligationLookup].
+     */
     val objectsRead: List<String>,
     val fingerprints: RecipeFingerprints,
     /** `always` · `on_route` (D-80; a program may override). */
