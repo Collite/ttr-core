@@ -67,7 +67,8 @@ object LexiconCompiler {
                 MdMetadataExtractor.rows(sources.ttrm)
 
         val warnings = mutableListOf<CompileWarning>()
-        val classified = (declared + metadata).mapNotNull { classify(it, refs, warnings) }
+        val packages = knownPackages(sources)
+        val classified = (declared + metadata).mapNotNull { classify(it, refs, packages, warnings) }
 
         val entries = phaseDefaults(merge(classified, warnings), cn, warnings)
         warnings += collisionWarnings(entries, cn)
@@ -507,16 +508,17 @@ object LexiconCompiler {
     private fun classify(
         row: SourceRow,
         refs: ModelRefIndex,
+        packages: List<String>,
         warnings: MutableList<CompileWarning>,
     ): Pair<SourceRow, TargetClass>? {
-        val cls =
+        val resolved =
             when {
-                row.targetRef.startsWith(OP_PREFIX) -> TargetClass.OPERATOR
-                row.targetRef.startsWith(GROUND_PREFIX) -> TargetClass.GROUNDING_TRIGGER
-                row.targetRef.startsWith(PRED_PREFIX) -> TargetClass.STRING_PREDICATE
-                else -> refs.classify(row.targetRef)
+                row.targetRef.startsWith(OP_PREFIX) -> row.targetRef to TargetClass.OPERATOR
+                row.targetRef.startsWith(GROUND_PREFIX) -> row.targetRef to TargetClass.GROUNDING_TRIGGER
+                row.targetRef.startsWith(PRED_PREFIX) -> row.targetRef to TargetClass.STRING_PREDICATE
+                else -> resolve(row.targetRef, refs, packages)
             }
-        if (cls == null) {
+        if (resolved == null) {
             warnings +=
                 CompileWarning(
                     code = CompileWarning.DANGLING_REF,
@@ -527,7 +529,49 @@ object LexiconCompiler {
                 )
             return null
         }
-        return row to cls
+        val (ref, cls) = resolved
+        return row.copy(targetRef = ref) to cls
+    }
+
+    /**
+     * ttr-core#325 — a model ref as written, else without a package the estate declares in front of it.
+     *
+     * Every archive ref is package-less (`QualifiedName.dotted()` drops the package; A-CN-9), but TTR-M also
+     * accepts the qualified spelling, and `@tatrman/edit` writes it (`for: hartland.er.entity.returns_review`).
+     * Looked up verbatim, that ref dangled: RG-LEXC-001, the row dropped, the build still exiting 0. Without
+     * the prefix the row carries the ref the archive spells, so both spellings compile to one row.
+     *
+     * Only a declared package is removed, so a misspelt one still dangles with the warning. Which package the
+     * object is in is not checked: the archive cannot tell two packages' objects of one name apart either.
+     */
+    private fun resolve(
+        ref: String,
+        refs: ModelRefIndex,
+        packages: List<String>,
+    ): Pair<String, TargetClass>? {
+        refs.classify(ref)?.let { return ref to it }
+        for (pkg in packages) {
+            val bare = ref.removePrefix("$pkg.")
+            if (bare != ref) refs.classify(bare)?.let { return bare to it }
+        }
+        return null
+    }
+
+    /**
+     * The packages the estate declares, longest first so `a.b.` is removed before `a.`: the model's objects'
+     * and the `.ttrm` units' own (md and lexicon units reach no `Model`).
+     */
+    private fun knownPackages(sources: LexiconSources): List<String> {
+        val model =
+            sources.model
+                ?.objectByQname()
+                ?.keys
+                ?.map { it.`package` }
+                .orEmpty()
+        return (model + sources.ttrm.mapNotNull { it.parsed.packageName })
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .sortedWith(compareByDescending<String> { it.length }.thenBy { it })
     }
 
     /**

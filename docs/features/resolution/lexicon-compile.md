@@ -473,6 +473,12 @@ addressable. `domain`, `hierarchy` and `map` are **deliberately** not: a domain 
 than something a query selects, a hierarchy is a navigation structure, and a map is binding
 plumbing. A ref naming one dangles like any other unknown.
 
+A ref may also carry its package in front (`hartland.er.entity.customer`), as TTR-M accepts it and
+`@tatrman/edit` writes it. When the ref does not resolve as written, the compiler removes a package
+the estate declares (a model object's, or a `.ttrm` unit's own `package`) and stores the row under
+the package-less ref, so both spellings compile to one row (ttr-core#325). A prefix nothing declares
+still dangles.
+
 Getting a ref wrong is not an error — RV-20 drops the row with an `RG-LEXC-001` warning and the
 build still succeeds. So an authoring pass with the wrong shape "works" and indexes nothing. Read
 the warning count.

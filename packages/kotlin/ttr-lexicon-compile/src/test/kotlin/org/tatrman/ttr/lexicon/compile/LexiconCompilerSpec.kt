@@ -3,6 +3,7 @@ package org.tatrman.ttr.lexicon.compile
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.collections.shouldNotBeEmpty
@@ -214,6 +215,70 @@ class LexiconCompilerSpec :
             result.lexicon.entries shouldBe emptyList()
             result.warnings shouldHaveSize 1
             result.lexicon.header.modelSnapshotHash shouldBe snapshotHash
+        }
+
+        test("a package-qualified target compiles to the package-less row (ttr-core#325)") {
+            // What `@tatrman/edit` writes, beside the spelling hartland authors by hand: one row, under the ref the
+            // archive spells. md and attribute depth take the same path. (Member depth has no TTR-M spelling: the
+            // grammar takes no numeric segment in `for:`.)
+            val qualified =
+                """
+                package hartland
+                model lexicon locale en
+                def term returns_review_en { for: hartland.er.entity.returns_review, forms: ["returns review"] }
+                def term revenue_en { for: hartland.md.measure.revenue, forms: ["revenue"] }
+                def term status_en { for: hartland.er.entity.customer.status, forms: ["status"] }
+                """.trimIndent()
+            val bare =
+                """
+                package hartland
+                model lexicon locale en
+                def term returns_review { for: er.entity.returns_review, forms: ["returns review"] }
+                """.trimIndent()
+
+            val result =
+                LexiconCompiler.compile(
+                    LexiconSources(
+                        ttrm =
+                            listOf(
+                                ttrm("model/lexicon/en/returns.ttrm", qualified),
+                                ttrm("model/lexicon/en/reviews.ttrm", bare),
+                            ),
+                    ),
+                    index(
+                        objects = setOf("er.entity.returns_review", "md.measure.revenue", "er.entity.customer.status"),
+                    ),
+                    snapshotHash,
+                    builtAt,
+                )
+
+            result.warnings shouldBe emptyList()
+            result.lexicon.entries.map { it.termNormalized to it.targetRef } shouldContainExactlyInAnyOrder
+                listOf(
+                    "returns review" to "er.entity.returns_review",
+                    "revenue" to "md.measure.revenue",
+                    "status" to "er.entity.customer.status",
+                )
+        }
+
+        test("a ref qualified with a package nothing declares still dangles") {
+            val src =
+                """
+                package hartland
+                model lexicon locale en
+                def term typo_en { for: hartlnd.er.entity.returns_review, forms: ["returns review"] }
+                """.trimIndent()
+
+            val result =
+                LexiconCompiler.compile(
+                    LexiconSources(ttrm = listOf(ttrm("model/lexicon/en/returns.ttrm", src))),
+                    index(objects = setOf("er.entity.returns_review")),
+                    snapshotHash,
+                    builtAt,
+                )
+
+            result.lexicon.entries shouldBe emptyList()
+            result.warnings.single().code shouldBe CompileWarning.DANGLING_REF
         }
 
         // ---- (c) RV-38/RV-42: target_class derivation ------------------------------------------

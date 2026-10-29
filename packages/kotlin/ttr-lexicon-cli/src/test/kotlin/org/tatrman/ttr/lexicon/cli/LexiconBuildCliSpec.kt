@@ -128,6 +128,39 @@ class LexiconBuildCliSpec :
             entries.map { it.termNormalized }.toSet() shouldContainElement "odběratel"
         }
 
+        test("(a) a package-qualified for: reaches the archive under the package-less ref (ttr-core#325)") {
+            // The shape `@tatrman/edit` writes into a `package hartland` estate. It used to warn RG-LEXC-001, drop the
+            // row and still exit 0, through the real loader, which is why this case loads one.
+            val root =
+                estate(
+                    Files.createTempDirectory("estate-qualified"),
+                    modelFiles =
+                        mapOf(
+                            "er/returns-review.ttrm" to "package hartland\n\nmodel er\n\ndef entity returns_review {}",
+                            "lexicon/en/returns.ttrm" to
+                                """
+                                package hartland
+
+                                model lexicon locale en
+
+                                def term returns_review_en {
+                                    for: hartland.er.entity.returns_review,
+                                    forms: ["returns review"]
+                                }
+                                """.trimIndent(),
+                        ),
+                )
+            val out = root.resolve("generated/lexicon.tar.zst")
+
+            val outcome = run(root, out)
+
+            withClue(outcome.stderr + outcome.stdout) { outcome.exitCode shouldBe LexiconBuildCli.EXIT_OK }
+            (outcome.stderr + outcome.stdout) shouldNotContain "RG-LEXC-001"
+            val entries = LexiconBuildCli.readBack(out).lexicon.entries
+            entries.filter { it.termNormalized == "returns review" }.map { it.targetRef } shouldBe
+                listOf("er.entity.returns_review")
+        }
+
         // ---- (b) determinism ------------------------------------------------------------------
 
         test("(b) two runs over the same estate emit byte-identical archives") {
