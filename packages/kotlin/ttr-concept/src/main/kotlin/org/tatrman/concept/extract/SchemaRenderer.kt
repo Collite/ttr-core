@@ -39,7 +39,9 @@ class SchemaRenderException(
  * [model]: no I/O, no clock; every object's keys sorted, every list in model order, so two renderings are byte-equal.
  *
  * What a rendering reads:
- * - the **entity's attributes** (keys excluded — a row's identity is the gold ETL's, not the extraction's), each typed
+ * - the **entity's attributes** (keys excluded — a row's identity is the gold ETL's, not the extraction's — and so are
+ *   attributes tagged `"provenance"`, the columns the record ETL writes from the run itself, such as the annotations a
+ *   row came from), each typed
  *   from its er type: text → `string` (+ `maxLength`), int → `integer`, decimal → `number` + `x-ttr-scale: <scale>`
  *   (never `multipleOf`: a float validator refuses `19.99` against `0.01`, and `10^-7` has no plain numeral every
  *   language re-prints alike — the scale is checked where decimals are exact, review-158 F7), date / timestamp →
@@ -111,7 +113,7 @@ class SchemaRenderer(
         val concept = conceptOf(e)
         val modifiers = concept?.let { modifiersOf(it, e) } ?: emptyList()
         val modifierAttrs = modifiers.map { it.second.simple }.toSet()
-        val attributes = e.attributes.filter { !it.isKey && it.simple !in modifierAttrs }
+        val attributes = e.attributes.filter { !it.isKey && PROVENANCE_TAG !in it.tags && it.simple !in modifierAttrs }
         val record = kind == TypeKind.RECORD
 
         val defs = sortedMapOf<String, JsonElement>()
@@ -405,6 +407,7 @@ class SchemaRenderer(
     companion object {
         const val JSON_SCHEMA = "https://json-schema.org/draft/2020-12/schema"
         const val MODIFIER_TAG = "modifier"
+        const val PROVENANCE_TAG = "provenance"
         const val CLOSED_LIMIT = 200
 
         const val UNKNOWN_ENTITY = "extract/unknown-entity"
