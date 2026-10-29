@@ -244,6 +244,7 @@ trigger dangle against a snapshot that will never contain it.
 | `RG-LEXC-002` | one term+target declared with two methods — widest kept |
 | `RG-LEXC-003` | an estate skill overrode a stdlib op of the same id |
 | `RG-LEXC-004` | a declared form folds onto another ref's row — both refs claim the word (§4.1) |
+| `RG-LEXC-005` | `modeler.toml` does not parse, or its `packages` is not a table — no manifest package is removed from a ref |
 
 Schema **violations** (`RG-LEX-*`, P1.1) are reported separately from these warnings: a violation
 is a broken file the author must fix, a warning is a good artifact with a row missing.
@@ -491,7 +492,11 @@ rewrites the rest to the archive's key, so every spelling of one target compiles
 
 A db ref is tried as written before its kind is removed (`db.dbo.table.x` is also column `x` of a table
 named `table`). A `cn.concept.<Name>` ref always becomes `cn.<Name>`, even unqualified, because the cn tier
-reads only that key. A prefix nothing declares still dangles.
+reads only that key. A prefix nothing declares still dangles. A db term binds only where both sides agree on
+the schema: the db file has a `schema` line, or the manifest's default schema is `dbo`. The Kotlin loader does
+not read `[defaults] schema` or `[packages."<name>"].default-schema` yet
+([ttr-core#331](https://github.com/Collite/ttr-core/issues/331)). If `modeler.toml` does not parse, or its
+`packages` is not a table, the build warns `RG-LEXC-005` and removes no manifest package.
 
 Getting a ref wrong is not an error — RV-20 drops the row with an `RG-LEXC-001` warning and the
 build still succeeds. So an authoring pass with the wrong shape "works" and indexes nothing. Read

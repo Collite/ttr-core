@@ -46,13 +46,19 @@ first of:
 2. the same path under that locale's folder as such a file in another locale (`en/topics/sales.ttrm` →
    `cs/topics/sales.ttrm`);
 3. the target file's first hyphen-separated stem (`returns-review.ttrm` → `returns.ttrm`; the target's model
-   code, as in `er.ttrm`, when the stem is empty or holds `%`, `?` or `#`), in the folder of the package's first
-   lexicon file in that locale, or `model/lexicon/<lang>/` when it has none; created if absent.
+   code, as in `er.ttrm`, when the stem is empty or would make a path `file` refuses: one holding `%`, `?`,
+   `#`, `/`, a backslash or a control character, or starting like a URI scheme, as `c:x` does), created if
+   absent. It goes in the folder of the package's first lexicon file in that locale. Without one, it goes in
+   the folder of the package's first lexicon file in another locale, with that locale's folder swapped
+   (`model/b/lexicon/cs/terms.ttrm` → `model/b/lexicon/en/`), and in `model/lexicon/<lang>/` when the package
+   has no lexicon file at all.
 
 A path from rule 2 or 3 that a file of another package, model or locale already holds gives way to the
-package's first lexicon file in that locale. For a new entity only rule 3 applies, so the two-step path
-(entity, then one `add-term` per locale) writes the same files as the inline one. `file` is a locale-relative
-filename (for example `returns.ttrm`) and overrides this choice. Binding files are
+package's first lexicon file in that locale. Without one, it gives way to `<folder>/<model code>.ttrm`, and
+when another package, model or locale holds that path too, the edit refuses `invalid-args`. Inline terms are
+placed en first, then cs, and the cs term sees what the en term wrote in the same edit (a new file, a term),
+so the two-step path (entity, then one `add-term` per locale) writes the same files as the inline one. `file`
+is a locale-relative filename (for example `returns.ttrm`) and overrides this choice. Binding files are
 selected within the source package, preferring an existing `er2db_entity` carrier.
 
 The DB input is already parsed TTR-M, so column types, precision, optionality and keys are retained.
