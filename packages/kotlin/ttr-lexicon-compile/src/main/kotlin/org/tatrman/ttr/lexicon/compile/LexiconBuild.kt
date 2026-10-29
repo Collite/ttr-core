@@ -11,9 +11,11 @@ import org.tatrman.ttr.metadata.model.Attribute
 import org.tatrman.ttr.metadata.model.Model
 import org.tatrman.ttr.parser.loader.TtrLoader
 import org.tatrman.ttr.semantics.md.MdModel
+import org.tomlj.Toml
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.isDirectory
+import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 import kotlin.io.path.relativeTo
 
@@ -84,6 +86,10 @@ object LexiconBuild {
     const val AREA_DIR: String = "lexicon"
     private const val MODEL_DIR = "model"
     private const val TTRM_SUFFIX = ".ttrm"
+    private const val MANIFEST = "modeler.toml"
+    private const val PACKAGES = "packages"
+    private const val ROOT = "root"
+    private const val LAYOUT = "layout"
     private val MD_MODEL = MdRefs.MD_MODEL_CODE
 
     /**
@@ -150,7 +156,14 @@ object LexiconBuild {
                 units.filter { it.parsed.modelDirective?.modelCode == MD_MODEL }.flatMap { it.parsed.definitions },
             )
 
-        val sources = LexiconSources(area = area, ttrm = units, model = model, repoRoot = repoRoot)
+        val sources =
+            LexiconSources(
+                area = area,
+                ttrm = units,
+                model = model,
+                repoRoot = repoRoot,
+                manifestPackages = manifestPackages(repoRoot),
+            )
         // er/db/cnc first, md second, cn third (CN-P4: `cn.<Name>` for every concept) — the key spaces
         // cannot collide (the schema token differs), so this order is precedence in principle only. RV-P3.4.
         val refs = ModelRefIndex.of(model) orElse ModelRefIndex.ofMd(md) orElse ModelRefIndex.ofCn(model)
@@ -168,6 +181,25 @@ object LexiconBuild {
         // The PACK reads `compiled`, not `result`: warnings are build output, never artifact
         // content, so folding one in must not be able to move a byte of the archive.
         return LexiconBuildOutcome(result, LexiconPacker.pack(compiled, modelSnapshotId, producedBy), violations)
+    }
+
+    /**
+     * ttr-core#325 — the package names `modeler.toml` declares: `[packages] root`, and the key of every table under
+     * `[packages]` (`[packages."x.y"]`); `root` and `layout` are its two settings, as `@tatrman/semantics` reads them.
+     * A missing or unreadable manifest declares none: reporting it is the model loader's job, not the lexicon's.
+     */
+    private fun manifestPackages(repoRoot: Path): List<String> {
+        val manifest = repoRoot.resolve(MANIFEST)
+        if (!manifest.isRegularFile()) return emptyList()
+        val parsed = runCatching { Toml.parse(manifest) }.getOrNull()
+        val packages = parsed?.takeUnless { it.hasErrors() }?.getTable(listOf(PACKAGES)) ?: return emptyList()
+        return packages.keySet().sorted().mapNotNull { key ->
+            when {
+                key == ROOT -> packages.get(listOf(ROOT)) as? String
+                key != LAYOUT && packages.isTable(listOf(key)) -> key
+                else -> null
+            }
+        }
     }
 
     /**

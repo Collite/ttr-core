@@ -161,6 +161,38 @@ class LexiconBuildCliSpec :
                 listOf("er.entity.returns_review")
         }
 
+        test("(a) without package lines, a for: qualified with a manifest package compiles (ttr-core#325)") {
+            // The edit qualifies a ref with `[packages] root` when the files declare no package; the Kotlin loader never
+            // reads the manifest, so only the build's own read of `[packages]` lets the compiler remove it.
+            val root =
+                estate(
+                    Files.createTempDirectory("estate-manifest-root"),
+                    modelFiles =
+                        mapOf(
+                            "lexicon/en/x.ttrm" to
+                                """
+                                model lexicon locale en
+
+                                def term customer_en { for: acme.er.entity.customer, forms: ["client"] }
+
+                                def term customer_sales_en { for: acme.sales.er.entity.customer, forms: ["account"] }
+                                """.trimIndent(),
+                        ),
+                )
+            root.resolve("modeler.toml").writeText(
+                "[packages]\nroot = \"acme\"\nlayout = \"off\"\n\n[packages.\"acme.sales\"]\ndefault-schema = \"dbo\"\n",
+            )
+            val out = root.resolve("generated/lexicon.tar.zst")
+
+            val outcome = run(root, out)
+
+            withClue(outcome.stderr + outcome.stdout) { outcome.exitCode shouldBe LexiconBuildCli.EXIT_OK }
+            (outcome.stderr + outcome.stdout) shouldNotContain "RG-LEXC-001"
+            val entries = LexiconBuildCli.readBack(out).lexicon.entries
+            entries.filter { it.termNormalized in setOf("client", "account") }.map { it.targetRef }.distinct() shouldBe
+                listOf("er.entity.customer")
+        }
+
         // ---- (b) determinism ------------------------------------------------------------------
 
         test("(b) two runs over the same estate emit byte-identical archives") {

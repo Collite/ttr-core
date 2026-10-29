@@ -69,6 +69,13 @@ data class LexiconSources(
      * model carries pass through unchanged, exactly as before.
      */
     val repoRoot: Path? = null,
+    /**
+     * ttr-core#325 — the package names the estate's `modeler.toml` declares: `[packages] root` and the name of each
+     * `[packages."<name>"]` table. In an estate whose files have no `package` line, the TypeScript side puts every file
+     * in the `root` package and `@tatrman/edit` writes it in front of a `for:` target, yet no unit and no model object
+     * here carries it. Empty without a manifest.
+     */
+    val manifestPackages: List<String> = emptyList(),
 )
 
 /**
