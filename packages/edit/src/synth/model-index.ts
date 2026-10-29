@@ -6,6 +6,13 @@ import { compareCodePoints } from '@tatrman/parser/layout';
 import { Refusal } from './refusals.js';
 
 export interface ModelDocument { uri: string; text: string; ast: Document; pkg: string; model: string; schema: string }
+/** What a file declares at its top: on disk, or in the header `append` prints into a new one. */
+export interface Header { pkg: string; model: string; locale?: string }
+/**
+ * What one synthesis has written so far. `ModelIndex.documents` are the files before the edit, so a later step of the
+ * same run (inline terms: en, then cs) sees an earlier step's new file and term only through this.
+ */
+export interface Written { files: Map<string, Header>; terms: { uri: string; qname: string }[] }
 export interface IndexedNode { symbol: SymbolEntry; def: Definition; doc: ModelDocument }
 export function targetOf(target: ObjectValue | Reference | undefined): { kind: string; path: string } | undefined {
   if (!target) return undefined;
@@ -91,12 +98,17 @@ export class ModelIndex {
     return undefined;
   }
   uri(path: string): string {
-    if (!path || path.startsWith('/') || path.includes('\\') || UNSAFE.test(path) || path.split('/').some(p => p === '..' || p === '.') || /^[a-z]+:/i.test(path)) throw new Refusal('invalid-args', 'file must be a repository-relative path.');
-    const candidate = this.ctx.rootUri ? this.ctx.rootUri.replace(/\/$/, '') + '/' + path : path;
+    if (!usablePath(path)) throw new Refusal('invalid-args', 'file must be a repository-relative path.');
+    const root = this.ctx.rootUri.replace(/\/$/, '');
+    const candidate = root ? root + '/' + path : path;
     const existing = Object.keys(this.ctx.files).find(key => decoded(key) === decoded(candidate));
     if (existing) return existing;
-    if (this.ctx.rootUri.startsWith('file://') && new URL(this.ctx.rootUri).href === this.ctx.rootUri)
-      return this.ctx.rootUri.replace(/\/$/, '') + '/' + path.split('/').map(encodeURIComponent).join('/');
+    // A new key is spelled like the host's keys: encoded when the root is, or when the keys under a raw root are.
+    if (root.startsWith('file://')) {
+      const href = new URL(root).href.replace(/\/$/, '');
+      if (href === root || Object.keys(this.ctx.files).some(key => key.startsWith(href + '/')))
+        return href + '/' + path.split('/').map(encodeURIComponent).join('/');
+    }
     return candidate;
   }
   assertWritable(uri: string): void {
@@ -109,6 +121,16 @@ export class ModelIndex {
   packageFor(uri: string): string {
     return effectivePackage(parseString('', uri).ast!, uri, this.ctx.rootUri.startsWith('file://') ? new URL(this.ctx.rootUri).pathname : this.ctx.rootUri, this.ctx.manifest.packages);
   }
+  /** The header of the file at `uri`: on disk, else as this run created it. */
+  header(uri: string, written?: Written): Header | undefined {
+    const d = this.documents.find(x => x.uri === uri);
+    return d ? { pkg: d.pkg, model: d.model, locale: d.ast.modelDirective?.locale } : written?.files.get(uri);
+  }
+  /** Whether the file at `uri` takes a definition of `want`'s package and model (and locale, when given): no file yet, or one declaring the same. */
+  takes(uri: string, want: Header, written?: Written): boolean {
+    const h = this.header(uri, written);
+    return !h || h.pkg === want.pkg && h.model === want.model && (!want.locale || h.locale === want.locale);
+  }
   bindingFile(pkg: string): string {
     const docs = this.documents.filter(d => d.pkg === pkg && d.model === 'binding');
     return docs.find(d => d.ast.definitions.some(b => b.kind === 'er2dbEntity'))?.uri ?? docs[0]?.uri ?? this.uri('model/binding/er2db.ttrm');
@@ -117,46 +139,66 @@ export class ModelIndex {
    * Without `file`, a term goes beside the target's terms in this locale (a file of the package with a `def term` for
    * it), else into the twin of a file holding them in another locale (its path under this locale's folder:
    * `en/topics/sales.ttrm` → `cs/topics/sales.ttrm`), else into the target file's first hyphen-separated stem
-   * (`returns-review.ttrm` → `returns.ttrm`; the target's model code when the stem is empty or not a usable name), in
-   * the folder of the package's first lexicon file in this locale (`model/lexicon/<lang>/` when it has none). A path
-   * held by another package, model or locale gives way to that first file. Inline `insert-entity.terms` use this too,
-   * so both paths agree.
+   * (`returns-review.ttrm` → `returns.ttrm`; the target's model code when the stem is empty or not a usable name). The
+   * stem file goes in the folder of the package's first lexicon file in this locale; without one, in the folder of
+   * its first file in another locale, swapped to this locale (`b/lexicon/cs/terms.ttrm` → `b/lexicon/en/`), and
+   * `model/lexicon/<lang>/` when the package has no lexicon file at all. A path held by another package, model or
+   * locale gives way to that first file; without one, to `<folder>/<model code>.ttrm`. `written` is what this run has
+   * written already, so inline `insert-entity.terms` place each locale as the two-step path does.
    */
-  lexiconFile(lang: string, target: { qname: string; pkg: string; uri: string; model: string }, file?: string): string {
+  lexiconFile(lang: string, target: { qname: string; pkg: string; uri: string; model: string }, file?: string, written?: Written): string {
     if (file) return this.uri(`model/lexicon/${lang}/${file}`);
-    const lexicon = this.documents.filter(d => d.model === 'lexicon' && d.pkg === target.pkg);
     const refs = this.references.findByQname(target.qname);
-    const holders = lexicon.filter(d => d.ast.definitions.some(t => t.kind === 'term' && t.target
-      && refs.some(r => r.documentUri === d.uri && r.source.offsetStart === t.target!.source.offsetStart)));
-    const same = holders.find(d => d.ast.modelDirective?.locale === lang);
+    const holds = (d: ModelDocument): boolean => d.ast.definitions.some(t => t.kind === 'term' && t.target
+      && refs.some(r => r.documentUri === d.uri && r.source.offsetStart === t.target!.source.offsetStart));
+    // The package's lexicon files, on disk and new in this run, in the order the index reads files in.
+    const lexicon = [
+      ...this.documents.filter(d => d.model === 'lexicon' && d.pkg === target.pkg).map(d => ({ uri: d.uri, locale: d.ast.modelDirective?.locale, holds: holds(d) })),
+      ...[...written?.files ?? []].filter(([, h]) => h.model === 'lexicon' && h.pkg === target.pkg).map(([uri, h]) => ({ uri, locale: h.locale, holds: false })),
+    ].map(f => ({ ...f, holds: f.holds || !!written?.terms.some(t => t.uri === f.uri && t.qname === target.qname) }))
+      .sort((a, b) => compareCodePoints(a.uri, b.uri));
+    const holders = lexicon.filter(f => f.holds);
+    const same = holders.find(f => f.locale === lang);
     if (same) return same.uri;
-    const first = lexicon.find(d => d.ast.modelDirective?.locale === lang);
-    const fits = (uri: string): boolean => {
-      const d = this.documents.find(x => x.uri === uri);
-      return !d || d.model === 'lexicon' && d.pkg === target.pkg && d.ast.modelDirective?.locale === lang;
-    };
+    const fits = (uri: string): boolean => this.takes(uri, { pkg: target.pkg, model: 'lexicon', locale: lang }, written);
+    // The index of `path`'s last folder named `locale`; -1 when it has none.
+    const localeAt = (segments: string[], locale: string | undefined): number => locale ? segments.slice(0, -1).lastIndexOf(locale) : -1;
+    const first = lexicon.find(f => f.locale === lang), other = lexicon.find(f => f.locale);
+    const folder = ((): string => {
+      if (first) return this.path(first.uri).split('/').slice(0, -1).join('/');
+      if (!other) return '';
+      const segments = this.path(other.uri).split('/'), at = localeAt(segments, other.locale);
+      return (at < 0 ? segments.slice(0, -1) : [...segments.slice(0, at), lang]).join('/');
+    })();
+    const twins = holders.flatMap(f => {
+      const segments = this.path(f.uri).split('/'), at = localeAt(segments, f.locale);
+      if (at < 0) return [];
+      segments[at] = lang;
+      const twin = segments.join('/');
+      return usablePath(twin) ? [this.uri(twin)] : [];
+    });
     const stem = fileName(target.uri).replace(/\.ttrm$/, '').split('-')[0];
-    const folder = first ? this.path(first.uri).split('/').slice(0, -1).join('/') : '';
-    const candidates = [
-      ...holders.flatMap(d => {
-        const path = this.path(d.uri), segments = path.split('/'), locale = d.ast.modelDirective?.locale;
-        const at = locale ? segments.lastIndexOf(locale) : -1;
-        if (at < 0 || UNSAFE.test(path)) return [];
-        segments[at] = lang;
-        return [segments.join('/')];
-      }),
-      `${folder && !UNSAFE.test(folder) ? folder : `model/lexicon/${lang}`}/${stem && !UNSAFE.test(stem) ? stem : target.model}.ttrm`,
-    ].map(path => this.uri(path));
-    return candidates.find(fits) ?? first?.uri ?? candidates.at(-1)!;
+    const named = (name: string): string => this.uri(`${folder && usablePath(folder) ? folder : `model/lexicon/${lang}`}/${name}.ttrm`);
+    const derived = [...twins, named(stem && usableName(stem) ? stem : target.model)];
+    return derived.find(fits) ?? first?.uri ?? [named(target.model)].find(fits) ?? derived.at(-1)!;
   }
-  /** A file key's repository-relative, decoded path. */
+  /** A file key's repository-relative, decoded path; the root and the key are compared decoded, as `uri()` does. */
   private path(uri: string): string {
-    const root = this.ctx.rootUri.replace(/\/$/, '');
-    return decoded(root && uri.startsWith(root + '/') ? uri.slice(root.length + 1) : uri);
+    const root = decoded(this.ctx.rootUri.replace(/\/$/, '')), key = decoded(uri);
+    return root && key.startsWith(root + '/') ? key.slice(root.length + 1) : key;
   }
 }
-/** What `uri()` refuses in a path; a derived name holding one falls back instead. */
+/** Characters a path may not hold: `%`, `?`, `#` and control characters. */
 const UNSAFE = /[%?#\x00-\x1f]/;
+/** A path `uri()` accepts: repository-relative, no backslash, `.`/`..` segment, scheme or UNSAFE character. */
+function usablePath(path: string): boolean {
+  return !!path && !path.startsWith('/') && !path.includes('\\') && !UNSAFE.test(path)
+    && !path.split('/').some(p => p === '..' || p === '.') && !/^[a-z]+:/i.test(path);
+}
+/** A derived file name `uri()` accepts as one segment. */
+function usableName(name: string): boolean {
+  return !name.includes('/') && usablePath(`${name}.ttrm`);
+}
 function decoded(key: string): string {
   try { return decodeURIComponent(key); } catch { return key; }
 }
