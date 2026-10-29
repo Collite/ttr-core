@@ -1,6 +1,6 @@
 # Trademark Policy
 
-"Tatrman" and "Tatrman Server" are trademarks of **Collite** (Collite, a.s.). The
+"Tatrman", "Tatrman Server" and "Tatrman Studio" are trademarks of **Collite** (Collite, a.s.). The
 software is open source under Apache-2.0; the **name** is not — the mark is how a
 user can trust that something called "Tatrman" is the real thing. This policy
 explains what you may and may not do with the name. It is written to be valid
@@ -38,6 +38,21 @@ of the standard: third parties can self-verify and then say so, truthfully.
 The conformance program is **coming with 1.0** — the suite is being authored and
 no conformance claim is available yet. Until it exists, no one (including us) is
 "Tatrman-conformant".
+
+## Where the open source ends: the Studio
+
+The open-source code in this repository and its siblings is the Tatrman language
+family, its formats and schemas, the Server, the command-line tools, the language
+server and the editor extensions. **Tatrman Studio** — the graphical application
+(the model viewer and modeler, reports, data entry, planning) — is **not open
+source**. It is a Collite product, published from a separate repository under its
+own licence terms. Its read-only tier, **Studio Free**, is free of charge for
+anyone to run — no registration, no call home — but it is still proprietary
+software: "free" here means price, not licence. Everything Studio Free shows lives
+in open formats in your own git repository and is served by the open Server, so
+nothing you build with the open tools depends on the Studio to be read back, and
+anyone may build another viewer on the same formats and APIs. We state this line
+here, up front, so that nobody has to discover it by reading a licence file.
 
 ## Ownership and contact
 
