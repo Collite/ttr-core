@@ -111,6 +111,12 @@ A `decision` ends in a `switch` statement. Each route is a name, **one** conditi
 `role.sales`, `"AR"`), a duration (`2 working_days`, `days(:inbound_reminder)`), a bare list (`detail: shortfall,
 price_differences`) or another action (`on_due: hold { order: order_number }`). `verdict.all` wires every routed row.
 
+A directly wired action whose native sink is `obligation` and which declares a transition needs to look up an
+existing obligation. The bundle includes `er.entity.obligation` in `objectsRead` and its README even when no
+island loads it. An insert-only obligation action adds no such lookup. Do not add a JOIN to the candidates just
+to authorize fulfilment: that can change which candidates are selected. The declared read authorizes scope;
+the runtime still checks its pinned model, storage route and read guards.
+
 ## Expressions in recipes
 
 - `:name` binds a parameter (`:tolerance`) or a value of the run (`:as_of`), in canonical bodies and in SQL alike —

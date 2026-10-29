@@ -6,6 +6,19 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — native obligation-transition read scope (#319)
+
+- Recipe bundles include `er.entity.obligation` in `objectsRead` when a directly wired action has
+  native sink `obligation` and declares a transition. The generated README lists that lookup too.
+  Authors no longer need an artificial obligation JOIN to authorize the runtime's fulfilment read;
+  candidate SQL and selection are unchanged. Actions resolve in the recipe's checked import scope,
+  independently of checkout paths. Visible but unwired actions, inserts without transitions and other
+  executors do not add the read; existing reads stay sorted and unique.
+- Frozen text/1 and text/2 approval algorithms are unchanged. The README's artifact hash covers the
+  derived read list; existing action dependency evidence, when present, already covers native sinks
+  and transitions. This adds no broader metadata approval guarantee to default-free recipes.
+  No grammar or API change; the next internal grammar bundle stays on **0.18.x**.
+
 ### Changed — provenance attributes stay out of the extraction types (`ttr-concept`, DX PX T2b)
 
 - `SchemaRenderer` leaves an er attribute tagged `"provenance"` (`tags: ["provenance"]`) out of both

@@ -15,6 +15,7 @@ import org.tatrman.ttrp.graph.model.Load
 import org.tatrman.ttrp.graph.recipe.ContextClass
 import org.tatrman.ttrp.graph.recipe.RecipeModel
 import org.tatrman.ttrp.graph.recipe.SwitchLowering
+import org.tatrman.ttrp.resolve.ActionResolution
 import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
 import java.nio.file.Files
@@ -268,7 +269,7 @@ class RecipeBundleAssembler(
                         detail = "${model.name}_verdict_detail",
                         current = "${model.name}_verdict_current",
                     ),
-                objectsRead = objectsRead(plan),
+                objectsRead = objectsRead(plan, model),
                 fingerprints = fingerprints,
                 protocol = model.protocol,
                 parts = parts.ifEmpty { null },
@@ -339,23 +340,37 @@ class RecipeBundleAssembler(
             else -> "text"
         }
 
-    /** The model objects the statements read (D-94): an entity as `er.entity.<name>`, a table by its qname. */
-    private fun objectsRead(plan: TtrpPipeline.PlanResult): List<String> {
-        val graph = plan.graph ?: return emptyList()
-        return graph.nodes.values
-            .filterIsInstance<Load>()
-            .mapNotNull { l ->
-                val src = graph.loadSources[l.id] ?: return@mapNotNull null
-                if (src.objectQname.startsWith(
-                        "er.",
-                    )
-                ) {
-                    "er.entity.${src.objectQname.substringAfterLast('.')}"
-                } else {
-                    src.objectQname
+    /** Statement reads plus native action lookups (D-94), in the same governed scope. */
+    private fun objectsRead(
+        plan: TtrpPipeline.PlanResult,
+        model: RecipeModel,
+    ): List<String> {
+        val graph = requireNotNull(plan.graph)
+        val statementReads =
+            graph.nodes.values
+                .filterIsInstance<Load>()
+                .mapNotNull { l ->
+                    val src = graph.loadSources[l.id] ?: return@mapNotNull null
+                    if (src.objectQname.startsWith(
+                            "er.",
+                        )
+                    ) {
+                        "er.entity.${src.objectQname.substringAfterLast('.')}"
+                    } else {
+                        src.objectQname
+                    }
                 }
-            }.distinct()
-            .sorted()
+        val scope = requireNotNull(plan.frontendReport?.automationScope)
+        val needsObligationLookup =
+            model.wirings.map { it.action }.distinct().any { name ->
+                val action =
+                    checkNotNull((scope.action(name) as? ActionResolution.Resolved)?.action) {
+                        "checker accepted unresolved or ambiguous wired action `$name`"
+                    }
+                action.sinks["native"] == "obligation" && action.transition != null
+            }
+        val actionReads = if (needsObligationLookup) listOf("er.entity.obligation") else emptyList()
+        return (statementReads + actionReads).distinct().sorted()
     }
 
     private fun over(w: org.tatrman.ttrp.ast.Window): String =
