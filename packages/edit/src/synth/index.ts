@@ -70,7 +70,7 @@ class Synthesis {
       if (args.from) for (const c of columns) defs.push(this.attributeMapping(f, `${args.name}_${c.name}`, `${qname}.${c.name}`, `${source.symbol.qname}.${c.name}`));
       this.append(this.index.bindingFile(pkg), pkg, 'binding', defs, f);
     }
-    for (const lang of ['en', 'cs'] as const) if (args.terms?.[lang]) this.term({ lang, term: args.terms[lang], target: qname }, { qname, pkg, uri, name: args.name });
+    for (const lang of ['en', 'cs'] as const) if (args.terms?.[lang]) this.term({ lang, term: args.terms[lang], target: qname }, { qname, pkg, uri, model: 'er', name: args.name });
   }
   replace(node: IndexedNode, newText: string): void {
     const text = this.text(node.doc.uri);
@@ -152,9 +152,9 @@ class Synthesis {
     }
     if (refs.length) throw new Refusal('would-orphan', 'The replacement removes referenced members.', refs);
   }
-  term(args: EditArguments['add-term'], inserted?: { qname: string; pkg: string; uri: string; name: string }): void {
+  term(args: EditArguments['add-term'], inserted?: { qname: string; pkg: string; uri: string; model: string; name: string }): void {
     if (!['en', 'cs'].includes(args.lang) || !args.term.trim() || /[\x00-\x1f]/.test(args.term)) throw new Refusal('invalid-args', 'Term needs a supported locale and non-empty text.');
-    const target = inserted ?? (() => { const n = this.require(args.target, undefined, 'target-unknown'); return { qname: n.symbol.qname, pkg: n.doc.pkg, uri: n.doc.uri, name: n.symbol.name }; })();
+    const target = inserted ?? (() => { const n = this.require(args.target, undefined, 'target-unknown'); return { qname: n.symbol.qname, pkg: n.doc.pkg, uri: n.doc.uri, model: n.symbol.schemaCode, name: n.symbol.name }; })();
     for (const d of this.index.documents) if (d.model === 'lexicon' && d.ast.modelDirective?.locale === args.lang) for (const t of d.ast.definitions) if (t.kind === 'term' && t.forms?.includes(args.term)) {
       if (t.target && this.index.lookup(t.target.path, undefined, d)?.symbol.qname === target.qname) return;
       throw new Refusal('term-exists', `The term ${args.term} already targets another definition.`);

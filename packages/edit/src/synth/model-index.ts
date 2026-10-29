@@ -91,9 +91,8 @@ export class ModelIndex {
     return undefined;
   }
   uri(path: string): string {
-    if (!path || path.startsWith('/') || path.includes('\\') || /[%?#\x00-\x1f]/.test(path) || path.split('/').some(p => p === '..' || p === '.') || /^[a-z]+:/i.test(path)) throw new Refusal('invalid-args', 'file must be a repository-relative path.');
+    if (!path || path.startsWith('/') || path.includes('\\') || UNSAFE.test(path) || path.split('/').some(p => p === '..' || p === '.') || /^[a-z]+:/i.test(path)) throw new Refusal('invalid-args', 'file must be a repository-relative path.');
     const candidate = this.ctx.rootUri ? this.ctx.rootUri.replace(/\/$/, '') + '/' + path : path;
-    const decoded = (key: string) => { try { return decodeURIComponent(key); } catch { return key; } };
     const existing = Object.keys(this.ctx.files).find(key => decoded(key) === decoded(candidate));
     if (existing) return existing;
     if (this.ctx.rootUri.startsWith('file://') && new URL(this.ctx.rootUri).href === this.ctx.rootUri)
@@ -115,21 +114,52 @@ export class ModelIndex {
     return docs.find(d => d.ast.definitions.some(b => b.kind === 'er2dbEntity'))?.uri ?? docs[0]?.uri ?? this.uri('model/binding/er2db.ttrm');
   }
   /**
-   * Without `file`, a term goes beside the target's terms in this locale, else into the file holding them in
-   * another locale (twin files), else under the target file's first hyphen-separated stem
-   * (`returns-review.ttrm` → `returns.ttrm`). Inline `insert-entity.terms` use this too, so both paths agree.
+   * Without `file`, a term goes beside the target's terms in this locale (a file of the package with a `def term` for
+   * it), else into the twin of a file holding them in another locale (its path under this locale's folder:
+   * `en/topics/sales.ttrm` → `cs/topics/sales.ttrm`), else into the target file's first hyphen-separated stem
+   * (`returns-review.ttrm` → `returns.ttrm`; the target's model code when the stem is empty or not a usable name), in
+   * the folder of the package's first lexicon file in this locale (`model/lexicon/<lang>/` when it has none). A path
+   * held by another package, model or locale gives way to that first file. Inline `insert-entity.terms` use this too,
+   * so both paths agree.
    */
-  lexiconFile(lang: string, target: { qname: string; pkg: string; uri: string }, file?: string): string {
+  lexiconFile(lang: string, target: { qname: string; pkg: string; uri: string; model: string }, file?: string): string {
     if (file) return this.uri(`model/lexicon/${lang}/${file}`);
-    const holders = [...new Set(this.references.findByQname(target.qname).map(r => r.documentUri))].sort(compareCodePoints)
-      .flatMap(uri => this.documents.filter(d => d.uri === uri && d.model === 'lexicon' && d.pkg === target.pkg));
+    const lexicon = this.documents.filter(d => d.model === 'lexicon' && d.pkg === target.pkg);
+    const refs = this.references.findByQname(target.qname);
+    const holders = lexicon.filter(d => d.ast.definitions.some(t => t.kind === 'term' && t.target
+      && refs.some(r => r.documentUri === d.uri && r.source.offsetStart === t.target!.source.offsetStart)));
     const same = holders.find(d => d.ast.modelDirective?.locale === lang);
     if (same) return same.uri;
-    const name = holders.length ? fileName(holders[0].uri) : fileName(target.uri).replace(/\.ttrm$/, '').split('-')[0] + '.ttrm';
-    return this.uri(`model/lexicon/${lang}/${name}`);
+    const first = lexicon.find(d => d.ast.modelDirective?.locale === lang);
+    const fits = (uri: string): boolean => {
+      const d = this.documents.find(x => x.uri === uri);
+      return !d || d.model === 'lexicon' && d.pkg === target.pkg && d.ast.modelDirective?.locale === lang;
+    };
+    const stem = fileName(target.uri).replace(/\.ttrm$/, '').split('-')[0];
+    const folder = first ? this.path(first.uri).split('/').slice(0, -1).join('/') : '';
+    const candidates = [
+      ...holders.flatMap(d => {
+        const path = this.path(d.uri), segments = path.split('/'), locale = d.ast.modelDirective?.locale;
+        const at = locale ? segments.lastIndexOf(locale) : -1;
+        if (at < 0 || UNSAFE.test(path)) return [];
+        segments[at] = lang;
+        return [segments.join('/')];
+      }),
+      `${folder && !UNSAFE.test(folder) ? folder : `model/lexicon/${lang}`}/${stem && !UNSAFE.test(stem) ? stem : target.model}.ttrm`,
+    ].map(path => this.uri(path));
+    return candidates.find(fits) ?? first?.uri ?? candidates.at(-1)!;
+  }
+  /** A file key's repository-relative, decoded path. */
+  private path(uri: string): string {
+    const root = this.ctx.rootUri.replace(/\/$/, '');
+    return decoded(root && uri.startsWith(root + '/') ? uri.slice(root.length + 1) : uri);
   }
 }
+/** What `uri()` refuses in a path; a derived name holding one falls back instead. */
+const UNSAFE = /[%?#\x00-\x1f]/;
+function decoded(key: string): string {
+  try { return decodeURIComponent(key); } catch { return key; }
+}
 function fileName(uri: string): string {
-  const name = uri.split('/').at(-1)!;
-  try { return decodeURIComponent(name); } catch { return name; }
+  return decoded(uri.split('/').at(-1)!);
 }
