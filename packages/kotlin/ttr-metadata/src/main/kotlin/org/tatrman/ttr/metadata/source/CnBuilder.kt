@@ -591,17 +591,45 @@ private class CnTierBuilder(
         }
     }
 
-    /** Whether [stated]'s participant [label] is [target]'s own row: its concept lands on that entity (`label: []`). */
+    /**
+     * Whether [stated]'s participant [label] is [target]'s own row: its concept lands on that entity (`label: []`). The
+     * label is read up the `of:` / `is_a` chain, as the lattice reads it (review-175 R5): an event subkind's `order: []`
+     * names its bearer's `order`.
+     */
     private fun sameRow(
         stated: CnConcept?,
         label: String,
         target: SymbolEntry?,
     ): Boolean {
         if (stated == null || target?.kind != "entity") return false
-        val concept = involves(stated).firstOrNull { it.label == label }?.concept ?: return false
+        val concept = participantUp(stated, label) ?: return false
         val key = concepts.keys.firstOrNull { cnName(it) == concept } ?: return false
         val landing = landingOf(key)
         return landing.qualifiedErTarget == target.qname || landing.erTarget == elementRefOf(target)
+    }
+
+    /** [c]'s participant [label]'s concept: its own `involves:`, else up its `of:` / `is_a` chain, nearest first. */
+    private fun participantUp(
+        c: CnConcept,
+        label: String,
+    ): QualifiedName? {
+        val seen = mutableSetOf<CnConcept>()
+        val queue = ArrayDeque(listOf(c))
+        while (queue.isNotEmpty()) {
+            val at = queue.removeFirst()
+            if (!seen.add(at)) continue
+            involves(at).firstOrNull { it.label == label }?.let { return it.concept }
+            for (k in listOf("of", "is_a")) {
+                val (v, d) = entry(at, k) ?: continue
+                for (id in ids(v)) {
+                    resolve(id.ref.path, id.parts, d, cn = true)
+                        ?.takeIf { it.kind == "concept" }
+                        ?.let { concepts[it.qname] }
+                        ?.let { queue += it }
+                }
+            }
+        }
+        return null
     }
 
     /** The er entity a quality's bearer lands on — rule 2 of the hop (AM-29). */

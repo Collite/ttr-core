@@ -7,6 +7,9 @@ def cn2er_kind site_g     { kind: cn.Site, target: er.entity.site }
 // same row: the shipment is the event's own row; the customer is not (its empty path is dangling)
 def cn2er_event shipped_g   { event: cn.Shipped, target: er.entity.shipment, period: { at: er.entity.shipment.shipped }, participants: { shipment: [], customer: [er.relation.shipment_customer] } }
 def cn2er_event misplaced_g { event: cn.Misplaced, target: er.entity.shipment, period: { at: er.entity.shipment.shipped }, participants: { shipment: [], customer: [] } }
+// review-175 R5: an inherited participant's empty path (a cn2er_kind classifier on the event's own entity)
+def cn2er_kind early_g    { kind: cn.EarlyShipped, target: er.entity.shipment, participants: { shipment: [] } }
+def cn2er_kind misearly_g { kind: cn.EarlyMisplaced, target: er.entity.shipment, participants: { customer: [] } }
 // written targets that do not resolve
 def cn2md_kind region_g  { kind: cn.Region, target: md.Nowhere }
 def cn2er_phase closed_g { phase: cn.Closed, target: er.entity.nowhere }

@@ -724,6 +724,37 @@ private class CnValidator(
         return from to to
     }
 
+    /**
+     * The concept of a concept's participant [label]: its own `involves:`, else up its `of:` / `is_a` chain, nearest
+     * first (review-175 R5 — an event subkind inherits its bearer's participants). Mirrors TS `participantUp`.
+     */
+    private fun participantUp(
+        key: String,
+        label: String,
+    ): SymbolEntry? {
+        val seen = mutableSetOf<String>()
+        val queue = ArrayDeque(listOf(key))
+        while (queue.isNotEmpty()) {
+            val at = concepts[queue.removeFirst()] ?: continue
+            if (!seen.add(at.key)) continue
+            val involves = at.stated<ConceptProperty.Involves>()
+            if (involves != null) {
+                val p =
+                    (involves.property as ConceptProperty.Involves).participants.firstOrNull {
+                        (it.label ?: it.ref.parts.last().lowercase()) == label
+                    }
+                if (p != null) return concept(p.ref, involves.doc)
+            }
+            for (k in listOf("of", "is_a")) {
+                val up = at.statedEntry(k) ?: continue
+                for (id in idsOf((up.property as ConceptProperty.Entry).value)) {
+                    concept(id, up.doc)?.let { queue += it.qname }
+                }
+            }
+        }
+        return null
+    }
+
     /** The entity a participant concept's own grounding lands on directly in er; null when it has none. */
     private fun directErEntity(conceptKey: String): String? {
         val g = groundings.byConcept[conceptKey]?.firstOrNull() ?: return null
@@ -752,7 +783,6 @@ private class CnValidator(
             val entries = participants?.value as? PropertyValue.ObjectValue ?: continue
             val doc = docByUri[placed.uri] ?: continue
             val event = placed.conceptKey?.let { concepts[it] }
-            val involves = event?.stated<ConceptProperty.Involves>()
             val enclosing = buildCanonicalKey(doc.packageName, "", "cn2er_event", listOf(g.name))
             for ((key, value) in entries.entries) {
                 val path = idsOf(value)
@@ -796,16 +826,8 @@ private class CnValidator(
                         at = if (ends.first == at) ends.second else ends.first
                     }
                 }
-                if (broken || involves == null) continue
-                val participant =
-                    (involves.property as ConceptProperty.Involves).participants.firstOrNull {
-                        (
-                            it.label ?: it.ref.parts
-                                .last()
-                                .lowercase()
-                        ) == key
-                    }
-                val concept = participant?.let { concept(it.ref, involves.doc) } ?: continue
+                if (broken || event == null) continue
+                val concept = participantUp(event.key, key) ?: continue
                 val lands = directErEntity(concept.qname)
                 if (lands != null && lands != at) {
                     // An empty path (`order: []`) says the participant IS the binding's own row: its concept must land there.

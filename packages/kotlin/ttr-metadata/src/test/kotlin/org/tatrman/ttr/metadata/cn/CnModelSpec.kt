@@ -271,6 +271,18 @@ class CnModelSpec :
             }
         }
 
+        "R5: an event subkind's empty path reads the participant it inherits from its bearer" {
+            val rv = CnFixtures.review175()
+            rv.concept("EarlyShipped").grounding!!.let {
+                it.participants shouldBe mapOf("shipment" to emptyList())
+                it.dangling shouldBe emptyList()
+            }
+            rv.concept("EarlyMisplaced").grounding!!.let {
+                it.participants shouldBe emptyMap()
+                it.dangling shouldBe listOf("customer: []")
+            }
+        }
+
         "F10: a written target that does not resolve stays on its layer's landing; it is not inherited" {
             val rv = CnFixtures.review175()
             rv.concept("Region").let { Triple(it.erTarget, it.via, it.grade) } shouldBe

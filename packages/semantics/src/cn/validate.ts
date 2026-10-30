@@ -695,6 +695,36 @@ class CnValidator {
     return from && to ? [from, to] : undefined;
   }
 
+  /**
+   * The concept of a concept's participant `label`: its own `involves:`, else up its `of:` / `is_a` chain, nearest
+   * first (review-175 R5 — an event subkind inherits its bearer's participants). Mirrors Kotlin `participantUp`.
+   */
+  private participantUp(key: string, label: string): SymbolEntry | undefined {
+    const seen = new Set<string>();
+    const queue = [key];
+    while (queue.length) {
+      const at = this.concepts.get(queue.shift()!);
+      if (!at || seen.has(at.key)) continue;
+      seen.add(at.key);
+      const involves = stated(at, 'involves');
+      if (involves?.property.kind === 'involves') {
+        const p = involves.property.participants.find(
+          (pt) => (pt.label ?? pt.ref.parts[pt.ref.parts.length - 1].toLowerCase()) === label,
+        );
+        if (p) return this.concept(p.ref, involves.doc);
+      }
+      for (const k of ['of', 'is_a']) {
+        const up = stated(at, 'entry', k);
+        if (!up) continue;
+        for (const id of idsOf((up.property as ConceptEntry).value)) {
+          const sym = this.concept(idRef(id), up.doc);
+          if (sym) queue.push(sym.qname);
+        }
+      }
+    }
+    return undefined;
+  }
+
   /** The entity a participant concept's own grounding lands on directly in er; `undefined` when it has none. */
   private directErEntity(conceptKey: string): string | undefined {
     const g = this.groundings.byConcept.get(conceptKey)?.[0];
@@ -711,7 +741,6 @@ class CnValidator {
       const doc = this.docByUri.get(g.uri);
       if (participants?.kind !== 'entry' || participants.value.kind !== 'object' || !doc) continue;
       const event = g.conceptKey ? this.concepts.get(g.conceptKey) : undefined;
-      const involves = event ? stated(event, 'involves') : undefined;
       const enclosing = buildCanonicalKey({ packageName: doc.packageName, kind: g.bindingKind!, parts: [g.name] });
       for (const entry of participants.value.entries) {
         const path = idsOf(entry.value);
@@ -742,11 +771,8 @@ class CnValidator {
             at = ends[0] === at ? ends[1] : ends[0];
           }
         }
-        if (broken || involves?.property.kind !== 'involves') continue;
-        const participant = involves.property.participants.find(
-          (p) => (p.label ?? p.ref.parts[p.ref.parts.length - 1].toLowerCase()) === entry.key,
-        );
-        const concept = participant ? this.concept(participant.ref, involves.doc) : undefined;
+        if (broken || !event) continue;
+        const concept = this.participantUp(event.key, entry.key);
         const lands = concept ? this.directErEntity(concept.qname) : undefined;
         if (lands && lands !== at) {
           // An empty path (`order: []`) says the participant IS the binding's own row: its concept must land there.

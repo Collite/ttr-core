@@ -822,6 +822,35 @@ class _CnValidator:
             return t.qname.value
         return t.parent if t.kind == "attribute" else None
 
+    def _participant_up(self, key: str, label: str) -> SymbolEntry | None:
+        """The concept of a concept's participant `label`: its own `involves:`, else up its `of:` / `is_a` chain,
+        nearest first (review-175 R5 - an event subkind inherits its bearer's participants). Mirrors TS
+        `participantUp`."""
+        seen: set[str] = set()
+        queue: deque[str] = deque([key])
+        while queue:
+            at = self.concepts.get(queue.popleft())
+            if at is None or at.key in seen:
+                continue
+            seen.add(at.key)
+            involves = at.stated(ConceptInvolves)
+            if involves is not None and isinstance(involves.property, ConceptInvolves):
+                p = next(
+                    (pt for pt in involves.property.participants if (pt.label or pt.ref.parts[-1].lower()) == label),
+                    None,
+                )
+                if p is not None:
+                    return self._concept(p.ref.path, involves.doc)
+            for k in ("of", "is_a"):
+                up = at.stated_entry(k)
+                if up is None or not isinstance(up.property, ConceptEntry):
+                    continue
+                for v in ids_of(up.property.value):
+                    sym = self._concept(id_path(v), up.doc)
+                    if sym is not None:
+                        queue.append(sym.qname.value)
+        return None
+
     def _check_participant_paths(self) -> None:
         for placed in self.groundings.groundings:
             g = placed.grounding
@@ -833,7 +862,6 @@ class _CnValidator:
             if participants is None or not isinstance(participants.value, ObjectValue) or doc is None:
                 continue
             event = self.concepts.get(placed.concept_key) if placed.concept_key is not None else None
-            involves = event.stated(ConceptInvolves) if event is not None else None
             enclosing = build_canonical_key(doc.package_name, "", "cn2er_event", [g.name])
             for key, value in participants.value.entries.items():
                 path = ids_of(value)
@@ -868,12 +896,9 @@ class _CnValidator:
                         at = ends[1] if ends[0] == at else ends[0]
                     if broken:
                         break
-                if broken or involves is None or not isinstance(involves.property, ConceptInvolves):
+                if broken or event is None:
                     continue
-                participant = next(
-                    (p for p in involves.property.participants if (p.label or p.ref.parts[-1].lower()) == key), None
-                )
-                concept = self._concept(participant.ref.path, involves.doc) if participant is not None else None
+                concept = self._participant_up(event.key, key)
                 if concept is None:
                     continue
                 lands = self._direct_er_entity(concept.qname.value)
