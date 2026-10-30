@@ -426,8 +426,10 @@ class ThingsInTimeSpec :
         "R7: a stacked entity pairs its key with the row's by name — a key named otherwise refuses" {
             val extra =
                 "model er\n" +
-                    "def entity flagged { binding: { target: { table: db.dbo.table.flagged } }, attributes: [def attribute id { type: text, isKey: true }] }\n" +
-                    "def entity marked { binding: { target: { table: db.dbo.table.marked } }, attributes: [def attribute mark_id { type: text, isKey: true }] }\n"
+                    "def entity flagged { binding: { target: { table: db.dbo.table.flagged } }," +
+                    " attributes: [def attribute id { type: text, isKey: true }] }\n" +
+                    "def entity marked { binding: { target: { table: db.dbo.table.marked } }," +
+                    " attributes: [def attribute mark_id { type: text, isKey: true }] }\n"
             val cn =
                 "model cn\n" +
                     "def subkind Flagged { of: Ticket, grounds: er.entity.flagged }\n" +

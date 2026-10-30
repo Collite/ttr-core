@@ -744,7 +744,11 @@ private class CnValidator(
             if (involves != null) {
                 val p =
                     (involves.property as ConceptProperty.Involves).participants.firstOrNull {
-                        (it.label ?: it.ref.parts.last().lowercase()) == label
+                        (
+                            it.label ?: it.ref.parts
+                                .last()
+                                .lowercase()
+                        ) == label
                     }
                 if (p != null) return concept(p.ref, involves.doc)
             }
@@ -1167,7 +1171,11 @@ private class CnValidator(
                             val p = s.property as? ConceptProperty.Involves ?: return@flatMap emptyList()
                             p.participants.mapNotNull { pt ->
                                 concept(pt.ref, s.doc)?.qname?.let { concepts[it] }?.let { got ->
-                                    (pt.label ?: pt.ref.parts.last().lowercase()) to got
+                                    (
+                                        pt.label ?: pt.ref.parts
+                                            .last()
+                                            .lowercase()
+                                    ) to got
                                 }
                             }
                         }
