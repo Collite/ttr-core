@@ -64,10 +64,11 @@ const EXPECTED: Record<string, string[]> = {
     'b-concepts.ttrm:5 ttr/required-property-missing',
     'b-concepts.ttrm:7 ttr/required-property-missing',
   ],
-  '89-cn-phase-double-definition': ['b-concepts.ttrm:5 cn/phase-double-definition', 'c-bindings.ttrm:4 cn/phase-double-definition'],
+  '89-cn-phase-double-definition': ['b-concepts.ttrm:4 cn/durative-event', 'b-concepts.ttrm:5 cn/phase-double-definition', 'b-concepts.ttrm:5 cn/phase-source-conflict', 'b-concepts.ttrm:6 cn/phase-source-conflict', 'c-bindings.ttrm:4 cn/phase-double-definition'],
   '90-cn-phase-no-definition': ['b-concepts.ttrm:5 cn/phase-no-definition'],
   '91-cn-event-no-period': ['a-er.ttrm:17 cn/event-no-period', 'b-concepts.ttrm:4 cn/event-no-period'],
   '92-cn-ungrounded': [
+    'b-concepts.ttrm:10 cn/subkind-as-kind',
     'b-concepts.ttrm:4 cn/ungrounded',
     'b-concepts.ttrm:5 cn/ungrounded',
     'b-concepts.ttrm:6 cn/ungrounded',
@@ -132,15 +133,27 @@ describe('CN-P2 S2.3 — the cn rules in the registry and the presets', () => {
       'cn/db-grounding',
       'cn/duplicate-default-sense',
       'cn/duplicate-grounding',
+      'cn/durative-event',
+      'cn/episode-subject-missing',
       'cn/event-no-period',
+      'cn/extent-retired',
       'cn/grounding-target-kind',
       'cn/hierarchy-shape',
       'cn/involves-unlabelled-duplicate',
+      'cn/lifetime-period',
       'cn/participant-path-broken',
+      'cn/partition-incomplete',
+      'cn/partition-overlap',
       'cn/phase-as-default',
+      'cn/phase-bounds-participant',
       'cn/phase-double-definition',
       'cn/phase-no-definition',
+      'cn/phase-source-conflict',
+      'cn/projection-source',
       'cn/role-no-event',
+      'cn/subkind-as-kind',
+      'cn/subkind-bearer',
+      'cn/subkind-temporal-definition',
       'cn/ungrounded',
       'cn/unknown-relation-type',
     ]);
@@ -174,7 +187,7 @@ describe('CN-P2 S2.3 — the cn rules in the registry and the presets', () => {
   });
 
   it('recommended shows no hygiene', () => {
-    expect(cnSites('92-cn-ungrounded', recommendedConfig())).toEqual([]);
+    expect(cnSites('92-cn-ungrounded', recommendedConfig())).toEqual(['b-concepts.ttrm:10 cn/subkind-as-kind']);
   });
 
   it('a project diagnostic lands on the file it points at, and a directive suppresses it', () => {

@@ -78,7 +78,7 @@ class ErStatementLaneSpec :
             val r =
                 ErRenderer(hartland).statement(
                     ErStatement(
-                        event = concept(hartland, "Invoicing"),
+                        event = concept(hartland, "Invoice"),
                         measures = listOf(ErMeasure(concept(hartland, "amount"), "SUM")),
                         phases = listOf(ErPhase(concept(hartland, "OverdueInvoice"))),
                         asOf = { day },

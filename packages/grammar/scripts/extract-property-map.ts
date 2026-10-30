@@ -31,6 +31,9 @@ const grammarVersion = versionMatch[1];
 // property name 1:1.
 const RULE_NAME_OVERRIDES: Record<string, string> = {
   searchBlock: 'search',
+  cnFrom: 'from',
+  cnUntil: 'until',
+  cnPer: 'per',
   semanticsBlock: 'semantics',
   lexiconBlock: 'lexicon',
   columnNamesList: 'columnNames',
@@ -79,6 +82,8 @@ const typeMap: Record<string, string> = {
   searchable: 'inclusion marker (optional boolean, optional method)',
   indexed: 'boolean',
   from: 'reference',
+  until: 'reference',
+  per: 'reference',
   to: 'reference',
   parameters: 'list of parameter definitions',
   resultColumns: 'list of column definitions',

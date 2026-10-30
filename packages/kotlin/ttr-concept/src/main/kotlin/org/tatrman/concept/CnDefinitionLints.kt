@@ -9,6 +9,23 @@ import org.tatrman.ttr.metadata.model.GroundingGrade
 import org.tatrman.ttr.metadata.model.GroundingLayer
 import org.tatrman.ttr.metadata.model.Imprecision
 import org.tatrman.ttr.metadata.model.QualifiedName
+import org.tatrman.ttrp.expr.AggregateCall
+import org.tatrman.ttrp.expr.CaseWhen
+import org.tatrman.ttrp.expr.Cast
+import org.tatrman.ttrp.expr.ColumnRef
+import org.tatrman.ttrp.expr.ConceptAggregate
+import org.tatrman.ttrp.expr.DurationExpr
+import org.tatrman.ttrp.expr.ExistsExpr
+import org.tatrman.ttrp.expr.Expression
+import org.tatrman.ttrp.expr.FunctionCall
+import org.tatrman.ttrp.expr.InCall
+import org.tatrman.ttrp.expr.InList
+import org.tatrman.ttrp.expr.IsNull
+import org.tatrman.ttrp.expr.Literal
+import org.tatrman.ttrp.expr.MdPath
+import org.tatrman.ttrp.expr.ParamRef
+import org.tatrman.ttrp.expr.TemporalPredicate
+import org.tatrman.ttrp.expr.ThisRef
 
 /**
  * The definition-level `cn/…` slugs (contracts §7; CN-D29 — Kotlin's, reported by `ttr cn hygiene`, never in the
@@ -70,6 +87,39 @@ object CnDefinitionLints {
         for (d in conceptDefs) {
             val owner = cn.concepts[d.owner] ?: continue
             val closure = closure(d, byOwner)
+            if (owner.stereotype == "subkind") {
+                // The same rule as the semantic layer's portable text check (review-175 F9): `:as_of` (written, or read
+                // by `within(…, last:)` / `age(…)`), a `:name`, a DC-12 predicate — `within(…)` in either form is one —
+                // or a phase / valued-state read. A bare `period` read is rigid in both.
+                val temporal =
+                    closure.any { block ->
+                        block.reads.asOf ||
+                            callsWithin(block.expression) ||
+                            block.reads.parameters.isNotEmpty() ||
+                            block.reads.comparisons.any {
+                                it.op in
+                                    setOf("before", "at_or_before", "contains", "ended_before", "overlaps")
+                            } ||
+                            (block.reads.concepts + block.reads.definitions).any { q ->
+                                cn.concepts[q]?.let {
+                                    it.stereotype ==
+                                        "phase" ||
+                                        it.valuedState
+                                } ==
+                                    true
+                            }
+                    }
+                if (temporal) {
+                    out +=
+                        Diagnostic(
+                            "cn/subkind-temporal-definition",
+                            Severity.ERROR,
+                            "`${owner.ref}` has a temporal or parametric definition",
+                            owner.ref,
+                            d.block.source,
+                        )
+                }
+            }
             out += unresolved(cn, owner, d, closure)
             out += unreachable(cn, owner, d, closure)
             if (d.kind == BlockKind.DEFINITION) {
@@ -79,6 +129,32 @@ object CnDefinitionLints {
         }
         return out
     }
+
+    /**
+     * Whether [e] calls `within(…)` anywhere — a DC-12 predicate whatever its bounds (`from:`/`to:` or `last:`). A dotted
+     * `x.within(…)` is a projection read, not the predicate — as the text rule reads it (A-CN-118, review-175 R2).
+     */
+    private fun callsWithin(e: Expression?): Boolean =
+        when (e) {
+            null -> false
+            is FunctionCall -> isWithin(e.function.value) || e.args.any(::callsWithin)
+            is AggregateCall -> e.args.any(::callsWithin)
+            is Cast -> callsWithin(e.expr)
+            is CaseWhen -> e.branches.any { callsWithin(it.first) || callsWithin(it.second) } || callsWithin(e.elseExpr)
+            is InList -> callsWithin(e.expr) || e.items.any(::callsWithin)
+            is IsNull -> callsWithin(e.expr)
+            is ExistsExpr -> e.involving.any { callsWithin(it.path) } || callsWithin(e.where)
+            is ConceptAggregate ->
+                e.involving.any { callsWithin(it.path) } ||
+                    callsWithin(e.where) ||
+                    e.namedArgs.any { callsWithin(it.second) }
+            is InCall -> callsWithin(e.expr) || callsWithin(e.call)
+            is TemporalPredicate -> callsWithin(e.lhs) || callsWithin(e.rhs)
+            is ColumnRef, is Literal, is MdPath, is ParamRef, is DurationExpr, is ThisRef -> false
+        }
+
+    /** `within` as the catalogue spells it — bare, or under `fn.`. */
+    private fun isWithin(id: String): Boolean = id == "within" || id == "fn.within"
 
     /** What [d] reads with every definition it names inlined, transitively (cycle-safe). */
     private fun closure(

@@ -1,0 +1,449 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "kind",
+            "name": "Document",
+            "properties": {
+                "abstract": {
+                    "kind": "bool",
+                    "value": true
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "subkind",
+            "name": "Invoice",
+            "properties": {
+                "involves": [
+                    {
+                        "ref": "Customer"
+                    },
+                    {
+                        "ref": "Order"
+                    }
+                ],
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Document"
+                    ],
+                    "path": "Document"
+                },
+                "qualities": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "amount"
+                            ],
+                            "path": "amount"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "paid"
+                            ],
+                            "path": "paid"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "status"
+                            ],
+                            "path": "status"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "issued"
+                            ],
+                            "path": "issued"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "due"
+                            ],
+                            "path": "due"
+                        }
+                    ],
+                    "kind": "list"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "subkind",
+            "name": "WebSale",
+            "properties": {
+                "definition": {
+                    "form": "tripleString",
+                    "language": "pl",
+                    "text": "channel = 'web'"
+                },
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Sale"
+                    ],
+                    "path": "Sale"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "subkind",
+            "name": "CodeRange",
+            "properties": {
+                "members": {
+                    "form": "tripleString",
+                    "language": "pl",
+                    "text": "descendants(Diagnosis, 'R10-R19')"
+                },
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Diagnosis"
+                    ],
+                    "path": "Diagnosis"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "subkind",
+            "name": "StoredSale",
+            "properties": {
+                "grounds": "er.entity.stored_sale",
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Sale"
+                    ],
+                    "path": "Sale"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "kind",
+            "name": "Order",
+            "properties": {
+                "involves": [
+                    {
+                        "ref": "Customer"
+                    },
+                    {
+                        "label": "fulfilling",
+                        "ref": "Warehouse"
+                    },
+                    {
+                        "label": "receiving",
+                        "ref": "Warehouse"
+                    }
+                ],
+                "period": {
+                    "entries": {
+                        "end": {
+                            "kind": "id",
+                            "parts": [
+                                "delivered_date"
+                            ],
+                            "path": "delivered_date"
+                        },
+                        "end_open": {
+                            "kind": "id",
+                            "parts": [
+                                "open"
+                            ],
+                            "path": "open"
+                        },
+                        "start": {
+                            "kind": "id",
+                            "parts": [
+                                "placed_date"
+                            ],
+                            "path": "placed_date"
+                        }
+                    },
+                    "kind": "object"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "kind",
+            "name": "InstantKind",
+            "properties": {
+                "period": {
+                    "entries": {
+                        "at": {
+                            "kind": "id",
+                            "parts": [
+                                "issued"
+                            ],
+                            "path": "issued"
+                        }
+                    },
+                    "kind": "object"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "role",
+            "name": "Supplier",
+            "properties": {
+                "event": "OrderPlaced",
+                "involves": [
+                    {
+                        "ref": "Customer"
+                    },
+                    {
+                        "ref": "Item"
+                    }
+                ],
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Customer"
+                    ],
+                    "path": "Customer"
+                },
+                "period": {
+                    "entries": {
+                        "end": {
+                            "kind": "id",
+                            "parts": [
+                                "until"
+                            ],
+                            "path": "until"
+                        },
+                        "start": {
+                            "kind": "id",
+                            "parts": [
+                                "since"
+                            ],
+                            "path": "since"
+                        }
+                    },
+                    "kind": "object"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "event",
+            "name": "InvoiceIssued",
+            "properties": {
+                "involves": [
+                    {
+                        "ref": "Invoice"
+                    }
+                ],
+                "period": {
+                    "entries": {
+                        "at": {
+                            "kind": "id",
+                            "parts": [
+                                "issued"
+                            ],
+                            "path": "issued"
+                        }
+                    },
+                    "kind": "object"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "event",
+            "name": "LegacyDuration",
+            "properties": {
+                "extent": "durative"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "phase",
+            "name": "OutOfService",
+            "properties": {
+                "grounds": "er.entity.warehouse_outage",
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Warehouse"
+                    ],
+                    "path": "Warehouse"
+                },
+                "period": {
+                    "entries": {
+                        "end": {
+                            "kind": "id",
+                            "parts": [
+                                "to_date"
+                            ],
+                            "path": "to_date"
+                        },
+                        "start": {
+                            "kind": "id",
+                            "parts": [
+                                "from_date"
+                            ],
+                            "path": "from_date"
+                        }
+                    },
+                    "kind": "object"
+                },
+                "qualities": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "reason"
+                            ],
+                            "path": "reason"
+                        }
+                    ],
+                    "kind": "list"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "phase",
+            "name": "OpenOrder",
+            "properties": {
+                "from": "OrderPlaced",
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Order"
+                    ],
+                    "path": "Order"
+                },
+                "until": "OrderDelivered"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "kind",
+            "name": "ListPrice",
+            "properties": {
+                "involves": [
+                    {
+                        "ref": "Item"
+                    },
+                    {
+                        "ref": "Channel"
+                    }
+                ],
+                "label": {
+                    "cs": "Ceníková cena",
+                    "en": "List price"
+                },
+                "period": {
+                    "entries": {
+                        "end": {
+                            "kind": "id",
+                            "parts": [
+                                "valid_to"
+                            ],
+                            "path": "valid_to"
+                        },
+                        "end_open": {
+                            "kind": "id",
+                            "parts": [
+                                "open"
+                            ],
+                            "path": "open"
+                        },
+                        "start": {
+                            "kind": "id",
+                            "parts": [
+                                "valid_from"
+                            ],
+                            "path": "valid_from"
+                        }
+                    },
+                    "kind": "object"
+                },
+                "qualities": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "price"
+                            ],
+                            "path": "price"
+                        }
+                    ],
+                    "kind": "list"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "quality",
+            "name": "list_price",
+            "properties": {
+                "from": "ListPrice.price",
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Item"
+                    ],
+                    "path": "Item"
+                },
+                "per": "Channel",
+                "valued_state": {
+                    "kind": "bool",
+                    "value": true
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "quality",
+            "name": "agreed_price",
+            "properties": {
+                "from": "PriceAgreement.price",
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Customer"
+                    ],
+                    "path": "Customer"
+                },
+                "per": "Item",
+                "valued_state": {
+                    "kind": "bool",
+                    "value": true
+                }
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": "workshop.concepts",
+    "schemaDirective": {
+        "code": "cn",
+        "namespace": null
+    }
+}

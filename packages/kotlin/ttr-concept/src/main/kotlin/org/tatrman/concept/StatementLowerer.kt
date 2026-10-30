@@ -134,10 +134,10 @@ internal class StatementLowerer(
     private fun grainEvent(measure: Concept): Concept? {
         measure.of
             ?.let { model.cn.concepts[it] }
-            ?.takeIf { it.stereotype == "event" }
+            ?.takeIf { it.stereotype in setOf("event", "kind", "subkind", "role") }
             ?.let { return it }
         return model.cn.concepts.values
-            .filter { it.stereotype == "event" && measure.qname.name in it.qualities }
+            .filter { it.stereotype in setOf("event", "kind", "subkind", "role") && measure.qname.name in it.qualities }
             .singleOrNull()
     }
 

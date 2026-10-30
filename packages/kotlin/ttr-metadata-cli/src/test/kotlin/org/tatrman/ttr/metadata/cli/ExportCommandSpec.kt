@@ -5,6 +5,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import kotlinx.serialization.json.*
+import org.tatrman.ttr.metadata.export.ExportGrammar
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -35,7 +36,11 @@ class ExportCommandSpec :
             run(out, "--model", "cn", "--format", "ttl", "--profile", "owl").exitCode shouldBe 0
             val version = Files.readString(out.resolve(".snapshot")).trim()
             normalized(Files.readAllBytes(out.resolve("cn.ttl")), version) shouldBe
-                Files.readString(golden("ttl", "world-owl.ttl"))
+                // The library golden uses a fixed grammar header; the real CLI stamps the current grammar.
+                Files.readString(golden("ttl", "world-owl.ttl")).replace(
+                    "owl:versionInfo \"0.18\"",
+                    "owl:versionInfo \"${ExportGrammar.version}\"",
+                )
             Files.list(out).use { it.count() } shouldBe 2
         }
         "graph since reads previous snapshot ids and authored renames" {

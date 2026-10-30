@@ -143,7 +143,7 @@ private fun collectInto(
             }
         }
         // 0.17 — the cn model: a concept def's and a binding's slots.
-        is ConceptDef -> collectConceptBody(def.body, BodyMode.Def, owner, out)
+        is ConceptDef -> collectConceptBody(def.body, BodyMode.Def, owner, out, def.stereotype)
         is ConceptBindingDef -> collectConceptBody(def.body, BodyMode.Binding, owner, out)
         is ColumnDef, is IndexDef, is ConstraintDef -> {}
         else -> {}
@@ -185,6 +185,7 @@ private fun collectConceptBody(
     mode: BodyMode,
     owner: Definition,
     out: MutableList<CollectedRef>,
+    stereotype: String? = null,
 ) {
     fun cn(
         path: String,
@@ -205,6 +206,7 @@ private fun collectConceptBody(
     }
 
     val declaring = if (mode == BodyMode.Sugar) sugarStereotypeKey(body) else null
+    val quality = (stereotype ?: declaring) == "quality"
     val eventRef =
         if (mode == BodyMode.Binding) {
             body.properties.firstOrNull { it is ConceptProperty.Ref && it.key == "event" } as? ConceptProperty.Ref
@@ -214,6 +216,18 @@ private fun collectConceptBody(
     for (p in body.properties) {
         when (p) {
             is ConceptProperty.Ref -> if (p.key != declaring) cn(p.ref.path, p.ref.parts, p.ref.source)
+            // A quality's `from: ListPrice.amount` names its relator (the quality is the relator's, checked by
+            // `cn/projection-source`); a phase's `from:` names its starting event, dotted or not (review-175 F11).
+            is ConceptProperty.From ->
+                if (quality && p.ref.parts.size > 1) {
+                    headOf(p.ref.path, p.ref.parts, p.ref.source).let { (path, parts, source) ->
+                        cn(path, parts, source)
+                    }
+                } else {
+                    cn(p.ref.path, p.ref.parts, p.ref.source)
+                }
+            is ConceptProperty.Until -> cn(p.ref.path, p.ref.parts, p.ref.source)
+            is ConceptProperty.Per -> cn(p.ref.path, p.ref.parts, p.ref.source)
             is ConceptProperty.Grounds -> out += refOf(p.ref, owner)
             is ConceptProperty.ValueSpace -> cn(p.ref.path, p.ref.parts, p.ref.source)
             is ConceptProperty.Involves -> p.participants.forEach { cn(it.ref.path, it.ref.parts, it.ref.source) }
@@ -259,12 +273,50 @@ private fun collectConceptBody(
                             }
                         }
                     }
-                    "via" -> idsOf(p.value).forEach { plain(it) }
+                    "episodes" -> idsOf(p.value).forEach { plain(it) }
+                    "bounds" -> for (key in listOf("from", "until")) idsOf(entryOf(p.value, key)).forEach { cn(it) }
+                    "via" ->
+                        idsOf(p.value).forEach { id ->
+                            if (mode == BodyMode.Binding &&
+                                body.ref("quality") != null &&
+                                id.parts.firstOrNull() !in setOf("er", "md", "db")
+                            ) {
+                                headOf(id.ref.path, id.parts, id.source).let { (path, parts, source) ->
+                                    cn(path, parts, source)
+                                }
+                            } else {
+                                plain(id)
+                            }
+                        }
                     else -> {}
                 }
             else -> {}
         }
     }
+}
+
+/**
+ * `ListPrice` of `ListPrice.amount` — the reference to a relator whose quality a projection reads. Its span covers the
+ * head only, so a rename of the relator rewrites `ListPrice` and keeps `.amount` (a span with whitespace inside keeps
+ * the whole span). Mirrors TS `headRef` (`references.ts`).
+ */
+private fun headOf(
+    path: String,
+    parts: List<String>,
+    source: SourceLocation,
+): Triple<String, List<String>, SourceLocation> {
+    val head = parts.dropLast(1)
+    val headPath = head.joinToString(".")
+    val tight = source.offsetEnd - source.offsetStart == path.length && source.line == source.endLine
+    // `column + length` is the start-plus-length form the SourceLocation rule (tatrman CLAUDE.md) forbids for a
+    // multi-token span; it is exact only under `tight` — the span is the path's own text, on one line, no trivia
+    val span =
+        if (tight) {
+            source.copy(endColumn = source.column + headPath.length, offsetEnd = source.offsetStart + headPath.length)
+        } else {
+            source
+        }
+    return Triple(headPath, head, span)
 }
 
 private fun mdRef(

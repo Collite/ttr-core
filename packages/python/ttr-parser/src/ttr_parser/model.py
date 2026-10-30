@@ -1284,6 +1284,22 @@ class ConceptRef(ConceptProperty):
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptFrom(ConceptProperty):
+    ref: Reference
+    kind: ClassVar[str] = "from"
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptUntil(ConceptProperty):
+    ref: Reference
+    kind: ClassVar[str] = "until"
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ConceptPer(ConceptProperty):
+    ref: Reference
+    kind: ClassVar[str] = "per"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ConceptGrounds(ConceptProperty):
     ref: Reference
     kind: ClassVar[str] = "grounds"
@@ -1401,7 +1417,7 @@ class ConceptSugar:
 
 
 #: The concept stereotypes, in grammar order (`role` is the shared `def role`).
-CONCEPT_STEREOTYPES: tuple[str, ...] = ("kind", "role", "event", "phase", "quality", "relation_type")
+CONCEPT_STEREOTYPES: tuple[str, ...] = ("kind", "subkind", "role", "event", "phase", "quality", "relation_type")
 
 #: The ten cn binding keywords, in grammar order.
 CONCEPT_BINDING_KINDS: tuple[str, ...] = (

@@ -2,7 +2,7 @@
 // =============================================================================
 // CN (conceptual model) v1 — `assertion.v1`, the WRITE frame (cn contracts §2.3; AM-7, AM-38)
 //
-// A processor proposes an Assertion — "this event happened, with these participants, qualities and period" —
+// A processor proposes an Assertion — an occurrence, a validity row, or a phase episode with its subject and interval —
 // over concept IDs. `ttr-concept` validates it (labels, relation paths, units, the as-of), lowers it to the E-R row
 // payload a ledger writes, and explains it as the inspector's sentence. **cn never executes a write**: the lowered
 // payload is handed to whoever owns the write (a ledger / consolidation). Ambiguity is representable and
@@ -10,7 +10,9 @@
 //
 // JSON mapping: protobuf JsonFormat, canonical. FROZEN at CN-P3 S3.1 (2026-10-22): `Assertion` and `Identity` as
 // contracts §2.3 pins them, and the sub-messages it sketches (KeyValues, Participant, QualityValue, Provenance) as
-// written here — J-v2 additive-only from that freeze.
+// written here — J-v2 additive-only from that freeze, except the CN-P8 field-1 rename (translator 0.13.0): field 1
+// `event` became `concept`. The binary encoding is unchanged; the JSON key (`event` → `concept`) and the generated
+// accessors are not — a BREAKING change for JSON and API clients, with no `event` alias.
 // =============================================================================
 syntax = "proto3";
 
@@ -22,7 +24,7 @@ option java_package = "org.tatrman.assertion.v1";
 option java_multiple_files = true;
 
 message Assertion {
-  org.tatrman.concept.v1.ConceptRef event = 1;          // REQUIRED — the cn event that bears the claim
+  org.tatrman.concept.v1.ConceptRef concept = 1;        // REQUIRED — an instant event, valid kind row or phase episode (CN-P8); field number retained
   Identity identity = 2;                                // known key values, or NEW (consolidation assigns)
   repeated Participant participants = 3;                // label = the event's involves label (validated, R-cn-5)
   repeated QualityValue qualities = 4;

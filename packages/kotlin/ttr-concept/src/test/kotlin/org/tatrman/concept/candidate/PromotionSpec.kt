@@ -463,7 +463,13 @@ class PromotionSpec :
             val before = pkg("hartland") + ("er-credit.ttrm" to sugar)
             val role =
                 synthesized.copy(
-                    proposal = Proposal.Concept(Stereo.ROLE, "Creditor", of = "cn.CreditNote", event = "cn.Order"),
+                    proposal =
+                        Proposal.Concept(
+                            Stereo.ROLE,
+                            "Creditor",
+                            of = "cn.CreditNote",
+                            event = "cn.OrderPlaced",
+                        ),
                 )
             val (rolePatch, roleLoaded) = promote(role, before)
             rolePatch.files.keys shouldBe setOf("cn-qualities.ttrm") // the first `model cn` file, never the er file

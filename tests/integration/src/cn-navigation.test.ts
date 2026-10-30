@@ -558,3 +558,86 @@ describe('CN-P2 review-120 F2 — a participant label a definition reads is not 
     expect(edits).toEqual(['source', 'source']);
   });
 });
+
+// ---- CN-P8 review-175 F11 — a quality's dotted `from:` (and a binding's `via:`) names its relator ----
+
+const ROOT175 = 'file:///cnnav175';
+const CONCEPTS175 = `${ROOT175}/concepts.ttrm`;
+const BINDINGS175 = `${ROOT175}/bindings.ttrm`;
+const FILES175: Record<string, string> = {
+  [CONCEPTS175]: `package hartland.web
+model cn
+def kind Item { label: { en: "Item" } }
+def kind Channel { label: { en: "Channel" } }
+def kind ListPrice { involves: [Item, Channel], qualities: [amount] }
+def quality amount { of: ListPrice }
+def quality list_price { of: Item, valued_state: true, per: Channel, from: ListPrice.amount }
+def quality web_price { of: Item, valued_state: true, abstract: true }
+def quality typo_price { of: Item, valued_state: true, per: Channel, from: ListPrize.amount }
+`,
+  [BINDINGS175]: `package hartland.web
+model binding
+def cn2er_quality web_price_g { quality: cn.web_price, via: ListPrice.amount, per: Channel }
+`,
+};
+
+describe('CN-P8 review-175 F11 — a dotted `from:` is a reference to its relator', () => {
+  let client: lsp.Connection;
+  let server: lsp.Connection;
+  const diagnostics = new Map<string, lsp.Diagnostic[]>();
+  const at175 = (uri: string, needle: string, delta = 0) => posIn(FILES175, uri, needle, delta);
+
+  beforeAll(async () => {
+    const p = createPairedConnection();
+    client = p.client;
+    server = p.server;
+    client.onNotification('textDocument/publishDiagnostics', (params: lsp.PublishDiagnosticsParams) => {
+      diagnostics.set(params.uri, params.diagnostics);
+    });
+    createServerConnection(server);
+    await client.sendRequest('initialize', {
+      processId: null,
+      rootUri: ROOT175,
+      workspaceFolders: [{ uri: ROOT175, name: 'cnnav175' }],
+      capabilities: {},
+    });
+    client.sendNotification('initialized', {});
+    for (const [uri, text] of Object.entries(FILES175)) {
+      client.sendNotification('textDocument/didOpen', { textDocument: { uri, languageId: 'ttr', version: 1, text } });
+    }
+    await sleep(500);
+  });
+  afterAll(() => {
+    client.dispose();
+    server.dispose();
+  });
+
+  it('renaming the relator rewrites the head of `from: ListPrice.amount` and `via: ListPrice.amount`, keeping `.amount`', async () => {
+    const edit = (await client.sendRequest('textDocument/rename', {
+      textDocument: { uri: CONCEPTS175 },
+      position: at175(CONCEPTS175, 'def kind ListPrice', 9),
+      newName: 'PriceList',
+    })) as lsp.WorkspaceEdit;
+    const edits = (edit.documentChanges ?? [])
+      .flatMap((c) => ('edits' in c ? c.edits.map((e) => `${c.textDocument.uri.split('/').pop()}:${e.range.start.line}:${e.range.start.character}-${e.range.end.character} ${e.newText}`) : []))
+      .sort();
+    const span = (uri: string, needle: string) => {
+      const p = at175(uri, needle);
+      return `${uri.split('/').pop()}:${p.line}:${p.character}-${p.character + 'ListPrice'.length} PriceList`;
+    };
+    expect(edits).toEqual(
+      [
+        span(CONCEPTS175, 'ListPrice {'),
+        span(CONCEPTS175, 'ListPrice }'),
+        span(CONCEPTS175, 'ListPrice.amount }'),
+        span(BINDINGS175, 'ListPrice.amount,'),
+      ].sort(),
+    );
+  });
+
+  it('a typo in the relator is an unresolved reference, not only a projection error', () => {
+    const unresolved = (diagnostics.get(CONCEPTS175) ?? []).filter((d) => d.code === 'ttr/unresolved-reference');
+    expect(unresolved.map((d) => d.range.start)).toEqual([at175(CONCEPTS175, 'ListPrize')]);
+    expect(unresolved[0].range.end).toEqual(at175(CONCEPTS175, 'ListPrize', 'ListPrize'.length));
+  });
+});

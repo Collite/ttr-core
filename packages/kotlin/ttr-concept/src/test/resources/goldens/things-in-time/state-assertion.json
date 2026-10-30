@@ -1,0 +1,7 @@
+{
+  "concept": { "qname": "cn.OutOfService" },
+  "identity": { "new": true },
+  "participants": [{ "label": "warehouse", "concept": { "qname": "cn.Warehouse" }, "member": { "resolvedValue": "W1" } }],
+  "period": { "start": { "value": "2026-10-12T10:00", "granularity": "MINUTE" }, "endState": "END_OPEN" },
+  "assertedAsOf": { "value": "2026-10-12T11:00", "granularity": "MINUTE" }
+}

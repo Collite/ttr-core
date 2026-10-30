@@ -1,0 +1,8 @@
+model db schema dbo
+def table warehouse { columns: [def column id { type: text, isKey: true }] }
+def table item { columns: [def column id { type: text, isKey: true }] }
+def table ticket { columns: [def column id { type: text, isKey: true }, def column channel { type: text }, def column created { type: date }, def column closed { type: date, optional: true }] }
+def table started { columns: [def column id { type: text, isKey: true }, def column subject { type: text }, def column occurred { type: datetime }] }
+def table finished { columns: [def column id { type: text, isKey: true }, def column subject { type: text }, def column occurred { type: datetime }] }
+def table outage { columns: [def column id { type: text, isKey: true }, def column warehouse { type: text }, def column since { type: datetime }, def column until { type: datetime, optional: true }, def column reason { type: text }] }
+def table price { columns: [def column id { type: text, isKey: true }, def column item { type: text }, def column channel { type: text }, def column since { type: date }, def column until { type: date, optional: true }, def column amount { type: decimal }] }

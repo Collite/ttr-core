@@ -1,0 +1,11 @@
+// review-175 F11: a quality's dotted `from:` names its relator; a phase's names its event, dotted or not.
+model cn
+def kind Item { label: { en: "Item" } }
+def kind Channel { label: { en: "Channel" } }
+def kind ListPrice { involves: [Item, Channel], qualities: [amount] }
+def quality amount { of: ListPrice }
+def quality list_price { of: Item, valued_state: true, per: Channel, from: ListPrice.amount }
+def quality typo_price { of: Item, valued_state: true, per: Channel, from: ListPrize.amount }
+def event Listed { involves: [Item] }
+def event Delisted { involves: [Item] }
+def phase OnSale { of: Item, from: cn.Listed, until: cn.Delisted }

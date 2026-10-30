@@ -14,6 +14,13 @@ import org.tatrman.ttr.metadata.model.GroundingLayer
 import org.tatrman.ttr.metadata.model.QualifiedName
 import org.tatrman.ttr.metadata.model.Via
 import org.tatrman.ttr.metadata.model.EndState as ModelEndState
+import org.tatrman.ttrp.expr.CatalogId
+import org.tatrman.ttrp.expr.ColumnRef
+import org.tatrman.ttrp.expr.Expression
+import org.tatrman.ttrp.expr.FunctionCall
+import org.tatrman.ttrp.expr.Literal
+import org.tatrman.ttrp.expr.LiteralValue
+import org.tatrman.ttrp.expr.ThisRef
 
 /**
  * `assertionValidate` (cn contracts §2.3, §3; CN-P3 S3.2): the event resolves and lands on E-R (`cn/not-assertable` —
@@ -26,6 +33,10 @@ import org.tatrman.ttr.metadata.model.EndState as ModelEndState
  *
  * A **state claim** (AM-38): the event bears a `current_state` / `past_state` phase, or such a phase reads its period
  * in a state shape (the episode event — [CnDefinitionLints.BASIS_SHAPES]), or an asserted quality is `valued_state`.
+ *
+ * A **subkind claim** (⚑D, review-175 F7) lands through the grounding it lands on — its own, else its bearer's up the
+ * `of:` chain — and its definition is an obligation: each subkind's settable discriminator up the chain is written on
+ * the row (another value in the claim is `cn/slot-mismatch`); any other definition is `cn/not-assertable`.
  *
  * Once those checks pass, the event's row is planned ([RowPlanner], CN-P3 S3.5) and its findings join them — so a frame
  * this validator passes is one `assertionLower` lowers (A-CN-49).
@@ -75,7 +86,28 @@ internal class AssertionValidator(
         val planned = mutableListOf<PlannedParticipant>()
         val plannedQualities = mutableListOf<PlannedQuality>()
         val refs = FrameRefs(model, FrameSlugs.AMBIGUOUS_ASSERTION, f)
-        val event = refs.concept(a.event, "event", "event", setOf("event"))
+        val candidate =
+            refs.concept(
+                a.concept,
+                "concept",
+                "claim bearer",
+                setOf("event", "kind", "subkind", "role", "phase"),
+            )
+        val event = candidate?.takeIf { c -> lattice.chain(c).any { it.stereotype == "event" || it.period != null } }
+        if (candidate != null && event == null) {
+            f.error(
+                FrameSlugs.SLOT_MISMATCH,
+                "concept",
+                "`${candidate.ref}` names no row with validity or phase episode",
+            )
+        }
+        if (event?.stereotype == "phase" && event.grounding?.episodes == null) {
+            f.error(
+                FrameSlugs.NOT_ASSERTABLE,
+                "concept",
+                "`${event.ref}` is a derived phase — no episode entity holds its asserted row",
+            )
+        }
         val landed = event?.let { landing(it, f) } ?: false
         identity(a.identity, event?.takeIf { landed }, f)
         val labels = mutableSetOf<String>()
@@ -138,7 +170,11 @@ internal class AssertionValidator(
         if (event != null) period(a, event, f)
         val asOf = if (a.hasAssertedAsOf()) instant(a.assertedAsOf, "assertedAsOf", f) else null
         if (event != null &&
-            (lattice.chain(event).any { it.qname in stateEvents } || asserted.any { it.valuedState })
+            (
+                event.stereotype == "phase" ||
+                    lattice.chain(event).any { it.qname in stateEvents } ||
+                    asserted.any { it.valuedState }
+            )
         ) {
             if (!a.hasAssertedAsOf()) {
                 f.error(
@@ -169,12 +205,18 @@ internal class AssertionValidator(
         if (event != null && entity == null && !f.hasErrors()) {
             f.error(
                 FrameSlugs.NOT_ASSERTABLE,
-                "event",
+                "concept",
                 "`${event.ref}` lands on `${event.erTarget}` — no entity holds its row",
             )
         }
+        val obligations =
+            if (event != null && entity != null && event.stereotype == "subkind") {
+                discriminators(event, entity, f)
+            } else {
+                emptyList()
+            }
         if (f.hasErrors() || event == null || entity == null) return Checked(f.sorted(), null)
-        val plan = planner.plan(a, event, entity, planned, plannedQualities, f)
+        val plan = planner.plan(a, event, entity, planned, plannedQualities, f, obligations)
         return Checked(f.sorted(), plan.takeUnless { f.hasErrors() })
     }
 
@@ -193,7 +235,7 @@ internal class AssertionValidator(
                 ?: " — it has no grounding"
         f.error(
             FrameSlugs.NOT_ASSERTABLE,
-            "event",
+            "concept",
             "`${e.ref}` has no E-R landing (${FrameRefs.grade(e.grade)})$why: an assertion writes E-R rows",
         )
         return false
@@ -270,8 +312,9 @@ internal class AssertionValidator(
     }
 
     /**
-     * The label's way onto E-R: its relation path from the event's `cn2er_event` (L15-3) — up its chain — or, a value
-     * kind (AM-27), its column; null — reported — when it has neither.
+     * The label's way onto E-R: its relation path from the grounding the claimed concept lands on — its own, else (a
+     * subkind, ⚑D) the first er grounding up its `of:` chain ([ParticipantPaths.grounding], L15-3) — or, a value kind
+     * (AM-27), its column; null — reported — when it has neither.
      */
     private fun path(
         event: Concept,
@@ -279,15 +322,28 @@ internal class AssertionValidator(
         subject: String,
         f: Findings,
     ): ParticipantPaths.Path? {
-        val g = event.grounding
-        if (event.via != Via.DIRECT || g == null || g.layer != GroundingLayer.ER) {
+        if (event.via != Via.DIRECT) {
+            val through =
+                event.landingFrom
+                    ?.takeIf { it != event.qname }
+                    ?.let { " (its bearer `cn.${it.name}`'s)" }
+                    .orEmpty()
             f.error(
                 FrameSlugs.PARTICIPANT_PATH_BROKEN,
                 subject,
-                "`${event.ref}` lands on E-R through the hop — no grounding states `$label`'s relation path",
+                "`${event.ref}` lands on E-R through the hop$through — no grounding states `$label`'s relation path",
             )
             return null
         }
+        val g =
+            paths.grounding(event) { true } ?: run {
+                f.error(
+                    FrameSlugs.PARTICIPANT_PATH_BROKEN,
+                    subject,
+                    "`${event.ref}` has no er grounding up its chain — none states `$label`'s relation path",
+                )
+                return null
+            }
         return paths.of(event, label) ?: run {
             f.error(
                 FrameSlugs.PARTICIPANT_PATH_BROKEN,
@@ -296,6 +352,92 @@ internal class AssertionValidator(
             )
             null
         }
+    }
+
+    /**
+     * What a claimed subkind obliges its row to (⚑D, review-175 F7) — the definition of every subkind from the claimed
+     * one up its `of:` chain: the settable discriminator `<name> = '<value>'` (`this.<name>` alike; the shape the
+     * partition lint reads) whose name is an attribute of the claimed row — a quality of the chain grounded there, a
+     * value-kind participant's column, or the row's attribute of that name. Any other definition (`exists …`, another
+     * comparison, a conjunction) cannot be set by writing the row: `cn/not-assertable`, naming the bearer to claim.
+     * A `members:` block is read as the renderer reads it, a definition (review-175 ⚑R1). A subkind with neither block
+     * is one by its own stacked entity (A-CN-111): the row satisfies it only when it is that entity's row.
+     */
+    private fun discriminators(
+        claimed: Concept,
+        entity: org.tatrman.ttr.metadata.model.Entity,
+        f: Findings,
+    ): List<Discriminator> {
+        val out = mutableListOf<Discriminator>()
+        for (s in lattice.chain(claimed).takeWhile { it.stereotype == "subkind" }) {
+            val bearer = s.of?.let { "`cn.${it.name}`" } ?: "its bearer"
+            val block =
+                model.definitions
+                    .of(s.qname)
+                    .firstOrNull { it.kind == BlockKind.DEFINITION || it.kind == BlockKind.MEMBERS }
+            if (block == null) {
+                val own = s.grounding?.takeIf { it.layer == GroundingLayer.ER }?.let { entityOf(s) }
+                if (own == entity) continue
+                val why =
+                    own?.let { "its entity `${it.qname.name}` is not the claimed row's `${entity.qname.name}`" }
+                        ?: "no entity of its own"
+                f.error(
+                    FrameSlugs.NOT_ASSERTABLE,
+                    "concept",
+                    "`${s.ref}` has no definition and $why; claim $bearer",
+                )
+                continue
+            }
+            val eq = block.expression?.let(::settable)
+            val attribute = eq?.let { (name, _) -> rowAttribute(claimed, name, entity) }
+            if (eq == null || attribute == null) {
+                f.error(
+                    FrameSlugs.NOT_ASSERTABLE,
+                    "concept",
+                    "`${s.ref}`'s definition is not a settable discriminator; claim $bearer",
+                )
+                continue
+            }
+            out += Discriminator(s, eq.first, attribute, eq.second)
+        }
+        return out
+    }
+
+    /** `<name> = '<value>'` / `this.<name> = '<value>'` → (name, value); anything else → null. */
+    private fun settable(e: Expression): Pair<String, String>? {
+        val call = e as? FunctionCall ?: return null
+        if (call.function != CatalogId.EQ || call.args.size != 2) return null
+        val name =
+            when (val lhs = call.args[0]) {
+                is ColumnRef -> lhs.column.takeIf { lhs.port == null || lhs.port == "this" }
+                is ThisRef -> lhs.path.singleOrNull()
+                else -> null
+            } ?: return null
+        val value = ((call.args[1] as? Literal)?.value as? LiteralValue.Str)?.value ?: return null
+        return name to value
+    }
+
+    /** The claimed row's attribute a discriminator's [name] reads; null when it reads none of the row's. */
+    private fun rowAttribute(
+        claimed: Concept,
+        name: String,
+        entity: org.tatrman.ttr.metadata.model.Entity,
+    ): String? {
+        val row = entity.qname.name
+        val owners = lattice.chain(claimed).map { it.qname }.toSet()
+        val quality =
+            cn.concepts.values.filter {
+                it.stereotype == "quality" && it.qname.name == name && it.of in owners
+            }
+        if (quality.isNotEmpty()) {
+            val (e, attr) = ParticipantPaths.attributeRef(quality.singleOrNull()?.erTarget) ?: return null
+            return attr.takeIf { e == row }
+        }
+        if (lattice.participant(claimed, name) != null) {
+            val column = paths.of(claimed, name) as? ParticipantPaths.Column ?: return null
+            return column.attribute.takeIf { column.entity == row }
+        }
+        return entity.attributes.firstOrNull { attributeName(it) == name }?.let { name }
     }
 
     /**
@@ -520,6 +662,6 @@ internal class AssertionValidator(
         }
 
     private companion object {
-        val PARTICIPANT = setOf("kind", "role", "event", "phase")
+        val PARTICIPANT = setOf("kind", "role", "subkind", "event", "phase")
     }
 }

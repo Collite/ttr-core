@@ -1261,6 +1261,9 @@ object TtrRenderer {
             "hierarchy",
             "involves",
             "period",
+            "from",
+            "until",
+            "per",
             "qualities",
             "value_space",
             "valued_state",
@@ -1374,6 +1377,9 @@ object TtrRenderer {
             is ConceptProperty.Label -> renderLocalizedString(p.value)
             is ConceptProperty.Tags -> "[${p.value.joinToString(", ") { renderString(it) }}]"
             is ConceptProperty.Ref -> p.ref.path
+            is ConceptProperty.From -> p.ref.path
+            is ConceptProperty.Until -> p.ref.path
+            is ConceptProperty.Per -> p.ref.path
             is ConceptProperty.Grounds -> p.ref.path
             is ConceptProperty.ValueSpace -> p.ref.path
             is ConceptProperty.Involves -> renderInvolves(p.participants, indent, broken)

@@ -1,0 +1,16 @@
+package hartland.rv
+model cn
+
+def kind Shipment {}
+def kind Customer {}
+def kind Site {}
+def kind Region {}
+def event Shipped   { involves: [Shipment, Customer], period: { at: shipped } }
+def event Misplaced { involves: [Shipment, Customer], period: { at: shipped } }
+// R5: an event subkind inherits its bearer's participants
+def subkind EarlyShipped   { of: Shipped }
+def subkind EarlyMisplaced { of: Misplaced }
+def subkind Closed  { of: Site, definition: """sk = 0""" }
+def phase Down      { of: Site, qualities: [began, ended] }
+def quality began   { of: Down }
+def quality ended   { of: Down }

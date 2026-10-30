@@ -1011,7 +1011,7 @@ data class ConceptDef(
 
     companion object {
         /** The concept stereotypes, in grammar order (`role` is the shared `def role`). */
-        val STEREOTYPES: List<String> = listOf("kind", "role", "event", "phase", "quality", "relation_type")
+        val STEREOTYPES: List<String> = listOf("kind", "subkind", "role", "event", "phase", "quality", "relation_type")
     }
 }
 
@@ -1102,6 +1102,27 @@ sealed interface ConceptProperty {
 
     /** A stereotype ref — [key] is `kind | role | quality | event | phase | concept`. */
     data class Ref(
+        override val key: String,
+        val ref: Reference,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    /** Grammar 0.20 — `from:` reference; per-host validity is semantic. */
+    data class From(
+        override val key: String,
+        val ref: Reference,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    /** Grammar 0.20 — `until:` reference; per-host validity is semantic. */
+    data class Until(
+        override val key: String,
+        val ref: Reference,
+        override val source: SourceLocation,
+    ) : ConceptProperty
+
+    /** Grammar 0.20 — `per:` reference; per-host validity is semantic. */
+    data class Per(
         override val key: String,
         val ref: Reference,
         override val source: SourceLocation,

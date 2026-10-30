@@ -48,6 +48,26 @@ class DeterminismSpec :
     FunSpec({
         val reloaded = ConcurrentHashMap<String, Reload>()
 
+        test("CN-P8 temporal renderings are identical twice and over a shuffled reload") {
+            val w = GoldenWorlds["time"]
+            val shuffled = reload(w)
+            val counting = CountingClock(FIXED)
+            val original = CnConceptService(w.cn, counting)
+            val again = CnConceptService(shuffled.model, counting)
+            val options = RenderOptions(asOf = Instant.parse("2026-10-12T00:00:00Z"))
+            for (name in listOf("WebTicket", "OutOfService", "OpenTicket", "quoted_price")) {
+                val ref =
+                    org.tatrman.concept.v1.ConceptRef
+                        .newBuilder()
+                        .setQname("cn.$name")
+                        .build()
+                val first = original.definitionRender(ref, Layer.ER, "postgresql", options)
+                original.definitionRender(ref, Layer.ER, "postgresql", options) shouldBe first
+                again.definitionRender(ref, Layer.ER, "postgresql", options) shouldBe first
+            }
+            counting.reads.get() shouldBe 0
+        }
+
         for (c in GoldenCases.cases) {
             test("${c.id} [${c.call}] — byte-identical twice and over a shuffled reload") {
                 val world = GoldenWorlds[c.world]

@@ -121,8 +121,12 @@ class CnModelSpec :
         "the model-level cn errors are load errors; hygiene and advisory ones ride the grades" {
             // 76 grounds eight concepts 75 already grounds — the second of each is the error, in 76's file
             concepts.result.errors.map { it.message.substringBefore(':') } shouldBe
-                List(8) { "cn/duplicate-grounding" }
-            concepts.result.errors.all { it.file.endsWith("d-bindings.ttrm") } shouldBe true
+                List(3) { "cn/durative-event" } + List(8) { "cn/duplicate-grounding" }
+            concepts.result.errors
+                .filter {
+                    it.message.startsWith("cn/duplicate-grounding")
+                }.all { it.file.endsWith("d-bindings.ttrm") } shouldBe
+                true
             (concepts.result.warnings + concepts.result.errors).none {
                 it.message.startsWith("cn/ungrounded") || it.message.startsWith("cn/db-grounding")
             } shouldBe true
@@ -218,7 +222,8 @@ class CnModelSpec :
                     "Party" to Row(null, null, UNGROUNDED),
                     "Supplier" to Row(null, null, UNGROUNDED),
                     "WarehouseOutage" to Row(null, null, UNGROUNDED),
-                    "HomeCategory" to Row(null, null, UNGROUNDED),
+                    "HomeCategory" to
+                        Row("er.entity.category_code", Via.DIRECT, GroundingGrade.ER_GROUNDED, "ProductCategory"),
                     "open_amount" to Row(null, null, UNGROUNDED),
                     "transfer_delay" to Row(null, null, UNGROUNDED),
                     "StockCondition" to Row(null, null, UNGROUNDED),
@@ -249,6 +254,53 @@ class CnModelSpec :
                 it.landingFrom shouldBe cn("WebSale", "hartland.web")
             }
             hop.result.errors shouldBe emptyList()
+        }
+
+        // ---- review-175 ------------------------------------------------------------------------------------------
+
+        "F1: an empty participant path is kept when the participant is the binding's own row, else it is dangling" {
+            val rv = CnFixtures.review175()
+            rv.concept("Shipped").grounding!!.let {
+                it.participants shouldBe
+                    mapOf("shipment" to emptyList(), "customer" to listOf("er.relation.shipment_customer"))
+                it.dangling shouldBe emptyList()
+            }
+            rv.concept("Misplaced").grounding!!.let {
+                it.participants shouldBe mapOf("shipment" to emptyList())
+                it.dangling shouldBe listOf("customer: []")
+            }
+        }
+
+        "R5: an event subkind's empty path reads the participant it inherits from its bearer" {
+            val rv = CnFixtures.review175()
+            rv.concept("EarlyShipped").grounding!!.let {
+                it.participants shouldBe mapOf("shipment" to emptyList())
+                it.dangling shouldBe emptyList()
+            }
+            rv.concept("EarlyMisplaced").grounding!!.let {
+                it.participants shouldBe emptyMap()
+                it.dangling shouldBe listOf("customer: []")
+            }
+        }
+
+        "F10: a written target that does not resolve stays on its layer's landing; it is not inherited" {
+            val rv = CnFixtures.review175()
+            rv.concept("Region").let { Triple(it.erTarget, it.via, it.grade) } shouldBe
+                Triple(null, MD_HOP, MD_GROUNDED_HOP_MISSING)
+            // a subkind inherits its bearer's landing (er.entity.site) — but not when its own binding is broken
+            rv.concept("Site").erTarget shouldBe "er.entity.site"
+            rv.concept("Closed").let {
+                it.erTarget.shouldBeNull()
+                it.landingFrom.shouldBeNull()
+            }
+        }
+
+        "F12: a period written only on the cn2er_phase binding still makes the phase an episode table" {
+            CnFixtures
+                .review175()
+                .concept("Down")
+                .grounding!!
+                .episodes shouldBe "er.entity.site_outage"
         }
 
         "the grounding read: its target, kind and layer; a desugared one is synthetic" {

@@ -1,0 +1,32 @@
+// review-175 — empty participant paths (F1), dangling binding targets (F10), a binding-only episode period (F12).
+// Invented names.
+package hartland.rv
+model er
+
+def entity shipment {
+    attributes: [
+        def attribute shipment_id { type: int, isKey: true },
+        def attribute customer    { type: int },
+        def attribute shipped     { type: date }
+    ]
+}
+def entity customer {
+    attributes: [
+        def attribute sk { type: int, isKey: true }
+    ]
+}
+def entity site {
+    attributes: [
+        def attribute sk { type: int, isKey: true }
+    ]
+}
+def entity site_outage {
+    attributes: [
+        def attribute outage_id { type: int, isKey: true },
+        def attribute site      { type: int },
+        def attribute began     { type: date },
+        def attribute ended     { type: date }
+    ]
+}
+def relation shipment_customer { from: er.entity.shipment, to: er.entity.customer, join: [{ from: er.entity.shipment.customer, to: er.entity.customer.sk }] }
+def relation outage_site { from: er.entity.site_outage, to: er.entity.site, join: [{ from: er.entity.site_outage.site, to: er.entity.site.sk }] }

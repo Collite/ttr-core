@@ -109,6 +109,16 @@ function idRef(v: IdValue): Reference {
   return { path: v.path, parts: v.parts, source: v.source };
 }
 
+/**
+ * `cn/subkind-temporal-definition`'s word rule (review-175 F9), shared with Kotlin and Python: a definition's words are
+ * `TTR.g4`'s `IDENT` (`À-ɏ` included). It is temporal when it reads `:as_of` or a `:name` parameter — written, or
+ * implied by `within(…)` / `age(…)`, which `ttr-concept`'s reads count as an as-of read and DC-12 lists as a temporal
+ * predicate — or a DC-12 word. `period` alone is not temporal (a period bound against a constant is rigid).
+ */
+const DEFINITION_WORD = /[A-Za-zÀ-ɏ_][A-Za-z0-9_À-ɏ]*/g;
+const TEMPORAL_READ = /(?<![A-Za-z0-9_À-ɏ]):[A-Za-zÀ-ɏ_]|(?<![.A-Za-z0-9_À-ɏ])(?:within|age)\s*\(/i;
+const TEMPORAL_WORDS: ReadonlySet<string> = new Set(['at_or_before', 'before', 'contains', 'ended_before', 'overlaps']);
+
 /** The last segment of a key — how a message names a concept or an element. */
 function shortName(qname: string): string {
   return qname.slice(qname.lastIndexOf('.') + 1);
@@ -208,6 +218,7 @@ class CnValidator {
       this.checkAntirigid(c);
       this.checkRelationTypes(c);
     }
+    this.checkThingsInTime();
     this.checkHierarchies();
     this.checkParticipantPaths();
     this.checkSenses();
@@ -338,7 +349,7 @@ class CnValidator {
       const expected = stereotypeOfBinding(g.bindingKind);
       if (g.origin === 'binding' && expected && g.conceptRef && g.conceptKey) {
         const st = this.concepts.get(g.conceptKey)?.stereotype ?? this.resolver.getSymbol(g.conceptKey)?.stereotype;
-        if (st && st !== expected) {
+        if (st && st !== expected && !(st === 'subkind' && (expected === 'kind' || expected === 'phase'))) {
           this.report(
             DiagnosticCode.CnGroundingTargetKind,
             'error',
@@ -350,7 +361,7 @@ class CnValidator {
       }
       if (g.targetSymbol) {
         const t = TARGETS[g.bindingKind];
-        if (!t.ok(g.targetSymbol, this.stacked)) {
+        if (!t.ok(g.targetSymbol, this.stacked) && !(g.bindingKind === 'cn2er_phase' && g.targetSymbol.kind === 'entity' && (this.concepts.get(g.conceptKey ?? '')?.properties.some((s) => s.property.kind === 'period') || g.properties.some((p) => p.kind === 'period')))) {
           const sym = g.targetSymbol;
           const is = g.bindingKind === 'cn2er_phase' && sym.kind === 'entity' ? 'an entity no query backs' : describe(sym);
           this.report(
@@ -384,6 +395,113 @@ class CnValidator {
 
   // --- the def-shape slugs -------------------------------------------------
 
+  /** CN-P8 AM-45…49, shared with Kotlin and Python's model-level checks. */
+  private checkThingsInTime(): void {
+    const prop = (c: CnConcept, key: string): StatedProperty | undefined => {
+      const own = c.properties.find((s) => s.property.key === key); if (own) return own;
+      const g = this.groundingsOf(c)[0], doc = g && this.docByUri.get(g.uri); if (!g || !doc) return;
+      const properties = g.properties, direct = properties.find((p) => p.key === key); if (direct) return { property: direct, doc };
+      const bounds = properties.find((p) => p.kind === 'entry' && p.key === 'bounds');
+      const value = bounds?.kind === 'entry' && bounds.value.kind === 'object' ? bounds.value.entries.find((e) => e.key === key)?.value : undefined;
+      const via = properties.find((p) => p.kind === 'entry' && p.key === 'via');
+      const id = value?.kind === 'id' ? value : key === 'from' && c.stereotype === 'quality' && via?.kind === 'entry' && via.value.kind === 'id' ? via.value : undefined;
+      if (id) return { property: { kind: key === 'until' ? 'until' : 'from', key, ref: idRef(id), source: id.source }, doc };
+    };
+    const named = (c: CnConcept, key: string): CnConcept | undefined => {
+      const s = prop(c, key); if (!s) return;
+      const p = s.property;
+      const ref = p.kind === 'entry' && p.value.kind === 'id' ? idRef(p.value) : 'ref' in p ? p.ref : undefined;
+      const symbol = ref && this.concept(ref, s.doc); return symbol && this.concepts.get(symbol.qname);
+    };
+    const chain = (c: CnConcept): Set<string> => {
+      const seen = new Set<string>(); let at: CnConcept | undefined = c;
+      while (at && !seen.has(at.key)) { seen.add(at.key); at = named(at, 'of') ?? named(at, 'is_a'); }
+      return seen;
+    };
+    const participates = (c: CnConcept, bearer: CnConcept): boolean => [...chain(c)].some((key) => {
+      const s = prop(this.concepts.get(key)!, 'involves'); if (s?.property.kind !== 'involves') return false;
+      return s.property.participants.some((pt) => { const sym = this.concept(pt.ref, s.doc); const got = sym && this.concepts.get(sym.qname); return got && (chain(got).has(bearer.key) || chain(bearer).has(got.key)); });
+    });
+    const emit = (c: CnConcept, code: DiagnosticCode, message: string, warning = false, key?: string) => {
+      const s = key ? prop(c, key) : undefined;
+      this.report(code, warning ? 'warning' : 'error', s?.doc.uri ?? c.uri, s?.property.source ?? c.source, message);
+    };
+    const temporal = (c: CnConcept, visiting: Set<string>): boolean => {
+      if (visiting.has(c.key)) return false; visiting.add(c.key);
+      if (c.stereotype === 'phase' || isTrue(prop(c, 'valued_state'))) return true;
+      const p = prop(c, 'definition')?.property ?? prop(c, 'members')?.property;
+      if (!p || !('block' in p) || !('text' in p.block)) return false;
+      const text = p.block.text.replace(/'(''|[^'])*'|"(\\.|[^"])*"/g, ' ');
+      if (TEMPORAL_READ.test(text)) return true;
+      const words = new Set(text.match(DEFINITION_WORD));
+      if ([...words].some((w) => TEMPORAL_WORDS.has(w.toLowerCase()))) return true;
+      return [...this.concepts.values()].some((x) => x.key !== c.key && words.has(x.name) && temporal(x, visiting));
+    };
+    for (const c of this.concepts.values()) {
+      if (c.stereotype === 'subkind' && temporal(c, new Set())) emit(c, DiagnosticCode.CnSubkindTemporalDefinition, `subkind '${c.name}' has a temporal or parametric definition`, false, prop(c, 'definition') ? 'definition' : 'members');
+      if (c.stereotype === 'kind' && prop(c, 'members') && prop(c, 'is_a')) emit(c, DiagnosticCode.CnSubkindAsKind, `kind '${c.name}' with members and is_a is a subkind — use 'def subkind'`, true);
+      if (c.stereotype === 'role' && named(c, 'event') && named(c, 'event')!.stereotype !== 'event') emit(c, DiagnosticCode.CnRoleNoEvent, `role '${c.name}' requires an event as its defining event`, false, 'event');
+      if (c.stereotype === 'subkind' && named(c, 'of') && !['kind', 'subkind', 'role', 'event'].includes(named(c, 'of')!.stereotype)) emit(c, DiagnosticCode.CnSubkindBearer, `subkind '${c.name}' requires a rigid bearer — a kind, subkind, role or event, not a ${named(c, 'of')!.stereotype}`, false, 'of');
+      const ep = prop(c, 'extent')?.property; const extent = ep?.kind === 'extent' ? ep.value : undefined;
+      if (ep) emit(c, DiagnosticCode.CnExtentRetired, 'extent is retired — events are instantaneous; kinds and phases carry intervals', true, 'extent');
+      const pp = prop(c, 'period')?.property; const period = pp?.kind === 'period' ? pp.value.entries.map((e) => e.key) : undefined;
+      if (c.stereotype === 'event' && (extent === 'durative' || period?.some((k) => k === 'start' || k === 'end'))) emit(c, DiagnosticCode.CnDurativeEvent, `event '${c.name}' is durative — model a kind with a lifetime or a phase`, false, ep ? 'extent' : 'period');
+      if (['kind', 'role', 'subkind', 'phase'].includes(c.stereotype) && period && (period.includes('at') || !period.includes('start') || !period.includes('end'))) emit(c, DiagnosticCode.CnLifetimePeriod, `'${c.name}' needs a start/end interval`, false, 'period');
+      const from = !!prop(c, 'from'), until = !!prop(c, 'until');
+      if (c.stereotype === 'phase') {
+        const sources = [!!prop(c, 'definition'), this.groundingsOf(c).some((g) => !!g.target || !!g.targetKey), from || until].filter(Boolean).length;
+        if (sources > 1 || from !== until) emit(c, DiagnosticCode.CnPhaseSourceConflict, `phase '${c.name}' needs exactly one source: definition, grounding, or both from and until`);
+        const bearer = named(c, 'of');
+        if (from && until && bearer) for (const key of ['from', 'until']) { const event = named(c, key); if (!event || event.stereotype !== 'event' || !participates(event, bearer)) emit(c, DiagnosticCode.CnPhaseBoundsParticipant, `phase '${c.name}' ${key} bound must be an event involving '${bearer.name}'`, false, key); }
+        if (period && bearer) {
+          const target = this.groundingsOf(c)[0]?.targetSymbol;
+          const subject = [...chain(bearer)].map((key) => this.directErEntity(key)).find(Boolean);
+          if (target && subject) {
+            const paths = this.docs.flatMap((d) => d.ast.definitions.filter((r): r is RelationDef => r.kind === 'relation').flatMap((r) => { const ref: Reference = { path: `er.relation.${r.name}`, parts: ['er', 'relation', r.name], source: r.source }; const sym = this.element(ref, d); const ends = sym && this.endsOf(sym); return ends ? [ends] : []; }));
+            if (!paths.some(([a, b]) => a === target.qname && b === subject)) emit(c, DiagnosticCode.CnEpisodeSubjectMissing, `episode phase '${c.name}' has no relation to its subject '${bearer.name}'`);
+          }
+        }
+      }
+      if (c.stereotype === 'quality' && (from || prop(c, 'per'))) {
+        const s = prop(c, 'from'); const ref = s?.property.kind === 'from' ? s.property.ref : undefined;
+        const parts = ref?.parts.slice(0, -1) ?? []; const sym = parts.length && s ? this.concept({ path: parts.join('.'), parts, source: ref!.source }, s.doc) : undefined;
+        const source = sym && this.concepts.get(sym.qname), bearer = named(c, 'of'), per = named(c, 'per');
+        const quality = [...this.concepts.values()].find((q) => q.name === ref?.parts.at(-1) && q.stereotype === 'quality' && named(q, 'of')?.key === source?.key);
+        if (!isTrue(prop(c, 'valued_state')) || !source || !['kind', 'subkind', 'role'].includes(source.stereotype) || !bearer || !participates(source, bearer) || !quality || (!!prop(c, 'per') && (!per || !participates(source, per)))) emit(c, DiagnosticCode.CnProjectionSource, `quality '${c.name}' needs a valued-state projection of a relator quality involving its bearer and per participant`);
+        else {
+          // ⚑C (review-175 F6, ⚑R4): one row per bearer — exactly one participant of the relator stands for the bearer,
+          // exactly one for `per:`, and every other one is uncovered. Counted by participant (label), not by concept.
+          const covers = (got: CnConcept, by: CnConcept | undefined) => !!by && (chain(got).has(by.key) || chain(by).has(got.key));
+          const participants = [...chain(source)].flatMap((key) => {
+            const s = prop(this.concepts.get(key)!, 'involves'); if (s?.property.kind !== 'involves') return [];
+            return s.property.participants.flatMap((pt) => { const sym = this.concept(pt.ref, s.doc); const got = sym && this.concepts.get(sym.qname); return got ? [{ label: pt.label ?? pt.ref.parts[pt.ref.parts.length - 1].toLowerCase(), got }] : []; });
+          });
+          const ambiguous = [bearer, per].flatMap((by) => { const fits = by ? participants.filter((p) => covers(p.got, by)) : []; return by && fits.length > 1 ? [{ by, labels: fits.map((p) => p.label) }] : []; })[0];
+          const uncovered = participants.find((p) => !covers(p.got, bearer) && !covers(p.got, per));
+          if (ambiguous) emit(c, DiagnosticCode.CnProjectionSource, `quality '${c.name}' projects '${source.name}', which has ${ambiguous.labels.length === 2 ? 'two' : ambiguous.labels.length} participants '${ambiguous.by.name}' can be — ${ambiguous.labels.map((l) => `'${l}'`).join(', ')}`);
+          else if (uncovered) emit(c, DiagnosticCode.CnProjectionSource, `quality '${c.name}' projects '${source.name}', whose participant '${uncovered.label}' ('${uncovered.got.name}') is neither its bearer nor its per: — one '${bearer.name}' reads several rows; add 'per: ${uncovered.got.name}'`);
+        }
+      }
+    }
+    const groups = new Map<string, Array<{c: CnConcept; bearer: CnConcept; attr: string; value: string}>>();
+    for (const c of this.concepts.values()) {
+      if (c.stereotype !== 'subkind') continue;
+      const p = prop(c, 'definition')?.property; const match = p?.kind === 'definition' ? /^\s*(?:this\.)?([A-Za-z\u00C0-\u024F_][A-Za-z0-9_\u00C0-\u024F]*)\s*=\s*'([^']*)'\s*$/.exec(p.block.text) : null;
+      const bearer = named(c, 'of'); if (!match || !bearer) continue;
+      const key = `${bearer.key}|${match[1]}`; const group = groups.get(key) ?? []; group.push({c, bearer, attr: match[1], value: match[2]}); groups.set(key, group);
+    }
+    for (const group of groups.values()) {
+      const values = new Map<string, CnConcept>();
+      for (const p of group) { const prior = values.get(p.value); if (prior) emit(p.c, DiagnosticCode.CnPartitionOverlap, `subkind '${p.c.name}' overlaps '${prior.name}' on '${p.attr}'`, false, 'definition'); else values.set(p.value, p.c); }
+      const first = group[0]; const quality = [...this.concepts.values()].find((q) => q.name === first.attr && named(q, 'of')?.key === first.bearer.key);
+      const space = quality && named(quality, 'value_space'), target = space && this.groundingsOf(space)[0]?.targetSymbol;
+      if (!target) continue;
+      const attribute = this.docs.flatMap((d) => d.ast.definitions.filter((x): x is EntityDef => x.kind === 'entity').flatMap((x) => x.attributes ?? [])).find((x) => x.source.file === target.source.file && x.source.offsetStart === target.source.offsetStart);
+      const missing = (attribute?.valueLabels?.entries.map((e) => e.key) ?? []).filter((v) => !values.has(v));
+      if (missing.length) emit(first.c, DiagnosticCode.CnPartitionIncomplete, `subkind partition on '${first.attr}' misses ${missing.sort().join(', ')}`, true);
+    }
+  }
+
   private checkShape(c: CnConcept): void {
     const grounded = this.groundingsOf(c).length > 0;
     const definition = stated(c, 'definition');
@@ -396,6 +514,7 @@ class CnValidator {
         break;
       case 'quality':
       case 'phase':
+      case 'subkind':
         if (!stated(c, 'entry', 'of')) {
           this.report(DiagnosticCode.RequiredPropertyMissing, 'error', c.uri, c.source, `${c.stereotype} '${c.name}' names no bearer — 'of:' is required`);
         }
@@ -414,7 +533,7 @@ class CnValidator {
           `phase '${c.name}' has a 'definition:' and a grounding — a phase is defined, or grounded to a stacked entity, never both (AM-2)`,
         );
       }
-      if (!definition && !grounded && !abstract) {
+      if (!definition && !grounded && !abstract && !stated(c, 'from')) {
         this.report(
           DiagnosticCode.CnPhaseNoDefinition,
           'info',
@@ -428,7 +547,7 @@ class CnValidator {
       this.report(DiagnosticCode.CnEventNoPeriod, 'info', c.uri, c.source, `event '${c.name}' has no 'period:' — no consumer can place it in time`);
     }
     const exempt =
-      c.stereotype === 'relation_type' || c.stereotype === 'phase' || !!definition || !!stated(c, 'members') || abstract;
+      c.stereotype === 'relation_type' || c.stereotype === 'phase' || c.stereotype === 'subkind' || !!stated(c, 'from') || !!definition || !!stated(c, 'members') || abstract;
     if (!grounded && !exempt) {
       this.report(DiagnosticCode.CnUngrounded, 'info', c.uri, c.source, `${c.stereotype} '${c.name}' is not grounded yet — no consumer reaches it (P-1, eventually grounded)`);
     }
@@ -437,7 +556,7 @@ class CnValidator {
   // --- cn/involves-unlabelled-duplicate -----------------------------------
 
   private checkInvolves(c: CnConcept): void {
-    if (c.stereotype !== 'event') return;
+    if (!['event', 'kind', 'subkind', 'role'].includes(c.stereotype)) return;
     const involves = stated(c, 'involves');
     if (!involves) return;
     const seen = new Set<string>();
@@ -580,6 +699,36 @@ class CnValidator {
     return from && to ? [from, to] : undefined;
   }
 
+  /**
+   * The concept of a concept's participant `label`: its own `involves:`, else up its `of:` / `is_a` chain, nearest
+   * first (review-175 R5 — an event subkind inherits its bearer's participants). Mirrors Kotlin `participantUp`.
+   */
+  private participantUp(key: string, label: string): SymbolEntry | undefined {
+    const seen = new Set<string>();
+    const queue = [key];
+    while (queue.length) {
+      const at = this.concepts.get(queue.shift()!);
+      if (!at || seen.has(at.key)) continue;
+      seen.add(at.key);
+      const involves = stated(at, 'involves');
+      if (involves?.property.kind === 'involves') {
+        const p = involves.property.participants.find(
+          (pt) => (pt.label ?? pt.ref.parts[pt.ref.parts.length - 1].toLowerCase()) === label,
+        );
+        if (p) return this.concept(p.ref, involves.doc);
+      }
+      for (const k of ['of', 'is_a']) {
+        const up = stated(at, 'entry', k);
+        if (!up) continue;
+        for (const id of idsOf((up.property as ConceptEntry).value)) {
+          const sym = this.concept(idRef(id), up.doc);
+          if (sym) queue.push(sym.qname);
+        }
+      }
+    }
+    return undefined;
+  }
+
   /** The entity a participant concept's own grounding lands on directly in er; `undefined` when it has none. */
   private directErEntity(conceptKey: string): string | undefined {
     const g = this.groundings.byConcept.get(conceptKey)?.[0];
@@ -591,17 +740,16 @@ class CnValidator {
 
   private checkParticipantPaths(): void {
     for (const g of this.groundings.groundings) {
-      if (g.bindingKind !== 'cn2er_event' || g.targetSymbol?.kind !== 'entity') continue;
+      if (!['cn2er_event', 'cn2er_kind', 'cn2er_role', 'cn2er_phase'].includes(g.bindingKind ?? '') || g.targetSymbol?.kind !== 'entity') continue;
       const participants = g.properties.find((p) => p.kind === 'entry' && p.key === 'participants');
       const doc = this.docByUri.get(g.uri);
       if (participants?.kind !== 'entry' || participants.value.kind !== 'object' || !doc) continue;
       const event = g.conceptKey ? this.concepts.get(g.conceptKey) : undefined;
-      const involves = event ? stated(event, 'involves') : undefined;
-      const enclosing = buildCanonicalKey({ packageName: doc.packageName, kind: g.bindingKind, parts: [g.name] });
+      const enclosing = buildCanonicalKey({ packageName: doc.packageName, kind: g.bindingKind!, parts: [g.name] });
       for (const entry of participants.value.entries) {
         const path = idsOf(entry.value);
         const rels = path.map((id) => this.element(idRef(id), doc, enclosing));
-        if (path.length === 0 || rels.some((r) => !r)) continue; // `ttr/unresolved-reference`
+        if (rels.some((r) => !r)) continue; // `ttr/unresolved-reference`
         let at = g.targetSymbol.qname;
         let broken = false;
         for (let i = 0; i < path.length && !broken; i++) {
@@ -627,19 +775,19 @@ class CnValidator {
             at = ends[0] === at ? ends[1] : ends[0];
           }
         }
-        if (broken || involves?.property.kind !== 'involves') continue;
-        const participant = involves.property.participants.find(
-          (p) => (p.label ?? p.ref.parts[p.ref.parts.length - 1].toLowerCase()) === entry.key,
-        );
-        const concept = participant ? this.concept(participant.ref, involves.doc) : undefined;
+        if (broken || !event) continue;
+        const concept = this.participantUp(event.key, entry.key);
         const lands = concept ? this.directErEntity(concept.qname) : undefined;
         if (lands && lands !== at) {
+          // An empty path (`order: []`) says the participant IS the binding's own row: its concept must land there.
           this.report(
             DiagnosticCode.CnParticipantPathBroken,
             'error',
             g.uri,
-            path[path.length - 1].source,
-            `the path of '${entry.key}' ends on '${shortName(at)}', but '${concept!.name}' is grounded to '${shortName(lands)}'`,
+            path.length ? path[path.length - 1].source : entry.value.source,
+            path.length
+              ? `the path of '${entry.key}' ends on '${shortName(at)}', but '${concept!.name}' is grounded to '${shortName(lands)}'`
+              : `the empty path of '${entry.key}' reads the binding's own row '${shortName(at)}', but '${concept!.name}' is grounded to '${shortName(lands)}'`,
           );
         }
       }
@@ -770,4 +918,5 @@ export function cncDeprecations(ast: Document, uri: string): CnDiagnostic[] {
     });
   }
   return out;
+
 }

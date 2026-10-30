@@ -87,6 +87,9 @@ from ttr_parser.model import (
     ConceptEntry,
     ConceptExtent,
     ConceptFilter,
+    ConceptFrom,
+    ConceptUntil,
+    ConceptPer,
     ConceptGrounds,
     ConceptInvolves,
     ConceptLabel,
@@ -863,7 +866,7 @@ def _concept_props(b: ConceptBody, with_common: bool) -> dict[str, Any]:
                 p["tags"] = list(prop.value)
         elif isinstance(prop, ConceptLabel):
             _present(p, "label", _localized(prop.value))
-        elif isinstance(prop, (ConceptRef, ConceptGrounds, ConceptValueSpace)):
+        elif isinstance(prop, (ConceptRef, ConceptFrom, ConceptUntil, ConceptPer, ConceptGrounds, ConceptValueSpace)):
             p[prop.key] = _ref_path(prop.ref)
         elif isinstance(prop, ConceptInvolves):
             p["involves"] = [

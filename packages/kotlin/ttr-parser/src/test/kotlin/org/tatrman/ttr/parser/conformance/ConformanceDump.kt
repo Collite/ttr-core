@@ -476,6 +476,9 @@ object ConformanceDump {
                 is ConceptProperty.Tags -> if (withCommon && prop.value.isNotEmpty()) p["tags"] = strList(prop.value)
                 is ConceptProperty.Label -> localized(prop.value)?.let { p["label"] = it }
                 is ConceptProperty.Ref -> p[prop.key] = JsonPrimitive(prop.ref.path)
+                is ConceptProperty.From -> p[prop.key] = JsonPrimitive(prop.ref.path)
+                is ConceptProperty.Until -> p[prop.key] = JsonPrimitive(prop.ref.path)
+                is ConceptProperty.Per -> p[prop.key] = JsonPrimitive(prop.ref.path)
                 is ConceptProperty.Grounds -> p[prop.key] = JsonPrimitive(prop.ref.path)
                 is ConceptProperty.ValueSpace -> p[prop.key] = JsonPrimitive(prop.ref.path)
                 is ConceptProperty.Involves ->

@@ -41,6 +41,7 @@ internal class ExplainWords private constructor(
     val involving = w("involving", "účastník")
     val asLabel = w("as", "jako")
     val where = w("where", "kde")
+    val whileHolding = w("while", "dokud")
     val by = w("by", "řazeno:")
     val from = w("from", "od")
     val until = w("until", "do")

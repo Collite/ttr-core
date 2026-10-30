@@ -57,11 +57,51 @@ internal class ParticipantPaths(
     ): Path? {
         val g = grounding(owner) { label in it.participants }
         val names = g?.participants?.get(label).orEmpty()
-        if (g != null && names.isNotEmpty()) return Relations(g, names.map { relation(it) ?: return null })
+        if (g != null) return Relations(g, names.map { relation(it) ?: return null })
         val declared = lattice.participant(owner, label)?.second?.concept
-        val stands = concept ?: declared?.let { cn.concepts[it] }
-        val (entity, attribute) = attributeRef(stands?.erTarget) ?: return null
+        val stands = concept ?: declared?.let { cn.concepts[it] } ?: return null
+        val column =
+            when (val v = valued(owner, label, stands)) {
+                Valued.None -> stands.erTarget
+                Valued.Ambiguous -> return null
+                is Valued.One -> v.quality.erTarget ?: return null
+            }
+        val (entity, attribute) = attributeRef(column) ?: return null
         return Column(entity, attribute)
+    }
+
+    private sealed interface Valued {
+        data object None : Valued
+
+        data object Ambiguous : Valued
+
+        data class One(
+            val quality: Concept,
+        ) : Valued
+    }
+
+    /**
+     * The owner's quality valued in [stands] (a value-kind participant read through it, AM-27): the one named [label]
+     * anywhere up the chain (the nearest wins), else the only one at the nearest level of the chain that has any
+     * (review-175 R6 — a label-named quality one level up beats an unrelated single one below it). Several with no
+     * label match read no column — `cn/participant-path-broken`, never the first of them.
+     */
+    private fun valued(
+        owner: Concept,
+        label: String,
+        stands: Concept,
+    ): Valued {
+        val levels =
+            lattice.chain(owner).map { c ->
+                cn.concepts.values.filter {
+                    it.stereotype == "quality" && it.of == c.qname && it.valueSpace == stands.qname
+                }
+            }
+        levels.firstNotNullOfOrNull { level -> level.firstOrNull { it.qname.name == label } }?.let {
+            return Valued.One(it)
+        }
+        val nearest = levels.firstOrNull { it.isNotEmpty() } ?: return Valued.None
+        return nearest.singleOrNull()?.let(Valued::One) ?: Valued.Ambiguous
     }
 
     companion object {

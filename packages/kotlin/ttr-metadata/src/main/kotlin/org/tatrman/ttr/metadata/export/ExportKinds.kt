@@ -50,7 +50,7 @@ object ExportKinds {
             "approval" to setOf("approval"),
             "program" to setOf("program"),
             "recipe" to setOf("recipe"),
-            "concept" to setOf("kind", "role", "phase", "quality", "event", "relation_type"),
+            "concept" to setOf("kind", "subkind", "role", "phase", "quality", "event", "relation_type"),
             "conceptBinding" to
                 setOf(
                     "cn2md_kind",
@@ -128,6 +128,7 @@ object ExportKinds {
             "cubelet",
             "kind",
             "role",
+            "subkind",
             "phase",
             "quality",
             "event",

@@ -12,7 +12,7 @@ def kind Warehouse { label: { en: "Distribution center", cs: "Distribuční cent
 def kind Channel   { label: { en: "Channel", cs: "Kanál" } }                     // a value kind: store · web · marketplace
 
 // ---- roles ----
-def role Customer { of: Party, event: Order, label: { en: "Customer", cs: "Zákazník" } }
+def role Customer { of: Party, event: OrderPlaced, label: { en: "Customer", cs: "Zákazník" } }
 
 // ---- events ----
 def event Sale {
@@ -21,22 +21,21 @@ def event Sale {
     period: { at: sale_date },
     qualities: [revenue, quantity, sale_date]
 }
-def event Order {
+def kind Order {
     label: { en: "Order", cs: "Objednávka" },
-    extent: durative,
     involves: [Customer, Warehouse as fulfilling],
     period: { start: placed_date, end: delivered_date, end_open: open },
     qualities: [order_value, state, channel, placed_date, delivered_date]
 }
-def event OrderLine {
+def kind OrderLine {
     label: { en: "Order line", cs: "Řádek objednávky" },
     involves: [Order, Item, Warehouse],
-    period: { at: line_date },
     qualities: [line_quantity, unit_price, line_date]
 }
-def event Invoicing {
+def kind Document { abstract: true }
+def subkind Invoice {
+    of: Document,
     label: { en: "Invoice", cs: "Faktura" },
-    extent: durative,
     involves: [Customer, Order],
     period: { start: issued, end: due },
     qualities: [amount, paid, invoice_status, issued, due]
@@ -47,41 +46,38 @@ def event Inventory {
     period: { at: as_of_date },
     qualities: [quantity_on_hand, as_of_date]
 }
-def event WarehouseOutage {
+def phase OutOfService {
+    of: Warehouse,
     label: { en: "Outage", cs: "Výpadek" },
-    extent: durative,
     involves: [Warehouse],
     period: { start: outage_from, end: outage_to },                              // closed: the end is the last day (no `end_open:`)
     qualities: [outage_from, outage_to, outage_reason]
 }
-def event PriceList {
+def kind ListPrice {
     label: { en: "List price", cs: "Ceníková cena" },
-    extent: durative,
-    involves: [Item],
+    involves: [Item, Channel],
     period: { start: pl_from, end: pl_to, end_open: open },
     qualities: [pl_price, pl_channel, pl_from, pl_to]
 }
-def event CustomerPrice {
+def kind PriceAgreement {
     label: { en: "Individual price", cs: "Individuální cena" },
-    extent: durative,
     involves: [Customer, Item],
     period: { start: cp_from, end: cp_to, end_open: open },
     qualities: [cp_price, cp_from, cp_to]
 }
-def event ReturnRequest {
+def kind ReturnRequest {
     label: { en: "Return request", cs: "Reklamace" },
     involves: [Customer, Order],
-    period: { at: requested_date },
     qualities: [request_state, requested_date]
 }
-def event ReturnLine {
+def kind ReturnLine {
     label: { en: "Return request line", cs: "Řádek reklamace" },
     involves: [ReturnRequest as request, Customer, Item],
     qualities: [return_quantity, return_unit_price, return_reason, line_state, line_amount]
 }
 
 // ---- qualities (defined) ----
-def quality open_amount { of: Invoicing, label: { en: "Open amount", cs: "Neuhrazená částka" }, definition: """amount - paid""" }
+def quality open_amount { of: Invoice, label: { en: "Open amount", cs: "Neuhrazená částka" }, definition: """amount - paid""" }
 def quality on_hand {
     of: OrderLine,
     label: { en: "On hand", cs: "Skladem" },
@@ -91,25 +87,25 @@ def quality short { of: OrderLine, label: { en: "Short", cs: "Chybí" }, definit
 def quality outage {                                                             // a boolean: the line's center is out today
     of: OrderLine,
     label: { en: "Outage", cs: "Výpadek" },
-    definition: """exists WarehouseOutage involving this.warehouse where period contains :as_of"""
+    definition: """exists OutOfService involving this.warehouse where period contains :as_of"""
 }
 def quality list_price {
     of: OrderLine,
     label: { en: "List price", cs: "Ceníková cena" },
     definition: """coalesce(
-        max(CustomerPrice involving this.item, this.order.customer where period contains this.order.period.start).cp_price,
-        max(PriceList involving this.item where pl_channel = this.order.channel and period contains this.order.period.start).pl_price)"""
+        max(PriceAgreement involving this.item, this.order.customer where period contains this.order.period.start).cp_price,
+        max(ListPrice involving this.item where pl_channel = this.order.channel and period contains this.order.period.start).pl_price)"""
 }
 def quality return_share {                                                       // DC-4: revenue's er landing is md/hop's
     of: Customer,
-    definition: """sum(ReturnLine involving this where within(request.period.at, last: days(365))).line_amount
+    definition: """sum(ReturnLine involving this where within(request.requested_date, last: days(365))).line_amount
         / sum(Sale involving this where within(period.at, last: days(365))).revenue"""
 }
 
 // ---- phases: the per-channel cubelets are phases of one event (L16-5) ----
-def phase StoreSale       { of: Sale, label: { en: "Store sale", cs: "Prodej na prodejně" }, definition: """channel = 'store'""" }
-def phase WebSale         { of: Sale, label: { en: "Web sale", cs: "Prodej na webu" },       definition: """channel = 'web'""" }
-def phase MarketplaceSale { of: Sale, label: { en: "Marketplace sale", cs: "Prodej na tržišti" }, definition: """channel = 'marketplace'""" }
+def subkind StoreSale       { of: Sale, label: { en: "Store sale", cs: "Prodej na prodejně" }, definition: """channel = 'store'""" }
+def subkind WebSale         { of: Sale, label: { en: "Web sale", cs: "Prodej na webu" },       definition: """channel = 'web'""" }
+def subkind MarketplaceSale { of: Sale, label: { en: "Marketplace sale", cs: "Prodej na tržišti" }, definition: """channel = 'marketplace'""" }
 
 // ---- phases: the recipe vocabulary ----
 def phase PendingOrder { of: Order, label: { en: "Pending order", cs: "Čekající objednávka" }, definition: """state in ('placed', 'held')""" }
@@ -126,14 +122,14 @@ def phase MispricedLine {
     definition: """list_price is null or abs(unit_price - list_price) > :tolerance"""
 }
 def phase OverdueInvoice {
-    of: Invoicing,
+    of: Invoice,
     label: { en: "Overdue invoice", cs: "Faktura po splatnosti" },
     definition: """invoice_status = 'open' and period.end < :as_of"""
 }
 def phase DebtorCustomer {
     of: Customer,
     label: { en: "Customer with overdue invoices", cs: "Zákazník s fakturami po splatnosti" },
-    definition: """exists Invoicing involving this as customer where OverdueInvoice"""
+    definition: """exists Invoice involving this as customer where OverdueInvoice"""
 }
 def phase RecentBuyer {
     of: Customer,
@@ -150,9 +146,18 @@ def phase ForeignReturnLine {
 }
 def phase LateReturnLine {                                                       // DC-6 + DC-10: G-ER-2
     of: ReturnLine,
-    definition: """this.request.period.at - this.request.order.period.end > days(:return_window)"""
+    definition: """this.request.requested_date - this.request.order.period.end > days(:return_window)"""
 }
 
 // ---- refusals: a definition cycle (cn/definition-cycle) ----
 def phase LoopA { of: Order, definition: """LoopB""" }
 def phase LoopB { of: Order, definition: """LoopA""" }
+
+// CN-P8 transitions and the two episode sources; legacy computed list_price keeps the AU SQL column name.
+def event OrderPlaced { involves: [Order, Customer], period: { at: placed_date } }
+def event OrderDelivered { involves: [Order], period: { at: delivered_date } }
+def event InvoiceIssued { involves: [Invoice], period: { at: issued } }
+def event ReturnRequested { involves: [ReturnRequest], period: { at: requested_date } }
+def phase OpenOrder { of: Order, from: OrderPlaced, until: OrderDelivered }
+def quality item_list_price { of: Item, valued_state: true, per: Channel, from: ListPrice.pl_price }
+def quality agreed_price { of: Customer, valued_state: true, per: Item, from: PriceAgreement.cp_price }

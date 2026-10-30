@@ -1,0 +1,46 @@
+{
+    "diagnostics": [
+        "cn/event-no-period",
+        "cn/event-no-period",
+        "cn/projection-source",
+        "cn/ungrounded",
+        "cn/ungrounded",
+        "cn/ungrounded",
+        "cn/ungrounded",
+        "cn/ungrounded",
+        "cn/ungrounded",
+        "ttr/unresolved-reference"
+    ],
+    "resolved": [
+        "Channel => cn.concept.Channel",
+        "Channel => cn.concept.Channel",
+        "Channel => cn.concept.Channel",
+        "Item => cn.concept.Item",
+        "Item => cn.concept.Item",
+        "Item => cn.concept.Item",
+        "Item => cn.concept.Item",
+        "Item => cn.concept.Item",
+        "Item => cn.concept.Item",
+        "ListPrice => cn.concept.ListPrice",
+        "ListPrice => cn.concept.ListPrice",
+        "amount => cn.concept.amount",
+        "cn.Delisted => cn.concept.Delisted",
+        "cn.Listed => cn.concept.Listed"
+    ],
+    "symbols": [
+        "binding.cn2er_phase.OnSale.grounds",
+        "binding.cn2er_quality.list_price.grounds",
+        "binding.cn2er_quality.typo_price.grounds",
+        "cn.concept.Channel",
+        "cn.concept.Delisted",
+        "cn.concept.Delisted.item",
+        "cn.concept.Item",
+        "cn.concept.ListPrice",
+        "cn.concept.Listed",
+        "cn.concept.Listed.item",
+        "cn.concept.OnSale",
+        "cn.concept.amount",
+        "cn.concept.list_price",
+        "cn.concept.typo_price"
+    ]
+}

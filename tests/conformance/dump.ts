@@ -381,6 +381,9 @@ function conceptProps(b: ConceptBody, withCommon: boolean): { [k: string]: Json 
         break;
       }
       case 'ref':
+      case 'from':
+      case 'until':
+      case 'per':
       case 'grounds':
       case 'valueSpace':
         p[prop.key] = prop.ref.path;

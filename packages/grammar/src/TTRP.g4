@@ -1,5 +1,6 @@
 // TTR-P canonical grammar — the C3-converged canonical surface (P1 Stage 1.1).
-// @grammar-version: 0.6  (TTR-P spec version is an integer cut via docs/grammar-master/ — S6)
+// 0.7 (CN-P8): qualified quality calls with named arguments (DC-13); no new tokens.
+// @grammar-version: 0.7  (TTR-P spec version is an integer cut via docs/grammar-master/ — S6)
 //   0.1 → 0.2 (PL-P2.S1, additive minor): runtime params (F-4-i) + on-failure
 //   islands / retries (F-4-iv/F-4-ii) — see docs/features/grammar-master/pl-grammar-work-items.md.
 //   0.2 → 0.3 (AG B5, additive minor): a container body may live in a file —
@@ -312,7 +313,7 @@ primary
     ;
 castExpr        : CAST LPAREN expr AS typeName RPAREN ;      // explicit cast only (B-T5)
 caseExpr        : CASE (WHEN expr THEN expr)+ (ELSE expr)? END ;
-functionCall    : identifier LPAREN (DISTINCT? fnArg (COMMA fnArg)*)? RPAREN ;  // distinct → AggregateCall only
+functionCall    : identifier (DOT idPart)* LPAREN (DISTINCT? fnArg (COMMA fnArg)*)? RPAREN ;  // distinct → AggregateCall only
 fnArg           : (fnArgName COLON)? expr ;                  // AU-core-P0: named (`age(since: x)`) or positional
 fnArgName       : identifier | AND | OR | BETWEEN | NOT ;        // `working_days(between: a, and: :as_of)`
 paramRef        : COLON identifier ;                         // `:as_of` · `:tolerance`

@@ -6,8 +6,8 @@ import { TTR_GRAMMAR_VERSION, PROPERTY_MAP } from '@tatrman/grammar';
 // the grammar prebuild) is what moves this constant; the assertion is the
 // reminder that the CHANGELOG entry + downstream proto/version sync move with it.
 describe('grammar version', () => {
-  it('is 0.18 (explicit dimensions and structural measures for the MD to ER hop)', () => {
-    expect(TTR_GRAMMAR_VERSION).toBe('0.18');
+  it('is 0.20 (subkinds, relators, episodes and valued-state projections)', () => {
+    expect(TTR_GRAMMAR_VERSION).toBe('0.20');
   });
 
   it('advertises the automation kinds on the one shared body (typed alternatives only)', () => {
@@ -21,7 +21,7 @@ describe('grammar version', () => {
 
   it('advertises the cn role properties and the `concept { }` sugar on the er hosts (0.17)', () => {
     expect(PROPERTY_MAP.role.map((p) => p.name)).toEqual([
-      'description', 'tags', 'label', 'search', 'resolve', 'delivery', 'members', 'event', 'grounds', 'lexicon',
+      'description', 'tags', 'label', 'search', 'resolve', 'delivery', 'members', 'event', 'grounds', 'involves', 'period', 'lexicon',
     ]);
     // The md kinds are not in the property map (they never were); entity and attribute are.
     for (const kind of ['entity', 'attribute'] as const) {
@@ -32,11 +32,11 @@ describe('grammar version', () => {
   it('advertises the concept body and the cn binding body under their AST kinds (0.17)', () => {
     expect(PROPERTY_MAP.concept.map((p) => p.name)).toEqual([
       'description', 'label', 'tags', 'event', 'grounds', 'involves', 'period', 'extent', 'basis', 'definition', 'members',
-      'value_space', 'lexicon',
+      'from', 'until', 'per', 'value_space', 'lexicon',
     ]);
     expect(PROPERTY_MAP.concept.find((p) => p.name === 'members')?.type).toBe('expression block');
     expect(PROPERTY_MAP.conceptBinding.map((p) => p.name)).toEqual([
-      'description', 'tags', 'kind', 'role', 'quality', 'event', 'phase', 'concept', 'target', 'period',
+      'description', 'tags', 'kind', 'role', 'quality', 'event', 'phase', 'concept', 'target', 'per', 'period',
     ]);
     expect(PROPERTY_MAP.conceptBinding.find((p) => p.name === 'concept')?.type).toBe('reference');
   });

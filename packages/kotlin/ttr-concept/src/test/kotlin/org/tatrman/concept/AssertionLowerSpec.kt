@@ -45,7 +45,7 @@ class AssertionLowerSpec :
 
         fun frame(vararg parts: String) = parts.joinToString(", ", "{ ", " }")
 
-        fun ev(qname: String) = "\"event\": { \"qname\": \"$qname\" }"
+        fun ev(qname: String) = "\"concept\": { \"qname\": \"$qname\" }"
 
         val fresh = "\"identity\": { \"new\": true }"
 

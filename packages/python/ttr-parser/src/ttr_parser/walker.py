@@ -79,18 +79,21 @@ from .model import (
     ConceptEntry,
     ConceptExtent,
     ConceptFilter,
+    ConceptFrom,
     ConceptGrounds,
     ConceptInvolves,
     ConceptLabel,
     ConceptLexicon,
     ConceptMembers,
     ConceptParticipant,
+    ConceptPer,
     ConceptPeriod,
     ConceptProperty,
     ConceptRef,
     ConceptSugar,
     ConceptTags,
     ConceptTarget,
+    ConceptUntil,
     ConceptValueSpace,
     ConstraintDef,
     CubeletDef,
@@ -1054,7 +1057,7 @@ def _visit_role(
     # outside `model cn` reaches here (a cn role is a `ConceptDef`), so they are rejected: a cnc / automation
     # role keeps its 0.16 surface and a typo (`lable:`) is still a parse error (review-114 M5).
     for p in props:
-        cn_only = p.cnEntry() or p.cnRefProperty() or p.groundsProperty() or p.lexiconBlockProperty()
+        cn_only = p.cnEntry() or p.cnRefProperty() or p.groundsProperty() or p.involvesProperty() or p.periodProperty() or p.lexiconBlockProperty()
         if cn_only is None:
             continue
         key = p.cnEntry().cnKey().getText() if p.cnEntry() is not None else cn_only.getChild(0).getText()
@@ -1537,6 +1540,7 @@ def _visit_world_schema(ctx: Any, name: str, source: SourceLocation, file: str) 
 # ---------------------------------------------------------------------------
 
 _STEREOTYPE_TOKENS: tuple[tuple[str, str], ...] = (
+    ("SUBKIND", "subkind"),
     ("KIND", "kind"),
     ("EVENT", "event"),
     ("PHASE", "phase"),
@@ -1797,6 +1801,15 @@ def _visit_concept_property(  # noqa: C901, PLR0911, PLR0912 — one branch per 
     if isinstance(c, TTRParser.CnRefPropertyContext):
         ref = _reference_of(cx.id_(), file)
         return ConceptRef(key, source, ref=ref) if ref is not None else None
+    if isinstance(c, TTRParser.CnFromPropertyContext):
+        ref = _reference_of(cx.id_(), file)
+        return ConceptFrom(key, source, ref=ref) if ref is not None else None
+    if isinstance(c, TTRParser.CnUntilPropertyContext):
+        ref = _reference_of(cx.id_(), file)
+        return ConceptUntil(key, source, ref=ref) if ref is not None else None
+    if isinstance(c, TTRParser.CnPerPropertyContext):
+        ref = _reference_of(cx.id_(), file)
+        return ConceptPer(key, source, ref=ref) if ref is not None else None
     if isinstance(c, TTRParser.GroundsPropertyContext):
         ref = _reference_of(cx.id_(), file)
         return ConceptGrounds(key, source, ref=ref) if ref is not None else None

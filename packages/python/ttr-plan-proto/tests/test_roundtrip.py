@@ -83,7 +83,7 @@ def test_cn_frames_roundtrip() -> None:
     assert statement_pb2.Statement.FromString(s.SerializeToString()) == s
 
     a = assertion_pb2.Assertion()
-    a.event.qname = "cn.Transfer"
+    a.concept.qname = "cn.Transfer"
     a.identity.new = True
     p = a.participants.add(label="from")
     p.member.resolved_value = "501"
@@ -119,3 +119,26 @@ def test_cn_frames_canonical_json_matches_the_kotlin_samples() -> None:
         )
         json_format.Parse(f.read_text(), message)
         assert json_format.MessageToDict(message) == json.loads(f.read_text()), f.name
+
+
+def test_assertion_concept_keeps_wire_field_one() -> None:
+    from org.tatrman.assertion.v1 import assertion_pb2
+
+    # Old `event` field 1 containing ConceptRef.qname field 1 (cn.Transfer).
+    legacy = bytes.fromhex("0a0d0a0b636e2e5472616e73666572")
+    parsed = assertion_pb2.Assertion.FromString(legacy)
+    assert parsed.concept.qname == "cn.Transfer"
+    assert parsed.SerializeToString() == legacy
+    assert assertion_pb2.Assertion.DESCRIPTOR.fields_by_name["concept"].number == 1
+
+
+def test_assertion_event_json_key_is_gone() -> None:
+    # review-175 F8 (⚑B): the field-1 rename is BREAKING for JSON — no `event` alias; the strict parser refuses it.
+    import pytest
+    from google.protobuf import json_format
+
+    from org.tatrman.assertion.v1 import assertion_pb2
+
+    old = '{ "event": { "qname": "cn.Transfer" }, "identity": { "new": true } }'
+    with pytest.raises(json_format.ParseError, match="event"):
+        json_format.Parse(old, assertion_pb2.Assertion())

@@ -1,0 +1,8 @@
+model binding
+def cn2er_event started { event: cn.Started, target: er.entity.started, period: { at: er.entity.started.occurred }, participants: { ticket: [er.relation.started_ticket] } }
+def cn2er_event finished { event: cn.Finished, target: er.entity.finished, period: { at: er.entity.finished.occurred }, participants: { ticket: [er.relation.finished_ticket] } }
+def cn2er_kind price { kind: cn.ListPrice, target: er.entity.price, period: { start: er.entity.price.since, end: er.entity.price.until }, participants: { item: [er.relation.price_item] } }
+
+def cn2er_phase bounded { phase: cn.OpenTicket, bounds: { from: cn.Started, until: cn.Finished } }
+def cn2er_phase episodes { phase: cn.OutOfService, episodes: er.entity.outage, period: { start: er.entity.outage.since, end: er.entity.outage.until, end_open: open } }
+def cn2er_quality projected { quality: cn.list_price, via: ListPrice.amount, per: Channel }

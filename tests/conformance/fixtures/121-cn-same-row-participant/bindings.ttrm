@@ -1,0 +1,9 @@
+model binding
+// `order: []` — Order lands on er.entity.order, the binding's own row: clean
+def cn2er_event placed { event: cn.OrderPlaced, target: er.entity.order, period: { at: er.entity.order.placed }, participants: { order: [], customer: [er.relation.order_customer] } }
+// `customer: []` — Customer lands on er.entity.customer, not the order row: cn/participant-path-broken
+def cn2er_event flagged { event: cn.OrderFlagged, target: er.entity.order, period: { at: er.entity.order.placed }, participants: { customer: [] } }
+// review-175 R5: `order: []` inherited from OrderPlaced — Order lands on the order row: clean
+def cn2er_kind early { kind: cn.EarlyPlaced, target: er.entity.order, participants: { order: [] } }
+// `customer: []` inherited from OrderFlagged — Customer lands on er.entity.customer: cn/participant-path-broken
+def cn2er_kind early_flagged { kind: cn.EarlyFlagged, target: er.entity.order, participants: { customer: [] } }

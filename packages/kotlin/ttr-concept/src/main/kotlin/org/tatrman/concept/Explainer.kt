@@ -86,7 +86,7 @@ internal class Explainer(
         val labels = ExplainLabels(model, words)
         val asOf =
             (if (s.hasAsOf()) FrameTime.evaluationDay(s.asOf) else null) ?: LocalDate.now(clock)
-        val prose = DefinitionProse(model, words, labels, asOf).takeIf { definitions }
+        val prose = if (definitions) DefinitionProse(model, words, labels, asOf) else null
         val say = StatementSentence(words, labels, prose)
         val items = mutableListOf<String>()
         s.measuresList.forEach { items += labels.ref(it) }
@@ -117,7 +117,15 @@ internal class Explainer(
                 Filter.FormCase.PHASE -> {
                     val ref = f.phase.phase
                     val phase = labels.resolved(ref)
-                    val definition = phase?.let { prose?.of(it) }?.let { ": $it" } ?: ""
+                    val connector =
+                        if (phase?.stereotype == "phase" &&
+                            phase.definition != null
+                        ) {
+                            " ${words.whileHolding} "
+                        } else {
+                            ": "
+                        }
+                    val definition = phase?.let { prose?.of(it) }?.let { connector + it } ?: ""
                     (if (f.phase.negated) "${words.not} " else "") + labels.ref(ref) + definition
                 }
                 Filter.FormCase.GROUP -> {
@@ -184,7 +192,7 @@ internal class Explainer(
     ): Explanation {
         val (words, fallback) = words(locale.ifBlank { a.locale })
         val labels = ExplainLabels(model, words)
-        val event = labels.resolved(a.event)
+        val event = labels.resolved(a.concept)
         val items = mutableListOf<String>()
         val keys =
             if (a.identity.hasKnown()) {
@@ -195,7 +203,7 @@ internal class Explainer(
             } else {
                 ""
             }
-        items += labels.ref(a.event, lower = false) + if (keys.isEmpty()) "" else " $keys"
+        items += labels.ref(a.concept, lower = false) + if (keys.isEmpty()) "" else " $keys"
         for (p in a.participantsList) {
             val concept =
                 if (p.hasConcept()) {

@@ -1,0 +1,3 @@
+// Syntax accepted; S8.2 must report cn/projection-source.
+model cn
+def quality MissingState { of: Item, per: Channel, from: ListPrice.price }

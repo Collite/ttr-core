@@ -1,0 +1,9 @@
+// review-175 F1: an empty participant path (`order: []`) is the binding's own row.
+model cn
+def kind Order { grounds: er.entity.order }
+def kind Customer { grounds: er.entity.customer }
+def event OrderPlaced { involves: [Order, Customer], period: { at: placed } }
+def event OrderFlagged { involves: [Customer], period: { at: placed } }
+// review-175 R5: an event subkind inherits its bearer's participants
+def subkind EarlyPlaced { of: OrderPlaced }
+def subkind EarlyFlagged { of: OrderFlagged }

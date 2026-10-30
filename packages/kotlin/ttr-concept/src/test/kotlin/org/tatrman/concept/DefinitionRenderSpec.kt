@@ -295,7 +295,7 @@ class DefinitionRenderSpec :
                     def phase NoOrders          { of: Customer, definition: ""${'"'}count(Order involving this) = 0""${'"'} }
                     def phase BusyOrDisputing   {
                         of: Customer,
-                        definition: ""${'"'}count(Order involving this) >= 3 or exists Invoicing involving this as customer where invoice_status = 'disputed'""${'"'}
+                        definition: ""${'"'}count(Order involving this) >= 3 or exists Invoice involving this as customer where invoice_status = 'disputed'""${'"'}
                     }
                     def quality lines_count     { of: Order, definition: ""${'"'}count(OrderLine involving this)""${'"'} }
                     def phase Undercovered      {
@@ -304,10 +304,10 @@ class DefinitionRenderSpec :
                     }
                     def phase SiblingHeld       { of: Order, definition: ""${'"'}exists Order involving this.customer where state = 'held'""${'"'} }
                     def phase FirstQuarterOrder { of: Order, definition: ""${'"'}within(placed_date, from: '2026-01-01', to: '2026-03-31')""${'"'} }
-                    def phase DuringOutage      { of: Order, definition: ""${'"'}exists WarehouseOutage w involving this.fulfilling where w.period overlaps this.period""${'"'} }
+                    def phase DuringOutage      { of: Order, definition: ""${'"'}exists OutOfService w involving this.fulfilling where w.period overlaps this.period""${'"'} }
                     def phase OutOfStockReading { of: Inventory, definition: ""${'"'}quantity_on_hand = 0""${'"'} }
                     def phase SlowDelivery      { of: Order, definition: ""${'"'}period.end - period.start > days(3)""${'"'} }
-                    def phase DueThisWeek       { of: Invoicing, definition: ""${'"'}within(period.end, from: :as_of, to: :as_of + days(7))""${'"'} }
+                    def phase DueThisWeek       { of: Invoice, definition: ""${'"'}within(period.end, from: :as_of, to: :as_of + days(7))""${'"'} }
                     """.trimIndent(),
             )
 

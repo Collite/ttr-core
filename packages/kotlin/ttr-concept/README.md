@@ -7,7 +7,18 @@ lowers to an E-R row payload, and `definitionRender` renders a phase or defined 
 predicate for `ttrp-emit`) or the er layer (SQL over entities in the shared dialect). No LLM, no server call, no I/O
 mid-lower: the same model and frame always give the same bytes.
 
-**Status: CN-P3 complete.** Published as `org.tatrman:ttr-concept` in the `grammar/v*` bundle (A-CN-1) — first with
+**CN-P8 S8.2:** rigid subkinds inherit their bearer; relator kinds carry participants and
+validity; phases use episode tables or event bounds; `per:` / `from:` qualities support
+DC-13 qualified calls with named arguments and a default `at: :as_of`. The new portable
+lints run in TS, Kotlin and Python. English/Czech prose distinguishes `whose` subkinds,
+`while` phases, episodes and projected values. See the [manual](../../../docs/manual/en/20-conceptual-model.md).
+
+`assertion.v1` field 1 is now `concept`: binary encoding is unchanged; JSON clients
+and generated API callers must migrate/rebuild. Claims may name an instant event,
+a kind row with validity, or an entity-backed phase episode. Transfer row payloads
+are unchanged. Derived phases cannot be asserted as rows.
+
+**Status: CN-P3 complete; CN-P8 in progress.** Published as `org.tatrman:ttr-concept` in the `grammar/v*` bundle (A-CN-1) — first with
 `grammar/v0.17.5` — beside `ttr-plan-proto` / `ttr-translator` at the pinned translator release.
 
 ## Loading a model

@@ -412,7 +412,7 @@ class FrameValidationSpec :
         val minute = "\"period\": { \"start\": { \"value\": \"2026-03-14T09:30\", \"granularity\": \"MINUTE\" } }"
         val fresh = "\"identity\": { \"new\": true }"
 
-        fun ev(qname: String) = "\"event\": { \"qname\": \"$qname\" }"
+        fun ev(qname: String) = "\"concept\": { \"qname\": \"$qname\" }"
 
         fun parts(vararg ps: String) = "\"participants\": [${ps.joinToString(", ")}]"
 
@@ -426,8 +426,8 @@ class FrameValidationSpec :
         val transfer = ev("cn.Transfer")
 
         a("a transfer", clinic, st(transfer, fresh, parts(patient, from), quals(qv("cn.transfer_kind")), minute))
-        a("a kind as the event", clinic, st(ev("cn.Person"), fresh), "cn/slot-mismatch event")
-        a("no event", clinic, st(fresh), "cn/ambiguous-assertion event")
+        a("a kind as the event", clinic, st(ev("cn.Person"), fresh), "cn/slot-mismatch concept")
+        a("no event", clinic, st(fresh), "cn/ambiguous-assertion concept")
         a("no identity", clinic, st(transfer, minute), "cn/malformed-frame identity")
         a(
             "a known identity",

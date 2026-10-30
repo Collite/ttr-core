@@ -130,6 +130,18 @@ enum class DiagnosticCode(
     CnDuplicateGrounding("cn/duplicate-grounding"), // a concept's second grounding, or sugar restating a concept
     CnGroundingTargetKind("cn/grounding-target-kind"), // a target the stereotype × layer table does not allow
     CnRoleNoEvent("cn/role-no-event"), // a role without its defining event (CN-D6)
+    CnSubkindTemporalDefinition("cn/subkind-temporal-definition"),
+    CnSubkindBearer("cn/subkind-bearer"), // a subkind whose `of:` is not rigid (a phase, quality, …)
+    CnPartitionOverlap("cn/partition-overlap"),
+    CnPartitionIncomplete("cn/partition-incomplete"),
+    CnSubkindAsKind("cn/subkind-as-kind"),
+    CnExtentRetired("cn/extent-retired"),
+    CnDurativeEvent("cn/durative-event"),
+    CnEpisodeSubjectMissing("cn/episode-subject-missing"),
+    CnPhaseBoundsParticipant("cn/phase-bounds-participant"),
+    CnPhaseSourceConflict("cn/phase-source-conflict"),
+    CnProjectionSource("cn/projection-source"),
+    CnLifetimePeriod("cn/lifetime-period"),
     CnPhaseDoubleDefinition("cn/phase-double-definition"), // a phase both defined and grounded (AM-2)
     CnPhaseNoDefinition("cn/phase-no-definition"), // hygiene: a phase neither defined nor grounded
     CnEventNoPeriod("cn/event-no-period"), // hygiene: an event without `period:`

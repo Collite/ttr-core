@@ -1,0 +1,15 @@
+{
+    "diagnostics": [
+        "ttr/unresolved-reference"
+    ],
+    "resolved": [
+        "db.dbo.subkind.per => workshop.concepts.db.dbo.table.subkind.per"
+    ],
+    "symbols": [
+        "workshop.concepts.db.dbo.fk.until",
+        "workshop.concepts.db.dbo.table.subkind",
+        "workshop.concepts.db.dbo.table.subkind.per",
+        "workshop.concepts.db.dbo.table.subkind.subkind",
+        "workshop.concepts.db.dbo.table.subkind.until"
+    ]
+}
