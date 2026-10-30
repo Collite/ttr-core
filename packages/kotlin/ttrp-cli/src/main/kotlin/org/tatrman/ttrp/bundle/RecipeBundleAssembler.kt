@@ -276,7 +276,7 @@ class RecipeBundleAssembler(
                         detail = "${model.name}_verdict_detail",
                         current = "${model.name}_verdict_current",
                     ),
-                objectsRead = objectsRead(graph, actions),
+                objectsRead = (objectsRead(graph, actions) + model.actionObjectsRead).distinct().sorted(),
                 fingerprints = fingerprints,
                 protocol = model.protocol,
                 parts = parts.ifEmpty { null },
@@ -350,7 +350,8 @@ class RecipeBundleAssembler(
     /**
      * The model objects the recipe reads (D-94's out-of-scope-read check): every statement's load
      * (an entity as `er.entity.<name>`, a table by its qname), plus `er.entity.obligation` when a
-     * directly wired action [AutomationScope.needsObligationLookup].
+     * directly wired action [AutomationScope.needsObligationLookup]. Checked action-time calendar reads
+     * from [RecipeModel.actionObjectsRead] are merged into this list at assembly.
      */
     private fun objectsRead(
         graph: TtrpGraph,

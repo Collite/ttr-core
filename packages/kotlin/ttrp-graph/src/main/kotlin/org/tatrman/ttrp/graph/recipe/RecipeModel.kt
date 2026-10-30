@@ -67,6 +67,8 @@ data class RecipeModel(
     val elseNone: Boolean = false,
     /** AU-core-P2: every `+`/`-` with a date operand, by location — [RecipeTime.dateArithmetic]. */
     val dateArithmetic: Map<org.tatrman.ttrp.ast.SourceLocation, String> = emptyMap(),
+    /** Checked implicit calendar reads for directly wired argument, when and writer-default expressions. */
+    val actionObjectsRead: List<String> = emptyList(),
 )
 
 /**

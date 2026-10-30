@@ -154,6 +154,8 @@ class RecipeChecker(
         checkParameters(recipe, rg, programs, keyColumns)
         diags += time.check(rows)
 
+        val actionObjectsRead =
+            ActionCalendarReads(report, time, routeRow, diags).collect(recipe)
         val sw = recipe.decisions.firstOrNull()?.switch
         val recipeModel =
             RecipeModel(
@@ -204,6 +206,7 @@ class RecipeChecker(
                 calendarSkWithins = time.calendarSkWithins.toSet(),
                 implicitLatestDates = time.implicitLatestDates.toMap(),
                 dateArithmetic = time.dateArithmetic.toMap(),
+                actionObjectsRead = actionObjectsRead,
                 elseNone = sw?.elseRoute?.let { it.name == null } ?: false,
                 kinds =
                     recipe.roleContainers
