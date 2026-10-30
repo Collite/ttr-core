@@ -130,11 +130,14 @@ object CnDefinitionLints {
         return out
     }
 
-    /** Whether [e] calls `within(…)` anywhere — a DC-12 predicate whatever its bounds (`from:`/`to:` or `last:`). */
+    /**
+     * Whether [e] calls `within(…)` anywhere — a DC-12 predicate whatever its bounds (`from:`/`to:` or `last:`). A dotted
+     * `x.within(…)` is a projection read, not the predicate — as the text rule reads it (A-CN-118, review-175 R2).
+     */
     private fun callsWithin(e: Expression?): Boolean =
         when (e) {
             null -> false
-            is FunctionCall -> e.function.name == "within" || e.args.any(::callsWithin)
+            is FunctionCall -> isWithin(e.function.value) || e.args.any(::callsWithin)
             is AggregateCall -> e.args.any(::callsWithin)
             is Cast -> callsWithin(e.expr)
             is CaseWhen -> e.branches.any { callsWithin(it.first) || callsWithin(it.second) } || callsWithin(e.elseExpr)
@@ -149,6 +152,9 @@ object CnDefinitionLints {
             is TemporalPredicate -> callsWithin(e.lhs) || callsWithin(e.rhs)
             is ColumnRef, is Literal, is MdPath, is ParamRef, is DurationExpr, is ThisRef -> false
         }
+
+    /** `within` as the catalogue spells it — bare, or under `fn.`. */
+    private fun isWithin(id: String): Boolean = id == "within" || id == "fn.within"
 
     /** What [d] reads with every definition it names inlined, transitively (cycle-safe). */
     private fun closure(

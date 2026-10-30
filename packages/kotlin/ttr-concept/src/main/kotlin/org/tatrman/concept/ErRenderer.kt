@@ -1282,19 +1282,19 @@ internal class ErRenderer(
                 "op.mul" -> Scalar(SqlExpr.Bin("*", scalar(value(e.args[0], scope)), scalar(value(e.args[1], scope))))
                 "op.div" -> Scalar(SqlExpr.Bin("/", scalar(value(e.args[0], scope)), scalar(value(e.args[1], scope))))
                 "op.neg" -> Scalar(SqlExpr.Bin("-", SqlExpr.Lit("0"), scalar(value(e.args[0], scope))))
-                else ->
+                else -> {
+                    // a dotted name is a projection read or nothing — never a SQL function (nor a built-in) of its
+                    // last segment: `this.within(…)` is no window (review-175 R2)
+                    if ('.' in id && CATALOG_PREFIXES.none { id.startsWith(it) }) {
+                        refuse("`$id(…)` names no projected quality (DC-13) in scope")
+                    }
                     when (e.function.name) {
                         "within" -> Scalar(window(e, scope))
                         "age", "working_days" -> refuse("`${e.function.name}(…)` — a datetime difference", "G-ER-2")
                         "descendants" -> refuse("`descendants(…)` outside `in`")
-                        else -> {
-                            // a dotted name is a projection read or nothing — never a SQL function of its last segment
-                            if ('.' in id && CATALOG_PREFIXES.none { id.startsWith(it) }) {
-                                refuse("`$id(…)` names no projected quality (DC-13) in scope")
-                            }
-                            Scalar(SqlExpr.Fn(e.function.name.uppercase(), e.args.map { scalar(value(it, scope)) }))
-                        }
+                        else -> Scalar(SqlExpr.Fn(e.function.name.uppercase(), e.args.map { scalar(value(it, scope)) }))
                     }
+                }
             }
         }
 

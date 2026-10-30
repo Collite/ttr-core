@@ -28,6 +28,8 @@ class SubkindTemporalAgreementSpec :
                 "created < :as_of" to true,
                 "created >= '2026-01-01'" to false,
                 "code = 'web'" to false,
+                // a dotted call is a projection read, never the built-in (review-175 R2)
+                "this.within(created, last: days(30))" to false,
             )
         for ((definition, temporal) in cases) {
             "lint and materialize agree that `$definition` is ${if (temporal) "" else "not "}temporal" {

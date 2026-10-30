@@ -324,6 +324,22 @@ class ThingsInTimeSpec :
             quoted.diagnostics.single().message shouldContain "cn/participant-path-broken"
         }
 
+        "R2: a dotted call ending in a built-in is no built-in — it refuses as a projection read and renders no SQL" {
+            val extra =
+                "model cn\n" +
+                    "def phase RecentT { of: Ticket, definition: \"\"\"this.within(created, last: days(7))\"\"\" }\n" +
+                    "def phase TyposT { of: Ticket, definition: \"\"\"this.tckt.within(created, last: days(7))\"\"\" }\n"
+            val model = StatementLowerSpec.world("time", mapOf("review175-r2.ttrm" to extra))
+            val s = CnConceptService(model)
+            for (name in listOf("RecentT", "TyposT")) {
+                withClue(name) {
+                    val r = s.definitionRender(ref(name), Layer.ER, "postgresql", RenderOptions())
+                    r.text shouldBe ""
+                    r.diagnostics.map { it.message }.single { "names no projected quality (DC-13) in scope" in it }
+                }
+            }
+        }
+
         "F12: a stacked-entity subkind is a subset test; a binding-only period phase is an episode table" {
             val extra =
                 "model er\n" +
