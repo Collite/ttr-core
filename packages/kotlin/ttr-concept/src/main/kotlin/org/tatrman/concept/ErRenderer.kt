@@ -1116,6 +1116,28 @@ internal class ErRenderer(
                 is Held -> ref.relation.joinPairs.map { col(ref.holder, it.fromAttr.name) }
             }
 
+        /**
+         * The key [ref] stands for, by its attribute names on the entity it is a row of: a bound row's own key, a held
+         * one's relation target attributes (each the holder's foreign key) — what a key equality pairs by name, never
+         * by position (review-175 R7).
+         */
+        private fun keyedColumns(ref: Ref): Map<String, SqlExpr> =
+            when (ref) {
+                is Bound -> keys(ref.row.entity).associateWith { SqlExpr.Col(ref.row.alias, it) }
+                is Held -> ref.relation.joinPairs.associate { it.toAttr.name to col(ref.holder, it.fromAttr.name) }
+            }
+
+        /** `<alias>.<k> = <outer k>` for every key [k] of [inner], paired by name; null when the two keys differ. */
+        private fun keyEqualities(
+            alias: String,
+            inner: List<String>,
+            outer: Ref,
+        ): List<SqlExpr>? {
+            val columns = keyedColumns(outer)
+            if (inner.toSet() != columns.keys) return null
+            return inner.map { k -> SqlExpr.Bin("=", SqlExpr.Col(alias, k), columns.getValue(k)) }
+        }
+
         // ---- predicates ---------------------------------------------------------------------------------------
 
         private fun conjuncts(e: Expression): List<Expression> =
@@ -1645,7 +1667,10 @@ internal class ErRenderer(
                     refuse("`${ranged.ref}`'s participant `$l` is its own `$entity` row — `${ref.concept.ref}` is not")
                 }
                 val pairs =
-                    keys(r.entity).zip(keyColumns(ref)).map { (k, o) -> SqlExpr.Bin("=", SqlExpr.Col(r.alias, k), o) }
+                    keyEqualities(r.alias, keys(r.entity), ref)
+                        ?: refuse(
+                            "`${ranged.ref}`'s participant `$l` is its own `$entity` row — the row named holds another key",
+                        )
                 return pairs to (ref as? Bound)?.row
             }
             var cur = r
@@ -1847,7 +1872,8 @@ internal class ErRenderer(
 
         /**
          * A stacked-entity subkind or phase (its own `cn2er_*` target, no definition) as a predicate: the subset test —
-         * the row is one of its entity's rows, `EXISTS (SELECT 1 FROM <entity> WHERE <its key> = <the row's key>)`.
+         * the row is one of its entity's rows, `EXISTS (SELECT 1 FROM <entity> WHERE <its key> = <the row's key>)`, the
+         * same key attributes paired by name; a stacked entity whose key is named otherwise refuses (A-CN-117(d), R7).
          */
         private fun stacked(
             ref: Ref,
@@ -1858,14 +1884,11 @@ internal class ErRenderer(
                 refuse("`${phase.ref}` has no `definition:` and no stacked entity on E-R")
             }
             val own = entityOf(phase) ?: unreachable(phase)
-            val outer = keyColumns(ref)
-            val inner = keys(own)
-            if (inner.size != outer.size) {
-                refuse("`${phase.ref}`'s entity `${own.qname.name}` shares no key with the row it is read on")
-            }
             val query = Select(Source.Entity(own.qname.name, fresh(own.qname.name)), bound(ref).select.depth + 1)
             query.items += Item(SqlExpr.Lit("1"))
-            query.where += inner.zip(outer).map { (k, o) -> SqlExpr.Bin("=", SqlExpr.Col(query.from.alias, k), o) }
+            query.where +=
+                keyEqualities(query.from.alias, keys(own), ref)
+                    ?: refuse("`${phase.ref}`'s entity `${own.qname.name}` shares no key with the row it is read on")
             inlined += phase.ref
             return SqlExpr.Exists(query, false)
         }

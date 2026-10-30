@@ -423,6 +423,26 @@ class ThingsInTimeSpec :
                 .of(bound.cn.byName("OutOfService")!!)!! shouldContain "during an episode"
         }
 
+        "R7: a stacked entity pairs its key with the row's by name — a key named otherwise refuses" {
+            val extra =
+                "model er\n" +
+                    "def entity flagged { binding: { target: { table: db.dbo.table.flagged } }, attributes: [def attribute id { type: text, isKey: true }] }\n" +
+                    "def entity marked { binding: { target: { table: db.dbo.table.marked } }, attributes: [def attribute mark_id { type: text, isKey: true }] }\n"
+            val cn =
+                "model cn\n" +
+                    "def subkind Flagged { of: Ticket, grounds: er.entity.flagged }\n" +
+                    "def subkind Marked { of: Ticket, grounds: er.entity.marked }\n" +
+                    "def phase Watched { of: Ticket, definition: \"\"\"Flagged\"\"\" }\n" +
+                    "def phase Noted { of: Ticket, definition: \"\"\"Marked\"\"\" }\n"
+            val s = CnConceptService(StatementLowerSpec.world("time", mapOf("r7-er.ttrm" to extra, "r7.ttrm" to cn)))
+            val watched = s.definitionRender(ref("Watched"), Layer.ER, "postgresql", RenderOptions())
+            watched.diagnostics.filter { it.severity == Severity.ERROR } shouldBe emptyList()
+            watched.text shouldContain "flagged.id = ticket.id"
+            val noted = s.definitionRender(ref("Noted"), Layer.ER, "postgresql", RenderOptions())
+            noted.text shouldBe ""
+            noted.diagnostics.map { it.message }.single { "shares no key with the row it is read on" in it }
+        }
+
         "canonical bindings and top-down temporal sources render identically" {
             val source =
                 Files
