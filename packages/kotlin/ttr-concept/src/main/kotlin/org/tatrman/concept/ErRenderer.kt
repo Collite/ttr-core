@@ -1923,7 +1923,11 @@ internal class ErRenderer(
                 val entity = entityOf(event) ?: unreachable(event)
                 val query = Select(Source.Entity(entity.qname.name, fresh(entity.qname.name)), at)
                 val eventRef = Bound(row(entity, query, query.from.alias), event)
-                val label = subjectOn(event, bearer) ?: refuse("`${event.ref}` does not involve `${bearer.ref}`")
+                val label =
+                    subjectOn(event, bearer)
+                        ?: refuse(
+                            "`${event.ref}` involves no one participant `${bearer.ref}` can be (cn/phase-bounds-participant)",
+                        )
                 val subject =
                     (participant(eventRef, label, bearer) as? RowV)?.ref
                         ?: refuse("an episode subject is not an entity")

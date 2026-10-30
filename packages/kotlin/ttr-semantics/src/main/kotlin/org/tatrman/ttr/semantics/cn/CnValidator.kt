@@ -941,6 +941,45 @@ private class CnValidator(
                 }
             }
 
+        // ⚑N1 (review-175 re-review 2): the labels of [event]'s participants [bearer] can be, read where the renderer
+        // reads an episode's subject (A-CN-114, R3) — its own `involves:`, else the labels its grounding names, else the
+        // nearest `of:` / `is_a` level that has one. One is the subject; two or more are ambiguous (⚑R4's count).
+        fun subjectLabels(
+            event: CnConcept,
+            bearer: CnConcept,
+        ): List<String> {
+            fun fits(got: CnConcept?) = got != null && (bearer.key in chain(got) || got.key in chain(bearer))
+
+            fun own(owner: CnConcept): List<String> {
+                val s = prop(owner, "involves") ?: return emptyList()
+                val p = s.property as? ConceptProperty.Involves ?: return emptyList()
+                return p.participants
+                    .filter { pt -> fits(concept(pt.ref, s.doc)?.qname?.let { concepts[it] }) }
+                    .map { pt ->
+                        pt.label ?: pt.ref.parts
+                            .last()
+                            .lowercase()
+                    }
+            }
+            own(event).takeIf { it.isNotEmpty() }?.let { return it }
+            val participants =
+                groundingsOf(event).firstOrNull()?.grounding?.properties?.firstOrNull {
+                    it is ConceptProperty.Entry && it.key == "participants"
+                } as? ConceptProperty.Entry
+            val grounded =
+                (participants?.value as? PropertyValue.ObjectValue)
+                    ?.entries
+                    ?.keys
+                    .orEmpty()
+                    .filter { label -> fits(participantUp(event.key, label)?.qname?.let { concepts[it] }) }
+            if (grounded.isNotEmpty()) return grounded
+            return chain(event)
+                .drop(1)
+                .map { own(concepts.getValue(it)) }
+                .firstOrNull { it.isNotEmpty() }
+                .orEmpty()
+        }
+
         fun emit(
             c: CnConcept,
             code: DiagnosticCode,
@@ -1085,15 +1124,21 @@ private class CnValidator(
                 val bearer = named(c, "of")
                 if (from && until && bearer != null) {
                     for (key in listOf("from", "until")) {
-                        val event = named(c, key)
-                        if (event == null ||
-                            event.stereotype != "event" ||
-                            !participates(event, bearer)
-                        ) {
+                        val event = named(c, key)?.takeIf { it.stereotype == "event" }
+                        val labels = event?.let { subjectLabels(it, bearer) }.orEmpty()
+                        if (event == null || labels.isEmpty()) {
                             emit(
                                 c,
                                 DiagnosticCode.CnPhaseBoundsParticipant,
                                 "phase '${c.name}' $key bound must be an event involving '${bearer.name}'",
+                                key = key,
+                            )
+                        } else if (labels.size > 1) {
+                            emit(
+                                c,
+                                DiagnosticCode.CnPhaseBoundsParticipant,
+                                "phase '${c.name}' $key bound '${event.name}' has ${count(labels.size)} participants " +
+                                    "'${bearer.name}' can be — " + labels.joinToString(", ") { "'$it'" },
                                 key = key,
                             )
                         }

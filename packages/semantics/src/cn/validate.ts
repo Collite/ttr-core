@@ -422,7 +422,24 @@ class CnValidator {
       const s = prop(this.concepts.get(key)!, 'involves'); if (s?.property.kind !== 'involves') return false;
       return s.property.participants.some((pt) => { const sym = this.concept(pt.ref, s.doc); const got = sym && this.concepts.get(sym.qname); return got && (chain(got).has(bearer.key) || chain(bearer).has(got.key)); });
     });
-    const emit = (c: CnConcept, code: DiagnosticCode, message: string, warning = false, key?: string) => {
+    // ⚑N1 (review-175 re-review 2): the labels of `event`'s participants `bearer` can be, read where the renderer reads an
+    // episode's subject (A-CN-114, R3) — its own `involves:`, else the labels its grounding names, else the nearest `of:` /
+    // `is_a` level that has one. One is the subject; two or more are ambiguous (⚑R4's count).
+    const subjectLabels = (event: CnConcept, bearer: CnConcept): string[] => {
+      const fits = (got: CnConcept | undefined) => !!got && (chain(got).has(bearer.key) || chain(bearer).has(got.key));
+      const own = (owner: CnConcept): string[] => {
+        const s = prop(owner, 'involves'); if (s?.property.kind !== 'involves') return [];
+        return s.property.participants.filter((pt) => { const sym = this.concept(pt.ref, s.doc); return fits(sym && this.concepts.get(sym.qname)); }).map((pt) => pt.label ?? pt.ref.parts[pt.ref.parts.length - 1].toLowerCase());
+      };
+      const mine = own(event); if (mine.length) return mine;
+      const participants = this.groundingsOf(event)[0]?.properties.find((p) => p.kind === 'entry' && p.key === 'participants');
+      const grounded = participants?.kind === 'entry' && participants.value.kind === 'object'
+        ? participants.value.entries.map((e) => e.key).filter((label) => { const sym = this.participantUp(event.key, label); return fits(sym && this.concepts.get(sym.qname)); })
+        : [];
+      if (grounded.length) return grounded;
+      return [...chain(event)].slice(1).map((key) => own(this.concepts.get(key)!)).find((labels) => labels.length) ?? [];
+    };
+    const emit =(c: CnConcept, code: DiagnosticCode, message: string, warning = false, key?: string) => {
       const s = key ? prop(c, key) : undefined;
       this.report(code, warning ? 'warning' : 'error', s?.doc.uri ?? c.uri, s?.property.source ?? c.source, message);
     };
@@ -452,7 +469,12 @@ class CnValidator {
         const sources = [!!prop(c, 'definition'), this.groundingsOf(c).some((g) => !!g.target || !!g.targetKey), from || until].filter(Boolean).length;
         if (sources > 1 || from !== until) emit(c, DiagnosticCode.CnPhaseSourceConflict, `phase '${c.name}' needs exactly one source: definition, grounding, or both from and until`);
         const bearer = named(c, 'of');
-        if (from && until && bearer) for (const key of ['from', 'until']) { const event = named(c, key); if (!event || event.stereotype !== 'event' || !participates(event, bearer)) emit(c, DiagnosticCode.CnPhaseBoundsParticipant, `phase '${c.name}' ${key} bound must be an event involving '${bearer.name}'`, false, key); }
+        if (from && until && bearer) for (const key of ['from', 'until']) {
+          const found = named(c, key), event = found?.stereotype === 'event' ? found : undefined;
+          const labels = event ? subjectLabels(event, bearer) : [];
+          if (!event || !labels.length) emit(c, DiagnosticCode.CnPhaseBoundsParticipant, `phase '${c.name}' ${key} bound must be an event involving '${bearer.name}'`, false, key);
+          else if (labels.length > 1) emit(c, DiagnosticCode.CnPhaseBoundsParticipant, `phase '${c.name}' ${key} bound '${event.name}' has ${labels.length === 2 ? 'two' : labels.length} participants '${bearer.name}' can be — ${labels.map((l) => `'${l}'`).join(', ')}`, false, key);
+        }
         if (period && bearer) {
           const target = this.groundingsOf(c)[0]?.targetSymbol;
           const subject = [...chain(bearer)].map((key) => this.directErEntity(key)).find(Boolean);

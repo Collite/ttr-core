@@ -361,7 +361,23 @@ class ThingsInTimeSpec :
             }
         }
 
-        "R6: a value-kind participant takes the quality its label names up the chain before a single one below it" {
+        "N1: an event bound that involves its bearer twice names no one subject — the refusal says so" {
+            val source =
+                Files
+                    .readString(world.dir.resolve("cn.ttrm"))
+                    .replace(
+                        "def event Started { involves: [Ticket],",
+                        "def event Started { involves: [Ticket, Ticket as parent],",
+                    )
+            val twice = CnConceptService(StatementLowerSpec.world("time", mapOf("cn.ttrm" to source)))
+            val r = twice.definitionRender(ref("OpenTicket"), Layer.ER, "postgresql", RenderOptions())
+            r.text shouldBe ""
+            r.diagnostics.map { it.message }.single {
+                "`cn.Started` involves no one participant `cn.Ticket` can be (cn/phase-bounds-participant)" in it
+            }
+        }
+
+        "R6:a value-kind participant takes the quality its label names up the chain before a single one below it" {
             val extra =
                 "model cn\n" +
                     "def kind Quote { involves: [Item, Channel], qualities: [channel] }\n" +
