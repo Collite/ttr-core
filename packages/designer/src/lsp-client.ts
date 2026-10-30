@@ -16,13 +16,13 @@ export interface LspClient {
   edit(params: ModelerEditParams): Promise<ModelerEditResult>;
   transportKind: 'node' | 'browser';
   openDocument(uri: string, content: string): Promise<void>;
-  setProjectRoot(projectRoot: string, manifest?: string): Promise<ProjectRootResult>;
+  setProjectRoot(projectRoot: string, manifest?: string, options?: { deferDiagnostics?: boolean }): Promise<ProjectRootResult>;
   listSchemaSubjects(): Promise<{ subjects: SchemaSubject[] }>;
   listGraphs(projectRoot: string): Promise<{ graphs: GraphMetadata[] }>;
-  getGraph(uri: string): Promise<GetGraphResponse | null>;
+  getGraph(uri: string, preferredLanguage?: string): Promise<GetGraphResponse | null>;
   getPackageGraph(): Promise<PackageGraphResponse>;
-  getModelGraph(uri: string, schema: RenderableSchemaCode): Promise<ModelGraph>;
-  getBindings(): Promise<BindingMapData>;
+  getModelGraph(uri: string, schema: RenderableSchemaCode, preferredLanguage?: string): Promise<ModelGraph>;
+  getBindings(preferredLanguage?: string): Promise<BindingMapData>;
   getLayout(uri: string, projectRoot?: string): Promise<LayoutFile>;
   setLayout(uri: string, layout: LayoutFile, projectRoot?: string): Promise<WorkspaceEdit>;
   exportLayout(uri?: string, projectRoot?: string): Promise<LayoutFile>;

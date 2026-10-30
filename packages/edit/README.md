@@ -1,6 +1,6 @@
 # @tatrman/edit
 
-Apache-2.0 · `@tatrman/edit@0.1.1`, family-locked with the eight Designer packages and released
+Apache-2.0 · `@tatrman/edit@0.1.3`, family-locked with the eight Designer packages and released
 as internal `designer/v*` assets. Historical public release: `@tatrman/edit@0.1.0` (`edit/v0.1.0`).
 
 Pure TTR-M edit synthesis shared by the Node and browser LSP. Text is canonical: callers apply the

@@ -209,3 +209,60 @@ it('focuses each page after an empty canvas click without stealing control focus
   expect(input).toHaveFocus();
   expect(screen.queryAllByTestId('cmdk-input')).toHaveLength(0);
 });
+
+
+it.each(['en', 'cs'] as const)('uses the selected %s language for hosted schema and layout labels without changing source bytes', async lang => {
+  const snapshot = { sha: 'bilingual', files: {
+    'modeler.toml': '[packages]\nlayout="off"\n[language]\npreferred="en"',
+    'model/er.ttrm': 'package demo\nmodel er\ndef entity calendar { displayLabel: { en: "Calendar", cs: "Kalendář" } }',
+    'model/view.ttrg': 'graph view { model: er, objects: [demo.er.entity.calendar] }',
+  } };
+  let source!: ModelDataSource;
+  const extensions = [{ manifest: { name: 'probe', version: '1', license: 'none' as const, requires: [] },
+    activate: async (context: { dataSource: ModelDataSource }) => { source = context.dataSource; return null; } }];
+  const collect = createRef<CollectFiles>();
+  render(<DesignerPage files={snapshot} basePath="/m/" lang={lang} workspace="demo" location="/w/demo/s/er" collect={collect} extensions={extensions} />);
+  await waitFor(() => expect(source).toBeDefined());
+  const label = lang === 'cs' ? 'Kalendář' : 'Calendar';
+  await waitFor(() => expect(screen.getByTestId('mock-kernel')).toHaveTextContent(label));
+  expect((await source.getGraph('file:///repo/model/view.ttrg'))?.nodes[0].label).toBe(label);
+  expect(collect.current!()).toEqual([]);
+  expect((source as BffFilesDataSource).project?.files.get('modeler.toml')).toBe(snapshot.files['modeler.toml']);
+});
+
+it.each([
+  ['/m/', 'en', '/w/demo/s/er', '/m/demo/s/er?lang=en'],
+  ['/m/', 'cs', '/w/demo/s/er?skin=er.chen', '/m/demo/s/er?skin=er.chen&lang=cs'],
+  ['/m/c/model/maya/3/', 'cs', '/w/demo/s/er', '/m/c/model/maya/3/demo/s/er?lang=cs'],
+  ['/m/c/model/maya/3/', 'cs', '/w/demo/p/lineage?root=demo.er.entity.customer', '/m/c/model/maya/3/demo/p/lineage?root=demo.er.entity.customer&scope=neighborhood&dir=upstream&kind=measure&label=customer&lang=cs'],
+] as const)('Copy retains scope, view query and language (%s %s %s)', async (basePath, lang, path, expected) => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+  render(<DesignerPage files={files} basePath={basePath} lang={lang} workspace="demo" location={path} />);
+  const copy = await screen.findByTestId('copy-federation-link');
+  await waitFor(() => expect(copy).toHaveAttribute('data-federation-url', window.location.origin + expected));
+  fireEvent.click(copy);
+  await waitFor(() => expect(writeText).toHaveBeenCalledWith(window.location.origin + expected));
+});
+
+
+it('switches an installed page language while preserving its authored files and selected view', async () => {
+  let source!: ModelDataSource;
+  const collect = createRef<CollectFiles>();
+  const snapshot = { sha: 'bilingual', files: { ...files.files,
+    'model/er.ttrm': 'package demo\nmodel er\ndef entity customer { displayLabel: { en: "Customer", cs: "Zákazník" } }',
+  } };
+  const extensions = [{ manifest: { name: 'probe', version: '1', license: 'none' as const, requires: [] },
+    activate: async (context: { dataSource: ModelDataSource }) => { source = context.dataSource; return null; } }];
+  const props = { files: snapshot, basePath: '/m/', workspace: 'demo', location: '/w/demo/s/er', extensions, collect };
+  const view = render(<DesignerPage {...props} lang="en" />);
+  await waitFor(() => expect(screen.getByTestId('mock-kernel')).toHaveTextContent('Customer'));
+  await act(async () => expect((await source.edit!({ op: 'set-source', args: { nodeRef: 'demo.er.entity.customer',
+    text: 'def entity customer { displayLabel: { en: "Customer", cs: "Zákazník" }, description: "unsaved" }',
+  } })).ok).toBe(true));
+  const edits = collect.current!();
+  view.rerender(<DesignerPage {...props} lang="cs" />);
+  await waitFor(() => expect(screen.getByTestId('mock-kernel')).toHaveTextContent('Zákazník'));
+  expect(collect.current!()).toEqual(edits);
+  expect((source as BffFilesDataSource).sha).toBe('bilingual');
+});
