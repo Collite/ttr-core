@@ -1049,6 +1049,36 @@ internal class ErRenderer(
                 .singleOrNull()
                 ?.label
 
+        /**
+         * The label an episode's [owner] (a phase, or an event bounding one) names its subject [bearer] by (review-175
+         * F5, R3): one of its own `involves:` the bearer can be, else one of its grounding's participant labels, else
+         * the nearest chain level's — null when there is none, or several where the first are found. A phase's chain
+         * holds its bearer, so a bearer that involves its own type (`Warehouse as parent`) never competes with the
+         * phase's own subject.
+         */
+        private fun subjectOn(
+            owner: Concept,
+            bearer: Concept,
+        ): String? {
+            fun fits(concept: QualifiedName?) =
+                concept?.let { cn.concepts[it] }?.let { lattice.compatible(it, bearer) } == true
+
+            val own = owner.involves.filter { fits(it.concept) }.map { it.label }
+            if (own.isNotEmpty()) return own.singleOrNull()
+            val grounded =
+                owner.grounding
+                    ?.participants
+                    ?.keys
+                    .orEmpty()
+                    .filter { fits(lattice.participant(owner, it)?.second?.concept) }
+            if (grounded.isNotEmpty()) return grounded.singleOrNull()
+            for (level in lattice.chain(owner).drop(1)) {
+                val labels = level.involves.filter { fits(it.concept) }.map { it.label }
+                if (labels.isNotEmpty()) return labels.singleOrNull()
+            }
+            return null
+        }
+
         /** [owner]'s participant [label] as relations, holder first (`Grounding.participants`). */
         private fun path(
             owner: Concept,
@@ -1780,7 +1810,7 @@ internal class ErRenderer(
                 val bearer = phase.of?.let { cn.concepts[it] } ?: refuse("an episode table without its subject")
                 // the label the episode's grounding names its subject by — as written, never guessed from a name
                 val label =
-                    participantOn(phase, bearer)
+                    subjectOn(phase, bearer)
                         ?: refuse(
                             "`${phase.ref}` involves no one participant `${bearer.ref}` can be (cn/episode-subject-missing)",
                         )
@@ -1865,7 +1895,7 @@ internal class ErRenderer(
                 val entity = entityOf(event) ?: unreachable(event)
                 val query = Select(Source.Entity(entity.qname.name, fresh(entity.qname.name)), at)
                 val eventRef = Bound(row(entity, query, query.from.alias), event)
-                val label = participantOn(event, bearer) ?: refuse("`${event.ref}` does not involve `${bearer.ref}`")
+                val label = subjectOn(event, bearer) ?: refuse("`${event.ref}` does not involve `${bearer.ref}`")
                 val subject =
                     (participant(eventRef, label, bearer) as? RowV)?.ref
                         ?: refuse("an episode subject is not an entity")

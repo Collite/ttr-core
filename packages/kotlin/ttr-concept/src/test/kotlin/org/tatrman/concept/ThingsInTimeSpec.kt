@@ -340,6 +340,27 @@ class ThingsInTimeSpec :
             }
         }
 
+        "R3: a bearer that involves its own type leaves the episode's subject to the phase's own participant" {
+            val source =
+                Files
+                    .readString(world.dir.resolve("cn.ttrm"))
+                    .replace(
+                        "def kind Warehouse { grounds: er.entity.warehouse }",
+                        "def kind Warehouse { grounds: er.entity.warehouse, involves: [Warehouse as parent] }",
+                    ).replace(
+                        "def kind Ticket { grounds: er.entity.ticket,",
+                        "def kind Ticket { grounds: er.entity.ticket, involves: [Ticket as parent],",
+                    )
+            val selfish = CnConceptService(StatementLowerSpec.world("time", mapOf("cn.ttrm" to source)))
+            for (name in listOf("OutOfService", "OpenTicket")) {
+                withClue(name) {
+                    val r = selfish.definitionRender(ref(name), Layer.ER, "postgresql", RenderOptions())
+                    r.diagnostics.filter { it.severity == Severity.ERROR } shouldBe emptyList()
+                    r.text shouldBe service.definitionRender(ref(name), Layer.ER, "postgresql", RenderOptions()).text
+                }
+            }
+        }
+
         "F12: a stacked-entity subkind is a subset test; a binding-only period phase is an episode table" {
             val extra =
                 "model er\n" +
