@@ -2,7 +2,7 @@
 import { parseString, type AttributeDef, type Definition, type EntityDef, type Er2dbAttributeDef, type Er2dbEntityDef, type LexiconEntryDef, type RelationDef, type SourceLocation } from '@tatrman/parser';
 import { isTtrId, compareCodePoints } from '@tatrman/parser/layout';
 import type { CreateFile, TextDocumentEdit } from 'vscode-languageserver-types';
-import { ModelIndex, type IndexedNode, type ModelDocument } from './model-index.js';
+import { ModelIndex, type IndexedNode, type ModelDocument, type Written } from './model-index.js';
 import { Fragment, location, position, printHeader, utf16Offset } from './print.js';
 import { foreignKey } from './foreign-key.js';
 import { addAttribute } from './attribute-edit.js';
@@ -16,13 +16,15 @@ export type { RefusalCode } from './refusals.js';
 class Synthesis {
   readonly index: ModelIndex;
   readonly texts = new Map<string, string>();
+  /** The new files and the terms this run has written, which `index` (the files before the edit) does not show. */
+  readonly written: Written = { files: new Map(), terms: [] };
   constructor(readonly ctx: SynthContext) { this.index = new ModelIndex(ctx); }
   text(uri: string): string { return this.texts.get(uri) ?? this.ctx.files[uri] ?? ''; }
   save(uri: string, text: string): void { this.index.assertWritable(uri); this.texts.set(uri, text); }
   /** New documents are explicit WorkspaceEdit CreateFile operations; existing bytes outside patches survive. */
   append(uri: string, pkg: string, model: string, definitions: Definition[], f: Fragment, locale?: string): void {
+    if (!this.index.takes(uri, { pkg, model, locale }, this.written)) throw new Refusal('invalid-args', `Destination ${uri} has a different package/model/locale.`);
     const existing = this.index.documents.find(d => d.uri === uri);
-    if (existing && (existing.pkg !== pkg || existing.model !== model || (locale && existing.ast.modelDirective?.locale !== locale))) throw new Refusal('invalid-args', `Destination ${uri} has a different package/model/locale.`);
     const names = new Set(existing?.ast.definitions.map(d => `${d.kind}:${d.name}`));
     for (const def of definitions) {
       if (names.has(`${def.kind}:${def.name}`)) throw new Refusal('invalid-args', `Destination already declares ${def.name}.`);
@@ -30,6 +32,7 @@ class Synthesis {
     }
     const old = this.text(uri);
     const header = printHeader(pkg, model, locale);
+    if (!old) this.written.files.set(uri, { pkg, model, locale });
     this.save(uri, (old || header).trimEnd() + '\n\n' + f.print(definitions));
   }
   require(ref: string, kinds: Parameters<ModelIndex['lookup']>[1], code: 'entity-unknown' | 'node-unknown' | 'source-unknown' | 'column-unknown' | 'target-unknown'): IndexedNode {
@@ -51,7 +54,8 @@ class Synthesis {
     if (!args.from && !args.on && this.ctx.manifest.bindings.required) throw new Refusal('entity-needs-binding', 'Choose a table or a parameterless query.');
     const source = args.from ? this.require(args.from, ['table'], 'source-unknown') : args.on ? this.require(args.on, ['query'], 'source-unknown') : undefined;
     if (source?.def.kind === 'query' && source.def.parameters?.length) throw new Refusal('query-has-parameters', 'A stacked entity requires a parameterless query.');
-    const erFile = this.index.documents.find(d => d.model === 'er' && (!source || d.pkg === source.doc.pkg));
+    // A stacked entity lives beside the query it stacks on (hartland's LQ files hold both); otherwise the package's first er file.
+    const erFile = args.on && source?.doc.model === 'er' ? source.doc : this.index.documents.find(d => d.model === 'er' && (!source || d.pkg === source.doc.pkg));
     let pkg = source?.doc.pkg ?? erFile?.pkg ?? this.ctx.manifest.packages.root;
     const uri = args.file ? this.index.uri(args.file) : erFile?.uri ?? this.index.uri(`model/er/${args.name}.ttrm`);
     if (!source && !erFile) pkg = this.index.packageFor(uri);
@@ -69,8 +73,7 @@ class Synthesis {
       if (args.from) for (const c of columns) defs.push(this.attributeMapping(f, `${args.name}_${c.name}`, `${qname}.${c.name}`, `${source.symbol.qname}.${c.name}`));
       this.append(this.index.bindingFile(pkg), pkg, 'binding', defs, f);
     }
-    const termFile = uri.split('/').at(-1)!.replace(/\.ttrm$/, '').split('-')[0] + '.ttrm';
-    for (const lang of ['en', 'cs'] as const) if (args.terms?.[lang]) this.term({ lang, term: args.terms[lang], target: qname, file: termFile }, { qname, pkg, model: 'er', name: args.name });
+    for (const lang of ['en', 'cs'] as const) if (args.terms?.[lang]) this.term({ lang, term: args.terms[lang], target: qname }, { qname, pkg, uri, model: 'er', name: args.name });
   }
   replace(node: IndexedNode, newText: string): void {
     const text = this.text(node.doc.uri);
@@ -152,14 +155,14 @@ class Synthesis {
     }
     if (refs.length) throw new Refusal('would-orphan', 'The replacement removes referenced members.', refs);
   }
-  term(args: EditArguments['add-term'], inserted?: { qname: string; pkg: string; model: string; name: string }): void {
+  term(args: EditArguments['add-term'], inserted?: { qname: string; pkg: string; uri: string; model: string; name: string }): void {
     if (!['en', 'cs'].includes(args.lang) || !args.term.trim() || /[\x00-\x1f]/.test(args.term)) throw new Refusal('invalid-args', 'Term needs a supported locale and non-empty text.');
-    const target = inserted ?? (() => { const n = this.require(args.target, undefined, 'target-unknown'); return { qname: n.symbol.qname, pkg: n.doc.pkg, model: n.symbol.schemaCode, name: n.symbol.name }; })();
+    const target = inserted ?? (() => { const n = this.require(args.target, undefined, 'target-unknown'); return { qname: n.symbol.qname, pkg: n.doc.pkg, uri: n.doc.uri, model: n.symbol.schemaCode, name: n.symbol.name }; })();
     for (const d of this.index.documents) if (d.model === 'lexicon' && d.ast.modelDirective?.locale === args.lang) for (const t of d.ast.definitions) if (t.kind === 'term' && t.forms?.includes(args.term)) {
       if (t.target && this.index.lookup(t.target.path, undefined, d)?.symbol.qname === target.qname) return;
       throw new Refusal('term-exists', `The term ${args.term} already targets another definition.`);
     }
-    const uri = this.index.lexiconFile(args.lang, target.pkg, target.model, args.file);
+    const uri = this.index.lexiconFile(args.lang, target, args.file, this.written);
     if (!uri.endsWith('.ttrm')) throw new Refusal('invalid-args', 'Lexicon files must end in .ttrm.');
     const used = new Set(this.index.documents.filter(d => d.model === 'lexicon' && d.pkg === target.pkg).flatMap(d => d.ast.definitions.map(t => t.name)));
     const base = target.name.replace(/[^a-zA-Z0-9_]/g, '_') + '_' + args.lang;
@@ -169,6 +172,7 @@ class Synthesis {
     const f = new Fragment();
     const def: LexiconEntryDef = { kind: 'term', name, source: location, target: f.ref(target.qname), forms: [args.term] };
     this.append(uri, target.pkg, 'lexicon', [def], f, args.lang);
+    this.written.terms.push({ uri, qname: target.qname });
   }
   ref(doc: ModelDocument, span: SourceLocation, kind: string, text = doc.text): RefusalRef {
     return { uri: doc.uri, kind, range: { start: position(text, utf16Offset(text, span.offsetStart)), end: position(text, utf16Offset(text, span.offsetEnd)) } };

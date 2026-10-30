@@ -138,7 +138,7 @@ describe('WorkerLspDataSource', () => {
     const client = stubClient();
     const src = new WorkerLspDataSource(client, { projectRoot: 'file:///proj', graphUri: 'file:///g.ttrg' });
     const graph = await src.getModelGraph({ schema: 'db' });
-    expect(client.getModelGraph).toHaveBeenCalledWith('file:///g.ttrg', 'db');
+    expect(client.getModelGraph).toHaveBeenCalledWith('file:///g.ttrg', 'db', undefined);
     expect(graph.nodes[0]).toMatchObject({ qname: 'db.dbo.customers', kind: 'table', schema: 'db' });
     expect(graph.edges[0]).toMatchObject({ from: 'db.dbo.orders', to: 'db.dbo.customers', type: 'REFERENCES' });
   });

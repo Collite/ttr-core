@@ -57,8 +57,8 @@ export async function lspClientOver(
         textDocument: { uri, version }, contentChanges: [{ text: content }],
       });
     },
-    async setProjectRoot(projectRoot, manifest) {
-      return connection.sendRequest('modeler/setProjectRoot', { projectRoot, ...(manifest === undefined ? {} : { manifest }) }) as Promise<ProjectRootResult>;
+    async setProjectRoot(projectRoot, manifest, options) {
+      return connection.sendRequest('modeler/setProjectRoot', { projectRoot, ...(manifest === undefined ? {} : { manifest }), ...options }) as Promise<ProjectRootResult>;
     },
     async listSchemaSubjects() {
       return connection.sendRequest('modeler/listSchemaSubjects', {}) as Promise<{ subjects: SchemaSubject[] }>;
@@ -66,20 +66,20 @@ export async function lspClientOver(
     async listGraphs(projectRoot) {
       return connection.sendRequest('modeler/listGraphs', { projectRoot }) as Promise<{ graphs: GraphMetadata[] }>;
     },
-    async getGraph(uri) {
-      return connection.sendRequest('modeler/getGraph', { uri }) as Promise<GetGraphResponse | null>;
+    async getGraph(uri, preferredLanguage) {
+      return connection.sendRequest('modeler/getGraph', { uri, preferredLanguage }) as Promise<GetGraphResponse | null>;
     },
     async getPackageGraph() {
       return connection.sendRequest('modeler/getPackageGraph', {}) as Promise<PackageGraphResponse>;
     },
-    async getModelGraph(uri, schema) {
+    async getModelGraph(uri, schema, preferredLanguage) {
       return connection.sendRequest('modeler/getModelGraph', {
         textDocument: { uri },
-        schema,
+        schema, preferredLanguage,
       }) as Promise<ModelGraph>;
     },
-    async getBindings() {
-      return connection.sendRequest('modeler/getBindings', {}) as Promise<BindingMapData>;
+    async getBindings(preferredLanguage) {
+      return connection.sendRequest('modeler/getBindings', { preferredLanguage }) as Promise<BindingMapData>;
     },
     async getLayout(uri, projectRoot) {
       return connection.sendRequest('modeler/getLayout', { graphUri: uri, projectRoot }) as Promise<LayoutFile>;

@@ -91,3 +91,46 @@ describe.each([false, true])('file-map load (reverse order: %s)', (reverse) => {
     }
   });
 });
+
+it('defers file-map project diagnostics to the final barrier, then resumes normal edit validation', async () => {
+  const client = await createTestClient();
+  const uri = 'file:///world/model/invalid.ttrm';
+  try {
+    await client.setProjectRoot('file:///world', '[packages]\nlayout="off"', { deferDiagnostics: true });
+    await client.openDocument(uri, 'model er\ndef entity broken { attributes: [');
+    await client.listSchemaSubjects(); // Notification barrier without ending the batch.
+    expect(client.diagnostics!().filter(d => d.uri === uri)).toEqual([]);
+    await client.setProjectRoot('file:///world', '[packages]\nlayout="off"');
+    expect(client.diagnostics!().filter(d => d.uri === uri && d.severity === 1).length).toBeGreaterThan(0);
+    await client.openDocument(uri, 'model er\ndef entity repaired { attributes: [def attribute id { type: int }] }');
+    await client.listSchemaSubjects();
+    expect(client.diagnostics!().filter(d => d.uri === uri && d.severity === 1)).toEqual([]);
+  } finally { client.dispose(); }
+});
+
+
+it('closes the diagnostics batch after an open fails so a reused local client still validates', async () => {
+  const client = await createTestClient();
+  const uri = 'file:///world/model/a-binding.ttrm';
+  try {
+    vi.spyOn(client, 'openDocument').mockRejectedValueOnce(new Error('open failed'));
+    await expect(openFileMap(client, 'file:///world', files)).rejects.toThrow('open failed');
+    await client.openDocument(uri, 'model er\ndef entity broken { attributes: [');
+    await client.listSchemaSubjects();
+    expect(client.diagnostics!().filter(d => d.uri === uri && d.severity === 1).length).toBeGreaterThan(0);
+  } finally { client.dispose(); }
+});
+
+it('keeps manifest language as the default and presentation overrides local to each graph read', async () => {
+  const client = await createTestClient();
+  try {
+    await openFileMap(client, 'file:///world', new Map([
+      ['modeler.toml', '[packages]\nlayout="off"\n[language]\npreferred="cs"'],
+      ['model/er.ttrm', 'model er\ndef entity calendar { displayLabel: { en: "Calendar", cs: "Kalendář" } }'],
+    ]));
+    expect((await client.getModelGraph('file:///world', 'er')).nodes[0].label).toBe('Kalendář');
+    expect((await client.getModelGraph('file:///world', 'er', 'en')).nodes[0].label).toBe('Calendar');
+    expect((await client.getModelGraph('file:///world', 'er', '')).nodes[0].label).toBe('Kalendář');
+    expect((await client.getModelGraph('file:///world', 'er')).nodes[0].label).toBe('Kalendář');
+  } finally { client.dispose(); }
+});

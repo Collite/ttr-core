@@ -5,7 +5,7 @@ Initialize the connection, set the project root, open model documents, then set 
 
 ## Project root and manifest
 
-`modeler/setProjectRoot { projectRoot: string, manifest?: string }` accepts the
+`modeler/setProjectRoot { projectRoot: string, manifest?: string, deferDiagnostics?: boolean }` accepts the
 text of `modeler.toml`. It returns `{ ok: true, projectRoot, manifest }`, where
 `manifest` is the resolved configuration. Supplying new configuration reindexes
 and revalidates already open documents. Invalid TOML applies defaults and publishes an Error
@@ -22,6 +22,12 @@ entry point can load the manifest through its filesystem callback.
 is false. Unknown keys in that block produce `manifest/unknown-key` warnings.
 The editing operations enforce this policy.
 
+A file-map host may set `deferDiagnostics: true` on the initial root request of a fresh worker.
+Documents are indexed as they open, while document diagnostics wait for the closing root request
+(with the flag omitted or false). That closing request reindexes and validates the complete project
+once; ordinary edits then publish diagnostics normally. The Designer closes the batch in a `finally` block even if a document fails to open.
+If the connection itself fails, dispose the worker rather than reusing an unfinished batch.
+
 ## Whole-schema subjects
 
 `modeler/listSchemaSubjects {}` returns
@@ -36,6 +42,15 @@ layouts. `/w/<workspace>/s/er` opens the ER schema without requiring a `.ttrg`.
 All graph cards carry their effective package in `pkg`; the Designer needs no symbol-list fetch to
 recover it. Graph qnames are unchanged for saved-position compatibility; inferred-package qnames
 can still differ from the symbol table ([ttr-core#255](https://github.com/Collite/ttr-core/issues/255)).
+
+## Presentation language
+
+`modeler/getModelGraph`, `modeler/getGraph`, and `modeler/getBindings` accept an optional
+`preferredLanguage` string. A nonempty request value overrides the manifest's preferred language
+for that read only; an absent or empty value uses the manifest. The embedded Designer supplies
+its `lang` prop for schema graphs, saved graphs, layouts and binding predicates. This changes
+presentation without modifying `modeler.toml` or the collected source files. Embedded Copy links
+include that language alongside the view query and the host's base path.
 
 ## Symbol pages
 

@@ -35,7 +35,8 @@ it('R4 preserves a new file authored after collect',async()=>{
   await h.edit('collected');const collected=h.source.collectChangedFiles();
   expect((await h.source.edit({op:'add-term',args:{lang:'en',term:'A',target:'er.entity.a'}})).ok).toBe(true);
   h.snapshot({...h.files(),[path]:collected[0].text!});await h.source.refresh({reason:'save'});
-  expect(h.source.changedFiles()).toEqual([{path:'model/lexicon/en/er.ttrm',text:expect.stringContaining('forms: ["A"]')}]);
+  // ttr-core#326: a term with no file goes under its target file's stem (`er/a.ttrm` → `en/a.ttrm`).
+  expect(h.source.changedFiles()).toEqual([{path:'model/lexicon/en/a.ttrm',text:expect.stringContaining('forms: ["A"]')}]);
  } finally {h.source.dispose();}
 });
 it('R4 conflicts retain the old snapshot and pending whole-file bytes',async()=>{

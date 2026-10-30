@@ -37,6 +37,7 @@ export interface BffOptions {
   api: string;
   token: string;
   scope: HostScope;
+  preferredLanguage?: string;
 }
 export interface Snapshot {
   sha: string;
@@ -109,15 +110,24 @@ export class BffFilesDataSource implements ModelDataSource {
   private readonly fetcher: typeof fetch;
   private readonly createClient: () => Promise<LspClient>;
   private token: string;
+  private preferredLanguage?: string;
   constructor(
     private readonly options: BffOptions,
     private readonly deps: { fetch?: typeof fetch; createClient?: () => Promise<LspClient>; loadSnapshot?: () => Promise<Snapshot> } = {}
   ) {
     if (!isHostPath(options.api)) throw new Error('The BFF API must be a same-origin path.');
     this.token = options.token;
+    this.preferredLanguage = options.preferredLanguage;
     this.fetcher = deps.fetch ?? ((...args) => globalThis.fetch(...args));
     this.createClient =
       deps.createClient ?? (async () => (await import('../lsp-client.js')).createLspClient());
+  }
+  setPreferredLanguage(language: string): void {
+    if (language === this.preferredLanguage) return;
+    this.preferredLanguage = language;
+    this.worker?.setPreferredLanguage(language);
+    this.worker?.invalidate();
+    for (const cb of this.fileListeners) cb();
   }
   setToken(token: string): void {
     this.token = token;
@@ -185,7 +195,8 @@ export class BffFilesDataSource implements ModelDataSource {
       try {
         let required = true;
         await openFileMap(client, 'file:///repo', authored, { under: 'model/', onManifest: manifest => { required = manifest.bindings.required; } });
-        const worker = new SnapshotWorker(client, {projectRoot:'file:///repo',files:project.files,currentFiles:authored});
+        const loadedLanguage = this.preferredLanguage;
+        const worker = new SnapshotWorker(client, {projectRoot:'file:///repo',files:project.files,currentFiles:authored,preferredLanguage:loadedLanguage});
         const catalog = await worker.listCatalog();
         if (this.disposed) throw new Error('Hosted source is disposed.');
         if (!options.discard) {
@@ -193,6 +204,10 @@ export class BffFilesDataSource implements ModelDataSource {
           if (!sameFiles(current, this.currentFiles())) { client.dispose(); continue; }
         }
         worker.onModelChanged(() => { if (this.worker !== worker) return; worker.invalidate(); this.catalogGen++; this.catalog = null; for (const cb of this.fileListeners) cb(); });
+        if (loadedLanguage !== this.preferredLanguage) {
+          worker.setPreferredLanguage(this.preferredLanguage ?? 'en');
+          worker.invalidate();
+        }
         const previous = this.worker;
         this.worker = worker;
         this.catalogGen++;

@@ -293,6 +293,37 @@ class SchemaRendererSpec :
             props["grade"]!!.jsonObject["enum"] shouldBe JsonArray(listOf(JsonPrimitive(1L), JsonPrimitive(2L)))
         }
 
+        // DX PX T2b — the record ETL's own columns (tagged `provenance`) are queryable on the entity, never extracted.
+        test("an attribute tagged provenance is left out of both kinds, as a key is") {
+            val m =
+                ExtractWorlds.of(
+                    mapOf(
+                        "er.ttrm" to
+                            """
+                            model er
+                            def entity review {
+                                attributes: [
+                                    def attribute review_id { type: int, isKey: true },
+                                    def attribute body { type: text },
+                                    def attribute annotation_refs { type: text, tags: ["provenance"] },
+                                    def attribute consolidation_run { type: text, optional: true, tags: ["provenance"] },
+                                    def attribute rating { type: int, optional: true, tags: ["measured"] }
+                                ]
+                            }
+                            """.trimIndent(),
+                    ),
+                )
+            for (kind in TypeKind.entries) {
+                attributes(m, "review", kind).keys shouldContainExactly setOf("body", "rating")
+            }
+            SchemaRenderer(m)
+                .render("review", TypeKind.RECORD)["properties"]!!
+                .jsonObject["attributes"]!!
+                .jsonObject["required"]!!
+                .jsonArray
+                .map { it.jsonPrimitive.content } shouldBe listOf("body")
+        }
+
         test("a concept's own modifier landing on another entity is refused") {
             val m =
                 ExtractWorlds.of(

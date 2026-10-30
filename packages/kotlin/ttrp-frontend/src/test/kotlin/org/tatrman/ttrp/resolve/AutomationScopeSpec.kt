@@ -15,6 +15,8 @@ import org.tatrman.ttr.metadata.registry.RegistrySnapshot
 import java.time.Instant
 import org.tatrman.ttr.metadata.model.Attribute
 import org.tatrman.ttr.metadata.model.AutomationAction
+import org.tatrman.ttr.metadata.model.AutomationSet
+import org.tatrman.ttr.metadata.model.AutomationTransition
 import org.tatrman.ttr.metadata.model.Entity
 import org.tatrman.ttr.metadata.model.QualifiedName
 import org.tatrman.ttr.metadata.model.SchemaCode
@@ -32,6 +34,21 @@ class AutomationScopeSpec :
             actions: List<AutomationAction> = listOf(action),
             stdlib: List<Entity> = emptyList(),
         ) = AutomationScope(emptyList(), actions, entities, stdlib) { _, prefix -> prefix == "hartland" }
+
+        "native obligation lookup depends on sink and transition without narrowing the target" {
+            val insert = action.copy(sinks = mapOf("native" to "obligation"))
+            val transition = insert.copy(transition = AutomationTransition("obligation.state", to = "fulfilled"))
+            AutomationScope.needsObligationLookup(insert) shouldBe false
+            AutomationScope.needsObligationLookup(insert.copy(set = AutomationSet("obligation.state", "to"))) shouldBe
+                false
+            AutomationScope.needsObligationLookup(transition.copy(sinks = mapOf("n8n" to "obligation"))) shouldBe false
+            AutomationScope.needsObligationLookup(transition.copy(sinks = mapOf("native" to "transition"))) shouldBe
+                false
+            AutomationScope.needsObligationLookup(transition) shouldBe true
+            AutomationScope.needsObligationLookup(
+                transition.copy(transition = AutomationTransition("order.state", to = "released")),
+            ) shouldBe true
+        }
 
         "bare package and canonical target refs resolve the same entity and attribute" {
             val expected = TargetResolution.Resolved(entity, attr)

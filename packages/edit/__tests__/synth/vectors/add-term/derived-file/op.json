@@ -1,0 +1,8 @@
+{
+  "op": "add-term",
+  "args": {
+    "lang": "en",
+    "term": "returns review",
+    "target": "hartland.er.entity.returns_review"
+  }
+}

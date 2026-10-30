@@ -164,7 +164,7 @@ trailing definition whitespace is trimmed at the splice. Renames use `textDocume
 `@tatrman/designer-core` exports a React page, its TypeScript props, `ShellEditContext`, and the
 stage 1 message types. `@tatrman/designer-core/extensions` exports the open extension contracts
 and `editModel`. This stage supplies the built library for internal consumers; the family release
-is delivered as the Designer 0.1.1 family. Internal 0.x releases suffice unless a public release is explicitly requested.
+is delivered as the Designer 0.1.3 family. Internal 0.x releases suffice unless a public release is explicitly requested.
 
 ```tsx
 import { useRef } from 'react';
@@ -280,11 +280,11 @@ copying the worker. This is dependency optimization configuration; no worker plu
 Webpack hosts must keep the emitted worker as an asset when resolving `new URL(..., import.meta.url)`.
 
 The lockstep family is `designer-core`, `canvas-core`, `lsp`, `parser`, `tokens`, `perspectives`,
-`deep-links`, and `edit`, all at **0.1.1**. `perspectives` and `deep-links` are runtime imports.
+`deep-links`, and `edit`, all at **0.1.3**. `perspectives` and `deep-links` are runtime imports.
 `canvas-core` is pure TypeScript; React is only a peer of Designer. The LSP tarball bundles its private
 compiler modules and their declaration types; consumers need no private workspace packages.
 
-After merge, `just publish designer set 0.1.1` creates the internal `designer/v0.1.1` GitHub release.
+After merge, `just publish designer set 0.1.3` creates the internal `designer/v0.1.3` GitHub release.
 Download all `.tgz` assets, verify `SHA256SUMS`, then install them together:
 
 ```sh
@@ -298,29 +298,29 @@ to npm. An explicit public release is a separate maintainer action; see `PUBLISH
 ### pnpm hosts: internal release artifacts
 
 Platform P4 consumes the internal release under ruling R144-A(a). Download all eight release
-assets into `vendor/designer-0.1.1/` in the host repository, verify their release hashes before
+assets into `vendor/designer-0.1.3/` in the host repository, verify their release hashes before
 installing, and retain the manifest/checksums with them:
 
 ```sh
-mkdir -p vendor/designer-0.1.1
-gh release download designer/v0.1.1 --repo Collite/ttr-core --dir vendor/designer-0.1.1
-(cd vendor/designer-0.1.1 && shasum -a 256 -c SHA256SUMS)
+mkdir -p vendor/designer-0.1.3
+gh release download designer/v0.1.3 --repo Collite/ttr-core --dir vendor/designer-0.1.3
+(cd vendor/designer-0.1.3 && shasum -a 256 -c SHA256SUMS)
 ```
 
-In the host package.json, depend on the same eight `file:vendor/designer-0.1.1/tatrman-<name>-0.1.1.tgz`
+In the host package.json, depend on the same eight `file:vendor/designer-0.1.3/tatrman-<name>-0.1.3.tgz`
 artifacts (use relative paths from each consuming package). Pin transitive references in the
 workspace root's **pnpm-workspace.yaml**, not `pnpm.overrides` in package.json (ignored by pnpm 11):
 
 ```yaml
 overrides:
-  '@tatrman/designer-core': file:vendor/designer-0.1.1/tatrman-designer-core-0.1.1.tgz
-  '@tatrman/canvas-core': file:vendor/designer-0.1.1/tatrman-canvas-core-0.1.1.tgz
-  '@tatrman/lsp': file:vendor/designer-0.1.1/tatrman-lsp-0.1.1.tgz
-  '@tatrman/parser': file:vendor/designer-0.1.1/tatrman-parser-0.1.1.tgz
-  '@tatrman/tokens': file:vendor/designer-0.1.1/tatrman-tokens-0.1.1.tgz
-  '@tatrman/perspectives': file:vendor/designer-0.1.1/tatrman-perspectives-0.1.1.tgz
-  '@tatrman/deep-links': file:vendor/designer-0.1.1/tatrman-deep-links-0.1.1.tgz
-  '@tatrman/edit': file:vendor/designer-0.1.1/tatrman-edit-0.1.1.tgz
+  '@tatrman/designer-core': file:vendor/designer-0.1.3/tatrman-designer-core-0.1.3.tgz
+  '@tatrman/canvas-core': file:vendor/designer-0.1.3/tatrman-canvas-core-0.1.3.tgz
+  '@tatrman/lsp': file:vendor/designer-0.1.3/tatrman-lsp-0.1.3.tgz
+  '@tatrman/parser': file:vendor/designer-0.1.3/tatrman-parser-0.1.3.tgz
+  '@tatrman/tokens': file:vendor/designer-0.1.3/tatrman-tokens-0.1.3.tgz
+  '@tatrman/perspectives': file:vendor/designer-0.1.3/tatrman-perspectives-0.1.3.tgz
+  '@tatrman/deep-links': file:vendor/designer-0.1.3/tatrman-deep-links-0.1.3.tgz
+  '@tatrman/edit': file:vendor/designer-0.1.3/tatrman-edit-0.1.3.tgz
 ```
 
 Run `pnpm install` after adding React/ReactDOM 19 peers to the host. This form is exercised by
@@ -328,7 +328,7 @@ Run `pnpm install` after adding React/ReactDOM 19 peers to the host. This form i
 strict declarations and both dev/production browsers. The nested ELK include works without npm
 hoisting. Exact public release-asset URLs may replace the tarball specs in **both** direct dependencies
 and overrides, for example
-`https://github.com/Collite/ttr-core/releases/download/designer/v0.1.1/tatrman-lsp-0.1.1.tgz`;
+`https://github.com/Collite/ttr-core/releases/download/designer/v0.1.3/tatrman-lsp-0.1.3.tgz`;
 verify the downloaded bytes against that release's SHA256SUMS first. ttr-core is public, so asset URLs
 need no registry auth. Only released, hash-checked tarball specs are permitted: source `file:` paths,
 `workspace:`, `link:` and git dependencies remain forbidden in Platform's dependency rules.

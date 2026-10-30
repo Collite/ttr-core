@@ -48,6 +48,12 @@ object LexiconCompiler {
     private const val GROUND_PREFIX = "ground:"
     private const val PRED_PREFIX = "pred:"
 
+    /** The segments the TypeScript key has and `QualifiedName.dotted()` does not ([archiveSpellings]). */
+    private const val DB = "db"
+    private const val CN = "cn"
+    private const val CN_CONCEPT = "concept"
+    private val DB_KINDS = setOf("table", "view", "procedure", "query")
+
     fun compile(
         sources: LexiconSources,
         refs: ModelRefIndex,
@@ -67,7 +73,8 @@ object LexiconCompiler {
                 MdMetadataExtractor.rows(sources.ttrm)
 
         val warnings = mutableListOf<CompileWarning>()
-        val classified = (declared + metadata).mapNotNull { classify(it, refs, warnings) }
+        val packages = knownPackages(sources)
+        val classified = (declared + metadata).mapNotNull { classify(it, refs, packages, warnings) }
 
         val entries = phaseDefaults(merge(classified, warnings), cn, warnings)
         warnings += collisionWarnings(entries, cn)
@@ -507,16 +514,17 @@ object LexiconCompiler {
     private fun classify(
         row: SourceRow,
         refs: ModelRefIndex,
+        packages: List<String>,
         warnings: MutableList<CompileWarning>,
     ): Pair<SourceRow, TargetClass>? {
-        val cls =
+        val resolved =
             when {
-                row.targetRef.startsWith(OP_PREFIX) -> TargetClass.OPERATOR
-                row.targetRef.startsWith(GROUND_PREFIX) -> TargetClass.GROUNDING_TRIGGER
-                row.targetRef.startsWith(PRED_PREFIX) -> TargetClass.STRING_PREDICATE
-                else -> refs.classify(row.targetRef)
+                row.targetRef.startsWith(OP_PREFIX) -> row.targetRef to TargetClass.OPERATOR
+                row.targetRef.startsWith(GROUND_PREFIX) -> row.targetRef to TargetClass.GROUNDING_TRIGGER
+                row.targetRef.startsWith(PRED_PREFIX) -> row.targetRef to TargetClass.STRING_PREDICATE
+                else -> resolve(row.targetRef, refs, packages)
             }
-        if (cls == null) {
+        if (resolved == null) {
             warnings +=
                 CompileWarning(
                     code = CompileWarning.DANGLING_REF,
@@ -527,7 +535,83 @@ object LexiconCompiler {
                 )
             return null
         }
-        return row to cls
+        val (ref, cls) = resolved
+        return row.copy(targetRef = ref) to cls
+    }
+
+    /**
+     * ttr-core#325 — a model ref in the spelling the archive uses, from any spelling TTR-M accepts.
+     *
+     * Every archive ref is package-less (`QualifiedName.dotted()` drops the package; A-CN-9), but TTR-M also accepts
+     * the qualified spelling, and `@tatrman/edit` writes the TypeScript canonical key, package first. Looked up
+     * verbatim, that ref dangled: RG-LEXC-001, the row dropped, the build still exiting 0. So the ref is tried as
+     * written, then without each package the estate declares in front of it, each in its archive spellings
+     * ([archiveSpellings]):
+     *
+     * | `@tatrman/edit` writes | the row's ref |
+     * |---|---|
+     * | `hartland.er.entity.customer[.status]` | `er.entity.customer[.status]` |
+     * | `hartland.md.measure.revenue` | `md.measure.revenue` |
+     * | `hartland.db.dbo.table.invoice[.id]` | `db.dbo.invoice[.id]` |
+     * | `hartland.cn.concept.Party` | `cn.Party` |
+     *
+     * The row carries the ref it resolved under, so every spelling of one target compiles to one row. Only a declared
+     * package is removed, so a misspelt one still dangles with the warning. Which package the object is in is not
+     * checked: the archive cannot tell two packages' objects of one name apart either.
+     */
+    private fun resolve(
+        ref: String,
+        refs: ModelRefIndex,
+        packages: List<String>,
+    ): Pair<String, TargetClass>? {
+        val unqualified = listOf(ref) + packages.filter { ref.startsWith("$it.") }.map { ref.removePrefix("$it.") }
+        for (candidate in unqualified) {
+            for (spelling in archiveSpellings(candidate)) refs.classify(spelling)?.let { return spelling to it }
+        }
+        return null
+    }
+
+    /**
+     * The archive spellings of a package-less [ref], in the order tried. The TypeScript key keeps a segment `dotted()`
+     * does not: a db object's kind (the archive has `db.<schema>.<name>`) and a concept's `concept` (`cn.<Name>`, the
+     * key [CnTargets] reads).
+     *
+     * A db ref is tried as written first, since `db.dbo.table.x` is also column `x` of a table named `table`. A
+     * `cn.concept.` ref never is: the model index answers it too (`CnSchema.objects()` lists the concepts), under a key
+     * no cn consumer reads. Phase defaults, the collision rule and the `targets` facts all look up `cn.<Name>`.
+     */
+    private fun archiveSpellings(ref: String): List<String> {
+        val segments = ref.split('.')
+        return when {
+            segments.size > 2 && segments[0] == CN && segments[1] == CN_CONCEPT -> {
+                listOf((listOf(CN) + segments.drop(2)).joinToString("."))
+            }
+
+            segments.size > 3 && segments[0] == DB && segments[2] in DB_KINDS -> {
+                listOf(ref, (segments.take(2) + segments.drop(3)).joinToString("."))
+            }
+
+            else -> {
+                listOf(ref)
+            }
+        }
+    }
+
+    /**
+     * The packages the estate declares, longest first so `a.b.` is removed before `a.`: the model's objects', the
+     * `.ttrm` units' own (md and lexicon units reach no `Model`), and the manifest's ([LexiconSources.manifestPackages]).
+     */
+    private fun knownPackages(sources: LexiconSources): List<String> {
+        val model =
+            sources.model
+                ?.objectByQname()
+                ?.keys
+                ?.map { it.`package` }
+                .orEmpty()
+        return (model + sources.ttrm.mapNotNull { it.parsed.packageName } + sources.manifestPackages)
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .sortedWith(compareByDescending<String> { it.length }.thenBy { it })
     }
 
     /**

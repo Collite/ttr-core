@@ -80,6 +80,65 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   `extent:` remains accepted during retirement. JVM consumers must rebuild
   against the extended parser model. Grammar bundle releases use 0.20.x.
 
+### Fixed — package-qualified lexicon targets, and where the Studio's edits land (#325, #326)
+
+- `ttr-lexicon-compile`: a term whose `for:` is spelled the way `@tatrman/edit` writes it, package first
+  (`for: hartland.er.entity.returns_review`), no longer drops with `RG-LEXC-001` while the build exits 0.
+  When a ref does not resolve as written, the compiler removes a package the estate declares (a model
+  object's, a `.ttrm` unit's own `package`, or `modeler.toml`'s `[packages] root` and `[packages."<name>"]`
+  tables) and rewrites the rest to the archive's key: `er.entity.x` and `md.measure.x` unchanged,
+  `db.<schema>.table.<t>` to `db.<schema>.<t>`, `cn.concept.<Name>` to `cn.<Name>`. Every spelling of one
+  target compiles to one row, and a prefix nothing declares still dangles. A `cn.concept.<Name>` ref,
+  qualified or not, now compiles under `cn.<Name>`, the key the cn tier reads. Unqualified, it used to
+  compile under `cn.concept.<Name>`, which no cn consumer reads; no known estate spells it so. Archives whose
+  estates spell every ref the archive's way are byte-identical. A `modeler.toml` that does not parse, or whose
+  `packages` is not a table, no longer stops the build: it warns `RG-LEXC-005` and reads no manifest packages.
+- `@tatrman/edit`: `insert-entity` stacked `on:` an er query, with no `file`, puts the entity in that query's
+  file, not in the package's first er file. A term without `file` goes beside the target's `def term`s in
+  that locale, else into the same path under that locale's folder as the file holding them in another
+  locale, else under the target file's stem (`returns-review.ttrm` → `returns.ttrm`; the model code when the
+  stem is unusable) in the package's own lexicon folder for that locale: the folder of its first lexicon file
+  there, else of its first one in another locale with the locale swapped. A path another package, model or
+  locale holds gives way to the package's first lexicon file there, else to `<model code>.ttrm` in that folder.
+  Inline `insert-entity.terms` take the same rule and see each other's new file and term, so the Studio's
+  two-step path writes the same files as the inline vector. Before, `add-term` without `file` used the locale's
+  first file that had any term for the same model. A raw root URI over encoded file keys no longer refuses a new
+  file, and the new key is encoded like the others. All eight Designer family artifacts advance together to 0.1.2,
+  which carries this `@tatrman/edit`; the internal release is cut after merge.
+
+### Fixed — native obligation-transition read scope (#319)
+
+- Recipe bundles include `er.entity.obligation` in `objectsRead` when a directly wired action has
+  native sink `obligation` and declares a transition. The generated README lists that lookup too.
+  Authors no longer need an artificial obligation JOIN to authorize the runtime's fulfilment read;
+  candidate SQL and selection are unchanged. Actions resolve in the recipe's checked import scope,
+  independently of checkout paths. Visible but unwired actions, inserts without transitions and other
+  executors do not add the read; existing reads stay sorted and unique.
+- Frozen text/1 and text/2 approval algorithms are unchanged. The README's artifact hash covers the
+  derived read list; existing action dependency evidence, when present, already covers native sinks
+  and transitions. This adds no broader metadata approval guarantee to default-free recipes.
+  The additive public `AutomationScope.needsObligationLookup` helper keeps this predicate shared with
+  runtimes; `RecipeActionDependencies.wiredActions` and an additive `RecipeFingerprints.capture` overload
+  let the assembler resolve every wired action once for scope and evidence. Existing JVM entry points remain.
+  No grammar change; the next internal grammar bundle stays on **0.18.x**.
+
+### Changed — provenance attributes stay out of the extraction types (`ttr-concept`, DX PX T2b)
+
+- `SchemaRenderer` leaves an er attribute tagged `"provenance"` (`tags: ["provenance"]`) out of both
+  `Statement[<entity>]` and `Record.<entity>`, as it already does keys. Such an attribute is a column the record ETL
+  writes from the run itself (the annotations a row came from, the consolidation run), so it is queryable on the
+  entity but is neither extracted nor consolidated. Models with no such tag render byte-identically. The tag is
+  declared with no grammar change. `SchemaRenderer.PROVENANCE_TAG` names it.
+
+### Fixed — the conceptual model chapter (CN-P6 S6.4)
+
+- [Conceptual model (cn)](docs/manual/en/20-conceptual-model.md) names the releases that shipped each part (the cn
+  checks in grammar 0.17.2, `ttr-concept` first published in 0.17.6, the er lane in 0.18.10–0.18.12). Its `Channel`
+  examples ground to `er.entity.sales.channel`, as the Hartland demo does. The diagnostics table says when
+  `cn/not-analytically-reachable` fires now that E-R reads what md cannot, and that `cn/retired-code` waits for a
+  code-system importer. The Hartland hygiene summary is 84 concepts.
+- `refusals/retired-code` stays pending on ttr-server#281 (a code-system importer), not on CN-P5 S5.3, which landed.
+
 ### Fixed — declared package resolution (#251)
 
 - TTR-P imports, qualified loads, automation objects and row schemas use loader
@@ -554,7 +613,7 @@ pin bump until rebuilt and committed, even when the recipe logic is unchanged.
   defs through unchecked (the cn semantics, the typed model and `ttr-writer` support are CN-P2). `model cnc` and
   `roles:` are deprecated (they parse unchanged). Tooling: TextMate highlighting and the formatter's cn layout
   (see `packages/grammar/CHANGELOG.md` 0.17). Manual: [Conceptual model (cn)](docs/manual/en/20-conceptual-model.md).
-- **Grammar 0.17.1 — the cn semantics (CN-P2; code only, `TTR.g4` stays 0.17).** What CN-P1 carried through
+- **Grammar 0.17.2 — the cn semantics (CN-P2; code only, `TTR.g4` stays 0.17).** What CN-P1 carried through
   unchecked is now resolved, desugared and checked, the same on TS, Kotlin and Python (conformance `out-ts-sem` 01–106
   zero drift on three targets):
   - **`ttr-semantics`** — `cn` is a model code: a concept keys `<pkg>.cn.concept.<Name>`, an event's participant

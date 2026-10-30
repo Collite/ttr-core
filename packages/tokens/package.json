@@ -1,6 +1,6 @@
 {
   "name": "@tatrman/tokens",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "private": false,
   "type": "module",
   "description": "FO-P1.S6 \u2014 the shared Studio design tokens (PF F): one dependency-free source of the suite's semantic colors, spacing, and radii so the Viewer, the authoring extension, and the launcher cohere (P-2, 'suite coherence is earned').",

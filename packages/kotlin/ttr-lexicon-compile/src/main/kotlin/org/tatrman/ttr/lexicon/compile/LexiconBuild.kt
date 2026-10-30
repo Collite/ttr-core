@@ -11,9 +11,11 @@ import org.tatrman.ttr.metadata.model.Attribute
 import org.tatrman.ttr.metadata.model.Model
 import org.tatrman.ttr.parser.loader.TtrLoader
 import org.tatrman.ttr.semantics.md.MdModel
+import org.tomlj.Toml
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.isDirectory
+import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 import kotlin.io.path.relativeTo
 
@@ -84,6 +86,10 @@ object LexiconBuild {
     const val AREA_DIR: String = "lexicon"
     private const val MODEL_DIR = "model"
     private const val TTRM_SUFFIX = ".ttrm"
+    private const val MANIFEST = "modeler.toml"
+    private const val PACKAGES = "packages"
+    private const val ROOT = "root"
+    private const val LAYOUT = "layout"
     private val MD_MODEL = MdRefs.MD_MODEL_CODE
 
     /**
@@ -150,24 +156,76 @@ object LexiconBuild {
                 units.filter { it.parsed.modelDirective?.modelCode == MD_MODEL }.flatMap { it.parsed.definitions },
             )
 
-        val sources = LexiconSources(area = area, ttrm = units, model = model, repoRoot = repoRoot)
+        val manifest = manifestPackages(repoRoot)
+        val sources =
+            LexiconSources(
+                area = area,
+                ttrm = units,
+                model = model,
+                repoRoot = repoRoot,
+                manifestPackages = manifest.names,
+            )
         // er/db/cnc first, md second, cn third (CN-P4: `cn.<Name>` for every concept) — the key spaces
         // cannot collide (the schema token differs), so this order is precedence in principle only. RV-P3.4.
         val refs = ModelRefIndex.of(model) orElse ModelRefIndex.ofMd(md) orElse ModelRefIndex.ofCn(model)
         val compiled = LexiconCompiler.compile(sources, refs, modelSnapshotId, builtAt)
+        val buildWarnings = authoringWarnings.map { it.asCompileWarning() } + listOfNotNull(manifest.warning)
         val result =
-            if (authoringWarnings.isEmpty()) {
+            if (buildWarnings.isEmpty()) {
                 compiled
             } else {
-                compiled.copy(
-                    warnings =
-                        (compiled.warnings + authoringWarnings.map { it.asCompileWarning() })
-                            .sortedWith(CompileWarning.ORDER),
-                )
+                compiled.copy(warnings = (compiled.warnings + buildWarnings).sortedWith(CompileWarning.ORDER))
             }
         // The PACK reads `compiled`, not `result`: warnings are build output, never artifact
         // content, so folding one in must not be able to move a byte of the archive.
         return LexiconBuildOutcome(result, LexiconPacker.pack(compiled, modelSnapshotId, producedBy), violations)
+    }
+
+    /** The `[packages]` names `modeler.toml` declares, and the warning when it is there but cannot be read. */
+    private class ManifestPackages(
+        val names: List<String>,
+        val warning: CompileWarning? = null,
+    )
+
+    /**
+     * ttr-core#325 — the package names `modeler.toml` declares: `[packages] root`, and the key of every table under
+     * `[packages]` (`[packages."x.y"]`); `root` and `layout` are its two settings, as `@tatrman/semantics` reads them.
+     * No manifest, or one without `[packages]`, declares none. A manifest that does not parse, or whose `packages` is
+     * not a table, declares none either, with an [CompileWarning.MANIFEST_UNREADABLE] naming the file: the build still
+     * succeeds, but a `for:` qualified with a manifest package then drops.
+     */
+    private fun manifestPackages(repoRoot: Path): ManifestPackages {
+        val manifest = repoRoot.resolve(MANIFEST)
+        if (!manifest.isRegularFile()) return ManifestPackages(emptyList())
+
+        fun unreadable(
+            line: Int,
+            why: String,
+        ) = ManifestPackages(
+            emptyList(),
+            CompileWarning(
+                CompileWarning.MANIFEST_UNREADABLE,
+                "$why; its [$PACKAGES] are not read, so a for: qualified with one of them drops",
+                EntryProvenance(MANIFEST, line),
+            ),
+        )
+        val parsed = runCatching { Toml.parse(manifest) }.getOrNull() ?: return unreadable(1, "it cannot be read")
+        val error = parsed.errors().firstOrNull()
+        if (error != null) return unreadable(error.position()?.line() ?: 1, error.message ?: "it does not parse")
+        if (!parsed.contains(listOf(PACKAGES))) return ManifestPackages(emptyList())
+        if (!parsed.isTable(listOf(PACKAGES))) {
+            return unreadable(parsed.inputPositionOf(listOf(PACKAGES))?.line() ?: 1, "`$PACKAGES` is not a table")
+        }
+        val packages = parsed.getTable(listOf(PACKAGES))!!
+        return ManifestPackages(
+            packages.keySet().sorted().mapNotNull { key ->
+                when {
+                    key == ROOT -> packages.get(listOf(ROOT)) as? String
+                    key != LAYOUT && packages.isTable(listOf(key)) -> key
+                    else -> null
+                }
+            },
+        )
     }
 
     /**

@@ -172,7 +172,8 @@ jobs:
 
   designer-family:
     # A bare designer tag creates internal downloadable artifacts. Public npm is opt-in.
-    runs-on: ubuntu-latest
+    # The locked Playwright browser installer supports Ubuntu 24.04, not the latest runner image.
+    runs-on: ubuntu-24.04
     if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/designer/v')
     permissions:
       contents: write

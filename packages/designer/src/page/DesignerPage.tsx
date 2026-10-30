@@ -101,7 +101,7 @@ export function DesignerPage(props: DesignerPageProps) {
     root,
     config: { basePath, lang, languages: ['en', 'cs'], veles: null, layoutFormat: 'yaml' },
     theme, authoringLoader,
-    location: { ...route, absolute: path => window.location.origin + toBrowserPath(path.replace(/^\/w\//, '/'), basePath, []) },
+    location: { ...route, absolute: path => window.location.origin + toBrowserPath(path.replace(/^\/w\//, '/'), basePath, [['lang', lang]]) },
   }), [basePath, lang, theme, authoringLoader, route]);
   useImperativeHandle(props.collect, () => () => controller.current?.workspace === (latest.current.workspace ?? 'repo') ? controller.current.source.collectChangedFiles() : [], []);
   useEffect(() => {
@@ -109,7 +109,7 @@ export function DesignerPage(props: DesignerPageProps) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const host = new PropsHost(() => latest.current);
     let request: { input: DesignerPageProps; sha?: string };
-    const source = new BffFilesDataSource({ api: '/', token: '', scope: { kind: 'served' } }, {
+    const source = new BffFilesDataSource({ api: '/', token: '', scope: { kind: 'served' }, preferredLanguage: latest.current.lang }, {
       createClient: createLspClient,
       loadSnapshot: async () => {
         // The queue captures each input. A newer render cannot retarget an older Save.
@@ -203,6 +203,7 @@ export function DesignerPage(props: DesignerPageProps) {
       if (controller.current?.source === source) controller.current = null;
     };
   }, [workspace, route]);
+  useEffect(() => { controller.current?.source.setPreferredLanguage(lang); }, [lang]);
   const firstInput = useRef(props.files);
   const firstManifest = useRef(props.manifest);
   useEffect(() => {
