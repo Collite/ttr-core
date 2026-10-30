@@ -445,6 +445,40 @@ class ThingsInTimeSpec :
             noted.diagnostics.map { it.message }.single { "shares no key with the row it is read on" in it }
         }
 
+        "N3: a same-row participant pairs a composite key with the held foreign key by name, not by position (R7)" {
+            // the relation lists its join pairs as (b, a); the key is (a, b) — a positional zip crosses them
+            val er =
+                "model er\n" +
+                    "def entity pair { binding: { target: { table: db.dbo.table.pair } }," +
+                    " attributes: [def attribute a { type: text, isKey: true }," +
+                    " def attribute b { type: text, isKey: true }, def attribute at { type: datetime }] }\n" +
+                    "def entity holder { binding: { target: { table: db.dbo.table.holder } }," +
+                    " attributes: [def attribute id { type: text, isKey: true }," +
+                    " def attribute fk_a { type: text }, def attribute fk_b { type: text }] }\n" +
+                    "def relation holder_pair { from: er.entity.holder, to: er.entity.pair," +
+                    " join: [{ from: er.entity.holder.fk_b, to: er.entity.pair.b }," +
+                    " { from: er.entity.holder.fk_a, to: er.entity.pair.a }] }\n"
+            val cn =
+                "model cn\n" +
+                    "def kind Pair { grounds: er.entity.pair }\n" +
+                    "def kind Holder { involves: [Pair] }\n" +
+                    "def event Paired { involves: [Pair], period: { at: at } }\n" +
+                    "def phase WithPaired { of: Holder, definition: \"\"\"exists Paired involving this.pair\"\"\" }\n"
+            val binding =
+                "model binding\n" +
+                    "def cn2er_kind holder_g { kind: cn.Holder, target: er.entity.holder," +
+                    " participants: { pair: [er.relation.holder_pair] } }\n" +
+                    "def cn2er_event paired_g { event: cn.Paired, target: er.entity.pair," +
+                    " period: { at: er.entity.pair.at }, participants: { pair: [] } }\n"
+            val files = mapOf("n3-er.ttrm" to er, "n3.ttrm" to cn, "n3-b.ttrm" to binding)
+            val s = CnConceptService(StatementLowerSpec.world("time", files))
+            val r = s.definitionRender(ref("WithPaired"), Layer.ER, "postgresql", RenderOptions())
+            r.diagnostics.filter { it.severity == Severity.ERROR } shouldBe emptyList()
+            r.text shouldContain "pair.a = holder.fk_a"
+            r.text shouldContain "pair.b = holder.fk_b"
+            r.text shouldNotContain "pair.a = holder.fk_b"
+        }
+
         "canonical bindings and top-down temporal sources render identically" {
             val source =
                 Files
