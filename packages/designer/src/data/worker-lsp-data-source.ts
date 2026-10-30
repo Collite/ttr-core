@@ -42,6 +42,8 @@ import { modeOf } from '@tatrman/parser/layout';
 
 export interface WorkerContext {
   projectRoot: string;
+  /** Presentation override; never changes the project manifest or authored text. */
+  preferredLanguage?: string;
   /** The currently open graph document uri (set as graphs are opened). */
   graphUri?: string;
   files?: ReadonlyMap<string, string>;
@@ -160,6 +162,8 @@ export class WorkerLspDataSource implements ModelDataSource {
     for (const cb of this.modelListeners) cb(String(this.revision));
   }
 
+  setPreferredLanguage(language: string): void { this.ctx.preferredLanguage = language; }
+
   setGraphUri(uri: string): void {
     this.ctx.graphUri = uri;
   }
@@ -183,12 +187,12 @@ export class WorkerLspDataSource implements ModelDataSource {
   async getModelGraph(scope?: GraphScope): Promise<ModelGraphPayload> {
     const uri = this.ctx.graphUri;
     if (!uri) throw new Error('WorkerLspDataSource.getModelGraph: no current graph uri');
-    const mg = await this.lspClient.getModelGraph(uri, (scope?.schema ?? 'db') as RenderableSchemaCode);
+    const mg = await this.lspClient.getModelGraph(uri, (scope?.schema ?? 'db') as RenderableSchemaCode, this.ctx.preferredLanguage);
     return modelGraphToTtrm(mg);
   }
 
   getBindings(): Promise<BindingMapData> {
-    return this.lspClient.getBindings();
+    return this.lspClient.getBindings(this.ctx.preferredLanguage);
   }
 
   getSymbolDetail(qname: string): Promise<SymbolDetail | null> {
@@ -199,7 +203,7 @@ export class WorkerLspDataSource implements ModelDataSource {
    * The whole-schema graph (VL V-21), including each card's effective package from the LSP.
    */
   async getSchemaGraph(schema: RenderableSchemaCode): Promise<GetGraphResponse | null> {
-    const mg = await this.lspClient.getModelGraph(this.ctx.graphUri ?? this.ctx.projectRoot, schema);
+    const mg = await this.lspClient.getModelGraph(this.ctx.graphUri ?? this.ctx.projectRoot, schema, this.ctx.preferredLanguage);
     return {
       schema,
       nodes: mg.nodes.map((n) => ({ ...n, pkg: n.pkg ?? '' })),
@@ -213,7 +217,7 @@ export class WorkerLspDataSource implements ModelDataSource {
   getGraph(ref: string): Promise<GetGraphResponse | null> {
     if (this.capabilities.modelKinds.includes(ref as RenderableSchemaCode)) return this.getSchemaGraph(ref as RenderableSchemaCode);
     // Native rich shape — the Worker path carries the DS LSP graft (slot data, layout, imports).
-    return this.lspClient.getGraph(ref);
+    return this.lspClient.getGraph(ref, this.ctx.preferredLanguage);
   }
 
   async listCatalog(): Promise<CatalogListing> {

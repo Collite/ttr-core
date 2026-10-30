@@ -13,18 +13,22 @@ export async function openFileMap(
   opts?: { under?: string; onManifest?: (manifest: import('@tatrman/lsp').ProjectRootResult['manifest']) => void }
 ): Promise<string[]> {
   const manifest = files.get('modeler.toml');
-  await client.setProjectRoot(root, manifest);
+  await client.setProjectRoot(root, manifest, { deferDiagnostics: true });
   const paths = [...files.keys()].filter(
     (p) => isModelFile(p) && (!opts?.under || p.startsWith(opts.under))
   );
   // The removal guard reads JS roster bytes, but the worker must never parse them as TTR.
   const rosters = [...files.keys()].filter(p => /^model\/tests\/.+\.mjs$/.test(p));
-  await Promise.all(
-    [...paths, ...rosters].map((p) => client.openDocument(uriFor(root, p), files.get(p)!))
-  );
-  // Like loadProjectIntoSymbols' two-pass load: references can resolve only after all symbols exist.
-  // This request is also the notification barrier and republishes final cross-file diagnostics.
-  const result = await client.setProjectRoot(root, manifest);
-  if (result?.manifest) opts?.onManifest?.(result.manifest);
+  try {
+    await Promise.all(
+      [...paths, ...rosters].map((p) => client.openDocument(uriFor(root, p), files.get(p)!))
+    );
+  } finally {
+    // Close the batch even if an open fails: local folder loaders may reuse their client.
+    // References resolve against the complete symbol universe at this notification barrier;
+    // final project diagnostics replace all partial results before catalog reads start.
+    const result = await client.setProjectRoot(root, manifest);
+    if (result?.manifest) opts?.onManifest?.(result.manifest);
+  }
   return paths;
 }

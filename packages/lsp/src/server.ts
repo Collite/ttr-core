@@ -923,6 +923,9 @@ export function createServerConnection(
     invalidateSymbols();
   }
 
+  // File-map hosts bracket didOpen notifications with setProjectRoot requests.
+  // Index each document immediately; publish complete diagnostics once at the closing barrier.
+  let deferDocumentDiagnostics = false;
   documents.onDidOpen(async (event: TextDocumentChangeEvent<TextDocument>) => {
     // TextDocuments fires onDidChangeContent immediately after onDidOpen, even for a new file.
     // The worker already has its manifest: let that handler index/lint once. A desktop host's
@@ -959,7 +962,7 @@ export function createServerConnection(
     editDocs.delete(uri);
     pendingTexts.delete(uri);
     updateSymbolTable(uri, event.document.getText());
-    publishDiagnostics(uri, event.document.getText());
+    if (!deferDocumentDiagnostics) publishDiagnostics(uri, event.document.getText());
   });
 
   documents.onDidClose((event: TextDocumentChangeEvent<TextDocument>) => {
@@ -1225,7 +1228,8 @@ export function createServerConnection(
   // root; without it, nested files mis-infer their package and emit spurious
   // ttr/package-declaration-mismatch errors. Re-validates already-open docs so
   // it is order-independent with respect to didOpen.
-  connection.onRequest('modeler/setProjectRoot', async (params: { projectRoot: string; manifest?: string }) => {
+  connection.onRequest('modeler/setProjectRoot', async (params: { projectRoot: string; manifest?: string; deferDiagnostics?: boolean }) => {
+    deferDocumentDiagnostics = params.deferDiagnostics === true;
     authoringRootUri = params.projectRoot.startsWith('file://') ? params.projectRoot.replace(/\/$/, '') : undefined;
     const root = params.projectRoot.startsWith('file://')
       ? new URL(params.projectRoot).pathname
@@ -1270,7 +1274,7 @@ export function createServerConnection(
       updateSymbolTable(doc.uri, doc.getText());
     }
     // Re-reads `.ttrlint.toml` under the new root and re-publishes all open docs.
-    await refreshLintConfig();
+    if (!deferDocumentDiagnostics) await refreshLintConfig();
     return { ok: true, projectRoot: root, manifest };
   });
 
@@ -1287,7 +1291,7 @@ export function createServerConnection(
     return { subjects };
   });
 
-  connection.onRequest('modeler/getModelGraph', (params: { textDocument: { uri: string }; schema: RenderableSchemaCode }) => {
+  connection.onRequest('modeler/getModelGraph', (params: { textDocument: { uri: string }; schema: RenderableSchemaCode; preferredLanguage?: string }) => {
     if (params.schema !== 'db' && params.schema !== 'er' && params.schema !== 'md' && params.schema !== 'cnc') {
       return { schemaCode: params.schema, nodes: [], edges: [] };
     }
@@ -1301,7 +1305,7 @@ export function createServerConnection(
       if (result.ast) { asts.push(result.ast); packages.set(result.ast, effPkg(doc.uri, result.ast)); }
     }
 
-    return buildProjectModelGraph(asts, params.schema, manifest.preferredLanguage, (ast) => packages.get(ast) ?? '');
+    return buildProjectModelGraph(asts, params.schema, params.preferredLanguage || manifest.preferredLanguage, (ast) => packages.get(ast) ?? '');
   });
 
   connection.onRequest('modeler/listGraphs', (_params: { projectRoot: string }) => {
@@ -1331,10 +1335,10 @@ export function createServerConnection(
     return { graphs: listGraphs(docMap, qnameToDef) };
   });
 
-  connection.onRequest('modeler/getGraph', (_params: { uri: string }) => {
+  connection.onRequest('modeler/getGraph', (_params: { uri: string; preferredLanguage?: string }) => {
     const docMap = new Map<string, string>();
     for (const doc of cachedDocuments()) docMap.set(doc.uri, doc.getText());
-    return getGraph(_params.uri, docMap, manifest.preferredLanguage);
+    return getGraph(_params.uri, docMap, _params.preferredLanguage || manifest.preferredLanguage);
   });
 
   connection.onRequest('modeler/getPackageGraph', () => {
@@ -1344,10 +1348,10 @@ export function createServerConnection(
 
   // DS-P4.S1 — the er↔db binding map (C-2), canonicalized to match er/db graph qnames. Feeds
   // the binding perspective and the er-canvas show-bindings decoration.
-  connection.onRequest('modeler/getBindings', () => {
+  connection.onRequest('modeler/getBindings', (params: { preferredLanguage?: string } = {}) => {
     const docMap = new Map<string, string>();
     for (const doc of cachedDocuments()) docMap.set(doc.uri, doc.getText());
-    return buildBindingMap(docMap);
+    return buildBindingMap(docMap, params.preferredLanguage || manifest.preferredLanguage);
   });
 
   connection.onRequest('modeler/getLayout', async (_params: { graphUri?: string; projectRoot?: string }): Promise<LayoutFile> => {

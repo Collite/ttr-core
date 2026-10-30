@@ -46,7 +46,8 @@ describe('BFF snapshots in a worker', () => {
         cache: 'no-store',
       })
     );
-    expect(clients[0].setProjectRoot).toHaveBeenCalledWith('file:///repo', manifest);
+    expect(clients[0].setProjectRoot).toHaveBeenNthCalledWith(1, 'file:///repo', manifest, { deferDiagnostics: true });
+    expect(clients[0].setProjectRoot).toHaveBeenNthCalledWith(2, 'file:///repo', manifest);
     expect(clients[0].openDocument).toHaveBeenCalledExactlyOnceWith(
       'file:///repo/model/er/item.ttrm',
       'model er'
