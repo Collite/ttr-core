@@ -304,6 +304,8 @@ def _head_of(path: str, parts: tuple[str, ...], source: SourceLocation) -> tuple
     head = parts[:-1]
     head_path = ".".join(head)
     tight = source.offset_end - source.offset_start == len(path) and source.line == source.end_line
+    # `column + length` is the start-plus-length form the SourceLocation rule (tatrman CLAUDE.md) forbids for a
+    # multi-token span; it is exact only under `tight` - the span is the path's own text, on one line, no trivia
     span = (
         replace(source, end_column=source.column + len(head_path), offset_end=source.offset_start + len(head_path))
         if tight

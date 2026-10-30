@@ -86,7 +86,7 @@ internal class Explainer(
         val labels = ExplainLabels(model, words)
         val asOf =
             (if (s.hasAsOf()) FrameTime.evaluationDay(s.asOf) else null) ?: LocalDate.now(clock)
-        val prose = DefinitionProse(model, words, labels, asOf).takeIf { definitions }
+        val prose = if (definitions) DefinitionProse(model, words, labels, asOf) else null
         val say = StatementSentence(words, labels, prose)
         val items = mutableListOf<String>()
         s.measuresList.forEach { items += labels.ref(it) }

@@ -308,6 +308,8 @@ private fun headOf(
     val head = parts.dropLast(1)
     val headPath = head.joinToString(".")
     val tight = source.offsetEnd - source.offsetStart == path.length && source.line == source.endLine
+    // `column + length` is the start-plus-length form the SourceLocation rule (tatrman CLAUDE.md) forbids for a
+    // multi-token span; it is exact only under `tight` — the span is the path's own text, on one line, no trivia
     val span =
         if (tight) {
             source.copy(endColumn = source.column + headPath.length, offsetEnd = source.offsetStart + headPath.length)

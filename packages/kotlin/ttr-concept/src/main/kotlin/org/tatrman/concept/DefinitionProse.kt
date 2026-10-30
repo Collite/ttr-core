@@ -39,9 +39,10 @@ internal class DefinitionProse(
 ) {
     private class Unsaid : RuntimeException(null, null, false, false)
 
-    /** One resolver for every DC-13 read (as `ErRenderer` / `MdRenderer` hold theirs). */
-    private val resolver =
+    /** One resolver for every DC-13 read (as `ErRenderer` / `MdRenderer` hold theirs) — built on the first one. */
+    private val resolver by lazy {
         DefinitionResolver(model.cn, model.model.schemas["er"] as? org.tatrman.ttr.metadata.model.ErSchema, emptySet())
+    }
 
     /** Inside an `exists` / aggregate body: a receiver that is not `this.` would read its implicit row, not the bearer. */
     private var nested = 0

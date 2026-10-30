@@ -11,7 +11,7 @@ GOLDENS = (Path(__file__).resolve().parents[4] / "packages/kotlin/ttr-concept/sr
 
 
 def test_bounded_episodes_close_at_the_first_termination_at_or_after_the_start() -> None:
-    # Active at t iff some start s <= t has no termination f with s <= f <= t (A-CN-106, review-175 ⚑A: a
+    # Active at t iff some start s <= t has no termination f with s <= f <= t (A-CN-114, review-175 ⚑A: a
     # termination at the start's own instant closes it — [t, t) is empty):
     #   A  starts 1, 4; ends 3, 8   -> 2 yes (1, nothing in [1,2]); 3 no (3 in [1,3]); 4, 6 yes (4); 8 no (8 in [4,8])
     #   B  starts 2;    ends 1, 2, 6 -> never: the end at 2 closes the start at 2 (the end at 1 precedes it)

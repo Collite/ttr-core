@@ -1359,6 +1359,8 @@ internal class ErRenderer(
             e: FunctionCall,
             scope: Scope,
         ): V? {
+            // the catalogue's own calls (`op.*`, `fn.*`, `agg.*`) are never a receiver path — no walk (review-175 R9)
+            if (CATALOG_PREFIXES.any { e.function.value.startsWith(it) }) return null
             val parts = e.function.value.split('.')
             if (parts.first() == "this" && scope.self == null) {
                 if (scope.outward().any { it.sealed }) throw Correlated()
@@ -1894,7 +1896,7 @@ internal class ErRenderer(
         }
 
         /**
-         * CN-P8 (A-CN-106, ⚑A): the subject is in [phase] at `:as_of` when one of its start occurrences is at or before
+         * CN-P8 (A-CN-114, ⚑A): the subject is in [phase] at `:as_of` when one of its start occurrences is at or before
          * it and no termination of the subject falls in `[start, :as_of]` — a termination at the start's own instant
          * closes the episode (`[t, t)` is empty), and so does one at the instant a new start reopens it.
          * `EXISTS (SELECT 1 FROM <starts> s WHERE s.subject = <key> AND s.at <= :as_of AND NOT EXISTS (SELECT 1 FROM

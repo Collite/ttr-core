@@ -170,6 +170,8 @@ function headRef(ref: Reference): Reference {
   const path = parts.join('.');
   const s = ref.source;
   const tight = s.offsetEnd - s.offsetStart === ref.path.length && s.line === s.endLine;
+  // `column + length` is the start-plus-length form the SourceLocation rule (CLAUDE.md) forbids for a multi-token
+  // span; it is exact only under `tight` — the span is the path's own text, on one line, no trivia
   const source = tight ? { ...s, endColumn: s.column + path.length, offsetEnd: s.offsetStart + path.length } : s;
   return { path, parts, source };
 }

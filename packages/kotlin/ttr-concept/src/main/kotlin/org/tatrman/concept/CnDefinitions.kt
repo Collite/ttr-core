@@ -335,11 +335,6 @@ internal class DefinitionResolver(
         val def: Concept?,
     )
 
-    internal fun qualityOn(
-        s: Concept,
-        name: String,
-    ): Concept? = chain(s).firstNotNullOfOrNull { qualityOwnOn(it, name) }
-
     /** The quality [name] stated `of:` [c] itself — no chain walk. */
     internal fun qualityOwnOn(
         c: Concept,
@@ -640,10 +635,11 @@ internal class DefinitionResolver(
             // DC-13: a `this.` receiver walks from the bearer; a bare one from the innermost implicit subject with the
             // projection, else the bearer (as the er renderer reads it)
             val roots =
-                if (id.substringBefore('.') == "this" && '.' in id) {
-                    listOfNotNull(bearer)
-                } else {
-                    (scope.outward().mapNotNull { it.implicit } + listOfNotNull(bearer)).distinct().toList()
+                when {
+                    // the catalogue's own calls are never a receiver path — no walk (review-175 R9)
+                    id.startsWith("fn.") || id.startsWith("agg.") -> emptyList()
+                    id.substringBefore('.') == "this" && '.' in id -> listOfNotNull(bearer)
+                    else -> (scope.outward().mapNotNull { it.implicit } + listOfNotNull(bearer)).distinct().toList()
                 }
             for (subject in roots) {
                 val receiver = projectionReceiver(e, subject, this@DefinitionResolver) ?: continue

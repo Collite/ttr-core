@@ -57,6 +57,17 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - **A quality's dotted `from:`** and a binding's `via:` head are references (head span only), so rename,
   find-references and `ttr/unresolved-reference` reach them; a phase's dotted `from:` resolves. Conformance dump 115
   gains an honest `ttr/unresolved-reference`.
+- **A subkind claim** with a `members:` block reads it as a definition (a settable one is a discriminator); a subkind
+  with no block is assertable only on its own stacked entity's row, else `cn/not-assertable` (review-175 R1).
+- **A dotted call ending in a built-in** (`this.within(…)`, `x.age(…)`) is a projection read: it refuses as one
+  instead of rendering the built-in (R2).
+- **An episode table** whose bearer involves its own type (`Warehouse as parent`) names its subject by the phase's own
+  participant again (R3, a regression of the F5 fix).
+- **A value-kind participant** reads the quality its label names up the chain before a single one nearer (R6); the
+  same-row and stacked-entity key equalities pair keys by attribute name, and a differently named key refuses (R7).
+
+### Changed — test infrastructure
+
 - The browser LSP Worker bundle ceiling is 720 KB gz (696,864 B at grammar 0.20; 680 KB before).
 
 ### Added — conceptual-model grammar 0.20 (CN-P8 S8.1)

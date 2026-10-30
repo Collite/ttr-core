@@ -336,7 +336,7 @@ internal class AssertionValidator(
             return null
         }
         val g =
-            event.grounding?.takeIf { it.layer == GroundingLayer.ER } ?: paths.grounding(event) { true } ?: run {
+            paths.grounding(event) { true } ?: run {
                 f.error(
                     FrameSlugs.PARTICIPANT_PATH_BROKEN,
                     subject,
