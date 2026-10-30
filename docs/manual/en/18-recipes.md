@@ -117,6 +117,15 @@ island loads it. An insert-only obligation action adds no such lookup. Do not ad
 to authorize fulfilment: that can change which candidates are selected. The declared read authorizes scope;
 the runtime still checks its pinned model, storage route and read guards.
 
+Direct action argument expressions, wiring `when:` conditions and directly wired actions' `writer_defaults`
+expressions also declare the model calendar in `objectsRead` and the README when they use `working_days`,
+`age`, or a bound date minus a row column (`:as_of - placed`). The calendar is the single entity with an
+attribute carrying `semantics { role: event_date }`; a missing or ambiguous calendar is TTRP-FN-002 at the
+wiring. String literals and ordinary numeric subtraction add no read. This adds no island, JOIN or candidate
+filter and leaves the recipe's existing fingerprint algorithms unchanged. Defaults are inspected even when
+an explicit argument overrides them. Nested action callees and their defaults are outside this direct-action
+contract. The runtime still resolves and guards the auxiliary read in the pinned world.
+
 ## Expressions in recipes
 
 - `:name` binds a parameter (`:tolerance`) or a value of the run (`:as_of`), in canonical bodies and in SQL alike —

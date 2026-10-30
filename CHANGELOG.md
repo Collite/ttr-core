@@ -6,6 +6,16 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — calendar read scope for recipe action values
+
+- Direct action arguments, wiring conditions and directly wired writer-default expressions using `working_days`,
+  `age` or a bound date minus a row column now declare the model calendar in `objectsRead` and the hashed README.
+  No artificial candidate JOIN is needed. Missing/ambiguous calendars and malformed default expressions report
+  located TTRP-FN-002 diagnostics. Candidate SQL and frozen text/1, text/2, values and labels algorithms are unchanged.
+- JVM consumers of `RecipeModel` must rebuild: its constructor/copy shape gains checked action reads. This is a
+  library fix with no grammar marker change; bundle release major/minor must match the grammar being published.
+
+
 ### Changed — BREAKING: `assertion.v1` field 1 is `concept` (translator 0.13.0)
 
 - `org.tatrman.assertion.v1.Assertion` field 1 is renamed `event` → `concept` (number and type kept). The **binary

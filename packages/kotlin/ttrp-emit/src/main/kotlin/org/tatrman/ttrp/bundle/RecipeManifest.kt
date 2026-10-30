@@ -37,7 +37,9 @@ data class RecipeManifest(
     /**
      * The model objects the recipe reads (D-94's out-of-scope-read check): every statement's load
      * (an entity as `er.entity.<name>`, a table by its qname), plus `er.entity.obligation` when a
-     * directly wired action [org.tatrman.ttrp.resolve.AutomationScope.needsObligationLookup].
+     * directly wired action [org.tatrman.ttrp.resolve.AutomationScope.needsObligationLookup], plus the model
+     * calendar for time counts in direct action arguments, wiring conditions or writer-default expressions.
+     * These implicit reads add no island JOIN and remain subject to runtime model/storage/read guards.
      */
     val objectsRead: List<String>,
     val fingerprints: RecipeFingerprints,
