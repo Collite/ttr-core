@@ -360,6 +360,8 @@ internal class AssertionValidator(
      * partition lint reads) whose name is an attribute of the claimed row — a quality of the chain grounded there, a
      * value-kind participant's column, or the row's attribute of that name. Any other definition (`exists …`, another
      * comparison, a conjunction) cannot be set by writing the row: `cn/not-assertable`, naming the bearer to claim.
+     * A `members:` block is read as the renderer reads it, a definition (review-175 ⚑R1). A subkind with neither block
+     * is one by its own stacked entity (A-CN-111): the row satisfies it only when it is that entity's row.
      */
     private fun discriminators(
         claimed: Concept,
@@ -368,16 +370,27 @@ internal class AssertionValidator(
     ): List<Discriminator> {
         val out = mutableListOf<Discriminator>()
         for (s in lattice.chain(claimed).takeWhile { it.stereotype == "subkind" }) {
-            if (s.definition == null) continue
-            val eq =
+            val bearer = s.of?.let { "`cn.${it.name}`" } ?: "its bearer"
+            val block =
                 model.definitions
                     .of(s.qname)
-                    .firstOrNull { it.kind == BlockKind.DEFINITION }
-                    ?.expression
-                    ?.let(::settable)
+                    .firstOrNull { it.kind == BlockKind.DEFINITION || it.kind == BlockKind.MEMBERS }
+            if (block == null) {
+                val own = s.grounding?.takeIf { it.layer == GroundingLayer.ER }?.let { entityOf(s) }
+                if (own == entity) continue
+                val why =
+                    own?.let { "its entity `${it.qname.name}` is not the claimed row's `${entity.qname.name}`" }
+                        ?: "no entity of its own"
+                f.error(
+                    FrameSlugs.NOT_ASSERTABLE,
+                    "concept",
+                    "`${s.ref}` has no definition and $why; claim $bearer",
+                )
+                continue
+            }
+            val eq = block.expression?.let(::settable)
             val attribute = eq?.let { (name, _) -> rowAttribute(claimed, name, entity) }
             if (eq == null || attribute == null) {
-                val bearer = s.of?.let { "`cn.${it.name}`" } ?: "its bearer"
                 f.error(
                     FrameSlugs.NOT_ASSERTABLE,
                     "concept",

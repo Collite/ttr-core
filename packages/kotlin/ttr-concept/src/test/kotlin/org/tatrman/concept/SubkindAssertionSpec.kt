@@ -182,6 +182,69 @@ class SubkindAssertionSpec :
             }
         }
 
+        test("R1: a settable `members:` block is a discriminator; another value mismatches") {
+            val json =
+                frame(
+                    concept("cn.MemberStart"),
+                    known("id", "e4"),
+                    parts(part("ticket", "T4")),
+                    at("2026-03-14T09:30", "MINUTE"),
+                )
+            validate(starts, json).shouldBeEmpty()
+            lower(starts, json).rows.single().values shouldBe
+                linkedMapOf("id" to "e4", "subject" to "T4", "occurred" to "2026-03-14T09:30", "start_id" to "S9")
+            val other =
+                frame(
+                    concept("cn.MemberStart"),
+                    known("id", "e4"),
+                    parts(part("ticket", "T4")),
+                    at("2026-03-14T09:30", "MINUTE"),
+                    quals("start_id" to "S1"),
+                )
+            shown(lower(starts, other).diagnostics) shouldBe listOf("cn/slot-mismatch qualities[0].value")
+        }
+
+        test("R1: a block-less subkind with no entity of its own refuses as not-assertable") {
+            val json =
+                frame(
+                    concept("cn.BareStart"),
+                    known("id", "e5"),
+                    parts(part("ticket", "T5")),
+                    at("2026-03-14T09:30", "MINUTE"),
+                )
+            val r = lower(starts, json)
+            r.rows.shouldBeEmpty()
+            shown(r.diagnostics) shouldBe listOf("cn/not-assertable concept")
+            r.diagnostics.single().message shouldBe
+                "`cn.BareStart` has no definition and no entity of its own; claim `cn.Started`"
+            shown(validate(starts, json)) shouldBe listOf("cn/not-assertable concept")
+        }
+
+        test("R1: a block-less subkind on its own stacked entity lowers onto that entity") {
+            val json =
+                frame(
+                    concept("cn.EscalatedStart"),
+                    known("id", "e6"),
+                    parts(part("ticket", "T6")),
+                    at("2026-03-14T09:30", "MINUTE"),
+                )
+            validate(starts, json).shouldBeEmpty()
+            val r = lower(starts, json)
+            r.diagnostics.shouldBeEmpty()
+            r.rows.single().entity shouldBe "escalated"
+            r.rows.single().values shouldBe
+                linkedMapOf("id" to "e6", "subject" to "T6", "occurred" to "2026-03-14T09:30")
+            // Hartland's Invoice is block-less too and lands on its own entity (a `cn2er_kind`): no obligation
+            val invoice =
+                frame(
+                    concept("cn.Invoice"),
+                    known("invoice_id", "3"),
+                    parts(part("customer", "5"), part("order", "17")),
+                    "\"period\": { \"start\": { \"value\": \"2026-03-14\", \"granularity\": \"DAY\" } }",
+                )
+            shown(lower(hartland, invoice).diagnostics).filter { "not-assertable" in it }.shouldBeEmpty()
+        }
+
         test("F7: Hartland's WebSale lowers a Sale row with its channel discriminator; a store channel mismatches") {
             val json =
                 frame(
@@ -227,7 +290,10 @@ class SubkindAssertionSpec :
         }
     }) {
     companion object {
-        /** The time world's tickets with an invented start stream: two settable subkinds, two that are not. */
+        /**
+         * The time world's tickets with an invented start stream: two settable subkinds, two that are not; a `members:`
+         * discriminator, a block-less subkind, and one on its own stacked entity (review-175 R1).
+         */
         val STARTS =
             mapOf(
                 "er.ttrm" to
@@ -238,6 +304,8 @@ class SubkindAssertionSpec :
                     def entity finished { attributes: [def attribute id { type: text, isKey: true }, def attribute subject { type: text }, def attribute occurred { type: datetime }] }
                     def relation started_ticket { from: er.entity.started, to: er.entity.ticket, join: [{ from: er.entity.started.subject, to: er.entity.ticket.id }] }
                     def relation finished_ticket { from: er.entity.finished, to: er.entity.ticket, join: [{ from: er.entity.finished.subject, to: er.entity.ticket.id }] }
+                    def entity escalated { attributes: [def attribute id { type: text, isKey: true }, def attribute subject { type: text }, def attribute occurred { type: datetime }] }
+                    def relation escalated_ticket { from: er.entity.escalated, to: er.entity.ticket, join: [{ from: er.entity.escalated.subject, to: er.entity.ticket.id }] }
                     """.trimIndent(),
                 "cn.ttrm" to
                     """
@@ -249,12 +317,16 @@ class SubkindAssertionSpec :
                     def subkind FirstWebStart { of: FirstStart, definition: ""${'"'}this.channel = 'web'""${'"'} }
                     def subkind RestartedStart { of: Started, definition: ""${'"'}exists Finished involving this.ticket""${'"'} }
                     def subkind PairedStart { of: Started, definition: ""${'"'}start_id = 'S1' and channel = 'web'""${'"'} }
+                    def subkind MemberStart { of: Started, members: ""${'"'}start_id = 'S9'""${'"'} }
+                    def subkind BareStart { of: Started }
+                    def subkind EscalatedStart { of: Started }
                     """.trimIndent(),
                 "bindings.ttrm" to
                     """
                     model binding
                     def cn2er_event started { event: cn.Started, target: er.entity.started, period: { at: er.entity.started.occurred }, participants: { ticket: [er.relation.started_ticket] } }
                     def cn2er_event finished { event: cn.Finished, target: er.entity.finished, period: { at: er.entity.finished.occurred }, participants: { ticket: [er.relation.finished_ticket] } }
+                    def cn2er_phase escalated { phase: cn.EscalatedStart, target: er.entity.escalated, period: { at: er.entity.escalated.occurred }, participants: { ticket: [er.relation.escalated_ticket] } }
                     """.trimIndent(),
             )
     }
