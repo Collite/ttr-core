@@ -18,3 +18,8 @@ def kind InvalidLifetime { period: { at: created } }
 def quality flat_price { of: Item, valued_state: true, from: ListPrice.amount }
 // review-175 F15: a subkind specializes a rigid bearer; a phase is not one.
 def subkind OpenWeb { of: OpenTicket, definition: """code = 'web'""" }
+// review-175 R4 (⚑R4): coverage is counted by participant — two an Item can be is ambiguous, with or without `per: Item`.
+def kind Twin { grounds: er.entity.price, involves: [Item as left, Item as right], qualities: [gap] }
+def quality gap { of: Twin, grounds: er.entity.price.amount }
+def quality twin_gap { of: Item, valued_state: true, from: Twin.gap }
+def quality twin_gap_per { of: Item, valued_state: true, per: Item, from: Twin.gap }

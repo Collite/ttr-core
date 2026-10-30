@@ -131,6 +131,9 @@ private fun StatedProperty?.isTrue(): Boolean =
 
 private fun shortName(qname: String): String = qname.substringAfterLast('.')
 
+/** How many, in a message: `two`, else the digits. */
+private fun count(n: Int): String = if (n == 2) "two" else n.toString()
+
 /** The message for a `concept { }` on a cubelet's inline measure (review-119 M-11; TS `inlineMeasureSugar`). */
 internal fun inlineMeasureSugar(
     measure: String,
@@ -1151,31 +1154,47 @@ private class CnValidator(
                         "quality '${c.name}' needs a valued-state projection of a relator quality involving its bearer and per participant",
                     )
                 } else {
-                    // ⚑C (review-175 F6): one row per bearer — every other participant of the relator is the `per:` one.
+                    // ⚑C (review-175 F6, ⚑R4): one row per bearer — exactly one participant of the relator stands for
+                    // the bearer, exactly one for `per:`, and every other one is uncovered. Counted by participant
+                    // (label), not by concept: `[Item as left, Item as right]` is ambiguous for an `Item` bearer.
                     fun covers(
                         got: CnConcept,
                         by: CnConcept?,
                     ) = by != null && (by.key in chain(got) || got.key in chain(by))
-                    val uncovered =
+                    val participants =
                         chain(source).flatMap { key ->
                             val s = prop(concepts.getValue(key), "involves") ?: return@flatMap emptyList()
                             val p = s.property as? ConceptProperty.Involves ?: return@flatMap emptyList()
                             p.participants.mapNotNull { pt ->
-                                concept(pt.ref, s.doc)
-                                    ?.qname
-                                    ?.let { concepts[it] }
-                                    ?.takeIf { got ->
-                                        !covers(got, bearer) && !covers(got, per)
-                                    }?.name
+                                concept(pt.ref, s.doc)?.qname?.let { concepts[it] }?.let { got ->
+                                    (pt.label ?: pt.ref.parts.last().lowercase()) to got
+                                }
                             }
                         }
-                    if (uncovered.isNotEmpty()) {
+                    val ambiguous =
+                        listOfNotNull(bearer, per).firstNotNullOfOrNull { by ->
+                            participants
+                                .filter { covers(it.second, by) }
+                                .takeIf { it.size > 1 }
+                                ?.let { by to it.map { (label, _) -> label } }
+                        }
+                    val uncovered = participants.firstOrNull { !covers(it.second, bearer) && !covers(it.second, per) }
+                    if (ambiguous != null) {
+                        val (by, labels) = ambiguous
                         emit(
                             c,
                             DiagnosticCode.CnProjectionSource,
-                            "quality '${c.name}' projects '${source.name}', whose participant " +
-                                "'${uncovered.first()}' is neither its bearer nor its per: — one '${bearer.name}' " +
-                                "reads several rows; add 'per: ${uncovered.first()}'",
+                            "quality '${c.name}' projects '${source.name}', which has ${count(labels.size)} " +
+                                "participants '${by.name}' can be — " + labels.joinToString(", ") { "'$it'" },
+                        )
+                    } else if (uncovered != null) {
+                        val (label, got) = uncovered
+                        emit(
+                            c,
+                            DiagnosticCode.CnProjectionSource,
+                            "quality '${c.name}' projects '${source.name}', whose participant '$label' " +
+                                "('${got.name}') is neither its bearer nor its per: — one '${bearer.name}' reads " +
+                                "several rows; add 'per: ${got.name}'",
                         )
                     }
                 }
