@@ -361,6 +361,25 @@ class ThingsInTimeSpec :
             }
         }
 
+        "R6: a value-kind participant takes the quality its label names up the chain before a single one below it" {
+            val extra =
+                "model cn\n" +
+                    "def kind Quote { involves: [Item, Channel], qualities: [channel] }\n" +
+                    "def quality channel { of: Quote, value_space: Channel }\n" +
+                    "def subkind WebQuote { of: Quote, qualities: [promo_channel] }\n" +
+                    "def quality promo_channel { of: WebQuote, value_space: Channel }\n"
+            val binding =
+                "model binding\n" +
+                    "def cn2er_kind quote_g { kind: cn.Quote, target: er.entity.price," +
+                    " participants: { item: [er.relation.price_item] } }\n" +
+                    "def cn2er_quality channel_g { quality: cn.channel, target: er.entity.price.channel }\n" +
+                    "def cn2er_quality promo_g { quality: cn.promo_channel, target: er.entity.price.id }\n"
+            val model =
+                StatementLowerSpec.world("time", mapOf("review175-r6.ttrm" to extra, "review175-r6-b.ttrm" to binding))
+            val webQuote = model.cn.byName("WebQuote")!!
+            ParticipantPaths(model).of(webQuote, "channel") shouldBe ParticipantPaths.Column("price", "channel")
+        }
+
         "F12: a stacked-entity subkind is a subset test; a binding-only period phase is an episode table" {
             val extra =
                 "model er\n" +

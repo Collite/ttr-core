@@ -81,25 +81,27 @@ internal class ParticipantPaths(
     }
 
     /**
-     * The owner's quality valued in [stands] (a value-kind participant read through it, AM-27): the one named [label],
-     * else the only one, at the nearest level of the chain that has any. Several with no label match read no column —
-     * `cn/participant-path-broken`, never the first of them.
+     * The owner's quality valued in [stands] (a value-kind participant read through it, AM-27): the one named [label]
+     * anywhere up the chain (the nearest wins), else the only one at the nearest level of the chain that has any
+     * (review-175 R6 — a label-named quality one level up beats an unrelated single one below it). Several with no
+     * label match read no column — `cn/participant-path-broken`, never the first of them.
      */
     private fun valued(
         owner: Concept,
         label: String,
         stands: Concept,
     ): Valued {
-        for (c in lattice.chain(owner)) {
-            val candidates =
+        val levels =
+            lattice.chain(owner).map { c ->
                 cn.concepts.values.filter {
                     it.stereotype == "quality" && it.of == c.qname && it.valueSpace == stands.qname
                 }
-            if (candidates.isEmpty()) continue
-            val pick = candidates.firstOrNull { it.qname.name == label } ?: candidates.singleOrNull()
-            return pick?.let(Valued::One) ?: Valued.Ambiguous
+            }
+        levels.firstNotNullOfOrNull { level -> level.firstOrNull { it.qname.name == label } }?.let {
+            return Valued.One(it)
         }
-        return Valued.None
+        val nearest = levels.firstOrNull { it.isNotEmpty() } ?: return Valued.None
+        return nearest.singleOrNull()?.let(Valued::One) ?: Valued.Ambiguous
     }
 
     companion object {
