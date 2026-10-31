@@ -1,0 +1,1587 @@
+[
+  {
+    "group": "document envelope",
+    "name": "empty",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21"
+    }
+  },
+  {
+    "group": "document envelope",
+    "name": "headers",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "package": "demo.sales",
+      "imports": [
+        "demo.common.*"
+      ],
+      "model": "er",
+      "schema": "demo",
+      "locale": "cs"
+    }
+  },
+  {
+    "group": "document envelope",
+    "name": "graph",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "graph": {
+        "id": "sales",
+        "properties": {
+          "model": "er",
+          "objects": [
+            "er.entity.Item"
+          ],
+          "layout": {
+            "skin": "plain"
+          }
+        }
+      }
+    }
+  },
+  {
+    "group": "document envelope",
+    "name": "security blocks",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "security": [
+        [
+          {
+            "verb": "own",
+            "object": "er.entity.Item",
+            "owner": "sales"
+          },
+          {
+            "verb": "classify",
+            "object": "er.entity.Item",
+            "classification": "internal"
+          }
+        ],
+        [
+          {
+            "verb": "grant",
+            "privilege": "read",
+            "object": "er.entity.Item",
+            "to": "sales"
+          },
+          {
+            "verb": "mask",
+            "object": "er.entity.Item.email"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "group": "document envelope",
+    "name": "numeric version",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": 0.21
+    }
+  },
+  {
+    "group": "document envelope",
+    "name": "wrong version",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.20"
+    }
+  },
+  {
+    "group": "document envelope",
+    "name": "unknown header",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "models": []
+    }
+  },
+  {
+    "group": "document envelope",
+    "name": "schema without model",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "schema": "demo"
+    }
+  },
+  {
+    "group": "document envelope",
+    "name": "locale without model",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "locale": "cs"
+    }
+  },
+  {
+    "group": "document envelope",
+    "name": "both model and graph",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "model": "er",
+      "graph": {
+        "id": "g",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "group": "document envelope",
+    "name": "unknown model",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "model": "invented"
+    }
+  },
+  {
+    "group": "document envelope",
+    "name": "unknown security verb",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "security": [
+        [
+          {
+            "verb": "deny",
+            "object": "x"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "group": "document envelope",
+    "name": "grant missing target",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "security": [
+        [
+          {
+            "verb": "grant",
+            "privilege": "read",
+            "object": "x"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "group": "document envelope",
+    "name": "grant extra field",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "security": [
+        [
+          {
+            "verb": "mask",
+            "object": "x",
+            "predicate": "a=1"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "nested attributes",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "entity",
+          "id": "Item",
+          "properties": {
+            "displayLabel": {
+              "en": "Item"
+            },
+            "attributes": [
+              {
+                "id": "code",
+                "properties": {
+                  "type": {
+                    "type": "text",
+                    "length": 80
+                  },
+                  "isKey": true
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "query carriers",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "model": "er",
+      "defs": [
+        {
+          "kind": "query",
+          "id": "Item",
+          "properties": {
+            "skipSecurity": false,
+            "parameters": [
+              {
+                "name": "p",
+                "type": "text",
+                "defaultValue": "",
+                "binds": [
+                  "er.entity.Item.code"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "lexical policy",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "model": "lexicon",
+      "locale": "en",
+      "defs": [
+        {
+          "kind": "pattern",
+          "id": "Item",
+          "properties": {
+            "for": "er.entity.Item",
+            "match": "^\\d{4}",
+            "text": "which item",
+            "indexSecurity": "applied"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "exact binding kind",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "model": "binding",
+      "defs": [
+        {
+          "kind": "er2db_entity",
+          "id": "Item",
+          "properties": {
+            "entity": "er.entity.Item",
+            "target": "db.demo.item"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "md measure",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "model": "md",
+      "defs": [
+        {
+          "kind": "measure",
+          "id": "Item",
+          "properties": {
+            "domain": "md.Amount",
+            "aggregation": "sum",
+            "class": "additive"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "md hierarchy",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "model": "md",
+      "defs": [
+        {
+          "kind": "hierarchy",
+          "id": "Item",
+          "properties": {
+            "dimension": "md.Calendar",
+            "levels": [
+              {
+                "attribute": "day"
+              },
+              {
+                "attribute": "month",
+                "via": "md.monthOfDay"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "world nested members",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "model": "world",
+      "defs": [
+        {
+          "kind": "world",
+          "id": "Item",
+          "properties": {
+            "members": [
+              {
+                "kind": "engine",
+                "id": "postgres",
+                "properties": {
+                  "type": "postgresql"
+                }
+              },
+              {
+                "kind": "grant",
+                "properties": [
+                  {
+                    "who": {
+                      "ref": "operator"
+                    }
+                  },
+                  {
+                    "program": {
+                      "star": true
+                    }
+                  }
+                ]
+              },
+              {
+                "kind": "storage",
+                "id": "main",
+                "properties": {
+                  "hosts": [
+                    "demo"
+                  ],
+                  "staging": true,
+                  "schemas": [
+                    {
+                      "id": "row",
+                      "fields": {
+                        "code": "text"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "unknown kind",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "foreign_key",
+          "id": "Item",
+          "properties": {}
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "AST alias kind",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "er2dbEntity",
+          "id": "Item",
+          "properties": {}
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "nested kind at top",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "engine",
+          "id": "Item",
+          "properties": {}
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "unknown typed property",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "entity",
+          "id": "Item",
+          "properties": {
+            "attribtues": []
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "wrong nested property",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "entity",
+          "id": "Item",
+          "properties": {
+            "attributes": [
+              {
+                "id": "x",
+                "properties": {
+                  "skipSecurity": true
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "wrong nested scalar",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "entity",
+          "id": "Item",
+          "properties": {
+            "attributes": [
+              {
+                "id": "x",
+                "properties": {
+                  "isKey": "true"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "wrong policy type",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "query",
+          "id": "Item",
+          "properties": {
+            "skipSecurity": "true"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "wrong default type",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "query",
+          "id": "Item",
+          "properties": {
+            "parameters": [
+              {
+                "name": "p",
+                "defaultValue": 42
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "wrong binds type",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "query",
+          "id": "Item",
+          "properties": {
+            "parameters": [
+              {
+                "name": "p",
+                "binds": [
+                  42
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "unknown parameter key",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "query",
+          "id": "Item",
+          "properties": {
+            "parameters": [
+              {
+                "name": "p",
+                "default": "x"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "plural kind",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "entities",
+          "id": "Item",
+          "properties": {}
+        }
+      ]
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "unknown graph key",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "graph": {
+        "id": "x",
+        "properties": {
+          "entities": []
+        }
+      }
+    }
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "named world grant",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "world",
+          "id": "Item",
+          "properties": {
+            "members": [
+              {
+                "kind": "grant",
+                "id": "g",
+                "properties": []
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "generic ref versus text",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "fk",
+          "id": "Item",
+          "properties": {
+            "from": {
+              "ref": "er.entity.Item.code"
+            },
+            "to": "er.entity.Item.code"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "generic triples and calls",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "fk",
+          "id": "Item",
+          "properties": {
+            "from": {
+              "triple": "multi\nline"
+            },
+            "to": {
+              "call": "lookup",
+              "args": [
+                {
+                  "ref": "Item"
+                },
+                "Item"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "generic reserved object escape",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "fk",
+          "id": "Item",
+          "properties": {
+            "from": {
+              "object": {
+                "ref": "literal data"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "free semantics keys",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "entity",
+          "id": "Item",
+          "properties": {
+            "semantics": {
+              "role": "fact",
+              "custom": {
+                "ref": "Item"
+              },
+              "measures": [
+                {
+                  "attribute": {
+                    "ref": "amount"
+                  },
+                  "aggregation": {
+                    "ref": "sum"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "repeated cn entries",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "model": "cn",
+      "defs": [
+        {
+          "kind": "kind",
+          "id": "Item",
+          "properties": [
+            {
+              "of": {
+                "ref": "Base"
+              }
+            },
+            {
+              "of": {
+                "ref": "Other"
+              }
+            },
+            {
+              "definition": {
+                "block": "x = 1",
+                "form": "string"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "cn mapping shorthand",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "model": "cn",
+      "defs": [
+        {
+          "kind": "kind",
+          "id": "Item",
+          "properties": {
+            "indexSecurity": {
+              "ref": "legacy"
+            },
+            "defaultValue": "literal",
+            "skipSecurity": false,
+            "binds": [
+              {
+                "ref": "x"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "automation values",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "model": "automation",
+      "defs": [
+        {
+          "kind": "action",
+          "id": "Item",
+          "properties": [
+            {
+              "duration": {
+                "amount": 2,
+                "unit": "days"
+              }
+            },
+            {
+              "schedule": {
+                "tag": "cron",
+                "value": "0 * * * *"
+              }
+            },
+            {
+              "on_due": {
+                "call": "hold",
+                "entries": [
+                  {
+                    "order": {
+                      "ref": "order_id"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "program": {
+                "star": true
+              }
+            },
+            {
+              "config": {
+                "object": [
+                  {
+                    "value": 1
+                  },
+                  {
+                    "value": 2
+                  }
+                ]
+              }
+            },
+            {
+              "transition": {
+                "attribute": "order.state",
+                "toColumn": "next",
+                "from": [
+                  "held"
+                ]
+              }
+            },
+            {
+              "set": {
+                "attribute": "order.reason",
+                "column": "reason"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "embedded tagged source",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "query",
+          "id": "Item",
+          "properties": {
+            "sourceText": {
+              "block": "select 1",
+              "tag": "sql-postgres"
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "contextual role cn key",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "model": "cn",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": [
+            {
+              "of": {
+                "ref": "Person"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "cn typed field wrong value",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "model": "cn",
+      "defs": [
+        {
+          "kind": "kind",
+          "id": "Item",
+          "properties": {
+            "grounds": true
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "cn forbidden keyword fallback",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "model": "cn",
+      "defs": [
+        {
+          "kind": "kind",
+          "id": "Item",
+          "properties": {
+            "from": "x",
+            "type": "text"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "cn wrong duplicate occurrence",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "model": "cn",
+      "defs": [
+        {
+          "kind": "kind",
+          "id": "Item",
+          "properties": [
+            {
+              "grounds": "er.entity.Item"
+            },
+            {
+              "grounds": 42
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "typed body sequence",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "entity",
+          "id": "Item",
+          "properties": [
+            {
+              "description": "Item"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "role free key outside cn",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "model": "automation",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "lable": "oops"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "embedded extra field",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "query",
+          "id": "Item",
+          "properties": {
+            "sourceText": {
+              "block": "select 1",
+              "dialect": "sql"
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "embedded tag with incompatible form",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "query",
+          "id": "Item",
+          "properties": {
+            "sourceText": {
+              "block": "select 1",
+              "tag": "sql",
+              "form": "string"
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "bad typed ref",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "entity",
+          "id": "Item",
+          "properties": {
+            "nameAttribute": "not a ref"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "wrong localized scalar",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "entity",
+          "id": "Item",
+          "properties": {
+            "displayLabel": {
+              "en": 42
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "generic function wrong args",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "fk",
+          "id": "Item",
+          "properties": {
+            "from": {
+              "call": "f",
+              "args": "x"
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "lossless and free-form values",
+    "name": "automation bad typed field",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "model": "automation",
+      "defs": [
+        {
+          "kind": "action",
+          "id": "Item",
+          "properties": [
+            {
+              "columns": "wrong"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "all operations",
+    "schema": "profile",
+    "valid": true,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "kinds",
+          "at": "/items",
+          "mapping": {
+            "record": "entity"
+          }
+        },
+        {
+          "op": "package",
+          "mapping": {
+            "sales": "demo.sales"
+          },
+          "default": "demo"
+        },
+        {
+          "op": "rename",
+          "at": "/label",
+          "to": {
+            "kind": "entity",
+            "property": "description"
+          }
+        },
+        {
+          "op": "values",
+          "at": "/is_key",
+          "to": {
+            "kind": "attribute",
+            "property": "isKey"
+          },
+          "mapping": {
+            "yes": true,
+            "no": false
+          }
+        },
+        {
+          "op": "shape",
+          "at": "/item",
+          "to": {
+            "kind": "entity"
+          },
+          "template": {
+            "description": {
+              "input": "/label"
+            }
+          }
+        },
+        {
+          "op": "nest",
+          "at": "/key",
+          "to": {
+            "kind": "entity",
+            "path": [
+              "attributes",
+              "type"
+            ]
+          }
+        },
+        {
+          "op": "unnest",
+          "at": "/name",
+          "to": {
+            "kind": "entity",
+            "property": "aliases"
+          }
+        },
+        {
+          "op": "ignore",
+          "files": [
+            "layouts/**"
+          ],
+          "reason": "authored layout"
+        },
+        {
+          "op": "codes",
+          "mapping": {
+            "E_DEMO": "ys/demo"
+          }
+        },
+        {
+          "op": "link",
+          "at": "/foreign",
+          "to": {
+            "kind": "entity",
+            "property": "nameAttribute"
+          },
+          "by": "sourceName"
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "root declaration",
+    "schema": "profile",
+    "valid": true,
+    "value": {
+      "profile": "profiles/demo.yaml",
+      "grammar": ">=0.21 <1.0"
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "free-form target path",
+    "schema": "profile",
+    "valid": true,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "nest",
+          "at": "/hint",
+          "to": {
+            "kind": "entity",
+            "path": [
+              "semantics",
+              "custom",
+              "hint"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "unknown operation",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "execute",
+          "at": "/x"
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "unknown operand",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "rename",
+          "at": "/label",
+          "to": {
+            "kind": "entity",
+            "property": "description"
+          },
+          "unknown": true
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "unknown target",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "rename",
+          "at": "/label",
+          "to": {
+            "kind": "entity",
+            "property": "missing"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "wrong kind target",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "rename",
+          "at": "/label",
+          "to": {
+            "kind": "foreign_key",
+            "property": "from"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "wrong nested target",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "nest",
+          "at": "/key",
+          "to": {
+            "kind": "entity",
+            "path": [
+              "attributes",
+              "missing"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "scalar traversed as object",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "nest",
+          "at": "/key",
+          "to": {
+            "kind": "entity",
+            "path": [
+              "description",
+              "missing"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "wrong mapped kind",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "kinds",
+          "at": "/x",
+          "mapping": {
+            "x": "entities"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "wrong mapped value type",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "values",
+          "at": "/x",
+          "to": {
+            "kind": "attribute",
+            "property": "isKey"
+          },
+          "mapping": {
+            "yes": "true"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "missing property target",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "rename",
+          "at": "/x",
+          "to": {
+            "kind": "entity"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "ignore with no selector",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "ignore"
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "link invalid strategy",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "link",
+          "at": "/foreign",
+          "to": {
+            "kind": "entity",
+            "property": "nameAttribute"
+          },
+          "by": "name"
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "invalid pointer",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "rename",
+          "at": "label",
+          "to": {
+            "kind": "entity",
+            "property": "description"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "invalid profile name",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo",
+      "grammar": ">=0.21 <1.0",
+      "operations": []
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "profile unknown header",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [],
+      "unknown": true
+    }
+  }
+]

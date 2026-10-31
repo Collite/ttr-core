@@ -15,6 +15,7 @@ kotlin {
 
 tasks.test {
     inputs.dir("../../../tests/conformance/fixtures")
+    inputs.file("../../grammar/tests/canonical-schema-vectors.json")
     useJUnitPlatform()
     // VL-P0: TtrgGraphReaderSpec reads the shared layout vectors and two samples in place (never a
     // copy) — declare them, or a vector change leaves this task UP-TO-DATE.
@@ -61,6 +62,7 @@ dependencies {
     // kotlinx-serialization is only used by the test-only conformance dumper
     // (src/test/.../conformance/ConformanceDump.kt) — keep it off the published
     // runtime classpath. See contracts.md §1.
+    testImplementation(libs.json.schema.validator)
     testImplementation(libs.kotlinx.ser.json)
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)
