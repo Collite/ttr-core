@@ -117,6 +117,10 @@ export function tokenToScope(name: string, literal: string): string | null {
     case 'TARGET': return 'keyword.other.property.ttrm';
     case 'WHERE_FILTER': return 'keyword.other.property.ttrm';
     case 'LANGUAGE': return 'keyword.other.property.ttrm';
+    case 'INDEX_SECURITY':
+    case 'SKIP_SECURITY':
+    case 'DEFAULT_VALUE':
+    case 'BINDS':
     case 'SOURCE_TEXT': return 'keyword.other.property.ttrm';
     case 'LENGTH': return 'keyword.other.property.ttrm';
     case 'PRECISION': return 'keyword.other.property.ttrm';

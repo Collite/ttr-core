@@ -1,0 +1,15 @@
+model lexicon locale en
+def pattern escaped {
+    for: db.query.raw,
+    match: "^\d{4}\s+(\w+)$",
+    text: "a\tb",
+    description: "say \"hi\"\nnext"
+}
+def query q {
+    parameters: [{name: p, label: "a\tb", defaultValue: "C:\\new"}],
+    sourceText: """sql
+select '\d'
+"""
+}
+def entity Customer { labelPlural: "a\tb" }
+def kind Item { definition: "label = \"a\"\tand\rname = \"C:\\new\"" }

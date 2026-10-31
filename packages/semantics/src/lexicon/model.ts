@@ -36,6 +36,8 @@ export interface CanonicalLexiconEntry {
   default?: boolean;
   /** 0.17 — `sense_priority: <int>`: higher wins (cn contracts §1.5, step 4 of the resolution order). */
   sensePriority?: number;
+  /** Authored index policy on canonical entries; absent for inline sugar. */
+  indexSecurity?: string;
   /** How the entry was declared (the `mappingSource` precedent). `legacy` =
    * migrated from a deprecated `search{}` / entity `aliases` form (RS-32);
    * `valueLabels` = member vocabulary from a coded attribute (A4-β). */

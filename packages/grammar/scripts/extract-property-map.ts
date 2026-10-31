@@ -63,6 +63,8 @@ function extractProps(ruleName: string): string[] {
 }
 
 const typeMap: Record<string, string> = {
+  indexSecurity: 'identifier',
+  skipSecurity: 'boolean',
   // 0.13 (NLS-P10 / ⚑GXP-D7) — both forms are legal: `description: "…"` and
   // `description: { en: "…", cs: "…" }`. The property map is what the LSP and the
   // Designer show an author, so it advertises the union, not just the older half.
@@ -231,11 +233,15 @@ output += ';\n\n';
 
 output += 'export interface PropertyInfo {\n  name: string;\n  type: string;\n}\n\n';
 
+const propertiesByKind = Object.fromEntries(allKinds.map((kind) => [kind,
+  extractProps(KIND_RULE[kind] ?? `${kind}Property`).flatMap(
+    (p) => KIND_OVERRIDES[kind]?.[p] ?? [{ name: p, type: typeMap[p] ?? 'unknown' }],
+  ),
+]));
+
 output += 'export const PROPERTY_MAP: Record<DefinitionKind, PropertyInfo[]> = {\n';
 for (const kind of allKinds) {
-  const props = extractProps(KIND_RULE[kind] ?? `${kind}Property`).flatMap(
-    (p) => KIND_OVERRIDES[kind]?.[p] ?? [{ name: p, type: typeMap[p] ?? 'unknown' }],
-  );
+  const props = propertiesByKind[kind];
   const infos = props.map((p) => `{ name: '${p.name}', type: '${p.type}' }`);
   output += `  ${kind}: [${infos.join(', ')}],\n`;
 }
@@ -256,3 +262,15 @@ export const TTR_GRAMMAR_VERSION = '${grammarVersion}' as const;
 
 writeFileSync(versionOutputPath, versionOutput);
 console.log(`Generated version.ts (TTR grammar version ${grammarVersion})`);
+
+// Optional C-7 resource regeneration for a full source checkout. The default
+// grammar build stays a leaf: Designer's Docker context contains no Kotlin tree.
+// Run `pnpm --filter @tatrman/grammar prebuild --export-order` when updating C-7.
+if (process.argv.includes('--export-order')) {
+  const exportOrderPath = resolve(scriptDir, '../../kotlin/ttr-metadata/src/main/resources/export/property-map.json');
+  const exportOrder = Object.fromEntries(allKinds.map((kind) => [kind,
+    propertiesByKind[kind].map((p) => p.name),
+  ]));
+  mkdirSync(dirname(exportOrderPath), { recursive: true });
+  writeFileSync(exportOrderPath, JSON.stringify(exportOrder, null, 2) + '\n');
+}

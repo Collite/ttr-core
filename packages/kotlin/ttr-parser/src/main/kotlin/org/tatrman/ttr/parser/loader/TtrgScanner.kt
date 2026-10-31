@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.parser.loader
 
+import org.tatrman.ttr.parser.TtrStrings
+
 /**
  * The tokenizer + scanner behind [TtrgGraphReader.scan] (VL-P0, contracts V-14) — the JVM twin of the
  * TypeScript reader (`packages/parser/src/layout/layout-ttr.ts`): words (an `id` with its
@@ -60,17 +62,15 @@ internal object TtrgScanner {
                 }
                 c == '"' -> {
                     var j = i + 1
-                    val out = StringBuilder()
                     while (j < src.length && src[j] != '"' && src[j] != '\n') {
                         if (src[j] == '\\' && j + 1 < src.length && src[j + 1] != '\n') {
-                            out.append(src[j + 1])
                             j += 2
                         } else {
-                            out.append(src[j++])
+                            j++
                         }
                     }
                     if (src.getOrNull(j) != '"') throw Fail(TtrgIssue("", "unterminated string", line))
-                    toks += Tok(Kind.STRING, out.toString(), line)
+                    toks += Tok(Kind.STRING, TtrStrings.decode(src.substring(i, j + 1)), line)
                     i = j + 1
                 }
                 (c == '-' || c in '0'..'9') && NUMBER.matcher(src).region(i, src.length).lookingAt() -> {

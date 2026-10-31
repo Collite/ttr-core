@@ -122,7 +122,11 @@ private class AstJson(
                         "columnNames" to d.columns,
                     )
                 is FkDef -> mapOf<String, Any?>("from" to d.from, "to" to d.to)
-                is ProcedureDef -> mapOf<String, Any?>("parameters" to d.parameters, "resultColumns" to d.resultColumns)
+                is ProcedureDef ->
+                    mapOf<String, Any?>(
+                        "parameters" to d.parameters.map { parameter(it, e) },
+                        "resultColumns" to d.resultColumns,
+                    )
                 is EntityDef ->
                     mapOf<String, Any?>(
                         "labelPlural" to d.labelPlural,
@@ -172,6 +176,7 @@ private class AstJson(
                         "text" to d.text,
                         "default" to d.default,
                         "sense_priority" to d.sensePriority,
+                        "indexSecurity" to d.indexSecurity,
                     )
                 is RelationDef ->
                     mapOf<String, Any?>(
@@ -193,8 +198,9 @@ private class AstJson(
                 is QueryDef ->
                     mapOf<String, Any?>(
                         "language" to d.language,
-                        "parameters" to d.parameters,
+                        "parameters" to d.parameters.map { parameter(it, e) },
                         "sourceText" to sqlBlock(d.sourceTextBlock, d.sourceText),
+                        "skipSecurity" to d.skipSecurity,
                         "search" to d.search,
                     )
                 is RoleDef ->
@@ -307,6 +313,34 @@ private class AstJson(
             }
         }
     }
+
+    /** Only parameter binds resolve against ER attributes; other entries retain their original layer. */
+    private fun parameter(
+        p: PropertyValue,
+        e: DefinedObject,
+    ): JsonElement =
+        if (p is PropertyValue.ObjectValue) {
+            buildJsonObject {
+                p.entries.entries.sortedWith(compareBy(bytewise) { it.key }).forEach { (key, v) ->
+                    put(key, if (key == "binds") bindingValue(v, e) else value(v, e))
+                }
+            }
+        } else {
+            value(p, e)
+        }
+
+    private fun bindingValue(
+        v: PropertyValue,
+        e: DefinedObject,
+    ): JsonElement =
+        when (v) {
+            is PropertyValue.IdValue ->
+                JsonPrimitive(
+                    resolver.resolveKnown(v.ref.path, e, "er", "attribute") ?: v.ref.path,
+                )
+            is PropertyValue.ListValue -> JsonArray(v.items.map { bindingValue(it, e) })
+            else -> value(v, e)
+        }
 
     private fun referenceModel(
         e: DefinedObject,

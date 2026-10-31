@@ -127,7 +127,8 @@
     "language",
     "parameters",
     "sourceText",
-    "search"
+    "search",
+    "skipSecurity"
   ],
   "role": [
     "description",
@@ -360,7 +361,8 @@
     "match",
     "text",
     "default",
-    "sense_priority"
+    "sense_priority",
+    "indexSecurity"
   ],
   "pattern": [
     "description",
@@ -370,7 +372,8 @@
     "match",
     "text",
     "default",
-    "sense_priority"
+    "sense_priority",
+    "indexSecurity"
   ],
   "example": [
     "description",
@@ -380,7 +383,8 @@
     "match",
     "text",
     "default",
-    "sense_priority"
+    "sense_priority",
+    "indexSecurity"
   ],
   "world": [
     "description",

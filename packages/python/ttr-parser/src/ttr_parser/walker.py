@@ -161,6 +161,7 @@ from .model import (
     WorldSchemaDef,
     WorldSchemaField,
 )
+from .strings import decode_string, string_source_position
 from .tag_registry import resolve_expression_tag, resolve_tag
 
 __all__ = ["WalkResult", "walk_document"]
@@ -285,18 +286,10 @@ def _tok_text(tok: Any) -> str:
     return tok.getText() or ""
 
 
-def _str_lit_value(tok: Any) -> str:
-    """Strip the quotes off a STRING_LITERAL token and unescape backslash-X.
 
-    Mirrors walker.ts `StringLiteralForm` line 504: `raw.slice(1, -1).replace(/\\(.)/g, '$1')`.
-    Only handles the simple backslash-escapes the lexer actually emits; the
-    ANTLR STRING_LITERAL rule accepts `\\.` so we just drop the backslash.
-    """
-    raw = _tok_text(tok)
-    if len(raw) < 2:
-        return ""
-    inner = raw[1:-1]
-    return re.sub(r"\\(.)", r"\1", inner)
+
+def _str_lit_value(tok: Any) -> str:
+    return decode_string(_tok_text(tok))
 
 
 def _visit_string_value(ctx: Any, file: str) -> str:
@@ -553,6 +546,7 @@ def _visit_lexicon_entry(od: Any, kind: str, name: str, source: SourceLocation, 
     text: str | None = None
     is_default: bool | None = None
     sense_priority: float | None = None
+    index_security: str | None = None
     for p in od.lexiconEntryDef().lexiconEntryProperty():
         d = p.descriptionProperty()
         if d is not None and description is None and description_localized is None:
@@ -579,9 +573,12 @@ def _visit_lexicon_entry(od: Any, kind: str, name: str, source: SourceLocation, 
         sp = p.sensePriorityProperty()
         if sp is not None and sp.NUMBER_LITERAL() is not None:
             sense_priority = _number_value(sp.NUMBER_LITERAL())
+        ip = p.indexSecurityProperty()
+        if ip is not None:
+            index_security = ip.id_().getText()
     cls = {"term": TermDef, "pattern": PatternDef, "example": ExampleDef}[kind]
     return cls(name=name, source=source, description=description, description_localized=description_localized, tags=tags,
-              target=target, forms=forms, match=match, text=text, default=is_default, sense_priority=sense_priority)
+              target=target, forms=forms, match=match, text=text, default=is_default, sense_priority=sense_priority, index_security=index_security)
 
 
 def _visit_lexicon_block(ctx: Any, file: str) -> LexiconBlock:
@@ -1018,7 +1015,11 @@ def _visit_query(od: Any, name: str, source: SourceLocation, file: str, warnings
     parameters: tuple[PropertyValue, ...] = ()
     source_text: PropertyValue | None = None
     search = SearchHintsValue()
+    skip_security: bool | None = None
     for p in props:
+        policy = p.skipSecurityProperty()
+        if policy is not None:
+            skip_security = _bool_text(policy.BOOLEAN_LITERAL())
         d = p.descriptionProperty()
         if d is not None and description is None and description_localized is None:
             description, description_localized = _visit_description(d, file)
@@ -1039,7 +1040,7 @@ def _visit_query(od: Any, name: str, source: SourceLocation, file: str, warnings
             search = _visit_search_block(s.searchBlock(), file)
     return QueryDef(
         name=name, source=source, description=description, description_localized=description_localized, tags=tags,
-        language=language, parameters=parameters, source_text=source_text, search=search,
+        language=language, parameters=parameters, source_text=source_text, search=search, skip_security=skip_security,
     )
 
 
@@ -1964,18 +1965,8 @@ def _walk_expression_block(  # noqa: PLR0913
     source = SourceLocation(file, sym.line, col, end_line, end_column, sym.start, sym.stop + 1)
 
     if sym.type == TTRLexer.STRING_LITERAL:
-        # Each escape takes two characters of the file and one of `text`: `escapes` keeps where,
-        # so a position in `text` still maps onto the file.
-        quoted = raw[1:-1]
         escapes: list[int] = []
-
-        def unescape(m: re.Match[str]) -> str:
-            escapes.append(m.start() - len(escapes))
-            return m.group(1)
-
-        # `[\s\S]`, not `.`: the lexer admits a backslash before any character, a line break too, and
-        # the regex engines of the three targets disagree on what `.` matches.
-        text = re.sub(r"\\([\s\S])", unescape, quoted)
+        text = decode_string(raw, escapes.append)
         string_offsets = _string_line_offsets(text, escapes, sym.start + 1)
         return _block_of("string", text, source, sym.start + 1, sym.line, col + 1, 0, string_offsets, tuple(escapes))
 
@@ -2060,10 +2051,11 @@ def _block_of(  # noqa: PLR0913
     last_start = len(text) - len(lines[last])
     last_width = len(lines[last]) + sum(1 for e in escapes if e >= last_start)
     end_column = (column if last == 0 else indent_width if lines[last] else 0) + last_width
+    end_line, end_col = string_source_position(text, escapes, len(text), line, column) if form == "string" else (line + last, end_column)
     return EmbeddedBlock(
         form=form,
         text=text,
-        text_source=SourceLocation(source.file, line, column, line + last, end_column, text_start, last_offset + last_width),
+        text_source=SourceLocation(source.file, line, column, end_line, end_col, text_start, last_offset + last_width),
         line_offsets=line_offsets,
         indent_width=indent_width,
         source=source,
@@ -2109,6 +2101,14 @@ def _visit_parameter_def_list(ctx: Any, file: str) -> tuple[PropertyValue, ...]:
     for inline in ctx.parameterInline() or ():
         entries: dict[str, PropertyValue] = {}
         for p in inline.paramProperty() or ():
+            default = p.defaultValueProperty()
+            if default is not None and default.stringLiteralForm() is not None:
+                raw = _visit_string_literal_form(default.stringLiteralForm(), file)
+                entries["defaultValue"] = StringValue(raw=raw.raw, source=raw.source)
+            binds = p.bindsProperty()
+            if binds is not None and binds.listOfIds() is not None:
+                values = tuple(IdValue(ref=_build_reference(i, file), parts=_id_parts(i), source=_loc_of(i, file)) for i in binds.listOfIds().id_())
+                entries["binds"] = ListValue(items=values, source=_loc_of(binds, file))
             np = p.nameProperty()
             if np is not None:
                 name_id = np.id_()
@@ -2127,7 +2127,7 @@ def _visit_parameter_def_list(ctx: Any, file: str) -> tuple[PropertyValue, ...]:
                     source=type_loc,
                 )
             pl = p.paramLabelProperty()
-            if pl is not None:
+            if pl is not None and pl.stringLiteralForm() is not None:
                 entries["label"] = _visit_string_literal_form(pl.stringLiteralForm(), file)
             dp = p.directionProperty()
             if dp is not None:

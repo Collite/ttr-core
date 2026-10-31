@@ -896,6 +896,7 @@ private class CnTierBuilder(
                         text = def.text,
                         default = def.default,
                         sensePriority = def.sensePriority,
+                        indexSecurity = def.indexSecurity,
                         sourceFile = doc.uri,
                         sourceLocation = def.source,
                     )

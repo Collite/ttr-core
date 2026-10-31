@@ -743,16 +743,9 @@ data class Query(
     /** Search feature — search hints aggregated from the `search { ... }` block. */
     val search: SearchHints = SearchHints.EMPTY,
     /**
-     * ai-platform v2.1 (PP-17) — the query is executed **verbatim**, without parsing,
-     * translation or security validation (the "raw lane"). Carrier for a host dialect: it is
-     * declared in ai-platform's YAML pattern files, never in TTR-M — the TTR grammar is
-     * deliberately untouched, so a query loaded from (or written back to) `.ttr` always leaves
-     * this at its default. Appended last with a default so existing positional construction
-     * stays source-compatible.
-     *
-     * Defaults to `false`: exemption from validation is only ever explicit. A parse is still
-     * attempted for exempt queries, but as a **diagnostic** — it does not gate the load
-     * (`W_SKIPSEC_PARSE_FAILED`); the gating itself lives in the consuming platform.
+     * Explicit raw-execution declaration (PP-17; grammar 0.21 / MW-53).
+     * Defaults false. Parsing/serializing the model never executes a query; the consuming
+     * host owns authorization and whether this declaration permits bypassing its validation.
      */
     val skipSecurity: Boolean = false,
 ) : ModelObject {
@@ -763,14 +756,10 @@ data class QueryParameterDef(
     val name: String,
     val type: String,
     val label: String = "",
-    /**
-     * ai-platform PB — the model attributes (`entity.attribute`) whose resolved value fills this
-     * parameter. Carrier for a host dialect, exactly like [Query.skipSecurity]: declared in
-     * ai-platform's YAML pattern files, never in TTR-M — the grammar is untouched, so a query
-     * loaded from (or written back to) `.ttr` always leaves this at its default. Appended last
-     * with a default so positional construction stays source-compatible.
-     */
+    /** Ordered attribute bindings in the existing `entity.attribute` form. */
     val binds: List<String> = emptyList(),
+    /** Explicit parameter default (including empty string); null means no default was declared. */
+    val defaultValue: String? = null,
 )
 
 sealed interface ParseStatus {

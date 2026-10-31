@@ -317,6 +317,7 @@ object ConformanceDump {
                 d.fk?.let { p["fk"] = JsonPrimitive(it.path) }
             }
             is QueryDef -> {
+                d.skipSecurity?.let { p["skipSecurity"] = JsonPrimitive(it) }
                 d.language?.let { p["language"] = JsonPrimitive(it) }
                 if (d.parameters.isNotEmpty()) p["parameters"] = JsonArray(d.parameters.map { param(it) })
                 d.sourceTextBlock?.let { p["sourceText"] = embeddedDump(it) }
@@ -435,6 +436,7 @@ object ConformanceDump {
                 // 0.17 — the cn default sense (present-only: `default: false` dumps like no `default:`).
                 if (d.default == true) p["default"] = JsonPrimitive(true)
                 d.sensePriority?.let { p["sense_priority"] = num(it) }
+                d.indexSecurity?.let { p["indexSecurity"] = JsonPrimitive(it) }
             }
             // 0.17 — the concept defs and the cn bindings share one body.
             is ConceptDef -> p.putAll(conceptProps(d.body, withCommon = false))
@@ -813,7 +815,21 @@ object ConformanceDump {
             m["direction"] = JsonPrimitive(id.ref.path)
         }
 
-        val unexpected = o.entries.keys - setOf("name", "type", "label", "direction")
+        o.entries["defaultValue"]?.let {
+            val value = it as? PropertyValue.StringValue ?: error("conformance: defaultValue must be a string")
+            m["defaultValue"] = JsonPrimitive(value.raw)
+        }
+        o.entries["binds"]?.let {
+            val list = it as? PropertyValue.ListValue ?: error("conformance: binds must be a list")
+            m["binds"] =
+                JsonArray(
+                    list.items.map { value ->
+                        val id = value as? PropertyValue.IdValue ?: error("conformance: binding must be a reference")
+                        JsonPrimitive(id.ref.path)
+                    },
+                )
+        }
+        val unexpected = o.entries.keys - setOf("name", "type", "label", "direction", "defaultValue", "binds")
         if (unexpected.isNotEmpty()) {
             error("conformance: unexpected parameter key(s) $unexpected — update param() and the TS dump.ts together")
         }

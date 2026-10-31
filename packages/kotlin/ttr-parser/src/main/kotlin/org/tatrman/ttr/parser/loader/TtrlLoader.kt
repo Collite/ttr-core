@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.parser.loader
 
+import org.tatrman.ttr.parser.TtrStrings
+
 import org.antlr.v4.runtime.BaseErrorListener
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
@@ -164,7 +166,7 @@ object TtrlLoader {
 
     private fun unquote(s: String): String =
         if (s.length >= 2 && s.startsWith("\"") && s.endsWith("\"")) {
-            s.substring(1, s.length - 1).replace("\\\"", "\"").replace("\\\\", "\\")
+            TtrStrings.decode(s)
         } else {
             s
         }

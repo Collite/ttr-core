@@ -355,6 +355,7 @@ function collectCanonical(
     match: def.match,
     text: def.text,
     ...senseOf(def.default, def.sensePriority),
+    ...(def.indexSecurity !== undefined ? { indexSecurity: def.indexSecurity } : {}),
     origin: 'canonical',
     source: def.source,
   });

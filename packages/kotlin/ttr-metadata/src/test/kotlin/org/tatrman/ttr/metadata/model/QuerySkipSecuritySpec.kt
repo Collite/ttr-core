@@ -10,28 +10,11 @@ import org.tatrman.ttr.writer.TtrRenderer
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import java.nio.file.Path
 
-/**
- * ai-platform v2.1 · S0·T2 — `Query.skipSecurity`.
- *
- * The field is a **carrier for a host dialect**, not a TTR language feature: ai-platform's YAML
- * pattern files declare `skipSecurity: true` for queries that bypass parse/validation and go
- * down the raw execution lane (PP-17/PP-19). `ttr-metadata` owns the typed model those files
- * are loaded into, so the field lives here — but TTR-M's grammar is deliberately **not**
- * touched (S0·T3: "grammar version stays untouched"), which makes three properties contractual
- * and each is asserted below:
- *
- *  a. **Default false.** Absent from the source ⇒ `false`, both for direct construction and
- *     for a model loaded through the real TTR loader. Security-relevant defaults fail closed:
- *     nothing becomes exempt from validation by omission.
- *  b. **Older-consumer tolerance.** The field is appended with a default, and nothing in the
- *     write path emits it — so TTR text produced by this version is byte-identical to what the
- *     previous version produced, and any consumer ignoring the field is unaffected.
- *  c. **`copy` preserves it.** The data-class copy paths ai-platform's loader uses to enrich a
- *     Query must not silently reset the flag to its default.
- */
+/** MW-53: grammar 0.21 retains explicit policy; omission still defaults false. */
 class QuerySkipSecuritySpec :
     StringSpec({
 
@@ -102,7 +85,7 @@ class QuerySkipSecuritySpec :
             q.skipSecurity shouldBe false
         }
 
-        "a query loaded from TTR has skipSecurity=false — the grammar carries no such attribute" {
+        "a query with no policy declaration loads with skipSecurity=false" {
             val result = load(mapOf("/db.ttr" to dbTtr))
             result.errors shouldHaveSize 0
             val loaded =
@@ -113,14 +96,14 @@ class QuerySkipSecuritySpec :
 
         // ----- (b) older-consumer tolerance -----
 
-        "the write path never emits skipSecurity — rendered TTR is identical either way" {
+        "the write path retains true and leaves the default false undeclared" {
             val renderOf = { q: Query ->
                 TtrRenderer.renderFile(null, null, listOf(ModelToDefinitions.queryToQueryDef(q)))
             }
             val exempt = renderOf(query("find_customers", skipSecurity = true))
 
-            exempt shouldBe renderOf(query("find_customers", skipSecurity = false))
-            exempt shouldNotContain "skipSecurity"
+            exempt shouldContain "skipSecurity: true"
+            renderOf(query("find_customers", skipSecurity = false)) shouldNotContain "skipSecurity"
         }
 
         "a model rendered by this version reloads through the loader unchanged (older-consumer tolerance)" {
@@ -136,11 +119,7 @@ class QuerySkipSecuritySpec :
             val reloaded =
                 result.model.queries.values
                     .single { it.qname.name == "find_customers" }
-            // The flag is host-dialect state, not TTR text: a TTR round-trip returns the
-            // default. ai-platform re-derives it from its YAML on every load, so nothing is
-            // lost there — but a future consumer that expects TTR to carry it would be wrong,
-            // and this assertion is where it finds out.
-            reloaded.skipSecurity shouldBe false
+            reloaded.skipSecurity shouldBe true
             reloaded.sourceText shouldBe "SELECT * FROM customers WHERE name LIKE @name"
             reloaded.parameters.single().name shouldBe "name"
         }

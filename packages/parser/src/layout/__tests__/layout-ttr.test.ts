@@ -315,3 +315,11 @@ describe('readTtrl', () => {
     expect(r.ok && r.canvases.map((c) => [c.key, c.mode, Object.keys(c.nodes).length])).toEqual([['all_er', 'manual', 12]]);
   });
 });
+
+it('uses the TTR string escape rule for layout strings', () => {
+  const result = readTtrl(String.raw`ttrl 1 canvas a { skin: "C:\\new\t\d" nodes: { "a\nb": { x: 1, y: 2 } } }`);
+  expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  expect(result.canvases[0].skin).toBe('C:\\new\t\\d');
+  expect(result.canvases[0].nodes['a\nb']).toEqual({x: 1, y: 2});
+});

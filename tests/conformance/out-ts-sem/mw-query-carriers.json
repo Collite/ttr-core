@@ -1,0 +1,14 @@
+{
+    "diagnostics": [],
+    "resolved": [],
+    "symbols": [
+        "demo.carriers.db.demo.procedure.call",
+        "demo.carriers.db.demo.query.binds",
+        "demo.carriers.db.demo.query.checked_query",
+        "demo.carriers.db.demo.query.defaultValue",
+        "demo.carriers.db.demo.query.indexSecurity",
+        "demo.carriers.db.demo.query.ordinary_query",
+        "demo.carriers.db.demo.query.raw_query",
+        "demo.carriers.db.demo.query.skipSecurity"
+    ]
+}

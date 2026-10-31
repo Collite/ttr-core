@@ -1,0 +1,11 @@
+// SPDX-License-Identifier: Apache-2.0
+package demo.carriers
+model er
+
+def entity Customer {
+    description: "An invented customer",
+    attributes: [
+        def attribute name { type: text, description: "Name" },
+        def attribute code { type: text, description: "Code" }
+    ]
+}

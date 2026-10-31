@@ -1,0 +1,17 @@
+{
+    "diagnostics": [],
+    "resolved": [
+        "db.demo.lookup => demo.carriers.db.demo.query.lookup",
+        "db.demo.lookup => demo.carriers.db.demo.query.lookup",
+        "er.entity.Customer => demo.carriers.er.entity.Customer"
+    ],
+    "symbols": [
+        "demo.carriers.db.dbo.pattern.alternate",
+        "demo.carriers.db.dbo.pattern.paired",
+        "demo.carriers.db.dbo.term.customers",
+        "demo.carriers.db.demo.query.lookup",
+        "demo.carriers.er.entity.Customer",
+        "demo.carriers.er.entity.Customer.code",
+        "demo.carriers.er.entity.Customer.name"
+    ]
+}

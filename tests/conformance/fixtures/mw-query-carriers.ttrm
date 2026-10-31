@@ -1,0 +1,21 @@
+// SPDX-License-Identifier: Apache-2.0
+package demo.carriers
+model db schema demo
+
+def query raw_query {
+    skipSecurity: true,
+    parameters: [
+        { name: term, type: text, defaultValue: "", binds: [er.entity.Customer.name, er.entity.Customer.code] },
+        { name: count, type: int, defaultValue: "0", binds: [] }
+    ],
+    sourceText: "select 1"
+}
+def query checked_query { skipSecurity: false }
+def query ordinary_query { }
+def query skipSecurity { }
+def query defaultValue { }
+def query binds { }
+def query indexSecurity { }
+def procedure call {
+    parameters: [{name: p, type: text, direction: IN, defaultValue: "seed", binds: [er.entity.Customer.name]}]
+}

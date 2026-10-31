@@ -1,0 +1,2 @@
+model cn
+def kind Item { binds: x, defaultValue: y, skipSecurity: z, indexSecurity: w }

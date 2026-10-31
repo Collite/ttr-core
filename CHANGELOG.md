@@ -6,6 +6,24 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — grammar 0.21 canonical metadata carriers (MW-53)
+
+- Lexical entries retain `indexSecurity`; queries retain explicit `skipSecurity`; query/procedure parameters
+  retain string `defaultValue` (including empty) and ordered `binds` references. All properties are optional;
+  absent query policy stays false. Existing `match`/`text` fields keep regex/example pairs in one lexical entry.
+- TS, Kotlin and Python parsers, TS formatting, Kotlin rendering and metadata model/export bridges preserve
+  these declarations. Parsers only retain data; execution and authorization remain the consuming host's responsibility.
+- A query loaded from TTR can now carry `skipSecurity: true`. Hosts must gate exemptions through their own
+  authorization policy; TTR provenance alone no longer implies that this flag is false.
+- Model-to-TTR conversion and writers now emit `skipSecurity`, `defaultValue` and `binds`; text containing these
+  keys requires a grammar ≥0.21 reader. Typed bindings keep `entity.attribute`; text accepts bare or qualified
+  refs and model conversion emits `er.entity.<entity>.<attribute>`. C-7 resolves parameter bindings in ER.
+- STRING_LITERAL decoding is identical across targets: `\\`, `\"`, `\n`, `\t`, `\r` decode in one pass;
+  other backslash pairs retain both characters. Triple strings and tagged blocks remain raw.
+- **JVM consumers must rebuild:** `QueryDef`, `LexiconEntryDef`, `QueryParameterDef` and `LexiconLink` gain data-class fields,
+  changing constructors/copy signatures. This is an additive syntax change: the grammar marker is 0.21 and
+  its bundle must use 0.21.x. Internal publication suffices; downstream producer pins are not changed here.
+
 ### Fixed — calendar read scope for recipe action values
 
 - Direct action arguments, wiring conditions and directly wired writer-default expressions using `working_days`,

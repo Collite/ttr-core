@@ -477,6 +477,7 @@ object ModelToDefinitions {
             description = query.description.takeIf { it.isNotEmpty() },
             descriptionLocalized = query.descriptionLocalized.toLocalizedStringValue(),
             tags = query.tags,
+            skipSecurity = true.takeIf { query.skipSecurity },
             // The tagged block's tag carries the language; only fall back to the
             // soft-deprecated `language:` property for an un-taggable language.
             language = if (block != null) null else query.sourceLanguage.takeIf { it.isNotEmpty() },
@@ -488,6 +489,17 @@ object ModelToDefinitions {
                                 put("name", idVal(Reference(p.name)))
                                 put("type", idVal(Reference(p.type)))
                                 if (p.label.isNotEmpty()) put("label", strVal(p.label))
+                                p.defaultValue?.let { put("defaultValue", strVal(it)) }
+                                if (p.binds.isNotEmpty()) {
+                                    put(
+                                        "binds",
+                                        listVal(
+                                            p.binds.map {
+                                                idVal(Reference(if (it.startsWith("er.")) it else "er.entity.$it"))
+                                            },
+                                        ),
+                                    )
+                                }
                             },
                     )
                 },

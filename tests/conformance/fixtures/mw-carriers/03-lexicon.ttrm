@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+package demo.carriers
+model lexicon locale en
+
+def term customers { for: er.entity.Customer, forms: ["customer"], indexSecurity: applied }
+def pattern paired { for: db.demo.lookup, match: "name (.*)", text: "Name Alice?", description: "The main pair", indexSecurity: none }
+def pattern alternate { for: db.demo.lookup, match: "lookup (.*)", text: "Lookup Bob?", description: "The alternate pair" }

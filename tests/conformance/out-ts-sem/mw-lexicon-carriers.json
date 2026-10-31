@@ -1,0 +1,15 @@
+{
+    "diagnostics": [
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference"
+    ],
+    "resolved": [],
+    "symbols": [
+        "db.dbo.example.ordinary",
+        "db.dbo.pattern.alternate",
+        "db.dbo.pattern.paired",
+        "db.dbo.term.customer"
+    ]
+}

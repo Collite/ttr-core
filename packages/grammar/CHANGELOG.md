@@ -12,6 +12,17 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
+## 0.21 — 2026-10-31
+
+Optional generic metadata: lexical `indexSecurity`, query `skipSecurity`, and query/procedure parameter
+`defaultValue` and ordered `binds`. The four soft keywords remain identifiers and cn free-form keys (`cnKey`).
+Writers may emit the new keys; that text requires a grammar ≥0.21 reader. Absent query policy stays false;
+a TTR-loaded query may now explicitly carry true, subject to the consuming host's authorization policy.
+
+STRING_LITERAL readers use one left-to-right pass: `\\`→`\`, `\"`→`"`, `\n`→LF, `\t`→TAB, `\r`→CR;
+other `\X` pairs keep both characters. Writers escape those five characters only. Triple strings and tagged
+blocks stay raw. This fixes cross-target regex/default fidelity and order-dependent backslash decoding.
+
 ## TTR-P 0.7 — 2026-10-27
 
 Qualified calls with named arguments (`this.list_price(channel: 'web', at: :as_of)`)

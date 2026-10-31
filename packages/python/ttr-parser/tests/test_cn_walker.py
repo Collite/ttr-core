@@ -623,18 +623,18 @@ def test_review_117_l2_reads_a_to_string_first_line_as_text() -> None:
     assert [w.code for w in r.warnings] == [DiagnosticCode.UNKNOWN_LANGUAGE_TAG]
 
 
-def test_review_118_l1_reads_an_escaped_line_break_and_maps_the_line_after_it() -> None:
+def test_r190_b_retains_backslash_before_physical_line_break_and_maps_next_line() -> None:
     src = 'model cn\ndef quality P { of: X, definition: "a = 1 \\\nand b = 2" }'
     b = _block_named(src, "P")
-    assert b.text == "a = 1 \nand b = 2"
-    assert b.escapes == (6,)
+    assert b.text == "a = 1 \\\nand b = 2"
+    assert b.escapes == ()
     assert b.line_offsets == (45, 53)
     at = b.location(1, 0, 3)
     assert (at.line, at.column, _slice(src, at)) == (3, 0, "and")
     assert (b.text_source.offset_start, b.text_source.offset_end) == (45, 62)
     assert (b.text_source.end_line, b.text_source.end_column) == (3, 9)
     for sep in ("\r", " ", "\u0085"):
-        assert _block_named(f'model cn\ndef quality P {{ of: X, definition: "a\\{sep}b" }}', "P").text == f"a{sep}b"
+        assert _block_named(f'model cn\ndef quality P {{ of: X, definition: "a\\{sep}b" }}', "P").text == f"a\\{sep}b"
 
 
 def test_review_118_m2_reports_a_second_concept_on_an_md_inline_attribute_and_measure() -> None:

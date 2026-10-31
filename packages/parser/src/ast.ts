@@ -393,6 +393,10 @@ export type BindingColumnValue =
 
 export interface ParameterDef {
   name: string;
+  /** 0.21 — explicit default, including the empty string. */
+  defaultValue?: string;
+  /** 0.21 — ordered model attribute bindings. */
+  binds?: Reference[];
   type?: DataType;
   label?: string;
   direction?: ParameterDirection;
@@ -428,6 +432,8 @@ export interface ModelDirective {
  * in `@tatrman/semantics`, not the parser.
  */
 export interface LexiconEntryDef {
+  /** 0.21 — declared index security policy; interpreted by the consuming host. */
+  indexSecurity?: string;
   kind: 'term' | 'pattern' | 'example';
   name: string;
   source: SourceLocation;
@@ -774,6 +780,8 @@ export interface Er2dbRelationDef {
 
 export interface QueryDef {
   kind: 'query';
+  /** 0.21 — explicit execution policy; omission never enables the raw lane. */
+  skipSecurity?: boolean;
   name: string;
   source: SourceLocation;
   leadingTrivia?: Trivia[];

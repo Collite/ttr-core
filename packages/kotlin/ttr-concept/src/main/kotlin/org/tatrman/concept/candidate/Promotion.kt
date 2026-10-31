@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.concept.candidate
 
+import org.tatrman.ttr.parser.TtrStrings
+
 import org.tatrman.ttr.parser.loader.TtrLoader
 import org.tatrman.ttr.parser.model.ConceptDef
 import org.tatrman.ttr.parser.model.ConceptSugar
@@ -393,8 +395,8 @@ object Promotion {
 
     private fun word(v: PropertyValue?): String? = (v as? PropertyValue.IdValue)?.parts?.lastOrNull()
 
-    /** A TTR string literal: `"` and `\` escaped (the values are single lines — the schema says so). */
-    private fun quote(s: String): String = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+    /** Quote under the shared TTR STRING_LITERAL rule. */
+    private fun quote(s: String): String = TtrStrings.encode(s)
 
     /**
      * A term's def id from its first form: the lexicon's own fold (`TermNormalizer.fold` — lower case, diacritics off),

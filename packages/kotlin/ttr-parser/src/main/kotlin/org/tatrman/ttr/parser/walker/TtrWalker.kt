@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.parser.walker
 
+import org.tatrman.ttr.parser.TtrStrings
+
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.ParseTree
 import org.antlr.v4.runtime.tree.TerminalNode
@@ -290,6 +292,12 @@ class TtrWalker(
             tags =
                 props.firstNotNullOfOrNull { it.tagsProperty()?.let { stringList(it.listOfStrings()) } } ?: emptyList(),
             entryKind = entryKind,
+            indexSecurity =
+                props
+                    .lastOrNull { it.indexSecurityProperty() != null }
+                    ?.indexSecurityProperty()
+                    ?.id()
+                    ?.text,
             target = props.firstNotNullOfOrNull { it.forProperty()?.let { f -> makeRef(f.id()) } },
             forms =
                 props.firstNotNullOfOrNull { it.formsProperty()?.let { f -> stringList(f.listOfStrings()) } }
@@ -1427,6 +1435,16 @@ class TtrWalker(
             tags =
                 props.firstNotNullOfOrNull { it.tagsProperty()?.let { stringList(it.listOfStrings()) } } ?: emptyList(),
             language = language,
+            skipSecurity =
+                props
+                    .lastOrNull { it.skipSecurityProperty() != null }
+                    ?.skipSecurityProperty()
+                    ?.BOOLEAN_LITERAL()
+                    ?.text
+                    ?.let {
+                        it ==
+                            "true"
+                    },
             parameters =
                 props.flatMap {
                     it.parametersProperty()?.let { p -> visitParameterList(p.parameterDefList()) }
@@ -1996,15 +2014,8 @@ class TtrWalker(
         val source = SourceLocation(fileLabel, sym.line, col, end.first, end.second, sym.startIndex, sym.stopIndex + 1)
 
         if (sym.type == TTRLexer.STRING_LITERAL) {
-            // Each escape takes two characters of the file and one of `text`: `escapes` keeps where, so a
-            // position in `text` still maps onto the file.
-            val quoted = raw.substring(1, raw.length - 1)
             val escapes = mutableListOf<Int>()
-            val text =
-                simpleEscape.replace(quoted) { m ->
-                    escapes += quoted.codePointCount(0, m.range.first) - escapes.size
-                    m.groupValues[1]
-                }
+            val text = TtrStrings.decode(raw) { escapes += it }
             return blockOf(
                 "string",
                 text,
@@ -2107,6 +2118,14 @@ class TtrWalker(
                 }
             ) +
                 lastWidth
+        val end =
+            if (form ==
+                "string"
+            ) {
+                TtrStrings.sourcePosition(text, escapes, codePoints(text), line, column)
+            } else {
+                null
+            }
         return EmbeddedBlock(
             language = "pl",
             form = form,
@@ -2116,8 +2135,8 @@ class TtrWalker(
                     source.file,
                     line,
                     column,
-                    line + lastLine,
-                    endColumn,
+                    end?.first ?: (line + lastLine),
+                    end?.second ?: endColumn,
                     textStart,
                     lastOffset + lastWidth,
                 ),
@@ -2758,6 +2777,19 @@ class TtrWalker(
                 val entries = LinkedHashMap<String, PropertyValue>()
                 for (prop in inline.paramProperty()) {
                     when {
+                        prop.defaultValueProperty() != null -> {
+                            val value = prop.defaultValueProperty()
+                            stringForm(value.stringLiteralForm())?.let {
+                                entries["defaultValue"] = PropertyValue.StringValue(it, location(value))
+                            }
+                        }
+                        prop.bindsProperty() != null -> {
+                            val value = prop.bindsProperty()
+                            value.listOfIds()?.let { ids ->
+                                entries["binds"] =
+                                    PropertyValue.ListValue(ids.id().map { idValue(it.text, it) }, location(value))
+                            }
+                        }
                         prop.nameProperty() != null ->
                             entries["name"] = idValue(prop.nameProperty().id().text, prop.nameProperty())
                         prop.typeProperty() != null ->
@@ -2988,7 +3020,7 @@ class TtrWalker(
 
     private fun stringLiteral(node: TerminalNode): String {
         val raw = node.text
-        return raw.substring(1, raw.length - 1).unescape()
+        return TtrStrings.decode(raw)
     }
 
     private fun tripleStringLiteral(node: TerminalNode): String {
@@ -2996,12 +3028,6 @@ class TtrWalker(
         val inner = raw.substring(3, raw.length - 3)
         return Dedent.applyTextwrapDedent(inner)
     }
-
-    /**
-     * The expression-block unescape, as on TS and Python: `[\s\S]`, not `.` — the lexer admits a backslash before
-     * any character, a line break too, and the regex engines of the three targets disagree on what `.` matches.
-     */
-    private val simpleEscape = Regex("""\\([\s\S])""")
 
     /** The opening fence of a tagged block: `<tag>[ \t]*\r?\n` (the lexer guarantees it). */
     private val taggedOpener = Regex("^([A-Za-z][A-Za-z0-9-]*)([ \t]*\r?\n)")
@@ -3151,14 +3177,6 @@ class TtrWalker(
             offsetEnd = stop.stopIndex + 1,
         )
     }
-
-    private fun String.unescape(): String =
-        this
-            .replace("\\\\", "\\")
-            .replace("\\\"", "\"")
-            .replace("\\n", "\n")
-            .replace("\\t", "\t")
-            .replace("\\r", "\r")
 }
 
 /** Walker output: schema directive (if any) plus all definitions in source order. */

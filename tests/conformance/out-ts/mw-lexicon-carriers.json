@@ -1,0 +1,58 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "term",
+            "name": "customer",
+            "properties": {
+                "for": "er.entity.Customer",
+                "forms": [
+                    "customer"
+                ],
+                "indexSecurity": "applied"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "pattern",
+            "name": "paired",
+            "properties": {
+                "for": "db.query.raw",
+                "indexSecurity": "none",
+                "match": "name (.*)",
+                "text": "Name Alice?"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "pattern",
+            "name": "alternate",
+            "properties": {
+                "for": "db.query.raw",
+                "indexSecurity": "none",
+                "match": "lookup (.*)",
+                "text": "Lookup Bob?"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "example",
+            "name": "ordinary",
+            "properties": {
+                "for": "er.entity.Customer",
+                "text": "Show customers"
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": null,
+    "schemaDirective": {
+        "code": "lexicon",
+        "locale": "en",
+        "namespace": null
+    }
+}

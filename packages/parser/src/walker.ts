@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { decodeTtrString, stringSourcePosition } from './strings.js';
 import {
   CharStream,
   CommonTokenStream,
@@ -1190,16 +1191,9 @@ function walkExpressionBlock(token: TerminalNode, key: string, file: string, err
   };
 
   if (sym.type === TTRLexer.STRING_LITERAL) {
-    // Each escape takes two characters of the file and one of `text`: `escapes` keeps where, so a
-    // position in `text` still maps onto the file.
-    // `[\s\S]`, not `.`: the lexer admits a backslash before any character, a line break too, and the
-    // three regex engines disagree on what `.` matches.
-    const quoted = raw.slice(1, -1);
+    // Track only decoded escapes; unknown pairs occupy two positions in both text and source.
     const escapes: number[] = [];
-    const text = quoted.replace(/\\([\s\S])/g, (_m, c: string, at: number) => {
-      escapes.push(codePoints(quoted.slice(0, at)) - escapes.length);
-      return c;
-    });
+    const text = decodeTtrString(raw, (offset) => escapes.push(offset));
     return blockOf('string', text, source, sym.start + 1, sym.line, sym.column + 1, 0, stringLineOffsets(text, escapes, sym.start + 1), escapes);
   }
 
@@ -1270,6 +1264,7 @@ function blockOf(
   // Widths in code points — the unit of the parser's offsets and columns (and of a TTR-P position).
   const lastStart = codePoints(text) - codePoints(lines[lastLine]);
   const lastWidth = codePoints(lines[lastLine]) + escapes.filter((e) => e >= lastStart).length;
+  const end = form === 'string' ? stringSourcePosition(text, escapes, codePoints(text), line, column) : undefined;
   return {
     kind: 'embeddedBlock',
     language: 'pl',
@@ -1279,8 +1274,8 @@ function blockOf(
       file: source.file,
       line,
       column,
-      endLine: line + lastLine,
-      endColumn: (lastLine === 0 ? column : lines[lastLine].length ? indentWidth : 0) + lastWidth,
+      endLine: end?.line ?? line + lastLine,
+      endColumn: end?.column ?? (lastLine === 0 ? column : lines[lastLine].length ? indentWidth : 0) + lastWidth,
       offsetStart: textStart,
       offsetEnd: lastOffset + lastWidth,
     },
@@ -2092,13 +2087,13 @@ function walkLiteral(ctx: LiteralContext, file: string): PropertyValue {
  * consistently with `description`/`tags` instead of keeping raw backslashes.
  */
 function unescapeStringLiteral(raw: string): string {
-  return raw.slice(1, -1).replace(/\\(.)/g, '$1');
+  return decodeTtrString(raw);
 }
 
 function walkStringLiteralForm(ctx: StringLiteralFormContext, file: string): StringValue | TripleStringValue {
   if (ctx.STRING_LITERAL()) {
     const raw = ctx.STRING_LITERAL()!.getText();
-    const value = raw.slice(1, -1).replace(/\\(.)/g, '$1');
+    const value = decodeTtrString(raw);
     return { kind: 'string', value, source: makeSourceLocation(ctx, file) };
   }
   // Both a plain `"""…"""` and a `"""tag␊…"""` that lexed as TAGGED_BLOCK_LITERAL
@@ -2129,7 +2124,7 @@ function walkEmbeddedBlock(
 ): StringValue | TripleStringValue | TaggedBlockValue {
   if (ctx.STRING_LITERAL()) {
     const raw = ctx.STRING_LITERAL()!.getText();
-    const value = raw.slice(1, -1).replace(/\\(.)/g, '$1');
+    const value = decodeTtrString(raw);
     return { kind: 'string', value, source: makeSourceLocation(ctx, file) };
   }
   if (ctx.TRIPLE_STRING_LITERAL()) {
@@ -2712,7 +2707,7 @@ function walkEntityDef(
       tags = walkListOfStrings(p.tagsProperty()!.listOfStrings()!, file);
     }
     if (p.labelPluralProperty()) {
-      labelPlural = p.labelPluralProperty()!.STRING_LITERAL()!.getText().slice(1, -1);
+      labelPlural = decodeTtrString(p.labelPluralProperty()!.STRING_LITERAL()!.getText());
     }
     if (p.nameAttributeProperty()?.id()) {
       const idCtx = p.nameAttributeProperty()!.id()!;
@@ -3044,8 +3039,11 @@ function walkQueryDef(
   let parameters: ParameterDef[] | undefined;
   let sourceText: StringValue | TripleStringValue | TaggedBlockValue | undefined;
   let search: SearchBlock | undefined;
+  let skipSecurity: boolean | undefined;
 
   for (const p of ctx.queryProperty()) {
+    const policy = p.skipSecurityProperty()?.BOOLEAN_LITERAL();
+    if (policy && ['true', 'false'].includes(policy.getText())) skipSecurity = policy.getText() === 'true';
     if (p.descriptionProperty()) {
       description = descriptionOf(p.descriptionProperty()!, file);
       descriptionLocalized = descriptionLocalizedOf(p.descriptionProperty()!, file);
@@ -3090,7 +3088,7 @@ function walkQueryDef(
     });
   }
 
-  return { kind: 'query', name, source, description, descriptionLocalized, tags, language, parameters, sourceText, search };
+  return { kind: 'query', name, source, description, descriptionLocalized, tags, language, parameters, sourceText, search, ...(skipSecurity !== undefined ? { skipSecurity } : {}) };
 }
 
 function walkRoleDef(
@@ -3399,17 +3397,22 @@ function walkParameterDefList(ctx: ParameterDefListContext, file: string): Param
     let type: DataType | undefined;
     let label: string | undefined;
     let direction: ParameterDirection | undefined;
+    let defaultValue: string | undefined;
+    let binds: Reference[] | undefined;
 
     for (const p of inline.paramProperty()) {
+      const defaultForm = p.defaultValueProperty()?.stringLiteralForm();
+      if (defaultForm) defaultValue = walkStringLiteralForm(defaultForm, file).value;
+      const bindList = p.bindsProperty()?.listOfIds();
+      if (bindList) binds = bindList.id().map((idCtx) => walkId(idCtx, file));
       if (p.nameProperty()?.id()) {
         name = p.nameProperty()!.id()!.getText();
       }
       if (p.typeProperty()) {
         type = walkDataType(p.typeProperty()!.dataType()!, file);
       }
-      if (p.paramLabelProperty()) {
-        label = p.paramLabelProperty()!.stringLiteralForm()!.getText().slice(1, -1);
-      }
+      const labelForm = p.paramLabelProperty()?.stringLiteralForm();
+      if (labelForm) label = walkStringLiteralForm(labelForm, file).value;
       if (p.directionProperty()?.id()) {
         const d = p.directionProperty()!.id()!.getText().toUpperCase();
         if (d === 'IN' || d === 'OUT' || d === 'INOUT') {
@@ -3418,7 +3421,7 @@ function walkParameterDefList(ctx: ParameterDefListContext, file: string): Param
       }
     }
 
-    result.push({ name, type, label, direction, source: makeSourceLocation(inline, file) });
+    result.push({ name, type, label, direction, ...(defaultValue !== undefined ? { defaultValue } : {}), ...(binds !== undefined ? { binds } : {}), source: makeSourceLocation(inline, file) });
   }
   return result;
 }
@@ -3643,8 +3646,10 @@ function walkLexiconEntryDef(
   let text: string | undefined;
   let isDefault: boolean | undefined;
   let sensePriority: number | undefined;
+  let indexSecurity: string | undefined;
 
   for (const p of ctx.lexiconEntryProperty()) {
+    if (p.indexSecurityProperty()) indexSecurity = p.indexSecurityProperty()!.id()!.getText();
     if (p.descriptionProperty()) {
       description = descriptionOf(p.descriptionProperty()!, file);
       descriptionLocalized = descriptionLocalizedOf(p.descriptionProperty()!, file);
@@ -3667,6 +3672,7 @@ function walkLexiconEntryDef(
 
   return {
     kind, name, source, description, descriptionLocalized, tags, target, forms, match, text,
+    ...(indexSecurity !== undefined ? { indexSecurity } : {}),
     ...(isDefault !== undefined ? { default: isDefault } : {}),
     ...(sensePriority !== undefined ? { sensePriority } : {}),
   };

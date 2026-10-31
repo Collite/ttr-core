@@ -1,0 +1,13 @@
+{
+    "diagnostics": [
+        "ttr/required-property-missing",
+        "ttr/unresolved-reference"
+    ],
+    "resolved": [],
+    "symbols": [
+        "cn.concept.Item",
+        "db.dbo.pattern.escaped",
+        "db.dbo.query.q",
+        "er.entity.Customer"
+    ]
+}

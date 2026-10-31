@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { stringSourcePosition } from './strings.js';
 /**
  * 0.17 — read access to a cn body (`ConceptDef`, `ConceptSugar`, `ConceptBindingDef`). The body keeps
  * every property in authored order; a repeated key is a parse diagnostic and the FIRST one is the
@@ -52,12 +53,15 @@ export function embeddedBlockLocation(
   const base = l === 0 ? block.textSource.column : block.indentWidth;
   const start = column + shift(column);
   const end = column + length + shift(column + length);
+  const point = (offset: number) => stringSourcePosition(block.text, block.escapes ?? [], offset, block.textSource.line, block.textSource.column);
+  const from = block.form === 'string' ? point(lineStart + column) : undefined;
+  const to = block.form === 'string' ? point(lineStart + column + length) : undefined;
   return {
     file: block.source.file,
-    line: block.textSource.line + l,
-    column: base + start,
-    endLine: block.textSource.line + l,
-    endColumn: base + end,
+    line: from?.line ?? block.textSource.line + l,
+    column: from?.column ?? base + start,
+    endLine: to?.line ?? block.textSource.line + l,
+    endColumn: to?.column ?? base + end,
     offsetStart: block.lineOffsets[l] + start,
     offsetEnd: block.lineOffsets[l] + end,
   };

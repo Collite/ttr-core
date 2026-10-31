@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { decodeTtrString } from '../strings.js';
 // The TTR serialization of a layout (VL contracts §3, V-10…V-13): write ONE `.ttrg` — the graph block
 // with `model`, `objects` and, when there are positions, the in-file `layout: { nodes: {…} }` block
 // (the v1.1 D4 shape the worker mode writes). Read a `.ttrg` with or without that block, optionally
@@ -127,17 +128,15 @@ function tokenize(src: string): Tok[] {
     }
     if (c === '"') {
       let j = i + 1;
-      let out = '';
       while (j < src.length && src[j] !== '"' && src[j] !== '\n') {
         if (src[j] === '\\' && j + 1 < src.length && src[j + 1] !== '\n') {
-          out += src[j + 1];
           j += 2;
         } else {
-          out += src[j++];
+          j++;
         }
       }
       if (src[j] !== '"') throw new ScanError({ path: '', message: 'unterminated string', line });
-      toks.push({ kind: 'string', text: out, line });
+      toks.push({ kind: 'string', text: decodeTtrString(src.slice(i, j + 1)), line });
       i = j + 1;
       continue;
     }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.parser.model
 
+import org.tatrman.ttr.parser.TtrStrings
+
 /**
  * Typed model produced by the TTR parser.
  *
@@ -272,6 +274,8 @@ data class LexiconEntryDef(
     val default: Boolean? = null,
     /** Grammar 0.17 — `sense_priority: <n>` (higher wins); null when absent. */
     val sensePriority: Double? = null,
+    /** Grammar 0.21 — declared index security policy; execution is host-owned. */
+    val indexSecurity: String? = null,
 ) : Definition
 
 data class RelationDef(
@@ -350,6 +354,8 @@ data class QueryDef(
     val sourceTextBlock: PropertyValue? = null,
     /** `search { keywords {...} patterns [...] ... }`. Empty when absent. */
     val search: SearchHintsValue = SearchHintsValue(),
+    /** Grammar 0.21 — explicit execution policy; null means no authored declaration. */
+    val skipSecurity: Boolean? = null,
 ) : Definition
 
 /** `def role <name> { label { cs: "...", en: "..." }, description: "..." }`. */
@@ -1254,12 +1260,19 @@ data class EmbeddedBlock(
         val base = if (l == 0) textSource.column else indentWidth
         val start = column + shift(column)
         val end = column + length + shift(column + length)
+
+        fun physicalPosition(offset: Int): Pair<Int, Int>? {
+            if (form != "string") return null
+            return TtrStrings.sourcePosition(text, escapes, offset, textSource.line, textSource.column)
+        }
+        val from = physicalPosition(lineStart + column)
+        val to = physicalPosition(lineStart + column + length)
         return SourceLocation(
             file = source.file,
-            line = textSource.line + l,
-            column = base + start,
-            endLine = textSource.line + l,
-            endColumn = base + end,
+            line = from?.first ?: (textSource.line + l),
+            column = from?.second ?: (base + start),
+            endLine = to?.first ?: (textSource.line + l),
+            endColumn = to?.second ?: (base + end),
             offsetStart = lineOffsets[l] + start,
             offsetEnd = lineOffsets[l] + end,
         )
