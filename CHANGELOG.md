@@ -6,6 +6,16 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — generated canonical YAML and profile schemas
+
+- Grammar 0.21 now generates canonical document/profile schemas and exhaustive shape metadata, exported by
+  `@tatrman/grammar` and bundled under `/schemas/` in `ttr-parser`. Exact kind/property names, nested/open
+  bodies, retained value records, profile operations and typed target paths are checked mechanically.
+- Generation fails on unhandled structural forms; CI rejects stale resources. npm consumer and parser-jar
+  checks verify byte identity. Standalone JVM source builds use the dependency-free Node.js ≥20 emitter.
+- The grammar marker and producer pins stay unchanged; bundle major/minor remains 0.21. Codec/profile
+  execution is delivered separately. The existing 0.21 JVM rebuild notice below remains in force.
+
 ### Added — grammar 0.21 canonical metadata carriers (MW-53)
 
 - Lexical entries retain `indexSecurity`; queries retain explicit `skipSecurity`; query/procedure parameters

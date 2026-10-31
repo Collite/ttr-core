@@ -14,6 +14,11 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 
 ## 0.21 — 2026-10-31
 
+Generated canonical YAML document/profile schemas and exhaustive shape metadata are packaged as
+`schemas/*.json` exports and parser jar resources. Body membership and literal keys come from the grammar;
+structural adapters fail on unhandled forms. CI rejects regeneration drift; package tests verify bytes.
+This adds resources without changing `.g4` or its 0.21 major/minor. Codec/profile execution follows later.
+
 Optional generic metadata: lexical `indexSecurity`, query `skipSecurity`, and query/procedure parameter
 `defaultValue` and ordered `binds`. The four soft keywords remain identifiers and cn free-form keys (`cnKey`).
 Writers may emit the new keys; that text requires a grammar ≥0.21 reader. Absent query policy stays false;

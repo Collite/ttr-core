@@ -17,15 +17,26 @@ export function generatedFiles(source) {
     'canonical-metadata.json': bytes({ ...metadata, handledValueRules: handled }),
   };
 }
-export function generateCanonicalSchemas({ outputDirectory = resolve(directory, '../schemas'), check = false, grammarFile = resolve(directory, '../src/TTR.g4') } = {}) {
+export function generateCanonicalSchemas({
+  outputDirectory = resolve(directory, '../schemas'),
+  check = false,
+  grammarFile = resolve(directory, '../src/TTR.g4'),
+} = {}) {
   const files = generatedFiles(readFileSync(grammarFile, 'utf8'));
   if (!check) mkdirSync(outputDirectory, { recursive: true });
   for (const [name, bytes] of Object.entries(files)) {
     const path = resolve(outputDirectory, name);
     if (check) {
       let existing;
-      try { existing = readFileSync(path, 'utf8'); } catch { /* A missing output is drift too. */ }
-      if (existing !== bytes) throw new Error(`Stale generated schema: ${path}; run pnpm --filter @tatrman/grammar prebuild`);
+      try {
+        existing = readFileSync(path, 'utf8');
+      } catch {
+        /* A missing output is drift too. */
+      }
+      if (existing !== bytes)
+        throw new Error(
+          `Stale generated schema: ${path}; run pnpm --filter @tatrman/grammar prebuild`
+        );
     } else writeFileSync(path, bytes);
   }
   return files;
@@ -36,9 +47,15 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   let check = false;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--check') check = true;
-    else if (args[i] === '--output-dir' && args[i + 1] && !args[i + 1].startsWith('--')) outputDirectory = resolve(args[++i]);
+    else if (args[i] === '--output-dir' && args[i + 1] && !args[i + 1].startsWith('--'))
+      outputDirectory = resolve(args[++i]);
     else throw new Error(`Unknown/incomplete schema generator argument: ${args[i]}`);
   }
-  const files = generateCanonicalSchemas({ check, ...(outputDirectory ? { outputDirectory } : {}) });
-  console.log(`${args.includes('--check') ? 'Verified' : 'Generated'} ${Object.keys(files).join(', ')}`);
+  const files = generateCanonicalSchemas({
+    check,
+    ...(outputDirectory ? { outputDirectory } : {}),
+  });
+  console.log(
+    `${args.includes('--check') ? 'Verified' : 'Generated'} ${Object.keys(files).join(', ')}`
+  );
 }
