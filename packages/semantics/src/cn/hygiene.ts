@@ -251,9 +251,9 @@ class HygieneBuilder {
     return c.properties.find((s) => s.property.kind === kind && (key === undefined || s.property.key === key));
   }
 
-  /** The concept an `of:` names, by key. */
-  private ofKey(c: CnConcept): string | undefined {
-    const of = this.first(c, 'entry', 'of');
+  /** The concept an `of:` (or [key]) names, by key. */
+  private ofKey(c: CnConcept, key = 'of'): string | undefined {
+    const of = this.first(c, 'entry', key);
     if (!of || of.property.kind !== 'entry' || of.property.value.kind !== 'id') return undefined;
     const id = of.property.value;
     const sym = resolveIn(this.resolver, of.doc, id.path, id.parts, { cn: true });
@@ -262,6 +262,26 @@ class HygieneBuilder {
 
   private groundingOf(c: CnConcept): PlacedGrounding | undefined {
     return this.v.groundings.byConcept.get(c.key)?.[0];
+  }
+
+  /** A grounding synthesized from a temporal source — a phase's `from:` / `until:`, a quality's `from:` — names no target. */
+  private sourceOnly(p: PlacedGrounding): boolean {
+    return p.target === undefined && p.targetKey === undefined;
+  }
+
+  /**
+   * A valued-state projection (AM-49): `from: <Relator>.<quality>` on a quality — the relator kind's key and the quality
+   * named (the Kotlin `CnBuilder.projection`); undefined for anything else.
+   */
+  private projection(c: CnConcept): { source: string; quality: string } | undefined {
+    if (c.stereotype !== 'quality') return undefined;
+    const from = this.first(c, 'from');
+    if (from?.property.kind !== 'from') return undefined;
+    const parts = from.property.ref.parts;
+    if (parts.length < 2) return undefined;
+    const owner = parts.slice(0, -1);
+    const sym = resolveIn(this.resolver, from.doc, owner.join('.'), owner, { cn: true });
+    return sym?.kind === 'concept' ? { source: sym.qname, quality: parts[parts.length - 1] } : undefined;
   }
 
   // --- the landing (the Kotlin `CnBuilder.landingOf`) ---------------------
@@ -281,9 +301,19 @@ class HygieneBuilder {
     const c = this.v.concepts.get(key);
     if (!c) return { grade: 'ungrounded' };
     const placed = this.groundingOf(c);
-    if (!placed) {
-      if (c.stereotype !== 'phase' || !this.first(c, 'definition')) return { grade: 'ungrounded' };
-      const bearer = this.ofKey(c);
+    // Only a target-less source grounding (bounds, `from`/`until`, `via` + `per`) projects or inherits; a written
+    // target that does not resolve stays on its layer's path (an md one is hop-missing, A-CN-65).
+    if (!placed || this.sourceOnly(placed)) {
+      const p = this.projection(c);
+      if (p) {
+        const q = [...this.v.concepts.values()].find((x) => x.stereotype === 'quality' && x.name === p.quality && this.ofKey(x) === p.source);
+        if (q) return { ...this.landingOf(q.key), from: p.source, hop: undefined };
+      }
+      const inherited = c.stereotype === 'subkind'
+        || (c.stereotype === 'kind' && this.first(c, 'entry', 'members') !== undefined)
+        || (c.stereotype === 'phase' && (this.first(c, 'definition') !== undefined || this.first(c, 'from') !== undefined));
+      if (!inherited) return { grade: 'ungrounded' };
+      const bearer = this.ofKey(c) ?? this.ofKey(c, 'is_a');
       if (!bearer) return { grade: 'ungrounded' };
       return { ...this.landingOf(bearer), from: bearer, hop: undefined };
     }
@@ -369,7 +399,9 @@ class HygieneBuilder {
         if (id?.kind === 'id') element(id);
       }
     }
-    for (const id of idsOf(entry('via'))) element(id);
+    // a projection's `via` names its relator's quality, a cn ref — never an er element (the Kotlin `viaPath`)
+    const stated = p.conceptKey !== undefined ? this.v.concepts.get(p.conceptKey) : undefined;
+    if (!stated || !this.projection(stated)) for (const id of idsOf(entry('via'))) element(id);
     return [...new Set(out)];
   }
 
@@ -467,7 +499,10 @@ class HygieneBuilder {
   private row(c: CnConcept): ConceptHygieneRow {
     const landing = this.landingOf(c.key);
     const placed = this.groundingOf(c);
-    const target = placed?.targetSymbol ? elementRefOf(placed.targetSymbol) : null;
+    // a source-only grounding (a phase's bounds, a projection) is written on its landing, as the Kotlin builder does
+    const target = placed?.targetSymbol
+      ? elementRefOf(placed.targetSymbol)
+      : placed && this.sourceOnly(placed) ? landing.erTarget ?? null : null;
     const dangling: ConceptHygieneRow['dangling'] = [];
     const seenBindings = new Set<string>();
     for (const p of this.v.groundings.byConcept.get(c.key) ?? []) {

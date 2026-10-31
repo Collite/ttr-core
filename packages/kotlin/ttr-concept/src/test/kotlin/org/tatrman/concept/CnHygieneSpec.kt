@@ -93,10 +93,21 @@ class CnHygieneSpec :
             row("FrequentShopper").phaseAsDefault shouldBe listOf(PhaseAsDefault("frequent", "shopper", "cn.Shopper"))
             // a phase lifts from no element (L17-2): its own "shopper" is not a redundant duplicate
             row("FrequentShopper").redundantTerms shouldBe emptyList()
+            // grammar 0.20 (CN-P8): a rigid subkind and a bounded phase land through their bearer, a valued-state
+            // projection through its relator — and the projection's `from:` is a cn ref, no dangling one
+            row("GoldShopper").erTarget shouldBe "er.entity.shopper"
+            row("GoldShopper").landingFrom shouldBe "cn.Shopper"
+            row("Member").grounding!!.target shouldBe "er.entity.shopper"
+            row("Member").landingFrom shouldBe "cn.Shopper"
+            row("membership_fee").erTarget shouldBe "er.entity.membership.fee"
+            row("membership_fee").landingFrom shouldBe "cn.Membership"
+            row("membership_fee").danglingGroundings shouldBe emptyList()
             report.definitions.map { it.subject to it.slug } shouldBe
                 listOf(
                     "cn.LoyalShopper" to CnDefinitionLints.CYCLE,
                     "cn.VipShopper" to CnDefinitionLints.CYCLE,
+                    // `tier` has no md face: the subkind's definition renders on E-R only (a hygiene note)
+                    "cn.GoldShopper" to "cn/definition-unreachable(md)",
                 )
         }
 

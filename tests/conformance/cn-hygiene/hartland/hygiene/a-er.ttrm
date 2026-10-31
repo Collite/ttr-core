@@ -7,14 +7,18 @@
 // md-grounded with no hop (`md/er-unmapped`) · `Supplier` ungrounded, with an open-tier edge · `StoreVisit` a dangling
 // grounding (`visited_at` is not an attribute) · "shopper" and "sale" redundant term duplicates (each also a term on
 // the element the concept grounds to) · `FrequentShopper` a phase as the default sense of "shopper" · `LoyalShopper` ⇄
-// `VipShopper` a definition cycle (Kotlin only).
+// `VipShopper` a definition cycle (Kotlin only). Grammar 0.20 (CN-P8): `GoldShopper` a rigid subkind and `Member` a
+// phase bounded by two events, both landing through their bearer; `membership_fee` a valued-state projection, landing
+// through its relator `Membership` (its `from:` names a cn quality — no dangling ref).
 package hartland.hygiene
 model er
 
 def entity shopper {
     attributes: [
         def attribute shopper_id { type: int, isKey: true },
-        def attribute joined_on  { type: date }
+        def attribute joined_on  { type: date },
+        def attribute left_on    { type: date, optional: true },
+        def attribute tier       { type: text }
     ]
 }
 def entity sale {
@@ -33,3 +37,17 @@ def entity store_visit {
     ]
 }
 def relation rel_visit_shopper { from: er.entity.store_visit, to: er.entity.shopper }
+def entity membership {
+    attributes: [
+        def attribute membership_id { type: int, isKey: true },
+        def attribute shopper_id    { type: int },
+        def attribute fee           { type: decimal },
+        def attribute valid_from    { type: date },
+        def attribute valid_to      { type: date, optional: true }
+    ]
+}
+def relation rel_membership_shopper {
+    from: er.entity.membership,
+    to: er.entity.shopper,
+    join: [{ from: er.entity.membership.shopper_id, to: er.entity.shopper.shopper_id }]
+}

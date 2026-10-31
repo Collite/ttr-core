@@ -24,6 +24,65 @@
       "retiredCodes": []
     },
     {
+      "concept": "cn.GoldShopper",
+      "package": "hartland.hygiene",
+      "stereotype": "subkind",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": null,
+      "hop": null,
+      "landsOn": "er.entity.shopper",
+      "landingFrom": "cn.Shopper",
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.Joined",
+      "package": "hartland.hygiene",
+      "stereotype": "event",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": {
+        "layer": "er",
+        "binding": "cn2er_event",
+        "target": "er.entity.shopper"
+      },
+      "hop": null,
+      "landsOn": "er.entity.shopper",
+      "landingFrom": null,
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.Left",
+      "package": "hartland.hygiene",
+      "stereotype": "event",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": {
+        "layer": "er",
+        "binding": "cn2er_event",
+        "target": "er.entity.shopper"
+      },
+      "hop": null,
+      "landsOn": "er.entity.shopper",
+      "landingFrom": null,
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
       "concept": "cn.LoyalShopper",
       "package": "hartland.hygiene",
       "stereotype": "phase",
@@ -33,6 +92,48 @@
       "hop": null,
       "landsOn": "er.entity.shopper",
       "landingFrom": "cn.Shopper",
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.Member",
+      "package": "hartland.hygiene",
+      "stereotype": "phase",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": {
+        "layer": "er",
+        "binding": "cn2er_phase",
+        "target": "er.entity.shopper"
+      },
+      "hop": null,
+      "landsOn": "er.entity.shopper",
+      "landingFrom": "cn.Shopper",
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.Membership",
+      "package": "hartland.hygiene",
+      "stereotype": "kind",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": {
+        "layer": "er",
+        "binding": "cn2er_kind",
+        "target": "er.entity.membership"
+      },
+      "hop": null,
+      "landsOn": "er.entity.membership",
+      "landingFrom": null,
       "openEntries": [],
       "relations": [],
       "dangling": [],
@@ -190,6 +291,153 @@
       "redundantTerms": [],
       "phaseAsDefault": [],
       "retiredCodes": []
+    },
+    {
+      "concept": "cn.fee",
+      "package": "hartland.hygiene",
+      "stereotype": "quality",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": {
+        "layer": "er",
+        "binding": "cn2er_quality",
+        "target": "er.entity.membership.fee"
+      },
+      "hop": null,
+      "landsOn": "er.entity.membership.fee",
+      "landingFrom": null,
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.joined_on",
+      "package": "hartland.hygiene",
+      "stereotype": "quality",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": {
+        "layer": "er",
+        "binding": "cn2er_quality",
+        "target": "er.entity.shopper.joined_on"
+      },
+      "hop": null,
+      "landsOn": "er.entity.shopper.joined_on",
+      "landingFrom": null,
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.left_on",
+      "package": "hartland.hygiene",
+      "stereotype": "quality",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": {
+        "layer": "er",
+        "binding": "cn2er_quality",
+        "target": "er.entity.shopper.left_on"
+      },
+      "hop": null,
+      "landsOn": "er.entity.shopper.left_on",
+      "landingFrom": null,
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.membership_fee",
+      "package": "hartland.hygiene",
+      "stereotype": "quality",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": {
+        "layer": "er",
+        "binding": "cn2er_quality",
+        "target": "er.entity.membership.fee"
+      },
+      "hop": null,
+      "landsOn": "er.entity.membership.fee",
+      "landingFrom": "cn.Membership",
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.tier",
+      "package": "hartland.hygiene",
+      "stereotype": "quality",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": {
+        "layer": "er",
+        "binding": "cn2er_quality",
+        "target": "er.entity.shopper.tier"
+      },
+      "hop": null,
+      "landsOn": "er.entity.shopper.tier",
+      "landingFrom": null,
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.valid_from",
+      "package": "hartland.hygiene",
+      "stereotype": "quality",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": {
+        "layer": "er",
+        "binding": "cn2er_quality",
+        "target": "er.entity.membership.valid_from"
+      },
+      "hop": null,
+      "landsOn": "er.entity.membership.valid_from",
+      "landingFrom": null,
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
+    },
+    {
+      "concept": "cn.valid_to",
+      "package": "hartland.hygiene",
+      "stereotype": "quality",
+      "grade": "er-grounded",
+      "via": "direct",
+      "grounding": {
+        "layer": "er",
+        "binding": "cn2er_quality",
+        "target": "er.entity.membership.valid_to"
+      },
+      "hop": null,
+      "landsOn": "er.entity.membership.valid_to",
+      "landingFrom": null,
+      "openEntries": [],
+      "relations": [],
+      "dangling": [],
+      "redundantTerms": [],
+      "phaseAsDefault": [],
+      "retiredCodes": []
     }
   ],
   "relationTypes": [
@@ -210,6 +458,13 @@
       "severity": "error",
       "at": "hartland/hygiene/c-concepts.ttrm:12",
       "message": "the definitions inline each other: VipShopper → LoyalShopper → VipShopper (AM-26)"
+    },
+    {
+      "concept": "cn.GoldShopper",
+      "slug": "cn/definition-unreachable(md)",
+      "severity": "hygiene",
+      "at": "hartland/hygiene/c-concepts.ttrm:15",
+      "message": "the definition cannot render on md: `tier` has no md grounding and no md element hops to its E-R landing"
     }
   ]
 }
