@@ -38,7 +38,7 @@ def action notify {
     dry_run:    { en: "would notify {who} with {detail.count} rows" }
 }
 def action notify_customer {
-    columns:    [def column customer { type: customer.sk }, def column template { type: text }]
+    columns:    [def column customer { type: customer.sk }, def column to { type: customer.email }, def column template { type: text }]
     sinks:      { native: deliver, n8n: "n8n-nodes-base.emailSend" }
     deliverable: true
     approval:   none

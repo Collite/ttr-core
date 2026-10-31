@@ -307,6 +307,10 @@
         {
           "name": "c_center_sk",
           "type": "int"
+        },
+        {
+          "name": "c_email",
+          "type": "varchar"
         }
       ]
     },
@@ -1655,6 +1659,10 @@
         {
           "name": "center",
           "type": "int"
+        },
+        {
+          "name": "email",
+          "type": "text"
         }
       ]
     },
@@ -2611,6 +2619,10 @@
         {
           "name": "customer",
           "type": "customer.sk"
+        },
+        {
+          "name": "to",
+          "type": "customer.email"
         },
         {
           "name": "template",

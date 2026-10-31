@@ -54,7 +54,10 @@ def table customer {
         def column c_birth_year       { type: int },
         // AU D-83 — the customer's distribution center: the modal warehouse of their web/marketplace
         // lines (data/automation/24-centers.sql). NULL for a customer who never ordered from one.
-        def column c_center_sk        { type: int }
+        def column c_center_sk        { type: int },
+        // AU — the customer's mail address, generated from the key under the reserved .example domain
+        // (data/automation/10-ddl.sql). TPC-DS's own c_email_address stays unmodelled: its domains are real.
+        def column c_email            { type: { type: varchar, length: 64 } }
     ]
 }
 

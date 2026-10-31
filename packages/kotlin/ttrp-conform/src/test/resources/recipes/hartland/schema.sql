@@ -24,7 +24,8 @@ CREATE TABLE customer (
     c_current_cdemo_sk integer,
     c_current_hdemo_sk integer,
     c_birth_year integer,
-    c_center_sk integer
+    c_center_sk integer,
+    c_email varchar(64)
 );
 
 CREATE TABLE inventory (

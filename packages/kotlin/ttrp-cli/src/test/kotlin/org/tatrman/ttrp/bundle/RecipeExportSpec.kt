@@ -363,7 +363,7 @@ class RecipeExportSpec :
                     .trimEnd(),
             )
         }
-        "H-2 export refuses missing customer address and still verifies every process bundle" {
+        "H-2 export addresses customer mail per row and still verifies every process bundle" {
             val project = exportProject()
             val bundles = temporaryDirectory("n8n-h2-bundles")
             listOf("decide_return", "monitor_inbound", "settle").forEach { recipe ->
@@ -400,9 +400,64 @@ class RecipeExportSpec :
                         out.toString(),
                     ),
                 )
-            result.statusCode shouldBe 2
-            result.output shouldContain "emailSend action notify_customer needs exactly one addressing column"
-            Files.exists(out.resolve("returns_n8n.n8n_l1.export")) shouldBe false
+            io.kotest.assertions.withClue(result.output) { result.statusCode shouldBe 0 }
+            val rendered = Files.readString(out.resolve("returns_n8n.n8n_l1.export/workflow.json"))
+            listOf("decide_return", "monitor_inbound", "settle").forEach { rendered shouldContain "/recipes/$it/runs" }
+            golden("returns_n8n_workflow", rendered.trimEnd())
+            rendered shouldContain "obligation present"
+            // R2 (R189-A): every customer mail reads the route row's address column; nothing is sent to a role or "".
+            val workflow =
+                kotlinx.serialization.json.Json
+                    .parseToJsonElement(rendered)
+                    .jsonObject
+            val nodes = workflow.getValue("nodes").jsonArray.map { it.jsonObject }
+            val mail =
+                workflow
+                    .getValue("meta")
+                    .jsonObject
+                    .getValue("tatrman")
+                    .jsonObject
+                    .getValue("mail")
+                    .jsonArray
+                    .map { it.jsonObject }
+            mail.size shouldBe 6
+            mail.forEach {
+                it.getValue("action").jsonPrimitive.content shouldBe "notify_customer"
+                it.getValue("addressKind").jsonPrimitive.content shouldBe "row"
+                it.getValue("addressColumn").jsonPrimitive.content shouldBe "to"
+            }
+            val groups =
+                nodes.filter {
+                    it
+                        .getValue("name")
+                        .jsonPrimitive.content
+                        .endsWith(" notify_customer groups")
+                }
+            groups.size shouldBe 6
+            groups.forEach {
+                it
+                    .getValue("parameters")
+                    .jsonObject
+                    .getValue("jsCode")
+                    .jsonPrimitive.content shouldContain
+                    "const to=row[\"customer_email\"];"
+            }
+            nodes
+                .filter { it.getValue("type").jsonPrimitive.content == "n8n-nodes-base.emailSend" }
+                .forEach {
+                    val to =
+                        it
+                            .getValue("parameters")
+                            .jsonObject
+                            .getValue("toEmail")
+                            .jsonPrimitive.content
+                    to shouldContain ".item.json.mail.to"
+                    (to.contains("TTR_MAIL_RECIPIENTS") || to.contains("[\"\"]")) shouldBe false
+                }
+            listOf("decide_return", "monitor_inbound", "settle").forEach { recipe ->
+                Files.readString(out.resolve("returns_n8n.n8n_l1.export/tests/$recipe/shared.yaml")) shouldBe
+                    "recipe: $recipe\n"
+            }
             // A stale/missing step refuses the whole package, before any output directory exists.
             Files.delete(bundles.resolve("settle/manifest.json"))
             val failedOut = temporaryDirectory("n8n-missing-step")
@@ -590,7 +645,7 @@ class RecipeExportSpec :
             result.statusCode shouldBe 2
             result.output shouldContain "event schema column `at` collides with the port clock"
         }
-        "R2 the customer-addressed winback action shape refuses until its producer supplies an address column" {
+        "R2 the customer-addressed action shape renders its fixture address column and refuses without it" {
             val bundle = build("decide_return")
             val d = world.deployment("returns_n8n")!!
             val graph =
@@ -602,8 +657,11 @@ class RecipeExportSpec :
                     actions,
                 )
             val emit = actions.single { it.qname.name == "notify_customer" }
-            emit.columns.any { it.name == "to" } shouldBe false
-            val customer =
+            emit.columns.single { it.name == "to" }.type shouldBe "customer.email"
+            graph.wirings
+                .filter { it.action == "notify_customer" }
+                .forEach { it.columns["to"] shouldBe "customer_email" }
+            val addressed =
                 graph.copy(
                     recipe = graph.recipe.copy(name = "winback"),
                     wirings =
@@ -615,6 +673,32 @@ class RecipeExportSpec :
                     actions =
                         mapOf(
                             "emit" to graph.actions.getValue("notify_customer"),
+                        ),
+                )
+            String(
+                EmitPluginLoader
+                    .builtin("n8n_l1")
+                    .emitRecipe(
+                        org.tatrman.ttrp.emit.spi
+                            .RecipeEmitRequest(addressed, "{}", "", "{}"),
+                    ).files
+                    .getValue("workflow.json"),
+            ) shouldContain "const to=row[\\\"customer_email\\\"];"
+            val customer =
+                graph.copy(
+                    recipe = graph.recipe.copy(name = "winback"),
+                    wirings =
+                        graph.wirings
+                            .filter {
+                                it.action ==
+                                    "notify_customer"
+                            }.map { it.copy(action = "emit") },
+                    actions =
+                        mapOf(
+                            "emit" to
+                                graph.actions.getValue("notify_customer").let { a ->
+                                    a.copy(columns = a.columns - "to")
+                                },
                         ),
                 )
             io.kotest.assertions.throwables
