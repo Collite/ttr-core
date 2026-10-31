@@ -3,7 +3,8 @@
 `hartland/hygiene/` is one model project (Hartland names) with every row the hygiene report v2 shows (cn contracts
 §7): an er-grounded kind, an md-grounded event that hops (`md2er_cubelet sales_er`), an md-grounded kind with no hop
 (`md/er-unmapped`), an ungrounded kind with an open-tier edge, a dangling grounding, two redundant term duplicates, a
-phase as the default sense of its bearer's term, and a definition cycle.
+phase as the default sense of its bearer's term, a definition cycle, and (grammar 0.20) a rigid subkind and an
+event-bounded phase landing through their bearer and a valued-state projection landing through its relator.
 
 | File | What | Read by |
 |---|---|---|

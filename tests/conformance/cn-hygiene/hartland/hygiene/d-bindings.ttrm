@@ -7,3 +7,21 @@ def cn2er_event visit_g {
     participants: { shopper: [er.relation.rel_visit_shopper] },
     period: { at: er.entity.store_visit.visited_at }
 }
+def cn2er_event joined_g {
+    event: cn.Joined,
+    target: er.entity.shopper,
+    participants: { shopper: [] },
+    period: { at: er.entity.shopper.joined_on }
+}
+def cn2er_event left_g {
+    event: cn.Left,
+    target: er.entity.shopper,
+    participants: { shopper: [] },
+    period: { at: er.entity.shopper.left_on }
+}
+def cn2er_kind membership_g {
+    kind: cn.Membership,
+    target: er.entity.membership,
+    participants: { shopper: [er.relation.rel_membership_shopper] },
+    period: { start: er.entity.membership.valid_from, end: er.entity.membership.valid_to }
+}

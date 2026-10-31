@@ -91,6 +91,18 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   are an error that names the labels, on all three runtimes. The renderer's refusal for that case says "involves no one
   participant `cn.Ticket` can be" (it said "does not involve").
 
+### Fixed — the editor's hygiene report on the things-in-time families (CN-P8 S8.3)
+
+- `@tatrman/semantics` `cnHygieneReport` now grades three grammar-0.20 families the way `ttr cn hygiene` does,
+  restoring the CN-D29 parity up to `## Definitions`:
+  - a rigid `subkind` with a `definition:` lands through its bearer (it was `ungrounded`);
+  - a phase bounded by `from:` / `until:` writes its synthesized `cn2er_phase` on the bearer's landing (it was
+    `unresolved (cn2er_phase)`);
+  - a valued-state projection (`from: <Relator>.<quality>`) lands through its relator (it was
+    `unresolved (cn2er_quality)`), and its `from:` is no longer reported as a dangling er ref.
+- Found on Hartland's re-modelled package (model gate C5/C6). The `cn-hygiene` conformance golden now carries one row
+  of each family (`GoldShopper`, `Member`, `membership_fee`), so both runtimes are held to them.
+
 ### Changed — test infrastructure
 
 - The browser LSP Worker bundle ceiling is 720 KB gz (696,864 B at grammar 0.20; 680 KB before).

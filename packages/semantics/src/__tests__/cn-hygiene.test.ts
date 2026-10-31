@@ -58,6 +58,18 @@ describe('cn hygiene report — the editor half of the golden (CN-P2 S2.7)', () 
     expect(mdEscape('a\nb')).toBe('a b');
   });
 
+  // grammar 0.20 (CN-P8 S8.3): the editor had graded these three families apart from `ttr cn hygiene` — a rigid
+  // subkind ungrounded, a bounded phase's and a projection's synthesized grounding unresolved, the projection's
+  // `from: Membership.fee` a dangling er ref
+  it('a rigid subkind and a bounded phase land through their bearer, a projection through its relator', () => {
+    const row = (name: string) => golden().concepts.find((c) => c.concept === `cn.${name}`)!;
+    expect(row('GoldShopper')).toMatchObject({ grade: 'er-grounded', grounding: null, landsOn: 'er.entity.shopper', landingFrom: 'cn.Shopper' });
+    expect(row('Member')).toMatchObject({ grade: 'er-grounded', landsOn: 'er.entity.shopper', landingFrom: 'cn.Shopper' });
+    expect(row('Member').grounding).toEqual({ layer: 'er', binding: 'cn2er_phase', target: 'er.entity.shopper' });
+    expect(row('membership_fee')).toMatchObject({ grade: 'er-grounded', landsOn: 'er.entity.membership.fee', landingFrom: 'cn.Membership', dangling: [] });
+    expect(row('membership_fee').grounding).toEqual({ layer: 'er', binding: 'cn2er_quality', target: 'er.entity.membership.fee' });
+  });
+
   it('a project with no concepts: an empty report', () => {
     const r = load([{ uri: 'a.ttrm', src: 'package hartland.none\nmodel er\n\ndef entity shopper { attributes: [ def attribute id { type: int, isKey: true } ] }\n' }]);
     expect(r.concepts).toEqual([]);

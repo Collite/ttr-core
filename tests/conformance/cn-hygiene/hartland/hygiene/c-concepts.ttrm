@@ -11,4 +11,18 @@ def phase FrequentShopper { of: Shopper, definition: """count(Sale involving thi
 def phase LoyalShopper    { of: Shopper, definition: """VipShopper""" }
 def phase VipShopper      { of: Shopper, definition: """LoyalShopper""" }
 
+// grammar 0.20 (CN-P8): a rigid subkind and a bounded phase land through their bearer; a projection through its relator
+def subkind GoldShopper   { of: Shopper, definition: """tier = 'gold'""" }
+def event Joined          { involves: [Shopper], period: { at: joined_on } }
+def event Left            { involves: [Shopper], period: { at: left_on } }
+def phase Member          { of: Shopper, from: Joined, until: Left }
+def kind Membership       { involves: [Shopper], period: { start: valid_from, end: valid_to, end_open: open }, qualities: [fee, valid_from, valid_to] }
+def quality tier           { of: Shopper,    grounds: er.entity.shopper.tier }
+def quality joined_on      { of: Shopper,    grounds: er.entity.shopper.joined_on }
+def quality left_on        { of: Shopper,    grounds: er.entity.shopper.left_on }
+def quality fee            { of: Membership, grounds: er.entity.membership.fee }
+def quality valid_from     { of: Membership, grounds: er.entity.membership.valid_from }
+def quality valid_to       { of: Membership, grounds: er.entity.membership.valid_to }
+def quality membership_fee { of: Shopper, valued_state: true, from: Membership.fee }
+
 def relation_type supplies { label: { en: "supplies" } }
