@@ -617,14 +617,14 @@ describe('cn walker — review-117 fixes', () => {
     expect(at(ASTRAL, z.offsetStart, z.offsetEnd)).toBe('\\"z\\"');
   });
 
-  // review-118 L-1: a backslash before a line break escapes it (the lexer admits it) — on all three
+  // review-118 L-1: a backslash before a physical line break is now an unknown escape (R190-B) — on all three
   // targets alike, and the line after it maps onto the file's next line.
   const ESC_NEWLINE = 'model cn\ndef quality P { of: X, definition: "a = 1 \\\nand b = 2" }';
 
-  it('reads an escaped line break into the text and maps the line after it (review-118 L-1)', () => {
+  it('retains a backslash before a physical line break and maps the next line (R190-B)', () => {
     const b = definitionOf(ESC_NEWLINE, 'P');
-    expect(b.text).toBe('a = 1 \nand b = 2');
-    expect(b.escapes).toEqual([6]);
+    expect(b.text).toBe('a = 1 \\\nand b = 2');
+    expect(b.escapes).toBeUndefined();
     expect(b.lineOffsets).toEqual([offsetOf(ESC_NEWLINE, 'a = 1'), offsetOf(ESC_NEWLINE, 'and b')]);
     const and = embeddedBlockLocation(b, 1, 0, 3);
     expect(at(ESC_NEWLINE, and.offsetStart, and.offsetEnd)).toBe('and');
@@ -633,7 +633,7 @@ describe('cn walker — review-117 fixes', () => {
     expect([b.textSource.endLine, b.textSource.endColumn]).toEqual([3, 9]);
     for (const [sep, name] of [['\r', 'CR'], [' ', 'LS'], ['\u0085', 'NEL']]) {
       const src = `model cn\ndef quality P { of: X, definition: "a\\${sep}b" }`;
-      expect(definitionOf(src, 'P').text, name).toBe(`a${sep}b`);
+      expect(definitionOf(src, 'P').text, name).toBe(`a\\${sep}b`);
     }
   });
 

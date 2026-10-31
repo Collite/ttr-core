@@ -1,0 +1,66 @@
+{
+    "definitions": [
+        {
+            "description": "say \"hi\"\nnext",
+            "kind": "pattern",
+            "name": "escaped",
+            "properties": {
+                "for": "db.query.raw",
+                "match": "^\\d{4}\\s+(\\w+)$",
+                "text": "a\tb"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "query",
+            "name": "q",
+            "properties": {
+                "parameters": [
+                    {
+                        "defaultValue": "C:\\new",
+                        "label": "a\tb",
+                        "name": "p"
+                    }
+                ],
+                "sourceText": {
+                    "dialect": null,
+                    "kind": "taggedBlock",
+                    "language": "SQL",
+                    "tag": "sql",
+                    "value": "select '\\d'"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "entity",
+            "name": "Customer",
+            "properties": {
+                "labelPlural": "a\tb"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "kind",
+            "name": "Item",
+            "properties": {
+                "definition": {
+                    "form": "string",
+                    "language": "pl",
+                    "text": "label = \"a\"\tand\rname = \"C:\\new\""
+                }
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": null,
+    "schemaDirective": {
+        "code": "lexicon",
+        "locale": "en",
+        "namespace": null
+    }
+}

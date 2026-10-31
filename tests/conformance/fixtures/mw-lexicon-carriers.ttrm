@@ -1,0 +1,5 @@
+model lexicon locale en
+def term customer { for: er.entity.Customer, forms: ["customer"], indexSecurity: applied }
+def pattern paired { for: db.query.raw, match: "name (.*)", text: "Name Alice?", indexSecurity: none }
+def pattern alternate { for: db.query.raw, match: "lookup (.*)", text: "Lookup Bob?", indexSecurity: none }
+def example ordinary { for: er.entity.Customer, text: "Show customers" }

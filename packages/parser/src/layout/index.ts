@@ -39,3 +39,5 @@ export {
   type TtrlReadResult,
   type TtrReadResult,
 } from './layout-ttr.js';
+
+export { decodeTtrString, encodeTtrString } from '../strings.js';

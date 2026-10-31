@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { encodeTtrString } from '@tatrman/parser/layout';
 import { parseString } from '@tatrman/parser';
 import { Refusal } from './refusals.js';
 import type { DataType, Definition, Document, ObjectValue, PropertyValue, Reference, SourceLocation } from '@tatrman/parser';
@@ -18,7 +19,7 @@ export class Fragment {
   ref(path: string): Reference { return { path, parts: path.split('.'), source: this.span(path) }; }
   id(path: string): PropertyValue { return { kind: 'id', path, parts: path.split('.'), source: this.span(path) }; }
   object(entries: Record<string, string>, quoted = false): ObjectValue {
-    const text = '{ ' + Object.entries(entries).map(([k, v]) => `${k}: ${quoted ? JSON.stringify(v) : v}`).join(', ') + ' }';
+    const text = '{ ' + Object.entries(entries).map(([k, v]) => `${k}: ${quoted ? encodeTtrString(v) : v}`).join(', ') + ' }';
     return { kind: 'object', entries: [], source: this.span(text) };
   }
   type(value: string | DataType): DataType {

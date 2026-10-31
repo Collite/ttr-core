@@ -305,6 +305,7 @@ data class LexiconLink(
     val sensePriority: Double? = null,
     val sourceFile: String = "",
     val sourceLocation: SourceLocation? = null,
+    val indexSecurity: String? = null,
 )
 
 /**

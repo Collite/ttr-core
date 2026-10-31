@@ -195,3 +195,4 @@ export async function parseDirectory(rootPath: string, recursive = true): Promis
   await walk(rootPath);
   return results;
 }
+export { decodeTtrString, encodeTtrString } from './strings.js';

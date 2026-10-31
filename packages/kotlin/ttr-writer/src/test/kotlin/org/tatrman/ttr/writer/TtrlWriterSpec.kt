@@ -68,4 +68,21 @@ class TtrlWriterSpec :
             val doc = TtrlLoader.parseString(scrambled, "hero.ttrl").document!!
             TtrlWriter.write(doc) shouldBe canonical
         }
+
+        "layout strings use the shared escapes and roundtrip" {
+            val parsed =
+                TtrlLoader.parseString(
+                    """ttrl 1 canvas a { mode: manual skin: "C:\\new\t\d" nodes: { "a\nb": { x: 1, y: 2 } } }""",
+                    "escapes.ttrl",
+                )
+            parsed.errors shouldBe emptyList()
+            val doc = parsed.document!!
+            val written = TtrlWriter.write(doc)
+            val again = TtrlLoader.parseString(written, "escapes.ttrl")
+            again.errors shouldBe emptyList()
+            val actual = again.document!!.canvases.single()
+            actual.copy(location = doc.canvases.single().location) shouldBe doc.canvases.single()
+            written.contains("C:\\\\new\\t\\\\d") shouldBe true
+            written.contains("a\\nb") shouldBe true
+        }
     })

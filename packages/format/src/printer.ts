@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { encodeTtrString } from '@tatrman/parser/layout';
 import type {
   Document, Definition, SourceLocation, ParameterDef, GraphBlock, Trivia,
   ConceptBody, ConceptBindingDef, ConceptDef, ConceptParticipant, ConceptProperty, ConceptSugar, ListValue, ObjectValue,
@@ -118,7 +119,7 @@ function withTrivia(node: TriviaNode, doc: Doc): Doc {
 }
 
 function strListDoc(arr: string[], quoted: boolean): Doc {
-  const items = arr.map((s) => (quoted ? JSON.stringify(s) : s));
+  const items = arr.map((s) => (quoted ? encodeTtrString(s) : s));
   return text(`[${items.join(', ')}]`);
 }
 
@@ -171,7 +172,7 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
   };
   const v = (n: { source: SourceLocation } | undefined) => (n ? vsrc(ctx, n) : undefined);
   const b = (x: boolean | undefined) => (x === undefined ? undefined : text(x ? 'true' : 'false'));
-  const qstr = (x: string | undefined) => (x === undefined ? undefined : text(JSON.stringify(x)));
+  const qstr = (x: string | undefined) => (x === undefined ? undefined : text(encodeTtrString(x)));
   const defList = (arr: Definition[] | undefined) => (arr && arr.length ? defListDoc(arr, ctx) : undefined);
   switch (def.kind) {
     case 'md2erDimension':
@@ -183,7 +184,7 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
       add(def.kind === 'md2erDimension' ? 'entity' : 'target',
         (def.kind === 'md2erDimension' ? v(def.entityReference) : undefined) ?? (def.entity ? text(def.entity) : undefined));
       const value = (s: string) => /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(s)
-        && s.split('.').every(p => !TTR_NON_ID_WORDS.has(p)) ? s : JSON.stringify(s);
+        && s.split('.').every(p => !TTR_NON_ID_WORDS.has(p)) ? s : encodeTtrString(s);
       // Object keys are grammar `id`s, not string literals; keep their valid authored spelling.
       const record = (entries: Record<string, string>) => Object.keys(entries).length
         ? text(`{ ${Object.entries(entries).map(([k, val]) => `${k}: ${value(val)}`).join(', ')} }`) : undefined;
@@ -709,7 +710,7 @@ function formatDef(def: Definition, ctx: Ctx, topLevel: boolean): Doc {
 function formatGraph(graph: GraphBlock): Doc {
   const props: Prop[] = [];
   if (graph.schema) props.push({ key: 'model', value: text(graph.schema) });
-  if (graph.description !== undefined) props.push({ key: 'description', value: text(JSON.stringify(graph.description)) });
+  if (graph.description !== undefined) props.push({ key: 'description', value: text(encodeTtrString(graph.description)) });
   if (graph.tags && graph.tags.length) props.push({ key: 'tags', value: strListDoc(graph.tags, true) });
   // objects always break one-per-line.
   const objects = concat([
@@ -740,7 +741,7 @@ function formatLayout(layout: NonNullable<GraphBlock['layout']>): Doc {
   const items: Doc[] = [];
   if (layout.viewport) {
     const vp = layout.viewport;
-    items.push(text(`viewport: { zoom: ${vp.zoom}, panX: ${vp.panX}, panY: ${vp.panY}, displayMode: ${JSON.stringify(vp.displayMode)} }`));
+    items.push(text(`viewport: { zoom: ${vp.zoom}, panX: ${vp.panX}, panY: ${vp.panY}, displayMode: ${encodeTtrString(vp.displayMode)} }`));
   }
   items.push(concat([text('nodes: '), nodesDoc]));
   return concat([text('{'), indent(concat([hardline, join(items, concat([text(','), hardline]))])), hardline, text('}')]);

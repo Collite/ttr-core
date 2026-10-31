@@ -160,3 +160,13 @@ def example q1 { for: md.cubelet.sales, text: "Kolik jsme utržili" }
     expect(a.diagnostics.some((d) => d.code === DiagnosticCode.LexiconLocaleOnNonLexicon)).toBe(true);
   });
 });
+
+it('retains canonical index policy and leaves ordinary and inline entries absent', () => {
+  const canonical = desugarLexicon(parseString(`model lexicon
+    def term secure { for: er.entity.Customer, indexSecurity: applied }
+    def term ordinary { for: er.entity.Customer }
+  `).ast!);
+  expect(canonical.entries[0].indexSecurity).toBe('applied');
+  expect(canonical.entries[1].indexSecurity).toBeUndefined();
+  expect(desugarLexicon(parseString(INLINE).ast!).entries[0].indexSecurity).toBeUndefined();
+});

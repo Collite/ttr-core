@@ -756,7 +756,7 @@ data class QueryParameterDef(
     val name: String,
     val type: String,
     val label: String = "",
-    /** Ordered attribute bindings, retained by grammar 0.21 and host dialect loaders. */
+    /** Ordered attribute bindings in the existing `entity.attribute` form. */
     val binds: List<String> = emptyList(),
     /** Explicit parameter default (including empty string); null means no default was declared. */
     val defaultValue: String? = null,

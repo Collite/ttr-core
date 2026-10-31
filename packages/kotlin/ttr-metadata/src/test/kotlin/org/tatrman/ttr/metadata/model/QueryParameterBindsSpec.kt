@@ -96,7 +96,7 @@ class QueryParameterBindsSpec :
             val bound = render(query(binds = listOf(customerName)))
 
             bound shouldContain "binds"
-            bound shouldContain "název_zákazníka"
+            bound shouldContain "er.entity.$customerName"
             render(query(binds = emptyList())) shouldNotContain "binds"
         }
 

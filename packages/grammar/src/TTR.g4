@@ -755,9 +755,10 @@ valueSpaceProperty     : VALUE_SPACE propSep? id ;
 // `to`, `type`, `name`, `key`, `source`, `default`, `cardinality`, … are not free-form keys at the top
 // of a cn body. Inside a nested object a key is any `id` (every `idPart` word — `to`, `from`, `name`,
 // `default` …, not `cardinality`) or `type` / `precision`. HIERARCHY and VIA are the two pre-0.17 tokens
-// admitted as free-form keys (`hierarchy: { closure: … }`, `via: [ … ]`).
+// admitted as free-form keys (`hierarchy: { closure: … }`, `via: [ … ]`). The 0.21 soft keywords
+// also remain free-form keys: none starts a typed cn property.
 cnEntry          : cnKey propSep? cnValue ;
-cnKey            : IDENT | HIERARCHY | VIA ;
+cnKey            : IDENT | HIERARCHY | VIA | INDEX_SECURITY | SKIP_SECURITY | DEFAULT_VALUE | BINDS ;
 cnValue          : cnObject | cnList | literal | id ;
 cnObject         : LBRACE (cnObjectEntry (COMMA? cnObjectEntry)* COMMA?)? RBRACE ;
 // Nested keys are any word, plus the two type keywords cn spells as keys: `relations: [ { type: supplies,
@@ -1279,7 +1280,7 @@ id : idPart ( DOT idPart )* ;
 
 idPart
   : IDENT
-  | INDEX_SECURITY | SKIP_SECURITY | DEFAULT_VALUE | BINDS // 0.21 — soft keywords
+  | INDEX_SECURITY | SKIP_SECURITY | DEFAULT_VALUE | BINDS // 0.21 — soft keywords; also preserve cnKey compatibility
   | SUBKIND | PER | UNTIL                                // 0.20 — soft keywords
   | DB | ER | BINDING | MAP | QUERY | CNC                 // schema codes (MAP retained as id fragment only)
   | ROLE | ER2CNC_ROLE                                   // Phase 2.2 kinds

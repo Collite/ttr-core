@@ -1087,7 +1087,13 @@ class FileBasedSource(
                                     defaultValue = (obj["defaultValue"] as? PropertyValue.StringValue)?.raw,
                                     binds =
                                         (obj["binds"] as? PropertyValue.ListValue)?.items.orEmpty().mapNotNull {
-                                            (it as? PropertyValue.IdValue)?.ref?.path
+                                            (it as? PropertyValue.IdValue)?.ref?.path?.let { path ->
+                                                when {
+                                                    path.startsWith("er.entity.") -> path.removePrefix("er.entity.")
+                                                    path.startsWith("er.") -> path.removePrefix("er.")
+                                                    else -> path
+                                                }
+                                            }
                                         },
                                 )
                             },

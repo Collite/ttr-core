@@ -47,4 +47,40 @@ class CanonicalCarriersSpec :
             p.text shouldBe "Name Alice?"
             p.indexSecurity shouldBe "none"
         }
+
+        "canonical string escapes survive render and reparse" {
+            val lex =
+                TtrLoader.parseString(
+                    """model lexicon def pattern p { for: db.query.q, match: "^\d{4}\s+(\w+)$", text: "a\tb", description: "say \"hi\"\nnext" }""",
+                    "lex.ttrm",
+                )
+            lex.errors shouldBe emptyList()
+            val again = TtrLoader.parseString(TtrRenderer.renderFile("lexicon", null, lex.definitions), "lex.ttrm")
+            again.errors shouldBe emptyList()
+            val p = again.definitions.single() as LexiconEntryDef
+            p.match shouldBe "^\\d{4}\\s+(\\w+)$"
+            p.text shouldBe "a\tb"
+            p.description shouldBe "say \"hi\"\nnext"
+            val query =
+                TtrLoader.parseString(
+                    """model db def query q { parameters: [{name: p, defaultValue: "C:\\new", label: "a\tb"}] }""",
+                    "q.ttrm",
+                )
+            query.errors shouldBe emptyList()
+            val q = TtrLoader.parseString(TtrRenderer.renderFile("db", null, query.definitions), "q.ttrm")
+            q.errors shouldBe emptyList()
+            val parameter =
+                ((q.definitions.single() as QueryDef).parameters.single() as PropertyValue.ObjectValue)
+                    .entries
+            (parameter.getValue("defaultValue") as PropertyValue.StringValue).raw shouldBe "C:\\new"
+            (parameter.getValue("label") as PropertyValue.StringValue).raw shouldBe "a\tb"
+        }
+        "the shared encoder preserves characters outside the five escapes" {
+            val value = "\\d C:\\new \"hi\"\n\t\r\b\u000c\u0001😀"
+            org.tatrman.ttr.parser.TtrStrings
+                .decode(
+                    org.tatrman.ttr.parser.TtrStrings
+                        .encode(value),
+                ) shouldBe value
+        }
     })

@@ -30,6 +30,7 @@ from types import MappingProxyType
 from typing import ClassVar
 
 from .diagnostics import DiagnosticCode
+from .strings import string_source_position
 
 # ============================================================================
 # SourceLocation (D4 superset; ANTLR-style)
@@ -1233,12 +1234,16 @@ class EmbeddedBlock:
         base = self.text_source.column if ln == 0 else self.indent_width
         start = column + shift(column)
         end = column + length + shift(column + length)
+        def point(offset: int) -> tuple[int, int]:
+            return string_source_position(self.text, self.escapes, offset, self.text_source.line, self.text_source.column)
+        from_line, from_col = point(line_start + column) if self.form == "string" else (self.text_source.line + ln, base + start)
+        to_line, to_col = point(line_start + column + length) if self.form == "string" else (self.text_source.line + ln, base + end)
         return SourceLocation(
             file=self.source.file,
-            line=self.text_source.line + ln,
-            column=base + start,
-            end_line=self.text_source.line + ln,
-            end_column=base + end,
+            line=from_line,
+            column=from_col,
+            end_line=to_line,
+            end_column=to_col,
             offset_start=self.line_offsets[ln] + start,
             offset_end=self.line_offsets[ln] + end,
         )

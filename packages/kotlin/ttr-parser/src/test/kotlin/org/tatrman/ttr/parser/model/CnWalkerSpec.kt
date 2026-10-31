@@ -641,11 +641,11 @@ def quality P { of: X, definition: "a = \"held\" and b = 'c\\d'" }"""
             cpSlice(src, b.location(0, 16, 3)) shouldBe "\\\"z\\\""
         }
 
-        "review-118 L-1: reads an escaped line break into the text and maps the line after it" {
+        "R190-B: retains a backslash before a physical line break and maps the next line" {
             val src = "model cn\ndef quality P { of: X, definition: \"a = 1 \\\nand b = 2\" }"
             val b = definitionBlock(src)
-            b.text shouldBe "a = 1 \nand b = 2"
-            b.escapes shouldContainExactly listOf(6)
+            b.text shouldBe "a = 1 \\\nand b = 2"
+            b.escapes shouldContainExactly emptyList()
             b.lineOffsets shouldContainExactly listOf(45, 53)
             val and = b.location(1, 0, 3)
             Triple(and.line, and.column, cpSlice(src, and)) shouldBe Triple(3, 0, "and")
@@ -653,7 +653,7 @@ def quality P { of: X, definition: "a = \"held\" and b = 'c\\d'" }"""
             (b.textSource.endLine to b.textSource.endColumn) shouldBe (3 to 9)
             for (sep in listOf("\r", " ", "\u0085")) {
                 definitionBlock("model cn\ndef quality P { of: X, definition: \"a\\${sep}b\" }").text shouldBe
-                    "a${sep}b"
+                    "a\\${sep}b"
             }
         }
 

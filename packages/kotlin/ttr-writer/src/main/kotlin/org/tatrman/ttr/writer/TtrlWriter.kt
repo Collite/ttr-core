@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.writer
 
+import org.tatrman.ttr.parser.TtrStrings
+
 import org.tatrman.ttr.parser.model.TtrlCanvas
 import org.tatrman.ttr.parser.model.TtrlDocument
 import org.tatrman.ttr.parser.model.TtrlMode
@@ -93,7 +95,7 @@ object TtrlWriter {
         sb.append("}\n")
     }
 
-    private fun quote(s: String): String = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+    private fun quote(s: String): String = TtrStrings.encode(s)
 
     /** Integral coordinates drop the decimal (`120`, not `120.0`); non-integral keep it. */
     private fun num(v: Double): String =

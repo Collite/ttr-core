@@ -1,0 +1,46 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "kind",
+            "name": "Item",
+            "properties": {
+                "binds": {
+                    "kind": "id",
+                    "parts": [
+                        "x"
+                    ],
+                    "path": "x"
+                },
+                "defaultValue": {
+                    "kind": "id",
+                    "parts": [
+                        "y"
+                    ],
+                    "path": "y"
+                },
+                "indexSecurity": {
+                    "kind": "id",
+                    "parts": [
+                        "w"
+                    ],
+                    "path": "w"
+                },
+                "skipSecurity": {
+                    "kind": "id",
+                    "parts": [
+                        "z"
+                    ],
+                    "path": "z"
+                }
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": null,
+    "schemaDirective": {
+        "code": "cn",
+        "namespace": null
+    }
+}

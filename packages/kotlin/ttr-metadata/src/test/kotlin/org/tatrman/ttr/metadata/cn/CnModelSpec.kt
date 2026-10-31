@@ -514,4 +514,24 @@ class CnModelSpec :
             lex.cn.elementTerms.mapValues { (_, links) -> links.map { it.name to it.forms } } shouldBe
                 mapOf("md.dimension.Product" to listOf("product" to listOf("product")))
         }
+
+        "canonical ER lexical entries retain authored index policy" {
+            val root = Files.createTempDirectory("lexicon-policy")
+            try {
+                Files.writeString(root.resolve("er.ttrm"), "model er def entity Customer {}")
+                Files.writeString(
+                    root.resolve("lex.ttrm"),
+                    "model lexicon def term secure { for: er.entity.Customer, indexSecurity: applied } def term ordinary { for: er.entity.Customer }",
+                )
+                Files.writeString(root.resolve("cn.ttrm"), "model cn def kind CustomerKind {}")
+                val snapshot = FileBasedSource("policy", 100, LocalFsStorage("policy", root)).load()
+                snapshot.errors shouldBe emptyList()
+                val cn = snapshot.cn
+                val links = cn.elementTerms.getValue("er.entity.Customer").associateBy { it.name }
+                links.getValue("secure").indexSecurity shouldBe "applied"
+                links.getValue("ordinary").indexSecurity shouldBe null
+            } finally {
+                root.toFile().deleteRecursively()
+            }
+        }
     })

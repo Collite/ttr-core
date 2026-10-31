@@ -38,7 +38,7 @@ class CanonicalCarriersSpec :
             """
             model db schema dbo
             def query raw { skipSecurity: true, parameters: [
-                {name: p, type: text, defaultValue: "", binds: [er.entity.Customer.name, er.entity.Customer.code]}
+                {name: p, type: text, defaultValue: "", binds: [er.entity.Customer.name, Customer.code]}
             ], sourceText: "select 1" }
             def query checked { skipSecurity: false }
             def query ordinary { }
@@ -55,7 +55,7 @@ class CanonicalCarriersSpec :
             queries.getValue("ordinary").skipSecurity shouldBe false
             val raw = queries.getValue("raw")
             raw.parameters.single().defaultValue shouldBe ""
-            raw.parameters.single().binds shouldBe listOf("er.entity.Customer.name", "er.entity.Customer.code")
+            raw.parameters.single().binds shouldBe listOf("Customer.name", "Customer.code")
             val rendered = TtrRenderer.renderFile("db", "dbo", listOf(ModelToDefinitions.queryToQueryDef(raw)))
             val again = load(rendered)
             again.errors shouldBe emptyList()
@@ -111,7 +111,7 @@ class CanonicalCarriersSpec :
                     .jsonObject
             parameter.getValue("defaultValue").jsonPrimitive.content shouldBe ""
             parameter.getValue("binds").jsonArray.map { it.jsonPrimitive.content } shouldBe
-                listOf("er.entity.Customer.name", "er.entity.Customer.code")
+                listOf("er.entity.Customer.name", "Customer.code")
         }
 
         "C-7 retains lexical index policy and match-text pairing" {
@@ -146,5 +146,70 @@ class CanonicalCarriersSpec :
             props.getValue("indexSecurity").jsonPrimitive.content shouldBe "none"
             props.getValue("match").jsonPrimitive.content shouldBe "name (.*)"
             props.getValue("text").jsonPrimitive.content shouldBe "Name Alice?"
+        }
+
+        "C-7 resolves bare and qualified parameter binds in ER despite matching database columns" {
+            val er =
+                TtrLoader.parseString(
+                    "model er def entity Customer { attributes: [def attribute name { type: text }] }",
+                    "er.ttrm",
+                )
+            val db =
+                TtrLoader.parseString(
+                    "model db schema dbo def table Customer { columns: [def column name { type: text }] }",
+                    "db.ttrm",
+                )
+            val query =
+                TtrLoader.parseString(
+                    "model db def query q { parameters: [{name: p, binds: [Customer.name, er.entity.Customer.name, Missing.name]}] }",
+                    "q.ttrm",
+                )
+            er.errors + db.errors + query.errors shouldBe emptyList()
+            val entity = er.definitions.single() as org.tatrman.ttr.parser.model.EntityDef
+            val table = db.definitions.single() as org.tatrman.ttr.parser.model.TableDef
+            val entries =
+                listOf(
+                    DefinedObject("er.entity.Customer", "er", "entity", entity, "demo", "er.ttrm", "er"),
+                    DefinedObject(
+                        "er.entity.Customer.name",
+                        "er",
+                        "attribute",
+                        entity.attributes.single(),
+                        "demo",
+                        "er.ttrm",
+                        "er",
+                        parentQname = "er.entity.Customer",
+                    ),
+                    DefinedObject("db.dbo.Customer", "db", "table", table, "demo", "db.ttrm", "db"),
+                    DefinedObject(
+                        "db.dbo.Customer.name",
+                        "db",
+                        "column",
+                        table.columns.single(),
+                        "demo",
+                        "db.ttrm",
+                        "db",
+                        parentQname = "db.dbo.Customer",
+                    ),
+                    DefinedObject("db.dbo.q", "db", "query", query.definitions.single(), "demo", "q.ttrm", "db"),
+                )
+            val set = DefinitionSet(entries, emptyMap(), "demo", "0.21", "v1")
+            val doc = Json.parseToJsonElement(DefsJsonWriter.write(set).decodeToString()).jsonObject
+            val parameter =
+                doc
+                    .getValue(
+                        "definitions",
+                    ).jsonObject
+                    .getValue(
+                        "db.dbo.q",
+                    ).jsonObject
+                    .getValue("properties")
+                    .jsonObject
+                    .getValue("parameters")
+                    .jsonArray
+                    .single()
+                    .jsonObject
+            parameter.getValue("binds").jsonArray.map { it.jsonPrimitive.content } shouldBe
+                listOf("er.entity.Customer.name", "er.entity.Customer.name", "Missing.name")
         }
     })

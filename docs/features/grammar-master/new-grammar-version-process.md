@@ -41,7 +41,7 @@ grammar. Drift between targets is caught by `conformance.yml`, not by any sync s
 ## 1. Grammar
 
 - [ ] Edit `packages/grammar/src/TTR.g4`. New keywords used in cross-references must also be added to
-  `idPart`.
+  `idPart` and to `cnKey` (preserve formerly valid free-form keys).
 - [ ] Update the `@grammar-version:` marker comment to the new version and add a CHANGELOG entry in
   the header comment block. (The parser prebuild extracts this into `@modeler/grammar`'s
   `TTR_GRAMMAR_VERSION`; update any test asserting the string.)

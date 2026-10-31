@@ -490,7 +490,16 @@ object ModelToDefinitions {
                                 put("type", idVal(Reference(p.type)))
                                 if (p.label.isNotEmpty()) put("label", strVal(p.label))
                                 p.defaultValue?.let { put("defaultValue", strVal(it)) }
-                                if (p.binds.isNotEmpty()) put("binds", listVal(p.binds.map { idVal(Reference(it)) }))
+                                if (p.binds.isNotEmpty()) {
+                                    put(
+                                        "binds",
+                                        listVal(
+                                            p.binds.map {
+                                                idVal(Reference(if (it.startsWith("er.")) it else "er.entity.$it"))
+                                            },
+                                        ),
+                                    )
+                                }
                             },
                     )
                 },

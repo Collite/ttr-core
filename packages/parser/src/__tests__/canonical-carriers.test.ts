@@ -59,3 +59,30 @@ describe('canonical metadata carriers', () => {
     expect(parseString(source).errors.some((e) => e.severity === 'error')).toBe(true);
   });
 });
+
+it.each([
+  ['skipSecurity: tr', 'skipSecurity'],
+  ['skipSecurity: "true"', 'skipSecurity'],
+  ['skipSecurity: 1', 'skipSecurity'],
+  ['parameters: [{name: p, defaultValue }]', 'defaultValue'],
+  ['parameters: [{name: p, binds }]', 'binds'],
+  ['parameters: [{name: p, label }]', 'label'],
+])('keeps sibling definitions while editing %s', (body, field) => {
+  const result = parseString(`model db def query q { ${body} } def query r {}`);
+  expect(result.ast).toBeDefined();
+  expect(result.errors.some((e) => e.severity === 'error')).toBe(true);
+  expect(result.ast?.definitions.map((d) => d.name)).toEqual(['q', 'r']);
+  const q = result.ast!.definitions[0];
+  expect(q.kind).toBe('query');
+  if (q.kind !== 'query') throw new Error('expected query');
+  expect(field === 'skipSecurity' ? q.skipSecurity : q.parameters?.[0]?.[field as 'defaultValue' | 'binds' | 'label']).toBeUndefined();
+});
+
+it('keeps the new soft keywords as ordered cn free-form keys', () => {
+  const r = parseString('model cn def kind Item { binds: x, defaultValue: y, skipSecurity: z, indexSecurity: w }');
+  expect(r.errors).toEqual([]);
+  expect(r.ast?.definitions[0]).toMatchObject({properties: [
+    {kind: 'entry', key: 'binds'}, {kind: 'entry', key: 'defaultValue'},
+    {kind: 'entry', key: 'skipSecurity'}, {kind: 'entry', key: 'indexSecurity'},
+  ]});
+});

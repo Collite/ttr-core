@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.writer
 
+import org.tatrman.ttr.parser.TtrStrings
+
 import org.tatrman.ttr.parser.loader.ParseResult
 import org.tatrman.ttr.parser.loader.TtrId
 import org.tatrman.ttr.parser.model.AreaDef
@@ -1452,23 +1454,13 @@ object TtrRenderer {
 
     /**
      * An expression block (⚑CN-P5), so that a re-parse yields the same [EmbeddedBlock.text] (and, for the string
-     * form, the same escapes): the string form re-escapes exactly the characters written escaped; the triple-string
+     * form): the string form uses the shared canonical escapes; the triple-string
      * form opens on its own line (the walker drops that newline, and the text is already dedented); the tagged form
      * restores the closing newline the walker drops.
      */
     private fun renderEmbeddedBlock(b: EmbeddedBlock): String =
         when (b.form) {
-            "string" -> {
-                val escaped = b.escapes.toSet()
-                val sb = StringBuilder("\"")
-                var i = 0
-                b.text.codePoints().forEach { cp ->
-                    if (i in escaped) sb.append('\\')
-                    sb.appendCodePoint(cp)
-                    i++
-                }
-                sb.append('"').toString()
-            }
+            "string" -> TtrStrings.encode(b.text)
             "tagged" -> "\"\"\"${b.language}\n${b.text}\n\"\"\""
             else -> "\"\"\"\n${b.text}\"\"\""
         }
@@ -1660,13 +1652,6 @@ object TtrRenderer {
         if (raw.contains('\n') && !raw.contains("\"\"\"")) {
             return "\"\"\"$raw\"\"\""
         }
-        val escaped =
-            raw
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t")
-        return "\"$escaped\""
+        return TtrStrings.encode(raw)
     }
 }
