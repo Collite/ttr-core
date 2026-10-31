@@ -14,6 +14,7 @@ kotlin {
 }
 
 tasks.test {
+    inputs.dir("../../../tests/conformance/fixtures")
     useJUnitPlatform()
     // VL-P0: TtrgGraphReaderSpec reads the shared layout vectors and two samples in place (never a
     // copy) — declare them, or a vector change leaves this task UP-TO-DATE.

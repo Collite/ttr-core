@@ -592,6 +592,7 @@ def _er2db_relation_props(d: Er2DbRelationDef) -> dict[str, Any]:
 
 def _query_props(d: QueryDef) -> dict[str, Any]:
     p: dict[str, Any] = {}
+    _present(p, "skipSecurity", d.skip_security)
     _present(p, "language", d.language)
     if d.parameters:
         p["parameters"] = [_param(pv) for pv in d.parameters]
@@ -838,6 +839,7 @@ def _lexicon_entry_props(d: Any) -> dict[str, Any]:
         p["default"] = True
     if d.sense_priority is not None:
         p["sense_priority"] = _number(d.sense_priority)
+    _present(p, "indexSecurity", d.index_security)
     return p
 
 
@@ -1012,7 +1014,17 @@ def _param(pv: PropertyValue) -> dict[str, Any]:
             raise ValueError(f"conformance: parameter 'direction' must be an id, got {type(direction).__name__}")
         m["direction"] = direction.parts[0] if direction.parts else ""
 
-    unexpected = set(pv.entries) - {"name", "type", "label", "direction"}
+    default = pv.entries.get("defaultValue")
+    if default is not None:
+        if not isinstance(default, StringValue):
+            raise ValueError("conformance: defaultValue must be a string")
+        m["defaultValue"] = default.raw
+    binds = pv.entries.get("binds")
+    if binds is not None:
+        if not isinstance(binds, ListValue) or any(not isinstance(v, IdValue) for v in binds.items):
+            raise ValueError("conformance: binds must be a list of references")
+        m["binds"] = [_ref_path(v.ref) for v in binds.items if isinstance(v, IdValue)]
+    unexpected = set(pv.entries) - {"name", "type", "label", "direction", "defaultValue", "binds"}
     if unexpected:
         raise ValueError(f"conformance: unexpected parameter key(s) {sorted(unexpected)}")
     return m

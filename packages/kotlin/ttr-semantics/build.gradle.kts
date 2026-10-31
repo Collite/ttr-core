@@ -14,6 +14,7 @@ kotlin {
 }
 
 tasks.test {
+    inputs.dir("../../../tests/conformance/fixtures")
     useJUnitPlatform()
 }
 

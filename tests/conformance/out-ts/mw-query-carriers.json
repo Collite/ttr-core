@@ -1,0 +1,106 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "query",
+            "name": "raw_query",
+            "properties": {
+                "parameters": [
+                    {
+                        "binds": [
+                            "er.entity.Customer.name",
+                            "er.entity.Customer.code"
+                        ],
+                        "defaultValue": "",
+                        "name": "term",
+                        "type": {
+                            "name": "text"
+                        }
+                    },
+                    {
+                        "binds": [],
+                        "defaultValue": "0",
+                        "name": "count",
+                        "type": {
+                            "name": "int"
+                        }
+                    }
+                ],
+                "skipSecurity": true,
+                "sourceText": "select 1"
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "query",
+            "name": "checked_query",
+            "properties": {
+                "skipSecurity": false
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "query",
+            "name": "ordinary_query",
+            "properties": {},
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "query",
+            "name": "skipSecurity",
+            "properties": {},
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "query",
+            "name": "defaultValue",
+            "properties": {},
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "query",
+            "name": "binds",
+            "properties": {},
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "query",
+            "name": "indexSecurity",
+            "properties": {},
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "procedure",
+            "name": "call",
+            "properties": {
+                "parameters": [
+                    {
+                        "binds": [
+                            "er.entity.Customer.name"
+                        ],
+                        "defaultValue": "seed",
+                        "direction": "IN",
+                        "name": "p",
+                        "type": {
+                            "name": "text"
+                        }
+                    }
+                ]
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": "demo.carriers",
+    "schemaDirective": {
+        "code": "db",
+        "namespace": "demo"
+    }
+}

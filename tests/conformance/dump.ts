@@ -257,6 +257,7 @@ function propsOf(d: Definition): { [k: string]: Json } {
       if (d.fk) p.fk = d.fk.path;
       break;
     case 'query':
+      if (d.skipSecurity !== undefined) p.skipSecurity = d.skipSecurity;
       if (d.language) p.language = d.language;
       if (d.parameters?.length) p.parameters = d.parameters.map(param);
       if (d.sourceText) p.sourceText = embeddedDump(d.sourceText);
@@ -322,6 +323,7 @@ function propsOf(d: Definition): { [k: string]: Json } {
       // 0.17 — the cn default sense (present-only: `default: false` dumps like no `default:`).
       if (d.default) p.default = true;
       if (d.sensePriority !== undefined) p.sense_priority = d.sensePriority;
+      if (d.indexSecurity !== undefined) p.indexSecurity = d.indexSecurity;
       break;
     // 0.17 — the md hosts of the `concept { }` sugar. The md kinds dump no other property (they never
     // did); `concept` is present-only, so every pre-0.17 md fixture dumps unchanged.
@@ -673,6 +675,8 @@ function param(p: ParameterDef): Json {
   if (p.type) m.type = dataType(p.type);
   if (p.label != null) m.label = p.label;
   if (p.direction != null) m.direction = p.direction;
+  if (p.defaultValue !== undefined) m.defaultValue = p.defaultValue;
+  if (p.binds !== undefined) m.binds = p.binds.map((r) => r.path);
   return m;
 }
 
