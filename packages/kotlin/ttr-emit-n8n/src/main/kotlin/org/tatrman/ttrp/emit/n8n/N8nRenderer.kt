@@ -226,10 +226,17 @@ internal class N8nRenderer(
                 (fp["program"]?.let { "b.programFingerprint=${literal(it)}; " } ?: "") +
                 (fp["deployment"]?.let { "b.deploymentFingerprint=${literal(it)}; " } ?: "") +
                 (
-                    if (graph.program.mode == "batch") {
-                        "b.idempotencyKey=${dollar}execution.id" +
-                            (if (initial) "" else " + ${literal(":" + prefix.trim())}") +
-                            "; "
+                    if (!initial) {
+                        val anchor =
+                            runId(
+                                root.process!!
+                                    .steps
+                                    .first()
+                                    .name + " ",
+                            )
+                        "b.idempotencyKey=$anchor + ${literal(":" + prefix.trim())}; "
+                    } else if (graph.program.mode == "batch") {
+                        "b.idempotencyKey=${dollar}execution.id; "
                     } else {
                         ""
                     }
@@ -258,11 +265,7 @@ internal class N8nRenderer(
                 body = "$dollar(${literal(prefix + "open input")}).first().json.openBody",
             )
         flow.link(prepared, open)
-        val id = "($dollar(${literal(
-            prefix + "reopen",
-        )}).isExecuted ? $dollar(${literal(
-            prefix + "reopen",
-        )}) : $dollar(${literal(openName)})).first().json.body.runId"
+        val id = runId(prefix)
         val clock =
             if (initial) {
                 null
@@ -745,6 +748,13 @@ internal class N8nRenderer(
         return (clock ?: prepared) to complete
     }
 
+    private fun runId(prefix: String): String =
+        "($dollar(${literal(
+            prefix + "reopen",
+        )}).isExecuted ? $dollar(${literal(prefix + "reopen")}) : $dollar(${literal(
+            prefix + "open",
+        )})).first().json.body.runId"
+
     private fun retryAfter(): String =
         "(() => {const h=${dollar}json.headers || {}; const v=h['retry-after'] ?? h['Retry-After']; const n=Number(v); return Number.isFinite(n) && n > 0 ? n : (v && Number.isFinite(Date.parse(v)) ? Math.max(1,Math.ceil((Date.parse(v)-Date.now())/1000)) : 15);})()"
 
@@ -1003,13 +1013,18 @@ internal class N8nRenderer(
         On-event input is posted to `/webhook/${root.deployment.name}` with the recipe key fields (or `key`), `keys`,
         or the declared event body. On-event callers must send `at` as an ISO instant with an offset for duplicate events
         to be recognised. Without `at`, every POST is a new run. The clock is excluded from event columns; an event
-        schema declaring `at` is refused. Batch runs use the n8n execution id; later batch steps append their step name.
+        schema declaring `at` is refused. A first or standalone batch step uses the n8n execution id.
+        Every later process step, in either mode, uses the first step's run id plus `:<step name>` as its caller key,
+        taking the re-opened run id if the first step recovered from abandonment. Redeliveries share these keys.
+        A duplicate execution may claim a later step before the original reaches it; the original then handles its
+        202 response. Each step still claims once, and its saved clock supplies port.at/asOf for that claim.
         A 202 Open handle belongs to another execution: wait for closed/abandoned, and never repeat its actions.
-        A waiting handle ends the duplicate execution. After failure/abandonment there is one re-open with the same
+        A closed or waiting handle completes that step. After failure/abandonment there is one re-open with the same
         saved body; a second 202 refuses. A lost Open response can wait until the Server's budget plus recovery grace
         abandons the orphan, then recover through that single re-open. Later step clocks are saved after waits.
         Task actions with required approval register a Wait webhook as `callbackUrl` and re-read status after every
-        resume or timeout until all tasks have left waiting. Task dueAt bounds the timeout; calendar-based due rules
+        resume or timeout until all tasks have left waiting. When status carries tasks, task dueAt bounds the timeout;
+        otherwise ordinary declared due durations apply. Calendar-based due rules
         without a resolved dueAt use an hourly backstop.
         Obligation waits require an explicit `obligations` array on Server status. Missing fields fail; an empty
         array is absent. `until` selects fulfilled/due readiness. Waits wake at the nearest future dueAt, capped at 1 h.

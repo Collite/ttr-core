@@ -173,12 +173,16 @@ the duplicate, failed/abandoned allows one re-open with the saved body. A second
 response this can wait for the Server's budget plus recovery grace before recovering the orphan.
 
 Process exports verify and fingerprint every step before writing a package, preserve each step's recipe,
-effective port and parent deployment, and save later-step clocks after their waits. Later batch steps append
-`:<step>` to their execution idempotency key. Obligation waits require an explicit `obligations` array; missing
+effective port and parent deployment, and save later-step clocks after their waits. Every later step, in either
+mode, uses the first step's run ID plus `:<step name>` as its idempotency key, using its re-opened run ID after
+abandonment. Redeliveries share these keys; a duplicate may claim a later step first, leaving the original to
+handle its 202 response. Step 1 keeps the execution ID for batch and the derived key for on-event.
+Obligation waits require an explicit `obligations` array; missing
 fields fail, and only an empty array means absent. `until` controls fulfilled/due readiness. Webhook waits also
 wake at the nearest future dueAt, capped at an hour. Required task approvals wait again after each resume or
-timeout while the run remains waiting; resolved task dueAt sets the timeout, with an hourly backstop for
-calendar-based due rules that lack an instant. Evaluation and handle polls honour Retry-After (default 15 s)
+timeout while the run remains waiting. When status carries `tasks`, resolved task dueAt sets the timeout;
+otherwise ordinary declared due durations apply, with an hourly backstop for calendar-based due rules that lack
+an instant. Evaluation and handle polls honour Retry-After (default 15 s)
 with a program-budget plus two-minute recovery-grace bound.
 
 When supplying `--bundle` for a process, point it at a directory containing one ordinary bundle directory per

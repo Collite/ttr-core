@@ -1489,7 +1489,7 @@
                 0
             ],
             "parameters": {
-                "jsCode": "return [{json:{openBody:(() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; b.port.at=$(\"inbound clock\").first().json.at; return b;})()}}];",
+                "jsCode": "return [{json:{openBody:(() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; b.idempotencyKey=($(\"decide reopen\").isExecuted ? $(\"decide reopen\") : $(\"decide open\")).first().json.body.runId + \":inbound\"; b.port.at=$(\"inbound clock\").first().json.at; return b;})()}}];",
                 "mode": "runOnceForAllItems"
             }
         },
@@ -2965,7 +2965,7 @@
                 0
             ],
             "parameters": {
-                "jsCode": "return [{json:{openBody:(() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; b.port.at=$(\"settle clock\").first().json.at; return b;})()}}];",
+                "jsCode": "return [{json:{openBody:(() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; b.idempotencyKey=($(\"decide reopen\").isExecuted ? $(\"decide reopen\") : $(\"decide open\")).first().json.body.runId + \":settle\"; b.port.at=$(\"settle clock\").first().json.at; return b;})()}}];",
                 "mode": "runOnceForAllItems"
             }
         },

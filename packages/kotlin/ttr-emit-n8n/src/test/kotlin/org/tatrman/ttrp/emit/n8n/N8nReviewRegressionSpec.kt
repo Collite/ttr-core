@@ -281,6 +281,7 @@ class N8nReviewRegressionSpec :
                 val opens = f.calls.filter { it.path.endsWith("/runs") }.map { it.body!! }
                 opens.map { it.getValue("port").jsonObject.keys }.toSet() shouldBe setOf(setOf("none"))
                 opens.map { it.getValue("idempotencyKey") }.distinct().size shouldBe 2
+                opens.map { it.getValue("idempotencyKey").jsonPrimitive.content } shouldBe listOf("review", "r1:second")
             }
             workflow(process())
                 .getValue("nodes")
@@ -289,6 +290,110 @@ class N8nReviewRegressionSpec :
                     it.jsonObject["type"] ==
                         JsonPrimitive("n8n-nodes-base.httpRequest")
                 }.forEach { it.toString().contains("new Date()") shouldBe false }
+        }
+        "N1 redelivered processes claim each step once across executions and keep distinct instances separate" {
+            WorkflowFixture().use { f ->
+                f.obligations = Json.parseToJsonElement("""[{"kind":"inbound","state":"fulfilled"}]""").jsonArray
+                val claims = mutableMapOf<String, String>()
+                f.override = { c ->
+                    if (c.path.endsWith("/runs")) {
+                        val body = c.body!!
+                        val key = body["idempotencyKey"]?.jsonPrimitive?.content ?: body.toString()
+                        val replayed = key in claims
+                        val id = claims.getOrPut(key) { "instance-run-${claims.size + 1}" }
+                        Reply(if (replayed) 200 else 201, """{"runId":"$id","status":"closed","replayed":$replayed}""")
+                    } else {
+                        null
+                    }
+                }
+                val graph = process()
+                val meta = graph.process!!
+                val last = meta.steps.last()
+                val third =
+                    last.graph!!.let {
+                        it.copy(recipe = it.recipe.copy(name = "third"), program = it.program.copy(name = "third"))
+                    }
+                val rendered =
+                    workflow(
+                        graph.copy(
+                            process =
+                                meta.copy(
+                                    steps =
+                                        meta.steps + last.copy(name = "third", program = "third", graph = third),
+                                ),
+                        ),
+                    )
+                f.run(rendered, executionId = "original")["error"] shouldBe null
+                val firstCalls = f.calls.size
+                Thread.sleep(10) // A redelivery's later-step clock differs from the original execution's.
+                f.run(rendered, executionId = "redelivery")["error"] shouldBe null
+                claims.size shouldBe 3
+                val duplicateCalls = f.calls.drop(firstCalls)
+                duplicateCalls.count { it.path.endsWith("/runs") } shouldBe 3
+                duplicateCalls.any {
+                    it.path.endsWith(
+                        "/evaluate",
+                    ) ||
+                        "/parts/" in it.path ||
+                        it.path.endsWith("/close")
+                } shouldBe
+                    false
+                val laterOpens = f.calls.filter { it.path.endsWith("/second/runs") || it.path.endsWith("/third/runs") }
+                laterOpens
+                    .map {
+                        it.body!!
+                            .getValue("idempotencyKey")
+                            .jsonPrimitive.content
+                    }.toSet() shouldBe
+                    setOf("instance-run-1:second", "instance-run-1:third")
+                f.run(
+                    rendered,
+                    buildJsonObject {
+                        put("key", 2)
+                        put("at", "2026-10-31T12:00:00Z")
+                    },
+                    executionId = "distinct",
+                )["error"] shouldBe
+                    null
+                claims.size shouldBe 6
+            }
+        }
+        "N1 later steps anchor on the first handle or its recovered run id" {
+            for (state in listOf("closed", "abandoned")) {
+                WorkflowFixture().use { f ->
+                    f.obligations = Json.parseToJsonElement("""[{"kind":"inbound","state":"fulfilled"}]""").jsonArray
+                    var firstOpens = 0
+                    f.override = { c ->
+                        when {
+                            c.path.endsWith("/release_order/runs") -> {
+                                if (++firstOpens == 1) {
+                                    Reply(202, """{"runId":"original-handle","status":"running"}""")
+                                } else {
+                                    Reply(201, """{"runId":"recovered","status":"open"}""")
+                                }
+                            }
+                            c.path == "/automation/runs/original-handle" ->
+                                Reply(
+                                    200,
+                                    """{"status":"$state","obligations":[{"kind":"inbound","state":"fulfilled"}]}""",
+                                )
+                            else -> null
+                        }
+                    }
+                    f.run(workflow(process()))["error"] shouldBe null
+                    firstOpens shouldBe if (state == "abandoned") 2 else 1
+                    val key =
+                        f.calls
+                            .single {
+                                it.path.endsWith(
+                                    "/second/runs",
+                                )
+                            }.body!!
+                            .getValue("idempotencyKey")
+                            .jsonPrimitive.content
+                    key shouldBe if (state == "abandoned") "recovered:second" else "original-handle:second"
+                }
+            }
         }
         "R5 the event body excludes the port clock and identical timed redeliveries claim once" {
             WorkflowFixture().use { f ->
@@ -737,6 +842,7 @@ private class WorkflowFixture : AutoCloseable {
                 put("at", "2026-10-31T12:00:00Z")
             },
         maxWaits: Int = 20,
+        executionId: String = "review",
     ): JsonObject {
         val runner = Files.createTempFile("n8n-review-", ".mjs")
         val output = Files.createTempFile("n8n-review-output-", ".json")
@@ -759,7 +865,7 @@ private class WorkflowFixture : AutoCloseable {
                             put("server", "http://127.0.0.1:${server.address.port}")
                             put("token", "test-token")
                             put("input", input)
-                            put("executionId", "review")
+                            put("executionId", executionId)
                             put("mailRecipients", buildJsonObject {})
                             put("maxWaits", maxWaits)
                         }.toString(),
