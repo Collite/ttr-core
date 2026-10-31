@@ -553,6 +553,7 @@ def _visit_lexicon_entry(od: Any, kind: str, name: str, source: SourceLocation, 
     text: str | None = None
     is_default: bool | None = None
     sense_priority: float | None = None
+    index_security: str | None = None
     for p in od.lexiconEntryDef().lexiconEntryProperty():
         d = p.descriptionProperty()
         if d is not None and description is None and description_localized is None:
@@ -579,9 +580,12 @@ def _visit_lexicon_entry(od: Any, kind: str, name: str, source: SourceLocation, 
         sp = p.sensePriorityProperty()
         if sp is not None and sp.NUMBER_LITERAL() is not None:
             sense_priority = _number_value(sp.NUMBER_LITERAL())
+        ip = p.indexSecurityProperty()
+        if ip is not None:
+            index_security = ip.id_().getText()
     cls = {"term": TermDef, "pattern": PatternDef, "example": ExampleDef}[kind]
     return cls(name=name, source=source, description=description, description_localized=description_localized, tags=tags,
-              target=target, forms=forms, match=match, text=text, default=is_default, sense_priority=sense_priority)
+              target=target, forms=forms, match=match, text=text, default=is_default, sense_priority=sense_priority, index_security=index_security)
 
 
 def _visit_lexicon_block(ctx: Any, file: str) -> LexiconBlock:
@@ -1018,7 +1022,11 @@ def _visit_query(od: Any, name: str, source: SourceLocation, file: str, warnings
     parameters: tuple[PropertyValue, ...] = ()
     source_text: PropertyValue | None = None
     search = SearchHintsValue()
+    skip_security: bool | None = None
     for p in props:
+        policy = p.skipSecurityProperty()
+        if policy is not None:
+            skip_security = _bool_text(policy.BOOLEAN_LITERAL())
         d = p.descriptionProperty()
         if d is not None and description is None and description_localized is None:
             description, description_localized = _visit_description(d, file)
@@ -1039,7 +1047,7 @@ def _visit_query(od: Any, name: str, source: SourceLocation, file: str, warnings
             search = _visit_search_block(s.searchBlock(), file)
     return QueryDef(
         name=name, source=source, description=description, description_localized=description_localized, tags=tags,
-        language=language, parameters=parameters, source_text=source_text, search=search,
+        language=language, parameters=parameters, source_text=source_text, search=search, skip_security=skip_security,
     )
 
 
@@ -2109,6 +2117,14 @@ def _visit_parameter_def_list(ctx: Any, file: str) -> tuple[PropertyValue, ...]:
     for inline in ctx.parameterInline() or ():
         entries: dict[str, PropertyValue] = {}
         for p in inline.paramProperty() or ():
+            default = p.defaultValueProperty()
+            if default is not None:
+                raw = _visit_string_literal_form(default.stringLiteralForm(), file)
+                entries["defaultValue"] = StringValue(raw=raw.raw, source=raw.source)
+            binds = p.bindsProperty()
+            if binds is not None:
+                values = tuple(IdValue(ref=_build_reference(i, file), parts=_id_parts(i), source=_loc_of(i, file)) for i in binds.listOfIds().id_())
+                entries["binds"] = ListValue(items=values, source=_loc_of(binds, file))
             np = p.nameProperty()
             if np is not None:
                 name_id = np.id_()

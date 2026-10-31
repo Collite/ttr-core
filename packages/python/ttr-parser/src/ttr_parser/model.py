@@ -705,6 +705,8 @@ class TermDef(Definition):
     default: bool | None = None
     #: Grammar 0.17 — `sense_priority: <n>` (higher wins).
     sense_priority: float | None = None
+    #: Grammar 0.21 — declared index security policy, interpreted by the host.
+    index_security: str | None = None
     kind: ClassVar[str] = "term"
 
 
@@ -720,6 +722,8 @@ class PatternDef(Definition):
     default: bool | None = None
     #: Grammar 0.17 — `sense_priority: <n>` (higher wins).
     sense_priority: float | None = None
+    #: Grammar 0.21 — declared index security policy, interpreted by the host.
+    index_security: str | None = None
     kind: ClassVar[str] = "pattern"
 
 
@@ -735,6 +739,8 @@ class ExampleDef(Definition):
     default: bool | None = None
     #: Grammar 0.17 — `sense_priority: <n>` (higher wins).
     sense_priority: float | None = None
+    #: Grammar 0.21 — declared index security policy, interpreted by the host.
+    index_security: str | None = None
     kind: ClassVar[str] = "example"
 
 
@@ -791,6 +797,8 @@ class QueryDef(Definition):
     parameters: tuple[PropertyValue, ...] = ()
     source_text: PropertyValue | None = None
     search: SearchHintsValue = field(default_factory=SearchHintsValue)
+    #: Grammar 0.21 — None preserves an absent policy declaration.
+    skip_security: bool | None = None
     kind: ClassVar[str] = "query"
 
 

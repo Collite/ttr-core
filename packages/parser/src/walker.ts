@@ -3044,8 +3044,10 @@ function walkQueryDef(
   let parameters: ParameterDef[] | undefined;
   let sourceText: StringValue | TripleStringValue | TaggedBlockValue | undefined;
   let search: SearchBlock | undefined;
+  let skipSecurity: boolean | undefined;
 
   for (const p of ctx.queryProperty()) {
+    if (p.skipSecurityProperty()) skipSecurity = p.skipSecurityProperty()!.BOOLEAN_LITERAL()!.getText() === 'true';
     if (p.descriptionProperty()) {
       description = descriptionOf(p.descriptionProperty()!, file);
       descriptionLocalized = descriptionLocalizedOf(p.descriptionProperty()!, file);
@@ -3090,7 +3092,7 @@ function walkQueryDef(
     });
   }
 
-  return { kind: 'query', name, source, description, descriptionLocalized, tags, language, parameters, sourceText, search };
+  return { kind: 'query', name, source, description, descriptionLocalized, tags, language, parameters, sourceText, search, ...(skipSecurity !== undefined ? { skipSecurity } : {}) };
 }
 
 function walkRoleDef(
@@ -3399,8 +3401,12 @@ function walkParameterDefList(ctx: ParameterDefListContext, file: string): Param
     let type: DataType | undefined;
     let label: string | undefined;
     let direction: ParameterDirection | undefined;
+    let defaultValue: string | undefined;
+    let binds: Reference[] | undefined;
 
     for (const p of inline.paramProperty()) {
+      if (p.defaultValueProperty()) defaultValue = walkStringLiteralForm(p.defaultValueProperty()!.stringLiteralForm()!, file).value;
+      if (p.bindsProperty()) binds = p.bindsProperty()!.listOfIds()!.id().map((idCtx) => walkId(idCtx, file));
       if (p.nameProperty()?.id()) {
         name = p.nameProperty()!.id()!.getText();
       }
@@ -3418,7 +3424,7 @@ function walkParameterDefList(ctx: ParameterDefListContext, file: string): Param
       }
     }
 
-    result.push({ name, type, label, direction, source: makeSourceLocation(inline, file) });
+    result.push({ name, type, label, direction, ...(defaultValue !== undefined ? { defaultValue } : {}), ...(binds !== undefined ? { binds } : {}), source: makeSourceLocation(inline, file) });
   }
   return result;
 }
@@ -3643,8 +3649,10 @@ function walkLexiconEntryDef(
   let text: string | undefined;
   let isDefault: boolean | undefined;
   let sensePriority: number | undefined;
+  let indexSecurity: string | undefined;
 
   for (const p of ctx.lexiconEntryProperty()) {
+    if (p.indexSecurityProperty()) indexSecurity = p.indexSecurityProperty()!.id()!.getText();
     if (p.descriptionProperty()) {
       description = descriptionOf(p.descriptionProperty()!, file);
       descriptionLocalized = descriptionLocalizedOf(p.descriptionProperty()!, file);
@@ -3667,6 +3675,7 @@ function walkLexiconEntryDef(
 
   return {
     kind, name, source, description, descriptionLocalized, tags, target, forms, match, text,
+    ...(indexSecurity !== undefined ? { indexSecurity } : {}),
     ...(isDefault !== undefined ? { default: isDefault } : {}),
     ...(sensePriority !== undefined ? { sensePriority } : {}),
   };

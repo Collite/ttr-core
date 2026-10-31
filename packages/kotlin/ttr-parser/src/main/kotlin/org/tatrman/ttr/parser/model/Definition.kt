@@ -272,6 +272,8 @@ data class LexiconEntryDef(
     val default: Boolean? = null,
     /** Grammar 0.17 — `sense_priority: <n>` (higher wins); null when absent. */
     val sensePriority: Double? = null,
+    /** Grammar 0.21 — declared index security policy; execution is host-owned. */
+    val indexSecurity: String? = null,
 ) : Definition
 
 data class RelationDef(
@@ -350,6 +352,8 @@ data class QueryDef(
     val sourceTextBlock: PropertyValue? = null,
     /** `search { keywords {...} patterns [...] ... }`. Empty when absent. */
     val search: SearchHintsValue = SearchHintsValue(),
+    /** Grammar 0.21 — explicit execution policy; null means no authored declaration. */
+    val skipSecurity: Boolean? = null,
 ) : Definition
 
 /** `def role <name> { label { cs: "...", en: "..." }, description: "..." }`. */

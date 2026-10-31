@@ -1,7 +1,9 @@
 // =============================================================================
 // TTR (Tatrman) grammar
 //
-// @grammar-version: 0.20
+// @grammar-version: 0.21
+// 0.21 (MW-53): lexical indexSecurity; query skipSecurity; parameter
+// defaultValue and binds. Typed optional declarations; execution stays host-owned.
 // 0.20 (CN-P8): subkind; involves/period on kinds; phase episodes
 // (grounds+period, from/until); valued-state projection (per/from).
 // 0.18 (HP-P1): md2er_dimension; structural md2er_cubelet measures.
@@ -607,6 +609,7 @@ lexiconEntryProperty
   : descriptionProperty | tagsProperty
   | forProperty | formsProperty | matchProperty | textProperty
   | defaultProperty | sensePriorityProperty           // 0.17 — cn default senses (cn contracts §1.5)
+  | indexSecurityProperty
   ;
 forProperty   : FOR   propSep? id ;               // target ref (er/db/md; 0.17 cn) — resolved in semantics
 formsProperty : FORMS propSep? listOfStrings ;    // term surface forms
@@ -617,6 +620,10 @@ textProperty  : TEXT  propSep? stringLiteralForm ;// example utterance (TEXT tok
 // the note above (no free-form fallback on a lexicon entry); the rules are semantic.
 defaultProperty       : DEFAULT        propSep? BOOLEAN_LITERAL ;
 sensePriorityProperty : SENSE_PRIORITY propSep? NUMBER_LITERAL ;
+indexSecurityProperty : INDEX_SECURITY propSep? id ;
+skipSecurityProperty  : SKIP_SECURITY propSep? BOOLEAN_LITERAL ;
+defaultValueProperty  : DEFAULT_VALUE propSep? stringLiteralForm ;
+bindsProperty         : BINDS propSep? listOfIds ;
 
 // ----- v4.1 world model (ttr-metadata M0; D-d-α, D-d-i, D-f, T6) -----
 worldDef         : LBRACE (worldMember (COMMA? worldMember)* COMMA?)? RBRACE ;
@@ -810,7 +817,7 @@ er2dbAttributeProperty   : descriptionProperty | tagsProperty | attributePropert
 
 er2dbRelationProperty    : descriptionProperty | tagsProperty | relationProperty_ | fkProperty_ ;
 
-queryProperty            : descriptionProperty | tagsProperty | languageProperty | parametersProperty | sourceTextProperty | searchBlockProperty ;
+queryProperty            : descriptionProperty | tagsProperty | languageProperty | parametersProperty | sourceTextProperty | searchBlockProperty | skipSecurityProperty ;
 
 // 0.16 — `def role` in `model automation` gains three TYPED properties (resolve / delivery /
 // members) with `autoValue` values. Per-model validity is semantic.
@@ -918,7 +925,7 @@ allocationValue      : id | object_ ;                       // `proportional` | 
 // A query / procedure parameter: { name: <id>, type: <dataType>, label: "...", direction: <id> }.
 // `label` here is a plain display string (unlike `roleProperty`'s localised `labelProperty`).
 // `direction` (IN | OUT | INOUT) only appears on procedure parameters.
-paramProperty            : nameProperty | typeProperty | paramLabelProperty | directionProperty ;
+paramProperty            : nameProperty | typeProperty | paramLabelProperty | directionProperty | defaultValueProperty | bindsProperty ;
 
 // ----- Property productions -----
 
@@ -1272,6 +1279,7 @@ id : idPart ( DOT idPart )* ;
 
 idPart
   : IDENT
+  | INDEX_SECURITY | SKIP_SECURITY | DEFAULT_VALUE | BINDS // 0.21 — soft keywords
   | SUBKIND | PER | UNTIL                                // 0.20 — soft keywords
   | DB | ER | BINDING | MAP | QUERY | CNC                 // schema codes (MAP retained as id fragment only)
   | ROLE | ER2CNC_ROLE                                   // Phase 2.2 kinds
@@ -1405,6 +1413,10 @@ SHAPE            : 'shape' ;           // v3.1
 JOURNALING       : 'journaling' ;      // v3.1
 ALLOCATION       : 'allocation' ;      // v0.10 — md2db_cubelet writeback spread strategy (R21)
 SOURCE           : 'source' ;          // v3.1 (distinct from SOURCE_TEXT 'sourceText'; longest-match)
+INDEX_SECURITY : 'indexSecurity' ;
+SKIP_SECURITY : 'skipSecurity' ;
+DEFAULT_VALUE : 'defaultValue' ;
+BINDS : 'binds' ;
 
 // v4.1 world model (ttr-metadata M0). Def-kind nouns + typed-property keywords.
 // Declared before IDENT so the keyword wins ties.

@@ -66,6 +66,10 @@ const typeMap: Record<string, string> = {
   // 0.13 (NLS-P10 / ⚑GXP-D7) — both forms are legal: `description: "…"` and
   // `description: { en: "…", cs: "…" }`. The property map is what the LSP and the
   // Designer show an author, so it advertises the union, not just the older half.
+  indexSecurity: 'identifier',
+  skipSecurity: 'boolean',
+  defaultValue: 'string',
+  binds: 'list of references',
   description: 'localized string or string',
   tags: 'list of strings',
   version: 'string',
@@ -256,3 +260,10 @@ export const TTR_GRAMMAR_VERSION = '${grammarVersion}' as const;
 
 writeFileSync(versionOutputPath, versionOutput);
 console.log(`Generated version.ts (TTR grammar version ${grammarVersion})`);
+
+// C-7 shares the generated vocabulary/order with the parser and canonical YAML.
+const exportOrderPath = resolve(scriptDir, '../../kotlin/ttr-metadata/src/main/resources/export/property-map.json');
+const exportOrder = Object.fromEntries(allKinds.map((kind) => [kind,
+  extractProps(KIND_RULE[kind] ?? `${kind}Property`).flatMap((p) => KIND_OVERRIDES[kind]?.[p]?.map((x) => x.name) ?? [p]),
+]));
+writeFileSync(exportOrderPath, JSON.stringify(exportOrder, null, 2) + '\n');
