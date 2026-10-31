@@ -1,0 +1,4733 @@
+{
+  "version": "0.21",
+  "models": [
+    "db",
+    "er",
+    "binding",
+    "query",
+    "cnc",
+    "md",
+    "world",
+    "lexicon",
+    "automation",
+    "cn"
+  ],
+  "kinds": [
+    {
+      "kind": "project",
+      "body": "projectDef"
+    },
+    {
+      "kind": "table",
+      "body": "tableDef"
+    },
+    {
+      "kind": "view",
+      "body": "viewDef"
+    },
+    {
+      "kind": "column",
+      "body": "columnDef"
+    },
+    {
+      "kind": "index",
+      "body": "indexDef"
+    },
+    {
+      "kind": "constraint",
+      "body": "constraintDef"
+    },
+    {
+      "kind": "fk",
+      "body": "fkDef"
+    },
+    {
+      "kind": "procedure",
+      "body": "procedureDef"
+    },
+    {
+      "kind": "entity",
+      "body": "entityDef"
+    },
+    {
+      "kind": "attribute",
+      "body": "attributeDef"
+    },
+    {
+      "kind": "relation",
+      "body": "relationDef"
+    },
+    {
+      "kind": "er2db_entity",
+      "body": "er2dbEntityDef"
+    },
+    {
+      "kind": "er2db_attribute",
+      "body": "er2dbAttributeDef"
+    },
+    {
+      "kind": "er2db_relation",
+      "body": "er2dbRelationDef"
+    },
+    {
+      "kind": "query",
+      "body": "queryDef"
+    },
+    {
+      "kind": "role",
+      "body": "roleDef"
+    },
+    {
+      "kind": "er2cnc_role",
+      "body": "er2cncRoleDef"
+    },
+    {
+      "kind": "drill_map",
+      "body": "drillMapDef"
+    },
+    {
+      "kind": "area",
+      "body": "areaDef"
+    },
+    {
+      "kind": "schema",
+      "body": "schemaDef"
+    },
+    {
+      "kind": "domain",
+      "body": "mdDomainDef"
+    },
+    {
+      "kind": "dimension",
+      "body": "dimensionDef"
+    },
+    {
+      "kind": "map",
+      "body": "mdMapDef"
+    },
+    {
+      "kind": "hierarchy",
+      "body": "hierarchyDef"
+    },
+    {
+      "kind": "measure",
+      "body": "measureDef"
+    },
+    {
+      "kind": "cubelet",
+      "body": "cubeletDef"
+    },
+    {
+      "kind": "md2db_cubelet",
+      "body": "md2dbCubeletDef"
+    },
+    {
+      "kind": "md2db_domain",
+      "body": "md2dbDomainDef"
+    },
+    {
+      "kind": "md2db_map",
+      "body": "md2dbMapDef"
+    },
+    {
+      "kind": "md2er_dimension",
+      "body": "md2erDimensionDef"
+    },
+    {
+      "kind": "md2er_cubelet",
+      "body": "md2erCubeletDef"
+    },
+    {
+      "kind": "world",
+      "body": "worldDef"
+    },
+    {
+      "kind": "term",
+      "body": "lexiconEntryDef"
+    },
+    {
+      "kind": "pattern",
+      "body": "lexiconEntryDef"
+    },
+    {
+      "kind": "example",
+      "body": "lexiconEntryDef"
+    },
+    {
+      "kind": "parameter",
+      "body": "autoBody"
+    },
+    {
+      "kind": "action",
+      "body": "autoBody"
+    },
+    {
+      "kind": "service",
+      "body": "autoBody"
+    },
+    {
+      "kind": "approval",
+      "body": "autoBody"
+    },
+    {
+      "kind": "program",
+      "body": "autoBody"
+    },
+    {
+      "kind": "recipe",
+      "body": "autoBody"
+    },
+    {
+      "kind": "subkind",
+      "body": "cnBody"
+    },
+    {
+      "kind": "kind",
+      "body": "cnBody"
+    },
+    {
+      "kind": "event",
+      "body": "cnBody"
+    },
+    {
+      "kind": "phase",
+      "body": "cnBody"
+    },
+    {
+      "kind": "quality",
+      "body": "cnBody"
+    },
+    {
+      "kind": "relation_type",
+      "body": "cnBody"
+    },
+    {
+      "kind": "cn2md_kind",
+      "body": "cnBindingBody"
+    },
+    {
+      "kind": "cn2md_role",
+      "body": "cnBindingBody"
+    },
+    {
+      "kind": "cn2md_quality",
+      "body": "cnBindingBody"
+    },
+    {
+      "kind": "cn2md_event",
+      "body": "cnBindingBody"
+    },
+    {
+      "kind": "cn2er_kind",
+      "body": "cnBindingBody"
+    },
+    {
+      "kind": "cn2er_role",
+      "body": "cnBindingBody"
+    },
+    {
+      "kind": "cn2er_event",
+      "body": "cnBindingBody"
+    },
+    {
+      "kind": "cn2er_quality",
+      "body": "cnBindingBody"
+    },
+    {
+      "kind": "cn2er_phase",
+      "body": "cnBindingBody"
+    },
+    {
+      "kind": "cn2db_concept",
+      "body": "cnBindingBody"
+    }
+  ],
+  "nestedKinds": [
+    {
+      "kind": "engine",
+      "body": "engineDef",
+      "named": true
+    },
+    {
+      "kind": "executor",
+      "body": "executorDef",
+      "named": true
+    },
+    {
+      "kind": "storage",
+      "body": "storageDef",
+      "named": true
+    },
+    {
+      "kind": "identity",
+      "body": "autoBody",
+      "named": true
+    },
+    {
+      "kind": "grant",
+      "body": "autoBody",
+      "named": false
+    },
+    {
+      "kind": "deployment",
+      "body": "autoBody",
+      "named": true
+    },
+    {
+      "kind": "process",
+      "body": "processBody",
+      "named": true
+    },
+    {
+      "kind": "schema",
+      "body": "worldSchemaDef",
+      "named": true
+    },
+    {
+      "kind": "step",
+      "body": "autoBody",
+      "named": true
+    }
+  ],
+  "bodies": {
+    "projectDef": {
+      "rule": "projectDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "version",
+          "rule": "versionProperty",
+          "value": {
+            "symbol": "STRING_LITERAL"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "tableDef": {
+      "rule": "tableDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "primaryKey",
+          "rule": "primaryKeyProperty",
+          "value": {
+            "symbol": "primaryKeyValue"
+          }
+        },
+        {
+          "key": "columns",
+          "rule": "columnsProperty",
+          "value": {
+            "symbol": "columnDefList"
+          }
+        },
+        {
+          "key": "indices",
+          "rule": "indicesProperty",
+          "value": {
+            "symbol": "indexDefList"
+          }
+        },
+        {
+          "key": "constraints",
+          "rule": "constraintsProperty",
+          "value": {
+            "symbol": "constraintDefList"
+          }
+        },
+        {
+          "key": "search",
+          "rule": "searchBlockProperty",
+          "value": {
+            "symbol": "searchBlock"
+          }
+        },
+        {
+          "key": "semantics",
+          "rule": "semanticsBlockProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "lexicon",
+          "rule": "lexiconBlockProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "management",
+          "rule": "managementProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "changeSemantics",
+          "rule": "changeSemanticsProperty",
+          "value": {
+            "seq": [
+              {
+                "symbol": "id"
+              },
+              {
+                "repeat": "?",
+                "node": {
+                  "symbol": "changeRoleMap"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "key": "writeback",
+          "rule": "writebackReservationProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "viewDef": {
+      "rule": "viewDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "columns",
+          "rule": "columnsProperty",
+          "value": {
+            "symbol": "columnDefList"
+          }
+        },
+        {
+          "key": "definitionSql",
+          "rule": "definitionSqlProperty",
+          "value": {
+            "symbol": "embeddedBlock"
+          }
+        },
+        {
+          "key": "search",
+          "rule": "searchBlockProperty",
+          "value": {
+            "symbol": "searchBlock"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "columnDef": {
+      "rule": "columnDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "type",
+          "rule": "typeProperty",
+          "value": {
+            "symbol": "dataType"
+          }
+        },
+        {
+          "key": "optional",
+          "rule": "optionalProperty",
+          "value": {
+            "symbol": "BOOLEAN_LITERAL"
+          }
+        },
+        {
+          "key": "isKey",
+          "rule": "isKeyProperty",
+          "value": {
+            "symbol": "BOOLEAN_LITERAL"
+          }
+        },
+        {
+          "key": "indexed",
+          "rule": "indexedProperty",
+          "value": {
+            "symbol": "BOOLEAN_LITERAL"
+          }
+        },
+        {
+          "key": "search",
+          "rule": "searchBlockProperty",
+          "value": {
+            "symbol": "searchBlock"
+          }
+        },
+        {
+          "key": "semantics",
+          "rule": "semanticsBlockProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "lexicon",
+          "rule": "lexiconBlockProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "indexDef": {
+      "rule": "indexDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "type",
+          "rule": "indexTypeProperty",
+          "value": {
+            "symbol": "indexTypeValue"
+          }
+        },
+        {
+          "key": "columns",
+          "rule": "columnNamesListProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "constraintDef": {
+      "rule": "constraintDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "type",
+          "rule": "constraintTypeProperty",
+          "value": {
+            "symbol": "constraintTypeValue"
+          }
+        },
+        {
+          "key": "columns",
+          "rule": "columnNamesListProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "fkDef": {
+      "rule": "fkDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "from",
+          "rule": "fromProperty",
+          "value": {
+            "symbol": "value"
+          }
+        },
+        {
+          "key": "to",
+          "rule": "toProperty",
+          "value": {
+            "symbol": "value"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "procedureDef": {
+      "rule": "procedureDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "parameters",
+          "rule": "parametersProperty",
+          "value": {
+            "symbol": "parameterDefList"
+          }
+        },
+        {
+          "key": "resultColumns",
+          "rule": "resultColumnsProperty",
+          "value": {
+            "symbol": "columnDefList"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "entityDef": {
+      "rule": "entityDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "labelPlural",
+          "rule": "labelPluralProperty",
+          "value": {
+            "symbol": "STRING_LITERAL"
+          }
+        },
+        {
+          "key": "nameAttribute",
+          "rule": "nameAttributeProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "codeAttribute",
+          "rule": "codeAttributeProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "aliases",
+          "rule": "aliasesProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "attributes",
+          "rule": "attributesProperty",
+          "value": {
+            "symbol": "attributeDefList"
+          }
+        },
+        {
+          "key": "roles",
+          "rule": "rolesProperty",
+          "value": {
+            "symbol": "listOfIds"
+          }
+        },
+        {
+          "key": "displayLabel",
+          "rule": "displayLabelProperty",
+          "value": {
+            "symbol": "localizedString"
+          }
+        },
+        {
+          "key": "search",
+          "rule": "searchBlockProperty",
+          "value": {
+            "symbol": "searchBlock"
+          }
+        },
+        {
+          "key": "semantics",
+          "rule": "semanticsBlockProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "lexicon",
+          "rule": "lexiconBlockProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "binding",
+          "rule": "bindingProperty",
+          "value": {
+            "symbol": "bindingValue"
+          }
+        },
+        {
+          "key": "concept",
+          "rule": "conceptSugarProperty",
+          "value": {
+            "symbol": "cnBody"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "attributeDef": {
+      "rule": "attributeDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "type",
+          "rule": "typeProperty",
+          "value": {
+            "symbol": "dataType"
+          }
+        },
+        {
+          "key": "isKey",
+          "rule": "isKeyProperty",
+          "value": {
+            "symbol": "BOOLEAN_LITERAL"
+          }
+        },
+        {
+          "key": "optional",
+          "rule": "optionalProperty",
+          "value": {
+            "symbol": "BOOLEAN_LITERAL"
+          }
+        },
+        {
+          "key": "valueLabels",
+          "rule": "valueLabelsProperty",
+          "value": {
+            "symbol": "valueLabelsBody"
+          }
+        },
+        {
+          "key": "displayLabel",
+          "rule": "displayLabelProperty",
+          "value": {
+            "symbol": "localizedString"
+          }
+        },
+        {
+          "key": "search",
+          "rule": "searchBlockProperty",
+          "value": {
+            "symbol": "searchBlock"
+          }
+        },
+        {
+          "key": "semantics",
+          "rule": "semanticsBlockProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "lexicon",
+          "rule": "lexiconBlockProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "binding",
+          "rule": "bindingProperty",
+          "value": {
+            "symbol": "bindingValue"
+          }
+        },
+        {
+          "key": "domain",
+          "rule": "domainRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "aggregation",
+          "rule": "aggregationProperty",
+          "value": {
+            "symbol": "aggregationValue"
+          }
+        },
+        {
+          "key": "states",
+          "rule": "statesProperty",
+          "value": {
+            "symbol": "listOfIds"
+          }
+        },
+        {
+          "key": "transitions",
+          "rule": "transitionsProperty",
+          "value": {
+            "seq": [
+              {
+                "symbol": "LBRACE"
+              },
+              {
+                "repeat": "?",
+                "node": {
+                  "seq": [
+                    {
+                      "symbol": "transitionEntry"
+                    },
+                    {
+                      "repeat": "*",
+                      "node": {
+                        "seq": [
+                          {
+                            "repeat": "?",
+                            "node": {
+                              "symbol": "COMMA"
+                            }
+                          },
+                          {
+                            "symbol": "transitionEntry"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "repeat": "?",
+                      "node": {
+                        "symbol": "COMMA"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "symbol": "RBRACE"
+              }
+            ]
+          }
+        },
+        {
+          "key": "concept",
+          "rule": "conceptSugarProperty",
+          "value": {
+            "symbol": "cnBody"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "relationDef": {
+      "rule": "relationDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "from",
+          "rule": "fromProperty",
+          "value": {
+            "symbol": "value"
+          }
+        },
+        {
+          "key": "to",
+          "rule": "toProperty",
+          "value": {
+            "symbol": "value"
+          }
+        },
+        {
+          "key": "cardinality",
+          "rule": "cardinalityProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "join",
+          "rule": "joinProperty",
+          "value": {
+            "symbol": "list"
+          }
+        },
+        {
+          "key": "search",
+          "rule": "searchBlockProperty",
+          "value": {
+            "symbol": "searchBlock"
+          }
+        },
+        {
+          "key": "binding",
+          "rule": "bindingProperty",
+          "value": {
+            "symbol": "bindingValue"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "er2dbEntityDef": {
+      "rule": "er2dbEntityDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "entity",
+          "rule": "entityProperty_",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "target",
+          "rule": "targetProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "object_"
+              },
+              {
+                "symbol": "id"
+              }
+            ]
+          }
+        },
+        {
+          "key": "whereFilter",
+          "rule": "whereFilterProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "er2dbAttributeDef": {
+      "rule": "er2dbAttributeDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "attribute",
+          "rule": "attributeProperty_",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "target",
+          "rule": "targetProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "object_"
+              },
+              {
+                "symbol": "id"
+              }
+            ]
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "er2dbRelationDef": {
+      "rule": "er2dbRelationDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "relation",
+          "rule": "relationProperty_",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "fk",
+          "rule": "fkProperty_",
+          "value": {
+            "symbol": "id"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "queryDef": {
+      "rule": "queryDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "language",
+          "rule": "languageProperty",
+          "value": {
+            "symbol": "languageValue"
+          }
+        },
+        {
+          "key": "parameters",
+          "rule": "parametersProperty",
+          "value": {
+            "symbol": "parameterDefList"
+          }
+        },
+        {
+          "key": "sourceText",
+          "rule": "sourceTextProperty",
+          "value": {
+            "symbol": "embeddedBlock"
+          }
+        },
+        {
+          "key": "search",
+          "rule": "searchBlockProperty",
+          "value": {
+            "symbol": "searchBlock"
+          }
+        },
+        {
+          "key": "skipSecurity",
+          "rule": "skipSecurityProperty",
+          "value": {
+            "symbol": "BOOLEAN_LITERAL"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "roleDef": {
+      "rule": "roleDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "label",
+          "rule": "labelProperty",
+          "value": {
+            "symbol": "localizedString"
+          }
+        },
+        {
+          "key": "search",
+          "rule": "searchBlockProperty",
+          "value": {
+            "symbol": "searchBlock"
+          }
+        },
+        {
+          "key": "resolve",
+          "rule": "resolveProperty",
+          "value": {
+            "symbol": "autoValue"
+          }
+        },
+        {
+          "key": "delivery",
+          "rule": "deliveryProperty",
+          "value": {
+            "symbol": "autoValue"
+          }
+        },
+        {
+          "key": "members",
+          "rule": "membersProperty",
+          "value": {
+            "symbol": "autoValue"
+          }
+        },
+        {
+          "key": "kind",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "role",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "quality",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "event",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "phase",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "concept",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "grounds",
+          "rule": "groundsProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "involves",
+          "rule": "involvesProperty",
+          "value": {
+            "seq": [
+              {
+                "symbol": "LBRACK"
+              },
+              {
+                "symbol": "participant"
+              },
+              {
+                "repeat": "*",
+                "node": {
+                  "seq": [
+                    {
+                      "symbol": "COMMA"
+                    },
+                    {
+                      "symbol": "participant"
+                    }
+                  ]
+                }
+              },
+              {
+                "repeat": "?",
+                "node": {
+                  "symbol": "COMMA"
+                }
+              },
+              {
+                "symbol": "RBRACK"
+              }
+            ]
+          }
+        },
+        {
+          "key": "period",
+          "rule": "periodProperty",
+          "value": {
+            "symbol": "cnObject"
+          }
+        },
+        {
+          "key": "lexicon",
+          "rule": "lexiconBlockProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        }
+      ],
+      "freeForm": [
+        {
+          "rule": "cnEntry",
+          "key": "cnKey",
+          "value": "cnValue"
+        }
+      ],
+      "members": [],
+      "ordered": true
+    },
+    "er2cncRoleDef": {
+      "rule": "er2cncRoleDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "entity",
+          "rule": "entityProperty_",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "role",
+          "rule": "roleProperty_",
+          "value": {
+            "symbol": "id"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "drillMapDef": {
+      "rule": "drillMapDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "from",
+          "rule": "fromProperty",
+          "value": {
+            "symbol": "value"
+          }
+        },
+        {
+          "key": "to",
+          "rule": "toProperty",
+          "value": {
+            "symbol": "value"
+          }
+        },
+        {
+          "key": "args",
+          "rule": "argsProperty",
+          "value": {
+            "symbol": "drillArgsMap"
+          }
+        },
+        {
+          "key": "display",
+          "rule": "displayProperty",
+          "value": {
+            "symbol": "localizedString"
+          }
+        },
+        {
+          "key": "override",
+          "rule": "overrideProperty",
+          "value": {
+            "symbol": "BOOLEAN_LITERAL"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "areaDef": {
+      "rule": "areaDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "packages",
+          "rule": "areaPackagesProperty",
+          "value": {
+            "seq": [
+              {
+                "symbol": "LBRACK"
+              },
+              {
+                "repeat": "?",
+                "node": {
+                  "seq": [
+                    {
+                      "symbol": "id"
+                    },
+                    {
+                      "repeat": "*",
+                      "node": {
+                        "seq": [
+                          {
+                            "symbol": "COMMA"
+                          },
+                          {
+                            "symbol": "id"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "repeat": "?",
+                "node": {
+                  "symbol": "COMMA"
+                }
+              },
+              {
+                "symbol": "RBRACK"
+              }
+            ]
+          }
+        },
+        {
+          "key": "entities",
+          "rule": "areaEntitiesProperty",
+          "value": {
+            "seq": [
+              {
+                "symbol": "LBRACK"
+              },
+              {
+                "repeat": "?",
+                "node": {
+                  "seq": [
+                    {
+                      "symbol": "id"
+                    },
+                    {
+                      "repeat": "*",
+                      "node": {
+                        "seq": [
+                          {
+                            "symbol": "COMMA"
+                          },
+                          {
+                            "symbol": "id"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "repeat": "?",
+                "node": {
+                  "symbol": "COMMA"
+                }
+              },
+              {
+                "symbol": "RBRACK"
+              }
+            ]
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "schemaDef": {
+      "rule": "schemaDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "columns",
+          "rule": "columnsProperty",
+          "value": {
+            "symbol": "columnDefList"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "mdDomainDef": {
+      "rule": "mdDomainDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "type",
+          "rule": "typeProperty",
+          "value": {
+            "symbol": "dataType"
+          }
+        },
+        {
+          "key": "kind",
+          "rule": "kindProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "restrict",
+          "rule": "restrictProperty",
+          "value": {
+            "symbol": "restrictBlock"
+          }
+        },
+        {
+          "key": "publish",
+          "rule": "publishProperty",
+          "value": {
+            "symbol": "MEMBERS"
+          }
+        },
+        {
+          "key": "concept",
+          "rule": "conceptSugarProperty",
+          "value": {
+            "symbol": "cnBody"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "dimensionDef": {
+      "rule": "dimensionDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "key",
+          "rule": "keyProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "attributes",
+          "rule": "attributesProperty",
+          "value": {
+            "symbol": "attributeDefList"
+          }
+        },
+        {
+          "key": "hierarchies",
+          "rule": "hierarchiesProperty",
+          "value": {
+            "symbol": "listOfIds"
+          }
+        },
+        {
+          "key": "lexicon",
+          "rule": "lexiconBlockProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "concept",
+          "rule": "conceptSugarProperty",
+          "value": {
+            "symbol": "cnBody"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "mdMapDef": {
+      "rule": "mdMapDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "from",
+          "rule": "fromProperty",
+          "value": {
+            "symbol": "value"
+          }
+        },
+        {
+          "key": "to",
+          "rule": "toProperty",
+          "value": {
+            "symbol": "value"
+          }
+        },
+        {
+          "key": "cardinality",
+          "rule": "cardinalityProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "calc",
+          "rule": "calcProperty",
+          "value": {
+            "symbol": "calcRef"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "hierarchyDef": {
+      "rule": "hierarchyDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "dimension",
+          "rule": "dimensionRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "levels",
+          "rule": "levelsProperty",
+          "value": {
+            "symbol": "levelList"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "measureDef": {
+      "rule": "measureDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "domain",
+          "rule": "domainRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "class",
+          "rule": "classProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "aggregation",
+          "rule": "aggregationProperty",
+          "value": {
+            "symbol": "aggregationValue"
+          }
+        },
+        {
+          "key": "validBy",
+          "rule": "validByProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "lexicon",
+          "rule": "lexiconBlockProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "concept",
+          "rule": "conceptSugarProperty",
+          "value": {
+            "symbol": "cnBody"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "cubeletDef": {
+      "rule": "cubeletDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "grain",
+          "rule": "grainProperty",
+          "value": {
+            "symbol": "listOfIds"
+          }
+        },
+        {
+          "key": "measures",
+          "rule": "measuresProperty",
+          "value": {
+            "symbol": "measuresValue"
+          }
+        },
+        {
+          "key": "lexicon",
+          "rule": "lexiconBlockProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "concept",
+          "rule": "conceptSugarProperty",
+          "value": {
+            "symbol": "cnBody"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "md2dbCubeletDef": {
+      "rule": "md2dbCubeletDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "cubelet",
+          "rule": "cubeletRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "target",
+          "rule": "targetProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "object_"
+              },
+              {
+                "symbol": "id"
+              }
+            ]
+          }
+        },
+        {
+          "key": "shape",
+          "rule": "shapeProperty",
+          "value": {
+            "symbol": "shapeValue"
+          }
+        },
+        {
+          "key": "attributes",
+          "rule": "attributesMapProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "measures",
+          "rule": "measuresMapProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "journaling",
+          "rule": "journalingProperty",
+          "value": {
+            "symbol": "journalingValue"
+          }
+        },
+        {
+          "key": "allocation",
+          "rule": "allocationProperty",
+          "value": {
+            "symbol": "allocationValue"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "md2dbDomainDef": {
+      "rule": "md2dbDomainDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "domain",
+          "rule": "domainRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "source",
+          "rule": "sourceProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "md2dbMapDef": {
+      "rule": "md2dbMapDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "map",
+          "rule": "mapRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "target",
+          "rule": "targetProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "object_"
+              },
+              {
+                "symbol": "id"
+              }
+            ]
+          }
+        },
+        {
+          "key": "columns",
+          "rule": "columnsMapProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "md2erDimensionDef": {
+      "rule": "md2erDimensionDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "dimension",
+          "rule": "dimensionRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "entity",
+          "rule": "entityProperty_",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "attributes",
+          "rule": "attributesMapProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "md2erCubeletDef": {
+      "rule": "md2erCubeletDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "cubelet",
+          "rule": "cubeletRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "target",
+          "rule": "targetProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "object_"
+              },
+              {
+                "symbol": "id"
+              }
+            ]
+          }
+        },
+        {
+          "key": "attributes",
+          "rule": "attributesMapProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "shape",
+          "rule": "shapeProperty",
+          "value": {
+            "symbol": "shapeValue"
+          }
+        },
+        {
+          "key": "measures",
+          "rule": "measuresMapProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        },
+        {
+          "key": "journaling",
+          "rule": "journalingProperty",
+          "value": {
+            "symbol": "journalingValue"
+          }
+        },
+        {
+          "key": "allocation",
+          "rule": "allocationProperty",
+          "value": {
+            "symbol": "allocationValue"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "worldDef": {
+      "rule": "worldDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "extends",
+          "rule": "extendsProperty",
+          "value": {
+            "symbol": "id"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [
+        {
+          "kind": "engine",
+          "body": "engineDef",
+          "named": true
+        },
+        {
+          "kind": "executor",
+          "body": "executorDef",
+          "named": true
+        },
+        {
+          "kind": "storage",
+          "body": "storageDef",
+          "named": true
+        },
+        {
+          "kind": "identity",
+          "body": "autoBody",
+          "named": true
+        },
+        {
+          "kind": "grant",
+          "body": "autoBody",
+          "named": false
+        },
+        {
+          "kind": "deployment",
+          "body": "autoBody",
+          "named": true
+        },
+        {
+          "kind": "process",
+          "body": "processBody",
+          "named": true
+        }
+      ],
+      "ordered": false
+    },
+    "engineDef": {
+      "rule": "engineDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "type",
+          "rule": "typeProperty",
+          "value": {
+            "symbol": "dataType"
+          }
+        },
+        {
+          "key": "version",
+          "rule": "versionProperty",
+          "value": {
+            "symbol": "STRING_LITERAL"
+          }
+        },
+        {
+          "key": "extends",
+          "rule": "extendsProperty",
+          "value": {
+            "symbol": "id"
+          }
+        }
+      ],
+      "freeForm": [
+        {
+          "rule": "propertyEntry",
+          "key": "key",
+          "value": "value"
+        }
+      ],
+      "members": [],
+      "ordered": false
+    },
+    "executorDef": {
+      "rule": "executorDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "type",
+          "rule": "typeProperty",
+          "value": {
+            "symbol": "dataType"
+          }
+        },
+        {
+          "key": "version",
+          "rule": "versionProperty",
+          "value": {
+            "symbol": "STRING_LITERAL"
+          }
+        },
+        {
+          "key": "extends",
+          "rule": "extendsProperty",
+          "value": {
+            "symbol": "id"
+          }
+        }
+      ],
+      "freeForm": [
+        {
+          "rule": "propertyEntry",
+          "key": "key",
+          "value": "value"
+        }
+      ],
+      "members": [],
+      "ordered": false
+    },
+    "storageDef": {
+      "rule": "storageDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "type",
+          "rule": "typeProperty",
+          "value": {
+            "symbol": "dataType"
+          }
+        },
+        {
+          "key": "extends",
+          "rule": "extendsProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "via",
+          "rule": "viaProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "hosts",
+          "rule": "hostsProperty",
+          "value": {
+            "symbol": "listOfIds"
+          }
+        },
+        {
+          "key": "staging",
+          "rule": "stagingProperty",
+          "value": {
+            "symbol": "BOOLEAN_LITERAL"
+          }
+        }
+      ],
+      "freeForm": [
+        {
+          "rule": "propertyEntry",
+          "key": "key",
+          "value": "value"
+        }
+      ],
+      "members": [
+        {
+          "kind": "schema",
+          "body": "worldSchemaDef",
+          "named": true
+        }
+      ],
+      "ordered": false
+    },
+    "worldSchemaDef": {
+      "rule": "worldSchemaDef",
+      "properties": [],
+      "freeForm": [],
+      "members": [],
+      "ordered": false,
+      "fields": {
+        "key": "id",
+        "value": "dataType"
+      }
+    },
+    "autoBody": {
+      "rule": "autoBody",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "label",
+          "rule": "labelProperty",
+          "value": {
+            "symbol": "localizedString"
+          }
+        },
+        {
+          "key": "type",
+          "rule": "typeProperty",
+          "value": {
+            "symbol": "dataType"
+          }
+        },
+        {
+          "key": "columns",
+          "rule": "columnsProperty",
+          "value": {
+            "symbol": "columnDefList"
+          }
+        },
+        {
+          "key": "target",
+          "rule": "targetProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "object_"
+              },
+              {
+                "symbol": "id"
+              }
+            ]
+          }
+        },
+        {
+          "key": "transition",
+          "rule": "transitionProperty",
+          "value": {
+            "seq": [
+              {
+                "symbol": "id"
+              },
+              {
+                "symbol": "ARROW"
+              },
+              {
+                "symbol": "transitionTarget"
+              },
+              {
+                "repeat": "?",
+                "node": {
+                  "symbol": "transitionGuard"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "key": "set",
+          "rule": "setProperty",
+          "value": {
+            "seq": [
+              {
+                "symbol": "id"
+              },
+              {
+                "symbol": "EQUALS"
+              },
+              {
+                "symbol": "id"
+              }
+            ]
+          }
+        }
+      ],
+      "freeForm": [
+        {
+          "rule": "autoEntry",
+          "key": "autoKey",
+          "value": "autoValue"
+        }
+      ],
+      "members": [],
+      "ordered": true
+    },
+    "processBody": {
+      "rule": "processBody",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "steps",
+          "rule": "stepsProperty",
+          "value": {
+            "seq": [
+              {
+                "symbol": "LBRACK"
+              },
+              {
+                "repeat": "*",
+                "node": {
+                  "seq": [
+                    {
+                      "symbol": "stepInline"
+                    },
+                    {
+                      "repeat": "?",
+                      "node": {
+                        "symbol": "COMMA"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "symbol": "RBRACK"
+              }
+            ]
+          }
+        }
+      ],
+      "freeForm": [
+        {
+          "rule": "autoEntry",
+          "key": "autoKey",
+          "value": "autoValue"
+        }
+      ],
+      "members": [],
+      "ordered": true
+    },
+    "lexiconEntryDef": {
+      "rule": "lexiconEntryDef",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "for",
+          "rule": "forProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "forms",
+          "rule": "formsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "match",
+          "rule": "matchProperty",
+          "value": {
+            "symbol": "stringLiteralForm"
+          }
+        },
+        {
+          "key": "text",
+          "rule": "textProperty",
+          "value": {
+            "symbol": "stringLiteralForm"
+          }
+        },
+        {
+          "key": "default",
+          "rule": "defaultProperty",
+          "value": {
+            "symbol": "BOOLEAN_LITERAL"
+          }
+        },
+        {
+          "key": "sense_priority",
+          "rule": "sensePriorityProperty",
+          "value": {
+            "symbol": "NUMBER_LITERAL"
+          }
+        },
+        {
+          "key": "indexSecurity",
+          "rule": "indexSecurityProperty",
+          "value": {
+            "symbol": "id"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "cnBody": {
+      "rule": "cnBody",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "label",
+          "rule": "labelProperty",
+          "value": {
+            "symbol": "localizedString"
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "kind",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "role",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "quality",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "event",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "phase",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "concept",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "grounds",
+          "rule": "groundsProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "involves",
+          "rule": "involvesProperty",
+          "value": {
+            "seq": [
+              {
+                "symbol": "LBRACK"
+              },
+              {
+                "symbol": "participant"
+              },
+              {
+                "repeat": "*",
+                "node": {
+                  "seq": [
+                    {
+                      "symbol": "COMMA"
+                    },
+                    {
+                      "symbol": "participant"
+                    }
+                  ]
+                }
+              },
+              {
+                "repeat": "?",
+                "node": {
+                  "symbol": "COMMA"
+                }
+              },
+              {
+                "symbol": "RBRACK"
+              }
+            ]
+          }
+        },
+        {
+          "key": "period",
+          "rule": "periodProperty",
+          "value": {
+            "symbol": "cnObject"
+          }
+        },
+        {
+          "key": "extent",
+          "rule": "extentProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "basis",
+          "rule": "basisProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "definition",
+          "rule": "definitionProperty",
+          "value": {
+            "symbol": "embeddedBlock"
+          }
+        },
+        {
+          "key": "members",
+          "rule": "conceptMembersProperty",
+          "value": {
+            "symbol": "embeddedBlock"
+          }
+        },
+        {
+          "key": "from",
+          "rule": "cnFromProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "until",
+          "rule": "cnUntilProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "per",
+          "rule": "cnPerProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "value_space",
+          "rule": "valueSpaceProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "lexicon",
+          "rule": "lexiconBlockProperty",
+          "value": {
+            "symbol": "object_"
+          }
+        }
+      ],
+      "freeForm": [
+        {
+          "rule": "cnEntry",
+          "key": "cnKey",
+          "value": "cnValue"
+        }
+      ],
+      "members": [],
+      "ordered": true
+    },
+    "cnBindingBody": {
+      "rule": "cnBindingBody",
+      "properties": [
+        {
+          "key": "description",
+          "rule": "descriptionProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "stringLiteralForm"
+              },
+              {
+                "symbol": "localizedString"
+              }
+            ]
+          }
+        },
+        {
+          "key": "tags",
+          "rule": "tagsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "kind",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "role",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "quality",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "event",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "phase",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "concept",
+          "rule": "cnRefProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "target",
+          "rule": "targetProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "object_"
+              },
+              {
+                "symbol": "id"
+              }
+            ]
+          }
+        },
+        {
+          "key": "per",
+          "rule": "cnPerProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "period",
+          "rule": "periodProperty",
+          "value": {
+            "symbol": "cnObject"
+          }
+        }
+      ],
+      "freeForm": [
+        {
+          "rule": "cnEntry",
+          "key": "cnKey",
+          "value": "cnValue"
+        }
+      ],
+      "members": [],
+      "ordered": true
+    },
+    "bindingBlock": {
+      "rule": "bindingBlock",
+      "properties": [
+        {
+          "key": "target",
+          "rule": "targetProperty",
+          "value": {
+            "alt": [
+              {
+                "symbol": "object_"
+              },
+              {
+                "symbol": "id"
+              }
+            ]
+          }
+        },
+        {
+          "key": "columns",
+          "rule": "bindingColumnsProperty",
+          "value": {
+            "symbol": "bindingColumnMap"
+          }
+        },
+        {
+          "key": "fk",
+          "rule": "fkProperty_",
+          "value": {
+            "symbol": "id"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "searchBlock": {
+      "rule": "searchBlock",
+      "properties": [
+        {
+          "key": "keywords",
+          "rule": "keywordsProperty",
+          "value": {
+            "symbol": "localizedStringList"
+          }
+        },
+        {
+          "key": "patterns",
+          "rule": "patternsProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "descriptions",
+          "rule": "descriptionsProperty",
+          "value": {
+            "symbol": "localizedStringList"
+          }
+        },
+        {
+          "key": "examples",
+          "rule": "examplesProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "aliases",
+          "rule": "aliasesProperty",
+          "value": {
+            "symbol": "listOfStrings"
+          }
+        },
+        {
+          "key": "searchable",
+          "rule": "searchableProperty",
+          "value": {
+            "seq": [
+              {
+                "repeat": "?",
+                "node": {
+                  "seq": [
+                    {
+                      "repeat": "?",
+                      "node": {
+                        "symbol": "propSep"
+                      }
+                    },
+                    {
+                      "symbol": "BOOLEAN_LITERAL"
+                    }
+                  ]
+                }
+              },
+              {
+                "repeat": "?",
+                "node": {
+                  "symbol": "matchMethodAttr"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "key": "fuzzy",
+          "rule": "fuzzyProperty",
+          "value": {
+            "symbol": "BOOLEAN_LITERAL"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    },
+    "parameterInline": {
+      "rule": "parameterInline",
+      "properties": [
+        {
+          "key": "name",
+          "rule": "nameProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "type",
+          "rule": "typeProperty",
+          "value": {
+            "symbol": "dataType"
+          }
+        },
+        {
+          "key": "label",
+          "rule": "paramLabelProperty",
+          "value": {
+            "symbol": "stringLiteralForm"
+          }
+        },
+        {
+          "key": "direction",
+          "rule": "directionProperty",
+          "value": {
+            "symbol": "id"
+          }
+        },
+        {
+          "key": "defaultValue",
+          "rule": "defaultValueProperty",
+          "value": {
+            "symbol": "stringLiteralForm"
+          }
+        },
+        {
+          "key": "binds",
+          "rule": "bindsProperty",
+          "value": {
+            "symbol": "listOfIds"
+          }
+        }
+      ],
+      "freeForm": [],
+      "members": [],
+      "ordered": false
+    }
+  },
+  "identifiers": {
+    "id": "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$",
+    "cnKey": "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|action|aggregation|aliases|allocation|approval|area|args|as|attribute|attributes|automation|basis|binding|bool|boolean|btree|calc|canvas|cardinality|changeSemantics|char|class|classify|cn|cn2db_concept|cn2er_event|cn2er_kind|cn2er_phase|cn2er_quality|cn2er_role|cn2md_event|cn2md_kind|cn2md_quality|cn2md_role|cnc|codeAttribute|column|columns|concept|constraint|constraints|cubelet|date|datetime|db|decimal|def|default|definition|definitionSql|delivery|deployment|description|descriptions|dimension|direction|display|displayLabel|domain|double|drill_map|engine|entities|entity|er|er2cnc_role|er2db_attribute|er2db_entity|er2db_relation|event|example|examples|executor|extends|extent|false|fk|float|for|forms|from|fulltext|fuzzy|grain|grant|graph|grounds|hierarchies|hosts|identity|import|index|indexed|indices|int|integer|involves|isKey|join|journaling|key|keywords|kind|label|labelPlural|language|layout|length|levels|lexicon|list|locale|management|map|mask|match|md|md2db_cubelet|md2db_domain|md2db_map|md2er_cubelet|md2er_dimension|measure|measures|members|method|model|name|nameAttribute|notNull|null|number|object|objects|on|optional|ordered|override|own|package|packages|parameter|parameters|pattern|patterns|per|period|phase|precision|primary|primaryKey|procedure|process|program|project|publish|quality|query|recipe|relation|relation_type|resolve|restrict|resultColumns|role|roles|schema|search|searchable|secondary|security|semantics|sense_priority|service|set|shape|source|sourceText|staging|states|step|steps|storage|string|subkind|table|tags|target|term|text|timestamp|to|transition|transitions|true|ttrl|type|unique|until|validBy|valueLabels|value_space|varchar|version|view|whereFilter|world|writeback)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)$",
+    "autoKey": "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$",
+    "cnObjectKey": "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$"
+  },
+  "rules": {
+    "document": "packageDecl ? importDecl * ( modelDirective | graphBlock ) ? ( definition | securityBlock ) * EOF",
+    "securityBlock": "SECURITY LBRACE ( securityStatement ( COMMA ? securityStatement ) * COMMA ? ) ? RBRACE",
+    "securityStatement": "OWN id COLON id | CLASSIFY id COLON id | GRANT id ON id TO id | MASK id",
+    "ttrlDocument": "TTRL NUMBER_LITERAL ttrlCanvas * EOF",
+    "ttrlCanvas": "CANVAS id LBRACE ttrlProperty * RBRACE",
+    "ttrlProperty": "id propSep ? ttrlPropValue",
+    "ttrlPropValue": "STRING_LITERAL | id | listOfStrings | ttrlNodeMap | ttrlIntMap",
+    "ttrlNodeMap": "LBRACE ttrlNodeEntry * RBRACE",
+    "ttrlNodeEntry": "STRING_LITERAL propSep ? LBRACE ( ttrlCoord ( COMMA ? ttrlCoord ) * COMMA ? ) ? RBRACE",
+    "ttrlCoord": "id propSep ? NUMBER_LITERAL",
+    "ttrlIntMap": "LBRACE ttrlIntEntry * RBRACE",
+    "ttrlIntEntry": "STRING_LITERAL propSep ? NUMBER_LITERAL",
+    "packageDecl": "PACKAGE qualifiedName",
+    "importDecl": "IMPORT qualifiedName ( DOT STAR ) ?",
+    "graphBlock": "GRAPH id LBRACE ( graphProperty ( COMMA ? graphProperty ) * COMMA ? ) ? RBRACE",
+    "graphProperty": "graphModelProperty | descriptionProperty | tagsProperty | graphObjectsProperty | graphLayoutProperty",
+    "graphModelProperty": "MODEL propSep ? modelCode",
+    "graphObjectsProperty": "OBJECTS propSep ? LBRACK ( id ( COMMA id ) * ) ? COMMA ? RBRACK",
+    "graphLayoutProperty": "LAYOUT propSep ? object_",
+    "qualifiedName": "id",
+    "modelDirective": "MODEL modelCode ( SCHEMA id ) ? ( LOCALE id ) ?",
+    "modelCode": "DB | ER | BINDING | QUERY | CNC | MD | WORLD | LEXICON | AUTOMATION | CN",
+    "definition": "DEF objectDefinition",
+    "objectDefinition": "PROJECT id projectDef | TABLE id tableDef | VIEW id viewDef | COLUMN id columnDef | INDEX id indexDef | CONSTRAINT id constraintDef | FK id fkDef | PROCEDURE id procedureDef | ENTITY id entityDef | ATTRIBUTE id attributeDef | RELATION id relationDef | ER2DB_ENTITY id er2dbEntityDef | ER2DB_ATTRIBUTE id er2dbAttributeDef | ER2DB_RELATION id er2dbRelationDef | QUERY id queryDef | ROLE id roleDef | ER2CNC_ROLE id er2cncRoleDef | DRILL_MAP id drillMapDef | AREA id areaDef | SCHEMA id schemaDef | DOMAIN id mdDomainDef | DIMENSION id dimensionDef | MAP id mdMapDef | HIERARCHY id hierarchyDef | MEASURE id measureDef | CUBELET id cubeletDef | MD2DB_CUBELET id md2dbCubeletDef | MD2DB_DOMAIN id md2dbDomainDef | MD2DB_MAP id md2dbMapDef | MD2ER_DIMENSION id md2erDimensionDef | MD2ER_CUBELET id md2erCubeletDef | WORLD id worldDef | TERM id lexiconEntryDef | PATTERN id lexiconEntryDef | EXAMPLE id lexiconEntryDef | PARAMETER id autoBody | ACTION id autoBody | SERVICE id autoBody | APPROVAL id autoBody | PROGRAM id autoBody | RECIPE id autoBody | SUBKIND id cnBody | KIND id cnBody | EVENT id cnBody | PHASE id cnBody | QUALITY id cnBody | RELATION_TYPE id cnBody | CN2MD_KIND id cnBindingBody | CN2MD_ROLE id cnBindingBody | CN2MD_QUALITY id cnBindingBody | CN2MD_EVENT id cnBindingBody | CN2ER_KIND id cnBindingBody | CN2ER_ROLE id cnBindingBody | CN2ER_EVENT id cnBindingBody | CN2ER_QUALITY id cnBindingBody | CN2ER_PHASE id cnBindingBody | CN2DB_CONCEPT id cnBindingBody",
+    "projectDef": "LBRACE ( projectProperty ( COMMA ? projectProperty ) * COMMA ? ) ? RBRACE",
+    "tableDef": "LBRACE ( tableProperty ( COMMA ? tableProperty ) * COMMA ? ) ? RBRACE",
+    "viewDef": "LBRACE ( viewProperty ( COMMA ? viewProperty ) * COMMA ? ) ? RBRACE",
+    "columnDef": "LBRACE ( columnProperty ( COMMA ? columnProperty ) * COMMA ? ) ? RBRACE",
+    "indexDef": "LBRACE ( indexProperty ( COMMA ? indexProperty ) * COMMA ? ) ? RBRACE",
+    "constraintDef": "LBRACE ( constraintProperty ( COMMA ? constraintProperty ) * COMMA ? ) ? RBRACE",
+    "fkDef": "LBRACE ( fkProperty ( COMMA ? fkProperty ) * COMMA ? ) ? RBRACE",
+    "procedureDef": "LBRACE ( procedureProperty ( COMMA ? procedureProperty ) * COMMA ? ) ? RBRACE",
+    "entityDef": "LBRACE ( entityProperty ( COMMA ? entityProperty ) * COMMA ? ) ? RBRACE",
+    "attributeDef": "LBRACE ( attributeProperty ( COMMA ? attributeProperty ) * COMMA ? ) ? RBRACE",
+    "relationDef": "LBRACE ( relationProperty ( COMMA ? relationProperty ) * COMMA ? ) ? RBRACE",
+    "er2dbEntityDef": "LBRACE ( er2dbEntityProperty ( COMMA ? er2dbEntityProperty ) * COMMA ? ) ? RBRACE",
+    "er2dbAttributeDef": "LBRACE ( er2dbAttributeProperty ( COMMA ? er2dbAttributeProperty ) * COMMA ? ) ? RBRACE",
+    "er2dbRelationDef": "LBRACE ( er2dbRelationProperty ( COMMA ? er2dbRelationProperty ) * COMMA ? ) ? RBRACE",
+    "queryDef": "LBRACE ( queryProperty ( COMMA ? queryProperty ) * COMMA ? ) ? RBRACE",
+    "roleDef": "LBRACE ( roleProperty ( COMMA ? roleProperty ) * COMMA ? ) ? RBRACE",
+    "er2cncRoleDef": "LBRACE ( er2cncRoleProperty ( COMMA ? er2cncRoleProperty ) * COMMA ? ) ? RBRACE",
+    "drillMapDef": "LBRACE ( drillMapProperty ( COMMA ? drillMapProperty ) * COMMA ? ) ? RBRACE",
+    "areaDef": "LBRACE ( areaProperty ( COMMA ? areaProperty ) * COMMA ? ) ? RBRACE",
+    "schemaDef": "LBRACE ( schemaProperty ( COMMA ? schemaProperty ) * COMMA ? ) ? RBRACE",
+    "mdDomainDef": "LBRACE ( mdDomainProperty ( COMMA ? mdDomainProperty ) * COMMA ? ) ? RBRACE",
+    "dimensionDef": "LBRACE ( dimensionProperty ( COMMA ? dimensionProperty ) * COMMA ? ) ? RBRACE",
+    "mdMapDef": "LBRACE ( mdMapProperty ( COMMA ? mdMapProperty ) * COMMA ? ) ? RBRACE",
+    "hierarchyDef": "LBRACE ( hierarchyProperty ( COMMA ? hierarchyProperty ) * COMMA ? ) ? RBRACE",
+    "measureDef": "LBRACE ( measureProperty ( COMMA ? measureProperty ) * COMMA ? ) ? RBRACE",
+    "cubeletDef": "LBRACE ( cubeletProperty ( COMMA ? cubeletProperty ) * COMMA ? ) ? RBRACE",
+    "md2dbCubeletDef": "LBRACE ( md2dbCubeletProperty ( COMMA ? md2dbCubeletProperty ) * COMMA ? ) ? RBRACE",
+    "md2dbDomainDef": "LBRACE ( md2dbDomainProperty ( COMMA ? md2dbDomainProperty ) * COMMA ? ) ? RBRACE",
+    "md2dbMapDef": "LBRACE ( md2dbMapProperty ( COMMA ? md2dbMapProperty ) * COMMA ? ) ? RBRACE",
+    "md2erDimensionDef": "LBRACE ( md2erDimensionProperty ( COMMA ? md2erDimensionProperty ) * COMMA ? ) ? RBRACE",
+    "md2erCubeletDef": "LBRACE ( md2erCubeletProperty ( COMMA ? md2erCubeletProperty ) * COMMA ? ) ? RBRACE",
+    "lexiconEntryDef": "LBRACE ( lexiconEntryProperty ( COMMA ? lexiconEntryProperty ) * COMMA ? ) ? RBRACE",
+    "lexiconEntryProperty": "descriptionProperty | tagsProperty | forProperty | formsProperty | matchProperty | textProperty | defaultProperty | sensePriorityProperty | indexSecurityProperty",
+    "forProperty": "FOR propSep ? id",
+    "formsProperty": "FORMS propSep ? listOfStrings",
+    "matchProperty": "MATCH propSep ? stringLiteralForm",
+    "textProperty": "TEXT propSep ? stringLiteralForm",
+    "defaultProperty": "DEFAULT propSep ? BOOLEAN_LITERAL",
+    "sensePriorityProperty": "SENSE_PRIORITY propSep ? NUMBER_LITERAL",
+    "indexSecurityProperty": "INDEX_SECURITY propSep ? id",
+    "skipSecurityProperty": "SKIP_SECURITY propSep ? BOOLEAN_LITERAL",
+    "defaultValueProperty": "DEFAULT_VALUE propSep ? stringLiteralForm",
+    "bindsProperty": "BINDS propSep ? listOfIds",
+    "worldDef": "LBRACE ( worldMember ( COMMA ? worldMember ) * COMMA ? ) ? RBRACE",
+    "worldMember": "DEF ENGINE id engineDef | DEF EXECUTOR id executorDef | DEF STORAGE id storageDef | DEF IDENTITY id autoBody | DEF GRANT autoBody | DEF DEPLOYMENT id autoBody | DEF PROCESS id processBody | worldProperty",
+    "worldProperty": "descriptionProperty | tagsProperty | extendsProperty",
+    "engineDef": "LBRACE ( enginePartProperty ( COMMA ? enginePartProperty ) * COMMA ? ) ? RBRACE",
+    "executorDef": "LBRACE ( enginePartProperty ( COMMA ? enginePartProperty ) * COMMA ? ) ? RBRACE",
+    "enginePartProperty": "descriptionProperty | tagsProperty | typeProperty | versionProperty | extendsProperty | propertyEntry",
+    "storageDef": "LBRACE ( storageProperty ( COMMA ? storageProperty ) * COMMA ? ) ? RBRACE",
+    "storageProperty": "descriptionProperty | tagsProperty | typeProperty | extendsProperty | viaProperty | hostsProperty | stagingProperty | DEF SCHEMA id worldSchemaDef | propertyEntry",
+    "extendsProperty": "EXTENDS propSep ? id",
+    "hostsProperty": "HOSTS propSep ? listOfIds",
+    "stagingProperty": "STAGING propSep ? BOOLEAN_LITERAL",
+    "viaProperty": "VIA propSep ? id",
+    "worldSchemaDef": "LBRACE ( worldSchemaField ( COMMA ? worldSchemaField ) * COMMA ? ) ? RBRACE",
+    "worldSchemaField": "id propSep ? dataType",
+    "autoBody": "LBRACE ( autoProperty ( COMMA ? autoProperty ) * COMMA ? ) ? RBRACE",
+    "autoProperty": "descriptionProperty | tagsProperty | labelProperty | typeProperty | columnsProperty | targetProperty | transitionProperty | setProperty | autoEntry",
+    "autoEntry": "autoKey propSep ? autoValue",
+    "autoKey": "id | TEXT",
+    "autoValue": "durationLiteral | taggedValue | callValue | STAR | autoObject | autoList | literal | id",
+    "autoObject": "LBRACE ( autoEntry ( COMMA ? autoEntry ) * COMMA ? ) ? RBRACE",
+    "autoList": "LBRACK ( autoValue ( COMMA autoValue ) * ) ? COMMA ? RBRACK",
+    "durationLiteral": "NUMBER_LITERAL id",
+    "taggedValue": "id stringLiteralForm",
+    "callValue": "id autoObject",
+    "transitionProperty": "TRANSITION propSep ? id ARROW transitionTarget transitionGuard ?",
+    "transitionTarget": "id | LBRACE id RBRACE",
+    "transitionGuard": "LBRACE FROM propSep ? ( listOfIds | id ) RBRACE",
+    "setProperty": "SET propSep ? id EQUALS id",
+    "processBody": "LBRACE ( processProperty ( COMMA ? processProperty ) * COMMA ? ) ? RBRACE",
+    "processProperty": "descriptionProperty | tagsProperty | stepsProperty | autoEntry",
+    "stepsProperty": "STEPS propSep ? LBRACK ( stepInline COMMA ? ) * RBRACK",
+    "stepInline": "DEF STEP id autoBody",
+    "cnBody": "LBRACE ( cnProperty ( COMMA ? cnProperty ) * COMMA ? ) ? RBRACE",
+    "cnProperty": "descriptionProperty | labelProperty | tagsProperty | cnRefProperty | groundsProperty | involvesProperty | periodProperty | extentProperty | basisProperty | definitionProperty | conceptMembersProperty | cnFromProperty | cnUntilProperty | cnPerProperty | valueSpaceProperty | lexiconBlockProperty | cnEntry",
+    "cnRefProperty": "( KIND | ROLE | QUALITY | EVENT | PHASE | CONCEPT ) propSep ? id",
+    "cnFromProperty": "FROM propSep ? id",
+    "cnUntilProperty": "UNTIL propSep ? id",
+    "cnPerProperty": "PER propSep ? id",
+    "groundsProperty": "GROUNDS propSep ? id",
+    "involvesProperty": "INVOLVES propSep ? LBRACK participant ( COMMA participant ) * COMMA ? RBRACK",
+    "participant": "id ( AS id ) ?",
+    "periodProperty": "PERIOD propSep ? cnObject",
+    "extentProperty": "EXTENT propSep ? id",
+    "basisProperty": "BASIS propSep ? id",
+    "definitionProperty": "DEFINITION propSep ? embeddedBlock",
+    "conceptMembersProperty": "MEMBERS propSep ? embeddedBlock",
+    "valueSpaceProperty": "VALUE_SPACE propSep ? id",
+    "cnEntry": "cnKey propSep ? cnValue",
+    "cnKey": "IDENT | HIERARCHY | VIA | INDEX_SECURITY | SKIP_SECURITY | DEFAULT_VALUE | BINDS",
+    "cnValue": "cnObject | cnList | literal | id",
+    "cnObject": "LBRACE ( cnObjectEntry ( COMMA ? cnObjectEntry ) * COMMA ? ) ? RBRACE",
+    "cnObjectEntry": "( id | DATA_TYPE | PRECISION ) propSep ? cnValue",
+    "cnList": "LBRACK ( cnValue ( COMMA cnValue ) * ) ? COMMA ? RBRACK",
+    "cnBindingBody": "LBRACE ( cnBindingProperty ( COMMA ? cnBindingProperty ) * COMMA ? ) ? RBRACE",
+    "cnBindingProperty": "descriptionProperty | tagsProperty | cnRefProperty | targetProperty | cnPerProperty | periodProperty | cnEntry",
+    "conceptSugarProperty": "CONCEPT propSep ? cnBody",
+    "projectProperty": "descriptionProperty | tagsProperty | versionProperty",
+    "tableProperty": "descriptionProperty | tagsProperty | primaryKeyProperty | columnsProperty | indicesProperty | constraintsProperty | searchBlockProperty | semanticsBlockProperty | lexiconBlockProperty | managementProperty | changeSemanticsProperty | writebackReservationProperty",
+    "viewProperty": "descriptionProperty | tagsProperty | columnsProperty | definitionSqlProperty | searchBlockProperty",
+    "columnProperty": "descriptionProperty | tagsProperty | typeProperty | optionalProperty | isKeyProperty | indexedProperty | searchBlockProperty | semanticsBlockProperty | lexiconBlockProperty",
+    "indexProperty": "descriptionProperty | indexTypeProperty | columnNamesListProperty",
+    "constraintProperty": "descriptionProperty | constraintTypeProperty | columnNamesListProperty",
+    "fkProperty": "descriptionProperty | tagsProperty | fromProperty | toProperty",
+    "procedureProperty": "descriptionProperty | tagsProperty | parametersProperty | resultColumnsProperty",
+    "entityProperty": "descriptionProperty | tagsProperty | labelPluralProperty | nameAttributeProperty | codeAttributeProperty | aliasesProperty | attributesProperty | rolesProperty | displayLabelProperty | searchBlockProperty | semanticsBlockProperty | lexiconBlockProperty | bindingProperty | conceptSugarProperty",
+    "attributeProperty": "descriptionProperty | tagsProperty | typeProperty | isKeyProperty | optionalProperty | valueLabelsProperty | displayLabelProperty | searchBlockProperty | semanticsBlockProperty | lexiconBlockProperty | bindingProperty | domainRefProperty | aggregationProperty | statesProperty | transitionsProperty | conceptSugarProperty",
+    "relationProperty": "descriptionProperty | tagsProperty | fromProperty | toProperty | cardinalityProperty | joinProperty | searchBlockProperty | bindingProperty",
+    "er2dbEntityProperty": "descriptionProperty | tagsProperty | entityProperty_ | targetProperty | whereFilterProperty",
+    "er2dbAttributeProperty": "descriptionProperty | tagsProperty | attributeProperty_ | targetProperty",
+    "er2dbRelationProperty": "descriptionProperty | tagsProperty | relationProperty_ | fkProperty_",
+    "queryProperty": "descriptionProperty | tagsProperty | languageProperty | parametersProperty | sourceTextProperty | searchBlockProperty | skipSecurityProperty",
+    "roleProperty": "descriptionProperty | tagsProperty | labelProperty | searchBlockProperty | resolveProperty | deliveryProperty | membersProperty | cnRefProperty | groundsProperty | involvesProperty | periodProperty | lexiconBlockProperty | cnEntry",
+    "resolveProperty": "RESOLVE propSep ? autoValue",
+    "deliveryProperty": "DELIVERY propSep ? autoValue",
+    "membersProperty": "MEMBERS propSep ? autoValue",
+    "er2cncRoleProperty": "descriptionProperty | tagsProperty | entityProperty_ | roleProperty_",
+    "drillMapProperty": "descriptionProperty | tagsProperty | fromProperty | toProperty | argsProperty | displayProperty | overrideProperty",
+    "areaProperty": "descriptionProperty | tagsProperty | areaPackagesProperty | areaEntitiesProperty",
+    "schemaProperty": "descriptionProperty | tagsProperty | columnsProperty",
+    "areaPackagesProperty": "PACKAGES propSep ? LBRACK ( id ( COMMA id ) * ) ? COMMA ? RBRACK",
+    "areaEntitiesProperty": "ENTITIES propSep ? LBRACK ( id ( COMMA id ) * ) ? COMMA ? RBRACK",
+    "mdDomainProperty": "descriptionProperty | tagsProperty | typeProperty | kindProperty | restrictProperty | publishProperty | conceptSugarProperty",
+    "dimensionProperty": "descriptionProperty | tagsProperty | keyProperty | attributesProperty | hierarchiesProperty | lexiconBlockProperty | conceptSugarProperty",
+    "mdMapProperty": "descriptionProperty | tagsProperty | fromProperty | toProperty | cardinalityProperty | calcProperty",
+    "hierarchyProperty": "descriptionProperty | tagsProperty | dimensionRefProperty | levelsProperty",
+    "measureProperty": "descriptionProperty | tagsProperty | domainRefProperty | classProperty | aggregationProperty | validByProperty | lexiconBlockProperty | conceptSugarProperty",
+    "cubeletProperty": "descriptionProperty | tagsProperty | grainProperty | measuresProperty | lexiconBlockProperty | conceptSugarProperty",
+    "md2dbCubeletProperty": "descriptionProperty | tagsProperty | cubeletRefProperty | targetProperty | shapeProperty | attributesMapProperty | measuresMapProperty | journalingProperty | allocationProperty",
+    "md2dbDomainProperty": "descriptionProperty | tagsProperty | domainRefProperty | sourceProperty",
+    "md2dbMapProperty": "descriptionProperty | tagsProperty | mapRefProperty | targetProperty | columnsMapProperty",
+    "md2erDimensionProperty": "descriptionProperty | tagsProperty | dimensionRefProperty | entityProperty_ | attributesMapProperty",
+    "md2erCubeletProperty": "descriptionProperty | tagsProperty | cubeletRefProperty | targetProperty | attributesMapProperty | shapeProperty | measuresMapProperty | journalingProperty | allocationProperty",
+    "kindProperty": "KIND propSep ? id",
+    "restrictProperty": "RESTRICT propSep ? restrictBlock",
+    "publishProperty": "PUBLISH propSep ? MEMBERS",
+    "keyProperty": "KEY propSep ? id",
+    "hierarchiesProperty": "HIERARCHIES propSep ? listOfIds",
+    "domainRefProperty": "DOMAIN propSep ? id",
+    "aggregationProperty": "AGGREGATION propSep ? aggregationValue",
+    "calcProperty": "CALC propSep ? calcRef",
+    "dimensionRefProperty": "DIMENSION propSep ? id",
+    "levelsProperty": "LEVELS propSep ? levelList",
+    "classProperty": "CLASS propSep ? id",
+    "validByProperty": "VALID_BY propSep ? id",
+    "grainProperty": "GRAIN propSep ? listOfIds",
+    "measuresProperty": "MEASURES propSep ? measuresValue",
+    "cubeletRefProperty": "CUBELET propSep ? id",
+    "mapRefProperty": "MAP propSep ? id",
+    "shapeProperty": "SHAPE propSep ? shapeValue",
+    "journalingProperty": "JOURNALING propSep ? journalingValue",
+    "allocationProperty": "ALLOCATION propSep ? allocationValue",
+    "sourceProperty": "SOURCE propSep ? object_",
+    "attributesMapProperty": "ATTRIBUTES propSep ? object_",
+    "measuresMapProperty": "MEASURES propSep ? object_",
+    "columnsMapProperty": "COLUMNS propSep ? object_",
+    "restrictBlock": "LBRACE ( restrictClause ( COMMA ? restrictClause ) * COMMA ? ) ? RBRACE",
+    "restrictClause": "key propSep ? restrictValue",
+    "restrictValue": "rangeLiteral | membersBlock | value",
+    "rangeLiteral": "NUMBER_LITERAL DOTDOT NUMBER_LITERAL",
+    "membersBlock": "LBRACE ( memberEntry ( COMMA ? memberEntry ) * COMMA ? ) ? RBRACE",
+    "memberEntry": "stringLiteralForm propSep ? localizedString",
+    "calcRef": "id ( LPAREN ( calcArg ( COMMA calcArg ) * ) ? RPAREN ) ?",
+    "calcArg": "id propSep ? value",
+    "levelList": "LBRACK ( levelEntry ( COMMA levelEntry ) * ) ? COMMA ? RBRACK",
+    "levelEntry": "id ( VIA id ) ?",
+    "aggregationValue": "id | object_",
+    "measuresValue": "measureInlineList | listOfIds",
+    "measureInlineList": "LBRACK ( DEF MEASURE id measureDef COMMA ? ) * RBRACK",
+    "shapeValue": "id | object_",
+    "journalingValue": "id | object_",
+    "allocationValue": "id | object_",
+    "paramProperty": "nameProperty | typeProperty | paramLabelProperty | directionProperty | defaultValueProperty | bindsProperty",
+    "descriptionProperty": "DESCRIPTION propSep ? ( stringLiteralForm | localizedString )",
+    "tagsProperty": "TAGS propSep ? listOfStrings",
+    "versionProperty": "VERSION propSep ? STRING_LITERAL",
+    "primaryKeyProperty": "PRIMARY_KEY propSep ? primaryKeyValue",
+    "columnsProperty": "COLUMNS propSep ? columnDefList",
+    "indicesProperty": "INDICES propSep ? indexDefList",
+    "constraintsProperty": "CONSTRAINTS propSep ? constraintDefList",
+    "definitionSqlProperty": "DEFINITION_SQL propSep ? embeddedBlock",
+    "typeProperty": "DATA_TYPE propSep ? dataType",
+    "optionalProperty": "OPTIONAL propSep ? BOOLEAN_LITERAL",
+    "isKeyProperty": "IS_KEY propSep ? BOOLEAN_LITERAL",
+    "searchableProperty": "SEARCHABLE ( propSep ? BOOLEAN_LITERAL ) ? matchMethodAttr ?",
+    "matchMethodAttr": "METHOD propSep ? matchMethodValue",
+    "matchMethodValue": "id ( LPAREN NUMBER_LITERAL RPAREN ) ?",
+    "indexedProperty": "INDEXED propSep ? BOOLEAN_LITERAL",
+    "indexTypeProperty": "DATA_TYPE propSep ? indexTypeValue",
+    "constraintTypeProperty": "DATA_TYPE propSep ? constraintTypeValue",
+    "columnNamesListProperty": "COLUMNS propSep ? listOfStrings",
+    "fromProperty": "FROM propSep ? value",
+    "toProperty": "TO propSep ? value",
+    "parametersProperty": "PARAMETERS propSep ? parameterDefList",
+    "resultColumnsProperty": "RESULT_COLUMNS propSep ? columnDefList",
+    "labelPluralProperty": "LABEL_PLURAL propSep ? STRING_LITERAL",
+    "nameAttributeProperty": "NAME_ATTRIBUTE propSep ? id",
+    "nameProperty": "NAME propSep ? id",
+    "codeAttributeProperty": "CODE_ATTRIBUTE propSep ? id",
+    "aliasesProperty": "ALIASES propSep ? listOfStrings",
+    "attributesProperty": "ATTRIBUTES propSep ? attributeDefList",
+    "cardinalityProperty": "CARDINALITY propSep ? object_",
+    "joinProperty": "JOIN propSep ? list",
+    "entityProperty_": "ENTITY propSep ? id",
+    "attributeProperty_": "ATTRIBUTE propSep ? id",
+    "relationProperty_": "RELATION propSep ? id",
+    "fkProperty_": "FK propSep ? id",
+    "targetProperty": "TARGET propSep ? ( object_ | id )",
+    "whereFilterProperty": "WHERE_FILTER propSep ? object_",
+    "languageProperty": "LANGUAGE propSep ? languageValue",
+    "sourceTextProperty": "SOURCE_TEXT propSep ? embeddedBlock",
+    "labelProperty": "LABEL propSep ? localizedString",
+    "paramLabelProperty": "LABEL propSep ? stringLiteralForm",
+    "directionProperty": "DIRECTION propSep ? id",
+    "displayLabelProperty": "DISPLAY_LABEL propSep ? localizedString",
+    "rolesProperty": "ROLES propSep ? listOfIds",
+    "valueLabelsProperty": "VALUE_LABELS propSep ? valueLabelsBody",
+    "roleProperty_": "ROLE propSep ? id",
+    "statesProperty": "STATES propSep ? listOfIds",
+    "transitionsProperty": "TRANSITIONS propSep ? LBRACE ( transitionEntry ( COMMA ? transitionEntry ) * COMMA ? ) ? RBRACE",
+    "transitionEntry": "id propSep ? listOfIds",
+    "searchBlockProperty": "SEARCH propSep ? searchBlock",
+    "semanticsBlockProperty": "SEMANTICS propSep ? object_",
+    "managementProperty": "MANAGEMENT propSep ? id",
+    "changeSemanticsProperty": "CHANGE_SEMANTICS propSep ? id changeRoleMap ?",
+    "changeRoleMap": "LBRACE ( changeRoleEntry ( COMMA ? changeRoleEntry ) * COMMA ? ) ? RBRACE",
+    "changeRoleEntry": "id propSep ? id",
+    "writebackReservationProperty": "WRITEBACK propSep ? object_",
+    "lexiconBlockProperty": "LEXICON propSep ? object_",
+    "keywordsProperty": "KEYWORDS propSep ? localizedStringList",
+    "patternsProperty": "PATTERNS propSep ? listOfStrings",
+    "descriptionsProperty": "DESCRIPTIONS propSep ? localizedStringList",
+    "examplesProperty": "EXAMPLES propSep ? listOfStrings",
+    "fuzzyProperty": "FUZZY propSep ? BOOLEAN_LITERAL",
+    "argsProperty": "ARGS propSep ? drillArgsMap",
+    "displayProperty": "DISPLAY propSep ? localizedString",
+    "overrideProperty": "OVERRIDE propSep ? BOOLEAN_LITERAL",
+    "drillArgsMap": "LBRACE ( drillArgEntry ( COMMA ? drillArgEntry ) * COMMA ? ) ? RBRACE",
+    "drillArgEntry": "id propSep ? stringLiteralForm",
+    "bindingProperty": "BINDING propSep ? bindingValue",
+    "bindingValue": "id | bindingBlock",
+    "bindingBlock": "LBRACE ( bindingBlockProperty ( COMMA ? bindingBlockProperty ) * COMMA ? ) ? RBRACE",
+    "bindingBlockProperty": "targetProperty | bindingColumnsProperty | fkProperty_",
+    "bindingColumnsProperty": "COLUMNS propSep ? bindingColumnMap",
+    "bindingColumnMap": "LBRACE ( bindingColumnEntry ( COMMA ? bindingColumnEntry ) * COMMA ? ) ? RBRACE",
+    "bindingColumnEntry": "id propSep ? bindingColumnValue",
+    "bindingColumnValue": "id | LBRACE TARGET propSep ? bindingTargetValue RBRACE | object_",
+    "bindingTargetValue": "id | object_",
+    "columnDefList": "LBRACK ( columnInline COMMA ? ) * RBRACK | columnInline",
+    "columnInline": "DEF COLUMN id columnDef",
+    "indexDefList": "LBRACK ( indexInline COMMA ? ) * RBRACK | indexInline",
+    "indexInline": "DEF INDEX id indexDef",
+    "constraintDefList": "LBRACK ( constraintInline COMMA ? ) * RBRACK | constraintInline",
+    "constraintInline": "DEF CONSTRAINT id constraintDef",
+    "attributeDefList": "LBRACK ( attributeInline COMMA ? ) * RBRACK | attributeInline",
+    "attributeInline": "DEF ATTRIBUTE id attributeDef",
+    "parameterDefList": "LBRACK ( parameterInline COMMA ? ) * RBRACK | parameterInline",
+    "parameterInline": "LBRACE ( paramProperty COMMA ? ) * RBRACE",
+    "dataType": "typeValue | LBRACE dataTypeProperty ( COMMA ? dataTypeProperty ) * COMMA ? RBRACE",
+    "dataTypeProperty": "DATA_TYPE propSep ? typeValue | LENGTH propSep ? NUMBER_LITERAL | PRECISION propSep ? NUMBER_LITERAL",
+    "typeValue": "TEXT | INT | FLOAT | BOOL | DATETIME | STRING | BOOLEAN | NUMBER | INTEGER | DOUBLE | OBJECT | LIST | CHAR | VARCHAR | DECIMAL | DATE | TIMESTAMP | id",
+    "indexTypeValue": "PRIMARY | SECONDARY | ORDERED | BTREE | FULLTEXT",
+    "constraintTypeValue": "UNIQUE | NOT_NULL",
+    "languageValue": "SQL | TRANSFORMATION_DSL | DATAFRAME_DSL | REL_NODE",
+    "propSep": "COLON | EQUALS",
+    "value": "literal | id | list | object_ | functionCall",
+    "literal": "NUMBER_LITERAL | stringLiteralForm | BOOLEAN_LITERAL | NULL_LITERAL",
+    "stringLiteralForm": "STRING_LITERAL | TRIPLE_STRING_LITERAL | TAGGED_BLOCK_LITERAL",
+    "embeddedBlock": "TAGGED_BLOCK_LITERAL | TRIPLE_STRING_LITERAL | STRING_LITERAL",
+    "list": "LBRACK ( value ( COMMA value ) * ) ? COMMA ? RBRACK",
+    "listOfStrings": "LBRACK ( stringLiteralForm ( COMMA stringLiteralForm ) * ) ? COMMA ? RBRACK",
+    "listOfIds": "LBRACK ( id ( COMMA id ) * ) ? COMMA ? RBRACK",
+    "primaryKeyValue": "listOfStrings | listOfIds | id",
+    "localizedString": "LBRACE ( localizedEntry ( COMMA ? localizedEntry ) * COMMA ? ) ? RBRACE",
+    "localizedEntry": "id propSep ? stringLiteralForm",
+    "valueLabelsBody": "LBRACE ( valueLabelEntry ( COMMA ? valueLabelEntry ) * COMMA ? ) ? RBRACE",
+    "valueLabelEntry": "stringLiteralForm propSep ? valueLabelValue",
+    "valueLabelValue": "LBRACE ( valueLabelField ( COMMA ? valueLabelField ) * COMMA ? ) ? RBRACE",
+    "valueLabelField": "id propSep ? ( localizedString | listOfStrings | stringLiteralForm )",
+    "localizedStringList": "LBRACE ( localizedStringListEntry ( COMMA ? localizedStringListEntry ) * COMMA ? ) ? RBRACE",
+    "localizedStringListEntry": "id propSep ? listOfStrings",
+    "searchBlock": "LBRACE ( searchSubProperty ( COMMA ? searchSubProperty ) * COMMA ? ) ? RBRACE",
+    "searchSubProperty": "keywordsProperty | patternsProperty | descriptionsProperty | examplesProperty | aliasesProperty | searchableProperty | fuzzyProperty",
+    "object_": "LBRACE propertyList ? RBRACE",
+    "propertyList": "propertyEntry ( COMMA ? propertyEntry ) * COMMA ?",
+    "propertyEntry": "key propSep ? value",
+    "key": "id",
+    "functionCall": "id LPAREN ( value ( COMMA value ) * ) ? RPAREN",
+    "id": "idPart ( DOT idPart ) *",
+    "idPart": "IDENT | INDEX_SECURITY | SKIP_SECURITY | DEFAULT_VALUE | BINDS | SUBKIND | PER | UNTIL | DB | ER | BINDING | MAP | QUERY | CNC | ROLE | ER2CNC_ROLE | TABLE | VIEW | COLUMN | INDEX | CONSTRAINT | FK | PROCEDURE | ENTITY | ATTRIBUTE | RELATION | ER2DB_ENTITY | ER2DB_ATTRIBUTE | ER2DB_RELATION | MODEL | SCHEMA | PROJECT | NAME | LABEL | DIRECTION | FROM | TO | PACKAGE | IMPORT | GRAPH | OBJECTS | LAYOUT | TTRL | CANVAS | DRILL_MAP | ARGS | DISPLAY | OVERRIDE | PACKAGES | ENTITIES | AREA | MD | DOMAIN | DIMENSION | HIERARCHY | MEASURE | CUBELET | MD2DB_CUBELET | MD2DB_DOMAIN | MD2DB_MAP | MD2ER_CUBELET | MD2ER_DIMENSION | RESTRICT | MEMBERS | KIND | CALC | KEY | HIERARCHIES | PUBLISH | LEVELS | VIA | CLASS | AGGREGATION | VALID_BY | GRAIN | MEASURES | SHAPE | JOURNALING | SOURCE | ALLOCATION | WORLD | ENGINE | EXECUTOR | STORAGE | VERSION | SEMANTICS | LEXICON | TERM | PATTERN | EXAMPLE | FOR | FORMS | MATCH | LOCALE | PATTERNS | EXAMPLES | ALIASES | MANAGEMENT | CHANGE_SEMANTICS | WRITEBACK | SECURITY | OWN | CLASSIFY | GRANT | MASK | ON | METHOD | AUTOMATION | PARAMETER | ACTION | SERVICE | APPROVAL | PROGRAM | RECIPE | IDENTITY | DEPLOYMENT | PROCESS | STEP | STEPS | TRANSITION | TRANSITIONS | STATES | SET | RESOLVE | DELIVERY | PARAMETERS | CN | EVENT | PHASE | QUALITY | RELATION_TYPE | CONCEPT | CN2MD_KIND | CN2MD_ROLE | CN2MD_QUALITY | CN2MD_EVENT | CN2ER_KIND | CN2ER_ROLE | CN2ER_EVENT | CN2ER_QUALITY | CN2ER_PHASE | CN2DB_CONCEPT | INVOLVES | PERIOD | GROUNDS | DEFINITION | VALUE_SPACE | EXTENT | BASIS | AS | DEFAULT | SENSE_PRIORITY",
+    "DEF": "'def'",
+    "SCHEMA": "'schema'",
+    "PROJECT": "'project'",
+    "PACKAGE": "'package'",
+    "IMPORT": "'import'",
+    "GRAPH": "'graph'",
+    "OBJECTS": "'objects'",
+    "LAYOUT": "'layout'",
+    "TTRL": "'ttrl'",
+    "CANVAS": "'canvas'",
+    "PACKAGES": "'packages'",
+    "ENTITIES": "'entities'",
+    "AREA": "'area'",
+    "DB": "'db'",
+    "ER": "'er'",
+    "BINDING": "'binding'",
+    "MAP": "'map'",
+    "CNC": "'cnc'",
+    "MD": "'md'",
+    "MODEL": "'model'",
+    "TABLE": "'table'",
+    "VIEW": "'view'",
+    "COLUMN": "'column'",
+    "INDEX": "'index'",
+    "CONSTRAINT": "'constraint'",
+    "FK": "'fk'",
+    "PROCEDURE": "'procedure'",
+    "ENTITY": "'entity'",
+    "ATTRIBUTE": "'attribute'",
+    "RELATION": "'relation'",
+    "ER2DB_ENTITY": "'er2db_entity'",
+    "ER2DB_ATTRIBUTE": "'er2db_attribute'",
+    "ER2DB_RELATION": "'er2db_relation'",
+    "QUERY": "'query'",
+    "ROLE": "'role'",
+    "ER2CNC_ROLE": "'er2cnc_role'",
+    "DRILL_MAP": "'drill_map'",
+    "ARGS": "'args'",
+    "DISPLAY": "'display'",
+    "OVERRIDE": "'override'",
+    "DOMAIN": "'domain'",
+    "DIMENSION": "'dimension'",
+    "HIERARCHY": "'hierarchy'",
+    "MEASURE": "'measure'",
+    "CUBELET": "'cubelet'",
+    "MD2DB_CUBELET": "'md2db_cubelet'",
+    "MD2DB_DOMAIN": "'md2db_domain'",
+    "MD2DB_MAP": "'md2db_map'",
+    "MD2ER_DIMENSION": "'md2er_dimension'",
+    "MD2ER_CUBELET": "'md2er_cubelet'",
+    "RESTRICT": "'restrict'",
+    "MEMBERS": "'members'",
+    "PUBLISH": "'publish'",
+    "KIND": "'kind'",
+    "CALC": "'calc'",
+    "KEY": "'key'",
+    "HIERARCHIES": "'hierarchies'",
+    "LEVELS": "'levels'",
+    "VIA": "'via'",
+    "CLASS": "'class'",
+    "AGGREGATION": "'aggregation'",
+    "VALID_BY": "'validBy'",
+    "GRAIN": "'grain'",
+    "MEASURES": "'measures'",
+    "SHAPE": "'shape'",
+    "JOURNALING": "'journaling'",
+    "ALLOCATION": "'allocation'",
+    "SOURCE": "'source'",
+    "INDEX_SECURITY": "'indexSecurity'",
+    "SKIP_SECURITY": "'skipSecurity'",
+    "DEFAULT_VALUE": "'defaultValue'",
+    "BINDS": "'binds'",
+    "WORLD": "'world'",
+    "ENGINE": "'engine'",
+    "EXECUTOR": "'executor'",
+    "STORAGE": "'storage'",
+    "EXTENDS": "'extends'",
+    "HOSTS": "'hosts'",
+    "STAGING": "'staging'",
+    "AUTOMATION": "'automation'",
+    "PARAMETER": "'parameter'",
+    "ACTION": "'action'",
+    "SERVICE": "'service'",
+    "APPROVAL": "'approval'",
+    "PROGRAM": "'program'",
+    "RECIPE": "'recipe'",
+    "IDENTITY": "'identity'",
+    "DEPLOYMENT": "'deployment'",
+    "PROCESS": "'process'",
+    "STEPS": "'steps'",
+    "STEP": "'step'",
+    "TRANSITIONS": "'transitions'",
+    "TRANSITION": "'transition'",
+    "STATES": "'states'",
+    "SET": "'set'",
+    "RESOLVE": "'resolve'",
+    "DELIVERY": "'delivery'",
+    "CN": "'cn'",
+    "EVENT": "'event'",
+    "SUBKIND": "'subkind'",
+    "PER": "'per'",
+    "UNTIL": "'until'",
+    "PHASE": "'phase'",
+    "QUALITY": "'quality'",
+    "RELATION_TYPE": "'relation_type'",
+    "CONCEPT": "'concept'",
+    "CN2MD_KIND": "'cn2md_kind'",
+    "CN2MD_ROLE": "'cn2md_role'",
+    "CN2MD_QUALITY": "'cn2md_quality'",
+    "CN2MD_EVENT": "'cn2md_event'",
+    "CN2ER_KIND": "'cn2er_kind'",
+    "CN2ER_ROLE": "'cn2er_role'",
+    "CN2ER_EVENT": "'cn2er_event'",
+    "CN2ER_QUALITY": "'cn2er_quality'",
+    "CN2ER_PHASE": "'cn2er_phase'",
+    "CN2DB_CONCEPT": "'cn2db_concept'",
+    "INVOLVES": "'involves'",
+    "PERIOD": "'period'",
+    "GROUNDS": "'grounds'",
+    "DEFINITION": "'definition'",
+    "VALUE_SPACE": "'value_space'",
+    "EXTENT": "'extent'",
+    "BASIS": "'basis'",
+    "AS": "'as'",
+    "DEFAULT": "'default'",
+    "SENSE_PRIORITY": "'sense_priority'",
+    "MANAGEMENT": "'management'",
+    "CHANGE_SEMANTICS": "'changeSemantics'",
+    "WRITEBACK": "'writeback'",
+    "DESCRIPTION": "'description'",
+    "TAGS": "'tags'",
+    "VERSION": "'version'",
+    "PRIMARY_KEY": "'primaryKey'",
+    "COLUMNS": "'columns'",
+    "INDICES": "'indices'",
+    "CONSTRAINTS": "'constraints'",
+    "ATTRIBUTES": "'attributes'",
+    "PARAMETERS": "'parameters'",
+    "RESULT_COLUMNS": "'resultColumns'",
+    "DEFINITION_SQL": "'definitionSql'",
+    "DATA_TYPE": "'type'",
+    "OPTIONAL": "'optional'",
+    "IS_KEY": "'isKey'",
+    "SEARCHABLE": "'searchable'",
+    "INDEXED": "'indexed'",
+    "LABEL_PLURAL": "'labelPlural'",
+    "NAME_ATTRIBUTE": "'nameAttribute'",
+    "CODE_ATTRIBUTE": "'codeAttribute'",
+    "ALIASES": "'aliases'",
+    "CARDINALITY": "'cardinality'",
+    "JOIN": "'join'",
+    "TARGET": "'target'",
+    "WHERE_FILTER": "'whereFilter'",
+    "LANGUAGE": "'language'",
+    "SOURCE_TEXT": "'sourceText'",
+    "LENGTH": "'length'",
+    "PRECISION": "'precision'",
+    "LABEL": "'label'",
+    "NAME": "'name'",
+    "DIRECTION": "'direction'",
+    "DISPLAY_LABEL": "'displayLabel'",
+    "VALUE_LABELS": "'valueLabels'",
+    "ROLES": "'roles'",
+    "SEARCH": "'search'",
+    "SEMANTICS": "'semantics'",
+    "KEYWORDS": "'keywords'",
+    "PATTERNS": "'patterns'",
+    "DESCRIPTIONS": "'descriptions'",
+    "EXAMPLES": "'examples'",
+    "FUZZY": "'fuzzy'",
+    "METHOD": "'method'",
+    "LEXICON": "'lexicon'",
+    "TERM": "'term'",
+    "PATTERN": "'pattern'",
+    "EXAMPLE": "'example'",
+    "FOR": "'for'",
+    "FORMS": "'forms'",
+    "MATCH": "'match'",
+    "LOCALE": "'locale'",
+    "FROM": "'from'",
+    "TO": "'to'",
+    "SECURITY": "'security'",
+    "OWN": "'own'",
+    "CLASSIFY": "'classify'",
+    "GRANT": "'grant'",
+    "MASK": "'mask'",
+    "ON": "'on'",
+    "TEXT": "'text'",
+    "INT": "'int'",
+    "FLOAT": "'float'",
+    "BOOL": "'bool'",
+    "DATETIME": "'datetime'",
+    "STRING": "'string'",
+    "BOOLEAN": "'boolean'",
+    "NUMBER": "'number'",
+    "INTEGER": "'integer'",
+    "DOUBLE": "'double'",
+    "OBJECT": "'object'",
+    "LIST": "'list'",
+    "CHAR": "'char'",
+    "VARCHAR": "'varchar'",
+    "DECIMAL": "'decimal'",
+    "DATE": "'date'",
+    "TIMESTAMP": "'timestamp'",
+    "PRIMARY": "'primary'",
+    "SECONDARY": "'secondary'",
+    "ORDERED": "'ordered'",
+    "BTREE": "'btree'",
+    "FULLTEXT": "'fulltext'",
+    "UNIQUE": "'unique'",
+    "NOT_NULL": "'notNull'",
+    "SQL": "'SQL'",
+    "TRANSFORMATION_DSL": "'TRANSFORMATION_DSL'",
+    "DATAFRAME_DSL": "'DATAFRAME_DSL'",
+    "REL_NODE": "'REL_NODE'",
+    "ARROW": "'->'",
+    "EQUALS": "'='",
+    "COLON": "':'",
+    "COMMA": "','",
+    "LBRACE": "'{'",
+    "RBRACE": "'}'",
+    "LBRACK": "'['",
+    "RBRACK": "']'",
+    "LPAREN": "'('",
+    "RPAREN": "')'",
+    "DOTDOT": "'..'",
+    "DOT": "'.'",
+    "STAR": "'*'",
+    "NULL_LITERAL": "'null'",
+    "BOOLEAN_LITERAL": "'true' | 'false'",
+    "NUMBER_LITERAL": "'-'? [0-9]+ ( '.' [0-9]+ )? ( [eE] [+-]? [0-9]+ )?",
+    "TAGGED_BLOCK_LITERAL": "'\"\"\"' [a-zA-Z] [a-zA-Z0-9-]* [ \\t]* '\\r'? '\\n' .*? '\"\"\"'",
+    "TRIPLE_STRING_LITERAL": "'\"\"\"' .*? '\"\"\"'",
+    "STRING_LITERAL": "'\"' ( ~[\"\\\\\\r\\n] | '\\\\' . )* '\"'",
+    "IDENT": "[a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9_\\u00C0-\\u024F]*",
+    "LINE_COMMENT": "'//' ~[\\r\\n]* -> channel(HIDDEN)",
+    "BLOCK_COMMENT": "'/*' .*? '*/' -> channel(HIDDEN)",
+    "WS": "[ \\t\\r\\n]+   -> skip"
+  },
+  "literals": {
+    "DEF": [
+      "def"
+    ],
+    "SCHEMA": [
+      "schema"
+    ],
+    "PROJECT": [
+      "project"
+    ],
+    "PACKAGE": [
+      "package"
+    ],
+    "IMPORT": [
+      "import"
+    ],
+    "GRAPH": [
+      "graph"
+    ],
+    "OBJECTS": [
+      "objects"
+    ],
+    "LAYOUT": [
+      "layout"
+    ],
+    "TTRL": [
+      "ttrl"
+    ],
+    "CANVAS": [
+      "canvas"
+    ],
+    "PACKAGES": [
+      "packages"
+    ],
+    "ENTITIES": [
+      "entities"
+    ],
+    "AREA": [
+      "area"
+    ],
+    "DB": [
+      "db"
+    ],
+    "ER": [
+      "er"
+    ],
+    "BINDING": [
+      "binding"
+    ],
+    "MAP": [
+      "map"
+    ],
+    "CNC": [
+      "cnc"
+    ],
+    "MD": [
+      "md"
+    ],
+    "MODEL": [
+      "model"
+    ],
+    "TABLE": [
+      "table"
+    ],
+    "VIEW": [
+      "view"
+    ],
+    "COLUMN": [
+      "column"
+    ],
+    "INDEX": [
+      "index"
+    ],
+    "CONSTRAINT": [
+      "constraint"
+    ],
+    "FK": [
+      "fk"
+    ],
+    "PROCEDURE": [
+      "procedure"
+    ],
+    "ENTITY": [
+      "entity"
+    ],
+    "ATTRIBUTE": [
+      "attribute"
+    ],
+    "RELATION": [
+      "relation"
+    ],
+    "ER2DB_ENTITY": [
+      "er2db_entity"
+    ],
+    "ER2DB_ATTRIBUTE": [
+      "er2db_attribute"
+    ],
+    "ER2DB_RELATION": [
+      "er2db_relation"
+    ],
+    "QUERY": [
+      "query"
+    ],
+    "ROLE": [
+      "role"
+    ],
+    "ER2CNC_ROLE": [
+      "er2cnc_role"
+    ],
+    "DRILL_MAP": [
+      "drill_map"
+    ],
+    "ARGS": [
+      "args"
+    ],
+    "DISPLAY": [
+      "display"
+    ],
+    "OVERRIDE": [
+      "override"
+    ],
+    "DOMAIN": [
+      "domain"
+    ],
+    "DIMENSION": [
+      "dimension"
+    ],
+    "HIERARCHY": [
+      "hierarchy"
+    ],
+    "MEASURE": [
+      "measure"
+    ],
+    "CUBELET": [
+      "cubelet"
+    ],
+    "MD2DB_CUBELET": [
+      "md2db_cubelet"
+    ],
+    "MD2DB_DOMAIN": [
+      "md2db_domain"
+    ],
+    "MD2DB_MAP": [
+      "md2db_map"
+    ],
+    "MD2ER_DIMENSION": [
+      "md2er_dimension"
+    ],
+    "MD2ER_CUBELET": [
+      "md2er_cubelet"
+    ],
+    "RESTRICT": [
+      "restrict"
+    ],
+    "MEMBERS": [
+      "members"
+    ],
+    "PUBLISH": [
+      "publish"
+    ],
+    "KIND": [
+      "kind"
+    ],
+    "CALC": [
+      "calc"
+    ],
+    "KEY": [
+      "key"
+    ],
+    "HIERARCHIES": [
+      "hierarchies"
+    ],
+    "LEVELS": [
+      "levels"
+    ],
+    "VIA": [
+      "via"
+    ],
+    "CLASS": [
+      "class"
+    ],
+    "AGGREGATION": [
+      "aggregation"
+    ],
+    "VALID_BY": [
+      "validBy"
+    ],
+    "GRAIN": [
+      "grain"
+    ],
+    "MEASURES": [
+      "measures"
+    ],
+    "SHAPE": [
+      "shape"
+    ],
+    "JOURNALING": [
+      "journaling"
+    ],
+    "ALLOCATION": [
+      "allocation"
+    ],
+    "SOURCE": [
+      "source"
+    ],
+    "INDEX_SECURITY": [
+      "indexSecurity"
+    ],
+    "SKIP_SECURITY": [
+      "skipSecurity"
+    ],
+    "DEFAULT_VALUE": [
+      "defaultValue"
+    ],
+    "BINDS": [
+      "binds"
+    ],
+    "WORLD": [
+      "world"
+    ],
+    "ENGINE": [
+      "engine"
+    ],
+    "EXECUTOR": [
+      "executor"
+    ],
+    "STORAGE": [
+      "storage"
+    ],
+    "EXTENDS": [
+      "extends"
+    ],
+    "HOSTS": [
+      "hosts"
+    ],
+    "STAGING": [
+      "staging"
+    ],
+    "AUTOMATION": [
+      "automation"
+    ],
+    "PARAMETER": [
+      "parameter"
+    ],
+    "ACTION": [
+      "action"
+    ],
+    "SERVICE": [
+      "service"
+    ],
+    "APPROVAL": [
+      "approval"
+    ],
+    "PROGRAM": [
+      "program"
+    ],
+    "RECIPE": [
+      "recipe"
+    ],
+    "IDENTITY": [
+      "identity"
+    ],
+    "DEPLOYMENT": [
+      "deployment"
+    ],
+    "PROCESS": [
+      "process"
+    ],
+    "STEPS": [
+      "steps"
+    ],
+    "STEP": [
+      "step"
+    ],
+    "TRANSITIONS": [
+      "transitions"
+    ],
+    "TRANSITION": [
+      "transition"
+    ],
+    "STATES": [
+      "states"
+    ],
+    "SET": [
+      "set"
+    ],
+    "RESOLVE": [
+      "resolve"
+    ],
+    "DELIVERY": [
+      "delivery"
+    ],
+    "CN": [
+      "cn"
+    ],
+    "EVENT": [
+      "event"
+    ],
+    "SUBKIND": [
+      "subkind"
+    ],
+    "PER": [
+      "per"
+    ],
+    "UNTIL": [
+      "until"
+    ],
+    "PHASE": [
+      "phase"
+    ],
+    "QUALITY": [
+      "quality"
+    ],
+    "RELATION_TYPE": [
+      "relation_type"
+    ],
+    "CONCEPT": [
+      "concept"
+    ],
+    "CN2MD_KIND": [
+      "cn2md_kind"
+    ],
+    "CN2MD_ROLE": [
+      "cn2md_role"
+    ],
+    "CN2MD_QUALITY": [
+      "cn2md_quality"
+    ],
+    "CN2MD_EVENT": [
+      "cn2md_event"
+    ],
+    "CN2ER_KIND": [
+      "cn2er_kind"
+    ],
+    "CN2ER_ROLE": [
+      "cn2er_role"
+    ],
+    "CN2ER_EVENT": [
+      "cn2er_event"
+    ],
+    "CN2ER_QUALITY": [
+      "cn2er_quality"
+    ],
+    "CN2ER_PHASE": [
+      "cn2er_phase"
+    ],
+    "CN2DB_CONCEPT": [
+      "cn2db_concept"
+    ],
+    "INVOLVES": [
+      "involves"
+    ],
+    "PERIOD": [
+      "period"
+    ],
+    "GROUNDS": [
+      "grounds"
+    ],
+    "DEFINITION": [
+      "definition"
+    ],
+    "VALUE_SPACE": [
+      "value_space"
+    ],
+    "EXTENT": [
+      "extent"
+    ],
+    "BASIS": [
+      "basis"
+    ],
+    "AS": [
+      "as"
+    ],
+    "DEFAULT": [
+      "default"
+    ],
+    "SENSE_PRIORITY": [
+      "sense_priority"
+    ],
+    "MANAGEMENT": [
+      "management"
+    ],
+    "CHANGE_SEMANTICS": [
+      "changeSemantics"
+    ],
+    "WRITEBACK": [
+      "writeback"
+    ],
+    "DESCRIPTION": [
+      "description"
+    ],
+    "TAGS": [
+      "tags"
+    ],
+    "VERSION": [
+      "version"
+    ],
+    "PRIMARY_KEY": [
+      "primaryKey"
+    ],
+    "COLUMNS": [
+      "columns"
+    ],
+    "INDICES": [
+      "indices"
+    ],
+    "CONSTRAINTS": [
+      "constraints"
+    ],
+    "ATTRIBUTES": [
+      "attributes"
+    ],
+    "PARAMETERS": [
+      "parameters"
+    ],
+    "RESULT_COLUMNS": [
+      "resultColumns"
+    ],
+    "DEFINITION_SQL": [
+      "definitionSql"
+    ],
+    "DATA_TYPE": [
+      "type"
+    ],
+    "OPTIONAL": [
+      "optional"
+    ],
+    "IS_KEY": [
+      "isKey"
+    ],
+    "SEARCHABLE": [
+      "searchable"
+    ],
+    "INDEXED": [
+      "indexed"
+    ],
+    "LABEL_PLURAL": [
+      "labelPlural"
+    ],
+    "NAME_ATTRIBUTE": [
+      "nameAttribute"
+    ],
+    "CODE_ATTRIBUTE": [
+      "codeAttribute"
+    ],
+    "ALIASES": [
+      "aliases"
+    ],
+    "CARDINALITY": [
+      "cardinality"
+    ],
+    "JOIN": [
+      "join"
+    ],
+    "TARGET": [
+      "target"
+    ],
+    "WHERE_FILTER": [
+      "whereFilter"
+    ],
+    "LANGUAGE": [
+      "language"
+    ],
+    "SOURCE_TEXT": [
+      "sourceText"
+    ],
+    "LENGTH": [
+      "length"
+    ],
+    "PRECISION": [
+      "precision"
+    ],
+    "LABEL": [
+      "label"
+    ],
+    "NAME": [
+      "name"
+    ],
+    "DIRECTION": [
+      "direction"
+    ],
+    "DISPLAY_LABEL": [
+      "displayLabel"
+    ],
+    "VALUE_LABELS": [
+      "valueLabels"
+    ],
+    "ROLES": [
+      "roles"
+    ],
+    "SEARCH": [
+      "search"
+    ],
+    "SEMANTICS": [
+      "semantics"
+    ],
+    "KEYWORDS": [
+      "keywords"
+    ],
+    "PATTERNS": [
+      "patterns"
+    ],
+    "DESCRIPTIONS": [
+      "descriptions"
+    ],
+    "EXAMPLES": [
+      "examples"
+    ],
+    "FUZZY": [
+      "fuzzy"
+    ],
+    "METHOD": [
+      "method"
+    ],
+    "LEXICON": [
+      "lexicon"
+    ],
+    "TERM": [
+      "term"
+    ],
+    "PATTERN": [
+      "pattern"
+    ],
+    "EXAMPLE": [
+      "example"
+    ],
+    "FOR": [
+      "for"
+    ],
+    "FORMS": [
+      "forms"
+    ],
+    "MATCH": [
+      "match"
+    ],
+    "LOCALE": [
+      "locale"
+    ],
+    "FROM": [
+      "from"
+    ],
+    "TO": [
+      "to"
+    ],
+    "SECURITY": [
+      "security"
+    ],
+    "OWN": [
+      "own"
+    ],
+    "CLASSIFY": [
+      "classify"
+    ],
+    "GRANT": [
+      "grant"
+    ],
+    "MASK": [
+      "mask"
+    ],
+    "ON": [
+      "on"
+    ],
+    "TEXT": [
+      "text"
+    ],
+    "INT": [
+      "int"
+    ],
+    "FLOAT": [
+      "float"
+    ],
+    "BOOL": [
+      "bool"
+    ],
+    "DATETIME": [
+      "datetime"
+    ],
+    "STRING": [
+      "string"
+    ],
+    "BOOLEAN": [
+      "boolean"
+    ],
+    "NUMBER": [
+      "number"
+    ],
+    "INTEGER": [
+      "integer"
+    ],
+    "DOUBLE": [
+      "double"
+    ],
+    "OBJECT": [
+      "object"
+    ],
+    "LIST": [
+      "list"
+    ],
+    "CHAR": [
+      "char"
+    ],
+    "VARCHAR": [
+      "varchar"
+    ],
+    "DECIMAL": [
+      "decimal"
+    ],
+    "DATE": [
+      "date"
+    ],
+    "TIMESTAMP": [
+      "timestamp"
+    ],
+    "PRIMARY": [
+      "primary"
+    ],
+    "SECONDARY": [
+      "secondary"
+    ],
+    "ORDERED": [
+      "ordered"
+    ],
+    "BTREE": [
+      "btree"
+    ],
+    "FULLTEXT": [
+      "fulltext"
+    ],
+    "UNIQUE": [
+      "unique"
+    ],
+    "NOT_NULL": [
+      "notNull"
+    ],
+    "SQL": [
+      "SQL"
+    ],
+    "TRANSFORMATION_DSL": [
+      "TRANSFORMATION_DSL"
+    ],
+    "DATAFRAME_DSL": [
+      "DATAFRAME_DSL"
+    ],
+    "REL_NODE": [
+      "REL_NODE"
+    ],
+    "ARROW": [
+      "->"
+    ],
+    "EQUALS": [
+      "="
+    ],
+    "COLON": [
+      ":"
+    ],
+    "COMMA": [
+      ","
+    ],
+    "LBRACE": [
+      "{"
+    ],
+    "RBRACE": [
+      "}"
+    ],
+    "LBRACK": [
+      "["
+    ],
+    "RBRACK": [
+      "]"
+    ],
+    "LPAREN": [
+      "("
+    ],
+    "RPAREN": [
+      ")"
+    ],
+    "DOTDOT": [
+      ".."
+    ],
+    "DOT": [
+      "."
+    ],
+    "STAR": [
+      "*"
+    ],
+    "NULL_LITERAL": [
+      "null"
+    ],
+    "BOOLEAN_LITERAL": [
+      "true",
+      "false"
+    ]
+  },
+  "handledValueRules": [
+    "AUTOMATION",
+    "BINDING",
+    "BOOL",
+    "BOOLEAN",
+    "BOOLEAN_LITERAL",
+    "BTREE",
+    "CHAR",
+    "CN",
+    "CNC",
+    "DATAFRAME_DSL",
+    "DATE",
+    "DATETIME",
+    "DB",
+    "DECIMAL",
+    "DOUBLE",
+    "ER",
+    "FLOAT",
+    "FULLTEXT",
+    "INT",
+    "INTEGER",
+    "LEXICON",
+    "LIST",
+    "MD",
+    "MEMBERS",
+    "NOT_NULL",
+    "NUMBER",
+    "NUMBER_LITERAL",
+    "OBJECT",
+    "ORDERED",
+    "PRIMARY",
+    "QUERY",
+    "REL_NODE",
+    "SECONDARY",
+    "SQL",
+    "STRING",
+    "STRING_LITERAL",
+    "TEXT",
+    "TIMESTAMP",
+    "TRANSFORMATION_DSL",
+    "UNIQUE",
+    "VARCHAR",
+    "WORLD",
+    "aggregationValue",
+    "allocationValue",
+    "attributeDefList",
+    "autoValue",
+    "bindingBlock",
+    "bindingColumnMap",
+    "bindingColumnValue",
+    "bindingTargetValue",
+    "bindingValue",
+    "calcRef",
+    "cnBody",
+    "cnObject",
+    "cnValue",
+    "columnDefList",
+    "constraintDefList",
+    "constraintTypeValue",
+    "dataType",
+    "drillArgsMap",
+    "embeddedBlock",
+    "id",
+    "indexDefList",
+    "indexTypeValue",
+    "journalingValue",
+    "languageValue",
+    "levelEntry",
+    "levelList",
+    "list",
+    "listOfIds",
+    "listOfStrings",
+    "localizedString",
+    "localizedStringList",
+    "matchMethodValue",
+    "measureInlineList",
+    "measuresValue",
+    "membersBlock",
+    "modelCode",
+    "object_",
+    "parameterDefList",
+    "participant",
+    "primaryKeyValue",
+    "rangeLiteral",
+    "restrictBlock",
+    "restrictValue",
+    "searchBlock",
+    "shapeValue",
+    "stringLiteralForm",
+    "typeValue",
+    "value",
+    "valueLabelValue",
+    "valueLabelsBody"
+  ]
+}
