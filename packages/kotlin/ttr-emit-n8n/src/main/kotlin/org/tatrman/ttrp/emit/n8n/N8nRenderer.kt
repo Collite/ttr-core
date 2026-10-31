@@ -26,7 +26,8 @@ internal class N8nRenderer(
             require(
                 step.graph!!.process == null &&
                     step.graph!!.program.name == step.program &&
-                    step.graph!!.deployment.name == root.deployment.name,
+                    step.graph!!.deployment == root.deployment &&
+                    step.graph!!.program.port == (step.port ?: step.graph!!.program.port),
             ) { "invalid step graph ${step.name}" }
         }
         graphs.forEachIndexed { index, graph ->
@@ -45,9 +46,15 @@ internal class N8nRenderer(
                 val status = http(graph, prefix + "previous status", "status", "GET", previousId)
                 flow.link(previous, status)
                 val kinds = arr(step.obligations.map(::str)).toString()
-                val relevant = "(${dollar}json.body.obligations || []).filter(o => $kinds.includes(o.kind))"
+                val obligations =
+                    flow.code(
+                        prefix + "previous obligations",
+                        "if (!Array.isArray(${dollar}json.body.obligations)) throw new Error('run status has no obligations field (ttr-server §1.2 addition); this process export needs it'); return ${dollar}input.all();",
+                    )
+                flow.link(status, obligations)
+                val relevant = "${dollar}json.body.obligations.filter(o => $kinds.includes(o.kind))"
                 val exists = flow.condition(prefix + "obligation present", "$relevant.length > 0")
-                flow.link(status, exists)
+                flow.link(obligations, exists)
                 val wait =
                     flow.node(
                         prefix + "obligation wait",
@@ -57,15 +64,27 @@ internal class N8nRenderer(
                             "httpMethod" to str("POST"),
                             "limitWaitTime" to JsonPrimitive(true),
                             "limitType" to str("afterTimeInterval"),
-                            "resumeAmount" to JsonPrimitive(1),
-                            "resumeUnit" to str("minutes"),
+                            "resumeAmount" to
+                                str(
+                                    expression(
+                                        "Math.max(1, Math.min(3600, ...$relevant.filter(o => o.dueAt && Date.parse(o.dueAt) > Date.now()).map(o => Math.ceil((Date.parse(o.dueAt) - Date.now()) / 1000))))",
+                                    ),
+                                ),
+                            "resumeUnit" to str("seconds"),
                             "options" to json("webhookSuffix" to str(prefix.trim())),
                         ),
                     )
                 val ready =
                     flow.condition(
                         prefix + "obligation ready",
-                        "$relevant.every(o => ['fulfilled','due'].includes(o.state) || (o.dueAt && Date.parse(o.dueAt) <= Date.now()))",
+                        "$relevant.every(o => " +
+                            listOfNotNull(
+                                "(o.state === 'fulfilled')".takeIf { "fulfilled" in step.until },
+                                "(o.state === 'due' || (o.dueAt && Date.parse(o.dueAt) <= Date.now()))".takeIf {
+                                    "due" in
+                                        step.until
+                                },
+                            ).joinToString(" || ").ifEmpty { "false" } + ")",
                     )
                 flow.link(exists, ready)
                 flow.link(ready, wait, 1)
@@ -98,6 +117,7 @@ internal class N8nRenderer(
             skip?.let { flow.link(it, join, 1) }
             previous = join
             opens += prefix + "open"
+            opens += prefix + "reopen"
         }
         val meta =
             json(
@@ -105,6 +125,25 @@ internal class N8nRenderer(
                 "deployment" to str(root.deployment.name),
                 "recipes" to arr(graphs.map { str(it.recipe.name) }),
                 "calls" to arr(flow.calls),
+                "mail" to arr(flow.mail),
+                "roles" to
+                    arr(
+                        graphs
+                            .flatMap { graph ->
+                                graph.wirings.flatMap { wiring ->
+                                    graph.actions
+                                        .getValue(wiring.action)
+                                        .columns
+                                        .filterValues {
+                                            it ==
+                                                "role"
+                                        }.keys
+                                        .mapNotNull { wiring.columns[it] }
+                                }
+                            }.distinct()
+                            .sorted()
+                            .map(::str),
+                    ),
                 "nodeVersions" to JsonObject(NodeFactory.versions.mapValues { JsonPrimitive(it.value) }),
             )
         return flow.render(meta, timezone)
@@ -113,20 +152,9 @@ internal class N8nRenderer(
     private fun trigger(graph: RecipeGraph) {
         if (graph.program.mode == "batch") {
             val schedule = requireNotNull(graph.program.schedule) { "batch n8n export needs a schedule hint" }
-            val match = Regex("(\\d{2}):(\\d{2})\\s+(.+)").matchEntire(schedule)
-            val cron =
-                if (match != null) {
-                    val hour = match.groupValues[1].toInt()
-                    val minute = match.groupValues[2].toInt()
-                    require(hour in 0..23 && minute in 0..59) { "invalid schedule time" }
-                    timezone =
-                        java.time.ZoneId
-                            .of(match.groupValues[3])
-                            .id
-                    "0 $minute $hour * * *"
-                } else {
-                    schedule
-                }
+            val parsed = ScheduleHint.parse(schedule)
+            timezone = parsed.timezone
+            val cron = parsed.cron
             flow.node(
                 "trigger",
                 "scheduleTrigger",
@@ -135,7 +163,15 @@ internal class N8nRenderer(
                         json(
                             "interval" to
                                 arr(
-                                    listOf(json("field" to str("cronExpression"), "expression" to str(cron))),
+                                    listOf(
+                                        parsed.minutes?.let {
+                                            json(
+                                                "field" to str("minutes"),
+                                                "minutesInterval" to JsonPrimitive(it),
+                                            )
+                                        }
+                                            ?: json("field" to str("cronExpression"), "expression" to str(cron)),
+                                    ),
                                 ),
                         ),
                 ),
@@ -163,7 +199,7 @@ internal class N8nRenderer(
         val openName = prefix + "open"
         val input = "($dollar('trigger').first().json.body || $dollar('trigger').first().json)"
         val keys = graph.recipe.key.map { it.substringAfterLast('.') }
-        val digestSources = mutableListOf<Pair<String, String>>()
+        val digestSources = mutableListOf<String>()
         val key =
             if (keys.size ==
                 1
@@ -177,7 +213,7 @@ internal class N8nRenderer(
                 "none", null -> "{none:true}"
                 "key" -> "{key:($key)}"
                 "keys" -> "{keys:$input.keys}"
-                "event" -> "{event:$input}"
+                "event" -> "{event:Object.fromEntries(Object.entries($input).filter(([k]) => k !== 'at'))}"
                 else -> error("unsupported n8n port ${graph.program.port}")
             }
         val fp = graph.recipe.fingerprints
@@ -189,17 +225,124 @@ internal class N8nRenderer(
             )}, recipeValuesFingerprint:${literal(fp.getValue("values"))}}; " +
                 (fp["program"]?.let { "b.programFingerprint=${literal(it)}; " } ?: "") +
                 (fp["deployment"]?.let { "b.deploymentFingerprint=${literal(it)}; " } ?: "") +
-                (if (graph.program.mode == "batch") "b.idempotencyKey=${dollar}execution.id; " else "") +
-                (if (initial) "if ($input.at) b.port.at=$input.at; " else "b.port.at=new Date().toISOString(); ") +
+                (
+                    if (graph.program.mode == "batch") {
+                        "b.idempotencyKey=${dollar}execution.id" +
+                            (if (initial) "" else " + ${literal(":" + prefix.trim())}") +
+                            "; "
+                    } else {
+                        ""
+                    }
+                ) +
+                (
+                    if (graph.program.port in
+                        setOf(null, "none")
+                    ) {
+                        ""
+                    } else if (initial) {
+                        "if ($input.at) b.port.at=$input.at; "
+                    } else {
+                        "b.port.at=$dollar(${literal(
+                            prefix + "clock",
+                        )}).first().json.at; "
+                    }
+                ) +
                 "return b;})()"
-        val open = http(graph, openName, "open", "POST", body = body)
-        val id = "$dollar(${literal(openName)}).first().json.body.runId"
+        val prepared = flow.code(prefix + "open input", "return [{json:{openBody:$body}}];")
+        val open =
+            http(
+                graph,
+                openName,
+                "open",
+                "POST",
+                body = "$dollar(${literal(prefix + "open input")}).first().json.openBody",
+            )
+        flow.link(prepared, open)
+        val id = "($dollar(${literal(
+            prefix + "reopen",
+        )}).isExecuted ? $dollar(${literal(
+            prefix + "reopen",
+        )}) : $dollar(${literal(openName)})).first().json.body.runId"
+        val clock =
+            if (initial) {
+                null
+            } else {
+                flow.code(
+                    prefix + "clock",
+                    "return [{json:{at:new Date().toISOString(), started:Date.now()}}];",
+                )
+            }
+        clock?.let { flow.link(it, prepared) }
         val complete = flow.code(prefix + "run complete", "return [{json:{}}];")
-        val replayed = flow.condition(prefix + "replayed", "${dollar}json.body.replayed === true")
-        flow.link(open, replayed)
+        val fresh = flow.code(prefix + "fresh run", "return [{json:{started:Date.now()}}];")
+        val claimed = flow.condition(prefix + "claimed", "${dollar}json.statusCode === 201")
+        flow.link(open, claimed)
+        flow.link(claimed, fresh)
+        val replayed =
+            flow.condition(
+                prefix + "replayed",
+                "${dollar}json.statusCode === 200 && ${dollar}json.body.replayed === true",
+            )
+        flow.link(claimed, replayed, 1)
         flow.link(replayed, complete)
-        val fresh = flow.code(prefix + "fresh run", "return ${dollar}input.all();")
-        flow.link(replayed, fresh, 1)
+        val awaiting =
+            flow.code(
+                prefix + "await handle",
+                "if (${dollar}json.statusCode !== 202) throw new Error('unexpected Open response'); return [{json:{...${dollar}json, started:Date.now()}}];",
+            )
+        flow.link(replayed, awaiting, 1)
+        val handleWait =
+            flow.node(
+                prefix + "handle wait",
+                "wait",
+                json(
+                    "resume" to str("timeInterval"),
+                    "amount" to str(expression(retryAfter())),
+                    "unit" to str("seconds"),
+                ),
+            )
+        val handleStatus = http(graph, prefix + "handle status", "status", "GET", id)
+        val handleStart = "$dollar(${literal(prefix + "await handle")}).first().json.started"
+        val timeout = pollBudget(graph)
+        val handleCheck =
+            flow.code(
+                prefix + "check handle",
+                "if(!['closed','waiting','failed','abandoned'].includes(${dollar}json.body.status) && Date.now() - $handleStart > $timeout) throw new Error('live handle polling timed out'); return ${dollar}input.all();",
+            )
+        val terminal =
+            flow.condition(
+                prefix + "handle complete",
+                "['closed','waiting'].includes(${dollar}json.body.status)",
+            )
+        val abandoned =
+            flow.condition(
+                prefix + "handle abandoned",
+                "['abandoned','failed'].includes(${dollar}json.body.status)",
+            )
+        // A second 202 is an error: the duplicate must never drive a run another execution owns.
+        val reopen =
+            http(
+                graph,
+                prefix + "reopen",
+                "open",
+                "POST",
+                body = "$dollar(${literal(prefix + "open input")}).first().json.openBody",
+            )
+        val reopened =
+            flow.code(
+                prefix + "check reopen",
+                "if (${dollar}json.statusCode !== 201) throw new Error('re-open did not claim run (second live handle)'); return ${dollar}input.all();",
+            )
+        flow.link(awaiting, handleWait)
+        flow.link(handleWait, handleStatus)
+        flow.link(handleStatus, handleCheck)
+        flow.link(handleCheck, terminal)
+        flow.link(terminal, complete)
+        flow.link(terminal, abandoned, 1)
+        flow.link(abandoned, reopen)
+        flow.link(abandoned, handleWait, 1)
+        flow.link(reopen, reopened)
+        flow.link(reopened, fresh)
         var last = fresh
 
         fun chain(
@@ -214,7 +357,7 @@ internal class N8nRenderer(
         when (graph.deployment.granularity) {
             "parts" -> {
                 chain("part", "candidates", mapOf("part" to "candidates"))
-                graph.roles.contexts.forEach { chain("part", it.name, mapOf("part" to it.name)) }
+                graph.roles.contexts.forEach { chain("part", "context ${it.name}", mapOf("part" to it.name)) }
                 if (graph.roles.decision != null) chain("part", "decision", mapOf("part" to "decision"))
             }
             "islands" -> {
@@ -227,7 +370,11 @@ internal class N8nRenderer(
         val checked =
             flow.code(
                 prefix + "check evaluation",
-                "if (${dollar}runIndex > 120) throw new Error('evaluation polling timed out'); const b=${dollar}input.first().json.body; if (['failed','abandoned','waiting'].includes(b.status)) throw new Error('evaluation refused'); return ${dollar}input.all();",
+                "if (Date.now() - $dollar(${literal(
+                    prefix + "fresh run",
+                )}).first().json.started > ${pollBudget(
+                    graph,
+                )}) throw new Error('evaluation polling timed out'); const b=${dollar}input.first().json.body; if (['failed','abandoned','waiting'].includes(b.status)) throw new Error('evaluation refused'); return ${dollar}input.all();",
             )
         flow.link(last, checked)
         val evaluated =
@@ -242,7 +389,7 @@ internal class N8nRenderer(
                 "wait",
                 json(
                     "resume" to str("timeInterval"),
-                    "amount" to JsonPrimitive(1),
+                    "amount" to str(expression(retryAfter())),
                     "unit" to str("seconds"),
                 ),
             )
@@ -262,8 +409,14 @@ internal class N8nRenderer(
                 """.trimIndent(),
             )
         val actionStatus = http(graph, prefix + "action status", "status", "GET", id)
+        val actionCheck =
+            flow.code(
+                prefix + "check actions",
+                "if (!Array.isArray(${dollar}json.body.actions)) throw new Error('run status has no actions field; per-key selection required'); return ${dollar}input.all();",
+            )
         flow.link(evaluated, actionStatus)
-        flow.link(actionStatus, prepare)
+        flow.link(actionStatus, actionCheck)
+        flow.link(actionCheck, prepare)
         val loop =
             flow.node(
                 prefix + "routes loop",
@@ -310,7 +463,7 @@ internal class N8nRenderer(
             val read =
                 http(
                     graph,
-                    prefix + route.name + " rows",
+                    prefix + "route " + route.name + " rows",
                     "route",
                     "GET",
                     id,
@@ -320,7 +473,7 @@ internal class N8nRenderer(
             flow.link(switch, read, index)
             var tail =
                 flow.code(
-                    prefix + route.name + " collect",
+                    prefix + "route " + route.name + " collect",
                     "const rows = ${dollar}input.all().flatMap(i => i.json.body?.rows || i.json.rows || []); return [{json:{rows}}];",
                 )
             flow.link(read, tail)
@@ -346,24 +499,53 @@ internal class N8nRenderer(
                     )} : a.key)"
                     val rows =
                         if (sink == "n8n-nodes-base.emailSend") {
-                            "$routeRows.filter(r => ($statusBody.actions || []).some(a => a.action === ${literal(
+                            "$routeRows.filter(r => ($statusBody.actions).some(a => a.action === ${literal(
                                 wiring.action,
                             )} && JSON.stringify(${keyProjection("r", keys)}) === JSON.stringify($previewKey)))"
                         } else {
                             routeRows
                         }
                     if (digest && action.deliverable) {
-                        digestSources += rows to (wiring.columns["who"] ?: "")
+                        val address = mailAddress(action, wiring)
+                        digestSources +=
+                            "...$rows.map(row => ({...row,who:${address.role?.let(
+                                ::literal,
+                            ) ?: "row[${literal(
+                                requireNotNull(address.column),
+                            )}]"},to:${address.recipient("row", keys)}}))"
                         return@forEach
                     }
                     val selectedKeys = "$rows.map(r => ${keyProjection("r", keys)})"
-                    val actionName = prefix + route.name + " " + wiring.action
+                    val actionName = prefix + "action " + route.name + " " + wiring.action
                     if (sink == "n8n-nodes-base.emailSend") {
-                        val mail = email(actionName, rows, literal(wiring.columns["who"] ?: ""))
-                        val deliver = flow.condition("$actionName deliver", "!$statusBody.dryRun && $rows.length > 0")
-                        flow.link(tail, deliver)
+                        val address = mailAddress(action, wiring)
+                        val recipientExpression = address.recipient("row", keys)
+                        val groups =
+                            flow.code(
+                                "$actionName groups",
+                                "const rows=$rows; const groups=new Map(); for(const row of rows) {const to=$recipientExpression; if(!groups.has(to)) groups.set(to,[]); groups.get(to).push(row);} return [{json:{groups:groups.size ? [...groups].map(([to,rows])=>({to,rows})) : [{to:null,rows:[]}]}}];",
+                            )
+                        flow.link(tail, groups)
+                        val split =
+                            flow.node(
+                                "$actionName split",
+                                "splitOut",
+                                json(
+                                    "fieldToSplitOut" to str("groups"),
+                                    "options" to json("destinationFieldName" to str("mail")),
+                                ),
+                            )
+                        flow.link(groups, split)
+                        val mailRows = "$dollar(${literal(split)}).item.json.mail.rows"
+                        val recipient = "$dollar(${literal(split)}).item.json.mail.to"
+                        val mail = email(graph, actionName, mailRows, recipient, wiring.action, keys)
+                        val deliver =
+                            flow.condition(
+                                "$actionName deliver",
+                                "${root.deployment.dryRun} === false && $statusBody.dryRun === false && ${dollar}json.mail.rows.length > 0",
+                            )
+                        flow.link(split, deliver)
                         flow.link(deliver, mail)
-                        tail = mail
                         val outcome =
                             http(
                                 graph,
@@ -374,11 +556,12 @@ internal class N8nRenderer(
                                 mapOf(
                                     "action" to wiring.action,
                                 ),
-                                body =
-                                    "{outcomes:$selectedKeys.map(key => " +
-                                        "({key,status:'delivered',at:new Date().toISOString()}))}",
+                                body = "{outcomes:$mailRows.map(r => ({key:${keyProjection(
+                                    "r",
+                                    keys,
+                                )},status:'delivered',at:new Date().toISOString()}))}",
                             )
-                        flow.link(tail, outcome)
+                        flow.link(mail, outcome)
                         val delivered = flow.code("$actionName complete", "return [{json:{}}];")
                         flow.link(outcome, delivered)
                         flow.link(deliver, delivered, 1)
@@ -397,6 +580,7 @@ internal class N8nRenderer(
                                     "n8n-nodes-base.httpRequest",
                                 ),
                         ) { "unsupported n8n action sink $sink" }
+                        val asking = action.sinks["native"] == "task" && action.approval == "required"
                         val suffix = actionName.replace(' ', '-')
                         val perform =
                             http(
@@ -409,9 +593,7 @@ internal class N8nRenderer(
                                 body =
                                     "{keys:$selectedKeys" +
                                         (
-                                            if (wiring.action ==
-                                                "ask"
-                                            ) {
+                                            if (asking) {
                                                 ",callbackUrl:${dollar}execution.resumeUrl + '/$suffix'"
                                             } else {
                                                 ""
@@ -421,7 +603,10 @@ internal class N8nRenderer(
                             )
                         flow.link(tail, perform)
                         tail = perform
-                        if (wiring.action == "ask") {
+                        if (asking) {
+                            val taskAction = literal(wiring.action)
+                            val fallbackDue =
+                                action.due?.takeUnless { "working_days" in it }?.let(::durationSeconds) ?: 3600
                             val wait =
                                 flow.node(
                                     "$actionName wait",
@@ -429,6 +614,15 @@ internal class N8nRenderer(
                                     json(
                                         "resume" to str("webhook"),
                                         "httpMethod" to str("POST"),
+                                        "limitWaitTime" to JsonPrimitive(true),
+                                        "limitType" to str("afterTimeInterval"),
+                                        "resumeAmount" to
+                                            str(
+                                                expression(
+                                                    "(() => {const due=(${dollar}json.body.tasks || []).filter(t => t.action === $taskAction && t.dueAt).map(t => Date.parse(t.dueAt)).filter(Number.isFinite); return due.length ? Math.max(1, Math.ceil((Math.min(...due)-Date.now())/1000)) : $fallbackDue;})()",
+                                                ),
+                                            ),
+                                        "resumeUnit" to str("seconds"),
                                         "options" to json("webhookSuffix" to str(suffix)),
                                     ),
                                 )
@@ -439,30 +633,37 @@ internal class N8nRenderer(
                                 )
                             val resumed = flow.code("$actionName resumed", "return [{json:{}}];")
                             flow.link(tail, pending)
-                            flow.link(pending, wait)
+
                             flow.link(pending, resumed, 1)
-                            flow.link(wait, resumed)
+                            val taskStatus = http(graph, "$actionName task status", "status", "GET", id)
+                            val stillWaiting =
+                                flow.condition(
+                                    "$actionName still waiting",
+                                    "${dollar}json.body.status === 'waiting'",
+                                )
+                            flow.link(pending, taskStatus)
+                            flow.link(wait, taskStatus)
+                            flow.link(taskStatus, stillWaiting)
+                            flow.link(stillWaiting, wait)
+                            flow.link(stillWaiting, resumed, 1)
                             tail = resumed
                         }
                     }
                 }
             flow.link(tail, loop)
         }
-        var done = loop
+        var done = flow.code(prefix + "routes complete", "return [{json:{}}];")
+        flow.link(loop, done)
         var doneOutput = 0
         if (digest) {
             val digests = http(graph, prefix + "digests", "digests", "GET", id)
             flow.link(done, digests, doneOutput)
             val sources =
-                digestSources.joinToString(",") { (rows, who) ->
-                    "...$rows.map(row => ({...row,who:${literal(who)}}))"
-                }
+                digestSources.joinToString(",")
             val groups =
                 flow.code(
                     prefix + "digest groups",
-                    "const rows=[$sources]; const groups = ($dollar(${literal(
-                        prefix + "action status",
-                    )}).first().json.body.dryRun ? [] : ${dollar}input.first().json.body.groups).map(g => ({...g,rowsRef:g.rows,rows:rows.filter(r => Object.entries(g.by).every(([k,v]) => r[k] === v))})); if(groups.some(g=>!g.rows.length)) throw new Error('digest group has no resolved rows'); return [{json:{groups:groups.length ? groups : [{empty:true}]}}];",
+                    "const rows=[$sources]; const groups = ${dollar}input.first().json.body.groups.map(g => ({...g,rowsRef:g.rows,rows:rows.filter(r => Object.entries(g.by).every(([k,v]) => r[k] === v))})); if(groups.some(g=>!g.rows.length)) throw new Error('digest group has no resolved rows'); const addressed=groups.flatMap(g=>[...new Set(g.rows.map(r=>r.to))].map(to=>({...g,to,rows:g.rows.filter(r=>r.to===to)}))); return [{json:{groups:addressed.length ? addressed : [{empty:true,rows:[]}]}}];",
                 )
             flow.link(digests, groups)
             val split =
@@ -475,9 +676,32 @@ internal class N8nRenderer(
                     ),
                 )
             flow.link(groups, split)
-            val nonempty = flow.condition(prefix + "digest nonempty", "!${dollar}json.group.empty")
+            val nonempty =
+                flow.condition(
+                    prefix + "digest deliver",
+                    "${root.deployment.dryRun} === false && $dollar(${literal(
+                        prefix + "action status",
+                    )}).first().json.body.dryRun === false && ${dollar}json.group.rows.length > 0",
+                )
             flow.link(split, nonempty)
-            val mail = email(prefix + "digest mail", "${dollar}json.group.rows", "${dollar}json.group.by.who")
+            val digestAction =
+                graph.wirings
+                    .filter {
+                        graph.actions.getValue(it.action).deliverable
+                    }.map { it.action }
+                    .distinct()
+                    .single()
+            val mail =
+                email(
+                    graph,
+                    prefix + "digest mail",
+                    "$dollar(${literal(prefix + "digest split")}).item.json.group.rows",
+                    "$dollar(${literal(
+                        prefix + "digest split",
+                    )}).item.json.group.to",
+                    digestAction,
+                    keys,
+                )
             flow.link(nonempty, mail)
             val delivered =
                 graph.wirings
@@ -513,10 +737,39 @@ internal class N8nRenderer(
             done = collect
             doneOutput = 0
         }
+        val closeInput = flow.code(prefix + "close input", "return [{json:{}}];")
+        flow.link(done, closeInput, doneOutput)
         val close = http(graph, prefix + "close", "close", "POST", id)
-        flow.link(done, close, doneOutput)
+        flow.link(closeInput, close)
         flow.link(close, complete)
-        return open to complete
+        return (clock ?: prepared) to complete
+    }
+
+    private fun retryAfter(): String =
+        "(() => {const h=${dollar}json.headers || {}; const v=h['retry-after'] ?? h['Retry-After']; const n=Number(v); return Number.isFinite(n) && n > 0 ? n : (v && Number.isFinite(Date.parse(v)) ? Math.max(1,Math.ceil((Date.parse(v)-Date.now())/1000)) : 15);})()"
+
+    private fun pollBudget(graph: RecipeGraph): Long =
+        (
+            graph.program.budget[if (graph.program.mode == "batch") "batch" else "sync"]?.let(::durationSeconds)
+                ?: if (graph.program.mode == "batch") 1800 else 60
+        ) * 1000L + 120_000L
+
+    private fun durationSeconds(raw: String): Long {
+        val m =
+            Regex("([0-9.]+)\\s+(milliseconds|seconds|minutes|hours|days)").matchEntire(raw)
+                ?: error("unsupported duration $raw")
+        val scale =
+            mapOf(
+                "milliseconds" to 0.001,
+                "seconds" to 1.0,
+                "minutes" to 60.0,
+                "hours" to 3600.0,
+                "days" to 86400.0,
+            ).getValue(m.groupValues[2])
+        return kotlin.math
+            .ceil(m.groupValues[1].toDouble() * scale)
+            .toLong()
+            .coerceAtLeast(1)
     }
 
     private fun keyProjection(
@@ -529,23 +782,101 @@ internal class N8nRenderer(
             "{${keys.joinToString(",") { "${literal(it)}:$row[${literal(it)}]" }}}"
         }
 
+    private data class MailAddress(
+        val role: String?,
+        val column: String?,
+    ) {
+        fun recipient(
+            row: String,
+            keys: List<String>,
+        ): String {
+            if (role != null) {
+                val roleName = literal(role)
+                return "(() => {const role=$roleName; " +
+                    "const to=JSON.parse(${'$'}env.TTR_MAIL_RECIPIENTS || '{}')[role]; " +
+                    "if(typeof to !== 'string' || !to.trim()) throw new Error('no address for role ' + role); " +
+                    "return to;})()"
+            }
+            val columnName = literal(requireNotNull(column))
+            val key = keys.joinToString(",") { "$row[${literal(it)}]" }
+            return "(() => {const to=$row[$columnName]; " +
+                "if(typeof to !== 'string' || !to.trim()) " +
+                "throw new Error('no address for key ' + JSON.stringify([$key])); return to;})()"
+        }
+    }
+
+    private fun mailAddress(
+        action: ActionMeta,
+        wiring: WiringMeta,
+    ): MailAddress {
+        val columns = action.columns.filter { (name, type) -> type == "role" || (name == "to" && '.' in type) }
+        require(columns.size == 1) {
+            "emailSend action ${wiring.action} needs exactly one addressing column (role or to: E-R address attribute)"
+        }
+        val (name, type) = columns.entries.single()
+        val value = requireNotNull(wiring.columns[name]) { "emailSend action ${wiring.action} has no address wiring" }
+        return if (type == "role") {
+            require(
+                value.matches(Regex("role\\.[A-Za-z_][A-Za-z0-9_]*")),
+            ) { "emailSend role must be a role reference: $value" }
+            MailAddress(value, null)
+        } else {
+            require(value.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))) {
+                "emailSend address must name a bare route-row column: $value"
+            }
+            MailAddress(null, value)
+        }
+    }
+
     private fun email(
+        graph: RecipeGraph,
         name: String,
         rows: String,
-        who: String,
-    ): String =
-        flow.node(
+        recipient: String,
+        action: String,
+        keys: List<String>,
+    ): String {
+        flow.mail +=
+            json(
+                "node" to str(name),
+                "action" to str(action),
+                "rows" to str(expression(rows)),
+                "recipient" to str(expression(recipient)),
+                "key" to arr(keys.map(::str)),
+                "addressColumn" to
+                    str(
+                        graph.actions
+                            .getValue(action)
+                            .columns.entries
+                            .single { it.value == "role" || it.key == "to" }
+                            .key,
+                    ),
+                "addressKind" to
+                    str(
+                        if (graph.actions
+                                .getValue(action)
+                                .columns.values
+                                .any { it == "role" }
+                        ) {
+                            "role"
+                        } else {
+                            "row"
+                        },
+                    ),
+            )
+        return flow.node(
             name,
             "emailSend",
             json(
                 "fromEmail" to str(expression("${dollar}env.TTR_MAIL_FROM")),
-                "toEmail" to str(expression("JSON.parse(${dollar}env.TTR_MAIL_RECIPIENTS || '{}')[$who] || $who")),
-                "subject" to str("Tatrman ${root.program.name}"),
+                "toEmail" to str(expression(recipient)),
+                "subject" to str("Tatrman ${graph.program.name}"),
                 "emailFormat" to str("text"),
                 "text" to str(expression("JSON.stringify($rows, null, 2)")),
                 "options" to json("appendAttribution" to JsonPrimitive(false)),
             ),
         )
+    }
 
     private fun http(
         graph: RecipeGraph,
@@ -670,9 +1001,25 @@ internal class N8nRenderer(
         The workflow imports inactive; review the credentials and schedule before activation.
 
         On-event input is posted to `/webhook/${root.deployment.name}` with the recipe key fields (or `key`), `keys`,
-        or the declared event body. Batch runs derive their idempotency key from the n8n execution id; on-event
-        runs let the Server derive it. `ask` performs on the Server and registers the Wait webhook as `callbackUrl`.
-        Process obligation waits can be resumed by their webhook and also poll once per minute, including due checks.
+        or the declared event body. On-event callers must send `at` as an ISO instant with an offset for duplicate events
+        to be recognised. Without `at`, every POST is a new run. The clock is excluded from event columns; an event
+        schema declaring `at` is refused. Batch runs use the n8n execution id; later batch steps append their step name.
+        A 202 Open handle belongs to another execution: wait for closed/abandoned, and never repeat its actions.
+        A waiting handle ends the duplicate execution. After failure/abandonment there is one re-open with the same
+        saved body; a second 202 refuses. A lost Open response can wait until the Server's budget plus recovery grace
+        abandons the orphan, then recover through that single re-open. Later step clocks are saved after waits.
+        Task actions with required approval register a Wait webhook as `callbackUrl` and re-read status after every
+        resume or timeout until all tasks have left waiting. Task dueAt bounds the timeout; calendar-based due rules
+        without a resolved dueAt use an hourly backstop.
+        Obligation waits require an explicit `obligations` array on Server status. Missing fields fail; an empty
+        array is absent. `until` selects fulfilled/due readiness. Waits wake at the nearest future dueAt, capped at 1 h.
+        `emailSend` needs exactly one role-typed action column or `to` typed by an E-R address attribute and wired to
+        a bare route-row column. Row addresses are grouped per recipient; missing addresses name the key and fail.
+        Role addresses must exist in `TTR_MAIL_RECIPIENTS`; there is no literal fallback. Status must include the
+        per-key `actions` selection array for every run; missing is an error. Both deployment and status must
+        explicitly permit wet delivery. Process manifests fingerprint every step; any step can make the export stale.
+        Schedule hints: `HH:MM Zone`, `Mon|Tue|Wed|Thu|Fri|Sat|Sun HH:MM Zone`, `1st HH:MM Zone`, or `*/N`
+        (1–60 minutes). Unsupported hints refuse export.
         Route rows feed engine-side mail; outcomes are recorded on the Server. HTTP failures, including stale
         fingerprint refusals, stop the workflow before downstream nodes. Re-export after any stale refusal.
 

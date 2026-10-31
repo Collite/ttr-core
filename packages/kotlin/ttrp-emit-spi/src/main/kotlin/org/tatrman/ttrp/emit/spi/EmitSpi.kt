@@ -28,6 +28,11 @@ interface TtrEmitPlugin {
     /** The SPI major version this plugin was built against; a host rejects a plugin whose version is outside [SUPPORTED_VERSIONS]. */
     val spiVersion: Int get() = SPI_VERSION
 
+    /** Explicitly opt in after rebuilding against the D-140 data classes. Old binaries default to revision 0. */
+    val spiRevision: Int get() = 0
+
+    val supportsProcesses: Boolean get() = false
+
     val supportsRecipes: Boolean get() = false
 
     fun emitRecipe(request: RecipeEmitRequest): EmitResult =
@@ -42,6 +47,7 @@ interface TtrEmitPlugin {
     companion object {
         /** The current SPI major version. */
         const val SPI_VERSION: Int = 2
+        const val SPI_REVISION: Int = 1
         val SUPPORTED_VERSIONS: Set<Int> = setOf(1, 2)
     }
 }

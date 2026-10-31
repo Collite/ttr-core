@@ -6,6 +6,7 @@ import org.tatrman.ttrp.emit.spi.EmitRequest
 import org.tatrman.ttrp.emit.spi.EmitResult
 
 class Camunda7EmitPlugin : TtrEmitPlugin {
+    override val spiRevision = TtrEmitPlugin.SPI_REVISION
     override val targetId = "camunda_7"
 
     override fun executorTypeManifest(): String =

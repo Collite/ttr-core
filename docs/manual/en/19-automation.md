@@ -156,17 +156,37 @@ credential/import instructions, conformance references and an exact named call l
 The exporter carries no SQL. Every Open includes recipe and program/deployment fingerprints; stale refusals
 stop the workflow. A replayed Open skips the action path so a duplicate event does not send mail again.
 
-Batch Schedule Triggers use the program's `HH:MM IANA/Timezone` schedule hint (or a cron expression), while
+Batch schedules accept `HH:MM Zone`, `Mon|Tue|Wed|Thu|Fri|Sat|Sun HH:MM Zone`, `1st HH:MM Zone`,
+or `*/N` (1–60 minutes). Unsupported hints refuse export. Named zones use IANA timezone identifiers, while
 key/event programs expose `/webhook/<deployment>`. HTTP nodes use the `tatrman-automation` bearer credential
 and three retries. Engine-side mail uses `tatrman-mail` SMTP, `TTR_MAIL_FROM` and the `TTR_MAIL_RECIPIENTS`
-JSON role-to-address mapping; the Server's dry-run flag suppresses SMTP. Set `TTR_AUTOMATION_URL` to the Server
+JSON role-to-address mapping. Missing role mappings fail. A customer-addressed email action instead declares
+`to` typed by an E-R address attribute, wired to a bare route-row column. Rows are grouped by recipient;
+empty addresses fail with the key. Both the deployment and Server must explicitly permit wet delivery.
+The Server must return its per-key `actions` selection array for every run; missing fields fail. Set `TTR_AUTOMATION_URL` to the Server
 origin, without `/automation`. The generated README lists the required n8n worker environment access.
 
-Process exports verify every step before writing a package, preserve each step's recipe, effective port and
-parent deployment, wait on obligations and skip a step when its obligation is absent. Obligation waits accept
-webhook resumes and poll once per minute for fulfilment/due. When supplying `--bundle` for a process, point it
-at a directory containing one ordinary bundle directory per recipe name. SPI v2 JVM callers must rebuild with
-the updated toolchain; the grammar version is unchanged.
+On-event callers must supply a stable `at` ISO instant with an offset to recognise duplicate events. Without
+it every POST is a new run. `at` supplies the port clock and is excluded from event columns; a schema column
+named `at` refuses export. A 202 Open handle is polled without repeating its actions: closed/waiting completes
+the duplicate, failed/abandoned allows one re-open with the saved body. A second 202 refuses. After a lost Open
+response this can wait for the Server's budget plus recovery grace before recovering the orphan.
+
+Process exports verify and fingerprint every step before writing a package, preserve each step's recipe,
+effective port and parent deployment, and save later-step clocks after their waits. Later batch steps append
+`:<step>` to their execution idempotency key. Obligation waits require an explicit `obligations` array; missing
+fields fail, and only an empty array means absent. `until` controls fulfilled/due readiness. Webhook waits also
+wake at the nearest future dueAt, capped at an hour. Required task approvals wait again after each resume or
+timeout while the run remains waiting; resolved task dueAt sets the timeout, with an hourly backstop for
+calendar-based due rules that lack an instant. Evaluation and handle polls honour Retry-After (default 15 s)
+with a program-budget plus two-minute recovery-grace bound.
+
+When supplying `--bundle` for a process, point it at a directory containing one ordinary bundle directory per
+recipe name. A plugin must declare process support; native currently refuses process deployments. SPI v2 JVM
+callers must rebuild with the updated toolchain and explicitly declare `spiRevision = 1`; the host refuses older
+v2 plugins before rendering. SPI v1 remains compatible and the grammar version is unchanged.
+Hartland H-2/winback customer-mail exports refuse until its model supplies the address column. H-2 live
+certification also requires the Server's planned obligations status field.
 
 ## Conformance of a recipe
 
@@ -191,8 +211,12 @@ n8n dry replay interprets the supported generated node types and JavaScript expr
 it does not start n8n, send SMTP or wait for a person. Pass `--cells n8n-l1.on-event` and repeat
 `--export <deployment>.n8n_l1.export` for each recipe/mode. The exported deployment must be enabled,
 granted and current. The driver checks the manifest's call list against the actual HTTP parameters,
-executes with `dryRun: true`, and reads exact Server evidence for the same comparisons as native.
-Use trusted generated exports; arbitrary Code-node workflows are executable artifacts. Process lifecycle
+executes with `dryRun: true` and the fixture's asOf/origin, and reads exact Server evidence. A keys fixture
+substitutes its batch selection; an all fixture sends the rendered none port unchanged. Observed actions come
+from executed perform/outcome bodies and mail-node rows/recipient, with SMTP replaced by a dry stand-in, then
+are cross-checked against the Server's action selection multiset. Dropped/wrong actions disagree. This proves
+orchestration and dry evidence parity; committed writes, actual SMTP, human timing and a deployed n8n engine
+remain live certification. Use trusted generated exports; arbitrary Code-node workflows are executable artifacts. Process lifecycle
 replay and event-body fixtures remain separate from the H-1 key-based dry replay.
 
 Golden YAML uses `recipe`, `world`, `as_of`, `parameters`, `keys`, `expected`, and optional `pinned_from`

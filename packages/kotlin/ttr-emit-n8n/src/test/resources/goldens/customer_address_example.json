@@ -15,10 +15,24 @@
                     "interval": [
                         {
                             "field": "cronExpression",
-                            "expression": "0 0 6 1 * *"
+                            "expression": "0 0 8 1 * *"
                         }
                     ]
                 }
+            }
+        },
+        {
+            "id": "027c389a-01b5-3410-9316-c49105423179",
+            "name": "open input",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                220,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{openBody:(() => {const b = {deployment:\"release_n8n\", port:{none:true}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; b.idempotencyKey=$execution.id; return b;})()}}];",
+                "mode": "runOnceForAllItems"
             }
         },
         {
@@ -27,7 +41,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                220,
+                440,
                 0
             ],
             "parameters": {
@@ -37,7 +51,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ (() => {const b = {deployment:\"release_n8n\", port:{none:true}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; b.idempotencyKey=$execution.id; if (($('trigger').first().json.body || $('trigger').first().json).at) b.port.at=($('trigger').first().json.body || $('trigger').first().json).at; return b;})() }}",
+                "jsonBody": "={{ $(\"open input\").first().json.openBody }}",
                 "options": {
                     "response": {
                         "response": {
@@ -61,7 +75,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                440,
+                660,
                 0
             ],
             "parameters": {
@@ -70,12 +84,26 @@
             }
         },
         {
-            "id": "f61135d3-6747-3e0d-8e49-dfb479c69320",
-            "name": "replayed",
+            "id": "ca756a68-2c18-3cd9-bd5c-c15f97a104f3",
+            "name": "fresh run",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                880,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{started:Date.now()}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "8d817f56-03c2-3017-9353-707ffd611b92",
+            "name": "claimed",
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                660,
+                1100,
                 0
             ],
             "parameters": {
@@ -88,7 +116,7 @@
                     },
                     "conditions": [
                         {
-                            "leftValue": "={{ $json.body.replayed === true }}",
+                            "leftValue": "={{ $json.statusCode === 201 }}",
                             "rightValue": true,
                             "operator": {
                                 "type": "boolean",
@@ -102,16 +130,220 @@
             }
         },
         {
-            "id": "ca756a68-2c18-3cd9-bd5c-c15f97a104f3",
-            "name": "fresh run",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2.0,
+            "id": "f61135d3-6747-3e0d-8e49-dfb479c69320",
+            "name": "replayed",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
             "position": [
-                880,
+                1320,
                 0
             ],
             "parameters": {
-                "jsCode": "return $input.all();",
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ $json.statusCode === 200 && $json.body.replayed === true }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
+            "id": "b13f5331-e507-37f0-8cad-109aa2449bbd",
+            "name": "await handle",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                1540,
+                0
+            ],
+            "parameters": {
+                "jsCode": "if ($json.statusCode !== 202) throw new Error('unexpected Open response'); return [{json:{...$json, started:Date.now()}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "13bc487b-5870-31d7-b149-404dd0c438d0",
+            "name": "handle wait",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                1760,
+                0
+            ],
+            "parameters": {
+                "resume": "timeInterval",
+                "amount": "={{ (() => {const h=$json.headers || {}; const v=h['retry-after'] ?? h['Retry-After']; const n=Number(v); return Number.isFinite(n) && n > 0 ? n : (v && Number.isFinite(Date.parse(v)) ? Math.max(1,Math.ceil((Date.parse(v)-Date.now())/1000)) : 15);})() }}",
+                "unit": "seconds"
+            }
+        },
+        {
+            "id": "65b47c1d-de91-3313-9989-56a4e2adfa90",
+            "name": "handle status",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1980,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "be7af25b-e622-3801-9431-325aa211753f",
+            "name": "check handle",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                2200,
+                0
+            ],
+            "parameters": {
+                "jsCode": "if(!['closed','waiting','failed','abandoned'].includes($json.body.status) && Date.now() - $(\"await handle\").first().json.started > 1920000) throw new Error('live handle polling timed out'); return $input.all();",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "994f9de0-c9df-374a-8ba9-f18f17f8deec",
+            "name": "handle complete",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                2420,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ ['closed','waiting'].includes($json.body.status) }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
+            "id": "e4f2b131-a818-3112-acb1-60829aa4218b",
+            "name": "handle abandoned",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                2640,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ ['abandoned','failed'].includes($json.body.status) }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
+            "id": "91598826-49a5-3f13-8eab-7e82e7ee230c",
+            "name": "reopen",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2860,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/recipes/winback/runs\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ $(\"open input\").first().json.openBody }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "e5693381-8409-3832-b35a-314745b6f565",
+            "name": "check reopen",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                3080,
+                0
+            ],
+            "parameters": {
+                "jsCode": "if ($json.statusCode !== 201) throw new Error('re-open did not claim run (second live handle)'); return $input.all();",
                 "mode": "runOnceForAllItems"
             }
         },
@@ -121,11 +353,11 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                1100,
+                3300,
                 0
             ],
             "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/candidates\" }}",
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/parts/candidates\" }}",
                 "method": "POST",
                 "authentication": "genericCredentialType",
                 "genericAuthType": "httpBearerAuth",
@@ -150,16 +382,16 @@
             "maxTries": 3
         },
         {
-            "id": "be1e6745-8877-3bbc-a4f1-0bc5ed09e982",
-            "name": "channel_sales",
+            "id": "0ba9beb2-24f7-32ad-993b-ce68d3a084cf",
+            "name": "context channel_sales",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                1320,
+                3520,
                 0
             ],
             "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/channel_sales\" }}",
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/parts/channel_sales\" }}",
                 "method": "POST",
                 "authentication": "genericCredentialType",
                 "genericAuthType": "httpBearerAuth",
@@ -184,16 +416,16 @@
             "maxTries": 3
         },
         {
-            "id": "66aac883-2dec-3eb9-bdfb-ae505ae86eac",
-            "name": "demographics",
+            "id": "f797ad87-5942-37bf-92b0-a10ad3e30920",
+            "name": "context demographics",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                1540,
+                3740,
                 0
             ],
             "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/demographics\" }}",
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/parts/demographics\" }}",
                 "method": "POST",
                 "authentication": "genericCredentialType",
                 "genericAuthType": "httpBearerAuth",
@@ -218,16 +450,16 @@
             "maxTries": 3
         },
         {
-            "id": "67c311bb-f267-311e-9384-395016475262",
-            "name": "prior_mail",
+            "id": "ba05714b-9ea6-3e86-a6d9-91bbdc08079a",
+            "name": "context prior_mail",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                1760,
+                3960,
                 0
             ],
             "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/prior_mail\" }}",
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/parts/prior_mail\" }}",
                 "method": "POST",
                 "authentication": "genericCredentialType",
                 "genericAuthType": "httpBearerAuth",
@@ -257,11 +489,11 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                1980,
+                4180,
                 0
             ],
             "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/decision\" }}",
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/parts/decision\" }}",
                 "method": "POST",
                 "authentication": "genericCredentialType",
                 "genericAuthType": "httpBearerAuth",
@@ -291,11 +523,11 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                2200,
+                4400,
                 0
             ],
             "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/evaluate\" }}",
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/evaluate\" }}",
                 "method": "POST",
                 "authentication": "genericCredentialType",
                 "genericAuthType": "httpBearerAuth",
@@ -325,11 +557,11 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                2420,
+                4620,
                 0
             ],
             "parameters": {
-                "jsCode": "if ($runIndex > 120) throw new Error('evaluation polling timed out'); const b=$input.first().json.body; if (['failed','abandoned','waiting'].includes(b.status)) throw new Error('evaluation refused'); return $input.all();",
+                "jsCode": "if (Date.now() - $(\"fresh run\").first().json.started > 1920000) throw new Error('evaluation polling timed out'); const b=$input.first().json.body; if (['failed','abandoned','waiting'].includes(b.status)) throw new Error('evaluation refused'); return $input.all();",
                 "mode": "runOnceForAllItems"
             }
         },
@@ -339,7 +571,7 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                2640,
+                4840,
                 0
             ],
             "parameters": {
@@ -371,12 +603,12 @@
             "type": "n8n-nodes-base.wait",
             "typeVersion": 1.1,
             "position": [
-                2860,
+                5060,
                 0
             ],
             "parameters": {
                 "resume": "timeInterval",
-                "amount": 1,
+                "amount": "={{ (() => {const h=$json.headers || {}; const v=h['retry-after'] ?? h['Retry-After']; const n=Number(v); return Number.isFinite(n) && n > 0 ? n : (v && Number.isFinite(Date.parse(v)) ? Math.max(1,Math.ceil((Date.parse(v)-Date.now())/1000)) : 15);})() }}",
                 "unit": "seconds"
             }
         },
@@ -386,11 +618,11 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                3080,
+                5280,
                 0
             ],
             "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"\" }}",
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"\" }}",
                 "method": "GET",
                 "authentication": "genericCredentialType",
                 "genericAuthType": "httpBearerAuth",
@@ -417,7 +649,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                3300,
+                5500,
                 0
             ],
             "parameters": {
@@ -431,11 +663,11 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                3520,
+                5720,
                 0
             ],
             "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"\" }}",
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"\" }}",
                 "method": "GET",
                 "authentication": "genericCredentialType",
                 "genericAuthType": "httpBearerAuth",
@@ -457,12 +689,26 @@
             "maxTries": 3
         },
         {
+            "id": "80e16117-3090-3838-b27a-8f8b4bde8d60",
+            "name": "check actions",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                5940,
+                0
+            ],
+            "parameters": {
+                "jsCode": "if (!Array.isArray($json.body.actions)) throw new Error('run status has no actions field; per-key selection required'); return $input.all();",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
             "id": "fe587673-e2e3-3242-9efb-c88997a5083c",
             "name": "routes loop",
             "type": "n8n-nodes-base.splitInBatches",
             "typeVersion": 3.0,
             "position": [
-                3740,
+                6160,
                 0
             ],
             "parameters": {
@@ -476,7 +722,7 @@
             "type": "n8n-nodes-base.switch",
             "typeVersion": 3.0,
             "position": [
-                3960,
+                6380,
                 0
             ],
             "parameters": {
@@ -539,340 +785,8 @@
             }
         },
         {
-            "id": "474961e9-2cb3-3234-8ade-5f1701bd06ed",
-            "name": "premium rows",
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 4.2,
-            "position": [
-                4180,
-                0
-            ],
-            "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/premium\" }}",
-                "method": "GET",
-                "authentication": "genericCredentialType",
-                "genericAuthType": "httpBearerAuth",
-                "options": {
-                    "response": {
-                        "response": {
-                            "responseFormat": "json",
-                            "fullResponse": true
-                        }
-                    },
-                    "pagination": {
-                        "pagination": {
-                            "paginationMode": "updateAParameterInEachRequest",
-                            "parameters": {
-                                "parameters": [
-                                    {
-                                        "type": "qs",
-                                        "name": "offset",
-                                        "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
-                                    },
-                                    {
-                                        "type": "qs",
-                                        "name": "limit",
-                                        "value": "1000"
-                                    }
-                                ]
-                            },
-                            "paginationCompleteWhen": "other",
-                            "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
-                            "limitPagesFetched": true,
-                            "maxRequests": 10000
-                        }
-                    }
-                }
-            },
-            "credentials": {
-                "httpBearerAuth": {
-                    "name": "tatrman-automation"
-                }
-            },
-            "retryOnFail": true,
-            "maxTries": 3
-        },
-        {
-            "id": "98b09fcb-896b-34a6-8e65-f0ee2eb6425e",
-            "name": "premium collect",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2.0,
-            "position": [
-                4400,
-                0
-            ],
-            "parameters": {
-                "jsCode": "const rows = $input.all().flatMap(i => i.json.body?.rows || i.json.rows || []); return [{json:{rows}}];",
-                "mode": "runOnceForAllItems"
-            }
-        },
-        {
-            "id": "2c93a617-792e-3184-9ede-b34a38ffb5d0",
-            "name": "premium notify",
-            "type": "n8n-nodes-base.emailSend",
-            "typeVersion": 2.1,
-            "position": [
-                4620,
-                0
-            ],
-            "parameters": {
-                "fromEmail": "={{ $env.TTR_MAIL_FROM }}",
-                "toEmail": "={{ JSON.parse($env.TTR_MAIL_RECIPIENTS || '{}')[\"customer.email\"] || \"customer.email\" }}",
-                "subject": "Tatrman winback_monthly",
-                "emailFormat": "text",
-                "text": "={{ JSON.stringify(($(\"premium collect\").isExecuted ? $(\"premium collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))), null, 2) }}",
-                "options": {
-                    "appendAttribution": false
-                }
-            },
-            "credentials": {
-                "smtp": {
-                    "name": "tatrman-mail"
-                }
-            }
-        },
-        {
-            "id": "769b6eb1-2239-3a24-bc8e-99ca661774ad",
-            "name": "premium notify deliver",
-            "type": "n8n-nodes-base.if",
-            "typeVersion": 2.2,
-            "position": [
-                4840,
-                0
-            ],
-            "parameters": {
-                "conditions": {
-                    "options": {
-                        "caseSensitive": true,
-                        "leftValue": "",
-                        "typeValidation": "strict",
-                        "version": 2
-                    },
-                    "conditions": [
-                        {
-                            "leftValue": "={{ !$(\"action status\").first().json.body.dryRun && ($(\"premium collect\").isExecuted ? $(\"premium collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))).length > 0 }}",
-                            "rightValue": true,
-                            "operator": {
-                                "type": "boolean",
-                                "operation": "true",
-                                "singleValue": true
-                            }
-                        }
-                    ],
-                    "combinator": "and"
-                }
-            }
-        },
-        {
-            "id": "bf21b610-1279-3e38-9b89-d9a599d52833",
-            "name": "premium notify outcome",
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 4.2,
-            "position": [
-                5060,
-                0
-            ],
-            "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/notify/outcome\" }}",
-                "method": "POST",
-                "authentication": "genericCredentialType",
-                "genericAuthType": "httpBearerAuth",
-                "sendBody": true,
-                "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:($(\"premium collect\").isExecuted ? $(\"premium collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))).map(r => r[\"customer_sk\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
-                "options": {
-                    "response": {
-                        "response": {
-                            "responseFormat": "json",
-                            "fullResponse": true
-                        }
-                    }
-                }
-            },
-            "credentials": {
-                "httpBearerAuth": {
-                    "name": "tatrman-automation"
-                }
-            },
-            "retryOnFail": true,
-            "maxTries": 3
-        },
-        {
-            "id": "c1519c34-4979-3f46-b4cc-71ed0855221a",
-            "name": "premium notify complete",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2.0,
-            "position": [
-                5280,
-                0
-            ],
-            "parameters": {
-                "jsCode": "return [{json:{}}];",
-                "mode": "runOnceForAllItems"
-            }
-        },
-        {
-            "id": "4a45cda7-83a8-3d51-950e-46d6987ef71f",
-            "name": "premium record_mailed",
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 4.2,
-            "position": [
-                5500,
-                0
-            ],
-            "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/record_mailed/perform\" }}",
-                "method": "POST",
-                "authentication": "genericCredentialType",
-                "genericAuthType": "httpBearerAuth",
-                "sendBody": true,
-                "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"premium collect\").isExecuted ? $(\"premium collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
-                "options": {
-                    "response": {
-                        "response": {
-                            "responseFormat": "json",
-                            "fullResponse": true
-                        }
-                    }
-                }
-            },
-            "credentials": {
-                "httpBearerAuth": {
-                    "name": "tatrman-automation"
-                }
-            },
-            "retryOnFail": true,
-            "maxTries": 3
-        },
-        {
-            "id": "8fe25387-ad7f-3b4a-a197-3122da10b5ef",
-            "name": "regular rows",
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 4.2,
-            "position": [
-                5720,
-                0
-            ],
-            "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/regular\" }}",
-                "method": "GET",
-                "authentication": "genericCredentialType",
-                "genericAuthType": "httpBearerAuth",
-                "options": {
-                    "response": {
-                        "response": {
-                            "responseFormat": "json",
-                            "fullResponse": true
-                        }
-                    },
-                    "pagination": {
-                        "pagination": {
-                            "paginationMode": "updateAParameterInEachRequest",
-                            "parameters": {
-                                "parameters": [
-                                    {
-                                        "type": "qs",
-                                        "name": "offset",
-                                        "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
-                                    },
-                                    {
-                                        "type": "qs",
-                                        "name": "limit",
-                                        "value": "1000"
-                                    }
-                                ]
-                            },
-                            "paginationCompleteWhen": "other",
-                            "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
-                            "limitPagesFetched": true,
-                            "maxRequests": 10000
-                        }
-                    }
-                }
-            },
-            "credentials": {
-                "httpBearerAuth": {
-                    "name": "tatrman-automation"
-                }
-            },
-            "retryOnFail": true,
-            "maxTries": 3
-        },
-        {
-            "id": "cd0e7f60-6447-38b9-838d-b031f75b0961",
-            "name": "regular collect",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2.0,
-            "position": [
-                5940,
-                0
-            ],
-            "parameters": {
-                "jsCode": "const rows = $input.all().flatMap(i => i.json.body?.rows || i.json.rows || []); return [{json:{rows}}];",
-                "mode": "runOnceForAllItems"
-            }
-        },
-        {
-            "id": "cc819cbb-530c-3ee7-bf8e-3a17b28691f0",
-            "name": "regular notify",
-            "type": "n8n-nodes-base.emailSend",
-            "typeVersion": 2.1,
-            "position": [
-                6160,
-                0
-            ],
-            "parameters": {
-                "fromEmail": "={{ $env.TTR_MAIL_FROM }}",
-                "toEmail": "={{ JSON.parse($env.TTR_MAIL_RECIPIENTS || '{}')[\"customer.email\"] || \"customer.email\" }}",
-                "subject": "Tatrman winback_monthly",
-                "emailFormat": "text",
-                "text": "={{ JSON.stringify(($(\"regular collect\").isExecuted ? $(\"regular collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))), null, 2) }}",
-                "options": {
-                    "appendAttribution": false
-                }
-            },
-            "credentials": {
-                "smtp": {
-                    "name": "tatrman-mail"
-                }
-            }
-        },
-        {
-            "id": "9e11ccc2-2f52-3118-9659-8a5dc073022e",
-            "name": "regular notify deliver",
-            "type": "n8n-nodes-base.if",
-            "typeVersion": 2.2,
-            "position": [
-                6380,
-                0
-            ],
-            "parameters": {
-                "conditions": {
-                    "options": {
-                        "caseSensitive": true,
-                        "leftValue": "",
-                        "typeValidation": "strict",
-                        "version": 2
-                    },
-                    "conditions": [
-                        {
-                            "leftValue": "={{ !$(\"action status\").first().json.body.dryRun && ($(\"regular collect\").isExecuted ? $(\"regular collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))).length > 0 }}",
-                            "rightValue": true,
-                            "operator": {
-                                "type": "boolean",
-                                "operation": "true",
-                                "singleValue": true
-                            }
-                        }
-                    ],
-                    "combinator": "and"
-                }
-            }
-        },
-        {
-            "id": "d3d8b9ca-ffde-3c22-93fd-55ba0dc4029a",
-            "name": "regular notify outcome",
+            "id": "11db1334-b77b-3e61-bf8c-ff6451fcfb9f",
+            "name": "route premium rows",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
@@ -880,13 +794,168 @@
                 0
             ],
             "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/notify/outcome\" }}",
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/routes/premium\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    },
+                    "pagination": {
+                        "pagination": {
+                            "paginationMode": "updateAParameterInEachRequest",
+                            "parameters": {
+                                "parameters": [
+                                    {
+                                        "type": "qs",
+                                        "name": "offset",
+                                        "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
+                                    },
+                                    {
+                                        "type": "qs",
+                                        "name": "limit",
+                                        "value": "1000"
+                                    }
+                                ]
+                            },
+                            "paginationCompleteWhen": "other",
+                            "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
+                            "limitPagesFetched": true,
+                            "maxRequests": 10000
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "b4568f25-e50d-3d0d-b32d-e1c5c389f982",
+            "name": "route premium collect",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                6820,
+                0
+            ],
+            "parameters": {
+                "jsCode": "const rows = $input.all().flatMap(i => i.json.body?.rows || i.json.rows || []); return [{json:{rows}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "b6ca7425-4122-328b-b932-527f95d189c2",
+            "name": "action premium notify groups",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                7040,
+                0
+            ],
+            "parameters": {
+                "jsCode": "const rows=($(\"route premium collect\").isExecuted ? $(\"route premium collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))); const groups=new Map(); for(const row of rows) {const to=(() => {const to=row[\"email\"]; if(typeof to !== 'string' || !to.trim()) throw new Error('no address for key ' + JSON.stringify([row[\"customer_sk\"]])); return to;})(); if(!groups.has(to)) groups.set(to,[]); groups.get(to).push(row);} return [{json:{groups:groups.size ? [...groups].map(([to,rows])=>({to,rows})) : [{to:null,rows:[]}]}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "91b4fa3c-c950-3ac7-a727-3042e77b89d6",
+            "name": "action premium notify split",
+            "type": "n8n-nodes-base.splitOut",
+            "typeVersion": 1.0,
+            "position": [
+                7260,
+                0
+            ],
+            "parameters": {
+                "fieldToSplitOut": "groups",
+                "options": {
+                    "destinationFieldName": "mail"
+                }
+            }
+        },
+        {
+            "id": "edb1b55a-f0a7-37e4-adce-aa4f631ebad0",
+            "name": "action premium notify",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2.1,
+            "position": [
+                7480,
+                0
+            ],
+            "parameters": {
+                "fromEmail": "={{ $env.TTR_MAIL_FROM }}",
+                "toEmail": "={{ $(\"action premium notify split\").item.json.mail.to }}",
+                "subject": "Tatrman winback_monthly",
+                "emailFormat": "text",
+                "text": "={{ JSON.stringify($(\"action premium notify split\").item.json.mail.rows, null, 2) }}",
+                "options": {
+                    "appendAttribution": false
+                }
+            },
+            "credentials": {
+                "smtp": {
+                    "name": "tatrman-mail"
+                }
+            }
+        },
+        {
+            "id": "c91329e4-27e8-3efb-91ed-1db959a5cdaf",
+            "name": "action premium notify deliver",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                7700,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ false === false && $(\"action status\").first().json.body.dryRun === false && $json.mail.rows.length > 0 }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
+            "id": "15b089ff-094e-3a60-8a39-18c3cfdecc4a",
+            "name": "action premium notify outcome",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                7920,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/actions/notify/outcome\" }}",
                 "method": "POST",
                 "authentication": "genericCredentialType",
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:($(\"regular collect\").isExecuted ? $(\"regular collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))).map(r => r[\"customer_sk\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                "jsonBody": "={{ {outcomes:$(\"action premium notify split\").item.json.mail.rows.map(r => ({key:r[\"customer_sk\"],status:'delivered',at:new Date().toISOString()}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -905,12 +974,12 @@
             "maxTries": 3
         },
         {
-            "id": "183a2c5f-6403-39f9-9690-8a843c67c634",
-            "name": "regular notify complete",
+            "id": "d3675eaf-0f05-30df-8d33-ba9607d37fe2",
+            "name": "action premium notify complete",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                6820,
+                8140,
                 0
             ],
             "parameters": {
@@ -919,22 +988,22 @@
             }
         },
         {
-            "id": "d19e3a4a-2888-36a6-a3cb-e84aaf74eaca",
-            "name": "regular record_mailed",
+            "id": "4a9eb3ad-1607-3660-a005-baff85303902",
+            "name": "action premium record_mailed",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                7040,
+                8360,
                 0
             ],
             "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/record_mailed/perform\" }}",
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/actions/record_mailed/perform\" }}",
                 "method": "POST",
                 "authentication": "genericCredentialType",
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"regular collect\").isExecuted ? $(\"regular collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route premium collect\").isExecuted ? $(\"route premium collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -953,16 +1022,281 @@
             "maxTries": 3
         },
         {
+            "id": "a752ceba-b171-3c14-8580-2f1a40e8e4ec",
+            "name": "route regular rows",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                8580,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/routes/regular\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    },
+                    "pagination": {
+                        "pagination": {
+                            "paginationMode": "updateAParameterInEachRequest",
+                            "parameters": {
+                                "parameters": [
+                                    {
+                                        "type": "qs",
+                                        "name": "offset",
+                                        "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
+                                    },
+                                    {
+                                        "type": "qs",
+                                        "name": "limit",
+                                        "value": "1000"
+                                    }
+                                ]
+                            },
+                            "paginationCompleteWhen": "other",
+                            "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
+                            "limitPagesFetched": true,
+                            "maxRequests": 10000
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "8b8c58f9-032e-3ec0-8f01-26515073b7d7",
+            "name": "route regular collect",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                8800,
+                0
+            ],
+            "parameters": {
+                "jsCode": "const rows = $input.all().flatMap(i => i.json.body?.rows || i.json.rows || []); return [{json:{rows}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "5428fd50-0b26-3104-9d51-ea4b3a94cf4c",
+            "name": "action regular notify groups",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                9020,
+                0
+            ],
+            "parameters": {
+                "jsCode": "const rows=($(\"route regular collect\").isExecuted ? $(\"route regular collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))); const groups=new Map(); for(const row of rows) {const to=(() => {const to=row[\"email\"]; if(typeof to !== 'string' || !to.trim()) throw new Error('no address for key ' + JSON.stringify([row[\"customer_sk\"]])); return to;})(); if(!groups.has(to)) groups.set(to,[]); groups.get(to).push(row);} return [{json:{groups:groups.size ? [...groups].map(([to,rows])=>({to,rows})) : [{to:null,rows:[]}]}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "ef2ef553-d9d7-3905-903e-18d84e820879",
+            "name": "action regular notify split",
+            "type": "n8n-nodes-base.splitOut",
+            "typeVersion": 1.0,
+            "position": [
+                9240,
+                0
+            ],
+            "parameters": {
+                "fieldToSplitOut": "groups",
+                "options": {
+                    "destinationFieldName": "mail"
+                }
+            }
+        },
+        {
+            "id": "632ce15e-e985-3324-9ab3-fe2b1193f359",
+            "name": "action regular notify",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2.1,
+            "position": [
+                9460,
+                0
+            ],
+            "parameters": {
+                "fromEmail": "={{ $env.TTR_MAIL_FROM }}",
+                "toEmail": "={{ $(\"action regular notify split\").item.json.mail.to }}",
+                "subject": "Tatrman winback_monthly",
+                "emailFormat": "text",
+                "text": "={{ JSON.stringify($(\"action regular notify split\").item.json.mail.rows, null, 2) }}",
+                "options": {
+                    "appendAttribution": false
+                }
+            },
+            "credentials": {
+                "smtp": {
+                    "name": "tatrman-mail"
+                }
+            }
+        },
+        {
+            "id": "c3e4d2fa-548d-3b4d-bfe5-ae64d9133ad0",
+            "name": "action regular notify deliver",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                9680,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ false === false && $(\"action status\").first().json.body.dryRun === false && $json.mail.rows.length > 0 }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
+            "id": "09ffeb6f-1ffb-346b-8aea-11a6b5ca288b",
+            "name": "action regular notify outcome",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                9900,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/actions/notify/outcome\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {outcomes:$(\"action regular notify split\").item.json.mail.rows.map(r => ({key:r[\"customer_sk\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "e3d39fb0-0659-367c-a392-d5923dda450f",
+            "name": "action regular notify complete",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                10120,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "b9264114-9efa-31c8-a61c-ff23fe70d4c6",
+            "name": "action regular record_mailed",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                10340,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/actions/record_mailed/perform\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {keys:($(\"route regular collect\").isExecuted ? $(\"route regular collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "8f456247-f415-359b-9df8-c3f586261e65",
+            "name": "routes complete",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                10560,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "b164e919-292c-3081-80fd-5abf83303566",
+            "name": "close input",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                10780,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
             "id": "716f6b30-598b-3309-85d8-4485e61c1027",
             "name": "close",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                7260,
+                11000,
                 0
             ],
             "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/close\" }}",
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/close\" }}",
                 "method": "POST",
                 "authentication": "genericCredentialType",
                 "genericAuthType": "httpBearerAuth",
@@ -992,7 +1326,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                7480,
+                11220,
                 0
             ],
             "parameters": {
@@ -1002,8 +1336,37 @@
         }
     ],
     "connections": {
+        "open input": {
+            "main": [
+                [
+                    {
+                        "node": "open",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
         "open": {
             "main": [
+                [
+                    {
+                        "node": "claimed",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "claimed": {
+            "main": [
+                [
+                    {
+                        "node": "fresh run",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
                 [
                     {
                         "node": "replayed",
@@ -1022,6 +1385,108 @@
                         "index": 0
                     }
                 ],
+                [
+                    {
+                        "node": "await handle",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "await handle": {
+            "main": [
+                [
+                    {
+                        "node": "handle wait",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "handle wait": {
+            "main": [
+                [
+                    {
+                        "node": "handle status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "handle status": {
+            "main": [
+                [
+                    {
+                        "node": "check handle",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "check handle": {
+            "main": [
+                [
+                    {
+                        "node": "handle complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "handle complete": {
+            "main": [
+                [
+                    {
+                        "node": "run complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "handle abandoned",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "handle abandoned": {
+            "main": [
+                [
+                    {
+                        "node": "reopen",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "handle wait",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "reopen": {
+            "main": [
+                [
+                    {
+                        "node": "check reopen",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "check reopen": {
+            "main": [
                 [
                     {
                         "node": "fresh run",
@@ -1046,36 +1511,36 @@
             "main": [
                 [
                     {
-                        "node": "channel_sales",
+                        "node": "context channel_sales",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "channel_sales": {
+        "context channel_sales": {
             "main": [
                 [
                     {
-                        "node": "demographics",
+                        "node": "context demographics",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "demographics": {
+        "context demographics": {
             "main": [
                 [
                     {
-                        "node": "prior_mail",
+                        "node": "context prior_mail",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "prior_mail": {
+        "context prior_mail": {
             "main": [
                 [
                     {
@@ -1163,6 +1628,17 @@
             "main": [
                 [
                     {
+                        "node": "check actions",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "check actions": {
+            "main": [
+                [
+                    {
                         "node": "route items",
                         "type": "main",
                         "index": 0
@@ -1185,7 +1661,7 @@
             "main": [
                 [
                     {
-                        "node": "close",
+                        "node": "routes complete",
                         "type": "main",
                         "index": 0
                     }
@@ -1203,14 +1679,14 @@
             "main": [
                 [
                     {
-                        "node": "premium rows",
+                        "node": "route premium rows",
                         "type": "main",
                         "index": 0
                     }
                 ],
                 [
                     {
-                        "node": "regular rows",
+                        "node": "route regular rows",
                         "type": "main",
                         "index": 0
                     }
@@ -1224,80 +1700,102 @@
                 ]
             ]
         },
-        "premium rows": {
+        "route premium rows": {
             "main": [
                 [
                     {
-                        "node": "premium collect",
+                        "node": "route premium collect",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "premium collect": {
+        "route premium collect": {
             "main": [
                 [
                     {
-                        "node": "premium notify deliver",
+                        "node": "action premium notify groups",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "premium notify deliver": {
+        "action premium notify groups": {
             "main": [
                 [
                     {
-                        "node": "premium notify",
+                        "node": "action premium notify split",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "action premium notify split": {
+            "main": [
+                [
+                    {
+                        "node": "action premium notify deliver",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "action premium notify deliver": {
+            "main": [
+                [
+                    {
+                        "node": "action premium notify",
                         "type": "main",
                         "index": 0
                     }
                 ],
                 [
                     {
-                        "node": "premium notify complete",
+                        "node": "action premium notify complete",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "premium notify": {
+        "action premium notify": {
             "main": [
                 [
                     {
-                        "node": "premium notify outcome",
+                        "node": "action premium notify outcome",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "premium notify outcome": {
+        "action premium notify outcome": {
             "main": [
                 [
                     {
-                        "node": "premium notify complete",
+                        "node": "action premium notify complete",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "premium notify complete": {
+        "action premium notify complete": {
             "main": [
                 [
                     {
-                        "node": "premium record_mailed",
+                        "node": "action premium record_mailed",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "premium record_mailed": {
+        "action premium record_mailed": {
             "main": [
                 [
                     {
@@ -1308,84 +1806,128 @@
                 ]
             ]
         },
-        "regular rows": {
+        "route regular rows": {
             "main": [
                 [
                     {
-                        "node": "regular collect",
+                        "node": "route regular collect",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "regular collect": {
+        "route regular collect": {
             "main": [
                 [
                     {
-                        "node": "regular notify deliver",
+                        "node": "action regular notify groups",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "regular notify deliver": {
+        "action regular notify groups": {
             "main": [
                 [
                     {
-                        "node": "regular notify",
+                        "node": "action regular notify split",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "action regular notify split": {
+            "main": [
+                [
+                    {
+                        "node": "action regular notify deliver",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "action regular notify deliver": {
+            "main": [
+                [
+                    {
+                        "node": "action regular notify",
                         "type": "main",
                         "index": 0
                     }
                 ],
                 [
                     {
-                        "node": "regular notify complete",
+                        "node": "action regular notify complete",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "regular notify": {
+        "action regular notify": {
             "main": [
                 [
                     {
-                        "node": "regular notify outcome",
+                        "node": "action regular notify outcome",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "regular notify outcome": {
+        "action regular notify outcome": {
             "main": [
                 [
                     {
-                        "node": "regular notify complete",
+                        "node": "action regular notify complete",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "regular notify complete": {
+        "action regular notify complete": {
             "main": [
                 [
                     {
-                        "node": "regular record_mailed",
+                        "node": "action regular record_mailed",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "regular record_mailed": {
+        "action regular record_mailed": {
             "main": [
                 [
                     {
                         "node": "routes loop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "routes complete": {
+            "main": [
+                [
+                    {
+                        "node": "close input",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "close input": {
+            "main": [
+                [
+                    {
+                        "node": "close",
                         "type": "main",
                         "index": 0
                     }
@@ -1407,7 +1949,7 @@
             "main": [
                 [
                     {
-                        "node": "open",
+                        "node": "open input",
                         "type": "main",
                         "index": 0
                     }
@@ -1428,7 +1970,7 @@
     },
     "settings": {
         "executionOrder": "v1",
-        "timezone": "UTC"
+        "timezone": "Europe/Prague"
     },
     "active": false,
     "pinData": {},
@@ -1460,7 +2002,66 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ (() => {const b = {deployment:\"release_n8n\", port:{none:true}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; b.idempotencyKey=$execution.id; if (($('trigger').first().json.body || $('trigger').first().json).at) b.port.at=($('trigger').first().json.body || $('trigger').first().json).at; return b;})() }}",
+                        "jsonBody": "={{ $(\"open input\").first().json.openBody }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                },
+                {
+                    "node": "handle status",
+                    "name": "status",
+                    "method": "GET",
+                    "path": "/automation/runs/{id}",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"\" }}",
+                        "method": "GET",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                },
+                {
+                    "node": "reopen",
+                    "name": "open",
+                    "method": "POST",
+                    "path": "/automation/recipes/winback/runs",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/recipes/winback/runs\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ $(\"open input\").first().json.openBody }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -1485,7 +2086,7 @@
                         "customer.customer_sk"
                     ],
                     "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/candidates\" }}",
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/parts/candidates\" }}",
                         "method": "POST",
                         "authentication": "genericCredentialType",
                         "genericAuthType": "httpBearerAuth",
@@ -1507,7 +2108,7 @@
                     "part": "candidates"
                 },
                 {
-                    "node": "channel_sales",
+                    "node": "context channel_sales",
                     "name": "part",
                     "method": "POST",
                     "path": "/automation/runs/{id}/parts/channel_sales",
@@ -1519,7 +2120,7 @@
                         "customer.customer_sk"
                     ],
                     "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/channel_sales\" }}",
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/parts/channel_sales\" }}",
                         "method": "POST",
                         "authentication": "genericCredentialType",
                         "genericAuthType": "httpBearerAuth",
@@ -1541,7 +2142,7 @@
                     "part": "channel_sales"
                 },
                 {
-                    "node": "demographics",
+                    "node": "context demographics",
                     "name": "part",
                     "method": "POST",
                     "path": "/automation/runs/{id}/parts/demographics",
@@ -1553,7 +2154,7 @@
                         "customer.customer_sk"
                     ],
                     "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/demographics\" }}",
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/parts/demographics\" }}",
                         "method": "POST",
                         "authentication": "genericCredentialType",
                         "genericAuthType": "httpBearerAuth",
@@ -1575,7 +2176,7 @@
                     "part": "demographics"
                 },
                 {
-                    "node": "prior_mail",
+                    "node": "context prior_mail",
                     "name": "part",
                     "method": "POST",
                     "path": "/automation/runs/{id}/parts/prior_mail",
@@ -1587,7 +2188,7 @@
                         "customer.customer_sk"
                     ],
                     "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/prior_mail\" }}",
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/parts/prior_mail\" }}",
                         "method": "POST",
                         "authentication": "genericCredentialType",
                         "genericAuthType": "httpBearerAuth",
@@ -1621,7 +2222,7 @@
                         "customer.customer_sk"
                     ],
                     "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/decision\" }}",
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/parts/decision\" }}",
                         "method": "POST",
                         "authentication": "genericCredentialType",
                         "genericAuthType": "httpBearerAuth",
@@ -1655,7 +2256,7 @@
                         "customer.customer_sk"
                     ],
                     "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/evaluate\" }}",
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/evaluate\" }}",
                         "method": "POST",
                         "authentication": "genericCredentialType",
                         "genericAuthType": "httpBearerAuth",
@@ -1686,7 +2287,7 @@
                         "customer.customer_sk"
                     ],
                     "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"\" }}",
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"\" }}",
                         "method": "GET",
                         "authentication": "genericCredentialType",
                         "genericAuthType": "httpBearerAuth",
@@ -1714,7 +2315,7 @@
                         "customer.customer_sk"
                     ],
                     "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"\" }}",
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"\" }}",
                         "method": "GET",
                         "authentication": "genericCredentialType",
                         "genericAuthType": "httpBearerAuth",
@@ -1730,7 +2331,7 @@
                     "arguments": {}
                 },
                 {
-                    "node": "premium rows",
+                    "node": "route premium rows",
                     "name": "route",
                     "method": "GET",
                     "path": "/automation/runs/{id}/routes/premium",
@@ -1742,7 +2343,7 @@
                         "customer.customer_sk"
                     ],
                     "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/premium\" }}",
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/routes/premium\" }}",
                         "method": "GET",
                         "authentication": "genericCredentialType",
                         "genericAuthType": "httpBearerAuth",
@@ -1784,7 +2385,7 @@
                     "route": "premium"
                 },
                 {
-                    "node": "premium notify outcome",
+                    "node": "action premium notify outcome",
                     "name": "outcome",
                     "method": "POST",
                     "path": "/automation/runs/{id}/actions/notify/outcome",
@@ -1796,13 +2397,13 @@
                         "customer.customer_sk"
                     ],
                     "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/notify/outcome\" }}",
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/actions/notify/outcome\" }}",
                         "method": "POST",
                         "authentication": "genericCredentialType",
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:($(\"premium collect\").isExecuted ? $(\"premium collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))).map(r => r[\"customer_sk\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:$(\"action premium notify split\").item.json.mail.rows.map(r => ({key:r[\"customer_sk\"],status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -1818,7 +2419,7 @@
                     "action": "notify"
                 },
                 {
-                    "node": "premium record_mailed",
+                    "node": "action premium record_mailed",
                     "name": "perform",
                     "method": "POST",
                     "path": "/automation/runs/{id}/actions/record_mailed/perform",
@@ -1830,13 +2431,13 @@
                         "customer.customer_sk"
                     ],
                     "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/record_mailed/perform\" }}",
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/actions/record_mailed/perform\" }}",
                         "method": "POST",
                         "authentication": "genericCredentialType",
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"premium collect\").isExecuted ? $(\"premium collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route premium collect\").isExecuted ? $(\"route premium collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -1852,7 +2453,7 @@
                     "action": "record_mailed"
                 },
                 {
-                    "node": "regular rows",
+                    "node": "route regular rows",
                     "name": "route",
                     "method": "GET",
                     "path": "/automation/runs/{id}/routes/regular",
@@ -1864,7 +2465,7 @@
                         "customer.customer_sk"
                     ],
                     "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/regular\" }}",
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/routes/regular\" }}",
                         "method": "GET",
                         "authentication": "genericCredentialType",
                         "genericAuthType": "httpBearerAuth",
@@ -1906,7 +2507,7 @@
                     "route": "regular"
                 },
                 {
-                    "node": "regular notify outcome",
+                    "node": "action regular notify outcome",
                     "name": "outcome",
                     "method": "POST",
                     "path": "/automation/runs/{id}/actions/notify/outcome",
@@ -1918,13 +2519,13 @@
                         "customer.customer_sk"
                     ],
                     "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/notify/outcome\" }}",
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/actions/notify/outcome\" }}",
                         "method": "POST",
                         "authentication": "genericCredentialType",
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:($(\"regular collect\").isExecuted ? $(\"regular collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))).map(r => r[\"customer_sk\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:$(\"action regular notify split\").item.json.mail.rows.map(r => ({key:r[\"customer_sk\"],status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -1940,7 +2541,7 @@
                     "action": "notify"
                 },
                 {
-                    "node": "regular record_mailed",
+                    "node": "action regular record_mailed",
                     "name": "perform",
                     "method": "POST",
                     "path": "/automation/runs/{id}/actions/record_mailed/perform",
@@ -1952,13 +2553,13 @@
                         "customer.customer_sk"
                     ],
                     "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/record_mailed/perform\" }}",
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/actions/record_mailed/perform\" }}",
                         "method": "POST",
                         "authentication": "genericCredentialType",
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"regular collect\").isExecuted ? $(\"regular collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route regular collect\").isExecuted ? $(\"route regular collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -1986,7 +2587,7 @@
                         "customer.customer_sk"
                     ],
                     "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/close\" }}",
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/close\" }}",
                         "method": "POST",
                         "authentication": "genericCredentialType",
                         "genericAuthType": "httpBearerAuth",
@@ -2005,6 +2606,31 @@
                     "arguments": {}
                 }
             ],
+            "mail": [
+                {
+                    "node": "action premium notify",
+                    "action": "notify",
+                    "rows": "={{ $(\"action premium notify split\").item.json.mail.rows }}",
+                    "recipient": "={{ $(\"action premium notify split\").item.json.mail.to }}",
+                    "key": [
+                        "customer_sk"
+                    ],
+                    "addressColumn": "to",
+                    "addressKind": "row"
+                },
+                {
+                    "node": "action regular notify",
+                    "action": "notify",
+                    "rows": "={{ $(\"action regular notify split\").item.json.mail.rows }}",
+                    "recipient": "={{ $(\"action regular notify split\").item.json.mail.to }}",
+                    "key": [
+                        "customer_sk"
+                    ],
+                    "addressColumn": "to",
+                    "addressKind": "row"
+                }
+            ],
+            "roles": [],
             "nodeVersions": {
                 "webhook": 2.0,
                 "httpRequest": 4.2,

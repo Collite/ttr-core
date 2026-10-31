@@ -84,6 +84,7 @@ class N8nDryDriver(
             val descriptor = get("/automation/")
             val results = linkedMapOf<String, Expected>()
             val effects = mutableListOf<JsonObject>()
+            val evidenceDiffs = mutableListOf<ReplayDiff>()
             for (recipe in fixture.recipes) {
                 val workflow =
                     workflows.singleOrNull { w ->
@@ -166,6 +167,7 @@ class N8nDryDriver(
                                 val portKey = if (key is JsonArray) JsonObject(keyNames.zip(key).toMap()) else key
                                 put("key", portKey)
                             }
+                            put("at", replayInstant(fixture.asOf))
                         }
                     val executed = execute(workflow, input, fixture, mode)
                     executed["error"]?.takeIf { it != JsonNull }?.let { error(it.jsonPrimitive.content) }
@@ -220,7 +222,7 @@ class N8nDryDriver(
                             }
                         }
                     }
-                    actions +=
+                    val preview =
                         status.getValue("actions").jsonArray.map { raw ->
                             val action = raw.jsonObject
                             buildJsonObject {
@@ -230,6 +232,23 @@ class N8nDryDriver(
                                 put("columns", normalizeArguments(action.getValue("arguments").jsonObject))
                             }
                         }
+                    val observedActions = actionEvidence(executed, preview, keyNames)
+                    actions += observedActions
+                    val expectedCounts = preview.map(ReplayComparator::canonical).groupingBy { it }.eachCount()
+                    val actualCounts = observedActions.map(ReplayComparator::canonical).groupingBy { it }.eachCount()
+                    val missing =
+                        expectedCounts.flatMap { (v, n) ->
+                            List((n - (actualCounts[v] ?: 0)).coerceAtLeast(0)) { v }
+                        }
+                    val extra =
+                        actualCounts.flatMap { (v, n) ->
+                            List((n - (expectedCounts[v] ?: 0)).coerceAtLeast(0)) { v }
+                        }
+                    if (missing.isNotEmpty() ||
+                        extra.isNotEmpty()
+                    ) {
+                        evidenceDiffs += ReplayDiff("$recipe.actions.preview", missing, extra)
+                    }
                     val batch = get("/automation/runs/$id/batch")
                     require(batch["mode"] == JsonPrimitive("preview")) { "batch is not a preview" }
                     effects += batch.getValue("rows").jsonArray.map { it.jsonObject }
@@ -298,8 +317,97 @@ class N8nDryDriver(
                         )
                     }
                 }
-            Observed(results, finalStates)
+            Observed(results, finalStates, evidenceDiffs)
         }
+
+    /** Action membership comes from executed effects, never solely from evaluate's preview. */
+    private fun actionEvidence(
+        executed: JsonObject,
+        preview: List<JsonObject>,
+        keyNames: List<String>,
+    ): List<JsonObject> {
+        fun key(value: JsonElement): JsonElement = if (value is JsonObject) keyOf(value, keyNames) else value
+
+        fun selected(
+            action: JsonElement,
+            value: JsonElement,
+        ): JsonObject {
+            val k = key(value)
+            return preview.singleOrNull {
+                it["action"] == action &&
+                    ReplayComparator.canonical(it.getValue("key")) == ReplayComparator.canonical(k)
+            }
+                ?: buildJsonObject {
+                    put("action", action)
+                    put("key", k)
+                    put("columns", JsonObject(emptyMap()))
+                }
+        }
+        val records = executed.getValue("effects").jsonArray.map { it.jsonObject }
+        val observed = mutableListOf<JsonObject>()
+        records.filter { it["kind"] == JsonPrimitive("perform") }.forEach { record ->
+            val requested =
+                record.getValue("body").jsonObject.getValue("keys").jsonArray.map {
+                    ReplayComparator.canonical(key(it))
+                }
+            record.getValue("response").jsonObject.getValue("performed").jsonArray.forEach { raw ->
+                val k = raw.jsonObject.getValue("key")
+                require(ReplayComparator.canonical(key(k)) in requested) { "perform returned an unrequested key" }
+                observed += selected(record.getValue("action"), k)
+            }
+        }
+        val outcomes =
+            records
+                .filter { it["kind"] == JsonPrimitive("outcome") }
+                .flatMap { record ->
+                    record.getValue("body").jsonObject.getValue("outcomes").jsonArray.map {
+                        record.getValue("action") to
+                            it.jsonObject
+                    }
+                }.toMutableList()
+        executed.getValue("mails").jsonArray.forEach { raw ->
+            val mail = raw.jsonObject
+            val action = mail.getValue("action")
+            mail.getValue("rows").jsonArray.forEach { row ->
+                val k = keyOf(row.jsonObject, keyNames)
+                val outcome =
+                    outcomes.indexOfFirst { (a, o) ->
+                        a == action &&
+                            key(o.getValue("key")) == k &&
+                            o["status"] == JsonPrimitive("delivered")
+                    }
+                if (outcome >= 0) {
+                    outcomes.removeAt(outcome)
+                    var observedMail = selected(action, k)
+                    val columns = observedMail.getValue("columns").jsonObject
+                    val addressColumn = mail.getValue("addressColumn").jsonPrimitive.content
+                    val address = columns[addressColumn]
+                    val expectedRecipient =
+                        if (mail["addressKind"] ==
+                            JsonPrimitive("role")
+                        ) {
+                            address?.jsonPrimitive?.content?.let { JsonPrimitive("dry+$it@example.invalid") }
+                        } else {
+                            address
+                        }
+                    if (expectedRecipient != mail["recipient"]) {
+                        observedMail =
+                            JsonObject(
+                                observedMail + (
+                                    "columns" to
+                                        JsonObject(
+                                            columns + ("to" to mail.getValue("recipient")),
+                                        )
+                                ),
+                            )
+                    }
+                    observed += observedMail
+                }
+            }
+        }
+        // An outcome without an executed mail is not evidence of delivery; duplicate/missing rows disagree.
+        return observed
+    }
 
     private fun execute(
         workflow: JsonObject,
@@ -325,6 +433,7 @@ class N8nDryDriver(
                                     .randomUUID()
                                     .toString(),
                             )
+                            put("replay", true)
                             put("workflow", workflow)
                             put("server", origin)
                             put("token", token)

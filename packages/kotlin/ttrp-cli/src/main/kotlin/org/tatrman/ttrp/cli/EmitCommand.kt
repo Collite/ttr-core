@@ -102,14 +102,40 @@ class EmitCommand : CliktCommand(name = "emit") {
                         programObjects.singleOrNull { it.qname.name == name },
                     ) { "unknown or ambiguous program $name" }
                 }
+            val plugin =
+                EmitPluginLoader.builtin(
+                    org.tatrman.ttrp.graph.capability.RegistryGrid
+                        .executorType(world, deployment),
+                )
+            require(
+                process == null || plugin.supportsProcesses,
+            ) { "${plugin.targetId} does not support process exports" }
             val temp = if (bundlePath == null) Files.createTempDirectory("ttrp-export-build") else null
             try {
                 data class Loaded(
                     val graph: org.tatrman.ttrp.emit.spi.RecipeGraph,
                     val bundle: RunManifest,
                     val dir: Path,
+                    val actions: List<AutomationAction>,
                 )
 
+                val registrySnapshot =
+                    org.tatrman.ttr.metadata.registry.RegistrySnapshot(
+                        model = loaded.model,
+                        graph =
+                            org.tatrman.ttr.metadata.graph.ModelGraph
+                                .build(loaded.model),
+                        swappedAt = java.time.Instant.EPOCH,
+                        warnings = emptyList(),
+                    )
+                val packageOf = LayoutResolver.packagesFromFiles(loaded.files)
+                val resolved =
+                    org.tatrman.ttr.metadata.world
+                        .WorldResolver(registrySnapshot, packageOf)
+                        .resolve(world.qname)
+                require(
+                    resolved is org.tatrman.ttr.metadata.world.WorldResolution.Ok,
+                ) { "cannot resolve export world: $resolved" }
                 val bundleDirs = mutableMapOf<String, Path>()
 
                 fun load(
@@ -117,6 +143,20 @@ class EmitCommand : CliktCommand(name = "emit") {
                     port: String?,
                 ): Loaded {
                     val recipeName = requireNotNull(program.recipe)
+                    if ((port ?: program.port) == "event") {
+                        val event =
+                            requireNotNull(
+                                program.event,
+                            ) { "event port needs an event schema" }.removePrefix("schema.")
+                        val schemas =
+                            loaded.model.rowSchemas.values
+                                .filter { it.name == event }
+                        val schema =
+                            requireNotNull(schemas.singleOrNull()) { "unknown or ambiguous event schema $event" }
+                        require(
+                            schema.columns.none { it.name == "at" },
+                        ) { "event schema column `at` collides with the port clock" }
+                    }
                     val dir =
                         bundleDirs.getOrPut(recipeName) {
                             bundlePath?.let { base ->
@@ -148,23 +188,6 @@ class EmitCommand : CliktCommand(name = "emit") {
                             }
                         }
                     val bundle = RunManifest.fromJson(Files.readString(dir.resolve("manifest.json")))
-                    val registrySnapshot =
-                        org.tatrman.ttr.metadata.registry.RegistrySnapshot(
-                            model = loaded.model,
-                            graph =
-                                org.tatrman.ttr.metadata.graph.ModelGraph
-                                    .build(loaded.model),
-                            swappedAt = java.time.Instant.EPOCH,
-                            warnings = emptyList(),
-                        )
-                    val packageOf = LayoutResolver.packagesFromFiles(loaded.files)
-                    val resolved =
-                        org.tatrman.ttr.metadata.world
-                            .WorldResolver(registrySnapshot, packageOf)
-                            .resolve(world.qname)
-                    require(
-                        resolved is org.tatrman.ttr.metadata.world.WorldResolution.Ok,
-                    ) { "cannot resolve export world: $resolved" }
                     require(
                         bundle.world.fingerprint ==
                             org.tatrman.ttr.metadata.world.WorldFingerprint
@@ -274,6 +297,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                         ),
                         bundle,
                         dir,
+                        wiredActions.values.toList(),
                     )
                 }
                 val loadedRecipes =
@@ -288,24 +312,23 @@ class EmitCommand : CliktCommand(name = "emit") {
                     if (process == null) {
                         first.graph
                     } else {
-                        first.graph.copy(
-                            process =
-                                org.tatrman.ttrp.emit.spi.ProcessMeta(
-                                    process.qname.name,
-                                    process.instance,
-                                    steps.mapIndexed { index, step ->
-                                        org.tatrman.ttrp.emit.spi.StepMeta(
-                                            step.name,
-                                            step.program,
-                                            step.port,
-                                            step.after?.obligations.orEmpty(),
-                                            step.after?.time?.let { "${it.amount} ${it.unit}" },
-                                            step.after?.until.orEmpty(),
-                                            loadedRecipes[index].graph,
-                                        )
-                                    },
-                                ),
-                        )
+                        RecipeGraphProjector
+                            .project(
+                                first.bundle,
+                                world,
+                                programs.first(),
+                                deployment,
+                                first.actions,
+                                process = process,
+                                stepGraphs =
+                                    steps
+                                        .mapIndexed {
+                                            index,
+                                            step,
+                                            ->
+                                            step.name to loadedRecipes[index].graph
+                                        }.toMap(),
+                            ).let { it.copy(recipe = first.graph.recipe, program = first.graph.program) }
                     }
                 val program = programs.first()
                 val recipeName = graph.recipe.name
@@ -334,7 +357,6 @@ class EmitCommand : CliktCommand(name = "emit") {
                         )
                     }
                 require(diagnostics.isEmpty()) { diagnostics.joinToString("\n") { it.render() } }
-                val plugin = EmitPluginLoader.builtin(graph.deployment.type)
                 require(
                     plugin.supportsRecipes,
                 ) { "${plugin.targetId} ships its manifest; its recipe renderer is not available yet" }
@@ -347,7 +369,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                         )
                 val stale =
                     "Stale when any text, values, labels, program, deployment, world, toolchain " +
-                        "or target version fingerprint differs from the served bundle; re-export the deployment."
+                        "or target version fingerprint differs for any step from the served bundle; re-export the deployment."
 
                 fun fixturePath(
                     recipe: String,
@@ -363,7 +385,10 @@ class EmitCommand : CliktCommand(name = "emit") {
                 val conformance =
                     buildJsonObject {
                         put("fixtures", JsonArray(fixtures.map(::JsonPrimitive)))
-                        put("cells", JsonArray(listOf(JsonPrimitive("${graph.deployment.type}.${program.mode}"))))
+                        put(
+                            "cells",
+                            JsonArray(programs.map { JsonPrimitive("${graph.deployment.type}.${it.mode}") }.distinct()),
+                        )
                     }
                 val exportManifest =
                     buildJsonObject {
@@ -383,6 +408,33 @@ class EmitCommand : CliktCommand(name = "emit") {
                             JsonObject(fingerprints.toSortedMap().mapValues { JsonPrimitive(it.value) }),
                         )
                         put("toolchain", bundle.toolchain)
+                        if (process != null) {
+                            put(
+                                "steps",
+                                JsonArray(
+                                    steps.mapIndexed { index, step ->
+                                        val loadedStep = loadedRecipes[index]
+                                        buildJsonObject {
+                                            put("name", step.name)
+                                            put("recipe", loadedStep.graph.recipe.name)
+                                            put("program", loadedStep.graph.program.name)
+                                            put(
+                                                "fingerprints",
+                                                JsonObject(
+                                                    loadedStep.graph.recipe.fingerprints
+                                                        .toSortedMap()
+                                                        .mapValues {
+                                                            JsonPrimitive(it.value)
+                                                        },
+                                                ),
+                                            )
+                                            put("toolchain", loadedStep.bundle.toolchain)
+                                            put("cell", "${graph.deployment.type}.${loadedStep.graph.program.mode}")
+                                        }
+                                    },
+                                ),
+                            )
+                        }
                         put("granularity", graph.deployment.granularity)
                         put(
                             "connections",

@@ -33,6 +33,10 @@ if(config.validateOnly) {
 const nodes = new Map(workflow.nodes.map(n => [n.name, n]));
 const declared = workflow.meta.tatrman.calls;
 const opens = [];
+const effects = [];
+const mails = [];
+const httpRecords = [];
+const waits = [];
 const results = new Map();
 const runs = new Map();
 const loops = new Map();
@@ -42,7 +46,7 @@ let currentItems = [];
 let itemIndex = 0;
 let currentName = '';
 const context = vm.createContext({
-  $env: {TTR_AUTOMATION_URL:server, TTR_MAIL_FROM:'dry@example.invalid', TTR_MAIL_RECIPIENTS:'{}'},
+  $env: {TTR_AUTOMATION_URL:server, TTR_MAIL_FROM:'dry@example.invalid', TTR_MAIL_RECIPIENTS:JSON.stringify(config.mailRecipients || Object.fromEntries((workflow.meta.tatrman.roles || []).map(r=>[r,`dry+${r}@example.invalid`])))},
   $execution: {id:config.executionId || 'dry-replay', resumeUrl:'https://dry.invalid/resume'},
   $: name => ({
     isExecuted:results.has(name),
@@ -78,13 +82,17 @@ const request = async (node) => {
   for(itemIndex=0;itemIndex<currentItems.length;itemIndex++) {
     const url=new URL(evaluate(node.parameters.url,true));
     if(url.origin!==new URL(server).origin) throw Error('HTTP node escaped Server origin');
+    const renderBody = () => {
     let body=node.parameters.sendBody ? evaluate(node.parameters.jsonBody,true) : undefined;
-    if(call.name==='open') {
+    if(call.name==='open' && config.replay) {
       // A replay selects fixture keys and clock, while preserving the rendered deployment and fingerprints.
       body={...body,dryRun:true,asOf,origin:'driver'};
       if(mode==='batch' && config.keys) body.port={keys:config.keys};
-      if(mode!=='batch' && call.port==='event') throw Error('event replay needs an event fixture');
+
     }
+      return body;
+    };
+    let body=renderBody();
     let offset=0;
     let lastResponse;
     let query={};
@@ -99,7 +107,15 @@ const request = async (node) => {
         }
         if(Number(query.offset)!==offset) throw Error('incomplete route pagination offset');
       }
-      const response=await fetch(url,{method:node.parameters.method,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(30000)});
+      let response;
+      for(let attempt=0;attempt<3;attempt++) {
+        try {
+          body=renderBody();
+          response=await fetch(url,{method:node.parameters.method,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(30000)});
+          if(response.status<500 || attempt===2) break;
+        } catch(e) {if(attempt===2) throw e;}
+      }
+      httpRecords.push({node:node.name,name:call.name,recipe:call.recipe,body,status:response.status});
       if(!response.ok) throw Error(`HTTP ${response.status} at ${call.name}`);
       const text=await response.text();
       // n8n uses JS numbers. Refuse integer keys outside its exact range instead of certifying rounded values.
@@ -110,10 +126,11 @@ const request = async (node) => {
       if(call.name==='digests' && !Array.isArray(data.groups)) throw Error('invalid digest response');
       if(call.name==='status' && !['open','running','evaluated','waiting','closed','failed','abandoned'].includes(data.status)) throw Error('invalid status response');
       if(call.name==='close' && !['closed','waiting'].includes(data.status)) throw Error('invalid close response');
-      if(call.name==='open') {
+      if(call.name==='open' && config.replay) {
         if(!data.runId) throw Error('open omitted runId');
-        opens.push({recipe:call.recipe,id:data.runId,key:call.key});
+        opens.push({recipe:call.recipe,id:data.runId,key:call.key,owned:response.status===201});
       }
+      if(call.name==='perform' || call.name==='outcome') effects.push({action:call.arguments.action,kind:call.name,body,response:data});
       output.push({json:{body:data,statusCode:response.status,headers:Object.fromEntries(response.headers)}});
       if(call.name!=='route') break;
       if(!Array.isArray(data.rows) || !Number.isInteger(data.rowCount)) throw Error('route omitted rows/rowCount');
@@ -143,7 +160,18 @@ try {
       case 'code':outputs=[evaluate(node.parameters.jsCode)];break;
       case 'if': {
         const yes=[],no=[];
-        currentItems.forEach((item,i)=>{itemIndex=i;(booleanCondition(node.parameters.conditions)?yes:no).push(item);});
+        currentItems.forEach((item,i)=>{itemIndex=i;
+          let accepted=booleanCondition(node.parameters.conditions);
+          // SMTP is replaced by a stand-in in replay, while traversing the actual mail and outcome edges.
+          // A missing guard, missing edge, or missing mail still produces no evidence.
+          if(config.replay && node.name.endsWith(' deliver')) {
+            const mailLink=(workflow.connections[node.name]?.main?.[0] || []).find(l=>nodes.get(l.node)?.type==='n8n-nodes-base.emailSend');
+            const dryStatus=[...results.entries()].reverse().find(([name])=>name.endsWith('action status'))?.[1]?.[0]?.json?.body;
+            const rows=item.json.mail?.rows || item.json.group?.rows;
+            if(mailLink && dryStatus?.dryRun===true && rows?.length) accepted=true;
+          }
+          (accepted?yes:no).push(item);
+        });
         outputs=[yes,no];break;
       }
       case 'switch': {
@@ -166,9 +194,22 @@ try {
       }
       case 'emailSend': {
         // Validate the actual expressions, but dry replay never sends SMTP.
-        outputs=[currentItems.map((item,i)=>{itemIndex=i;for(const field of ['fromEmail','toEmail','text']) evaluate(node.parameters[field],true);return item;})];break;
+        outputs=[currentItems.map((item,i)=>{itemIndex=i;
+          const recipient=evaluate(node.parameters.toEmail,true);
+          evaluate(node.parameters.fromEmail,true);
+          const rows=exactParse(evaluate(node.parameters.text,true));
+          const declaration=(workflow.meta.tatrman.mail || []).find(m=>m.node===node.name);
+          if(!declaration || !Array.isArray(rows) || typeof recipient!=='string' || !recipient.trim()) throw Error('invalid mail evidence');
+          mails.push({action:declaration.action,rows,recipient,key:declaration.key,addressColumn:declaration.addressColumn,addressKind:declaration.addressKind});
+          return item;
+        })];break;
       }
-      case 'wait':outputs=[currentItems];break;
+      case 'wait': {
+        const parameters=Object.fromEntries(Object.entries(node.parameters).map(([k,v])=>[k,typeof v==='string' && v.startsWith('={{') ? evaluate(v,true) : v]));
+        waits.push({node:node.name,parameters});
+        if(config.maxWaits && waits.length>config.maxWaits) throw Error('test wait boundary');
+        outputs=[currentItems];break;
+      }
       default:throw Error('unsupported node type');
     }
     const data=outputs.flat();results.set(currentName,data);
@@ -177,12 +218,12 @@ try {
   }
 } catch(e) {
   // Expressions never see bearer credentials; avoid echoing arbitrary body data in diagnostics.
-  error=(String(e.message).startsWith('HTTP ') || /^(call declaration|HTTP node|workflow step|unsafe JSON|incomplete route|invalid .* response)/.test(String(e.message))) ? e.message : `dry node failed: ${currentName}`;
+  error=(String(e.message).startsWith('HTTP ') || /^(call declaration|HTTP node|workflow step|unsafe JSON|incomplete route|invalid .* response|run status has no obligations field|run status has no actions field|no address for|test wait boundary|re-open did not claim)/.test(String(e.message))) ? e.message : `dry node failed: ${currentName}`;
 }
 if(error) {
-  for(const open of opens) {
+  for(const open of opens.filter(o=>o.owned)) {
     const call=declared.find(c=>c.recipe===open.recipe && c.name==='close');
     if(call) {try {const url=new URL(server.replace(/\/$/,'')+call.path.replace('{id}',encodeURIComponent(open.id)));if(url.origin!==new URL(server).origin) continue;await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:'{}',redirect:'error',signal:AbortSignal.timeout(5000)});} catch {}}
   }
 }
-process.stdout.write(JSON.stringify({opens,error,executed:[...results.keys()]}));
+process.stdout.write(JSON.stringify({opens,error,effects,mails,httpRecords,waits,executed:[...results.keys()]}));
