@@ -6,6 +6,7 @@ import org.tatrman.ttrp.emit.spi.EmitRequest
 import org.tatrman.ttrp.emit.spi.EmitResult
 
 class SqlJobEmitPlugin : TtrEmitPlugin {
+    override val spiRevision = TtrEmitPlugin.SPI_REVISION
     override val targetId = "sql_job"
 
     override fun executorTypeManifest(): String =

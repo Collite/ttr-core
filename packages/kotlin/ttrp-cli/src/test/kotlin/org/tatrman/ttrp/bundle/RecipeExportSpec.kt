@@ -20,9 +20,17 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.ServiceLoader
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 
 class RecipeExportSpec :
     StringSpec({
+        val temporaryDirectories = mutableListOf<Path>()
+
+        fun temporaryDirectory(prefix: String): Path =
+            Files.createTempDirectory(prefix).also { temporaryDirectories.add(it) }
+        afterSpec { temporaryDirectories.asReversed().forEach { it.toFile().deleteRecursively() } }
+
         fun locate(rel: String): Path {
             var p: Path? = Path.of("").toAbsolutePath()
             while (p != null) {
@@ -62,7 +70,7 @@ class RecipeExportSpec :
                         manifestDir = root.parent,
                     ),
                 modelsRoot = root,
-                outDir = Files.createTempDirectory("recipe-export-spec"),
+                outDir = temporaryDirectory("recipe-export-spec"),
             )
         }
         val model =
@@ -264,7 +272,7 @@ class RecipeExportSpec :
         }
 
         fun exportProject(): Path {
-            val project = Files.createTempDirectory("n8n-export-project")
+            val project = temporaryDirectory("n8n-export-project")
             for (folder in listOf("automation", "worlds")) {
                 val target = project.resolve("models/hartland/$folder")
                 Files.createDirectories(target)
@@ -294,7 +302,7 @@ class RecipeExportSpec :
         "n8n CLI export renders the compiled H-1 recipe and publishes the exact workflow calls" {
             val project = exportProject()
             val bundle = build("release_order")
-            val out = Files.createTempDirectory("n8n-real-h1")
+            val out = temporaryDirectory("n8n-real-h1")
             val result =
                 TtrpCommand().subcommands(EmitCommand()).test(
                     listOf(
@@ -355,9 +363,9 @@ class RecipeExportSpec :
                     .trimEnd(),
             )
         }
-        "process CLI verifies every H-2 bundle and renders each step's actual recipe and conditional actions" {
+        "H-2 export refuses missing customer address and still verifies every process bundle" {
             val project = exportProject()
-            val bundles = Files.createTempDirectory("n8n-h2-bundles")
+            val bundles = temporaryDirectory("n8n-h2-bundles")
             listOf("decide_return", "monitor_inbound", "settle").forEach { recipe ->
                 val compiled = build(recipe)
                 val fixture = compiled.dir.resolve("tests/shared.yaml")
@@ -377,7 +385,7 @@ class RecipeExportSpec :
                 Files.writeString(compiled.dir.resolve("manifest.json"), manifest.toJson())
                 compiled.dir.toFile().copyRecursively(bundles.resolve(recipe).toFile())
             }
-            val out = Files.createTempDirectory("n8n-real-h2")
+            val out = temporaryDirectory("n8n-real-h2")
             val result =
                 TtrpCommand().subcommands(EmitCommand()).test(
                     listOf(
@@ -392,18 +400,12 @@ class RecipeExportSpec :
                         out.toString(),
                     ),
                 )
-            io.kotest.assertions.withClue(result.output) { result.statusCode shouldBe 0 }
-            val rendered = Files.readString(out.resolve("returns_n8n.n8n_l1.export/workflow.json"))
-            listOf("decide_return", "monitor_inbound", "settle").forEach { rendered shouldContain "/recipes/$it/runs" }
-            golden("returns_n8n_workflow", rendered.trimEnd())
-            rendered shouldContain "obligation present"
-            listOf("decide_return", "monitor_inbound", "settle").forEach { recipe ->
-                Files.readString(out.resolve("returns_n8n.n8n_l1.export/tests/$recipe/shared.yaml")) shouldBe
-                    "recipe: $recipe\n"
-            }
+            result.statusCode shouldBe 2
+            result.output shouldContain "emailSend action notify_customer needs exactly one addressing column"
+            Files.exists(out.resolve("returns_n8n.n8n_l1.export")) shouldBe false
             // A stale/missing step refuses the whole package, before any output directory exists.
             Files.delete(bundles.resolve("settle/manifest.json"))
-            val failedOut = Files.createTempDirectory("n8n-missing-step")
+            val failedOut = temporaryDirectory("n8n-missing-step")
             val failed =
                 TtrpCommand().subcommands(EmitCommand()).test(
                     listOf(
@@ -419,10 +421,216 @@ class RecipeExportSpec :
                     ),
                 )
             failed.statusCode shouldBe 2
+            failed.output shouldContain "settle/manifest.json"
             Files.exists(failedOut.resolve("returns_n8n.n8n_l1.export")) shouldBe false
         }
+        "R9 every process step contributes fingerprints and conformance to the manifest" {
+            // Synthetic three-recipe envelopes use the H-1 action shape; real H-2 remains a refusal above.
+            val project = exportProject()
+            val bundles = temporaryDirectory("n8n-process-manifests")
+            val compiled = build("release_order")
+            val recipes = listOf("decide_return", "monitor_inbound", "settle")
+            for (recipe in recipes) {
+                compiled.dir.toFile().copyRecursively(bundles.resolve(recipe).toFile())
+                val fixture = bundles.resolve("$recipe/tests/shared.yaml")
+                Files.createDirectories(fixture.parent)
+                Files.writeString(fixture, "recipe: $recipe\n")
+                val sha =
+                    "sha256:" +
+                        java.security.MessageDigest
+                            .getInstance(
+                                "SHA-256",
+                            ).digest(Files.readAllBytes(fixture))
+                            .joinToString("") {
+                                "%02x".format(it)
+                            }
+                val manifest =
+                    compiled.manifest.copy(
+                        recipe = compiled.manifest.recipe!!.copy(name = recipe, tests = listOf("tests/shared.yaml")),
+                        files =
+                            compiled.manifest.files + ("tests/shared.yaml" to sha),
+                    )
+                Files.writeString(bundles.resolve("$recipe/manifest.json"), manifest.toJson())
+            }
+
+            fun emit(): kotlinx.serialization.json.JsonObject {
+                val out = temporaryDirectory("n8n-process-output")
+                val result =
+                    TtrpCommand()
+                        .subcommands(
+                            EmitCommand(),
+                        ).test(
+                            listOf(
+                                "emit",
+                                "--deployment",
+                                "returns_n8n",
+                                "--project",
+                                project.toString(),
+                                "--bundle",
+                                bundles.toString(),
+                                "--out",
+                                out.toString(),
+                            ),
+                        )
+                io.kotest.assertions.withClue(result.output) { result.statusCode shouldBe 0 }
+                for (recipe in recipes) {
+                    Files.readString(out.resolve("returns_n8n.n8n_l1.export/tests/$recipe/shared.yaml")) shouldBe
+                        "recipe: $recipe\n"
+                }
+                return kotlinx.serialization.json.Json
+                    .parseToJsonElement(
+                        Files.readString(out.resolve("returns_n8n.n8n_l1.export/manifest.json")),
+                    ).jsonObject
+            }
+            val before = emit()
+            val path = bundles.resolve("settle/manifest.json")
+            val old = RunManifest.fromJson(Files.readString(path))
+            val r = old.recipe!!
+            Files.writeString(
+                path,
+                old
+                    .copy(
+                        recipe =
+                            r.copy(
+                                fingerprints =
+                                    r.fingerprints.copy(
+                                        values =
+                                            "sha256:" + "f".repeat(64),
+                                    ),
+                            ),
+                    ).toJson(),
+            )
+            val after = emit()
+            val a = before.getValue("steps").jsonArray
+            val b = after.getValue("steps").jsonArray
+            a.map {
+                it.jsonObject
+                    .getValue("recipe")
+                    .jsonPrimitive.content
+            } shouldBe recipes
+            a.take(2) shouldBe b.take(2)
+            (a[2] == b[2]) shouldBe false
+            b.forEach {
+                it.jsonObject.containsKey("cell") shouldBe true
+                it.jsonObject.containsKey("toolchain") shouldBe
+                    true
+            }
+        }
+        "R9 a plugin without process capability refuses before rendering or reading bundles" {
+            val project = exportProject()
+            val path = project.resolve("models/hartland/worlds/demo.ttrm")
+            Files.writeString(
+                path,
+                Files
+                    .readString(
+                        path,
+                    ).replace("process: return_line_flow, target: n8n", "process: return_line_flow, target: native"),
+            )
+            val out = temporaryDirectory("native-process-refusal")
+            val result =
+                TtrpCommand()
+                    .subcommands(
+                        EmitCommand(),
+                    ).test(
+                        listOf(
+                            "emit",
+                            "--deployment",
+                            "returns_n8n",
+                            "--project",
+                            project.toString(),
+                            "--bundle",
+                            project.resolve("nonexistent").toString(),
+                            "--out",
+                            out.toString(),
+                        ),
+                    )
+            result.statusCode shouldBe 2
+            result.output shouldContain "native does not support process exports"
+            Files.list(out).use { it.count() shouldBe 0L }
+        }
+        "R5 an event schema column at colliding with the clock refuses export" {
+            val project = exportProject()
+            val path = project.resolve("models/hartland/automation/programs.ttrm")
+            var text =
+                Files
+                    .readString(
+                        path,
+                    ).replace(
+                        "def program release_on_placement   { recipe: release_order,  port: key",
+                        "def program release_on_placement   { recipe: release_order,  event: schema.line_received, port: event",
+                    )
+            // Keep the mutation precise even if the fixture's alignment whitespace changes.
+            text =
+                Regex(
+                    "(def program release_on_placement\\s+\\{[^}]*?)port: key",
+                ).replace(text, "$1event: schema.line_received, port: event")
+            text =
+                text.replace(
+                    "def schema line_received    { columns: [",
+                    "def schema line_received    { columns: [def column at { type: text },",
+                )
+            Files.writeString(path, text)
+            val result =
+                TtrpCommand()
+                    .subcommands(
+                        EmitCommand(),
+                    ).test(
+                        listOf(
+                            "emit",
+                            "--deployment",
+                            "release_n8n",
+                            "--project",
+                            project.toString(),
+                            "--bundle",
+                            project.resolve("unused").toString(),
+                            "--out",
+                            temporaryDirectory("event-refusal").toString(),
+                        ),
+                    )
+            result.statusCode shouldBe 2
+            result.output shouldContain "event schema column `at` collides with the port clock"
+        }
+        "R2 the customer-addressed winback action shape refuses until its producer supplies an address column" {
+            val bundle = build("decide_return")
+            val d = world.deployment("returns_n8n")!!
+            val graph =
+                org.tatrman.ttrp.emit.recipe.RecipeGraphProjector.project(
+                    bundle.manifest,
+                    world,
+                    programs.getValue("decide_on_request"),
+                    d,
+                    actions,
+                )
+            val emit = actions.single { it.qname.name == "notify_customer" }
+            emit.columns.any { it.name == "to" } shouldBe false
+            val customer =
+                graph.copy(
+                    recipe = graph.recipe.copy(name = "winback"),
+                    wirings =
+                        graph.wirings
+                            .filter {
+                                it.action ==
+                                    "notify_customer"
+                            }.map { it.copy(action = "emit") },
+                    actions =
+                        mapOf(
+                            "emit" to graph.actions.getValue("notify_customer"),
+                        ),
+                )
+            io.kotest.assertions.throwables
+                .shouldThrow<IllegalArgumentException> {
+                    EmitPluginLoader
+                        .builtin(
+                            "n8n_l1",
+                        ).emitRecipe(
+                            org.tatrman.ttrp.emit.spi
+                                .RecipeEmitRequest(customer, "{}", "", "{}"),
+                        )
+                }.message!! shouldContain
+                "emailSend action emit needs exactly one addressing column"
+        }
         "native CLI export is deterministic and contains no launcher or run calls" {
-            val project = Files.createTempDirectory("recipe-export-project")
+            val project = temporaryDirectory("recipe-export-project")
             for (folder in listOf("automation", "worlds")) {
                 val target = project.resolve("models/hartland/$folder")
                 Files.createDirectories(target)
@@ -459,10 +667,10 @@ class RecipeExportSpec :
                             manifestDir = root.parent,
                         ),
                     modelsRoot = root,
-                    outDir = Files.createTempDirectory("recipe-export-bundle"),
+                    outDir = temporaryDirectory("recipe-export-bundle"),
                 )
-            val first = Files.createTempDirectory("native-export-a")
-            val second = Files.createTempDirectory("native-export-b")
+            val first = temporaryDirectory("native-export-a")
+            val second = temporaryDirectory("native-export-b")
 
             fun emit(out: Path) =
                 TtrpCommand()

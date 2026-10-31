@@ -6,6 +6,7 @@ import org.tatrman.ttrp.emit.spi.EmitRequest
 import org.tatrman.ttrp.emit.spi.EmitResult
 
 class PythonClientEmitPlugin : TtrEmitPlugin {
+    override val spiRevision = TtrEmitPlugin.SPI_REVISION
     override val targetId = "python_client"
 
     override fun executorTypeManifest(): String =

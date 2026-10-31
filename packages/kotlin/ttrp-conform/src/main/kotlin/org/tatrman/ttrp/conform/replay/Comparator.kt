@@ -16,6 +16,7 @@ import java.time.temporal.ChronoUnit
 data class Observed(
     val recipes: Map<String, Expected>,
     val finalStates: JsonObject? = null,
+    val evidenceDiffs: List<ReplayDiff> = emptyList(),
 )
 
 data class ReplayDiff(
@@ -32,6 +33,7 @@ object ReplayComparator {
         actual: Observed,
     ): List<ReplayDiff> =
         buildList {
+            addAll(actual.evidenceDiffs)
             for ((recipe, expected) in fixture.expected) {
                 val seen = actual.recipes[recipe]
                 if (seen == null) {

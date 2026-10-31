@@ -61,6 +61,7 @@ internal class Workflow(
 ) {
     val nodes = mutableListOf<JsonObject>()
     val calls = mutableListOf<JsonObject>()
+    val mail = mutableListOf<JsonObject>()
     private val edges = linkedMapOf<String, MutableList<MutableList<JsonObject>>>()
 
     fun node(

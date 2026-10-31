@@ -62,13 +62,13 @@ class N8nEmitSpec :
                 JsonPrimitive(true)
             val open = http.single { it["name"] == JsonPrimitive("open") }.getValue("parameters").jsonObject
             open.getValue("jsonBody").jsonPrimitive.content shouldNotContain "idempotencyKey"
-            val ask = http.single { it["name"] == JsonPrimitive("release_confirmed ask") }
+            val ask = http.single { it["name"] == JsonPrimitive("action release_confirmed ask") }
             ask
                 .getValue("parameters")
                 .jsonObject
                 .getValue("jsonBody")
                 .jsonPrimitive.content shouldContain "callbackUrl"
-            nodes(graph).count { it["name"] == JsonPrimitive("release_confirmed ask wait") } shouldBe 1
+            nodes(graph).count { it["name"] == JsonPrimitive("action release_confirmed ask wait") } shouldBe 1
         }
         "batch schedule and digest groups use a Split Out and engine-side delivery outcomes" {
             val g =
@@ -85,7 +85,7 @@ class N8nEmitSpec :
             golden("morning_release", g)
             val ns = nodes(g)
             ns.first()["type"] shouldBe JsonPrimitive("n8n-nodes-base.scheduleTrigger")
-            ns.single { it["name"] == JsonPrimitive("open") }.toString() shouldContain "idempotencyKey"
+            ns.single { it["name"] == JsonPrimitive("open input") }.toString() shouldContain "idempotencyKey"
             ns.any { it["type"] == JsonPrimitive("n8n-nodes-base.splitOut") } shouldBe true
             ns.count { it["type"] == JsonPrimitive("n8n-nodes-base.emailSend") } shouldBe 1
             ns.any { it["name"] == JsonPrimitive("digest outcome") } shouldBe true
@@ -132,7 +132,7 @@ class N8nEmitSpec :
                 ).deterministic shouldBe
                 true
         }
-        "winback contains no SQL and every golden's expressions compile in the dry runtime" {
+        "an addressed customer example contains no SQL and every golden's expressions compile in the dry runtime" {
             val base = n8nGraph()
             val winback =
                 base.copy(
@@ -142,7 +142,7 @@ class N8nEmitSpec :
                             name = "winback_monthly",
                             port = "none",
                             mode = "batch",
-                            schedule = "0 0 6 1 * *",
+                            schedule = "1st 08:00 Europe/Prague",
                         ),
                     roles =
                         base.roles.copy(
@@ -162,18 +162,22 @@ class N8nEmitSpec :
                     wirings =
                         listOf("premium", "regular").flatMap { route ->
                             listOf(
-                                WiringMeta(listOf("offer.$route"), "notify", mapOf("who" to "customer.email"), null),
+                                WiringMeta(listOf("offer.$route"), "notify", mapOf("to" to "email"), null),
                                 WiringMeta(listOf("offer.$route"), "record_mailed", emptyMap(), null),
                             )
                         },
                     actions =
                         mapOf(
-                            "notify" to action("n8n-nodes-base.emailSend", true),
+                            "notify" to
+                                action(
+                                    "n8n-nodes-base.emailSend",
+                                    true,
+                                ).copy(columns = mapOf("to" to "customer.email")),
                             "record_mailed" to action("door"),
                         ),
                 )
-            golden("winback", winback)
-            nodes(winback).forEach { it.getValue("parameters").toString().uppercase() shouldNotContain "SELECT" }
+            golden("customer_address_example", winback)
+            nodes(winback).forEach { it.getValue("parameters").toString().uppercase() shouldNotContain "SELECT " }
             val runner = Files.createTempFile("n8n-validate-", ".mjs")
             try {
                 Files.write(
@@ -196,6 +200,55 @@ class N8nEmitSpec :
                 }
             } finally {
                 Files.deleteIfExists(runner)
+            }
+        }
+        "R189-B structural assertions replace the illustrative node count" {
+            for (granularity in listOf("parts", "recipe", "islands")) {
+                val g = n8nGraph().let { it.copy(deployment = it.deployment.copy(granularity = granularity)) }
+                val ns = nodes(g)
+                val calls =
+                    workflow(
+                        g,
+                    ).getValue("meta").jsonObject.getValue("tatrman").jsonObject.getValue("calls").jsonArray.map {
+                        it.jsonObject
+                    }
+                calls.count { it["node"] == JsonPrimitive("open") } shouldBe 1
+                calls.count { it["name"] == JsonPrimitive("evaluate") } shouldBe 1
+                calls.count { it["name"] == JsonPrimitive("part") } shouldBe if (granularity == "parts") 3 else 0
+                calls.count { it["name"] == JsonPrimitive("island") } shouldBe if (granularity == "islands") 3 else 0
+                calls.count { it["name"] == JsonPrimitive("close") } shouldBe 1
+                ns
+                    .single {
+                        it["type"] == JsonPrimitive("n8n-nodes-base.switch")
+                    }.getValue(
+                        "parameters",
+                    ).jsonObject
+                    .getValue("rules")
+                    .jsonObject
+                    .getValue("values")
+                    .jsonArray.size shouldBe
+                    g.routes.size
+                for (name in listOf(
+                    "action release release",
+                    "action release_confirmed ask",
+                    "action release_confirmed ask wait",
+                    "action hold notify",
+                    "action hold notify outcome",
+                )) {
+                    ns.count {
+                        it["name"] ==
+                            JsonPrimitive(name)
+                    } shouldBe
+                        1
+                }
+                ns.filter { it["type"] == JsonPrimitive("n8n-nodes-base.emailSend") }.forEach {
+                    it
+                        .getValue("parameters")
+                        .jsonObject
+                        .getValue("toEmail")
+                        .jsonPrimitive.content shouldNotContain
+                        "[\"\"]"
+                }
             }
         }
         "process rendering retains three distinct recipes and skips absent obligations" {
@@ -245,7 +298,7 @@ class N8nEmitSpec :
                 )
             golden("returns_n8n", process)
             val ns = nodes(process)
-            ns.filter { it["name"]!!.jsonPrimitive.content.endsWith("open") }.size shouldBe 3
+            ns.filter { it["name"]!!.jsonPrimitive.content.endsWith(" open") }.size shouldBe 3
             ns.filter { it["name"]!!.jsonPrimitive.content.endsWith("obligation present") }.size shouldBe 2
             ns.filter { it["name"]!!.jsonPrimitive.content.endsWith("obligation wait") }.size shouldBe 2
             ns.filter { it["name"]!!.jsonPrimitive.content.endsWith("obligation wait") }.forEach {
@@ -291,7 +344,10 @@ internal fun n8nGraph(): RecipeGraph =
         ),
         mapOf(
             "release" to action("door"),
-            "ask" to action("door"),
+            "ask" to
+                action(
+                    "door",
+                ).copy(sinks = mapOf("n8n" to "door", "native" to "task"), approval = "required", due = "2 days"),
             "notify" to action("n8n-nodes-base.emailSend", true),
         ),
         null,
@@ -316,4 +372,18 @@ internal fun n8nGraph(): RecipeGraph =
 private fun action(
     sink: String,
     deliverable: Boolean = false,
-) = ActionMeta(emptyMap(), mapOf("n8n" to sink), null, deliverable, null, emptyMap(), null)
+) = ActionMeta(
+    if (sink ==
+        "n8n-nodes-base.emailSend"
+    ) {
+        mapOf("who" to "role")
+    } else {
+        emptyMap()
+    },
+    mapOf("n8n" to sink),
+    null,
+    deliverable,
+    null,
+    emptyMap(),
+    null,
+)
