@@ -35,11 +35,37 @@ object RecipeGraphProjector {
             deployment.granularity
                 ?: "parts",
         process: WorldProcess? = null,
+        stepGraphs: Map<String, RecipeGraph> = emptyMap(),
     ): RecipeGraph {
         require(bundle.schemaVersion == 3) { "recipe export requires manifest v3" }
         val recipe = requireNotNull(bundle.recipe) { "bundle has no recipe" }
         require(program.recipe == recipe.name) {
             "program ${program.qname.name} uses ${program.recipe}, bundle holds ${recipe.name}"
+        }
+        val islandNames = bundle.islands.map { it.name }
+        val waveNames = bundle.waves.flatten()
+        require(
+            islandNames.distinct().size == islandNames.size &&
+                waveNames.distinct().size == waveNames.size &&
+                waveNames.toSet() == islandNames.toSet(),
+        ) {
+            "bundle waves must name every island exactly once"
+        }
+        if (process != null) {
+            require(process.steps.isNotEmpty()) { "process has no steps" }
+            require(stepGraphs.keys == process.steps.map { it.name }.toSet()) { "process needs every step graph" }
+            process.steps.forEach { step ->
+                val graph = stepGraphs.getValue(step.name)
+                require(
+                    graph.process == null &&
+                        graph.program.name == step.program &&
+                        graph.deployment.name == deployment.qname.name &&
+                        graph.deployment.target == deployment.target &&
+                        graph.program.port == (step.port ?: graph.program.port),
+                ) { "invalid process step projection ${step.name}" }
+            }
+        } else {
+            require(stepGraphs.isEmpty()) { "step graphs require a process" }
         }
         val type = RegistryGrid.executorType(world, deployment)
         val executor = world.executors.singleOrNull { it.qname.name == deployment.target }
@@ -145,6 +171,7 @@ object RecipeGraphProjector {
                                 "${it.amount} ${it.unit}"
                             },
                             s.after?.until.orEmpty(),
+                            stepGraphs.getValue(s.name),
                         )
                     },
                 )
@@ -166,6 +193,7 @@ object RecipeGraphProjector {
                     "close" to "/runs/{id}/close",
                 ),
             ),
+            bundle.waves.map { it.toList() },
         )
     }
 

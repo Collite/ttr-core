@@ -139,6 +139,81 @@ class RecipeExportSpec :
                 ).deterministic shouldBe
                 true
         }
+        "island projection preserves verified waves and refuses incomplete or duplicate island schedules" {
+            val bundle = build("release_order").manifest
+            val d = world.deployment("release_n8n")!!
+
+            fun project(manifest: RunManifest) =
+                org.tatrman.ttrp.emit.recipe.RecipeGraphProjector.project(
+                    manifest,
+                    world,
+                    programs.getValue(d.program!!),
+                    d,
+                    actions,
+                )
+            project(bundle).islandWaves shouldBe bundle.waves
+            io.kotest.assertions.throwables.shouldThrow<IllegalArgumentException> {
+                project(bundle.copy(waves = emptyList()))
+            }
+            io.kotest.assertions.throwables.shouldThrow<IllegalArgumentException> {
+                project(bundle.copy(waves = bundle.waves + listOf(listOf(bundle.islands.first().name))))
+            }
+            io.kotest.assertions.throwables.shouldThrow<IllegalArgumentException> {
+                project(bundle.copy(waves = bundle.waves + listOf(listOf("unknown"))))
+            }
+        }
+        "process projection resolves all three recipes with effective ports under the parent deployment" {
+            val process = world.processes.single { it.qname.name == "return_line_flow" }
+            val d = world.deployment("returns_n8n")!!
+            val bundles =
+                process.steps.associate { step ->
+                    val program = programs.getValue(step.program!!)
+                    step.name to build(program.recipe!!).manifest
+                }
+            val graphs =
+                process.steps.associate { step ->
+                    val program = programs.getValue(step.program!!).copy(port = step.port)
+                    step.name to
+                        org.tatrman.ttrp.emit.recipe.RecipeGraphProjector.project(
+                            bundles.getValue(step.name),
+                            world,
+                            program,
+                            d,
+                            actions,
+                        )
+                }
+            val first = process.steps.first()
+
+            fun project(steps: Map<String, org.tatrman.ttrp.emit.spi.RecipeGraph>) =
+                org.tatrman.ttrp.emit.recipe.RecipeGraphProjector.project(
+                    bundles.getValue(first.name),
+                    world,
+                    programs.getValue(first.program!!).copy(port = first.port),
+                    d,
+                    actions,
+                    process = process,
+                    stepGraphs = steps,
+                )
+            val projected = project(graphs).process!!
+            projected.steps.map { it.graph!!.recipe.name } shouldBe listOf("decide_return", "monitor_inbound", "settle")
+            projected.steps.forEach { step ->
+                step.graph!!.deployment.name shouldBe "returns_n8n"
+                step.graph!!.program.port shouldBe "key"
+                step.graph!!.process shouldBe null
+            }
+            io.kotest.assertions.throwables
+                .shouldThrow<IllegalArgumentException> { project(graphs - first.name) }
+            io.kotest.assertions.throwables.shouldThrow<IllegalArgumentException> {
+                project(
+                    graphs + (
+                        first.name to
+                            graphs.getValue(first.name).copy(
+                                program = graphs.getValue(first.name).program.copy(port = "event"),
+                            )
+                    ),
+                )
+            }
+        }
         "seven plugin-owned TTR-M manifests load through metadata world objects" {
             manifests.all().map { it.id } shouldBe
                 listOf("camunda_7", "camunda_8", "n8n_l1", "native", "python_client", "python_offline", "sql_job")
