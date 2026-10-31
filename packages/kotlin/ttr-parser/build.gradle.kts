@@ -15,6 +15,7 @@ kotlin {
 
 tasks.test {
     inputs.dir("../../../tests/conformance/fixtures")
+    inputs.file("../../grammar/tests/canonical-schema-vectors.json")
     useJUnitPlatform()
     // VL-P0: TtrgGraphReaderSpec reads the shared layout vectors and two samples in place (never a
     // copy) — declare them, or a vector change leaves this task UP-TO-DATE.
@@ -26,6 +27,42 @@ tasks.test {
 // The canonical grammar lives in the pnpm workspace; the Kotlin build reads it
 // directly — no copy, no sync, no header rewriting (see docs/grammar-master/).
 val canonicalGrammar = file("../../grammar/src/TTR.g4")
+
+// Node-only emitter: no pnpm install, Kotlin metadata dependency or registry access.
+// Keep resources generated from the same inputs for npm packs and standalone JVM builds.
+val canonicalSchemaResources = layout.buildDirectory.dir("generated-resources/canonical-yaml")
+val generateCanonicalSchemas by tasks.registering(Exec::class) {
+    inputs.file(canonicalGrammar)
+    inputs.files(
+        fileTree("../../grammar/scripts") {
+            include("canonical-*.mjs", "generate-canonical-schemas.mjs")
+        },
+    )
+    outputs.dir(canonicalSchemaResources)
+    workingDir(rootProject.projectDir)
+    commandLine(
+        "node",
+        file("../../grammar/scripts/generate-canonical-schemas.mjs").absolutePath,
+        "--output-dir",
+        canonicalSchemaResources
+            .get()
+            .dir("schemas")
+            .asFile.absolutePath,
+    )
+}
+sourceSets["main"].resources.srcDir(generateCanonicalSchemas)
+
+tasks.test {
+    dependsOn(tasks.jar)
+    inputs.file(tasks.jar.flatMap { it.archiveFile })
+    systemProperty(
+        "ttr.schemaJar",
+        tasks.jar
+            .flatMap { it.archiveFile }
+            .get()
+            .asFile.absolutePath,
+    )
+}
 
 sourceSets["main"].antlr.setSrcDirs(listOf(canonicalGrammar.parentFile))
 
@@ -61,6 +98,7 @@ dependencies {
     // kotlinx-serialization is only used by the test-only conformance dumper
     // (src/test/.../conformance/ConformanceDump.kt) — keep it off the published
     // runtime classpath. See contracts.md §1.
+    testImplementation(libs.json.schema.validator)
     testImplementation(libs.kotlinx.ser.json)
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)

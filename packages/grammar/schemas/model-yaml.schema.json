@@ -1,0 +1,5338 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tatrman.org/schemas/0.21/model-yaml.schema.json",
+  "title": "Canonical TTR YAML document",
+  "x-ttr-version": "0.21",
+  "type": "object",
+  "properties": {
+    "ttr": {
+      "const": "0.21"
+    },
+    "package": {
+      "$ref": "#/$defs/identifier"
+    },
+    "imports": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*(?:\\.\\*)?$"
+      }
+    },
+    "model": {
+      "enum": [
+        "db",
+        "er",
+        "binding",
+        "query",
+        "cnc",
+        "md",
+        "world",
+        "lexicon",
+        "automation",
+        "cn"
+      ]
+    },
+    "schema": {
+      "$ref": "#/$defs/identifier"
+    },
+    "locale": {
+      "$ref": "#/$defs/identifier"
+    },
+    "graph": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "$ref": "#/$defs/value_modelCode"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/value_stringLiteralForm"
+                },
+                {
+                  "$ref": "#/$defs/value_localizedString"
+                }
+              ]
+            },
+            "tags": {
+              "$ref": "#/$defs/value_listOfStrings"
+            },
+            "objects": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/identifier"
+              }
+            },
+            "layout": {
+              "$ref": "#/$defs/value_object_"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "security": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "verb": {
+                  "const": "own"
+                },
+                "object": {
+                  "$ref": "#/$defs/identifier"
+                },
+                "owner": {
+                  "$ref": "#/$defs/identifier"
+                }
+              },
+              "required": [
+                "verb",
+                "object",
+                "owner"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "verb": {
+                  "const": "classify"
+                },
+                "object": {
+                  "$ref": "#/$defs/identifier"
+                },
+                "classification": {
+                  "$ref": "#/$defs/identifier"
+                }
+              },
+              "required": [
+                "verb",
+                "object",
+                "classification"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "verb": {
+                  "const": "grant"
+                },
+                "privilege": {
+                  "$ref": "#/$defs/identifier"
+                },
+                "object": {
+                  "$ref": "#/$defs/identifier"
+                },
+                "to": {
+                  "$ref": "#/$defs/identifier"
+                }
+              },
+              "required": [
+                "verb",
+                "privilege",
+                "object",
+                "to"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "verb": {
+                  "const": "mask"
+                },
+                "object": {
+                  "$ref": "#/$defs/identifier"
+                }
+              },
+              "required": [
+                "verb",
+                "object"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      }
+    },
+    "defs": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/def_project"
+          },
+          {
+            "$ref": "#/$defs/def_table"
+          },
+          {
+            "$ref": "#/$defs/def_view"
+          },
+          {
+            "$ref": "#/$defs/def_column"
+          },
+          {
+            "$ref": "#/$defs/def_index"
+          },
+          {
+            "$ref": "#/$defs/def_constraint"
+          },
+          {
+            "$ref": "#/$defs/def_fk"
+          },
+          {
+            "$ref": "#/$defs/def_procedure"
+          },
+          {
+            "$ref": "#/$defs/def_entity"
+          },
+          {
+            "$ref": "#/$defs/def_attribute"
+          },
+          {
+            "$ref": "#/$defs/def_relation"
+          },
+          {
+            "$ref": "#/$defs/def_er2db_entity"
+          },
+          {
+            "$ref": "#/$defs/def_er2db_attribute"
+          },
+          {
+            "$ref": "#/$defs/def_er2db_relation"
+          },
+          {
+            "$ref": "#/$defs/def_query"
+          },
+          {
+            "$ref": "#/$defs/def_role"
+          },
+          {
+            "$ref": "#/$defs/def_er2cnc_role"
+          },
+          {
+            "$ref": "#/$defs/def_drill_map"
+          },
+          {
+            "$ref": "#/$defs/def_area"
+          },
+          {
+            "$ref": "#/$defs/def_schema"
+          },
+          {
+            "$ref": "#/$defs/def_domain"
+          },
+          {
+            "$ref": "#/$defs/def_dimension"
+          },
+          {
+            "$ref": "#/$defs/def_map"
+          },
+          {
+            "$ref": "#/$defs/def_hierarchy"
+          },
+          {
+            "$ref": "#/$defs/def_measure"
+          },
+          {
+            "$ref": "#/$defs/def_cubelet"
+          },
+          {
+            "$ref": "#/$defs/def_md2db_cubelet"
+          },
+          {
+            "$ref": "#/$defs/def_md2db_domain"
+          },
+          {
+            "$ref": "#/$defs/def_md2db_map"
+          },
+          {
+            "$ref": "#/$defs/def_md2er_dimension"
+          },
+          {
+            "$ref": "#/$defs/def_md2er_cubelet"
+          },
+          {
+            "$ref": "#/$defs/def_world"
+          },
+          {
+            "$ref": "#/$defs/def_term"
+          },
+          {
+            "$ref": "#/$defs/def_pattern"
+          },
+          {
+            "$ref": "#/$defs/def_example"
+          },
+          {
+            "$ref": "#/$defs/def_parameter"
+          },
+          {
+            "$ref": "#/$defs/def_action"
+          },
+          {
+            "$ref": "#/$defs/def_service"
+          },
+          {
+            "$ref": "#/$defs/def_approval"
+          },
+          {
+            "$ref": "#/$defs/def_program"
+          },
+          {
+            "$ref": "#/$defs/def_recipe"
+          },
+          {
+            "$ref": "#/$defs/def_subkind"
+          },
+          {
+            "$ref": "#/$defs/def_kind"
+          },
+          {
+            "$ref": "#/$defs/def_event"
+          },
+          {
+            "$ref": "#/$defs/def_phase"
+          },
+          {
+            "$ref": "#/$defs/def_quality"
+          },
+          {
+            "$ref": "#/$defs/def_relation_type"
+          },
+          {
+            "$ref": "#/$defs/def_cn2md_kind"
+          },
+          {
+            "$ref": "#/$defs/def_cn2md_role"
+          },
+          {
+            "$ref": "#/$defs/def_cn2md_quality"
+          },
+          {
+            "$ref": "#/$defs/def_cn2md_event"
+          },
+          {
+            "$ref": "#/$defs/def_cn2er_kind"
+          },
+          {
+            "$ref": "#/$defs/def_cn2er_role"
+          },
+          {
+            "$ref": "#/$defs/def_cn2er_event"
+          },
+          {
+            "$ref": "#/$defs/def_cn2er_quality"
+          },
+          {
+            "$ref": "#/$defs/def_cn2er_phase"
+          },
+          {
+            "$ref": "#/$defs/def_cn2db_concept"
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "ttr"
+  ],
+  "additionalProperties": false,
+  "dependentRequired": {
+    "schema": [
+      "model"
+    ],
+    "locale": [
+      "model"
+    ]
+  },
+  "allOf": [
+    {
+      "not": {
+        "required": [
+          "model",
+          "graph"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "model": {
+            "const": "cn"
+          }
+        },
+        "required": [
+          "model"
+        ]
+      },
+      "then": {
+        "properties": {
+          "defs": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/def_project"
+                },
+                {
+                  "$ref": "#/$defs/def_table"
+                },
+                {
+                  "$ref": "#/$defs/def_view"
+                },
+                {
+                  "$ref": "#/$defs/def_column"
+                },
+                {
+                  "$ref": "#/$defs/def_index"
+                },
+                {
+                  "$ref": "#/$defs/def_constraint"
+                },
+                {
+                  "$ref": "#/$defs/def_fk"
+                },
+                {
+                  "$ref": "#/$defs/def_procedure"
+                },
+                {
+                  "$ref": "#/$defs/def_entity"
+                },
+                {
+                  "$ref": "#/$defs/def_attribute"
+                },
+                {
+                  "$ref": "#/$defs/def_relation"
+                },
+                {
+                  "$ref": "#/$defs/def_er2db_entity"
+                },
+                {
+                  "$ref": "#/$defs/def_er2db_attribute"
+                },
+                {
+                  "$ref": "#/$defs/def_er2db_relation"
+                },
+                {
+                  "$ref": "#/$defs/def_query"
+                },
+                {
+                  "$ref": "#/$defs/def_role"
+                },
+                {
+                  "$ref": "#/$defs/def_er2cnc_role"
+                },
+                {
+                  "$ref": "#/$defs/def_drill_map"
+                },
+                {
+                  "$ref": "#/$defs/def_area"
+                },
+                {
+                  "$ref": "#/$defs/def_schema"
+                },
+                {
+                  "$ref": "#/$defs/def_domain"
+                },
+                {
+                  "$ref": "#/$defs/def_dimension"
+                },
+                {
+                  "$ref": "#/$defs/def_map"
+                },
+                {
+                  "$ref": "#/$defs/def_hierarchy"
+                },
+                {
+                  "$ref": "#/$defs/def_measure"
+                },
+                {
+                  "$ref": "#/$defs/def_cubelet"
+                },
+                {
+                  "$ref": "#/$defs/def_md2db_cubelet"
+                },
+                {
+                  "$ref": "#/$defs/def_md2db_domain"
+                },
+                {
+                  "$ref": "#/$defs/def_md2db_map"
+                },
+                {
+                  "$ref": "#/$defs/def_md2er_dimension"
+                },
+                {
+                  "$ref": "#/$defs/def_md2er_cubelet"
+                },
+                {
+                  "$ref": "#/$defs/def_world"
+                },
+                {
+                  "$ref": "#/$defs/def_term"
+                },
+                {
+                  "$ref": "#/$defs/def_pattern"
+                },
+                {
+                  "$ref": "#/$defs/def_example"
+                },
+                {
+                  "$ref": "#/$defs/def_parameter"
+                },
+                {
+                  "$ref": "#/$defs/def_action"
+                },
+                {
+                  "$ref": "#/$defs/def_service"
+                },
+                {
+                  "$ref": "#/$defs/def_approval"
+                },
+                {
+                  "$ref": "#/$defs/def_program"
+                },
+                {
+                  "$ref": "#/$defs/def_recipe"
+                },
+                {
+                  "$ref": "#/$defs/def_subkind"
+                },
+                {
+                  "$ref": "#/$defs/def_kind"
+                },
+                {
+                  "$ref": "#/$defs/def_event"
+                },
+                {
+                  "$ref": "#/$defs/def_phase"
+                },
+                {
+                  "$ref": "#/$defs/def_quality"
+                },
+                {
+                  "$ref": "#/$defs/def_relation_type"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2md_kind"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2md_role"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2md_quality"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2md_event"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2er_kind"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2er_role"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2er_event"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2er_quality"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2er_phase"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2db_concept"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "defs": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/def_project"
+                },
+                {
+                  "$ref": "#/$defs/def_table"
+                },
+                {
+                  "$ref": "#/$defs/def_view"
+                },
+                {
+                  "$ref": "#/$defs/def_column"
+                },
+                {
+                  "$ref": "#/$defs/def_index"
+                },
+                {
+                  "$ref": "#/$defs/def_constraint"
+                },
+                {
+                  "$ref": "#/$defs/def_fk"
+                },
+                {
+                  "$ref": "#/$defs/def_procedure"
+                },
+                {
+                  "$ref": "#/$defs/def_entity"
+                },
+                {
+                  "$ref": "#/$defs/def_attribute"
+                },
+                {
+                  "$ref": "#/$defs/def_relation"
+                },
+                {
+                  "$ref": "#/$defs/def_er2db_entity"
+                },
+                {
+                  "$ref": "#/$defs/def_er2db_attribute"
+                },
+                {
+                  "$ref": "#/$defs/def_er2db_relation"
+                },
+                {
+                  "$ref": "#/$defs/def_query"
+                },
+                {
+                  "$ref": "#/$defs/def_role_closed"
+                },
+                {
+                  "$ref": "#/$defs/def_er2cnc_role"
+                },
+                {
+                  "$ref": "#/$defs/def_drill_map"
+                },
+                {
+                  "$ref": "#/$defs/def_area"
+                },
+                {
+                  "$ref": "#/$defs/def_schema"
+                },
+                {
+                  "$ref": "#/$defs/def_domain"
+                },
+                {
+                  "$ref": "#/$defs/def_dimension"
+                },
+                {
+                  "$ref": "#/$defs/def_map"
+                },
+                {
+                  "$ref": "#/$defs/def_hierarchy"
+                },
+                {
+                  "$ref": "#/$defs/def_measure"
+                },
+                {
+                  "$ref": "#/$defs/def_cubelet"
+                },
+                {
+                  "$ref": "#/$defs/def_md2db_cubelet"
+                },
+                {
+                  "$ref": "#/$defs/def_md2db_domain"
+                },
+                {
+                  "$ref": "#/$defs/def_md2db_map"
+                },
+                {
+                  "$ref": "#/$defs/def_md2er_dimension"
+                },
+                {
+                  "$ref": "#/$defs/def_md2er_cubelet"
+                },
+                {
+                  "$ref": "#/$defs/def_world"
+                },
+                {
+                  "$ref": "#/$defs/def_term"
+                },
+                {
+                  "$ref": "#/$defs/def_pattern"
+                },
+                {
+                  "$ref": "#/$defs/def_example"
+                },
+                {
+                  "$ref": "#/$defs/def_parameter"
+                },
+                {
+                  "$ref": "#/$defs/def_action"
+                },
+                {
+                  "$ref": "#/$defs/def_service"
+                },
+                {
+                  "$ref": "#/$defs/def_approval"
+                },
+                {
+                  "$ref": "#/$defs/def_program"
+                },
+                {
+                  "$ref": "#/$defs/def_recipe"
+                },
+                {
+                  "$ref": "#/$defs/def_subkind"
+                },
+                {
+                  "$ref": "#/$defs/def_kind"
+                },
+                {
+                  "$ref": "#/$defs/def_event"
+                },
+                {
+                  "$ref": "#/$defs/def_phase"
+                },
+                {
+                  "$ref": "#/$defs/def_quality"
+                },
+                {
+                  "$ref": "#/$defs/def_relation_type"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2md_kind"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2md_role"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2md_quality"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2md_event"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2er_kind"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2er_role"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2er_event"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2er_quality"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2er_phase"
+                },
+                {
+                  "$ref": "#/$defs/def_cn2db_concept"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$"
+    },
+    "genericRef": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/identifier"
+        }
+      },
+      "required": [
+        "ref"
+      ],
+      "additionalProperties": false
+    },
+    "genericTriple": {
+      "type": "object",
+      "properties": {
+        "triple": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "triple"
+      ],
+      "additionalProperties": false
+    },
+    "embeddedBlock": {
+      "type": "object",
+      "properties": {
+        "block": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9-]*$"
+        },
+        "form": {
+          "enum": [
+            "string",
+            "tripleString"
+          ]
+        }
+      },
+      "required": [
+        "block"
+      ],
+      "additionalProperties": false,
+      "not": {
+        "required": [
+          "tag",
+          "form"
+        ]
+      }
+    },
+    "genericValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/genericRef"
+        },
+        {
+          "$ref": "#/$defs/genericTriple"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/genericValue"
+          }
+        },
+        {
+          "anyOf": [
+            {
+              "type": "object",
+              "patternProperties": {
+                "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+                  "$ref": "#/$defs/genericValue"
+                }
+              },
+              "additionalProperties": false,
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "ref"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "triple"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "call"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "object"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "type": "object",
+                  "patternProperties": {
+                    "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+                      "$ref": "#/$defs/genericValue"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "object"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "call": {
+              "$ref": "#/$defs/identifier"
+            },
+            "args": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/genericValue"
+              }
+            }
+          },
+          "required": [
+            "call",
+            "args"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "cnValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/genericRef"
+        },
+        {
+          "$ref": "#/$defs/genericTriple"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cnValue"
+          }
+        },
+        {
+          "anyOf": [
+            {
+              "type": "object",
+              "patternProperties": {
+                "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+                  "$ref": "#/$defs/cnValue"
+                }
+              },
+              "additionalProperties": false,
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "ref"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "triple"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "call"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "object"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "type": "object",
+                  "patternProperties": {
+                    "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+                      "$ref": "#/$defs/cnValue"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "object"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      ]
+    },
+    "autoValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/genericRef"
+        },
+        {
+          "$ref": "#/$defs/genericTriple"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/autoValue"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "object": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "patternProperties": {
+                  "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+                    "$ref": "#/$defs/autoValue"
+                  }
+                },
+                "additionalProperties": false,
+                "minProperties": 1,
+                "maxProperties": 1
+              }
+            }
+          },
+          "required": [
+            "object"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "number"
+            },
+            "unit": {
+              "$ref": "#/$defs/identifier"
+            }
+          },
+          "required": [
+            "amount",
+            "unit"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "$ref": "#/$defs/identifier"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tag",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "call": {
+              "$ref": "#/$defs/identifier"
+            },
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "patternProperties": {
+                  "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+                    "$ref": "#/$defs/autoValue"
+                  }
+                },
+                "additionalProperties": false,
+                "minProperties": 1,
+                "maxProperties": 1
+              }
+            }
+          },
+          "required": [
+            "call",
+            "entries"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "star": {
+              "const": true
+            }
+          },
+          "required": [
+            "star"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "value_stringLiteralForm": {
+      "type": "string"
+    },
+    "value_localizedString": {
+      "type": "object",
+      "patternProperties": {
+        "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_listOfStrings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/value_stringLiteralForm"
+      }
+    },
+    "body_projectDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_primaryKeyValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        {
+          "$ref": "#/$defs/value_listOfIds"
+        },
+        {
+          "$ref": "#/$defs/identifier"
+        }
+      ]
+    },
+    "value_listOfIds": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/identifier"
+      }
+    },
+    "value_columnDefList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "properties": {
+            "$ref": "#/$defs/body_columnDef"
+          }
+        },
+        "required": [
+          "id",
+          "properties"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "value_dataType": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/value_typeValue"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "$ref": "#/$defs/value_typeValue"
+            },
+            "length": {
+              "type": "number"
+            },
+            "precision": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false,
+          "minProperties": 1
+        }
+      ]
+    },
+    "value_typeValue": {
+      "anyOf": [
+        {
+          "enum": [
+            "text"
+          ]
+        },
+        {
+          "enum": [
+            "int"
+          ]
+        },
+        {
+          "enum": [
+            "float"
+          ]
+        },
+        {
+          "enum": [
+            "bool"
+          ]
+        },
+        {
+          "enum": [
+            "datetime"
+          ]
+        },
+        {
+          "enum": [
+            "string"
+          ]
+        },
+        {
+          "enum": [
+            "boolean"
+          ]
+        },
+        {
+          "enum": [
+            "number"
+          ]
+        },
+        {
+          "enum": [
+            "integer"
+          ]
+        },
+        {
+          "enum": [
+            "double"
+          ]
+        },
+        {
+          "enum": [
+            "object"
+          ]
+        },
+        {
+          "enum": [
+            "list"
+          ]
+        },
+        {
+          "enum": [
+            "char"
+          ]
+        },
+        {
+          "enum": [
+            "varchar"
+          ]
+        },
+        {
+          "enum": [
+            "decimal"
+          ]
+        },
+        {
+          "enum": [
+            "date"
+          ]
+        },
+        {
+          "enum": [
+            "timestamp"
+          ]
+        },
+        {
+          "$ref": "#/$defs/identifier"
+        }
+      ]
+    },
+    "value_localizedStringList": {
+      "type": "object",
+      "patternProperties": {
+        "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_matchMethodValue": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "argument": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "body_searchBlock": {
+      "type": "object",
+      "properties": {
+        "keywords": {
+          "$ref": "#/$defs/value_localizedStringList"
+        },
+        "patterns": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "descriptions": {
+          "$ref": "#/$defs/value_localizedStringList"
+        },
+        "examples": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "aliases": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "searchable": {
+          "type": "boolean"
+        },
+        "fuzzy": {
+          "type": "boolean"
+        },
+        "method": {
+          "$ref": "#/$defs/value_matchMethodValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_object_": {
+      "anyOf": [
+        {
+          "type": "object",
+          "patternProperties": {
+            "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+              "$ref": "#/$defs/genericValue"
+            }
+          },
+          "additionalProperties": false,
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "ref"
+                ]
+              },
+              {
+                "required": [
+                  "triple"
+                ]
+              },
+              {
+                "required": [
+                  "call"
+                ]
+              },
+              {
+                "required": [
+                  "object"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "object": {
+              "type": "object",
+              "patternProperties": {
+                "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+                  "$ref": "#/$defs/genericValue"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "object"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "body_columnDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "type": {
+          "$ref": "#/$defs/value_dataType"
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "isKey": {
+          "type": "boolean"
+        },
+        "indexed": {
+          "type": "boolean"
+        },
+        "search": {
+          "$ref": "#/$defs/body_searchBlock"
+        },
+        "semantics": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "lexicon": {
+          "$ref": "#/$defs/value_object_"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_indexDefList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "properties": {
+            "$ref": "#/$defs/body_indexDef"
+          }
+        },
+        "required": [
+          "id",
+          "properties"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "value_indexTypeValue": {
+      "anyOf": [
+        {
+          "enum": [
+            "primary"
+          ]
+        },
+        {
+          "enum": [
+            "secondary"
+          ]
+        },
+        {
+          "enum": [
+            "ordered"
+          ]
+        },
+        {
+          "enum": [
+            "btree"
+          ]
+        },
+        {
+          "enum": [
+            "fulltext"
+          ]
+        }
+      ]
+    },
+    "body_indexDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "type": {
+          "$ref": "#/$defs/value_indexTypeValue"
+        },
+        "columns": {
+          "$ref": "#/$defs/value_listOfStrings"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_constraintDefList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "properties": {
+            "$ref": "#/$defs/body_constraintDef"
+          }
+        },
+        "required": [
+          "id",
+          "properties"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "value_constraintTypeValue": {
+      "anyOf": [
+        {
+          "enum": [
+            "unique"
+          ]
+        },
+        {
+          "enum": [
+            "notNull"
+          ]
+        }
+      ]
+    },
+    "body_constraintDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "type": {
+          "$ref": "#/$defs/value_constraintTypeValue"
+        },
+        "columns": {
+          "$ref": "#/$defs/value_listOfStrings"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_tableDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "primaryKey": {
+          "$ref": "#/$defs/value_primaryKeyValue"
+        },
+        "columns": {
+          "$ref": "#/$defs/value_columnDefList"
+        },
+        "indices": {
+          "$ref": "#/$defs/value_indexDefList"
+        },
+        "constraints": {
+          "$ref": "#/$defs/value_constraintDefList"
+        },
+        "search": {
+          "$ref": "#/$defs/body_searchBlock"
+        },
+        "semantics": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "lexicon": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "management": {
+          "$ref": "#/$defs/identifier"
+        },
+        "changeSemantics": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "$ref": "#/$defs/identifier"
+            },
+            "roles": {
+              "type": "object",
+              "patternProperties": {
+                "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+                  "$ref": "#/$defs/identifier"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "mode",
+            "roles"
+          ],
+          "additionalProperties": false
+        },
+        "writeback": {
+          "$ref": "#/$defs/value_object_"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_embeddedBlock": {
+      "$ref": "#/$defs/embeddedBlock"
+    },
+    "body_viewDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "columns": {
+          "$ref": "#/$defs/value_columnDefList"
+        },
+        "definitionSql": {
+          "$ref": "#/$defs/value_embeddedBlock"
+        },
+        "search": {
+          "$ref": "#/$defs/body_searchBlock"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_value": {
+      "$ref": "#/$defs/genericValue"
+    },
+    "body_fkDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "from": {
+          "$ref": "#/$defs/value_value"
+        },
+        "to": {
+          "$ref": "#/$defs/value_value"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_parameterDefList": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/body_parameterInline"
+      }
+    },
+    "body_parameterInline": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "type": {
+          "$ref": "#/$defs/value_dataType"
+        },
+        "label": {
+          "$ref": "#/$defs/value_stringLiteralForm"
+        },
+        "direction": {
+          "$ref": "#/$defs/identifier"
+        },
+        "defaultValue": {
+          "$ref": "#/$defs/value_stringLiteralForm"
+        },
+        "binds": {
+          "$ref": "#/$defs/value_listOfIds"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_procedureDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "parameters": {
+          "$ref": "#/$defs/value_parameterDefList"
+        },
+        "resultColumns": {
+          "$ref": "#/$defs/value_columnDefList"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_attributeDefList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "properties": {
+            "$ref": "#/$defs/body_attributeDef"
+          }
+        },
+        "required": [
+          "id",
+          "properties"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "value_valueLabelsBody": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/value_valueLabelValue"
+      }
+    },
+    "value_valueLabelValue": {
+      "type": "object",
+      "patternProperties": {
+        "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_bindingValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identifier"
+        },
+        {
+          "$ref": "#/$defs/body_bindingBlock"
+        }
+      ]
+    },
+    "value_bindingColumnMap": {
+      "type": "object",
+      "patternProperties": {
+        "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+          "$ref": "#/$defs/value_bindingColumnValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_bindingColumnValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identifier"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "target": {
+              "$ref": "#/$defs/value_bindingTargetValue"
+            }
+          },
+          "required": [
+            "target"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/value_object_"
+        }
+      ]
+    },
+    "value_bindingTargetValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identifier"
+        },
+        {
+          "$ref": "#/$defs/value_object_"
+        }
+      ]
+    },
+    "body_bindingBlock": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_object_"
+            },
+            {
+              "$ref": "#/$defs/identifier"
+            }
+          ]
+        },
+        "columns": {
+          "$ref": "#/$defs/value_bindingColumnMap"
+        },
+        "fk": {
+          "$ref": "#/$defs/identifier"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_aggregationValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identifier"
+        },
+        {
+          "$ref": "#/$defs/value_object_"
+        }
+      ]
+    },
+    "value_participant": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/identifier"
+        },
+        "as": {
+          "$ref": "#/$defs/identifier"
+        }
+      },
+      "required": [
+        "ref"
+      ],
+      "additionalProperties": false
+    },
+    "value_cnObject": {
+      "anyOf": [
+        {
+          "type": "object",
+          "patternProperties": {
+            "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+              "$ref": "#/$defs/cnValue"
+            }
+          },
+          "additionalProperties": false,
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "ref"
+                ]
+              },
+              {
+                "required": [
+                  "triple"
+                ]
+              },
+              {
+                "required": [
+                  "call"
+                ]
+              },
+              {
+                "required": [
+                  "object"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "object": {
+              "type": "object",
+              "patternProperties": {
+                "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+                  "$ref": "#/$defs/cnValue"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "object"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "value_cnValue": {
+      "$ref": "#/$defs/cnValue"
+    },
+    "body_cnBody": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "description": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/value_stringLiteralForm"
+                },
+                {
+                  "$ref": "#/$defs/value_localizedString"
+                }
+              ]
+            },
+            "label": {
+              "$ref": "#/$defs/value_localizedString"
+            },
+            "tags": {
+              "$ref": "#/$defs/value_listOfStrings"
+            },
+            "kind": {
+              "$ref": "#/$defs/identifier"
+            },
+            "role": {
+              "$ref": "#/$defs/identifier"
+            },
+            "quality": {
+              "$ref": "#/$defs/identifier"
+            },
+            "event": {
+              "$ref": "#/$defs/identifier"
+            },
+            "phase": {
+              "$ref": "#/$defs/identifier"
+            },
+            "concept": {
+              "$ref": "#/$defs/identifier"
+            },
+            "grounds": {
+              "$ref": "#/$defs/identifier"
+            },
+            "involves": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/value_participant"
+              },
+              "minItems": 1
+            },
+            "period": {
+              "$ref": "#/$defs/value_cnObject"
+            },
+            "extent": {
+              "$ref": "#/$defs/identifier"
+            },
+            "basis": {
+              "$ref": "#/$defs/identifier"
+            },
+            "definition": {
+              "$ref": "#/$defs/value_embeddedBlock"
+            },
+            "members": {
+              "$ref": "#/$defs/value_embeddedBlock"
+            },
+            "from": {
+              "$ref": "#/$defs/identifier"
+            },
+            "until": {
+              "$ref": "#/$defs/identifier"
+            },
+            "per": {
+              "$ref": "#/$defs/identifier"
+            },
+            "value_space": {
+              "$ref": "#/$defs/identifier"
+            },
+            "lexicon": {
+              "$ref": "#/$defs/value_object_"
+            }
+          },
+          "additionalProperties": false,
+          "patternProperties": {
+            "^(?!description$|label$|tags$|kind$|role$|quality$|event$|phase$|concept$|grounds$|involves$|period$|extent$|basis$|definition$|members$|from$|until$|per$|value_space$|lexicon$)(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|action|aggregation|aliases|allocation|approval|area|args|as|attribute|attributes|automation|basis|binding|bool|boolean|btree|calc|canvas|cardinality|changeSemantics|char|class|classify|cn|cn2db_concept|cn2er_event|cn2er_kind|cn2er_phase|cn2er_quality|cn2er_role|cn2md_event|cn2md_kind|cn2md_quality|cn2md_role|cnc|codeAttribute|column|columns|concept|constraint|constraints|cubelet|date|datetime|db|decimal|def|default|definition|definitionSql|delivery|deployment|description|descriptions|dimension|direction|display|displayLabel|domain|double|drill_map|engine|entities|entity|er|er2cnc_role|er2db_attribute|er2db_entity|er2db_relation|event|example|examples|executor|extends|extent|false|fk|float|for|forms|from|fulltext|fuzzy|grain|grant|graph|grounds|hierarchies|hosts|identity|import|index|indexed|indices|int|integer|involves|isKey|join|journaling|key|keywords|kind|label|labelPlural|language|layout|length|levels|lexicon|list|locale|management|map|mask|match|md|md2db_cubelet|md2db_domain|md2db_map|md2er_cubelet|md2er_dimension|measure|measures|members|method|model|name|nameAttribute|notNull|null|number|object|objects|on|optional|ordered|override|own|package|packages|parameter|parameters|pattern|patterns|per|period|phase|precision|primary|primaryKey|procedure|process|program|project|publish|quality|query|recipe|relation|relation_type|resolve|restrict|resultColumns|role|roles|schema|search|searchable|secondary|security|semantics|sense_priority|service|set|shape|source|sourceText|staging|states|step|steps|storage|string|subkind|table|tags|target|term|text|timestamp|to|transition|transitions|true|ttrl|type|unique|until|validBy|valueLabels|value_space|varchar|version|view|whereFilter|world|writeback)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)$": {
+              "$ref": "#/$defs/value_cnValue"
+            }
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/value_stringLiteralForm"
+                  },
+                  {
+                    "$ref": "#/$defs/value_localizedString"
+                  }
+                ]
+              },
+              "label": {
+                "$ref": "#/$defs/value_localizedString"
+              },
+              "tags": {
+                "$ref": "#/$defs/value_listOfStrings"
+              },
+              "kind": {
+                "$ref": "#/$defs/identifier"
+              },
+              "role": {
+                "$ref": "#/$defs/identifier"
+              },
+              "quality": {
+                "$ref": "#/$defs/identifier"
+              },
+              "event": {
+                "$ref": "#/$defs/identifier"
+              },
+              "phase": {
+                "$ref": "#/$defs/identifier"
+              },
+              "concept": {
+                "$ref": "#/$defs/identifier"
+              },
+              "grounds": {
+                "$ref": "#/$defs/identifier"
+              },
+              "involves": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/value_participant"
+                },
+                "minItems": 1
+              },
+              "period": {
+                "$ref": "#/$defs/value_cnObject"
+              },
+              "extent": {
+                "$ref": "#/$defs/identifier"
+              },
+              "basis": {
+                "$ref": "#/$defs/identifier"
+              },
+              "definition": {
+                "$ref": "#/$defs/value_embeddedBlock"
+              },
+              "members": {
+                "$ref": "#/$defs/value_embeddedBlock"
+              },
+              "from": {
+                "$ref": "#/$defs/identifier"
+              },
+              "until": {
+                "$ref": "#/$defs/identifier"
+              },
+              "per": {
+                "$ref": "#/$defs/identifier"
+              },
+              "value_space": {
+                "$ref": "#/$defs/identifier"
+              },
+              "lexicon": {
+                "$ref": "#/$defs/value_object_"
+              }
+            },
+            "additionalProperties": false,
+            "patternProperties": {
+              "^(?!description$|label$|tags$|kind$|role$|quality$|event$|phase$|concept$|grounds$|involves$|period$|extent$|basis$|definition$|members$|from$|until$|per$|value_space$|lexicon$)(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|action|aggregation|aliases|allocation|approval|area|args|as|attribute|attributes|automation|basis|binding|bool|boolean|btree|calc|canvas|cardinality|changeSemantics|char|class|classify|cn|cn2db_concept|cn2er_event|cn2er_kind|cn2er_phase|cn2er_quality|cn2er_role|cn2md_event|cn2md_kind|cn2md_quality|cn2md_role|cnc|codeAttribute|column|columns|concept|constraint|constraints|cubelet|date|datetime|db|decimal|def|default|definition|definitionSql|delivery|deployment|description|descriptions|dimension|direction|display|displayLabel|domain|double|drill_map|engine|entities|entity|er|er2cnc_role|er2db_attribute|er2db_entity|er2db_relation|event|example|examples|executor|extends|extent|false|fk|float|for|forms|from|fulltext|fuzzy|grain|grant|graph|grounds|hierarchies|hosts|identity|import|index|indexed|indices|int|integer|involves|isKey|join|journaling|key|keywords|kind|label|labelPlural|language|layout|length|levels|lexicon|list|locale|management|map|mask|match|md|md2db_cubelet|md2db_domain|md2db_map|md2er_cubelet|md2er_dimension|measure|measures|members|method|model|name|nameAttribute|notNull|null|number|object|objects|on|optional|ordered|override|own|package|packages|parameter|parameters|pattern|patterns|per|period|phase|precision|primary|primaryKey|procedure|process|program|project|publish|quality|query|recipe|relation|relation_type|resolve|restrict|resultColumns|role|roles|schema|search|searchable|secondary|security|semantics|sense_priority|service|set|shape|source|sourceText|staging|states|step|steps|storage|string|subkind|table|tags|target|term|text|timestamp|to|transition|transitions|true|ttrl|type|unique|until|validBy|valueLabels|value_space|varchar|version|view|whereFilter|world|writeback)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)$": {
+                "$ref": "#/$defs/value_cnValue"
+              }
+            },
+            "minProperties": 1,
+            "maxProperties": 1
+          }
+        }
+      ]
+    },
+    "body_attributeDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "type": {
+          "$ref": "#/$defs/value_dataType"
+        },
+        "isKey": {
+          "type": "boolean"
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "valueLabels": {
+          "$ref": "#/$defs/value_valueLabelsBody"
+        },
+        "displayLabel": {
+          "$ref": "#/$defs/value_localizedString"
+        },
+        "search": {
+          "$ref": "#/$defs/body_searchBlock"
+        },
+        "semantics": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "lexicon": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "binding": {
+          "$ref": "#/$defs/value_bindingValue"
+        },
+        "domain": {
+          "$ref": "#/$defs/identifier"
+        },
+        "aggregation": {
+          "$ref": "#/$defs/value_aggregationValue"
+        },
+        "states": {
+          "$ref": "#/$defs/value_listOfIds"
+        },
+        "transitions": {
+          "type": "object",
+          "patternProperties": {
+            "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/identifier"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "concept": {
+          "$ref": "#/$defs/body_cnBody"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_entityDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "labelPlural": {
+          "type": "string"
+        },
+        "nameAttribute": {
+          "$ref": "#/$defs/identifier"
+        },
+        "codeAttribute": {
+          "$ref": "#/$defs/identifier"
+        },
+        "aliases": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "attributes": {
+          "$ref": "#/$defs/value_attributeDefList"
+        },
+        "roles": {
+          "$ref": "#/$defs/value_listOfIds"
+        },
+        "displayLabel": {
+          "$ref": "#/$defs/value_localizedString"
+        },
+        "search": {
+          "$ref": "#/$defs/body_searchBlock"
+        },
+        "semantics": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "lexicon": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "binding": {
+          "$ref": "#/$defs/value_bindingValue"
+        },
+        "concept": {
+          "$ref": "#/$defs/body_cnBody"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_list": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/value_value"
+      }
+    },
+    "body_relationDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "from": {
+          "$ref": "#/$defs/value_value"
+        },
+        "to": {
+          "$ref": "#/$defs/value_value"
+        },
+        "cardinality": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "join": {
+          "$ref": "#/$defs/value_list"
+        },
+        "search": {
+          "$ref": "#/$defs/body_searchBlock"
+        },
+        "binding": {
+          "$ref": "#/$defs/value_bindingValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_er2dbEntityDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "entity": {
+          "$ref": "#/$defs/identifier"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_object_"
+            },
+            {
+              "$ref": "#/$defs/identifier"
+            }
+          ]
+        },
+        "whereFilter": {
+          "$ref": "#/$defs/value_object_"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_er2dbAttributeDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "attribute": {
+          "$ref": "#/$defs/identifier"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_object_"
+            },
+            {
+              "$ref": "#/$defs/identifier"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_er2dbRelationDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "relation": {
+          "$ref": "#/$defs/identifier"
+        },
+        "fk": {
+          "$ref": "#/$defs/identifier"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_languageValue": {
+      "anyOf": [
+        {
+          "enum": [
+            "SQL"
+          ]
+        },
+        {
+          "enum": [
+            "TRANSFORMATION_DSL"
+          ]
+        },
+        {
+          "enum": [
+            "DATAFRAME_DSL"
+          ]
+        },
+        {
+          "enum": [
+            "REL_NODE"
+          ]
+        }
+      ]
+    },
+    "body_queryDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "language": {
+          "$ref": "#/$defs/value_languageValue"
+        },
+        "parameters": {
+          "$ref": "#/$defs/value_parameterDefList"
+        },
+        "sourceText": {
+          "$ref": "#/$defs/value_embeddedBlock"
+        },
+        "search": {
+          "$ref": "#/$defs/body_searchBlock"
+        },
+        "skipSecurity": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_autoValue": {
+      "$ref": "#/$defs/autoValue"
+    },
+    "body_roleDef": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "description": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/value_stringLiteralForm"
+                },
+                {
+                  "$ref": "#/$defs/value_localizedString"
+                }
+              ]
+            },
+            "tags": {
+              "$ref": "#/$defs/value_listOfStrings"
+            },
+            "label": {
+              "$ref": "#/$defs/value_localizedString"
+            },
+            "search": {
+              "$ref": "#/$defs/body_searchBlock"
+            },
+            "resolve": {
+              "$ref": "#/$defs/value_autoValue"
+            },
+            "delivery": {
+              "$ref": "#/$defs/value_autoValue"
+            },
+            "members": {
+              "$ref": "#/$defs/value_autoValue"
+            },
+            "kind": {
+              "$ref": "#/$defs/identifier"
+            },
+            "role": {
+              "$ref": "#/$defs/identifier"
+            },
+            "quality": {
+              "$ref": "#/$defs/identifier"
+            },
+            "event": {
+              "$ref": "#/$defs/identifier"
+            },
+            "phase": {
+              "$ref": "#/$defs/identifier"
+            },
+            "concept": {
+              "$ref": "#/$defs/identifier"
+            },
+            "grounds": {
+              "$ref": "#/$defs/identifier"
+            },
+            "involves": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/value_participant"
+              },
+              "minItems": 1
+            },
+            "period": {
+              "$ref": "#/$defs/value_cnObject"
+            },
+            "lexicon": {
+              "$ref": "#/$defs/value_object_"
+            }
+          },
+          "additionalProperties": false,
+          "patternProperties": {
+            "^(?!description$|tags$|label$|search$|resolve$|delivery$|members$|kind$|role$|quality$|event$|phase$|concept$|grounds$|involves$|period$|lexicon$)(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|action|aggregation|aliases|allocation|approval|area|args|as|attribute|attributes|automation|basis|binding|bool|boolean|btree|calc|canvas|cardinality|changeSemantics|char|class|classify|cn|cn2db_concept|cn2er_event|cn2er_kind|cn2er_phase|cn2er_quality|cn2er_role|cn2md_event|cn2md_kind|cn2md_quality|cn2md_role|cnc|codeAttribute|column|columns|concept|constraint|constraints|cubelet|date|datetime|db|decimal|def|default|definition|definitionSql|delivery|deployment|description|descriptions|dimension|direction|display|displayLabel|domain|double|drill_map|engine|entities|entity|er|er2cnc_role|er2db_attribute|er2db_entity|er2db_relation|event|example|examples|executor|extends|extent|false|fk|float|for|forms|from|fulltext|fuzzy|grain|grant|graph|grounds|hierarchies|hosts|identity|import|index|indexed|indices|int|integer|involves|isKey|join|journaling|key|keywords|kind|label|labelPlural|language|layout|length|levels|lexicon|list|locale|management|map|mask|match|md|md2db_cubelet|md2db_domain|md2db_map|md2er_cubelet|md2er_dimension|measure|measures|members|method|model|name|nameAttribute|notNull|null|number|object|objects|on|optional|ordered|override|own|package|packages|parameter|parameters|pattern|patterns|per|period|phase|precision|primary|primaryKey|procedure|process|program|project|publish|quality|query|recipe|relation|relation_type|resolve|restrict|resultColumns|role|roles|schema|search|searchable|secondary|security|semantics|sense_priority|service|set|shape|source|sourceText|staging|states|step|steps|storage|string|subkind|table|tags|target|term|text|timestamp|to|transition|transitions|true|ttrl|type|unique|until|validBy|valueLabels|value_space|varchar|version|view|whereFilter|world|writeback)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)$": {
+              "$ref": "#/$defs/value_cnValue"
+            }
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/value_stringLiteralForm"
+                  },
+                  {
+                    "$ref": "#/$defs/value_localizedString"
+                  }
+                ]
+              },
+              "tags": {
+                "$ref": "#/$defs/value_listOfStrings"
+              },
+              "label": {
+                "$ref": "#/$defs/value_localizedString"
+              },
+              "search": {
+                "$ref": "#/$defs/body_searchBlock"
+              },
+              "resolve": {
+                "$ref": "#/$defs/value_autoValue"
+              },
+              "delivery": {
+                "$ref": "#/$defs/value_autoValue"
+              },
+              "members": {
+                "$ref": "#/$defs/value_autoValue"
+              },
+              "kind": {
+                "$ref": "#/$defs/identifier"
+              },
+              "role": {
+                "$ref": "#/$defs/identifier"
+              },
+              "quality": {
+                "$ref": "#/$defs/identifier"
+              },
+              "event": {
+                "$ref": "#/$defs/identifier"
+              },
+              "phase": {
+                "$ref": "#/$defs/identifier"
+              },
+              "concept": {
+                "$ref": "#/$defs/identifier"
+              },
+              "grounds": {
+                "$ref": "#/$defs/identifier"
+              },
+              "involves": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/value_participant"
+                },
+                "minItems": 1
+              },
+              "period": {
+                "$ref": "#/$defs/value_cnObject"
+              },
+              "lexicon": {
+                "$ref": "#/$defs/value_object_"
+              }
+            },
+            "additionalProperties": false,
+            "patternProperties": {
+              "^(?!description$|tags$|label$|search$|resolve$|delivery$|members$|kind$|role$|quality$|event$|phase$|concept$|grounds$|involves$|period$|lexicon$)(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|action|aggregation|aliases|allocation|approval|area|args|as|attribute|attributes|automation|basis|binding|bool|boolean|btree|calc|canvas|cardinality|changeSemantics|char|class|classify|cn|cn2db_concept|cn2er_event|cn2er_kind|cn2er_phase|cn2er_quality|cn2er_role|cn2md_event|cn2md_kind|cn2md_quality|cn2md_role|cnc|codeAttribute|column|columns|concept|constraint|constraints|cubelet|date|datetime|db|decimal|def|default|definition|definitionSql|delivery|deployment|description|descriptions|dimension|direction|display|displayLabel|domain|double|drill_map|engine|entities|entity|er|er2cnc_role|er2db_attribute|er2db_entity|er2db_relation|event|example|examples|executor|extends|extent|false|fk|float|for|forms|from|fulltext|fuzzy|grain|grant|graph|grounds|hierarchies|hosts|identity|import|index|indexed|indices|int|integer|involves|isKey|join|journaling|key|keywords|kind|label|labelPlural|language|layout|length|levels|lexicon|list|locale|management|map|mask|match|md|md2db_cubelet|md2db_domain|md2db_map|md2er_cubelet|md2er_dimension|measure|measures|members|method|model|name|nameAttribute|notNull|null|number|object|objects|on|optional|ordered|override|own|package|packages|parameter|parameters|pattern|patterns|per|period|phase|precision|primary|primaryKey|procedure|process|program|project|publish|quality|query|recipe|relation|relation_type|resolve|restrict|resultColumns|role|roles|schema|search|searchable|secondary|security|semantics|sense_priority|service|set|shape|source|sourceText|staging|states|step|steps|storage|string|subkind|table|tags|target|term|text|timestamp|to|transition|transitions|true|ttrl|type|unique|until|validBy|valueLabels|value_space|varchar|version|view|whereFilter|world|writeback)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)$": {
+                "$ref": "#/$defs/value_cnValue"
+              }
+            },
+            "minProperties": 1,
+            "maxProperties": 1
+          }
+        }
+      ]
+    },
+    "body_er2cncRoleDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "entity": {
+          "$ref": "#/$defs/identifier"
+        },
+        "role": {
+          "$ref": "#/$defs/identifier"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_drillArgsMap": {
+      "type": "object",
+      "patternProperties": {
+        "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_drillMapDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "from": {
+          "$ref": "#/$defs/value_value"
+        },
+        "to": {
+          "$ref": "#/$defs/value_value"
+        },
+        "args": {
+          "$ref": "#/$defs/value_drillArgsMap"
+        },
+        "display": {
+          "$ref": "#/$defs/value_localizedString"
+        },
+        "override": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_areaDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "packages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "entities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_schemaDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "columns": {
+          "$ref": "#/$defs/value_columnDefList"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_restrictBlock": {
+      "type": "object",
+      "patternProperties": {
+        "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+          "$ref": "#/$defs/value_restrictValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_restrictValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/value_rangeLiteral"
+        },
+        {
+          "$ref": "#/$defs/value_membersBlock"
+        },
+        {
+          "$ref": "#/$defs/value_value"
+        }
+      ]
+    },
+    "value_rangeLiteral": {
+      "type": "object",
+      "properties": {
+        "range": {
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "number"
+            },
+            "to": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "range"
+      ],
+      "additionalProperties": false
+    },
+    "value_membersBlock": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/value_localizedString"
+      }
+    },
+    "body_mdDomainDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "type": {
+          "$ref": "#/$defs/value_dataType"
+        },
+        "kind": {
+          "$ref": "#/$defs/identifier"
+        },
+        "restrict": {
+          "$ref": "#/$defs/value_restrictBlock"
+        },
+        "publish": {
+          "enum": [
+            "members"
+          ]
+        },
+        "concept": {
+          "$ref": "#/$defs/body_cnBody"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_dimensionDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "key": {
+          "$ref": "#/$defs/identifier"
+        },
+        "attributes": {
+          "$ref": "#/$defs/value_attributeDefList"
+        },
+        "hierarchies": {
+          "$ref": "#/$defs/value_listOfIds"
+        },
+        "lexicon": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "concept": {
+          "$ref": "#/$defs/body_cnBody"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_calcRef": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "args": {
+          "type": "object",
+          "patternProperties": {
+            "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "name",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    "body_mdMapDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "from": {
+          "$ref": "#/$defs/value_value"
+        },
+        "to": {
+          "$ref": "#/$defs/value_value"
+        },
+        "cardinality": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "calc": {
+          "$ref": "#/$defs/value_calcRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_levelList": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/value_levelEntry"
+      }
+    },
+    "value_levelEntry": {
+      "type": "object",
+      "properties": {
+        "attribute": {
+          "$ref": "#/$defs/identifier"
+        },
+        "via": {
+          "$ref": "#/$defs/identifier"
+        }
+      },
+      "required": [
+        "attribute"
+      ],
+      "additionalProperties": false
+    },
+    "body_hierarchyDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "dimension": {
+          "$ref": "#/$defs/identifier"
+        },
+        "levels": {
+          "$ref": "#/$defs/value_levelList"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_measureDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "domain": {
+          "$ref": "#/$defs/identifier"
+        },
+        "class": {
+          "$ref": "#/$defs/identifier"
+        },
+        "aggregation": {
+          "$ref": "#/$defs/value_aggregationValue"
+        },
+        "validBy": {
+          "$ref": "#/$defs/identifier"
+        },
+        "lexicon": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "concept": {
+          "$ref": "#/$defs/body_cnBody"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_measuresValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/value_measureInlineList"
+        },
+        {
+          "$ref": "#/$defs/value_listOfIds"
+        }
+      ]
+    },
+    "value_measureInlineList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/identifier"
+          },
+          "properties": {
+            "$ref": "#/$defs/body_measureDef"
+          }
+        },
+        "required": [
+          "id",
+          "properties"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "body_cubeletDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "grain": {
+          "$ref": "#/$defs/value_listOfIds"
+        },
+        "measures": {
+          "$ref": "#/$defs/value_measuresValue"
+        },
+        "lexicon": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "concept": {
+          "$ref": "#/$defs/body_cnBody"
+        }
+      },
+      "additionalProperties": false
+    },
+    "value_shapeValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identifier"
+        },
+        {
+          "$ref": "#/$defs/value_object_"
+        }
+      ]
+    },
+    "value_journalingValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identifier"
+        },
+        {
+          "$ref": "#/$defs/value_object_"
+        }
+      ]
+    },
+    "value_allocationValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identifier"
+        },
+        {
+          "$ref": "#/$defs/value_object_"
+        }
+      ]
+    },
+    "body_md2dbCubeletDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "cubelet": {
+          "$ref": "#/$defs/identifier"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_object_"
+            },
+            {
+              "$ref": "#/$defs/identifier"
+            }
+          ]
+        },
+        "shape": {
+          "$ref": "#/$defs/value_shapeValue"
+        },
+        "attributes": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "measures": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "journaling": {
+          "$ref": "#/$defs/value_journalingValue"
+        },
+        "allocation": {
+          "$ref": "#/$defs/value_allocationValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_md2dbDomainDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "domain": {
+          "$ref": "#/$defs/identifier"
+        },
+        "source": {
+          "$ref": "#/$defs/value_object_"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_md2dbMapDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "map": {
+          "$ref": "#/$defs/identifier"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_object_"
+            },
+            {
+              "$ref": "#/$defs/identifier"
+            }
+          ]
+        },
+        "columns": {
+          "$ref": "#/$defs/value_object_"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_md2erDimensionDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "dimension": {
+          "$ref": "#/$defs/identifier"
+        },
+        "entity": {
+          "$ref": "#/$defs/identifier"
+        },
+        "attributes": {
+          "$ref": "#/$defs/value_object_"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_md2erCubeletDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "cubelet": {
+          "$ref": "#/$defs/identifier"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_object_"
+            },
+            {
+              "$ref": "#/$defs/identifier"
+            }
+          ]
+        },
+        "attributes": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "shape": {
+          "$ref": "#/$defs/value_shapeValue"
+        },
+        "measures": {
+          "$ref": "#/$defs/value_object_"
+        },
+        "journaling": {
+          "$ref": "#/$defs/value_journalingValue"
+        },
+        "allocation": {
+          "$ref": "#/$defs/value_allocationValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_engineDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "type": {
+          "$ref": "#/$defs/value_dataType"
+        },
+        "version": {
+          "type": "string"
+        },
+        "extends": {
+          "$ref": "#/$defs/identifier"
+        }
+      },
+      "additionalProperties": false,
+      "patternProperties": {
+        "^(?!description$|tags$|type$|version$|extends$)(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+          "$ref": "#/$defs/value_value"
+        }
+      }
+    },
+    "body_executorDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "type": {
+          "$ref": "#/$defs/value_dataType"
+        },
+        "version": {
+          "type": "string"
+        },
+        "extends": {
+          "$ref": "#/$defs/identifier"
+        }
+      },
+      "additionalProperties": false,
+      "patternProperties": {
+        "^(?!description$|tags$|type$|version$|extends$)(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+          "$ref": "#/$defs/value_value"
+        }
+      }
+    },
+    "body_worldSchemaDef": {
+      "type": "object",
+      "patternProperties": {
+        "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+          "$ref": "#/$defs/value_dataType"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_storageDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "type": {
+          "$ref": "#/$defs/value_dataType"
+        },
+        "extends": {
+          "$ref": "#/$defs/identifier"
+        },
+        "via": {
+          "$ref": "#/$defs/identifier"
+        },
+        "hosts": {
+          "$ref": "#/$defs/value_listOfIds"
+        },
+        "staging": {
+          "type": "boolean"
+        },
+        "schemas": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/identifier"
+              },
+              "fields": {
+                "$ref": "#/$defs/body_worldSchemaDef"
+              }
+            },
+            "required": [
+              "id",
+              "fields"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false,
+      "patternProperties": {
+        "^(?!description$|tags$|type$|extends$|via$|hosts$|staging$|schemas$)(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+          "$ref": "#/$defs/value_value"
+        }
+      }
+    },
+    "body_autoBody": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "description": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/value_stringLiteralForm"
+                },
+                {
+                  "$ref": "#/$defs/value_localizedString"
+                }
+              ]
+            },
+            "tags": {
+              "$ref": "#/$defs/value_listOfStrings"
+            },
+            "label": {
+              "$ref": "#/$defs/value_localizedString"
+            },
+            "type": {
+              "$ref": "#/$defs/value_dataType"
+            },
+            "columns": {
+              "$ref": "#/$defs/value_columnDefList"
+            },
+            "target": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/value_object_"
+                },
+                {
+                  "$ref": "#/$defs/identifier"
+                }
+              ]
+            },
+            "transition": {
+              "type": "object",
+              "properties": {
+                "attribute": {
+                  "$ref": "#/$defs/identifier"
+                },
+                "to": {
+                  "$ref": "#/$defs/identifier"
+                },
+                "toColumn": {
+                  "$ref": "#/$defs/identifier"
+                },
+                "from": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/identifier"
+                  }
+                }
+              },
+              "required": [
+                "attribute"
+              ],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "required": [
+                    "to"
+                  ],
+                  "not": {
+                    "required": [
+                      "toColumn"
+                    ]
+                  }
+                },
+                {
+                  "required": [
+                    "toColumn"
+                  ],
+                  "not": {
+                    "required": [
+                      "to"
+                    ]
+                  }
+                }
+              ]
+            },
+            "set": {
+              "type": "object",
+              "properties": {
+                "attribute": {
+                  "$ref": "#/$defs/identifier"
+                },
+                "column": {
+                  "$ref": "#/$defs/identifier"
+                }
+              },
+              "required": [
+                "attribute",
+                "column"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false,
+          "patternProperties": {
+            "^(?!description$|tags$|label$|type$|columns$|target$|transition$|set$)(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+              "$ref": "#/$defs/value_autoValue"
+            }
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/value_stringLiteralForm"
+                  },
+                  {
+                    "$ref": "#/$defs/value_localizedString"
+                  }
+                ]
+              },
+              "tags": {
+                "$ref": "#/$defs/value_listOfStrings"
+              },
+              "label": {
+                "$ref": "#/$defs/value_localizedString"
+              },
+              "type": {
+                "$ref": "#/$defs/value_dataType"
+              },
+              "columns": {
+                "$ref": "#/$defs/value_columnDefList"
+              },
+              "target": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/value_object_"
+                  },
+                  {
+                    "$ref": "#/$defs/identifier"
+                  }
+                ]
+              },
+              "transition": {
+                "type": "object",
+                "properties": {
+                  "attribute": {
+                    "$ref": "#/$defs/identifier"
+                  },
+                  "to": {
+                    "$ref": "#/$defs/identifier"
+                  },
+                  "toColumn": {
+                    "$ref": "#/$defs/identifier"
+                  },
+                  "from": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/identifier"
+                    }
+                  }
+                },
+                "required": [
+                  "attribute"
+                ],
+                "additionalProperties": false,
+                "oneOf": [
+                  {
+                    "required": [
+                      "to"
+                    ],
+                    "not": {
+                      "required": [
+                        "toColumn"
+                      ]
+                    }
+                  },
+                  {
+                    "required": [
+                      "toColumn"
+                    ],
+                    "not": {
+                      "required": [
+                        "to"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "set": {
+                "type": "object",
+                "properties": {
+                  "attribute": {
+                    "$ref": "#/$defs/identifier"
+                  },
+                  "column": {
+                    "$ref": "#/$defs/identifier"
+                  }
+                },
+                "required": [
+                  "attribute",
+                  "column"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false,
+            "patternProperties": {
+              "^(?!description$|tags$|label$|type$|columns$|target$|transition$|set$)(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+                "$ref": "#/$defs/value_autoValue"
+              }
+            },
+            "minProperties": 1,
+            "maxProperties": 1
+          }
+        }
+      ]
+    },
+    "body_processBody": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "description": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/value_stringLiteralForm"
+                },
+                {
+                  "$ref": "#/$defs/value_localizedString"
+                }
+              ]
+            },
+            "tags": {
+              "$ref": "#/$defs/value_listOfStrings"
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/identifier"
+                  },
+                  "properties": {
+                    "$ref": "#/$defs/body_autoBody"
+                  }
+                },
+                "required": [
+                  "id",
+                  "properties"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false,
+          "patternProperties": {
+            "^(?!description$|tags$|steps$)(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+              "$ref": "#/$defs/value_autoValue"
+            }
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/value_stringLiteralForm"
+                  },
+                  {
+                    "$ref": "#/$defs/value_localizedString"
+                  }
+                ]
+              },
+              "tags": {
+                "$ref": "#/$defs/value_listOfStrings"
+              },
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "$ref": "#/$defs/identifier"
+                    },
+                    "properties": {
+                      "$ref": "#/$defs/body_autoBody"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "properties"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false,
+            "patternProperties": {
+              "^(?!description$|tags$|steps$)(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$": {
+                "$ref": "#/$defs/value_autoValue"
+              }
+            },
+            "minProperties": 1,
+            "maxProperties": 1
+          }
+        }
+      ]
+    },
+    "body_worldDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "extends": {
+          "$ref": "#/$defs/identifier"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "engine"
+                  },
+                  "id": {
+                    "$ref": "#/$defs/identifier"
+                  },
+                  "properties": {
+                    "$ref": "#/$defs/body_engineDef"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "id",
+                  "properties"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "executor"
+                  },
+                  "id": {
+                    "$ref": "#/$defs/identifier"
+                  },
+                  "properties": {
+                    "$ref": "#/$defs/body_executorDef"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "id",
+                  "properties"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "storage"
+                  },
+                  "id": {
+                    "$ref": "#/$defs/identifier"
+                  },
+                  "properties": {
+                    "$ref": "#/$defs/body_storageDef"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "id",
+                  "properties"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "identity"
+                  },
+                  "id": {
+                    "$ref": "#/$defs/identifier"
+                  },
+                  "properties": {
+                    "$ref": "#/$defs/body_autoBody"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "id",
+                  "properties"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "grant"
+                  },
+                  "properties": {
+                    "$ref": "#/$defs/body_autoBody"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "properties"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "deployment"
+                  },
+                  "id": {
+                    "$ref": "#/$defs/identifier"
+                  },
+                  "properties": {
+                    "$ref": "#/$defs/body_autoBody"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "id",
+                  "properties"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "process"
+                  },
+                  "id": {
+                    "$ref": "#/$defs/identifier"
+                  },
+                  "properties": {
+                    "$ref": "#/$defs/body_processBody"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "id",
+                  "properties"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_lexiconEntryDef": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "for": {
+          "$ref": "#/$defs/identifier"
+        },
+        "forms": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "match": {
+          "$ref": "#/$defs/value_stringLiteralForm"
+        },
+        "text": {
+          "$ref": "#/$defs/value_stringLiteralForm"
+        },
+        "default": {
+          "type": "boolean"
+        },
+        "sense_priority": {
+          "type": "number"
+        },
+        "indexSecurity": {
+          "$ref": "#/$defs/identifier"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body_cnBindingBody": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "description": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/value_stringLiteralForm"
+                },
+                {
+                  "$ref": "#/$defs/value_localizedString"
+                }
+              ]
+            },
+            "tags": {
+              "$ref": "#/$defs/value_listOfStrings"
+            },
+            "kind": {
+              "$ref": "#/$defs/identifier"
+            },
+            "role": {
+              "$ref": "#/$defs/identifier"
+            },
+            "quality": {
+              "$ref": "#/$defs/identifier"
+            },
+            "event": {
+              "$ref": "#/$defs/identifier"
+            },
+            "phase": {
+              "$ref": "#/$defs/identifier"
+            },
+            "concept": {
+              "$ref": "#/$defs/identifier"
+            },
+            "target": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/value_object_"
+                },
+                {
+                  "$ref": "#/$defs/identifier"
+                }
+              ]
+            },
+            "per": {
+              "$ref": "#/$defs/identifier"
+            },
+            "period": {
+              "$ref": "#/$defs/value_cnObject"
+            }
+          },
+          "additionalProperties": false,
+          "patternProperties": {
+            "^(?!description$|tags$|kind$|role$|quality$|event$|phase$|concept$|target$|per$|period$)(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|action|aggregation|aliases|allocation|approval|area|args|as|attribute|attributes|automation|basis|binding|bool|boolean|btree|calc|canvas|cardinality|changeSemantics|char|class|classify|cn|cn2db_concept|cn2er_event|cn2er_kind|cn2er_phase|cn2er_quality|cn2er_role|cn2md_event|cn2md_kind|cn2md_quality|cn2md_role|cnc|codeAttribute|column|columns|concept|constraint|constraints|cubelet|date|datetime|db|decimal|def|default|definition|definitionSql|delivery|deployment|description|descriptions|dimension|direction|display|displayLabel|domain|double|drill_map|engine|entities|entity|er|er2cnc_role|er2db_attribute|er2db_entity|er2db_relation|event|example|examples|executor|extends|extent|false|fk|float|for|forms|from|fulltext|fuzzy|grain|grant|graph|grounds|hierarchies|hosts|identity|import|index|indexed|indices|int|integer|involves|isKey|join|journaling|key|keywords|kind|label|labelPlural|language|layout|length|levels|lexicon|list|locale|management|map|mask|match|md|md2db_cubelet|md2db_domain|md2db_map|md2er_cubelet|md2er_dimension|measure|measures|members|method|model|name|nameAttribute|notNull|null|number|object|objects|on|optional|ordered|override|own|package|packages|parameter|parameters|pattern|patterns|per|period|phase|precision|primary|primaryKey|procedure|process|program|project|publish|quality|query|recipe|relation|relation_type|resolve|restrict|resultColumns|role|roles|schema|search|searchable|secondary|security|semantics|sense_priority|service|set|shape|source|sourceText|staging|states|step|steps|storage|string|subkind|table|tags|target|term|text|timestamp|to|transition|transitions|true|ttrl|type|unique|until|validBy|valueLabels|value_space|varchar|version|view|whereFilter|world|writeback)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)$": {
+              "$ref": "#/$defs/value_cnValue"
+            }
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/value_stringLiteralForm"
+                  },
+                  {
+                    "$ref": "#/$defs/value_localizedString"
+                  }
+                ]
+              },
+              "tags": {
+                "$ref": "#/$defs/value_listOfStrings"
+              },
+              "kind": {
+                "$ref": "#/$defs/identifier"
+              },
+              "role": {
+                "$ref": "#/$defs/identifier"
+              },
+              "quality": {
+                "$ref": "#/$defs/identifier"
+              },
+              "event": {
+                "$ref": "#/$defs/identifier"
+              },
+              "phase": {
+                "$ref": "#/$defs/identifier"
+              },
+              "concept": {
+                "$ref": "#/$defs/identifier"
+              },
+              "target": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/value_object_"
+                  },
+                  {
+                    "$ref": "#/$defs/identifier"
+                  }
+                ]
+              },
+              "per": {
+                "$ref": "#/$defs/identifier"
+              },
+              "period": {
+                "$ref": "#/$defs/value_cnObject"
+              }
+            },
+            "additionalProperties": false,
+            "patternProperties": {
+              "^(?!description$|tags$|kind$|role$|quality$|event$|phase$|concept$|target$|per$|period$)(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|action|aggregation|aliases|allocation|approval|area|args|as|attribute|attributes|automation|basis|binding|bool|boolean|btree|calc|canvas|cardinality|changeSemantics|char|class|classify|cn|cn2db_concept|cn2er_event|cn2er_kind|cn2er_phase|cn2er_quality|cn2er_role|cn2md_event|cn2md_kind|cn2md_quality|cn2md_role|cnc|codeAttribute|column|columns|concept|constraint|constraints|cubelet|date|datetime|db|decimal|def|default|definition|definitionSql|delivery|deployment|description|descriptions|dimension|direction|display|displayLabel|domain|double|drill_map|engine|entities|entity|er|er2cnc_role|er2db_attribute|er2db_entity|er2db_relation|event|example|examples|executor|extends|extent|false|fk|float|for|forms|from|fulltext|fuzzy|grain|grant|graph|grounds|hierarchies|hosts|identity|import|index|indexed|indices|int|integer|involves|isKey|join|journaling|key|keywords|kind|label|labelPlural|language|layout|length|levels|lexicon|list|locale|management|map|mask|match|md|md2db_cubelet|md2db_domain|md2db_map|md2er_cubelet|md2er_dimension|measure|measures|members|method|model|name|nameAttribute|notNull|null|number|object|objects|on|optional|ordered|override|own|package|packages|parameter|parameters|pattern|patterns|per|period|phase|precision|primary|primaryKey|procedure|process|program|project|publish|quality|query|recipe|relation|relation_type|resolve|restrict|resultColumns|role|roles|schema|search|searchable|secondary|security|semantics|sense_priority|service|set|shape|source|sourceText|staging|states|step|steps|storage|string|subkind|table|tags|target|term|text|timestamp|to|transition|transitions|true|ttrl|type|unique|until|validBy|valueLabels|value_space|varchar|version|view|whereFilter|world|writeback)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)$": {
+                "$ref": "#/$defs/value_cnValue"
+              }
+            },
+            "minProperties": 1,
+            "maxProperties": 1
+          }
+        }
+      ]
+    },
+    "body_roleDef_closed": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/value_stringLiteralForm"
+            },
+            {
+              "$ref": "#/$defs/value_localizedString"
+            }
+          ]
+        },
+        "tags": {
+          "$ref": "#/$defs/value_listOfStrings"
+        },
+        "label": {
+          "$ref": "#/$defs/value_localizedString"
+        },
+        "search": {
+          "$ref": "#/$defs/body_searchBlock"
+        },
+        "resolve": {
+          "$ref": "#/$defs/value_autoValue"
+        },
+        "delivery": {
+          "$ref": "#/$defs/value_autoValue"
+        },
+        "members": {
+          "$ref": "#/$defs/value_autoValue"
+        },
+        "kind": {
+          "$ref": "#/$defs/identifier"
+        },
+        "role": {
+          "$ref": "#/$defs/identifier"
+        },
+        "quality": {
+          "$ref": "#/$defs/identifier"
+        },
+        "event": {
+          "$ref": "#/$defs/identifier"
+        },
+        "phase": {
+          "$ref": "#/$defs/identifier"
+        },
+        "concept": {
+          "$ref": "#/$defs/identifier"
+        },
+        "grounds": {
+          "$ref": "#/$defs/identifier"
+        },
+        "involves": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/value_participant"
+          },
+          "minItems": 1
+        },
+        "period": {
+          "$ref": "#/$defs/value_cnObject"
+        },
+        "lexicon": {
+          "$ref": "#/$defs/value_object_"
+        }
+      },
+      "additionalProperties": false
+    },
+    "def_project": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "project"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_projectDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_table": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "table"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_tableDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_view": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "view"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_viewDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_column": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "column"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_columnDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_index": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "index"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_indexDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_constraint": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "constraint"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_constraintDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_fk": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "fk"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_fkDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_procedure": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "procedure"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_procedureDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_entity": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "entity"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_entityDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_attribute": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "attribute"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_attributeDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_relation": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "relation"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_relationDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_er2db_entity": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "er2db_entity"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_er2dbEntityDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_er2db_attribute": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "er2db_attribute"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_er2dbAttributeDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_er2db_relation": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "er2db_relation"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_er2dbRelationDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_query": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "query"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_queryDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_role": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "role"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_roleDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_er2cnc_role": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "er2cnc_role"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_er2cncRoleDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_drill_map": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "drill_map"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_drillMapDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_area": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "area"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_areaDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_schema": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "schema"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_schemaDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_domain": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "domain"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_mdDomainDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_dimension": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "dimension"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_dimensionDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_map": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "map"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_mdMapDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_hierarchy": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "hierarchy"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_hierarchyDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_measure": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "measure"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_measureDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_cubelet": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "cubelet"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cubeletDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_md2db_cubelet": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "md2db_cubelet"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_md2dbCubeletDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_md2db_domain": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "md2db_domain"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_md2dbDomainDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_md2db_map": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "md2db_map"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_md2dbMapDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_md2er_dimension": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "md2er_dimension"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_md2erDimensionDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_md2er_cubelet": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "md2er_cubelet"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_md2erCubeletDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_world": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "world"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_worldDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_term": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "term"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_lexiconEntryDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_pattern": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "pattern"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_lexiconEntryDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_example": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "example"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_lexiconEntryDef"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_parameter": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "parameter"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_autoBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_action": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "action"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_autoBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_service": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "service"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_autoBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_approval": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "approval"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_autoBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_program": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "program"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_autoBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_recipe": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "recipe"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_autoBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_subkind": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "subkind"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_kind": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "kind"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_event": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "event"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_phase": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "phase"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_quality": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "quality"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_relation_type": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "relation_type"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_cn2md_kind": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "cn2md_kind"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBindingBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_cn2md_role": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "cn2md_role"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBindingBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_cn2md_quality": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "cn2md_quality"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBindingBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_cn2md_event": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "cn2md_event"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBindingBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_cn2er_kind": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "cn2er_kind"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBindingBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_cn2er_role": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "cn2er_role"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBindingBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_cn2er_event": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "cn2er_event"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBindingBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_cn2er_quality": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "cn2er_quality"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBindingBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_cn2er_phase": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "cn2er_phase"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBindingBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_cn2db_concept": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "cn2db_concept"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBindingBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_role_closed": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "role"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_roleDef_closed"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "value_modelCode": {
+      "anyOf": [
+        {
+          "enum": [
+            "db"
+          ]
+        },
+        {
+          "enum": [
+            "er"
+          ]
+        },
+        {
+          "enum": [
+            "binding"
+          ]
+        },
+        {
+          "enum": [
+            "query"
+          ]
+        },
+        {
+          "enum": [
+            "cnc"
+          ]
+        },
+        {
+          "enum": [
+            "md"
+          ]
+        },
+        {
+          "enum": [
+            "world"
+          ]
+        },
+        {
+          "enum": [
+            "lexicon"
+          ]
+        },
+        {
+          "enum": [
+            "automation"
+          ]
+        },
+        {
+          "enum": [
+            "cn"
+          ]
+        }
+      ]
+    }
+  }
+}
