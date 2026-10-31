@@ -1,0 +1,183 @@
+// SPDX-License-Identifier: Apache-2.0
+package org.tatrman.ttrp.conform.replay
+
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
+import kotlinx.serialization.json.*
+import java.nio.file.Files
+import java.nio.file.Path
+
+/** Contract-derived HTTP fixture; the production H-1 recording is still a separate acceptance gate. */
+class N8nDryDriverSpec :
+    StringSpec({
+        fun export(
+            name: String,
+            mutate: (JsonObject) -> JsonObject = { it },
+        ): Path {
+            val golden = Path.of("../ttr-emit-n8n/src/test/resources/goldens/$name.json")
+            val workflow = mutate(Json.parseToJsonElement(Files.readString(golden)).jsonObject)
+            val directory = Files.createTempDirectory("n8n-dry-export")
+            Files.writeString(directory.resolve("workflow.json"), workflow.toString())
+            Files.writeString(
+                directory.resolve("manifest.json"),
+                buildJsonObject {
+                    put(
+                        "calls",
+                        workflow
+                            .getValue("meta")
+                            .jsonObject
+                            .getValue("tatrman")
+                            .jsonObject
+                            .getValue("calls"),
+                    )
+                }.toString(),
+            )
+            return directory
+        }
+        val fixture =
+            FixtureLoader.parse(
+                """
+                recipe: release_order
+                as_of: "2026-11-02"
+                keys: [4711, 4712]
+                expected:
+                  verdicts:
+                    - {key: 4711, route: release, verdict_reason: ready}
+                    - {key: 4712, route: release, verdict_reason: ready}
+                  actions:
+                    - {key: 4711, action: release, columns: {order: 4711}}
+                    - {key: 4712, action: release, columns: {order: 4712}}
+                  detail_counts: {4711: {stock: 1}, 4712: {stock: 1}}
+                  final_states: {entity: er.entity.order, attr: {state: {4711: released, 4712: released}}}
+                pinned_from: {run: prior, at: now, by: test}
+                """.trimIndent(),
+            )
+        "parts, recipe and island workflows execute their declared calls and agree with native" {
+            ContractServer().use { server ->
+                val native =
+                    NativeDriver(
+                        server.url,
+                        "test-token",
+                        pollMillis = 1,
+                    ).use { it.run(fixture, "native.on-event") }
+                for (name in listOf("release_n8n", "recipe", "islands")) {
+                    server.asyncOnce = true
+                    val directory = export(name)
+                    try {
+                        N8nDryDriver(server.url, "test-token", listOf(directory)).use { driver ->
+                            val result = driver.run(fixture, "n8n-l1.on-event")
+                            result shouldBe native
+                            ReplayComparator.compare(fixture, result) shouldBe emptyList()
+                        }
+                    } finally {
+                        directory.toFile().deleteRecursively()
+                    }
+                }
+                server.requests.any { "/parts/" in it } shouldBe true
+                server.requests.any { "/islands/" in it } shouldBe true
+                server.requests.any { "/perform" in it } shouldBe true
+                server.requests.count { it.endsWith("/close") } shouldBe 8
+                server.opens.forEach { it["dryRun"] shouldBe JsonPrimitive(true) }
+            }
+        }
+        "batch rendering pages route rows and suppresses SMTP in a Server-confirmed dry run" {
+            val directory = export("morning_release")
+            try {
+                ContractServer().use { server ->
+                    val native =
+                        NativeDriver(
+                            server.url,
+                            "test-token",
+                            pollMillis = 1,
+                        ).use { it.run(fixture, "native.batch") }
+                    server.asyncOnce = true
+                    N8nDryDriver(server.url, "test-token", listOf(directory)).use { driver ->
+                        driver.run(fixture, "n8n_l1.batch") shouldBe native
+                    }
+                    server.requests.any { it.endsWith("/digests") } shouldBe true
+                    server.requests.any { it.endsWith("/outcome") } shouldBe false
+                }
+            } finally {
+                directory.toFile().deleteRecursively()
+            }
+        }
+        "reason changes disagree while truncated evidence and HTTP errors refuse certification" {
+            val directory = export("release_n8n")
+            try {
+                ContractServer().use { server ->
+                    N8nDryDriver(server.url, "test-token", listOf(directory)).use { driver ->
+                        server.wrongReason = true
+                        ReplayRunner.run(fixture, listOf("n8n-l1.on-event")) { driver }.exitCode shouldBe 3
+                        server.wrongReason = false
+                        server.truncated = true
+                        val truncated = ReplayRunner.run(fixture, listOf("n8n-l1.on-event")) { driver }
+                        truncated.exitCode shouldBe 2
+                        truncated.summary() shouldContain "truncated"
+                        server.truncated = false
+                        server.precisionLoss = true
+                        val imprecise = ReplayRunner.run(fixture, listOf("n8n-l1.on-event")) { driver }
+                        imprecise.exitCode shouldBe 2
+                        imprecise.summary() shouldContain "unsafe JSON number"
+                        server.precisionLoss = false
+                        server.failHttp = true
+                        val failed = ReplayRunner.run(fixture, listOf("n8n-l1.on-event")) { driver }
+                        failed.exitCode shouldBe 2
+                        failed.summary() shouldNotContain "test-token"
+                    }
+                }
+            } finally {
+                directory.toFile().deleteRecursively()
+            }
+        }
+        "changing rendered HTTP parameters without the declared call is a driver error" {
+            val directory =
+                export("release_n8n") { workflow ->
+                    JsonObject(
+                        workflow + (
+                            "nodes" to
+                                JsonArray(
+                                    workflow.getValue("nodes").jsonArray.map { raw ->
+                                        val n = raw.jsonObject
+                                        if (n["name"] ==
+                                            JsonPrimitive("open")
+                                        ) {
+                                            JsonObject(
+                                                n +
+                                                    (
+                                                        "parameters" to
+                                                            JsonObject(
+                                                                n.getValue("parameters").jsonObject +
+                                                                    (
+                                                                        "url" to
+                                                                            JsonPrimitive(
+                                                                                "={{ 'https://untrusted.invalid/' }}",
+                                                                            )
+                                                                    ),
+                                                            )
+                                                    ),
+                                            )
+                                        } else {
+                                            n
+                                        }
+                                    },
+                                )
+                        ),
+                    )
+                }
+            try {
+                ContractServer().use { server ->
+                    N8nDryDriver(server.url, "test-token", listOf(directory)).use { driver ->
+                        val report = ReplayRunner.run(fixture, listOf("n8n-l1.on-event")) { driver }
+                        report.exitCode shouldBe 2
+                        report.summary() shouldContain "call declaration differs"
+                        report.summary() shouldNotContain "test-token"
+                        server.opens.size shouldBe 0
+                    }
+                }
+            } finally {
+                directory.toFile().deleteRecursively()
+            }
+        }
+    })

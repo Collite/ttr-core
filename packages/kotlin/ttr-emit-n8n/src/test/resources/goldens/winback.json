@@ -1,0 +1,2022 @@
+{
+    "name": "winback_monthly",
+    "nodes": [
+        {
+            "id": "c7d08e09-a44d-3b45-be7e-eecebf0a8daf",
+            "name": "trigger",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                0,
+                0
+            ],
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "cronExpression",
+                            "expression": "0 0 6 1 * *"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "id": "7cef8a73-4855-377c-aa9d-0caf42666e69",
+            "name": "open",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                220,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/recipes/winback/runs\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ (() => {const b = {deployment:\"release_n8n\", port:{none:true}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; b.idempotencyKey=$execution.id; if (($('trigger').first().json.body || $('trigger').first().json).at) b.port.at=($('trigger').first().json.body || $('trigger').first().json).at; return b;})() }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "02bee8d1-bd66-3cfc-b2cc-c70f4985bb9a",
+            "name": "run complete",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                440,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "f61135d3-6747-3e0d-8e49-dfb479c69320",
+            "name": "replayed",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                660,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ $json.body.replayed === true }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
+            "id": "ca756a68-2c18-3cd9-bd5c-c15f97a104f3",
+            "name": "fresh run",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                880,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return $input.all();",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "bef2e239-e46f-3902-abe7-7d801342fa6d",
+            "name": "candidates",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1100,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/candidates\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "be1e6745-8877-3bbc-a4f1-0bc5ed09e982",
+            "name": "channel_sales",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1320,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/channel_sales\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "66aac883-2dec-3eb9-bdfb-ae505ae86eac",
+            "name": "demographics",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1540,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/demographics\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "67c311bb-f267-311e-9384-395016475262",
+            "name": "prior_mail",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1760,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/prior_mail\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "b9b9e36c-1a5d-3be2-a158-df398f2e29b8",
+            "name": "decision",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1980,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/decision\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "94d2f2aa-bfda-3169-954a-9531cdb99890",
+            "name": "evaluate",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2200,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/evaluate\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "c0a399fe-581c-3820-873b-49f9b77d9179",
+            "name": "check evaluation",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                2420,
+                0
+            ],
+            "parameters": {
+                "jsCode": "if ($runIndex > 120) throw new Error('evaluation polling timed out'); const b=$input.first().json.body; if (['failed','abandoned','waiting'].includes(b.status)) throw new Error('evaluation refused'); return $input.all();",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "4009274e-ce2e-3f88-8028-cc06b63262ee",
+            "name": "evaluated",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                2640,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ !!$json.body.verdict && !['running','open'].includes($json.body.status) }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
+            "id": "d7434d44-f7dd-3d0d-8e66-ab8165f72590",
+            "name": "evaluation wait",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                2860,
+                0
+            ],
+            "parameters": {
+                "resume": "timeInterval",
+                "amount": 1,
+                "unit": "seconds"
+            }
+        },
+        {
+            "id": "a1ebbf42-fc6f-3194-a7c0-870beccba99e",
+            "name": "evaluation status",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                3080,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "36f3928d-c26c-35c9-87c8-b5719f912fde",
+            "name": "route items",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                3300,
+                0
+            ],
+            "parameters": {
+                "jsCode": "const b = $input.first().json.body;\nif (['failed','abandoned'].includes(b.status)) throw new Error('recipe evaluation failed');\nconst routes = [\"premium\",\"regular\"].filter(r => (b.verdict.routes[r]?.rowCount || 0) > 0);\nreturn (routes.length ? routes : [null]).map(route => ({json:{route}}));",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "4fe5fbfb-aa47-3aef-bbeb-fcd998bceee5",
+            "name": "action status",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                3520,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "fe587673-e2e3-3242-9efb-c88997a5083c",
+            "name": "routes loop",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3.0,
+            "position": [
+                3740,
+                0
+            ],
+            "parameters": {
+                "batchSize": 1,
+                "options": {}
+            }
+        },
+        {
+            "id": "1755347e-5f6a-362b-84a3-f6512a3e4e53",
+            "name": "routes",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 3.0,
+            "position": [
+                3960,
+                0
+            ],
+            "parameters": {
+                "rules": {
+                    "values": [
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict",
+                                    "version": 2
+                                },
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.route === \"premium\" }}",
+                                        "rightValue": true,
+                                        "operator": {
+                                            "type": "boolean",
+                                            "operation": "true",
+                                            "singleValue": true
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputKey": "premium"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict",
+                                    "version": 2
+                                },
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.route === \"regular\" }}",
+                                        "rightValue": true,
+                                        "operator": {
+                                            "type": "boolean",
+                                            "operation": "true",
+                                            "singleValue": true
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputKey": "regular"
+                        }
+                    ]
+                },
+                "options": {
+                    "allMatchingOutputs": false,
+                    "fallbackOutput": "extra"
+                }
+            }
+        },
+        {
+            "id": "474961e9-2cb3-3234-8ade-5f1701bd06ed",
+            "name": "premium rows",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                4180,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/premium\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    },
+                    "pagination": {
+                        "pagination": {
+                            "paginationMode": "updateAParameterInEachRequest",
+                            "parameters": {
+                                "parameters": [
+                                    {
+                                        "type": "qs",
+                                        "name": "offset",
+                                        "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
+                                    },
+                                    {
+                                        "type": "qs",
+                                        "name": "limit",
+                                        "value": "1000"
+                                    }
+                                ]
+                            },
+                            "paginationCompleteWhen": "other",
+                            "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
+                            "limitPagesFetched": true,
+                            "maxRequests": 10000
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "98b09fcb-896b-34a6-8e65-f0ee2eb6425e",
+            "name": "premium collect",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                4400,
+                0
+            ],
+            "parameters": {
+                "jsCode": "const rows = $input.all().flatMap(i => i.json.body?.rows || i.json.rows || []); return [{json:{rows}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "2c93a617-792e-3184-9ede-b34a38ffb5d0",
+            "name": "premium notify",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2.1,
+            "position": [
+                4620,
+                0
+            ],
+            "parameters": {
+                "fromEmail": "={{ $env.TTR_MAIL_FROM }}",
+                "toEmail": "={{ JSON.parse($env.TTR_MAIL_RECIPIENTS || '{}')[\"customer.email\"] || \"customer.email\" }}",
+                "subject": "Tatrman winback_monthly",
+                "emailFormat": "text",
+                "text": "={{ JSON.stringify(($(\"premium collect\").isExecuted ? $(\"premium collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))), null, 2) }}",
+                "options": {
+                    "appendAttribution": false
+                }
+            },
+            "credentials": {
+                "smtp": {
+                    "name": "tatrman-mail"
+                }
+            }
+        },
+        {
+            "id": "769b6eb1-2239-3a24-bc8e-99ca661774ad",
+            "name": "premium notify deliver",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                4840,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ !$(\"action status\").first().json.body.dryRun && ($(\"premium collect\").isExecuted ? $(\"premium collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))).length > 0 }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
+            "id": "bf21b610-1279-3e38-9b89-d9a599d52833",
+            "name": "premium notify outcome",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                5060,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/notify/outcome\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {outcomes:($(\"premium collect\").isExecuted ? $(\"premium collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))).map(r => r[\"customer_sk\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "c1519c34-4979-3f46-b4cc-71ed0855221a",
+            "name": "premium notify complete",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                5280,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "4a45cda7-83a8-3d51-950e-46d6987ef71f",
+            "name": "premium record_mailed",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                5500,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/record_mailed/perform\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {keys:($(\"premium collect\").isExecuted ? $(\"premium collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "8fe25387-ad7f-3b4a-a197-3122da10b5ef",
+            "name": "regular rows",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                5720,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/regular\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    },
+                    "pagination": {
+                        "pagination": {
+                            "paginationMode": "updateAParameterInEachRequest",
+                            "parameters": {
+                                "parameters": [
+                                    {
+                                        "type": "qs",
+                                        "name": "offset",
+                                        "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
+                                    },
+                                    {
+                                        "type": "qs",
+                                        "name": "limit",
+                                        "value": "1000"
+                                    }
+                                ]
+                            },
+                            "paginationCompleteWhen": "other",
+                            "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
+                            "limitPagesFetched": true,
+                            "maxRequests": 10000
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "cd0e7f60-6447-38b9-838d-b031f75b0961",
+            "name": "regular collect",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                5940,
+                0
+            ],
+            "parameters": {
+                "jsCode": "const rows = $input.all().flatMap(i => i.json.body?.rows || i.json.rows || []); return [{json:{rows}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "cc819cbb-530c-3ee7-bf8e-3a17b28691f0",
+            "name": "regular notify",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2.1,
+            "position": [
+                6160,
+                0
+            ],
+            "parameters": {
+                "fromEmail": "={{ $env.TTR_MAIL_FROM }}",
+                "toEmail": "={{ JSON.parse($env.TTR_MAIL_RECIPIENTS || '{}')[\"customer.email\"] || \"customer.email\" }}",
+                "subject": "Tatrman winback_monthly",
+                "emailFormat": "text",
+                "text": "={{ JSON.stringify(($(\"regular collect\").isExecuted ? $(\"regular collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))), null, 2) }}",
+                "options": {
+                    "appendAttribution": false
+                }
+            },
+            "credentials": {
+                "smtp": {
+                    "name": "tatrman-mail"
+                }
+            }
+        },
+        {
+            "id": "9e11ccc2-2f52-3118-9659-8a5dc073022e",
+            "name": "regular notify deliver",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                6380,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ !$(\"action status\").first().json.body.dryRun && ($(\"regular collect\").isExecuted ? $(\"regular collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))).length > 0 }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
+            "id": "d3d8b9ca-ffde-3c22-93fd-55ba0dc4029a",
+            "name": "regular notify outcome",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                6600,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/notify/outcome\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {outcomes:($(\"regular collect\").isExecuted ? $(\"regular collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))).map(r => r[\"customer_sk\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "183a2c5f-6403-39f9-9690-8a843c67c634",
+            "name": "regular notify complete",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                6820,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "d19e3a4a-2888-36a6-a3cb-e84aaf74eaca",
+            "name": "regular record_mailed",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                7040,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/record_mailed/perform\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {keys:($(\"regular collect\").isExecuted ? $(\"regular collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "716f6b30-598b-3309-85d8-4485e61c1027",
+            "name": "close",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                7260,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/close\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "cfeccac1-be0d-378f-89c6-9c6a7d7fae8f",
+            "name": "step complete",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                7480,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        }
+    ],
+    "connections": {
+        "open": {
+            "main": [
+                [
+                    {
+                        "node": "replayed",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "replayed": {
+            "main": [
+                [
+                    {
+                        "node": "run complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "fresh run",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "fresh run": {
+            "main": [
+                [
+                    {
+                        "node": "candidates",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "candidates": {
+            "main": [
+                [
+                    {
+                        "node": "channel_sales",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "channel_sales": {
+            "main": [
+                [
+                    {
+                        "node": "demographics",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "demographics": {
+            "main": [
+                [
+                    {
+                        "node": "prior_mail",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "prior_mail": {
+            "main": [
+                [
+                    {
+                        "node": "decision",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "decision": {
+            "main": [
+                [
+                    {
+                        "node": "evaluate",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "evaluate": {
+            "main": [
+                [
+                    {
+                        "node": "check evaluation",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "check evaluation": {
+            "main": [
+                [
+                    {
+                        "node": "evaluated",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "evaluated": {
+            "main": [
+                [
+                    {
+                        "node": "action status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "evaluation wait",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "evaluation wait": {
+            "main": [
+                [
+                    {
+                        "node": "evaluation status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "evaluation status": {
+            "main": [
+                [
+                    {
+                        "node": "check evaluation",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "action status": {
+            "main": [
+                [
+                    {
+                        "node": "route items",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "route items": {
+            "main": [
+                [
+                    {
+                        "node": "routes loop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "routes loop": {
+            "main": [
+                [
+                    {
+                        "node": "close",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "routes",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "routes": {
+            "main": [
+                [
+                    {
+                        "node": "premium rows",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "regular rows",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "routes loop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "premium rows": {
+            "main": [
+                [
+                    {
+                        "node": "premium collect",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "premium collect": {
+            "main": [
+                [
+                    {
+                        "node": "premium notify deliver",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "premium notify deliver": {
+            "main": [
+                [
+                    {
+                        "node": "premium notify",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "premium notify complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "premium notify": {
+            "main": [
+                [
+                    {
+                        "node": "premium notify outcome",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "premium notify outcome": {
+            "main": [
+                [
+                    {
+                        "node": "premium notify complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "premium notify complete": {
+            "main": [
+                [
+                    {
+                        "node": "premium record_mailed",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "premium record_mailed": {
+            "main": [
+                [
+                    {
+                        "node": "routes loop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "regular rows": {
+            "main": [
+                [
+                    {
+                        "node": "regular collect",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "regular collect": {
+            "main": [
+                [
+                    {
+                        "node": "regular notify deliver",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "regular notify deliver": {
+            "main": [
+                [
+                    {
+                        "node": "regular notify",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "regular notify complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "regular notify": {
+            "main": [
+                [
+                    {
+                        "node": "regular notify outcome",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "regular notify outcome": {
+            "main": [
+                [
+                    {
+                        "node": "regular notify complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "regular notify complete": {
+            "main": [
+                [
+                    {
+                        "node": "regular record_mailed",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "regular record_mailed": {
+            "main": [
+                [
+                    {
+                        "node": "routes loop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "close": {
+            "main": [
+                [
+                    {
+                        "node": "run complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "trigger": {
+            "main": [
+                [
+                    {
+                        "node": "open",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "run complete": {
+            "main": [
+                [
+                    {
+                        "node": "step complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1",
+        "timezone": "UTC"
+    },
+    "active": false,
+    "pinData": {},
+    "meta": {
+        "templateCredsSetupCompleted": false,
+        "tatrman": {
+            "schemaVersion": 1,
+            "deployment": "release_n8n",
+            "recipes": [
+                "winback"
+            ],
+            "calls": [
+                {
+                    "node": "open",
+                    "name": "open",
+                    "method": "POST",
+                    "path": "/automation/recipes/winback/runs",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/recipes/winback/runs\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ (() => {const b = {deployment:\"release_n8n\", port:{none:true}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; b.idempotencyKey=$execution.id; if (($('trigger').first().json.body || $('trigger').first().json).at) b.port.at=($('trigger').first().json.body || $('trigger').first().json).at; return b;})() }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                },
+                {
+                    "node": "candidates",
+                    "name": "part",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/parts/candidates",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/candidates\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "part": "candidates"
+                    },
+                    "part": "candidates"
+                },
+                {
+                    "node": "channel_sales",
+                    "name": "part",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/parts/channel_sales",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/channel_sales\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "part": "channel_sales"
+                    },
+                    "part": "channel_sales"
+                },
+                {
+                    "node": "demographics",
+                    "name": "part",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/parts/demographics",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/demographics\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "part": "demographics"
+                    },
+                    "part": "demographics"
+                },
+                {
+                    "node": "prior_mail",
+                    "name": "part",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/parts/prior_mail",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/prior_mail\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "part": "prior_mail"
+                    },
+                    "part": "prior_mail"
+                },
+                {
+                    "node": "decision",
+                    "name": "part",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/parts/decision",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/decision\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "part": "decision"
+                    },
+                    "part": "decision"
+                },
+                {
+                    "node": "evaluate",
+                    "name": "evaluate",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/evaluate",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/evaluate\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                },
+                {
+                    "node": "evaluation status",
+                    "name": "status",
+                    "method": "GET",
+                    "path": "/automation/runs/{id}",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"\" }}",
+                        "method": "GET",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                },
+                {
+                    "node": "action status",
+                    "name": "status",
+                    "method": "GET",
+                    "path": "/automation/runs/{id}",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"\" }}",
+                        "method": "GET",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                },
+                {
+                    "node": "premium rows",
+                    "name": "route",
+                    "method": "GET",
+                    "path": "/automation/runs/{id}/routes/premium",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/premium\" }}",
+                        "method": "GET",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            },
+                            "pagination": {
+                                "pagination": {
+                                    "paginationMode": "updateAParameterInEachRequest",
+                                    "parameters": {
+                                        "parameters": [
+                                            {
+                                                "type": "qs",
+                                                "name": "offset",
+                                                "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
+                                            },
+                                            {
+                                                "type": "qs",
+                                                "name": "limit",
+                                                "value": "1000"
+                                            }
+                                        ]
+                                    },
+                                    "paginationCompleteWhen": "other",
+                                    "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
+                                    "limitPagesFetched": true,
+                                    "maxRequests": 10000
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "route": "premium"
+                    },
+                    "route": "premium"
+                },
+                {
+                    "node": "premium notify outcome",
+                    "name": "outcome",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/actions/notify/outcome",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/notify/outcome\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {outcomes:($(\"premium collect\").isExecuted ? $(\"premium collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))).map(r => r[\"customer_sk\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "action": "notify"
+                    },
+                    "action": "notify"
+                },
+                {
+                    "node": "premium record_mailed",
+                    "name": "perform",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/actions/record_mailed/perform",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/record_mailed/perform\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {keys:($(\"premium collect\").isExecuted ? $(\"premium collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "action": "record_mailed"
+                    },
+                    "action": "record_mailed"
+                },
+                {
+                    "node": "regular rows",
+                    "name": "route",
+                    "method": "GET",
+                    "path": "/automation/runs/{id}/routes/regular",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/regular\" }}",
+                        "method": "GET",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            },
+                            "pagination": {
+                                "pagination": {
+                                    "paginationMode": "updateAParameterInEachRequest",
+                                    "parameters": {
+                                        "parameters": [
+                                            {
+                                                "type": "qs",
+                                                "name": "offset",
+                                                "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
+                                            },
+                                            {
+                                                "type": "qs",
+                                                "name": "limit",
+                                                "value": "1000"
+                                            }
+                                        ]
+                                    },
+                                    "paginationCompleteWhen": "other",
+                                    "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
+                                    "limitPagesFetched": true,
+                                    "maxRequests": 10000
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "route": "regular"
+                    },
+                    "route": "regular"
+                },
+                {
+                    "node": "regular notify outcome",
+                    "name": "outcome",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/actions/notify/outcome",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/notify/outcome\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {outcomes:($(\"regular collect\").isExecuted ? $(\"regular collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"customer_sk\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"customer_sk\"] : a.key)))).map(r => r[\"customer_sk\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "action": "notify"
+                    },
+                    "action": "notify"
+                },
+                {
+                    "node": "regular record_mailed",
+                    "name": "perform",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/actions/record_mailed/perform",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/record_mailed/perform\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {keys:($(\"regular collect\").isExecuted ? $(\"regular collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "action": "record_mailed"
+                    },
+                    "action": "record_mailed"
+                },
+                {
+                    "node": "close",
+                    "name": "close",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/close",
+                    "recipe": "winback",
+                    "program": "winback_monthly",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "customer.customer_sk"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/close\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                }
+            ],
+            "nodeVersions": {
+                "webhook": 2.0,
+                "httpRequest": 4.2,
+                "switch": 3.0,
+                "wait": 1.1,
+                "emailSend": 2.1,
+                "scheduleTrigger": 1.2,
+                "code": 2.0,
+                "splitInBatches": 3.0,
+                "splitOut": 1.0,
+                "if": 2.2
+            }
+        }
+    }
+}

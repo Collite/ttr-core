@@ -354,12 +354,43 @@
             }
         },
         {
+            "id": "fe047361-8e51-323e-9725-b243e7375bab",
+            "name": "decide action status",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                3080,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"decide open\").first().json.body.runId) + \"\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
             "id": "09553bc7-c009-3ddb-90a9-e84178697c8c",
             "name": "decide routes loop",
             "type": "n8n-nodes-base.splitInBatches",
             "typeVersion": 3.0,
             "position": [
-                3080,
+                3300,
                 0
             ],
             "parameters": {
@@ -373,7 +404,7 @@
             "type": "n8n-nodes-base.switch",
             "typeVersion": 3.0,
             "position": [
-                3300,
+                3520,
                 0
             ],
             "parameters": {
@@ -465,7 +496,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                3520,
+                3740,
                 0
             ],
             "parameters": {
@@ -519,7 +550,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                3740,
+                3960,
                 0
             ],
             "parameters": {
@@ -533,7 +564,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                3960,
+                4180,
                 0
             ],
             "parameters": {
@@ -543,7 +574,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:$(\"decide release collect\").first().json.rows.map(r => r[\"order_number\"])} }}",
+                "jsonBody": "={{ {keys:($(\"decide release collect\").isExecuted ? $(\"decide release collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -567,7 +598,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                4180,
+                4400,
                 0
             ],
             "parameters": {
@@ -621,7 +652,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                4400,
+                4620,
                 0
             ],
             "parameters": {
@@ -635,7 +666,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                4620,
+                4840,
                 0
             ],
             "parameters": {
@@ -645,7 +676,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:$(\"decide release_confirmed collect\").first().json.rows.map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/decide-release_confirmed-ask'} }}",
+                "jsonBody": "={{ {keys:($(\"decide release_confirmed collect\").isExecuted ? $(\"decide release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/decide-release_confirmed-ask'} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -669,7 +700,7 @@
             "type": "n8n-nodes-base.wait",
             "typeVersion": 1.1,
             "position": [
-                4840,
+                5060,
                 0
             ],
             "parameters": {
@@ -686,7 +717,7 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                5060,
+                5280,
                 0
             ],
             "parameters": {
@@ -718,7 +749,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                5280,
+                5500,
                 0
             ],
             "parameters": {
@@ -732,7 +763,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                5500,
+                5720,
                 0
             ],
             "parameters": {
@@ -786,7 +817,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                5720,
+                5940,
                 0
             ],
             "parameters": {
@@ -800,7 +831,7 @@
             "type": "n8n-nodes-base.emailSend",
             "typeVersion": 2.1,
             "position": [
-                5940,
+                6160,
                 0
             ],
             "parameters": {
@@ -808,7 +839,7 @@
                 "toEmail": "={{ JSON.parse($env.TTR_MAIL_RECIPIENTS || '{}')[\"role.sales\"] || \"role.sales\" }}",
                 "subject": "Tatrman decide",
                 "emailFormat": "text",
-                "text": "={{ JSON.stringify($(\"decide hold collect\").first().json.rows, null, 2) }}",
+                "text": "={{ JSON.stringify(($(\"decide hold collect\").isExecuted ? $(\"decide hold collect\").first().json.rows : []).filter(r => ($(\"decide action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))), null, 2) }}",
                 "options": {
                     "appendAttribution": false
                 }
@@ -820,12 +851,44 @@
             }
         },
         {
+            "id": "3e24c6e1-4590-3c69-ac93-f69e820a29f0",
+            "name": "decide hold notify deliver",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                6380,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ !$(\"decide action status\").first().json.body.dryRun && ($(\"decide hold collect\").isExecuted ? $(\"decide hold collect\").first().json.rows : []).filter(r => ($(\"decide action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).length > 0 }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
             "id": "df7af79d-3c78-3cba-973c-998b670ef168",
             "name": "decide hold notify outcome",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                6160,
+                6600,
                 0
             ],
             "parameters": {
@@ -835,7 +898,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:$(\"decide hold collect\").first().json.rows.map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                "jsonBody": "={{ {outcomes:($(\"decide hold collect\").isExecuted ? $(\"decide hold collect\").first().json.rows : []).filter(r => ($(\"decide action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -854,12 +917,26 @@
             "maxTries": 3
         },
         {
+            "id": "437bdacb-d7d4-3bbc-a92f-009b4c0fbbf7",
+            "name": "decide hold notify complete",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                6820,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
             "id": "bcdffb89-7857-3b00-af32-ef54e7d28534",
             "name": "decide close",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                6380,
+                7040,
                 0
             ],
             "parameters": {
@@ -893,7 +970,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                6600,
+                7260,
                 0
             ],
             "parameters": {
@@ -907,7 +984,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                6820,
+                7480,
                 0
             ],
             "parameters": {
@@ -938,7 +1015,7 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                7040,
+                7700,
                 0
             ],
             "parameters": {
@@ -970,7 +1047,7 @@
             "type": "n8n-nodes-base.wait",
             "typeVersion": 1.1,
             "position": [
-                7260,
+                7920,
                 0
             ],
             "parameters": {
@@ -991,7 +1068,7 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                7480,
+                8140,
                 0
             ],
             "parameters": {
@@ -1023,7 +1100,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                7700,
+                8360,
                 0
             ],
             "parameters": {
@@ -1033,7 +1110,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ (() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; if (($('trigger').first().json.body || $('trigger').first().json).at) b.port.at=($('trigger').first().json.body || $('trigger').first().json).at; return b;})() }}",
+                "jsonBody": "={{ (() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; b.port.at=new Date().toISOString(); return b;})() }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1057,7 +1134,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                7920,
+                8580,
                 0
             ],
             "parameters": {
@@ -1071,7 +1148,7 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                8140,
+                8800,
                 0
             ],
             "parameters": {
@@ -1103,7 +1180,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                8360,
+                9020,
                 0
             ],
             "parameters": {
@@ -1117,7 +1194,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                8580,
+                9240,
                 0
             ],
             "parameters": {
@@ -1151,7 +1228,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                8800,
+                9460,
                 0
             ],
             "parameters": {
@@ -1185,7 +1262,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                9020,
+                9680,
                 0
             ],
             "parameters": {
@@ -1219,7 +1296,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                9240,
+                9900,
                 0
             ],
             "parameters": {
@@ -1253,7 +1330,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                9460,
+                10120,
                 0
             ],
             "parameters": {
@@ -1267,7 +1344,7 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                9680,
+                10340,
                 0
             ],
             "parameters": {
@@ -1299,7 +1376,7 @@
             "type": "n8n-nodes-base.wait",
             "typeVersion": 1.1,
             "position": [
-                9900,
+                10560,
                 0
             ],
             "parameters": {
@@ -1314,7 +1391,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                10120,
+                10780,
                 0
             ],
             "parameters": {
@@ -1345,7 +1422,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                10340,
+                11000,
                 0
             ],
             "parameters": {
@@ -1354,12 +1431,43 @@
             }
         },
         {
+            "id": "cb63b916-8fcc-33bc-a13e-c5f4e652cfbe",
+            "name": "inbound action status",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                11220,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"inbound open\").first().json.body.runId) + \"\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
             "id": "6211a221-7aa0-3eaf-b264-59cbe1cc6e2a",
             "name": "inbound routes loop",
             "type": "n8n-nodes-base.splitInBatches",
             "typeVersion": 3.0,
             "position": [
-                10560,
+                11440,
                 0
             ],
             "parameters": {
@@ -1373,7 +1481,7 @@
             "type": "n8n-nodes-base.switch",
             "typeVersion": 3.0,
             "position": [
-                10780,
+                11660,
                 0
             ],
             "parameters": {
@@ -1465,7 +1573,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                11000,
+                11880,
                 0
             ],
             "parameters": {
@@ -1519,7 +1627,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                11220,
+                12100,
                 0
             ],
             "parameters": {
@@ -1533,7 +1641,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                11440,
+                12320,
                 0
             ],
             "parameters": {
@@ -1543,7 +1651,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:$(\"inbound release collect\").first().json.rows.map(r => r[\"order_number\"])} }}",
+                "jsonBody": "={{ {keys:($(\"inbound release collect\").isExecuted ? $(\"inbound release collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1567,7 +1675,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                11660,
+                12540,
                 0
             ],
             "parameters": {
@@ -1621,7 +1729,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                11880,
+                12760,
                 0
             ],
             "parameters": {
@@ -1635,7 +1743,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                12100,
+                12980,
                 0
             ],
             "parameters": {
@@ -1645,7 +1753,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:$(\"inbound release_confirmed collect\").first().json.rows.map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/inbound-release_confirmed-ask'} }}",
+                "jsonBody": "={{ {keys:($(\"inbound release_confirmed collect\").isExecuted ? $(\"inbound release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/inbound-release_confirmed-ask'} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1669,7 +1777,7 @@
             "type": "n8n-nodes-base.wait",
             "typeVersion": 1.1,
             "position": [
-                12320,
+                13200,
                 0
             ],
             "parameters": {
@@ -1686,7 +1794,7 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                12540,
+                13420,
                 0
             ],
             "parameters": {
@@ -1718,7 +1826,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                12760,
+                13640,
                 0
             ],
             "parameters": {
@@ -1732,7 +1840,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                12980,
+                13860,
                 0
             ],
             "parameters": {
@@ -1786,7 +1894,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                13200,
+                14080,
                 0
             ],
             "parameters": {
@@ -1800,7 +1908,7 @@
             "type": "n8n-nodes-base.emailSend",
             "typeVersion": 2.1,
             "position": [
-                13420,
+                14300,
                 0
             ],
             "parameters": {
@@ -1808,7 +1916,7 @@
                 "toEmail": "={{ JSON.parse($env.TTR_MAIL_RECIPIENTS || '{}')[\"role.sales\"] || \"role.sales\" }}",
                 "subject": "Tatrman decide",
                 "emailFormat": "text",
-                "text": "={{ JSON.stringify($(\"inbound hold collect\").first().json.rows, null, 2) }}",
+                "text": "={{ JSON.stringify(($(\"inbound hold collect\").isExecuted ? $(\"inbound hold collect\").first().json.rows : []).filter(r => ($(\"inbound action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))), null, 2) }}",
                 "options": {
                     "appendAttribution": false
                 }
@@ -1820,12 +1928,44 @@
             }
         },
         {
+            "id": "802a4ad5-2515-3c3b-bf63-1001d6643924",
+            "name": "inbound hold notify deliver",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                14520,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ !$(\"inbound action status\").first().json.body.dryRun && ($(\"inbound hold collect\").isExecuted ? $(\"inbound hold collect\").first().json.rows : []).filter(r => ($(\"inbound action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).length > 0 }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
             "id": "dee3a751-a4c3-3732-8142-7f5026102048",
             "name": "inbound hold notify outcome",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                13640,
+                14740,
                 0
             ],
             "parameters": {
@@ -1835,7 +1975,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:$(\"inbound hold collect\").first().json.rows.map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                "jsonBody": "={{ {outcomes:($(\"inbound hold collect\").isExecuted ? $(\"inbound hold collect\").first().json.rows : []).filter(r => ($(\"inbound action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1854,12 +1994,26 @@
             "maxTries": 3
         },
         {
+            "id": "13015e07-0851-3f8a-b5c0-d6b16ec0ca1d",
+            "name": "inbound hold notify complete",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                14960,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
             "id": "8d65e37a-b935-3583-acf2-8c2609877fd6",
             "name": "inbound close",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                13860,
+                15180,
                 0
             ],
             "parameters": {
@@ -1893,7 +2047,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                14080,
+                15400,
                 0
             ],
             "parameters": {
@@ -1907,7 +2061,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                14300,
+                15620,
                 0
             ],
             "parameters": {
@@ -1938,7 +2092,7 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                14520,
+                15840,
                 0
             ],
             "parameters": {
@@ -1970,7 +2124,7 @@
             "type": "n8n-nodes-base.wait",
             "typeVersion": 1.1,
             "position": [
-                14740,
+                16060,
                 0
             ],
             "parameters": {
@@ -1991,7 +2145,7 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                14960,
+                16280,
                 0
             ],
             "parameters": {
@@ -2023,7 +2177,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                15180,
+                16500,
                 0
             ],
             "parameters": {
@@ -2033,7 +2187,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ (() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; if (($('trigger').first().json.body || $('trigger').first().json).at) b.port.at=($('trigger').first().json.body || $('trigger').first().json).at; return b;})() }}",
+                "jsonBody": "={{ (() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; b.port.at=new Date().toISOString(); return b;})() }}",
                 "options": {
                     "response": {
                         "response": {
@@ -2057,7 +2211,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                15400,
+                16720,
                 0
             ],
             "parameters": {
@@ -2071,7 +2225,7 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                15620,
+                16940,
                 0
             ],
             "parameters": {
@@ -2103,7 +2257,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                15840,
+                17160,
                 0
             ],
             "parameters": {
@@ -2117,7 +2271,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                16060,
+                17380,
                 0
             ],
             "parameters": {
@@ -2151,7 +2305,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                16280,
+                17600,
                 0
             ],
             "parameters": {
@@ -2185,7 +2339,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                16500,
+                17820,
                 0
             ],
             "parameters": {
@@ -2219,7 +2373,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                16720,
+                18040,
                 0
             ],
             "parameters": {
@@ -2253,7 +2407,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                16940,
+                18260,
                 0
             ],
             "parameters": {
@@ -2267,7 +2421,7 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                17160,
+                18480,
                 0
             ],
             "parameters": {
@@ -2299,7 +2453,7 @@
             "type": "n8n-nodes-base.wait",
             "typeVersion": 1.1,
             "position": [
-                17380,
+                18700,
                 0
             ],
             "parameters": {
@@ -2314,7 +2468,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                17600,
+                18920,
                 0
             ],
             "parameters": {
@@ -2345,7 +2499,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                17820,
+                19140,
                 0
             ],
             "parameters": {
@@ -2354,12 +2508,43 @@
             }
         },
         {
+            "id": "74dc7c4b-0097-3271-bfea-7beb8cfca8b8",
+            "name": "settle action status",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                19360,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"settle open\").first().json.body.runId) + \"\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
             "id": "21b1821b-1f96-3f81-8818-d6559536c22e",
             "name": "settle routes loop",
             "type": "n8n-nodes-base.splitInBatches",
             "typeVersion": 3.0,
             "position": [
-                18040,
+                19580,
                 0
             ],
             "parameters": {
@@ -2373,7 +2558,7 @@
             "type": "n8n-nodes-base.switch",
             "typeVersion": 3.0,
             "position": [
-                18260,
+                19800,
                 0
             ],
             "parameters": {
@@ -2465,7 +2650,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                18480,
+                20020,
                 0
             ],
             "parameters": {
@@ -2519,7 +2704,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                18700,
+                20240,
                 0
             ],
             "parameters": {
@@ -2533,7 +2718,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                18920,
+                20460,
                 0
             ],
             "parameters": {
@@ -2543,7 +2728,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:$(\"settle release collect\").first().json.rows.map(r => r[\"order_number\"])} }}",
+                "jsonBody": "={{ {keys:($(\"settle release collect\").isExecuted ? $(\"settle release collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -2567,7 +2752,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                19140,
+                20680,
                 0
             ],
             "parameters": {
@@ -2621,7 +2806,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                19360,
+                20900,
                 0
             ],
             "parameters": {
@@ -2635,7 +2820,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                19580,
+                21120,
                 0
             ],
             "parameters": {
@@ -2645,7 +2830,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:$(\"settle release_confirmed collect\").first().json.rows.map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/settle-release_confirmed-ask'} }}",
+                "jsonBody": "={{ {keys:($(\"settle release_confirmed collect\").isExecuted ? $(\"settle release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/settle-release_confirmed-ask'} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -2669,7 +2854,7 @@
             "type": "n8n-nodes-base.wait",
             "typeVersion": 1.1,
             "position": [
-                19800,
+                21340,
                 0
             ],
             "parameters": {
@@ -2686,7 +2871,7 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                20020,
+                21560,
                 0
             ],
             "parameters": {
@@ -2718,7 +2903,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                20240,
+                21780,
                 0
             ],
             "parameters": {
@@ -2732,7 +2917,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                20460,
+                22000,
                 0
             ],
             "parameters": {
@@ -2786,7 +2971,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                20680,
+                22220,
                 0
             ],
             "parameters": {
@@ -2800,7 +2985,7 @@
             "type": "n8n-nodes-base.emailSend",
             "typeVersion": 2.1,
             "position": [
-                20900,
+                22440,
                 0
             ],
             "parameters": {
@@ -2808,7 +2993,7 @@
                 "toEmail": "={{ JSON.parse($env.TTR_MAIL_RECIPIENTS || '{}')[\"role.sales\"] || \"role.sales\" }}",
                 "subject": "Tatrman decide",
                 "emailFormat": "text",
-                "text": "={{ JSON.stringify($(\"settle hold collect\").first().json.rows, null, 2) }}",
+                "text": "={{ JSON.stringify(($(\"settle hold collect\").isExecuted ? $(\"settle hold collect\").first().json.rows : []).filter(r => ($(\"settle action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))), null, 2) }}",
                 "options": {
                     "appendAttribution": false
                 }
@@ -2820,12 +3005,44 @@
             }
         },
         {
+            "id": "7337a48b-0e58-3195-b3f9-a57505dd6628",
+            "name": "settle hold notify deliver",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                22660,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ !$(\"settle action status\").first().json.body.dryRun && ($(\"settle hold collect\").isExecuted ? $(\"settle hold collect\").first().json.rows : []).filter(r => ($(\"settle action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).length > 0 }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
             "id": "c78dfb15-851d-3a6f-a1dc-0f4b482d3a8b",
             "name": "settle hold notify outcome",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                21120,
+                22880,
                 0
             ],
             "parameters": {
@@ -2835,7 +3052,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:$(\"settle hold collect\").first().json.rows.map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                "jsonBody": "={{ {outcomes:($(\"settle hold collect\").isExecuted ? $(\"settle hold collect\").first().json.rows : []).filter(r => ($(\"settle action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -2854,12 +3071,26 @@
             "maxTries": 3
         },
         {
+            "id": "6735912c-889a-313b-a47f-51f7855a041c",
+            "name": "settle hold notify complete",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                23100,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
             "id": "79c0013c-a2e3-3334-8566-b27f4b42d9ee",
             "name": "settle close",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                21340,
+                23320,
                 0
             ],
             "parameters": {
@@ -2893,7 +3124,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                21560,
+                23540,
                 0
             ],
             "parameters": {
@@ -3002,7 +3233,7 @@
             "main": [
                 [
                     {
-                        "node": "decide route items",
+                        "node": "decide action status",
                         "type": "main",
                         "index": 0
                     }
@@ -3032,6 +3263,17 @@
                 [
                     {
                         "node": "decide check evaluation",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "decide action status": {
+            "main": [
+                [
+                    {
+                        "node": "decide route items",
                         "type": "main",
                         "index": 0
                     }
@@ -3220,7 +3462,25 @@
             "main": [
                 [
                     {
+                        "node": "decide hold notify deliver",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "decide hold notify deliver": {
+            "main": [
+                [
+                    {
                         "node": "decide hold notify",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "decide hold notify complete",
                         "type": "main",
                         "index": 0
                     }
@@ -3239,6 +3499,17 @@
             ]
         },
         "decide hold notify outcome": {
+            "main": [
+                [
+                    {
+                        "node": "decide hold notify complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "decide hold notify complete": {
             "main": [
                 [
                     {
@@ -3450,7 +3721,7 @@
             "main": [
                 [
                     {
-                        "node": "inbound route items",
+                        "node": "inbound action status",
                         "type": "main",
                         "index": 0
                     }
@@ -3480,6 +3751,17 @@
                 [
                     {
                         "node": "inbound check evaluation",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "inbound action status": {
+            "main": [
+                [
+                    {
+                        "node": "inbound route items",
                         "type": "main",
                         "index": 0
                     }
@@ -3668,7 +3950,25 @@
             "main": [
                 [
                     {
+                        "node": "inbound hold notify deliver",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "inbound hold notify deliver": {
+            "main": [
+                [
+                    {
                         "node": "inbound hold notify",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "inbound hold notify complete",
                         "type": "main",
                         "index": 0
                     }
@@ -3687,6 +3987,17 @@
             ]
         },
         "inbound hold notify outcome": {
+            "main": [
+                [
+                    {
+                        "node": "inbound hold notify complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "inbound hold notify complete": {
             "main": [
                 [
                     {
@@ -3887,7 +4198,7 @@
             "main": [
                 [
                     {
-                        "node": "settle route items",
+                        "node": "settle action status",
                         "type": "main",
                         "index": 0
                     }
@@ -3917,6 +4228,17 @@
                 [
                     {
                         "node": "settle check evaluation",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "settle action status": {
+            "main": [
+                [
+                    {
+                        "node": "settle route items",
                         "type": "main",
                         "index": 0
                     }
@@ -4105,7 +4427,25 @@
             "main": [
                 [
                     {
+                        "node": "settle hold notify deliver",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "settle hold notify deliver": {
+            "main": [
+                [
+                    {
                         "node": "settle hold notify",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "settle hold notify complete",
                         "type": "main",
                         "index": 0
                     }
@@ -4124,6 +4464,17 @@
             ]
         },
         "settle hold notify outcome": {
+            "main": [
+                [
+                    {
+                        "node": "settle hold notify complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "settle hold notify complete": {
             "main": [
                 [
                     {
@@ -4367,6 +4718,34 @@
                     "arguments": {}
                 },
                 {
+                    "node": "decide action status",
+                    "name": "status",
+                    "method": "GET",
+                    "path": "/automation/runs/{id}",
+                    "recipe": "decide_return",
+                    "program": "decide",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"decide open\").first().json.body.runId) + \"\" }}",
+                        "method": "GET",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                },
+                {
                     "node": "decide release rows",
                     "name": "route",
                     "method": "GET",
@@ -4439,7 +4818,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:$(\"decide release collect\").first().json.rows.map(r => r[\"order_number\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"decide release collect\").isExecuted ? $(\"decide release collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -4527,7 +4906,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:$(\"decide release_confirmed collect\").first().json.rows.map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/decide-release_confirmed-ask'} }}",
+                        "jsonBody": "={{ {keys:($(\"decide release_confirmed collect\").isExecuted ? $(\"decide release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/decide-release_confirmed-ask'} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -4615,7 +4994,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:$(\"decide hold collect\").first().json.rows.map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:($(\"decide hold collect\").isExecuted ? $(\"decide hold collect\").first().json.rows : []).filter(r => ($(\"decide action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -4708,7 +5087,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ (() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; if (($('trigger').first().json.body || $('trigger').first().json).at) b.port.at=($('trigger').first().json.body || $('trigger').first().json).at; return b;})() }}",
+                        "jsonBody": "={{ (() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; b.port.at=new Date().toISOString(); return b;})() }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -4882,6 +5261,34 @@
                     "arguments": {}
                 },
                 {
+                    "node": "inbound action status",
+                    "name": "status",
+                    "method": "GET",
+                    "path": "/automation/runs/{id}",
+                    "recipe": "monitor_inbound",
+                    "program": "inbound",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"inbound open\").first().json.body.runId) + \"\" }}",
+                        "method": "GET",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                },
+                {
                     "node": "inbound release rows",
                     "name": "route",
                     "method": "GET",
@@ -4954,7 +5361,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:$(\"inbound release collect\").first().json.rows.map(r => r[\"order_number\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"inbound release collect\").isExecuted ? $(\"inbound release collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -5042,7 +5449,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:$(\"inbound release_confirmed collect\").first().json.rows.map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/inbound-release_confirmed-ask'} }}",
+                        "jsonBody": "={{ {keys:($(\"inbound release_confirmed collect\").isExecuted ? $(\"inbound release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/inbound-release_confirmed-ask'} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -5130,7 +5537,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:$(\"inbound hold collect\").first().json.rows.map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:($(\"inbound hold collect\").isExecuted ? $(\"inbound hold collect\").first().json.rows : []).filter(r => ($(\"inbound action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -5223,7 +5630,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ (() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; if (($('trigger').first().json.body || $('trigger').first().json).at) b.port.at=($('trigger').first().json.body || $('trigger').first().json).at; return b;})() }}",
+                        "jsonBody": "={{ (() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:text\", recipeValuesFingerprint:\"sha256:values\"}; b.port.at=new Date().toISOString(); return b;})() }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -5397,6 +5804,34 @@
                     "arguments": {}
                 },
                 {
+                    "node": "settle action status",
+                    "name": "status",
+                    "method": "GET",
+                    "path": "/automation/runs/{id}",
+                    "recipe": "settle",
+                    "program": "settle",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"settle open\").first().json.body.runId) + \"\" }}",
+                        "method": "GET",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                },
+                {
                     "node": "settle release rows",
                     "name": "route",
                     "method": "GET",
@@ -5469,7 +5904,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:$(\"settle release collect\").first().json.rows.map(r => r[\"order_number\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"settle release collect\").isExecuted ? $(\"settle release collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -5557,7 +5992,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:$(\"settle release_confirmed collect\").first().json.rows.map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/settle-release_confirmed-ask'} }}",
+                        "jsonBody": "={{ {keys:($(\"settle release_confirmed collect\").isExecuted ? $(\"settle release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/settle-release_confirmed-ask'} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -5645,7 +6080,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:$(\"settle hold collect\").first().json.rows.map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:($(\"settle hold collect\").isExecuted ? $(\"settle hold collect\").first().json.rows : []).filter(r => ($(\"settle action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {

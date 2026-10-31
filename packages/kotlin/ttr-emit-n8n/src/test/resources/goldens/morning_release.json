@@ -358,12 +358,43 @@
             }
         },
         {
+            "id": "4fe5fbfb-aa47-3aef-bbeb-fcd998bceee5",
+            "name": "action status",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                3080,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
             "id": "fe587673-e2e3-3242-9efb-c88997a5083c",
             "name": "routes loop",
             "type": "n8n-nodes-base.splitInBatches",
             "typeVersion": 3.0,
             "position": [
-                3080,
+                3300,
                 0
             ],
             "parameters": {
@@ -377,7 +408,7 @@
             "type": "n8n-nodes-base.switch",
             "typeVersion": 3.0,
             "position": [
-                3300,
+                3520,
                 0
             ],
             "parameters": {
@@ -469,7 +500,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                3520,
+                3740,
                 0
             ],
             "parameters": {
@@ -523,7 +554,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                3740,
+                3960,
                 0
             ],
             "parameters": {
@@ -537,7 +568,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                3960,
+                4180,
                 0
             ],
             "parameters": {
@@ -547,7 +578,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:$(\"release collect\").first().json.rows.map(r => r[\"order_number\"])} }}",
+                "jsonBody": "={{ {keys:($(\"release collect\").isExecuted ? $(\"release collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -571,7 +602,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                4180,
+                4400,
                 0
             ],
             "parameters": {
@@ -625,7 +656,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                4400,
+                4620,
                 0
             ],
             "parameters": {
@@ -639,7 +670,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                4620,
+                4840,
                 0
             ],
             "parameters": {
@@ -649,7 +680,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:$(\"release_confirmed collect\").first().json.rows.map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/release_confirmed-ask'} }}",
+                "jsonBody": "={{ {keys:($(\"release_confirmed collect\").isExecuted ? $(\"release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/release_confirmed-ask'} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -673,7 +704,7 @@
             "type": "n8n-nodes-base.wait",
             "typeVersion": 1.1,
             "position": [
-                4840,
+                5060,
                 0
             ],
             "parameters": {
@@ -690,7 +721,7 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                5060,
+                5280,
                 0
             ],
             "parameters": {
@@ -722,7 +753,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                5280,
+                5500,
                 0
             ],
             "parameters": {
@@ -736,7 +767,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                5500,
+                5720,
                 0
             ],
             "parameters": {
@@ -790,7 +821,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                5720,
+                5940,
                 0
             ],
             "parameters": {
@@ -804,7 +835,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                5940,
+                6160,
                 0
             ],
             "parameters": {
@@ -835,11 +866,11 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                6160,
+                6380,
                 0
             ],
             "parameters": {
-                "jsCode": "const rows=[...($(\"hold collect\").isExecuted ? $(\"hold collect\").first().json.rows.map(row => ({...row,who:\"role.sales\"})) : [])]; const groups = $input.first().json.body.groups.map(g => ({...g,rowsRef:g.rows,rows:rows.filter(r => Object.entries(g.by).every(([k,v]) => r[k] === v))})); if(groups.some(g=>!g.rows.length)) throw new Error('digest group has no resolved rows'); return [{json:{groups:groups.length ? groups : [{empty:true}]}}];",
+                "jsCode": "const rows=[...($(\"hold collect\").isExecuted ? $(\"hold collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).map(row => ({...row,who:\"role.sales\"}))]; const groups = ($(\"action status\").first().json.body.dryRun ? [] : $input.first().json.body.groups).map(g => ({...g,rowsRef:g.rows,rows:rows.filter(r => Object.entries(g.by).every(([k,v]) => r[k] === v))})); if(groups.some(g=>!g.rows.length)) throw new Error('digest group has no resolved rows'); return [{json:{groups:groups.length ? groups : [{empty:true}]}}];",
                 "mode": "runOnceForAllItems"
             }
         },
@@ -849,7 +880,7 @@
             "type": "n8n-nodes-base.splitOut",
             "typeVersion": 1.0,
             "position": [
-                6380,
+                6600,
                 0
             ],
             "parameters": {
@@ -865,7 +896,7 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                6600,
+                6820,
                 0
             ],
             "parameters": {
@@ -897,7 +928,7 @@
             "type": "n8n-nodes-base.emailSend",
             "typeVersion": 2.1,
             "position": [
-                6820,
+                7040,
                 0
             ],
             "parameters": {
@@ -922,7 +953,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                7040,
+                7260,
                 0
             ],
             "parameters": {
@@ -956,7 +987,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                7260,
+                7480,
                 0
             ],
             "parameters": {
@@ -970,7 +1001,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                7480,
+                7700,
                 0
             ],
             "parameters": {
@@ -1004,7 +1035,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                7700,
+                7920,
                 0
             ],
             "parameters": {
@@ -1113,7 +1144,7 @@
             "main": [
                 [
                     {
-                        "node": "route items",
+                        "node": "action status",
                         "type": "main",
                         "index": 0
                     }
@@ -1143,6 +1174,17 @@
                 [
                     {
                         "node": "check evaluation",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "action status": {
+            "main": [
+                [
+                    {
+                        "node": "route items",
                         "type": "main",
                         "index": 0
                     }
@@ -1664,6 +1706,34 @@
                     "arguments": {}
                 },
                 {
+                    "node": "action status",
+                    "name": "status",
+                    "method": "GET",
+                    "path": "/automation/runs/{id}",
+                    "recipe": "release_order",
+                    "program": "morning_release",
+                    "mode": "batch",
+                    "port": "none",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"\" }}",
+                        "method": "GET",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                },
+                {
                     "node": "release rows",
                     "name": "route",
                     "method": "GET",
@@ -1736,7 +1806,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:$(\"release collect\").first().json.rows.map(r => r[\"order_number\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"release collect\").isExecuted ? $(\"release collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -1824,7 +1894,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:$(\"release_confirmed collect\").first().json.rows.map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/release_confirmed-ask'} }}",
+                        "jsonBody": "={{ {keys:($(\"release_confirmed collect\").isExecuted ? $(\"release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/release_confirmed-ask'} }}",
                         "options": {
                             "response": {
                                 "response": {

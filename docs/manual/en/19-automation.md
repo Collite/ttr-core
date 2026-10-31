@@ -146,7 +146,27 @@ against the bundle's hashes and a complete directory is published only after eve
 An export becomes stale when its recipe text, parameter values, labels, program, deployment, world,
 toolchain or target version differs from the served bundle. Rebuild and export again after such a change.
 Executor manifests are plugin-owned TTR-M resources. All seven target manifests ship with the toolchain;
-n8n, Camunda and Python renderers arrive in their later exporter phases. Process export arrives with P1.
+n8n L1 renders recipes and processes; Camunda and Python rendering remain in their planned exporter Stages.
+
+## n8n L1 exports
+
+`ttrp emit --deployment release_n8n --project . --out exports` produces an inactive `workflow.json`,
+credential/import instructions, conformance references and an exact named call list in `manifest.json`.
+`--granularity recipe|parts|islands` selects whole-recipe evaluation, named parts or the verified island waves.
+The exporter carries no SQL. Every Open includes recipe and program/deployment fingerprints; stale refusals
+stop the workflow. A replayed Open skips the action path so a duplicate event does not send mail again.
+
+Batch Schedule Triggers use the program's `HH:MM IANA/Timezone` schedule hint (or a cron expression), while
+key/event programs expose `/webhook/<deployment>`. HTTP nodes use the `tatrman-automation` bearer credential
+and three retries. Engine-side mail uses `tatrman-mail` SMTP, `TTR_MAIL_FROM` and the `TTR_MAIL_RECIPIENTS`
+JSON role-to-address mapping; the Server's dry-run flag suppresses SMTP. Set `TTR_AUTOMATION_URL` to the Server
+origin, without `/automation`. The generated README lists the required n8n worker environment access.
+
+Process exports verify every step before writing a package, preserve each step's recipe, effective port and
+parent deployment, wait on obligations and skip a step when its obligation is absent. Obligation waits accept
+webhook resumes and poll once per minute for fulfilment/due. When supplying `--bundle` for a process, point it
+at a directory containing one ordinary bundle directory per recipe name. SPI v2 JVM callers must rebuild with
+the updated toolchain; the grammar version is unchanged.
 
 ## Conformance of a recipe
 
@@ -166,6 +186,14 @@ environment variable. The Server must expose exactly one enabled, granted, curre
 for each recipe/mode. Fixture parameters must match the served recipe; replay cannot override approved
 parameter values. On-event fixtures need explicit keys; a batch fixture without `keys` selects all candidates.
 `--world` filters fixtures by their declared world; it does not change the Server's world or deployments.
+
+n8n dry replay interprets the supported generated node types and JavaScript expressions with Node 22+;
+it does not start n8n, send SMTP or wait for a person. Pass `--cells n8n-l1.on-event` and repeat
+`--export <deployment>.n8n_l1.export` for each recipe/mode. The exported deployment must be enabled,
+granted and current. The driver checks the manifest's call list against the actual HTTP parameters,
+executes with `dryRun: true`, and reads exact Server evidence for the same comparisons as native.
+Use trusted generated exports; arbitrary Code-node workflows are executable artifacts. Process lifecycle
+replay and event-body fixtures remain separate from the H-1 key-based dry replay.
 
 Golden YAML uses `recipe`, `world`, `as_of`, `parameters`, `keys`, `expected`, and optional `pinned_from`
 (`run`, `at`, `by`). A multi-recipe replay uses `recipes: [release_order, settle]` and stores each collection

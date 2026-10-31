@@ -90,7 +90,7 @@ internal class N8nRenderer(
                 flow.link(previous, wait)
                 previous = wait
             }
-            val (entry, exit) = recipe(graph, prefix)
+            val (entry, exit) = recipe(graph, prefix, index == 0)
             flow.link(previous, entry)
             // An absent obligation skips the associated recipe and joins the next process step.
             val join = flow.code(prefix + "step complete", "return [{json:{}}];")
@@ -157,6 +157,7 @@ internal class N8nRenderer(
     private fun recipe(
         graph: RecipeGraph,
         prefix: String,
+        initial: Boolean,
     ): Pair<String, String> {
         require(graph.deployment.granularity in setOf("recipe", "parts", "islands")) { "unsupported n8n granularity" }
         val openName = prefix + "open"
@@ -189,7 +190,8 @@ internal class N8nRenderer(
                 (fp["program"]?.let { "b.programFingerprint=${literal(it)}; " } ?: "") +
                 (fp["deployment"]?.let { "b.deploymentFingerprint=${literal(it)}; " } ?: "") +
                 (if (graph.program.mode == "batch") "b.idempotencyKey=${dollar}execution.id; " else "") +
-                "if ($input.at) b.port.at=$input.at; return b;})()"
+                (if (initial) "if ($input.at) b.port.at=$input.at; " else "b.port.at=new Date().toISOString(); ") +
+                "return b;})()"
         val open = http(graph, openName, "open", "POST", body = body)
         val id = "$dollar(${literal(openName)}).first().json.body.runId"
         val complete = flow.code(prefix + "run complete", "return [{json:{}}];")
@@ -259,7 +261,9 @@ internal class N8nRenderer(
                 return (routes.length ? routes : [null]).map(route => ({json:{route}}));
                 """.trimIndent(),
             )
-        flow.link(evaluated, prepare)
+        val actionStatus = http(graph, prefix + "action status", "status", "GET", id)
+        flow.link(evaluated, actionStatus)
+        flow.link(actionStatus, prepare)
         val loop =
             flow.node(
                 prefix + "routes loop",
@@ -321,102 +325,127 @@ internal class N8nRenderer(
                 )
             flow.link(read, tail)
             val rowNode = tail
-            graph.wirings.filter { it.routes.any { r -> r.substringAfterLast('.') == route.name } }.forEach { wiring ->
-                val action = graph.actions.getValue(wiring.action)
-                val sink =
-                    action.sinks["n8n_l1"] ?: action.sinks["n8n"] ?: action.sinks["native"]
-                        ?: error("no n8n sink for ${wiring.action}")
-                require(wiring.whenCondition == null) { "engine-side rendering of conditional wiring is not supported" }
-                if (digest && action.deliverable) {
-                    digestSources += rowNode to (wiring.columns["who"] ?: "")
-                    return@forEach
-                }
-                val rows = "$dollar(${literal(rowNode)}).first().json.rows"
-                val selectedKeys = "$rows.map(r => ${keyProjection("r", keys)})"
-                val actionName = prefix + route.name + " " + wiring.action
-                if (sink == "n8n-nodes-base.emailSend") {
-                    val mail = email(actionName, rows, literal(wiring.columns["who"] ?: ""))
-                    flow.link(tail, mail)
-                    tail = mail
-                    val outcome =
-                        http(
-                            graph,
-                            "$actionName outcome",
-                            "outcome",
-                            "POST",
-                            id,
-                            mapOf(
-                                "action" to wiring.action,
-                            ),
-                            body =
-                                "{outcomes:$selectedKeys.map(key => " +
-                                    "({key,status:'delivered',at:new Date().toISOString()}))}",
-                        )
-                    flow.link(tail, outcome)
-                    tail = outcome
-                } else {
-                    require(
-                        sink in
-                            setOf(
-                                "door",
-                                "transition",
-                                "writer",
-                                "obligation",
-                                "task",
-                                "message",
-                                "start",
-                                "n8n-nodes-base.httpRequest",
-                            ),
-                    ) { "unsupported n8n action sink $sink" }
-                    val suffix = actionName.replace(' ', '-')
-                    val perform =
-                        http(
-                            graph,
-                            actionName,
-                            "perform",
-                            "POST",
-                            id,
-                            mapOf("action" to wiring.action),
-                            body =
-                                "{keys:$selectedKeys" +
-                                    (
-                                        if (wiring.action ==
-                                            "ask"
-                                        ) {
-                                            ",callbackUrl:${dollar}execution.resumeUrl + '/$suffix'"
-                                        } else {
-                                            ""
-                                        }
-                                    ) +
-                                    "}",
-                        )
-                    flow.link(tail, perform)
-                    tail = perform
-                    if (wiring.action == "ask") {
-                        val wait =
-                            flow.node(
-                                "$actionName wait",
-                                "wait",
-                                json(
-                                    "resume" to str("webhook"),
-                                    "httpMethod" to str("POST"),
-                                    "options" to json("webhookSuffix" to str(suffix)),
+            graph.wirings
+                .filter {
+                    it.routes.any { r ->
+                        r.substringAfterLast('.') == route.name
+                    }
+                }.distinctBy { it.action }
+                .forEach { wiring ->
+                    val action = graph.actions.getValue(wiring.action)
+                    val sink =
+                        action.sinks["n8n_l1"] ?: action.sinks["n8n"] ?: action.sinks["native"]
+                            ?: error("no n8n sink for ${wiring.action}")
+                    val routeRows = "($dollar(${literal(
+                        rowNode,
+                    )}).isExecuted ? $dollar(${literal(rowNode)}).first().json.rows : [])"
+                    val statusBody = "$dollar(${literal(prefix + "action status")}).first().json.body"
+                    val previewKey = "(a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? ${keyProjection(
+                        "a.key",
+                        keys,
+                    )} : a.key)"
+                    val rows =
+                        if (sink == "n8n-nodes-base.emailSend") {
+                            "$routeRows.filter(r => ($statusBody.actions || []).some(a => a.action === ${literal(
+                                wiring.action,
+                            )} && JSON.stringify(${keyProjection("r", keys)}) === JSON.stringify($previewKey)))"
+                        } else {
+                            routeRows
+                        }
+                    if (digest && action.deliverable) {
+                        digestSources += rows to (wiring.columns["who"] ?: "")
+                        return@forEach
+                    }
+                    val selectedKeys = "$rows.map(r => ${keyProjection("r", keys)})"
+                    val actionName = prefix + route.name + " " + wiring.action
+                    if (sink == "n8n-nodes-base.emailSend") {
+                        val mail = email(actionName, rows, literal(wiring.columns["who"] ?: ""))
+                        val deliver = flow.condition("$actionName deliver", "!$statusBody.dryRun && $rows.length > 0")
+                        flow.link(tail, deliver)
+                        flow.link(deliver, mail)
+                        tail = mail
+                        val outcome =
+                            http(
+                                graph,
+                                "$actionName outcome",
+                                "outcome",
+                                "POST",
+                                id,
+                                mapOf(
+                                    "action" to wiring.action,
                                 ),
+                                body =
+                                    "{outcomes:$selectedKeys.map(key => " +
+                                        "({key,status:'delivered',at:new Date().toISOString()}))}",
                             )
-                        val pending =
-                            flow.condition(
-                                "$actionName task pending",
-                                "(${dollar}json.body.performed || []).some(p => p.taskId)",
+                        flow.link(tail, outcome)
+                        val delivered = flow.code("$actionName complete", "return [{json:{}}];")
+                        flow.link(outcome, delivered)
+                        flow.link(deliver, delivered, 1)
+                        tail = delivered
+                    } else {
+                        require(
+                            sink in
+                                setOf(
+                                    "door",
+                                    "transition",
+                                    "writer",
+                                    "obligation",
+                                    "task",
+                                    "message",
+                                    "start",
+                                    "n8n-nodes-base.httpRequest",
+                                ),
+                        ) { "unsupported n8n action sink $sink" }
+                        val suffix = actionName.replace(' ', '-')
+                        val perform =
+                            http(
+                                graph,
+                                actionName,
+                                "perform",
+                                "POST",
+                                id,
+                                mapOf("action" to wiring.action),
+                                body =
+                                    "{keys:$selectedKeys" +
+                                        (
+                                            if (wiring.action ==
+                                                "ask"
+                                            ) {
+                                                ",callbackUrl:${dollar}execution.resumeUrl + '/$suffix'"
+                                            } else {
+                                                ""
+                                            }
+                                        ) +
+                                        "}",
                             )
-                        val resumed = flow.code("$actionName resumed", "return [{json:{}}];")
-                        flow.link(tail, pending)
-                        flow.link(pending, wait)
-                        flow.link(pending, resumed, 1)
-                        flow.link(wait, resumed)
-                        tail = resumed
+                        flow.link(tail, perform)
+                        tail = perform
+                        if (wiring.action == "ask") {
+                            val wait =
+                                flow.node(
+                                    "$actionName wait",
+                                    "wait",
+                                    json(
+                                        "resume" to str("webhook"),
+                                        "httpMethod" to str("POST"),
+                                        "options" to json("webhookSuffix" to str(suffix)),
+                                    ),
+                                )
+                            val pending =
+                                flow.condition(
+                                    "$actionName task pending",
+                                    "(${dollar}json.body.performed || []).some(p => p.taskId)",
+                                )
+                            val resumed = flow.code("$actionName resumed", "return [{json:{}}];")
+                            flow.link(tail, pending)
+                            flow.link(pending, wait)
+                            flow.link(pending, resumed, 1)
+                            flow.link(wait, resumed)
+                            tail = resumed
+                        }
                     }
                 }
-            }
             flow.link(tail, loop)
         }
         var done = loop
@@ -425,17 +454,15 @@ internal class N8nRenderer(
             val digests = http(graph, prefix + "digests", "digests", "GET", id)
             flow.link(done, digests, doneOutput)
             val sources =
-                digestSources.joinToString(",") { (node, who) ->
-                    "...($dollar(${literal(
-                        node,
-                    )}).isExecuted ? $dollar(${literal(
-                        node,
-                    )}).first().json.rows.map(row => ({...row,who:${literal(who)}})) : [])"
+                digestSources.joinToString(",") { (rows, who) ->
+                    "...$rows.map(row => ({...row,who:${literal(who)}}))"
                 }
             val groups =
                 flow.code(
                     prefix + "digest groups",
-                    "const rows=[$sources]; const groups = ${dollar}input.first().json.body.groups.map(g => ({...g,rowsRef:g.rows,rows:rows.filter(r => Object.entries(g.by).every(([k,v]) => r[k] === v))})); if(groups.some(g=>!g.rows.length)) throw new Error('digest group has no resolved rows'); return [{json:{groups:groups.length ? groups : [{empty:true}]}}];",
+                    "const rows=[$sources]; const groups = ($dollar(${literal(
+                        prefix + "action status",
+                    )}).first().json.body.dryRun ? [] : ${dollar}input.first().json.body.groups).map(g => ({...g,rowsRef:g.rows,rows:rows.filter(r => Object.entries(g.by).every(([k,v]) => r[k] === v))})); if(groups.some(g=>!g.rows.length)) throw new Error('digest group has no resolved rows'); return [{json:{groups:groups.length ? groups : [{empty:true}]}}];",
                 )
             flow.link(digests, groups)
             val split =

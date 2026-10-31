@@ -19,6 +19,7 @@ import org.tatrman.ttrp.graph.capability.ExecutorManifestGate
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.ServiceLoader
+import kotlinx.serialization.json.jsonObject
 
 class RecipeExportSpec :
     StringSpec({
@@ -260,6 +261,140 @@ class RecipeExportSpec :
                 "registry_grid",
                 grid.joinToString("\n") { "${it.deployment}|${it.program}|${it.type}|${it.mode}|${it.ok}" },
             )
+        }
+
+        fun exportProject(): Path {
+            val project = Files.createTempDirectory("n8n-export-project")
+            for (folder in listOf("automation", "worlds")) {
+                val target = project.resolve("models/hartland/$folder")
+                Files.createDirectories(target)
+                Files.list(root.resolve("hartland/$folder")).use { paths ->
+                    paths.filter { it.fileName.toString() != "checker-probes.ttrm" }.forEach {
+                        Files.copy(it, target.resolve(it.fileName))
+                    }
+                }
+            }
+            Files.writeString(
+                project.resolve("models/hartland/writable.ttrm"),
+                """
+                package hartland
+                model er
+                def entity order { attributes: [def attribute order_number {type: int, isKey: true}, def attribute state {type: text}, def attribute held_for {type: text}] }
+                def entity return_request_line { attributes: [def attribute line_id {type: int, isKey: true}, def attribute state {type: text}, def attribute way {type: text}] }
+                def entity reorder_proposal { attributes: [def attribute id {type: int, isKey: true}] }
+                def entity winback_mail { attributes: [def attribute id {type: int, isKey: true}] }
+                """.trimIndent(),
+            )
+            Files.writeString(
+                project.resolve("modeler.toml"),
+                "[ttrp]\nworld = \"hartland.worlds.demo\"\n",
+            )
+            return project
+        }
+        "n8n CLI export renders the compiled H-1 recipe and publishes the exact workflow calls" {
+            val project = exportProject()
+            val bundle = build("release_order")
+            val out = Files.createTempDirectory("n8n-real-h1")
+            val result =
+                TtrpCommand().subcommands(EmitCommand()).test(
+                    listOf(
+                        "emit",
+                        "--deployment",
+                        "release_n8n",
+                        "--project",
+                        project.toString(),
+                        "--bundle",
+                        bundle.dir.toString(),
+                        "--out",
+                        out.toString(),
+                    ),
+                )
+            io.kotest.assertions.withClue(result.output) { result.statusCode shouldBe 0 }
+            val folder = out.resolve("release_n8n.n8n_l1.export")
+            val workflow =
+                kotlinx.serialization.json.Json
+                    .parseToJsonElement(
+                        Files.readString(folder.resolve("workflow.json")),
+                    ).jsonObject
+            val manifest =
+                kotlinx.serialization.json.Json
+                    .parseToJsonElement(
+                        Files.readString(folder.resolve("manifest.json")),
+                    ).jsonObject
+            manifest["calls"] shouldBe
+                workflow
+                    .getValue("meta")
+                    .jsonObject
+                    .getValue("tatrman")
+                    .jsonObject["calls"]
+            Files.readString(folder.resolve("workflow.json")) shouldContain "programFingerprint"
+            Files.readString(folder.resolve("README.md")) shouldContain "tatrman-automation"
+            Files.readString(folder.resolve("README.md")) shouldContain "Stale when"
+        }
+        "process CLI verifies every H-2 bundle and renders each step's actual recipe and conditional actions" {
+            val project = exportProject()
+            val bundles = Files.createTempDirectory("n8n-h2-bundles")
+            listOf("decide_return", "monitor_inbound", "settle").forEach { recipe ->
+                val compiled = build(recipe)
+                val fixture = compiled.dir.resolve("tests/shared.yaml")
+                Files.createDirectories(fixture.parent)
+                Files.writeString(fixture, "recipe: $recipe\n")
+                val sha =
+                    "sha256:" +
+                        java.security.MessageDigest
+                            .getInstance("SHA-256")
+                            .digest(Files.readAllBytes(fixture))
+                            .joinToString("") { "%02x".format(it) }
+                val manifest =
+                    compiled.manifest.copy(
+                        recipe = compiled.manifest.recipe!!.copy(tests = listOf("tests/shared.yaml")),
+                        files = compiled.manifest.files + ("tests/shared.yaml" to sha),
+                    )
+                Files.writeString(compiled.dir.resolve("manifest.json"), manifest.toJson())
+                compiled.dir.toFile().copyRecursively(bundles.resolve(recipe).toFile())
+            }
+            val out = Files.createTempDirectory("n8n-real-h2")
+            val result =
+                TtrpCommand().subcommands(EmitCommand()).test(
+                    listOf(
+                        "emit",
+                        "--deployment",
+                        "returns_n8n",
+                        "--project",
+                        project.toString(),
+                        "--bundle",
+                        bundles.toString(),
+                        "--out",
+                        out.toString(),
+                    ),
+                )
+            io.kotest.assertions.withClue(result.output) { result.statusCode shouldBe 0 }
+            val rendered = Files.readString(out.resolve("returns_n8n.n8n_l1.export/workflow.json"))
+            listOf("decide_return", "monitor_inbound", "settle").forEach { rendered shouldContain "/recipes/$it/runs" }
+            rendered shouldContain "obligation present"
+            listOf("decide_return", "monitor_inbound", "settle").forEach { recipe ->
+                Files.readString(out.resolve("returns_n8n.n8n_l1.export/tests/$recipe/shared.yaml")) shouldBe
+                    "recipe: $recipe\n"
+            }
+            // A stale/missing step refuses the whole package, before any output directory exists.
+            Files.delete(bundles.resolve("settle/manifest.json"))
+            val failedOut = Files.createTempDirectory("n8n-missing-step")
+            val failed =
+                TtrpCommand().subcommands(EmitCommand()).test(
+                    listOf(
+                        "emit",
+                        "--deployment",
+                        "returns_n8n",
+                        "--project",
+                        project.toString(),
+                        "--bundle",
+                        bundles.toString(),
+                        "--out",
+                        failedOut.toString(),
+                    ),
+                )
+            failed.statusCode shouldBe 2
+            Files.exists(failedOut.resolve("returns_n8n.n8n_l1.export")) shouldBe false
         }
         "native CLI export is deterministic and contains no launcher or run calls" {
             val project = Files.createTempDirectory("recipe-export-project")

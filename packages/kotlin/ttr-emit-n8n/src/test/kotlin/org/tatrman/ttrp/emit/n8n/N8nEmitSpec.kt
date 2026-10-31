@@ -132,6 +132,72 @@ class N8nEmitSpec :
                 ).deterministic shouldBe
                 true
         }
+        "winback contains no SQL and every golden's expressions compile in the dry runtime" {
+            val base = n8nGraph()
+            val winback =
+                base.copy(
+                    recipe = base.recipe.copy(name = "winback", key = listOf("customer.customer_sk")),
+                    program =
+                        base.program.copy(
+                            name = "winback_monthly",
+                            port = "none",
+                            mode = "batch",
+                            schedule = "0 0 6 1 * *",
+                        ),
+                    roles =
+                        base.roles.copy(
+                            contexts =
+                                listOf(
+                                    ContextMeta("channel_sales", "per_candidate", "sql"),
+                                    ContextMeta("demographics", "per_candidate", "sql"),
+                                    ContextMeta("prior_mail", "per_candidate", "sql"),
+                                ),
+                            switchMode = "exclusive",
+                        ),
+                    routes =
+                        listOf(
+                            RouteMeta("premium", null, emptyList(), false, false, false),
+                            RouteMeta("regular", null, emptyList(), false, true, false),
+                        ),
+                    wirings =
+                        listOf("premium", "regular").flatMap { route ->
+                            listOf(
+                                WiringMeta(listOf("offer.$route"), "notify", mapOf("who" to "customer.email"), null),
+                                WiringMeta(listOf("offer.$route"), "record_mailed", emptyMap(), null),
+                            )
+                        },
+                    actions =
+                        mapOf(
+                            "notify" to action("n8n-nodes-base.emailSend", true),
+                            "record_mailed" to action("door"),
+                        ),
+                )
+            golden("winback", winback)
+            nodes(winback).forEach { it.getValue("parameters").toString().uppercase() shouldNotContain "SELECT" }
+            val runner = Files.createTempFile("n8n-validate-", ".mjs")
+            try {
+                Files.write(
+                    runner,
+                    requireNotNull(javaClass.getResourceAsStream("/replay/n8n-dry-runner.mjs")).use { it.readBytes() },
+                )
+                Files.list(Path.of("src/test/resources/goldens")).use { paths ->
+                    paths.forEach { file ->
+                        val process = ProcessBuilder("node", runner.toString()).start()
+                        process.outputStream.bufferedWriter().use { writer ->
+                            writer.write(
+                                "{\"validateOnly\":true,\"workflow\":" + Files.readString(file) + "}",
+                            )
+                        }
+                        val output = process.inputStream.bufferedReader().readText()
+                        val errors = process.errorStream.bufferedReader().readText()
+                        io.kotest.assertions.withClue(file.toString() + errors) { process.waitFor() shouldBe 0 }
+                        output shouldBe "{\"valid\":true}"
+                    }
+                }
+            } finally {
+                Files.deleteIfExists(runner)
+            }
+        }
         "process rendering retains three distinct recipes and skips absent obligations" {
             val first =
                 n8nGraph().copy(

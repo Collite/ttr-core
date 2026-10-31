@@ -13,6 +13,8 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
 import org.tatrman.ttr.metadata.model.World
 import org.tatrman.ttr.metadata.model.AutomationProgram
 import org.tatrman.ttr.metadata.model.AutomationAction
@@ -81,154 +83,233 @@ class EmitCommand : CliktCommand(name = "emit") {
                 requireNotNull(pairs.singleOrNull()) {
                     "unknown or ambiguous deployment $deploymentName (world ${config.manifest.world})"
                 }
-            require(original.process == null) { "process deployments require the P1 process exporter" }
             val deployment = original.copy(granularity = granularity ?: original.granularity)
-            val program =
-                requireNotNull(
-                    objects.filterIsInstance<AutomationProgram>().singleOrNull {
-                        it.qname.name ==
-                            deployment.program
-                    },
-                ) { "unknown or ambiguous program ${deployment.program}" }
-            val recipeName = requireNotNull(program.recipe)
+            val process =
+                original.process?.let { name ->
+                    requireNotNull(
+                        world.processes.singleOrNull { it.qname.name == name },
+                    ) { "unknown or ambiguous process $name" }
+                }
+            val programObjects = objects.filterIsInstance<AutomationProgram>()
+            val steps = process?.steps.orEmpty()
+            require(process == null || steps.isNotEmpty()) { "process has no steps" }
+            val programNames =
+                process?.steps?.map { requireNotNull(it.program) { "process step has no program" } }
+                    ?: listOf(requireNotNull(deployment.program) { "deployment has no program" })
+            val programs =
+                programNames.map { name ->
+                    requireNotNull(
+                        programObjects.singleOrNull { it.qname.name == name },
+                    ) { "unknown or ambiguous program $name" }
+                }
             val temp = if (bundlePath == null) Files.createTempDirectory("ttrp-export-build") else null
             try {
-                val dir =
-                    bundlePath?.let { Path.of(it).toAbsolutePath().normalize() } ?: run {
-                        val sources =
-                            Files.walk(root).use { paths ->
-                                paths
-                                    .filter {
-                                        Files.isRegularFile(it) &&
-                                            it.fileName.toString() == "$recipeName.ttrp"
-                                    }.toList()
+                data class Loaded(
+                    val graph: org.tatrman.ttrp.emit.spi.RecipeGraph,
+                    val bundle: RunManifest,
+                    val dir: Path,
+                )
+
+                val bundleDirs = mutableMapOf<String, Path>()
+
+                fun load(
+                    program: AutomationProgram,
+                    port: String?,
+                ): Loaded {
+                    val recipeName = requireNotNull(program.recipe)
+                    val dir =
+                        bundleDirs.getOrPut(recipeName) {
+                            bundlePath?.let { base ->
+                                val path = Path.of(base).toAbsolutePath().normalize()
+                                if (process != null) ExportFolderWriter.safePath(path, recipeName) else path
+                            } ?: run {
+                                val sources =
+                                    Files.walk(root).use { paths ->
+                                        paths
+                                            .filter {
+                                                Files.isRegularFile(it) &&
+                                                    it.fileName.toString() == "$recipeName.ttrp"
+                                            }.toList()
+                                    }
+                                val source =
+                                    requireNotNull(
+                                        sources.singleOrNull(),
+                                    ) { "expected one $recipeName.ttrp; use --bundle for an existing bundle" }
+                                BundleAssembler(
+                                    ToolchainVersion.current,
+                                ).build(
+                                    source = Files.readString(source),
+                                    fileName = source.toString(),
+                                    recipeDir = source.parent,
+                                    pipelineManifest = config.manifest,
+                                    modelsRoot = config.manifest.modelsRoot(),
+                                    outDir = if (process != null) temp!!.resolve(recipeName) else temp!!,
+                                ).dir
                             }
-                        val source =
-                            requireNotNull(
-                                sources.singleOrNull(),
-                            ) { "expected one $recipeName.ttrp; use --bundle for an existing bundle" }
-                        BundleAssembler(
-                            ToolchainVersion.current,
-                        ).build(
-                            source = Files.readString(source),
-                            fileName = source.toString(),
-                            recipeDir = source.parent,
-                            pipelineManifest = config.manifest,
-                            modelsRoot = config.manifest.modelsRoot(),
-                            outDir = temp!!,
-                        ).dir
+                        }
+                    val bundle = RunManifest.fromJson(Files.readString(dir.resolve("manifest.json")))
+                    val registrySnapshot =
+                        org.tatrman.ttr.metadata.registry.RegistrySnapshot(
+                            model = loaded.model,
+                            graph =
+                                org.tatrman.ttr.metadata.graph.ModelGraph
+                                    .build(loaded.model),
+                            swappedAt = java.time.Instant.EPOCH,
+                            warnings = emptyList(),
+                        )
+                    val packageOf = LayoutResolver.packagesFromFiles(loaded.files)
+                    val resolved =
+                        org.tatrman.ttr.metadata.world
+                            .WorldResolver(registrySnapshot, packageOf)
+                            .resolve(world.qname)
+                    require(
+                        resolved is org.tatrman.ttr.metadata.world.WorldResolution.Ok,
+                    ) { "cannot resolve export world: $resolved" }
+                    require(
+                        bundle.world.fingerprint ==
+                            org.tatrman.ttr.metadata.world.WorldFingerprint
+                                .of(resolved.world),
+                    ) {
+                        "bundle world fingerprint differs from deployment world; rebuild the recipe bundle"
                     }
-                val bundle = RunManifest.fromJson(Files.readString(dir.resolve("manifest.json")))
-                val registrySnapshot =
-                    org.tatrman.ttr.metadata.registry.RegistrySnapshot(
-                        model = loaded.model,
-                        graph =
-                            org.tatrman.ttr.metadata.graph.ModelGraph
-                                .build(loaded.model),
-                        swappedAt = java.time.Instant.EPOCH,
-                        warnings = emptyList(),
+                    require(
+                        bundle.world.qname ==
+                            listOf(
+                                world.qname.`package`.ifBlank {
+                                    world.qname.namespace
+                                },
+                                world.qname.name,
+                            ).filter { it.isNotEmpty() }.joinToString("."),
+                    ) { "bundle world does not match deployment world" }
+                    // Refuse tampered artifacts before passing their metadata to a plugin.
+                    bundle.files.forEach { (relative, expected) ->
+                        val path = ExportFolderWriter.bundleFile(dir, relative)
+                        val actual =
+                            "sha256:" +
+                                MessageDigest
+                                    .getInstance(
+                                        "SHA-256",
+                                    ).digest(Files.readAllBytes(path))
+                                    .joinToString("") { "%02x".format(it) }
+                        require(actual == expected) { "bundle file hash mismatch: $relative" }
+                    }
+                    val recipe = requireNotNull(bundle.recipe) { "bundle has no recipe" }
+                    val actionObjects = objects.filterIsInstance<AutomationAction>()
+                    val actionGroups = actionObjects.groupBy { it.qname.name }
+                    val evidence = recipe.approvalDependencies
+                    // Validate the explicit evidence format before trying to reconstruct its scope.
+                    evidence?.let { RecipeActionDependencies.validate(it)?.let { bad -> error(bad.reason) } }
+                    val scope =
+                        evidence?.let {
+                            ModelIndex(registrySnapshot, packageOf).automationScope(
+                                it.imports.map { raw -> ModelIndex.importScope(raw.split('.'), raw) },
+                            )
+                        }
+                    scope?.missingImports?.firstOrNull()?.let { missing ->
+                        error("recorded import `$missing.*` resolves to no loader package in the export model")
+                    }
+                    val wiredActions =
+                        recipe.wiring.map { it.action }.distinct().associateWith { name ->
+                            val resolution =
+                                scope?.action(name) ?: AutomationScope.resolveAction(name, actionGroups[name].orEmpty())
+                            val location =
+                                if (evidence ==
+                                    null
+                                ) {
+                                    "export model (bundle records no approval scope)"
+                                } else {
+                                    "recorded approval scope"
+                                }
+                            when (resolution) {
+                                is ActionResolution.Resolved -> resolution.action
+                                is ActionResolution.Unresolved ->
+                                    error(
+                                        "action `$name` is unresolved in the $location",
+                                    )
+                                is ActionResolution.Ambiguous ->
+                                    error(
+                                        "action `$name` is ambiguous in the $location",
+                                    )
+                            }
+                        }
+                    if (evidence != null || wiredActions.values.any(AutomationScope::hasDefaults)) {
+                        val result =
+                            RecipeActionDependencies.verify(evidence, recipe.fingerprints.text, wiredActions) { ref ->
+                                scope?.target(ref) ?: TargetResolution.Unresolved(ref)
+                            }
+                        val reason =
+                            when (result) {
+                                RecipeActionDependencies.Verification.Ok -> null
+                                is RecipeActionDependencies.Verification.Stale ->
+                                    "action approval dependencies are stale for `${result.action}`; rebuild the recipe bundle"
+                                is RecipeActionDependencies.Verification.Unresolved ->
+                                    "unresolved action approval dependency `${result.ref}` in the recorded recipe import scope"
+                                is RecipeActionDependencies.Verification.Ambiguous ->
+                                    "ambiguous action approval dependency `${result.ref}` in the recorded recipe import scope"
+                                is RecipeActionDependencies.Verification.Malformed -> result.reason
+                            }
+                        require(reason == null) { requireNotNull(reason) }
+                    }
+                    val projected =
+                        RecipeGraphProjector.project(
+                            bundle,
+                            world,
+                            program,
+                            deployment,
+                            wiredActions.values.toList(),
+                        )
+                    return Loaded(
+                        projected.copy(
+                            program = projected.program.copy(port = port ?: projected.program.port),
+                            recipe =
+                                projected.recipe.copy(
+                                    fingerprints =
+                                        projected.recipe.fingerprints +
+                                            mapOf(
+                                                "program" to AutomationFingerprints.program(program),
+                                                "deployment" to AutomationFingerprints.deployment(original),
+                                                "world" to bundle.world.fingerprint,
+                                            ),
+                                ),
+                        ),
+                        bundle,
+                        dir,
                     )
-                val packageOf = LayoutResolver.packagesFromFiles(loaded.files)
-                val resolved =
-                    org.tatrman.ttr.metadata.world
-                        .WorldResolver(registrySnapshot, packageOf)
-                        .resolve(world.qname)
-                require(
-                    resolved is org.tatrman.ttr.metadata.world.WorldResolution.Ok,
-                ) { "cannot resolve export world: $resolved" }
-                require(
-                    bundle.world.fingerprint ==
-                        org.tatrman.ttr.metadata.world.WorldFingerprint
-                            .of(resolved.world),
-                ) {
-                    "bundle world fingerprint differs from deployment world; rebuild the recipe bundle"
                 }
-                require(
-                    bundle.world.qname ==
-                        listOf(
-                            world.qname.`package`.ifBlank {
-                                world.qname.namespace
-                            },
-                            world.qname.name,
-                        ).filter { it.isNotEmpty() }.joinToString("."),
-                ) { "bundle world does not match deployment world" }
-                // Refuse tampered artifacts before passing their metadata to a plugin.
-                bundle.files.forEach { (relative, expected) ->
-                    val path = ExportFolderWriter.bundleFile(dir, relative)
-                    val actual =
-                        "sha256:" +
-                            MessageDigest
-                                .getInstance(
-                                    "SHA-256",
-                                ).digest(Files.readAllBytes(path))
-                                .joinToString("") { "%02x".format(it) }
-                    require(actual == expected) { "bundle file hash mismatch: $relative" }
-                }
-                val recipe = requireNotNull(bundle.recipe) { "bundle has no recipe" }
-                val actionObjects = objects.filterIsInstance<AutomationAction>()
-                val actionGroups = actionObjects.groupBy { it.qname.name }
-                val evidence = recipe.approvalDependencies
-                // Validate the explicit evidence format before trying to reconstruct its scope.
-                evidence?.let { RecipeActionDependencies.validate(it)?.let { bad -> error(bad.reason) } }
-                val scope =
-                    evidence?.let {
-                        ModelIndex(registrySnapshot, packageOf).automationScope(
-                            it.imports.map { raw -> ModelIndex.importScope(raw.split('.'), raw) },
+                val loadedRecipes =
+                    programs.mapIndexed {
+                        index,
+                        program,
+                        ->
+                        load(program, steps.getOrNull(index)?.port)
+                    }
+                val first = loadedRecipes.first()
+                val graph =
+                    if (process == null) {
+                        first.graph
+                    } else {
+                        first.graph.copy(
+                            process =
+                                org.tatrman.ttrp.emit.spi.ProcessMeta(
+                                    process.qname.name,
+                                    process.instance,
+                                    steps.mapIndexed { index, step ->
+                                        org.tatrman.ttrp.emit.spi.StepMeta(
+                                            step.name,
+                                            step.program,
+                                            step.port,
+                                            step.after?.obligations.orEmpty(),
+                                            step.after?.time?.let { "${it.amount} ${it.unit}" },
+                                            step.after?.until.orEmpty(),
+                                            loadedRecipes[index].graph,
+                                        )
+                                    },
+                                ),
                         )
                     }
-                scope?.missingImports?.firstOrNull()?.let { missing ->
-                    error("recorded import `$missing.*` resolves to no loader package in the export model")
-                }
-                val wiredActions =
-                    recipe.wiring.map { it.action }.distinct().associateWith { name ->
-                        val resolution =
-                            scope?.action(name) ?: AutomationScope.resolveAction(name, actionGroups[name].orEmpty())
-                        val location =
-                            if (evidence ==
-                                null
-                            ) {
-                                "export model (bundle records no approval scope)"
-                            } else {
-                                "recorded approval scope"
-                            }
-                        when (resolution) {
-                            is ActionResolution.Resolved -> resolution.action
-                            is ActionResolution.Unresolved ->
-                                error(
-                                    "action `$name` is unresolved in the $location",
-                                )
-                            is ActionResolution.Ambiguous ->
-                                error(
-                                    "action `$name` is ambiguous in the $location",
-                                )
-                        }
-                    }
-                if (evidence != null || wiredActions.values.any(AutomationScope::hasDefaults)) {
-                    val result =
-                        RecipeActionDependencies.verify(evidence, recipe.fingerprints.text, wiredActions) { ref ->
-                            scope?.target(ref) ?: TargetResolution.Unresolved(ref)
-                        }
-                    val reason =
-                        when (result) {
-                            RecipeActionDependencies.Verification.Ok -> null
-                            is RecipeActionDependencies.Verification.Stale ->
-                                "action approval dependencies are stale for `${result.action}`; rebuild the recipe bundle"
-                            is RecipeActionDependencies.Verification.Unresolved ->
-                                "unresolved action approval dependency `${result.ref}` in the recorded recipe import scope"
-                            is RecipeActionDependencies.Verification.Ambiguous ->
-                                "ambiguous action approval dependency `${result.ref}` in the recorded recipe import scope"
-                            is RecipeActionDependencies.Verification.Malformed -> result.reason
-                        }
-                    require(reason == null) { requireNotNull(reason) }
-                }
-                val graph =
-                    RecipeGraphProjector.project(
-                        bundle,
-                        world,
-                        program,
-                        deployment,
-                        wiredActions.values.toList(),
-                    )
+                val program = programs.first()
+                val recipeName = graph.recipe.name
+                val bundle = first.bundle
                 val plugins = ServiceLoader.load(TtrEmitPlugin::class.java).toList()
                 val manifests =
                     RecipeManifestSource(
@@ -239,19 +320,19 @@ class EmitCommand : CliktCommand(name = "emit") {
                         manifests.load(graph.deployment.type),
                     ) { "unknown executor type ${graph.deployment.type}" }
                 val diagnostics =
-                    ExecutorManifestGate
-                        .checkRecipe(
+                    loadedRecipes.flatMapIndexed { index, loadedRecipe ->
+                        ExecutorManifestGate.checkRecipe(
                             manifest,
-                            program,
+                            programs[index],
                             deployment,
                             RegistryRecipe(
-                                graph.recipe.kinds,
-                                graph.actions
-                                    .mapValues {
-                                        RecipeGraphProjector.sink(it.value, graph.deployment.type)
-                                    },
+                                loadedRecipe.graph.recipe.kinds,
+                                loadedRecipe.graph.actions.mapValues {
+                                    RecipeGraphProjector.sink(it.value, graph.deployment.type)
+                                },
                             ),
                         )
+                    }
                 require(diagnostics.isEmpty()) { diagnostics.joinToString("\n") { it.render() } }
                 val plugin = EmitPluginLoader.builtin(graph.deployment.type)
                 require(
@@ -267,7 +348,18 @@ class EmitCommand : CliktCommand(name = "emit") {
                 val stale =
                     "Stale when any text, values, labels, program, deployment, world, toolchain " +
                         "or target version fingerprint differs from the served bundle; re-export the deployment."
-                val fixtures = bundle.recipe!!.tests.orEmpty()
+
+                fun fixturePath(
+                    recipe: String,
+                    relative: String,
+                ): String = if (process == null) relative else "tests/$recipe/${relative.removePrefix("tests/")}"
+                val fixtures =
+                    loadedRecipes
+                        .flatMap { loadedRecipe ->
+                            loadedRecipe.bundle.recipe!!.tests.orEmpty().map { relative ->
+                                fixturePath(loadedRecipe.graph.recipe.name, relative)
+                            }
+                        }.distinct()
                 val conformance =
                     buildJsonObject {
                         put("fixtures", JsonArray(fixtures.map(::JsonPrimitive)))
@@ -292,7 +384,16 @@ class EmitCommand : CliktCommand(name = "emit") {
                         )
                         put("toolchain", bundle.toolchain)
                         put("granularity", graph.deployment.granularity)
-                        put("connections", JsonArray(bundle.connections.sorted().map(::JsonPrimitive)))
+                        put(
+                            "connections",
+                            JsonArray(
+                                loadedRecipes
+                                    .flatMap { it.bundle.connections }
+                                    .distinct()
+                                    .sorted()
+                                    .map(::JsonPrimitive),
+                            ),
+                        )
                         put("calls", JsonArray(emptyList()))
                         put("conformance", "conformance.json")
                     }
@@ -330,14 +431,42 @@ class EmitCommand : CliktCommand(name = "emit") {
                         ).toAbsolutePath()
                         .normalize()
                         .resolve("$deploymentName.${graph.deployment.type}.export")
-                val fixtureBytes =
-                    fixtures.associateWith { relative ->
-                        require(relative in bundle.files) { "fixture missing from bundle hashes: $relative" }
-                        Files.readAllBytes(ExportFolderWriter.bundleFile(dir, relative))
+                val fixtureBytes = linkedMapOf<String, ByteArray>()
+                loadedRecipes.forEach { loadedRecipe ->
+                    loadedRecipe.bundle.recipe!!.tests.orEmpty().forEach { relative ->
+                        require(
+                            relative in loadedRecipe.bundle.files,
+                        ) { "fixture missing from bundle hashes: $relative" }
+                        val bytes = Files.readAllBytes(ExportFolderWriter.bundleFile(loadedRecipe.dir, relative))
+                        val destination = fixturePath(loadedRecipe.graph.recipe.name, relative)
+                        require(
+                            fixtureBytes[destination]?.contentEquals(bytes) != false,
+                        ) { "conflicting process fixture $relative" }
+                        fixtureBytes[destination] = bytes
+                    }
+                }
+                val workflowCalls =
+                    result.files["workflow.json"]?.let { bytes ->
+                        Json
+                            .parseToJsonElement(bytes.decodeToString())
+                            .jsonObject["meta"]
+                            ?.jsonObject
+                            ?.get("tatrman")
+                            ?.jsonObject
+                            ?.get("calls")
+                            ?.jsonArray
+                    }
+                val finalManifest =
+                    if (workflowCalls ==
+                        null
+                    ) {
+                        exportManifest
+                    } else {
+                        JsonObject(exportManifest + ("calls" to workflowCalls))
                     }
                 ExportFolderWriter.write(
                     folder,
-                    formatter.encodeToString(JsonObject.serializer(), exportManifest) + "\n",
+                    formatter.encodeToString(JsonObject.serializer(), finalManifest) + "\n",
                     result,
                     fixtureBytes,
                 )
@@ -345,7 +474,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                     echo(
                         buildJsonObject {
                             put("directory", folder.toString())
-                            put("manifest", exportManifest)
+                            put("manifest", finalManifest)
                             put("stale", stale)
                         }.toString(),
                     )

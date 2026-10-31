@@ -85,9 +85,12 @@ class NativeDriverSpec :
         }
     })
 
-private class ContractServer : AutoCloseable {
+internal class ContractServer : AutoCloseable {
     val opens = CopyOnWriteArrayList<JsonObject>()
     val requests = CopyOnWriteArrayList<String>()
+    private val closed =
+        java.util.concurrent.ConcurrentHashMap
+            .newKeySet<String>()
     private val bodies = java.util.concurrent.ConcurrentHashMap<String, JsonObject>()
 
     @Volatile var wrongReason = false
@@ -96,7 +99,9 @@ private class ContractServer : AutoCloseable {
 
     @Volatile var failHttp = false
 
-    @Volatile private var asyncOnce = true
+    @Volatile var precisionLoss = false
+
+    @Volatile var asyncOnce = true
     private val server =
         embeddedServer(CIO, port = 0) {
             routing { route("/{path...}") { handle { reply(call) } } }
@@ -160,6 +165,9 @@ private class ContractServer : AutoCloseable {
                     }.toString()
                 }
                 path.endsWith("/evaluate") -> buildJsonObject { put("verdict", verdict(id)) }.toString()
+                "/parts/" in path || "/islands/" in path -> """{"rows":[],"rowCount":0,"ref":"dry"}"""
+                path.endsWith("/perform") -> """{"performed":[],"skipped":[]}"""
+                path.endsWith("/digests") -> """{"groups":[]}"""
                 path.endsWith("/routes/release") -> {
                     val offset = call.request.queryParameters["offset"]!!.toInt()
                     buildJsonObject {
@@ -169,6 +177,12 @@ private class ContractServer : AutoCloseable {
                                 keys(id).drop(offset).take(1).map { key ->
                                     buildJsonObject {
                                         put("order_number", key)
+                                        if (precisionLoss) {
+                                            put(
+                                                "amount",
+                                                JsonPrimitive(java.math.BigDecimal("1.00000000000000000001")),
+                                            )
+                                        }
                                         put("verdict_reason", if (wrongReason) "wrong" else "ready")
                                         put("detail", buildJsonObject { put("stock", "/unused-ref") })
                                     }
@@ -212,10 +226,13 @@ private class ContractServer : AutoCloseable {
                             ),
                         )
                     }.toString()
-                path.endsWith("/close") -> """{"status":"closed"}"""
+                path.endsWith("/close") -> {
+                    closed += id
+                    """{"status":"closed"}"""
+                }
                 path == "/automation/runs/$id" ->
                     buildJsonObject {
-                        put("status", "evaluated")
+                        put("status", if (id in closed) "closed" else "evaluated")
                         put("dryRun", true)
                         put("verdict", verdict(id))
                         put(
