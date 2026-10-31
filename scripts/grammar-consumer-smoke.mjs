@@ -16,7 +16,8 @@
 //
 // Usage: `node scripts/grammar-consumer-smoke.mjs`  (add --skip-build to reuse dist).
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, readdirSync, mkdirSync, copyFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, mkdirSync, copyFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -36,10 +37,14 @@ if (!process.argv.includes('--skip-build')) {
     mkdirSync(join(pkg, 'src'), { recursive: true });
     writeFileSync(join(leaf, 'package.json'), '{"type":"module"}');
     copyFileSync(join(grammarDir, 'src', 'TTR.g4'), join(pkg, 'src', 'TTR.g4'));
-    copyFileSync(join(grammarDir, 'scripts', 'extract-property-map.ts'), join(pkg, 'scripts', 'extract-property-map.ts'));
+    for (const name of ['extract-property-map.ts', 'canonical-metadata.mjs', 'canonical-schemas.mjs', 'generate-canonical-schemas.mjs'])
+      copyFileSync(join(grammarDir, 'scripts', name), join(pkg, 'scripts', name));
     run('pnpm', ['exec', 'tsx', join(pkg, 'scripts', 'extract-property-map.ts')], grammarDir);
     if (!existsSync(join(pkg, 'src', 'generated', 'property-map.ts')))
       throw new Error('Isolated grammar extraction did not emit the property map');
+    for (const name of ['model-yaml.schema.json', 'profile.schema.json', 'canonical-metadata.json'])
+      if (readFileSync(join(pkg, 'schemas', name), 'utf8') !== readFileSync(join(grammarDir, 'schemas', name), 'utf8'))
+        throw new Error('Leaf schema generation differs: ' + name);
     if (existsSync(join(leaf, 'packages', 'kotlin')))
       throw new Error('Leaf grammar extraction wrote into a sibling Kotlin workspace');
     console.log('[grammar-smoke] TS-only source extraction OK');
@@ -52,10 +57,12 @@ if (!process.argv.includes('--skip-build')) {
 }
 
 console.log('[grammar-smoke] packing …');
-const packOut = run('pnpm', ['pack', '--pack-destination', tmpdir()], grammarDir).trim();
+const packDirectory = mkdtempSync(join(tmpdir(), 'ttr-grammar-pack-'));
+const packOut = run('pnpm', ['pack', '--pack-destination', packDirectory], grammarDir).trim();
 const tarball = packOut.split('\n').pop().trim();
 console.log(`[grammar-smoke] tarball: ${tarball}`);
 
+const resourceHashes = Object.fromEntries(['model-yaml.schema.json', 'profile.schema.json', 'canonical-metadata.json'].map((name) => [name, createHash('sha256').update(readFileSync(join(grammarDir, 'schemas', name))).digest('hex')]));
 const scratch = mkdtempSync(join(tmpdir(), 'ttr-grammar-consumer-'));
 try {
   writeFileSync(
@@ -71,6 +78,7 @@ try {
   writeFileSync(
     consumer,
     [
+      "import { createHash } from 'node:crypto';",
       "import { createRequire } from 'node:module';",
       "import { readFileSync } from 'node:fs';",
       "const require = createRequire(import.meta.url);",
@@ -82,6 +90,16 @@ try {
       "const g4Path = require.resolve('@tatrman/grammar/grammar');",
       "const g4 = readFileSync(g4Path, 'utf8');",
       "if (!/grammar\\s+TTR\\s*;/.test(g4)) throw new Error('TTR.g4 is not the canonical grammar');",
+      "const expectedHashes = " + JSON.stringify(resourceHashes) + ";",
+      "for (const name of ['model-yaml.schema.json', 'profile.schema.json', 'canonical-metadata.json']) {",
+      "  const bytes = readFileSync(require.resolve('@tatrman/grammar/schemas/' + name));",
+      "  if (createHash('sha256').update(bytes).digest('hex') !== expectedHashes[name]) throw new Error('Packed schema byte mismatch: ' + name);",
+      "  const resource = JSON.parse(bytes.toString('utf8'));",
+      "  if ((resource['x-ttr-version'] ?? resource.version) !== mod.TTR_GRAMMAR_VERSION) throw new Error('Schema version mismatch: ' + name);",
+      "}",
+      "const metadata = JSON.parse(readFileSync(require.resolve('@tatrman/grammar/schemas/canonical-metadata.json'), 'utf8'));",
+      "const schema = JSON.parse(readFileSync(require.resolve('@tatrman/grammar/schemas/model-yaml.schema.json'), 'utf8'));",
+      "for (const kind of metadata.kinds) if (!schema.$defs['def_' + kind.kind]) throw new Error('Missing packed kind: ' + kind.kind);",
       "console.log('[grammar-smoke] consumer OK — version ' + mod.TTR_GRAMMAR_VERSION + ', ' + Object.keys(mod.PROPERTY_MAP).length + ' property entries, raw grammar resolvable');",
     ].join('\n'),
   );
@@ -89,9 +107,5 @@ try {
   console.log('[grammar-consumer-smoke] OK — @tatrman/grammar installs and consumes cleanly.');
 } finally {
   rmSync(scratch, { recursive: true, force: true });
-  try {
-    for (const f of readdirSync(tmpdir())) if (join(tmpdir(), f) === tarball) rmSync(tarball, { force: true });
-  } catch {
-    /* best-effort tarball cleanup */
-  }
+  rmSync(packDirectory, { recursive: true, force: true });
 }

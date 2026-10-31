@@ -28,6 +28,42 @@ tasks.test {
 // directly — no copy, no sync, no header rewriting (see docs/grammar-master/).
 val canonicalGrammar = file("../../grammar/src/TTR.g4")
 
+// Node-only emitter: no pnpm install, Kotlin metadata dependency or registry access.
+// Keep resources generated from the same inputs for npm packs and standalone JVM builds.
+val canonicalSchemaResources = layout.buildDirectory.dir("generated-resources/canonical-yaml")
+val generateCanonicalSchemas by tasks.registering(Exec::class) {
+    inputs.file(canonicalGrammar)
+    inputs.files(
+        fileTree("../../grammar/scripts") {
+            include("canonical-*.mjs", "generate-canonical-schemas.mjs")
+        },
+    )
+    outputs.dir(canonicalSchemaResources)
+    workingDir(rootProject.projectDir)
+    commandLine(
+        "node",
+        file("../../grammar/scripts/generate-canonical-schemas.mjs").absolutePath,
+        "--output-dir",
+        canonicalSchemaResources
+            .get()
+            .dir("schemas")
+            .asFile.absolutePath,
+    )
+}
+sourceSets["main"].resources.srcDir(generateCanonicalSchemas)
+
+tasks.test {
+    dependsOn(tasks.jar)
+    inputs.file(tasks.jar.flatMap { it.archiveFile })
+    systemProperty(
+        "ttr.schemaJar",
+        tasks.jar
+            .flatMap { it.archiveFile }
+            .get()
+            .asFile.absolutePath,
+    )
+}
+
 sourceSets["main"].antlr.setSrcDirs(listOf(canonicalGrammar.parentFile))
 
 val generatedPackage = "org.tatrman.ttr.parser.generated"

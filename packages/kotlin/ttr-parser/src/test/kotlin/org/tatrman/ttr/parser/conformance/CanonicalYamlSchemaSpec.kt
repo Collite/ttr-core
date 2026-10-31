@@ -10,6 +10,7 @@ import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.jar.JarFile
 
 /** Public invented vectors validate normalized YAML values; no YAML codec/profile execution here. */
 class CanonicalYamlSchemaSpec :
@@ -42,6 +43,11 @@ class CanonicalYamlSchemaSpec :
         context("deterministic packaged resources") {
             listOf("model-yaml.schema.json", "profile.schema.json", "canonical-metadata.json").forEach { name ->
                 test(name) {
+                    JarFile(requireNotNull(System.getProperty("ttr.schemaJar"))).use { jar ->
+                        jar.getInputStream(requireNotNull(jar.getJarEntry("schemas/$name"))).bufferedReader().use {
+                            it.readText() shouldBe resource(name)
+                        }
+                    }
                     resource(name) shouldBe Files.readString(Path.of("../../grammar/schemas/$name"))
                     mapper
                         .readTree(resource(name))[if (name.endsWith("schema.json")) "x-ttr-version" else "version"]
