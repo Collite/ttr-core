@@ -261,9 +261,14 @@ export const TTR_GRAMMAR_VERSION = '${grammarVersion}' as const;
 writeFileSync(versionOutputPath, versionOutput);
 console.log(`Generated version.ts (TTR grammar version ${grammarVersion})`);
 
-// C-7 shares the generated vocabulary/order with the parser and canonical YAML.
-const exportOrderPath = resolve(scriptDir, '../../kotlin/ttr-metadata/src/main/resources/export/property-map.json');
-const exportOrder = Object.fromEntries(allKinds.map((kind) => [kind,
-  extractProps(KIND_RULE[kind] ?? `${kind}Property`).flatMap((p) => KIND_OVERRIDES[kind]?.[p]?.map((x) => x.name) ?? [p]),
-]));
-writeFileSync(exportOrderPath, JSON.stringify(exportOrder, null, 2) + '\n');
+// Optional C-7 resource regeneration for a full source checkout. The default
+// grammar build stays a leaf: Designer's Docker context contains no Kotlin tree.
+// Run `pnpm --filter @tatrman/grammar prebuild --export-order` when updating C-7.
+if (process.argv.includes('--export-order')) {
+  const exportOrderPath = resolve(scriptDir, '../../kotlin/ttr-metadata/src/main/resources/export/property-map.json');
+  const exportOrder = Object.fromEntries(allKinds.map((kind) => [kind,
+    extractProps(KIND_RULE[kind] ?? `${kind}Property`).flatMap((p) => KIND_OVERRIDES[kind]?.[p]?.map((x) => x.name) ?? [p]),
+  ]));
+  mkdirSync(dirname(exportOrderPath), { recursive: true });
+  writeFileSync(exportOrderPath, JSON.stringify(exportOrder, null, 2) + '\n');
+}

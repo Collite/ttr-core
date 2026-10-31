@@ -16,7 +16,7 @@
 //
 // Usage: `node scripts/grammar-consumer-smoke.mjs`  (add --skip-build to reuse dist).
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readdirSync, mkdirSync, copyFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +27,26 @@ const run = (cmd, args, cwd) =>
   execFileSync(cmd, args, { cwd, stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' });
 
 if (!process.argv.includes('--skip-build')) {
+  // Designer builds a TS-only context. The grammar extractor must not assume
+  // that another workspace package (such as Kotlin metadata) exists beside it.
+  const leaf = mkdtempSync(join(tmpdir(), 'ttr-grammar-leaf-'));
+  try {
+    const pkg = join(leaf, 'packages', 'grammar');
+    mkdirSync(join(pkg, 'scripts'), { recursive: true });
+    mkdirSync(join(pkg, 'src'), { recursive: true });
+    writeFileSync(join(leaf, 'package.json'), '{"type":"module"}');
+    copyFileSync(join(grammarDir, 'src', 'TTR.g4'), join(pkg, 'src', 'TTR.g4'));
+    copyFileSync(join(grammarDir, 'scripts', 'extract-property-map.ts'), join(pkg, 'scripts', 'extract-property-map.ts'));
+    run('pnpm', ['exec', 'tsx', join(pkg, 'scripts', 'extract-property-map.ts')], grammarDir);
+    if (!existsSync(join(pkg, 'src', 'generated', 'property-map.ts')))
+      throw new Error('Isolated grammar extraction did not emit the property map');
+    if (existsSync(join(leaf, 'packages', 'kotlin')))
+      throw new Error('Leaf grammar extraction wrote into a sibling Kotlin workspace');
+    console.log('[grammar-smoke] TS-only source extraction OK');
+  } finally {
+    rmSync(leaf, { recursive: true, force: true });
+  }
+
   console.log('[grammar-smoke] building @tatrman/grammar …');
   run('pnpm', ['--filter', '@tatrman/grammar', 'run', 'build'], repoRoot);
 }
