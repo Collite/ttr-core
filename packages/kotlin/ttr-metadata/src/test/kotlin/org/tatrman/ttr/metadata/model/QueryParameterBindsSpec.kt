@@ -10,25 +10,11 @@ import org.tatrman.ttr.writer.TtrRenderer
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import java.nio.file.Path
 
-/**
- * ai-platform PB · S3a — `QueryParameterDef.binds`.
- *
- * The field is a **carrier for a host dialect**, exactly like [Query.skipSecurity]: ai-platform's
- * YAML pattern files declare `binds: [entity.attribute, …]` on a parameter — the model attributes
- * whose resolved value fills that slot — and `ttr-metadata` owns the typed model those files are
- * loaded into. TTR-M's grammar is deliberately **not** touched, which makes the same three
- * properties contractual:
- *
- *  a. **Default empty.** Absent ⇒ `emptyList()`, for direct construction and for a query loaded
- *     through the real TTR loader (the grammar has no such attribute to read).
- *  b. **Older-consumer tolerance.** Appended last with a default; nothing in the write path emits
- *     it, so rendered TTR is byte-identical whatever the field holds, and positional construction
- *     still compiles.
- *  c. **`copy` preserves it.** The copy paths a loader uses to enrich a parameter must not reset it.
- */
+/** MW-53: grammar 0.21 retains bindings; absent bindings still default empty. */
 class QueryParameterBindsSpec :
     StringSpec({
 
@@ -93,10 +79,7 @@ class QueryParameterBindsSpec :
             QueryParameterDef("x", "text").binds shouldBe emptyList()
         }
 
-        "binds defaults to empty for a query loaded through the TTR loader" {
-            // Rendered from a parameter that DOES carry binds, then loaded: the grammar has no such
-            // attribute, so the loaded parameter reads the default. ai-platform re-derives it from
-            // its YAML on every load; a consumer expecting TTR text to carry it finds out here.
+        "a query loaded through TTR retains its authored bindings" {
             val result = load(mapOf("/db.ttr" to render(query(binds = listOf(customerName)))))
             result.errors shouldHaveSize 0
             val loaded =
@@ -104,21 +87,21 @@ class QueryParameterBindsSpec :
                     .single { it.qname.name == "nesplacene_faktury" }
             loaded.parameters shouldHaveSize 1
             loaded.parameters.single().name shouldBe "nazev_zakaznika"
-            loaded.parameters.single().binds shouldBe emptyList()
+            loaded.parameters.single().binds shouldBe listOf(customerName)
         }
 
         // ----- (b) older-consumer tolerance -----
 
-        "the write path never emits binds" {
+        "the write path preserves bindings and omits the absent declaration" {
             val bound = render(query(binds = listOf(customerName)))
 
-            bound shouldNotContain "binds"
-            bound shouldNotContain "název_zákazníka"
-            bound shouldBe render(query(binds = emptyList()))
+            bound shouldContain "binds"
+            bound shouldContain "název_zákazníka"
+            render(query(binds = emptyList())) shouldNotContain "binds"
         }
 
         "positional construction still compiles" {
-            // A compile-time assertion kept as a test so the intent is visible: the field is LAST
+            // A compile-time assertion kept as a test so the intent is visible: appended fields are
             // and defaulted, so every three-argument caller in every consumer survives.
             QueryParameterDef("n", "t", "l").binds shouldBe emptyList()
         }

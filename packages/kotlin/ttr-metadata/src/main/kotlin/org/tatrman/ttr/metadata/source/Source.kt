@@ -1076,6 +1076,7 @@ class FileBasedSource(
                         sourceText = block?.value ?: def.sourceText ?: "",
                         dialect = block?.dialect,
                         search = def.search.toSearchHints(),
+                        skipSecurity = def.skipSecurity ?: false,
                         parameters =
                             def.parameters.mapNotNull { p ->
                                 val obj = (p as? PropertyValue.ObjectValue)?.entries ?: return@mapNotNull null
@@ -1083,6 +1084,10 @@ class FileBasedSource(
                                     name = (obj["name"] as? PropertyValue.IdValue)?.ref?.path ?: return@mapNotNull null,
                                     type = (obj["type"] as? PropertyValue.IdValue)?.ref?.path ?: "text",
                                     label = (obj["label"] as? PropertyValue.StringValue)?.raw ?: "",
+                                    defaultValue = (obj["defaultValue"] as? PropertyValue.StringValue)?.raw,
+                                    binds = (obj["binds"] as? PropertyValue.ListValue)?.items.orEmpty().mapNotNull {
+                                        (it as? PropertyValue.IdValue)?.ref?.path
+                                    },
                                 )
                             },
                     )

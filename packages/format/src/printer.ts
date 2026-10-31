@@ -268,6 +268,7 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
       add('relation', v(def.relation), def.relation); add('fk', v(def.fk), def.fk);
       break;
     case 'query':
+      add('skipSecurity', def.skipSecurity === undefined ? undefined : text(String(def.skipSecurity)));
       add('description', v(def.description) ?? v(def.descriptionLocalized), def.description ?? def.descriptionLocalized); add('tags', def.tags && strListDoc(def.tags, true));
       add('language', def.language && text(def.language));
       add('parameters', def.parameters && def.parameters.length ? paramListDoc(def.parameters, ctx) : undefined);
@@ -305,6 +306,7 @@ function propsOf(def: Definition, ctx: Ctx): Prop[] {
       // 0.17 — the cn default sense (cn contracts §1.5).
       add('default', b(def.default));
       add('sense_priority', def.sensePriority === undefined ? undefined : text(String(def.sensePriority)));
+      add('indexSecurity', def.indexSecurity === undefined ? undefined : text(def.indexSecurity));
       break;
   }
   return p;

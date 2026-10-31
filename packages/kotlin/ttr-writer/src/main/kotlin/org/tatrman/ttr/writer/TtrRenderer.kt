@@ -348,6 +348,7 @@ object TtrRenderer {
                         def.text?.let { add("text: ${renderString(it)}") }
                         def.default?.let { add("default: $it") }
                         def.sensePriority?.let { add("sense_priority: $it") }
+                        def.indexSecurity?.let { add("indexSecurity: $it") }
                     },
                 )
             is Md2dbDomainDef ->
@@ -962,6 +963,7 @@ object TtrRenderer {
         val sb = StringBuilder()
         sb.append("def query ${def.name}")
         sb.append(" {")
+        def.skipSecurity?.let { sb.append(" skipSecurity: $it,") }
         renderDescriptionIfAny(def.description, def.descriptionLocalized)?.let { sb.append(it) }
         def.language?.let {
             sb.append(" language: $it,")

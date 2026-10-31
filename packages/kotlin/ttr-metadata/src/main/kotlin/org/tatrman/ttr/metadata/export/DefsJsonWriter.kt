@@ -172,6 +172,7 @@ private class AstJson(
                         "text" to d.text,
                         "default" to d.default,
                         "sense_priority" to d.sensePriority,
+                        "indexSecurity" to d.indexSecurity,
                     )
                 is RelationDef ->
                     mapOf<String, Any?>(
@@ -195,6 +196,7 @@ private class AstJson(
                         "language" to d.language,
                         "parameters" to d.parameters,
                         "sourceText" to sqlBlock(d.sourceTextBlock, d.sourceText),
+                        "skipSecurity" to d.skipSecurity,
                         "search" to d.search,
                     )
                 is RoleDef ->
