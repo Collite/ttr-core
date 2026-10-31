@@ -42,7 +42,7 @@ class CalendarReadScopeSpec :
                     orders -> switch { release: true because: "calendar action" }
                 }
                 actions {
-                    verdict.release -> notify_customer { customer: 42, template: VALUE }
+                    verdict.release -> notify_customer { customer: 42, to: 'customer-42@customers.hartland.example', template: VALUE }
                 }
             }
             """.trimIndent()
@@ -128,7 +128,7 @@ class CalendarReadScopeSpec :
         "a directly wired writer default declares the calendar and keeps approval evidence" {
             val text =
                 source.replace(
-                    "notify_customer { customer: 42, template: VALUE }",
+                    "notify_customer { customer: 42, to: 'customer-42@customers.hartland.example', template: VALUE }",
                     "stamp { order: order_number }",
                 )
             val result = build(text, extra = stamp)
@@ -142,7 +142,7 @@ class CalendarReadScopeSpec :
         "all direct writer default count forms declare the calendar even when explicitly overridden" {
             val text =
                 source.replace(
-                    "notify_customer { customer: 42, template: VALUE }",
+                    "notify_customer { customer: 42, to: 'customer-42@customers.hartland.example', template: VALUE }",
                     "stamp { order: order_number, tag: 'explicit' }",
                 )
             for (expression in listOf(
@@ -189,7 +189,7 @@ class CalendarReadScopeSpec :
                 TtrpPipeline(TtrpManifest(world = "hartland.worlds.demo", manifestDir = root), root.resolve("models"))
                     .plan(
                         source.replace(
-                            "notify_customer { customer: 42, template: VALUE }",
+                            "notify_customer { customer: 42, to: 'customer-42@customers.hartland.example', template: VALUE }",
                             "stamp { order: order_number }",
                         ),
                         "calendar_action.ttrp",

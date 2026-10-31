@@ -19,6 +19,8 @@ FROM (SELECT CAST(g.day AS DATE) AS d
 -- Customers: 10 and 20 and 50, all served from distribution center 1.
 INSERT INTO customer (c_customer_sk, c_customer_id, c_birth_year, c_center_sk) VALUES
     (10, 'C10', 1980, 1), (20, 'C20', 1975, 1), (50, 'C50', 1990, 1);
+-- The mail address: Hartland's generated column (data/automation/10-ddl.sql), written out here.
+UPDATE customer SET c_email = 'customer-' || c_customer_sk || '@customers.hartland.example';
 
 -- ---- release_order (H-1) — orders 1–8 ------------------------------------------------------------------------
 -- 1 release (in stock, list price, value 100) · 2 release_confirmed (value 60 000 > 50 000) · 3 hold_sales (item 102:
