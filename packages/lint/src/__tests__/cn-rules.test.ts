@@ -122,6 +122,15 @@ describe('CN-P2 S2.3 — the cn slugs fire on their fixture, and only at the sit
     expect(msgs).toContain("'cn2er_phase' grounds 'HeldOrder' to an er entity stacked on a query (AM-2) — 'order' is an entity no query backs");
     expect(msgs).toContain("'cn2md_role' grounds a role, but 'Category' is a kind");
   });
+
+  it('⚑R4 / ⚑N1: two participants the bearer can be are named by label (review-175)', () => {
+    const project = buildProject(load('117-cn-things-in-time'));
+    const msgs: string[] = [];
+    for (const [uri, ast] of project.documents) msgs.push(...lintDocument(uri, ast, project.deps, CN_ON).map((d) => d.message));
+    for (const diags of lintProject(project.documents, project.graph, project.deps, CN_ON).values()) msgs.push(...diags.map((d) => d.message));
+    expect(msgs).toContain("quality 'twin_gap' projects 'Twin', which has two participants 'Item' can be — 'left', 'right'");
+    expect(msgs).toContain("phase 'Reopening' from bound 'Reopened' has two participants 'Ticket' can be — 'ticket', 'parent'");
+  });
 });
 
 describe('CN-P2 S2.3 — the cn rules in the registry and the presets', () => {

@@ -190,6 +190,15 @@ class CnSemanticsSpec :
             messages.map { it.message } shouldContain "'cn2md_role' grounds a role, but 'Category' is a kind"
         }
 
+        "⚑R4 / ⚑N1: two participants the bearer can be are named by label (review-175)" {
+            val p = scenario("117-cn-things-in-time")
+            val messages = validateCn(p.docs, p.resolver).diagnostics.map { it.message }
+            messages shouldContain
+                "quality 'twin_gap' projects 'Twin', which has two participants 'Item' can be — 'left', 'right'"
+            messages shouldContain
+                "phase 'Reopening' from bound 'Reopened' has two participants 'Ticket' can be — 'ticket', 'parent'"
+        }
+
         // ----- keys and resolution (S2.1's slot table) -----
 
         val er =

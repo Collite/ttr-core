@@ -140,6 +140,14 @@ def test_cn_slug_fires_at_the_sites_its_header_names(name: str) -> None:
     assert _cn_sites(name) == _EXPECTED[name]
 
 
+def test_two_participants_the_bearer_can_be_are_named_by_label() -> None:
+    """review-175 ⚑R4 / ⚑N1: a relator's per: coverage and a phase's event bound count participants, not concepts."""
+    p = _scenario("117-cn-things-in-time")
+    messages = [d.message for d in validate_cn(p.docs, p.resolver).diagnostics]
+    assert "quality 'twin_gap' projects 'Twin', which has two participants 'Item' can be — 'left', 'right'" in messages
+    assert "phase 'Reopening' from bound 'Reopened' has two participants 'Ticket' can be — 'ticket', 'parent'" in messages
+
+
 def test_equivalence_fixtures_stay_clean_but_for_the_advisory_db_grounding() -> None:
     assert _cn_sites("81-cn-desugar-top-down") == ["d-concepts.ttrm:28 cn/db-grounding"]
     assert _cn_sites("82-cn-desugar-top-down-authored") == ["e-bindings.ttrm:25 cn/db-grounding"]

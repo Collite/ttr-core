@@ -23,3 +23,6 @@ def kind Twin { grounds: er.entity.price, involves: [Item as left, Item as right
 def quality gap { of: Twin, grounds: er.entity.price.amount }
 def quality twin_gap { of: Item, valued_state: true, from: Twin.gap }
 def quality twin_gap_per { of: Item, valued_state: true, per: Item, from: Twin.gap }
+// review-175 re-review 2 N1 (⚑N1): an event bound has one participant its bearer can be — `Reopened` has two.
+def event Reopened { involves: [Ticket, Ticket as parent], period: { at: occurred } }
+def phase Reopening { of: Ticket, from: Reopened, until: Finished }

@@ -1119,12 +1119,15 @@ internal class ErRenderer(
         /**
          * The key [ref] stands for, by its attribute names on the entity it is a row of: a bound row's own key, a held
          * one's relation target attributes (each the holder's foreign key) — what a key equality pairs by name, never
-         * by position (review-175 R7).
+         * by position (review-175 R7). A join pair names its attributes qualified (`pair.b`), the key unqualified (`b`).
          */
         private fun keyedColumns(ref: Ref): Map<String, SqlExpr> =
             when (ref) {
                 is Bound -> keys(ref.row.entity).associateWith { SqlExpr.Col(ref.row.alias, it) }
-                is Held -> ref.relation.joinPairs.associate { it.toAttr.name to col(ref.holder, it.fromAttr.name) }
+                is Held ->
+                    ref.relation.joinPairs.associate {
+                        it.toAttr.name.substringAfterLast('.') to col(ref.holder, it.fromAttr.name)
+                    }
             }
 
         /** `<alias>.<k> = <outer k>` for every key [k] of [inner], paired by name; null when the two keys differ. */
@@ -1920,7 +1923,11 @@ internal class ErRenderer(
                 val entity = entityOf(event) ?: unreachable(event)
                 val query = Select(Source.Entity(entity.qname.name, fresh(entity.qname.name)), at)
                 val eventRef = Bound(row(entity, query, query.from.alias), event)
-                val label = subjectOn(event, bearer) ?: refuse("`${event.ref}` does not involve `${bearer.ref}`")
+                val label =
+                    subjectOn(event, bearer)
+                        ?: refuse(
+                            "`${event.ref}` involves no one participant `${bearer.ref}` can be (cn/phase-bounds-participant)",
+                        )
                 val subject =
                     (participant(eventRef, label, bearer) as? RowV)?.ref
                         ?: refuse("an episode subject is not an entity")

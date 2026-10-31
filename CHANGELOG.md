@@ -58,12 +58,15 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - **New slug `cn/subkind-bearer`** (error; lint rule `cn-subkind-bearer`, TS/Kotlin/Python): a subkind whose `of:` is
   not a kind, subkind, role or event. It was reported as `cn/subkind-temporal-definition`, so suppressing that rule hid it.
 - **`cn/projection-source`** (⚑C) requires `per:` to cover every relator participant other than the bearer; a per-less
-  projection over a multi-participant relator read several rows per bearer.
+  projection over a multi-participant relator read several rows per bearer. Coverage is counted by participant: two
+  participants the bearer (or `per:`) can be are ambiguous, with or without `per:`, and the message names their labels
+  (⚑R4).
 - **`cn/subkind-temporal-definition`** reads words by `TTR.g4` IDENT on all three runtimes (a non-ASCII phase name was
   flagged by Kotlin only), and agrees with `ttr-concept`'s lint: `within(…)` and `age(…)` are temporal; a bare `period`
   read and the old `parameter` word are not.
 - **An empty participant path** must name a participant whose concept lands on the binding's own row
-  (`cn/participant-path-broken` on all three runtimes).
+  (`cn/participant-path-broken` on all three runtimes). The label is read up the concept's `of:` / `is_a` chain, so an
+  event subkind's `order: []` names its bearer's `order` (R5).
 - **A quality's dotted `from:`** and a binding's `via:` head are references (head span only), so rename,
   find-references and `ttr/unresolved-reference` reach them; a phase's dotted `from:` resolves. Conformance dump 115
   gains an honest `ttr/unresolved-reference`.
@@ -75,6 +78,18 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   participant again (R3, a regression of the F5 fix).
 - **A value-kind participant** reads the quality its label names up the chain before a single one nearer (R6); the
   same-row and stacked-entity key equalities pair keys by attribute name, and a differently named key refuses (R7).
+
+### Fixed — things in time, after grammar 0.20.1 (review-175 re-review 2)
+
+- **A same-row participant read through a held key** (`exists Paired involving this.pair`, where `this` holds the
+  foreign key) rendered again. In 0.20.1 its key equality matched the relation's qualified attribute names (`pair.b`)
+  against the key's unqualified ones (`b`), so every such read refused with "the row named holds another key". Keys are
+  paired by name, so a composite key whose relation lists its join pairs in another order is not crossed (R7, N3).
+- **`cn/phase-bounds-participant`** counts participants (⚑N1, ⚑R4's rule): a phase's `from:` / `until:` event needs
+  exactly one participant its bearer can be, read where the renderer reads the episode's subject (its own
+  `involves:`, then its grounding's labels, then the nearest `of:` / `is_a` level). Two (`[Ticket, Ticket as parent]`)
+  are an error that names the labels, on all three runtimes. The renderer's refusal for that case says "involves no one
+  participant `cn.Ticket` can be" (it said "does not involve").
 
 ### Changed — test infrastructure
 

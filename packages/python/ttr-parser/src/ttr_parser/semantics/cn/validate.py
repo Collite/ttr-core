@@ -487,6 +487,44 @@ class _CnValidator:
         def covers(got: CnConcept, by: CnConcept | None) -> bool:
             return by is not None and (by.key in chain(got) or got.key in chain(by))
 
+        def subject_labels(event: CnConcept, bearer: CnConcept) -> list[str]:
+            """⚑N1 (review-175 re-review 2): the labels of `event`'s participants `bearer` can be, read where the renderer
+            reads an episode's subject (A-CN-114, R3) - its own `involves:`, else the labels its grounding names, else the
+            nearest `of:` / `is_a` level that has one. One is the subject; two or more are ambiguous (⚑R4's count)."""
+
+            def own(owner: CnConcept) -> list[str]:
+                s = prop(owner, "involves")
+                if s is None or not isinstance(s.property, ConceptInvolves):
+                    return []
+                out: list[str] = []
+                for pt in s.property.participants:
+                    sym = self._concept(pt.ref.path, s.doc)
+                    got = self.concepts.get(sym.qname.value) if sym else None
+                    if got is not None and covers(got, bearer):
+                        out.append(pt.label or pt.ref.parts[-1].lower())
+                return out
+
+            mine = own(event)
+            if mine:
+                return mine
+            placed = self._groundings_of(event)
+            participants = next((p for p in placed[0].grounding.properties if isinstance(p, ConceptEntry) and p.key == "participants"), None) if placed else None
+            grounded: list[str] = []
+            if participants is not None and isinstance(participants.value, ObjectValue):
+                for label in participants.value.entries:
+                    sym = self._participant_up(event.key, label)
+                    got = self.concepts.get(sym.qname.value) if sym else None
+                    if got is not None and covers(got, bearer):
+                        grounded.append(label)
+            if grounded:
+                return grounded
+            walk: list[CnConcept] = []
+            at: CnConcept | None = event
+            while at is not None and all(w.key != at.key for w in walk):  # the chain in order, as TS / Kotlin read it
+                walk.append(at)
+                at = named(at, "of") or named(at, "is_a")
+            return next((labels for labels in (own(level) for level in walk[1:]) if labels), [])
+
         def relator_participants(source: CnConcept) -> list[tuple[str, CnConcept]]:
             """The relator's participants up its chain, in order, by label — what ⚑R4 counts (not concepts)."""
             out: list[tuple[str, CnConcept]] = []
@@ -557,8 +595,12 @@ class _CnValidator:
                 if from_ and until and bearer:
                     for key in ("from", "until"):
                         bound = named(c, key)
-                        if bound is None or bound.stereotype != "event" or not participates(bound, bearer):
+                        labels = subject_labels(bound, bearer) if bound is not None and bound.stereotype == "event" else []
+                        if bound is None or bound.stereotype != "event" or not labels:
                             emit(c, DiagnosticCode.CN_PHASE_BOUNDS_PARTICIPANT, f"phase '{c.name}' {key} bound must be an event involving '{bearer.name}'", key=key)
+                        elif len(labels) > 1:
+                            many = "two" if len(labels) == 2 else str(len(labels))
+                            emit(c, DiagnosticCode.CN_PHASE_BOUNDS_PARTICIPANT, f"phase '{c.name}' {key} bound '{bound.name}' has {many} participants '{bearer.name}' can be — " + ", ".join(f"'{label}'" for label in labels), key=key)
                 if period is not None and bearer:
                     group = self._groundings_of(c)
                     target = group[0].target_symbol if group else None
