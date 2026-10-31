@@ -43,6 +43,12 @@ describe('canonical metadata carriers', () => {
     expect(r.ast?.definitions.map((d) => d.name)).toEqual(['skipSecurity', 'indexSecurity']);
   });
 
+  it('retains default and binding metadata on the shared procedure parameter body', () => {
+    const r = parseString('model db def procedure call { parameters: [{name: p, type: text, direction: IN, defaultValue: "seed", binds: [er.Customer.name]}] }');
+    expect(r.errors.filter((e) => e.severity === 'error')).toEqual([]);
+    expect(r.ast?.definitions[0]).toMatchObject({kind: 'procedure', parameters: [{defaultValue: 'seed', binds: [{path: 'er.Customer.name'}]}]});
+  });
+
   it.each([
     'def query q { skipSecurity: "true" }',
     'def query q { parameters: [{ name: p, defaultValue: true }] }',

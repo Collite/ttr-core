@@ -290,7 +290,12 @@ class TtrWalker(
             tags =
                 props.firstNotNullOfOrNull { it.tagsProperty()?.let { stringList(it.listOfStrings()) } } ?: emptyList(),
             entryKind = entryKind,
-            indexSecurity = props.lastOrNull { it.indexSecurityProperty() != null }?.indexSecurityProperty()?.id()?.text,
+            indexSecurity =
+                props
+                    .lastOrNull { it.indexSecurityProperty() != null }
+                    ?.indexSecurityProperty()
+                    ?.id()
+                    ?.text,
             target = props.firstNotNullOfOrNull { it.forProperty()?.let { f -> makeRef(f.id()) } },
             forms =
                 props.firstNotNullOfOrNull { it.formsProperty()?.let { f -> stringList(f.listOfStrings()) } }
@@ -1428,7 +1433,16 @@ class TtrWalker(
             tags =
                 props.firstNotNullOfOrNull { it.tagsProperty()?.let { stringList(it.listOfStrings()) } } ?: emptyList(),
             language = language,
-            skipSecurity = props.lastOrNull { it.skipSecurityProperty() != null }?.skipSecurityProperty()?.BOOLEAN_LITERAL()?.text?.let { it == "true" },
+            skipSecurity =
+                props
+                    .lastOrNull { it.skipSecurityProperty() != null }
+                    ?.skipSecurityProperty()
+                    ?.BOOLEAN_LITERAL()
+                    ?.text
+                    ?.let {
+                        it ==
+                            "true"
+                    },
             parameters =
                 props.flatMap {
                     it.parametersProperty()?.let { p -> visitParameterList(p.parameterDefList()) }
@@ -2768,10 +2782,11 @@ class TtrWalker(
                         }
                         prop.bindsProperty() != null -> {
                             val value = prop.bindsProperty()
-                            entries["binds"] = PropertyValue.ListValue(
-                                value.listOfIds().id().map { idValue(it.text, it) },
-                                location(value),
-                            )
+                            entries["binds"] =
+                                PropertyValue.ListValue(
+                                    value.listOfIds().id().map { idValue(it.text, it) },
+                                    location(value),
+                                )
                         }
                         prop.nameProperty() != null ->
                             entries["name"] = idValue(prop.nameProperty().id().text, prop.nameProperty())

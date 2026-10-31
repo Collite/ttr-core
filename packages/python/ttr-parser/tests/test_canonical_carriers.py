@@ -14,9 +14,9 @@ def test_query_carriers():
     ''', "carriers.ttrm")
     assert not result.errors
     raw, checked, ordinary = result.definitions
-    assert getattr(raw, "skip_security") is True
-    assert getattr(checked, "skip_security") is False
-    assert getattr(ordinary, "skip_security") is None
+    assert raw.skip_security is True
+    assert checked.skip_security is False
+    assert ordinary.skip_security is None
     parameter = raw.parameters[0].entries
     assert parameter["defaultValue"].raw == ""
     assert [v.ref.path for v in parameter["binds"].items] == ["er.Customer.name", "er.Customer.code"]
@@ -29,13 +29,21 @@ def test_lexical_carriers():
     ''', "lex.ttrm")
     assert not result.errors
     first, second = result.definitions
-    assert (first.match, first.text, getattr(first, "index_security")) == ("name (.*)", "Name Alice?", "applied")
-    assert (second.match, second.text, getattr(second, "index_security")) == ("lookup (.*)", "Lookup Bob?", "none")
+    assert (first.match, first.text, first.index_security) == ("name (.*)", "Name Alice?", "applied")
+    assert (second.match, second.text, second.index_security) == ("lookup (.*)", "Lookup Bob?", "none")
 
 
 def test_property_keywords_remain_identifiers():
     result = parse_string("model er def entity skipSecurity { attributes: [def attribute defaultValue { type: text }, def attribute binds { type: text }] } def entity indexSecurity {}", "ids.ttrm")
     assert not result.errors
+
+
+def test_procedure_parameter_carriers():
+    result = parse_string('model db def procedure call { parameters: [{name: p, type: text, direction: IN, defaultValue: "seed", binds: [er.Customer.name]}] }', "procedure.ttrm")
+    assert not result.errors
+    parameter = result.definitions[0].parameters[0].entries
+    assert parameter["defaultValue"].raw == "seed"
+    assert parameter["binds"].items[0].ref.path == "er.Customer.name"
 
 
 @pytest.mark.parametrize("source", [

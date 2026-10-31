@@ -1085,9 +1085,10 @@ class FileBasedSource(
                                     type = (obj["type"] as? PropertyValue.IdValue)?.ref?.path ?: "text",
                                     label = (obj["label"] as? PropertyValue.StringValue)?.raw ?: "",
                                     defaultValue = (obj["defaultValue"] as? PropertyValue.StringValue)?.raw,
-                                    binds = (obj["binds"] as? PropertyValue.ListValue)?.items.orEmpty().mapNotNull {
-                                        (it as? PropertyValue.IdValue)?.ref?.path
-                                    },
+                                    binds =
+                                        (obj["binds"] as? PropertyValue.ListValue)?.items.orEmpty().mapNotNull {
+                                            (it as? PropertyValue.IdValue)?.ref?.path
+                                        },
                                 )
                             },
                     )

@@ -1413,10 +1413,10 @@ SHAPE            : 'shape' ;           // v3.1
 JOURNALING       : 'journaling' ;      // v3.1
 ALLOCATION       : 'allocation' ;      // v0.10 — md2db_cubelet writeback spread strategy (R21)
 SOURCE           : 'source' ;          // v3.1 (distinct from SOURCE_TEXT 'sourceText'; longest-match)
-INDEX_SECURITY : 'indexSecurity' ;
-SKIP_SECURITY : 'skipSecurity' ;
-DEFAULT_VALUE : 'defaultValue' ;
-BINDS : 'binds' ;
+INDEX_SECURITY   : 'indexSecurity' ;
+SKIP_SECURITY    : 'skipSecurity' ;
+DEFAULT_VALUE    : 'defaultValue' ;
+BINDS            : 'binds' ;
 
 // v4.1 world model (ttr-metadata M0). Def-kind nouns + typed-property keywords.
 // Declared before IDENT so the keyword wins ties.
