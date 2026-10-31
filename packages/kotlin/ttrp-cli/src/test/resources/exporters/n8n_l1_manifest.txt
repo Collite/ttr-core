@@ -12,7 +12,7 @@ def executor n8n_l1 {
     granularity: [recipe, parts, islands]
     conformance: n8n_driver
     idempotency: { on_event: derived, batch: execution_id }
-    nodeVersions: { webhook: 2, httpRequest: 4.2, switch: 3, wait: 1.1, emailSend: 2.1, scheduleTrigger: 1.2 }
+    nodeVersions: { webhook: 2, httpRequest: 4.2, switch: 3, wait: 1.1, emailSend: 2.1, scheduleTrigger: 1.2, code: 2, splitInBatches: 3, splitOut: 1, if: 2.2 }
     manifestSchema: { accepts: [3] }
 }
 }

@@ -30,6 +30,7 @@ import java.util.TreeMap
  * connection sets are sorted (order is NOT semantic there).
  */
 class KestraEmitPlugin : TtrEmitPlugin {
+    override val spiRevision = TtrEmitPlugin.SPI_REVISION
     override val targetId: String = "kestra"
 
     override val spiVersion: Int = TtrEmitPlugin.SPI_VERSION

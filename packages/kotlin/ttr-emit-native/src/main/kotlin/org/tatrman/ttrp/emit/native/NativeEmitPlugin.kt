@@ -7,6 +7,7 @@ import org.tatrman.ttrp.emit.spi.EmitResult
 import org.tatrman.ttrp.emit.spi.RecipeEmitRequest
 
 class NativeEmitPlugin : TtrEmitPlugin {
+    override val spiRevision = TtrEmitPlugin.SPI_REVISION
     override val targetId = "native"
 
     override fun executorTypeManifest(): String =

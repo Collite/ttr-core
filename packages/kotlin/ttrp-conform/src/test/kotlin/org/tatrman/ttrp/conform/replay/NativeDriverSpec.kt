@@ -85,9 +85,12 @@ class NativeDriverSpec :
         }
     })
 
-private class ContractServer : AutoCloseable {
+internal class ContractServer : AutoCloseable {
     val opens = CopyOnWriteArrayList<JsonObject>()
     val requests = CopyOnWriteArrayList<String>()
+    private val closed =
+        java.util.concurrent.ConcurrentHashMap
+            .newKeySet<String>()
     private val bodies = java.util.concurrent.ConcurrentHashMap<String, JsonObject>()
 
     @Volatile var wrongReason = false
@@ -96,7 +99,11 @@ private class ContractServer : AutoCloseable {
 
     @Volatile var failHttp = false
 
-    @Volatile private var asyncOnce = true
+    @Volatile var precisionLoss = false
+
+    @Volatile var includeMail = false
+
+    @Volatile var asyncOnce = true
     private val server =
         embeddedServer(CIO, port = 0) {
             routing { route("/{path...}") { handle { reply(call) } } }
@@ -116,12 +123,25 @@ private class ContractServer : AutoCloseable {
 
     private fun keys(id: String): List<JsonElement> {
         val port = bodies.getValue(id).getValue("port").jsonObject
-        return port["keys"]?.jsonArray ?: listOf(port.getValue("key"))
+        return port["keys"]?.jsonArray
+            ?: if (port["none"] ==
+                JsonPrimitive(true)
+            ) {
+                listOf(JsonPrimitive(4711), JsonPrimitive(4712))
+            } else {
+                listOf(port.getValue("key"))
+            }
     }
 
     private fun verdict(id: String) =
         buildJsonObject {
-            put("routes", buildJsonObject { put("release", buildJsonObject { put("rowCount", keys(id).size) }) })
+            put(
+                "routes",
+                buildJsonObject {
+                    put("release", buildJsonObject { put("rowCount", keys(id).size) })
+                    if (includeMail) put("hold", buildJsonObject { put("rowCount", keys(id).size) })
+                },
+            )
         }
 
     private suspend fun reply(call: ApplicationCall) {
@@ -160,7 +180,49 @@ private class ContractServer : AutoCloseable {
                     }.toString()
                 }
                 path.endsWith("/evaluate") -> buildJsonObject { put("verdict", verdict(id)) }.toString()
-                path.endsWith("/routes/release") -> {
+                "/parts/" in path || "/islands/" in path -> """{"rows":[],"rowCount":0,"ref":"dry"}"""
+                path.endsWith("/perform") -> {
+                    val body = Json.parseToJsonElement(call.receiveText()).jsonObject
+                    val selected = body.getValue("keys").jsonArray
+                    val eligible = keys(id)
+                    val action = path.substringAfter("/actions/").substringBefore('/')
+                    val performed = selected.filter { action == "release" && it in eligible }
+                    buildJsonObject {
+                        put(
+                            "performed",
+                            JsonArray(
+                                performed.map { key ->
+                                    buildJsonObject {
+                                        put("key", key)
+                                        put("batchRows", JsonArray(emptyList()))
+                                    }
+                                },
+                            ),
+                        )
+                        put(
+                            "skipped",
+                            JsonArray(
+                                (selected - performed.toSet()).map { key ->
+                                    buildJsonObject {
+                                        put("key", key)
+                                        put("reason", "not selected by preview")
+                                    }
+                                },
+                            ),
+                        )
+                    }.toString()
+                }
+                path.endsWith("/outcome") -> {
+                    val body = Json.parseToJsonElement(call.receiveText()).jsonObject
+                    body.getValue("outcomes").jsonArray.forEach { raw ->
+                        val outcome = raw.jsonObject
+                        require(includeMail && outcome["key"] in keys(id)) { "outcome key not in mail preview" }
+                        require(outcome["status"] == JsonPrimitive("delivered"))
+                    }
+                    "{}"
+                }
+                path.endsWith("/digests") -> """{"groups":[]}"""
+                path.endsWith("/routes/release") || (includeMail && path.endsWith("/routes/hold")) -> {
                     val offset = call.request.queryParameters["offset"]!!.toInt()
                     buildJsonObject {
                         put(
@@ -169,6 +231,12 @@ private class ContractServer : AutoCloseable {
                                 keys(id).drop(offset).take(1).map { key ->
                                     buildJsonObject {
                                         put("order_number", key)
+                                        if (precisionLoss) {
+                                            put(
+                                                "amount",
+                                                JsonPrimitive(java.math.BigDecimal("1.00000000000000000001")),
+                                            )
+                                        }
                                         put("verdict_reason", if (wrongReason) "wrong" else "ready")
                                         put("detail", buildJsonObject { put("stock", "/unused-ref") })
                                     }
@@ -212,27 +280,53 @@ private class ContractServer : AutoCloseable {
                             ),
                         )
                     }.toString()
-                path.endsWith("/close") -> """{"status":"closed"}"""
+                path.endsWith("/close") -> {
+                    closed += id
+                    """{"status":"closed"}"""
+                }
                 path == "/automation/runs/$id" ->
                     buildJsonObject {
-                        put("status", "evaluated")
+                        put("status", if (id in closed) "closed" else "evaluated")
                         put("dryRun", true)
                         put("verdict", verdict(id))
                         put(
                             "actions",
                             JsonArray(
-                                keys(id).map { key ->
-                                    buildJsonObject {
-                                        put("key", buildJsonObject { put("order_number", key) })
-                                        put("action", "release")
-                                        put("arguments", buildJsonObject { put("order", key) })
-                                    }
+                                keys(id).flatMap { key ->
+                                    listOf(
+                                        buildJsonObject {
+                                            put("key", buildJsonObject { put("order_number", key) })
+                                            put("action", "release")
+                                            put("arguments", buildJsonObject { put("order", key) })
+                                        },
+                                    ) +
+                                        if (includeMail) {
+                                            listOf(
+                                                buildJsonObject {
+                                                    put("key", buildJsonObject { put("order_number", key) })
+                                                    put("action", "notify")
+                                                    put("arguments", buildJsonObject { put("who", "role.sales") })
+                                                },
+                                            )
+                                        } else {
+                                            emptyList()
+                                        }
                                 },
                             ),
                         )
                     }.toString()
                 else -> error("unexpected $path")
             }
-        call.respondText(response, ContentType.Application.Json)
+        call.respondText(
+            response,
+            ContentType.Application.Json,
+            if (path ==
+                "/automation/recipes/release_order/runs"
+            ) {
+                HttpStatusCode.Created
+            } else {
+                HttpStatusCode.OK
+            },
+        )
     }
 }

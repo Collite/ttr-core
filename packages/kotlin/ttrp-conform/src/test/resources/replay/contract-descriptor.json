@@ -5,6 +5,7 @@
   ],
   "deployments": [
     {"name":"daily_native","program":"daily","targetType":"native","enabled":true,"granted":true,"stale":false},
-    {"name":"event_native","program":"event","targetType":"native","enabled":true,"granted":true,"stale":false}
+    {"name":"event_native","program":"event","targetType":"native","enabled":true,"granted":true,"stale":false},
+    {"name":"release_n8n","program":"event","targetType":"n8n_l1","enabled":true,"granted":true,"stale":false}
   ]
 }
