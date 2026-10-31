@@ -319,6 +319,12 @@ class N8nDryDriver(
                 process.outputStream.bufferedWriter().use { writer ->
                     writer.write(
                         buildJsonObject {
+                            put(
+                                "executionId",
+                                java.util.UUID
+                                    .randomUUID()
+                                    .toString(),
+                            )
                             put("workflow", workflow)
                             put("server", origin)
                             put("token", token)

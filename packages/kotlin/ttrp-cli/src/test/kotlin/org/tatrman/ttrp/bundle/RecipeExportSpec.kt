@@ -321,6 +321,7 @@ class RecipeExportSpec :
                     .parseToJsonElement(
                         Files.readString(folder.resolve("manifest.json")),
                     ).jsonObject
+            golden("release_n8n_workflow", Files.readString(folder.resolve("workflow.json")).trimEnd())
             manifest["calls"] shouldBe
                 workflow
                     .getValue("meta")
@@ -330,6 +331,29 @@ class RecipeExportSpec :
             Files.readString(folder.resolve("workflow.json")) shouldContain "programFingerprint"
             Files.readString(folder.resolve("README.md")) shouldContain "tatrman-automation"
             Files.readString(folder.resolve("README.md")) shouldContain "Stale when"
+        }
+        "compiled morning_release renders the full H-1 batch digest golden" {
+            val bundle = build("release_order")
+            val graph =
+                org.tatrman.ttrp.emit.recipe.RecipeGraphProjector.project(
+                    bundle.manifest,
+                    world,
+                    program,
+                    deployment.copy(target = "n8n"),
+                    actions,
+                )
+            val result =
+                EmitPluginLoader.builtin("n8n_l1").emitRecipe(
+                    org.tatrman.ttrp.emit.spi
+                        .RecipeEmitRequest(graph, "{}", "stale rule", "{}"),
+                )
+            golden(
+                "morning_release_workflow",
+                result.files
+                    .getValue("workflow.json")
+                    .decodeToString()
+                    .trimEnd(),
+            )
         }
         "process CLI verifies every H-2 bundle and renders each step's actual recipe and conditional actions" {
             val project = exportProject()
@@ -371,6 +395,7 @@ class RecipeExportSpec :
             io.kotest.assertions.withClue(result.output) { result.statusCode shouldBe 0 }
             val rendered = Files.readString(out.resolve("returns_n8n.n8n_l1.export/workflow.json"))
             listOf("decide_return", "monitor_inbound", "settle").forEach { rendered shouldContain "/recipes/$it/runs" }
+            golden("returns_n8n_workflow", rendered.trimEnd())
             rendered shouldContain "obligation present"
             listOf("decide_return", "monitor_inbound", "settle").forEach { recipe ->
                 Files.readString(out.resolve("returns_n8n.n8n_l1.export/tests/$recipe/shared.yaml")) shouldBe

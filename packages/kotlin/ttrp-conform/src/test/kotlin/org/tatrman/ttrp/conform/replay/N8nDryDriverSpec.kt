@@ -95,7 +95,12 @@ class N8nDryDriverSpec :
                     server.asyncOnce = true
                     N8nDryDriver(server.url, "test-token", listOf(directory)).use { driver ->
                         driver.run(fixture, "n8n_l1.batch") shouldBe native
+                        driver.run(fixture, "n8n_l1.batch") shouldBe native
                     }
+                    server.opens
+                        .mapNotNull { it["idempotencyKey"] }
+                        .distinct()
+                        .size shouldBe 2
                     server.requests.any { it.endsWith("/digests") } shouldBe true
                     server.requests.any { it.endsWith("/outcome") } shouldBe false
                 }

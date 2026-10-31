@@ -43,7 +43,7 @@ let itemIndex = 0;
 let currentName = '';
 const context = vm.createContext({
   $env: {TTR_AUTOMATION_URL:server, TTR_MAIL_FROM:'dry@example.invalid', TTR_MAIL_RECIPIENTS:'{}'},
-  $execution: {id:'dry-replay', resumeUrl:'https://dry.invalid/resume'},
+  $execution: {id:config.executionId || 'dry-replay', resumeUrl:'https://dry.invalid/resume'},
   $: name => ({
     isExecuted:results.has(name),
     first: () => {if (!results.has(name)) throw Error('node has not executed'); return results.get(name)[0];},
@@ -182,7 +182,7 @@ try {
 if(error) {
   for(const open of opens) {
     const call=declared.find(c=>c.recipe===open.recipe && c.name==='close');
-    if(call) {try {await fetch(new URL(server.replace(/\/$/,'')+call.path.replace('{id}',encodeURIComponent(open.id))),{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:'{}',redirect:'error',signal:AbortSignal.timeout(5000)});} catch {}}
+    if(call) {try {const url=new URL(server.replace(/\/$/,'')+call.path.replace('{id}',encodeURIComponent(open.id)));if(url.origin!==new URL(server).origin) continue;await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:'{}',redirect:'error',signal:AbortSignal.timeout(5000)});} catch {}}
   }
 }
 process.stdout.write(JSON.stringify({opens,error,executed:[...results.keys()]}));

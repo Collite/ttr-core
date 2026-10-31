@@ -1,0 +1,2629 @@
+{
+    "name": "release_on_placement",
+    "nodes": [
+        {
+            "id": "c7d08e09-a44d-3b45-be7e-eecebf0a8daf",
+            "name": "trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.0,
+            "position": [
+                0,
+                0
+            ],
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "release_n8n",
+                "responseMode": "onReceived",
+                "options": {}
+            }
+        },
+        {
+            "id": "7cef8a73-4855-377c-aa9d-0caf42666e69",
+            "name": "open",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                220,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/recipes/release_order/runs\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ (() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:b8e7981518acaba84ae3d55e0a6f350abe04025f6ef702386186f5c56f82b29c\", recipeValuesFingerprint:\"sha256:54e165c4463646ed8b9ae490dc1a830b34e76dda883caa0f3df407699c7ae888\"}; b.programFingerprint=\"sha256:c47e78b56316cdb6d1ec28ba5020998b08877e160c229a6998de3426ba44c357\"; b.deploymentFingerprint=\"sha256:fe77871c1f0c500785aa32197843b8c13fb37e410b52280c2eb02c81eebc0b04\"; if (($('trigger').first().json.body || $('trigger').first().json).at) b.port.at=($('trigger').first().json.body || $('trigger').first().json).at; return b;})() }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "02bee8d1-bd66-3cfc-b2cc-c70f4985bb9a",
+            "name": "run complete",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                440,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "f61135d3-6747-3e0d-8e49-dfb479c69320",
+            "name": "replayed",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                660,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ $json.body.replayed === true }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
+            "id": "ca756a68-2c18-3cd9-bd5c-c15f97a104f3",
+            "name": "fresh run",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                880,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return $input.all();",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "bef2e239-e46f-3902-abe7-7d801342fa6d",
+            "name": "candidates",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1100,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/candidates\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "3844ada8-18e1-3a38-af6d-5e6a12eb37a9",
+            "name": "shortfall",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1320,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/shortfall\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "fe8a1522-076a-3825-a331-9c4dfd0a77f7",
+            "name": "price_differences",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1540,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/price_differences\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "8121a571-4f1e-3ddf-b617-93ebf3ffa371",
+            "name": "overdue",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1760,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/overdue\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "b9b9e36c-1a5d-3be2-a158-df398f2e29b8",
+            "name": "decision",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1980,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/decision\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "94d2f2aa-bfda-3169-954a-9531cdb99890",
+            "name": "evaluate",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2200,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/evaluate\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "c0a399fe-581c-3820-873b-49f9b77d9179",
+            "name": "check evaluation",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                2420,
+                0
+            ],
+            "parameters": {
+                "jsCode": "if ($runIndex > 120) throw new Error('evaluation polling timed out'); const b=$input.first().json.body; if (['failed','abandoned','waiting'].includes(b.status)) throw new Error('evaluation refused'); return $input.all();",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "4009274e-ce2e-3f88-8028-cc06b63262ee",
+            "name": "evaluated",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                2640,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ !!$json.body.verdict && !['running','open'].includes($json.body.status) }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
+            "id": "d7434d44-f7dd-3d0d-8e66-ab8165f72590",
+            "name": "evaluation wait",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                2860,
+                0
+            ],
+            "parameters": {
+                "resume": "timeInterval",
+                "amount": 1,
+                "unit": "seconds"
+            }
+        },
+        {
+            "id": "a1ebbf42-fc6f-3194-a7c0-870beccba99e",
+            "name": "evaluation status",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                3080,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "36f3928d-c26c-35c9-87c8-b5719f912fde",
+            "name": "route items",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                3300,
+                0
+            ],
+            "parameters": {
+                "jsCode": "const b = $input.first().json.body;\nif (['failed','abandoned'].includes(b.status)) throw new Error('recipe evaluation failed');\nconst routes = [\"hold_sales\",\"hold_ar\",\"release_confirmed\",\"release\"].filter(r => (b.verdict.routes[r]?.rowCount || 0) > 0);\nreturn (routes.length ? routes : [null]).map(route => ({json:{route}}));",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "4fe5fbfb-aa47-3aef-bbeb-fcd998bceee5",
+            "name": "action status",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                3520,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "fe587673-e2e3-3242-9efb-c88997a5083c",
+            "name": "routes loop",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3.0,
+            "position": [
+                3740,
+                0
+            ],
+            "parameters": {
+                "batchSize": 1,
+                "options": {}
+            }
+        },
+        {
+            "id": "1755347e-5f6a-362b-84a3-f6512a3e4e53",
+            "name": "routes",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 3.0,
+            "position": [
+                3960,
+                0
+            ],
+            "parameters": {
+                "rules": {
+                    "values": [
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict",
+                                    "version": 2
+                                },
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.route === \"hold_sales\" }}",
+                                        "rightValue": true,
+                                        "operator": {
+                                            "type": "boolean",
+                                            "operation": "true",
+                                            "singleValue": true
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputKey": "hold_sales"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict",
+                                    "version": 2
+                                },
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.route === \"hold_ar\" }}",
+                                        "rightValue": true,
+                                        "operator": {
+                                            "type": "boolean",
+                                            "operation": "true",
+                                            "singleValue": true
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputKey": "hold_ar"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict",
+                                    "version": 2
+                                },
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.route === \"release_confirmed\" }}",
+                                        "rightValue": true,
+                                        "operator": {
+                                            "type": "boolean",
+                                            "operation": "true",
+                                            "singleValue": true
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputKey": "release_confirmed"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict",
+                                    "version": 2
+                                },
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.route === \"release\" }}",
+                                        "rightValue": true,
+                                        "operator": {
+                                            "type": "boolean",
+                                            "operation": "true",
+                                            "singleValue": true
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "renameOutput": true,
+                            "outputKey": "release"
+                        }
+                    ]
+                },
+                "options": {
+                    "allMatchingOutputs": true,
+                    "fallbackOutput": "extra"
+                }
+            }
+        },
+        {
+            "id": "779fe93f-0a90-31b5-b3bc-669352bb2702",
+            "name": "hold_sales rows",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                4180,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/hold_sales\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    },
+                    "pagination": {
+                        "pagination": {
+                            "paginationMode": "updateAParameterInEachRequest",
+                            "parameters": {
+                                "parameters": [
+                                    {
+                                        "type": "qs",
+                                        "name": "offset",
+                                        "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
+                                    },
+                                    {
+                                        "type": "qs",
+                                        "name": "limit",
+                                        "value": "1000"
+                                    }
+                                ]
+                            },
+                            "paginationCompleteWhen": "other",
+                            "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
+                            "limitPagesFetched": true,
+                            "maxRequests": 10000
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "3e7f5fc2-6d89-3fc6-8c18-ab51f7793b32",
+            "name": "hold_sales collect",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                4400,
+                0
+            ],
+            "parameters": {
+                "jsCode": "const rows = $input.all().flatMap(i => i.json.body?.rows || i.json.rows || []); return [{json:{rows}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "f9608e88-6526-3a73-a75f-d56d0df94bad",
+            "name": "hold_sales hold",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                4620,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/hold/perform\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {keys:($(\"hold_sales collect\").isExecuted ? $(\"hold_sales collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "01db0a8f-ac6c-30fc-bdf5-908981621f3a",
+            "name": "hold_sales notify",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2.1,
+            "position": [
+                4840,
+                0
+            ],
+            "parameters": {
+                "fromEmail": "={{ $env.TTR_MAIL_FROM }}",
+                "toEmail": "={{ JSON.parse($env.TTR_MAIL_RECIPIENTS || '{}')[\"role.sales\"] || \"role.sales\" }}",
+                "subject": "Tatrman release_on_placement",
+                "emailFormat": "text",
+                "text": "={{ JSON.stringify(($(\"hold_sales collect\").isExecuted ? $(\"hold_sales collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))), null, 2) }}",
+                "options": {
+                    "appendAttribution": false
+                }
+            },
+            "credentials": {
+                "smtp": {
+                    "name": "tatrman-mail"
+                }
+            }
+        },
+        {
+            "id": "ca472640-5965-3580-964a-68dc4ecc07f1",
+            "name": "hold_sales notify deliver",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                5060,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ !$(\"action status\").first().json.body.dryRun && ($(\"hold_sales collect\").isExecuted ? $(\"hold_sales collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).length > 0 }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
+            "id": "eb2f439a-cde2-3bba-b04e-b2a3ad892a82",
+            "name": "hold_sales notify outcome",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                5280,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/notify/outcome\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {outcomes:($(\"hold_sales collect\").isExecuted ? $(\"hold_sales collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "3ed50e3c-d8c6-304e-a16f-854e8083a6e8",
+            "name": "hold_sales notify complete",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                5500,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "d84fe23b-5f7c-3efe-892d-0c636b44b987",
+            "name": "hold_ar rows",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                5720,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/hold_ar\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    },
+                    "pagination": {
+                        "pagination": {
+                            "paginationMode": "updateAParameterInEachRequest",
+                            "parameters": {
+                                "parameters": [
+                                    {
+                                        "type": "qs",
+                                        "name": "offset",
+                                        "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
+                                    },
+                                    {
+                                        "type": "qs",
+                                        "name": "limit",
+                                        "value": "1000"
+                                    }
+                                ]
+                            },
+                            "paginationCompleteWhen": "other",
+                            "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
+                            "limitPagesFetched": true,
+                            "maxRequests": 10000
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "2745cfc8-7a76-3f55-bccd-6576c62e6ece",
+            "name": "hold_ar collect",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                5940,
+                0
+            ],
+            "parameters": {
+                "jsCode": "const rows = $input.all().flatMap(i => i.json.body?.rows || i.json.rows || []); return [{json:{rows}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "6960cb54-05bd-3098-97ee-d454c5c11330",
+            "name": "hold_ar hold",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                6160,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/hold/perform\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {keys:($(\"hold_ar collect\").isExecuted ? $(\"hold_ar collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "f3cd5a57-a996-3e1a-bb77-45b81ffd6f46",
+            "name": "hold_ar notify",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2.1,
+            "position": [
+                6380,
+                0
+            ],
+            "parameters": {
+                "fromEmail": "={{ $env.TTR_MAIL_FROM }}",
+                "toEmail": "={{ JSON.parse($env.TTR_MAIL_RECIPIENTS || '{}')[\"role.ar\"] || \"role.ar\" }}",
+                "subject": "Tatrman release_on_placement",
+                "emailFormat": "text",
+                "text": "={{ JSON.stringify(($(\"hold_ar collect\").isExecuted ? $(\"hold_ar collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))), null, 2) }}",
+                "options": {
+                    "appendAttribution": false
+                }
+            },
+            "credentials": {
+                "smtp": {
+                    "name": "tatrman-mail"
+                }
+            }
+        },
+        {
+            "id": "9d71ad32-f583-3c38-b8e2-c403426f408a",
+            "name": "hold_ar notify deliver",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                6600,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ !$(\"action status\").first().json.body.dryRun && ($(\"hold_ar collect\").isExecuted ? $(\"hold_ar collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).length > 0 }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
+            "id": "a27a6294-e89b-36d0-9604-0cd14046e3e3",
+            "name": "hold_ar notify outcome",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                6820,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/notify/outcome\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {outcomes:($(\"hold_ar collect\").isExecuted ? $(\"hold_ar collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "d226b54b-4ee4-3326-80f0-95f0e9e3141e",
+            "name": "hold_ar notify complete",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                7040,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "7034c094-d644-3921-9471-71df1cb97174",
+            "name": "release_confirmed rows",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                7260,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/release_confirmed\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    },
+                    "pagination": {
+                        "pagination": {
+                            "paginationMode": "updateAParameterInEachRequest",
+                            "parameters": {
+                                "parameters": [
+                                    {
+                                        "type": "qs",
+                                        "name": "offset",
+                                        "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
+                                    },
+                                    {
+                                        "type": "qs",
+                                        "name": "limit",
+                                        "value": "1000"
+                                    }
+                                ]
+                            },
+                            "paginationCompleteWhen": "other",
+                            "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
+                            "limitPagesFetched": true,
+                            "maxRequests": 10000
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "f6892c9a-5287-3d79-a58a-65a96023012d",
+            "name": "release_confirmed collect",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                7480,
+                0
+            ],
+            "parameters": {
+                "jsCode": "const rows = $input.all().flatMap(i => i.json.body?.rows || i.json.rows || []); return [{json:{rows}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "5b201c67-a4b9-3301-848f-e6dc8ef364be",
+            "name": "release_confirmed ask",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                7700,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/ask/perform\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {keys:($(\"release_confirmed collect\").isExecuted ? $(\"release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/release_confirmed-ask'} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "22be88ae-53ab-3448-bafb-7a5dd1c9fe04",
+            "name": "release_confirmed ask wait",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                7920,
+                0
+            ],
+            "parameters": {
+                "resume": "webhook",
+                "httpMethod": "POST",
+                "options": {
+                    "webhookSuffix": "release_confirmed-ask"
+                }
+            }
+        },
+        {
+            "id": "45146030-56b9-3eb7-a355-8ee6189df283",
+            "name": "release_confirmed ask task pending",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                8140,
+                0
+            ],
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict",
+                        "version": 2
+                    },
+                    "conditions": [
+                        {
+                            "leftValue": "={{ ($json.body.performed || []).some(p => p.taskId) }}",
+                            "rightValue": true,
+                            "operator": {
+                                "type": "boolean",
+                                "operation": "true",
+                                "singleValue": true
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            }
+        },
+        {
+            "id": "ca8c3e2f-32bd-3b05-9a56-70b644804ba0",
+            "name": "release_confirmed ask resumed",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                8360,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "a4efdf96-27ac-38d2-a25b-ac7dfb78b773",
+            "name": "release rows",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                8580,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/release\" }}",
+                "method": "GET",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    },
+                    "pagination": {
+                        "pagination": {
+                            "paginationMode": "updateAParameterInEachRequest",
+                            "parameters": {
+                                "parameters": [
+                                    {
+                                        "type": "qs",
+                                        "name": "offset",
+                                        "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
+                                    },
+                                    {
+                                        "type": "qs",
+                                        "name": "limit",
+                                        "value": "1000"
+                                    }
+                                ]
+                            },
+                            "paginationCompleteWhen": "other",
+                            "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
+                            "limitPagesFetched": true,
+                            "maxRequests": 10000
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "d051f0c5-1780-3561-a990-43fea3080813",
+            "name": "release collect",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                8800,
+                0
+            ],
+            "parameters": {
+                "jsCode": "const rows = $input.all().flatMap(i => i.json.body?.rows || i.json.rows || []); return [{json:{rows}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "44bc4283-ad35-3605-886e-9c2913db798d",
+            "name": "release release",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                9020,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/release/perform\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {keys:($(\"release collect\").isExecuted ? $(\"release collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "716f6b30-598b-3309-85d8-4485e61c1027",
+            "name": "close",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                9240,
+                0
+            ],
+            "parameters": {
+                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/close\" }}",
+                "method": "POST",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBearerAuth",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ {} }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "json",
+                            "fullResponse": true
+                        }
+                    }
+                }
+            },
+            "credentials": {
+                "httpBearerAuth": {
+                    "name": "tatrman-automation"
+                }
+            },
+            "retryOnFail": true,
+            "maxTries": 3
+        },
+        {
+            "id": "cfeccac1-be0d-378f-89c6-9c6a7d7fae8f",
+            "name": "step complete",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                9460,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        }
+    ],
+    "connections": {
+        "open": {
+            "main": [
+                [
+                    {
+                        "node": "replayed",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "replayed": {
+            "main": [
+                [
+                    {
+                        "node": "run complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "fresh run",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "fresh run": {
+            "main": [
+                [
+                    {
+                        "node": "candidates",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "candidates": {
+            "main": [
+                [
+                    {
+                        "node": "shortfall",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "shortfall": {
+            "main": [
+                [
+                    {
+                        "node": "price_differences",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "price_differences": {
+            "main": [
+                [
+                    {
+                        "node": "overdue",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "overdue": {
+            "main": [
+                [
+                    {
+                        "node": "decision",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "decision": {
+            "main": [
+                [
+                    {
+                        "node": "evaluate",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "evaluate": {
+            "main": [
+                [
+                    {
+                        "node": "check evaluation",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "check evaluation": {
+            "main": [
+                [
+                    {
+                        "node": "evaluated",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "evaluated": {
+            "main": [
+                [
+                    {
+                        "node": "action status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "evaluation wait",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "evaluation wait": {
+            "main": [
+                [
+                    {
+                        "node": "evaluation status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "evaluation status": {
+            "main": [
+                [
+                    {
+                        "node": "check evaluation",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "action status": {
+            "main": [
+                [
+                    {
+                        "node": "route items",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "route items": {
+            "main": [
+                [
+                    {
+                        "node": "routes loop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "routes loop": {
+            "main": [
+                [
+                    {
+                        "node": "close",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "routes",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "routes": {
+            "main": [
+                [
+                    {
+                        "node": "hold_sales rows",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "hold_ar rows",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "release_confirmed rows",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "release rows",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "routes loop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "hold_sales rows": {
+            "main": [
+                [
+                    {
+                        "node": "hold_sales collect",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "hold_sales collect": {
+            "main": [
+                [
+                    {
+                        "node": "hold_sales hold",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "hold_sales hold": {
+            "main": [
+                [
+                    {
+                        "node": "hold_sales notify deliver",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "hold_sales notify deliver": {
+            "main": [
+                [
+                    {
+                        "node": "hold_sales notify",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "hold_sales notify complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "hold_sales notify": {
+            "main": [
+                [
+                    {
+                        "node": "hold_sales notify outcome",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "hold_sales notify outcome": {
+            "main": [
+                [
+                    {
+                        "node": "hold_sales notify complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "hold_sales notify complete": {
+            "main": [
+                [
+                    {
+                        "node": "routes loop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "hold_ar rows": {
+            "main": [
+                [
+                    {
+                        "node": "hold_ar collect",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "hold_ar collect": {
+            "main": [
+                [
+                    {
+                        "node": "hold_ar hold",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "hold_ar hold": {
+            "main": [
+                [
+                    {
+                        "node": "hold_ar notify deliver",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "hold_ar notify deliver": {
+            "main": [
+                [
+                    {
+                        "node": "hold_ar notify",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "hold_ar notify complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "hold_ar notify": {
+            "main": [
+                [
+                    {
+                        "node": "hold_ar notify outcome",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "hold_ar notify outcome": {
+            "main": [
+                [
+                    {
+                        "node": "hold_ar notify complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "hold_ar notify complete": {
+            "main": [
+                [
+                    {
+                        "node": "routes loop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "release_confirmed rows": {
+            "main": [
+                [
+                    {
+                        "node": "release_confirmed collect",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "release_confirmed collect": {
+            "main": [
+                [
+                    {
+                        "node": "release_confirmed ask",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "release_confirmed ask": {
+            "main": [
+                [
+                    {
+                        "node": "release_confirmed ask task pending",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "release_confirmed ask task pending": {
+            "main": [
+                [
+                    {
+                        "node": "release_confirmed ask wait",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "release_confirmed ask resumed",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "release_confirmed ask wait": {
+            "main": [
+                [
+                    {
+                        "node": "release_confirmed ask resumed",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "release_confirmed ask resumed": {
+            "main": [
+                [
+                    {
+                        "node": "routes loop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "release rows": {
+            "main": [
+                [
+                    {
+                        "node": "release collect",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "release collect": {
+            "main": [
+                [
+                    {
+                        "node": "release release",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "release release": {
+            "main": [
+                [
+                    {
+                        "node": "routes loop",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "close": {
+            "main": [
+                [
+                    {
+                        "node": "run complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "trigger": {
+            "main": [
+                [
+                    {
+                        "node": "open",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "run complete": {
+            "main": [
+                [
+                    {
+                        "node": "step complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1",
+        "timezone": "UTC"
+    },
+    "active": false,
+    "pinData": {},
+    "meta": {
+        "templateCredsSetupCompleted": false,
+        "tatrman": {
+            "schemaVersion": 1,
+            "deployment": "release_n8n",
+            "recipes": [
+                "release_order"
+            ],
+            "calls": [
+                {
+                    "node": "open",
+                    "name": "open",
+                    "method": "POST",
+                    "path": "/automation/recipes/release_order/runs",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/recipes/release_order/runs\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ (() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:b8e7981518acaba84ae3d55e0a6f350abe04025f6ef702386186f5c56f82b29c\", recipeValuesFingerprint:\"sha256:54e165c4463646ed8b9ae490dc1a830b34e76dda883caa0f3df407699c7ae888\"}; b.programFingerprint=\"sha256:c47e78b56316cdb6d1ec28ba5020998b08877e160c229a6998de3426ba44c357\"; b.deploymentFingerprint=\"sha256:fe77871c1f0c500785aa32197843b8c13fb37e410b52280c2eb02c81eebc0b04\"; if (($('trigger').first().json.body || $('trigger').first().json).at) b.port.at=($('trigger').first().json.body || $('trigger').first().json).at; return b;})() }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                },
+                {
+                    "node": "candidates",
+                    "name": "part",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/parts/candidates",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/candidates\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "part": "candidates"
+                    },
+                    "part": "candidates"
+                },
+                {
+                    "node": "shortfall",
+                    "name": "part",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/parts/shortfall",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/shortfall\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "part": "shortfall"
+                    },
+                    "part": "shortfall"
+                },
+                {
+                    "node": "price_differences",
+                    "name": "part",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/parts/price_differences",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/price_differences\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "part": "price_differences"
+                    },
+                    "part": "price_differences"
+                },
+                {
+                    "node": "overdue",
+                    "name": "part",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/parts/overdue",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/overdue\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "part": "overdue"
+                    },
+                    "part": "overdue"
+                },
+                {
+                    "node": "decision",
+                    "name": "part",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/parts/decision",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/parts/decision\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "part": "decision"
+                    },
+                    "part": "decision"
+                },
+                {
+                    "node": "evaluate",
+                    "name": "evaluate",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/evaluate",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/evaluate\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                },
+                {
+                    "node": "evaluation status",
+                    "name": "status",
+                    "method": "GET",
+                    "path": "/automation/runs/{id}",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"\" }}",
+                        "method": "GET",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                },
+                {
+                    "node": "action status",
+                    "name": "status",
+                    "method": "GET",
+                    "path": "/automation/runs/{id}",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"\" }}",
+                        "method": "GET",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                },
+                {
+                    "node": "hold_sales rows",
+                    "name": "route",
+                    "method": "GET",
+                    "path": "/automation/runs/{id}/routes/hold_sales",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/hold_sales\" }}",
+                        "method": "GET",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            },
+                            "pagination": {
+                                "pagination": {
+                                    "paginationMode": "updateAParameterInEachRequest",
+                                    "parameters": {
+                                        "parameters": [
+                                            {
+                                                "type": "qs",
+                                                "name": "offset",
+                                                "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
+                                            },
+                                            {
+                                                "type": "qs",
+                                                "name": "limit",
+                                                "value": "1000"
+                                            }
+                                        ]
+                                    },
+                                    "paginationCompleteWhen": "other",
+                                    "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
+                                    "limitPagesFetched": true,
+                                    "maxRequests": 10000
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "route": "hold_sales"
+                    },
+                    "route": "hold_sales"
+                },
+                {
+                    "node": "hold_sales hold",
+                    "name": "perform",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/actions/hold/perform",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/hold/perform\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {keys:($(\"hold_sales collect\").isExecuted ? $(\"hold_sales collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "action": "hold"
+                    },
+                    "action": "hold"
+                },
+                {
+                    "node": "hold_sales notify outcome",
+                    "name": "outcome",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/actions/notify/outcome",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/notify/outcome\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {outcomes:($(\"hold_sales collect\").isExecuted ? $(\"hold_sales collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "action": "notify"
+                    },
+                    "action": "notify"
+                },
+                {
+                    "node": "hold_ar rows",
+                    "name": "route",
+                    "method": "GET",
+                    "path": "/automation/runs/{id}/routes/hold_ar",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/hold_ar\" }}",
+                        "method": "GET",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            },
+                            "pagination": {
+                                "pagination": {
+                                    "paginationMode": "updateAParameterInEachRequest",
+                                    "parameters": {
+                                        "parameters": [
+                                            {
+                                                "type": "qs",
+                                                "name": "offset",
+                                                "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
+                                            },
+                                            {
+                                                "type": "qs",
+                                                "name": "limit",
+                                                "value": "1000"
+                                            }
+                                        ]
+                                    },
+                                    "paginationCompleteWhen": "other",
+                                    "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
+                                    "limitPagesFetched": true,
+                                    "maxRequests": 10000
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "route": "hold_ar"
+                    },
+                    "route": "hold_ar"
+                },
+                {
+                    "node": "hold_ar hold",
+                    "name": "perform",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/actions/hold/perform",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/hold/perform\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {keys:($(\"hold_ar collect\").isExecuted ? $(\"hold_ar collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "action": "hold"
+                    },
+                    "action": "hold"
+                },
+                {
+                    "node": "hold_ar notify outcome",
+                    "name": "outcome",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/actions/notify/outcome",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/notify/outcome\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {outcomes:($(\"hold_ar collect\").isExecuted ? $(\"hold_ar collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions || []).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).map(r => r[\"order_number\"]).map(key => ({key,status:'delivered',at:new Date().toISOString()}))} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "action": "notify"
+                    },
+                    "action": "notify"
+                },
+                {
+                    "node": "release_confirmed rows",
+                    "name": "route",
+                    "method": "GET",
+                    "path": "/automation/runs/{id}/routes/release_confirmed",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/release_confirmed\" }}",
+                        "method": "GET",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            },
+                            "pagination": {
+                                "pagination": {
+                                    "paginationMode": "updateAParameterInEachRequest",
+                                    "parameters": {
+                                        "parameters": [
+                                            {
+                                                "type": "qs",
+                                                "name": "offset",
+                                                "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
+                                            },
+                                            {
+                                                "type": "qs",
+                                                "name": "limit",
+                                                "value": "1000"
+                                            }
+                                        ]
+                                    },
+                                    "paginationCompleteWhen": "other",
+                                    "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
+                                    "limitPagesFetched": true,
+                                    "maxRequests": 10000
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "route": "release_confirmed"
+                    },
+                    "route": "release_confirmed"
+                },
+                {
+                    "node": "release_confirmed ask",
+                    "name": "perform",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/actions/ask/perform",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/ask/perform\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {keys:($(\"release_confirmed collect\").isExecuted ? $(\"release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/release_confirmed-ask'} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "action": "ask"
+                    },
+                    "action": "ask"
+                },
+                {
+                    "node": "release rows",
+                    "name": "route",
+                    "method": "GET",
+                    "path": "/automation/runs/{id}/routes/release",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/routes/release\" }}",
+                        "method": "GET",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            },
+                            "pagination": {
+                                "pagination": {
+                                    "paginationMode": "updateAParameterInEachRequest",
+                                    "parameters": {
+                                        "parameters": [
+                                            {
+                                                "type": "qs",
+                                                "name": "offset",
+                                                "value": "={{ $pageCount === 0 ? 0 : Number($request.qs.offset || 0) + $response.body.rows.length }}"
+                                            },
+                                            {
+                                                "type": "qs",
+                                                "name": "limit",
+                                                "value": "1000"
+                                            }
+                                        ]
+                                    },
+                                    "paginationCompleteWhen": "other",
+                                    "completeExpression": "={{ Number($request.qs.offset || 0) + $response.body.rows.length >= $response.body.rowCount }}",
+                                    "limitPagesFetched": true,
+                                    "maxRequests": 10000
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "route": "release"
+                    },
+                    "route": "release"
+                },
+                {
+                    "node": "release release",
+                    "name": "perform",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/actions/release/perform",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/actions/release/perform\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {keys:($(\"release collect\").isExecuted ? $(\"release collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {
+                        "action": "release"
+                    },
+                    "action": "release"
+                },
+                {
+                    "node": "close",
+                    "name": "close",
+                    "method": "POST",
+                    "path": "/automation/runs/{id}/close",
+                    "recipe": "release_order",
+                    "program": "release_on_placement",
+                    "mode": "on_event",
+                    "port": "key",
+                    "key": [
+                        "order.order_number"
+                    ],
+                    "parameters": {
+                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent($(\"open\").first().json.body.runId) + \"/close\" }}",
+                        "method": "POST",
+                        "authentication": "genericCredentialType",
+                        "genericAuthType": "httpBearerAuth",
+                        "sendBody": true,
+                        "specifyBody": "json",
+                        "jsonBody": "={{ {} }}",
+                        "options": {
+                            "response": {
+                                "response": {
+                                    "responseFormat": "json",
+                                    "fullResponse": true
+                                }
+                            }
+                        }
+                    },
+                    "arguments": {}
+                }
+            ],
+            "nodeVersions": {
+                "webhook": 2.0,
+                "httpRequest": 4.2,
+                "switch": 3.0,
+                "wait": 1.1,
+                "emailSend": 2.1,
+                "scheduleTrigger": 1.2,
+                "code": 2.0,
+                "splitInBatches": 3.0,
+                "splitOut": 1.0,
+                "if": 2.2
+            }
+        }
+    }
+}
