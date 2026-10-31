@@ -1436,7 +1436,7 @@
           "to": {
             "kind": "entity",
             "path": [
-              "description",
+              "labelPlural",
               "missing"
             ]
           }
@@ -1583,5 +1583,352 @@
       "operations": [],
       "unknown": true
     }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "typed nested values",
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "values",
+          "at": "/key",
+          "to": {
+            "kind": "entity",
+            "path": [
+              "attributes",
+              "isKey"
+            ]
+          },
+          "mapping": {
+            "yes": true
+          }
+        }
+      ]
+    },
+    "valid": true,
+    "schema": "profile"
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "wrong typed nested values",
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "values",
+          "at": "/key",
+          "to": {
+            "kind": "entity",
+            "path": [
+              "attributes",
+              "isKey"
+            ]
+          },
+          "mapping": {
+            "yes": "true"
+          }
+        }
+      ]
+    },
+    "valid": false,
+    "schema": "profile"
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "localized target path",
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "values",
+          "at": "/label",
+          "to": {
+            "kind": "entity",
+            "path": [
+              "displayLabel",
+              "en"
+            ]
+          },
+          "mapping": {
+            "old": "new"
+          }
+        }
+      ]
+    },
+    "valid": true,
+    "schema": "profile"
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "localized target value type",
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "values",
+          "at": "/label",
+          "to": {
+            "kind": "entity",
+            "path": [
+              "displayLabel",
+              "en"
+            ]
+          },
+          "mapping": {
+            "old": false
+          }
+        }
+      ]
+    },
+    "valid": false,
+    "schema": "profile"
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "localized leaf cannot be traversed",
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "nest",
+          "at": "/label",
+          "to": {
+            "kind": "entity",
+            "path": [
+              "displayLabel",
+              "en",
+              "extra"
+            ]
+          }
+        }
+      ]
+    },
+    "valid": false,
+    "schema": "profile"
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "binding nested type",
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "values",
+          "at": "/column",
+          "to": {
+            "kind": "entity",
+            "path": [
+              "binding",
+              "columns",
+              "code"
+            ]
+          },
+          "mapping": {
+            "old": "item_code"
+          }
+        }
+      ]
+    },
+    "valid": true,
+    "schema": "profile"
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "binding wrong nested type",
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "values",
+          "at": "/column",
+          "to": {
+            "kind": "entity",
+            "path": [
+              "binding",
+              "columns",
+              "code"
+            ]
+          },
+          "mapping": {
+            "old": false
+          }
+        }
+      ]
+    },
+    "valid": false,
+    "schema": "profile"
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "nested engine target",
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "rename",
+          "at": "/db_type",
+          "to": {
+            "kind": "engine",
+            "property": "type"
+          }
+        }
+      ]
+    },
+    "valid": true,
+    "schema": "profile"
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "unknown nested engine target",
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "rename",
+          "at": "/db_type",
+          "to": {
+            "kind": "engine",
+            "property": "staging"
+          }
+        }
+      ]
+    },
+    "valid": false,
+    "schema": "profile"
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "template substitution pointer type",
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "shape",
+          "at": "/item",
+          "to": {
+            "kind": "entity"
+          },
+          "template": {
+            "description": {
+              "input": 7
+            }
+          }
+        }
+      ]
+    },
+    "valid": false,
+    "schema": "profile"
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "template substitution pointer syntax",
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "shape",
+          "at": "/item",
+          "to": {
+            "kind": "entity"
+          },
+          "template": {
+            "description": {
+              "input": "label"
+            }
+          }
+        }
+      ]
+    },
+    "valid": false,
+    "schema": "profile"
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "numeric zero profile major",
+    "value": {
+      "profile": "demo/0",
+      "grammar": ">=0.21",
+      "operations": []
+    },
+    "valid": true,
+    "schema": "profile"
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "lexical policy rejects boolean",
+    "value": {
+      "ttr": "0.21",
+      "model": "lexicon",
+      "defs": [
+        {
+          "kind": "term",
+          "id": "item",
+          "properties": {
+            "indexSecurity": true
+          }
+        }
+      ]
+    },
+    "valid": false,
+    "schema": "model-yaml"
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "search method typed",
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "entity",
+          "id": "Item",
+          "properties": {
+            "search": {
+              "searchable": true,
+              "method": {
+                "name": "TYPOS",
+                "argument": 2
+              }
+            }
+          }
+        }
+      ]
+    },
+    "valid": true,
+    "schema": "model-yaml"
+  },
+  {
+    "group": "exact vocabulary and nested types",
+    "name": "search method wrong argument",
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "entity",
+          "id": "Item",
+          "properties": {
+            "search": {
+              "method": {
+                "name": "TYPOS",
+                "argument": "2"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "valid": false,
+    "schema": "model-yaml"
   }
 ]

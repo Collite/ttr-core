@@ -2,6 +2,7 @@
 package org.tatrman.ttr.parser.conformance
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.networknt.schema.JsonSchema
 import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion
 import io.kotest.core.spec.style.FunSpec
@@ -15,6 +16,7 @@ class CanonicalYamlSchemaSpec :
     FunSpec({
         val mapper = ObjectMapper()
         val factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012)
+        val schemas = mutableMapOf<String, JsonSchema>()
         val vectors = mapper.readTree(Files.readString(Path.of("../../grammar/tests/canonical-schema-vectors.json")))
 
         fun resource(name: String): String =
@@ -26,7 +28,8 @@ class CanonicalYamlSchemaSpec :
             context(group) {
                 cases.forEach { vector ->
                     test(vector["name"].asText()) {
-                        val schema = factory.getSchema(resource("${vector["schema"].asText()}.schema.json"))
+                        val name = "${vector["schema"].asText()}.schema.json"
+                        val schema = schemas.getOrPut(name) { factory.getSchema(resource(name)) }
                         val errors = schema.validate(vector["value"])
                         withClue(errors.joinToString("\n")) {
                             errors.isEmpty() shouldBe vector["valid"].asBoolean()
