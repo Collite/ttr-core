@@ -8,10 +8,10 @@ The conceptual-model reader adds `def subkind`, `from:` / `until:` episode bound
 and `per:` / `from:` valued-state projections. Kinds, subkinds and CN roles can
 carry labelled `involves:` participants and a `period:` lifetime. The four temporal
 shapes are instant events, kinds with lifetimes, phases with episodes, and qualities
-with values over time. See [the conceptual-model manual](../../docs/manual/en/20-conceptual-model.md#grammar-020--things-in-time).
+with values over time. See [the conceptual-model manual](../../docs/manual/en/20-conceptual-model.md#six-stereotypes-four-tenses).
 
-This grammar Stage preserves these shapes in all three parsers and the writer;
-CN-P8 S8.2 supplies their validation and lowering. The shared CN body remains
+The three parsers and the writer preserve these shapes; the semantics packages
+and `ttr-concept` validate and lower them (CN-P8 S8.2). The shared CN body remains
 permissive: required bearers and valid source combinations are semantic checks.
 `extent:` still parses during its retirement window. The new keywords remain
 legal identifier parts. JVM consumers must rebuild against the new parser model.

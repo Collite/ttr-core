@@ -179,10 +179,15 @@ rows are off under `recommended` and `info` under `strict`.
 | `cn/duplicate-grounding` | Error | A concept grounded twice (binding, `grounds:` or `concept { }`); the first is read. |
 | `cn/grounding-target-kind` | Error | The target is not what the stereotype grounds to on that layer, or a `concept { }` on a cubelet's inline measure. |
 | `concept-bearer-missing` (`ttr/required-property-missing` on Kotlin / Python) | Error | A quality or a phase with no `of:`. |
-| `cn/role-no-event` · `cn/phase-double-definition` | Error | A role with no `event:` · a phase with both `definition:` and a grounding. |
+| `cn/role-no-event` · `cn/phase-double-definition` | Error | A role with no `event:`, or one that is not an event · a phase with both `definition:` and a grounding. |
+| `cn/subkind-bearer` · `cn/subkind-temporal-definition` · `cn/partition-overlap` | Error | A subkind whose `of:` is not a kind, subkind, role or event · a subkind whose definition reads time, a parameter, a valued state or a phase · two subkinds on one value of one attribute. |
+| `cn/durative-event` · `cn/lifetime-period` | Error | An event with a `start` / `end` or `extent: durative` · a non-event `period:` that is not a start and an end. |
+| `cn/phase-source-conflict` · `cn/phase-bounds-participant` · `cn/episode-subject-missing` | Error | A phase with more than one source, or `from:` without `until:` · a bound that is not an event with exactly one participant the bearer can be · an episode table with no relation to the bearer. |
+| `cn/projection-source` | Error | A valued-state `from:` that is not a relator's quality involving the bearer and `per:`, or a `per:` that leaves a participant uncovered. |
 | `cn/hierarchy-shape` · `cn/participant-path-broken` · `cn/involves-unlabelled-duplicate` | Error | A `hierarchy:` closure without its attributes or key · a participant path that does not chain · one concept twice in `involves:` unlabelled. |
 | `cn/unknown-relation-type` · `cn/duplicate-default-sense` | Error | An open-tier edge's `type:` is no relation type · two defaults for one bare form and locale. |
 | `cn/antirigid-supertype` · `cn/phase-as-default` · `cn/cnc-deprecated` | Warning | A kind `is_a` a role or phase · a phase as a bare form's default · `model cnc` / `roles:`. |
+| `cn/partition-incomplete` · `cn/subkind-as-kind` · `cn/extent-retired` | Warning | A value-space member no subkind covers · `def kind { is_a:, members: }` (read as a subkind) · `extent:` on an event (every event is an instant). |
 | `cn/db-grounding` | Advisory | A `cn2db_concept` grounding — documentation only. |
 | `cn/ungrounded` · `cn/phase-no-definition` · `cn/event-no-period` | Hygiene | No grounding · a phase with no definition or grounding · an event with no `period:`. |
 | `cn/definition-syntax` · `cn/definition-unknown-name` · `cn/descendants-no-hierarchy` | Error | A definition block that does not parse · names what its scope lacks · `descendants()` over a kind with no `hierarchy:` (`ttr cn hygiene`). |

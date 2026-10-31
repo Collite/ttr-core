@@ -102,7 +102,8 @@ guarantees. Surface it to your user; do not swallow it.
 - **The conceptual-model tools** — on the same door and behind the same identity gate.
   `statement.validate:v1` · `statement.lower:v1` · `statement.explain:v1` take a statement frame over
   concepts (measures, filters, grouping, a time) and check it, lower it to the md query it means, or
-  say it as a sentence. The three `assertion.*:v1` tools do the same for a recorded event.
+  say it as a sentence. The three `assertion.*:v1` tools do the same for a claim to record: an event's
+  occurrence, a row with its validity, or a phase's episode.
   `definition.render:v1` renders a defined concept (`cn.OverdueInvoice`) as SQL over entities or as an
   md predicate, and `concept.search:v1` returns the concepts a span may mean. A refused frame is a
   result carrying its `cn/*` findings, never a partial plan. The frame tools answer
