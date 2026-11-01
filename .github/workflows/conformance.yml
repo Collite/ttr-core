@@ -43,6 +43,11 @@ jobs:
       # unhandled-shape failures. Do not invoke generateTwins here: expected data must be reviewed.
       - name: YAML AST and semantics conformance, fixed points and C-7 bytes
         run: ./gradlew :packages:kotlin:ttr-yaml:test :packages:kotlin:ttr-metadata:test --tests '*DefsJsonRoundTripSpec'
+      - name: Package and exercise the real canonical YAML migration bridge
+        run: |
+          ./gradlew :packages:kotlin:ttr-yaml:installDist
+          pnpm --filter '@tatrman/migrate...' build
+          node --test scripts/yaml-migration.integration.test.mjs
 
   ts-dump:
     runs-on: ubuntu-latest
