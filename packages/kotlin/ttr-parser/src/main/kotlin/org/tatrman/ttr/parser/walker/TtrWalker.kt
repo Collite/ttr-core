@@ -1731,7 +1731,8 @@ class TtrWalker(
 
     private fun conceptStereotypeOf(od: TTRParser.ObjectDefinitionContext): String? =
         when {
-            od.SUBKIND() != null -> "subkind"
+            // 0.21.x — `variant` is the house spelling (CN-D32); `spelling` keeps the word.
+            od.SUBKIND() != null || od.VARIANT() != null -> "subkind"
             od.KIND() != null -> "kind"
             od.EVENT() != null -> "event"
             od.PHASE() != null -> "phase"
@@ -1765,6 +1766,12 @@ class TtrWalker(
             name,
             defSource(od),
             visitConceptBody(od.cnBody()?.cnProperty().orEmpty(), "concept"),
+            spelling =
+                when {
+                    od.VARIANT() != null -> "variant"
+                    od.SUBKIND() != null -> "subkind"
+                    else -> null
+                },
         )
     }
 

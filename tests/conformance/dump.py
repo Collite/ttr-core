@@ -302,6 +302,9 @@ def _definition(d: Definition) -> dict[str, Any]:
     dl = _localized(d.description_localized)
     if dl is not None:
         out["descriptionLocalized"] = dl
+    # 0.21.x (CN-D32): a subkind written `variant` records the word, present-only (a `subkind` dumps as before).
+    if isinstance(d, ConceptDef) and d.spelling is not None and d.spelling != d.stereotype:
+        out["spelling"] = d.spelling
     return out
 
 

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseString } from '@tatrman/parser';
-import { format } from '../index.js';
+import { parseString, type ConceptDef } from '@tatrman/parser';
+import { DEFAULT_FORMAT_CONFIG, format, formatDocument } from '../index.js';
 
 describe('CN-P8 formatting', () => {
   it('preserves every shape and reaches a fixed point', () => {
@@ -21,5 +21,23 @@ describe('CN-P8 formatting', () => {
     const output = format('model cn\ndef phase OpenOrder { until: Delivered, from: Placed, of: Order }\ndef quality price { from: ListPrice.price, per: Channel, of: Item, valued_state: true }', 'time.ttrm');
     expect(output.indexOf('from: Placed')).toBeLessThan(output.indexOf('until: Delivered'));
     expect(output.indexOf('from: ListPrice.price')).toBeLessThan(output.indexOf('per: Channel'));
+  });
+});
+
+describe('CN-P8 S8.6 variant (CN-D32)', () => {
+  it("keeps each author's word and reaches a fixed point", () => {
+    const source = readFileSync(new URL('../../../../tests/conformance/fixtures/122-cn-variant.ttrm', import.meta.url), 'utf8');
+    const output = format(source, 'variant.ttrm');
+    expect(format(output, 'variant.ttrm')).toBe(output);
+    expect(output).toMatch(/^def variant Invoice /m);
+    expect(output).toMatch(/^def subkind StoredSale /m);
+    expect(output).toMatch(/^def quality variant /m);
+  });
+
+  it('writes `variant` for a subkind def that records no word (a synthesized def)', () => {
+    const source = 'model cn\ndef subkind WebSale { of: Sale }';
+    const ast = parseString(source).ast!;
+    delete (ast.definitions[0] as ConceptDef).spelling;
+    expect(formatDocument(ast, source, DEFAULT_FORMAT_CONFIG)).toMatch(/^def variant WebSale /m);
   });
 });

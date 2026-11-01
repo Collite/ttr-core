@@ -1,0 +1,36 @@
+{
+    "diagnostics": [
+        "ttr/required-property-missing",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference"
+    ],
+    "resolved": [
+        "Document => workshop.concepts.cn.concept.Document",
+        "Product => workshop.concepts.cn.concept.Product",
+        "Product => workshop.concepts.cn.concept.Product",
+        "variant => workshop.concepts.cn.concept.variant"
+    ],
+    "symbols": [
+        "workshop.concepts.binding.cn2er_kind.Kit.grounds",
+        "workshop.concepts.binding.cn2er_kind.Product.grounds",
+        "workshop.concepts.binding.cn2er_phase.StoredSale.grounds",
+        "workshop.concepts.binding.cn2er_quality.variant.grounds",
+        "workshop.concepts.cn.concept.Bundle",
+        "workshop.concepts.cn.concept.CodeRange",
+        "workshop.concepts.cn.concept.Document",
+        "workshop.concepts.cn.concept.Invoice",
+        "workshop.concepts.cn.concept.Kit",
+        "workshop.concepts.cn.concept.MissingBearer",
+        "workshop.concepts.cn.concept.Product",
+        "workshop.concepts.cn.concept.StoredSale",
+        "workshop.concepts.cn.concept.WebSale",
+        "workshop.concepts.cn.concept.variant"
+    ]
+}

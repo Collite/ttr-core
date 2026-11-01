@@ -4,6 +4,7 @@
 // @grammar-version: 0.21
 // 0.21 (MW-53): lexical indexSecurity; query skipSecurity; parameter
 // defaultValue and binds. Typed optional declarations; execution stays host-owned.
+// 0.21.x (CN-P8 S8.6): variant = subkind alias (CN-D32) — one soft keyword, one stereotype.
 // 0.20 (CN-P8): subkind; involves/period on kinds; phase episodes
 // (grounds+period, from/until); valued-state projection (per/from).
 // 0.18 (HP-P1): md2er_dimension; structural md2er_cubelet measures.
@@ -544,7 +545,8 @@ objectDefinition
   | RECIPE         id  autoBody           // 0.16 — the GENERATED recipe catalog object (contracts §5.3)
   // ----- 0.17 cn model — concept def kinds (`model cn`); one shared permissive body -----
   // `def role` is NOT here: it stays the one ROLE alternative above (⚑CN-P6, CN-D28).
-  | SUBKIND        id  cnBody             // 0.20 — rigid specialization; of: is required semantically
+  | ( SUBKIND | VARIANT ) id cnBody      // 0.20 — rigid specialization; of: is required semantically. 0.21.x: `variant`
+                                        //        is the house spelling (CN-D32), `subkind` OntoUML's — one stereotype
   | KIND           id  cnBody             // 0.17 — rigid things; may bind a vocabulary (KIND token reused from MD)
   | EVENT          id  cnBody             // 0.17 — occurrences: labelled `involves`, a `period:`, an `extent:`
   | PHASE          id  cnBody             // 0.17 — anti-rigid: a `definition:` OR a grounding to a stacked entity
@@ -756,9 +758,9 @@ valueSpaceProperty     : VALUE_SPACE propSep? id ;
 // of a cn body. Inside a nested object a key is any `id` (every `idPart` word — `to`, `from`, `name`,
 // `default` …, not `cardinality`) or `type` / `precision`. HIERARCHY and VIA are the two pre-0.17 tokens
 // admitted as free-form keys (`hierarchy: { closure: … }`, `via: [ … ]`). The 0.21 soft keywords
-// also remain free-form keys: none starts a typed cn property.
+// also remain free-form keys, and so does 0.21.x's `variant`: none starts a typed cn property.
 cnEntry          : cnKey propSep? cnValue ;
-cnKey            : IDENT | HIERARCHY | VIA | INDEX_SECURITY | SKIP_SECURITY | DEFAULT_VALUE | BINDS ;
+cnKey            : IDENT | HIERARCHY | VIA | INDEX_SECURITY | SKIP_SECURITY | DEFAULT_VALUE | BINDS | VARIANT ;
 cnValue          : cnObject | cnList | literal | id ;
 cnObject         : LBRACE (cnObjectEntry (COMMA? cnObjectEntry)* COMMA?)? RBRACE ;
 // Nested keys are any word, plus the two type keywords cn spells as keys: `relations: [ { type: supplies,
@@ -1282,6 +1284,7 @@ idPart
   : IDENT
   | INDEX_SECURITY | SKIP_SECURITY | DEFAULT_VALUE | BINDS // 0.21 — soft keywords; also preserve cnKey compatibility
   | SUBKIND | PER | UNTIL                                // 0.20 — soft keywords
+  | VARIANT                                              // 0.21.x — soft keyword (CN-D32)
   | DB | ER | BINDING | MAP | QUERY | CNC                 // schema codes (MAP retained as id fragment only)
   | ROLE | ER2CNC_ROLE                                   // Phase 2.2 kinds
   | TABLE | VIEW | COLUMN | INDEX | CONSTRAINT
@@ -1458,6 +1461,7 @@ DELIVERY         : 'delivery' ;        // 0.16 — automation role `delivery: { 
 CN               : 'cn' ;              // 0.17 — model code `model cn`; the `cn.` ref head
 EVENT            : 'event' ;           // 0.17 — `def event`; also a role's / binding's `event:` key
 SUBKIND          : 'subkind' ;         // 0.20
+VARIANT          : 'variant' ;         // 0.21.x (CN-P8 S8.6) — `subkind`'s house spelling
 PER              : 'per' ;             // 0.20
 UNTIL            : 'until' ;           // 0.20
 PHASE            : 'phase' ;           // 0.17 — `def phase`; also a binding's `phase:` key

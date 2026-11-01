@@ -1,0 +1,15 @@
+// CN-P8 S8.6 (CN-D32): `variant` is the house spelling of `subkind` — one stereotype; the dump records the word.
+// 115's four subkinds spelled `variant`, a `subkind` beside them, and `variant` still a name.
+package workshop.concepts
+model cn
+
+def kind Document { abstract: true }
+def variant Invoice { of: Document, involves: [Customer, Order], qualities: [amount, paid, status, issued, due] }
+def variant WebSale { of: Sale, definition: """channel = 'web'""" }
+def variant CodeRange { of: Diagnosis, members: """descendants(Diagnosis, 'R10-R19')""" }
+def subkind StoredSale { of: Sale, grounds: er.entity.stored_sale }
+def kind Product { grounds: er.entity.product, qualities: [variant] }
+def quality variant { of: Product, grounds: er.entity.product.variant }
+def variant Bundle { of: Product, definition: """variant = 'bundle'""" }
+def kind Kit { grounds: er.entity.kit, variant: boxed } // a free-form key, as 0.21's soft keywords stay one (mw-cn-soft-keys)
+def variant MissingBearer { definition: """channel = 'web'""" } // S8.2: ttr/required-property-missing, as for a subkind.

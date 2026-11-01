@@ -1,0 +1,83 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "table",
+            "name": "variant",
+            "properties": {
+                "columns": [
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "variant",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    },
+                    {
+                        "description": null,
+                        "kind": "column",
+                        "name": "subkind",
+                        "properties": {
+                            "type": {
+                                "name": "text"
+                            }
+                        },
+                        "tags": []
+                    }
+                ],
+                "primaryKey": [
+                    "variant"
+                ]
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "fk",
+            "name": "variant_fk",
+            "properties": {
+                "from": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "db",
+                                "dbo",
+                                "variant",
+                                "variant"
+                            ],
+                            "path": "db.dbo.variant.variant"
+                        }
+                    ],
+                    "kind": "list"
+                },
+                "to": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "db",
+                                "dbo",
+                                "variant",
+                                "subkind"
+                            ],
+                            "path": "db.dbo.variant.subkind"
+                        }
+                    ],
+                    "kind": "list"
+                }
+            },
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": "workshop.concepts",
+    "schemaDirective": {
+        "code": "db",
+        "namespace": "dbo"
+    }
+}

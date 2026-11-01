@@ -175,6 +175,10 @@ object ConformanceDump {
         // 0.13 (NLS-P10): the localised form of the SAME property, present-only (a
         // plain-string model dumps byte-identically to what 0.12 produced).
         localized(d.descriptionLocalized)?.let { fields["descriptionLocalized"] = it }
+        // 0.21.x (CN-D32): a subkind written `variant` records the word, present-only (a `subkind` dumps as before).
+        if (d is ConceptDef && d.spelling != null && d.spelling != d.stereotype) {
+            fields["spelling"] = JsonPrimitive(d.spelling)
+        }
         return obj(fields)
     }
 

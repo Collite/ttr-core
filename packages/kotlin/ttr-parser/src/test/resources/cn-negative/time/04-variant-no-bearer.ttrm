@@ -1,0 +1,3 @@
+// Syntax accepted by the permissive cn body; S8.2 reports ttr/required-property-missing, as for 01's subkind.
+model cn
+def variant MissingBearer { definition: """channel = 'web'""" }

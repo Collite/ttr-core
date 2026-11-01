@@ -28,7 +28,7 @@ describe('CN-P8 things in time syntax', () => {
   });
 
   it('leaves per-kind validity to S8.2 and rejects malformed typed references', () => {
-    for (const name of ['01-subkind-no-bearer', '02-phase-no-until', '03-per-without-valued-state']) {
+    for (const name of ['01-subkind-no-bearer', '02-phase-no-until', '03-per-without-valued-state', '04-variant-no-bearer']) {
       const source = readFileSync(new URL(`../../../kotlin/ttr-parser/src/test/resources/cn-negative/time/${name}.ttrm`, import.meta.url), 'utf8');
       expect(parseString(source).errors, name).toEqual([]);
     }
@@ -43,5 +43,30 @@ describe('CN-P8 things in time syntax', () => {
     for (const property of ['involves: [Item]', 'period: { start: since, end: until }']) {
       expect(parseString(`model ${model}\ndef role Reader { ${property} }`).errors.some((e) => e.code === 'ttr/unknown-property')).toBe(true);
     }
+  });
+});
+
+describe('CN-P8 S8.6 variant (CN-D32)', () => {
+  const variant = readFileSync(new URL('../../../../tests/conformance/fixtures/122-cn-variant.ttrm', import.meta.url), 'utf8');
+
+  it('reads `variant` as the subkind stereotype and records the word', () => {
+    const result = parseString(variant, 'variant.ttrm');
+    expect(result.errors).toEqual([]);
+    const subkinds = (result.ast!.definitions as ConceptDef[]).filter((d) => d.stereotype === 'subkind');
+    expect(subkinds.map((d) => [d.name, d.spelling])).toEqual([
+      ['Invoice', 'variant'],
+      ['WebSale', 'variant'],
+      ['CodeRange', 'variant'],
+      ['StoredSale', 'subkind'],
+      ['Bundle', 'variant'],
+      ['MissingBearer', 'variant'],
+    ]);
+    expect((result.ast!.definitions as ConceptDef[]).filter((d) => d.stereotype !== 'subkind').every((d) => d.spelling === undefined)).toBe(true);
+  });
+
+  it('keeps `variant` a name outside a cn def head', () => {
+    const result = parseString(readFileSync(new URL('../../../../tests/conformance/fixtures/124-cn-variant-as-id.ttrm', import.meta.url), 'utf8'));
+    expect(result.errors).toEqual([]);
+    expect(result.ast!.definitions.map((d) => d.name)).toEqual(['variant', 'variant_fk']);
   });
 });

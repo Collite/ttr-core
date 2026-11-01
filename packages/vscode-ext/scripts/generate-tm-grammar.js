@@ -265,6 +265,7 @@ function tokenToScope(name, literal) {
         case 'CN': return 'keyword.other.schema.ttrm';
         case 'EVENT': return 'keyword.other.kind.ttrm';
         case 'SUBKIND': return 'keyword.other.kind.ttrm';
+        case 'VARIANT': return 'keyword.other.kind.ttrm'; // 0.21.x — `subkind`'s house spelling
         case 'PER': return 'keyword.other.property.ttrm';
         case 'UNTIL': return 'keyword.other.property.ttrm';
         case 'PHASE': return 'keyword.other.kind.ttrm';
