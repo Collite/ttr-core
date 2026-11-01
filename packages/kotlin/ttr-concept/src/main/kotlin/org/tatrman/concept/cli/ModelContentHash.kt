@@ -8,7 +8,7 @@ import java.security.MessageDigest
 
 /**
  * The content hash of a TTR-M model (⚑R158-A, review-158 F2) — what an extraction pack's `types/generated/index.json`
- * pins as `snapshotHash`: `ttr cn render-types` writes it, and Pinakes recomputes it at pack load over the model the
+ * pins as `snapshotHash`: `ttr cn render-types` writes it, and the pack loader recomputes it over the model the
  * pack names (contracts §6: a registry whose generated files do not match the snapshot fails to load). It depends on
  * the model's bytes only — the same model on any clone, at any path, after any `touch` gives the same hash, and one
  * changed byte gives another. Not `ResolvedCnModel.snapshotHash`: that is the load's version (`LocalFsStorage` hashes

@@ -9,7 +9,7 @@ import java.nio.file.Files
 import java.nio.file.attribute.FileTime
 
 /**
- * review-158 F2 (⚑R158-A) — [ModelContentHash]: the hash `index.json` pins and Pinakes recomputes at pack load. The
+ * review-158 F2 (⚑R158-A) — [ModelContentHash]: the hash `index.json` pins and the pack loader recomputes. The
  * algorithm is pinned on a three-file tree (the digest below is Python's `hashlib.sha256` over the same feed); it reads
  * the model files only, by their path under the root; it ignores where the root is and when a file was touched.
  */
