@@ -73,6 +73,17 @@ grammar. Drift between targets is caught by `conformance.yml`, not by any sync s
   (`./gradlew … *ConformanceSpec*`, `*SemanticsConformanceSpec*`) and Python (`py-dump` /
   `py-sem-dump`); `pnpm --filter @modeler/conformance diff` + `diff-sem`. All three targets must agree.
 
+- [ ] **Canonical YAML:** regenerate `packages/grammar/schemas/` with
+  `node packages/grammar/scripts/generate-canonical-schemas.mjs`; commit all three resources and verify
+  `--check`. Implement newly reached Kotlin codec handlers and refresh the explicit grammar coverage
+  signatures only after every shape is handled; no catch-all fallback.
+- [ ] Generate and review committed YAML twins for every new/changed positive native fixture with
+  `./gradlew :packages:kotlin:ttr-yaml:generateTwins`. Commit them; CI must read, never generate, its
+  expected bytes. Run codec AST/semantics/native-byte fixed points and the metadata C-7 test.
+- [ ] Register any supported canonical YAML version transform explicitly in `YamlMigration` and test
+  marker/version refusal, semantics, idempotence and no-write dry-run via `packages/migrate`. Run
+  `node --test scripts/yaml-migration.integration.test.mjs` after building/installing the bridge and CLI.
+
 ## 4. Docs
 
 - [ ] CHANGELOG: `packages/grammar/CHANGELOG.md` (+ repo `CHANGELOG.md` if present), with the

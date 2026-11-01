@@ -135,7 +135,6 @@ internal class YamlNodes(
 
     fun read(source: String): JsonObject {
         inputText = source
-        checkSimpleNumericLines(source, file, yaml = true)
         val settings =
             LoadSettings
                 .builder()
@@ -315,7 +314,7 @@ internal class YamlNodes(
                     Tag.BOOL -> JsonPrimitive(node.value.lowercase() == "true")
                     Tag.INT, Tag.FLOAT -> {
                         checkNumberLength(node.value) { fail(node, it) }
-                        val raw = node.value.replace("_", "")
+                        val raw = node.value
                         val decimalText =
                             try {
                                 when {
@@ -439,7 +438,10 @@ internal object YamlText {
                 // Explicit indentation prevents leading content spaces being stripped.
                 out.append(prefix).append(marker.replace("|", "|2")).append('\n')
                 val lines = value.content.split('\n').let { if (trailing > 0) it.dropLast(1) else it }
-                lines.forEach { out.append(" ".repeat(indent + 2)).append(it).append('\n') }
+                lines.forEach {
+                    if (it.isNotEmpty()) out.append(" ".repeat(indent + 2)).append(it)
+                    out.append('\n')
+                }
             } else if (leaf(value)) {
                 out.append(prefix).append(spelling(value) ?: scalar(value)).append('\n')
             } else {

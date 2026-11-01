@@ -7,6 +7,6 @@ defs:
       sourceText:
         block: |2-
           SELECT 1
-          
+
           FROM t
         tag: "sql"

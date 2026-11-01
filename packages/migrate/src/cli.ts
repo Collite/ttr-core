@@ -286,6 +286,26 @@ program
     }
   });
 
+program
+  .command('migrate-yaml')
+  .description('Normalize canonical YAML through the Kotlin bridge; only registered version pairs are accepted')
+  .argument('<files...>', 'Explicit YAML files (all are validated before any write)')
+  .requiredOption('--from <version>', 'Source grammar major.minor')
+  .requiredOption('--to <version>', 'Target grammar major.minor')
+  .option('--bridge <executable>', 'Kotlin ttr-yaml-migrate launcher', process.env.TTR_YAML_BRIDGE)
+  .option('--dry-run', 'Validate and show diffs without writing', false)
+  .action(async (files: string[], opts: { from: string; to: string; bridge?: string; dryRun?: boolean }) => {
+    try {
+      const { runYamlMigration } = await import('./yaml-migrate.js');
+      const result = await runYamlMigration(files, { ...opts, bridge: opts.bridge ?? '' });
+      if (opts.dryRun) for (const write of result.writes) console.log(write.diff);
+      console.log(`${opts.dryRun ? 'Would change' : 'Changed'} ${result.writes.length} file(s).`);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 2;
+    }
+  });
+
 // `pnpm --filter @tatrman/migrate cli -- <cmd>` forwards the literal `--`
 // separator into argv; drop a single leading one so the documented invocation
 // (and the built `modeler-migrate` bin) both parse identically.

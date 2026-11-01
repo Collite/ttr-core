@@ -38,6 +38,8 @@ YAML parser has already discarded it.
 
 ## Document shape
 
+The YAML examples below are accepted input; the writer normalizes their quoting and layout.
+
 ```yaml
 ttr: '0.21'
 package: demo.sales
@@ -158,9 +160,9 @@ automation fingerprints retain their text. Exponent spellings (including tiny fi
 compact through validation and retain their spelling; nonfinite values fail at their source token.
 YAML-only numeric spellings such as `+1`, `.5`, `0x1F`, `0o17` and `5.` normalize to
 `1`, `0.5`, `31`, `15` and `5`, matching the native route. Numeric literals are limited to
-1000 authored characters (including sign, radix prefix and separators) before decimal or radix
+1000 authored characters (including sign and radix prefix) before decimal or radix
 conversion, in both YAML and TTR input. Longer literals raise a located `Number literal too long`
-diagnostic. This limit does not apply to quoted text.
+diagnostic. The independent finite-double check already refuses integers beyond about 309 digits; the length bound mainly protects long fractions and zero-padded literals. YAML 1.2 core numbers have no digit separators. This limit does not apply to quoted text.
 Duplicate storage fields and restrict members are refused at the second key; CN object duplicates
 retain the existing parser last-wins rule. Native TTR escape handling follows the
 grammar string contract.

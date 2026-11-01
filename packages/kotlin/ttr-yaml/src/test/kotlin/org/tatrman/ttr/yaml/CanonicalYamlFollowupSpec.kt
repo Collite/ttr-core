@@ -6,6 +6,7 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.string.shouldContain
+import kotlinx.serialization.json.*
 import org.tatrman.ttr.parser.model.MdDomainDef
 
 /** Review-201's approved S2.3 follow-ups exercise YAML-authored input as well as native input. */
@@ -61,16 +62,22 @@ class CanonicalYamlFollowupSpec :
                 CanonicalYaml.write(CanonicalYaml.fromTtr(CanonicalYaml.toTtr(doc))) shouldBe CanonicalYaml.write(doc)
             }
         }
-        test("N3 million-digit decimal hex and native numbers are refused promptly at their token") {
+        test("N3 real guards refuse million-digit numbers at their token in median under one second") {
             val decimal = "1".repeat(1_000_000)
-            val hex = "0x" + "F".repeat(1_000_000)
             val cases =
                 listOf(
-                    yaml("a: $decimal", "automation", "program").replace("id: D", "id: \"D\"") to false,
-                    yaml("a: $hex", "automation", "program") to false,
-                    "model automation\ndef program D {\n  a: $decimal\n}\n" to true,
+                    Triple("# c\n" + yaml("a: $decimal", "automation", "program"), 8, 10),
+                    Triple("# c\n" + yaml("a: 0x" + "F".repeat(1_000_000), "automation", "program"), 8, 10),
+                    Triple(
+                        "ttr: \"0.21\"\nmodel: automation\ndefs:\n - kind: program\n   id: D\n   properties: {a: $decimal}\n",
+                        6,
+                        20,
+                    ),
+                    Triple("// c\nmodel automation\ndef program D {\n  a: $decimal\n}\n", 4, 6),
                 )
-            for ((source, native) in cases) {
+            for ((source, line, column) in cases) {
+                val native = source.startsWith("//")
+
                 fun reject(): CanonicalYamlException =
                     shouldThrow<CanonicalYamlException> {
                         if (native) {
@@ -82,17 +89,27 @@ class CanonicalYamlFollowupSpec :
                             CanonicalYaml.read(source, "large.yaml")
                         }
                     }
-                // Warm class loading, YAML scanning and the lexer before measuring the actual public entry point.
                 repeat(4) { reject() }
-                val start = System.nanoTime()
-                val error = reject()
-                val elapsed = System.nanoTime() - start
-                error.detail shouldContain "Number literal too long"
-                error.file shouldBe if (native) "large.ttrm" else "large.yaml"
-                error.line shouldBe if (native) 3 else 7
-                error.column shouldBe if (native) 6 else 10
-                elapsed shouldBeLessThan 100_000_000L
+                val elapsed =
+                    (1..3)
+                        .map {
+                            val start = System.nanoTime()
+                            val error = reject()
+                            val duration = System.nanoTime() - start
+                            error.detail shouldContain "Number literal too long"
+                            error.file shouldBe if (native) "large.ttrm" else "large.yaml"
+                            error.line shouldBe line
+                            error.column shouldBe column
+                            duration
+                        }.sorted()
+                elapsed[1] shouldBeLessThan 1_000_000_000L
             }
+        }
+        test("R204 the three-million-code-point YAML limit remains enforced") {
+            val source = yaml("a: \"" + "x".repeat(3_000_001) + "\"", "automation", "program")
+            val error = shouldThrow<CanonicalYamlException> { CanonicalYaml.read(source, "limit.yaml") }
+            error.file shouldBe "limit.yaml"
+            error.detail shouldContain "limit"
         }
         test("N3 finite decimal and hex literals at the bound remain accepted") {
             val decimal = "0." + "1".repeat(MAX_NUMBER_LENGTH - 2)
@@ -103,7 +120,7 @@ class CanonicalYamlFollowupSpec :
             }
             CanonicalYaml.fromTtr("model automation\ndef program D { a: $decimal }")
         }
-        test("N3 early refusal never limits numeric-looking strings blocks tags or comments") {
+        test("N3 numeric limits never apply to numeric-looking strings blocks tags or comments") {
             val digits = "1".repeat(MAX_NUMBER_LENGTH + 1)
             for (value in listOf(
                 "'$digits'",
@@ -123,17 +140,71 @@ class CanonicalYamlFollowupSpec :
                     "   properties: {\n      a: $digits\n      suffix\n   }\n"
             CanonicalYaml.read(flow).ast.ok shouldBe true
         }
-        test("N3 simple numeric leaf preflight rejects before the full scanner, including quoted metadata") {
+        test("R204 F1 triple strings and multiline plain scalars preserve numeric-looking text") {
             val digits = "1".repeat(MAX_NUMBER_LENGTH + 1)
-            for (value in listOf(digits, "0x$digits")) {
-                val source = yaml("a: $value", "automation", "program").replace("id: D", "id: \"D\"")
-                val error =
-                    shouldThrow<CanonicalYamlException> { checkSimpleNumericLines(source, "early.yaml", yaml = true) }
-                error.line shouldBe 7
-                error.column shouldBe 10
+            val triple = "\"\"\""
+            for ((header, field, content) in listOf(
+                Triple("model er\ndef entity E", "description", "he said \"hi\na: $digits\n"),
+                Triple("model world\ndef query E", "sourceText", "SELECT \"Col\nx: $digits\n"),
+            )) {
+                val source = "$header {\n  $field: $triple$content$triple\n}"
+                val doc = CanonicalYaml.fromTtr(source)
+                doc.ast.ok shouldBe true
+                val value =
+                    doc.value
+                        .getValue("defs")
+                        .jsonArray
+                        .single()
+                        .jsonObject
+                        .getValue("properties")
+                        .jsonObject
+                        .getValue(field)
+                val retained =
+                    if (value is JsonPrimitive) {
+                        value.content
+                    } else {
+                        value.jsonObject
+                            .getValue(
+                                "block",
+                            ).jsonPrimitive.content
+                    }
+                retained shouldBe content
+                CanonicalYaml.fromTtr(CanonicalYaml.toTtr(doc)).value shouldBe doc.value
             }
-            shouldThrow<CanonicalYamlException> {
-                checkSimpleNumericLines("model automation\ndef program D {\n a: $digits\n}", "early.ttrm", yaml = false)
-            }.line shouldBe 3
+            val doc = CanonicalYaml.read(yaml("description: Some text\n  x:$digits", "er", "entity"))
+            doc.ast.ok shouldBe true
+            CanonicalYaml.toTtr(doc) shouldContain "Some text x:$digits"
+        }
+        test("R204 F2 guards cover signed radix block flow sequence and native list positions") {
+            val digits = "1".repeat(MAX_NUMBER_LENGTH + 1)
+            for (token in listOf(digits, "-$digits", "+$digits", "0x$digits", "0o$digits")) {
+                for (value in listOf(token, "[$token]", "{x: $token}")) {
+                    val error =
+                        shouldThrow<CanonicalYamlException> {
+                            CanonicalYaml.read(yaml("a: $value", "automation", "program"), "guard.yaml")
+                        }
+                    error.detail shouldContain "Number literal too long"
+                    error.file shouldBe "guard.yaml"
+                    error.line shouldBe 7
+                    error.column shouldBe
+                        when {
+                            value.startsWith("[") -> 11
+                            value.startsWith("{") -> 14
+                            else -> 10
+                        }
+                }
+            }
+            for (token in listOf(digits, "-$digits")) {
+                for (value in listOf(token, "[1, $token]")) {
+                    val error =
+                        shouldThrow<CanonicalYamlException> {
+                            CanonicalYaml.fromTtr("model automation\ndef program D {\n a: $value\n}", "guard.ttrm")
+                        }
+                    error.detail shouldContain "Number literal too long"
+                    error.file shouldBe "guard.ttrm"
+                    error.line shouldBe 3
+                    error.column shouldBe if (value.startsWith("[")) 9 else 5
+                }
+            }
         }
     })

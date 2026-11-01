@@ -25,6 +25,29 @@ class CanonicalYamlConformanceSpec :
             roster.requireTwins()
         }
 
+        test("native extension stem collisions are refused before generating twins") {
+            val root = Files.createTempDirectory("yaml-collision-")
+            try {
+                Files.writeString(root.resolve("a.ttrm"), "model er\n")
+                Files.writeString(root.resolve("a.ttrg"), "graph G {}\n")
+                shouldThrow<IllegalStateException> { YamlFixtureRoster(root) }.message!! shouldContain
+                    "Twin stem collision"
+                Files.exists(root.resolve("a.yaml")) shouldBe false
+            } finally {
+                root.toFile().deleteRecursively()
+            }
+        }
+
+        test("committed twins contain no indentation-only blank lines") {
+            for (scenario in roster.positive) {
+                for (file in scenario.files) {
+                    withClue(roster.twin(file)) {
+                        Files.readAllLines(roster.twin(file)).any { it.isNotEmpty() && it.isBlank() } shouldBe false
+                    }
+                }
+            }
+        }
+
         test("the roster rejects missing twins and discovers new root and directory inputs") {
             val root = Files.createTempDirectory("yaml-roster-")
             try {
@@ -77,6 +100,7 @@ class CanonicalYamlConformanceSpec :
                         val back = CanonicalYaml.fromTtr(CanonicalYaml.toTtr(doc), uri)
                         back.ast.errors shouldBe emptyList()
                         back.value shouldBe fromText.value
+                        CanonicalYaml.write(back) shouldBe bytes
                         astDump(back.ast) shouldBe astDump(original)
                         nativeDocs += SemanticsConformanceDump.DocInput(uri, original)
                         yamlDocs += SemanticsConformanceDump.DocInput(uri, doc.ast)
@@ -142,29 +166,28 @@ class CanonicalYamlConformanceSpec :
         }
         val cases = YamlFixtureRoster(Path.of("../../../tests/conformance/yaml-cases"))
         test("explicit diagnostic-bearing cases also require committed twins") { cases.requireTwins() }
-        for (file in cases.positive.flatMap { it.files }) {
-            test("repeated grammar properties and diagnostics survive: ${file.fileName}") {
-                val original = TtrLoader.parseFile(file)
-                original.errors.size shouldBe 2
-                val bytes = Files.readString(cases.twin(file))
-                val doc = CanonicalYaml.read(bytes)
-                astDump(doc.ast) shouldBe astDump(original)
-                doc.ast.errors.map { it.code to it.message } shouldBe original.errors.map { it.code to it.message }
-                CanonicalYaml.write(doc) shouldBe bytes
-                val native = CanonicalYaml.fromTtr(CanonicalYaml.toTtr(doc))
-                astDump(native.ast) shouldBe astDump(original)
-                val properties =
-                    doc.value
-                        .getValue("defs")
-                        .jsonArray
-                        .single()
-                        .jsonObject
-                        .getValue("properties")
-                        .jsonArray
-                properties.map { it.jsonObject.keys.single() } shouldBe listOf("label", "custom", "custom", "label")
-                SemanticsConformanceDump.dump(doc.ast, "repeated.ttrm") shouldBe
-                    SemanticsConformanceDump.dump(original, "repeated.ttrm")
-            }
+        test("repeated.ttrm grammar properties and diagnostics survive") {
+            val file = cases.root.resolve("repeated.ttrm")
+            val original = TtrLoader.parseFile(file)
+            original.errors.size shouldBe 2
+            val bytes = Files.readString(cases.twin(file))
+            val doc = CanonicalYaml.read(bytes)
+            astDump(doc.ast) shouldBe astDump(original)
+            doc.ast.errors.map { it.code to it.message } shouldBe original.errors.map { it.code to it.message }
+            CanonicalYaml.write(doc) shouldBe bytes
+            val native = CanonicalYaml.fromTtr(CanonicalYaml.toTtr(doc))
+            astDump(native.ast) shouldBe astDump(original)
+            val properties =
+                doc.value
+                    .getValue("defs")
+                    .jsonArray
+                    .single()
+                    .jsonObject
+                    .getValue("properties")
+                    .jsonArray
+            properties.map { it.jsonObject.keys.single() } shouldBe listOf("label", "custom", "custom", "label")
+            SemanticsConformanceDump.dump(doc.ast, "repeated.ttrm") shouldBe
+                SemanticsConformanceDump.dump(original, "repeated.ttrm")
         }
     })
 

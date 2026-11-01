@@ -389,3 +389,5 @@ export async function runMigration(args: MigrateArgs): Promise<{ report: Migrate
 
   return { report, writes };
 }
+export { runYamlMigration } from './yaml-migrate.js';
+export type { YamlMigrationOptions, YamlMigrationWrite } from './yaml-migrate.js';

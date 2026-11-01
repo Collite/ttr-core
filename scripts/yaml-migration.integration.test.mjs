@@ -1,0 +1,120 @@
+// SPDX-License-Identifier: Apache-2.0
+// Run after :packages:kotlin:ttr-yaml:installDist and pnpm --filter '@tatrman/migrate...' build.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
+import { join, resolve } from 'node:path';
+
+const root = fileURLToPath(new URL('../', import.meta.url));
+const bridge = resolve(
+  root,
+  'packages/kotlin/ttr-yaml/build/install/ttr-yaml-migrate/bin/ttr-yaml-migrate'
+);
+const cli = resolve(root, 'packages/migrate/dist/cli.js');
+const input = JSON.stringify({
+  ttr: '0.21',
+  model: 'er',
+  defs: [{ kind: 'entity', id: 'Item', properties: { description: 'Příliš žluťoučký 🐈' } }],
+});
+const request = (source, from = '0.21', to = '0.21') =>
+  JSON.stringify({ operation: 'migrate', from, to, source });
+const invoke = (source) => spawnSync(bridge, [], { input: source, encoding: 'utf8' });
+const runCli = (files, extra = []) =>
+  spawnSync(
+    process.execPath,
+    [cli, 'migrate-yaml', ...files, '--from', '0.21', '--to', '0.21', '--bridge', bridge, ...extra],
+    { encoding: 'utf8' }
+  );
+function withFiles(action) {
+  const dir = mkdtempSync(join(tmpdir(), 'yaml migration real '));
+  try {
+    action(dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('packaged UTF-8 bridge normalizes and then reaches an unchanged fixed point', () => {
+  const result = invoke(request(input));
+  assert.equal(result.status, 0, result.stderr);
+  const value = JSON.parse(result.stdout);
+  assert.deepEqual(Object.keys(value).sort(), ['changed', 'source']);
+  assert.equal(value.changed, true);
+  assert.match(value.source, /Příliš žluťoučký 🐈/);
+  const again = invoke(request(value.source));
+  assert.equal(again.status, 0, again.stderr);
+  assert.deepEqual(JSON.parse(again.stdout), { source: value.source, changed: false });
+});
+
+test('packaged bridge reports located YAML errors only on stderr', () => {
+  const result = invoke(
+    request(
+      'ttr: "0.21"\nmodel: er\ndefs:\n - kind: entity\n   id: E\n   properties:\n     unknown: 1\n'
+    )
+  );
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /<yaml>:7:15:/);
+});
+
+test('packaged bridge refuses unregistered versions and malformed requests', () => {
+  for (const text of [
+    request(input, '0.20'),
+    '{}',
+    '[]',
+    '{',
+    '{} {}',
+    request(input).replace('"operation":"migrate"', '"operation":"migrate","operation":"migrate"'),
+  ]) {
+    const result = invoke(text);
+    assert.equal(result.status, 2, result.stderr);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /<(yaml|request)>:/);
+  }
+});
+
+test('real TS CLI dry-run, write and idempotent no-op', () =>
+  withFiles((dir) => {
+    const path = join(dir, 'model with spaces.yaml');
+    writeFileSync(path, input);
+    const dry = runCli([path], ['--dry-run']);
+    assert.equal(dry.status, 0, dry.stderr);
+    assert.match(dry.stdout, /Would change 1 file/);
+    assert.equal(readFileSync(path, 'utf8'), input);
+    const write = runCli([path]);
+    assert.equal(write.status, 0, write.stderr);
+    const normalized = readFileSync(path, 'utf8');
+    assert.equal(JSON.parse(invoke(request(input)).stdout).source, normalized);
+    const again = runCli([path]);
+    assert.equal(again.status, 0, again.stderr);
+    assert.match(again.stdout, /Changed 0 file/);
+    assert.equal(readFileSync(path, 'utf8'), normalized);
+    assert.deepEqual(readdirSync(dir), ['model with spaces.yaml']);
+  }));
+
+test('real TS CLI refuses an undeclared dialect before any batch write', () =>
+  withFiles((dir) => {
+    const first = join(dir, 'first.yaml');
+    const foreign = join(dir, 'foreign.yaml');
+    writeFileSync(first, input);
+    writeFileSync(foreign, 'entities: []\n');
+    const result = runCli([first, foreign]);
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /foreign\.yaml: [\s\S]*<yaml>:/);
+    assert.equal(readFileSync(first, 'utf8'), input);
+    assert.equal(readFileSync(foreign, 'utf8'), 'entities: []\n');
+    assert.deepEqual(readdirSync(dir).sort(), ['first.yaml', 'foreign.yaml']);
+  }));
+
+test('real TS CLI refuses unsupported target versions without writing', () =>
+  withFiles((dir) => {
+    const path = join(dir, 'model.yaml');
+    writeFileSync(path, input);
+    const result = runCli([path], ['--to', '0.22']);
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /No registered canonical YAML migration/);
+    assert.equal(readFileSync(path, 'utf8'), input);
+  }));

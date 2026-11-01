@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ktlint)
     `java-library`
+    application
 }
 kotlin { jvmToolchain(21) }
 dependencies {
@@ -31,4 +32,9 @@ tasks.test {
     inputs.dir("../../../tests/conformance/fixtures")
     inputs.dir("../../../tests/conformance/yaml-cases")
     inputs.file("../../grammar/tests/canonical-schema-vectors.json")
+}
+
+application {
+    mainClass.set("org.tatrman.ttr.yaml.YamlMigrationCli")
+    applicationName = "ttr-yaml-migrate"
 }

@@ -35,6 +35,11 @@ internal class YamlFixtureRoster(
                 }
             }.also { check(it.isNotEmpty()) { "Empty conformance roster $root" } }
 
+    init {
+        val collisions = scenarios.flatMap { it.files }.groupBy(::twin).filterValues { it.size > 1 }
+        check(collisions.isEmpty()) { "Twin stem collision: $collisions" }
+    }
+
     val positive = scenarios.filterNot { it.negative }
     val negative = scenarios.filter { it.negative }
 
