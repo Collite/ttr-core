@@ -98,7 +98,9 @@ duration, tagged, call, transition, set and wildcard forms have distinct records
 
 At a `restrict` clause's value, generic objects always use `{object: {...}}`.
 `{range: {from: 1, to: 12}}` denotes a range literal; a plain map such as
-`{A: {en: Alpha}}` denotes a members block. A members block whose only key is
+`{A: {en: Alpha}}` denotes a members block. The `range` key is reserved at this
+position: a members block containing a member named `range` is refused by the
+codec with a located diagnostic. A members block whose only key is
 `"object"` with all-string localized values collides with an escaped generic
 object of strings; the codec refuses that members block with a located diagnostic.
 Other generic value forms are unchanged.

@@ -3556,5 +3556,58 @@
         }
       ]
     }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F3 reserved range member",
+    "schema": "model-yaml",
+    "valid": false,
+    "path": "$.defs[0].properties.restrict.members",
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "domain",
+          "id": "Item",
+          "properties": {
+            "restrict": {
+              "members": {
+                "range": {
+                  "en": "Range"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F3 reserved range alongside other members",
+    "schema": "model-yaml",
+    "valid": false,
+    "path": "$.defs[0].properties.restrict.members",
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "domain",
+          "id": "Item",
+          "properties": {
+            "restrict": {
+              "members": {
+                "range": {
+                  "en": "Range"
+                },
+                "A": {
+                  "en": "Alpha"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
   }
 ]
