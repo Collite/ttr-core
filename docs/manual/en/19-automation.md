@@ -220,7 +220,8 @@ exclusivity is enforced per row by the Server. Camunda refuses digest delivery i
 use `deliver: immediate` or n8n L1 until the digest follow-up is implemented.
 
 HTTP 409 takes the stale boundary; other 4xx except 408/429 take the drawn refusal task. HTTP 408/429, 5xx and
-transport errors retry, then become incidents. C8 error retries honour Retry-After; C7 Connect failed jobs use
+transport errors retry, then become incidents. C8 error retries honour numeric or HTTP-date Retry-After,
+with a 15 s fallback, a 1 s minimum and a cap of the program budget + 2 min. C7 Connect failed jobs use
 R3/PT15S because an output exception cannot commit a dynamic retry delay. No failed response continues into
 an action outcome or close. C7 `ttrInput` must be a Java Map; the generated README states the REST variable
 contract and the limits of expression-only verification.

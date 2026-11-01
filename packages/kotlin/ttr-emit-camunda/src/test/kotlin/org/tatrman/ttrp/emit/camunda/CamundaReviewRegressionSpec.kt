@@ -619,6 +619,90 @@ class CamundaReviewRegressionSpec :
                 }
             }
         }
+        "F1 all C8 retries cap numeric and date Retry-After at each program budget plus 120 seconds" {
+            val base = releaseGraph("camunda_8")
+            val batch = releaseGraph("camunda_8", batch = true)
+            val authored = base.copy(program = base.program.copy(budget = mapOf("sync" to "7 seconds")))
+            val authoredBatch = batch.copy(program = batch.program.copy(budget = mapOf("batch" to "45 seconds")))
+            val later = base.copy(program = base.program.copy(name = "later", budget = mapOf("sync" to "17 seconds")))
+            val process =
+                authored.copy(
+                    process =
+                        ProcessMeta(
+                            "budget_steps",
+                            "order_number",
+                            listOf(
+                                StepMeta(
+                                    "first",
+                                    authored.program.name,
+                                    "key",
+                                    emptyList(),
+                                    null,
+                                    emptyList(),
+                                    authored,
+                                ),
+                                StepMeta("later", later.program.name, "key", emptyList(), null, emptyList(), later),
+                            ),
+                        ),
+                )
+            val cases =
+                listOf(
+                    Triple(reviewDocument(base, Dialect.C8), 180L, "default sync"),
+                    Triple(reviewDocument(batch, Dialect.C8), 1920L, "default batch"),
+                    Triple(reviewDocument(authored, Dialect.C8), 127L, "authored sync"),
+                    Triple(reviewDocument(authoredBatch, Dialect.C8), 165L, "authored batch"),
+                    Triple(reviewDocument(process, Dialect.C8).named("first"), 127L, "process first"),
+                    Triple(reviewDocument(process, Dialect.C8).named("later"), 137L, "process later"),
+                )
+            val expr = ReviewExpressions(Dialect.C8)
+            for ((scope, cap, label) in cases) {
+                val sources = scope.descendants("header", C8NS).filter { it.getAttribute("key") == "errorExpression" }
+                (sources.size > 10) shouldBe true
+                // Evaluate the generated expression at every HTTP site, including outside bounded polling scopes.
+                for (header in sources) {
+                    val source = header.getAttribute("value").removePrefix("=")
+                    val functions =
+                        "{bpmnError:function(code,message) {code:code}, " +
+                            "jobError:function(message,variables,retries,timeout) {retries:retries,timeout:timeout}, result:"
+                    for ((code, headers, delay) in listOf(
+                        Triple("429", mapOf("Retry-After" to "999999"), cap),
+                        Triple("503", mapOf("retry-after" to "Wed, 21 Oct 2099 07:28:00 GMT"), cap),
+                        Triple("408", mapOf("Retry-After" to "37"), 37L),
+                        Triple("429", mapOf("Retry-After" to "0"), 15L),
+                        Triple("503", emptyMap<String, String>(), 15L),
+                        Triple("503", mapOf("Retry-After" to "invalid"), 15L),
+                        Triple("429", mapOf("Retry-After" to "0.2"), 1L),
+                        Triple("503", mapOf("Retry-After" to "Wed, 21 Oct 2015 07:28:00 GMT"), 1L),
+                    )) {
+                        withClue("$label HTTP $code $headers") {
+                            // Connector functions are adapters; the FEEL expression is real, no connector is running.
+                            val result =
+                                expr.evaluate(
+                                    functions + source + "}.result",
+                                    mapOf(
+                                        "error" to
+                                            mapOf(
+                                                "code" to code,
+                                                "variables" to mapOf("response" to mapOf("headers" to headers)),
+                                            ),
+                                        "job" to mapOf("retries" to 3),
+                                    ),
+                                ) as Map<*, *>
+                            (result["retries"] as Number).toInt() shouldBe 2
+                            result["timeout"] shouldBe java.time.Duration.ofSeconds(delay)
+                        }
+                    }
+                    expr.evaluate(
+                        functions + source + "}.result",
+                        mapOf(
+                            "error" to mapOf("code" to "TRANSPORT_ERROR"),
+                            "job" to mapOf("retries" to 3),
+                        ),
+                    ) shouldBe null
+                }
+            }
+        }
+
         "C9 HTTP refusal maps 403 and 422 to drawn handlers while 409 is stale and 429 503 retry" {
             GroovyClassLoader().use { loader ->
                 loader.parseClass(

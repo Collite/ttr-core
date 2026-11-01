@@ -115,6 +115,7 @@ internal enum class Dialect(
         url: String,
         body: String?,
         result: String,
+        retryBudgetSeconds: Long,
     ): List<Xml> =
         if (this == C7) {
             listOf(
@@ -283,9 +284,9 @@ internal enum class Dialect(
                                         "if list contains([\"408\",\"429\"],error.code) " +
                                         "or number(error.code) >= 500 then " +
                                         "jobError(\"run API HTTP \" + error.code, {}, job.retries - 1, " +
-                                        "duration(\"PT\" + string(${feelRetryAfter(
+                                        "duration(\"PT\" + string(min([$retryBudgetSeconds,max([1,${feelRetryAfter(
                                             "error.variables.response",
-                                        )}) + \"S\")) else null",
+                                        )}])])) + \"S\")) else null",
                                 ),
                             ),
                             Xml("zeebe:header", mapOf("key" to "retryBackoff", "value" to "PT15S")),

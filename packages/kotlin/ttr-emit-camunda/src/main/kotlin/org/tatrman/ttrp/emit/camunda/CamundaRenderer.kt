@@ -98,6 +98,7 @@ internal class CamundaRenderer(
                 },
                 if (method == "POST") body ?: obj() else null,
                 result,
+                budget(graph),
             )
         if (d == Dialect.C7) {
             task.attrs["camunda:asyncBefore"] = "true"
@@ -1127,7 +1128,8 @@ internal class CamundaRenderer(
         | 408/429, 5xx, transport errors | Connector retries, then incident |
 
         C8 uses the error response's numeric or HTTP-date Retry-After when retrying HTTP errors, defaulting to
-        15 seconds. C7 Connect failed jobs use R3/PT15S: its output exception cannot commit a dynamic retry delay.
+        15 seconds, with a 1 second minimum and a cap of the program budget + 2 min.
+        C7 Connect failed jobs use R3/PT15S: its output exception cannot commit a dynamic retry delay.
         Successful handle/evaluation polls in both dialects honour Retry-After and are bounded by budget + 2 min.
         Failed/abandoned evaluation refuses immediately; running/open or null-verdict evidence keeps polling.
         Run-level route forks and joins are inclusive for every switchMode: exclusivity holds per row and is
