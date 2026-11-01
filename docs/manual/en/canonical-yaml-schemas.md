@@ -155,7 +155,7 @@ the grammar property order, then UTF-8 byte order for retained keys. CN/automati
 properties and automation objects use ordered single-entry sequences. Numeric
 spellings such as `1`, `1.0`, `1.00`, `01` and `-0.0` remain distinguishable where
 automation fingerprints retain their text. Exponent spellings (including tiny finite numbers) stay
-compact through validation and retain their spelling; nonfinite values fail at their source token.
+compact through validation and retain their spelling; nonfinite values fail at their source token. Numeric literals are limited to 1000 authored characters (including sign, radix prefix and separators) before decimal or radix conversion, in both YAML and TTR input. Longer literals raise a located `Number literal too long` diagnostic. This limit does not apply to quoted text.
 Duplicate storage fields and restrict members are refused at the second key; CN object duplicates
 retain the existing parser last-wins rule. Native TTR escape handling follows the
 grammar string contract.

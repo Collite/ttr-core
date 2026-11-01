@@ -103,10 +103,20 @@ internal fun isEmbeddedRecord(value: JsonElement): Boolean =
         !("tag" in value && "form" in value)
 
 // Keep exponent notation compact through JSON validation; never allocate its plain decimal expansion.
+internal const val MAX_NUMBER_LENGTH = 1000
+
+internal fun checkNumberLength(
+    raw: String,
+    invalid: (String) -> Nothing,
+) {
+    if (raw.length > MAX_NUMBER_LENGTH) invalid("Number literal too long (maximum $MAX_NUMBER_LENGTH characters)")
+}
+
 internal fun number(
     raw: String,
     invalid: (String) -> Nothing,
 ): JsonElement {
+    checkNumberLength(raw, invalid)
     val decimal =
         try {
             raw.toBigDecimal()

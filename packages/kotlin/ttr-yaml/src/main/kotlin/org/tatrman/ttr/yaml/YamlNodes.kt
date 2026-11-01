@@ -313,6 +313,7 @@ internal class YamlNodes(
                     Tag.NULL -> JsonNull
                     Tag.BOOL -> JsonPrimitive(node.value.lowercase() == "true")
                     Tag.INT, Tag.FLOAT -> {
+                        checkNumberLength(node.value) { fail(node, it) }
                         val raw = node.value.replace("_", "")
                         val decimalText =
                             try {

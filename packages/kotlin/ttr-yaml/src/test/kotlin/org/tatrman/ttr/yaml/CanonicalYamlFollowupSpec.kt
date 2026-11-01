@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.yaml
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.longs.shouldBeLessThan
+import io.kotest.matchers.string.shouldContain
 import org.tatrman.ttr.parser.model.MdDomainDef
 
 /** Review-201's approved S2.3 follow-ups exercise YAML-authored input as well as native input. */
@@ -57,5 +60,47 @@ class CanonicalYamlFollowupSpec :
                 CanonicalYaml.write(doc) shouldBe CanonicalYaml.write(native)
                 CanonicalYaml.write(CanonicalYaml.fromTtr(CanonicalYaml.toTtr(doc))) shouldBe CanonicalYaml.write(doc)
             }
+        }
+        test("N3 million-digit decimal hex and native numbers are refused promptly at their token") {
+            val decimal = "1".repeat(1_000_000)
+            val hex = "0x" + "F".repeat(1_000_000)
+            val cases =
+                listOf(
+                    yaml("a: $decimal", "automation", "program") to false,
+                    yaml("a: $hex", "automation", "program") to false,
+                    "model automation\ndef program D {\n  a: $decimal\n}\n" to true,
+                )
+            for ((source, native) in cases) {
+                fun reject(): CanonicalYamlException =
+                    shouldThrow<CanonicalYamlException> {
+                        if (native) {
+                            CanonicalYaml.fromTtr(
+                                source,
+                                "large.ttrm",
+                            )
+                        } else {
+                            CanonicalYaml.read(source, "large.yaml")
+                        }
+                    }
+                // Warm class loading, YAML scanning and the lexer before measuring the actual public entry point.
+                repeat(4) { reject() }
+                val start = System.nanoTime()
+                val error = reject()
+                val elapsed = System.nanoTime() - start
+                error.detail shouldContain "Number literal too long"
+                error.file shouldBe if (native) "large.ttrm" else "large.yaml"
+                error.line shouldBe if (native) 3 else 7
+                error.column shouldBe if (native) 6 else 10
+                elapsed shouldBeLessThan 100_000_000L
+            }
+        }
+        test("N3 finite decimal and hex literals at the bound remain accepted") {
+            val decimal = "0." + "1".repeat(MAX_NUMBER_LENGTH - 2)
+            val hex = "0x" + "0".repeat(MAX_NUMBER_LENGTH - 3) + "1"
+            for (spelling in listOf(decimal, hex)) {
+                val doc = CanonicalYaml.read(yaml("a: $spelling", "automation", "program"))
+                CanonicalYaml.write(CanonicalYaml.read(CanonicalYaml.write(doc))) shouldBe CanonicalYaml.write(doc)
+            }
+            CanonicalYaml.fromTtr("model automation\ndef program D { a: $decimal }")
         }
     })
