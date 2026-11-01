@@ -1,0 +1,232 @@
+{
+    "definitions": [
+        {
+            "description": null,
+            "kind": "kind",
+            "name": "Document",
+            "properties": {
+                "abstract": {
+                    "kind": "bool",
+                    "value": true
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "subkind",
+            "name": "Invoice",
+            "properties": {
+                "involves": [
+                    {
+                        "ref": "Customer"
+                    },
+                    {
+                        "ref": "Order"
+                    }
+                ],
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Document"
+                    ],
+                    "path": "Document"
+                },
+                "qualities": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "amount"
+                            ],
+                            "path": "amount"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "paid"
+                            ],
+                            "path": "paid"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "status"
+                            ],
+                            "path": "status"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "issued"
+                            ],
+                            "path": "issued"
+                        },
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "due"
+                            ],
+                            "path": "due"
+                        }
+                    ],
+                    "kind": "list"
+                }
+            },
+            "spelling": "variant",
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "subkind",
+            "name": "WebSale",
+            "properties": {
+                "definition": {
+                    "form": "tripleString",
+                    "language": "pl",
+                    "text": "channel = 'web'"
+                },
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Sale"
+                    ],
+                    "path": "Sale"
+                }
+            },
+            "spelling": "variant",
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "subkind",
+            "name": "CodeRange",
+            "properties": {
+                "members": {
+                    "form": "tripleString",
+                    "language": "pl",
+                    "text": "descendants(Diagnosis, 'R10-R19')"
+                },
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Diagnosis"
+                    ],
+                    "path": "Diagnosis"
+                }
+            },
+            "spelling": "variant",
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "subkind",
+            "name": "StoredSale",
+            "properties": {
+                "grounds": "er.entity.stored_sale",
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Sale"
+                    ],
+                    "path": "Sale"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "kind",
+            "name": "Product",
+            "properties": {
+                "grounds": "er.entity.product",
+                "qualities": {
+                    "items": [
+                        {
+                            "kind": "id",
+                            "parts": [
+                                "variant"
+                            ],
+                            "path": "variant"
+                        }
+                    ],
+                    "kind": "list"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "quality",
+            "name": "variant",
+            "properties": {
+                "grounds": "er.entity.product.variant",
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Product"
+                    ],
+                    "path": "Product"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "subkind",
+            "name": "Bundle",
+            "properties": {
+                "definition": {
+                    "form": "tripleString",
+                    "language": "pl",
+                    "text": "variant = 'bundle'"
+                },
+                "of": {
+                    "kind": "id",
+                    "parts": [
+                        "Product"
+                    ],
+                    "path": "Product"
+                }
+            },
+            "spelling": "variant",
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "kind",
+            "name": "Kit",
+            "properties": {
+                "grounds": "er.entity.kit",
+                "variant": {
+                    "kind": "id",
+                    "parts": [
+                        "boxed"
+                    ],
+                    "path": "boxed"
+                }
+            },
+            "tags": []
+        },
+        {
+            "description": null,
+            "kind": "subkind",
+            "name": "MissingBearer",
+            "properties": {
+                "definition": {
+                    "form": "tripleString",
+                    "language": "pl",
+                    "text": "channel = 'web'"
+                }
+            },
+            "spelling": "variant",
+            "tags": []
+        }
+    ],
+    "imports": [],
+    "package": "workshop.concepts",
+    "schemaDirective": {
+        "code": "cn",
+        "namespace": null
+    }
+}

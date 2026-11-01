@@ -34,3 +34,23 @@ def test_time_shapes_and_reference_spans() -> None:
 @pytest.mark.parametrize("prop", ["involves: [Item]", "period: { start: since, end: until }"])
 def test_lifetime_role_properties_are_cn_only(model: str, prop: str) -> None:
     assert parse_string(f"model {model}\ndef role Reader {{ {prop} }}").errors
+
+
+def test_variant_is_the_subkind_stereotype_and_records_the_word() -> None:
+    """CN-P8 S8.6 (CN-D32): `variant` and `subkind` are one stereotype; the word is kept."""
+    root = Path(__file__).resolve().parents[4]
+    result = parse_string((root / "tests/conformance/fixtures/122-cn-variant.ttrm").read_text())
+    assert not result.errors
+    concepts = [d for d in result.definitions if isinstance(d, ConceptDef)]
+    assert [(d.name, d.spelling) for d in concepts if d.stereotype == "subkind"] == [
+        ("Invoice", "variant"),
+        ("WebSale", "variant"),
+        ("CodeRange", "variant"),
+        ("StoredSale", "subkind"),
+        ("Bundle", "variant"),
+        ("MissingBearer", "variant"),
+    ]
+    assert all(d.spelling is None for d in concepts if d.stereotype != "subkind")
+    ids = parse_string((root / "tests/conformance/fixtures/124-cn-variant-as-id.ttrm").read_text())
+    assert not ids.errors
+    assert [d.name for d in ids.definitions] == ["variant", "variant_fk"]

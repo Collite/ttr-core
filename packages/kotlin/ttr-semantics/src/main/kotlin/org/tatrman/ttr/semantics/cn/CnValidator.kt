@@ -1037,7 +1037,7 @@ private class CnValidator(
                 emit(
                     c,
                     DiagnosticCode.CnSubkindAsKind,
-                    "kind '${c.name}' with members and is_a is a subkind — use 'def subkind'",
+                    "kind '${c.name}' with members and is_a is a subkind — use 'def variant'",
                     true,
                 )
             }

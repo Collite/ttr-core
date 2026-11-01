@@ -1323,7 +1323,11 @@ object TtrRenderer {
         }
 
     private fun renderConceptDef(def: ConceptDef): String =
-        renderCnDef("def ${def.stereotype} ${def.name}", cnOrder(def.body.properties, CN_BODY_ORDER))
+        renderCnDef("def ${conceptKeyword(def)} ${def.name}", cnOrder(def.body.properties, CN_BODY_ORDER))
+
+    /** A concept def's keyword: a subkind keeps its author's word, and `variant` when it records none (CN-D32). */
+    private fun conceptKeyword(def: ConceptDef): String =
+        if (def.stereotype == "subkind") def.spelling ?: "variant" else def.stereotype
 
     private fun renderConceptBinding(def: ConceptBindingDef): String =
         renderCnDef("def ${def.bindingKind} ${def.name}", cnOrder(def.body.properties, CN_BINDING_ORDER))

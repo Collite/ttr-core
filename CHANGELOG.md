@@ -17,6 +17,21 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   behavior stay unchanged. No grammar/dependency pin or artifact version changes; internal release wiring
   remains in MW-P2 certification. Existing JVM rebuild notices remain in force.
 
+### Added — `variant`, the house spelling of `subkind` (grammar 0.21.1, CN-P8 S8.6)
+
+- `def variant <Name> { … }` is the same construct as `def subkind`: one soft keyword (`variant` stays a name, a
+  dotted-ref part and a cn free-form key everywhere else), one stereotype. Every rule below the parser reads the
+  stereotype, so the `cn/subkind-*` and partition lints, the renderers, the explanations and the lexicon treat the two
+  words alike; the slugs keep their names. `subkind` stays a first-class synonym (OntoUML's word), never deprecated
+  and never warned (CN-D32).
+- The TS, Kotlin and Python parsers record the word on a subkind def (`spelling`: `variant` | `subkind`; absent on
+  the other stereotypes). The TS formatter and the Kotlin writer print it, and write `variant` for a def that
+  records none (a synthesized def). The conformance dumps add `spelling` only for `variant`, so the existing corpus
+  dumps byte-identically; a `variant` copy of the S8.2 rules fixture dumps the same semantics as the original.
+  TextMate highlights `variant` as a def kind; the LSP outline shows the word as written.
+- Text written with `variant` needs a 0.21.1 reader. **JVM consumers must rebuild:** `ConceptDef` gains a data-class
+  field (`spelling`, defaulted), changing its constructor/copy signature. The grammar marker stays 0.21.
+
 ### Added — generated canonical YAML and profile schemas
 
 - Grammar 0.21 now generates canonical document/profile schemas and exhaustive shape metadata, exported by

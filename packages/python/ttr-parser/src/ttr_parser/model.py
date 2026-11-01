@@ -1447,6 +1447,9 @@ class ConceptDef(Definition):
 
     stereotype: str = "kind"
     body: ConceptBody = field(default_factory=ConceptBody)
+    # 0.21.x (CN-D32) — the word a `subkind` def was written with: "variant" (the house spelling) or
+    # "subkind" (OntoUML's); None on the other stereotypes. Semantics read `stereotype` only.
+    spelling: str | None = None
     kind: ClassVar[str] = "concept"
 
 

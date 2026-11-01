@@ -646,9 +646,14 @@ function cnLayout(ctx: Ctx, body: ConceptBody, properties: ConceptProperty[]): P
   }
 }
 
+/** A concept def's keyword: a subkind keeps its author's word, and `variant` when it records none (CN-D32). */
+function conceptKeyword(def: ConceptDef): string {
+  return def.stereotype === 'subkind' ? (def.spelling ?? 'variant') : def.stereotype;
+}
+
 /** A concept def or a cn binding — always top-level (neither nests in a def list). */
 function formatCnDef(def: ConceptDef | ConceptBindingDef, ctx: Ctx): Doc {
-  const header = `def ${def.kind === 'concept' ? def.stereotype : def.bindingKind} ${def.name}`;
+  const header = `def ${def.kind === 'concept' ? conceptKeyword(def) : def.bindingKind} ${def.name}`;
   const order = def.kind === 'concept' ? CN_BODY_ORDER : CN_BINDING_ORDER;
   const props = cnLayout(ctx, def, cnOrder(def, order));
   if (!props) return verbatim(slice(ctx, def.source));

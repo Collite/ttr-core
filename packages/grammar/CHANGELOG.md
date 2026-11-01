@@ -12,6 +12,14 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
+## 0.21.1 — `variant` (CN-P8 S8.6)
+
+`def variant <Name> { … }` is `def subkind` under its house spelling (CN-D32): one new soft keyword, `VARIANT`, beside
+`SUBKIND` in the one subkind alternative, in `idPart` and in `cnKey`, so `variant` remains an identifier, a dotted
+ref part and a cn free-form key. No new production or property. Parsers record the word (`spelling`); semantics read
+the stereotype only. Text using `variant` requires a 0.21.1 reader. The marker stays 0.21 (Bora 2026-11-01: a patch,
+as CN-D32 planned).
+
 ## 0.21 — 2026-10-31
 
 Generated canonical YAML document/profile schemas and exhaustive shape metadata are packaged as

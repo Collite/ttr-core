@@ -1010,6 +1010,12 @@ data class ConceptDef(
     override val name: String,
     override val source: SourceLocation,
     val body: ConceptBody = ConceptBody(),
+    /**
+     * 0.21.x (CN-D32) — the word a `subkind` def was written with: `variant` (the house spelling) or `subkind`
+     * (OntoUML's); null on the other stereotypes. Semantics read [stereotype]; the writer prints this, and
+     * `variant` when a def records none (a synthesized def).
+     */
+    val spelling: String? = null,
 ) : Definition {
     override val description: String? get() = body.description
     override val descriptionLocalized: LocalizedStringValue get() = body.descriptionLocalized

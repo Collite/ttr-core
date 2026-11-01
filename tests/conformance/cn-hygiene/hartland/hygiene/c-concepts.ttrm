@@ -12,7 +12,7 @@ def phase LoyalShopper    { of: Shopper, definition: """VipShopper""" }
 def phase VipShopper      { of: Shopper, definition: """LoyalShopper""" }
 
 // grammar 0.20 (CN-P8): a rigid subkind and a bounded phase land through their bearer; a projection through its relator
-def subkind GoldShopper   { of: Shopper, definition: """tier = 'gold'""" }
+def variant GoldShopper   { of: Shopper, definition: """tier = 'gold'""" }
 def event Joined          { involves: [Shopper], period: { at: joined_on } }
 def event Left            { involves: [Shopper], period: { at: left_on } }
 def phase Member          { of: Shopper, from: Joined, until: Left }

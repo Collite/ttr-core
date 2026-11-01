@@ -6,8 +6,8 @@ def kind Ticket { grounds: er.entity.ticket, qualities: [code, created, closed] 
 def quality code { of: Ticket, value_space: Channel, grounds: er.entity.ticket.channel }
 def quality created { of: Ticket, grounds: er.entity.ticket.created }
 def quality closed { of: Ticket, grounds: er.entity.ticket.closed }
-def subkind WebTicket { of: Ticket, definition: """code = 'web'""" }
-def subkind StoreTicket { of: Ticket, definition: """code = 'store'""" }
+def variant WebTicket { of: Ticket, definition: """code = 'web'""" }
+def variant StoreTicket { of: Ticket, definition: """code = 'store'""" }
 def event Started { involves: [Ticket], period: { at: occurred } }
 def event Finished { involves: [Ticket], period: { at: occurred } }
 def phase OpenTicket { of: Ticket, from: Started, until: Finished }
