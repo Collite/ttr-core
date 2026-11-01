@@ -47,7 +47,17 @@ internal object CnFixtures {
     fun dir(
         dir: Path,
         pkgDir: String,
-    ): Map<String, Path> = Files.list(dir).use { s -> s.sorted().toList() }.associateBy { "$pkgDir/${it.fileName}" }
+    ): Map<String, Path> =
+        Files
+            .list(dir)
+            .use { s ->
+                s
+                    .filter {
+                        Files.isRegularFile(it) &&
+                            it.fileName.toString().endsWith(".ttrm")
+                    }.sorted()
+                    .toList()
+            }.associateBy { "$pkgDir/${it.fileName}" }
 
     /**
      * Conformance fixtures 75 (`model cn`) and 76 (`model binding`) as one package `hartland.concepts`, beside the
