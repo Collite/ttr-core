@@ -152,17 +152,18 @@ internal class CanonicalNormalization(
         }
         if (symbol == "bindingValue" && value is JsonObject) return properties("bindingBlock", value)
         if (symbol == "restrictBlock") {
-            return JsonObject(
-                value.jsonObject.mapValues { (_, v) ->
-                    if (v is JsonObject &&
-                        !isGenericRecord(v) &&
-                        v.keys != setOf("range") &&
-                        v.keys != setOf("object")
-                    ) {
-                        orderedMap(v)
-                    } else {
-                        data(v)
-                    }
+            return canonicalMap(
+                value.jsonObject.map { (key, v) ->
+                    key to
+                        if (v is JsonObject &&
+                            !isGenericRecord(v) &&
+                            v.keys != setOf("range") &&
+                            v.keys != setOf("object")
+                        ) {
+                            orderedMap(v)
+                        } else {
+                            data(v)
+                        }
                 },
             )
         }
