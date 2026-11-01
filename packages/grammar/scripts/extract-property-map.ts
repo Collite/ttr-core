@@ -5,6 +5,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { generateCanonicalSchemas } from './generate-canonical-schemas.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const grammarPath = resolve(scriptDir, '../src/TTR.g4');
@@ -274,3 +275,6 @@ if (process.argv.includes('--export-order')) {
   mkdirSync(dirname(exportOrderPath), { recursive: true });
   writeFileSync(exportOrderPath, JSON.stringify(exportOrder, null, 2) + '\n');
 }
+
+// Canonical YAML/profile resources share the grammar generation entry point.
+generateCanonicalSchemas();

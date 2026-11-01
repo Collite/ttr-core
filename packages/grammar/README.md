@@ -16,6 +16,21 @@ permissive: required bearers and valid source combinations are semantic checks.
 `extent:` still parses during its retirement window. The new keywords remain
 legal identifier parts. JVM consumers must rebuild against the new parser model.
 
+## Canonical YAML schemas — grammar 0.21
+
+`prebuild` generates `schemas/model-yaml.schema.json`, `schemas/profile.schema.json`
+and `schemas/canonical-metadata.json` from the grammar productions and explicit
+structural value adapters. They are exported at `@tatrman/grammar/schemas/<filename>`
+and packaged at `/schemas/<filename>` in the Kotlin `ttr-parser` jar.
+
+Run `pnpm --filter @tatrman/grammar schemas:check` to reject drift without
+rewriting files, and `pnpm --filter @tatrman/grammar test` for generation checks.
+Both schemas use draft 2020-12 with local references. See the
+[canonical schema manual](../../docs/manual/en/canonical-yaml-schemas.md) for the
+ordered envelope, typed/open bodies, profile targets and resource/build checks.
+The grammar stays 0.21; this delivery adds schema resources. The Kotlin YAML
+codec and profile execution follow in later stages.
+
 ## Files
 
 - `src/TTR.g4` — ANTLR4 grammar file (canonical source)

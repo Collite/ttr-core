@@ -153,6 +153,9 @@ jobs:
           echo "$list" | grep -qx 'package/src/generated/version.ts'      || { echo "::error::generated/version.ts missing from tarball"; exit 1; }
           echo "$list" | grep -qx 'package/src/generated/property-map.ts' || { echo "::error::generated/property-map.ts missing from tarball"; exit 1; }
           echo "$list" | grep -qx 'package/dist/index.js'                 || { echo "::error::dist/index.js missing from tarball"; exit 1; }
+          echo "$list" | grep -qx 'package/schemas/model-yaml.schema.json' || { echo "::error::model-yaml.schema.json missing from tarball"; exit 1; }
+          echo "$list" | grep -qx 'package/schemas/profile.schema.json' || { echo "::error::profile.schema.json missing from tarball"; exit 1; }
+          echo "$list" | grep -qx 'package/schemas/canonical-metadata.json' || { echo "::error::canonical-metadata.json missing from tarball"; exit 1; }
           tar -xzOf "$tarball" package/dist/index.js | grep -q 'TTR_GRAMMAR_VERSION' \
             || { echo "::error::dist/index.js does not re-export TTR_GRAMMAR_VERSION"; exit 1; }
           echo "Tarball is self-contained."

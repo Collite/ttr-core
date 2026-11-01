@@ -54,6 +54,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node scripts/grammar-consumer-smoke.mjs
 
+  # Check before any build can regenerate tracked resources and hide drift.
+  canonical-schema-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node packages/grammar/scripts/generate-canonical-schemas.mjs --check
+
   edit-consumer-smoke:
     runs-on: ubuntu-latest
     steps:
