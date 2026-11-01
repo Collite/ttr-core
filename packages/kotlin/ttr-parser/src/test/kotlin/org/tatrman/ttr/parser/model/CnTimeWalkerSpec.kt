@@ -33,6 +33,22 @@ class CnTimeWalkerSpec :
             }
         }
 
+        "variant is the subkind stereotype and records the word (S8.6, CN-D32)" {
+            val text =
+                "model cn\ndef variant WebSale { of: Sale }\ndef subkind StoreSale { of: Sale }\n" +
+                    "def quality variant { of: Product }\ndef kind Product { qualities: [variant] }"
+            val parsed = TtrLoader.parseString(text)
+            parsed.errors shouldBe emptyList()
+            val concepts = parsed.definitions.filterIsInstance<ConceptDef>()
+            concepts.map { listOf(it.stereotype, it.name, it.spelling) } shouldBe
+                listOf(
+                    listOf("subkind", "WebSale", "variant"),
+                    listOf("subkind", "StoreSale", "subkind"),
+                    listOf("quality", "variant", null),
+                    listOf("kind", "Product", null),
+                )
+        }
+
         "role lifetimes stay confined to model cn" {
             for (model in listOf("cnc", "automation")) {
                 for (prop in listOf("involves: [Item]", "period: { start: since, end: until }")) {

@@ -1572,6 +1572,12 @@ export interface StepDef extends AutoBody {
  */
 export type ConceptStereotype = 'subkind' | 'kind' | 'role' | 'event' | 'phase' | 'quality' | 'relation_type';
 
+/**
+ * 0.21.x (CN-D32) — the word a subkind def is written with: `variant`, the house spelling, or `subkind`, OntoUML's.
+ * One stereotype either way; only a writer reads the word.
+ */
+export type ConceptSpelling = 'variant' | 'subkind';
+
 /** The ten cn binding kinds (`model binding`) — one grounding per concept (cn contracts §1.2). */
 export type ConceptBindingKind =
   | 'cn2md_kind'
@@ -1775,6 +1781,11 @@ export interface ConceptDef extends ConceptBody {
   /** One discriminator for every stereotype — `kind: 'role'` is the cnc / automation {@link RoleDef}. */
   kind: 'concept';
   stereotype: ConceptStereotype;
+  /**
+   * The word a `subkind` def was written with (0.21.x, CN-D32) — set on every parsed subkind, absent on the other
+   * stereotypes. Semantics read {@link stereotype}; a writer prints this, and `variant` when a def records none.
+   */
+  spelling?: ConceptSpelling;
   name: string;
   source: SourceLocation;
   leadingTrivia?: Trivia[];

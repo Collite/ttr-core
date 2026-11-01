@@ -569,7 +569,7 @@ class _CnValidator:
             if c.stereotype == "subkind" and temporal(c, set()):
                 emit(c, DiagnosticCode.CN_SUBKIND_TEMPORAL_DEFINITION, f"subkind '{c.name}' has a temporal or parametric definition", key="definition" if prop(c, "definition") else "members")
             if c.stereotype == "kind" and prop(c, "members") and prop(c, "is_a"):
-                emit(c, DiagnosticCode.CN_SUBKIND_AS_KIND, f"kind '{c.name}' with members and is_a is a subkind — use 'def subkind'", True)
+                emit(c, DiagnosticCode.CN_SUBKIND_AS_KIND, f"kind '{c.name}' with members and is_a is a subkind — use 'def variant'", True)
             event = named(c, "event")
             if c.stereotype == "role" and event and event.stereotype != "event":
                 emit(c, DiagnosticCode.CN_ROLE_NO_EVENT, f"role '{c.name}' requires an event as its defining event", key="event")

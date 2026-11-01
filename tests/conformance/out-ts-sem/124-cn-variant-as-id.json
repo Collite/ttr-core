@@ -1,0 +1,13 @@
+{
+    "diagnostics": [],
+    "resolved": [
+        "db.dbo.variant.subkind => workshop.concepts.db.dbo.table.variant.subkind",
+        "db.dbo.variant.variant => workshop.concepts.db.dbo.table.variant.variant"
+    ],
+    "symbols": [
+        "workshop.concepts.db.dbo.fk.variant_fk",
+        "workshop.concepts.db.dbo.table.variant",
+        "workshop.concepts.db.dbo.table.variant.subkind",
+        "workshop.concepts.db.dbo.table.variant.variant"
+    ]
+}

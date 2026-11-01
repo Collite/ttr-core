@@ -1542,6 +1542,7 @@ def _visit_world_schema(ctx: Any, name: str, source: SourceLocation, file: str) 
 
 _STEREOTYPE_TOKENS: tuple[tuple[str, str], ...] = (
     ("SUBKIND", "subkind"),
+    ("VARIANT", "subkind"),  # 0.21.x — the house spelling (CN-D32); `spelling` keeps the word
     ("KIND", "kind"),
     ("EVENT", "event"),
     ("PHASE", "phase"),
@@ -1563,9 +1564,10 @@ def _visit_concept(
 ) -> ConceptDef:
     body_ctx = od.cnBody()
     body = _visit_concept_body(body_ctx.cnProperty() if body_ctx is not None else [], "concept", file, warnings, errors)
+    spelling = "variant" if od.VARIANT() is not None else "subkind" if od.SUBKIND() is not None else None
     return ConceptDef(
         name=name, source=source, description=body.description, description_localized=body.description_localized, tags=body.tags,
-        stereotype=stereotype, body=body,
+        stereotype=stereotype, body=body, spelling=spelling,
     )
 
 

@@ -244,6 +244,7 @@ import type {
   ChangeSemanticsDecl,
   WritebackReservation,
   ConceptStereotype,
+  ConceptSpelling,
   ConceptBindingKind,
   ConceptDef,
   ConceptBindingDef,
@@ -924,6 +925,7 @@ function walkProcessDef(ctx: ProcessBodyContext, name: string, source: SourceLoc
 
 const STEREOTYPE_OF_TOKEN: ReadonlyArray<[(o: ObjectDefinitionContext) => unknown, ConceptStereotype]> = [
   [(o) => o.SUBKIND(), 'subkind'],
+  [(o) => o.VARIANT(), 'subkind'], // 0.21.x — the house spelling (CN-D32); `spelling` keeps the word
   [(o) => o.KIND(), 'kind'],
   [(o) => o.EVENT(), 'event'],
   [(o) => o.PHASE(), 'phase'],
@@ -948,6 +950,11 @@ function conceptStereotypeOf(objDef: ObjectDefinitionContext): ConceptStereotype
   return STEREOTYPE_OF_TOKEN.find(([has]) => has(objDef))?.[1];
 }
 
+function conceptSpellingOf(objDef: ObjectDefinitionContext): ConceptSpelling | undefined {
+  if (objDef.VARIANT()) return 'variant';
+  return objDef.SUBKIND() ? 'subkind' : undefined;
+}
+
 function conceptBindingKindOf(objDef: ObjectDefinitionContext): ConceptBindingKind | undefined {
   return BINDING_KIND_OF_TOKEN.find(([has]) => has(objDef))?.[1];
 }
@@ -955,12 +962,20 @@ function conceptBindingKindOf(objDef: ObjectDefinitionContext): ConceptBindingKi
 function walkConceptDef(
   ctx: CnBodyContext | null,
   stereotype: ConceptStereotype,
+  spelling: ConceptSpelling | undefined,
   name: string,
   source: SourceLocation,
   file: string,
   errors: ParseError[],
 ): ConceptDef {
-  return { kind: 'concept', stereotype, name, source, ...walkConceptBody(ctx?.cnProperty() ?? [], 'concept', file, errors) };
+  return {
+    kind: 'concept',
+    stereotype,
+    ...(spelling ? { spelling } : {}),
+    name,
+    source,
+    ...walkConceptBody(ctx?.cnProperty() ?? [], 'concept', file, errors),
+  };
 }
 
 function walkConceptBindingDef(
@@ -2036,7 +2051,7 @@ function walkDefinition(ctx: DefinitionContext, file: string, errors: ParseError
   if (objDef.EXAMPLE()) return walkLexiconEntryDef(objDef.lexiconEntryDef()!, 'example', name, source, file);
   // 0.17 cn kinds (model cn / model binding) — one shared body each, the stereotype / binding kind tags it.
   const stereotype = conceptStereotypeOf(objDef);
-  if (stereotype) return walkConceptDef(objDef.cnBody(), stereotype, name, source, file, errors);
+  if (stereotype) return walkConceptDef(objDef.cnBody(), stereotype, conceptSpellingOf(objDef), name, source, file, errors);
   const bindingKind = conceptBindingKindOf(objDef);
   if (bindingKind) return walkConceptBindingDef(objDef.cnBindingBody(), bindingKind, name, source, file, errors);
 

@@ -131,6 +131,8 @@ function defTree(d: Definition): Json {
   // plain-string model dumps byte-identically to what 0.12 produced).
   const dl = loc((d as { descriptionLocalized?: LocalizedString }).descriptionLocalized);
   if (dl !== undefined) out.descriptionLocalized = dl;
+  // 0.21.x (CN-D32): a subkind written `variant` records the word, present-only (a `subkind` dumps as before).
+  if (d.kind === 'concept' && d.spelling && d.spelling !== d.stereotype) out.spelling = d.spelling;
   return out;
 }
 

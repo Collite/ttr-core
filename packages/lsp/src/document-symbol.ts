@@ -143,7 +143,7 @@ function buildNestedDefSymbol(def: Definition, subKind: SymbolKind, lines: strin
 
 /** The def keyword as written — a concept def and a cn binding carry theirs beside a shared `kind` (0.17). */
 function defKeyword(def: Definition): string {
-  if (def.kind === 'concept') return def.stereotype;
+  if (def.kind === 'concept') return def.spelling ?? def.stereotype;
   if (def.kind === 'conceptBinding') return def.bindingKind;
   return def.kind;
 }

@@ -1,0 +1,8 @@
+// CN-P8 S8.6: `variant` is a soft keyword — a name everywhere but a cn def's head (116's precedent).
+package workshop.concepts
+model db schema dbo
+def table variant {
+    columns: [def column variant { type: text }, def column subkind { type: text }],
+    primaryKey: [variant]
+}
+def fk variant_fk { from: [db.dbo.variant.variant], to: [db.dbo.variant.subkind] }

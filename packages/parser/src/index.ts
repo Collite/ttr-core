@@ -133,6 +133,7 @@ export type {
   ProcessDef,
   StepDef,
   ConceptStereotype,
+  ConceptSpelling,
   ConceptBindingKind,
   ConceptRefKey,
   ExpressionLanguage,
