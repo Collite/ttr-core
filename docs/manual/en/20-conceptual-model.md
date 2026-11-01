@@ -142,6 +142,8 @@ A kind in a part it plays, defined by an event: `event:` is required and must na
 `of:` may name the base kind. `Order` is a kind now, so a Hartland customer is whoever places one:
 
 ```ttrm
+model cn
+
 def role Customer { event: OrderPlaced, grounds: md.Customer }
 ```
 
