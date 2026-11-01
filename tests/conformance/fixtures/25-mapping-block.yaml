@@ -1,0 +1,12 @@
+ttr: "0.21"
+model: "er"
+defs:
+  -
+    kind: "attribute"
+    id: "product_name"
+    properties:
+      type: "text"
+      binding:
+        target:
+          column:
+            ref: "i_product_name"

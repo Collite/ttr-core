@@ -1,0 +1,18 @@
+ttr: "0.21"
+package: "east"
+imports:
+  - "base.*"
+model: "er"
+schema: "ignored"
+defs:
+  -
+    kind: "relation"
+    id: "address"
+    properties:
+      from:
+        ref: "base.er.entity.customer"
+      to:
+        ref: "base.er.entity.addr"
+      cardinality:
+        from: "N"
+        to: "1"

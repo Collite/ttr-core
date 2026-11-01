@@ -1,0 +1,18 @@
+ttr: "0.21"
+model: "md"
+defs:
+  -
+    kind: "domain"
+    id: "Code"
+    properties:
+      type: "string"
+  -
+    kind: "dimension"
+    id: "md2er_dimension"
+    properties:
+      key: "md2er_dimension"
+      attributes:
+        -
+          id: "md2er_dimension"
+          properties:
+            domain: "md.Code"

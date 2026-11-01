@@ -1,0 +1,76 @@
+ttr: "0.21"
+model: "binding"
+defs:
+  -
+    kind: "cn2er_event"
+    id: "started"
+    properties:
+      -
+        event: "cn.Started"
+      -
+        target: "er.entity.started"
+      -
+        period:
+          at:
+            ref: "er.entity.started.occurred"
+      -
+        participants:
+          ticket:
+            -
+              ref: "er.relation.started_ticket"
+  -
+    kind: "cn2er_event"
+    id: "finished"
+    properties:
+      -
+        event: "cn.Finished"
+      -
+        target: "er.entity.finished"
+      -
+        period:
+          at:
+            ref: "er.entity.finished.occurred"
+      -
+        participants:
+          ticket:
+            -
+              ref: "er.relation.finished_ticket"
+  -
+    kind: "cn2er_event"
+    id: "reopened"
+    properties:
+      -
+        event: "cn.Reopened"
+      -
+        target: "er.entity.started"
+      -
+        period:
+          at:
+            ref: "er.entity.started.occurred"
+      -
+        participants:
+          parent:
+            -
+              ref: "er.relation.started_ticket"
+          ticket:
+            -
+              ref: "er.relation.started_ticket"
+  -
+    kind: "cn2er_kind"
+    id: "price"
+    properties:
+      -
+        kind: "cn.ListPrice"
+      -
+        target: "er.entity.price"
+      -
+        period:
+          end:
+            ref: "er.entity.price.until"
+          start:
+            ref: "er.entity.price.since"
+      -
+        participants:
+          item:
+            -
+              ref: "er.relation.price_item"

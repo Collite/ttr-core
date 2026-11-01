@@ -1,0 +1,63 @@
+ttr: "0.21"
+package: "hartland.web"
+model: "cn"
+defs:
+  -
+    kind: "event"
+    id: "Order"
+    properties:
+      -
+        period:
+          end:
+            ref: "delivered_date"
+          start:
+            ref: "placed_date"
+  -
+    kind: "kind"
+    id: "Brand"
+    properties:
+      -
+        lexicon:
+          examples:
+            - "the brand"
+          terms:
+            - "brand"
+  -
+    kind: "kind"
+    id: "Shelf"
+    properties:
+      -
+        lexicon:
+          default: true
+          sense_priority: 2
+          terms:
+            - "shelf"
+  -
+    kind: "kind"
+    id: "Bin"
+    properties:
+      -
+        spec:
+          height: 2
+          width: 1
+  -
+    kind: "event"
+    id: "WebReturn"
+    properties:
+      -
+        period:
+          at:
+            ref: "returned_on"
+      -
+        lexicon:
+          sense_priority: 2
+          terms:
+            - "return"
+  -
+    kind: "kind"
+    id: "Colour"
+    properties:
+      -
+        lexicon:
+          terms:
+            - "red,blue"

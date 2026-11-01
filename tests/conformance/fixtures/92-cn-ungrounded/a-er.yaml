@@ -1,0 +1,37 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "store"
+    properties:
+      attributes:
+        -
+          id: "store_id"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "entity"
+    id: "brand"
+    properties:
+      attributes:
+        -
+          id: "brand_code"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "region"
+    properties:
+      attributes:
+        -
+          id: "region_code"
+          properties:
+            type: "text"
+            isKey: true
+      concept:
+        -
+          kind: "Region"

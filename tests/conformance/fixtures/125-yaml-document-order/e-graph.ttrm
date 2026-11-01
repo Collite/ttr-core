@@ -1,0 +1,10 @@
+package demo.order
+import demo.order.*
+
+graph Overview {
+    objects: [er.entity.Zeta, er.entity.Alpha]
+    tags: ["invented", "ordered"]
+    description: "Shared document graph"
+    model: er
+    layout: {zeta: {x: 20, y: 1}, alpha: {x: 1, y: 2}}
+}

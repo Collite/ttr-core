@@ -1,0 +1,22 @@
+ttr: "0.21"
+package: "demo.carriers"
+model: "db"
+schema: "demo"
+defs:
+  -
+    kind: "query"
+    id: "lookup"
+    properties:
+      description: "Look up an invented customer"
+      parameters:
+        -
+          name: "term"
+          type: "text"
+          defaultValue: ""
+          binds:
+            - "er.entity.Customer.name"
+            - "er.entity.Customer.code"
+      sourceText:
+        block: "select 1"
+        form: "string"
+      skipSecurity: false

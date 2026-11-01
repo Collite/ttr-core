@@ -1,0 +1,24 @@
+{
+    "diagnostics": [
+        "ttr/required-property-missing",
+        "ttr/required-property-missing",
+        "ttr/unresolved-reference",
+        "ttr/unresolved-reference",
+        "ttr/unused-import",
+        "ttr/wildcard-with-no-matches"
+    ],
+    "resolved": [],
+    "symbols": [
+        "demo.order.cn.concept.Alpha",
+        "demo.order.cn.concept.Zeta",
+        "demo.order.db.dbo.term.Zeta",
+        "demo.order.er.entity.Alpha",
+        "demo.order.er.entity.Zeta",
+        "demo.order.er.entity.Zeta.a",
+        "demo.order.er.entity.Zeta.z",
+        "demo.order.md.domain.Ordered",
+        "demo.order.world.world.Ordered",
+        "demo.order.world.world.Ordered.S",
+        "demo.order.world.world.Ordered.S.row"
+    ]
+}

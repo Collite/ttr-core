@@ -1,0 +1,51 @@
+ttr: "0.21"
+model: "db"
+schema: "dbo"
+defs:
+  -
+    kind: "table"
+    id: "accounting_period"
+    properties:
+      columns:
+        -
+          id: "start_date"
+          properties:
+            type: "date"
+            semantics:
+              role:
+                ref: "period_start"
+        -
+          id: "end_date"
+          properties:
+            type: "date"
+            semantics:
+              role:
+                ref: "period_end"
+        -
+          id: "period"
+          properties:
+            type:
+              length: 6
+              type: "varchar"
+            semantics:
+              code_format: "yyyyMM"
+              role:
+                ref: "period_code"
+      semantics:
+        kind:
+          ref: "period_table"
+  -
+    kind: "table"
+    id: "poi"
+    properties:
+      columns:
+        -
+          id: "point"
+          properties:
+            type: "text"
+            semantics:
+              role:
+                ref: "geo_point"
+      semantics:
+        kind:
+          ref: "poi"

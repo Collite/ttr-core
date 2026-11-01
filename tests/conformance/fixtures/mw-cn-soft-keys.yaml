@@ -1,0 +1,19 @@
+ttr: "0.21"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Item"
+    properties:
+      -
+        binds:
+          ref: "x"
+      -
+        defaultValue:
+          ref: "y"
+      -
+        skipSecurity:
+          ref: "z"
+      -
+        indexSecurity:
+          ref: "w"

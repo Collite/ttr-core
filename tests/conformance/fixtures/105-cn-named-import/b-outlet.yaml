@@ -1,0 +1,11 @@
+ttr: "0.21"
+package: "hartland.outlet"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Store"
+    properties:
+      -
+        label:
+          en: "Outlet"

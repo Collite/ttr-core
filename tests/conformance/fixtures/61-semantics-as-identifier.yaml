@@ -1,0 +1,8 @@
+ttr: "0.21"
+model: "er"
+defs:
+  -
+    kind: "attribute"
+    id: "semantics"
+    properties:
+      type: "int"

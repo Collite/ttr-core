@@ -1,0 +1,36 @@
+ttr: "0.21"
+package: "hartland.web"
+model: "md"
+defs:
+  -
+    kind: "dimension"
+    id: "Customer"
+    properties:
+      key: "code"
+      attributes:
+        -
+          id: "code"
+          properties:
+            isKey: true
+            domain: "md.CustomerCode"
+  -
+    kind: "dimension"
+    id: "Product"
+    properties:
+      key: "sku"
+      attributes:
+        -
+          id: "sku"
+          properties:
+            isKey: true
+            domain: "md.Sku"
+        -
+          id: "brand"
+          properties:
+            domain: "md.Brand"
+  -
+    kind: "measure"
+    id: "revenue"
+    properties:
+      domain: "md.Money"
+      aggregation: "sum"

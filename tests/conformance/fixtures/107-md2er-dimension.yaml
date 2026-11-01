@@ -1,0 +1,17 @@
+ttr: "0.21"
+model: "binding"
+defs:
+  -
+    kind: "md2er_dimension"
+    id: "customer_hop"
+    properties:
+      description: "The customer's ER landing"
+      tags:
+        - "structural"
+      dimension: "md.Customer"
+      entity: "er.entity.customer"
+      attributes:
+        code:
+          ref: "sk"
+        state:
+          ref: "address.state"

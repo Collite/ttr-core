@@ -26,6 +26,7 @@ dependencies {
 
     // Shared MD fixture home (S1-A1): resources + a tiny loader other arc modules reuse.
     testFixturesApi(project(":packages:kotlin:ttr-parser"))
+    testFixturesImplementation(libs.slf4j.api)
 
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)

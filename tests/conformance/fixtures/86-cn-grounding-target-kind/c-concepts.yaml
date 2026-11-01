@@ -1,0 +1,152 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Item"
+    properties:
+      -
+        grounds: "md.Product"
+  -
+    kind: "kind"
+    id: "ItemSize"
+    properties:
+      -
+        grounds: "md.Size"
+  -
+    kind: "kind"
+    id: "Category"
+    properties:
+      -
+        label:
+          en: "Product category"
+  -
+    kind: "kind"
+    id: "Brand"
+    properties:
+      -
+        grounds: "md.net_sales"
+  -
+    kind: "quality"
+    id: "net_sales"
+    properties:
+      -
+        of:
+          ref: "StoreSale"
+      -
+        grounds: "md.net_sales"
+  -
+    kind: "quality"
+    id: "color"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        grounds: "md.Product.color"
+  -
+    kind: "event"
+    id: "StoreSale"
+    properties:
+      -
+        involves:
+          -
+            ref: "Item"
+      -
+        period:
+          at:
+            ref: "sold_date"
+      -
+        grounds: "md.store_sales"
+  -
+    kind: "event"
+    id: "ReturnLine"
+    properties:
+      -
+        involves:
+          -
+            ref: "Item"
+      -
+        period:
+          at:
+            ref: "returned_date"
+      -
+        grounds: "md.Product"
+  -
+    kind: "kind"
+    id: "Party"
+    properties:
+      -
+        grounds: "er.entity.party"
+  -
+    kind: "kind"
+    id: "Channel"
+    properties:
+      -
+        grounds: "er.entity.store.channel"
+  -
+    kind: "role"
+    id: "Buyer"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        event: "Order"
+      -
+        grounds: "er.entity.party"
+  -
+    kind: "event"
+    id: "Order"
+    properties:
+      -
+        involves:
+          -
+            ref: "Buyer"
+      -
+        period:
+          at:
+            ref: "placed_date"
+      -
+        grounds: "er.entity.order"
+  -
+    kind: "quality"
+    id: "amount"
+    properties:
+      -
+        of:
+          ref: "Order"
+  -
+    kind: "phase"
+    id: "PlacedOrder"
+    properties:
+      -
+        of:
+          ref: "Order"
+      -
+        grounds: "er.entity.placed_order"
+  -
+    kind: "phase"
+    id: "HeldOrder"
+    properties:
+      -
+        of:
+          ref: "Order"
+      -
+        grounds: "er.entity.order"
+  -
+    kind: "phase"
+    id: "BigBasket"
+    properties:
+      -
+        of:
+          ref: "StoreSale"
+      -
+        grounds: "md.store_sales"
+  -
+    kind: "relation_type"
+    id: "supplies"
+    properties:
+      -
+        grounds: "er.entity.store"

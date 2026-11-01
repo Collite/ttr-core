@@ -1,0 +1,245 @@
+ttr: "0.21"
+model: "cn"
+defs:
+  -
+    kind: "subkind"
+    id: "TemporalTicket"
+    properties:
+      -
+        of:
+          ref: "Ticket"
+      -
+        definition:
+          block: "created < :as_of"
+  -
+    kind: "subkind"
+    id: "DuplicateWeb"
+    properties:
+      -
+        of:
+          ref: "Ticket"
+      -
+        definition:
+          block: "code = 'web'"
+  -
+    kind: "kind"
+    id: "OtherTicket"
+    properties:
+      -
+        grounds: "er.entity.ticket"
+  -
+    kind: "quality"
+    id: "other_code"
+    properties:
+      -
+        of:
+          ref: "OtherTicket"
+      -
+        value_space: "Channel"
+      -
+        grounds: "er.entity.ticket.channel"
+  -
+    kind: "subkind"
+    id: "OnlyWeb"
+    properties:
+      -
+        of:
+          ref: "OtherTicket"
+      -
+        definition:
+          block: "other_code = 'web'"
+  -
+    kind: "kind"
+    id: "LegacyWeb"
+    properties:
+      -
+        is_a:
+          ref: "Ticket"
+      -
+        members:
+          block: "code = 'web'"
+  -
+    kind: "event"
+    id: "Duration"
+    properties:
+      -
+        extent: "durative"
+      -
+        period:
+          end:
+            ref: "closed"
+          start:
+            ref: "created"
+  -
+    kind: "event"
+    id: "Instant"
+    properties:
+      -
+        extent: "instantaneous"
+      -
+        period:
+          at:
+            ref: "created"
+  -
+    kind: "phase"
+    id: "BrokenBounds"
+    properties:
+      -
+        of:
+          ref: "Ticket"
+      -
+        from: "Started"
+  -
+    kind: "phase"
+    id: "WrongParticipant"
+    properties:
+      -
+        of:
+          ref: "Warehouse"
+      -
+        from: "Started"
+      -
+        until: "Finished"
+  -
+    kind: "phase"
+    id: "MissingSubject"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        grounds: "er.entity.outage"
+      -
+        period:
+          end:
+            ref: "until"
+          start:
+            ref: "since"
+  -
+    kind: "quality"
+    id: "InvalidProjection"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        per: "Channel"
+      -
+        from: "ListPrice.amount"
+  -
+    kind: "quality"
+    id: "MissingQuality"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        valued_state: true
+      -
+        from: "ListPrice.absent"
+  -
+    kind: "kind"
+    id: "InvalidLifetime"
+    properties:
+      -
+        period:
+          at:
+            ref: "created"
+  -
+    kind: "quality"
+    id: "flat_price"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        valued_state: true
+      -
+        from: "ListPrice.amount"
+  -
+    kind: "subkind"
+    id: "OpenWeb"
+    properties:
+      -
+        of:
+          ref: "OpenTicket"
+      -
+        definition:
+          block: "code = 'web'"
+  -
+    kind: "kind"
+    id: "Twin"
+    properties:
+      -
+        grounds: "er.entity.price"
+      -
+        involves:
+          -
+            as: "left"
+            ref: "Item"
+          -
+            as: "right"
+            ref: "Item"
+      -
+        qualities:
+          -
+            ref: "gap"
+  -
+    kind: "quality"
+    id: "gap"
+    properties:
+      -
+        of:
+          ref: "Twin"
+      -
+        grounds: "er.entity.price.amount"
+  -
+    kind: "quality"
+    id: "twin_gap"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        valued_state: true
+      -
+        from: "Twin.gap"
+  -
+    kind: "quality"
+    id: "twin_gap_per"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        valued_state: true
+      -
+        per: "Item"
+      -
+        from: "Twin.gap"
+  -
+    kind: "event"
+    id: "Reopened"
+    properties:
+      -
+        involves:
+          -
+            ref: "Ticket"
+          -
+            as: "parent"
+            ref: "Ticket"
+      -
+        period:
+          at:
+            ref: "occurred"
+  -
+    kind: "phase"
+    id: "Reopening"
+    properties:
+      -
+        of:
+          ref: "Ticket"
+      -
+        from: "Reopened"
+      -
+        until: "Finished"

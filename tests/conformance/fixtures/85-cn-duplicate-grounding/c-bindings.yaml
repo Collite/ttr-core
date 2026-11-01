@@ -1,0 +1,12 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "binding"
+defs:
+  -
+    kind: "cn2er_kind"
+    id: "party_again"
+    properties:
+      -
+        kind: "cn.Party"
+      -
+        target: "er.entity.customer"

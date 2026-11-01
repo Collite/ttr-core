@@ -1,0 +1,30 @@
+ttr: "0.21"
+package: "workshop.concepts"
+model: "db"
+schema: "dbo"
+defs:
+  -
+    kind: "table"
+    id: "variant"
+    properties:
+      primaryKey:
+        - "variant"
+      columns:
+        -
+          id: "variant"
+          properties:
+            type: "text"
+        -
+          id: "subkind"
+          properties:
+            type: "text"
+  -
+    kind: "fk"
+    id: "variant_fk"
+    properties:
+      from:
+        -
+          ref: "db.dbo.variant.variant"
+      to:
+        -
+          ref: "db.dbo.variant.subkind"

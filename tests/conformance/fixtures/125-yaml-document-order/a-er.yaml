@@ -1,0 +1,44 @@
+ttr: "0.21"
+package: "demo.order"
+imports:
+  - "demo.shared.*"
+  - "demo.extra.Item"
+model: "er"
+schema: "retail"
+security:
+  -
+    -
+      verb: "own"
+      object: "er.entity.Zeta"
+      owner: "admin"
+    -
+      verb: "grant"
+      privilege: "read"
+      object: "er.entity.Zeta"
+      to: "staff"
+  -
+    -
+      verb: "classify"
+      object: "er.entity.Zeta.z"
+      classification: "public"
+    -
+      verb: "mask"
+      object: "er.entity.Zeta.z"
+defs:
+  -
+    kind: "entity"
+    id: "Zeta"
+    properties:
+      attributes:
+        -
+          id: "z"
+          properties:
+            type: "text"
+        -
+          id: "a"
+          properties:
+            type: "int"
+  -
+    kind: "entity"
+    id: "Alpha"
+    properties: {}

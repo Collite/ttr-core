@@ -1,0 +1,11 @@
+ttr: "0.21"
+package: "shop"
+model: "md"
+defs:
+  -
+    kind: "cubelet"
+    id: "sales"
+    properties:
+      grain: []
+      measures:
+        - "revenue"

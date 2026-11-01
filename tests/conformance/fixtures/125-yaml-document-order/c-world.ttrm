@@ -1,0 +1,8 @@
+package demo.order
+model world
+
+def world Ordered {
+    def storage S {
+        def schema row { zeta: text, alpha: int }
+    }
+}

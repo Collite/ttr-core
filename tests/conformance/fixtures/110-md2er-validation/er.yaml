@@ -1,0 +1,36 @@
+ttr: "0.21"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "customer"
+    properties:
+      attributes:
+        -
+          id: "sk"
+          properties:
+            type: "int"
+        -
+          id: "amount"
+          properties:
+            type: "decimal"
+  -
+    kind: "entity"
+    id: "addr"
+    properties:
+      attributes:
+        -
+          id: "state"
+          properties:
+            type: "text"
+  -
+    kind: "relation"
+    id: "address"
+    properties:
+      from:
+        ref: "er.entity.customer"
+      to:
+        ref: "er.entity.addr"
+      cardinality:
+        from: "N"
+        to: "1"

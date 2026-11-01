@@ -1,0 +1,16 @@
+ttr: "0.21"
+package: "domains"
+defs:
+  -
+    kind: "area"
+    id: "sales_360"
+    properties:
+      description: "Sales reporting slice"
+      tags:
+        - "reporting"
+        - "core"
+      packages:
+        - "shop.sales"
+        - "shop.catalog"
+      entities:
+        - "shop.sales.er.entity.order"

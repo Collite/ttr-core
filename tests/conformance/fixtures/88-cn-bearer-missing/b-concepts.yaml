@@ -1,0 +1,42 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Item"
+    properties:
+      -
+        grounds: "er.entity.item"
+  -
+    kind: "quality"
+    id: "weight"
+    properties:
+      -
+        grounds: "er.entity.item.weight"
+  -
+    kind: "quality"
+    id: "color"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        grounds: "er.entity.item.color"
+  -
+    kind: "phase"
+    id: "Heavy"
+    properties:
+      -
+        definition:
+          block: "weight > 20"
+  -
+    kind: "phase"
+    id: "Light"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        definition:
+          block: "weight < 1"

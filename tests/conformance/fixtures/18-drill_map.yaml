@@ -1,0 +1,19 @@
+ttr: "0.21"
+package: "returns"
+model: "query"
+schema: "drill"
+defs:
+  -
+    kind: "drill_map"
+    id: "agg_to_detail"
+    properties:
+      from:
+        ref: "query.query.agg"
+      to:
+        ref: "query.query.detail"
+      args:
+        order_number: "cr_order_number"
+      display:
+        cs: "Detail"
+        en: "Detail"
+      override: true

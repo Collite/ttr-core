@@ -1,0 +1,19 @@
+ttr: "0.21"
+model: "er"
+schema: "entity"
+defs:
+  -
+    kind: "entity"
+    id: "artikl"
+    properties:
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "int"
+  -
+    kind: "er2cnc_role"
+    id: "ar"
+    properties:
+      entity: "artikl"
+      role: "fact"

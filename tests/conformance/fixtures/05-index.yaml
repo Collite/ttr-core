@@ -1,0 +1,10 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "index"
+    id: "ix_name"
+    properties:
+      type: "btree"
+      columns:
+        - "name"
+        - "code"

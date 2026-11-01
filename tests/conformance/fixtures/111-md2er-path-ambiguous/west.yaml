@@ -1,0 +1,17 @@
+ttr: "0.21"
+package: "west"
+imports:
+  - "base.*"
+model: "er"
+defs:
+  -
+    kind: "relation"
+    id: "address"
+    properties:
+      from:
+        ref: "base.er.entity.customer"
+      to:
+        ref: "base.er.entity.addr"
+      cardinality:
+        from: "N"
+        to: "1"

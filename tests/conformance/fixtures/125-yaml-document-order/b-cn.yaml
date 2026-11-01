@@ -1,0 +1,28 @@
+ttr: "0.21"
+package: "demo.order"
+imports:
+  - "demo.order.*"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Zeta"
+    properties:
+      -
+        label:
+          en: "First"
+      -
+        custom: 1.0
+      -
+        other: 1e3
+      -
+        definition:
+          block: "x > 1"
+          tag: "pl"
+  -
+    kind: "subkind"
+    id: "Alpha"
+    properties:
+      -
+        is_a:
+          ref: "cn.kind.Zeta"

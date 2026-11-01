@@ -1,0 +1,11 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "entity"
+    id: "Customer"
+    properties:
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "int"

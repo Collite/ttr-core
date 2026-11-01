@@ -1,0 +1,26 @@
+ttr: "0.21"
+package: "hartland.west"
+model: "md"
+defs:
+  -
+    kind: "domain"
+    id: "Code"
+    properties:
+      type: "text"
+  -
+    kind: "dimension"
+    id: "Store"
+    properties:
+      key: "code"
+      attributes:
+        -
+          id: "code"
+          properties:
+            isKey: true
+            domain: "md.Code"
+  -
+    kind: "cubelet"
+    id: "sales"
+    properties:
+      grain:
+        - "Store.code"

@@ -1,0 +1,22 @@
+ttr: "0.21"
+package: "demo.order"
+imports:
+  - "demo.order.*"
+graph:
+  id: "Overview"
+  properties:
+    model: "er"
+    description: "Shared document graph"
+    tags:
+      - "invented"
+      - "ordered"
+    objects:
+      - "er.entity.Zeta"
+      - "er.entity.Alpha"
+    layout:
+      alpha:
+        x: 1
+        y: 2
+      zeta:
+        x: 20
+        y: 1

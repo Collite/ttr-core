@@ -1,0 +1,19 @@
+ttr: "0.21"
+model: "db"
+defs:
+  -
+    kind: "view"
+    id: "active_customers"
+    properties:
+      description: "Active customers"
+      tags:
+        - "reporting"
+        - "core"
+      columns:
+        -
+          id: "id"
+          properties:
+            type: "int"
+      definitionSql:
+        block: "SELECT * FROM customers WHERE active = 1"
+        form: "string"

@@ -1,0 +1,12 @@
+ttr: "0.21"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "sale"
+    properties:
+      attributes:
+        -
+          id: "n"
+          properties:
+            type: "decimal"

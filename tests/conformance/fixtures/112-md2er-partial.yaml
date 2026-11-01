@@ -1,0 +1,26 @@
+ttr: "0.21"
+model: "binding"
+defs:
+  -
+    kind: "md2er_dimension"
+    id: "p"
+    properties:
+      entity: "er.entity.x"
+  -
+    kind: "md2er_cubelet"
+    id: "q"
+    properties:
+      target: "er.entity.x"
+      measures:
+        m:
+          ref: "a"
+  -
+    kind: "md2er_cubelet"
+    id: "invalid_values"
+    properties:
+      cubelet: "md.sales"
+      target: "er.entity.x"
+      attributes:
+        code: 1
+      measures:
+        m: false

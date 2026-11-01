@@ -1,0 +1,13 @@
+ttr: "0.21"
+model: "db"
+schema: "dbo"
+defs:
+  -
+    kind: "table"
+    id: "sales"
+    properties:
+      columns:
+        -
+          id: "amount"
+          properties:
+            type: "decimal"

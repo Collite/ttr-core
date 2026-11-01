@@ -1,0 +1,126 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "party"
+    properties:
+      attributes:
+        -
+          id: "party_id"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "entity"
+    id: "customer"
+    properties:
+      attributes:
+        -
+          id: "customer_id"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "entity"
+    id: "store"
+    properties:
+      attributes:
+        -
+          id: "store_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "channel"
+          properties:
+            type: "text"
+  -
+    kind: "entity"
+    id: "sale"
+    properties:
+      attributes:
+        -
+          id: "sale_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "store_id"
+          properties:
+            type: "int"
+        -
+          id: "customer_id"
+          properties:
+            type: "int"
+        -
+          id: "sold_date"
+          properties:
+            type: "date"
+        -
+          id: "amount"
+          properties:
+            type: "decimal"
+  -
+    kind: "query"
+    id: "placed_orders"
+    properties:
+      sourceText:
+        block: "SELECT sale.sale_id AS order_number FROM sale"
+        tag: "sql"
+  -
+    kind: "entity"
+    id: "placed_order"
+    properties:
+      attributes:
+        -
+          id: "order_number"
+          properties:
+            type: "int"
+            isKey: true
+      binding:
+        target:
+          query:
+            ref: "er.query.placed_orders"
+  -
+    kind: "entity"
+    id: "category_code"
+    properties:
+      attributes:
+        -
+          id: "code"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "category_closure"
+    properties:
+      attributes:
+        -
+          id: "ancestor_code"
+          properties:
+            type: "text"
+            isKey: true
+        -
+          id: "descendant_code"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "relation"
+    id: "sale_store"
+    properties:
+      from:
+        ref: "er.entity.sale"
+      to:
+        ref: "er.entity.store"
+  -
+    kind: "relation"
+    id: "sale_customer"
+    properties:
+      from:
+        ref: "er.entity.sale"
+      to:
+        ref: "er.entity.customer"

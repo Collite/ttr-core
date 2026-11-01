@@ -1,0 +1,62 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "price_check"
+    properties:
+      attributes:
+        -
+          id: "check_id"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "entity"
+    id: "store_visit"
+    properties:
+      attributes:
+        -
+          id: "visit_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "visited_at"
+          properties:
+            type: "timestamp"
+  -
+    kind: "entity"
+    id: "referral"
+    properties:
+      attributes:
+        -
+          id: "referral_id"
+          properties:
+            type: "int"
+            isKey: true
+      concept:
+        -
+          event: "Referral"
+  -
+    kind: "entity"
+    id: "delivery"
+    properties:
+      attributes:
+        -
+          id: "delivery_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "delivered_at"
+          properties:
+            type: "timestamp"
+      concept:
+        -
+          event: "Delivery"
+        -
+          period:
+            at:
+              ref: "delivered_at"

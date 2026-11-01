@@ -1,0 +1,21 @@
+ttr: "0.21"
+model: "er"
+defs:
+  -
+    kind: "attribute"
+    id: "status"
+    properties:
+      type: "int"
+      valueLabels:
+        "0":
+          cs: "Neaktivní"
+          en: "Inactive"
+        "1":
+          cs: "Aktivní"
+          en: "Active"
+      displayLabel:
+        cs: "Stav"
+        en: "Status"
+      search:
+        searchable: true
+        fuzzy: true

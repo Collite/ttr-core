@@ -1,0 +1,16 @@
+ttr: "0.21"
+package: "shop"
+model: "md"
+defs:
+  -
+    kind: "domain"
+    id: "Money"
+    properties:
+      type: "decimal"
+  -
+    kind: "measure"
+    id: "revenue"
+    properties:
+      domain: "md.Money"
+      class: "additive"
+      aggregation: "sum"

@@ -1,0 +1,12 @@
+ttr: "0.21"
+package: "shop"
+model: "lexicon"
+locale: "en"
+defs:
+  -
+    kind: "term"
+    id: "Revenue"
+    properties:
+      for: "revenue"
+      forms:
+        - "Revenue"

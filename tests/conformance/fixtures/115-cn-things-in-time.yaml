@@ -1,0 +1,215 @@
+ttr: "0.21"
+package: "workshop.concepts"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Document"
+    properties:
+      -
+        abstract: true
+  -
+    kind: "subkind"
+    id: "Invoice"
+    properties:
+      -
+        of:
+          ref: "Document"
+      -
+        involves:
+          -
+            ref: "Customer"
+          -
+            ref: "Order"
+      -
+        qualities:
+          -
+            ref: "amount"
+          -
+            ref: "paid"
+          -
+            ref: "status"
+          -
+            ref: "issued"
+          -
+            ref: "due"
+  -
+    kind: "subkind"
+    id: "WebSale"
+    properties:
+      -
+        of:
+          ref: "Sale"
+      -
+        definition:
+          block: "channel = 'web'"
+  -
+    kind: "subkind"
+    id: "CodeRange"
+    properties:
+      -
+        of:
+          ref: "Diagnosis"
+      -
+        members:
+          block: "descendants(Diagnosis, 'R10-R19')"
+  -
+    kind: "subkind"
+    id: "StoredSale"
+    properties:
+      -
+        of:
+          ref: "Sale"
+      -
+        grounds: "er.entity.stored_sale"
+  -
+    kind: "kind"
+    id: "Order"
+    properties:
+      -
+        involves:
+          -
+            ref: "Customer"
+          -
+            as: "fulfilling"
+            ref: "Warehouse"
+          -
+            as: "receiving"
+            ref: "Warehouse"
+      -
+        period:
+          end:
+            ref: "delivered_date"
+          end_open:
+            ref: "open"
+          start:
+            ref: "placed_date"
+  -
+    kind: "kind"
+    id: "InstantKind"
+    properties:
+      -
+        period:
+          at:
+            ref: "issued"
+  -
+    kind: "role"
+    id: "Supplier"
+    properties:
+      -
+        of:
+          ref: "Customer"
+      -
+        event: "OrderPlaced"
+      -
+        involves:
+          -
+            ref: "Customer"
+          -
+            ref: "Item"
+      -
+        period:
+          end:
+            ref: "until"
+          start:
+            ref: "since"
+  -
+    kind: "event"
+    id: "InvoiceIssued"
+    properties:
+      -
+        involves:
+          -
+            ref: "Invoice"
+      -
+        period:
+          at:
+            ref: "issued"
+  -
+    kind: "event"
+    id: "LegacyDuration"
+    properties:
+      -
+        extent: "durative"
+  -
+    kind: "phase"
+    id: "OutOfService"
+    properties:
+      -
+        of:
+          ref: "Warehouse"
+      -
+        grounds: "er.entity.warehouse_outage"
+      -
+        period:
+          end:
+            ref: "to_date"
+          start:
+            ref: "from_date"
+      -
+        qualities:
+          -
+            ref: "reason"
+  -
+    kind: "phase"
+    id: "OpenOrder"
+    properties:
+      -
+        of:
+          ref: "Order"
+      -
+        from: "OrderPlaced"
+      -
+        until: "OrderDelivered"
+  -
+    kind: "kind"
+    id: "ListPrice"
+    properties:
+      -
+        label:
+          cs: "Ceníková cena"
+          en: "List price"
+      -
+        involves:
+          -
+            ref: "Item"
+          -
+            ref: "Channel"
+      -
+        period:
+          end:
+            ref: "valid_to"
+          end_open:
+            ref: "open"
+          start:
+            ref: "valid_from"
+      -
+        qualities:
+          -
+            ref: "price"
+  -
+    kind: "quality"
+    id: "list_price"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        valued_state: true
+      -
+        per: "Channel"
+      -
+        from: "ListPrice.price"
+  -
+    kind: "quality"
+    id: "agreed_price"
+    properties:
+      -
+        of:
+          ref: "Customer"
+      -
+        valued_state: true
+      -
+        per: "Item"
+      -
+        from: "PriceAgreement.price"

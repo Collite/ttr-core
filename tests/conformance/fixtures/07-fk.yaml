@@ -1,0 +1,12 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "fk"
+    id: "fk_orders_customer"
+    properties:
+      from:
+        -
+          ref: "db.dbo.orders.customer_id"
+      to:
+        -
+          ref: "db.dbo.customers.id"

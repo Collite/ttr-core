@@ -1,0 +1,45 @@
+ttr: "0.21"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "order"
+    properties:
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "text"
+            isKey: true
+        -
+          id: "customer"
+          properties:
+            type: "text"
+        -
+          id: "placed"
+          properties:
+            type: "date"
+  -
+    kind: "entity"
+    id: "customer"
+    properties:
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "relation"
+    id: "order_customer"
+    properties:
+      from:
+        ref: "er.entity.order"
+      to:
+        ref: "er.entity.customer"
+      join:
+        -
+          from:
+            ref: "er.entity.order.customer"
+          to:
+            ref: "er.entity.customer.id"

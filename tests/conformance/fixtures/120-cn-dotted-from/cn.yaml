@@ -1,0 +1,91 @@
+ttr: "0.21"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Item"
+    properties:
+      -
+        label:
+          en: "Item"
+  -
+    kind: "kind"
+    id: "Channel"
+    properties:
+      -
+        label:
+          en: "Channel"
+  -
+    kind: "kind"
+    id: "ListPrice"
+    properties:
+      -
+        involves:
+          -
+            ref: "Item"
+          -
+            ref: "Channel"
+      -
+        qualities:
+          -
+            ref: "amount"
+  -
+    kind: "quality"
+    id: "amount"
+    properties:
+      -
+        of:
+          ref: "ListPrice"
+  -
+    kind: "quality"
+    id: "list_price"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        valued_state: true
+      -
+        per: "Channel"
+      -
+        from: "ListPrice.amount"
+  -
+    kind: "quality"
+    id: "typo_price"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        valued_state: true
+      -
+        per: "Channel"
+      -
+        from: "ListPrize.amount"
+  -
+    kind: "event"
+    id: "Listed"
+    properties:
+      -
+        involves:
+          -
+            ref: "Item"
+  -
+    kind: "event"
+    id: "Delisted"
+    properties:
+      -
+        involves:
+          -
+            ref: "Item"
+  -
+    kind: "phase"
+    id: "OnSale"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        from: "cn.Listed"
+      -
+        until: "cn.Delisted"

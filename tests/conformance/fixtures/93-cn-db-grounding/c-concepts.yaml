@@ -1,0 +1,23 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "LoyaltyCard"
+    properties:
+      -
+        grounds: "db.dbo.loyalty_card"
+  -
+    kind: "kind"
+    id: "GiftCard"
+    properties:
+      -
+        label:
+          en: "Gift card"
+  -
+    kind: "kind"
+    id: "Store"
+    properties:
+      -
+        grounds: "er.entity.store"

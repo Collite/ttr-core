@@ -1,0 +1,32 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Shop"
+    properties:
+      -
+        grounds: "er.entity.store"
+  -
+    kind: "event"
+    id: "Purchase"
+    properties:
+      -
+        involves:
+          -
+            ref: "Shop"
+      -
+        period:
+          at:
+            ref: "sold_date"
+      -
+        grounds: "er.entity.sale"
+  -
+    kind: "role"
+    id: "Shopper"
+    properties:
+      -
+        event: "Purchase"
+      -
+        grounds: "er.entity.shopper"

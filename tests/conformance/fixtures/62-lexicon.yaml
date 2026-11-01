@@ -1,0 +1,27 @@
+ttr: "0.21"
+model: "lexicon"
+locale: "cs"
+defs:
+  -
+    kind: "term"
+    id: "trzba"
+    properties:
+      description: "revenue synonyms"
+      for: "md.measure.net"
+      forms:
+        - "tržba"
+        - "tržby"
+        - "obrat"
+        - "utržit"
+  -
+    kind: "pattern"
+    id: "nazev"
+    properties:
+      for: "db.query.by_name"
+      match: "název .*"
+  -
+    kind: "example"
+    id: "q1"
+    properties:
+      for: "md.cubelet.sales"
+      text: "Kolik jsme utržili za Octavie"

@@ -1,0 +1,52 @@
+ttr: "0.21"
+package: "shop.actions"
+defs:
+  -
+    kind: "schema"
+    id: "notify"
+    properties:
+      description: "Send a notification to a recipient"
+      columns:
+        -
+          id: "recipient"
+          properties:
+            type: "text"
+        -
+          id: "subject"
+          properties:
+            description: "one line"
+            type: "text"
+        -
+          id: "order_id"
+          properties:
+            type: "int"
+        -
+          id: "amount"
+          properties:
+            type: "decimal"
+            optional: true
+        -
+          id: "note"
+          properties:
+            type: "text"
+            optional: true
+  -
+    kind: "schema"
+    id: "flag_order"
+    properties:
+      tags:
+        - "action"
+      columns:
+        -
+          id: "order_id"
+          properties:
+            type: "int"
+        -
+          id: "reason"
+          properties:
+            type: "text"
+        -
+          id: "due"
+          properties:
+            type: "date"
+            optional: true

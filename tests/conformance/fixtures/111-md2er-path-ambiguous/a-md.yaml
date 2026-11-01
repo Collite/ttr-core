@@ -1,0 +1,49 @@
+ttr: "0.21"
+package: "base"
+model: "md"
+defs:
+  -
+    kind: "domain"
+    id: "Code"
+    properties:
+      type: "string"
+  -
+    kind: "dimension"
+    id: "Customer"
+    properties:
+      key: "code"
+      attributes:
+        -
+          id: "code"
+          properties:
+            domain: "md.Code"
+  -
+    kind: "dimension"
+    id: "CustomerEast"
+    properties:
+      key: "code"
+      attributes:
+        -
+          id: "code"
+          properties:
+            domain: "md.Code"
+  -
+    kind: "dimension"
+    id: "CustomerHidden"
+    properties:
+      key: "code"
+      attributes:
+        -
+          id: "code"
+          properties:
+            domain: "md.Code"
+  -
+    kind: "dimension"
+    id: "CustomerNamed"
+    properties:
+      key: "code"
+      attributes:
+        -
+          id: "code"
+          properties:
+            domain: "md.Code"

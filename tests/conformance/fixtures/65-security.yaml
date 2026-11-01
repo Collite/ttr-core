@@ -1,0 +1,48 @@
+ttr: "0.21"
+model: "db"
+schema: "dbo"
+security:
+  -
+    -
+      verb: "own"
+      object: "sales"
+      owner: "team_sales"
+    -
+      verb: "classify"
+      object: "order_line.customer_email"
+      classification: "pii"
+    -
+      verb: "grant"
+      privilege: "read"
+      object: "sales"
+      to: "accounting"
+    -
+      verb: "mask"
+      object: "order_line.customer_email"
+defs:
+  -
+    kind: "table"
+    id: "sales"
+    properties:
+      columns:
+        -
+          id: "region"
+          properties:
+            type: "text"
+        -
+          id: "amount"
+          properties:
+            type: "decimal"
+  -
+    kind: "table"
+    id: "order_line"
+    properties:
+      columns:
+        -
+          id: "customer_email"
+          properties:
+            type: "text"
+        -
+          id: "qty"
+          properties:
+            type: "int"

@@ -1,0 +1,60 @@
+ttr: "0.21"
+package: "hartland.west"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Store"
+    properties:
+      -
+        grounds: "er.entity.store"
+  -
+    kind: "kind"
+    id: "Outlet"
+    properties:
+      -
+        grounds: "hartland.west.er.entity.store"
+  -
+    kind: "kind"
+    id: "Depot"
+    properties:
+      -
+        grounds: "er.entity.depot"
+  -
+    kind: "kind"
+    id: "Shop"
+    properties: []
+  -
+    kind: "quality"
+    id: "region"
+    properties:
+      -
+        of:
+          ref: "Store"
+      -
+        grounds: "er.entity.store.region"
+  -
+    kind: "kind"
+    id: "Branch"
+    properties:
+      -
+        grounds: "md.Store"
+  -
+    kind: "event"
+    id: "Sale"
+    properties:
+      -
+        period:
+          at:
+            ref: "sold_on"
+      -
+        grounds: "md.sales"
+  -
+    kind: "quality"
+    id: "store_code"
+    properties:
+      -
+        of:
+          ref: "Sale"
+      -
+        grounds: "md.Store.code"

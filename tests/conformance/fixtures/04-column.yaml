@@ -1,0 +1,10 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "column"
+    id: "nazev"
+    properties:
+      type: "varchar"
+      optional: true
+      search:
+        searchable: true

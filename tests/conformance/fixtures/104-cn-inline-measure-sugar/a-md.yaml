@@ -1,0 +1,62 @@
+ttr: "0.21"
+package: "hartland.web"
+model: "md"
+defs:
+  -
+    kind: "domain"
+    id: "Money"
+    properties:
+      type: "decimal"
+  -
+    kind: "domain"
+    id: "Code"
+    properties:
+      type: "text"
+  -
+    kind: "dimension"
+    id: "Product"
+    properties:
+      key: "sku"
+      attributes:
+        -
+          id: "sku"
+          properties:
+            isKey: true
+            domain: "md.Code"
+  -
+    kind: "measure"
+    id: "net_sales"
+    properties:
+      domain: "md.Money"
+      aggregation: "sum"
+      concept:
+        -
+          quality: "net_sales"
+        -
+          of:
+            ref: "Sale"
+  -
+    kind: "cubelet"
+    id: "sales"
+    properties:
+      grain:
+        - "Product.sku"
+      measures:
+        -
+          id: "units"
+          properties:
+            domain: "md.Money"
+            aggregation: "sum"
+            concept:
+              -
+                quality: "units_sold"
+              -
+                of:
+                  ref: "Sale"
+      concept:
+        -
+          event: "Sale"
+        -
+          period:
+            at:
+              ref: "sold_on"

@@ -1,0 +1,24 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "party"
+    properties:
+      attributes:
+        -
+          id: "party_id"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "entity"
+    id: "warehouse"
+    properties:
+      attributes:
+        -
+          id: "warehouse_code"
+          properties:
+            type: "text"
+            isKey: true

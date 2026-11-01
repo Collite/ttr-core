@@ -1,0 +1,46 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Party"
+    properties:
+      -
+        grounds: "er.entity.party"
+  -
+    kind: "kind"
+    id: "Shop"
+    properties:
+      -
+        grounds: "er.entity.store"
+  -
+    kind: "kind"
+    id: "Channel"
+    properties:
+      -
+        label:
+          en: "Sales channel"
+  -
+    kind: "role"
+    id: "Buyer"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        event: "Purchase"
+  -
+    kind: "event"
+    id: "Purchase"
+    properties:
+      -
+        involves:
+          -
+            ref: "Buyer"
+          -
+            ref: "Shop"
+      -
+        period:
+          at:
+            ref: "sold_date"

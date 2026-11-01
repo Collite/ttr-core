@@ -1,0 +1,9 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cnc"
+defs:
+  -
+    kind: "role"
+    id: "sales_fact"
+    properties:
+      description: "A fact role"

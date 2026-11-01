@@ -1,0 +1,12 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "query"
+    id: "q2"
+    properties:
+      language: "SQL"
+      sourceText:
+        block: |2
+          first
+          
+          third

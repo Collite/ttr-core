@@ -1,0 +1,109 @@
+ttr: "0.21"
+package: "workshop.concepts"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Document"
+    properties:
+      -
+        abstract: true
+  -
+    kind: "variant"
+    id: "Invoice"
+    properties:
+      -
+        of:
+          ref: "Document"
+      -
+        involves:
+          -
+            ref: "Customer"
+          -
+            ref: "Order"
+      -
+        qualities:
+          -
+            ref: "amount"
+          -
+            ref: "paid"
+          -
+            ref: "status"
+          -
+            ref: "issued"
+          -
+            ref: "due"
+  -
+    kind: "variant"
+    id: "WebSale"
+    properties:
+      -
+        of:
+          ref: "Sale"
+      -
+        definition:
+          block: "channel = 'web'"
+  -
+    kind: "variant"
+    id: "CodeRange"
+    properties:
+      -
+        of:
+          ref: "Diagnosis"
+      -
+        members:
+          block: "descendants(Diagnosis, 'R10-R19')"
+  -
+    kind: "subkind"
+    id: "StoredSale"
+    properties:
+      -
+        of:
+          ref: "Sale"
+      -
+        grounds: "er.entity.stored_sale"
+  -
+    kind: "kind"
+    id: "Product"
+    properties:
+      -
+        grounds: "er.entity.product"
+      -
+        qualities:
+          -
+            ref: "variant"
+  -
+    kind: "quality"
+    id: "variant"
+    properties:
+      -
+        of:
+          ref: "Product"
+      -
+        grounds: "er.entity.product.variant"
+  -
+    kind: "variant"
+    id: "Bundle"
+    properties:
+      -
+        of:
+          ref: "Product"
+      -
+        definition:
+          block: "variant = 'bundle'"
+  -
+    kind: "kind"
+    id: "Kit"
+    properties:
+      -
+        grounds: "er.entity.kit"
+      -
+        variant:
+          ref: "boxed"
+  -
+    kind: "variant"
+    id: "MissingBearer"
+    properties:
+      -
+        definition:
+          block: "channel = 'web'"

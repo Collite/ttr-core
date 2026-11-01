@@ -1,0 +1,101 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Party"
+    properties:
+      -
+        label:
+          en: "Party"
+  -
+    kind: "role"
+    id: "Buyer"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        event: "Purchase"
+  -
+    kind: "kind"
+    id: "Shop"
+    properties: []
+  -
+    kind: "kind"
+    id: "Channel"
+    properties: []
+  -
+    kind: "event"
+    id: "Purchase"
+    properties:
+      -
+        involves:
+          -
+            ref: "Buyer"
+          -
+            ref: "Shop"
+      -
+        qualities:
+          -
+            ref: "amount"
+      -
+        period:
+          at:
+            ref: "sold_date"
+  -
+    kind: "quality"
+    id: "amount"
+    properties:
+      -
+        of:
+          ref: "Purchase"
+  -
+    kind: "kind"
+    id: "Item"
+    properties:
+      -
+        label:
+          en: "Product"
+  -
+    kind: "quality"
+    id: "color"
+    properties:
+      -
+        of:
+          ref: "Item"
+  -
+    kind: "role"
+    id: "Shopper"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        event: "StoreSale"
+  -
+    kind: "kind"
+    id: "Brand"
+    properties: []
+  -
+    kind: "quality"
+    id: "net_sales"
+    properties:
+      -
+        of:
+          ref: "StoreSale"
+  -
+    kind: "event"
+    id: "StoreSale"
+    properties:
+      -
+        involves:
+          -
+            ref: "Shopper"
+          -
+            ref: "Item"
+      -
+        period:
+          at:
+            ref: "sold_date"

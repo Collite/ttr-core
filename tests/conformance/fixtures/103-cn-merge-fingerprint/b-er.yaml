@@ -1,0 +1,125 @@
+ttr: "0.21"
+package: "hartland.web"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "web_order"
+    properties:
+      attributes:
+        -
+          id: "order_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "placed_date"
+          properties:
+            type: "date"
+        -
+          id: "delivered_date"
+          properties:
+            type: "date"
+      concept:
+        -
+          event: "Order"
+        -
+          period:
+            end:
+              ref: "delivered_date"
+            start:
+              ref: "placed_date"
+  -
+    kind: "entity"
+    id: "brand"
+    properties:
+      attributes:
+        -
+          id: "brand_id"
+          properties:
+            type: "int"
+            isKey: true
+      concept:
+        -
+          kind: "Brand"
+        -
+          lexicon:
+            examples:
+              - "the brand"
+            terms:
+              - "brand"
+  -
+    kind: "entity"
+    id: "shelf"
+    properties:
+      attributes:
+        -
+          id: "shelf_id"
+          properties:
+            type: "int"
+            isKey: true
+      concept:
+        -
+          kind: "Shelf"
+        -
+          lexicon:
+            default: true
+            sense_priority: 2.0
+            terms:
+              - "shelf"
+  -
+    kind: "entity"
+    id: "bin"
+    properties:
+      attributes:
+        -
+          id: "bin_id"
+          properties:
+            type: "int"
+            isKey: true
+      concept:
+        -
+          kind: "Bin"
+        -
+          spec:
+            height: 2
+            width: 1
+  -
+    kind: "entity"
+    id: "web_return"
+    properties:
+      attributes:
+        -
+          id: "return_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "returned_on"
+          properties:
+            type: "date"
+      concept:
+        -
+          event: "WebReturn"
+        -
+          lexicon:
+            terms:
+              - "return"
+  -
+    kind: "entity"
+    id: "colour"
+    properties:
+      attributes:
+        -
+          id: "colour_id"
+          properties:
+            type: "int"
+            isKey: true
+      concept:
+        -
+          kind: "Colour"
+        -
+          lexicon:
+            terms:
+              - "red"
+              - "blue"

@@ -1,0 +1,100 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "binding"
+defs:
+  -
+    kind: "cn2er_kind"
+    id: "party_g"
+    properties:
+      -
+        kind: "cn.Party"
+      -
+        target: "er.entity.party"
+  -
+    kind: "cn2er_role"
+    id: "buyer_g"
+    properties:
+      -
+        role: "cn.Buyer"
+      -
+        target: "er.entity.customer"
+  -
+    kind: "cn2er_kind"
+    id: "shop_g"
+    properties:
+      -
+        kind: "cn.Shop"
+      -
+        target: "er.entity.store"
+  -
+    kind: "cn2er_kind"
+    id: "channel_g"
+    properties:
+      -
+        kind: "cn.Channel"
+      -
+        target: "er.entity.store.channel"
+  -
+    kind: "cn2er_event"
+    id: "purchase_g"
+    properties:
+      -
+        event: "cn.Purchase"
+      -
+        target: "er.entity.sale"
+  -
+    kind: "cn2er_quality"
+    id: "amount_g"
+    properties:
+      -
+        quality: "cn.amount"
+      -
+        target: "er.entity.sale.amount"
+  -
+    kind: "cn2md_kind"
+    id: "item_g"
+    properties:
+      -
+        kind: "cn.Item"
+      -
+        target: "md.Product"
+  -
+    kind: "cn2md_quality"
+    id: "color_g"
+    properties:
+      -
+        quality: "cn.color"
+      -
+        target: "md.Product.color"
+  -
+    kind: "cn2md_role"
+    id: "shopper_g"
+    properties:
+      -
+        role: "cn.Shopper"
+      -
+        target: "md.Shopper"
+  -
+    kind: "cn2md_kind"
+    id: "brand_g"
+    properties:
+      -
+        kind: "cn.Brand"
+      -
+        target: "md.Brand"
+  -
+    kind: "cn2md_quality"
+    id: "net_sales_g"
+    properties:
+      -
+        quality: "cn.net_sales"
+      -
+        target: "md.net_sales"
+  -
+    kind: "cn2md_event"
+    id: "store_sale_g"
+    properties:
+      -
+        event: "cn.StoreSale"
+      -
+        target: "md.store_sales"

@@ -1,0 +1,96 @@
+ttr: "0.21"
+model: "binding"
+defs:
+  -
+    kind: "cn2er_event"
+    id: "started"
+    properties:
+      -
+        event: "cn.Started"
+      -
+        target: "er.entity.started"
+      -
+        period:
+          at:
+            ref: "er.entity.started.occurred"
+      -
+        participants:
+          ticket:
+            -
+              ref: "er.relation.started_ticket"
+  -
+    kind: "cn2er_event"
+    id: "finished"
+    properties:
+      -
+        event: "cn.Finished"
+      -
+        target: "er.entity.finished"
+      -
+        period:
+          at:
+            ref: "er.entity.finished.occurred"
+      -
+        participants:
+          ticket:
+            -
+              ref: "er.relation.finished_ticket"
+  -
+    kind: "cn2er_kind"
+    id: "price"
+    properties:
+      -
+        kind: "cn.ListPrice"
+      -
+        target: "er.entity.price"
+      -
+        period:
+          end:
+            ref: "er.entity.price.until"
+          start:
+            ref: "er.entity.price.since"
+      -
+        participants:
+          item:
+            -
+              ref: "er.relation.price_item"
+  -
+    kind: "cn2er_phase"
+    id: "bounded"
+    properties:
+      -
+        phase: "cn.OpenTicket"
+      -
+        bounds:
+          from:
+            ref: "cn.Started"
+          until:
+            ref: "cn.Finished"
+  -
+    kind: "cn2er_phase"
+    id: "episodes"
+    properties:
+      -
+        phase: "cn.OutOfService"
+      -
+        episodes:
+          ref: "er.entity.outage"
+      -
+        period:
+          end:
+            ref: "er.entity.outage.until"
+          end_open:
+            ref: "open"
+          start:
+            ref: "er.entity.outage.since"
+  -
+    kind: "cn2er_quality"
+    id: "projected"
+    properties:
+      -
+        quality: "cn.list_price"
+      -
+        via:
+          ref: "ListPrice.amount"
+      -
+        per: "Channel"

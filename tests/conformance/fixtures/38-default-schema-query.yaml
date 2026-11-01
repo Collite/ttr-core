@@ -1,0 +1,10 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "query"
+    id: "topCustomers"
+    properties:
+      language: "SQL"
+      sourceText:
+        block: "SELECT id FROM customers"
+        form: "string"

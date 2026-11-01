@@ -1,0 +1,20 @@
+ttr: "0.21"
+model: "er"
+schema: "entity"
+defs:
+  -
+    kind: "attribute"
+    id: "status"
+    properties:
+      type: "int"
+      valueLabels:
+        "1":
+          aliases:
+            - "živý"
+            - "aktivni"
+          label:
+            cs: "Aktivní"
+            en: "Active"
+        "2":
+          cs: "Neaktivní"
+          en: "Inactive"

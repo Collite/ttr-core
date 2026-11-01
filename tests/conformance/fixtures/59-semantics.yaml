@@ -1,0 +1,252 @@
+ttr: "0.21"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "AccountingPeriod"
+    properties:
+      attributes:
+        -
+          id: "start_date"
+          properties:
+            type: "date"
+            semantics:
+              role:
+                ref: "period_start"
+        -
+          id: "end_date"
+          properties:
+            type: "date"
+            semantics:
+              role:
+                ref: "period_end"
+        -
+          id: "period"
+          properties:
+            type:
+              length: 6
+              type: "varchar"
+            semantics:
+              code_format: "yyyyMM"
+              role:
+                ref: "period_code"
+      semantics:
+        code:
+          ref: "period"
+        kind:
+          ref: "period_table"
+  -
+    kind: "entity"
+    id: "Transaction"
+    properties:
+      attributes:
+        -
+          id: "txn_date"
+          properties:
+            type: "date"
+            semantics:
+              period:
+                ref: "AccountingPeriod"
+              role:
+                ref: "event_date"
+        -
+          id: "doc_date"
+          properties:
+            type: "date"
+            semantics:
+              role:
+                ref: "document_date"
+        -
+          id: "posted"
+          properties:
+            type: "date"
+            semantics:
+              role:
+                ref: "posting_date"
+        -
+          id: "due"
+          properties:
+            type: "date"
+            semantics:
+              role:
+                ref: "due_date"
+        -
+          id: "amount"
+          properties:
+            type: "decimal"
+            semantics:
+              currency:
+                ref: "currency_code"
+              role:
+                ref: "amount"
+        -
+          id: "amount_dom"
+          properties:
+            type: "decimal"
+            semantics:
+              role:
+                ref: "amount_domestic"
+        -
+          id: "currency_code"
+          properties:
+            type:
+              length: 3
+              type: "varchar"
+            semantics:
+              role:
+                ref: "currency_code"
+  -
+    kind: "entity"
+    id: "PoiLatLon"
+    properties:
+      attributes:
+        -
+          id: "lat"
+          properties:
+            type: "decimal"
+            semantics:
+              role:
+                ref: "geo_lat"
+        -
+          id: "lon"
+          properties:
+            type: "decimal"
+            semantics:
+              role:
+                ref: "geo_lon"
+      semantics:
+        kind:
+          ref: "poi"
+  -
+    kind: "entity"
+    id: "PoiPoint"
+    properties:
+      attributes:
+        -
+          id: "point"
+          properties:
+            type: "text"
+            semantics:
+              role:
+                ref: "geo_point"
+      semantics:
+        kind:
+          ref: "poi"
+  -
+    kind: "entity"
+    id: "CalendarDim"
+    properties:
+      attributes:
+        -
+          id: "day"
+          properties:
+            type: "date"
+            semantics:
+              role:
+                ref: "calendar_date"
+      semantics:
+        kind:
+          ref: "calendar"
+  -
+    kind: "entity"
+    id: "FxRate"
+    properties:
+      attributes:
+        -
+          id: "from_ccy"
+          properties:
+            type:
+              length: 3
+              type: "varchar"
+            semantics:
+              role:
+                ref: "fx_from_currency"
+        -
+          id: "to_ccy"
+          properties:
+            type:
+              length: 3
+              type: "varchar"
+            semantics:
+              role:
+                ref: "fx_to_currency"
+        -
+          id: "rate"
+          properties:
+            type: "decimal"
+            semantics:
+              role:
+                ref: "fx_rate"
+        -
+          id: "valid_from"
+          properties:
+            type: "date"
+            semantics:
+              role:
+                ref: "valid_from"
+        -
+          id: "valid_to"
+          properties:
+            type: "date"
+            semantics:
+              role:
+                ref: "valid_to"
+      semantics:
+        kind:
+          ref: "fx_rate"
+  -
+    kind: "entity"
+    id: "Customer"
+    properties:
+      attributes:
+        -
+          id: "customer_name"
+          properties:
+            type: "text"
+        -
+          id: "customer_no"
+          properties:
+            type:
+              length: 12
+              type: "varchar"
+      semantics:
+        code:
+          ref: "customer_no"
+        name:
+          ref: "customer_name"
+  -
+    kind: "entity"
+    id: "SalesOrderLine"
+    properties:
+      attributes:
+        -
+          id: "line_label"
+          properties:
+            type: "text"
+        -
+          id: "line_no"
+          properties:
+            type:
+              length: 12
+              type: "varchar"
+        -
+          id: "amount_czk"
+          properties:
+            type: "decimal"
+        -
+          id: "quantity"
+          properties:
+            type: "decimal"
+      semantics:
+        code:
+          ref: "line_no"
+        measures:
+          -
+            ref: "amount_czk"
+          -
+            aggregation:
+              ref: "avg"
+            attribute:
+              ref: "quantity"
+        name:
+          ref: "line_label"

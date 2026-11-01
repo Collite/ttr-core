@@ -1,0 +1,8 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "query"
+    id: "c6"
+    properties:
+      sourceText:
+        block: "a note"

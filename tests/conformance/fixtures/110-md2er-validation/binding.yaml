@@ -1,0 +1,105 @@
+ttr: "0.21"
+model: "binding"
+defs:
+  -
+    kind: "md2er_dimension"
+    id: "good"
+    properties:
+      dimension: "md.Customer"
+      entity: "er.entity.customer"
+      attributes:
+        code:
+          ref: "sk"
+        state:
+          ref: "address.state"
+  -
+    kind: "md2er_dimension"
+    id: "missing_key"
+    properties:
+      dimension: "md.Customer"
+      entity: "er.entity.customer"
+      attributes: {}
+  -
+    kind: "md2er_cubelet"
+    id: "measure"
+    properties:
+      cubelet: "md.sales"
+      target: "er.entity.customer"
+      measures:
+        revenue:
+          ref: "unknown"
+  -
+    kind: "md2er_cubelet"
+    id: "typo"
+    properties:
+      cubelet: "md.sales"
+      target: "er.entity.customer"
+      measures:
+        revnue:
+          ref: "amount"
+  -
+    kind: "md2er_cubelet"
+    id: "foreign_measure"
+    properties:
+      cubelet: "md.sales"
+      target: "er.entity.customer"
+      measures:
+        bonus:
+          ref: "amount"
+  -
+    kind: "md2er_cubelet"
+    id: "missing_cubelet"
+    properties:
+      target: "er.entity.customer"
+      measures:
+        revenue:
+          ref: "amount"
+  -
+    kind: "md2er_cubelet"
+    id: "unknown_cubelet"
+    properties:
+      cubelet: "md.salez"
+      target: "er.entity.customer"
+  -
+    kind: "md2er_cubelet"
+    id: "bad_grain"
+    properties:
+      cubelet: "md.sales"
+      target: "er.entity.customer"
+      attributes:
+        "Customer.bogus":
+          ref: "absent"
+  -
+    kind: "md2er_dimension"
+    id: "unknown_attribute"
+    properties:
+      dimension: "md.Customer"
+      entity: "er.entity.customer"
+      attributes:
+        bogus:
+          ref: "sk"
+        code:
+          ref: "sk"
+  -
+    kind: "md2er_dimension"
+    id: "wrong_kind_a"
+    properties:
+      dimension: "md.sales"
+      entity: "er.entity.customer"
+      attributes: {}
+  -
+    kind: "md2er_dimension"
+    id: "wrong_kind_b"
+    properties:
+      dimension: "md.sales"
+      entity: "er.entity.customer"
+      attributes: {}
+  -
+    kind: "md2er_cubelet"
+    id: "wrong_target"
+    properties:
+      cubelet: "md.sales"
+      target: "db.dbo.sales"
+      measures:
+        revenue:
+          ref: "amount"

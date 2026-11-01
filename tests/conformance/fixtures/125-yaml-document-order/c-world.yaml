@@ -1,0 +1,19 @@
+ttr: "0.21"
+package: "demo.order"
+model: "world"
+defs:
+  -
+    kind: "world"
+    id: "Ordered"
+    properties:
+      members:
+        -
+          kind: "storage"
+          id: "S"
+          properties:
+            schemas:
+              -
+                id: "row"
+                fields:
+                  zeta: "text"
+                  alpha: "int"

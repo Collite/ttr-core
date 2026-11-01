@@ -1,0 +1,13 @@
+ttr: "0.21"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "store"
+    properties:
+      attributes:
+        -
+          id: "store_id"
+          properties:
+            type: "int"
+            isKey: true

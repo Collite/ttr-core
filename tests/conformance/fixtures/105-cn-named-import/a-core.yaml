@@ -1,0 +1,18 @@
+ttr: "0.21"
+package: "hartland.core"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Party"
+    properties:
+      -
+        label:
+          en: "Party"
+  -
+    kind: "kind"
+    id: "Store"
+    properties:
+      -
+        label:
+          en: "Store"

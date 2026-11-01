@@ -1,0 +1,51 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "ProductCategory"
+    properties:
+      -
+        grounds: "er.entity.category_code"
+      -
+        hierarchy:
+          ancestor:
+            ref: "ancestor_code"
+          closure:
+            ref: "er.entity.category_closure"
+          descendant:
+            ref: "descendant_code"
+  -
+    kind: "kind"
+    id: "Department"
+    properties:
+      -
+        grounds: "er.entity.department"
+      -
+        hierarchy:
+          ancestor:
+            ref: "ancestor_code"
+          closure:
+            ref: "er.entity.department_closure"
+          descendant:
+            ref: "descendant_code"
+  -
+    kind: "kind"
+    id: "Region"
+    properties:
+      -
+        grounds: "er.entity.region"
+      -
+        hierarchy:
+          ancestor:
+            ref: "parent_code"
+          closure:
+            ref: "er.entity.region_closure"
+  -
+    kind: "kind"
+    id: "Brand"
+    properties:
+      -
+        label:
+          en: "Brand"

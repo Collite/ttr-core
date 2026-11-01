@@ -1,0 +1,12 @@
+ttr: "0.21"
+package: "hartland.web"
+model: "lexicon"
+locale: "en"
+defs:
+  -
+    kind: "term"
+    id: "revenue"
+    properties:
+      for: "md.measure.revenue"
+      forms:
+        - "revenue"

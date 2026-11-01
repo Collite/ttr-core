@@ -1,0 +1,63 @@
+ttr: "0.21"
+package: "demo.carriers"
+model: "db"
+schema: "demo"
+defs:
+  -
+    kind: "query"
+    id: "raw_query"
+    properties:
+      parameters:
+        -
+          name: "term"
+          type: "text"
+          defaultValue: ""
+          binds:
+            - "er.entity.Customer.name"
+            - "er.entity.Customer.code"
+        -
+          name: "count"
+          type: "int"
+          defaultValue: "0"
+          binds: []
+      sourceText:
+        block: "select 1"
+        form: "string"
+      skipSecurity: true
+  -
+    kind: "query"
+    id: "checked_query"
+    properties:
+      skipSecurity: false
+  -
+    kind: "query"
+    id: "ordinary_query"
+    properties: {}
+  -
+    kind: "query"
+    id: "skipSecurity"
+    properties: {}
+  -
+    kind: "query"
+    id: "defaultValue"
+    properties: {}
+  -
+    kind: "query"
+    id: "binds"
+    properties: {}
+  -
+    kind: "query"
+    id: "indexSecurity"
+    properties: {}
+  -
+    kind: "procedure"
+    id: "call"
+    properties:
+      parameters:
+        -
+          name: "p"
+          type: "text"
+          direction: "IN"
+          defaultValue: "seed"
+          binds:
+            - "er.entity.Customer.name"

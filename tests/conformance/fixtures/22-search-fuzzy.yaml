@@ -1,0 +1,9 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "attribute"
+    id: "af"
+    properties:
+      type: "text"
+      search:
+        fuzzy: true

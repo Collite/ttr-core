@@ -1,0 +1,68 @@
+ttr: "0.21"
+package: "hartland.bindings"
+imports:
+  - "hartland.web.*"
+model: "binding"
+defs:
+  -
+    kind: "cn2md_kind"
+    id: "item_g"
+    properties:
+      -
+        kind: "cn.Item"
+      -
+        target: "md.Product"
+  -
+    kind: "cn2md_quality"
+    id: "brand_g"
+    properties:
+      -
+        quality: "brand"
+      -
+        target: "md.Product.brand"
+  -
+    kind: "cn2er_kind"
+    id: "warehouse_g"
+    properties:
+      -
+        kind: "Warehouse"
+      -
+        target: "er.entity.warehouse"
+  -
+    kind: "cn2er_event"
+    id: "order_g"
+    properties:
+      -
+        event: "cn.Order"
+      -
+        target: "er.entity.order"
+      -
+        participants:
+          customer:
+            -
+              ref: "er.relation.order_customer"
+          fulfilling:
+            -
+              ref: "er.relation.order_warehouse"
+      -
+        period:
+          end:
+            ref: "er.entity.order.delivered_date"
+          start:
+            ref: "er.entity.order.placed_date"
+  -
+    kind: "cn2er_quality"
+    id: "state_g"
+    properties:
+      -
+        quality: "cn.hartland.web.state"
+      -
+        target: "er.entity.order.state"
+  -
+    kind: "cn2er_quality"
+    id: "placed_g"
+    properties:
+      -
+        quality: "hartland.web.placed_date"
+      -
+        target: "er.entity.order.placed_date"

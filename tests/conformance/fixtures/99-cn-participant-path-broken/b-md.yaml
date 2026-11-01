@@ -1,0 +1,15 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "md"
+defs:
+  -
+    kind: "dimension"
+    id: "Region"
+    properties:
+      key: "region_code"
+      attributes:
+        -
+          id: "region_code"
+          properties:
+            isKey: true
+            domain: "md.RegionCode"

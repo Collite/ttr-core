@@ -1,0 +1,20 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Party"
+    properties:
+      -
+        label:
+          en: "Party"
+  -
+    kind: "role"
+    id: "Buyer"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        event: "Purchase"

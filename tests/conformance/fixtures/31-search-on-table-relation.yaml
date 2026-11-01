@@ -1,0 +1,41 @@
+ttr: "0.21"
+model: "db"
+schema: "dbo"
+defs:
+  -
+    kind: "table"
+    id: "customers"
+    properties:
+      description: "Customer master"
+      primaryKey:
+        - "id"
+      columns:
+        -
+          id: "id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "name"
+          properties:
+            type: "text"
+      search:
+        keywords:
+          cs:
+            - "zákazník"
+          en:
+            - "customer"
+        searchable: true
+  -
+    kind: "relation"
+    id: "customer_orders"
+    properties:
+      from:
+        ref: "db.dbo.customers"
+      to:
+        ref: "db.dbo.orders"
+      cardinality:
+        from: "1"
+        to: "0..*"
+      search:
+        fuzzy: true

@@ -1,0 +1,22 @@
+ttr: "0.21"
+package: "hartland.web"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "sale"
+    properties:
+      description: "A web sale."
+      attributes:
+        -
+          id: "amount"
+          properties:
+            type: "decimal"
+  -
+    kind: "relation"
+    id: "sale_revenue"
+    properties:
+      from:
+        ref: "er.entity.sale"
+      to:
+        ref: "md.revenue"

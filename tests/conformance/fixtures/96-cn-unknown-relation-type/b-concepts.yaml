@@ -1,0 +1,56 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "relation_type"
+    id: "supplies"
+    properties:
+      -
+        label:
+          en: "supplies"
+  -
+    kind: "kind"
+    id: "Warehouse"
+    properties:
+      -
+        grounds: "er.entity.warehouse"
+  -
+    kind: "kind"
+    id: "Supplier"
+    properties:
+      -
+        grounds: "er.entity.party"
+      -
+        relations:
+          -
+            to:
+              ref: "Warehouse"
+            type:
+              ref: "supplies"
+  -
+    kind: "kind"
+    id: "Carrier"
+    properties:
+      -
+        grounds: "er.entity.party"
+      -
+        relations:
+          -
+            to:
+              ref: "Warehouse"
+            type:
+              ref: "delivers"
+  -
+    kind: "kind"
+    id: "Broker"
+    properties:
+      -
+        grounds: "er.entity.party"
+      -
+        relations:
+          -
+            to:
+              ref: "Warehouse"
+            type:
+              ref: "Warehouse"

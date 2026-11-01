@@ -1,0 +1,62 @@
+ttr: "0.21"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Sklad"
+    properties:
+      -
+        label:
+          cs: "Sklad"
+          en: "Warehouse"
+      -
+        qualities:
+          -
+            ref: "stav"
+  -
+    kind: "quality"
+    id: "stav"
+    properties:
+      -
+        of:
+          ref: "Sklad"
+  -
+    kind: "phase"
+    id: "Výpadek"
+    properties:
+      -
+        of:
+          ref: "Sklad"
+      -
+        definition:
+          block: "stav = 'mimo'"
+  -
+    kind: "subkind"
+    id: "PostiženýSklad"
+    properties:
+      -
+        of:
+          ref: "Sklad"
+      -
+        definition:
+          block: "exists Výpadek involving this"
+  -
+    kind: "subkind"
+    id: "StaršíSklad"
+    properties:
+      -
+        of:
+          ref: "Sklad"
+      -
+        definition:
+          block: "this.period.start < '2020-01-01'"
+  -
+    kind: "subkind"
+    id: "NedávnýSklad"
+    properties:
+      -
+        of:
+          ref: "Sklad"
+      -
+        definition:
+          block: "within(this.period.start, from: '2026-01-01', to: '2026-12-31')"

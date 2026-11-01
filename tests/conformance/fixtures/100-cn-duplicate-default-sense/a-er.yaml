@@ -1,0 +1,38 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "partner"
+    properties:
+      attributes:
+        -
+          id: "partner_id"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "entity"
+    id: "web_account"
+    properties:
+      attributes:
+        -
+          id: "account_id"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "entity"
+    id: "sale"
+    properties:
+      attributes:
+        -
+          id: "sale_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "sold_date"
+          properties:
+            type: "date"

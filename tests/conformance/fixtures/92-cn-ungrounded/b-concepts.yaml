@@ -1,0 +1,89 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Party"
+    properties:
+      -
+        label:
+          en: "Party"
+  -
+    kind: "role"
+    id: "Shopper"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        event: "StoreVisit"
+  -
+    kind: "event"
+    id: "StoreVisit"
+    properties:
+      -
+        involves:
+          -
+            ref: "Shopper"
+      -
+        period:
+          at:
+            ref: "visited_at"
+  -
+    kind: "quality"
+    id: "basket_size"
+    properties:
+      -
+        of:
+          ref: "StoreVisit"
+  -
+    kind: "quality"
+    id: "basket_value"
+    properties:
+      -
+        of:
+          ref: "StoreVisit"
+      -
+        definition:
+          block: "sum(line_amount)"
+  -
+    kind: "phase"
+    id: "Regular"
+    properties:
+      -
+        of:
+          ref: "Shopper"
+      -
+        definition:
+          block: "count(StoreVisit involving this) >= 4"
+  -
+    kind: "kind"
+    id: "PremiumParty"
+    properties:
+      -
+        is_a:
+          ref: "Party"
+      -
+        members:
+          block: "descendants(Party, 'P1')"
+  -
+    kind: "relation_type"
+    id: "refers"
+    properties:
+      -
+        label:
+          en: "refers"
+  -
+    kind: "kind"
+    id: "Store"
+    properties:
+      -
+        grounds: "er.entity.store"
+  -
+    kind: "kind"
+    id: "Brand"
+    properties:
+      -
+        label:
+          en: "Brand"

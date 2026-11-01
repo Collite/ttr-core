@@ -1,0 +1,90 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "md"
+defs:
+  -
+    kind: "dimension"
+    id: "Product"
+    properties:
+      key: "sku"
+      attributes:
+        -
+          id: "sku"
+          properties:
+            isKey: true
+            domain: "md.Sku"
+        -
+          id: "color"
+          properties:
+            domain: "md.Color"
+            concept:
+              -
+                quality: "color"
+              -
+                of:
+                  ref: "Item"
+      concept:
+        -
+          kind: "Item"
+        -
+          label:
+            en: "Product"
+  -
+    kind: "dimension"
+    id: "Shopper"
+    properties:
+      key: "shopper_code"
+      attributes:
+        -
+          id: "shopper_code"
+          properties:
+            isKey: true
+            domain: "md.ShopperCode"
+      concept:
+        -
+          role: "Shopper"
+        -
+          of:
+            ref: "Party"
+        -
+          event: "StoreSale"
+  -
+    kind: "domain"
+    id: "Brand"
+    properties:
+      type: "text"
+      concept:
+        -
+          kind: "Brand"
+  -
+    kind: "measure"
+    id: "net_sales"
+    properties:
+      domain: "md.Money"
+      aggregation: "sum"
+      concept:
+        -
+          quality: "net_sales"
+        -
+          of:
+            ref: "StoreSale"
+  -
+    kind: "cubelet"
+    id: "store_sales"
+    properties:
+      grain:
+        - "Shopper.shopper_code"
+        - "Product.sku"
+      concept:
+        -
+          event: "StoreSale"
+        -
+          involves:
+            -
+              ref: "Shopper"
+            -
+              ref: "Item"
+        -
+          period:
+            at:
+              ref: "sold_date"

@@ -1,0 +1,20 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "binding"
+defs:
+  -
+    kind: "cn2er_kind"
+    id: "brand_g"
+    properties:
+      -
+        kind: "cn.Brand"
+      -
+        target: "er.entity.brand"
+      -
+        hierarchy:
+          ancestor:
+            ref: "ancestor_code"
+          closure:
+            ref: "er.entity.brand_closure"
+          descendant:
+            ref: "child_code"

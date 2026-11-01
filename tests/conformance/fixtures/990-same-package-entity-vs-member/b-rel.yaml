@@ -1,0 +1,15 @@
+ttr: "0.21"
+package: "shop"
+model: "er"
+defs:
+  -
+    kind: "relation"
+    id: "places"
+    properties:
+      from:
+        ref: "order"
+      to:
+        ref: "customer"
+      cardinality:
+        from: "0..*"
+        to: "1"

@@ -1,0 +1,51 @@
+ttr: "0.21"
+model: "db"
+schema: "dbo"
+defs:
+  -
+    kind: "table"
+    id: "method"
+    properties:
+      columns:
+        -
+          id: "exact_col"
+          properties:
+            type: "varchar"
+            search:
+              searchable: true
+              method:
+                name: "EXACT"
+        -
+          id: "typos_col"
+          properties:
+            type: "varchar"
+            search:
+              searchable: true
+              method:
+                argument: 2
+                name: "TYPOS"
+        -
+          id: "tokens_col"
+          properties:
+            type: "varchar"
+            search:
+              searchable: true
+              method:
+                name: "TOKENS"
+        -
+          id: "bare_col"
+          properties:
+            type: "varchar"
+            search:
+              searchable: true
+        -
+          id: "off_col"
+          properties:
+            type: "varchar"
+            search:
+              searchable: false
+      search:
+        searchable: true
+        method:
+          argument: 1
+          name: "TYPOS"

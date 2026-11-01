@@ -1,0 +1,55 @@
+ttr: "0.21"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Order"
+    properties:
+      -
+        grounds: "er.entity.order"
+  -
+    kind: "kind"
+    id: "Customer"
+    properties:
+      -
+        grounds: "er.entity.customer"
+  -
+    kind: "event"
+    id: "OrderPlaced"
+    properties:
+      -
+        involves:
+          -
+            ref: "Order"
+          -
+            ref: "Customer"
+      -
+        period:
+          at:
+            ref: "placed"
+  -
+    kind: "event"
+    id: "OrderFlagged"
+    properties:
+      -
+        involves:
+          -
+            ref: "Customer"
+      -
+        period:
+          at:
+            ref: "placed"
+  -
+    kind: "subkind"
+    id: "EarlyPlaced"
+    properties:
+      -
+        of:
+          ref: "OrderPlaced"
+  -
+    kind: "subkind"
+    id: "EarlyFlagged"
+    properties:
+      -
+        of:
+          ref: "OrderFlagged"

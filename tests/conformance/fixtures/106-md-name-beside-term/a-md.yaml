@@ -1,0 +1,15 @@
+ttr: "0.21"
+package: "hartland.web"
+model: "md"
+defs:
+  -
+    kind: "domain"
+    id: "Money"
+    properties:
+      type: "decimal"
+  -
+    kind: "measure"
+    id: "revenue"
+    properties:
+      domain: "md.Money"
+      aggregation: "sum"
