@@ -96,7 +96,10 @@ const FREE_ENTRIES = {
   autoEntry: { key: 'autoKey', value: 'autoValue' },
 };
 const word = '[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*';
-const regexEscape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export const regexEscape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// Unlike $, this is an absolute end on both ECMA-262 and java.util.regex.
+export const patternEnd = '(?![\\s\\S])';
+export const anchoredPattern = (body) => `^${body}${patternEnd}`;
 
 export function deriveMetadata(source) {
   const grammar = readGrammar(source);
@@ -121,17 +124,23 @@ export function deriveMetadata(source) {
       dotted = false;
     } else {
       allowed = new Set(symbols(parse('idPart')));
-      if (rule === 'autoKey') for (const t of symbols(parse('autoKey'))) allowed.add(t);
-      if (rule === 'cnObjectEntry') {
-        allowed.add('DATA_TYPE');
-        allowed.add('PRECISION');
-      }
     }
     const excluded = keywordWords.filter(
       (w) => !Object.entries(literals).some(([t, values]) => allowed.has(t) && values.includes(w))
     );
-    const part = `(?!(?:${excluded.map(regexEscape).join('|')})(?:\\.|$))${word}`;
-    return dotted ? `^(?:${part})(?:\\.${part})*$` : `^(?:${part})$`;
+    const part = `(?!(?:${excluded.map(regexEscape).join('|')})(?:\\.|${patternEnd}))${word}`;
+    const id = dotted ? `(?:${part})(?:\\.${part})*` : `(?:${part})`;
+    // TEXT / DATA_TYPE / PRECISION are whole-key alternatives, not idPart.
+    const extras =
+      rule === 'autoKey' ? ['TEXT'] : rule === 'cnObjectEntry' ? ['DATA_TYPE', 'PRECISION'] : [];
+    return anchoredPattern(
+      extras.length
+        ? `(?:${id}|${extras
+            .flatMap((t) => literals[t])
+            .map(regexEscape)
+            .join('|')})`
+        : id
+    );
   }
   const bodies = Object.create(null);
   function tokenKeys(node) {
@@ -162,6 +171,7 @@ export function deriveMetadata(source) {
       rule: name,
       properties: [],
       freeForm: [],
+      fallthroughKeys: [],
       members: [],
       ordered: false,
     });
@@ -222,6 +232,20 @@ export function deriveMetadata(source) {
       throw new Error(`Unhandled definition body shape ${name}`);
     const refs = [...new Set(interior.flatMap(symbols).filter((s) => /^[a-z]/.test(s)))];
     refs.forEach(properties);
+    const freeTokens = new Set(
+      result.freeForm.flatMap((entry) =>
+        entry.key === 'cnKey'
+          ? symbols(parse('cnKey'))
+          : [...symbols(parse('idPart')), ...(entry.key === 'autoKey' ? ['TEXT'] : [])]
+      )
+    );
+    result.fallthroughKeys = result.properties
+      .filter(({ key }) =>
+        Object.entries(literals).some(
+          ([token, values]) => freeTokens.has(token) && values.includes(key)
+        )
+      )
+      .map(({ key }) => key);
     if (
       !result.properties.length &&
       !result.freeForm.length &&
@@ -253,7 +277,11 @@ export function deriveMetadata(source) {
         .map((m) => [`${m.kind}/${m.body}`, m])
     ).values(),
   ];
-  const models = symbols(parse('modelCode')).flatMap((token) => literals[token] ?? []);
+  const models = alternatives(parse('modelCode')).flatMap((option) => {
+    if (!option.symbol || literals[option.symbol]?.length !== 1)
+      throw new Error('Unhandled modelCode alternative');
+    return literals[option.symbol];
+  });
   if (!models.length || new Set(kinds.map((k) => k.kind)).size !== kinds.length)
     throw new Error('Invalid grammar vocabulary');
   return {

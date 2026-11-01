@@ -158,10 +158,91 @@ test('all three generated outputs are deterministic UTF-8/LF JSON with the gramm
     assert.ok(bytes.endsWith('\n'), name);
     assert.ok(!bytes.includes('\r'), name);
     const value = JSON.parse(bytes);
-    assert.equal(value['x-ttr-version'] ?? value.version, '0.21');
+    assert.equal(
+      name.endsWith('schema.json') ? value.$id.split('/schemas/')[1].split('/')[0] : value.version,
+      '0.21'
+    );
     if (name.endsWith('schema.json'))
       assert.equal(value.$schema, 'https://json-schema.org/draft/2020-12/schema');
   }
+});
+
+test('fallthrough keys are derived from each entry key token set', () => {
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(metadata.bodies)
+        .filter(([, body]) => body.fallthroughKeys.length)
+        .map(([name, body]) => [name, body.fallthroughKeys])
+    ),
+    {
+      engineDef: ['version'],
+      executorDef: ['version'],
+      storageDef: ['via'],
+      autoBody: ['label', 'transition', 'set'],
+      processBody: ['steps'],
+    }
+  );
+});
+
+test('storage members and ambiguous profile kinds cannot silently lose a body', () => {
+  const storage = source.replace(
+    '| DEF SCHEMA id worldSchemaDef',
+    '| DEF ENGINE id engineDef | DEF SCHEMA id worldSchemaDef'
+  );
+  assert.notEqual(storage, source);
+  assert.throws(() => generatedFiles(storage), /Unhandled storage member/);
+  const ambiguous = source.replace(
+    '  | worldProperty',
+    '  | DEF ENGINE id autoBody\n  | worldProperty'
+  );
+  assert.notEqual(ambiguous, source);
+  assert.throws(() => generatedFiles(ambiguous), /Ambiguous target kind engine/);
+});
+
+test('all emitted patterns use portable absolute end anchors', () => {
+  for (const name of ['model-yaml.schema.json', 'profile.schema.json']) {
+    const visit = (value) => {
+      if (!value || typeof value !== 'object') return;
+      if (value.pattern) assert.ok(!value.pattern.includes('$'), value.pattern);
+      if (value.patternProperties)
+        for (const pattern of Object.keys(value.patternProperties))
+          assert.ok(!pattern.includes('$'), pattern);
+      Object.values(value).forEach(visit);
+    };
+    visit(JSON.parse(files[name]));
+  }
+});
+
+test('assumed structural rules reject changed productions', () => {
+  for (const name of ['id', 'qualifiedName', 'list', 'definition', 'modelCode', 'roleProperty']) {
+    const changed = source.replace(
+      new RegExp(`(^${name}\\s*:)`, 'm'),
+      name === 'roleProperty' ? '$1 typeProperty |' : '$1 id |'
+    );
+    assert.notEqual(changed, source, name);
+    assert.throws(
+      () => generatedFiles(changed),
+      new RegExp(`Unhandled (grammar shape in ${name}|modelCode alternative)`)
+    );
+  }
+});
+
+test('schema roots use standard 2020-12 vocabulary only', () => {
+  const vocabulary = new Set([
+    '$schema',
+    '$id',
+    '$defs',
+    'title',
+    'type',
+    'properties',
+    'required',
+    'additionalProperties',
+    'dependentRequired',
+    'allOf',
+    'oneOf',
+  ]);
+  for (const name of ['model-yaml.schema.json', 'profile.schema.json'])
+    for (const key of Object.keys(JSON.parse(files[name]))) assert.ok(vocabulary.has(key), key);
 });
 
 test('drift checker detects a stale or missing schema and never overwrites it', () => {

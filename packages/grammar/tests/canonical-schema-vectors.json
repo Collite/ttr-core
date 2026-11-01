@@ -197,13 +197,16 @@
       "security": [
         [
           {
-            "verb": "mask",
+            "verb": "grant",
+            "privilege": "read",
             "object": "x",
+            "to": "sales",
             "predicate": "a=1"
           }
         ]
       ]
-    }
+    },
+    "path": "$.security[0][0]"
   },
   {
     "group": "exact vocabulary and nested types",
@@ -984,7 +987,7 @@
   },
   {
     "group": "lossless and free-form values",
-    "name": "cn forbidden keyword fallback",
+    "name": "cn forbidden type fallback",
     "schema": "model-yaml",
     "valid": false,
     "value": {
@@ -995,12 +998,12 @@
           "kind": "kind",
           "id": "Item",
           "properties": {
-            "from": "x",
             "type": "text"
           }
         }
       ]
-    }
+    },
+    "path": "$.defs[0].properties"
   },
   {
     "group": "lossless and free-form values",
@@ -1063,7 +1066,8 @@
           }
         }
       ]
-    }
+    },
+    "path": "$.defs[0].properties"
   },
   {
     "group": "lossless and free-form values",
@@ -1930,5 +1934,1627 @@
     },
     "valid": false,
     "schema": "model-yaml"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 custom outside cn (automation)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "custom": 5
+          }
+        }
+      ],
+      "model": "automation"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 custom outside cn (cnc)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "custom": 5
+          }
+        }
+      ],
+      "model": "cnc"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 custom outside cn (absent)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "custom": 5
+          }
+        }
+      ]
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 custom in cn",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": [
+            {
+              "custom": 5
+            }
+          ]
+        }
+      ],
+      "model": "cn"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 kind outside cn (automation)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "kind": "Base"
+          }
+        }
+      ],
+      "model": "automation"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 kind outside cn (cnc)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "kind": "Base"
+          }
+        }
+      ],
+      "model": "cnc"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 kind outside cn (absent)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "kind": "Base"
+          }
+        }
+      ]
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 kind in cn",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": [
+            {
+              "kind": "Base"
+            }
+          ]
+        }
+      ],
+      "model": "cn"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 grounds outside cn (automation)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "grounds": "er.entity.x"
+          }
+        }
+      ],
+      "model": "automation"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 grounds outside cn (cnc)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "grounds": "er.entity.x"
+          }
+        }
+      ],
+      "model": "cnc"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 grounds outside cn (absent)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "grounds": "er.entity.x"
+          }
+        }
+      ]
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 grounds in cn",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": [
+            {
+              "grounds": "er.entity.x"
+            }
+          ]
+        }
+      ],
+      "model": "cn"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 involves outside cn (automation)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "involves": [
+              {
+                "ref": "A"
+              }
+            ]
+          }
+        }
+      ],
+      "model": "automation"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 involves outside cn (cnc)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "involves": [
+              {
+                "ref": "A"
+              }
+            ]
+          }
+        }
+      ],
+      "model": "cnc"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 involves outside cn (absent)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "involves": [
+              {
+                "ref": "A"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 involves in cn",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": [
+            {
+              "involves": [
+                {
+                  "ref": "A"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "model": "cn"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 period outside cn (automation)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "period": {
+              "at": {
+                "ref": "placed_date"
+              }
+            }
+          }
+        }
+      ],
+      "model": "automation"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 period outside cn (cnc)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "period": {
+              "at": {
+                "ref": "placed_date"
+              }
+            }
+          }
+        }
+      ],
+      "model": "cnc"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 period outside cn (absent)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "period": {
+              "at": {
+                "ref": "placed_date"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 period in cn",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": [
+            {
+              "period": {
+                "at": {
+                  "ref": "placed_date"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "model": "cn"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 lexicon outside cn (automation)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "lexicon": {
+              "label": "Thing"
+            }
+          }
+        }
+      ],
+      "model": "automation"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 lexicon outside cn (cnc)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "lexicon": {
+              "label": "Thing"
+            }
+          }
+        }
+      ],
+      "model": "cnc"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 lexicon outside cn (absent)",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "lexicon": {
+              "label": "Thing"
+            }
+          }
+        }
+      ]
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 lexicon in cn",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": [
+            {
+              "lexicon": {
+                "label": "Thing"
+              }
+            }
+          ]
+        }
+      ],
+      "model": "cn"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 search forbidden in cn",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": [
+            {
+              "search": {
+                "searchable": true
+              }
+            }
+          ]
+        }
+      ],
+      "model": "cn"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 search outside cn",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "search": {
+              "searchable": true
+            }
+          }
+        }
+      ],
+      "model": "cnc"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 resolve forbidden in cn",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": [
+            {
+              "resolve": {
+                "tag": "keycloak_group",
+                "value": "x"
+              }
+            }
+          ]
+        }
+      ],
+      "model": "cn"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 resolve outside cn",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "resolve": {
+              "tag": "keycloak_group",
+              "value": "x"
+            }
+          }
+        }
+      ],
+      "model": "cnc"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 delivery forbidden in cn",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": [
+            {
+              "delivery": {
+                "object": [
+                  {
+                    "email": "a@b"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "model": "cn"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 delivery outside cn",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "delivery": {
+              "object": [
+                {
+                  "email": "a@b"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "model": "cnc"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 members forbidden in cn",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": [
+            {
+              "members": [
+                "ana",
+                "bo"
+              ]
+            }
+          ]
+        }
+      ],
+      "model": "cn"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F1 members outside cn",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "members": [
+              "ana",
+              "bo"
+            ]
+          }
+        }
+      ],
+      "model": "cnc"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "cn from reference",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "kind",
+          "id": "Item",
+          "properties": {
+            "from": "x"
+          }
+        }
+      ],
+      "model": "cn"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F2 schema colums",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": "0.21",
+      "operations": [
+        {
+          "op": "rename",
+          "at": "/x",
+          "to": {
+            "kind": "schema",
+            "property": "colums"
+          }
+        }
+      ]
+    },
+    "path": "$.operations[0].to"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F2 schema customer",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": "0.21",
+      "operations": [
+        {
+          "op": "rename",
+          "at": "/x",
+          "to": {
+            "kind": "schema",
+            "property": "customer"
+          }
+        }
+      ]
+    },
+    "path": "$.operations[0].to"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F2 schema columns",
+    "schema": "profile",
+    "valid": true,
+    "value": {
+      "profile": "demo/1",
+      "grammar": "0.21",
+      "operations": [
+        {
+          "op": "rename",
+          "at": "/x",
+          "to": {
+            "kind": "schema",
+            "property": "columns"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F2 nested storage schema field",
+    "schema": "profile",
+    "valid": true,
+    "value": {
+      "profile": "demo/1",
+      "grammar": "0.21",
+      "operations": [
+        {
+          "op": "rename",
+          "at": "/x",
+          "to": {
+            "kind": "storage",
+            "path": [
+              "schemas",
+              "fields",
+              "customer"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F3 restrict range",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "domain",
+          "id": "Item",
+          "properties": {
+            "restrict": {
+              "members": {
+                "range": {
+                  "from": 1,
+                  "to": 12
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F3 restrict members",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "domain",
+          "id": "Item",
+          "properties": {
+            "restrict": {
+              "members": {
+                "A": {
+                  "en": "Alpha"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F3 restrict escaped range object",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "domain",
+          "id": "Item",
+          "properties": {
+            "restrict": {
+              "members": {
+                "object": {
+                  "range": {
+                    "from": 1,
+                    "to": 12
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F3 restrict ref",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "domain",
+          "id": "Item",
+          "properties": {
+            "restrict": {
+              "members": {
+                "ref": "A"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F3 restrict list",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "domain",
+          "id": "Item",
+          "properties": {
+            "restrict": {
+              "members": [
+                {
+                  "ref": "A"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F3 restrict call",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "domain",
+          "id": "Item",
+          "properties": {
+            "restrict": {
+              "members": {
+                "call": "f",
+                "args": []
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F3 restrict malformed bare range",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "domain",
+          "id": "Item",
+          "properties": {
+            "restrict": {
+              "members": {
+                "range": {
+                  "from": "a"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "path": "$.defs[0].properties.restrict"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F3 restrict nonlocalized bare members",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "domain",
+          "id": "Item",
+          "properties": {
+            "restrict": {
+              "members": {
+                "members": {
+                  "A": 5
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "path": "$.defs[0].properties.restrict"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F4 neg-07 set twin",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "action",
+          "id": "Item",
+          "properties": [
+            {
+              "set": {
+                "ref": "order.held_for"
+              }
+            }
+          ]
+        }
+      ],
+      "model": "automation"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F4 engine version 16",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "world",
+          "id": "Item",
+          "properties": {
+            "members": [
+              {
+                "kind": "engine",
+                "id": "demo",
+                "properties": {
+                  "version": 16
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "model": "world"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F4 engine version '16'",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "world",
+          "id": "Item",
+          "properties": {
+            "members": [
+              {
+                "kind": "engine",
+                "id": "demo",
+                "properties": {
+                  "version": "16"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "model": "world"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F4 executor version 16",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "world",
+          "id": "Item",
+          "properties": {
+            "members": [
+              {
+                "kind": "executor",
+                "id": "demo",
+                "properties": {
+                  "version": 16
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "model": "world"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F4 executor version '16'",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "world",
+          "id": "Item",
+          "properties": {
+            "members": [
+              {
+                "kind": "executor",
+                "id": "demo",
+                "properties": {
+                  "version": "16"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "model": "world"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F4 storage via fallthrough",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "world",
+          "id": "Item",
+          "properties": {
+            "members": [
+              {
+                "kind": "storage",
+                "id": "demo",
+                "properties": {
+                  "via": "not an id"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "model": "world"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F4 storage typed via",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "world",
+          "id": "Item",
+          "properties": {
+            "members": [
+              {
+                "kind": "storage",
+                "id": "demo",
+                "properties": {
+                  "via": "erp_pg"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "model": "world"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F4 closed staging",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "world",
+          "id": "Item",
+          "properties": {
+            "members": [
+              {
+                "kind": "storage",
+                "id": "demo",
+                "properties": {
+                  "staging": "x"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "model": "world"
+    },
+    "path": "$.defs[0].properties.members[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F4 closed extends",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "world",
+          "id": "Item",
+          "properties": {
+            "members": [
+              {
+                "kind": "storage",
+                "id": "demo",
+                "properties": {
+                  "extends": 5
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "model": "world"
+    },
+    "path": "$.defs[0].properties.members[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F4 closed hosts",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "world",
+          "id": "Item",
+          "properties": {
+            "members": [
+              {
+                "kind": "storage",
+                "id": "demo",
+                "properties": {
+                  "hosts": 5
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "model": "world"
+    },
+    "path": "$.defs[0].properties.members[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F4 version invalid object key",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "world",
+          "id": "Item",
+          "properties": {
+            "members": [
+              {
+                "kind": "engine",
+                "id": "demo",
+                "properties": {
+                  "version": {
+                    "bad key!": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "model": "world"
+    },
+    "path": "$.defs[0].properties.members[0].properties.version"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F5 storage schemas reserved",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "world",
+          "id": "Item",
+          "properties": {
+            "members": [
+              {
+                "kind": "storage",
+                "id": "demo",
+                "properties": {
+                  "schemas": [
+                    "a"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "model": "world"
+    },
+    "path": "$.defs[0].properties.members[0].properties.schemas"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F6 identifier trailing newline",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "entity",
+          "id": "Customer\n",
+          "properties": {}
+        }
+      ]
+    },
+    "path": "$.defs[0].id"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F6 profile trailing newline",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1\n",
+      "grammar": "0.21",
+      "operations": [
+        {
+          "op": "rename",
+          "at": "/x",
+          "to": {
+            "kind": "entity",
+            "property": "description"
+          }
+        }
+      ]
+    },
+    "path": "$.profile"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F6 embedded tag trailing newline",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "query",
+          "id": "Item",
+          "properties": {
+            "sourceText": {
+              "block": "x",
+              "tag": "sql\n"
+            }
+          }
+        }
+      ]
+    },
+    "path": "$.defs[0].properties.sourceText"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F8 method requires searchable",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "role",
+          "id": "Item",
+          "properties": {
+            "search": {
+              "method": {
+                "name": "TOKENS"
+              }
+            }
+          }
+        }
+      ],
+      "model": "cnc"
+    },
+    "path": "$.defs[0].properties.search"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F9 automation key text.x",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "action",
+          "id": "Item",
+          "properties": [
+            {
+              "text.x": "x"
+            }
+          ]
+        }
+      ],
+      "model": "automation"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F9 automation key x.text",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "action",
+          "id": "Item",
+          "properties": [
+            {
+              "x.text": "x"
+            }
+          ]
+        }
+      ],
+      "model": "automation"
+    },
+    "path": "$.defs[0].properties"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F9 whole text key",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "action",
+          "id": "Item",
+          "properties": [
+            {
+              "text": "x"
+            }
+          ]
+        }
+      ],
+      "model": "automation"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F9 cn object key type.x",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "kind",
+          "id": "Item",
+          "properties": {
+            "period": {
+              "type.x": "x"
+            }
+          }
+        }
+      ],
+      "model": "cn"
+    },
+    "path": "$.defs[0].properties.period"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F9 cn object key a.precision",
+    "schema": "model-yaml",
+    "valid": false,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "kind",
+          "id": "Item",
+          "properties": {
+            "period": {
+              "a.precision": "x"
+            }
+          }
+        }
+      ],
+      "model": "cn"
+    },
+    "path": "$.defs[0].properties.period"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F9 whole cn object type",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "kind",
+          "id": "Item",
+          "properties": {
+            "period": {
+              "type": "x"
+            }
+          }
+        }
+      ],
+      "model": "cn"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "F9 whole cn object precision",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "defs": [
+        {
+          "kind": "kind",
+          "id": "Item",
+          "properties": {
+            "period": {
+              "precision": "x"
+            }
+          }
+        }
+      ],
+      "model": "cn"
+    }
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "N-d participant record is terminal",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": "0.21",
+      "operations": [
+        {
+          "op": "rename",
+          "at": "/x",
+          "to": {
+            "kind": "event",
+            "path": [
+              "involves",
+              "ref"
+            ]
+          }
+        }
+      ]
+    },
+    "path": "$.operations[0].to"
+  },
+  {
+    "group": "review-196 regressions",
+    "name": "N-d participant endpoint",
+    "schema": "profile",
+    "valid": true,
+    "value": {
+      "profile": "demo/1",
+      "grammar": "0.21",
+      "operations": [
+        {
+          "op": "rename",
+          "at": "/x",
+          "to": {
+            "kind": "event",
+            "path": [
+              "involves"
+            ]
+          }
+        }
+      ]
+    }
   }
 ]

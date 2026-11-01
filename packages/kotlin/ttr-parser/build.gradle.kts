@@ -16,6 +16,7 @@ kotlin {
 tasks.test {
     inputs.dir("../../../tests/conformance/fixtures")
     inputs.file("../../grammar/tests/canonical-schema-vectors.json")
+    inputs.files(fileTree("../../grammar/schemas"))
     useJUnitPlatform()
     // VL-P0: TtrgGraphReaderSpec reads the shared layout vectors and two samples in place (never a
     // copy) — declare them, or a vector change leaves this task UP-TO-DATE.

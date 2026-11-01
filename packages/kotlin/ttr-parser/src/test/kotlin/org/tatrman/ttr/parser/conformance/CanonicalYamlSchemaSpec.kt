@@ -34,6 +34,9 @@ class CanonicalYamlSchemaSpec :
                         val errors = schema.validate(vector["value"])
                         withClue(errors.joinToString("\n")) {
                             errors.isEmpty() shouldBe vector["valid"].asBoolean()
+                            vector["path"]?.asText()?.let { expected ->
+                                errors.any { it.instanceLocation.toString().startsWith(expected) } shouldBe true
+                            }
                         }
                     }
                 }
@@ -49,9 +52,12 @@ class CanonicalYamlSchemaSpec :
                         }
                     }
                     resource(name) shouldBe Files.readString(Path.of("../../grammar/schemas/$name"))
-                    mapper
-                        .readTree(resource(name))[if (name.endsWith("schema.json")) "x-ttr-version" else "version"]
-                        .asText() shouldBe "0.21"
+                    val json = mapper.readTree(resource(name))
+                    if (name.endsWith("schema.json")) {
+                        json["\$id"].asText().substringAfter("/schemas/").substringBefore('/') shouldBe "0.21"
+                    } else {
+                        json["version"].asText() shouldBe "0.21"
+                    }
                 }
             }
         }

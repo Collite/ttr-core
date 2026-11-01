@@ -73,11 +73,6 @@ if (!process.argv.includes('--skip-build')) {
 }
 
 console.log('[grammar-smoke] packing …');
-const packDirectory = mkdtempSync(join(tmpdir(), 'ttr-grammar-pack-'));
-const packOut = run('pnpm', ['pack', '--pack-destination', packDirectory], grammarDir).trim();
-const tarball = packOut.split('\n').pop().trim();
-console.log(`[grammar-smoke] tarball: ${tarball}`);
-
 const resourceHashes = Object.fromEntries(
   ['model-yaml.schema.json', 'profile.schema.json', 'canonical-metadata.json'].map((name) => [
     name,
@@ -86,8 +81,15 @@ const resourceHashes = Object.fromEntries(
       .digest('hex'),
   ])
 );
-const scratch = mkdtempSync(join(tmpdir(), 'ttr-grammar-consumer-'));
+let packDirectory;
+let scratch;
 try {
+  packDirectory = mkdtempSync(join(tmpdir(), 'ttr-grammar-pack-'));
+  const packOut = run('pnpm', ['pack', '--pack-destination', packDirectory], grammarDir).trim();
+  const tarball = packOut.split('\n').pop().trim();
+  console.log(`[grammar-smoke] tarball: ${tarball}`);
+  scratch = mkdtempSync(join(tmpdir(), 'ttr-grammar-consumer-'));
+
   writeFileSync(
     join(scratch, 'package.json'),
     JSON.stringify(
@@ -122,7 +124,7 @@ try {
       "  const bytes = readFileSync(require.resolve('@tatrman/grammar/schemas/' + name));",
       "  if (createHash('sha256').update(bytes).digest('hex') !== expectedHashes[name]) throw new Error('Packed schema byte mismatch: ' + name);",
       "  const resource = JSON.parse(bytes.toString('utf8'));",
-      "  if ((resource['x-ttr-version'] ?? resource.version) !== mod.TTR_GRAMMAR_VERSION) throw new Error('Schema version mismatch: ' + name);",
+      "  if ((name.endsWith('schema.json') ? resource.$id.split('/schemas/')[1].split('/')[0] : resource.version) !== mod.TTR_GRAMMAR_VERSION) throw new Error('Schema version mismatch: ' + name);",
       '}',
       "const metadata = JSON.parse(readFileSync(require.resolve('@tatrman/grammar/schemas/canonical-metadata.json'), 'utf8'));",
       "const schema = JSON.parse(readFileSync(require.resolve('@tatrman/grammar/schemas/model-yaml.schema.json'), 'utf8'));",
@@ -133,6 +135,6 @@ try {
   run('node', ['consume.mjs'], scratch);
   console.log('[grammar-consumer-smoke] OK — @tatrman/grammar installs and consumes cleanly.');
 } finally {
-  rmSync(scratch, { recursive: true, force: true });
-  rmSync(packDirectory, { recursive: true, force: true });
+  if (scratch) rmSync(scratch, { recursive: true, force: true });
+  if (packDirectory) rmSync(packDirectory, { recursive: true, force: true });
 }

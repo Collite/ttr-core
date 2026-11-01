@@ -323,6 +323,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -432,6 +433,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -482,6 +484,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -560,6 +563,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -596,6 +600,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -632,6 +637,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -675,6 +681,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -718,6 +725,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -831,6 +839,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -997,6 +1006,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -1068,6 +1078,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -1125,6 +1136,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -1175,6 +1187,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -1218,6 +1231,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -1282,6 +1296,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -1451,6 +1466,7 @@
           "value": "cnValue"
         }
       ],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": true
     },
@@ -1494,6 +1510,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -1558,6 +1575,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -1673,6 +1691,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -1709,6 +1728,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -1773,6 +1793,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -1837,6 +1858,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -1894,6 +1916,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -1937,6 +1960,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -2008,6 +2032,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -2065,6 +2090,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -2150,6 +2176,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -2193,6 +2220,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -2250,6 +2278,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -2300,6 +2329,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -2385,6 +2415,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -2421,6 +2452,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [
         {
           "kind": "engine",
@@ -2513,6 +2545,9 @@
           "value": "value"
         }
       ],
+      "fallthroughKeys": [
+        "version"
+      ],
       "members": [],
       "ordered": false
     },
@@ -2568,6 +2603,9 @@
           "key": "key",
           "value": "value"
         }
+      ],
+      "fallthroughKeys": [
+        "version"
       ],
       "members": [],
       "ordered": false
@@ -2639,6 +2677,9 @@
           "value": "value"
         }
       ],
+      "fallthroughKeys": [
+        "via"
+      ],
       "members": [
         {
           "kind": "schema",
@@ -2652,6 +2693,7 @@
       "rule": "worldSchemaDef",
       "properties": [],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false,
       "fields": {
@@ -2766,6 +2808,11 @@
           "value": "autoValue"
         }
       ],
+      "fallthroughKeys": [
+        "label",
+        "transition",
+        "set"
+      ],
       "members": [],
       "ordered": true
     },
@@ -2830,6 +2877,9 @@
           "key": "autoKey",
           "value": "autoValue"
         }
+      ],
+      "fallthroughKeys": [
+        "steps"
       ],
       "members": [],
       "ordered": true
@@ -2909,6 +2959,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -3106,6 +3157,7 @@
           "value": "cnValue"
         }
       ],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": true
     },
@@ -3211,6 +3263,7 @@
           "value": "cnValue"
         }
       ],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": true
     },
@@ -3247,6 +3300,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -3327,6 +3381,7 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     },
@@ -3377,15 +3432,16 @@
         }
       ],
       "freeForm": [],
+      "fallthroughKeys": [],
       "members": [],
       "ordered": false
     }
   },
   "identifiers": {
-    "id": "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$",
-    "cnKey": "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|action|aggregation|aliases|allocation|approval|area|args|as|attribute|attributes|automation|basis|binding|bool|boolean|btree|calc|canvas|cardinality|changeSemantics|char|class|classify|cn|cn2db_concept|cn2er_event|cn2er_kind|cn2er_phase|cn2er_quality|cn2er_role|cn2md_event|cn2md_kind|cn2md_quality|cn2md_role|cnc|codeAttribute|column|columns|concept|constraint|constraints|cubelet|date|datetime|db|decimal|def|default|definition|definitionSql|delivery|deployment|description|descriptions|dimension|direction|display|displayLabel|domain|double|drill_map|engine|entities|entity|er|er2cnc_role|er2db_attribute|er2db_entity|er2db_relation|event|example|examples|executor|extends|extent|false|fk|float|for|forms|from|fulltext|fuzzy|grain|grant|graph|grounds|hierarchies|hosts|identity|import|index|indexed|indices|int|integer|involves|isKey|join|journaling|key|keywords|kind|label|labelPlural|language|layout|length|levels|lexicon|list|locale|management|map|mask|match|md|md2db_cubelet|md2db_domain|md2db_map|md2er_cubelet|md2er_dimension|measure|measures|members|method|model|name|nameAttribute|notNull|null|number|object|objects|on|optional|ordered|override|own|package|packages|parameter|parameters|pattern|patterns|per|period|phase|precision|primary|primaryKey|procedure|process|program|project|publish|quality|query|recipe|relation|relation_type|resolve|restrict|resultColumns|role|roles|schema|search|searchable|secondary|security|semantics|sense_priority|service|set|shape|source|sourceText|staging|states|step|steps|storage|string|subkind|table|tags|target|term|text|timestamp|to|transition|transitions|true|ttrl|type|unique|until|validBy|valueLabels|value_space|varchar|version|view|whereFilter|world|writeback)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)$",
-    "autoKey": "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$",
-    "cnObjectKey": "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|unique|valueLabels|varchar|whereFilter)(?:\\.|$))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*$"
+    "id": "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|(?![\\s\\S])))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|(?![\\s\\S])))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*(?![\\s\\S])",
+    "cnKey": "^(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|action|aggregation|aliases|allocation|approval|area|args|as|attribute|attributes|automation|basis|binding|bool|boolean|btree|calc|canvas|cardinality|changeSemantics|char|class|classify|cn|cn2db_concept|cn2er_event|cn2er_kind|cn2er_phase|cn2er_quality|cn2er_role|cn2md_event|cn2md_kind|cn2md_quality|cn2md_role|cnc|codeAttribute|column|columns|concept|constraint|constraints|cubelet|date|datetime|db|decimal|def|default|definition|definitionSql|delivery|deployment|description|descriptions|dimension|direction|display|displayLabel|domain|double|drill_map|engine|entities|entity|er|er2cnc_role|er2db_attribute|er2db_entity|er2db_relation|event|example|examples|executor|extends|extent|false|fk|float|for|forms|from|fulltext|fuzzy|grain|grant|graph|grounds|hierarchies|hosts|identity|import|index|indexed|indices|int|integer|involves|isKey|join|journaling|key|keywords|kind|label|labelPlural|language|layout|length|levels|lexicon|list|locale|management|map|mask|match|md|md2db_cubelet|md2db_domain|md2db_map|md2er_cubelet|md2er_dimension|measure|measures|members|method|model|name|nameAttribute|notNull|null|number|object|objects|on|optional|ordered|override|own|package|packages|parameter|parameters|pattern|patterns|per|period|phase|precision|primary|primaryKey|procedure|process|program|project|publish|quality|query|recipe|relation|relation_type|resolve|restrict|resultColumns|role|roles|schema|search|searchable|secondary|security|semantics|sense_priority|service|set|shape|source|sourceText|staging|states|step|steps|storage|string|subkind|table|tags|target|term|text|timestamp|to|transition|transitions|true|ttrl|type|unique|until|validBy|valueLabels|value_space|varchar|version|view|whereFilter|world|writeback)(?:\\.|(?![\\s\\S])))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?![\\s\\S])",
+    "autoKey": "^(?:(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|(?![\\s\\S])))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|(?![\\s\\S])))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*|text)(?![\\s\\S])",
+    "cnObjectKey": "^(?:(?:(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|(?![\\s\\S])))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)(?:\\.(?!(?:DATAFRAME_DSL|REL_NODE|SQL|TRANSFORMATION_DSL|attributes|bool|boolean|btree|cardinality|char|codeAttribute|columns|constraints|date|datetime|decimal|def|definitionSql|description|descriptions|displayLabel|double|extends|false|float|fulltext|fuzzy|hosts|indexed|indices|int|integer|isKey|join|keywords|labelPlural|language|length|list|nameAttribute|notNull|null|number|object|optional|ordered|precision|primary|primaryKey|resultColumns|roles|search|searchable|secondary|sourceText|staging|string|tags|target|text|timestamp|true|type|unique|valueLabels|varchar|whereFilter)(?:\\.|(?![\\s\\S])))[A-Za-z_\\u00C0-\\u024F][A-Za-z0-9_\\u00C0-\\u024F]*)*|type|precision)(?![\\s\\S])"
   },
   "rules": {
     "document": "packageDecl ? importDecl * ( modelDirective | graphBlock ) ? ( definition | securityBlock ) * EOF",

@@ -37,7 +37,7 @@ Workspace uses pnpm 11 (see `packageManager`). Node 20+ required.
 
 1. `cd packages/parser && pnpm run prebuild` — regenerates `packages/parser/src/generated/*` via `antlr-ng` (script: `packages/grammar/scripts/generate-typescript-parser.sh`). The `prebuild` hook runs automatically before `pnpm --filter @tatrman/parser build`.
 2. `cd packages/vscode-ext && node scripts/generate-tm-grammar.ts` — regenerates the TextMate grammar used by the VS Code extension for syntax highlighting.
-3. Commit the grammar change. `packages/grammar/src/generated/` and `packages/parser/src/generated/` are **gitignored** — they are regenerated at build time from `TTR.g4`. Only `TTR.g4`, the generation scripts, and `packages/vscode-ext/syntaxes/ttrm.tmLanguage.json` are committed.
+3. Commit the grammar change. `packages/grammar/src/generated/` and `packages/parser/src/generated/` are **gitignored** — they are regenerated at build time from `TTR.g4`. `TTR.g4`, the generation scripts, `packages/vscode-ext/syntaxes/ttrm.tmLanguage.json` and generated `packages/grammar/schemas/*.json` are committed; `schemas:check` rejects schema drift.
 
 `TTR.g4` is **not vendored anywhere**. It is the single canonical source for all three generated parsers (TS via `antlr-ng`, Kotlin via the ANTLR Gradle plugin, Python via the reference ANTLR jar — all reading this `.g4` directly). Downstream consumers like `ai-platform` consume the **published artifacts** (`org.tatrman:ttr-parser` on Maven, the `ttr-parser` wheel on PyPI), never a copy of the grammar. Cross-target drift is caught by the conformance harness (`conformance.yml`), not by grammar sync. The full procedure for cutting a new grammar version lives in [`docs/features/grammar-master/new-grammar-version-process.md`](docs/features/grammar-master/new-grammar-version-process.md).
 
@@ -88,7 +88,7 @@ the migration plan and contracts are in [`docs/features/grammar-master/`](docs/f
 
 ## Architecture
 
-This is a pnpm workspaces monorepo. All TS packages extend `tsconfig.base.json` (strict, ES2022, Node16 modules, ESM). Source goes in `src/`, output in `dist/`. Tests live in `src/__tests__/*.test.ts` and use Vitest.
+This is a pnpm workspaces monorepo. All TS packages extend `tsconfig.base.json` (strict, ES2022, Node16 modules, ESM). Source goes in `src/`, output in `dist/`. Tests generally live in `src/__tests__/*.test.ts` and use Vitest; grammar generation tests use dependency-free `node:test` in `packages/grammar/tests/*.test.mjs`.
 
 ### Dependency graph (one-way)
 

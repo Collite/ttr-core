@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // Schema adapters for retained AST value forms. Vocabulary/body membership is
 // supplied by canonical-metadata; no parallel table of kinds or property names.
-import { expression, symbols, sequence, alternatives } from './canonical-metadata.mjs';
+import {
+  expression,
+  symbols,
+  sequence,
+  alternatives,
+  regexEscape,
+  patternEnd,
+  anchoredPattern,
+} from './canonical-metadata.mjs';
 
 const string = { type: 'string' };
 const number = { type: 'number' };
@@ -33,7 +41,20 @@ const groupBy = (items, key) => {
   for (const item of items) (groups[key(item)] ??= []).push(item);
   return groups;
 };
-const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// TtrWalker.visitRole:1464–1478 rejects the CN alternatives outside model cn.
+// The concept visitor's else branch (~1946) rejects the non-CN alternatives.
+const ROLE_ALTERNATIVES = {
+  cn: [
+    'cnRefProperty',
+    'groundsProperty',
+    'involvesProperty',
+    'periodProperty',
+    'lexiconBlockProperty',
+    'cnEntry',
+  ],
+  non_cn: ['searchBlockProperty', 'resolveProperty', 'deliveryProperty', 'membersProperty'],
+  shared: ['descriptionProperty', 'tagsProperty', 'labelProperty'],
+};
 
 export function createSchemas(metadata) {
   const { rules, literals, bodies, identifiers } = metadata;
@@ -46,6 +67,16 @@ export function createSchemas(metadata) {
   // evaluation. Check their grammar signatures, including helper rules, so an
   // edit inside an existing rule cannot silently retain an obsolete schema.
   const signatures = {
+    id: 'idPart ( DOT idPart )*',
+    qualifiedName: 'id',
+    list: 'LBRACK ( value ( COMMA value )* )? COMMA? RBRACK',
+    definition: 'DEF objectDefinition',
+    modelCode: 'DB | ER | BINDING | QUERY | CNC | MD | WORLD | LEXICON | AUTOMATION | CN',
+    roleProperty: [
+      ...ROLE_ALTERNATIVES.shared,
+      ...ROLE_ALTERNATIVES.non_cn,
+      ...ROLE_ALTERNATIVES.cn,
+    ].join(' | '),
     document:
       'packageDecl ? importDecl * ( modelDirective | graphBlock ) ? ( definition | securityBlock ) * EOF',
     securityBlock:
@@ -72,6 +103,7 @@ export function createSchemas(metadata) {
     restrictClause: 'key propSep ? restrictValue',
     membersBlock: 'LBRACE ( memberEntry ( COMMA ? memberEntry ) * COMMA ? ) ? RBRACE',
     memberEntry: 'stringLiteralForm propSep ? localizedString',
+    restrictValue: 'rangeLiteral | membersBlock | value',
     parameterDefList: 'LBRACK ( parameterInline COMMA ? ) * RBRACK | parameterInline',
     columnDefList: 'LBRACK ( columnInline COMMA ? ) * RBRACK | columnInline',
     columnInline: 'DEF COLUMN id columnDef',
@@ -138,7 +170,7 @@ export function createSchemas(metadata) {
     }
   }
   function checkReachable(name, seen = new Set()) {
-    if (seen.has(name) || /^[A-Z]/.test(name) || ['id', 'idPart', 'propSep'].includes(name)) return;
+    if (seen.has(name) || /^[A-Z]/.test(name) || ['idPart', 'propSep'].includes(name)) return;
     seen.add(name);
     if (!rules[name]) throw new Error(`Unhandled value rule: ${name}`);
     guard(name);
@@ -162,7 +194,7 @@ export function createSchemas(metadata) {
     ...object(
       {
         block: string,
-        tag: { type: 'string', pattern: '^[A-Za-z][A-Za-z0-9-]*$' },
+        tag: { type: 'string', pattern: anchoredPattern('[A-Za-z][A-Za-z0-9-]*') },
         form: { enum: ['string', 'tripleString'] },
       },
       ['block']
@@ -178,6 +210,17 @@ export function createSchemas(metadata) {
   });
   const genericObject = (value, key = identifiers.id) =>
     any(ordinaryObject(value, key), object({ object: patternMap(key, value) }, ['object']));
+  defs.functionCall = object({ call: identifier, args: array(ref('genericValue')) }, [
+    'call',
+    'args',
+  ]);
+  defs.autoObject = object({ object: entrySequence(ref('autoValue')) }, ['object']);
+  defs.durationLiteral = object({ amount: number, unit: identifier }, ['amount', 'unit']);
+  defs.taggedValue = object({ tag: identifier, value: string }, ['tag', 'value']);
+  defs.callValue = object({ call: identifier, entries: entrySequence(ref('autoValue')) }, [
+    'call',
+    'entries',
+  ]);
   defs.genericValue = any(
     string,
     number,
@@ -187,7 +230,7 @@ export function createSchemas(metadata) {
     ref('genericTriple'),
     array(ref('genericValue')),
     genericObject(ref('genericValue')),
-    object({ call: identifier, args: array(ref('genericValue')) }, ['call', 'args'])
+    ref('functionCall')
   );
   defs.cnValue = any(
     string,
@@ -207,10 +250,10 @@ export function createSchemas(metadata) {
     ref('genericRef'),
     ref('genericTriple'),
     array(ref('autoValue')),
-    object({ object: entrySequence(ref('autoValue')) }, ['object']),
-    object({ amount: number, unit: identifier }, ['amount', 'unit']),
-    object({ tag: identifier, value: string }, ['tag', 'value']),
-    object({ call: identifier, entries: entrySequence(ref('autoValue')) }, ['call', 'entries']),
+    ref('autoObject'),
+    ref('durationLiteral'),
+    ref('taggedValue'),
+    ref('callValue'),
     object({ star: { const: true } }, ['star'])
   );
 
@@ -270,7 +313,7 @@ export function createSchemas(metadata) {
       case 'cnObject':
         return genericObject(ref('cnValue'), identifiers.cnObjectKey);
       case 'autoObject':
-        return object({ object: entrySequence(ref('autoValue')) }, ['object']);
+        return ref('autoObject');
       case 'embeddedBlock':
         return ref('embeddedBlock');
       case 'dataType':
@@ -279,7 +322,7 @@ export function createSchemas(metadata) {
           minProperties: 1,
         });
       case 'functionCall':
-        return object({ call: identifier, args: array(ref('genericValue')) }, ['call', 'args']);
+        return ref('functionCall');
       case 'participant':
         return object({ ref: identifier, as: identifier }, ['ref']);
       case 'rangeLiteral':
@@ -292,14 +335,26 @@ export function createSchemas(metadata) {
       case 'levelEntry':
         return object({ attribute: identifier, via: identifier }, ['attribute']);
       case 'durationLiteral':
-        return object({ amount: number, unit: identifier }, ['amount', 'unit']);
+        return ref('durationLiteral');
       case 'taggedValue':
-        return object({ tag: identifier, value: string }, ['tag', 'value']);
+        return ref('taggedValue');
       case 'callValue':
-        return object({ call: identifier, entries: entrySequence(ref('autoValue')) }, [
-          'call',
-          'entries',
-        ]);
+        return ref('callValue');
+      case 'restrictValue':
+        // §7 A: objects here require the escape; plain maps are members blocks.
+        return any(
+          nameSchema('rangeLiteral'),
+          { allOf: [nameSchema('membersBlock'), { not: { required: ['range'] } }] },
+          string,
+          number,
+          boolean,
+          { type: 'null' },
+          ref('genericRef'),
+          ref('genericTriple'),
+          array(ref('genericValue')),
+          ref('functionCall'),
+          object({ object: patternMap(identifiers.id, ref('genericValue')) }, ['object'])
+        );
       case 'matchMethodValue':
         return object({ name: identifier, argument: number }, ['name']);
       case 'parameterDefList':
@@ -373,6 +428,11 @@ export function createSchemas(metadata) {
     return object({ id: identifier, properties: bodySchema(name) }, ['id', 'properties']);
   }
   const building = new Set();
+  const valueRecords = new Set();
+  const valueRecord = (schema) => {
+    valueRecords.add(schema);
+    return schema;
+  };
   function propertySchema(property) {
     const { rule } = property;
     checkReachable(rule);
@@ -380,12 +440,14 @@ export function createSchemas(metadata) {
       case 'searchableProperty':
         return boolean;
       case 'changeSemanticsProperty':
-        return object({ mode: identifier, roles: patternMap(identifiers.id, identifier) }, [
-          'mode',
-          'roles',
-        ]);
+        return valueRecord(
+          object({ mode: identifier, roles: patternMap(identifiers.id, identifier) }, [
+            'mode',
+            'roles',
+          ])
+        );
       case 'transitionProperty':
-        return {
+        return valueRecord({
           ...object(
             {
               attribute: identifier,
@@ -399,9 +461,11 @@ export function createSchemas(metadata) {
             { required: ['to'], not: { required: ['toColumn'] } },
             { required: ['toColumn'], not: { required: ['to'] } },
           ],
-        };
+        });
       case 'setProperty':
-        return object({ attribute: identifier, column: identifier }, ['attribute', 'column']);
+        return valueRecord(
+          object({ attribute: identifier, column: identifier }, ['attribute', 'column'])
+        );
       case 'transitionsProperty':
         return patternMap(identifiers.id, array(identifier));
       case 'stepsProperty':
@@ -409,23 +473,55 @@ export function createSchemas(metadata) {
     }
     return expressionSchema(property.value, rule);
   }
-  function bodySchema(name, closedRole = false) {
-    const key = `body_${name}${closedRole ? '_closed' : ''}`;
+  function bodySchema(name, roleMode = 'union') {
+    const key = `body_${name}${name === 'roleDef' ? `_${roleMode}` : ''}`;
     if (defs[key] || building.has(key)) return ref(key);
     building.add(key);
     const body = bodies[name];
     if (!body) throw new Error(`Unhandled body ${name}`);
+    if (
+      name === 'storageDef' &&
+      JSON.stringify(body.members) !==
+        JSON.stringify([{ kind: 'schema', body: 'worldSchemaDef', named: true }])
+    )
+      throw new Error(`Unhandled storage member ${JSON.stringify(body.members)}`);
+    if (name === 'roleDef' && roleMode === 'union') {
+      defs[key] = any(bodySchema(name, 'cn'), bodySchema(name, 'non_cn'));
+      // Retain the public body key used by inventory/consumer checks.
+      defs.body_roleDef = ref(key);
+      building.delete(key);
+      return ref(key);
+    }
     let mapping;
     if (body.fields) {
       mapping = patternMap(identifiers.id, nameSchema(body.fields.value));
     } else {
-      const properties = Object.fromEntries(body.properties.map((p) => [p.key, propertySchema(p)]));
+      const allowed =
+        name === 'roleDef' ? [...ROLE_ALTERNATIVES.shared, ...ROLE_ALTERNATIVES[roleMode]] : null;
+      const free = name === 'roleDef' && roleMode === 'non_cn' ? [] : body.freeForm;
+      const properties = Object.fromEntries(
+        body.properties
+          .filter((p) => !allowed || allowed.includes(p.rule))
+          .map((p) => {
+            const typed = propertySchema(p);
+            return [
+              p.key,
+              body.fallthroughKeys.includes(p.key) && free.length
+                ? any(
+                    typed,
+                    free.map((f) => nameSchema(f.value))
+                  )
+                : typed,
+            ];
+          })
+      );
       if (body.properties.some((p) => p.rule === 'searchableProperty'))
         properties.method = nameSchema('matchMethodValue');
       if (body.members.length) {
         if (name === 'storageDef') {
+          const [member] = body.members;
           properties.schemas = array(
-            object({ id: identifier, fields: bodySchema('worldSchemaDef') }, ['id', 'fields'])
+            object({ id: identifier, fields: bodySchema(member.body) }, ['id', 'fields'])
           );
         } else {
           properties.members = array(
@@ -445,10 +541,12 @@ export function createSchemas(metadata) {
         }
       }
       mapping = object(properties);
-      const free = closedRole ? [] : body.freeForm;
+      if (properties.method) mapping.dependentRequired = { method: ['searchable'] };
       if (free.length) {
         const known = Object.keys(properties);
-        const exclude = known.length ? `(?!${known.map(escape).join('$|')}$)` : '';
+        const exclude = known.length
+          ? `(?!(?:${known.map(regexEscape).join('|')})${patternEnd})`
+          : '';
         mapping.patternProperties = Object.fromEntries(
           free.map((f) => {
             const pattern =
@@ -463,28 +561,38 @@ export function createSchemas(metadata) {
       }
     }
     defs[key] =
-      !closedRole && body.ordered
+      !(name === 'roleDef' && roleMode === 'non_cn') && body.ordered
         ? any(mapping, array({ ...mapping, minProperties: 1, maxProperties: 1 }))
         : mapping;
     building.delete(key);
     return ref(key);
   }
   for (const name of Object.keys(bodies)) bodySchema(name);
-  bodySchema('roleDef', true);
+  bodySchema('roleDef', 'non_cn');
   for (const kind of metadata.kinds) {
     defs[`def_${kind.kind}`] = object(
-      { kind: { const: kind.kind }, id: identifier, properties: bodySchema(kind.body) },
+      { kind: { const: kind.kind }, id: identifier, properties: bodySchema(kind.body, 'cn') },
       ['kind', 'id', 'properties']
     );
   }
   defs.def_role_closed = object(
-    { kind: { const: 'role' }, id: identifier, properties: bodySchema('roleDef', true) },
+    { kind: { const: 'role' }, id: identifier, properties: bodySchema('roleDef', 'non_cn') },
     ['kind', 'id', 'properties']
   );
-  const definitions = (cn) =>
-    any(
-      metadata.kinds.map((k) => ref(k.kind === 'role' && !cn ? 'def_role_closed' : `def_${k.kind}`))
-    );
+  const definitions = (cn) => ({
+    ...object(
+      {
+        kind: { enum: metadata.kinds.map((k) => k.kind) },
+        id: identifier,
+        properties: { type: ['object', 'array'] },
+      },
+      ['kind', 'id', 'properties']
+    ),
+    allOf: metadata.kinds.map((k) => ({
+      if: { properties: { kind: { const: k.kind } }, required: ['kind'] },
+      then: ref(k.kind === 'role' && !cn ? 'def_role_closed' : `def_${k.kind}`),
+    })),
+  });
   const graphProperties = {};
   const graphRefs = symbols(expression(rules.graphProperty));
   for (const rule of graphRefs) {
@@ -517,12 +625,14 @@ export function createSchemas(metadata) {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     $id: `https://tatrman.org/schemas/${metadata.version}/model-yaml.schema.json`,
     title: 'Canonical TTR YAML document',
-    'x-ttr-version': metadata.version,
     ...object(
       {
         ttr: { const: metadata.version },
         package: identifier,
-        imports: array({ type: 'string', pattern: identifiers.id.replace(/\$$/, '(?:\\.\\*)?$') }),
+        imports: array({
+          type: 'string',
+          pattern: anchoredPattern(`${identifiers.id.slice(1, -patternEnd.length)}(?:\\.\\*)?`),
+        }),
         model: { enum: metadata.models },
         schema: identifier,
         locale: identifier,
@@ -531,7 +641,7 @@ export function createSchemas(metadata) {
           'properties',
         ]),
         security: array(array(any(security))),
-        defs: array(definitions(true)),
+        defs: { type: 'array' },
       },
       ['ttr']
     ),
@@ -588,8 +698,28 @@ export function createSchemas(metadata) {
       });
     }
     function walk(schema, prefix = [], seen = new Set()) {
+      // These fields encode a single TTR value, not addressable grammar properties.
+      if (valueRecords.has(schema)) return;
       if (schema.$ref) {
         const key = schema.$ref.split('/').at(-1);
+        if (
+          [
+            'genericRef',
+            'genericTriple',
+            'embeddedBlock',
+            'functionCall',
+            'autoObject',
+            'durationLiteral',
+            'taggedValue',
+            'callValue',
+            'value_participant',
+            'value_rangeLiteral',
+            'value_calcRef',
+            'value_levelEntry',
+            'value_matchMethodValue',
+          ].includes(key)
+        )
+          return;
         if (recursiveValues[key]) {
           endpoint(prefix, schema, keySchema(recursiveValues[key]));
           return;
@@ -626,11 +756,18 @@ export function createSchemas(metadata) {
     walk(bodySchema(bodyName));
     return [...new Map(paths.map((p) => [JSON.stringify(p), p])).values()];
   }
-  const targetKinds = [
-    ...new Map(
-      [...metadata.kinds, ...metadata.nestedKinds].map((k) => [`${k.kind}/${k.body}`, k])
-    ).values(),
-  ];
+  // Top-level schema has columns; storage schemas remain reachable via storage.schemas.fields.
+  const targetBodyOverrides = { schema: 'schemaDef' };
+  const targetKinds = Object.entries(
+    groupBy([...metadata.kinds, ...metadata.nestedKinds], (k) => k.kind)
+  ).map(([kind, entries]) => {
+    const names = [...new Set(entries.map((k) => k.body))];
+    if (names.length > 1 && !targetBodyOverrides[kind])
+      throw new Error(`Ambiguous target kind ${kind}: ${names.join(', ')}`);
+    const body = targetBodyOverrides[kind] ?? names[0];
+    if (!names.includes(body)) throw new Error(`Unhandled target body for ${kind}`);
+    return { kind, body };
+  });
   const pathsByBody = {};
   const targetBranches = targetKinds.map(({ kind, body: bodyName }) => {
     const variants = objectVariants(bodySchema(bodyName));
@@ -673,7 +810,7 @@ export function createSchemas(metadata) {
     type: 'object',
     anyOf: [{ required: ['property'] }, { required: ['path'] }],
   };
-  const pointer = { type: 'string', pattern: '^(?:/(?:[^~/]|~[01])*)*$' };
+  const pointer = { type: 'string', pattern: anchoredPattern('(?:/(?:[^~/]|~[01])*)*') };
   defs.profileTemplate = any(
     string,
     number,
@@ -779,12 +916,11 @@ export function createSchemas(metadata) {
     $schema: model.$schema,
     $id: `https://tatrman.org/schemas/${metadata.version}/profile.schema.json`,
     title: 'TTR profile definition or tree declaration',
-    'x-ttr-version': metadata.version,
     oneOf: [
       declaration,
       object(
         {
-          profile: { type: 'string', pattern: '^.+/[0-9]+$' },
+          profile: { type: 'string', pattern: anchoredPattern('.+/[0-9]+') },
           grammar: nonEmpty,
           extends: nonEmpty,
           overlay: any(nonEmpty, {
