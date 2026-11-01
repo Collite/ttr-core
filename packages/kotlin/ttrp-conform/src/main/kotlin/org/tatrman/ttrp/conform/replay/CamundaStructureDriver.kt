@@ -266,7 +266,12 @@ class CamundaStructureDriver(
                     if (flow == null ||
                         gateway?.localName !in setOf("exclusiveGateway", "inclusiveGateway") ||
                         flow.getAttribute("sourceRef") != gateway?.getAttribute("id") ||
-                        flow.getAttribute("targetRef") != task
+                        flow.getAttribute("targetRef") != (branch?.get("entry")?.jsonPrimitive?.content ?: task) ||
+                        (
+                            branch?.get("entry")?.jsonPrimitive?.content?.let { nodes[it] }?.let { entry ->
+                                elements(entry, BPMN, "serviceTask").none { it.getAttribute("id") == task }
+                            } == true
+                        )
                     ) {
                         missing("routes", "$route branch to $task")
                     } else {

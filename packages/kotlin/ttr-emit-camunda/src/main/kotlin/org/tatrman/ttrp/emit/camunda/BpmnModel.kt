@@ -333,8 +333,19 @@ internal class BpmnModel(
                     "xmlns:dc" to "http://www.omg.org/spec/DD/20100524/DC",
                     "xmlns:di" to "http://www.omg.org/spec/DD/20100524/DI",
                     "xmlns:xsi" to "http://www.w3.org/2001/XMLSchema-instance",
-                    "xmlns:camunda" to "http://camunda.org/schema/1.0/bpmn",
-                    "xmlns:zeebe" to "http://camunda.org/schema/zeebe/1.0",
+                    (if (dialect == Dialect.C7) "xmlns:camunda" else "xmlns:zeebe") to
+                        (
+                            if (dialect ==
+                                Dialect.C7
+                            ) {
+                                "http://camunda.org/schema/1.0/bpmn"
+                            } else {
+                                "http://camunda.org/schema/zeebe/1.0"
+                            }
+                        ),
+                    "xmlns:modeler" to "http://camunda.org/schema/modeler/1.0",
+                    "modeler:executionPlatform" to dialect.choose("Camunda Platform", "Camunda Cloud"),
+                    "modeler:executionPlatformVersion" to dialect.choose("7.24.0", "8.6.0"),
                     "xmlns:ttr" to TTR,
                     "id" to stableId("$processId/definitions"),
                     "targetNamespace" to TTR,

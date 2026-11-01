@@ -25,7 +25,12 @@ internal data class CamundaSchedule(
             val hour = m.groupValues[2].toInt()
             val minute = m.groupValues[3].toInt()
             require(hour in 0..23 && minute in 0..59) { "invalid schedule hint $hint" }
-            val zone = ZoneId.of(m.groupValues[4]).id
+            val zone =
+                try {
+                    ZoneId.of(m.groupValues[4]).id
+                } catch (e: java.time.DateTimeException) {
+                    throw IllegalArgumentException("invalid schedule hint $hint", e)
+                }
             if (dialect == Dialect.C7) {
                 val ending =
                     when (day) {

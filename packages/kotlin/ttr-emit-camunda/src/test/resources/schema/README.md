@@ -10,7 +10,8 @@ not represented as official Camunda schemas or a substitute for engine validatio
 [C7 connector model](https://github.com/camunda/camunda-bpm-platform/tree/7.24.0/model-api/bpmn-model/src/main/java/org/camunda/bpm/model/bpmn/instance/camunda),
 [Zeebe model](https://github.com/camunda/camunda/tree/8.8.0/zeebe/bpmn-model/src/main/java/io/camunda/zeebe/model/bpmn/instance/zeebe) and
 [REST connector template](https://github.com/camunda/connectors/blob/main/connectors/http/rest/element-templates/http-json-connector.json).
-`ttr-export.xsd` defines the exporter's structural contract extension. Tests load all four namespaces so lax
+`modeler-supported.xsd` locally validates the two Modeler execution-platform attributes, following
+[Camunda execution-platform](https://github.com/camunda/execution-platform). `ttr-export.xsd` defines the exporter's structural contract extension. Tests load all five namespaces so lax
 extension validation in the standard schema cannot silently skip these supported shapes.
 
 The Modeler opening is a separate, pending manual acceptance. No DFP draft is used as a schema or fixture.

@@ -138,7 +138,7 @@ class CamundaExpressionSpec :
                     (run(code) as org.camunda.spin.json.SpinJsonNode).prop("runId").stringValue() shouldBe
                         "run"
                 }
-                for (code in listOf(400, 403, 500)) {
+                for (code in listOf(408, 429, 500)) {
                     io.kotest.assertions.throwables
                         .shouldThrow<RuntimeException> { run(code) }
                         .message shouldBe
@@ -420,7 +420,7 @@ class CamundaExpressionSpec :
                         }
                     val variables =
                         mapOf<String, Any>(
-                            "ttrInput" to mapOf("key" to 4711),
+                            "ttrInput" to mapOf("key" to 4711, "at" to "2026-11-01T10:00:00Z"),
                             "ttrStepAt" to "2026-11-01T10:00:00Z",
                             "ttrAnchor" to "first-run",
                             "ttrExecutionId" to "execution",
@@ -428,6 +428,7 @@ class CamundaExpressionSpec :
                         )
                     val context = SimpleContext()
                     context.setFunction("", "S", Spin::class.java.getMethod("S", Any::class.java))
+                    context.setFunction("", "dateTime", ReviewFunctions::class.java.getMethod("dateTime"))
                     variables.forEach { (name, value) ->
                         context.setVariable(name, factory.createValueExpression(value, Any::class.java))
                     }
@@ -466,7 +467,9 @@ class CamundaExpressionSpec :
                             } else {
                                 result["idempotencyKey"] shouldBe "first-run:second"
                             }
-                            (result["port"] as Map<*, *>)["at"] shouldBe "2026-11-01T10:00:00Z"
+                            val at = (result["port"] as Map<*, *>)["at"].toString()
+                            java.time.Instant.parse(at)
+                            if (index == 0) at shouldBe "2026-11-01T10:00:00Z"
                         } else {
                             (result["port"] as Map<*, *>).keys shouldBe setOf("none")
                             result["idempotencyKey"] shouldBe "execution"

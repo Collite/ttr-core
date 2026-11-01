@@ -15,7 +15,7 @@ internal enum class Dialect(
 
     fun condition(value: String): String = choose("\${$value}", "=$value")
 
-    private fun feelRetryAfter(): String {
+    private fun feelRetryAfter(response: String = "response"): String {
         val date =
             listOf(
                 "parts:split(header,\" \")",
@@ -24,8 +24,8 @@ internal enum class Dialect(
                 "instant:if iso != null then date and time(iso) else null",
                 "delay:if instant != null then max([1,ceiling((instant-now())/duration(\"PT1S\"))]) else 15",
             ).joinToString(",", "{", "}.delay")
-        return "{header:if get value(response.headers,\"retry-after\") != null then " +
-            "get value(response.headers,\"retry-after\") else get value(response.headers,\"Retry-After\"), " +
+        return "{header:if get value($response.headers,\"retry-after\") != null then " +
+            "get value($response.headers,\"retry-after\") else get value($response.headers,\"Retry-After\"), " +
             "seconds:number(header), delay:if seconds != null and seconds > 0 then seconds " +
             "else if header != null then $date else 15}.delay"
     }
@@ -62,7 +62,11 @@ internal enum class Dialect(
     fun exists(
         variable: String,
         name: String,
-    ): String = choose("$variable.hasProp(${quote(name)})", "$variable.$name != null")
+    ): String =
+        choose(
+            "$variable.hasProp(${quote(name)}) && !$variable.prop(${quote(name)}).isNull()",
+            "$variable.$name != null",
+        )
 
     fun eq(
         a: String,
@@ -174,6 +178,7 @@ internal enum class Dialect(
                                                             """
                                                             def code = ((Number) statusCode).intValue()
                                                             if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')
+                                                            if (code >= 400 && code < 500 && code != 408 && code != 429) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_REFUSED', 'run API HTTP ' + code + ': ' + response.toString().take(256))
                                                             if (code < 200 || code >= 300) throw new IllegalStateException('run API HTTP ' + code)
                                                             return org.camunda.spin.Spin.JSON(response)
                                                             """.trimIndent(),
@@ -269,7 +274,18 @@ internal enum class Dialect(
                                 "zeebe:header",
                                 mapOf(
                                     "key" to "errorExpression",
-                                    "value" to "=if error.code = \"409\" then bpmnError(\"TTR_STALE\") else null",
+                                    "value" to
+                                        "=if error.code = \"409\" then " +
+                                        "bpmnError(\"TTR_STALE\", \"run API fingerprint refused\") else " +
+                                        "if number(error.code) >= 400 and number(error.code) < 500 and " +
+                                        "not(list contains([\"408\",\"429\"],error.code)) " +
+                                        "then bpmnError(\"TTR_REFUSED\", \"run API HTTP \" + error.code) else " +
+                                        "if list contains([\"408\",\"429\"],error.code) " +
+                                        "or number(error.code) >= 500 then " +
+                                        "jobError(\"run API HTTP \" + error.code, {}, job.retries - 1, " +
+                                        "duration(\"PT\" + string(${feelRetryAfter(
+                                            "error.variables.response",
+                                        )}) + \"S\")) else null",
                                 ),
                             ),
                             Xml("zeebe:header", mapOf("key" to "retryBackoff", "value" to "PT15S")),

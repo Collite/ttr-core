@@ -11,7 +11,13 @@ internal fun validateBpmn(xml: String) {
     factory.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "")
     factory.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "file")
     val sources =
-        listOf("BPMN20.xsd", "camunda-supported.xsd", "zeebe-supported.xsd", "ttr-export.xsd").map {
+        listOf(
+            "BPMN20.xsd",
+            "camunda-supported.xsd",
+            "zeebe-supported.xsd",
+            "ttr-export.xsd",
+            "modeler-supported.xsd",
+        ).map {
             StreamSource(requireNotNull(CamundaEmitSpec::class.java.getResource("/schema/$it")).toExternalForm())
         }
     val schema = factory.newSchema(sources.toTypedArray())

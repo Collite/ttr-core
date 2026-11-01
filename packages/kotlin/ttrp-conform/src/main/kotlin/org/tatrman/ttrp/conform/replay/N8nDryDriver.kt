@@ -68,9 +68,20 @@ class N8nDryDriver(
                 "unsupported replay cell"
             }
             val workflows =
-                exports.map { folder ->
-                    val workflow = Json.parseToJsonElement(Files.readString(folder.resolve("workflow.json"))).jsonObject
+                exports.mapNotNull { folder ->
                     val manifest = Json.parseToJsonElement(Files.readString(folder.resolve("manifest.json"))).jsonObject
+                    if (manifest
+                            .getValue(
+                                "target",
+                            ).jsonObject
+                            .getValue("type")
+                            .jsonPrimitive.content
+                            .replace('-', '_') !=
+                        "n8n_l1"
+                    ) {
+                        return@mapNotNull null
+                    }
+                    val workflow = Json.parseToJsonElement(Files.readString(folder.resolve("workflow.json"))).jsonObject
                     val declared =
                         workflow
                             .getValue("meta")

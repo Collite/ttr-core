@@ -68,6 +68,7 @@ internal class CamundaRenderer(
         args: Map<String, String> = emptyMap(),
         body: String? = null,
         run: String = "ttrRunId",
+        query: String? = null,
     ): BpmnModel.Node {
         var path = graph.runApi.basePath.trimEnd('/') + graph.runApi.calls.getValue(call)
         (args + ("recipe" to graph.recipe.name)).forEach { (key, value) ->
@@ -85,7 +86,19 @@ internal class CamundaRenderer(
                 d.concat(base, quote(path))
             }
         val task = scope.node("serviceTask", label)
-        task.extensions += d.rest(method, url, if (method == "POST") body ?: obj() else null, result)
+        task.extensions +=
+            d.rest(
+                method,
+                if (query ==
+                    null
+                ) {
+                    url
+                } else {
+                    d.concat(url, query)
+                },
+                if (method == "POST") body ?: obj() else null,
+                result,
+            )
         if (d == Dialect.C7) {
             task.attrs["camunda:asyncBefore"] = "true"
             task.extensions += Xml("camunda:failedJobRetryTimeCycle", text = "R3/PT15S")
@@ -123,7 +136,7 @@ internal class CamundaRenderer(
             ) {
                 port
             } else {
-                expr("$port.prop('at', ttrStepAt)", "context merge([$port,{at:ttrStepAt}])")
+                expr("$port.prop('at', ${stepClock(graph, first)})", "context merge([$port,{at:ttrStepAt}])")
             }
         val fields =
             linkedMapOf(
@@ -153,6 +166,20 @@ internal class CamundaRenderer(
         return d.objectValue(fields)
     }
 
+    // C7 evaluates sibling inputs in the parent scope. Inline this once into the saved Open body.
+    private fun stepClock(
+        graph: RecipeGraph,
+        first: Boolean,
+    ): String =
+        if (first && graph.program.port !in setOf(null, "none")) {
+            expr(
+                "ttrInput['at'] != null ? ttrInput['at'] : dateTime().toString()",
+                "if ttrInput.at != null then ttrInput.at else string(date and time(now(), \"Z\"))",
+            )
+        } else {
+            expr("dateTime().toString()", "string(date and time(now(), \"Z\"))")
+        }
+
     private fun step(
         graph: RecipeGraph,
         name: String,
@@ -160,6 +187,9 @@ internal class CamundaRenderer(
     ): BpmnModel.Node {
         require(graph.deployment.granularity in setOf("recipe", "parts")) { "unsupported Camunda granularity" }
         require(graph.program.mode in setOf("on_event", "batch")) { "unsupported Camunda mode" }
+        require(graph.program.deliver?.contains("digest") != true) {
+            "camunda exports do not render digest delivery; use n8n_l1 or deliver: immediate"
+        }
         val scope = BpmnModel.Scope(stableId("${model.processId}/step/$name"))
         val sub =
             model.root.node(
@@ -181,17 +211,7 @@ internal class CamundaRenderer(
             inputs["ttrExecutionId"] =
                 expr("execution.processInstanceId", "if ttrExecutionId != null then ttrExecutionId else uuid()")
         }
-        inputs["ttrStepAt"] =
-            if (first &&
-                graph.program.port !in setOf(null, "none")
-            ) {
-                expr(
-                    "ttrInput['at'] != null ? ttrInput['at'] : dateTime().toString()",
-                    "if ttrInput.at != null then ttrInput.at else string(now())",
-                )
-            } else {
-                expr("dateTime().toString()", "string(now())")
-            }
+        if (d == Dialect.C8) inputs["ttrStepAt"] = stepClock(graph, first)
         inputs["ttrOpenBody"] = openBody(graph, name, first)
         val outputs = linkedMapOf("ttrPreviousRunId" to d.string("ttrOpen", "runId"))
         if (first) outputs["ttrAnchor"] = d.string("ttrOpen", "runId")
@@ -199,12 +219,10 @@ internal class CamundaRenderer(
         val start = scope.node("startEvent", "start $name")
         val end = scope.node("endEvent", "step complete")
         val refused = error(scope, "run refused", "run_refused")
-        val stale = error(scope, "stale export", "stale_export")
         val open = http(scope, graph, "open", "open", "ttrOpen", body = "ttrOpenBody")
         scope.link(start, open)
         val codes = scope.node("exclusiveGateway", "Open ownership")
         scope.link(open, codes)
-        scope.link(codes, stale, "409 stale", eq("ttrOpenCode", "409"))
         scope.link(codes, end, "200 replayed", d.and(eq("ttrOpenCode", "200"), d.bool("ttrOpen", "replayed")))
         val fresh = scope.node("exclusiveGateway", "claimed run")
         scope.link(codes, fresh, "201 claimed", eq("ttrOpenCode", "201"))
@@ -260,7 +278,6 @@ internal class CamundaRenderer(
         val reopened = scope.node("exclusiveGateway", "re-open claimed")
         scope.link(reopen, reopened)
         scope.link(reopened, fresh, "201 recovered", eq("ttrOpenCode", "201"))
-        scope.link(reopened, stale, "409 stale", eq("ttrOpenCode", "409"))
         scope.default(reopened, refused)
         val work = BpmnModel.Scope(stableId("${scope.id}/work"))
         val decide = scope.node("subProcess", "Decide", child = work)
@@ -326,7 +343,6 @@ internal class CamundaRenderer(
         val evaluate = http(evaluation, graph, "evaluate", "evaluate", "ttrEvaluation")
         evaluation.link(last, evaluate)
         val evaluated = evaluation.node("exclusiveGateway", "evaluation complete")
-        evaluation.link(evaluate, evaluated)
         val poll =
             timer(
                 evaluation,
@@ -340,17 +356,34 @@ internal class CamundaRenderer(
             )
         val progress = http(evaluation, graph, "evaluation status", "status", "ttrEvaluation")
         evaluation.default(evaluated, poll)
+        // Synchronous EvaluationResult has no status: use RunProgress on both paths.
+        evaluation.link(evaluate, progress)
         evaluation.link(poll, progress)
         evaluation.link(progress, evaluated)
         val evaluationEnd = evaluation.node("endEvent", "verdict ready")
-        evaluation.link(evaluated, evaluationEnd, "verdict ready", d.exists("ttrEvaluation", "verdict"))
+        val evaluationFailed = error(evaluation, "evaluation failed or abandoned", "run_refused")
+        evaluation.link(
+            evaluated,
+            evaluationFailed,
+            "failed or abandoned",
+            d.or(state("ttrEvaluation", "failed"), state("ttrEvaluation", "abandoned")),
+        )
+        val ready =
+            d.and(
+                d.exists("ttrEvaluation", "verdict"),
+                expr(
+                    "!(${state("ttrEvaluation", "running")}) && !(${state("ttrEvaluation", "open")})",
+                    "not(${state("ttrEvaluation", "running")}) and not(${state("ttrEvaluation", "open")})",
+                ),
+            )
+        evaluation.link(evaluated, evaluationEnd, "verdict ready", ready)
         val statusActions = http(work, graph, "selected actions", "status", "ttrStatus")
         work.link(boundedEvaluation, statusActions)
         val valid = work.node("exclusiveGateway", "per-key actions required")
         work.link(statusActions, valid)
         val wfail = error(work, "missing or failed run evidence", "run_refused")
         work.default(valid, wfail)
-        val switchKind = if (graph.roles.switchMode == "overlapping") "inclusiveGateway" else "exclusiveGateway"
+        val switchKind = "inclusiveGateway" // switchMode is exclusive per row, never per run.
         val forkRoutes = work.node(switchKind, "routes")
         val joinRoutes = work.node(switchKind, "routes complete")
         val actionsArray =
@@ -382,21 +415,7 @@ internal class CamundaRenderer(
 
     private fun budget(graph: RecipeGraph): Long {
         val raw = graph.program.budget[if (graph.program.mode == "batch") "batch" else "sync"]
-        val m = raw?.let { Regex("([0-9.]+)\\s*(milliseconds|seconds|minutes|hours)").matchEntire(it) }
-        val seconds =
-            if (m == null) {
-                if (graph.program.mode == "batch") 1800L else 60L
-            } else {
-                (
-                    m.groupValues[1].toDouble() *
-                        mapOf(
-                            "milliseconds" to .001,
-                            "seconds" to 1.0,
-                            "minutes" to 60.0,
-                            "hours" to 3600.0,
-                        ).getValue(m.groupValues[2])
-                ).toLong()
-            }
+        val seconds = raw?.let(::durationSeconds) ?: if (graph.program.mode == "batch") 1800L else 60L
         return seconds + 120
     }
 
@@ -415,29 +434,116 @@ internal class CamundaRenderer(
         join: BpmnModel.Node,
     ) {
         val rows = "ttrRows_${stableId(route.name)}"
-        val read = http(scope, graph, "route ${route.name}", "route", rows, mapOf("route" to route.name))
         val verdictRoutes = d.field(d.field("ttrEvaluation", "verdict"), "routes")
-        val count =
+        val expected =
             expr(
-                "$verdictRoutes.prop(${quote(route.name)}).prop('rowCount').numberValue() > 0",
-                "get value($verdictRoutes,${quote(route.name)}).rowCount > 0",
+                "$verdictRoutes.prop(${quote(route.name)}).prop('rowCount').numberValue()",
+                "get value($verdictRoutes,${quote(route.name)}).rowCount",
             )
-        val branch = scope.link(fork, read, route.name, count)
+        val paging = BpmnModel.Scope(stableId("${scope.id}/pages/${route.name}"))
+        val pages = scope.node("subProcess", "page ${route.name} rows", child = paging)
+        pages.extensions +=
+            d.mapping(
+                mapOf(
+                    "ttrPageState" to obj("rows" to d.array(), "offset" to "0", "size" to "0", "reads" to "0"),
+                    "ttrExpectedRows" to expected,
+                ),
+                mapOf(rows to d.field("ttrPageState", "rows")),
+            )
+        val branch = scope.link(fork, pages, route.name, "$expected > 0")
+        val read =
+            http(
+                paging,
+                graph,
+                "route ${route.name}",
+                "route",
+                "ttrPage",
+                mapOf("route" to route.name),
+                query =
+                    d.concat(
+                        quote("?offset="),
+                        expr("ttrPageState.prop('offset').numberValue().toString()", "string(ttrPageState.offset)"),
+                    ),
+            )
         model.routes +=
             buildJsonObject {
                 put("recipe", graph.recipe.name)
                 put("route", route.name)
                 put("flow", branch.id)
                 put("gateway", fork.id)
+                put("entry", pages.id)
                 put("task", read.id)
             }
-        val complete = scope.node("exclusiveGateway", "route ${route.name} rows complete")
-        scope.link(read, complete)
-        val truncated = error(scope, "route ${route.name} evidence truncated", "run_refused")
-        scope.default(complete, truncated)
+        paging.link(paging.node("startEvent", "pages start"), read)
+        val validPage = paging.node("exclusiveGateway", "route ${route.name} page valid")
+        paging.link(read, validPage)
+        val truncated = error(paging, "route ${route.name} evidence truncated", "run_refused")
+        paging.default(validPage, truncated)
+        val append = paging.node("scriptTask", "append ${route.name} page")
+        val pageCount = expr("ttrPage.prop('rows').elements().size()", "count(ttrPage.rows)")
+        val valid =
+            expr(
+                "ttrPage.hasProp('rows') && ttrPage.prop('rows').isArray() && " +
+                    "ttrPage.prop('rowCount').numberValue() == ttrExpectedRows && " +
+                    "$pageCount > 0 && $pageCount + ttrPageState.prop('offset').numberValue() <= ttrExpectedRows",
+                "if ttrPage.rows instance of list then ttrPage.rowCount = ttrExpectedRows and " +
+                    "$pageCount > 0 and $pageCount + ttrPageState.offset <= ttrExpectedRows else false",
+            )
+        paging.link(validPage, append, "consistent nonempty page", valid)
+        if (d == Dialect.C7) {
+            append.attrs["scriptFormat"] = "groovy"
+            append.tail +=
+                Xml(
+                    "bpmn:script",
+                    text =
+                        """
+                        def state = execution.getVariable('ttrPageState')
+                        def page = execution.getVariable('ttrPage')
+                        def values = page.prop('rows').elements()
+                        values.each { state.prop('rows').append(it) }
+                        state.prop('offset', state.prop('offset').numberValue().longValue() + values.size())
+                        if (state.prop('size').numberValue().longValue() == 0) state.prop('size', values.size())
+                        state.prop('reads', state.prop('reads').numberValue().longValue() + 1)
+                        execution.setVariable('ttrPageState', state)
+                        """.trimIndent(),
+                )
+        } else {
+            append.extensions +=
+                Xml(
+                    "zeebe:script",
+                    mapOf(
+                        "resultVariable" to "ttrPageState",
+                        "expression" to
+                            "={rows:concatenate(ttrPageState.rows,ttrPage.rows), " +
+                            "offset:ttrPageState.offset+count(ttrPage.rows), " +
+                            "size:if ttrPageState.size = 0 then count(ttrPage.rows) else ttrPageState.size, " +
+                            "reads:ttrPageState.reads+1}",
+                    ),
+                )
+        }
+        val complete = paging.node("exclusiveGateway", "route ${route.name} rows complete")
+        paging.link(append, complete)
+        val all = paging.node("endEvent", "all route rows available")
+        paging.link(
+            complete,
+            all,
+            "all rows available",
+            eq(expr("ttrPageState.prop('offset').numberValue()", "ttrPageState.offset"), "ttrExpectedRows"),
+        )
+        val more =
+            expr(
+                "$pageCount == ttrPageState.prop('size').numberValue() && " +
+                    "ttrPageState.prop('offset').numberValue() < ttrExpectedRows && " +
+                    "ttrPageState.prop('reads').numberValue() * " +
+                    "ttrPageState.prop('size').numberValue() < ttrExpectedRows",
+                "$pageCount = ttrPageState.size and ttrPageState.offset < ttrExpectedRows and " +
+                    "ttrPageState.reads < ceiling(ttrExpectedRows / ttrPageState.size)",
+            )
+        paging.link(complete, read, "next full page within bound", more)
+        paging.default(complete, truncated)
         val rowScope = BpmnModel.Scope(stableId("${scope.id}/route/${route.name}"))
         val each = scope.node("subProcess", "each ${route.name} row", child = rowScope)
-        val collection = expr("$rows.prop('rows').elements()", "$rows.rows")
+        val collection = expr("$rows.elements()", rows)
         each.tail +=
             if (d ==
                 Dialect.C7
@@ -471,12 +577,7 @@ internal class CamundaRenderer(
                     ),
                 )
             }
-        scope.link(
-            complete,
-            each,
-            "all rows available",
-            eq(d.number(rows, "rowCount"), expr("$rows.prop('rows').elements().size()", "count($rows.rows)")),
-        )
+        scope.link(pages, each)
         scope.link(each, join)
         var last = rowScope.node("startEvent", "row start")
         graph.wirings
@@ -522,6 +623,9 @@ internal class CamundaRenderer(
                             if (type ==
                                 "role"
                             ) {
+                                require(source.matches(Regex("role\\.[A-Za-z_][A-Za-z0-9_]*"))) {
+                                    "mail role address must reference role.<name>"
+                                }
                                 expr(
                                     "TTR_MAIL_RECIPIENTS[${quote(source)}]",
                                     "get value(TTR_MAIL_RECIPIENTS,${quote(source)})",
@@ -573,7 +677,11 @@ internal class CamundaRenderer(
                                             obj(
                                                 "key" to rowKey(graph),
                                                 "status" to quote("delivered"),
-                                                "at" to expr("dateTime().toString()", "string(now())"),
+                                                "at" to
+                                                    expr(
+                                                        "dateTime().toString()",
+                                                        "string(date and time(now(), \"Z\"))",
+                                                    ),
                                             ),
                                         ),
                                 ),
@@ -982,7 +1090,12 @@ internal class CamundaRenderer(
 
         Import `${root.recipe.name}.${d.suffix}.bpmn` in the matching Camunda Modeler. This is an L1 orchestration
         skeleton; SQL and governed writes stay on the Server. No live Camunda is deployed by this export.
-        The Modeler opening is Bora's manual acceptance; XSD/structure checks do not certify a live engine.
+        The Modeler opening follows the repair re-review and is Bora's manual acceptance; XSD/structure checks
+        do not certify a live engine. The file declares Camunda Platform 7.24.0 or Camunda Cloud 8.6.0 as its
+        execution platform. C8 requires at least 8.6: [converging inclusive gateways](https://unsupported.docs.camunda.io/8.6/docs/components/modeler/bpmn/inclusive-gateways/),
+        [zeebe:userTask](https://unsupported.docs.camunda.io/8.6/docs/components/modeler/bpmn/user-tasks/) and
+        [FEEL timezone conversion](https://unsupported.docs.camunda.io/8.5/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-conversion/)
+        are available there (timezone conversion is already documented in 8.5).
 
         C7 requires Camunda Connect's HTTP connector, Spin JSON and Groovy for Retry-After normalization and process
         obligation readiness. Configure TTR_CONN_AUTOMATION
@@ -992,7 +1105,10 @@ internal class CamundaRenderer(
         ${scheduleZone ?: "UTC (no batch timer)"}. C8 calendar timers use zoned ISO repeating intervals.
 
         Start with ttrInput={key:..., at:"offset ISO instant"}, keys, or event. Event payload is nested under event;
-        at is separate. On-event deduplication requires a stable at; absent at is a new run. First batch steps use
+        at is separate. On C7, ttrInput is a Java Map, including nested maps/lists for events or keys; a REST
+        Object variable must deserialize to a Map, rather than a Spin Json variable. This input contract is
+        expression-tested; no REST start on a live C7 engine is certified here. On-event deduplication requires a
+        stable at; absent at is a new run. First batch steps use
         the engine execution id (C8 saves ttrExecutionId, generating one if absent). Every later step uses
         ttrAnchor + ':<step>', anchored on the first run id, including its recovered re-open id. A duplicate may
         claim a later step before the original; the original follows its 202 handle without repeating effects.
@@ -1000,8 +1116,25 @@ internal class CamundaRenderer(
 
         201 alone drives evaluation. 200 replay completes the step; 202 polls, closed/waiting completes,
         abandoned/failed allows one re-open. A second non-201 recovery refuses. 409 raises TTR_STALE and reaches
-        export outdated. Transport errors retain connector retries/incidents. Polls are bounded by budget + 2 min.
-        Missing obligations/actions and truncated route pages refuse, never count as empty evidence.
+        export outdated. The HTTP response policy for every call, including perform/outcome/close, is:
+
+        | Response | Result |
+        | --- | --- |
+        | 2xx | Continue with the response body |
+        | 409 | TTR_STALE boundary → export outdated |
+        | Other 4xx except 408/429 | TTR_REFUSED boundary → run refused; inspect evidence |
+        | 408/429, 5xx, transport errors | Connector retries, then incident |
+
+        C8 uses the error response's numeric or HTTP-date Retry-After when retrying HTTP errors, defaulting to
+        15 seconds. C7 Connect failed jobs use R3/PT15S: its output exception cannot commit a dynamic retry delay.
+        Successful handle/evaluation polls in both dialects honour Retry-After and are bounded by budget + 2 min.
+        Failed/abandoned evaluation refuses immediately; running/open or null-verdict evidence keeps polling.
+        Run-level route forks and joins are inclusive for every switchMode: exclusivity holds per row and is
+        enforced by the Server. Read every route page using offset and the Server's default page size; do not
+        override its displayRows limit. Empty/short pages before rowCount or inconsistent counts refuse before
+        any row action. Missing obligations/actions refuse, never count as empty evidence.
+        Digest delivery is not rendered: every digest program or process step refuses export. Use n8n_l1 or
+        deliver: immediate; Camunda digest rendering is a planned follow-up.
 
         Send tasks are customer template nodes using TTR_CONN_MAIL (C7 external task / C8 job type). Their worker
         belongs to Platform and is not bundled. Resolve TTR_MAIL_RECIPIENTS for role recipients; per-row addresses

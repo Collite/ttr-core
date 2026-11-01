@@ -23,6 +23,7 @@ class N8nDryDriverSpec :
             Files.writeString(
                 directory.resolve("manifest.json"),
                 buildJsonObject {
+                    put("target", buildJsonObject { put("type", "n8n_l1") })
                     put(
                         "calls",
                         workflow
@@ -54,6 +55,40 @@ class N8nDryDriverSpec :
                 pinned_from: {run: prior, at: now, by: test}
                 """.trimIndent(),
             )
+        "C10 one replay invocation mixes n8n execution and Camunda structure exports" {
+            val n8n = export("release_n8n")
+            val camunda = Files.createTempDirectory("mixed-camunda-export")
+            try {
+                val xml =
+                    Files.readString(
+                        Path.of("../ttr-emit-camunda/src/test/resources/goldens/release_order.c8.bpmn"),
+                    )
+                val contract = CamundaStructureDriver.contract(xml)
+                Files.writeString(camunda.resolve("release_order.c8.bpmn"), xml)
+                Files.writeString(
+                    camunda.resolve("manifest.json"),
+                    buildJsonObject {
+                        put("target", buildJsonObject { put("type", "camunda_8") })
+                        put("deployment", contract.getValue("deployment"))
+                        put("calls", contract.getValue("calls"))
+                    }.toString(),
+                )
+                ContractServer().use { server ->
+                    val exports = listOf(camunda, n8n) // Camunda first: n8n must filter before reading workflow.json.
+                    N8nDryDriver(server.url, "test-token", exports).use { driver ->
+                        val report =
+                            ReplayRunner.run(fixture, listOf("n8n_l1.on_event", "camunda_8.on_event")) { cell ->
+                                if (cell.startsWith("n8n")) driver else CamundaStructureDriver(exports)
+                            }
+                        report.exitCode shouldBe 0
+                        report.cells.map { it.status } shouldBe listOf("agree", "structure-agree")
+                    }
+                }
+            } finally {
+                n8n.toFile().deleteRecursively()
+                camunda.toFile().deleteRecursively()
+            }
+        }
         "parts, recipe and island workflows execute their declared calls and agree with native" {
             ContractServer().use { server ->
                 val native =

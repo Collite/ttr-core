@@ -764,24 +764,6 @@ internal class N8nRenderer(
                 ?: if (graph.program.mode == "batch") 1800 else 60
         ) * 1000L + 120_000L
 
-    private fun durationSeconds(raw: String): Long {
-        val m =
-            Regex("([0-9.]+)\\s+(milliseconds|seconds|minutes|hours|days)").matchEntire(raw)
-                ?: error("unsupported duration $raw")
-        val scale =
-            mapOf(
-                "milliseconds" to 0.001,
-                "seconds" to 1.0,
-                "minutes" to 60.0,
-                "hours" to 3600.0,
-                "days" to 86400.0,
-            ).getValue(m.groupValues[2])
-        return kotlin.math
-            .ceil(m.groupValues[1].toDouble() * scale)
-            .toLong()
-            .coerceAtLeast(1)
-    }
-
     private fun keyProjection(
         row: String,
         keys: List<String>,

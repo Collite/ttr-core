@@ -146,7 +146,7 @@ against the bundle's hashes and a complete directory is published only after eve
 An export becomes stale when its recipe text, parameter values, labels, program, deployment, world,
 toolchain or target version differs from the served bundle. Rebuild and export again after such a change.
 Executor manifests are plugin-owned TTR-M resources. All seven target manifests ship with the toolchain;
-n8n L1 renders recipes and processes; Camunda and Python rendering remain in their planned exporter Stages.
+n8n L1 and Camunda render recipes and processes; Python rendering remains in its planned exporter Stage.
 
 ## n8n L1 exports
 
@@ -198,6 +198,11 @@ certification also requires the Server's planned obligations status field.
 `release_order.c8.bpmn` for a `camunda_8` executor; `camunda_7` emits the C7 dialect as
 `release_order.c7.bpmn`. Open the matching file in Camunda Modeler. Both dialects share stable SHA-1-derived
 node IDs and BPMN DI. They contain named run-API calls and fingerprints, with no SQL or credentials.
+The definitions declare Camunda Platform 7.24.0 or Camunda Cloud 8.6.0 for the Modeler. C8 needs at least 8.6 for
+[converging inclusive gateways](https://unsupported.docs.camunda.io/8.6/docs/components/modeler/bpmn/inclusive-gateways/).
+Its [Zeebe user tasks](https://unsupported.docs.camunda.io/8.6/docs/components/modeler/bpmn/user-tasks/) and
+[FEEL timezone conversion](https://unsupported.docs.camunda.io/8.5/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-conversion/)
+are also available by that version. Server clocks use offset ISO instants.
 
 C7 uses Camunda Connect HTTP, Spin JSON and Groovy for response-header and obligation-time handling. Its
 `TTR_CONN_AUTOMATION` runtime bean supplies the Server origin and bearer. C8 uses the standard REST outbound
@@ -209,7 +214,16 @@ Only a newly claimed run drives effects. Replays finish that step; live handles 
 after abandonment/failure. Later process steps share the first run ID plus the step name as a caller key,
 including after recovery. The diagram includes parallel contexts, route branches, per-row action tasks, bounded
 evaluation, stale-export boundaries and obligation message/timer waits. Missing obligation/action evidence or
-truncated route pages refuses rather than finishing with partial effects.
+incomplete route pages refuses rather than finishing with partial effects. Every route is paged with offset using
+the Server's default page size, then all rows are processed. Route forks and joins are inclusive in every mode;
+exclusivity is enforced per row by the Server. Camunda refuses digest delivery in any program or process step;
+use `deliver: immediate` or n8n L1 until the digest follow-up is implemented.
+
+HTTP 409 takes the stale boundary; other 4xx except 408/429 take the drawn refusal task. HTTP 408/429, 5xx and
+transport errors retry, then become incidents. C8 error retries honour Retry-After; C7 Connect failed jobs use
+R3/PT15S because an output exception cannot commit a dynamic retry delay. No failed response continues into
+an action outcome or close. C7 `ttrInput` must be a Java Map; the generated README states the REST variable
+contract and the limits of expression-only verification.
 
 Mail and approval nodes are customer integration templates. The mail worker (`TTR_CONN_MAIL`) and the exchange's
 approval integration belong to Platform; this export does not bundle or certify them. The file and its Modeler
