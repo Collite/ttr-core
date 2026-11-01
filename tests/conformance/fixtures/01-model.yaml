@@ -1,0 +1,11 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "project"
+    id: "erp"
+    properties:
+      description: "ERP model"
+      tags:
+        - "v1"
+        - "core"
+      version: "1.2.3"

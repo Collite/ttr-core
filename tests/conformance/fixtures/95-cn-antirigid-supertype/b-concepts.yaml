@@ -1,0 +1,93 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Party"
+    properties:
+      -
+        grounds: "er.entity.party"
+  -
+    kind: "event"
+    id: "Purchase"
+    properties:
+      -
+        involves:
+          -
+            ref: "Customer"
+      -
+        period:
+          at:
+            ref: "sold_date"
+      -
+        grounds: "er.entity.sale"
+  -
+    kind: "role"
+    id: "Customer"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        event: "Purchase"
+      -
+        grounds: "er.entity.party"
+  -
+    kind: "phase"
+    id: "Active"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        definition:
+          block: "is_active"
+  -
+    kind: "kind"
+    id: "LoyalCustomer"
+    properties:
+      -
+        is_a:
+          ref: "Customer"
+      -
+        grounds: "er.entity.party"
+  -
+    kind: "kind"
+    id: "VipCustomer"
+    properties:
+      -
+        is_a:
+          ref: "LoyalCustomer"
+      -
+        grounds: "er.entity.party"
+  -
+    kind: "kind"
+    id: "ActiveParty"
+    properties:
+      -
+        is_a:
+          -
+            ref: "Party"
+          -
+            ref: "Active"
+      -
+        grounds: "er.entity.party"
+  -
+    kind: "kind"
+    id: "Business"
+    properties:
+      -
+        is_a:
+          ref: "Party"
+      -
+        grounds: "er.entity.party"
+  -
+    kind: "kind"
+    id: "SmallBusiness"
+    properties:
+      -
+        is_a:
+          ref: "Business"
+      -
+        grounds: "er.entity.party"

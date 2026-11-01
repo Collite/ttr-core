@@ -1,0 +1,40 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "sale"
+    properties:
+      attributes:
+        -
+          id: "sale_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "sold_date"
+          properties:
+            type: "date"
+      roles:
+        - "fact"
+  -
+    kind: "entity"
+    id: "store"
+    properties:
+      attributes:
+        -
+          id: "store_id"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "entity"
+    id: "shopper"
+    properties:
+      attributes:
+        -
+          id: "shopper_id"
+          properties:
+            type: "int"
+            isKey: true

@@ -1,0 +1,57 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "event"
+    id: "Order"
+    properties:
+      -
+        period:
+          end:
+            ref: "delivered_date"
+          start:
+            ref: "placed_date"
+      -
+        grounds: "er.entity.order"
+  -
+    kind: "phase"
+    id: "PlacedOrder"
+    properties:
+      -
+        of:
+          ref: "Order"
+      -
+        definition:
+          block: "state = 'placed'"
+      -
+        grounds: "er.entity.order_in_state"
+  -
+    kind: "phase"
+    id: "HeldOrder"
+    properties:
+      -
+        of:
+          ref: "Order"
+      -
+        definition:
+          block: "state = 'held'"
+  -
+    kind: "phase"
+    id: "OpenOrder"
+    properties:
+      -
+        of:
+          ref: "Order"
+      -
+        definition:
+          block: "state = 'open'"
+  -
+    kind: "phase"
+    id: "ShippedOrder"
+    properties:
+      -
+        of:
+          ref: "Order"
+      -
+        grounds: "er.entity.order_in_state"

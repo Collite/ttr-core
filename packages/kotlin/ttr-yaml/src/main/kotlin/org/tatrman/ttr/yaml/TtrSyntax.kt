@@ -117,6 +117,7 @@ internal class TtrSyntax(
 
     fun read(source: String): JsonObject {
         input = source
+        checkSimpleNumericLines(source, file, yaml = false)
         val errors = mutableListOf<CanonicalYamlException>()
         val listener =
             object : BaseErrorListener() {

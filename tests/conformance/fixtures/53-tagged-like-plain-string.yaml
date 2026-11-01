@@ -1,0 +1,22 @@
+ttr: "0.21"
+model: "er"
+schema: "entity"
+defs:
+  -
+    kind: "entity"
+    id: "volby"
+    properties:
+      attributes:
+        -
+          id: "objednávkový_list"
+          properties:
+            description: |2-
+              Ne
+              1 = Ano
+            type: "int"
+            optional: true
+            valueLabels:
+              "0":
+                cs: |2-
+                  Ne
+                  1 = Ano

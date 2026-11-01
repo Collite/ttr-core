@@ -1,0 +1,18 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "item"
+    properties:
+      attributes:
+        -
+          id: "sku"
+          properties:
+            type: "text"
+            isKey: true
+        -
+          id: "quantity_on_hand"
+          properties:
+            type: "int"

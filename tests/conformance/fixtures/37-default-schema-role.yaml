@@ -1,0 +1,7 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "role"
+    id: "analytic_fact"
+    properties:
+      description: "A fact role"

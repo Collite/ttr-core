@@ -1,0 +1,28 @@
+ttr: "0.21"
+model: "er"
+schema: "entity"
+defs:
+  -
+    kind: "entity"
+    id: "legacy_fuzzy"
+    properties:
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "fuzzy_on"
+          properties:
+            type: "text"
+            search:
+              searchable: true
+              fuzzy: true
+        -
+          id: "fuzzy_off"
+          properties:
+            type: "text"
+            search:
+              searchable: true
+              fuzzy: false

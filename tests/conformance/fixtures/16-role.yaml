@@ -1,0 +1,18 @@
+ttr: "0.21"
+model: "cnc"
+defs:
+  -
+    kind: "role"
+    id: "analytic_fact"
+    properties:
+      description: "A fact role"
+      label:
+        cs: "Fakta"
+        en: "Facts"
+      search:
+        keywords:
+          en:
+            - "fact"
+            - "facts"
+        aliases:
+          - "fact-table"

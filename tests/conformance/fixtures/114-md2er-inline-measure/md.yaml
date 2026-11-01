@@ -1,0 +1,24 @@
+ttr: "0.21"
+model: "md"
+defs:
+  -
+    kind: "domain"
+    id: "Amount"
+    properties:
+      type: "decimal"
+  -
+    kind: "measure"
+    id: "units"
+    properties:
+      domain: "md.Amount"
+      aggregation: "sum"
+  -
+    kind: "cubelet"
+    id: "sales"
+    properties:
+      measures:
+        -
+          id: "units"
+          properties:
+            domain: "md.Amount"
+            aggregation: "sum"

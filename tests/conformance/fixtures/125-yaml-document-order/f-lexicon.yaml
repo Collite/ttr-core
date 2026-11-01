@@ -1,0 +1,15 @@
+ttr: "0.21"
+package: "demo.order"
+imports:
+  - "demo.order.*"
+model: "lexicon"
+locale: "cs"
+defs:
+  -
+    kind: "term"
+    id: "Zeta"
+    properties:
+      for: "cn.kind.Zeta"
+      forms:
+        - "zeta"
+        - "příklad"

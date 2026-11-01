@@ -1,0 +1,58 @@
+ttr: "0.21"
+model: "binding"
+defs:
+  -
+    kind: "cn2er_event"
+    id: "placed"
+    properties:
+      -
+        event: "cn.OrderPlaced"
+      -
+        target: "er.entity.order"
+      -
+        period:
+          at:
+            ref: "er.entity.order.placed"
+      -
+        participants:
+          customer:
+            -
+              ref: "er.relation.order_customer"
+          order: []
+  -
+    kind: "cn2er_event"
+    id: "flagged"
+    properties:
+      -
+        event: "cn.OrderFlagged"
+      -
+        target: "er.entity.order"
+      -
+        period:
+          at:
+            ref: "er.entity.order.placed"
+      -
+        participants:
+          customer: []
+  -
+    kind: "cn2er_kind"
+    id: "early"
+    properties:
+      -
+        kind: "cn.EarlyPlaced"
+      -
+        target: "er.entity.order"
+      -
+        participants:
+          order: []
+  -
+    kind: "cn2er_kind"
+    id: "early_flagged"
+    properties:
+      -
+        kind: "cn.EarlyFlagged"
+      -
+        target: "er.entity.order"
+      -
+        participants:
+          customer: []

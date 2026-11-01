@@ -1,0 +1,13 @@
+ttr: "0.21"
+package: "base"
+model: "binding"
+defs:
+  -
+    kind: "md2er_dimension"
+    id: "e_hidden"
+    properties:
+      dimension: "md.CustomerHidden"
+      entity: "er.entity.customer"
+      attributes:
+        code:
+          ref: "address.state"

@@ -1,0 +1,17 @@
+ttr: "0.21"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Repeated"
+    properties:
+      -
+        label:
+          en: "First"
+      -
+        custom: 1.0
+      -
+        custom: 1e3
+      -
+        label:
+          cs: "Druhý"

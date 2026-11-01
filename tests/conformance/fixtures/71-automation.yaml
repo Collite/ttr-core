@@ -1,0 +1,320 @@
+ttr: "0.21"
+package: "acme.automation"
+model: "automation"
+defs:
+  -
+    kind: "parameter"
+    id: "tolerance"
+    properties:
+      -
+        type: "decimal"
+      -
+        value: 0.01
+      -
+        label:
+          cs: "Cenová tolerance"
+          en: "Price tolerance"
+  -
+    kind: "parameter"
+    id: "settlement"
+    properties:
+      -
+        type: "working_days"
+      -
+        value: 5
+      -
+        description: "settlement window"
+  -
+    kind: "action"
+    id: "release"
+    properties:
+      -
+        columns:
+          -
+            id: "order"
+            properties:
+              type: "order.order_number"
+      -
+        transition:
+          attribute: "order.state"
+          from:
+            - "placed"
+            - "held"
+          to: "released"
+      -
+        sinks:
+          object:
+            -
+              native:
+                ref: "transition"
+            -
+              n8n:
+                ref: "door"
+      -
+        approval:
+          ref: "none"
+      -
+        dry_run:
+          object:
+            -
+              en: "would release order {order}"
+  -
+    kind: "action"
+    id: "hold"
+    properties:
+      -
+        columns:
+          -
+            id: "order"
+            properties:
+              type: "order.order_number"
+          -
+            id: "department"
+            properties:
+              type: "text"
+      -
+        set:
+          attribute: "order.held_for"
+          column: "department"
+      -
+        transition:
+          attribute: "order.state"
+          from:
+            - "placed"
+          to: "held"
+      -
+        sinks:
+          object:
+            -
+              native:
+                ref: "transition"
+  -
+    kind: "action"
+    id: "set_state"
+    properties:
+      -
+        columns:
+          -
+            id: "line"
+            properties:
+              type: "return_request_line.line_id"
+          -
+            id: "to"
+            properties:
+              type: "text"
+      -
+        transition:
+          attribute: "return_request_line.state"
+          toColumn: "to"
+  -
+    kind: "action"
+    id: "ask"
+    properties:
+      -
+        columns:
+          -
+            id: "who"
+            properties:
+              type: "role"
+          -
+            id: "action"
+            properties:
+              type: "action"
+          -
+            id: "detail"
+            properties:
+              type: "rows"
+              optional: true
+      -
+        approval:
+          ref: "required"
+      -
+        due:
+          amount: 2
+          unit: "working_days"
+      -
+        on_due:
+          call: "hold"
+          entries:
+            -
+              order:
+                ref: "order_number"
+            -
+              department: "Sales"
+      -
+        tags:
+          - "human"
+  -
+    kind: "service"
+    id: "geocode"
+    properties:
+      -
+        request:
+          ref: "address_in"
+      -
+        response:
+          ref: "address_out"
+      -
+        timeout:
+          amount: 30
+          unit: "seconds"
+      -
+        budget:
+          object:
+            -
+              per_run: 200
+      -
+        write: false
+      -
+        idempotency:
+          ref: "row"
+  -
+    kind: "role"
+    id: "sales"
+    properties:
+      label:
+        en: "Sales"
+      resolve:
+        tag: "keycloak_group"
+        value: "acme-sales"
+      delivery:
+        object:
+          -
+            email: "sales@acme.example"
+  -
+    kind: "role"
+    id: "auditors"
+    properties:
+      members:
+        - "ana"
+        - "bo"
+  -
+    kind: "approval"
+    id: "values"
+    properties:
+      -
+        by:
+          ref: "role.sales"
+      -
+        quorum: 2
+  -
+    kind: "program"
+    id: "release_on_placement"
+    properties:
+      -
+        recipe:
+          ref: "release_order"
+      -
+        port:
+          ref: "key"
+      -
+        mode:
+          ref: "on_event"
+      -
+        as_of:
+          ref: "event"
+      -
+        deliver:
+          ref: "immediate"
+      -
+        budget:
+          object:
+            -
+              sync:
+                amount: 30
+                unit: "seconds"
+            -
+              batch:
+                amount: 10
+                unit: "minutes"
+      -
+        turn_budget:
+          object:
+            -
+              per_run: 50
+            -
+              per_candidate: 2
+      -
+        overrides:
+          object:
+            -
+              tolerance: 0.02
+      -
+        ask_due:
+          amount: 1
+          unit: "days"
+      -
+        protocol:
+          ref: "on_route"
+  -
+    kind: "program"
+    id: "morning_release"
+    properties:
+      -
+        recipe:
+          ref: "release_order"
+      -
+        port:
+          ref: "none"
+      -
+        mode:
+          ref: "batch"
+      -
+        deliver:
+          object:
+            -
+              digest:
+                object:
+                  -
+                    by:
+                      ref: "who"
+                  -
+                    per:
+                      ref: "day"
+      -
+        schedule: "06:00 Europe/Prague"
+  -
+    kind: "recipe"
+    id: "release_order"
+    properties:
+      -
+        key:
+          ref: "order.order_number"
+      -
+        parameters:
+          -
+            ref: "tolerance"
+      -
+        candidates:
+          ref: "placed_orders"
+      -
+        contexts:
+          -
+            ref: "shortfall"
+          -
+            ref: "overdue"
+      -
+        decision:
+          ref: "verdict"
+      -
+        routes:
+          -
+            ref: "hold_sales"
+          -
+            ref: "release"
+      -
+        kinds:
+          -
+            ref: "sql"
+      -
+        mode:
+          ref: "per_candidate"
+      -
+        document: "releasing-a-placed-order.md"
+      -
+        fingerprints:
+          object:
+            -
+              text: "sha256:aa"
+            -
+              values: "sha256:bb"

@@ -1,0 +1,30 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "lexicon"
+locale: "en"
+defs:
+  -
+    kind: "term"
+    id: "customer_default"
+    properties:
+      for: "cn.Customer"
+      forms:
+        - "customer"
+        - "client"
+      default: true
+  -
+    kind: "term"
+    id: "shopper_default"
+    properties:
+      for: "cn.Shopper"
+      forms:
+        - "shopper"
+        - "customer"
+      default: true
+  -
+    kind: "term"
+    id: "buyer"
+    properties:
+      for: "cn.Shopper"
+      forms:
+        - "client"

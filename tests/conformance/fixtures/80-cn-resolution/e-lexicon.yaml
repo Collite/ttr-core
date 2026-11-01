@@ -1,0 +1,29 @@
+ttr: "0.21"
+package: "hartland.web"
+model: "lexicon"
+locale: "en"
+defs:
+  -
+    kind: "term"
+    id: "customer"
+    properties:
+      for: "cn.Customer"
+      forms:
+        - "customer"
+        - "customers"
+      default: true
+  -
+    kind: "term"
+    id: "customer_dimension"
+    properties:
+      for: "md.Customer"
+      forms:
+        - "customer dimension"
+  -
+    kind: "term"
+    id: "pending_order"
+    properties:
+      for: "cn.PendingOrder"
+      forms:
+        - "pending order"
+        - "pending orders"

@@ -1,0 +1,20 @@
+ttr: "0.21"
+package: "demo.carriers"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Customer"
+    properties:
+      description: "An invented customer"
+      attributes:
+        -
+          id: "name"
+          properties:
+            description: "Name"
+            type: "text"
+        -
+          id: "code"
+          properties:
+            description: "Code"
+            type: "text"

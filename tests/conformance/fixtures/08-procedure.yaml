@@ -1,0 +1,14 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "procedure"
+    id: "recalc"
+    properties:
+      description: "Recalculate"
+      parameters:
+        -
+          name: "from_date"
+          type: "date"
+        -
+          name: "region"
+          type: "text"

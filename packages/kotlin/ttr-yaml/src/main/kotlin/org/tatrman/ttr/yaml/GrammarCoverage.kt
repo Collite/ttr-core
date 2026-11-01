@@ -20,7 +20,7 @@ internal object GrammarCoverage {
             "id" to "dd3f081e98311c7874387539dbe8b5ce422d73b0d7a38a8456a8f2bd60553ad1",
             "qualifiedName" to "a56145270ce6b3bebd1dd012b73948677dd618d496488bc608a3cb43ce3547dd",
             "key" to "a56145270ce6b3bebd1dd012b73948677dd618d496488bc608a3cb43ce3547dd",
-            "cnKey" to "4e08d978c5d2611c6fbb48d0d807bbb989cf22d2f49f9425819f8c4418de6d12",
+            "cnKey" to "fcd16c567948bb2ce2cffecd9a66b38ec6bc9b2ff5de990333c7ac974d8befd5",
             "autoKey" to "05a9daca42061f12ac7622c328da2093c78ac93c7f0b684f1af6d12e7d4217e9",
             "value" to "246aec4d030e3f2916ed2347f81b185264f2101de2a03c9f232015e39baa2067",
             "cnValue" to "5f4d5a5d546e1117ca0876d7afd703ffc37966939fbd7ad156d542bc96aaf288",

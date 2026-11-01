@@ -1,0 +1,101 @@
+ttr: "0.21"
+package: "hartland.web"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "customer"
+    properties:
+      attributes:
+        -
+          id: "customer_id"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "entity"
+    id: "warehouse"
+    properties:
+      attributes:
+        -
+          id: "warehouse_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "warehouse_name"
+          properties:
+            type: "text"
+  -
+    kind: "entity"
+    id: "order"
+    properties:
+      attributes:
+        -
+          id: "order_number"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "customer_id"
+          properties:
+            type: "int"
+        -
+          id: "warehouse_id"
+          properties:
+            type: "int"
+            optional: true
+        -
+          id: "placed_date"
+          properties:
+            type: "date"
+        -
+          id: "delivered_date"
+          properties:
+            type: "date"
+            optional: true
+        -
+          id: "state"
+          properties:
+            type: "text"
+  -
+    kind: "entity"
+    id: "category_code"
+    properties:
+      attributes:
+        -
+          id: "code"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "category_closure"
+    properties:
+      attributes:
+        -
+          id: "ancestor_code"
+          properties:
+            type: "text"
+            isKey: true
+        -
+          id: "descendant_code"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "relation"
+    id: "order_customer"
+    properties:
+      from:
+        ref: "er.entity.order"
+      to:
+        ref: "er.entity.customer"
+  -
+    kind: "relation"
+    id: "order_warehouse"
+    properties:
+      from:
+        ref: "er.entity.order"
+      to:
+        ref: "er.entity.warehouse"

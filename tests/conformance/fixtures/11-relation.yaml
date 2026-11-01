@@ -1,0 +1,20 @@
+ttr: "0.21"
+model: "er"
+defs:
+  -
+    kind: "relation"
+    id: "customer_orders"
+    properties:
+      from:
+        ref: "er.Customer"
+      to:
+        ref: "er.Order"
+      cardinality:
+        from: "1"
+        to: "0..*"
+      join:
+        -
+          from:
+            ref: "er.Customer.id"
+          to:
+            ref: "er.Order.customer_id"

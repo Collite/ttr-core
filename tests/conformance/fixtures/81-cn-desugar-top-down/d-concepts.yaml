@@ -1,0 +1,154 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Item"
+    properties:
+      -
+        label:
+          en: "Product"
+      -
+        grounds: "md.Product"
+  -
+    kind: "kind"
+    id: "Brand"
+    properties:
+      -
+        grounds: "md.Brand"
+  -
+    kind: "role"
+    id: "Shopper"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        event: "StoreSale"
+      -
+        grounds: "md.Shopper"
+  -
+    kind: "event"
+    id: "StoreSale"
+    properties:
+      -
+        involves:
+          -
+            ref: "Shopper"
+          -
+            ref: "Item"
+      -
+        period:
+          at:
+            ref: "sold_date"
+      -
+        grounds: "md.store_sales"
+  -
+    kind: "quality"
+    id: "net_sales"
+    properties:
+      -
+        of:
+          ref: "StoreSale"
+      -
+        grounds: "md.net_sales"
+  -
+    kind: "quality"
+    id: "color"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        grounds: "md.Product.color"
+  -
+    kind: "kind"
+    id: "Party"
+    properties:
+      -
+        label:
+          en: "Party"
+      -
+        grounds: "er.entity.party"
+  -
+    kind: "kind"
+    id: "Shop"
+    properties:
+      -
+        grounds: "er.entity.store"
+  -
+    kind: "kind"
+    id: "Channel"
+    properties:
+      -
+        grounds: "er.entity.store.channel"
+  -
+    kind: "kind"
+    id: "ProductCategory"
+    properties:
+      -
+        grounds: "er.entity.category_code"
+      -
+        hierarchy:
+          ancestor:
+            ref: "ancestor_code"
+          closure:
+            ref: "er.entity.category_closure"
+          descendant:
+            ref: "descendant_code"
+  -
+    kind: "role"
+    id: "Buyer"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        event: "Purchase"
+      -
+        grounds: "er.entity.customer"
+  -
+    kind: "event"
+    id: "Purchase"
+    properties:
+      -
+        involves:
+          -
+            ref: "Buyer"
+          -
+            ref: "Shop"
+      -
+        qualities:
+          -
+            ref: "amount"
+      -
+        period:
+          at:
+            ref: "sold_date"
+      -
+        grounds: "er.entity.sale"
+  -
+    kind: "quality"
+    id: "amount"
+    properties:
+      -
+        of:
+          ref: "Purchase"
+      -
+        grounds: "er.entity.sale.amount"
+  -
+    kind: "phase"
+    id: "PlacedOrder"
+    properties:
+      -
+        of:
+          ref: "Purchase"
+      -
+        grounds: "er.entity.placed_order"
+  -
+    kind: "kind"
+    id: "LoyaltyCard"
+    properties:
+      -
+        grounds: "db.dbo.loyalty_card"

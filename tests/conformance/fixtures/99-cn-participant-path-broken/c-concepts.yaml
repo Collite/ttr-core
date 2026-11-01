@@ -1,0 +1,56 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Item"
+    properties:
+      -
+        grounds: "er.entity.item"
+  -
+    kind: "kind"
+    id: "Warehouse"
+    properties:
+      -
+        grounds: "er.entity.warehouse"
+  -
+    kind: "kind"
+    id: "Region"
+    properties:
+      -
+        grounds: "md.Region"
+  -
+    kind: "event"
+    id: "StockTransfer"
+    properties:
+      -
+        involves:
+          -
+            ref: "Item"
+          -
+            as: "from"
+            ref: "Warehouse"
+          -
+            as: "to"
+            ref: "Warehouse"
+          -
+            ref: "Region"
+      -
+        period:
+          at:
+            ref: "shipped_at"
+  -
+    kind: "event"
+    id: "Restock"
+    properties:
+      -
+        involves:
+          -
+            ref: "Item"
+          -
+            ref: "Warehouse"
+      -
+        period:
+          at:
+            ref: "restocked_at"

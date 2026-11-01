@@ -1,0 +1,13 @@
+ttr: "0.21"
+package: "cnc.sales"
+imports:
+  - "er.sales.Product"
+  - "db.dbo.*"
+model: "cnc"
+schema: "role"
+defs:
+  -
+    kind: "role"
+    id: "transaction"
+    properties:
+      description: "Tx role"

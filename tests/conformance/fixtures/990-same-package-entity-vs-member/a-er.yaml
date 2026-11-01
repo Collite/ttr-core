@@ -1,0 +1,26 @@
+ttr: "0.21"
+package: "shop"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "customer"
+    properties:
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "int"
+  -
+    kind: "entity"
+    id: "order"
+    properties:
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "int"
+        -
+          id: "customer"
+          properties:
+            type: "int"

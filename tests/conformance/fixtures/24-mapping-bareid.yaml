@@ -1,0 +1,9 @@
+ttr: "0.21"
+model: "er"
+defs:
+  -
+    kind: "attribute"
+    id: "category_id"
+    properties:
+      type: "int"
+      binding: "i_category_id"

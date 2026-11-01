@@ -1,0 +1,34 @@
+ttr: "0.21"
+model: "lexicon"
+locale: "en"
+defs:
+  -
+    kind: "term"
+    id: "customer"
+    properties:
+      for: "er.entity.Customer"
+      forms:
+        - "customer"
+      indexSecurity: "applied"
+  -
+    kind: "pattern"
+    id: "paired"
+    properties:
+      for: "db.query.raw"
+      match: "name (.*)"
+      text: "Name Alice?"
+      indexSecurity: "none"
+  -
+    kind: "pattern"
+    id: "alternate"
+    properties:
+      for: "db.query.raw"
+      match: "lookup (.*)"
+      text: "Lookup Bob?"
+      indexSecurity: "none"
+  -
+    kind: "example"
+    id: "ordinary"
+    properties:
+      for: "er.entity.Customer"
+      text: "Show customers"

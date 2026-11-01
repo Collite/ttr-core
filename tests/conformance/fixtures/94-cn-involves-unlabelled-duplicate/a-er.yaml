@@ -1,0 +1,38 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "item"
+    properties:
+      attributes:
+        -
+          id: "sku"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "warehouse"
+    properties:
+      attributes:
+        -
+          id: "warehouse_code"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "transfer"
+    properties:
+      attributes:
+        -
+          id: "transfer_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "shipped_at"
+          properties:
+            type: "timestamp"

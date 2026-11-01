@@ -1,0 +1,9 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "query"
+    id: "c10"
+    properties:
+      sourceText:
+        block: "SELECT `id`"
+        tag: "mysql"

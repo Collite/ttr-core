@@ -1,0 +1,11 @@
+ttr: "0.21"
+model: "binding"
+defs:
+  -
+    kind: "er2db_attribute"
+    id: "name_map"
+    properties:
+      attribute: "er.Customer.name"
+      target:
+        column:
+          ref: "db.dbo.customers.name"

@@ -1,0 +1,25 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "db"
+schema: "dbo"
+defs:
+  -
+    kind: "table"
+    id: "loyalty_card"
+    properties:
+      columns:
+        -
+          id: "card_no"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "table"
+    id: "gift_card"
+    properties:
+      columns:
+        -
+          id: "card_no"
+          properties:
+            type: "text"
+            isKey: true

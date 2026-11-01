@@ -1,0 +1,11 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "query"
+    id: "c4"
+    properties:
+      sourceText:
+        block: |2-
+          SELECT a,
+              b
+        tag: "sql"

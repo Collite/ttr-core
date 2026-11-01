@@ -1,0 +1,71 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Item"
+    properties:
+      -
+        grounds: "er.entity.item"
+  -
+    kind: "kind"
+    id: "Warehouse"
+    properties:
+      -
+        grounds: "er.entity.warehouse"
+  -
+    kind: "event"
+    id: "StockTransfer"
+    properties:
+      -
+        involves:
+          -
+            ref: "Item"
+          -
+            ref: "Warehouse"
+          -
+            ref: "Warehouse"
+      -
+        period:
+          at:
+            ref: "shipped_at"
+      -
+        grounds: "er.entity.transfer"
+  -
+    kind: "event"
+    id: "Restock"
+    properties:
+      -
+        involves:
+          -
+            ref: "Item"
+          -
+            as: "from"
+            ref: "Warehouse"
+          -
+            as: "to"
+            ref: "Warehouse"
+      -
+        period:
+          at:
+            ref: "shipped_at"
+      -
+        grounds: "er.entity.transfer"
+  -
+    kind: "event"
+    id: "Rebalance"
+    properties:
+      -
+        involves:
+          -
+            ref: "Warehouse"
+          -
+            as: "warehouse"
+            ref: "Warehouse"
+      -
+        period:
+          at:
+            ref: "shipped_at"
+      -
+        grounds: "er.entity.transfer"

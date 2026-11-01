@@ -1,0 +1,32 @@
+ttr: "0.21"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Customer"
+    properties:
+      description: "A customer"
+      labelPlural: "Customers"
+      nameAttribute: "name"
+      codeAttribute: "code"
+      aliases:
+        - "client"
+        - "buyer"
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "name"
+          properties:
+            type: "text"
+            search:
+              searchable: true
+      roles:
+        - "fact"
+        - "dimension"
+      displayLabel:
+        cs: "Zákazník"
+        en: "Customer"

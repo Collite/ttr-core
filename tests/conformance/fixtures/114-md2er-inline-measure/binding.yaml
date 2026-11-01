@@ -1,0 +1,12 @@
+ttr: "0.21"
+model: "binding"
+defs:
+  -
+    kind: "md2er_cubelet"
+    id: "m"
+    properties:
+      cubelet: "md.sales"
+      target: "er.entity.sale"
+      measures:
+        units:
+          ref: "n"

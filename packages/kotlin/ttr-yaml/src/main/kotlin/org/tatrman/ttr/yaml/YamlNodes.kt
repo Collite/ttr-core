@@ -135,6 +135,7 @@ internal class YamlNodes(
 
     fun read(source: String): JsonObject {
         inputText = source
+        checkSimpleNumericLines(source, file, yaml = true)
         val settings =
             LoadSettings
                 .builder()
@@ -313,6 +314,7 @@ internal class YamlNodes(
                     Tag.NULL -> JsonNull
                     Tag.BOOL -> JsonPrimitive(node.value.lowercase() == "true")
                     Tag.INT, Tag.FLOAT -> {
+                        checkNumberLength(node.value) { fail(node, it) }
                         val raw = node.value.replace("_", "")
                         val decimalText =
                             try {
@@ -324,7 +326,9 @@ internal class YamlNodes(
                             } catch (_: NumberFormatException) {
                                 fail(node, "Expected a finite number")
                             }
-                        number(decimalText) { fail(node, it) }.also { spellings[it] = node.value }
+                        number(decimalText) { fail(node, it) }.also {
+                            if (ttrNumber.matches(node.value)) spellings[it] = node.value
+                        }
                     }
                     else -> fail(node, "Unsupported YAML tag ${node.tag}")
                 }

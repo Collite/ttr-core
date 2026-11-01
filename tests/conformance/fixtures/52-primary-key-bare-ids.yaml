@@ -1,0 +1,56 @@
+ttr: "0.21"
+model: "db"
+schema: "dbo"
+defs:
+  -
+    kind: "table"
+    id: "t_single_bare"
+    properties:
+      primaryKey: "S_STORE_SK"
+      columns:
+        -
+          id: "S_STORE_SK"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "table"
+    id: "t_bare_list"
+    properties:
+      primaryKey:
+        - "ID"
+      columns:
+        -
+          id: "ID"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "table"
+    id: "t_bare_multi"
+    properties:
+      primaryKey:
+        - "ID"
+        - "CODE"
+      columns:
+        -
+          id: "ID"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "CODE"
+          properties:
+            type: "text"
+  -
+    kind: "table"
+    id: "t_quoted_legacy"
+    properties:
+      primaryKey:
+        - "ID"
+      columns:
+        -
+          id: "ID"
+          properties:
+            type: "int"
+            isKey: true

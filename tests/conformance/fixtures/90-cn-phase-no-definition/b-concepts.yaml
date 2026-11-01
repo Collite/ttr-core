@@ -1,0 +1,39 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Item"
+    properties:
+      -
+        grounds: "er.entity.item"
+  -
+    kind: "phase"
+    id: "Discontinued"
+    properties:
+      -
+        of:
+          ref: "Item"
+  -
+    kind: "phase"
+    id: "StockCondition"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        abstract: true
+  -
+    kind: "phase"
+    id: "OutOfStock"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        is_a:
+          ref: "StockCondition"
+      -
+        definition:
+          block: "quantity_on_hand = 0"

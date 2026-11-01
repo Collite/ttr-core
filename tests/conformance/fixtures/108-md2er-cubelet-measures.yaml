@@ -1,0 +1,28 @@
+ttr: "0.21"
+model: "binding"
+defs:
+  -
+    kind: "md2er_cubelet"
+    id: "sales_hop"
+    properties:
+      cubelet: "md.sales"
+      target: "er.entity.sales"
+      attributes:
+        "Customer.code":
+          ref: "customer"
+      measures:
+        revenue:
+          ref: "amount"
+  -
+    kind: "md2er_cubelet"
+    id: "physical"
+    properties:
+      cubelet: "md.sales"
+      target: "er.entity.sales"
+      attributes: {}
+      shape: "wide"
+      measures:
+        revenue:
+          ref: "amount"
+      journaling: "overwrite"
+      allocation: "equal"

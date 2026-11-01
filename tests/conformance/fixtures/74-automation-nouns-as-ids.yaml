@@ -1,0 +1,76 @@
+ttr: "0.21"
+package: "acme.automation"
+model: "db"
+defs:
+  -
+    kind: "table"
+    id: "process"
+    properties:
+      primaryKey:
+        - "action"
+        - "step"
+      columns:
+        -
+          id: "action"
+          properties:
+            type: "text"
+        -
+          id: "service"
+          properties:
+            type: "text"
+        -
+          id: "program"
+          properties:
+            type: "text"
+        -
+          id: "recipe"
+          properties:
+            type: "text"
+        -
+          id: "parameter"
+          properties:
+            type: "text"
+        -
+          id: "approval"
+          properties:
+            type: "text"
+        -
+          id: "identity"
+          properties:
+            type: "text"
+        -
+          id: "deployment"
+          properties:
+            type: "text"
+        -
+          id: "step"
+          properties:
+            type: "text"
+        -
+          id: "steps"
+          properties:
+            type: "int"
+        -
+          id: "set"
+          properties:
+            type: "text"
+        -
+          id: "states"
+          properties:
+            type: "text"
+        -
+          id: "transition"
+          properties:
+            type: "text"
+        -
+          id: "transitions"
+          properties:
+            type: "text"
+        -
+          id: "automation"
+          properties:
+            type: "text"
+        -
+          id: "parameters"
+          properties:
+            type: "text"

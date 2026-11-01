@@ -1,0 +1,22 @@
+ttr: "0.21"
+package: "base"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "customer"
+    properties:
+      attributes:
+        -
+          id: "sk"
+          properties:
+            type: "int"
+  -
+    kind: "entity"
+    id: "addr"
+    properties:
+      attributes:
+        -
+          id: "state"
+          properties:
+            type: "text"

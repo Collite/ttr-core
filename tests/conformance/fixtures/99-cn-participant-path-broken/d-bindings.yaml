@@ -1,0 +1,54 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "binding"
+defs:
+  -
+    kind: "cn2er_event"
+    id: "transfer_g"
+    properties:
+      -
+        event: "cn.StockTransfer"
+      -
+        target: "er.entity.transfer"
+      -
+        participants:
+          from:
+            -
+              ref: "er.relation.transfer_from"
+          item:
+            -
+              ref: "er.relation.transfer_lot"
+            -
+              ref: "er.relation.lot_item"
+          region:
+            -
+              ref: "er.relation.transfer_to"
+          to:
+            -
+              ref: "er.relation.lot_item"
+      -
+        period:
+          at:
+            ref: "er.entity.transfer.shipped_at"
+  -
+    kind: "cn2er_event"
+    id: "restock_g"
+    properties:
+      -
+        event: "cn.Restock"
+      -
+        target: "er.entity.restock"
+      -
+        participants:
+          item:
+            -
+              ref: "er.relation.restock_lot"
+            -
+              ref: "er.relation.warehouse_region"
+          warehouse:
+            -
+              ref: "er.relation.restock_lot"
+      -
+        period:
+          at:
+            ref: "er.entity.restock.restocked_at"

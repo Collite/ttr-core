@@ -1,0 +1,388 @@
+ttr: "0.21"
+package: "hartland.concepts"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Item"
+    properties:
+      -
+        description: "A product the stores, the web shop and the marketplace sell."
+      -
+        label:
+          cs: "Produkt"
+          en: "Product"
+      -
+        sources:
+          - "doc://hartland/handbook#products"
+      -
+        grounds: "md.Product"
+      -
+        qualities:
+          -
+            ref: "category"
+          -
+            ref: "brand"
+      -
+        lexicon:
+          terms:
+            - "product"
+            - "item"
+            - "SKU"
+  -
+    kind: "kind"
+    id: "ProductCategory"
+    properties:
+      -
+        label:
+          en: "Product category"
+      -
+        grounds: "er.entity.category_code"
+      -
+        hierarchy:
+          ancestor:
+            ref: "ancestor_code"
+          closure:
+            ref: "er.entity.category_closure"
+          descendant:
+            ref: "descendant_code"
+          ranges:
+            ref: "node"
+  -
+    kind: "kind"
+    id: "HomeCategory"
+    properties:
+      -
+        is_a:
+          ref: "ProductCategory"
+      -
+        members:
+          block: "descendants(ProductCategory, 'H10-H19')"
+      -
+        label:
+          en: "Home and garden categories"
+  -
+    kind: "kind"
+    id: "Channel"
+    properties:
+      -
+        grounds: "er.entity.channel_sales.channel"
+  -
+    kind: "kind"
+    id: "Warehouse"
+    properties:
+      -
+        label:
+          en: "Distribution center"
+      -
+        grounds: "md.DistributionCentre"
+      -
+        tags:
+          - "logistics"
+  -
+    kind: "kind"
+    id: "Party"
+    properties:
+      -
+        label:
+          en: "Party"
+  -
+    kind: "kind"
+    id: "Supplier"
+    properties:
+      -
+        is_a:
+          -
+            ref: "Party"
+          -
+            ref: "Organization"
+      -
+        relations:
+          -
+            to:
+              ref: "Warehouse"
+            type:
+              ref: "supplies"
+  -
+    kind: "role"
+    id: "Customer"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        event: "Order"
+      -
+        label:
+          cs: "Zákazník"
+          en: "Customer"
+      -
+        grounds: "md.Customer"
+  -
+    kind: "event"
+    id: "Sale"
+    properties:
+      -
+        extent: "instantaneous"
+      -
+        involves:
+          -
+            ref: "Customer"
+          -
+            ref: "Item"
+          -
+            ref: "Channel"
+      -
+        period:
+          at:
+            ref: "sold_date"
+      -
+        grounds: "er.entity.channel_sales"
+      -
+        qualities:
+          -
+            ref: "revenue"
+          -
+            ref: "quantity"
+          -
+            ref: "sold_date"
+  -
+    kind: "event"
+    id: "Order"
+    properties:
+      -
+        extent: "durative"
+      -
+        involves:
+          -
+            ref: "Customer"
+          -
+            as: "fulfilling"
+            ref: "Warehouse"
+      -
+        period:
+          end:
+            ref: "delivered_date"
+          end_open:
+            ref: "open"
+          start:
+            ref: "placed_date"
+      -
+        qualities:
+          -
+            ref: "order_value"
+          -
+            ref: "state"
+          -
+            ref: "placed_date"
+          -
+            ref: "delivered_date"
+  -
+    kind: "event"
+    id: "Invoicing"
+    properties:
+      -
+        involves:
+          -
+            ref: "Customer"
+          -
+            ref: "Order"
+      -
+        period:
+          end:
+            ref: "due"
+          start:
+            ref: "issued"
+      -
+        grounds: "er.entity.invoice"
+      -
+        qualities:
+          -
+            ref: "amount"
+          -
+            ref: "paid"
+          -
+            ref: "open_amount"
+          -
+            ref: "invoice_status"
+  -
+    kind: "event"
+    id: "StockTransfer"
+    properties:
+      -
+        extent: "instantaneous"
+      -
+        involves:
+          -
+            ref: "Item"
+          -
+            as: "from"
+            ref: "Warehouse"
+          -
+            as: "to"
+            ref: "Warehouse"
+      -
+        period:
+          at:
+            ref: "shipped_at"
+          precision:
+            ref: "day"
+      -
+        qualities:
+          -
+            ref: "shipped_at"
+          -
+            ref: "transfer_delay"
+  -
+    kind: "event"
+    id: "WarehouseOutage"
+    properties:
+      -
+        extent: "durative"
+      -
+        involves:
+          -
+            ref: "Warehouse"
+      -
+        period:
+          end:
+            ref: "ended_at"
+          end_open:
+            ref: "unknown"
+          start:
+            ref: "started_at"
+  -
+    kind: "quality"
+    id: "revenue"
+    properties:
+      -
+        of:
+          ref: "Sale"
+      -
+        label:
+          cs: "Tržby"
+          en: "Revenue"
+      -
+        grounds: "md.revenue"
+  -
+    kind: "quality"
+    id: "category"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        value_space: "ProductCategory"
+      -
+        grounds: "er.entity.item.category"
+  -
+    kind: "quality"
+    id: "stock_level"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        valued_state: true
+      -
+        grounds: "er.entity.inventory.quantity_on_hand"
+  -
+    kind: "quality"
+    id: "open_amount"
+    properties:
+      -
+        of:
+          ref: "Invoicing"
+      -
+        definition:
+          block: "amount - paid"
+          form: "string"
+  -
+    kind: "quality"
+    id: "transfer_delay"
+    properties:
+      -
+        of:
+          ref: "StockTransfer"
+      -
+        definition:
+          block: "this.period.at - this.from.period.at"
+          tag: "pl"
+  -
+    kind: "phase"
+    id: "PendingOrder"
+    properties:
+      -
+        of:
+          ref: "Order"
+      -
+        label:
+          en: "Pending order"
+      -
+        definition:
+          block: "state in ('placed', 'held')"
+  -
+    kind: "phase"
+    id: "OverdueInvoice"
+    properties:
+      -
+        of:
+          ref: "Invoicing"
+      -
+        definition:
+          block: "invoice_status = 'open' and period.end < :as_of"
+  -
+    kind: "phase"
+    id: "DebtorCustomer"
+    properties:
+      -
+        of:
+          ref: "Customer"
+      -
+        definition:
+          block: "exists Invoicing involving this as customer where OverdueInvoice"
+      -
+        imprecision:
+          ref: "certainly"
+  -
+    kind: "phase"
+    id: "PlacedOrder"
+    properties:
+      -
+        of:
+          ref: "Order"
+      -
+        grounds: "er.entity.placed_order"
+  -
+    kind: "phase"
+    id: "StockCondition"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        abstract: true
+  -
+    kind: "phase"
+    id: "OutOfStock"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        is_a:
+          ref: "StockCondition"
+      -
+        basis: "current_state"
+      -
+        definition:
+          block: "exists StockoutEpisode e involving this where e.period contains :as_of"
+  -
+    kind: "relation_type"
+    id: "supplies"
+    properties:
+      -
+        description: "A supplier supplies a distribution center."
+      -
+        label:
+          en: "supplies"

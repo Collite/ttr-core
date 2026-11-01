@@ -38,6 +38,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core) // MetadataRefresher (M1.2)
 
     testImplementation(libs.bundles.kotest)
+    testImplementation(project(":packages:kotlin:ttr-yaml")) // C-7 canonical YAML fixed point; runtime stays acyclic.
     testImplementation(libs.mockk)
     testImplementation(libs.jena.arq) {
         // Turtle/SPARQL only; binary RDF Protobuf is outside the test oracle and the MD3 classpath.

@@ -1,0 +1,103 @@
+ttr: "0.21"
+package: "hartland.concepts"
+defs:
+  -
+    kind: "cubelet"
+    id: "storeReturns"
+    properties:
+      grain:
+        - "Customer.code"
+        - "Product.code"
+      concept:
+        -
+          event: "Return"
+        -
+          involves:
+            -
+              ref: "Customer"
+            -
+              ref: "Item"
+            -
+              ref: "ReturnReason"
+  -
+    kind: "dimension"
+    id: "Product"
+    properties:
+      key: "sku"
+      concept:
+        -
+          kind: "Item"
+        -
+          label:
+            en: "Product"
+  -
+    kind: "domain"
+    id: "ReasonCode"
+    properties:
+      type: "text"
+      concept:
+        -
+          kind: "ReturnReason"
+  -
+    kind: "measure"
+    id: "returnAmount"
+    properties:
+      domain: "md.Money"
+      aggregation: "sum"
+      concept:
+        -
+          quality: "return_amount"
+  -
+    kind: "entity"
+    id: "invoice"
+    properties:
+      attributes:
+        -
+          id: "invoice_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "status"
+          properties:
+            type: "text"
+            concept:
+              -
+                quality: "invoice_status"
+      concept:
+        -
+          kind: "Invoice"
+  -
+    kind: "entity"
+    id: "order"
+    properties:
+      concept:
+        -
+          event: "Order"
+        -
+          period:
+            end:
+              ref: "delivered_date"
+            start:
+              ref: "placed_date"
+  -
+    kind: "entity"
+    id: "customer"
+    properties:
+      concept:
+        -
+          role: "Customer"
+        -
+          event: "Order"
+  -
+    kind: "entity"
+    id: "channel_sales"
+    properties:
+      attributes:
+        -
+          id: "channel"
+          properties:
+            type: "text"
+            concept:
+              -
+                kind: "Channel"

@@ -108,6 +108,8 @@ class CanonicalYamlEdgeSpec :
                 )
             bodies["entityDef"] = JsonObject(entity + ("properties" to JsonArray(props)))
             shouldThrowAny { GrammarCoverage.check(JsonObject(m + ("bodies" to JsonObject(bodies)))) }
+            val kinds = m.getValue("kinds").jsonArray + obj("kind" to text("invented"), "body" to text("unhandledBody"))
+            shouldThrowAny { GrammarCoverage.check(JsonObject(m + ("kinds" to JsonArray(kinds)))) }
         }
         test("ordinary map order is canonical while ordered objects keep occurrences") {
             val a = CanonicalYaml.fromTtr("model er\ndef entity A { description: { cs: \"A\", en: \"B\" } }")

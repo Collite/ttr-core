@@ -1,0 +1,102 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "category_code"
+    properties:
+      attributes:
+        -
+          id: "code"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "category_closure"
+    properties:
+      attributes:
+        -
+          id: "ancestor_code"
+          properties:
+            type: "text"
+            isKey: true
+        -
+          id: "descendant_code"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "department"
+    properties:
+      attributes:
+        -
+          id: "department_code"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "department_closure"
+    properties:
+      attributes:
+        -
+          id: "ancestor_code"
+          properties:
+            type: "text"
+        -
+          id: "descendant_code"
+          properties:
+            type: "text"
+  -
+    kind: "entity"
+    id: "region"
+    properties:
+      attributes:
+        -
+          id: "region_code"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "region_closure"
+    properties:
+      attributes:
+        -
+          id: "parent_code"
+          properties:
+            type: "text"
+            isKey: true
+        -
+          id: "child_code"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "brand"
+    properties:
+      attributes:
+        -
+          id: "brand_code"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "brand_closure"
+    properties:
+      attributes:
+        -
+          id: "ancestor_code"
+          properties:
+            type: "text"
+            isKey: true
+        -
+          id: "descendant_code"
+          properties:
+            type: "text"
+            isKey: true

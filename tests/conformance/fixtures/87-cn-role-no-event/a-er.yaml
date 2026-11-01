@@ -1,0 +1,62 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "party"
+    properties:
+      attributes:
+        -
+          id: "party_id"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "entity"
+    id: "store_visit"
+    properties:
+      attributes:
+        -
+          id: "visit_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "visited_at"
+          properties:
+            type: "timestamp"
+  -
+    kind: "entity"
+    id: "loyalty_card"
+    properties:
+      attributes:
+        -
+          id: "card_no"
+          properties:
+            type: "text"
+            isKey: true
+      concept:
+        -
+          role: "Holder"
+        -
+          of:
+            ref: "Party"
+  -
+    kind: "entity"
+    id: "membership"
+    properties:
+      attributes:
+        -
+          id: "member_no"
+          properties:
+            type: "text"
+            isKey: true
+      concept:
+        -
+          role: "Member"
+        -
+          of:
+            ref: "Party"
+        -
+          event: "StoreVisit"

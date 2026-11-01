@@ -1,0 +1,11 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "table"
+    id: "customers"
+    properties:
+      columns:
+        -
+          id: "id"
+          properties:
+            type: "int"

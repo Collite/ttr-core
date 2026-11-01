@@ -1,0 +1,12 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "binding"
+defs:
+  -
+    kind: "cn2er_phase"
+    id: "held_g"
+    properties:
+      -
+        phase: "cn.HeldOrder"
+      -
+        target: "er.entity.order_in_state"

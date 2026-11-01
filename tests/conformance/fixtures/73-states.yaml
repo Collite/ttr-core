@@ -1,0 +1,38 @@
+ttr: "0.21"
+package: "acme"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "order"
+    properties:
+      attributes:
+        -
+          id: "order_number"
+          properties:
+            type: "text"
+            isKey: true
+        -
+          id: "state"
+          properties:
+            type: "text"
+            states:
+              - "placed"
+              - "held"
+              - "released"
+              - "cancelled"
+            transitions:
+              held:
+                - "released"
+                - "cancelled"
+              placed:
+                - "held"
+                - "released"
+                - "cancelled"
+        -
+          id: "stage"
+          properties:
+            type: "text"
+            states:
+              - "new"
+              - "done"

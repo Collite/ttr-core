@@ -1,0 +1,13 @@
+ttr: "0.21"
+package: "shop"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "sale"
+    properties:
+      attributes:
+        -
+          id: "revenue"
+          properties:
+            type: "decimal"

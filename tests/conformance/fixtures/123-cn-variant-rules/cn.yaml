@@ -1,0 +1,194 @@
+ttr: "0.21"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Warehouse"
+    properties:
+      -
+        grounds: "er.entity.warehouse"
+  -
+    kind: "kind"
+    id: "Item"
+    properties:
+      -
+        grounds: "er.entity.item"
+  -
+    kind: "kind"
+    id: "Channel"
+    properties:
+      -
+        grounds: "er.entity.price.channel"
+  -
+    kind: "kind"
+    id: "Ticket"
+    properties:
+      -
+        grounds: "er.entity.ticket"
+      -
+        qualities:
+          -
+            ref: "code"
+          -
+            ref: "created"
+          -
+            ref: "closed"
+  -
+    kind: "quality"
+    id: "code"
+    properties:
+      -
+        of:
+          ref: "Ticket"
+      -
+        value_space: "Channel"
+      -
+        grounds: "er.entity.ticket.channel"
+  -
+    kind: "quality"
+    id: "created"
+    properties:
+      -
+        of:
+          ref: "Ticket"
+      -
+        grounds: "er.entity.ticket.created"
+  -
+    kind: "quality"
+    id: "closed"
+    properties:
+      -
+        of:
+          ref: "Ticket"
+      -
+        grounds: "er.entity.ticket.closed"
+  -
+    kind: "variant"
+    id: "WebTicket"
+    properties:
+      -
+        of:
+          ref: "Ticket"
+      -
+        definition:
+          block: "code = 'web'"
+  -
+    kind: "variant"
+    id: "StoreTicket"
+    properties:
+      -
+        of:
+          ref: "Ticket"
+      -
+        definition:
+          block: "code = 'store'"
+  -
+    kind: "event"
+    id: "Started"
+    properties:
+      -
+        involves:
+          -
+            ref: "Ticket"
+      -
+        period:
+          at:
+            ref: "occurred"
+  -
+    kind: "event"
+    id: "Finished"
+    properties:
+      -
+        involves:
+          -
+            ref: "Ticket"
+      -
+        period:
+          at:
+            ref: "occurred"
+  -
+    kind: "phase"
+    id: "OpenTicket"
+    properties:
+      -
+        of:
+          ref: "Ticket"
+      -
+        from: "Started"
+      -
+        until: "Finished"
+  -
+    kind: "phase"
+    id: "OutOfService"
+    properties:
+      -
+        of:
+          ref: "Warehouse"
+      -
+        grounds: "er.entity.outage"
+      -
+        period:
+          end:
+            ref: "until"
+          end_open:
+            ref: "open"
+          start:
+            ref: "since"
+      -
+        qualities:
+          -
+            ref: "reason"
+  -
+    kind: "kind"
+    id: "ListPrice"
+    properties:
+      -
+        involves:
+          -
+            ref: "Item"
+          -
+            ref: "Channel"
+      -
+        period:
+          end:
+            ref: "until"
+          end_open:
+            ref: "open"
+          start:
+            ref: "since"
+      -
+        qualities:
+          -
+            ref: "amount"
+  -
+    kind: "quality"
+    id: "amount"
+    properties:
+      -
+        of:
+          ref: "ListPrice"
+      -
+        grounds: "er.entity.price.amount"
+  -
+    kind: "quality"
+    id: "list_price"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        valued_state: true
+      -
+        per: "Channel"
+      -
+        from: "ListPrice.amount"
+  -
+    kind: "quality"
+    id: "quoted_price"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        definition:
+          block: "this.list_price(channel: 'web')"

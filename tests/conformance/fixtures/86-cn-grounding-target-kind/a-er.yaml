@@ -1,0 +1,71 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "party"
+    properties:
+      attributes:
+        -
+          id: "party_id"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "entity"
+    id: "store"
+    properties:
+      attributes:
+        -
+          id: "store_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "channel"
+          properties:
+            type: "text"
+  -
+    kind: "entity"
+    id: "order"
+    properties:
+      attributes:
+        -
+          id: "order_number"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "state"
+          properties:
+            type: "text"
+        -
+          id: "amount"
+          properties:
+            type: "decimal"
+        -
+          id: "placed_date"
+          properties:
+            type: "date"
+  -
+    kind: "query"
+    id: "placed_orders"
+    properties:
+      sourceText:
+        block: "SELECT order.order_number FROM order WHERE order.state = 'placed'"
+        tag: "sql"
+  -
+    kind: "entity"
+    id: "placed_order"
+    properties:
+      attributes:
+        -
+          id: "order_number"
+          properties:
+            type: "int"
+            isKey: true
+      binding:
+        target:
+          query:
+            ref: "er.query.placed_orders"

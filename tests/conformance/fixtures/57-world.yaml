@@ -1,0 +1,57 @@
+ttr: "0.21"
+package: "acme.worlds"
+model: "world"
+defs:
+  -
+    kind: "world"
+    id: "dev"
+    properties:
+      description: "acme dev world (M0 golden fixture — roster from ttr-p tasks-p1-s1.3 T1.3.1)"
+      members:
+        -
+          kind: "engine"
+          id: "erp_pg"
+          properties:
+            type: "postgres"
+            version: "16"
+            extensions:
+              -
+                ref: "pg_trgm"
+        -
+          kind: "engine"
+          id: "polars"
+          properties:
+            type: "polars"
+        -
+          kind: "executor"
+          id: "sh"
+          properties:
+            type: "bash"
+        -
+          kind: "storage"
+          id: "erp_db"
+          properties:
+            type: "postgres"
+            via: "erp_pg"
+            hosts:
+              - "erp"
+        -
+          kind: "storage"
+          id: "files"
+          properties:
+            type: "local_dir"
+            path: "/data/files"
+            schemas:
+              -
+                id: "sales_csv"
+                fields:
+                  customer: "string"
+                  region: "string"
+                  amount: "decimal"
+        -
+          kind: "storage"
+          id: "stage"
+          properties:
+            type: "local_dir"
+            staging: true
+            path: "/data/stage"

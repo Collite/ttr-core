@@ -1,0 +1,24 @@
+ttr: "0.21"
+model: "query"
+defs:
+  -
+    kind: "query"
+    id: "topCustomers"
+    properties:
+      language: "SQL"
+      parameters:
+        -
+          name: "limit"
+          type: "int"
+          label: "Limit"
+      sourceText:
+        block: |2
+          SELECT id, name
+          FROM customers
+          ORDER BY id DESC
+      search:
+        keywords:
+          en:
+            - "customers"
+            - "clients"
+        searchable: true

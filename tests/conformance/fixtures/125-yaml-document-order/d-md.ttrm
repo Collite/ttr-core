@@ -1,0 +1,7 @@
+package demo.order
+model md
+
+def domain Ordered {
+    type: text
+    restrict: {pattern: "^x", members: {"z": {en: "Z"}, "a": {en: "A"}}}
+}

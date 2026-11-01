@@ -1,0 +1,8 @@
+// Repeated properties retain both entries and the existing duplicate-property diagnostics.
+model cn
+def kind Repeated {
+    label: {en: "First"}
+    custom: 1.0
+    custom: 1e3
+    label: {cs: "Druhý"}
+}

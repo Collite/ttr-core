@@ -1,0 +1,36 @@
+ttr: "0.21"
+model: "er"
+defs:
+  -
+    kind: "query"
+    id: "shopper_revenue"
+    properties:
+      description: "Revenue per shopper, written over entities"
+      sourceText:
+        block: |2-
+          SELECT shopper.shopper_id, SUM(sale.revenue) AS revenue
+          FROM sale JOIN shopper
+          GROUP BY shopper.shopper_id
+        tag: "sql"
+  -
+    kind: "entity"
+    id: "shopper_revenue"
+    properties:
+      description: "A shopper with the revenue of their sales"
+      attributes:
+        -
+          id: "shopper_id"
+          properties:
+            description: "Shopper"
+            type: "int"
+            isKey: true
+        -
+          id: "total_revenue"
+          properties:
+            description: "Revenue"
+            type: "decimal"
+            binding: "revenue"
+      binding:
+        target:
+          query:
+            ref: "er.query.shopper_revenue"

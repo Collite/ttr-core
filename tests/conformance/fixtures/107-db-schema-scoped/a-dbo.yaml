@@ -1,0 +1,39 @@
+ttr: "0.21"
+package: "hartland.shop"
+model: "db"
+schema: "dbo"
+defs:
+  -
+    kind: "table"
+    id: "Orders"
+    properties:
+      columns:
+        -
+          id: "order_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "cust_id"
+          properties:
+            type: "int"
+  -
+    kind: "table"
+    id: "Customers"
+    properties:
+      columns:
+        -
+          id: "id"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "fk"
+    id: "fk_orders_cust"
+    properties:
+      from:
+        -
+          ref: "db.Orders.cust_id"
+      to:
+        -
+          ref: "db.Customers.id"

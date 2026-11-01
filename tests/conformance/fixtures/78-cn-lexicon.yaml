@@ -1,0 +1,66 @@
+ttr: "0.21"
+model: "lexicon"
+locale: "en"
+defs:
+  -
+    kind: "term"
+    id: "customer"
+    properties:
+      for: "cn.Customer"
+      forms:
+        - "customer"
+        - "customers"
+        - "client"
+      default: true
+  -
+    kind: "term"
+    id: "debtor"
+    properties:
+      for: "cn.DebtorCustomer"
+      forms:
+        - "debtor"
+        - "customer with overdue invoices"
+      sense_priority: 2
+  -
+    kind: "term"
+    id: "customer_phase"
+    properties:
+      description: "a phase never takes the bare form (cn/phase-as-default)"
+      for: "cn.DebtorCustomer"
+      forms:
+        - "customer"
+      default: false
+      sense_priority: 1
+  -
+    kind: "term"
+    id: "revenue"
+    properties:
+      for: "cn.revenue"
+      forms:
+        - "revenue"
+        - "sales"
+      default: true
+      sense_priority: 3
+  -
+    kind: "term"
+    id: "channel"
+    properties:
+      for: "cn.Channel"
+      forms:
+        - "channel"
+        - "sales channel"
+  -
+    kind: "term"
+    id: "product"
+    properties:
+      for: "md.Product"
+      forms:
+        - "product"
+  -
+    kind: "example"
+    id: "web_revenue"
+    properties:
+      for: "cn.WebSale"
+      text: "revenue on the web last month"
+      default: true
+      sense_priority: 1

@@ -136,7 +136,7 @@ class CnHopSpec :
             val root = CnFixtures.conformance.resolve("111-md2er-path-ambiguous")
             val sources =
                 Files.list(root).use { paths ->
-                    paths.toList().associate {
+                    paths.filter { it.fileName.toString().endsWith(".ttrm") }.toList().associate {
                         it.fileName.toString() to
                             Files.readString(it)
                     }

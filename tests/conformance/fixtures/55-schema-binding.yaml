@@ -1,0 +1,11 @@
+ttr: "0.21"
+model: "binding"
+defs:
+  -
+    kind: "er2db_entity"
+    id: "order_binding"
+    properties:
+      entity: "er.Order"
+      target:
+        table:
+          ref: "db.dbo.orders"

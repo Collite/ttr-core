@@ -1,0 +1,53 @@
+ttr: "0.21"
+model: "md"
+defs:
+  -
+    kind: "domain"
+    id: "Customer"
+    properties:
+      type: "string"
+  -
+    kind: "domain"
+    id: "Code"
+    properties:
+      type: "string"
+  -
+    kind: "dimension"
+    id: "Customer"
+    properties:
+      key: "code"
+      attributes:
+        -
+          id: "code"
+          properties:
+            domain: "md.Code"
+        -
+          id: "state"
+          properties:
+            domain: "md.Code"
+  -
+    kind: "measure"
+    id: "revenue"
+    properties:
+      domain: "md.Code"
+      aggregation: "sum"
+  -
+    kind: "measure"
+    id: "bonus"
+    properties:
+      domain: "md.Code"
+      aggregation: "sum"
+  -
+    kind: "cubelet"
+    id: "revenue"
+    properties:
+      measures:
+        - "md.measure.revenue"
+  -
+    kind: "cubelet"
+    id: "sales"
+    properties:
+      grain:
+        - "Customer.code"
+      measures:
+        - "md.measure.revenue"

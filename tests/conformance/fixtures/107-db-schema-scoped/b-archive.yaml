@@ -1,0 +1,29 @@
+ttr: "0.21"
+package: "hartland.shop"
+model: "db"
+schema: "archive"
+defs:
+  -
+    kind: "table"
+    id: "Orders"
+    properties:
+      columns:
+        -
+          id: "order_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "cust_id"
+          properties:
+            type: "int"
+  -
+    kind: "table"
+    id: "Customers"
+    properties:
+      columns:
+        -
+          id: "id"
+          properties:
+            type: "int"
+            isKey: true

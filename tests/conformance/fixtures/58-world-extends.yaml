@@ -1,0 +1,20 @@
+ttr: "0.21"
+package: "acme.worlds"
+model: "world"
+defs:
+  -
+    kind: "world"
+    id: "staged"
+    properties:
+      members:
+        -
+          kind: "engine"
+          id: "erp_pg"
+          properties:
+            extends: "acme.types.postgres16"
+        -
+          kind: "storage"
+          id: "stage"
+          properties:
+            extends: "acme.types.scratch_dir"
+            staging: true

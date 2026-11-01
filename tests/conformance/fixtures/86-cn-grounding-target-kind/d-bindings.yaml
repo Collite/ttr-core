@@ -1,0 +1,20 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "binding"
+defs:
+  -
+    kind: "cn2er_quality"
+    id: "amount_g"
+    properties:
+      -
+        quality: "cn.amount"
+      -
+        target: "er.entity.order"
+  -
+    kind: "cn2md_role"
+    id: "category_as_role"
+    properties:
+      -
+        role: "cn.Category"
+      -
+        target: "md.Product"

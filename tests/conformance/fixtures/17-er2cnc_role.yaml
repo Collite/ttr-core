@@ -1,0 +1,9 @@
+ttr: "0.21"
+model: "cnc"
+defs:
+  -
+    kind: "er2cnc_role"
+    id: "sales_fact"
+    properties:
+      entity: "er.Sales"
+      role: "cnc.role.fact"

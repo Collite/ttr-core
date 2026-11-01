@@ -1,0 +1,80 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "party"
+    properties:
+      attributes:
+        -
+          id: "party_id"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "entity"
+    id: "customer"
+    properties:
+      attributes:
+        -
+          id: "customer_id"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "entity"
+    id: "store"
+    properties:
+      attributes:
+        -
+          id: "store_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "channel"
+          properties:
+            type: "text"
+  -
+    kind: "entity"
+    id: "sale"
+    properties:
+      attributes:
+        -
+          id: "sale_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "store_id"
+          properties:
+            type: "int"
+        -
+          id: "customer_id"
+          properties:
+            type: "int"
+        -
+          id: "sold_date"
+          properties:
+            type: "date"
+        -
+          id: "amount"
+          properties:
+            type: "decimal"
+  -
+    kind: "relation"
+    id: "sale_store"
+    properties:
+      from:
+        ref: "er.entity.sale"
+      to:
+        ref: "er.entity.store"
+  -
+    kind: "relation"
+    id: "sale_customer"
+    properties:
+      from:
+        ref: "er.entity.sale"
+      to:
+        ref: "er.entity.customer"

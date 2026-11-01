@@ -1,0 +1,12 @@
+ttr: "0.21"
+model: "binding"
+defs:
+  -
+    kind: "md2er_dimension"
+    id: "md2er_dimension"
+    properties:
+      dimension: "md.md2er_dimension"
+      entity: "er.entity.md2er_dimension"
+      attributes:
+        md2er_dimension:
+          ref: "md2er_dimension"

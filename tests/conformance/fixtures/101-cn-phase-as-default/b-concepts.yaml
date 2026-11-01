@@ -1,0 +1,55 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Party"
+    properties:
+      -
+        grounds: "er.entity.partner"
+  -
+    kind: "event"
+    id: "Purchase"
+    properties:
+      -
+        involves:
+          -
+            ref: "Customer"
+      -
+        period:
+          at:
+            ref: "sold_date"
+      -
+        grounds: "er.entity.sale"
+  -
+    kind: "role"
+    id: "Customer"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        event: "Purchase"
+      -
+        grounds: "er.entity.partner"
+  -
+    kind: "phase"
+    id: "DebtorCustomer"
+    properties:
+      -
+        of:
+          ref: "Customer"
+      -
+        definition:
+          block: "open_amount > 0"
+  -
+    kind: "phase"
+    id: "LapsedParty"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        definition:
+          block: "last_seen < :as_of"

@@ -1,0 +1,30 @@
+ttr: "0.21"
+model: "db"
+schema: "dbo"
+defs:
+  -
+    kind: "table"
+    id: "customers"
+    properties:
+      description: "Customer master"
+      primaryKey:
+        - "id"
+      columns:
+        -
+          id: "id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "total"
+          properties:
+            type:
+              length: 19
+              precision: 5
+              type: "decimal"
+        -
+          id: "name"
+          properties:
+            type: "text"
+            optional: true
+            indexed: true

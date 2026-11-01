@@ -1,0 +1,32 @@
+ttr: "0.21"
+package: "hartland.web"
+imports:
+  - "hartland.core.Party"
+  - "hartland.core.Store"
+  - "hartland.core.Supplier"
+  - "hartland.outlet.*"
+model: "cn"
+defs:
+  -
+    kind: "role"
+    id: "Shopper"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        event: "Visit"
+  -
+    kind: "event"
+    id: "Visit"
+    properties:
+      -
+        involves:
+          -
+            ref: "Shopper"
+          -
+            ref: "Store"
+      -
+        period:
+          at:
+            ref: "visited_at"

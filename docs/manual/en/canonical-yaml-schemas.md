@@ -9,14 +9,14 @@ codec is available in the source module `packages/kotlin/ttr-yaml`; its internal
 
 ## Resources
 
-| Consumer | Path |
-|---|---|
-| npm | `@tatrman/grammar/schemas/model-yaml.schema.json` |
-| npm | `@tatrman/grammar/schemas/profile.schema.json` |
-| npm | `@tatrman/grammar/schemas/canonical-metadata.json` |
-| `org.tatrman:ttr-parser` jar | `/schemas/model-yaml.schema.json` |
-| `org.tatrman:ttr-parser` jar | `/schemas/profile.schema.json` |
-| `org.tatrman:ttr-parser` jar | `/schemas/canonical-metadata.json` |
+| Consumer                     | Path                                               |
+| ---------------------------- | -------------------------------------------------- |
+| npm                          | `@tatrman/grammar/schemas/model-yaml.schema.json`  |
+| npm                          | `@tatrman/grammar/schemas/profile.schema.json`     |
+| npm                          | `@tatrman/grammar/schemas/canonical-metadata.json` |
+| `org.tatrman:ttr-parser` jar | `/schemas/model-yaml.schema.json`                  |
+| `org.tatrman:ttr-parser` jar | `/schemas/profile.schema.json`                     |
+| `org.tatrman:ttr-parser` jar | `/schemas/canonical-metadata.json`                 |
 
 Both schemas use JSON Schema draft 2020-12 and local `$defs` references. They can
 be validated offline. The version segment in each `$id` (and `version` in the
@@ -26,9 +26,9 @@ metadata) comes from the grammar marker. npm subpaths resolve through the packag
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 const require = createRequire(import.meta.url);
-const schema = JSON.parse(readFileSync(
-  require.resolve('@tatrman/grammar/schemas/model-yaml.schema.json'), 'utf8',
-));
+const schema = JSON.parse(
+  readFileSync(require.resolve('@tatrman/grammar/schemas/model-yaml.schema.json'), 'utf8')
+);
 ```
 
 The schema inputs are normalized JSON values from YAML 1.2. Duplicate YAML keys,
@@ -39,7 +39,7 @@ YAML parser has already discarded it.
 ## Document shape
 
 ```yaml
-ttr: "0.21"
+ttr: '0.21'
 package: demo.sales
 imports: [demo.common.*]
 model: er
@@ -47,10 +47,10 @@ defs:
   - kind: entity
     id: Item
     properties:
-      description: {en: Item}
+      description: { en: Item }
       attributes:
         - id: code
-          properties: {type: text, isKey: true}
+          properties: { type: text, isKey: true }
 ```
 
 Definitions preserve order in `defs`. Kind names use the grammar's literal
@@ -85,13 +85,13 @@ alternative order. A quoted string that is a valid qname at a typed-reference ke
 order and repeated declarations:
 
 ```yaml
-ttr: "0.21"
+ttr: '0.21'
 model: cn
 defs:
   - kind: kind
     id: Item
     properties:
-      - of: {ref: BaseItem}
+      - of: { ref: BaseItem }
       - description: An item
 ```
 
@@ -156,6 +156,11 @@ properties and automation objects use ordered single-entry sequences. Numeric
 spellings such as `1`, `1.0`, `1.00`, `01` and `-0.0` remain distinguishable where
 automation fingerprints retain their text. Exponent spellings (including tiny finite numbers) stay
 compact through validation and retain their spelling; nonfinite values fail at their source token.
+YAML-only numeric spellings such as `+1`, `.5`, `0x1F`, `0o17` and `5.` normalize to
+`1`, `0.5`, `31`, `15` and `5`, matching the native route. Numeric literals are limited to
+1000 authored characters (including sign, radix prefix and separators) before decimal or radix
+conversion, in both YAML and TTR input. Longer literals raise a located `Number literal too long`
+diagnostic. This limit does not apply to quoted text.
 Duplicate storage fields and restrict members are refused at the second key; CN object duplicates
 retain the existing parser last-wins rule. Native TTR escape handling follows the
 grammar string contract.
@@ -169,22 +174,24 @@ parse as exactly one TTR value. A CN binding's expression `filter` uses the same
 The module depends on parser/model types, the existing pinned YAML engine, JSON
 schema validator and Kotlin reflection; it has no metadata dependency. The grammar
 metadata supplies the kind/property vocabulary. Structural adapter signatures and
-coverage checks fail when a reached rule needs a new handler. Profile execution,
-committed fixture twins, migration and release wiring are subsequent stages.
+coverage checks fail when a reached rule needs a new handler. Committed fixture twins now
+exercise file/directory AST and semantics conformance and both fixed points in CI; C-7
+round-trips through actual YAML with unchanged export bytes. See `tests/conformance/README.md`
+for fixture authoring. Profile execution, migration and release wiring are subsequent stages.
 
 ## Profile shape
 
 ```yaml
 profile: demo/1
-grammar: ">=0.21 <1.0"
+grammar: '>=0.21 <1.0'
 operations:
   - op: rename
     at: /records/title
-    to: {kind: entity, property: description}
+    to: { kind: entity, property: description }
   - op: values
     at: /records/key
-    to: {kind: entity, path: [attributes, isKey]}
-    mapping: {yes: true, no: false}
+    to: { kind: entity, path: [attributes, isKey] }
+    mapping: { yes: true, no: false }
 ```
 
 The root declaration in `ttr.yaml` has just `profile` and `grammar`. A profile

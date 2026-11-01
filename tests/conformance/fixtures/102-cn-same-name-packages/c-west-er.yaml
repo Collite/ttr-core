@@ -1,0 +1,42 @@
+ttr: "0.21"
+package: "hartland.west"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "store"
+    properties:
+      attributes:
+        -
+          id: "store_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "region"
+          properties:
+            type: "text"
+  -
+    kind: "entity"
+    id: "depot"
+    properties:
+      attributes:
+        -
+          id: "depot_id"
+          properties:
+            type: "int"
+            isKey: true
+  -
+    kind: "entity"
+    id: "sale"
+    properties:
+      attributes:
+        -
+          id: "sale_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "store_code"
+          properties:
+            type: "text"

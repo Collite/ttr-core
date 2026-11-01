@@ -1,0 +1,174 @@
+ttr: "0.21"
+package: "acme.worlds"
+model: "world"
+defs:
+  -
+    kind: "world"
+    id: "demo"
+    properties:
+      members:
+        -
+          kind: "engine"
+          id: "erp_pg"
+          properties:
+            type: "postgres"
+        -
+          kind: "storage"
+          id: "erp_db"
+          properties:
+            type: "postgres"
+            via: "erp_pg"
+            hosts:
+              - "acme"
+            writable:
+              -
+                ref: "order.state"
+              -
+                ref: "return_request_line"
+              - "acme_*"
+        -
+          kind: "executor"
+          id: "n8n"
+          properties:
+            extends: "n8n_l1"
+            connection:
+              ref: "n8n_acme"
+            url: "https://n8n.acme.example"
+        -
+          kind: "identity"
+          id: "automation_decider"
+          properties:
+            -
+              principal: "svc-acme-automation"
+            -
+              credential:
+                ref: "TTR_CONN_AUTOMATION_DECIDER"
+        -
+          kind: "grant"
+          properties:
+            -
+              who:
+                ref: "role.ops"
+            -
+              program:
+                star: true
+            -
+              as:
+                ref: "identity.automation_decider"
+        -
+          kind: "grant"
+          properties:
+            -
+              who: "*"
+            -
+              program:
+                ref: "release_on_placement"
+            -
+              as:
+                ref: "author"
+        -
+          kind: "deployment"
+          id: "release_native_morning"
+          properties:
+            -
+              program:
+                ref: "morning_release"
+            -
+              target: "native"
+            -
+              run_as:
+                ref: "identity.automation_decider"
+            -
+              trigger:
+                tag: "schedule"
+                value: "06:00 Europe/Prague"
+            -
+              dry_run: false
+            -
+              enabled: true
+        -
+          kind: "deployment"
+          id: "release_n8n"
+          properties:
+            -
+              program:
+                ref: "release_on_placement"
+            -
+              target: "n8n"
+            -
+              run_as:
+                ref: "caller"
+            -
+              granularity:
+                ref: "parts"
+        -
+          kind: "deployment"
+          id: "returns_n8n"
+          properties:
+            -
+              process:
+                ref: "return_line_flow"
+            -
+              target: "n8n"
+            -
+              run_as:
+                ref: "identity.automation_decider"
+        -
+          kind: "process"
+          id: "return_line_flow"
+          properties:
+            -
+              description: "one execution per return line"
+            -
+              instance:
+                ref: "return_request_line.line_id"
+            -
+              steps:
+                -
+                  id: "decide"
+                  properties:
+                    -
+                      program:
+                        ref: "decide_on_request"
+                    -
+                      port:
+                        ref: "key"
+                -
+                  id: "inbound"
+                  properties:
+                    -
+                      program:
+                        ref: "inbound_on_receipt"
+                    -
+                      port:
+                        ref: "key"
+                    -
+                      after:
+                        object:
+                          -
+                            obligation:
+                              ref: "inbound"
+                          -
+                            until:
+                              -
+                                ref: "fulfilled"
+                              -
+                                ref: "due"
+                              -
+                                ref: "absent"
+                -
+                  id: "wait"
+                  properties:
+                    -
+                      program:
+                        ref: "settle_on_document"
+                    -
+                      port:
+                        ref: "keys"
+                    -
+                      after:
+                        object:
+                          -
+                            time:
+                              amount: 30
+                              unit: "days"

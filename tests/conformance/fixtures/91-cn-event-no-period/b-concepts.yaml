@@ -1,0 +1,20 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "event"
+    id: "PriceCheck"
+    properties:
+      -
+        grounds: "er.entity.price_check"
+  -
+    kind: "event"
+    id: "StoreVisit"
+    properties:
+      -
+        period:
+          at:
+            ref: "visited_at"
+      -
+        grounds: "er.entity.store_visit"

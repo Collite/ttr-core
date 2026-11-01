@@ -1,0 +1,154 @@
+ttr: "0.21"
+package: "hartland.concepts"
+model: "db"
+schema: "dbo"
+defs:
+  -
+    kind: "table"
+    id: "concept"
+    properties:
+      primaryKey:
+        - "event"
+        - "period"
+      columns:
+        -
+          id: "cn"
+          properties:
+            type: "text"
+        -
+          id: "event"
+          properties:
+            type: "text"
+        -
+          id: "phase"
+          properties:
+            type: "text"
+        -
+          id: "quality"
+          properties:
+            type: "text"
+        -
+          id: "relation_type"
+          properties:
+            type: "text"
+        -
+          id: "concept"
+          properties:
+            type: "text"
+        -
+          id: "cn2md_kind"
+          properties:
+            type: "text"
+        -
+          id: "cn2md_role"
+          properties:
+            type: "text"
+        -
+          id: "cn2md_quality"
+          properties:
+            type: "text"
+        -
+          id: "cn2md_event"
+          properties:
+            type: "text"
+        -
+          id: "cn2er_kind"
+          properties:
+            type: "text"
+        -
+          id: "cn2er_role"
+          properties:
+            type: "text"
+        -
+          id: "cn2er_event"
+          properties:
+            type: "text"
+        -
+          id: "cn2er_quality"
+          properties:
+            type: "text"
+        -
+          id: "cn2er_phase"
+          properties:
+            type: "text"
+        -
+          id: "cn2db_concept"
+          properties:
+            type: "text"
+        -
+          id: "involves"
+          properties:
+            type: "text"
+        -
+          id: "period"
+          properties:
+            type: "text"
+        -
+          id: "grounds"
+          properties:
+            type: "text"
+        -
+          id: "definition"
+          properties:
+            type: "text"
+        -
+          id: "value_space"
+          properties:
+            type: "text"
+        -
+          id: "extent"
+          properties:
+            type: "text"
+        -
+          id: "basis"
+          properties:
+            type: "text"
+        -
+          id: "as"
+          properties:
+            type: "text"
+        -
+          id: "default"
+          properties:
+            type: "text"
+        -
+          id: "sense_priority"
+          properties:
+            type: "text"
+      writeback:
+        as: 24
+        basis: 23
+        cn: 1
+        cn2db_concept: 16
+        cn2er_event: 13
+        cn2er_kind: 11
+        cn2er_phase: 15
+        cn2er_quality: 14
+        cn2er_role: 12
+        cn2md_event: 10
+        cn2md_kind: 7
+        cn2md_quality: 9
+        cn2md_role: 8
+        concept: 6
+        default: 25
+        definition: 20
+        event: 2
+        extent: 22
+        grounds: 19
+        involves: 17
+        period: 18
+        phase: 3
+        quality: 4
+        relation_type: 5
+        sense_priority: 26
+        value_space: 21
+  -
+    kind: "fk"
+    id: "fk_concept_as"
+    properties:
+      from:
+        -
+          ref: "db.dbo.concept.as"
+      to:
+        -
+          ref: "db.dbo.cn.definition"

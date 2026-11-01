@@ -1,0 +1,39 @@
+ttr: "0.21"
+model: "lexicon"
+locale: "en"
+defs:
+  -
+    kind: "pattern"
+    id: "escaped"
+    properties:
+      description: |2-
+        say "hi"
+        next
+      for: "db.query.raw"
+      match: "^\\d{4}\\s+(\\w+)$"
+      text: "a\tb"
+  -
+    kind: "query"
+    id: "q"
+    properties:
+      parameters:
+        -
+          name: "p"
+          label: "a\tb"
+          defaultValue: "C:\\new"
+      sourceText:
+        block: "select '\\d'"
+        tag: "sql"
+  -
+    kind: "entity"
+    id: "Customer"
+    properties:
+      labelPlural: "a\tb"
+  -
+    kind: "kind"
+    id: "Item"
+    properties:
+      -
+        definition:
+          block: "label = \"a\"\tand\rname = \"C:\\new\""
+          form: "string"

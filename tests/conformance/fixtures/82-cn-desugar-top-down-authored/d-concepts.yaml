@@ -1,0 +1,116 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Item"
+    properties:
+      -
+        label:
+          en: "Product"
+  -
+    kind: "kind"
+    id: "Brand"
+    properties: []
+  -
+    kind: "role"
+    id: "Shopper"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        event: "StoreSale"
+  -
+    kind: "event"
+    id: "StoreSale"
+    properties:
+      -
+        involves:
+          -
+            ref: "Shopper"
+          -
+            ref: "Item"
+      -
+        period:
+          at:
+            ref: "sold_date"
+  -
+    kind: "quality"
+    id: "net_sales"
+    properties:
+      -
+        of:
+          ref: "StoreSale"
+  -
+    kind: "quality"
+    id: "color"
+    properties:
+      -
+        of:
+          ref: "Item"
+  -
+    kind: "kind"
+    id: "Party"
+    properties:
+      -
+        label:
+          en: "Party"
+  -
+    kind: "kind"
+    id: "Shop"
+    properties: []
+  -
+    kind: "kind"
+    id: "Channel"
+    properties: []
+  -
+    kind: "kind"
+    id: "ProductCategory"
+    properties: []
+  -
+    kind: "role"
+    id: "Buyer"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        event: "Purchase"
+  -
+    kind: "event"
+    id: "Purchase"
+    properties:
+      -
+        involves:
+          -
+            ref: "Buyer"
+          -
+            ref: "Shop"
+      -
+        qualities:
+          -
+            ref: "amount"
+      -
+        period:
+          at:
+            ref: "sold_date"
+  -
+    kind: "quality"
+    id: "amount"
+    properties:
+      -
+        of:
+          ref: "Purchase"
+  -
+    kind: "phase"
+    id: "PlacedOrder"
+    properties:
+      -
+        of:
+          ref: "Purchase"
+  -
+    kind: "kind"
+    id: "LoyaltyCard"
+    properties: []

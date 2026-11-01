@@ -1,0 +1,9 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "query"
+    id: "c5"
+    properties:
+      sourceText:
+        block: |2
+          plain

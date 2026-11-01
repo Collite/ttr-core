@@ -1,0 +1,41 @@
+ttr: "0.21"
+package: "workshop.concepts"
+model: "db"
+schema: "dbo"
+defs:
+  -
+    kind: "table"
+    id: "subkind"
+    properties:
+      primaryKey:
+        - "per"
+      columns:
+        -
+          id: "per"
+          properties:
+            type: "text"
+        -
+          id: "until"
+          properties:
+            type: "text"
+        -
+          id: "subkind"
+          properties:
+            type: "text"
+      writeback:
+        per:
+          ref: "until"
+        subkind:
+          ref: "per"
+        until:
+          ref: "subkind"
+  -
+    kind: "fk"
+    id: "until"
+    properties:
+      from:
+        -
+          ref: "db.dbo.subkind.per"
+      to:
+        -
+          ref: "db.dbo.until.subkind"

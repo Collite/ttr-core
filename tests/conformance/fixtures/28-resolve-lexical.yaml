@@ -1,0 +1,14 @@
+ttr: "0.21"
+model: "er"
+schema: "entity"
+defs:
+  -
+    kind: "entity"
+    id: "artikl"
+    properties:
+      nameAttribute: "id"
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "int"

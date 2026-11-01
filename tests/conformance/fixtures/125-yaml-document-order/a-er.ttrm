@@ -1,0 +1,18 @@
+// Invented document-envelope and nested author-order coverage for canonical YAML.
+package demo.order
+import demo.shared.*
+import demo.extra.Item
+model er schema retail
+
+def entity Zeta {
+    attributes: [def attribute z { type: text }, def attribute a { type: int }]
+}
+def entity Alpha { }
+security {
+    own er.entity.Zeta: admin
+    grant read on er.entity.Zeta to staff
+}
+security {
+    classify er.entity.Zeta.z: public
+    mask er.entity.Zeta.z
+}

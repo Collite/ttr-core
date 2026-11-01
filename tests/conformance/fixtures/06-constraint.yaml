@@ -1,0 +1,9 @@
+ttr: "0.21"
+defs:
+  -
+    kind: "constraint"
+    id: "uq_code"
+    properties:
+      type: "unique"
+      columns:
+        - "code"

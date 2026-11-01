@@ -1,0 +1,52 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "lexicon"
+locale: "en"
+defs:
+  -
+    kind: "term"
+    id: "customer"
+    properties:
+      for: "cn.Customer"
+      forms:
+        - "customer"
+  -
+    kind: "term"
+    id: "party"
+    properties:
+      for: "cn.Party"
+      forms:
+        - "party"
+  -
+    kind: "term"
+    id: "debtor"
+    properties:
+      for: "cn.DebtorCustomer"
+      forms:
+        - "debtor"
+        - "customer"
+      default: true
+  -
+    kind: "term"
+    id: "debtor_party"
+    properties:
+      for: "cn.DebtorCustomer"
+      forms:
+        - "party in debt"
+        - "party"
+      default: true
+  -
+    kind: "term"
+    id: "lapsed_party"
+    properties:
+      for: "cn.LapsedParty"
+      forms:
+        - "party"
+  -
+    kind: "term"
+    id: "lapsed"
+    properties:
+      for: "cn.LapsedParty"
+      forms:
+        - "lapsed"
+      default: true

@@ -1,0 +1,28 @@
+ttr: "0.21"
+model: "query"
+defs:
+  -
+    kind: "query"
+    id: "q3"
+    properties:
+      language: "SQL"
+      sourceText:
+        block: "select 1"
+        form: "string"
+      search:
+        keywords:
+          cs:
+            - "zákazník"
+          en:
+            - "customer"
+        patterns:
+          - "all (of |)customers"
+        descriptions:
+          en:
+            - "a description"
+        examples:
+          - "Show all customers"
+        aliases:
+          - "all-customers"
+        searchable: true
+        fuzzy: true

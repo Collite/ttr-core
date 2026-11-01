@@ -14,9 +14,21 @@ dependencies {
     implementation(libs.json.schema.validator)
     testImplementation(libs.bundles.kotest)
     testImplementation(testFixtures(project(":packages:kotlin:ttr-parser")))
+    testImplementation(project(":packages:kotlin:ttr-semantics"))
+    testImplementation(testFixtures(project(":packages:kotlin:ttr-semantics")))
+}
+
+// Explicit authoring command only. Neither test/check nor CI generates its expected twins.
+tasks.register<JavaExec>("generateTwins") {
+    group = "verification"
+    description = "Generate canonical YAML twins for review; commit them before running conformance"
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("org.tatrman.ttr.yaml.GenerateYamlTwins")
 }
 tasks.test {
     useJUnitPlatform()
     inputs.dir("../../../tests/conformance/fixtures")
+    inputs.dir("../../../tests/conformance/yaml-cases")
     inputs.file("../../grammar/tests/canonical-schema-vectors.json")
 }

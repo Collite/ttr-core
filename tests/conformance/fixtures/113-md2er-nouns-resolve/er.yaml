@@ -1,0 +1,12 @@
+ttr: "0.21"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "md2er_dimension"
+    properties:
+      attributes:
+        -
+          id: "md2er_dimension"
+          properties:
+            type: "int"

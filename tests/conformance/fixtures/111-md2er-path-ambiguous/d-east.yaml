@@ -1,0 +1,15 @@
+ttr: "0.21"
+package: "base"
+imports:
+  - "east.*"
+model: "binding"
+defs:
+  -
+    kind: "md2er_dimension"
+    id: "d_east"
+    properties:
+      dimension: "md.CustomerEast"
+      entity: "er.entity.customer"
+      attributes:
+        code:
+          ref: "address.state"

@@ -1,0 +1,120 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "item"
+    properties:
+      attributes:
+        -
+          id: "sku"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "item_lot"
+    properties:
+      attributes:
+        -
+          id: "lot_no"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "warehouse"
+    properties:
+      attributes:
+        -
+          id: "warehouse_code"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "region"
+    properties:
+      attributes:
+        -
+          id: "region_code"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "transfer"
+    properties:
+      attributes:
+        -
+          id: "transfer_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "shipped_at"
+          properties:
+            type: "timestamp"
+  -
+    kind: "entity"
+    id: "restock"
+    properties:
+      attributes:
+        -
+          id: "restock_id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "restocked_at"
+          properties:
+            type: "timestamp"
+  -
+    kind: "relation"
+    id: "transfer_from"
+    properties:
+      from:
+        ref: "er.entity.transfer"
+      to:
+        ref: "er.entity.warehouse"
+  -
+    kind: "relation"
+    id: "transfer_to"
+    properties:
+      from:
+        ref: "er.entity.transfer"
+      to:
+        ref: "er.entity.warehouse"
+  -
+    kind: "relation"
+    id: "transfer_lot"
+    properties:
+      from:
+        ref: "er.entity.transfer"
+      to:
+        ref: "er.entity.item_lot"
+  -
+    kind: "relation"
+    id: "lot_item"
+    properties:
+      from:
+        ref: "er.entity.item_lot"
+      to:
+        ref: "er.entity.item"
+  -
+    kind: "relation"
+    id: "warehouse_region"
+    properties:
+      from:
+        ref: "er.entity.warehouse"
+      to:
+        ref: "er.entity.region"
+  -
+    kind: "relation"
+    id: "restock_lot"
+    properties:
+      from:
+        ref: "er.entity.restock"
+      to:
+        ref: "er.entity.item_lot"

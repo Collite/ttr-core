@@ -1,0 +1,51 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "order"
+    properties:
+      attributes:
+        -
+          id: "order_number"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "state"
+          properties:
+            type: "text"
+        -
+          id: "placed_date"
+          properties:
+            type: "date"
+        -
+          id: "delivered_date"
+          properties:
+            type: "date"
+  -
+    kind: "query"
+    id: "orders_by_state"
+    properties:
+      sourceText:
+        block: "SELECT order.order_number, order.state FROM order"
+        tag: "sql"
+  -
+    kind: "entity"
+    id: "order_in_state"
+    properties:
+      attributes:
+        -
+          id: "order_number"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "state"
+          properties:
+            type: "text"
+      binding:
+        target:
+          query:
+            ref: "er.query.orders_by_state"

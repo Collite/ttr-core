@@ -1,0 +1,10 @@
+ttr: "0.21"
+package: "hartland.north"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Store"
+    properties:
+      -
+        grounds: "er.entity.store"

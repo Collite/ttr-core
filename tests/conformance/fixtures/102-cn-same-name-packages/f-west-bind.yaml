@@ -1,0 +1,12 @@
+ttr: "0.21"
+package: "hartland.west"
+model: "binding"
+defs:
+  -
+    kind: "cn2er_kind"
+    id: "shop_g"
+    properties:
+      -
+        kind: "cn.Shop"
+      -
+        target: "er.entity.store"

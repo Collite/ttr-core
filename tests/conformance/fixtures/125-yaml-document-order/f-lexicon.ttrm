@@ -1,0 +1,5 @@
+package demo.order
+import demo.order.*
+model lexicon locale cs
+
+def term Zeta { for: cn.kind.Zeta, forms: ["zeta", "příklad"] }

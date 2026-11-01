@@ -1,0 +1,30 @@
+ttr: "0.21"
+package: "hartland.web"
+defs:
+  -
+    kind: "entity"
+    id: "web_customer"
+    properties:
+      attributes:
+        -
+          id: "customer_id"
+          properties:
+            type: "int"
+            isKey: true
+      concept:
+        -
+          role: "WebCustomer"
+        -
+          event: "Order"
+  -
+    kind: "measure"
+    id: "discount"
+    properties:
+      domain: "md.Money"
+      aggregation: "sum"
+      concept:
+        -
+          quality: "discount_amount"
+        -
+          of:
+            ref: "Order"

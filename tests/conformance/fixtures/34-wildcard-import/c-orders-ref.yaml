@@ -1,0 +1,13 @@
+ttr: "0.21"
+package: "orders"
+imports:
+  - "sales.*"
+model: "er"
+schema: "entity"
+defs:
+  -
+    kind: "er2db_entity"
+    id: "orders_map"
+    properties:
+      entity: "Customer"
+      target: "db.dbo.CUSTOMER"

@@ -1,0 +1,206 @@
+ttr: "0.21"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "warehouse"
+    properties:
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "item"
+    properties:
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "text"
+            isKey: true
+  -
+    kind: "entity"
+    id: "ticket"
+    properties:
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "text"
+            isKey: true
+        -
+          id: "channel"
+          properties:
+            type: "text"
+            valueLabels:
+              store:
+                en: "Store"
+              web:
+                en: "Web"
+        -
+          id: "created"
+          properties:
+            type: "date"
+        -
+          id: "closed"
+          properties:
+            type: "date"
+            optional: true
+  -
+    kind: "entity"
+    id: "started"
+    properties:
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "text"
+            isKey: true
+        -
+          id: "subject"
+          properties:
+            type: "text"
+        -
+          id: "occurred"
+          properties:
+            type: "datetime"
+  -
+    kind: "entity"
+    id: "finished"
+    properties:
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "text"
+            isKey: true
+        -
+          id: "subject"
+          properties:
+            type: "text"
+        -
+          id: "occurred"
+          properties:
+            type: "datetime"
+  -
+    kind: "entity"
+    id: "outage"
+    properties:
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "text"
+            isKey: true
+        -
+          id: "warehouse"
+          properties:
+            type: "text"
+        -
+          id: "since"
+          properties:
+            type: "datetime"
+        -
+          id: "until"
+          properties:
+            type: "datetime"
+            optional: true
+        -
+          id: "reason"
+          properties:
+            type: "text"
+  -
+    kind: "entity"
+    id: "price"
+    properties:
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "text"
+            isKey: true
+        -
+          id: "item"
+          properties:
+            type: "text"
+        -
+          id: "channel"
+          properties:
+            type: "text"
+            valueLabels:
+              store:
+                en: "Store"
+              web:
+                en: "Web"
+        -
+          id: "since"
+          properties:
+            type: "date"
+        -
+          id: "until"
+          properties:
+            type: "date"
+            optional: true
+        -
+          id: "amount"
+          properties:
+            type: "decimal"
+  -
+    kind: "relation"
+    id: "started_ticket"
+    properties:
+      from:
+        ref: "er.entity.started"
+      to:
+        ref: "er.entity.ticket"
+      join:
+        -
+          from:
+            ref: "er.entity.started.subject"
+          to:
+            ref: "er.entity.ticket.id"
+  -
+    kind: "relation"
+    id: "finished_ticket"
+    properties:
+      from:
+        ref: "er.entity.finished"
+      to:
+        ref: "er.entity.ticket"
+      join:
+        -
+          from:
+            ref: "er.entity.finished.subject"
+          to:
+            ref: "er.entity.ticket.id"
+  -
+    kind: "relation"
+    id: "outage_warehouse"
+    properties:
+      from:
+        ref: "er.entity.outage"
+      to:
+        ref: "er.entity.warehouse"
+      join:
+        -
+          from:
+            ref: "er.entity.outage.warehouse"
+          to:
+            ref: "er.entity.warehouse.id"
+  -
+    kind: "relation"
+    id: "price_item"
+    properties:
+      from:
+        ref: "er.entity.price"
+      to:
+        ref: "er.entity.item"
+      join:
+        -
+          from:
+            ref: "er.entity.price.item"
+          to:
+            ref: "er.entity.item.id"

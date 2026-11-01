@@ -1,0 +1,39 @@
+ttr: "0.21"
+package: "hartland.stores"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "item"
+    properties:
+      attributes:
+        -
+          id: "sku"
+          properties:
+            type: "text"
+            isKey: true
+        -
+          id: "weight"
+          properties:
+            type: "decimal"
+        -
+          id: "color"
+          properties:
+            type: "text"
+        -
+          id: "size_code"
+          properties:
+            type: "text"
+            concept:
+              -
+                quality: "size_code"
+        -
+          id: "pack_size"
+          properties:
+            type: "int"
+            concept:
+              -
+                quality: "pack_size"
+              -
+                of:
+                  ref: "Item"

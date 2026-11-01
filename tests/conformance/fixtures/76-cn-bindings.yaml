@@ -1,0 +1,169 @@
+ttr: "0.21"
+package: "hartland.concepts"
+model: "binding"
+defs:
+  -
+    kind: "cn2md_kind"
+    id: "item_g"
+    properties:
+      -
+        kind: "cn.Item"
+      -
+        target: "md.Product"
+  -
+    kind: "cn2md_role"
+    id: "customer_g"
+    properties:
+      -
+        role: "cn.Customer"
+      -
+        target: "md.Customer"
+  -
+    kind: "cn2md_quality"
+    id: "revenue_g"
+    properties:
+      -
+        quality: "cn.revenue"
+      -
+        target: "md.revenue"
+  -
+    kind: "cn2md_quality"
+    id: "brand_g"
+    properties:
+      -
+        quality: "cn.brand"
+      -
+        target: "md.Product.brand"
+      -
+        description: "an attribute, not a measure"
+  -
+    kind: "cn2md_event"
+    id: "return_g"
+    properties:
+      -
+        event: "cn.Return"
+      -
+        target: "md.storeReturns"
+  -
+    kind: "cn2er_kind"
+    id: "category_g"
+    properties:
+      -
+        kind: "cn.ProductCategory"
+      -
+        target: "er.entity.category_code"
+      -
+        hierarchy:
+          ancestor:
+            ref: "ancestor_code"
+          closure:
+            ref: "er.entity.category_closure"
+          descendant:
+            ref: "descendant_code"
+          ranges:
+            ref: "lexical"
+  -
+    kind: "cn2er_kind"
+    id: "channel_g"
+    properties:
+      -
+        kind: "cn.Channel"
+      -
+        target: "er.entity.channel_sales.channel"
+  -
+    kind: "cn2er_role"
+    id: "buyer_g"
+    properties:
+      -
+        role: "cn.Customer"
+      -
+        target: "er.entity.customer"
+  -
+    kind: "cn2er_role"
+    id: "orderer_g"
+    properties:
+      -
+        role: "cn.Orderer"
+      -
+        target: "er.entity.party"
+      -
+        via:
+          -
+            ref: "er.relation.rel_order_customer"
+  -
+    kind: "cn2er_event"
+    id: "transfer_g"
+    properties:
+      -
+        event: "cn.StockTransfer"
+      -
+        target: "er.entity.stock_transfer"
+      -
+        participants:
+          from:
+            -
+              ref: "er.relation.rel_transfer_from"
+          item:
+            -
+              ref: "er.relation.rel_transfer_item"
+          to:
+            -
+              ref: "er.relation.rel_transfer_to"
+            -
+              ref: "er.relation.rel_warehouse_region"
+      -
+        period:
+          at:
+            ref: "er.entity.stock_transfer.shipped_at"
+  -
+    kind: "cn2er_event"
+    id: "order_g"
+    properties:
+      -
+        event: "cn.Order"
+      -
+        target: "er.entity.order"
+      -
+        period:
+          end:
+            ref: "er.entity.order.delivered_date"
+          start:
+            ref: "er.entity.order.placed_date"
+  -
+    kind: "cn2er_quality"
+    id: "state_g"
+    properties:
+      -
+        quality: "cn.state"
+      -
+        target: "er.entity.order.state"
+  -
+    kind: "cn2er_quality"
+    id: "stock_g"
+    properties:
+      -
+        quality: "cn.stock_level"
+      -
+        target: "er.entity.inventory.quantity_on_hand"
+      -
+        filter:
+          block: "warehouse = 1"
+  -
+    kind: "cn2er_phase"
+    id: "placed_g"
+    properties:
+      -
+        phase: "cn.PlacedOrder"
+      -
+        target: "er.entity.placed_order"
+  -
+    kind: "cn2db_concept"
+    id: "legacy_g"
+    properties:
+      -
+        concept: "cn.LegacyStock"
+      -
+        target: "db.dbo.legacy_stock"
+      -
+        tags:
+          - "legacy"

@@ -1,0 +1,16 @@
+ttr: "0.21"
+package: "demo.order"
+model: "md"
+defs:
+  -
+    kind: "domain"
+    id: "Ordered"
+    properties:
+      type: "text"
+      restrict:
+        members:
+          z:
+            en: "Z"
+          a:
+            en: "A"
+        pattern: "^x"

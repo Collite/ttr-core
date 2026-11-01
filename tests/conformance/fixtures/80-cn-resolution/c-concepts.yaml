@@ -1,0 +1,168 @@
+ttr: "0.21"
+package: "hartland.web"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Party"
+    properties:
+      -
+        label:
+          en: "Party"
+  -
+    kind: "kind"
+    id: "Warehouse"
+    properties:
+      -
+        label:
+          en: "Distribution center"
+      -
+        qualities:
+          -
+            ref: "warehouse_name"
+  -
+    kind: "kind"
+    id: "Item"
+    properties:
+      -
+        label:
+          en: "Product"
+      -
+        qualities:
+          -
+            ref: "brand"
+          -
+            ref: "category"
+  -
+    kind: "kind"
+    id: "ProductCategory"
+    properties:
+      -
+        grounds: "er.entity.category_code"
+      -
+        hierarchy:
+          ancestor:
+            ref: "ancestor_code"
+          closure:
+            ref: "er.entity.category_closure"
+          descendant:
+            ref: "descendant_code"
+  -
+    kind: "kind"
+    id: "Supplier"
+    properties:
+      -
+        is_a:
+          ref: "Party"
+      -
+        relations:
+          -
+            to:
+              ref: "Warehouse"
+            type:
+              ref: "supplies"
+  -
+    kind: "role"
+    id: "Customer"
+    properties:
+      -
+        of:
+          ref: "Party"
+      -
+        event: "Order"
+      -
+        grounds: "md.Customer"
+  -
+    kind: "event"
+    id: "Order"
+    properties:
+      -
+        extent: "durative"
+      -
+        involves:
+          -
+            ref: "Customer"
+          -
+            as: "fulfilling"
+            ref: "Warehouse"
+      -
+        period:
+          end:
+            ref: "delivered_date"
+          end_open:
+            ref: "open"
+          start:
+            ref: "placed_date"
+      -
+        qualities:
+          -
+            ref: "state"
+          -
+            ref: "placed_date"
+          -
+            ref: "delivered_date"
+          -
+            ref: "order_value"
+  -
+    kind: "quality"
+    id: "state"
+    properties:
+      -
+        of:
+          ref: "Order"
+  -
+    kind: "quality"
+    id: "placed_date"
+    properties:
+      -
+        of:
+          ref: "Order"
+  -
+    kind: "quality"
+    id: "delivered_date"
+    properties:
+      -
+        of:
+          ref: "Order"
+  -
+    kind: "quality"
+    id: "brand"
+    properties:
+      -
+        of:
+          ref: "Item"
+  -
+    kind: "quality"
+    id: "category"
+    properties:
+      -
+        of:
+          ref: "Item"
+      -
+        value_space: "ProductCategory"
+  -
+    kind: "quality"
+    id: "revenue"
+    properties:
+      -
+        of:
+          ref: "Order"
+      -
+        grounds: "md.revenue"
+  -
+    kind: "phase"
+    id: "PendingOrder"
+    properties:
+      -
+        of:
+          ref: "Order"
+      -
+        definition:
+          block: "state in ('placed', 'held')"
+  -
+    kind: "relation_type"
+    id: "supplies"
+    properties:
+      -
+        label:
+          en: "supplies"

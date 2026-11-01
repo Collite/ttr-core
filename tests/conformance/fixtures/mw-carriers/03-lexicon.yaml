@@ -1,0 +1,30 @@
+ttr: "0.21"
+package: "demo.carriers"
+model: "lexicon"
+locale: "en"
+defs:
+  -
+    kind: "term"
+    id: "customers"
+    properties:
+      for: "er.entity.Customer"
+      forms:
+        - "customer"
+      indexSecurity: "applied"
+  -
+    kind: "pattern"
+    id: "paired"
+    properties:
+      description: "The main pair"
+      for: "db.demo.lookup"
+      match: "name (.*)"
+      text: "Name Alice?"
+      indexSecurity: "none"
+  -
+    kind: "pattern"
+    id: "alternate"
+    properties:
+      description: "The alternate pair"
+      for: "db.demo.lookup"
+      match: "lookup (.*)"
+      text: "Lookup Bob?"

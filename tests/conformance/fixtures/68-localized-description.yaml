@@ -1,0 +1,38 @@
+ttr: "0.21"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Product"
+    properties:
+      description:
+        cs: "Produkt"
+        en: "A product"
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "int"
+            isKey: true
+        -
+          id: "name"
+          properties:
+            description:
+              cs: "Název"
+            type: "text"
+        -
+          id: "code"
+          properties:
+            description: "stays a plain string"
+            type: "text"
+  -
+    kind: "entity"
+    id: "Plain"
+    properties:
+      description: "an old-style description"
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "int"
+            isKey: true
