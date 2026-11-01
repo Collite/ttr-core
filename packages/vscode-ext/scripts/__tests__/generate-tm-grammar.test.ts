@@ -123,13 +123,16 @@ describe('TextMate grammar generator', () => {
     'MANAGEMENT', 'CHANGE_SEMANTICS', 'WRITEBACK',        // db table management (0.10, EN-P1)
     'SECURITY', 'OWN', 'CLASSIFY', 'GRANT', 'MASK', 'ON', // security block (0.11, PL-P4)
   ]);
+  // Words a pattern of their own scopes, never the global keyword list: `variant` is a def kind only
+  // after `def` (the #def-kind rule) and a column / attribute name elsewhere (review-200 R1).
+  const SCOPED_BY_A_RULE = new Set(['VARIANT']);
 
   it('every keyword token has a scope (or is a known pre-guard gap)', () => {
     const unscoped = tokens
       .filter(t => /^[A-Za-z_][A-Za-z0-9_]*$/.test(t.literal))
       .filter(t => tokenToScope(t.name, t.literal) === null)
       .map(t => t.name)
-      .filter(name => !UNSCOPED_BEFORE_THE_GUARD.has(name));
+      .filter(name => !UNSCOPED_BEFORE_THE_GUARD.has(name) && !SCOPED_BY_A_RULE.has(name));
     expect(unscoped).toEqual([]);
   });
 

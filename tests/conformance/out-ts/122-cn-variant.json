@@ -198,6 +198,13 @@
             "name": "Kit",
             "properties": {
                 "grounds": "er.entity.kit",
+                "subkind": {
+                    "kind": "id",
+                    "parts": [
+                        "kitted"
+                    ],
+                    "path": "kitted"
+                },
                 "variant": {
                     "kind": "id",
                     "parts": [

@@ -4,6 +4,7 @@ import {
   SymbolKind,
   Range,
 } from 'vscode-languageserver';
+import { conceptKeyword } from '@tatrman/parser';
 import type { Document, Definition, GraphBlock } from '@tatrman/parser';
 
 export function buildDocumentSymbols(doc: Document, lines: string[] = []): DocumentSymbol[] {
@@ -143,7 +144,7 @@ function buildNestedDefSymbol(def: Definition, subKind: SymbolKind, lines: strin
 
 /** The def keyword as written — a concept def and a cn binding carry theirs beside a shared `kind` (0.17). */
 function defKeyword(def: Definition): string {
-  if (def.kind === 'concept') return def.spelling ?? def.stereotype;
+  if (def.kind === 'concept') return conceptKeyword(def);
   if (def.kind === 'conceptBinding') return def.bindingKind;
   return def.kind;
 }

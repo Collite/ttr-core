@@ -11,5 +11,5 @@ def subkind StoredSale { of: Sale, grounds: er.entity.stored_sale }
 def kind Product { grounds: er.entity.product, qualities: [variant] }
 def quality variant { of: Product, grounds: er.entity.product.variant }
 def variant Bundle { of: Product, definition: """variant = 'bundle'""" }
-def kind Kit { grounds: er.entity.kit, variant: boxed } // a free-form key, as 0.21's soft keywords stay one (mw-cn-soft-keys)
+def kind Kit { grounds: er.entity.kit, variant: boxed, subkind: kitted } // free-form keys, as 0.21's soft keywords stay (mw-cn-soft-keys); subkind since 0.21.2
 def variant MissingBearer { definition: """channel = 'web'""" } // S8.2: ttr/required-property-missing, as for a subkind.

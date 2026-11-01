@@ -40,6 +40,16 @@ describe('variant = subkind (S8.6)', () => {
     expect(withoutSpelling(dump(a))).toBe(JSON.stringify(JSON.parse(dump(b))));
   });
 
+  // review-200 R2: both words are cn free-form keys (`subkind` joined `cnKey` at 0.21.2).
+  it('reads `variant:` and `subkind:` as free-form keys', () => {
+    const parsed = parseString(variant, '122.ttrm');
+    expect(parsed.errors).toEqual([]);
+    const defs = JSON.parse(dump(parsed)).definitions as (Def & { properties: Record<string, { path?: string }> })[];
+    const kit = defs.find((d) => d.name === 'Kit');
+    expect(kit?.properties.variant?.path).toBe('boxed');
+    expect(kit?.properties.subkind?.path).toBe('kitted');
+  });
+
   it('reads the same semantics in either word', async () => {
     const stock = await loadStockVocabularies(['cnc-roles']);
     const sem = (src: string) => renderSem(dumpSem(parseString(src, '122.ttrm').ast, '122.ttrm', stock));

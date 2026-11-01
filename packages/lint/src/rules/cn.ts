@@ -101,7 +101,7 @@ export const CN_RULES: Rule[] = [
     'concept-bearer-missing',
     DiagnosticCode.RequiredPropertyMissing,
     'error',
-    'A quality or a phase names no bearer: `of:` is required on both (cn contracts §1.1).',
+    'A quality, a phase or a variant names no bearer: `of:` is required on all three (cn contracts §1.1).',
   ),
   cnRule(
     'cn-phase-double-definition',

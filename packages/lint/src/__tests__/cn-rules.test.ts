@@ -131,6 +131,17 @@ describe('CN-P2 S2.3 — the cn slugs fire on their fixture, and only at the sit
     expect(msgs).toContain("quality 'twin_gap' projects 'Twin', which has two participants 'Item' can be — 'left', 'right'");
     expect(msgs).toContain("phase 'Reopening' from bound 'Reopened' has two participants 'Ticket' can be — 'ticket', 'parent'");
   });
+
+  // review-200 R4: the one message S8.6 changed below the parser; CnSemanticsSpec and test_cn_semantics pin the same text.
+  it('the subkind-as-kind hint says `def variant` (review-200)', () => {
+    const project = buildProject(load('123-cn-variant-rules'));
+    const all: LintDiagnostic[] = [];
+    for (const [uri, ast] of project.documents) all.push(...lintDocument(uri, ast, project.deps, CN_ON));
+    for (const diags of lintProject(project.documents, project.graph, project.deps, CN_ON).values()) all.push(...diags);
+    expect(all.filter((d) => d.code === 'cn/subkind-as-kind').map((d) => d.message)).toEqual([
+      "kind 'LegacyWeb' with members and is_a is a subkind — use 'def variant'",
+    ]);
+  });
 });
 
 describe('CN-P2 S2.3 — the cn rules in the registry and the presets', () => {
