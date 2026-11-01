@@ -3609,5 +3609,60 @@
         }
       ]
     }
+  },
+  {
+    "group": "variant alias",
+    "name": "variant and subkind with soft keyword name and key",
+    "schema": "model-yaml",
+    "valid": true,
+    "value": {
+      "ttr": "0.21",
+      "model": "cn",
+      "defs": [
+        {
+          "kind": "variant",
+          "id": "WebSale",
+          "properties": {
+            "of": {
+              "ref": "Sale"
+            },
+            "variant": {
+              "ref": "boxed"
+            }
+          }
+        },
+        {
+          "kind": "subkind",
+          "id": "variant",
+          "properties": {
+            "of": {
+              "ref": "Sale"
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "variant alias",
+    "name": "variant profile target and path",
+    "schema": "profile",
+    "valid": true,
+    "value": {
+      "profile": "demo/1",
+      "grammar": "0.21",
+      "operations": [
+        {
+          "op": "rename",
+          "at": "/sale",
+          "to": {
+            "kind": "variant",
+            "path": [
+              "of"
+            ]
+          }
+        }
+      ]
+    }
   }
 ]

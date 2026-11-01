@@ -18,6 +18,7 @@ import java.util.TreeMap
  * derived stably from island names), the heavier H-6 burden of a code-defined target discharged by construction.
  */
 class Airflow3EmitPlugin : TtrEmitPlugin {
+    override val spiRevision = TtrEmitPlugin.SPI_REVISION
     override val targetId: String = "airflow3"
 
     override val spiVersion: Int = TtrEmitPlugin.SPI_VERSION

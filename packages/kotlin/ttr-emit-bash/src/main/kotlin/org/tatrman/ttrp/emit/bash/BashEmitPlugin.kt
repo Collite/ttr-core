@@ -23,6 +23,7 @@ import java.util.TreeMap
  * islands/transfers read their own creds from env inside the script (F-c-ii α).
  */
 class BashEmitPlugin : TtrEmitPlugin {
+    override val spiRevision = TtrEmitPlugin.SPI_REVISION
     override val targetId: String = "bash"
 
     override val spiVersion: Int = TtrEmitPlugin.SPI_VERSION

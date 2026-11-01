@@ -19,6 +19,8 @@ tasks.test {
 
 dependencies {
     implementation(project(":packages:kotlin:ttrp-emit-spi"))
+    implementation(libs.kotlinx.ser.json)
+    testImplementation(project(":packages:kotlin:ttrp-conform"))
     testImplementation(libs.bundles.kotest)
 }
 

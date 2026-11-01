@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Local strict schema for the emitted C7 extension subset; not an upstream Camunda schema. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:c="http://camunda.org/schema/1.0/bpmn" targetNamespace="http://camunda.org/schema/1.0/bpmn" elementFormDefault="qualified">
+  <xs:element name="connector"><xs:complexType><xs:sequence><xs:element ref="c:connectorId"/><xs:element ref="c:inputOutput"/></xs:sequence></xs:complexType></xs:element>
+  <xs:element name="connectorId" type="xs:string"/>
+  <xs:element name="inputOutput"><xs:complexType><xs:sequence><xs:element ref="c:inputParameter" minOccurs="0" maxOccurs="unbounded"/><xs:element ref="c:outputParameter" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType></xs:element>
+  <xs:complexType name="parameter" mixed="true"><xs:choice minOccurs="0"><xs:element ref="c:map"/><xs:element ref="c:script"/></xs:choice><xs:attribute name="name" type="xs:string" use="required"/></xs:complexType>
+  <xs:element name="inputParameter" type="c:parameter"/><xs:element name="outputParameter" type="c:parameter"/>
+  <xs:element name="map"><xs:complexType><xs:sequence><xs:element ref="c:entry" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType></xs:element>
+  <xs:element name="entry"><xs:complexType mixed="true"><xs:attribute name="key" type="xs:string" use="required"/></xs:complexType></xs:element>
+  <xs:element name="failedJobRetryTimeCycle" type="xs:string"/>
+  <xs:element name="executionListener"><xs:complexType><xs:sequence><xs:element ref="c:script"/></xs:sequence><xs:attribute name="event" type="xs:string" use="required"/></xs:complexType></xs:element>
+  <xs:element name="script"><xs:complexType mixed="true"><xs:attribute name="scriptFormat" type="xs:string" use="required"/></xs:complexType></xs:element>
+  <xs:attribute name="asyncBefore" type="xs:boolean"/><xs:attribute name="type" type="xs:string"/><xs:attribute name="topic" type="xs:string"/>
+  <xs:attribute name="collection" type="xs:string"/><xs:attribute name="elementVariable" type="xs:string"/>
+</xs:schema>

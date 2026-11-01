@@ -13,6 +13,7 @@ import java.util.TreeMap
 class RecordingFakePlugin(
     override val targetId: String = "fake",
 ) : TtrEmitPlugin {
+    override val spiRevision = TtrEmitPlugin.SPI_REVISION
     override val spiVersion: Int = TtrEmitPlugin.SPI_VERSION
 
     /** The last request handed to [emit] — for host-side assertions on what the core passed. */

@@ -12,6 +12,8 @@ data class RecipeGraph(
     val actions: Map<String, ActionMeta>,
     val process: ProcessMeta?,
     val runApi: RunApiMeta,
+    /** Verified bundle waves: each island occurs once, in execution order. No executable payload crosses the SPI. */
+    val islandWaves: List<List<String>> = emptyList(),
 )
 
 data class RecipeMeta(
@@ -105,6 +107,8 @@ data class StepMeta(
     val obligations: List<String>,
     val time: String?,
     val until: List<String>,
+    /** Resolved step projection; required on process export, with process == null and the parent deployment. */
+    val graph: RecipeGraph? = null,
 )
 
 data class RunApiMeta(

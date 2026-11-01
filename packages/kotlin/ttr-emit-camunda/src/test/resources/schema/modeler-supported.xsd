@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Local supported Modeler metadata attributes, not an official Camunda XSD. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://camunda.org/schema/modeler/1.0">
+  <xs:attribute name="executionPlatform"><xs:simpleType><xs:restriction base="xs:string"><xs:enumeration value="Camunda Platform"/><xs:enumeration value="Camunda Cloud"/></xs:restriction></xs:simpleType></xs:attribute>
+  <xs:attribute name="executionPlatformVersion" type="xs:string"/>
+</xs:schema>

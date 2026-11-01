@@ -277,6 +277,10 @@ class ConformCommand : CliktCommand(name = "conform") {
     private val server by option("--server")
     private val tokenEnv by option("--token-env")
     private val world by option("--world")
+    private val replayExports by option(
+        "--export",
+        help = "rendered export directory for n8n dry replay; repeat per recipe/mode",
+    ).multiple()
     private val reportOut by option("--out", help = "replay JSON report")
     private val tolerance by option("--tolerance", help = "per-column float64 tolerance, <col>=<eps>").multiple()
     private val engines by option(
@@ -307,6 +311,7 @@ class ConformCommand : CliktCommand(name = "conform") {
                     tokenEnv,
                     world,
                     reportOut,
+                    exports = replayExports,
                 ) { echo(it) },
             )
         }
