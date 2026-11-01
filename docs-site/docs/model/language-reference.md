@@ -31,7 +31,7 @@ allow Latin-1/Extended letters, so real Czech names are valid verbatim.
 | `db` | `table`, `column` (inline), `view`, `index`, `constraint`, `fk`, `procedure` |
 | `er` | `entity`, `attribute` (inline), `relation` |
 | `binding` | `er2db_entity`, `er2db_attribute`, `er2db_relation` |
-| `cn` | `kind`, `role`, `event`, `quality`, `phase`, `relation_type`; grounded by `cn2md_*` / `cn2er_*` in `binding` |
+| `cn` | `kind`, `subkind`, `role`, `event`, `quality`, `phase`, `relation_type`; grounded by `cn2md_*` / `cn2er_*` in `binding` |
 | `cnc` _(deprecated)_ | `role`, `er2cnc_role` |
 | `md` | `domain`, `dimension`, `hierarchy`, `measure`, `cubelet`, `map`, `md2db_*`, `md2er_*` |
 | structure | `package`, `import`, `area` (`packages:` / `entities:`), `graph`, `drill_map`, `query`, `world` |

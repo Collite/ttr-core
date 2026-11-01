@@ -28,7 +28,7 @@ thing you measure and an md dimension *is* what you measure by.
 | `fact` | **derived**: the entity a cubelet lands on, or an entity with measures and two many-to-one outgoing relations | landed (grammar 0.18.2) |
 | `dimension` | **derived**: the entity a dimension lands on, or the one side of a relation from a fact | landed (grammar 0.18.2) |
 | `bridge` | **derived**: the target of a many-to-many map; it is kept out of grain coarsening | landed (grammar 0.18.2) |
-| `master` · `transaction` · `structural` | an entity kind in `semantics { kind: … }` | **planned** — not in grammar 0.18, whose `semantics { kind: }` takes `period_table`, `calendar`, `poi` and `fx_rate` |
+| `master` · `transaction` · `structural` | an entity kind in `semantics { kind: … }` | **planned** — not in grammar 0.21, whose `semantics { kind: }` still takes only `period_table`, `calendar`, `poi` and `fx_rate` |
 
 The derived roles come from the same md → er mappings that [the hop](15-md-model.md#the-md--er-hop-what-you-pin-what-is-derived)
 reads. An entity no rule classifies stays unclassified rather than guessed. What a business means by a thing — a
