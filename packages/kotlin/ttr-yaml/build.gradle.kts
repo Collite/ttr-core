@@ -9,12 +9,14 @@ kotlin { jvmToolchain(21) }
 dependencies {
     api(project(":packages:kotlin:ttr-parser"))
     api(libs.kotlinx.ser.json)
-    implementation(project(":packages:kotlin:ttr-writer"))
+    implementation(libs.kotlin.reflect)
     implementation(libs.snakeyaml.engine)
     implementation(libs.json.schema.validator)
     testImplementation(libs.bundles.kotest)
+    testImplementation(testFixtures(project(":packages:kotlin:ttr-parser")))
 }
 tasks.test {
     useJUnitPlatform()
     inputs.dir("../../../tests/conformance/fixtures")
+    inputs.file("../../grammar/tests/canonical-schema-vectors.json")
 }

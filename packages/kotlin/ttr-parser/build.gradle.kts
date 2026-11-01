@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ktlint)
     `java-library`
+    `java-test-fixtures`
     `maven-publish`
     alias(libs.plugins.maven.publish.vanniktech)
     antlr
@@ -92,6 +93,7 @@ configurations.api {
 }
 
 dependencies {
+    testFixturesImplementation(libs.kotlinx.ser.json)
     antlr(libs.antlr.tool)
     api(libs.antlr.runtime)
     implementation(libs.slf4j.api)
